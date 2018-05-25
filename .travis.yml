@@ -138,12 +138,18 @@ script:
       export LD_LIBRARY_PATH=${TRAVIS_BUILD_DIR}/Vulkan-Loader/build/loader:$LD_LIBRARY_PATH
       export VK_LAYER_PATH=${TRAVIS_BUILD_DIR}/external/VulkanTools/build/layersvt:${TRAVIS_BUILD_DIR}/build/layers
       export VK_ICD_FILENAMES=${TRAVIS_BUILD_DIR}/Vulkan-Tools/build/icd/VkICD_mock_icd.json
-      build/tests/vk_layer_validation_tests
-      for profile in tests/device_profiles/*.json
-      do
-        echo Testing with profile $profile
-        VK_DEVSIM_FILENAME=$profile build/tests/vk_layer_validation_tests --devsim
-      done
+      set +e
+      {
+        echo Testing with profile native
+        build/tests/vk_layer_validation_tests --gtest_color=yes
+        for profile in tests/device_profiles/*.json
+        do
+          echo Testing with profile $profile
+          VK_DEVSIM_FILENAME=$profile build/tests/vk_layer_validation_tests --devsim --gtest_color=yes
+        done
+      } > test.out
+      set -e
+      cat test.out | python3 ./scripts/parse_test_results.py --fail_on_skip --fail_on_unexpected
       cd ${TRAVIS_BUILD_DIR}
     fi
   - |

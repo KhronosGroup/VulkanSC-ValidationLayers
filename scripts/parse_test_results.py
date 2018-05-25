@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 #
 # Copyright (c) 2018 Google Inc.
 #
@@ -35,10 +35,18 @@
 #       a test printed unexpected errors
 #
 
+from enum import Enum
 import argparse
 import re
 import sys
 from collections import defaultdict
+
+class Result(Enum):
+  UNKNOWN = -1
+  PASSED = 0
+  SKIPPED = 1
+  UNEXPECTED = 2
+  FAILED = 3
 
 class OutputStats(object):
     def __init__(self):
@@ -46,7 +54,6 @@ class OutputStats(object):
         self.current_test = ""
         self.current_test_output = ""
         self.test_results = defaultdict(defaultdict)
-        self.unexpected_errors = defaultdict(defaultdict)
 
     def match(self, line):
         self.new_profile_match(line)
@@ -63,54 +70,47 @@ class OutputStats(object):
         if self.current_test != "":
             self.test_died()
 
-        passed_tests = 0
-        skipped_tests = 0
-        failed_tests = 0
-        unexpected_error_tests = 0
-        did_fail = False
+        test_count = defaultdict(int)
+        outcome = Result.PASSED
 
         for test_name, results in self.test_results.items():
-            skipped_profiles = 0
-            passed_profiles = 0
-            failed_profiles = 0
-            aborted_profiles = 0
-            unexpected_error_profiles = 0
+            profile_count = defaultdict(int)
             for profile, result in results.items():
-                if result == "pass":
-                    passed_profiles += 1
-                if result == "fail":
-                    failed_profiles += 1
-                if result == "skip":
-                    skipped_profiles += 1
-                if self.unexpected_errors.get(test_name, {}).get(profile, "") == "true":
-                    unexpected_error_profiles += 1
-            if failed_profiles != 0:
+                profile_count[result] += 1
+
+            if profile_count[Result.FAILED] != 0:
                 print("TEST FAILED:", test_name)
-                failed_tests += 1
-            elif skipped_profiles == len(results):
+                test_count[Result.FAILED] += 1
+            elif profile_count[Result.SKIPPED] == len(results):
                 print("TEST SKIPPED ALL DEVICES:", test_name)
-                skipped_tests += 1
-            else:
-                passed_tests += 1
-            if unexpected_error_profiles != 0:
+                test_count[Result.SKIPPED] += 1
+            elif profile_count[Result.UNEXPECTED] != 0:
                 print("UNEXPECTED ERRORS:", test_name)
-                unexpected_error_tests += 1
+                test_count[Result.UNEXPECTED] += 1
+            else:
+                test_count[Result.PASSED] += 1
+
         num_tests = len(self.test_results)
-        print("PASSED: ", passed_tests, "/", num_tests, " tests")
-        if skipped_tests != 0:
-            did_fail |= skip_is_failure
-            print("NEVER RAN: ", skipped_tests, "/", num_tests, " tests")
-        if failed_tests != 0:
-            did_fail = True
-            print("FAILED: ", failed_tests, "/", num_tests, "tests")
-        if unexpected_error_tests != 0:
-            did_fail |= unexpected_is_failure
-            print("UNEXPECTED OUPUT: ", unexpected_error_tests, "/", num_tests, "tests")
-        return did_fail
+        print("PASSED: ", test_count[Result.PASSED], "/", num_tests, " tests")
+        if test_count[Result.UNEXPECTED] != 0:
+            if unexpected_is_failure:
+                outcome = Result.UNEXPECTED
+            print("UNEXPECTED OUPUT: ", test_count[Result.UNEXPECTED], "/", num_tests, "tests")
+
+        if test_count[Result.SKIPPED] != 0:
+            if skip_is_failure:
+                outcome = Result.SKIPPED
+            print("NEVER RAN: ", test_count[Result.SKIPPED], "/", num_tests, " tests")
+
+        if test_count[Result.FAILED] != 0:
+            outcome = Result.FAILED
+            print("FAILED: ", test_count[Result.FAILED], "/", num_tests, "tests")
+        return outcome
 
     def new_profile_match(self, line):
-        if re.search(r'Testing with profile .*/(.*)', line) != None:
-            self.current_profile = re.search(r'Testing with profile .*/(.*)', line).group(1)
+        new_profile_match = re.search(r'Testing with profile .*/(.*)', line)
+        if new_profile_match != None:
+            self.current_profile = new_profile_match.group(1)
 
     def test_suite_end_match(self, line):
         if re.search(r'\[-*\]', line) != None:
@@ -127,30 +127,40 @@ class OutputStats(object):
             self.current_test = re.search(r'] (.*)', line).group(1)
             self.current_test_output = ""
 
+    def current_result(self):
+        return self.test_results.get(self.current_test, {}).get(self.current_profile, Result.UNKNOWN)
+
+    def set_current_result(self, result):
+        self.test_results[self.current_test][self.current_profile] = result
+
     def skip_test_match(self, line):
         if re.search(r'TEST SKIPPED', line) != None:
-            self.test_results[self.current_test][self.current_profile] = "skip"
+            self.set_current_result(Result.SKIPPED);
 
     def pass_test_match(self, line):
         if re.search(r'\[\s*OK \]', line) != None:
-            # If gtest says the test passed, check if it was skipped before marking it passed
-            if self.test_results.get(self.current_test, {}).get(self.current_profile, "") != "skip":
-                    self.test_results[self.current_test][self.current_profile] = "pass"
+            # If gtest says the test passed, check if it was skipped or printed
+            # unexpected output before marking it as passed.
+            if self.current_result() != Result.SKIPPED and self.current_result() != Result.UNEXPECTED:
+                self.set_current_result(Result.PASSED)
+            elif self.current_result() == Result.UNEXPECTED:
+                print(self.current_test_output)
             self.current_test = ""
 
     def fail_test_match(self, line):
+        # The [ FAILED ] line gets printed both right when a test fails and in a summary at the end
+        # of all tests. We want to just catch the first case here.
         if re.search(r'\[\s*FAILED\s*\]', line) != None and self.current_test != "":
-            self.test_results[self.current_test][self.current_profile] = "fail"
+            self.set_current_result(Result.FAILED)
+            print(self.current_test_output)
             self.current_test = ""
 
     def unexpected_error_match(self, line):
         if re.search(r'^Unexpected: ', line) != None:
-            self.unexpected_errors[self.current_test][self.current_profile] = "true"
+            self.set_current_result(Result.UNEXPECTED)
 
     def test_died(self):
         print("A test likely crashed. Testing is being aborted.")
-        print("Final test output: ")
-        print(self.current_test_output)
         sys.exit(1)
 
 def main():
@@ -164,9 +174,15 @@ def main():
     stats = OutputStats()
     for line in sys.stdin:
         stats.match(line)
-    failed = stats.print_summary(args.fail_on_skip, args.fail_on_unexpected)
-    if failed == True:
-        print("\nFAILED CI")
+    outcome = stats.print_summary(args.fail_on_skip, args.fail_on_unexpected)
+    if outcome != Result.PASSED:
+        print("")
+        if outcome == Result.SKIPPED:
+            print("Failed CI because one or more tests skipped on every device profile.\n")
+        elif outcome == Result.UNEXPECTED:
+            print("Failed CI because one or more tests caused unexpected errors in validation.\n")
+        elif outcome == Result.FAILED:
+            print("Failed CI because one or more tests failed.\n")
         sys.exit(1)
 
 if __name__ == '__main__':
