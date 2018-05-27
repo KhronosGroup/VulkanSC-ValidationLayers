@@ -21083,6 +21083,176 @@ TEST_F(VkLayerTest, CopyImageTypeExtentMismatch) {
     m_errorMonitor->VerifyFound();
     m_commandBuffer->end();
 }
+#if 0
+TEST_F(VkWsiEnabledLayerTest, InvalidImageLayoutSharedPresentableImage) {
+    // Test invalid image layouts when the shared_presentable_image extension is enabled
+
+    // Enable KHR_shared_presentation_image's required extensions
+    bool supports_prerequisites = InstanceExtensionSupported(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME) &&
+                                  InstanceExtensionSupported(VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME);
+    if (supports_prerequisites) {
+        m_instance_extension_names.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+        m_instance_extension_names.push_back(VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME);
+    } else {
+        printf("             %s prerequisite extensions cannot be enabled, testing core spec VUs instead.\n",
+               VK_KHR_SHARED_PRESENTABLE_IMAGE_EXTENSION_NAME);
+    }
+    ASSERT_NO_FATAL_FAILURE(InitFramework(myDbgFunc, m_errorMonitor));
+
+    bool supports_shared_presentable_image =
+        supports_prerequisites && DeviceExtensionSupported(gpu(), nullptr, VK_KHR_SHARED_PRESENTABLE_IMAGE_EXTENSION_NAME);
+    if (supports_shared_presentable_image) {
+        m_device_extension_names.push_back(VK_KHR_SHARED_PRESENTABLE_IMAGE_EXTENSION_NAME);
+    } else {
+        printf("             %s extension cannot be enabled, testing core spec VUs instead.\n",
+               VK_KHR_SHARED_PRESENTABLE_IMAGE_EXTENSION_NAME);
+    }
+    ASSERT_NO_FATAL_FAILURE(InitState());
+
+    const uint32_t img_dim = 128;
+    VkImageCreateInfo img_ci;
+    img_ci.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    img_ci.pNext = NULL;
+    img_ci.flags = 0;
+    img_ci.imageType = VK_IMAGE_TYPE_2D;
+    img_ci.format = VK_FORMAT_R8G8B8A8_UNORM;
+    img_ci.extent = {img_dim, img_dim, 1};
+    img_ci.mipLevels = 1;
+    img_ci.arrayLayers = 1;
+    img_ci.samples = VK_SAMPLE_COUNT_1_BIT;
+    img_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
+    img_ci.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    img_ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    img_ci.queueFamilyIndexCount = 0;
+    img_ci.pQueueFamilyIndices = NULL;
+    img_ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    VkImageObj imgA(m_device);
+    imgA.init(&img_ci);
+    ASSERT_TRUE(imgA.initialized());
+    VkImageObj imgB(m_device);
+    imgB.init(&img_ci);
+    ASSERT_TRUE(imgB.initialized());
+    // imgA_ms and imgB_ms are multisampled
+    img_ci.samples = VK_SAMPLE_COUNT_4_BIT;
+    VkImageObj imgA_ms(m_device);
+    imgA_ms.init(&img_ci);
+    ASSERT_TRUE(imgA_ms.initialized());
+    VkImageObj imgB_ms(m_device);
+    imgB_ms.init(&img_ci);
+    ASSERT_TRUE(imgB_ms.initialized());
+
+    vk_testing::Buffer buf;
+    VkMemoryPropertyFlags reqs = 0;
+    buf.init_as_src_and_dst(*m_device, img_ci.extent.width * img_ci.extent.height * sizeof(uint32_t), reqs);
+    ASSERT_TRUE(buf.initialized());
+
+    VkBufferImageCopy buf_img_copy;
+    buf_img_copy.bufferOffset = 0;
+    buf_img_copy.bufferRowLength = 0;
+    buf_img_copy.bufferImageHeight = 0;
+    buf_img_copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    buf_img_copy.imageSubresource.mipLevel = 0;
+    buf_img_copy.imageSubresource.baseArrayLayer = 0;
+    buf_img_copy.imageSubresource.layerCount = 1;
+    buf_img_copy.imageOffset = {0, 0, 0};
+    buf_img_copy.imageExtent = img_ci.extent;
+    VkImageCopy img_img_copy;
+    img_img_copy.srcSubresource = buf_img_copy.imageSubresource;
+    img_img_copy.srcOffset = buf_img_copy.imageOffset;
+    img_img_copy.dstSubresource = buf_img_copy.imageSubresource;
+    img_img_copy.dstOffset = buf_img_copy.imageOffset;
+    img_img_copy.extent = buf_img_copy.imageExtent;
+    VkImageBlit img_img_blit;
+    img_img_blit.srcSubresource = img_img_copy.srcSubresource;
+    img_img_blit.srcOffsets[0] = img_img_copy.srcOffset;
+    img_img_blit.srcOffsets[1] = {img_img_copy.srcOffset.x + (int32_t)img_img_copy.extent.width,
+                                  img_img_copy.srcOffset.y + (int32_t)img_img_copy.extent.height,
+                                  img_img_copy.srcOffset.z + (int32_t)img_img_copy.extent.depth};
+    img_img_blit.dstSubresource = img_img_copy.dstSubresource;
+    img_img_blit.dstOffsets[0] = img_img_blit.srcOffsets[0];
+    img_img_blit.dstOffsets[1] = img_img_blit.srcOffsets[1];
+    VkImageResolve img_img_resolve;
+    img_img_resolve.srcSubresource = buf_img_copy.imageSubresource;
+    img_img_resolve.srcOffset = buf_img_copy.imageOffset;
+    img_img_resolve.dstSubresource = buf_img_copy.imageSubresource;
+    img_img_resolve.dstOffset = buf_img_copy.imageOffset;
+    img_img_resolve.extent = buf_img_copy.imageExtent;
+
+    const VkImageLayout invalid_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    m_commandBuffer->begin();
+    imgA.SetLayout(m_commandBuffer, VK_IMAGE_ASPECT_COLOR_BIT, invalid_layout);
+    imgB.SetLayout(m_commandBuffer, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL);
+    imgA_ms.SetLayout(m_commandBuffer, VK_IMAGE_ASPECT_COLOR_BIT, invalid_layout);
+    imgB_ms.SetLayout(m_commandBuffer, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL);
+
+    // All images need to be shared-presentable here, which means they need to come from a
+    // shared-presentable swapchain.
+
+    // Test invalid layout in buffer-to-image destination
+    m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_ERROR_BIT_EXT, supports_shared_presentable_image
+                                                                            ? "VUID-vkCmdCopyBufferToImage-dstImageLayout-01396"
+                                                                            : "VUID-vkCmdCopyBufferToImage-dstImageLayout-00181");
+    vkCmdCopyBufferToImage(m_commandBuffer->handle(), buf.handle(), imgA.handle(), invalid_layout, 1, &buf_img_copy);
+    m_errorMonitor->VerifyFound();
+
+    // Test invalid layout in image-to-buffer source
+    m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_ERROR_BIT_EXT, supports_shared_presentable_image
+                                                                            ? "VUID-vkCmdCopyImageToBuffer-srcImageLayout-01397"
+                                                                            : "VUID-vkCmdCopyImageToBuffer-srcImageLayout-00190");
+    vkCmdCopyImageToBuffer(m_commandBuffer->handle(), imgA.handle(), invalid_layout, buf.handle(), 1, &buf_img_copy);
+    m_errorMonitor->VerifyFound();
+
+    // test invalid layout in image-to-image copy source
+    m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_ERROR_BIT_EXT, supports_shared_presentable_image
+                                                                            ? "VUID-vkCmdCopyImage-srcImageLayout-01917"
+                                                                            : "VUID-vkCmdCopyImage-srcImageLayout-00129");
+    vkCmdCopyImage(m_commandBuffer->handle(), imgA.handle(), invalid_layout, imgB.handle(), VK_IMAGE_LAYOUT_GENERAL, 1,
+                   &img_img_copy);
+    m_errorMonitor->VerifyFound();
+
+    // test invalid layout in image-to-image copy destination
+    m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_ERROR_BIT_EXT, supports_shared_presentable_image
+                                                                            ? "VUID-vkCmdCopyImage-dstImageLayout-01395"
+                                                                            : "VUID-vkCmdCopyImage-dstImageLayout-00134");
+    vkCmdCopyImage(m_commandBuffer->handle(), imgB.handle(), VK_IMAGE_LAYOUT_GENERAL, imgA.handle(), invalid_layout, 1,
+                   &img_img_copy);
+    m_errorMonitor->VerifyFound();
+
+    // test invalid layout in image-to-image blit source
+    m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_ERROR_BIT_EXT, supports_shared_presentable_image
+                                                                            ? "VUID-vkCmdBlitImage-srcImageLayout-01398"
+                                                                            : "VUID-vkCmdBlitImage-srcImageLayout-00222");
+    vkCmdBlitImage(m_commandBuffer->handle(), imgA.handle(), invalid_layout, imgB.handle(), VK_IMAGE_LAYOUT_GENERAL, 1,
+                   &img_img_blit, VK_FILTER_LINEAR);
+    m_errorMonitor->VerifyFound();
+
+    // test invalid layout in image-to-image blit destination
+    m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_ERROR_BIT_EXT, supports_shared_presentable_image
+                                                                            ? "VUID-vkCmdBlitImage-dstImageLayout-01399"
+                                                                            : "VUID-vkCmdBlitImage-dstImageLayout-00227");
+    vkCmdBlitImage(m_commandBuffer->handle(), imgB.handle(), VK_IMAGE_LAYOUT_GENERAL, imgA.handle(), invalid_layout, 1,
+                   &img_img_blit, VK_FILTER_LINEAR);
+    m_errorMonitor->VerifyFound();
+
+    // test invalid layout in image-to-image resolve source
+    m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_ERROR_BIT_EXT, supports_shared_presentable_image
+                                                                            ? "VUID-vkCmdResolveImage-srcImageLayout-01400"
+                                                                            : "VUID-vkCmdResolveImage-srcImageLayout-00261");
+    vkCmdResolveImage(m_commandBuffer->handle(), imgA_ms.handle(), invalid_layout, imgB.handle(), VK_IMAGE_LAYOUT_GENERAL, 1,
+                      &img_img_resolve);
+    m_errorMonitor->VerifyFound();
+
+    // test invalid layout in image-to-image resolve destination
+    m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_ERROR_BIT_EXT, supports_shared_presentable_image
+                                                                            ? "VUID-vkCmdResolveImage-dstImageLayout-01401"
+                                                                            : "VUID-vkCmdResolveImage-dstImageLayout-00263");
+    vkCmdResolveImage(m_commandBuffer->handle(), imgB_ms.handle(), VK_IMAGE_LAYOUT_GENERAL, imgA.handle(), invalid_layout, 1,
+                      &img_img_resolve);
+    m_errorMonitor->VerifyFound();
+
+    m_commandBuffer->end();
+}
+#endif
 
 TEST_F(VkLayerTest, CopyImageTypeExtentMismatchMaintenance1) {
     // Image copy tests where format type and extents don't match and the Maintenance1 extension is enabled
