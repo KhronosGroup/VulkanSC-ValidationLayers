@@ -23462,13 +23462,11 @@ TEST_F(VkLayerTest, ExtensionNotEnabled) {
         return;
     }
 
-    // Find address of extension API
-    PFN_vkTrimCommandPoolKHR vkTrimCommandPoolKHR =
-        (PFN_vkTrimCommandPoolKHR)vkGetDeviceProcAddr(m_device->handle(), "vkTrimCommandPoolKHR");
-    if (vkTrimCommandPoolKHR == nullptr) {
+    if (!DeviceExtensionSupported(gpu(), nullptr, VK_KHR_MAINTENANCE1_EXTENSION_NAME)) {
         printf("%s Maintenance1 not supported by device; skipped.\n", kSkipPrefix);
         return;
     }
+
     m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_ERROR_BIT_EXT,
                                          "but its required extension VK_KHR_maintenance1 has not been enabled");
     vkTrimCommandPoolKHR(m_device->handle(), m_commandPool->handle(), (VkCommandPoolTrimFlags)0);
