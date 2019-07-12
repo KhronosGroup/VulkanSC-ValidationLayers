@@ -675,6 +675,8 @@ static bool CollectInterfaceBlockMembers(SHADER_MODULE_STATE const *src, std::ma
 }
 
 static std::vector<uint32_t> FindEntrypointInterfaces(spirv_inst_iter entrypoint) {
+    assert(entrypoint.opcode() == spv::OpEntryPoint);
+
     std::vector<uint32_t> interfaces;
     // Find the end of the entrypoint's name string. additional zero bytes follow the actual null terminator, to fill out the
     // rest of the word - so we only need to look at the last byte in the word to determine which word contains the terminator.
@@ -695,13 +697,13 @@ static std::map<location_t, interface_var> CollectInterfaceByLocation(SHADER_MOD
 
     std::map<location_t, interface_var> out;
 
-    for (uint32_t word : FindEntrypointInterfaces(entrypoint)) {
-        auto insn = src->get_def(word);
+    for (uint32_t iid : FindEntrypointInterfaces(entrypoint)) {
+        auto insn = src->get_def(iid);
         assert(insn != src->end());
         assert(insn.opcode() == spv::OpVariable);
 
         if (insn.word(3) == static_cast<uint32_t>(sinterface)) {
-            auto d = src->get_decorations(entrypoint.word(word));
+            auto d = src->get_decorations(iid);
             unsigned id = insn.word(2);
             unsigned type = insn.word(1);
 
