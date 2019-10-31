@@ -18,6 +18,9 @@
  * Author: Mark Lobodzinski <mark@lunarg.com>
  */
 
+// Thread Local Storage for RP/AD info to key on RP object handle.
+thread_local std::vector<bool> ad_modified_indices{};
+
 class PoisonMem : public ValidationObject {
   public:
     // Override chassis read/write locks for this validation object
@@ -28,6 +31,8 @@ class PoisonMem : public ValidationObject {
 
     VkPhysicalDeviceMemoryProperties phys_dev_mem_properties = {};
     static const int MEM_POISONING_FILL_VALUE = 0xA5;
+
+    std::unordered_map<VkRenderPass, std::vector<bool>> renderpass_modified_attachment_map{};
 
     void PostCallRecordAllocateMemory(VkDevice device, const VkMemoryAllocateInfo* pAllocateInfo,
                                       const VkAllocationCallbacks* pAllocator, VkDeviceMemory* pMemory, VkResult result) {
@@ -45,4 +50,92 @@ class PoisonMem : public ValidationObject {
             }
         }
     }
+
+    void PreCallRecordCreateRenderPass(VkDevice device, const VkRenderPassCreateInfo* pCreateInfo,
+                                       const VkAllocationCallbacks* pAllocator, VkRenderPass* pRenderPass) {
+        bool has_color_load_op = false;
+        std::vector<bool> is_color_attachment{};
+        is_color_attachment.resize(pCreateInfo->attachmentCount);
+        ad_modified_indices.resize(pCreateInfo->attachmentCount);
+
+        // Find all color attachments
+        for (uint32_t subpass = 0; subpass < pCreateInfo->subpassCount; subpass++) {
+            for (uint32_t color_attachment = 0; color_attachment < pCreateInfo->pSubpasses[subpass].colorAttachmentCount;
+                 color_attachment++) {
+                if (pCreateInfo->pSubpasses[subpass].pColorAttachments[color_attachment].attachment != VK_ATTACHMENT_UNUSED) {
+                    is_color_attachment[pCreateInfo->pSubpasses[subpass].pColorAttachments[color_attachment].attachment] = true;
+                }
+            }
+        }
+
+        for (uint32_t i = 0; i < pCreateInfo->attachmentCount; i++) {
+            if ((is_color_attachment[i]) && (pCreateInfo->pAttachments[i].loadOp == VK_ATTACHMENT_LOAD_OP_DONT_CARE)) {
+                // Change the load op from DC to CLEAR
+                const_cast<VkAttachmentLoadOp>(pCreateInfo->pAttachments[i].loadOp) = VK_ATTACHMENT_LOAD_OP_CLEAR;
+                has_color_load_op = ad_modified_indices[i] = true;
+            } else {
+                ad_modified_indices[i] = false;
+            }
+        }
+
+        if (!has_color_load_op) {
+            ad_modified_indices.clear();
+        }
+    }
+
+    void PostCallRecordCreateRenderPass(VkDevice device, const VkRenderPassCreateInfo* pCreateInfo,
+                                        const VkAllocationCallbacks* pAllocator, VkRenderPass* pRenderPass, VkResult result) {
+        if (ad_modified_indices.size()) {
+            renderpass_modified_attachment_map[*pRenderPass] = std::move(ad_modified_indices);
+        }
+    }
+
+    void PreCallRecordDestroyRenderPass(VkDevice device, VkRenderPass renderPass, const VkAllocationCallbacks* pAllocator) {
+        // Remove AD vector from the RP map.
+        auto target_renderpass = renderpass_modified_attachment_map.find(renderPass);
+        if (target_renderpass != renderpass_modified_attachment_map.end()) {
+            renderpass_modified_attachment_map.erase(target_renderpass);
+        }
+    }
+
+    void PreCallRecordCmdBeginRenderPass(VkCommandBuffer commandBuffer, const VkRenderPassBeginInfo* pRenderPassBegin,
+                                         VkSubpassContents contents) {
+        auto target_renderpass = renderpass_modified_attachment_map.find(pRenderPassBegin->renderPass);
+        if (target_renderpass == renderpass_modified_attachment_map.end()) return;
+
+        uint32_t att_count = static_cast<uint32_t>(target_renderpass->second.size());
+        uint32_t i;
+        // We need to reallocate some clear values here!
+        VkClearValue* new_clear_values = new VkClearValue[att_count];
+
+        for (i = 0; i < pRenderPassBegin->clearValueCount; i++) {
+            if (target_renderpass->second[i]) {
+                new_clear_values[i].color = {0xA5, 0xA5, 0xA5, 0xA5};
+            } else {
+                new_clear_values[i] = pRenderPassBegin->pClearValues[i];
+            }
+        }
+
+        for (i; i < att_count; i++) {
+            if (target_renderpass->second[i]) {
+                new_clear_values[i].color = {0xA5, 0xA5, 0xA5, 0xA5};
+            }
+        }
+
+        // Change the clear values in the down-chain call.
+        // We should prolly use a safe struct here and blow it away in PostCallRecord
+        const_cast<VkRenderPassBeginInfo*>(pRenderPassBegin)->clearValueCount = att_count;
+        const_cast<VkRenderPassBeginInfo*>(pRenderPassBegin)->pClearValues = new_clear_values;
+    }
+
+    // void PreCallRecordCreateRenderPass2KHR(
+    //    VkDevice                                    device,
+    //    const VkRenderPassCreateInfo2KHR*           pCreateInfo,
+    //    const VkAllocationCallbacks*                pAllocator,
+    //    VkRenderPass*                               pRenderPass);
+
+    // bool PreCallRecordCmdBeginRenderPass2KHR(
+    //    VkCommandBuffer                             commandBuffer,
+    //    const VkRenderPassBeginInfo*                pRenderPassBegin,
+    //    const VkSubpassBeginInfoKHR*                pSubpassBeginInfo);
 };
