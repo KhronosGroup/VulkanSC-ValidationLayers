@@ -52,6 +52,7 @@ bool wrap_handles = true;
 #include "object_lifetime_validation.h"
 #include "stateless_validation.h"
 #include "thread_safety.h"
+#include "poison_mem.h"
 
 namespace vulkan_layer_chassis {
 
@@ -433,6 +434,12 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateInstance(const VkInstanceCreateInfo *pCreat
     }
     gpu_assisted->container_type = LayerObjectTypeGpuAssisted;
 
+    auto poison_mem = new PoisonMem;
+    //if (local_enables.best_practices) {
+        local_object_dispatch.emplace_back(poison_mem);
+    //}
+    poison_mem->container_type = LayerObjectTypePoisonMem;
+
     // If handle wrapping is disabled via the ValidationFeatures extension, override build flag
     if (local_disables.handle_wrapping) {
         wrap_handles = false;
@@ -484,6 +491,10 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateInstance(const VkInstanceCreateInfo *pCreat
     gpu_assisted->instance_dispatch_table = framework->instance_dispatch_table;
     gpu_assisted->enabled = framework->enabled;
     gpu_assisted->disabled = framework->disabled;
+    poison_mem->instance_dispatch_table = framework->instance_dispatch_table;
+    poison_mem->enabled = framework->enabled;
+    poison_mem->disabled = framework->disabled;
+
 
     for (auto intercept : framework->object_dispatch) {
         intercept->PostCallRecordCreateInstance(pCreateInfo, pAllocator, pInstance, result);
@@ -630,6 +641,11 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateDevice(VkPhysicalDevice gpu, const VkDevice
     if (instance_interceptor->enabled.gpu_validation) {
         device_interceptor->object_dispatch.emplace_back(gpu_assisted);
     }
+    auto poison_mem = new PoisonMem;
+    poison_mem->container_type = LayerObjectTypePoisonMem;
+    ////if (instance_interceptor->enabled.poison_mem) {
+        device_interceptor->object_dispatch.emplace_back(poison_mem);
+    ////}
 
     // Set per-intercept common data items
     for (auto dev_intercept : device_interceptor->object_dispatch) {
