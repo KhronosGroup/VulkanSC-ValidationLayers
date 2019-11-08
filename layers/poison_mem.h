@@ -19,7 +19,19 @@
  */
 
 // Thread Local Storage for RP/AD info to key on RP object handle.
-thread_local std::vector<bool> ad_modified_indices{};
+
+thread_local std::vector<bool> att_desc_modified_indices{};
+thread_local safe_VkRenderPassCreateInfo* local_rcpi{};
+thread_local const VkRenderPassCreateInfo* original_rpci{};
+thread_local safe_VkRenderPassBeginInfo* local_rpbi{};
+thread_local const VkRenderPassBeginInfo* original_rpbi{};
+
+
+thread_local std::vector<bool> att_desc2khr_modified_indices{};
+thread_local safe_VkRenderPassCreateInfo2KHR* local_rcpi2khr{};
+thread_local const VkRenderPassCreateInfo2KHR* original_rpci2khr{};
+thread_local safe_VkRenderPassBeginInfo* local_rpbi2khr{};
+thread_local const VkRenderPassBeginInfo* original_rpbi2khr{};
 
 class PoisonMem : public ValidationObject {
   public:
@@ -56,7 +68,8 @@ class PoisonMem : public ValidationObject {
         bool has_color_load_op = false;
         std::vector<bool> is_color_attachment{};
         is_color_attachment.resize(pCreateInfo->attachmentCount);
-        ad_modified_indices.resize(pCreateInfo->attachmentCount);
+        att_desc_modified_indices.resize(pCreateInfo->attachmentCount);
+        local_rcpi = new safe_VkRenderPassCreateInfo(pCreateInfo);
 
         // Find all color attachments
         for (uint32_t subpass = 0; subpass < pCreateInfo->subpassCount; subpass++) {
@@ -71,22 +84,29 @@ class PoisonMem : public ValidationObject {
         for (uint32_t i = 0; i < pCreateInfo->attachmentCount; i++) {
             if ((is_color_attachment[i]) && (pCreateInfo->pAttachments[i].loadOp == VK_ATTACHMENT_LOAD_OP_DONT_CARE)) {
                 // Change the load op from DC to CLEAR
-                const_cast<VkAttachmentLoadOp>(pCreateInfo->pAttachments[i].loadOp) = VK_ATTACHMENT_LOAD_OP_CLEAR;
-                has_color_load_op = ad_modified_indices[i] = true;
+                local_rcpi->pAttachments[i].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+                has_color_load_op = att_desc_modified_indices[i] = true;
             } else {
-                ad_modified_indices[i] = false;
+                att_desc_modified_indices[i] = false;
             }
         }
 
         if (!has_color_load_op) {
-            ad_modified_indices.clear();
+            att_desc_modified_indices.clear();
+        } else {
+            original_rpci = pCreateInfo;
+            pCreateInfo = local_rcpi->ptr();
         }
     }
 
     void PostCallRecordCreateRenderPass(VkDevice device, const VkRenderPassCreateInfo* pCreateInfo,
                                         const VkAllocationCallbacks* pAllocator, VkRenderPass* pRenderPass, VkResult result) {
-        if (ad_modified_indices.size()) {
-            renderpass_modified_attachment_map[*pRenderPass] = std::move(ad_modified_indices);
+        if (att_desc_modified_indices.size()) {
+            renderpass_modified_attachment_map[*pRenderPass] = std::move(att_desc_modified_indices);
+            pCreateInfo = original_rpci;
+            original_rpci = nullptr;
+            delete local_rcpi;
+            local_rcpi = nullptr;
         }
     }
 
@@ -103,29 +123,44 @@ class PoisonMem : public ValidationObject {
         auto target_renderpass = renderpass_modified_attachment_map.find(pRenderPassBegin->renderPass);
         if (target_renderpass == renderpass_modified_attachment_map.end()) return;
 
-        uint32_t att_count = static_cast<uint32_t>(target_renderpass->second.size());
+        local_rpbi = new safe_VkRenderPassBeginInfo(pRenderPassBegin);
+
         uint32_t i;
-        // We need to reallocate some clear values here!
-        VkClearValue* new_clear_values = new VkClearValue[att_count];
+        uint32_t att_count = static_cast<uint32_t>(target_renderpass->second.size());
+
+        VkClearValue* new_clear_values{};
+        if (att_count != pRenderPassBegin->clearValueCount) {
+            delete local_rpbi->pClearValues;
+            local_rpbi->pClearValues = new VkClearValue[att_count];
+            local_rpbi->clearValueCount = att_count;
+        }
 
         for (i = 0; i < pRenderPassBegin->clearValueCount; i++) {
             if (target_renderpass->second[i]) {
-                new_clear_values[i].color = {0xA5, 0xA5, 0xA5, 0xA5};
+                local_rpbi->pClearValues[i].color = {0xA5, 0xA5, 0xA5, 0xA5};
             } else {
-                new_clear_values[i] = pRenderPassBegin->pClearValues[i];
+                local_rpbi->pClearValues[i] = pRenderPassBegin->pClearValues[i];
             }
         }
 
-        for (i; i < att_count; i++) {
+        for (i; i < local_rpbi->clearValueCount; i++) {
             if (target_renderpass->second[i]) {
-                new_clear_values[i].color = {0xA5, 0xA5, 0xA5, 0xA5};
+                local_rpbi->pClearValues[i].color = {0xA5, 0xA5, 0xA5, 0xA5};
             }
         }
 
-        // Change the clear values in the down-chain call.
-        // We should prolly use a safe struct here and blow it away in PostCallRecord
-        const_cast<VkRenderPassBeginInfo*>(pRenderPassBegin)->clearValueCount = att_count;
-        const_cast<VkRenderPassBeginInfo*>(pRenderPassBegin)->pClearValues = new_clear_values;
+        original_rpbi = pRenderPassBegin;
+        pRenderPassBegin = local_rpbi->ptr();
+    }
+
+    void PostCallRecordCmdBeginRenderPass(VkCommandBuffer commandBuffer, const VkRenderPassBeginInfo* pRenderPassBegin,
+                                          VkSubpassContents contents) {
+        auto target_renderpass = renderpass_modified_attachment_map.find(pRenderPassBegin->renderPass);
+        if (target_renderpass == renderpass_modified_attachment_map.end()) return;
+
+        pRenderPassBegin = original_rpbi;
+        delete local_rpbi;
+        local_rpbi = nullptr;
     }
 
     // void PreCallRecordCreateRenderPass2KHR(
