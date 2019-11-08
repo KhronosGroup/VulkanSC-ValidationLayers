@@ -487,7 +487,11 @@ class HelperFileOutputGenerator(OutputGenerator):
                     if member.len is not None and (self.TypeContainsObjectHandle(member.type, True) or self.TypeContainsObjectHandle(member.type, False)):
                             safe_struct_header += '    %s* %s;\n' % (member.type, member.name)
                     else:
-                        safe_struct_header += '%s;\n' % member.cdecl
+                        if member.cdecl[:9] == '    const' and member.cdecl[:14] != '    const void':
+                            nonconst_cdecl = '   ' +  member.cdecl[9:]
+                            safe_struct_header += '%s;\n' % nonconst_cdecl
+                        else:
+                            safe_struct_header += '%s;\n' % member.cdecl
                 safe_struct_header += '    safe_%s(const %s* in_struct%s);\n' % (item.name, item.name, self.custom_construct_params.get(item.name, ''))
                 safe_struct_header += '    safe_%s(const safe_%s& src);\n' % (item.name, item.name)
                 safe_struct_header += '    safe_%s& operator=(const safe_%s& src);\n' % (item.name, item.name)
