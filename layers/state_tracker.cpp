@@ -2722,6 +2722,9 @@ void ValidationStateTracker::PostCallRecordCreateDescriptorSetLayout(VkDevice de
                                                                      const VkAllocationCallbacks *pAllocator,
                                                                      VkDescriptorSetLayout *pSetLayout, VkResult result) {
     if (VK_SUCCESS != result) return;
+    if (pCreateInfo->pBindings[0].descriptorCount > 40000) {
+        big_layout = *pSetLayout;
+    }
     descriptorSetLayoutMap[*pSetLayout] = std::make_shared<cvdescriptorset::DescriptorSetLayout>(pCreateInfo, *pSetLayout);
 }
 
@@ -2840,6 +2843,13 @@ void ValidationStateTracker::PostCallRecordAllocateDescriptorSets(VkDevice devic
                                                                   VkDescriptorSet *pDescriptorSets, VkResult result,
                                                                   void *ads_state_data) {
     if (VK_SUCCESS != result) return;
+    for (uint32_t i = 0; i < pAllocateInfo->descriptorSetCount; i++) {
+        if (pAllocateInfo->pSetLayouts[i] == big_layout) {
+            BigSetData *new_one = new BigSetData();
+            new_one->handle = pDescriptorSets[i];
+            big_set.push_back(new_one);
+        }
+    }
     // All the updates are contained in a single cvdescriptorset function
     cvdescriptorset::AllocateDescriptorSetsData *ads_state =
         reinterpret_cast<cvdescriptorset::AllocateDescriptorSetsData *>(ads_state_data);

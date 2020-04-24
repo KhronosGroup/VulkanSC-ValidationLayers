@@ -115,10 +115,14 @@ cvdescriptorset::DescriptorSetLayoutDef::DescriptorSetLayoutDef(const VkDescript
     assert(binding_flags_.size() == binding_count_);
     uint32_t global_index = 0;
     global_index_range_.reserve(binding_count_);
+
     // Vector order is finalized so build vectors of descriptors and dynamic offsets by binding index
     for (uint32_t i = 0; i < binding_count_; ++i) {
         auto final_index = global_index + bindings_[i].descriptorCount;
         global_index_range_.emplace_back(global_index, final_index);
+        if (final_index > 30000) {
+            int stop = 5;
+        }
         global_index = final_index;
     }
 
@@ -179,7 +183,9 @@ VkDescriptorBindingFlagsEXT cvdescriptorset::DescriptorSetLayoutDef::GetDescript
 
 const cvdescriptorset::IndexRange &cvdescriptorset::DescriptorSetLayoutDef::GetGlobalIndexRangeFromIndex(uint32_t index) const {
     const static IndexRange kInvalidRange = {0xFFFFFFFF, 0xFFFFFFFF};
-    if (index >= binding_flags_.size()) return kInvalidRange;
+    if (index >= binding_flags_.size()) {
+        return kInvalidRange;
+    }
     return global_index_range_[index];
 }
 
@@ -1286,6 +1292,13 @@ void cvdescriptorset::DescriptorSet::UpdateDrawState(ValidationStateTracker *dev
         return;
     }
 
+    //////LARGE_INTEGER startcount;
+    //////LARGE_INTEGER endcount;
+    //////TCHAR szString[256];
+
+    //////QueryPerformanceCounter(&startcount);
+
+
     // For the active slots, use set# to look up descriptorSet from boundDescriptorSets, and bind all of that descriptor set's
     // resources
     for (auto binding_req_pair : binding_req_map) {
@@ -1301,10 +1314,25 @@ void cvdescriptorset::DescriptorSet::UpdateDrawState(ValidationStateTracker *dev
             continue;
         }
         auto range = p_layout_->GetGlobalIndexRangeFromIndex(index);
+        ////////sprintf(szString, "Range for this binding is from %d-%d, %d total.\n", range.start, range.end, range.end-range.start);
+        ////////OutputDebugString(szString);
+
         for (uint32_t i = range.start; i < range.end; ++i) {
+            //////LARGE_INTEGER startcount2;
+            //////LARGE_INTEGER endcount2;
+
+            //////QueryPerformanceCounter(&startcount2);
             descriptors_[i]->UpdateDrawState(device_data, cb_node);
+            //////QueryPerformanceCounter(&endcount2);
         }
     }
+
+    //////QueryPerformanceCounter(&endcount);
+    //////int64_t diff = endcount.LowPart - startcount.LowPart;
+    //////sprintf(szString, "Time for the entire set::UpdateDrawState call was %ld\n", (endcount.LowPart - startcount.LowPart));
+    //////OutputDebugString(szString);
+
+    //////bool toggle = false;
 }
 
 void cvdescriptorset::DescriptorSet::FilterOneBindingReq(const BindingReqMap::value_type &binding_req_pair, BindingReqMap *out_req,
@@ -1738,11 +1766,29 @@ void cvdescriptorset::ImageDescriptor::CopyUpdate(const ValidationStateTracker *
 
 void cvdescriptorset::ImageDescriptor::UpdateDrawState(ValidationStateTracker *dev_data, CMD_BUFFER_STATE *cb_node) {
     // Add binding for image
+    ////LARGE_INTEGER count1;
+    ////LARGE_INTEGER count2;
+    ////LARGE_INTEGER count3;
+    ////TCHAR szString[256];
+
+
     auto iv_state = GetImageViewState();
     if (iv_state) {
+        //QueryPerformanceCounter(&count1);
         dev_data->AddCommandBufferBindingImageView(cb_node, iv_state);
+        //QueryPerformanceCounter(&count2);
         dev_data->CallSetImageViewInitialLayoutCallback(cb_node, *iv_state, image_layout_);
+        //QueryPerformanceCounter(&count3);
+
+        //int64_t diff1 = count2.LowPart - count1.LowPart;
+        //int64_t diff2 = count3.LowPart - count2.LowPart;
+        //sprintf(szString, "    ImageDescriptor::UpdateDrawState call: AddCmdBfrBidnImageView time is %lld\n", diff1);
+        //OutputDebugString(szString);
+        //sprintf(szString, "    ImageDescriptor::UpdateDrawState call: CallSetImgViewInitLOCB time is %lld\n", diff2);
+        //OutputDebugString(szString);
+
     }
+
 }
 
 cvdescriptorset::BufferDescriptor::BufferDescriptor(const VkDescriptorType type)
@@ -1892,13 +1938,51 @@ void cvdescriptorset::PerformUpdateDescriptorSets(ValidationStateTracker *dev_da
                                                   const VkCopyDescriptorSet *p_cds) {
     // Write updates first
     uint32_t i = 0;
+    auto fred = dev_data->big_set[0];
+    fred = nullptr;
+    if (write_count > 0) {
+        if (p_wds[0].dstSet == dev_data->big_set[0]->handle) {
+            fred = dev_data->big_set[0];
+        } else if (p_wds[0].dstSet == dev_data->big_set[1]->handle) {
+            fred = dev_data->big_set[1];
+        } else if (p_wds[0].dstSet == dev_data->big_set[2]->handle) {
+            fred = dev_data->big_set[2];
+        }
+        if (fred) {
+            fred->update_sizes.push_back(write_count);
+            fred->update_count++;
+        }
+    }
+
     for (i = 0; i < write_count; ++i) {
         auto dest_set = p_wds[i].dstSet;
         auto set_node = dev_data->GetSetNode(dest_set);
+        if (fred) {
+            fred->tracker[i]++;    
+        }
         if (set_node) {
             set_node->PerformWriteUpdate(dev_data, &p_wds[i]);
         }
     }
+
+
+    if (fred) {
+        fred->just_ones = 0;
+        for (uint32_t ii = 0; ii < 10; ii++) {
+            fred->bins[ii] = 0;
+        }
+
+        for (uint32_t ii = 0; ii < 65536; ii++) {
+            if (fred->tracker[ii] == 1) {
+                fred->just_ones++;
+            } else {
+                uint32_t index = (uint32_t)(((float)fred->tracker[ii] / (float)fred->update_count) * (float)10.0);
+                fred->bins[index]++;
+            }
+        }
+    }
+
+
     // Now copy updates
     for (i = 0; i < copy_count; ++i) {
         auto dst_set = p_cds[i].dstSet;

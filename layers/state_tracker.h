@@ -236,6 +236,18 @@ struct SHADER_MODULE_STATE;
 
 class ValidationStateTracker : public ValidationObject {
   public:
+    // TEMP GLOBAL STUFF FOR DEBUGGING
+    VkDescriptorSetLayout big_layout{};
+    struct BigSetData {
+        VkDescriptorSet handle;
+        uint32_t update_count;
+        uint32_t tracker[65536];
+        std::vector<uint32_t> update_sizes;
+        uint32_t bins[10];
+        uint32_t just_ones;
+    };
+    std::vector<BigSetData *> big_set{};
+
     //  TODO -- move to private
     //  TODO -- make consistent with traits approach below.
     unordered_map<VkQueue, QUEUE_STATE> queueMap;
