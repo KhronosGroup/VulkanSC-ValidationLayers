@@ -2371,6 +2371,13 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateDescriptorSetLayout(
     const VkDescriptorSetLayoutCreateInfo*      pCreateInfo,
     const VkAllocationCallbacks*                pAllocator,
     VkDescriptorSetLayout*                      pSetLayout) {
+    bool changed = false;
+    if (pCreateInfo->bindingCount && pCreateInfo->pBindings[0].descriptorCount == 65536) {
+        VkDescriptorSetLayoutBinding* copy = const_cast<VkDescriptorSetLayoutBinding*>(pCreateInfo->pBindings);
+        copy[0].descriptorCount = 700;
+        changed = true;
+    }
+
     auto layer_data = GetLayerDataPtr(get_dispatch_key(device), layer_data_map);
     bool skip = false;
     for (auto intercept : layer_data->object_dispatch) {
@@ -2386,6 +2393,11 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateDescriptorSetLayout(
     for (auto intercept : layer_data->object_dispatch) {
         auto lock = intercept->write_lock();
         intercept->PostCallRecordCreateDescriptorSetLayout(device, pCreateInfo, pAllocator, pSetLayout, result);
+    }
+
+    if (changed) {
+        VkDescriptorSetLayoutBinding* copy = const_cast<VkDescriptorSetLayoutBinding*>(pCreateInfo->pBindings);
+        copy[0].descriptorCount = 65536;
     }
     return result;
 }
@@ -2513,6 +2525,11 @@ VKAPI_ATTR void VKAPI_CALL UpdateDescriptorSets(
     const VkCopyDescriptorSet*                  pDescriptorCopies) {
     auto layer_data = GetLayerDataPtr(get_dispatch_key(device), layer_data_map);
     bool skip = false;
+    bool changed = false;
+    if ((descriptorWriteCount == 65536)) {
+        descriptorWriteCount = 700;
+        changed = true;
+    }
     for (auto intercept : layer_data->object_dispatch) {
         auto lock = intercept->read_lock();
         skip |= (const_cast<const ValidationObject*>(intercept))->PreCallValidateUpdateDescriptorSets(device, descriptorWriteCount, pDescriptorWrites, descriptorCopyCount, pDescriptorCopies);
@@ -2526,6 +2543,9 @@ VKAPI_ATTR void VKAPI_CALL UpdateDescriptorSets(
     for (auto intercept : layer_data->object_dispatch) {
         auto lock = intercept->write_lock();
         intercept->PostCallRecordUpdateDescriptorSets(device, descriptorWriteCount, pDescriptorWrites, descriptorCopyCount, pDescriptorCopies);
+    }
+    if (changed) {
+        descriptorWriteCount = 65536;
     }
 }
 

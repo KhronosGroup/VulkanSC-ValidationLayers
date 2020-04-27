@@ -1938,49 +1938,49 @@ void cvdescriptorset::PerformUpdateDescriptorSets(ValidationStateTracker *dev_da
                                                   const VkCopyDescriptorSet *p_cds) {
     // Write updates first
     uint32_t i = 0;
-    auto fred = dev_data->big_set[0];
-    fred = nullptr;
-    if (write_count > 0) {
-        if (p_wds[0].dstSet == dev_data->big_set[0]->handle) {
-            fred = dev_data->big_set[0];
-        } else if (p_wds[0].dstSet == dev_data->big_set[1]->handle) {
-            fred = dev_data->big_set[1];
-        } else if (p_wds[0].dstSet == dev_data->big_set[2]->handle) {
-            fred = dev_data->big_set[2];
-        }
-        if (fred) {
-            fred->update_sizes.push_back(write_count);
-            fred->update_count++;
-        }
-    }
+    ////////auto fred = dev_data->big_set[0]; /// LUGMAL
+    ////////fred = nullptr;
+    ////////if (write_count > 0) {
+    ////////    if (p_wds[0].dstSet == dev_data->big_set[0]->handle) {
+    ////////        fred = dev_data->big_set[0];
+    ////////    } else if (p_wds[0].dstSet == dev_data->big_set[1]->handle) {
+    ////////        fred = dev_data->big_set[1];
+    ////////    } else if (p_wds[0].dstSet == dev_data->big_set[2]->handle) {
+    ////////        fred = dev_data->big_set[2];
+    ////////    }
+    ////////    if (fred) {
+    ////////        fred->update_sizes.push_back(write_count);
+    ////////        fred->update_count++;
+    ////////    }
+    ////////}
 
     for (i = 0; i < write_count; ++i) {
         auto dest_set = p_wds[i].dstSet;
         auto set_node = dev_data->GetSetNode(dest_set);
-        if (fred) {
-            fred->tracker[i]++;    
-        }
+        ////////if (fred) {
+        ////////    fred->tracker[i]++;    
+        ////////}
         if (set_node) {
             set_node->PerformWriteUpdate(dev_data, &p_wds[i]);
         }
     }
 
 
-    if (fred) {
-        fred->just_ones = 0;
-        for (uint32_t ii = 0; ii < 10; ii++) {
-            fred->bins[ii] = 0;
-        }
+    ////////if (fred) {
+    ////////    fred->just_ones = 0;
+    ////////    for (uint32_t ii = 0; ii < 10; ii++) {
+    ////////        fred->bins[ii] = 0;
+    ////////    }
 
-        for (uint32_t ii = 0; ii < 65536; ii++) {
-            if (fred->tracker[ii] == 1) {
-                fred->just_ones++;
-            } else {
-                uint32_t index = (uint32_t)(((float)fred->tracker[ii] / (float)fred->update_count) * (float)10.0);
-                fred->bins[index]++;
-            }
-        }
-    }
+    ////////    for (uint32_t ii = 0; ii < 65536; ii++) {
+    ////////        if (fred->tracker[ii] == 1) {
+    ////////            fred->just_ones++;
+    ////////        } else {
+    ////////            uint32_t index = (uint32_t)(((float)fred->tracker[ii] / (float)fred->update_count) * (float)10.0);
+    ////////            fred->bins[index]++;
+    ////////        }
+    ////////    }
+    ////////}
 
 
     // Now copy updates
