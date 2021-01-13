@@ -2849,6 +2849,9 @@ enum LayerObjectTypeId {
     LayerObjectTypeDebugPrintf,                 // Instance or device shader debug printf layer object
     LayerObjectTypeCommandCounter,              // Command Counter validation object, child of corechecks
     LayerObjectTypeSyncValidation,              // Instance or device synchronization validation layer object
+
+    LayerObjectTypeTestObject,                  // Test object identifier
+
     LayerObjectTypeMaxEnum,                     // Max enum count
 };
 
@@ -4674,5 +4677,16 @@ class ValidationObject {
             PreCallRecordCreateDevice(physicalDevice, pCreateInfo, pAllocator, pDevice);
         };
 };
+
+class TestObject : public ValidationObject {
+  public:
+    read_lock_guard_t read_lock() override { return read_lock_guard_t(validation_object_mutex, std::defer_lock); }
+    write_lock_guard_t write_lock() override  { return write_lock_guard_t(validation_object_mutex, std::defer_lock); }
+
+    TestObject() { container_type = LayerObjectTypeTestObject; }
+
+
+};
+
 
 extern small_unordered_map<void*, ValidationObject*, 2> layer_data_map;

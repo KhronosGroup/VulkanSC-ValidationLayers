@@ -32,6 +32,9 @@
 
 small_unordered_map<void*, ValidationObject*, 2> layer_data_map;
 
+static const bool ADD_TEST_OBJECTS = true;
+static const uint32_t test_object_count = 10;
+
 // Global unique object identifier.
 std::atomic<uint64_t> global_unique_id(1ULL);
 // Map uniqueID to actual object handle. Accesses to the map itself are
@@ -281,6 +284,9 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateInstance(const VkInstanceCreateInfo *pCreat
     // Create temporary dispatch vector for pre-calls until instance is created
     std::vector<ValidationObject*> local_object_dispatch;
 
+    auto test_obj = new TestObject;
+    test_obj->RegisterValidationObject(ADD_TEST_OBJECTS, api_version, report_data, local_object_dispatch);
+
     // Add VOs to dispatch vector. Order here will be the validation dispatch order!
     auto thread_checker_obj = new ThreadSafety(nullptr);
     thread_checker_obj->RegisterValidationObject(!local_disables[thread_safety], api_version, report_data, local_object_dispatch);
@@ -340,6 +346,8 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateInstance(const VkInstanceCreateInfo *pCreat
     framework->instance_extensions.InitFromInstanceCreateInfo(specified_version, pCreateInfo);
 
     OutputLayerStatusInfo(framework);
+
+    test_obj->FinalizeInstanceValidationObject(framework);
 
     thread_checker_obj->FinalizeInstanceValidationObject(framework);
     object_tracker_obj->FinalizeInstanceValidationObject(framework);
@@ -472,6 +480,11 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateDevice(VkPhysicalDevice gpu, const VkDevice
     // Note that this DEFINES THE ORDER IN WHICH THE LAYER VALIDATION OBJECTS ARE CALLED
     auto disables = instance_interceptor->disabled;
     auto enables = instance_interceptor->enabled;
+
+    for (uint32_t i = 0; i < test_object_count; i++) {
+        auto test_obj =  new TestObject;
+        test_obj->InitDeviceValidationObject(ADD_TEST_OBJECTS, instance_interceptor, device_interceptor);
+    }
 
     auto thread_safety_obj = new ThreadSafety(reinterpret_cast<ThreadSafety *>(instance_interceptor->GetValidationObject(instance_interceptor->object_dispatch, LayerObjectTypeThreading)));
     thread_safety_obj->InitDeviceValidationObject(!disables[thread_safety], instance_interceptor, device_interceptor);
