@@ -241,6 +241,7 @@ class LayerChassisOutputGenerator(OutputGenerator):
 #include "vk_safe_struct.h"
 #include "vk_typemap_helper.h"
 
+extern uint32_t vo_misses;
 
 extern std::atomic<uint64_t> global_unique_id;
 
@@ -664,6 +665,9 @@ class ValidationObject {
 #include "chassis.h"
 #include "layer_options.h"
 #include "layer_chassis_dispatch.h"
+
+uint32_t vo_count = 0;
+uint32_t vo_misses = 0;
 
 small_unordered_map<void*, ValidationObject*, 2> layer_data_map;
 
@@ -1837,11 +1841,11 @@ VK_LAYER_EXPORT VKAPI_ATTR VkResult VKAPI_CALL vkNegotiateLoaderLayerInterfaceVe
         # Toss everything before the undecorated name
         prototype = raw.split("VKAPI_PTR *PFN_vk")[1]
         prototype = prototype.replace(")", "", 1)
-        prototype = prototype.replace(";", " {};")
+        prototype = prototype.replace(";", " {vo_misses++;};")
 
         # Build up pre/post call virtual function declarations
         pre_call_validate = 'virtual bool PreCallValidate' + prototype
-        pre_call_validate = pre_call_validate.replace("{}", "const { return false; }")
+        pre_call_validate = pre_call_validate.replace("{vo_misses++;}", "const { vo_misses++; return false; }")
         pre_call_record = 'virtual void PreCallRecord' + prototype
         post_call_record = 'virtual void PostCallRecord' + prototype
         resulttype = elem.find('proto/type')
@@ -1934,6 +1938,7 @@ VK_LAYER_EXPORT VKAPI_ATTR VkResult VKAPI_CALL vkNegotiateLoaderLayerInterfaceVe
         # Generate pre-call validation source code
         self.appendSection('command', '    %s' % self.precallvalidate_loop)
         self.appendSection('command', '        auto lock = intercept->read_lock();')
+        self.appendSection('command', '        vo_count++;')
         self.appendSection('command', '        skip |= (const_cast<const ValidationObject*>(intercept))->PreCallValidate%s(%s);' % (api_function_name[2:], paramstext))
         self.appendSection('command', '        if (skip) %s' % return_map[resulttype.text])
         self.appendSection('command', '    }')
@@ -1941,6 +1946,7 @@ VK_LAYER_EXPORT VKAPI_ATTR VkResult VKAPI_CALL vkNegotiateLoaderLayerInterfaceVe
         # Generate pre-call state recording source code
         self.appendSection('command', '    %s' % self.precallrecord_loop)
         self.appendSection('command', '        auto lock = intercept->write_lock();')
+        self.appendSection('command', '        vo_count++;')
         self.appendSection('command', '        intercept->PreCallRecord%s(%s);' % (api_function_name[2:], paramstext))
         self.appendSection('command', '    }')
 
@@ -1961,6 +1967,7 @@ VK_LAYER_EXPORT VKAPI_ATTR VkResult VKAPI_CALL vkNegotiateLoaderLayerInterfaceVe
         if (resulttype.text == 'VkResult' or resulttype.text == 'VkDeviceAddress'):
             returnparam = ', result'
         self.appendSection('command', '        auto lock = intercept->write_lock();')
+        self.appendSection('command', '        vo_count++;')
         self.appendSection('command', '        intercept->PostCallRecord%s(%s%s);' % (api_function_name[2:], paramstext, returnparam))
         self.appendSection('command', '    }')
         # Return result variable, if any.
