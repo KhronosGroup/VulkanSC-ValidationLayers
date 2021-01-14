@@ -33,7 +33,7 @@
 small_unordered_map<void*, ValidationObject*, 2> layer_data_map;
 
 static const bool ADD_TEST_OBJECTS = true;
-static const uint32_t test_object_count = 10;
+static const uint32_t test_object_count = 2;
 
 // Global unique object identifier.
 std::atomic<uint64_t> global_unique_id(1ULL);
