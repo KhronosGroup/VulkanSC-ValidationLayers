@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-# Copyright (c) 2020 Valve Corporation
-# Copyright (c) 2020 LunarG, Inc.
+# Copyright (c) 2021 Valve Corporation
+# Copyright (c) 2021 LunarG, Inc.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -72,9 +72,10 @@ jobs:
           }
     steps:
     - name: Select and Set Up CMake Version
-      uses: jwlawson/actions-setup-cmake@v1.4
+      uses: jwlawson/actions-setup-cmake@v1.6
       with:
         cmake-version: '3.10.2'
+        github-api-token: ${{ secrets.GITHUB_TOKEN }}
     - name: Clone repository
       uses: actions/checkout@v1
     - name: Install build dependencies
@@ -101,9 +102,10 @@ jobs:
           }
     steps:
     - name: Select and Set Up CMake Version
-      uses: jwlawson/actions-setup-cmake@v1.4
+      uses: jwlawson/actions-setup-cmake@v1.6
       with:
         cmake-version: '3.10.2'
+        github-api-token: ${{ secrets.GITHUB_TOKEN }}
     - name: Clone repository
       uses: actions/checkout@v1
     - name: Install build dependencies
@@ -137,9 +139,10 @@ jobs:
           }
     steps:
     - name: Select and Set Up CMake Version
-      uses: jwlawson/actions-setup-cmake@v1.4
+      uses: jwlawson/actions-setup-cmake@v1.6
       with:
         cmake-version: '3.10.2'
+        github-api-token: ${{ secrets.GITHUB_TOKEN }}
     - name: Clone repository
       uses: actions/checkout@v1
     - name: Build ValidationLayers
