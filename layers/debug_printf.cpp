@@ -22,6 +22,7 @@
 #include "spirv-tools/instrument.hpp"
 #include <iostream>
 #include "layer_chassis_dispatch.h"
+#include "sync_utils.h"
 
 static const VkShaderStageFlags kShaderStageAllRayTracing =
     VK_SHADER_STAGE_ANY_HIT_BIT_NV | VK_SHADER_STAGE_CALLABLE_BIT_NV | VK_SHADER_STAGE_CLOSEST_HIT_BIT_NV |
@@ -163,6 +164,24 @@ bool DebugPrintf::PreCallValidateCmdWaitEvents(VkCommandBuffer commandBuffer, ui
     if (srcStageMask & VK_PIPELINE_STAGE_HOST_BIT) {
         ReportSetupProblem(commandBuffer,
                            "CmdWaitEvents recorded with VK_PIPELINE_STAGE_HOST_BIT set. "
+                           "Debug Printf waits on queue completion. "
+                           "This wait could block the host's signaling of this event, resulting in deadlock.");
+    }
+    return false;
+}
+
+bool DebugPrintf::PreCallValidateCmdWaitEvents2KHR(VkCommandBuffer commandBuffer, uint32_t eventCount, const VkEvent *pEvents,
+                                                   const VkDependencyInfoKHR *pDependencyInfos) const {
+    VkPipelineStageFlags2KHR srcStageMask = 0;
+
+    for (uint32_t i = 0; i < eventCount; i++) {
+        auto stage_masks = sync_utils::GetGlobalStageMasks(pDependencyInfos[i]);
+        srcStageMask = stage_masks.src;
+    }
+
+    if (srcStageMask & VK_PIPELINE_STAGE_HOST_BIT) {
+        ReportSetupProblem(commandBuffer,
+                           "CmdWaitEvents2KHR recorded with VK_PIPELINE_STAGE_HOST_BIT set. "
                            "Debug Printf waits on queue completion. "
                            "This wait could block the host's signaling of this event, resulting in deadlock.");
     }
@@ -632,6 +651,41 @@ void DebugPrintf::PostCallRecordQueueSubmit(VkQueue queue, uint32_t submitCount,
             UtilProcessInstrumentationBuffer(queue, cb_node, this);
             for (auto secondary_cmd_buffer : cb_node->linkedCommandBuffers) {
                 UtilProcessInstrumentationBuffer(queue, secondary_cmd_buffer, this);
+            }
+        }
+    }
+}
+
+void DebugPrintf::PostCallRecordQueueSubmit2KHR(VkQueue queue, uint32_t submitCount, const VkSubmitInfo2KHR *pSubmits,
+                                                VkFence fence, VkResult result) {
+    ValidationStateTracker::PostCallRecordQueueSubmit2KHR(queue, submitCount, pSubmits, fence, result);
+
+    if (aborted || (result != VK_SUCCESS)) return;
+    bool buffers_present = false;
+    // Don't QueueWaitIdle if there's nothing to process
+    for (uint32_t submit_idx = 0; submit_idx < submitCount; submit_idx++) {
+        const VkSubmitInfo2KHR *submit = &pSubmits[submit_idx];
+        for (uint32_t i = 0; i < submit->commandBufferInfoCount; i++) {
+            auto cb_node = GetCBState(submit->pCommandBufferInfos[i].commandBuffer);
+            if (GetBufferInfo(cb_node->commandBuffer).size()) buffers_present = true;
+            for (auto secondaryCmdBuffer : cb_node->linkedCommandBuffers) {
+                if (GetBufferInfo(secondaryCmdBuffer->commandBuffer).size()) buffers_present = true;
+            }
+        }
+    }
+    if (!buffers_present) return;
+
+    UtilSubmitBarrier(queue, this);
+
+    DispatchQueueWaitIdle(queue);
+
+    for (uint32_t submit_idx = 0; submit_idx < submitCount; submit_idx++) {
+        const VkSubmitInfo2KHR *submit = &pSubmits[submit_idx];
+        for (uint32_t i = 0; i < submit->commandBufferInfoCount; i++) {
+            auto cb_node = GetCBState(submit->pCommandBufferInfos[i].commandBuffer);
+            UtilProcessInstrumentationBuffer(queue, cb_node, this);
+            for (auto secondaryCmdBuffer : cb_node->linkedCommandBuffers) {
+                UtilProcessInstrumentationBuffer(queue, secondaryCmdBuffer, this);
             }
         }
     }
