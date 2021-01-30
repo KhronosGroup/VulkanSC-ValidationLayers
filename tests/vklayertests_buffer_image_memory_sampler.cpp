@@ -4059,6 +4059,215 @@ TEST_F(VkLayerTest, ImageBarrierSubpassConflicts) {
     vk::DestroyRenderPass(m_device->device(), rp_noselfdep, nullptr);
 }
 
+TEST_F(VkLayerTest, Sync2ImageBarrierSubpassConflicts) {
+    TEST_DESCRIPTION("Add a pipeline barrier within a subpass that has conflicting state");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    ASSERT_NO_FATAL_FAILURE(InitFramework());
+    if (DeviceExtensionSupported(gpu(), nullptr, VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME)) {
+        m_device_extension_names.push_back(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
+    } else {
+        printf("%s Synchronization2 not supported, skipping test\n", kSkipPrefix);
+        return;
+    }
+
+    if (!CheckSynchronization2SupportAndInitState(this)) {
+        printf("%s Synchronization2 not supported, skipping test\n", kSkipPrefix);
+        return;
+    }
+
+    // A renderpass with a single subpass that declared a self-dependency
+    VkAttachmentDescription attach[] = {
+        {0, VK_FORMAT_R8G8B8A8_UNORM, VK_SAMPLE_COUNT_1_BIT, VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE,
+         VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE, VK_IMAGE_LAYOUT_UNDEFINED,
+         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL},
+    };
+    VkAttachmentReference ref = {0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
+    VkSubpassDescription subpasses[] = {
+        {0, VK_PIPELINE_BIND_POINT_GRAPHICS, 0, nullptr, 1, &ref, nullptr, nullptr, 0, nullptr},
+    };
+    VkSubpassDependency dep = {0,
+                               0,
+                               VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                               VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                               VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+                               VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+                               VK_DEPENDENCY_BY_REGION_BIT};
+    VkRenderPassCreateInfo rpci = {VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO, nullptr, 0, 1, attach, 1, subpasses, 1, &dep};
+    VkRenderPass rp;
+    VkRenderPass rp_noselfdep;
+
+    VkResult err = vk::CreateRenderPass(m_device->device(), &rpci, nullptr, &rp);
+    ASSERT_VK_SUCCESS(err);
+    rpci.dependencyCount = 0;
+    rpci.pDependencies = nullptr;
+    err = vk::CreateRenderPass(m_device->device(), &rpci, nullptr, &rp_noselfdep);
+    ASSERT_VK_SUCCESS(err);
+
+    VkImageObj image(m_device);
+    image.InitNoLayout(32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_IMAGE_TILING_OPTIMAL, 0);
+    VkImageView imageView = image.targetView(VK_FORMAT_R8G8B8A8_UNORM);
+
+    VkFramebufferCreateInfo fbci = {VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO, nullptr, 0, rp, 1, &imageView, 32, 32, 1};
+    VkFramebuffer fb;
+    err = vk::CreateFramebuffer(m_device->device(), &fbci, nullptr, &fb);
+    ASSERT_VK_SUCCESS(err);
+
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdPipelineBarrier-pDependencies-02285");
+    m_commandBuffer->begin();
+    VkRenderPassBeginInfo rpbi = {VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+                                  nullptr,
+                                  rp_noselfdep,
+                                  fb,
+                                  {{
+                                       0,
+                                       0,
+                                   },
+                                   {32, 32}},
+                                  0,
+                                  nullptr};
+
+    vk::CmdBeginRenderPass(m_commandBuffer->handle(), &rpbi, VK_SUBPASS_CONTENTS_INLINE);
+    VkMemoryBarrier mem_barrier = {};
+    mem_barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+    mem_barrier.pNext = NULL;
+    mem_barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
+    mem_barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    vk::CmdPipelineBarrier(m_commandBuffer->handle(), VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, 0, 1,
+                           &mem_barrier, 0, nullptr, 0, nullptr);
+    m_errorMonitor->VerifyFound();
+    vk::CmdEndRenderPass(m_commandBuffer->handle());
+
+    rpbi.renderPass = rp;
+    vk::CmdBeginRenderPass(m_commandBuffer->handle(), &rpbi, VK_SUBPASS_CONTENTS_INLINE);
+    VkImageMemoryBarrier img_barrier = {};
+    img_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    img_barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    img_barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    img_barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    img_barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    img_barrier.image = image.handle();
+    img_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    img_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    img_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    img_barrier.subresourceRange.baseArrayLayer = 0;
+    img_barrier.subresourceRange.baseMipLevel = 0;
+    img_barrier.subresourceRange.layerCount = 1;
+    img_barrier.subresourceRange.levelCount = 1;
+    // Mis-match src stage mask
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdPipelineBarrier-pDependencies-02285");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdPipelineBarrier-pDependencies-02285");
+    vk::CmdPipelineBarrier(m_commandBuffer->handle(), VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                           VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1, &img_barrier);
+    m_errorMonitor->VerifyFound();
+    // Now mis-match dst stage mask
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdPipelineBarrier-pDependencies-02285");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdPipelineBarrier-pDependencies-02285");
+    vk::CmdPipelineBarrier(m_commandBuffer->handle(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_HOST_BIT,
+                           VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1, &img_barrier);
+    m_errorMonitor->VerifyFound();
+    // Set srcQueueFamilyIndex to something other than IGNORED
+    img_barrier.srcQueueFamilyIndex = 0;
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdPipelineBarrier-srcQueueFamilyIndex-01182");
+    vk::CmdPipelineBarrier(m_commandBuffer->handle(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                           VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1,
+                           &img_barrier);
+    m_errorMonitor->VerifyFound();
+    img_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    // Mis-match mem barrier src access mask
+    mem_barrier = {};
+    mem_barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+    mem_barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    mem_barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdPipelineBarrier-pDependencies-02285");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdPipelineBarrier-pDependencies-02285");
+    vk::CmdPipelineBarrier(m_commandBuffer->handle(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                           VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT, 1, &mem_barrier, 0, nullptr,
+                           0, nullptr);
+    m_errorMonitor->VerifyFound();
+    // Mis-match mem barrier dst access mask. Also set srcAccessMask to 0 which should not cause an error
+    mem_barrier.srcAccessMask = 0;
+    mem_barrier.dstAccessMask = VK_ACCESS_HOST_WRITE_BIT;
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdPipelineBarrier-pDependencies-02285");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdPipelineBarrier-pDependencies-02285");
+    vk::CmdPipelineBarrier(m_commandBuffer->handle(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                           VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT, 1, &mem_barrier, 0, nullptr,
+                           0, nullptr);
+    m_errorMonitor->VerifyFound();
+    // Mis-match image barrier src access mask
+    img_barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdPipelineBarrier-pDependencies-02285");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdPipelineBarrier-pDependencies-02285");
+    vk::CmdPipelineBarrier(m_commandBuffer->handle(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                           VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1,
+                           &img_barrier);
+    m_errorMonitor->VerifyFound();
+    // Mis-match image barrier dst access mask
+    img_barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    img_barrier.dstAccessMask = VK_ACCESS_HOST_WRITE_BIT;
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdPipelineBarrier-pDependencies-02285");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdPipelineBarrier-pDependencies-02285");
+    vk::CmdPipelineBarrier(m_commandBuffer->handle(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                           VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1,
+                           &img_barrier);
+    m_errorMonitor->VerifyFound();
+    // Mis-match dependencyFlags
+    img_barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdPipelineBarrier-pDependencies-02285");
+    vk::CmdPipelineBarrier(m_commandBuffer->handle(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                           VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0 /* wrong */, 0, nullptr, 0, nullptr, 1, &img_barrier);
+    m_errorMonitor->VerifyFound();
+    // Send non-zero bufferMemoryBarrierCount
+    // Construct a valid BufferMemoryBarrier to avoid any parameter errors
+    // First we need a valid buffer to reference
+    VkBufferObj buffer;
+    VkMemoryPropertyFlags mem_reqs = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+    buffer.init_as_src_and_dst(*m_device, 256, mem_reqs);
+    VkBufferMemoryBarrier bmb = {};
+    bmb.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+    bmb.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
+    bmb.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    bmb.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    bmb.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    bmb.buffer = buffer.handle();
+    bmb.offset = 0;
+    bmb.size = VK_WHOLE_SIZE;
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdPipelineBarrier-bufferMemoryBarrierCount-01178");
+    vk::CmdPipelineBarrier(m_commandBuffer->handle(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                           VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 1, &bmb, 0,
+                           nullptr);
+    m_errorMonitor->VerifyFound();
+    // Add image barrier w/ image handle that's not in framebuffer
+    VkImageObj lone_image(m_device);
+    lone_image.InitNoLayout(32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_IMAGE_TILING_OPTIMAL, 0);
+    img_barrier.image = lone_image.handle();
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdPipelineBarrier-image-04073");
+    vk::CmdPipelineBarrier(m_commandBuffer->handle(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                           VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1,
+                           &img_barrier);
+    m_errorMonitor->VerifyFound();
+    // Have image barrier with mis-matched layouts
+    img_barrier.image = image.handle();
+    img_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdPipelineBarrier-oldLayout-01181");
+    vk::CmdPipelineBarrier(m_commandBuffer->handle(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                           VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1,
+                           &img_barrier);
+    m_errorMonitor->VerifyFound();
+
+    img_barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+    img_barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdPipelineBarrier-oldLayout-01181");
+    vk::CmdPipelineBarrier(m_commandBuffer->handle(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                           VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1,
+                           &img_barrier);
+    m_errorMonitor->VerifyFound();
+    vk::CmdEndRenderPass(m_commandBuffer->handle());
+
+    vk::DestroyFramebuffer(m_device->device(), fb, nullptr);
+    vk::DestroyRenderPass(m_device->device(), rp, nullptr);
+    vk::DestroyRenderPass(m_device->device(), rp_noselfdep, nullptr);
+}
+
 TEST_F(VkLayerTest, InvalidCmdBufferBufferDestroyed) {
     TEST_DESCRIPTION("Attempt to draw with a command buffer that is invalid due to a buffer dependency being destroyed.");
     ASSERT_NO_FATAL_FAILURE(Init());
@@ -6031,6 +6240,410 @@ TEST_F(VkLayerTest, InvalidBarriers) {
     vk::DestroyEvent(m_device->device(), event, nullptr);
 }
 
+TEST_F(VkLayerTest, Sync2InvalidBarriers) {
+    TEST_DESCRIPTION("A variety of ways to get VK_INVALID_BARRIER ");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    ASSERT_NO_FATAL_FAILURE(InitFramework());
+    if (DeviceExtensionSupported(gpu(), nullptr, VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME)) {
+        m_device_extension_names.push_back(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
+    } else {
+        printf("%s Synchronization2 not supported, skipping test\n", kSkipPrefix);
+        return;
+    }
+    bool separate_ds_layouts = false;
+    if (DeviceExtensionSupported(gpu(), nullptr, VK_KHR_SEPARATE_DEPTH_STENCIL_LAYOUTS_EXTENSION_NAME)) {
+        m_device_extension_names.push_back(VK_KHR_SEPARATE_DEPTH_STENCIL_LAYOUTS_EXTENSION_NAME);
+        separate_ds_layouts = true;
+    }
+    bool maintaince2 = DeviceExtensionSupported(gpu(), nullptr, VK_KHR_MAINTENANCE2_EXTENSION_NAME);
+    if (maintaince2) {
+        m_device_extension_names.push_back(VK_KHR_MAINTENANCE2_EXTENSION_NAME);
+    }
+
+    if (!CheckSynchronization2SupportAndInitState(this)) {
+        printf("%s Synchronization2 not supported, skipping test\n", kSkipPrefix);
+        return;
+    }
+
+    auto depth_format = FindSupportedDepthStencilFormat(gpu());
+    if (!depth_format) {
+        printf("%s No Depth + Stencil format found. Skipped.\n", kSkipPrefix);
+        return;
+    }
+    // Add a token self-dependency for this test to avoid unexpected errors
+    m_addRenderPassSelfDependency = true;
+    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+
+    const uint32_t submit_family = m_device->graphics_queue_node_index_;
+    const uint32_t invalid = static_cast<uint32_t>(m_device->queue_props.size());
+    const uint32_t other_family = submit_family != 0 ? 0 : 1;
+    const bool only_one_family = (invalid == 1) || (m_device->queue_props[other_family].queueCount == 0);
+    std::vector<uint32_t> qf_indices{{submit_family, other_family}};
+    if (only_one_family) {
+        qf_indices.resize(1);
+    }
+    Barrier2QueueFamilyTestHelper::Context test_context(this, qf_indices);
+
+    // Use image unbound to memory in barrier
+    // Use buffer unbound to memory in barrier
+    Barrier2QueueFamilyTestHelper conc_test(&test_context);
+    conc_test.Init(nullptr, false, false);
+
+    conc_test.image_barrier_.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    conc_test(" used with no memory bound. Memory should be bound by calling vkBindImageMemory()",
+              " used with no memory bound. Memory should be bound by calling vkBindBufferMemory()");
+
+    VkBufferObj buffer;
+    VkMemoryPropertyFlags mem_reqs = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+    buffer.init_as_src_and_dst(*m_device, 256, mem_reqs);
+    conc_test.buffer_barrier_.buffer = buffer.handle();
+
+    VkImageObj image(m_device);
+    image.Init(128, 128, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_IMAGE_TILING_OPTIMAL, 0);
+    conc_test.image_barrier_.image = image.handle();
+
+    // New layout can't be UNDEFINED
+    conc_test.image_barrier_.newLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    conc_test("VUID-VkImageMemoryBarrier2KHR-newLayout-01198", "");
+
+    // Transition image to color attachment optimal
+    conc_test.image_barrier_.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    conc_test("");
+
+    // TODO: this looks vestigal or incomplete...
+    m_commandBuffer->begin();
+    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
+
+    // Can't send buffer memory barrier during a render pass
+    vk::CmdEndRenderPass(m_commandBuffer->handle());
+
+    // Duplicate barriers that change layout
+    auto img_barrier = lvl_init_struct<VkImageMemoryBarrier2KHR>();
+    img_barrier.image = image.handle();
+    img_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    img_barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    img_barrier.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    img_barrier.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    img_barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    img_barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    img_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    img_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    img_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    img_barrier.subresourceRange.baseArrayLayer = 0;
+    img_barrier.subresourceRange.baseMipLevel = 0;
+    img_barrier.subresourceRange.layerCount = 1;
+    img_barrier.subresourceRange.levelCount = 1;
+    VkImageMemoryBarrier2KHR img_barriers[2] = {img_barrier, img_barrier};
+
+    auto dep_info = lvl_init_struct<VkDependencyInfoKHR>();
+    dep_info.imageMemoryBarrierCount = 2;
+    dep_info.pImageMemoryBarriers = img_barriers;
+    dep_info.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+    // Transitions from UNDEFINED  are valid, even if duplicated
+    m_errorMonitor->ExpectSuccess();
+    m_commandBuffer->PipelineBarrier2KHR(&dep_info);
+    m_errorMonitor->VerifyNotFound();
+
+    // Duplication of layout transitions (not from undefined) are not valid
+    img_barriers[0].oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+    img_barriers[0].newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    img_barriers[1].oldLayout = img_barriers[0].oldLayout;
+    img_barriers[1].newLayout = img_barriers[0].newLayout;
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageMemoryBarrier2KHR-oldLayout-01197");
+    m_commandBuffer->PipelineBarrier2KHR(&dep_info);
+    m_errorMonitor->VerifyFound();
+
+    {
+        // Transitions to and from EXTERNAL within the same command buffer are valid, if pointless.
+        m_errorMonitor->ExpectSuccess();
+        dep_info.imageMemoryBarrierCount = 1;
+        dep_info.pImageMemoryBarriers = &img_barrier;
+        img_barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+        img_barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        img_barrier.srcQueueFamilyIndex = submit_family;
+        img_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_EXTERNAL;
+        img_barrier.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+        img_barrier.dstAccessMask = 0;
+        img_barrier.srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+        img_barrier.dstStageMask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+
+        m_commandBuffer->PipelineBarrier2KHR(&dep_info);
+
+        img_barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        img_barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+        img_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_EXTERNAL;
+        img_barrier.dstQueueFamilyIndex = submit_family;
+        img_barrier.srcAccessMask = 0;
+        img_barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+
+        m_commandBuffer->PipelineBarrier2KHR(&dep_info);
+        m_errorMonitor->VerifyNotFound();
+    }
+
+    // Exceed the buffer size
+    conc_test.buffer_barrier_.offset = conc_test.buffer_.create_info().size + 1;
+    conc_test("", "VUID-VkBufferMemoryBarrier2KHR-offset-01187");
+
+    conc_test.buffer_barrier_.offset = 0;
+    conc_test.buffer_barrier_.size = conc_test.buffer_.create_info().size + 1;
+    // Size greater than total size
+    conc_test("", "VUID-VkBufferMemoryBarrier2KHR-size-01189");
+
+    conc_test.buffer_barrier_.size = 0;
+    // Size is zero
+    conc_test("", "VUID-VkBufferMemoryBarrier2KHR-size-01188");
+
+    conc_test.buffer_barrier_.size = VK_WHOLE_SIZE;
+
+    // Now exercise barrier aspect bit errors, first DS
+    VkDepthStencilObj ds_image(m_device);
+    ds_image.Init(m_device, 128, 128, depth_format);
+    ASSERT_TRUE(ds_image.initialized());
+
+    conc_test.image_barrier_.oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    conc_test.image_barrier_.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    conc_test.image_barrier_.image = ds_image.handle();
+
+    // Not having DEPTH or STENCIL set is an error
+    conc_test.image_barrier_.subresourceRange.aspectMask = VK_IMAGE_ASPECT_METADATA_BIT;
+
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-CoreValidation-DrawState-InvalidImageAspect");
+    {
+        const char *vuid = (separate_ds_layouts == true) ? "VUID-VkImageMemoryBarrier2KHR-image-03320"
+                                                         : "VUID-VkImageMemoryBarrier2KHR-image-01207";
+        conc_test(vuid);
+
+        // Having only one of depth or stencil set for DS image is an error
+        conc_test.image_barrier_.subresourceRange.aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT;
+        conc_test(vuid);
+    }
+
+    // Having anything other than DEPTH and STENCIL is an error
+    conc_test.image_barrier_.subresourceRange.aspectMask =
+        VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT | VK_IMAGE_ASPECT_COLOR_BIT;
+    conc_test("UNASSIGNED-CoreValidation-DrawState-InvalidImageAspect");
+
+    // Now test depth-only
+    VkFormatProperties format_props;
+    vk::GetPhysicalDeviceFormatProperties(m_device->phy().handle(), VK_FORMAT_D16_UNORM, &format_props);
+    if (format_props.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) {
+        VkDepthStencilObj d_image(m_device);
+        d_image.Init(m_device, 128, 128, VK_FORMAT_D16_UNORM);
+        ASSERT_TRUE(d_image.initialized());
+
+        conc_test.image_barrier_.oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        conc_test.image_barrier_.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+        conc_test.image_barrier_.image = d_image.handle();
+
+        // DEPTH bit must be set
+        conc_test.image_barrier_.subresourceRange.aspectMask = VK_IMAGE_ASPECT_METADATA_BIT;
+        conc_test("depth-only image formats must have the VK_IMAGE_ASPECT_DEPTH_BIT set.");
+
+        // No bits other than DEPTH may be set
+        conc_test.image_barrier_.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_COLOR_BIT;
+        conc_test("depth-only image formats can have only the VK_IMAGE_ASPECT_DEPTH_BIT set.");
+    }
+
+    // Now test stencil-only
+    vk::GetPhysicalDeviceFormatProperties(m_device->phy().handle(), VK_FORMAT_S8_UINT, &format_props);
+    if (format_props.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) {
+        VkDepthStencilObj s_image(m_device);
+        s_image.Init(m_device, 128, 128, VK_FORMAT_S8_UINT);
+        ASSERT_TRUE(s_image.initialized());
+
+        conc_test.image_barrier_.oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        conc_test.image_barrier_.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+        conc_test.image_barrier_.image = s_image.handle();
+
+        // Use of COLOR aspect on depth image is error
+        conc_test.image_barrier_.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        conc_test("stencil-only image formats must have the VK_IMAGE_ASPECT_STENCIL_BIT set.");
+    }
+
+    // Finally test color
+    VkImageObj c_image(m_device);
+    c_image.Init(128, 128, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_IMAGE_TILING_OPTIMAL, 0);
+    ASSERT_TRUE(c_image.initialized());
+    conc_test.image_barrier_.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    conc_test.image_barrier_.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    conc_test.image_barrier_.image = c_image.handle();
+
+    const char *color_vuid = "VUID-VkImageMemoryBarrier2KHR-image-01671";
+
+    // COLOR bit must be set
+    conc_test.image_barrier_.subresourceRange.aspectMask = VK_IMAGE_ASPECT_METADATA_BIT;
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-CoreValidation-DrawState-InvalidImageAspect");
+    conc_test(color_vuid);
+
+    // No bits other than COLOR may be set
+    conc_test.image_barrier_.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT | VK_IMAGE_ASPECT_DEPTH_BIT;
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-CoreValidation-DrawState-InvalidImageAspect");
+    conc_test(color_vuid);
+
+    // A barrier's new and old VkImageLayout must be compatible with an image's VkImageUsageFlags.
+    {
+        VkImageObj img_color(m_device);
+        img_color.Init(128, 128, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_IMAGE_TILING_OPTIMAL);
+        ASSERT_TRUE(img_color.initialized());
+
+        VkImageObj img_ds(m_device);
+        img_ds.Init(128, 128, 1, depth_format, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_IMAGE_TILING_OPTIMAL);
+        ASSERT_TRUE(img_ds.initialized());
+
+        VkImageObj img_xfer_src(m_device);
+        img_xfer_src.Init(128, 128, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_TILING_OPTIMAL);
+        ASSERT_TRUE(img_xfer_src.initialized());
+
+        VkImageObj img_xfer_dst(m_device);
+        img_xfer_dst.Init(128, 128, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_TILING_OPTIMAL);
+        ASSERT_TRUE(img_xfer_dst.initialized());
+
+        VkImageObj img_sampled(m_device);
+        img_sampled.Init(32, 32, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_TILING_OPTIMAL);
+        ASSERT_TRUE(img_sampled.initialized());
+
+        VkImageObj img_input(m_device);
+        img_input.Init(128, 128, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT, VK_IMAGE_TILING_OPTIMAL);
+        ASSERT_TRUE(img_input.initialized());
+
+        const struct {
+            VkImageObj &image_obj;
+            VkImageLayout bad_layout;
+            std::string msg_code;
+        } bad_buffer_layouts[] = {
+            // clang-format off
+            // images _without_ VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT
+            {img_ds,       VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,         "VUID-VkImageMemoryBarrier2KHR-oldLayout-01208"},
+            {img_xfer_src, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,         "VUID-VkImageMemoryBarrier2KHR-oldLayout-01208"},
+            {img_xfer_dst, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,         "VUID-VkImageMemoryBarrier2KHR-oldLayout-01208"},
+            {img_sampled,  VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,         "VUID-VkImageMemoryBarrier2KHR-oldLayout-01208"},
+            {img_input,    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,         "VUID-VkImageMemoryBarrier2KHR-oldLayout-01208"},
+            // images _without_ VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT
+            {img_color,    VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, "VUID-VkImageMemoryBarrier2KHR-oldLayout-01209"},
+            {img_xfer_src, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, "VUID-VkImageMemoryBarrier2KHR-oldLayout-01209"},
+            {img_xfer_dst, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, "VUID-VkImageMemoryBarrier2KHR-oldLayout-01209"},
+            {img_sampled,  VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, "VUID-VkImageMemoryBarrier2KHR-oldLayout-01209"},
+            {img_input,    VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, "VUID-VkImageMemoryBarrier2KHR-oldLayout-01209"},
+            {img_color,    VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,  "VUID-VkImageMemoryBarrier2KHR-oldLayout-01210"},
+            {img_xfer_src, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,  "VUID-VkImageMemoryBarrier2KHR-oldLayout-01210"},
+            {img_xfer_dst, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,  "VUID-VkImageMemoryBarrier2KHR-oldLayout-01210"},
+            {img_sampled,  VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,  "VUID-VkImageMemoryBarrier2KHR-oldLayout-01210"},
+            {img_input,    VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,  "VUID-VkImageMemoryBarrier2KHR-oldLayout-01210"},
+            // images _without_ VK_IMAGE_USAGE_SAMPLED_BIT or VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT
+            {img_color,    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,         "VUID-VkImageMemoryBarrier2KHR-oldLayout-01211"},
+            {img_ds,       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,         "VUID-VkImageMemoryBarrier2KHR-oldLayout-01211"},
+            {img_xfer_src, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,         "VUID-VkImageMemoryBarrier2KHR-oldLayout-01211"},
+            {img_xfer_dst, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,         "VUID-VkImageMemoryBarrier2KHR-oldLayout-01211"},
+            // images _without_ VK_IMAGE_USAGE_TRANSFER_SRC_BIT
+            {img_color,    VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,             "VUID-VkImageMemoryBarrier2KHR-oldLayout-01212"},
+            {img_ds,       VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,             "VUID-VkImageMemoryBarrier2KHR-oldLayout-01212"},
+            {img_xfer_dst, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,             "VUID-VkImageMemoryBarrier2KHR-oldLayout-01212"},
+            {img_sampled,  VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,             "VUID-VkImageMemoryBarrier2KHR-oldLayout-01212"},
+            {img_input,    VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,             "VUID-VkImageMemoryBarrier2KHR-oldLayout-01212"},
+            // images _without_ VK_IMAGE_USAGE_TRANSFER_DST_BIT
+            {img_color,    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,             "VUID-VkImageMemoryBarrier2KHR-oldLayout-01213"},
+            {img_ds,       VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,             "VUID-VkImageMemoryBarrier2KHR-oldLayout-01213"},
+            {img_xfer_src, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,             "VUID-VkImageMemoryBarrier2KHR-oldLayout-01213"},
+            {img_sampled,  VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,             "VUID-VkImageMemoryBarrier2KHR-oldLayout-01213"},
+            {img_input,    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,             "VUID-VkImageMemoryBarrier2KHR-oldLayout-01213"},
+            // images _without_ VK_KHR_maintenance2 added layouts
+            {img_color,    VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL, "VUID-VkImageMemoryBarrier2KHR-oldLayout-01658"},
+            {img_xfer_src, VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL, "VUID-VkImageMemoryBarrier2KHR-oldLayout-01658"},
+            {img_sampled,  VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL, "VUID-VkImageMemoryBarrier2KHR-oldLayout-01658"},
+            {img_input,    VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL, "VUID-VkImageMemoryBarrier2KHR-oldLayout-01658"},
+            {img_color,    VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL, "VUID-VkImageMemoryBarrier2KHR-oldLayout-01659"},
+            {img_xfer_src, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL, "VUID-VkImageMemoryBarrier2KHR-oldLayout-01659"},
+            {img_sampled,  VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL, "VUID-VkImageMemoryBarrier2KHR-oldLayout-01659"},
+            {img_input,    VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL, "VUID-VkImageMemoryBarrier2KHR-oldLayout-01659"},
+            // clang-format on
+        };
+        const uint32_t layout_count = sizeof(bad_buffer_layouts) / sizeof(bad_buffer_layouts[0]);
+
+        for (uint32_t i = 0; i < layout_count; ++i) {
+            const VkImageLayout bad_layout = bad_buffer_layouts[i].bad_layout;
+            // Skip layouts that require maintaince2 support
+            if ((maintaince2 == false) && ((bad_layout == VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL) ||
+                                           (bad_layout == VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL))) {
+                continue;
+            }
+            conc_test.image_barrier_.image = bad_buffer_layouts[i].image_obj.handle();
+            const VkImageUsageFlags usage = bad_buffer_layouts[i].image_obj.usage();
+            conc_test.image_barrier_.subresourceRange.aspectMask = (usage == VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
+                                                                       ? (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT)
+                                                                       : VK_IMAGE_ASPECT_COLOR_BIT;
+
+            conc_test.image_barrier_.oldLayout = bad_layout;
+            conc_test.image_barrier_.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+            conc_test(bad_buffer_layouts[i].msg_code);
+
+            conc_test.image_barrier_.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+            conc_test.image_barrier_.newLayout = bad_layout;
+            conc_test(bad_buffer_layouts[i].msg_code);
+        }
+
+        conc_test.image_barrier_.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+        conc_test.image_barrier_.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+        conc_test.image_barrier_.image = image.handle();
+    }
+
+    // Attempt barrier where srcAccessMask is not supported by srcStageMask
+    // Have lower-order bit that's supported (shader write), but higher-order bit not supported to verify multi-bit validation
+    // TODO: synchronization2 has a separate VUID for every access flag. Gotta test them all..
+    conc_test.buffer_barrier_.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    conc_test.buffer_barrier_.offset = 0;
+    conc_test.buffer_barrier_.size = VK_WHOLE_SIZE;
+    conc_test("", "VUID-VkBufferMemoryBarrier2KHR-srcAccessMask-03909");
+
+    // Attempt barrier where dstAccessMask is not supported by dstStageMask
+    conc_test.buffer_barrier_.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+    conc_test.buffer_barrier_.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    conc_test("", "VUID-VkBufferMemoryBarrier2KHR-dstAccessMask-03911");
+
+    // Attempt to mismatch barriers/waitEvents calls with incompatible queues
+    // Create command pool with incompatible queueflags
+    const std::vector<VkQueueFamilyProperties> queue_props = m_device->queue_props;
+    uint32_t queue_family_index = m_device->QueueFamilyMatching(VK_QUEUE_GRAPHICS_BIT, VK_QUEUE_COMPUTE_BIT);
+    if (queue_family_index == UINT32_MAX) {
+        printf("%s No non-compute queue supporting graphics found; skipped.\n", kSkipPrefix);
+        return;  // NOTE: this exits the test function!
+    }
+
+    auto buf_barrier = lvl_init_struct<VkBufferMemoryBarrier2KHR>();
+    buf_barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+    buf_barrier.pNext = NULL;
+    buf_barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    buf_barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    buf_barrier.srcStageMask = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+    buf_barrier.dstStageMask = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    buf_barrier.buffer = buffer.handle();
+    buf_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    buf_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    buf_barrier.offset = 0;
+    buf_barrier.size = VK_WHOLE_SIZE;
+
+    dep_info = lvl_init_struct<VkDependencyInfoKHR>();
+    dep_info.bufferMemoryBarrierCount = 1;
+    dep_info.pBufferMemoryBarriers = &buf_barrier;
+
+    m_commandBuffer->PipelineBarrier2KHR(&dep_info);
+
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdPipelineBarrier-srcStageMask-4098");
+
+    VkCommandPoolObj command_pool(m_device, queue_family_index, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+    VkCommandBufferObj bad_command_buffer(m_device, &command_pool);
+
+    bad_command_buffer.begin();
+    buf_barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    // Set two bits that should both be supported as a bonus positive check
+    buf_barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT | VK_ACCESS_TRANSFER_READ_BIT;
+    buf_barrier.srcAccessMask = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+    buf_barrier.dstAccessMask = VK_PIPELINE_STAGE_TRANSFER_BIT;
+
+    m_commandBuffer->PipelineBarrier2KHR(&dep_info);
+    m_errorMonitor->VerifyFound();
+}
+
 TEST_F(VkLayerTest, InvalidBarrierQueueFamily) {
     TEST_DESCRIPTION("Create and submit barriers with invalid queue families");
     SetTargetApiVersion(VK_API_VERSION_1_0);
@@ -6061,9 +6674,9 @@ TEST_F(VkLayerTest, InvalidBarrierQueueFamily) {
             std::vector<uint32_t> families = {submit_family, other_family};
             BarrierQueueFamilyTestHelper conc_test(&test_context);
             conc_test.Init(&families);
-            // core_validation::barrier_queue_families::kSrcAndDestMustBeIgnore
             static const char *img_vuid = "VUID-VkImageMemoryBarrier-synchronization2-03856";
             static const char *buf_vuid = "VUID-VkBufferMemoryBarrier-synchronization2-03852";
+            // core_validation::barrier_queue_families::kSrcAndDestMustBeIgnore
             conc_test(img_vuid, buf_vuid, VK_QUEUE_FAMILY_IGNORED, submit_family);
             conc_test(img_vuid, buf_vuid, submit_family, VK_QUEUE_FAMILY_IGNORED);
             conc_test(img_vuid, buf_vuid, submit_family, submit_family);
@@ -6204,6 +6817,86 @@ TEST_F(VkLayerTest, InvalidBarrierQueueFamilyWithMemExt) {
               VK_QUEUE_FAMILY_EXTERNAL_KHR, true);
     excl_test("VUID-VkImageMemoryBarrier-image-04072", "VUID-VkBufferMemoryBarrier-buffer-04089", VK_QUEUE_FAMILY_EXTERNAL_KHR,
               submit_family, true);
+}
+
+TEST_F(VkLayerTest, Sync2InvalidBarrierQueueFamily) {
+    TEST_DESCRIPTION("Create and submit barriers with invalid queue families with synchronization2");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    ASSERT_NO_FATAL_FAILURE(InitFramework());
+    if (DeviceExtensionSupported(gpu(), nullptr, VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME)) {
+        m_device_extension_names.push_back(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
+    } else {
+        printf("%s Synchronization2 not supported, skipping test\n", kSkipPrefix);
+        return;
+    }
+
+    if (!CheckSynchronization2SupportAndInitState(this)) {
+        printf("%s Synchronization2 not supported, skipping test\n", kSkipPrefix);
+        return;
+    }
+    // Find queues of two families
+    const uint32_t submit_family = m_device->graphics_queue_node_index_;
+    const uint32_t invalid = static_cast<uint32_t>(m_device->queue_props.size());
+    const uint32_t other_family = submit_family != 0 ? 0 : 1;
+    const bool only_one_family = (invalid == 1) || (m_device->queue_props[other_family].queueCount == 0);
+
+    std::vector<uint32_t> qf_indices{{submit_family, other_family}};
+    if (only_one_family) {
+        qf_indices.resize(1);
+    }
+    BarrierQueueFamilyTestHelper::Context test_context(this, qf_indices);
+    Barrier2QueueFamilyTestHelper::Context test_context2(this, qf_indices);
+
+    if (only_one_family) {
+        printf("%s Single queue family found -- VK_SHARING_MODE_CONCURRENT testcases skipped.\n", kSkipPrefix);
+    } else {
+        std::vector<uint32_t> families = {submit_family, other_family};
+        BarrierQueueFamilyTestHelper conc_test(&test_context);
+
+        // core_validation::barrier_queue_families::kSrcOrDstMustBeIgnore
+        conc_test.Init(&families);
+        conc_test("VUID-VkImageMemoryBarrier-synchronization2-03857", "VUID-VkBufferMemoryBarrier-synchronization2-03853",
+                  submit_family, submit_family, true);
+        // true -> positive test
+        conc_test("VUID-VkImageMemoryBarrier-synchronization2-03857", "VUID-VkBufferMemoryBarrier-synchronization2-03853",
+                  VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, true);
+        conc_test("VUID-VkImageMemoryBarrier-synchronization2-03857", "VUID-VkBufferMemoryBarrier-synchronization2-03853",
+                  VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_EXTERNAL_KHR, true);
+        conc_test("VUID-VkImageMemoryBarrier-synchronization2-03857", "VUID-VkBufferMemoryBarrier-synchronization2-03853",
+                  VK_QUEUE_FAMILY_EXTERNAL_KHR, VK_QUEUE_FAMILY_IGNORED, true);
+
+        Barrier2QueueFamilyTestHelper conc_test2(&test_context2);
+        conc_test2.Init(&families);
+        conc_test2("POSITIVE_TEST", "POSITIVE_TEST", VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, true);
+        conc_test2("POSITIVE_TEST", "POSITIVE_TEST", VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_EXTERNAL_KHR, true);
+        conc_test2("POSITIVE_TEST", "POSITIVE_TEST", VK_QUEUE_FAMILY_EXTERNAL_KHR, VK_QUEUE_FAMILY_IGNORED, true);
+
+        // core_validation::barrier_queue_families::kSpecialOrIgnoreOnly
+        conc_test2("VUID-VkImageMemoryBarrier2KHR-image-04071", "VUID-VkBufferMemoryBarrier2KHR-buffer-04088", submit_family,
+                   VK_QUEUE_FAMILY_IGNORED);
+        conc_test2("VUID-VkImageMemoryBarrier2KHR-image-04071", "VUID-VkBufferMemoryBarrier2KHR-buffer-04088",
+                   VK_QUEUE_FAMILY_IGNORED, submit_family);
+        // This is to flag the errors that would be considered only "unexpected" in the parallel case above
+        // true -> positive test
+        conc_test2("VUID-VkImageMemoryBarrier2KHR-image-04071", "VUID-VkBufferMemoryBarrier2KHR-buffer-04088",
+                   VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_EXTERNAL_KHR, true);
+        conc_test2("VUID-VkImageMemoryBarrier2KHR-image-04071", "VUID-VkBufferMemoryBarrier2KHR-buffer-04088",
+                   VK_QUEUE_FAMILY_EXTERNAL_KHR, VK_QUEUE_FAMILY_IGNORED, true);
+    }
+
+    Barrier2QueueFamilyTestHelper excl_test(&test_context2);
+    excl_test.Init(nullptr);  // no queue families means *exclusive* sharing mode.
+
+    // core_validation::barrier_queue_families::kSrcAndDstValidOrSpecial
+    excl_test("VUID-VkImageMemoryBarrier2KHR-image-04072", "VUID-VkBufferMemoryBarrier2KHR-buffer-04089", submit_family, invalid);
+    excl_test("VUID-VkImageMemoryBarrier2KHR-image-04072", "VUID-VkBufferMemoryBarrier2KHR-buffer-04089", invalid, submit_family);
+    // true -> positive test
+    excl_test("VUID-VkImageMemoryBarrier2KHR-image-04072", "VUID-VkBufferMemoryBarrier2KHR-buffer-04089", submit_family,
+              submit_family, true);
+    excl_test("VUID-VkImageMemoryBarrier2KHR-image-04072", "VUID-VkBufferMemoryBarrier2KHR-buffer-04089", submit_family,
+              VK_QUEUE_FAMILY_EXTERNAL_KHR, true);
+    excl_test("VUID-VkImageMemoryBarrier2KHR-image-04072", "VUID-VkBufferMemoryBarrier2KHR-buffer-04089",
+              VK_QUEUE_FAMILY_EXTERNAL_KHR, submit_family, true);
 }
 
 TEST_F(VkLayerTest, ImageBarrierWithBadRange) {
@@ -6604,6 +7297,321 @@ TEST_F(VkLayerTest, BadIndexBufferOffset) {
 
 // INVALID_IMAGE_LAYOUT tests (one other case is hit by MapMemWithoutHostVisibleBit and not here)
 TEST_F(VkLayerTest, InvalidImageLayout) {
+    TEST_DESCRIPTION(
+        "Hit all possible validation checks associated with the UNASSIGNED-CoreValidation-DrawState-InvalidImageLayout error. "
+        "Generally these involve having images in the wrong layout when they're copied or transitioned.");
+    // 3 in ValidateCmdBufImageLayouts
+    // *  -1 Attempt to submit cmd buf w/ deleted image
+    // *  -2 Cmd buf submit of image w/ layout not matching first use w/ subresource
+    // *  -3 Cmd buf submit of image w/ layout not matching first use w/o subresource
+
+    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
+
+    bool copy_commands2 = false;
+    if (DeviceExtensionSupported(gpu(), nullptr, VK_KHR_COPY_COMMANDS_2_EXTENSION_NAME)) {
+        m_device_extension_names.push_back(VK_KHR_COPY_COMMANDS_2_EXTENSION_NAME);
+        copy_commands2 = true;
+    }
+    ASSERT_NO_FATAL_FAILURE(InitState());
+
+    PFN_vkCmdCopyImage2KHR vkCmdCopyImage2Function = nullptr;
+    if (copy_commands2) {
+        vkCmdCopyImage2Function = (PFN_vkCmdCopyImage2KHR)vk::GetDeviceProcAddr(m_device->handle(), "vkCmdCopyImage2KHR");
+    }
+
+    auto depth_format = FindSupportedDepthStencilFormat(gpu());
+    if (!depth_format) {
+        printf("%s No Depth + Stencil format found. Skipped.\n", kSkipPrefix);
+        return;
+    }
+    // Create src & dst images to use for copy operations
+    VkImageObj src_image(m_device);
+    VkImageObj dst_image(m_device);
+    VkImageObj depth_image(m_device);
+
+    const VkFormat tex_format = VK_FORMAT_B8G8R8A8_UNORM;
+    const int32_t tex_width = 32;
+    const int32_t tex_height = 32;
+
+    VkImageCreateInfo image_create_info = {};
+    image_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    image_create_info.pNext = NULL;
+    image_create_info.imageType = VK_IMAGE_TYPE_2D;
+    image_create_info.format = tex_format;
+    image_create_info.extent.width = tex_width;
+    image_create_info.extent.height = tex_height;
+    image_create_info.extent.depth = 1;
+    image_create_info.mipLevels = 1;
+    image_create_info.arrayLayers = 4;
+    image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_create_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    image_create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    image_create_info.flags = 0;
+
+    src_image.init(&image_create_info);
+
+    image_create_info.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    dst_image.init(&image_create_info);
+
+    image_create_info.format = VK_FORMAT_D16_UNORM;
+    image_create_info.usage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    depth_image.init(&image_create_info);
+
+    m_commandBuffer->begin();
+    VkImageCopy copy_region;
+    copy_region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    copy_region.srcSubresource.mipLevel = 0;
+    copy_region.srcSubresource.baseArrayLayer = 0;
+    copy_region.srcSubresource.layerCount = 1;
+    copy_region.srcOffset.x = 0;
+    copy_region.srcOffset.y = 0;
+    copy_region.srcOffset.z = 0;
+    copy_region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    copy_region.dstSubresource.mipLevel = 0;
+    copy_region.dstSubresource.baseArrayLayer = 0;
+    copy_region.dstSubresource.layerCount = 1;
+    copy_region.dstOffset.x = 0;
+    copy_region.dstOffset.y = 0;
+    copy_region.dstOffset.z = 0;
+    copy_region.extent.width = 1;
+    copy_region.extent.height = 1;
+    copy_region.extent.depth = 1;
+
+    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit,
+                                         "layout should be VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL instead of GENERAL.");
+    m_errorMonitor->SetUnexpectedError("layout should be VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL instead of GENERAL.");
+    m_commandBuffer->CopyImage(src_image.handle(), VK_IMAGE_LAYOUT_GENERAL, dst_image.handle(), VK_IMAGE_LAYOUT_GENERAL, 1,
+                               &copy_region);
+    m_errorMonitor->VerifyFound();
+    // The first call hits the expected WARNING and skips the call down the chain, so call a second time to call down chain and
+    // update layer state
+    m_errorMonitor->SetUnexpectedError("layout should be VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL instead of GENERAL.");
+    m_errorMonitor->SetUnexpectedError("layout should be VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL instead of GENERAL.");
+    m_commandBuffer->CopyImage(src_image.handle(), VK_IMAGE_LAYOUT_GENERAL, dst_image.handle(), VK_IMAGE_LAYOUT_GENERAL, 1,
+                               &copy_region);
+    // Now cause error due to src image layout changing
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdCopyImage-srcImageLayout-00128");
+    m_errorMonitor->SetUnexpectedError("is VK_IMAGE_LAYOUT_UNDEFINED but can only be VK_IMAGE_LAYOUT");
+    m_commandBuffer->CopyImage(src_image.handle(), VK_IMAGE_LAYOUT_UNDEFINED, dst_image.handle(), VK_IMAGE_LAYOUT_GENERAL, 1,
+                               &copy_region);
+    m_errorMonitor->VerifyFound();
+    // Final src error is due to bad layout type
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdCopyImage-srcImageLayout-00129");
+    m_errorMonitor->SetUnexpectedError(
+        "with specific layout VK_IMAGE_LAYOUT_UNDEFINED that doesn't match the previously used layout VK_IMAGE_LAYOUT_GENERAL.");
+    m_commandBuffer->CopyImage(src_image.handle(), VK_IMAGE_LAYOUT_UNDEFINED, dst_image.handle(), VK_IMAGE_LAYOUT_GENERAL, 1,
+                               &copy_region);
+    m_errorMonitor->VerifyFound();
+    // Now verify same checks for dst
+    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit,
+                                         "layout should be VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL instead of GENERAL.");
+    m_errorMonitor->SetUnexpectedError("layout should be VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL instead of GENERAL.");
+    m_commandBuffer->CopyImage(src_image.handle(), VK_IMAGE_LAYOUT_GENERAL, dst_image.handle(), VK_IMAGE_LAYOUT_GENERAL, 1,
+                               &copy_region);
+    m_errorMonitor->VerifyFound();
+    // Now cause error due to src image layout changing
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdCopyImage-dstImageLayout-00133");
+    m_errorMonitor->SetUnexpectedError(
+        "is VK_IMAGE_LAYOUT_UNDEFINED but can only be VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL or VK_IMAGE_LAYOUT_GENERAL.");
+    m_commandBuffer->CopyImage(src_image.handle(), VK_IMAGE_LAYOUT_GENERAL, dst_image.handle(), VK_IMAGE_LAYOUT_UNDEFINED, 1,
+                               &copy_region);
+    m_errorMonitor->VerifyFound();
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdCopyImage-dstImageLayout-00134");
+    m_errorMonitor->SetUnexpectedError(
+        "with specific layout VK_IMAGE_LAYOUT_UNDEFINED that doesn't match the previously used layout VK_IMAGE_LAYOUT_GENERAL.");
+    m_commandBuffer->CopyImage(src_image.handle(), VK_IMAGE_LAYOUT_GENERAL, dst_image.handle(), VK_IMAGE_LAYOUT_UNDEFINED, 1,
+                               &copy_region);
+    m_errorMonitor->VerifyFound();
+
+    // Equivalent tests using KHR_copy_commands2
+    if (copy_commands2 && vkCmdCopyImage2Function) {
+        const VkImageCopy2KHR copy_region2 = {VK_STRUCTURE_TYPE_IMAGE_COPY_2_KHR,
+                                              NULL,
+                                              copy_region.srcSubresource,
+                                              copy_region.srcOffset,
+                                              copy_region.dstSubresource,
+                                              copy_region.dstOffset,
+                                              copy_region.extent};
+        VkCopyImageInfo2KHR copy_image_info2 = {VK_STRUCTURE_TYPE_COPY_IMAGE_INFO_2_KHR,
+                                                NULL,
+                                                src_image.handle(),
+                                                VK_IMAGE_LAYOUT_GENERAL,
+                                                dst_image.handle(),
+                                                VK_IMAGE_LAYOUT_GENERAL,
+                                                1,
+                                                &copy_region2};
+        m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit,
+                                             "layout should be VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL instead of GENERAL.");
+        m_errorMonitor->SetUnexpectedError("layout should be VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL instead of GENERAL.");
+        vkCmdCopyImage2Function(m_commandBuffer->handle(), &copy_image_info2);
+        m_errorMonitor->VerifyFound();
+        // The first call hits the expected WARNING and skips the call down the chain, so call a second time to call down chain and
+        // update layer state
+        m_errorMonitor->SetUnexpectedError("layout should be VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL instead of GENERAL.");
+        m_errorMonitor->SetUnexpectedError("layout should be VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL instead of GENERAL.");
+        vkCmdCopyImage2Function(m_commandBuffer->handle(), &copy_image_info2);
+        // Now cause error due to src image layout changing
+        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkCopyImageInfo2KHR-srcImageLayout-00128");
+        m_errorMonitor->SetUnexpectedError("is VK_IMAGE_LAYOUT_UNDEFINED but can only be VK_IMAGE_LAYOUT");
+        copy_image_info2.srcImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        vkCmdCopyImage2Function(m_commandBuffer->handle(), &copy_image_info2);
+        m_errorMonitor->VerifyFound();
+        // Final src error is due to bad layout type
+        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkCopyImageInfo2KHR-srcImageLayout-00129");
+        m_errorMonitor->SetUnexpectedError(
+            "with specific layout VK_IMAGE_LAYOUT_UNDEFINED that doesn't match the previously used layout "
+            "VK_IMAGE_LAYOUT_GENERAL.");
+        vkCmdCopyImage2Function(m_commandBuffer->handle(), &copy_image_info2);
+        m_errorMonitor->VerifyFound();
+        // Now verify same checks for dst
+        m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit,
+                                             "layout should be VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL instead of GENERAL.");
+        m_errorMonitor->SetUnexpectedError("layout should be VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL instead of GENERAL.");
+        copy_image_info2.srcImageLayout = VK_IMAGE_LAYOUT_GENERAL;
+        vkCmdCopyImage2Function(m_commandBuffer->handle(), &copy_image_info2);
+        m_errorMonitor->VerifyFound();
+        // Now cause error due to src image layout changing
+        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkCopyImageInfo2KHR-dstImageLayout-00133");
+        m_errorMonitor->SetUnexpectedError(
+            "is VK_IMAGE_LAYOUT_UNDEFINED but can only be VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL or VK_IMAGE_LAYOUT_GENERAL.");
+        copy_image_info2.dstImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        vkCmdCopyImage2Function(m_commandBuffer->handle(), &copy_image_info2);
+        m_errorMonitor->VerifyFound();
+        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkCopyImageInfo2KHR-dstImageLayout-00134");
+        m_errorMonitor->SetUnexpectedError(
+            "with specific layout VK_IMAGE_LAYOUT_UNDEFINED that doesn't match the previously used layout "
+            "VK_IMAGE_LAYOUT_GENERAL.");
+        vkCmdCopyImage2Function(m_commandBuffer->handle(), &copy_image_info2);
+        m_errorMonitor->VerifyFound();
+    }
+
+    // Convert dst and depth images to TRANSFER_DST for subsequent tests
+    VkImageMemoryBarrier transfer_dst_image_barrier[1] = {};
+    transfer_dst_image_barrier[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    transfer_dst_image_barrier[0].oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    transfer_dst_image_barrier[0].newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    transfer_dst_image_barrier[0].srcAccessMask = 0;
+    transfer_dst_image_barrier[0].dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    transfer_dst_image_barrier[0].image = dst_image.handle();
+    transfer_dst_image_barrier[0].subresourceRange.layerCount = image_create_info.arrayLayers;
+    transfer_dst_image_barrier[0].subresourceRange.levelCount = image_create_info.mipLevels;
+    transfer_dst_image_barrier[0].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    vk::CmdPipelineBarrier(m_commandBuffer->handle(), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0,
+                           NULL, 0, NULL, 1, transfer_dst_image_barrier);
+    transfer_dst_image_barrier[0].image = depth_image.handle();
+    transfer_dst_image_barrier[0].subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    vk::CmdPipelineBarrier(m_commandBuffer->handle(), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0,
+                           NULL, 0, NULL, 1, transfer_dst_image_barrier);
+
+    // Cause errors due to clearing with invalid image layouts
+    VkClearColorValue color_clear_value = {};
+    VkImageSubresourceRange clear_range;
+    clear_range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    clear_range.baseMipLevel = 0;
+    clear_range.baseArrayLayer = 0;
+    clear_range.layerCount = 1;
+    clear_range.levelCount = 1;
+
+    // Fail due to explicitly prohibited layout for color clear (only GENERAL and TRANSFER_DST are permitted).
+    // Since the image is currently not in UNDEFINED layout, this will emit two errors.
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdClearColorImage-imageLayout-00005");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdClearColorImage-imageLayout-00004");
+    m_commandBuffer->ClearColorImage(dst_image.handle(), VK_IMAGE_LAYOUT_UNDEFINED, &color_clear_value, 1, &clear_range);
+    m_errorMonitor->VerifyFound();
+    // Fail due to provided layout not matching actual current layout for color clear.
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdClearColorImage-imageLayout-00004");
+    m_commandBuffer->ClearColorImage(dst_image.handle(), VK_IMAGE_LAYOUT_GENERAL, &color_clear_value, 1, &clear_range);
+    m_errorMonitor->VerifyFound();
+
+    VkClearDepthStencilValue depth_clear_value = {};
+    clear_range.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+
+    // Fail due to explicitly prohibited layout for depth clear (only GENERAL and TRANSFER_DST are permitted).
+    // Since the image is currently not in UNDEFINED layout, this will emit two errors.
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdClearDepthStencilImage-imageLayout-00012");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdClearDepthStencilImage-imageLayout-00011");
+    m_commandBuffer->ClearDepthStencilImage(depth_image.handle(), VK_IMAGE_LAYOUT_UNDEFINED, &depth_clear_value, 1, &clear_range);
+    m_errorMonitor->VerifyFound();
+    // Fail due to provided layout not matching actual current layout for depth clear.
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdClearDepthStencilImage-imageLayout-00011");
+    m_commandBuffer->ClearDepthStencilImage(depth_image.handle(), VK_IMAGE_LAYOUT_GENERAL, &depth_clear_value, 1, &clear_range);
+    m_errorMonitor->VerifyFound();
+
+    // Now cause error due to bad image layout transition in PipelineBarrier
+    VkImageMemoryBarrier image_barrier[1] = {};
+    image_barrier[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    image_barrier[0].oldLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+    image_barrier[0].newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    image_barrier[0].image = src_image.handle();
+    image_barrier[0].subresourceRange.layerCount = image_create_info.arrayLayers;
+    image_barrier[0].subresourceRange.levelCount = image_create_info.mipLevels;
+    image_barrier[0].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageMemoryBarrier-oldLayout-01197");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageMemoryBarrier-oldLayout-01210");
+    vk::CmdPipelineBarrier(m_commandBuffer->handle(), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0,
+                           NULL, 0, NULL, 1, image_barrier);
+    m_errorMonitor->VerifyFound();
+
+    // Finally some layout errors at RenderPass create time
+    // Just hacking in specific state to get to the errors we want so don't copy this unless you know what you're doing.
+    VkAttachmentReference attach = {};
+    VkSubpassDescription subpass = {};
+    subpass.inputAttachmentCount = 1;
+    subpass.pInputAttachments = &attach;
+    VkRenderPassCreateInfo rpci = {};
+    rpci.subpassCount = 1;
+    rpci.pSubpasses = &subpass;
+    rpci.attachmentCount = 1;
+    VkAttachmentDescription attach_desc = {};
+    attach_desc.format = VK_FORMAT_R8G8B8A8_UNORM;
+    attach_desc.samples = VK_SAMPLE_COUNT_1_BIT;
+    attach_desc.finalLayout = VK_IMAGE_LAYOUT_GENERAL;
+    rpci.pAttachments = &attach_desc;
+    rpci.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    VkRenderPass rp;
+    // error w/ non-general layout
+    attach.layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSubpassDescription-None-04437");
+    vk::CreateRenderPass(m_device->device(), &rpci, NULL, &rp);
+    m_errorMonitor->VerifyFound();
+
+    subpass.inputAttachmentCount = 0;
+    subpass.colorAttachmentCount = 1;
+    subpass.pColorAttachments = &attach;
+    // error w/ non-color opt or GENERAL layout for color attachment
+    attach.layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSubpassDescription-None-04437");
+    vk::CreateRenderPass(m_device->device(), &rpci, NULL, &rp);
+    m_errorMonitor->VerifyFound();
+
+    subpass.colorAttachmentCount = 0;
+    subpass.pDepthStencilAttachment = &attach;
+    attach_desc.format = VK_FORMAT_D16_UNORM;
+    // error w/ non-ds opt or GENERAL layout for color attachment
+    attach.layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSubpassDescription-None-04437");
+    vk::CreateRenderPass(m_device->device(), &rpci, NULL, &rp);
+    m_errorMonitor->VerifyFound();
+
+    // For this error we need a valid renderpass so create default one
+    attach.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+    attach.attachment = 0;
+    attach_desc.format = depth_format;
+    attach_desc.samples = VK_SAMPLE_COUNT_1_BIT;
+    attach_desc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    attach_desc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    attach_desc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    // Can't do a CLEAR load on READ_ONLY initialLayout
+    attach_desc.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    attach_desc.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+    attach_desc.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkAttachmentDescription-format-03283");
+    vk::CreateRenderPass(m_device->device(), &rpci, NULL, &rp);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(VkLayerTest, Sync2InvalidImageLayout) {
     TEST_DESCRIPTION(
         "Hit all possible validation checks associated with the UNASSIGNED-CoreValidation-DrawState-InvalidImageLayout error. "
         "Generally these involve having images in the wrong layout when they're copied or transitioned.");
