@@ -199,6 +199,8 @@ set(CORE_VALIDATION_LIBRARY_FILES
     buffer_validation.h
     shader_validation.cpp
     shader_validation.h
+    sync_vuid_maps.cpp
+    sync_vuid_maps.h
     generated/spirv_validation_helper.cpp
     generated/synchronization_validation_types.cpp
     gpu_validation.cpp

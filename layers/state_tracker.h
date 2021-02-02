@@ -199,7 +199,7 @@ struct GpuQueue {
 };
 
 struct SubresourceRangeErrorCodes {
-    const char *base_mip_err, *mip_count_err, *base_layer_err, *layer_count_err;
+    std::string base_mip_err, mip_count_err, base_layer_err, layer_count_err;
 };
 
 inline bool operator==(GpuQueue const& lhs, GpuQueue const& rhs) {
