@@ -260,6 +260,33 @@ TEST_F(VkSyncValTest, Sync2BufferCopyHazards) {
 
         m_commandBuffer->end();
     }
+#if 0
+    // CmdWriteBufferMarkerAMD
+    if (has_amd_buffer_maker) {
+        auto fpCmdWriteBufferMarker2AMD =
+            (PFN_vkCmdWriteBufferMarker2AMD)vk::GetDeviceProcAddr(m_device->device(), "vkCmdWriteBufferMarker2AMD");
+        if (!fpCmdWriteBufferMarkerAMD) {
+            printf("%s Test requires unsupported vkCmdWriteBufferMarker2AMD feature. Skipped.\n", kSkipPrefix);
+        } else {
+            m_errorMonitor->ExpectSuccess();
+            m_commandBuffer->reset();
+            m_commandBuffer->begin();
+            fpCmdWriteBufferMarkerAMD2(m_commandBuffer->handle(), VK_PIPELINE_STAGE_TRANSFER_BIT, buffer_a.handle(), 0, 1);
+            m_commandBuffer->end();
+            m_errorMonitor->VerifyNotFound();
+
+            m_commandBuffer->reset();
+            m_commandBuffer->begin();
+            vk::CmdCopyBuffer(cb, buffer_b.handle(), buffer_a.handle(), 1, &region);
+            m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_ERROR_BIT_EXT, "SYNC-HAZARD-WRITE_AFTER_WRITE");
+            fpCmdWriteBufferMarkerAMD(m_commandBuffer->handle(), VK_PIPELINE_STAGE_TRANSFER_BIT, buffer_a.handle(), 0, 1);
+            m_errorMonitor->VerifyFound();
+            m_commandBuffer->end();
+        }
+    } else {
+        printf("%s Test requires unsupported vkCmdWriteBufferMarkerAMD feature. Skipped.\n", kSkipPrefix);
+    }
+#endif
 }
 
 TEST_F(VkSyncValTest, SyncCopyOptimalImageHazards) {
@@ -3021,6 +3048,370 @@ TEST_F(VkSyncValTest, RenderPassAsyncHazard) {
     }
 }
 
+TEST_F(VkSyncValTest, Sync2RenderPassAsyncHazard) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    ASSERT_NO_FATAL_FAILURE(InitSyncValFramework());
+    if (DeviceExtensionSupported(gpu(), nullptr, VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME)) {
+        m_device_extension_names.push_back(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
+    } else {
+        printf("%s Synchronization2 not supported, skipping test\n", kSkipPrefix);
+        return;
+    }
+    CheckCreateRenderPass2Support(this, m_device_extension_names);
+
+    if (!CheckSynchronization2SupportAndInitState(this)) {
+        printf("%s Synchronization2 not supported, skipping test\n", kSkipPrefix);
+        return;
+    }
+
+    auto fpCmdPipelineBarrier2KHR =
+        (PFN_vkCmdPipelineBarrier2KHR)vk::GetDeviceProcAddr(m_device->device(), "vkCmdPipelineBarrier2KHR");
+    auto fpCreateRenderPass2KHR = (PFN_vkCreateRenderPass2KHR)vk::GetDeviceProcAddr(m_device->device(), "vkCreateRenderPass2KHR");
+    auto fpCmdBeginRenderPass2KHR = (PFN_vkCmdBeginRenderPass2KHR)vk::GetDeviceProcAddr(m_device->device(), "vkCmdBeginRenderPass2KHR");
+    auto fpCmdEndRenderPass2KHR = (PFN_vkCmdEndRenderPass2KHR)vk::GetDeviceProcAddr(m_device->device(), "vkCmdEndRenderPass2KHR");
+    auto fpCmdNextSubpass2KHR = (PFN_vkCmdNextSubpass2KHR)vk::GetDeviceProcAddr(m_device->device(), "vkCmdNextSubpass2KHR");
+
+    // overall set up:
+    // subpass 0:
+    //   write image 0
+    // subpass 1:
+    //   read image 0
+    //   write image 1
+    // subpass 2:
+    //   read image 0
+    //   write image 2
+    // subpass 3:
+    //   read image 0
+    //   write image 3
+    //
+    // subpasses 1 & 2 can run in parallel but both should depend on 0
+    // subpass 3 must run after 1 & 2 because otherwise the store operation will
+    // race with the reads in the other subpasses.
+
+    constexpr VkFormat kFormat = VK_FORMAT_R8G8B8A8_UNORM;
+    constexpr uint32_t kWidth = 32, kHeight = 32;
+    constexpr uint32_t kNumImages = 4;
+
+    VkImageCreateInfo src_img_info = {};
+    src_img_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    src_img_info.pNext = NULL;
+    src_img_info.flags = 0;
+    src_img_info.imageType = VK_IMAGE_TYPE_2D;
+    src_img_info.format = kFormat;
+    src_img_info.extent = {kWidth, kHeight, 1};
+    src_img_info.mipLevels = 1;
+    src_img_info.arrayLayers = 1;
+    src_img_info.samples = VK_SAMPLE_COUNT_2_BIT;
+    src_img_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+    src_img_info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
+    src_img_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    src_img_info.queueFamilyIndexCount = 0;
+    src_img_info.pQueueFamilyIndices = nullptr;
+    src_img_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+    VkImageCreateInfo dst_img_info = {};
+    dst_img_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    dst_img_info.pNext = nullptr;
+    dst_img_info.flags = 0;
+    dst_img_info.imageType = VK_IMAGE_TYPE_2D;
+    dst_img_info.format = kFormat;
+    dst_img_info.extent = {kWidth, kHeight, 1};
+    dst_img_info.mipLevels = 1;
+    dst_img_info.arrayLayers = 1;
+    dst_img_info.samples = VK_SAMPLE_COUNT_1_BIT;
+    dst_img_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+    dst_img_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    dst_img_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    dst_img_info.queueFamilyIndexCount = 0;
+    dst_img_info.pQueueFamilyIndices = nullptr;
+    dst_img_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+    std::vector<std::unique_ptr<VkImageObj>> images;
+    for (uint32_t i = 0; i < kNumImages; i++) {
+        images.emplace_back(new VkImageObj(m_device));
+    }
+    images[0]->Init(src_img_info);
+    for (uint32_t i = 1; i < images.size(); i++) {
+        images[i]->Init(dst_img_info);
+    }
+
+    std::array<VkImageView, kNumImages> attachments{};
+    std::array<VkAttachmentDescription2, kNumImages> attachment_descriptions{};
+    std::array<VkAttachmentReference2, kNumImages> color_refs{};
+    std::array<VkImageMemoryBarrier2KHR, kNumImages> img_barriers{};
+
+    for (uint32_t i = 0; i < attachments.size(); i++) {
+        attachments[i] = images[i]->targetView(kFormat);
+        attachment_descriptions[i] = lvl_init_struct<VkAttachmentDescription2>();
+        attachment_descriptions[i].format = kFormat;
+        attachment_descriptions[i].samples = VK_SAMPLE_COUNT_1_BIT;
+        attachment_descriptions[i].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        attachment_descriptions[i].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        attachment_descriptions[i].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        attachment_descriptions[i].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        attachment_descriptions[i].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        attachment_descriptions[i].finalLayout =
+            (i == 0) ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+        color_refs[i] = lvl_init_struct<VkAttachmentReference2>();
+        color_refs[i].attachment = i;
+        color_refs[i].layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+        img_barriers[i] = lvl_init_struct<VkImageMemoryBarrier2KHR>();
+        img_barriers[i].srcStageMask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        img_barriers[i].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        img_barriers[i].srcAccessMask = 0;
+        img_barriers[i].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        img_barriers[i].oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        img_barriers[i].newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        img_barriers[i].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        img_barriers[i].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        img_barriers[i].image = images[i]->handle();
+        img_barriers[i].subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, VK_REMAINING_MIP_LEVELS, 0, VK_REMAINING_ARRAY_LAYERS};
+    }
+
+    auto input_ref = lvl_init_struct<VkAttachmentReference2>();
+    input_ref.attachment = 0u;
+    input_ref.layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+    std::array<std::array<uint32_t, 2>, kNumImages - 1> preserve_subpass{{{2, 3}, {1, 3}, {1, 2}}};
+
+    std::array<VkSubpassDescription2, kNumImages> subpasses{};
+
+    subpasses[0] = lvl_init_struct<VkSubpassDescription2>();
+    subpasses[0].colorAttachmentCount = 1;
+    subpasses[0].pColorAttachments = &color_refs[0];
+
+    for (uint32_t i = 1; i < subpasses.size(); i++) {
+        subpasses[i] = lvl_init_struct<VkSubpassDescription2>();
+        subpasses[i].pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+        subpasses[i].inputAttachmentCount = 1;
+        subpasses[i].pInputAttachments = &input_ref;
+        subpasses[i].colorAttachmentCount = 1;
+        subpasses[i].pColorAttachments = &color_refs[1];
+        subpasses[i].preserveAttachmentCount = preserve_subpass[i - 1].size();
+        subpasses[i].pPreserveAttachments = preserve_subpass[i - 1].data();
+    }
+
+    auto renderpass_info = lvl_init_struct<VkRenderPassCreateInfo2>();
+    renderpass_info.attachmentCount = attachment_descriptions.size();
+    renderpass_info.pAttachments = attachment_descriptions.data();
+    renderpass_info.subpassCount = subpasses.size();
+    renderpass_info.pSubpasses = subpasses.data();
+
+    auto subpass_begin_info = lvl_init_struct<VkSubpassBeginInfo>();
+    subpass_begin_info.contents = VK_SUBPASS_CONTENTS_INLINE;
+
+    VkFramebufferCreateInfo fbci = {};
+    fbci.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+    fbci.pNext = nullptr;
+    fbci.flags = 0;
+    fbci.attachmentCount = attachments.size();
+    fbci.pAttachments = attachments.data();
+    fbci.width = kWidth;
+    fbci.height = kHeight;
+    fbci.layers = 1;
+
+    VkSampler sampler = VK_NULL_HANDLE;
+    VkSamplerCreateInfo sampler_info = SafeSaneSamplerCreateInfo();
+    vk::CreateSampler(m_device->device(), &sampler_info, NULL, &sampler);
+
+    char const *fsSource =
+        "#version 450\n"
+        "layout(input_attachment_index=0, set=0, binding=0) uniform subpassInput x;\n"
+        "void main() {\n"
+        "   vec4 color = subpassLoad(x);\n"
+        "}\n";
+
+    VkShaderObj vs(m_device, bindStateVertShaderText, VK_SHADER_STAGE_VERTEX_BIT, this);
+    VkShaderObj fs(m_device, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT, this);
+
+    VkClearValue clear = {};
+    clear.color = m_clear_color;
+    std::array<VkClearValue, 3> clear_values = {{clear, clear, clear}};
+
+    // add dependencies from subpass 0 to the others, which are necessary but not sufficient
+    std::vector<VkMemoryBarrier2KHR> subpass_barriers;
+    std::vector<VkSubpassDependency2> subpass_dependencies;
+    for (uint32_t i = 1; i < subpasses.size(); i++) {
+        auto barrier = lvl_init_struct<VkMemoryBarrier2KHR>();
+        barrier.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        barrier.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+
+        subpass_barriers.push_back(barrier);
+
+        auto dep = lvl_init_struct<VkSubpassDependency2>();
+        dep.srcSubpass = 0;
+        dep.dstSubpass = i;
+        subpass_dependencies.push_back(dep);
+    }
+    // wait till the end to set up pNext, in case the vectors realloc themselves
+    for (uint32_t i = 0; i < subpass_dependencies.size(); i++) {
+        subpass_dependencies[i].pNext = &subpass_barriers[i];
+    }
+    renderpass_info.dependencyCount = subpass_dependencies.size();
+    renderpass_info.pDependencies = subpass_dependencies.data();
+
+    {
+        VkRenderPass rp;
+        VkFramebuffer fb;
+        ASSERT_VK_SUCCESS(fpCreateRenderPass2KHR(device(), &renderpass_info, nullptr, &rp));
+
+        fbci.renderPass = rp;
+        ASSERT_VK_SUCCESS(vk::CreateFramebuffer(device(), &fbci, nullptr, &fb));
+
+        CreatePipelineHelper g_pipe_0(*this);
+        g_pipe_0.InitInfo();
+        g_pipe_0.gp_ci_.renderPass = rp;
+        g_pipe_0.InitState();
+        ASSERT_VK_SUCCESS(g_pipe_0.CreateGraphicsPipeline());
+
+        CreatePipelineHelper g_pipe_12(*this);
+        g_pipe_12.InitInfo();
+        g_pipe_12.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
+        g_pipe_12.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}};
+        g_pipe_12.gp_ci_.renderPass = rp;
+        g_pipe_12.InitState();
+        ASSERT_VK_SUCCESS(g_pipe_12.CreateGraphicsPipeline());
+
+        g_pipe_12.descriptor_set_->WriteDescriptorImageInfo(0, attachments[0], sampler, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT);
+        g_pipe_12.descriptor_set_->UpdateDescriptorSets();
+
+        m_commandBuffer->begin();
+
+        auto dep_info = lvl_init_struct<VkDependencyInfoKHR>();
+        dep_info.imageMemoryBarrierCount = img_barriers.size();
+        dep_info.pImageMemoryBarriers = img_barriers.data();
+        fpCmdPipelineBarrier2KHR(m_commandBuffer->handle(), &dep_info);
+
+        m_renderPassBeginInfo.renderArea = {{0, 0}, {16, 16}};
+        m_renderPassBeginInfo.pClearValues = clear_values.data();
+        m_renderPassBeginInfo.clearValueCount = clear_values.size();
+
+        m_renderPassBeginInfo.renderArea = {{0, 0}, {kWidth, kHeight}};
+        m_renderPassBeginInfo.renderPass = rp;
+        m_renderPassBeginInfo.framebuffer = fb;
+
+        fpCmdBeginRenderPass2KHR(m_commandBuffer->handle(), &m_renderPassBeginInfo, &subpass_begin_info);
+        vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe_0.pipeline_);
+        vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe_0.pipeline_layout_.handle(), 0,
+                                  1, &g_pipe_0.descriptor_set_->set_, 0, NULL);
+
+        vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
+
+        m_errorMonitor->ExpectSuccess();
+        auto end_info = lvl_init_struct<VkSubpassEndInfo>();
+        for (uint32_t i = 1; i < subpasses.size(); i++) {
+            fpCmdNextSubpass2KHR(m_commandBuffer->handle(), &subpass_begin_info, &end_info);
+            vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe_12.pipeline_);
+            vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                      g_pipe_12.pipeline_layout_.handle(), 0, 1, &g_pipe_12.descriptor_set_->set_, 0, NULL);
+            vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
+        }
+        m_errorMonitor->VerifyNotFound();
+        // expect this error because 2 subpasses could try to do the store operation
+        m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_ERROR_BIT_EXT, "SYNC-HAZARD-WRITE-RACING-WRITE");
+        // ... and this one because the store could happen during a shader read from another subpass
+        m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_ERROR_BIT_EXT, "SYNC-HAZARD-WRITE-RACING-READ");
+        fpCmdEndRenderPass2KHR(m_commandBuffer->handle(), &end_info);
+        m_errorMonitor->VerifyFound();
+
+        m_commandBuffer->end();
+
+        m_errorMonitor->VerifyFound();
+        vk::DestroyFramebuffer(device(), fb, nullptr);
+        vk::DestroyRenderPass(device(), rp, nullptr);
+    }
+
+    for (uint32_t i = 1; i < (subpasses.size() - 1); i++) {
+        auto barrier = lvl_init_struct<VkMemoryBarrier2KHR>();
+        barrier.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        barrier.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+
+        subpass_barriers.push_back(barrier);
+
+        auto dep = lvl_init_struct<VkSubpassDependency2>();
+        dep.srcSubpass = i;
+        dep.dstSubpass = static_cast<uint32_t>(subpasses.size() - 1);
+        dep.pNext = &subpass_barriers.back();
+        subpass_dependencies.push_back(dep);
+    }
+    for (uint32_t i = 0; i < subpass_dependencies.size(); i++) {
+        subpass_dependencies[i].pNext = &subpass_barriers[i];
+    }
+    renderpass_info.dependencyCount = subpass_dependencies.size();
+    renderpass_info.pDependencies = subpass_dependencies.data();
+    {
+        VkRenderPass rp;
+        VkFramebuffer fb;
+        ASSERT_VK_SUCCESS(fpCreateRenderPass2KHR(device(), &renderpass_info, nullptr, &rp));
+
+        fbci.renderPass = rp;
+        ASSERT_VK_SUCCESS(vk::CreateFramebuffer(device(), &fbci, nullptr, &fb));
+
+        CreatePipelineHelper g_pipe_0(*this);
+        g_pipe_0.InitInfo();
+        g_pipe_0.gp_ci_.renderPass = rp;
+        g_pipe_0.InitState();
+        ASSERT_VK_SUCCESS(g_pipe_0.CreateGraphicsPipeline());
+
+        CreatePipelineHelper g_pipe_12(*this);
+        g_pipe_12.InitInfo();
+        g_pipe_12.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
+        g_pipe_12.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}};
+        g_pipe_12.gp_ci_.renderPass = rp;
+        g_pipe_12.InitState();
+        ASSERT_VK_SUCCESS(g_pipe_12.CreateGraphicsPipeline());
+
+        g_pipe_12.descriptor_set_->WriteDescriptorImageInfo(0, attachments[0], sampler, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT);
+        g_pipe_12.descriptor_set_->UpdateDescriptorSets();
+
+        m_errorMonitor->ExpectSuccess();
+        m_commandBuffer->begin();
+
+        auto dep_info = lvl_init_struct<VkDependencyInfoKHR>();
+        dep_info.imageMemoryBarrierCount = img_barriers.size();
+        dep_info.pImageMemoryBarriers = img_barriers.data();
+        fpCmdPipelineBarrier2KHR(m_commandBuffer->handle(), &dep_info);
+
+        m_renderPassBeginInfo.renderArea = {{0, 0}, {16, 16}};
+        m_renderPassBeginInfo.pClearValues = clear_values.data();
+        m_renderPassBeginInfo.clearValueCount = clear_values.size();
+
+        m_renderPassBeginInfo.renderArea = {{0, 0}, {kWidth, kHeight}};
+        m_renderPassBeginInfo.renderPass = rp;
+        m_renderPassBeginInfo.framebuffer = fb;
+
+        fpCmdBeginRenderPass2KHR(m_commandBuffer->handle(), &m_renderPassBeginInfo, &subpass_begin_info);
+        vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe_0.pipeline_);
+        vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe_0.pipeline_layout_.handle(), 0,
+                                  1, &g_pipe_0.descriptor_set_->set_, 0, NULL);
+
+        vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
+
+        auto end_info = lvl_init_struct<VkSubpassEndInfo>();
+        for (uint32_t i = 1; i < subpasses.size(); i++) {
+            fpCmdNextSubpass2KHR(m_commandBuffer->handle(), &subpass_begin_info, &end_info);
+            vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe_12.pipeline_);
+            vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                      g_pipe_12.pipeline_layout_.handle(), 0, 1, &g_pipe_12.descriptor_set_->set_, 0, NULL);
+            vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
+        }
+
+        fpCmdEndRenderPass2KHR(m_commandBuffer->handle(), &end_info);
+
+        m_commandBuffer->end();
+
+        m_errorMonitor->VerifyNotFound();
+        vk::DestroyFramebuffer(device(), fb, nullptr);
+        vk::DestroyRenderPass(device(), rp, nullptr);
+    }
+}
+
 TEST_F(VkSyncValTest, SyncEventsBufferCopy) {
     TEST_DESCRIPTION("Check Set/Wait protection for a variety of use cases using buffer copies");
     ASSERT_NO_FATAL_FAILURE(InitSyncValFramework());
@@ -3118,6 +3509,131 @@ TEST_F(VkSyncValTest, SyncEventsBufferCopy) {
     vk::CmdCopyBuffer(cb, buffer_a.handle(), buffer_b.handle(), 1, &back2back);
     m_errorMonitor->VerifyFound();
     m_commandBuffer->end();
+}
+
+TEST_F(VkSyncValTest, Sync2EventsBufferCopy) {
+    TEST_DESCRIPTION("Check Set/Wait protection for a variety of use cases using buffer copies");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    ASSERT_NO_FATAL_FAILURE(InitSyncValFramework());
+    if (DeviceExtensionSupported(gpu(), nullptr, VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME)) {
+        m_device_extension_names.push_back(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
+    } else {
+        printf("%s Synchronization2 not supported, skipping test\n", kSkipPrefix);
+        return;
+    }
+
+    if (!CheckSynchronization2SupportAndInitState(this)) {
+        printf("%s Synchronization2 not supported, skipping test\n", kSkipPrefix);
+        return;
+    }
+    auto fpCmdSetEvent2KHR= (PFN_vkCmdSetEvent2KHR)vk::GetDeviceProcAddr(m_device->device(), "vkCmdSetEvent2KHR");
+    auto fpCmdWaitEvents2KHR= (PFN_vkCmdWaitEvents2KHR)vk::GetDeviceProcAddr(m_device->device(), "vkCmdWaitEvents2KHR");
+
+    VkBufferObj buffer_a;
+    VkBufferObj buffer_b;
+    VkBufferObj buffer_c;
+    VkMemoryPropertyFlags mem_prop = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+    buffer_a.init_as_src_and_dst(*m_device, 256, mem_prop);
+    buffer_b.init_as_src_and_dst(*m_device, 256, mem_prop);
+    buffer_c.init_as_src_and_dst(*m_device, 256, mem_prop);
+
+    VkBufferCopy region = {0, 0, 256};
+    VkBufferCopy front2front = {0, 0, 128};
+    VkBufferCopy front2back = {0, 128, 128};
+    VkBufferCopy back2back = {128, 128, 128};
+
+    VkEventObj event;
+    event.init(*m_device, VkEventObj::create_info(0));
+    VkEvent event_handle = event.handle();
+
+    auto cb = m_commandBuffer->handle();
+    m_commandBuffer->begin();
+
+    // Copy after set for WAR (note we are writing to the back half of c but only reading from the front
+    {
+        auto mem_barrier = lvl_init_struct<VkMemoryBarrier2KHR>();
+        mem_barrier.srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT_KHR;
+        mem_barrier.dstStageMask = VK_PIPELINE_STAGE_2_COPY_BIT_KHR;
+        mem_barrier.srcAccessMask = 0;
+        mem_barrier.dstAccessMask = 0;
+        auto dep_info = lvl_init_struct<VkDependencyInfoKHR>();
+        dep_info.memoryBarrierCount = 1;
+        dep_info.pMemoryBarriers = &mem_barrier;
+
+        m_errorMonitor->ExpectSuccess();
+        vk::CmdCopyBuffer(cb, buffer_a.handle(), buffer_b.handle(), 1, &region);
+        fpCmdSetEvent2KHR(cb, event_handle, &dep_info);
+        vk::CmdCopyBuffer(cb, buffer_a.handle(), buffer_c.handle(), 1, &back2back);
+        fpCmdWaitEvents2KHR(cb, 1, &event_handle, &dep_info);
+        vk::CmdCopyBuffer(cb, buffer_c.handle(), buffer_a.handle(), 1, &front2front);
+        m_errorMonitor->VerifyNotFound();
+        m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_ERROR_BIT_EXT, "SYNC-HAZARD-WRITE_AFTER_READ");
+        vk::CmdCopyBuffer(cb, buffer_c.handle(), buffer_a.handle(), 1, &front2back);
+        m_errorMonitor->VerifyFound();
+        m_commandBuffer->end();
+
+        // WAR prevented
+        m_commandBuffer->reset();
+        m_commandBuffer->begin();
+        m_errorMonitor->ExpectSuccess();
+        vk::CmdCopyBuffer(cb, buffer_a.handle(), buffer_b.handle(), 1, &region);
+        fpCmdSetEvent2KHR(cb, event_handle, &dep_info);
+        // Just protect against WAR, only need a sync barrier.
+        fpCmdWaitEvents2KHR(cb, 1, &event_handle, &dep_info);
+        vk::CmdCopyBuffer(cb, buffer_c.handle(), buffer_a.handle(), 1, &region);
+        m_errorMonitor->VerifyNotFound();
+
+        // Wait shouldn't prevent this WAW though, as it's only a synchronization barrier
+        m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_ERROR_BIT_EXT, "SYNC-HAZARD-WRITE_AFTER_WRITE");
+        vk::CmdCopyBuffer(cb, buffer_c.handle(), buffer_b.handle(), 1, &region);
+        m_errorMonitor->VerifyFound();
+        m_commandBuffer->end();
+
+        // Prevent WAR and WAW
+        m_commandBuffer->reset();
+        m_commandBuffer->begin();
+        m_errorMonitor->ExpectSuccess();
+        vk::CmdCopyBuffer(cb, buffer_a.handle(), buffer_b.handle(), 1, &region);
+        mem_barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        mem_barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        fpCmdSetEvent2KHR(cb, event_handle, &dep_info);
+        fpCmdWaitEvents2KHR(cb, 1, &event_handle, &dep_info);
+
+        // The WAW should be safe (on a memory barrier)
+        vk::CmdCopyBuffer(cb, buffer_c.handle(), buffer_b.handle(), 1, &region);
+        // The WAR should also be safe (on a sync barrier)
+        vk::CmdCopyBuffer(cb, buffer_c.handle(), buffer_a.handle(), 1, &region);
+        m_errorMonitor->VerifyNotFound();
+        m_commandBuffer->end();
+    }
+    {
+        // Barrier range check for WAW
+        auto buffer_barrier_front_waw = lvl_init_struct<VkBufferMemoryBarrier2KHR>();
+        buffer_barrier_front_waw.srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT_KHR;
+        buffer_barrier_front_waw.dstStageMask = VK_PIPELINE_STAGE_2_COPY_BIT_KHR;
+        buffer_barrier_front_waw.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        buffer_barrier_front_waw.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        buffer_barrier_front_waw.buffer = buffer_b.handle();
+        buffer_barrier_front_waw.offset = front2front.dstOffset;
+        buffer_barrier_front_waw.size = front2front.size;
+        auto dep_info = lvl_init_struct<VkDependencyInfoKHR>();
+        dep_info.bufferMemoryBarrierCount = 1;
+        dep_info.pBufferMemoryBarriers = &buffer_barrier_front_waw;
+
+        // Front safe, back WAW
+        m_commandBuffer->reset();
+        m_commandBuffer->begin();
+        m_errorMonitor->ExpectSuccess();
+        vk::CmdCopyBuffer(cb, buffer_a.handle(), buffer_b.handle(), 1, &region);
+        fpCmdSetEvent2KHR(cb, event_handle, &dep_info);
+        fpCmdWaitEvents2KHR(cb, 1, &event_handle, &dep_info);
+        vk::CmdCopyBuffer(cb, buffer_a.handle(), buffer_b.handle(), 1, &front2front);
+        m_errorMonitor->VerifyNotFound();
+        m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_ERROR_BIT_EXT, "SYNC-HAZARD-WRITE_AFTER_WRITE");
+        vk::CmdCopyBuffer(cb, buffer_a.handle(), buffer_b.handle(), 1, &back2back);
+        m_errorMonitor->VerifyFound();
+        m_commandBuffer->end();
+    }
 }
 
 TEST_F(VkSyncValTest, SyncEventsCopyImageHazards) {
@@ -3250,6 +3766,163 @@ TEST_F(VkSyncValTest, SyncEventsCopyImageHazards) {
     copy_general(image_a, image_b, region_1_to_1);
     m_errorMonitor->VerifyFound();
     m_commandBuffer->end();
+}
+
+TEST_F(VkSyncValTest, Sync2EventsCopyImageHazards) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    ASSERT_NO_FATAL_FAILURE(InitSyncValFramework());
+    if (DeviceExtensionSupported(gpu(), nullptr, VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME)) {
+        m_device_extension_names.push_back(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
+    } else {
+        printf("%s Synchronization2 not supported, skipping test\n", kSkipPrefix);
+        return;
+    }
+
+    if (!CheckSynchronization2SupportAndInitState(this)) {
+        printf("%s Synchronization2 not supported, skipping test\n", kSkipPrefix);
+        return;
+    }
+    auto fpCmdSetEvent2KHR= (PFN_vkCmdSetEvent2KHR)vk::GetDeviceProcAddr(m_device->device(), "vkCmdSetEvent2KHR");
+    auto fpCmdWaitEvents2KHR= (PFN_vkCmdWaitEvents2KHR)vk::GetDeviceProcAddr(m_device->device(), "vkCmdWaitEvents2KHR");
+
+    VkImageUsageFlags usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
+    VkImageObj image_a(m_device);
+    auto image_ci = VkImageObj::ImageCreateInfo2D(128, 128, 1, 2, format, usage, VK_IMAGE_TILING_OPTIMAL);
+    image_a.Init(image_ci);
+    ASSERT_TRUE(image_a.initialized());
+
+    VkImageObj image_b(m_device);
+    image_b.Init(image_ci);
+    ASSERT_TRUE(image_b.initialized());
+
+    VkImageObj image_c(m_device);
+    image_c.Init(image_ci);
+    ASSERT_TRUE(image_c.initialized());
+
+    VkEventObj event;
+    event.init(*m_device, VkEventObj::create_info(0));
+    VkEvent event_handle = event.handle();
+
+    VkImageSubresourceLayers layers_all{VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 2};
+    VkImageSubresourceLayers layers_0{VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    VkImageSubresourceLayers layers_1{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 1};
+    VkImageSubresourceRange layers_0_subresource_range{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    VkOffset3D zero_offset{0, 0, 0};
+    VkOffset3D half_offset{64, 64, 0};
+    VkExtent3D full_extent{128, 128, 1};  // <-- image type is 2D
+    VkExtent3D half_extent{64, 64, 1};    // <-- image type is 2D
+
+    VkImageCopy full_region = {layers_all, zero_offset, layers_all, zero_offset, full_extent};
+    VkImageCopy region_0_to_0 = {layers_0, zero_offset, layers_0, zero_offset, full_extent};
+    VkImageCopy region_1_to_1 = {layers_1, zero_offset, layers_1, zero_offset, full_extent};
+    VkImageCopy region_0_q0toq0 = {layers_0, zero_offset, layers_0, zero_offset, half_extent};
+    VkImageCopy region_0_q0toq3 = {layers_0, zero_offset, layers_0, half_offset, half_extent};
+    VkImageCopy region_0_q3toq3 = {layers_0, half_offset, layers_0, half_offset, half_extent};
+
+    auto cb = m_commandBuffer->handle();
+    auto copy_general = [cb](const VkImageObj &from, const VkImageObj &to, const VkImageCopy &region) {
+        vk::CmdCopyImage(cb, from.handle(), VK_IMAGE_LAYOUT_GENERAL, to.handle(), VK_IMAGE_LAYOUT_GENERAL, 1, &region);
+    };
+
+    auto set_layouts = [this, &image_a, &image_b, &image_c]() {
+        image_c.SetLayout(m_commandBuffer, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL);
+        image_b.SetLayout(m_commandBuffer, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL);
+        image_a.SetLayout(m_commandBuffer, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL);
+    };
+
+    {
+        auto mem_barrier = lvl_init_struct<VkMemoryBarrier2KHR>();
+        mem_barrier.srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT_KHR;
+        mem_barrier.dstStageMask = VK_PIPELINE_STAGE_2_COPY_BIT_KHR;
+        mem_barrier.srcAccessMask = 0;
+        mem_barrier.dstAccessMask = 0;
+        auto dep_info = lvl_init_struct<VkDependencyInfoKHR>();
+        dep_info.memoryBarrierCount = 1;
+        dep_info.pMemoryBarriers = &mem_barrier;
+        // Scope check.  One access in, one access not
+        m_commandBuffer->begin();
+        set_layouts();
+        m_errorMonitor->ExpectSuccess();
+        copy_general(image_a, image_b, full_region);
+        fpCmdSetEvent2KHR(cb, event_handle, &dep_info);
+        copy_general(image_a, image_c, region_0_q3toq3);
+        fpCmdWaitEvents2KHR(cb, 1, &event_handle, &dep_info);
+        copy_general(image_c, image_a, region_0_q0toq0);
+        m_errorMonitor->VerifyNotFound();
+        m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_ERROR_BIT_EXT, "SYNC-HAZARD-WRITE_AFTER_READ");
+        copy_general(image_c, image_a, region_0_q0toq3);
+        m_errorMonitor->VerifyFound();
+        m_commandBuffer->end();
+
+        // WAR prevented
+        m_commandBuffer->reset();
+        m_commandBuffer->begin();
+        set_layouts();
+        m_errorMonitor->ExpectSuccess();
+        copy_general(image_a, image_b, full_region);
+        fpCmdSetEvent2KHR(cb, event_handle, &dep_info);
+        // Just protect against WAR, only need a sync barrier.
+        fpCmdWaitEvents2KHR(cb, 1, &event_handle, &dep_info);
+        copy_general(image_c, image_a, full_region);
+        m_errorMonitor->VerifyNotFound();
+
+        // Wait shouldn't prevent this WAW though, as it's only a synchronization barrier
+        m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_ERROR_BIT_EXT, "SYNC-HAZARD-WRITE_AFTER_WRITE");
+        copy_general(image_c, image_b, full_region);
+        m_errorMonitor->VerifyFound();
+        m_commandBuffer->end();
+
+        // Prevent WAR and WAW
+        m_commandBuffer->reset();
+        m_commandBuffer->begin();
+        m_errorMonitor->ExpectSuccess();
+        set_layouts();
+        copy_general(image_a, image_b, full_region);
+        mem_barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        mem_barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        fpCmdSetEvent2KHR(cb, event_handle, &dep_info);
+        fpCmdWaitEvents2KHR(cb, 1, &event_handle, &dep_info);
+        // The WAW should be safe (on a memory barrier)
+        copy_general(image_c, image_b, full_region);
+        // The WAR should also be safe (on a sync barrier)
+        copy_general(image_c, image_a, full_region);
+        m_errorMonitor->VerifyNotFound();
+        m_commandBuffer->end();
+    }
+
+    // Barrier range check for WAW
+    {
+        auto image_barrier_region0_waw = lvl_init_struct<VkImageMemoryBarrier2KHR>();
+        image_barrier_region0_waw.srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT_KHR;
+        image_barrier_region0_waw.dstStageMask = VK_PIPELINE_STAGE_2_COPY_BIT_KHR;
+        image_barrier_region0_waw.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        image_barrier_region0_waw.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        image_barrier_region0_waw.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+        image_barrier_region0_waw.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+        image_barrier_region0_waw.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        image_barrier_region0_waw.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        image_barrier_region0_waw.image = image_b.handle();
+        image_barrier_region0_waw.subresourceRange = layers_0_subresource_range;
+        auto dep_info = lvl_init_struct<VkDependencyInfoKHR>();
+        dep_info.imageMemoryBarrierCount = 1;
+        dep_info.pImageMemoryBarriers = &image_barrier_region0_waw;
+
+        // Region 0 safe, back WAW
+        m_commandBuffer->reset();
+        m_commandBuffer->begin();
+        set_layouts();
+        m_errorMonitor->ExpectSuccess();
+        copy_general(image_a, image_b, full_region);
+        fpCmdSetEvent2KHR(cb, event_handle, &dep_info);
+        fpCmdWaitEvents2KHR(cb, 1, &event_handle, &dep_info);
+        copy_general(image_a, image_b, region_0_to_0);
+        m_errorMonitor->VerifyNotFound();
+        m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_ERROR_BIT_EXT, "SYNC-HAZARD-WRITE_AFTER_WRITE");
+        copy_general(image_a, image_b, region_1_to_1);
+        m_errorMonitor->VerifyFound();
+        m_commandBuffer->end();
+    }
 }
 
 TEST_F(VkSyncValTest, SyncEventsCommandHazards) {
