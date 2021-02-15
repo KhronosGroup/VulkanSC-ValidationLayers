@@ -100,7 +100,34 @@ static VkImageLayout NormalizeStencilImageLayout(VkImageLayout layout) {
                                 VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL);
 }
 
+VkImageLayout NormalizeSynchronization2Layout(const VkImageAspectFlags aspect_mask, VkImageLayout layout) {
+    if (layout == VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR) {
+        if (aspect_mask == VK_IMAGE_ASPECT_COLOR_BIT) {
+            layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        } else if (aspect_mask == (VK_IMAGE_ASPECT_DEPTH_BIT|VK_IMAGE_ASPECT_STENCIL_BIT)) {
+            layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        } else if (aspect_mask == VK_IMAGE_ASPECT_DEPTH_BIT) {
+            layout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+        } else if (aspect_mask == VK_IMAGE_ASPECT_STENCIL_BIT) {
+            layout = VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL;
+        }
+    } else if (layout == VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL_KHR) {
+        if (aspect_mask == VK_IMAGE_ASPECT_COLOR_BIT) {
+            layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        } else if (aspect_mask == (VK_IMAGE_ASPECT_DEPTH_BIT|VK_IMAGE_ASPECT_STENCIL_BIT)) {
+            layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+        } else if (aspect_mask == VK_IMAGE_ASPECT_DEPTH_BIT) {
+            layout = VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL;
+        } else if (aspect_mask == VK_IMAGE_ASPECT_STENCIL_BIT) {
+            layout = VK_IMAGE_LAYOUT_STENCIL_READ_ONLY_OPTIMAL;
+        }
+    }
+    return layout;
+}
+
 bool ImageLayoutMatches(const VkImageAspectFlags aspect_mask, VkImageLayout a, VkImageLayout b) {
+    a = NormalizeSynchronization2Layout(aspect_mask, a);
+    b = NormalizeSynchronization2Layout(aspect_mask, b);
     bool matches = (a == b);
     if (!matches) {
         // Relaxed rules when referencing *only* the depth or stencil aspects
@@ -9883,6 +9910,7 @@ bool CoreChecks::ValidateRenderpassAttachmentUsage(RenderPassCreateVersion rp_ve
                     case VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL:
                     case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
                     case VK_IMAGE_LAYOUT_GENERAL:
+                    case VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL_KHR:
                         break;  // valid layouts
                     default:
                         skip |= LogError(device, vuid,
@@ -9891,7 +9919,8 @@ bool CoreChecks::ValidateRenderpassAttachmentUsage(RenderPassCreateVersion rp_ve
                                          "VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL, "
                                          "VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL, "
                                          "VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, "
-                                         "VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, or VK_IMAGE_LAYOUT_GENERAL.",
+                                         "VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, or "
+                                         "VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL_KHR",
                                          function_name, error_type.c_str(), string_VkImageLayout(attachment_ref.layout));
                         break;
                 }
@@ -10002,13 +10031,16 @@ bool CoreChecks::ValidateRenderpassAttachmentUsage(RenderPassCreateVersion rp_ve
                     case VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL:
                     case VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL:
                     case VK_IMAGE_LAYOUT_STENCIL_READ_ONLY_OPTIMAL:
+                    case VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL_KHR:
+                    case VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR:
                         if (input_attachments.find(attachment) != input_attachments.end()) {
                             skip |= LogError(
                                 device, vuid,
                                 "%s: %s is also an input attachment so the layout (%s) must not be "
                                 "VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, "
-                                "VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL, or "
-                                "VK_IMAGE_LAYOUT_STENCIL_READ_ONLY_OPTIMAL.",
+                                "VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL, "
+                                "VK_IMAGE_LAYOUT_STENCIL_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL_KHR "
+                                "or VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR.",
                                 function_name, error_type.c_str(), string_VkImageLayout(image_layout));
                         }
                         break;
@@ -10023,8 +10055,10 @@ bool CoreChecks::ValidateRenderpassAttachmentUsage(RenderPassCreateVersion rp_ve
                                          "VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR, "
                                          "VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL, "
                                          "VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL, "
-                                         "VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, or "
-                                         "VK_IMAGE_LAYOUT_GENERAL.",
+                                         "VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, "
+                                         "VK_IMAGE_LAYOUT_GENERAL, ",
+                                         "VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL_KHR or"
+                                         "VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR.",
                                          function_name, error_type.c_str(), string_VkImageLayout(image_layout));
                         break;
                 }
@@ -10132,10 +10166,11 @@ bool CoreChecks::ValidateRenderpassAttachmentUsage(RenderPassCreateVersion rp_ve
                     case VK_IMAGE_LAYOUT_GENERAL:
                         break;  // valid layouts
                     case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+                    case VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR:
                         if (input_attachments.find(attachment_index) != input_attachments.end()) {
                             skip |= LogError(device, vuid,
                                              "%s: %s is also an input attachment so the layout (%s) must not be "
-                                             "VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL.",
+                                             "VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL or VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR.",
                                              function_name, error_type.c_str(), string_VkImageLayout(attachment_ref.layout));
                         }
                         break;
@@ -10143,7 +10178,8 @@ bool CoreChecks::ValidateRenderpassAttachmentUsage(RenderPassCreateVersion rp_ve
                         skip |= LogError(device, vuid,
                                          "%s: %s layout is %s but color attachments must be "
                                          "VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, "
-                                         "VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR, or "
+                                         "VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR, "
+                                         "VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR or "
                                          "VK_IMAGE_LAYOUT_GENERAL.",
                                          function_name, error_type.c_str(), string_VkImageLayout(attachment_ref.layout));
                         break;

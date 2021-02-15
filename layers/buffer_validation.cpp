@@ -943,8 +943,10 @@ bool CoreChecks::ValidateBarriersToImages(const CoreErrorLocation &outer_loc, co
                 auto subres_it = subres_map.find(img_barrier.subresourceRange);
                 if (subres_it != subres_map.end()) {
                     auto &entry = subres_it->second;
-                    if ((entry.barrier->newLayout != img_barrier.oldLayout) &&
-                        (img_barrier.oldLayout != VK_IMAGE_LAYOUT_UNDEFINED)) {
+                    auto entry_layout = NormalizeSynchronization2Layout(entry.barrier->subresourceRange.aspectMask, entry.barrier->newLayout);
+                    auto old_layout = NormalizeSynchronization2Layout(img_barrier.subresourceRange.aspectMask, img_barrier.oldLayout);
+                    if ((entry_layout != old_layout) &&
+                        (old_layout != VK_IMAGE_LAYOUT_UNDEFINED)) {
                         const VkImageSubresourceRange &range = img_barrier.subresourceRange;
                         const auto &vuid = GetImageBarrierVUID(loc, ImageError::kConflictingLayout);
                         skip = LogError(
@@ -1026,7 +1028,8 @@ bool CoreChecks::ValidateBarriersToImages(const CoreErrorLocation &outer_loc, co
                 // the next "constant value" range
                 for (auto pos = subresource_map->Find(normalized_isr); !(pos.AtEnd()) && !subres_skip; pos.IncrementInterval()) {
                     const auto &value = *pos;
-                    if (!layout_check.Check(value.subresource, img_barrier.oldLayout, value.current_layout, value.initial_layout)) {
+                    auto old_layout = NormalizeSynchronization2Layout(img_barrier.subresourceRange.aspectMask, img_barrier.oldLayout);
+                    if (!layout_check.Check(value.subresource, old_layout, value.current_layout, value.initial_layout)) {
                         const auto &vuid = GetImageBarrierVUID(loc, ImageError::kConflictingLayout);
                         subres_skip = LogError(cb_state->commandBuffer, vuid,
                                                "%s %s cannot transition the layout of aspect=%d level=%d layer=%d from %s when the "
@@ -1481,6 +1484,8 @@ template void CoreChecks::TransitionImageLayouts(CMD_BUFFER_STATE *cb_state, uin
 template void CoreChecks::TransitionImageLayouts(CMD_BUFFER_STATE *cb_state, uint32_t barrier_count,
                                                  const VkImageMemoryBarrier2KHR *barrier);
 
+VkImageLayout NormalizeSynchronization2Layout(const VkImageAspectFlags aspect_mask, VkImageLayout layout);
+
 template <typename ImgBarrier>
 void CoreChecks::RecordTransitionImageLayout(CMD_BUFFER_STATE *cb_state, const IMAGE_STATE *image_state,
                                              const ImgBarrier &mem_barrier, bool is_release_op) {
@@ -1495,7 +1500,8 @@ void CoreChecks::RecordTransitionImageLayout(CMD_BUFFER_STATE *cb_state, const I
         normalized_isr.layerCount = image_create_info.extent.depth;  // Treat each depth slice as a layer subresource
     }
 
-    VkImageLayout initial_layout = mem_barrier.oldLayout;
+    VkImageLayout initial_layout = NormalizeSynchronization2Layout(mem_barrier.subresourceRange.aspectMask , mem_barrier.oldLayout);
+    VkImageLayout new_layout = NormalizeSynchronization2Layout(mem_barrier.subresourceRange.aspectMask , mem_barrier.newLayout);
 
     // Layout transitions in external instance are not tracked, so don't validate initial layout.
     if (QueueFamilyIsExternal(mem_barrier.srcQueueFamilyIndex)) {
@@ -1503,9 +1509,9 @@ void CoreChecks::RecordTransitionImageLayout(CMD_BUFFER_STATE *cb_state, const I
     }
 
     if (is_release_op) {
-        SetImageInitialLayout(cb_state, *image_state, normalized_isr, mem_barrier.oldLayout);
+        SetImageInitialLayout(cb_state, *image_state, normalized_isr, initial_layout);
     } else {
-        SetImageLayout(cb_state, *image_state, normalized_isr, mem_barrier.newLayout, initial_layout);
+        SetImageLayout(cb_state, *image_state, normalized_isr, new_layout, initial_layout);
     }
 }
 
