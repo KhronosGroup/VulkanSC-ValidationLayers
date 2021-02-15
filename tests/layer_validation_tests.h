@@ -210,6 +210,8 @@ bool CheckDescriptorIndexingSupportAndInitFramework(VkRenderFramework *renderFra
 // Helper for checking timeline semaphore support and initializing
 bool CheckTimelineSemaphoreSupportAndInitState(VkRenderFramework *renderFramework);
 
+bool CheckSynchronization2SupportAndInitState(VkRenderFramework *renderFramework);
+
 // Dependent "false" type for the static assert, as GCC will evaluate
 // non-dependent static_asserts even for non-instantiated templates
 template <typename T>

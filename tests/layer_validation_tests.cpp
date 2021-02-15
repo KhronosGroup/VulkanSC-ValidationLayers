@@ -752,6 +752,20 @@ bool CheckTimelineSemaphoreSupportAndInitState(VkRenderFramework *renderFramewor
     return true;
 }
 
+bool CheckSynchronization2SupportAndInitState(VkRenderFramework *framework) {
+    PFN_vkGetPhysicalDeviceFeatures2 vkGetPhysicalDeviceFeatures2 =
+        (PFN_vkGetPhysicalDeviceFeatures2)vk::GetInstanceProcAddr(framework->instance(),
+                                                                     "vkGetPhysicalDeviceFeatures2");
+    auto sync2_features = lvl_init_struct<VkPhysicalDeviceSynchronization2FeaturesKHR>();
+    auto features2 = lvl_init_struct<VkPhysicalDeviceFeatures2>(&sync2_features);
+    vkGetPhysicalDeviceFeatures2(framework->gpu(), &features2);
+    if (!sync2_features.synchronization2) {
+        return false;
+    }
+    framework->InitState(nullptr, &features2);
+    return true;
+}
+
 void VkLayerTest::VKTriangleTest(BsoFailSelect failCase) {
     ASSERT_TRUE(m_device && m_device->initialized());  // VKTriangleTest assumes Init() has finished
 
