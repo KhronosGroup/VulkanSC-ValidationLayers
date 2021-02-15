@@ -4940,7 +4940,7 @@ SyncEventState::IgnoreReason SyncEventState::IsIgnoredByWait(VkPipelineStageFlag
     IgnoreReason reason = NotIgnored;
 
     if ((last_command == CMD_RESETEVENT || last_command == CMD_RESETEVENT2KHR) && !HasBarrier(0U, 0U)) {
-        reason = ResetWaitRace;
+        reason = (last_command == CMD_RESETEVENT) ? ResetWaitRace : Reset2WaitRace;
     } else if (unsynchronized_set) {
         reason = SetRace;
     } else {
@@ -5260,11 +5260,14 @@ bool SyncOpWaitEvents::Validate(const CommandBufferAccessContext &cb_context) co
         const auto ignore_reason = sync_event->IsIgnoredByWait(src_exec_scope_.mask_param);
         if (ignore_reason) {
             switch (ignore_reason) {
-                case SyncEventState::ResetWaitRace: {
-                    const char *const vuid = "VUID-vkCmdResetEvent-event-03834";
-                    //TODO: VUID-vkCmdResetEvent-event-03835 vkCmdResetEvent -> vkCmdWaitEvents2KHR
-                    //TODO: VUID-vkCmdResetEvent2KHR-event-03831 vkCmdResetEvent2KHR -> vkCmdWaitEvents
-                    //TODO: VUID-vkCmdResetEvent2KHR-event-03832 vkCmdResetEvent2KHR -> vkCmdWaitEvents2KHR
+                case SyncEventState::ResetWaitRace:
+                case SyncEventState::Reset2WaitRace: {
+                    // Four permuations of Reset and Wait calls...
+                    const char *vuid =
+                        (cmd_ == CMD_WAITEVENTS) ? "VUID-vkCmdResetEvent-event-03834" : "VUID-vkCmdResetEvent-event-03835";
+                    if (ignore_reason == SyncEventState::Reset2WaitRace) {
+                        vuid = (cmd_ == CMD_WAITEVENTS) ? "VUID-vkCmdResetEvent-event-03831" : "VUID-vkCmdResetEvent-event-03832";
+                    }
                     const char *const message =
                         "%s: %s %s operation following %s without intervening execution barrier, may cause race condition. %s";
                     skip |=

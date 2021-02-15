@@ -160,7 +160,7 @@ struct SyncBarrier {
 enum class AccessAddressType : uint32_t { kLinear = 0, kIdealized = 1, kMaxType = 1, kTypeCount = kMaxType + 1 };
 
 struct SyncEventState {
-    enum IgnoreReason { NotIgnored = 0, ResetWaitRace, SetRace, MissingStageBits };
+    enum IgnoreReason { NotIgnored = 0, ResetWaitRace, Reset2WaitRace, SetRace, MissingStageBits };
     using EventPointer = std::shared_ptr<const EVENT_STATE>;
     using ScopeMap = sparse_container::range_map<VkDeviceSize, bool>;
     EventPointer event;
