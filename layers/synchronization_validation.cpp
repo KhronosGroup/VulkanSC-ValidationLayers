@@ -4797,6 +4797,27 @@ void SyncValidator::PostCallRecordCmdSetEvent(VkCommandBuffer commandBuffer, VkE
     set_event_op.Record(cb_context);
 }
 
+bool SyncValidator::PreCallValidateCmdSetEvent2KHR(VkCommandBuffer commandBuffer, VkEvent event,
+                                                   const VkDependencyInfoKHR *pDependencyInfo) const {
+    bool skip = false;
+    const auto *cb_context = GetAccessContext(commandBuffer);
+    assert(cb_context);
+    if (!cb_context) return skip;
+
+    SyncOpSetEvent set_event_op(CMD_SETEVENT2KHR, *this, cb_context->GetQueueFlags(), event, 0);  // TODO: pass in pDependencyInfo
+    return set_event_op.Validate(*cb_context);
+}
+
+void SyncValidator::PostCallRecordCmdSetEvent2KHR(VkCommandBuffer commandBuffer, VkEvent event,
+                                                  const VkDependencyInfoKHR *pDependencyInfo) {
+    StateTracker::PostCallRecordCmdSetEvent2KHR(commandBuffer, event, pDependencyInfo);
+    auto *cb_context = GetAccessContext(commandBuffer);
+    assert(cb_context);
+    if (!cb_context) return;
+    SyncOpSetEvent set_event_op(CMD_SETEVENT2KHR, *this, cb_context->GetQueueFlags(), event, 0);  // TODO: pass in pDependencyInfo
+    set_event_op.Record(cb_context);
+}
+
 bool SyncValidator::PreCallValidateCmdResetEvent(VkCommandBuffer commandBuffer, VkEvent event,
                                                  VkPipelineStageFlags stageMask) const {
     bool skip = false;
@@ -4815,6 +4836,28 @@ void SyncValidator::PostCallRecordCmdResetEvent(VkCommandBuffer commandBuffer, V
     if (!cb_context) return;
 
     SyncOpResetEvent reset_event_op(CMD_RESETEVENT, *this, cb_context->GetQueueFlags(), event, stageMask);
+    reset_event_op.Record(cb_context);
+}
+
+bool SyncValidator::PreCallValidateCmdResetEvent2KHR(VkCommandBuffer commandBuffer, VkEvent event,
+                                                     VkPipelineStageFlags2KHR stageMask) const {
+    bool skip = false;
+    const auto *cb_context = GetAccessContext(commandBuffer);
+    assert(cb_context);
+    if (!cb_context) return skip;
+
+    SyncOpResetEvent reset_event_op(CMD_RESETEVENT2KHR, *this, cb_context->GetQueueFlags(), event, stageMask);
+    return reset_event_op.Validate(*cb_context);
+}
+
+void SyncValidator::PostCallRecordCmdResetEvent2KHR(VkCommandBuffer commandBuffer, VkEvent event,
+                                                    VkPipelineStageFlags2KHR stageMask) {
+    StateTracker::PostCallRecordCmdResetEvent2KHR(commandBuffer, event, stageMask);
+    auto *cb_context = GetAccessContext(commandBuffer);
+    assert(cb_context);
+    if (!cb_context) return;
+
+    SyncOpResetEvent reset_event_op(CMD_RESETEVENT2KHR, *this, cb_context->GetQueueFlags(), event, stageMask);
     reset_event_op.Record(cb_context);
 }
 
@@ -4857,6 +4900,34 @@ void SyncValidator::PostCallRecordCmdWaitEvents(VkCommandBuffer commandBuffer, u
     return wait_events_op.Record(cb_context);
 }
 
+bool SyncValidator::PreCallValidateCmdWaitEvents2KHR(VkCommandBuffer commandBuffer, uint32_t eventCount, const VkEvent *pEvents,
+                                                     const VkDependencyInfoKHR *pDependencyInfos) const {
+    bool skip = false;
+    const auto *cb_context = GetAccessContext(commandBuffer);
+    assert(cb_context);
+    if (!cb_context) return skip;
+
+    for (uint32_t i = 0; i < eventCount; i++) {
+        SyncOpWaitEvents wait_events_op(CMD_WAITEVENTS2KHR, *this, cb_context->GetQueueFlags(), pEvents[i], pDependencyInfos[i]);
+        skip |= wait_events_op.Validate(*cb_context);
+    }
+    return skip;
+}
+
+void SyncValidator::PostCallRecordCmdWaitEvents2KHR(VkCommandBuffer commandBuffer, uint32_t eventCount, const VkEvent *pEvents,
+                                                    const VkDependencyInfoKHR *pDependencyInfos) {
+    StateTracker::PostCallRecordCmdWaitEvents2KHR(commandBuffer, eventCount, pEvents, pDependencyInfos);
+
+    auto *cb_context = GetAccessContext(commandBuffer);
+    assert(cb_context);
+    if (!cb_context) return;
+
+    for (uint32_t i = 0; i < eventCount; i++) {
+        SyncOpWaitEvents wait_events_op(CMD_WAITEVENTS2KHR, *this, cb_context->GetQueueFlags(), pEvents[i], pDependencyInfos[i]);
+        wait_events_op.Record(cb_context);
+    }
+}
+
 void SyncEventState::ResetFirstScope() {
     for (const auto address_type : kAddressTypes) {
         first_scope[static_cast<size_t>(address_type)].clear();
@@ -4868,7 +4939,7 @@ void SyncEventState::ResetFirstScope() {
 SyncEventState::IgnoreReason SyncEventState::IsIgnoredByWait(VkPipelineStageFlags2KHR srcStageMask) const {
     IgnoreReason reason = NotIgnored;
 
-    if (last_command == CMD_RESETEVENT && !HasBarrier(0U, 0U)) {
+    if ((last_command == CMD_RESETEVENT || last_command == CMD_RESETEVENT2KHR) && !HasBarrier(0U, 0U)) {
         reason = ResetWaitRace;
     } else if (unsynchronized_set) {
         reason = SetRace;
@@ -5149,6 +5220,12 @@ SyncOpWaitEvents::SyncOpWaitEvents(CMD_TYPE cmd, const SyncValidator &sync_state
     MakeEventsList(sync_state, eventCount, pEvents);
 }
 
+SyncOpWaitEvents::SyncOpWaitEvents(CMD_TYPE cmd, const SyncValidator &sync_state, VkQueueFlags queue_flags, const VkEvent event,
+                                   const VkDependencyInfoKHR &pDependencyInfo)
+    : SyncOpBarriers(cmd, sync_state, queue_flags, pDependencyInfo) {
+    MakeEventsList(sync_state, 1, &event);
+}
+
 bool SyncOpWaitEvents::Validate(const CommandBufferAccessContext &cb_context) const {
     const char *const ignored = "Wait operation is ignored for this event.";
     bool skip = false;
@@ -5158,11 +5235,11 @@ bool SyncOpWaitEvents::Validate(const CommandBufferAccessContext &cb_context) co
     if (src_exec_scope_.mask_param & VK_PIPELINE_STAGE_HOST_BIT) {
         const char *const vuid = "SYNC-vkCmdWaitEvents-hostevent-unsupported";
         skip = sync_state.LogInfo(command_buffer_handle, vuid,
-                                  "%s, srcStageMask includes %s, unsupported by synchronization validaton.", CmdName(),
+                                  "%s, srcStageMask includes %s, unsupported by synchronization validation.", CmdName(),
                                   string_VkPipelineStageFlagBits(VK_PIPELINE_STAGE_HOST_BIT));
     }
 
-    VkPipelineStageFlags event_stage_masks = 0U;
+    VkPipelineStageFlags2KHR event_stage_masks = 0U;
     bool events_not_found = false;
     const auto *events_context = cb_context.GetCurrentEventsContext();
     assert(events_context);
@@ -5184,7 +5261,10 @@ bool SyncOpWaitEvents::Validate(const CommandBufferAccessContext &cb_context) co
         if (ignore_reason) {
             switch (ignore_reason) {
                 case SyncEventState::ResetWaitRace: {
-                    const char *const vuid = "SYNC-vkCmdWaitEvents-missingbarrier-reset";
+                    const char *const vuid = "VUID-vkCmdResetEvent-event-03834";
+                    //TODO: VUID-vkCmdResetEvent-event-03835 vkCmdResetEvent -> vkCmdWaitEvents2KHR
+                    //TODO: VUID-vkCmdResetEvent2KHR-event-03831 vkCmdResetEvent2KHR -> vkCmdWaitEvents
+                    //TODO: VUID-vkCmdResetEvent2KHR-event-03832 vkCmdResetEvent2KHR -> vkCmdWaitEvents2KHR
                     const char *const message =
                         "%s: %s %s operation following %s without intervening execution barrier, may cause race condition. %s";
                     skip |=
@@ -5205,7 +5285,7 @@ bool SyncOpWaitEvents::Validate(const CommandBufferAccessContext &cb_context) co
                     break;
                 }
                 case SyncEventState::MissingStageBits: {
-                    const VkPipelineStageFlags missing_bits = sync_event->scope.mask_param & ~src_exec_scope_.mask_param;
+                    const auto missing_bits = sync_event->scope.mask_param & ~src_exec_scope_.mask_param;
                     // Issue error message that event waited for is not in wait events scope
                     const char *const vuid = "VUID-vkCmdWaitEvents-srcStageMask-01158";
                     const char *const message =
@@ -5245,7 +5325,7 @@ bool SyncOpWaitEvents::Validate(const CommandBufferAccessContext &cb_context) co
     }
 
     // Note that we can't check for HOST in pEvents as we don't track that set event type
-    const auto extra_stage_bits = (src_exec_scope_.mask_param & ~VK_PIPELINE_STAGE_HOST_BIT) & ~event_stage_masks;
+    const auto extra_stage_bits = (src_exec_scope_.mask_param & ~VK_PIPELINE_STAGE_2_HOST_BIT_KHR) & ~event_stage_masks;
     if (extra_stage_bits) {
         // Issue error message that event waited for is not in wait events scope
         const char *const vuid = "VUID-vkCmdWaitEvents-srcStageMask-01158";
@@ -5253,11 +5333,11 @@ bool SyncOpWaitEvents::Validate(const CommandBufferAccessContext &cb_context) co
             "%s: srcStageMask 0x%" PRIx64 " contains stages not present in pEvents stageMask. Extra stages are %s.%s";
         if (events_not_found) {
             skip |= sync_state.LogInfo(command_buffer_handle, vuid, message, CmdName(), src_exec_scope_.mask_param,
-                                       string_VkPipelineStageFlags(extra_stage_bits).c_str(),
+                                       sync_utils::StringPipelineStageFlags(extra_stage_bits).c_str(),
                                        " vkCmdSetEvent may be in previously submitted command buffer.");
         } else {
             skip |= sync_state.LogError(command_buffer_handle, vuid, message, CmdName(), src_exec_scope_.mask_param,
-                                        string_VkPipelineStageFlags(extra_stage_bits).c_str(), "");
+                                        sync_utils::StringPipelineStageFlags(extra_stage_bits).c_str(), "");
         }
     }
     return skip;
@@ -5396,7 +5476,7 @@ void SyncOpWaitEvents::MakeEventsList(const SyncValidator &sync_state, uint32_t 
 }
 
 SyncOpResetEvent::SyncOpResetEvent(CMD_TYPE cmd, const SyncValidator &sync_state, VkQueueFlags queue_flags, VkEvent event,
-                                   VkPipelineStageFlags stageMask)
+                                   VkPipelineStageFlags2KHR stageMask)
     : SyncOpBase(cmd),
       event_(sync_state.GetShared<EVENT_STATE>(event)),
       exec_scope_(SyncExecScope::MakeSrc(queue_flags, stageMask)) {}
@@ -5457,7 +5537,7 @@ void SyncOpResetEvent::Record(CommandBufferAccessContext *cb_context) const {
 }
 
 SyncOpSetEvent::SyncOpSetEvent(CMD_TYPE cmd, const SyncValidator &sync_state, VkQueueFlags queue_flags, VkEvent event,
-                               VkPipelineStageFlags stageMask)
+                               VkPipelineStageFlags2KHR stageMask)
     : SyncOpBase(cmd),
       event_(sync_state.GetShared<EVENT_STATE>(event)),
       src_exec_scope_(SyncExecScope::MakeSrc(queue_flags, stageMask)) {}

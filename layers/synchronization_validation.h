@@ -537,6 +537,10 @@ class SyncOpWaitEvents : public SyncOpBarriers {
                      uint32_t memoryBarrierCount, const VkMemoryBarrier *pMemoryBarriers, uint32_t bufferMemoryBarrierCount,
                      const VkBufferMemoryBarrier *pBufferMemoryBarriers, uint32_t imageMemoryBarrierCount,
                      const VkImageMemoryBarrier *pImageMemoryBarriers);
+
+    SyncOpWaitEvents(CMD_TYPE cmd, const SyncValidator &sync_state, VkQueueFlags queue_flags, const VkEvent event,
+                     const VkDependencyInfoKHR &dep_info);
+
     bool Validate(const CommandBufferAccessContext &cb_context) const override;
     void Record(CommandBufferAccessContext *cb_context) const override;
 
@@ -550,7 +554,7 @@ class SyncOpWaitEvents : public SyncOpBarriers {
 class SyncOpResetEvent : public SyncOpBase {
   public:
     SyncOpResetEvent(CMD_TYPE cmd, const SyncValidator &sync_state, VkQueueFlags queue_flags, VkEvent event,
-                     VkPipelineStageFlags stageMask);
+                     VkPipelineStageFlags2KHR stageMask);
     bool Validate(const CommandBufferAccessContext &cb_context) const override;
     void Record(CommandBufferAccessContext *cb_context) const override;
 
@@ -562,7 +566,7 @@ class SyncOpResetEvent : public SyncOpBase {
 class SyncOpSetEvent : public SyncOpBase {
   public:
     SyncOpSetEvent(CMD_TYPE cmd, const SyncValidator &sync_state, VkQueueFlags queue_flags, VkEvent event,
-                   VkPipelineStageFlags stageMask);
+                   VkPipelineStageFlags2KHR stageMask);
     bool Validate(const CommandBufferAccessContext &cb_context) const override;
     void Record(CommandBufferAccessContext *cb_context) const override;
 
@@ -1276,8 +1280,17 @@ class SyncValidator : public ValidationStateTracker, public SyncStageAccess {
     bool PreCallValidateCmdSetEvent(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags stageMask) const override;
     void PostCallRecordCmdSetEvent(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags stageMask) override;
 
+    bool PreCallValidateCmdSetEvent2KHR(VkCommandBuffer commandBuffer, VkEvent event,
+                                        const VkDependencyInfoKHR *pDependencyInfo) const override;
+    void PostCallRecordCmdSetEvent2KHR(VkCommandBuffer commandBuffer, VkEvent event,
+                                       const VkDependencyInfoKHR *pDependencyInfo) override;
+
     bool PreCallValidateCmdResetEvent(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags stageMask) const override;
     void PostCallRecordCmdResetEvent(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags stageMask) override;
+
+    bool PreCallValidateCmdResetEvent2KHR(VkCommandBuffer commandBuffer, VkEvent event,
+                                          VkPipelineStageFlags2KHR stageMask) const override;
+    void PostCallRecordCmdResetEvent2KHR(VkCommandBuffer commandBuffer, VkEvent event, VkPipelineStageFlags2KHR stageMask) override;
 
     bool PreCallValidateCmdWaitEvents(VkCommandBuffer commandBuffer, uint32_t eventCount, const VkEvent *pEvents,
                                       VkPipelineStageFlags sourceStageMask, VkPipelineStageFlags dstStageMask,
@@ -1290,6 +1303,10 @@ class SyncValidator : public ValidationStateTracker, public SyncStageAccess {
                                      uint32_t memoryBarrierCount, const VkMemoryBarrier *pMemoryBarriers,
                                      uint32_t bufferMemoryBarrierCount, const VkBufferMemoryBarrier *pBufferMemoryBarriers,
                                      uint32_t imageMemoryBarrierCount, const VkImageMemoryBarrier *pImageMemoryBarriers) override;
+    bool PreCallValidateCmdWaitEvents2KHR(VkCommandBuffer commandBuffer, uint32_t eventCount, const VkEvent *pEvents,
+                                          const VkDependencyInfoKHR *pDependencyInfos) const override;
+    void PostCallRecordCmdWaitEvents2KHR(VkCommandBuffer commandBuffer, uint32_t eventCount, const VkEvent *pEvents,
+                                         const VkDependencyInfoKHR *pDependencyInfos) override;
     bool PreCallValidateCmdWriteBufferMarker2AMD(VkCommandBuffer commandBuffer, VkPipelineStageFlags2KHR stage, VkBuffer dstBuffer,
                                                  VkDeviceSize dstOffset, uint32_t marker) const override;
     void PreCallRecordCmdWriteBufferMarker2AMD(VkCommandBuffer commandBuffer, VkPipelineStageFlags2KHR stage, VkBuffer dstBuffer,
