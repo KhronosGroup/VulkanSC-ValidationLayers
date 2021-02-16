@@ -162,7 +162,7 @@ struct SyncBarrier {
 enum class AccessAddressType : uint32_t { kLinear = 0, kIdealized = 1, kMaxType = 1, kTypeCount = kMaxType + 1 };
 
 struct SyncEventState {
-    enum IgnoreReason { NotIgnored = 0, ResetWaitRace, Reset2WaitRace, SetRace, MissingStageBits };
+    enum IgnoreReason { NotIgnored = 0, ResetWaitRace, Reset2WaitRace, SetRace, MissingStageBits, SetVsWait2 };
     using EventPointer = std::shared_ptr<const EVENT_STATE>;
     using ScopeMap = sparse_container::range_map<VkDeviceSize, bool>;
     EventPointer event;
@@ -185,7 +185,7 @@ struct SyncEventState {
     SyncEventState() : SyncEventState(EventPointer()) {}
     void ResetFirstScope();
     const ScopeMap &FirstScope(AccessAddressType address_type) const { return first_scope[static_cast<size_t>(address_type)]; }
-    IgnoreReason IsIgnoredByWait(VkPipelineStageFlags2KHR srcStageMask) const;
+    IgnoreReason IsIgnoredByWait(CMD_TYPE cmd, VkPipelineStageFlags2KHR srcStageMask) const;
     bool HasBarrier(VkPipelineStageFlags2KHR stageMask, VkPipelineStageFlags2KHR exec_scope) const;
 };
 using SyncEventStateShared = std::shared_ptr<SyncEventState>;
@@ -491,32 +491,34 @@ class SyncOpBarriers : public SyncOpBase {
                    const VkMemoryBarrier *pMemoryBarriers, uint32_t bufferMemoryBarrierCount,
                    const VkBufferMemoryBarrier *pBufferMemoryBarriers, uint32_t imageMemoryBarrierCount,
                    const VkImageMemoryBarrier *pImageMemoryBarriers);
-    SyncOpBarriers(CMD_TYPE cmd, const SyncValidator &sync_state, VkQueueFlags queue_flags,
-                   const VkDependencyInfoKHR &pDependencyInfo);
+    SyncOpBarriers(CMD_TYPE cmd, const SyncValidator &sync_state, VkQueueFlags queue_flags, uint32_t event_count,
+                   const VkDependencyInfoKHR *pDependencyInfo);
 
   protected:
-    void MakeMemoryBarriers(const SyncExecScope &src, const SyncExecScope &dst, VkDependencyFlags dependencyFlags,
-                            uint32_t memoryBarrierCount, const VkMemoryBarrier *pMemoryBarriers);
-    void MakeBufferMemoryBarriers(const SyncValidator &sync_state, const SyncExecScope &src, const SyncExecScope &dst,
-                                  VkDependencyFlags dependencyFlags, uint32_t bufferMemoryBarrierCount,
-                                  const VkBufferMemoryBarrier *pBufferMemoryBarriers);
-    void MakeImageMemoryBarriers(const SyncValidator &sync_state, const SyncExecScope &src, const SyncExecScope &dst,
-                                 VkDependencyFlags dependencyFlags, uint32_t imageMemoryBarrierCount,
-                                 const VkImageMemoryBarrier *pImageMemoryBarriers);
-
-    void MakeMemoryBarriers(VkQueueFlags queue_flags, VkDependencyFlags dependency_flags, uint32_t barrier_count,
-                            const VkMemoryBarrier2KHR *barriers);
-    void MakeBufferMemoryBarriers(const SyncValidator &sync_state, VkQueueFlags queue_flags, VkDependencyFlags dependency_flags,
-                                  uint32_t barrier_count, const VkBufferMemoryBarrier2KHR *barriers);
-    void MakeImageMemoryBarriers(const SyncValidator &sync_state, VkQueueFlags queue_flags, VkDependencyFlags dependency_flags,
-                                 uint32_t barrier_count, const VkImageMemoryBarrier2KHR *barriers);
-
-    VkDependencyFlags dependency_flags_;
-    SyncExecScope src_exec_scope_;
-    SyncExecScope dst_exec_scope_;
-    std::vector<SyncMemoryBarrier> memory_barriers_;
-    std::vector<SyncBufferMemoryBarrier> buffer_memory_barriers_;
-    std::vector<SyncImageMemoryBarrier> image_memory_barriers_;
+    struct BarrierSet {
+        VkDependencyFlags dependency_flags;
+        SyncExecScope src_exec_scope;
+        SyncExecScope dst_exec_scope;
+        std::vector<SyncMemoryBarrier> memory_barriers;
+        std::vector<SyncBufferMemoryBarrier> buffer_memory_barriers;
+        std::vector<SyncImageMemoryBarrier> image_memory_barriers;
+        bool single_exec_scope;
+        void MakeMemoryBarriers(const SyncExecScope &src, const SyncExecScope &dst, VkDependencyFlags dependencyFlags,
+                                uint32_t memoryBarrierCount, const VkMemoryBarrier *pMemoryBarriers);
+        void MakeBufferMemoryBarriers(const SyncValidator &sync_state, const SyncExecScope &src, const SyncExecScope &dst,
+                                      VkDependencyFlags dependencyFlags, uint32_t bufferMemoryBarrierCount,
+                                      const VkBufferMemoryBarrier *pBufferMemoryBarriers);
+        void MakeImageMemoryBarriers(const SyncValidator &sync_state, const SyncExecScope &src, const SyncExecScope &dst,
+                                     VkDependencyFlags dependencyFlags, uint32_t imageMemoryBarrierCount,
+                                     const VkImageMemoryBarrier *pImageMemoryBarriers);
+        void MakeMemoryBarriers(VkQueueFlags queue_flags, VkDependencyFlags dependency_flags, uint32_t barrier_count,
+                                const VkMemoryBarrier2KHR *barriers);
+        void MakeBufferMemoryBarriers(const SyncValidator &sync_state, VkQueueFlags queue_flags, VkDependencyFlags dependency_flags,
+                                      uint32_t barrier_count, const VkBufferMemoryBarrier2KHR *barriers);
+        void MakeImageMemoryBarriers(const SyncValidator &sync_state, VkQueueFlags queue_flags, VkDependencyFlags dependency_flags,
+                                     uint32_t barrier_count, const VkImageMemoryBarrier2KHR *barriers);
+    };
+    std::vector<BarrierSet> barriers_;
 };
 
 class SyncOpPipelineBarrier : public SyncOpBarriers {
@@ -540,8 +542,8 @@ class SyncOpWaitEvents : public SyncOpBarriers {
                      const VkBufferMemoryBarrier *pBufferMemoryBarriers, uint32_t imageMemoryBarrierCount,
                      const VkImageMemoryBarrier *pImageMemoryBarriers);
 
-    SyncOpWaitEvents(CMD_TYPE cmd, const SyncValidator &sync_state, VkQueueFlags queue_flags, const VkEvent event,
-                     const VkDependencyInfoKHR &dep_info);
+    SyncOpWaitEvents(CMD_TYPE cmd, const SyncValidator &sync_state, VkQueueFlags queue_flags, uint32_t eventCount,
+                     const VkEvent *pEvents, const VkDependencyInfoKHR *pDependencyInfo);
 
     bool Validate(const CommandBufferAccessContext &cb_context) const override;
     void Record(CommandBufferAccessContext *cb_context) const override;
@@ -569,12 +571,16 @@ class SyncOpSetEvent : public SyncOpBase {
   public:
     SyncOpSetEvent(CMD_TYPE cmd, const SyncValidator &sync_state, VkQueueFlags queue_flags, VkEvent event,
                    VkPipelineStageFlags2KHR stageMask);
+    SyncOpSetEvent(CMD_TYPE cmd, const SyncValidator &sync_state, VkQueueFlags queue_flags, VkEvent event,
+                   const VkDependencyInfoKHR &dep_info);
     bool Validate(const CommandBufferAccessContext &cb_context) const override;
     void Record(CommandBufferAccessContext *cb_context) const override;
 
   private:
     std::shared_ptr<const EVENT_STATE> event_;
     SyncExecScope src_exec_scope_;
+    // Note that the dep info is *not* dehandled, but retained for comparison with a future WaitEvents2
+    std::shared_ptr<safe_VkDependencyInfoKHR> dep_info_;
 };
 
 class SyncOpBeginRenderPass : public SyncOpBase {
