@@ -450,7 +450,58 @@ TEST_F(VkSyncValTest, SyncCopyOptimalImageHazards) {
 
     m_commandBuffer->end();
 
-    // CmdResolveImage
+    // Test secondary command buffers
+    // Create secondary buffers to use
+    m_errorMonitor->ExpectSuccess();
+    VkCommandBufferObj secondary_cb1(m_device, m_commandPool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+    VkCommandBuffer scb1 = secondary_cb1.handle();
+    secondary_cb1.begin();
+    vk::CmdCopyImage(scb1, image_c.handle(), VK_IMAGE_LAYOUT_GENERAL, image_a.handle(), VK_IMAGE_LAYOUT_GENERAL, 1, &full_region);
+    secondary_cb1.end();
+    m_errorMonitor->VerifyNotFound();
+
+    auto record_primary = [&]() {
+        m_commandBuffer->reset();
+        m_commandBuffer->begin();
+        vk::CmdCopyImage(cb, image_a.handle(), VK_IMAGE_LAYOUT_GENERAL, image_b.handle(), VK_IMAGE_LAYOUT_GENERAL, 1, &full_region);
+        vk::CmdExecuteCommands(cb, 1, &scb1);
+        m_commandBuffer->end();
+    };
+
+    m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_ERROR_BIT_EXT, "SYNC-HAZARD-WRITE_AFTER_READ");
+    record_primary();
+    m_errorMonitor->VerifyFound();
+
+    m_errorMonitor->ExpectSuccess();
+    // With a barrier...
+    secondary_cb1.reset();
+    secondary_cb1.begin();
+    vk::CmdPipelineBarrier(scb1, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 1, &mem_barrier, 0, nullptr, 0,
+                           nullptr);
+    vk::CmdCopyImage(scb1, image_c.handle(), VK_IMAGE_LAYOUT_GENERAL, image_a.handle(), VK_IMAGE_LAYOUT_GENERAL, 1, &full_region);
+    secondary_cb1.end();
+    record_primary();
+    m_errorMonitor->VerifyNotFound();
+
+    auto image_transition_barrier = image_barrier;
+    image_transition_barrier.image = image_a.handle();
+    image_transition_barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+    image_transition_barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+
+    m_errorMonitor->ExpectSuccess();
+    secondary_cb1.reset();
+    secondary_cb1.begin();
+    // Use the wrong stage, get an error
+    vk::CmdPipelineBarrier(scb1, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1,
+                           &image_transition_barrier);
+    secondary_cb1.end();
+    m_errorMonitor->VerifyNotFound();
+
+    m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_ERROR_BIT_EXT, "SYNC-HAZARD-WRITE_AFTER_READ");
+    record_primary();
+    m_errorMonitor->VerifyFound();
+
+    // CmdResolveImage hazard testing
     VkImageFormatProperties formProps = {{0, 0, 0}, 0, 0, 0, 0};
     vk::GetPhysicalDeviceImageFormatProperties(m_device->phy().handle(), VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TYPE_2D,
                                                VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, 0, &formProps);
