@@ -50,6 +50,7 @@ jobs:
         cc: [gcc, clang]
         cxx: [g++, clang++]
         config: [debug, release]
+        api: [ vulkan, vulkansc ]
         exclude:
           - cc: gcc
             cxx: clang++
@@ -69,13 +70,13 @@ jobs:
                                 libx11-xcb-dev libxcb-keysyms1 libxcb-keysyms1-dev libxcb-ewmh-dev \
                                 libxcb-randr0-dev cmake
       - name: Build and Test Vulkan-ValidationLayers
-        run: python3 scripts/github_ci_win_linux.py --config ${{ matrix.config }}
+        run: python3 scripts/github_ci_win_linux.py --config ${{ matrix.config }} --api ${{ matrix.api }}
         env:
           CC: ${{ matrix.cc }}
           CXX: ${{ matrix.cxx }}
       - name: Test CMake minimum version requirements
         run: python3 scripts/cmake_test_min.py
-        if: matrix.cc == 'gcc' && matrix.config == 'release'
+        if: matrix.cc == 'gcc' && matrix.config == 'release' && matrix.api == 'vulkan'
 
   linux-cpp20:
     runs-on: ubuntu-20.04

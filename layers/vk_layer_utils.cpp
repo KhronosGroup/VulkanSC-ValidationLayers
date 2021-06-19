@@ -1,6 +1,7 @@
 /* Copyright (c) 2015-2016, 2020-2021 The Khronos Group Inc.
  * Copyright (c) 2015-2016, 2020-2021 Valve Corporation
- * Copyright (c) 2015-2016, 2020-2021 LunarG, Inc.
+ * Copyright (c) 2015-2016, 2020-2022 LunarG, Inc.
+ * Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,7 +26,11 @@
 #include <string>
 #include <vector>
 
+#ifdef VULKANSC
+#include "vulkan/vulkan_sc.h"
+#else
 #include "vulkan/vulkan.h"
+#endif
 #include "vk_layer_config.h"
 
 static const uint8_t kUtF8OneByteCode = 0xC0;
@@ -152,6 +157,7 @@ VK_LAYER_EXPORT void layer_debug_messenger_actions(debug_report_data *report_dat
     }
 }
 
+#if !defined(VULKANSC)
 // NOTE: This function has been deprecated, and the above function (layer_debug_messenger_actions) should be
 //       used in its place.
 VK_LAYER_EXPORT void layer_debug_report_actions(debug_report_data *report_data, const VkAllocationCallbacks *pAllocator,
@@ -201,6 +207,7 @@ VK_LAYER_EXPORT void layer_debug_report_actions(debug_report_data *report_data, 
         layer_create_report_callback(report_data, default_layer_callback, &dbg_create_info, pAllocator, &callback);
     }
 }
+#endif // !defined(VULKANSC)
 
 VK_LAYER_EXPORT VkLayerInstanceCreateInfo *get_chain_info(const VkInstanceCreateInfo *pCreateInfo, VkLayerFunction func) {
     VkLayerInstanceCreateInfo *chain_info = (VkLayerInstanceCreateInfo *)pCreateInfo->pNext;

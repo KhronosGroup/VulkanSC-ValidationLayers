@@ -1,7 +1,8 @@
 /* Copyright (c) 2015-2021 The Khronos Group Inc.
  * Copyright (c) 2015-2021 Valve Corporation
- * Copyright (c) 2015-2021 LunarG, Inc.
+ * Copyright (c) 2015-2022 LunarG, Inc.
  * Copyright (C) 2015-2021 Google Inc.
+ * Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,7 +25,11 @@
 
 #include <cstdlib>
 
+#ifdef VULKANSC
+#include "vulkan/vulkan_sc.h"
+#else
 #include "vulkan/vulkan.h"
+#endif
 #include <generated/spirv_tools_commit_id.h>
 #include "shader_module.h"
 
@@ -38,6 +43,7 @@ struct shader_stage_attributes {
     VkShaderStageFlags stage;
 };
 
+#if defined(VK_EXT_validation_cache)
 class ValidationCache {
     // hashes of shaders that have passed validation before, and can be skipped.
     // we don't store negative results, as we would have to also store what was
@@ -132,6 +138,7 @@ class ValidationCache {
         }
     }
 };
+#endif
 
 spv_target_env PickSpirvEnv(uint32_t api_version, bool spirv_1_4);
 

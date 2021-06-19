@@ -2,7 +2,7 @@
 #
 # Copyright (c) 2015-2021 The Khronos Group Inc.
 # Copyright (c) 2015-2021 Valve Corporation
-# Copyright (c) 2015-2021 LunarG, Inc.
+# Copyright (c) 2015-2022 LunarG, Inc.
 # Copyright (c) 2015-2021 Google Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -116,7 +116,7 @@ class LayerDispatchTableOutputGenerator(OutputGenerator):
         copyright =  '/*\n'
         copyright += ' * Copyright (c) 2015-2021 The Khronos Group Inc.\n'
         copyright += ' * Copyright (c) 2015-2021 Valve Corporation\n'
-        copyright += ' * Copyright (c) 2015-2021 LunarG, Inc.\n'
+        copyright += ' * Copyright (c) 2015-2022 LunarG, Inc.\n'
         copyright += ' *\n'
         copyright += ' * Licensed under the Apache License, Version 2.0 (the "License");\n'
         copyright += ' * you may not use this file except in compliance with the License.\n'

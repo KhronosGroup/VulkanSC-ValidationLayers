@@ -1,8 +1,9 @@
 /*
  *
  * Copyright (c) 2016-2020 Valve Corporation
- * Copyright (c) 2016-2020 LunarG, Inc.
+ * Copyright (c) 2016-2022 LunarG, Inc.
  * Copyright (c) 2016-2020 The Khronos Group Inc.
+ * Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +24,11 @@
 #ifndef __VK_DEVICE_PROFILE_API_H__
 #define __VK_DEVICE_PROFILE_API_H__
 
+#if defined(VULKANSC)
+#include "vulkan/vulkan_sc.h"
+#else
 #include "vulkan/vulkan.h"
+#endif
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus

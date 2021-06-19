@@ -1,8 +1,9 @@
 /* Copyright (c) 2015-2021 The Khronos Group Inc.
  * Copyright (c) 2015-2021 Valve Corporation
- * Copyright (c) 2015-2021 LunarG, Inc.
+ * Copyright (c) 2015-2022 LunarG, Inc.
  * Copyright (C) 2015-2021 Google Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -71,7 +72,11 @@ class DEVICE_MEMORY_STATE : public BASE_NODE {
 
     bool IsImport() const { return import_handle_type_flags != 0; }
     bool IsImportAHB() const {
+#if defined(VK_ANDROID_external_memory_android_hardware_buffer)
         return (import_handle_type_flags & VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID) != 0;
+#else
+        return false;
+#endif
     }
     bool IsExport() const { return export_handle_type_flags != 0; }
 
@@ -147,7 +152,11 @@ class BINDABLE : public BASE_NODE {
     void SetSparseMemBinding(std::shared_ptr<DEVICE_MEMORY_STATE> &mem, const VkDeviceSize mem_offset, const VkDeviceSize mem_size);
 
     bool IsExternalAHB() const {
+#if defined(VK_ANDROID_external_memory_android_hardware_buffer)
         return (external_memory_handle & VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID) != 0;
+#else
+        return false;
+#endif
     }
 
     virtual VkDeviceSize GetFakeBaseAddress() const;

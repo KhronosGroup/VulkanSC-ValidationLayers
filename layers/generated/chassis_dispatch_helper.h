@@ -4,8 +4,9 @@
 
 /* Copyright (c) 2015-2021 The Khronos Group Inc.
  * Copyright (c) 2015-2021 Valve Corporation
- * Copyright (c) 2015-2021 LunarG, Inc.
+ * Copyright (c) 2015-2022 LunarG, Inc.
  * Copyright (c) 2015-2021 Google Inc.
+ * Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1199,8 +1200,11 @@ typedef enum InterceptId{
     InterceptIdCount,
 } InterceptId;
 
+
+
 void ValidationObject::InitObjectDispatchVectors() {
 
+#if !defined(VULKANSC)
 #define BUILD_DISPATCH_VECTOR(name) \
     init_object_dispatch_vector(InterceptId ## name, \
                                 typeid(&ValidationObject::name), \
@@ -1212,7 +1216,15 @@ void ValidationObject::InitObjectDispatchVectors() {
                                 typeid(&GpuAssisted::name), \
                                 typeid(&DebugPrintf::name), \
                                 typeid(&SyncValidator::name));
+#else
+#define BUILD_DISPATCH_VECTOR(name) \
+    init_object_dispatch_vector(InterceptId ## name, \
+                                typeid(&ValidationObject::name), \
+                                typeid(&ThreadSafety::name), \
+                                typeid(&StatelessValidation::name));
+#endif
 
+#if !defined(VULKANSC)
     auto init_object_dispatch_vector = [this](InterceptId id,
                                               const std::type_info& vo_typeid,
                                               const std::type_info& tt_typeid,
@@ -1259,6 +1271,30 @@ void ValidationObject::InitObjectDispatchVectors() {
             }
         }
     };
+#else
+    auto init_object_dispatch_vector = [this](InterceptId id,
+                                              const std::type_info& vo_typeid,
+                                              const std::type_info& tt_typeid,
+                                              const std::type_info& tpv_typeid) {
+        for (auto item : this->object_dispatch) {
+            auto intercept_vector = &this->intercept_vectors[id];
+            switch (item->container_type) {
+            case LayerObjectTypeThreading:
+                if (tt_typeid != vo_typeid) intercept_vector->push_back(item);
+                break;
+            case LayerObjectTypeParameterValidation:
+                if (tpv_typeid != vo_typeid) intercept_vector->push_back(item);
+                break;
+            case LayerObjectTypeInstance:
+            case LayerObjectTypeDevice:
+                break;
+            default:
+                /* Chassis codegen needs to be updated for unknown validation object type */
+                assert(0);
+            }
+        }
+    };
+#endif
 
     intercept_vectors.resize(InterceptIdCount);
 

@@ -1,8 +1,9 @@
 /* Copyright (c) 2015-2021 The Khronos Group Inc.
  * Copyright (c) 2015-2021 Valve Corporation
- * Copyright (c) 2015-2021 LunarG, Inc.
+ * Copyright (c) 2015-2022 LunarG, Inc.
  * Copyright (C) 2015-2021 Google Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,7 +28,11 @@
  */
 #pragma once
 
+#if !defined(VULKANSC)
 #include "vulkan/vulkan.h"
+#else
+#include "vulkan/vulkan_sc.h"
+#endif
 #include "vk_object_types.h"
 #include "vk_layer_data.h"
 #include "vk_layer_logging.h"

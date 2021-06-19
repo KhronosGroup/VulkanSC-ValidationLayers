@@ -1,4 +1,5 @@
 /* Copyright (c) 2021 The Khronos Group Inc.
+ * Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -207,6 +208,7 @@ struct shader_struct_member {
 
 struct shader_module_used_operators;
 
+#if !defined(VULKANSC)
 struct SHADER_MODULE_STATE : public BASE_NODE {
     struct EntryPoint {
         uint32_t offset;  // into module to get OpEntryPoint instruction
@@ -389,6 +391,7 @@ struct SHADER_MODULE_STATE : public BASE_NODE {
 
     static std::unordered_multimap<std::string, EntryPoint> ProcessEntryPoints(const SHADER_MODULE_STATE &mod);
 };
+#endif // !defined(VULKANSC)
 
 // String helpers functions to give better error messages
 char const *StorageClassName(unsigned sc);

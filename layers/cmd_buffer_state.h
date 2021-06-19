@@ -1,8 +1,9 @@
 /* Copyright (c) 2015-2021 The Khronos Group Inc.
  * Copyright (c) 2015-2021 Valve Corporation
- * Copyright (c) 2015-2021 LunarG, Inc.
+ * Copyright (c) 2015-2022 LunarG, Inc.
  * Copyright (C) 2015-2021 Google Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -401,7 +402,9 @@ class CMD_BUFFER_STATE : public REFCOUNTED_NODE {
     void NextSubpass(CMD_TYPE cmd_type, VkSubpassContents contents);
     void EndRenderPass(CMD_TYPE cmd_type);
 
+#if defined(VK_KHR_dynamic_rendering)
     void BeginRendering(CMD_TYPE cmd_type, const VkRenderingInfoKHR *pRenderingInfo);
+#endif
 
     void ExecuteCommands(uint32_t commandBuffersCount, const VkCommandBuffer *pCommandBuffers);
 
@@ -445,6 +448,7 @@ class CMD_BUFFER_STATE : public REFCOUNTED_NODE {
     void Retire(uint32_t perf_submit_pass);
 
     uint32_t GetDynamicColorAttachmentCount() {
+#if defined(VK_KHR_dynamic_rendering)
         if (activeRenderPass) {
             if (activeRenderPass->use_dynamic_rendering_inherited) {
                 return activeRenderPass->inheritance_rendering_info.colorAttachmentCount;
@@ -453,6 +457,7 @@ class CMD_BUFFER_STATE : public REFCOUNTED_NODE {
                 return activeRenderPass->dynamic_rendering_info.colorAttachmentCount;
             }
         }
+#endif
         return 0;
     }
     uint32_t GetDynamicColorAttachmentImageIndex(uint32_t index) { return index; }

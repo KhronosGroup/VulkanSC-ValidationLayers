@@ -1,7 +1,8 @@
 /* Copyright (c) 2015-2021 The Khronos Group Inc.
  * Copyright (c) 2015-2021 Valve Corporation
- * Copyright (c) 2015-2021 LunarG, Inc.
+ * Copyright (c) 2015-2022 LunarG, Inc.
  * Copyright (C) 2015-2021 Google Inc.
+ * Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -127,8 +128,10 @@ class ObjectLifetimes : public ValidationObject {
     bool ValidateDescriptorWrite(VkWriteDescriptorSet const *desc, bool isPush) const;
     bool ValidateAnonymousObject(uint64_t object, VkObjectType core_object_type, bool null_allowed, const char *invalid_handle_code,
                                  const char *wrong_device_code) const;
+#if defined(VK_KHR_acceleration_structure)
     bool ValidateAccelerationStructures(const char *dst_handle_vuid, uint32_t count,
                                         const VkAccelerationStructureBuildGeometryInfoKHR *infos) const;
+#endif
 
     ObjectLifetimes *GetObjectLifetimeData(std::vector<ValidationObject *> &object_dispatch) const {
         for (auto *layer_object : object_dispatch) {
