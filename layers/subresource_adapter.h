@@ -1,7 +1,8 @@
 /* Copyright (c) 2019-2021 The Khronos Group Inc.
  * Copyright (c) 2019-2021 Valve Corporation
- * Copyright (c) 2019-2021 LunarG, Inc.
+ * Copyright (c) 2019-2022 LunarG, Inc.
  * Copyright (C) 2019-2021 Google Inc.
+ * Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,7 +30,11 @@
 #include "range_vector.h"
 #include "vk_layer_data.h"
 #ifndef SPARSE_CONTAINER_UNIT_TEST
+#ifdef VULKANSC
+#include "vulkan/vulkan_sc.h"
+#else
 #include "vulkan/vulkan.h"
+#endif
 #else
 #include "vk_snippets.h"
 #endif
@@ -68,8 +73,12 @@ struct Subresource : public VkImageSubresource {
     Subresource(const RangeEncoder& encoder, const VkImageSubresource& subres);
     Subresource(VkImageAspectFlags aspect_mask_, uint32_t mip_level_, uint32_t array_layer_, uint32_t aspect_index_)
         : VkImageSubresource({aspect_mask_, mip_level_, array_layer_}), aspect_index(aspect_index_) {}
+// VkImageAspectFlags and VkImageAspectFlagBits are both VkFlags in VKSC
+// Can't overload this function for VKSC
+#if !defined(VULKANSC)
     Subresource(VkImageAspectFlagBits aspect_, uint32_t mip_level_, uint32_t array_layer_, uint32_t aspect_index_)
         : Subresource(static_cast<VkImageAspectFlags>(aspect_), mip_level_, array_layer_, aspect_index_) {}
+#endif
 };
 
 // Subresource is encoded in (from slowest varying to fastest)

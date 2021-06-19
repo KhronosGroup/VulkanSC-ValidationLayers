@@ -47,6 +47,8 @@ CONFIGURATIONS = ['release', 'debug']
 DEFAULT_CONFIGURATION = CONFIGURATIONS[0]
 ARCHS = [ 'x64', 'Win32' ]
 DEFAULT_ARCH = ARCHS[0]
+APIS = ['vulkan', 'vulkansc']
+DEFAULT_API = APIS[0]
 
 # Runs a command in a directory and returns its return code.
 # Directory is project root by default, or a relative path from project root
@@ -63,10 +65,19 @@ def RunShellCmd(command, start_dir = PROJECT_ROOT, env=None, verbose=False):
 def IsWindows(): return 'windows' == platform.system().lower()
 
 #
+# Get the {API}-Headers name
+def GetApiHeadersName(args):
+    if args.api == 'vulkansc':
+        return "VulkanSC-Headers"
+    else:
+        return "Vulkan-Headers"
+
+#
 # Verify consistency of generated source code
-def CheckVVLCodegenConsistency():
+def CheckVVLCodegenConsistency(args):
     print("Check Generated Source Code Consistency")
-    gen_check_cmd = 'python3 scripts/generate_source.py --verify %s/Vulkan-Headers/registry %s/SPIRV-Headers/include/spirv/unified1/' % (EXTERNAL_DIR, EXTERNAL_DIR)
+    header_name = GetApiHeadersName(args)
+    gen_check_cmd = 'python3 scripts/generate_source.py --verify %s/%s/registry %s/SPIRV-Headers/include/spirv/unified1/ -api %s' % (EXTERNAL_DIR, header_name, EXTERNAL_DIR, args.api)
     RunShellCmd(gen_check_cmd)
 
 #
@@ -92,6 +103,7 @@ def BuildVVL(args, build_tests=False):
     cmake_cmd = f'cmake -DUPDATE_DEPS=ON -DCMAKE_BUILD_TYPE={args.configuration.capitalize()} {args.cmake} ..'
     if IsWindows(): cmake_cmd = cmake_cmd + f' -A {args.arch}'
     if build_tests: cmake_cmd = cmake_cmd + ' -DBUILD_TESTS=ON'
+    if args.api == 'vulkansc': cmake_cmd = cmake_cmd + ' -DVULKANSC=ON'
     RunShellCmd(cmake_cmd, VVL_BUILD_DIR)
 
     print("Build Validation Layers and Tests")
@@ -101,7 +113,8 @@ def BuildVVL(args, build_tests=False):
 
     print('Run vk_validation_stats.py')
     utils.make_dirs(os.path.join(VVL_BUILD_DIR, 'layers', args.configuration.capitalize()))
-    RunShellCmd(f'python3 ../scripts/vk_validation_stats.py ../{EXTERNAL_DIR_NAME}/Vulkan-Headers/registry/validusage.json -text layers/{args.configuration.capitalize()}/vuid_coverage_database.txt', VVL_BUILD_DIR)
+    header_name = GetApiHeadersName(args)
+    RunShellCmd(f'python3 ../scripts/vk_validation_stats.py ../{EXTERNAL_DIR_NAME}/{header_name}/registry/validusage.json -text layers/{args.configuration.capitalize()}/vuid_coverage_database.txt', VVL_BUILD_DIR)
 
 #
 # Prepare Loader for executing Layer Validation Tests
@@ -114,7 +127,7 @@ def BuildLoader(args):
         RunShellCmd(clone_loader_cmd, EXTERNAL_DIR)
 
     print("Run update_deps.py for Loader Repository")
-    update_cmd = 'python3 scripts/update_deps.py --dir external'
+    update_cmd = f'python3 scripts/update_deps.py --api {args.api} --dir external'
     RunShellCmd(update_cmd, LOADER_DIR)
 
     print("Run CMake for Loader")
@@ -122,6 +135,7 @@ def BuildLoader(args):
     utils.make_dirs(LOADER_BUILD_DIR)
     cmake_cmd = f'cmake -C ../external/helper.cmake -DCMAKE_BUILD_TYPE={args.configuration.capitalize()} {args.cmake} ..'
     if IsWindows(): cmake_cmd = cmake_cmd + f' -A {args.arch}'
+    if args.api == 'vulkansc': cmake_cmd = cmake_cmd + ' -DVulkanSC=TRUE'
     RunShellCmd(cmake_cmd, LOADER_BUILD_DIR)
 
     print("Build Loader")
@@ -132,6 +146,10 @@ def BuildLoader(args):
 #
 # Prepare Mock ICD for use with Layer Validation Tests
 def BuildMockICD(args):
+    if args.api == 'vulkansc':
+        print("Skipping MockICD build for Vulkan SC")
+        return
+
     VT_DIR = RepoRelative("%s/Vulkan-Tools" % EXTERNAL_DIR_NAME)
     if not os.path.exists(VT_DIR):
         print("Clone Vulkan-Tools Repository")
@@ -161,6 +179,10 @@ def BuildMockICD(args):
 #
 # Run the Layer Validation Tests
 def RunVVLTests(args):
+    if args.api == 'vulkansc':
+        print("Skipping Vulkan-ValidationLayer Tests for Vulkan SC (No Mock ICD)")
+        return
+
     print("Run Vulkan-ValidationLayer Tests using Mock ICD")
     lvt_cmd = os.path.join(PROJECT_ROOT, BUILD_DIR_NAME, 'tests')
     if IsWindows(): lvt_cmd = os.path.join(lvt_cmd, args.configuration.capitalize())
@@ -207,4 +229,8 @@ def GetArgParser():
         '--cmake', dest='cmake',
         metavar='CMAKE', type=str,
         default='', help='Additional args to pass to cmake')
+    parser.add_argument(
+        '--api', dest='api', action='store',
+        choices=APIS, default=DEFAULT_API,
+        help=f'Target API. Can be one of: {APIS}')
     return parser

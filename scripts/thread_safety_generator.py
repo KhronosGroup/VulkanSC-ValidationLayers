@@ -3,8 +3,9 @@
 #
 # Copyright (c) 2015-2021 The Khronos Group Inc.
 # Copyright (c) 2015-2021 Valve Corporation
-# Copyright (c) 2015-2021 LunarG, Inc.
+# Copyright (c) 2015-2022 LunarG, Inc.
 # Copyright (c) 2015-2021 Google Inc.
+# Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -134,8 +135,9 @@ class ThreadOutputGenerator(OutputGenerator):
 
 /* Copyright (c) 2015-2021 The Khronos Group Inc.
  * Copyright (c) 2015-2021 Valve Corporation
- * Copyright (c) 2015-2021 LunarG, Inc.
+ * Copyright (c) 2015-2022 LunarG, Inc.
  * Copyright (c) 2015-2021 Google Inc.
+ * Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -768,6 +770,8 @@ void ThreadSafety::PostCallRecordFreeDescriptorSets(
     }
 }
 
+// vkDestroyDescriptorPool is removed from VulkanSC
+#if !defined(VULKANSC)
 void ThreadSafety::PreCallRecordDestroyDescriptorPool(
     VkDevice                                    device,
     VkDescriptorPool                            descriptorPool,
@@ -804,6 +808,7 @@ void ThreadSafety::PostCallRecordDestroyDescriptorPool(
         pool_descriptor_sets_map.erase(descriptorPool);
     }
 }
+#endif // !defined(VULKANSC)
 
 void ThreadSafety::PreCallRecordResetDescriptorPool(
     VkDevice                                    device,
@@ -920,6 +925,8 @@ void ThreadSafety::PostCallRecordUpdateDescriptorSets(
     // Host access to pDescriptorCopies[].dstSet must be externally synchronized
 }
 
+// The below are removed in VulkanSC
+#if !defined(VULKANSC)
 void ThreadSafety::PreCallRecordUpdateDescriptorSetWithTemplate(
     VkDevice                                    device,
     VkDescriptorSet                             descriptorSet,
@@ -987,6 +994,7 @@ void ThreadSafety::PostCallRecordUpdateDescriptorSetWithTemplateKHR(
     }
     // Host access to descriptorSet must be externally synchronized
 }
+#endif // !defined(VULKANSC)
 
 void ThreadSafety::PreCallRecordFreeCommandBuffers(VkDevice device, VkCommandPool commandPool, uint32_t commandBufferCount,
                                                    const VkCommandBuffer *pCommandBuffers) {
@@ -1052,6 +1060,8 @@ void ThreadSafety::PostCallRecordResetCommandPool(VkDevice device, VkCommandPool
     // Host access to commandPool must be externally synchronized
 }
 
+// vkDestroyCommandPool is removed from VulkanSC
+#if !defined(VULKANSC)
 void ThreadSafety::PreCallRecordDestroyCommandPool(VkDevice device, VkCommandPool commandPool, const VkAllocationCallbacks *pAllocator) {
     StartReadObjectParentInstance(device, "vkDestroyCommandPool");
     StartWriteObject(commandPool, "vkDestroyCommandPool");
@@ -1077,6 +1087,7 @@ void ThreadSafety::PostCallRecordDestroyCommandPool(VkDevice device, VkCommandPo
     c_VkCommandPoolContents.FinishWrite(commandPool, "vkDestroyCommandPool");
     c_VkCommandPoolContents.DestroyObject(commandPool);
 }
+#endif
 
 // GetSwapchainImages can return a non-zero count with a NULL pSwapchainImages pointer.  Let's avoid crashes by ignoring
 // pSwapchainImages.
@@ -1100,6 +1111,8 @@ void ThreadSafety::PostCallRecordGetSwapchainImagesKHR(VkDevice device, VkSwapch
     }
 }
 
+// vkDestroySwapchainKHR is removed from VulkanSC
+#if !defined(VULKANSC)
 void ThreadSafety::PreCallRecordDestroySwapchainKHR(
     VkDevice                                    device,
     VkSwapchainKHR                              swapchain,
@@ -1128,6 +1141,7 @@ void ThreadSafety::PostCallRecordDestroySwapchainKHR(
     }
     swapchain_wrapped_image_handle_map.erase(swapchain);
 }
+#endif
 
 void ThreadSafety::PreCallRecordDestroyDevice(
     VkDevice                                    device,
@@ -1632,6 +1646,12 @@ void ThreadSafety::PostCallRecordDeviceWaitIdle(
     def genType(self, typeinfo, name, alias):
         OutputGenerator.genType(self, typeinfo, name, alias)
         if self.handle_types.IsNonDispatchable(name):
+            # VkShaderModule is only kept in the Vulkan SC registry
+            # for compatibility. We avoid adding it to object types
+            # here to avoid conflicts with VK_OBJECT_TYPE_SHADER_MODULE
+            # being removed.
+            if name == 'VkShaderModule' and self.genOpts.apiname == 'vulkansc':
+                return
             self.non_dispatchable_types.add(name)
     #
     # Struct (e.g. C "struct" type) generation.

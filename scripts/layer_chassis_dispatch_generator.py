@@ -2,8 +2,9 @@
 #
 # Copyright (c) 2015-2021 The Khronos Group Inc.
 # Copyright (c) 2015-2021 Valve Corporation
-# Copyright (c) 2015-2021 LunarG, Inc.
+# Copyright (c) 2015-2022 LunarG, Inc.
 # Copyright (c) 2015-2021 Google Inc.
+# Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -131,8 +132,9 @@ class LayerChassisDispatchOutputGenerator(OutputGenerator):
 
 /* Copyright (c) 2015-2021 The Khronos Group Inc.
  * Copyright (c) 2015-2021 Valve Corporation
- * Copyright (c) 2015-2021 LunarG, Inc.
+ * Copyright (c) 2015-2022 LunarG, Inc.
  * Copyright (c) 2015-2021 Google Inc.
+ * Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -153,6 +155,7 @@ class LayerChassisDispatchOutputGenerator(OutputGenerator):
 
 #define DISPATCH_MAX_STACK_ALLOCATIONS 32
 
+#if defined(VK_EXT_pipeline_creation_feedback)
 // The VK_EXT_pipeline_creation_feedback extension returns data from the driver -- we've created a copy of the pnext chain, so
 // copy the returned data to the caller before freeing the copy's data.
 void CopyCreatePipelineFeedbackData(const void *src_chain, const void *dst_chain) {
@@ -165,6 +168,7 @@ void CopyCreatePipelineFeedbackData(const void *src_chain, const void *dst_chain
         dst_feedback_struct->pPipelineStageCreationFeedbacks[i] = src_feedback_struct->pPipelineStageCreationFeedbacks[i];
     }
 }
+#endif
 
 VkResult DispatchCreateGraphicsPipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t createInfoCount,
                                          const VkGraphicsPipelineCreateInfo *pCreateInfos,
@@ -190,11 +194,13 @@ VkResult DispatchCreateGraphicsPipelines(VkDevice device, VkPipelineCache pipeli
                 }
             }
 
+#if defined(VK_KHR_dynamic_rendering)
             auto dynamic_rendering = LvlFindInChain<VkPipelineRenderingCreateInfoKHR>(pCreateInfos[idx0].pNext);
             if (dynamic_rendering) {
                 uses_color_attachment        = (dynamic_rendering->colorAttachmentCount > 0);
                 uses_depthstencil_attachment = (dynamic_rendering->depthAttachmentFormat != VK_FORMAT_UNDEFINED);
             }
+#endif
 
             local_pCreateInfos[idx0].initialize(&pCreateInfos[idx0], uses_color_attachment, uses_depthstencil_attachment);
 
@@ -222,11 +228,13 @@ VkResult DispatchCreateGraphicsPipelines(VkDevice device, VkPipelineCache pipeli
 
     VkResult result = layer_data->device_dispatch_table.CreateGraphicsPipelines(device, pipelineCache, createInfoCount,
                                                                                 local_pCreateInfos->ptr(), pAllocator, pPipelines);
+#if defined(VK_EXT_pipeline_creation_feedback)
     for (uint32_t i = 0; i < createInfoCount; ++i) {
         if (pCreateInfos[i].pNext != VK_NULL_HANDLE) {
             CopyCreatePipelineFeedbackData(local_pCreateInfos[i].pNext, pCreateInfos[i].pNext);
         }
     }
+#endif
 
     delete[] local_pCreateInfos;
     {
@@ -271,6 +279,7 @@ VkResult DispatchCreateRenderPass(VkDevice device, const VkRenderPassCreateInfo 
     return result;
 }
 
+#if defined(VK_KHR_create_renderpass2)
 VkResult DispatchCreateRenderPass2KHR(VkDevice device, const VkRenderPassCreateInfo2 *pCreateInfo,
                                       const VkAllocationCallbacks *pAllocator, VkRenderPass *pRenderPass) {
     auto layer_data = GetLayerDataPtr(get_dispatch_key(device), layer_data_map);
@@ -283,6 +292,7 @@ VkResult DispatchCreateRenderPass2KHR(VkDevice device, const VkRenderPassCreateI
     }
     return result;
 }
+#endif
 
 VkResult DispatchCreateRenderPass2(VkDevice device, const VkRenderPassCreateInfo2 *pCreateInfo,
                                       const VkAllocationCallbacks *pAllocator, VkRenderPass *pRenderPass) {
@@ -395,6 +405,7 @@ VkResult DispatchGetSwapchainImagesKHR(VkDevice device, VkSwapchainKHR swapchain
     return result;
 }
 
+#if !defined(VULKANSC)
 void DispatchDestroySwapchainKHR(VkDevice device, VkSwapchainKHR swapchain, const VkAllocationCallbacks *pAllocator) {
     auto layer_data = GetLayerDataPtr(get_dispatch_key(device), layer_data_map);
     if (!wrap_handles) return layer_data->device_dispatch_table.DestroySwapchainKHR(device, swapchain, pAllocator);
@@ -418,6 +429,7 @@ void DispatchDestroySwapchainKHR(VkDevice device, VkSwapchainKHR swapchain, cons
 
     layer_data->device_dispatch_table.DestroySwapchainKHR(device, swapchain, pAllocator);
 }
+#endif
 
 VkResult DispatchQueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo) {
     auto layer_data = GetLayerDataPtr(get_dispatch_key(queue), layer_data_map);
@@ -451,6 +463,7 @@ VkResult DispatchQueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresent
     return result;
 }
 
+#if !defined(VULKANSC)
 void DispatchDestroyDescriptorPool(VkDevice device, VkDescriptorPool descriptorPool, const VkAllocationCallbacks *pAllocator) {
     auto layer_data = GetLayerDataPtr(get_dispatch_key(device), layer_data_map);
     if (!wrap_handles) return layer_data->device_dispatch_table.DestroyDescriptorPool(device, descriptorPool, pAllocator);
@@ -474,6 +487,7 @@ void DispatchDestroyDescriptorPool(VkDevice device, VkDescriptorPool descriptorP
 
     layer_data->device_dispatch_table.DestroyDescriptorPool(device, descriptorPool, pAllocator);
 }
+#endif
 
 VkResult DispatchResetDescriptorPool(VkDevice device, VkDescriptorPool descriptorPool, VkDescriptorPoolResetFlags flags) {
     auto layer_data = GetLayerDataPtr(get_dispatch_key(device), layer_data_map);
@@ -561,6 +575,7 @@ VkResult DispatchFreeDescriptorSets(VkDevice device, VkDescriptorPool descriptor
     return result;
 }
 
+#if !defined(VULKANSC)
 // This is the core version of this routine.  The extension version is below.
 VkResult DispatchCreateDescriptorUpdateTemplate(VkDevice device, const VkDescriptorUpdateTemplateCreateInfo *pCreateInfo,
                                                 const VkAllocationCallbacks *pAllocator,
@@ -595,7 +610,9 @@ VkResult DispatchCreateDescriptorUpdateTemplate(VkDevice device, const VkDescrip
     }
     return result;
 }
+#endif
 
+#if defined(VK_KHR_descriptor_update_template)
 // This is the extension version of this routine.  The core version is above.
 VkResult DispatchCreateDescriptorUpdateTemplateKHR(VkDevice device, const VkDescriptorUpdateTemplateCreateInfo *pCreateInfo,
                                                    const VkAllocationCallbacks *pAllocator,
@@ -631,7 +648,9 @@ VkResult DispatchCreateDescriptorUpdateTemplateKHR(VkDevice device, const VkDesc
     }
     return result;
 }
+#endif
 
+#if !defined(VULKANSC)
 // This is the core version of this routine.  The extension version is below.
 void DispatchDestroyDescriptorUpdateTemplate(VkDevice device, VkDescriptorUpdateTemplate descriptorUpdateTemplate,
                                              const VkAllocationCallbacks *pAllocator) {
@@ -652,7 +671,9 @@ void DispatchDestroyDescriptorUpdateTemplate(VkDevice device, VkDescriptorUpdate
 
     layer_data->device_dispatch_table.DestroyDescriptorUpdateTemplate(device, descriptorUpdateTemplate, pAllocator);
 }
+#endif
 
+#if defined(VK_KHR_descriptor_update_template)
 // This is the extension version of this routine.  The core version is above.
 void DispatchDestroyDescriptorUpdateTemplateKHR(VkDevice device, VkDescriptorUpdateTemplate descriptorUpdateTemplate,
                                                 const VkAllocationCallbacks *pAllocator) {
@@ -673,7 +694,9 @@ void DispatchDestroyDescriptorUpdateTemplateKHR(VkDevice device, VkDescriptorUpd
 
     layer_data->device_dispatch_table.DestroyDescriptorUpdateTemplateKHR(device, descriptorUpdateTemplate, pAllocator);
 }
+#endif
 
+#if !defined(VULKANSC)
 void *BuildUnwrappedUpdateTemplateBuffer(ValidationObject *layer_data, uint64_t descriptorUpdateTemplate, const void *pData) {
     auto const template_map_entry = layer_data->desc_template_createinfo_map.find(descriptorUpdateTemplate);
     auto const &create_info = template_map_entry->second->create_info;
@@ -807,7 +830,9 @@ void DispatchUpdateDescriptorSetWithTemplate(VkDevice device, VkDescriptorSet de
     layer_data->device_dispatch_table.UpdateDescriptorSetWithTemplate(device, descriptorSet, descriptorUpdateTemplate, unwrapped_buffer);
     free(unwrapped_buffer);
 }
+#endif
 
+#if defined(VK_KHR_descriptor_update_template)
 void DispatchUpdateDescriptorSetWithTemplateKHR(VkDevice device, VkDescriptorSet descriptorSet,
                                                 VkDescriptorUpdateTemplate descriptorUpdateTemplate, const void *pData) {
     auto layer_data = GetLayerDataPtr(get_dispatch_key(device), layer_data_map);
@@ -845,6 +870,7 @@ void DispatchCmdPushDescriptorSetWithTemplateKHR(VkCommandBuffer commandBuffer,
                                                                  unwrapped_buffer);
     free(unwrapped_buffer);
 }
+#endif
 
 VkResult DispatchGetPhysicalDeviceDisplayPropertiesKHR(VkPhysicalDevice physicalDevice, uint32_t *pPropertyCount,
                                                        VkDisplayPropertiesKHR *pProperties) {
@@ -958,6 +984,7 @@ VkResult DispatchGetDisplayModeProperties2KHR(VkPhysicalDevice physicalDevice, V
     return result;
 }
 
+#if defined(VK_EXT_debug_marker)
 VkResult DispatchDebugMarkerSetObjectTagEXT(VkDevice device, const VkDebugMarkerObjectTagInfoEXT *pTagInfo) {
     auto layer_data = GetLayerDataPtr(get_dispatch_key(device), layer_data_map);
     if (!wrap_handles) return layer_data->device_dispatch_table.DebugMarkerSetObjectTagEXT(device, pTagInfo);
@@ -987,6 +1014,7 @@ VkResult DispatchDebugMarkerSetObjectNameEXT(VkDevice device, const VkDebugMarke
         device, reinterpret_cast<VkDebugMarkerObjectNameInfoEXT *>(&local_name_info));
     return result;
 }
+#endif
 
 // VK_EXT_debug_utils
 VkResult DispatchSetDebugUtilsObjectTagEXT(VkDevice device, const VkDebugUtilsObjectTagInfoEXT *pTagInfo) {
@@ -1019,6 +1047,7 @@ VkResult DispatchSetDebugUtilsObjectNameEXT(VkDevice device, const VkDebugUtilsO
     return result;
 }
 
+#if defined(VK_EXT_tooling_info)
 VkResult DispatchGetPhysicalDeviceToolPropertiesEXT(
     VkPhysicalDevice                            physicalDevice,
     uint32_t*                                   pToolCount,
@@ -1035,6 +1064,7 @@ VkResult DispatchGetPhysicalDeviceToolPropertiesEXT(
 
     return result;
 }
+#endif
 
 bool NotDispatchableHandle(VkObjectType object_type) {
     bool not_dispatchable = true;
@@ -1048,6 +1078,7 @@ bool NotDispatchableHandle(VkObjectType object_type) {
     return not_dispatchable;
 }
 
+#if defined(VK_EXT_private_data)
 VkResult DispatchSetPrivateDataEXT(
     VkDevice                                    device,
     VkObjectType                                objectType,
@@ -1080,6 +1111,7 @@ void DispatchGetPrivateDataEXT(
     }
     layer_data->device_dispatch_table.GetPrivateDataEXT(device, objectType, objectHandle, privateDataSlot, pData);
 }
+#endif
 
 layer_data::unordered_map<VkCommandBuffer, VkCommandPool> secondary_cb_map{};
 
@@ -1126,6 +1158,7 @@ void DispatchFreeCommandBuffers(VkDevice device, VkCommandPool commandPool, uint
     }
 }
 
+#if !defined(VULKANSC)
 void DispatchDestroyCommandPool(VkDevice device, VkCommandPool commandPool, const VkAllocationCallbacks* pAllocator) {
     auto layer_data = GetLayerDataPtr(get_dispatch_key(device), layer_data_map);
     if (!wrap_handles) return layer_data->device_dispatch_table.DestroyCommandPool(device, commandPool, pAllocator);
@@ -1146,6 +1179,7 @@ void DispatchDestroyCommandPool(VkDevice device, VkCommandPool commandPool, cons
         }
     }
 }
+#endif
 
 VkResult DispatchBeginCommandBuffer(VkCommandBuffer commandBuffer, const VkCommandBufferBeginInfo* pBeginInfo) {
     bool cb_is_primary;
@@ -1491,7 +1525,7 @@ VkResult DispatchBeginCommandBuffer(VkCommandBuffer commandBuffer, const VkComma
         for struct in self.structMembers:
             if (len(struct.members) > 1) and struct.members[1].extstructs is not None:
                 for item in struct.members[1].extstructs:
-                    if item != '' and self.struct_contains_ndo(item) and item not in self.ndo_extension_structs:
+                    if item != '' and item in self.struct_member_dict and self.struct_contains_ndo(item) and item not in self.ndo_extension_structs:
                         self.ndo_extension_structs.append(item)
     #
     # Returns True if a struct may have a pNext chain containing an NDO
@@ -1973,13 +2007,14 @@ VkResult DispatchBeginCommandBuffer(VkCommandBuffer commandBuffer, const VkComma
             self.appendSection('source_file', '    ' + assignresult + api_func + '(' + wrapped_paramstext + ');')
 
             # And add the post-API-call codegen
-            if ('CreateGraphicsPipelines' in cmdname) or ('CreateComputePipelines' in cmdname) or ('CreateRayTracingPipelines' in cmdname):
-                copy_feedback_source  = '    for (uint32_t i = 0; i < createInfoCount; ++i) {\n'
-                copy_feedback_source += '        if (pCreateInfos[i].pNext != VK_NULL_HANDLE) {\n'
-                copy_feedback_source += '            CopyCreatePipelineFeedbackData(local_pCreateInfos[i].pNext, pCreateInfos[i].pNext);\n'
-                copy_feedback_source += '        }\n'
-                copy_feedback_source += '    }\n'
-                self.appendSection('source_file', copy_feedback_source)
+            if self.genOpts.apiname != 'vulkansc':
+                if ('CreateGraphicsPipelines' in cmdname) or ('CreateComputePipelines' in cmdname) or ('CreateRayTracingPipelines' in cmdname):
+                    copy_feedback_source  = '    for (uint32_t i = 0; i < createInfoCount; ++i) {\n'
+                    copy_feedback_source += '        if (pCreateInfos[i].pNext != VK_NULL_HANDLE) {\n'
+                    copy_feedback_source += '            CopyCreatePipelineFeedbackData(local_pCreateInfos[i].pNext, pCreateInfos[i].pNext);\n'
+                    copy_feedback_source += '        }\n'
+                    copy_feedback_source += '    }\n'
+                    self.appendSection('source_file', copy_feedback_source)
             self.appendSection('source_file', "\n".join(str(api_post).rstrip().split("\n")))
             # Handle the return result variable, if any
             if (resulttype is not None):

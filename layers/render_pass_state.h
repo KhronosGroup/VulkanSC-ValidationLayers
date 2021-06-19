@@ -1,8 +1,9 @@
 /* Copyright (c) 2015-2021 The Khronos Group Inc.
  * Copyright (c) 2015-2021 Valve Corporation
- * Copyright (c) 2015-2021 LunarG, Inc.
+ * Copyright (c) 2015-2022 LunarG, Inc.
  * Copyright (C) 2015-2021 Google Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -90,9 +91,11 @@ class RENDER_PASS_STATE : public BASE_NODE {
     };
     const bool use_dynamic_rendering;
     const bool use_dynamic_rendering_inherited;
+#if defined(VK_KHR_dynamic_rendering)
     safe_VkRenderingInfoKHR dynamic_rendering_info;
     const safe_VkPipelineRenderingCreateInfoKHR rendering_create_info;
     const safe_VkCommandBufferInheritanceRenderingInfoKHR inheritance_rendering_info;
+#endif
     const safe_VkRenderPassCreateInfo2 createInfo;
     using SubpassVec = std::vector<uint32_t>;
     using SelfDepVec = std::vector<SubpassVec>;
@@ -113,9 +116,11 @@ class RENDER_PASS_STATE : public BASE_NODE {
     RENDER_PASS_STATE(VkRenderPass rp, VkRenderPassCreateInfo2 const *pCreateInfo);
     RENDER_PASS_STATE(VkRenderPass rp, VkRenderPassCreateInfo const *pCreateInfo);
 
+#if defined(VK_KHR_dynamic_rendering)
     RENDER_PASS_STATE(VkPipelineRenderingCreateInfoKHR const *pPipelineRenderingCreateInfo);
     RENDER_PASS_STATE(VkRenderingInfoKHR const *pRenderingInfo);
     RENDER_PASS_STATE(VkCommandBufferInheritanceRenderingInfoKHR const *pInheritanceRenderingInfo);
+#endif
 
     VkRenderPass renderPass() const { return handle_.Cast<VkRenderPass>(); }
 

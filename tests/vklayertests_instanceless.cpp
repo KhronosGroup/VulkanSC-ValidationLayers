@@ -1,6 +1,7 @@
 /* Copyright (c) 2020-2021 The Khronos Group Inc.
  * Copyright (c) 2020-2021 Valve Corporation
- * Copyright (c) 2020-2021 LunarG, Inc.
+ * Copyright (c) 2020-2022 LunarG, Inc.
+ * Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -155,6 +156,7 @@ TEST_F(VkLayerTest, InstanceValidationFeaturesBadFlags) {
     }
 }
 
+#if defined(VK_EXT_validation_flags)
 TEST_F(VkLayerTest, InstanceBadValidationFlags) {
     TEST_DESCRIPTION("Test creating instance with invalid VkValidationFlagsEXT.");
 
@@ -200,6 +202,7 @@ TEST_F(VkLayerTest, InstanceBadValidationFlags) {
         Monitor().VerifyFound();
     }
 }
+#endif
 
 void* VKAPI_PTR DummyAlloc(void*, size_t size, size_t alignment, VkSystemAllocationScope) {
     size_t space = size + alignment - 1;
@@ -272,3 +275,4 @@ TEST_F(VkLayerTest, DestroyInstanceHandleLeak) {
     vk::DestroyInstance(instance, nullptr);
     Monitor().VerifyFound();
 }
+

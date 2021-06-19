@@ -2,8 +2,9 @@
 #
 # Copyright (c) 2015-2021 The Khronos Group Inc.
 # Copyright (c) 2015-2021 Valve Corporation
-# Copyright (c) 2015-2021 LunarG, Inc.
+# Copyright (c) 2015-2022 LunarG, Inc.
 # Copyright (c) 2015-2021 Google Inc.
+# Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -419,8 +420,9 @@ class ObjectTrackerOutputGenerator(OutputGenerator):
         copyright += ' *\n'
         copyright += ' * Copyright (c) 2015-2021 The Khronos Group Inc.\n'
         copyright += ' * Copyright (c) 2015-2021 Valve Corporation\n'
-        copyright += ' * Copyright (c) 2015-2021 LunarG, Inc.\n'
+        copyright += ' * Copyright (c) 2015-2022 LunarG, Inc.\n'
         copyright += ' * Copyright (c) 2015-2021 Google Inc.\n'
+        copyright += ' * Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.\n'
         copyright += ' *\n'
         copyright += ' * Licensed under the Apache License, Version 2.0 (the "License");\n'
         copyright += ' * you may not use this file except in compliance with the License.\n'
@@ -486,7 +488,8 @@ class ObjectTrackerOutputGenerator(OutputGenerator):
         self.otwrite('hdr', 'void PreCallRecordFreeCommandBuffers(VkDevice device, VkCommandPool commandPool, uint32_t commandBufferCount, const VkCommandBuffer *pCommandBuffers) override;')
         self.otwrite('hdr', 'void PreCallRecordFreeDescriptorSets(VkDevice device, VkDescriptorPool descriptorPool, uint32_t descriptorSetCount, const VkDescriptorSet *pDescriptorSets) override;')
         self.otwrite('hdr', 'void PostCallRecordGetPhysicalDeviceQueueFamilyProperties2(VkPhysicalDevice physicalDevice, uint32_t *pQueueFamilyPropertyCount, VkQueueFamilyProperties2 *pQueueFamilyProperties) override;')
-        self.otwrite('hdr', 'void PostCallRecordGetPhysicalDeviceQueueFamilyProperties2KHR(VkPhysicalDevice physicalDevice, uint32_t *pQueueFamilyPropertyCount, VkQueueFamilyProperties2 *pQueueFamilyProperties) override;')
+        if self.genOpts.apiname != 'vulkansc':
+            self.otwrite('hdr', 'void PostCallRecordGetPhysicalDeviceQueueFamilyProperties2KHR(VkPhysicalDevice physicalDevice, uint32_t *pQueueFamilyPropertyCount, VkQueueFamilyProperties2 *pQueueFamilyProperties) override;')
         self.otwrite('hdr', 'void PostCallRecordGetPhysicalDeviceDisplayPropertiesKHR(VkPhysicalDevice physicalDevice, uint32_t *pPropertyCount, VkDisplayPropertiesKHR *pProperties, VkResult result) override;')
         self.otwrite('hdr', 'void PostCallRecordGetDisplayModePropertiesKHR(VkPhysicalDevice physicalDevice, VkDisplayKHR display, uint32_t *pPropertyCount, VkDisplayModePropertiesKHR *pProperties, VkResult result) override;')
         self.otwrite('hdr', 'void PostCallRecordGetPhysicalDeviceDisplayProperties2KHR(VkPhysicalDevice physicalDevice, uint32_t *pPropertyCount, VkDisplayProperties2KHR *pProperties, VkResult result) override;')
@@ -530,6 +533,12 @@ class ObjectTrackerOutputGenerator(OutputGenerator):
         if (category == 'struct' or category == 'union'):
             self.genStruct(typeinfo, name, alias)
         if category == 'handle':
+            # VkShaderModule is only kept in the Vulkan SC registry
+            # for compatibility. We avoid adding it to object types
+            # here to avoid conflicts with VK_OBJECT_TYPE_SHADER_MODULE
+            # being removed.
+            if name == 'VkShaderModule' and self.genOpts.apiname == 'vulkansc':
+                return
             self.object_types.append(name)
     #
     # Append a definition to the specified section

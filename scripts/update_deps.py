@@ -2,7 +2,8 @@
 
 # Copyright 2017 The Glslang Authors. All rights reserved.
 # Copyright (c) 2018 Valve Corporation
-# Copyright (c) 2018-2021 LunarG, Inc.
+# Copyright (c) 2018-2022 LunarG, Inc.
+# Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -336,6 +337,10 @@ class GoodRepo(object):
         self.custom_build = json['custom_build'] if ('custom_build' in json) else []
         self.cmake_options = json['cmake_options'] if (
             'cmake_options' in json) else []
+        if self._args.cmake_options:
+            cmake_options_arg = self._args.cmake_options.split()
+            for cmake_option in cmake_options_arg:
+                self.cmake_options.append(cmake_option)
         self.ci_only = json['ci_only'] if ('ci_only' in json) else []
         self.build_step = json['build_step'] if ('build_step' in json) else 'build'
         self.build_platforms = json['build_platforms'] if ('build_platforms' in json) else []
@@ -596,6 +601,9 @@ def CreateHelper(args, repos, filename):
     install_names = GetInstallNames(args)
     with open(filename, 'w') as helper_file:
         for repo in repos:
+            # Ignore the vulkan header repo not corresponding to our api
+            if "vulkan" in repo.name.lower() and repo.name.lower().split('-')[0] != args.api:
+                continue
             if install_names and repo.name in install_names and repo.on_build_platform:
                 helper_file.write('set({var} "{dir}" CACHE STRING "" FORCE)\n'
                                   .format(
@@ -676,6 +684,18 @@ def main():
         type=lambda a: set(a.lower().split(',')),
         help="Comma-separated list of 'optional' resources that may be skipped. Only 'tests' is currently supported as 'optional'",
         default=set())
+    parser.add_argument(
+        '--cmake-options',
+        dest='cmake_options',
+        help='Pass in CMake options, ex. to facilitate building for aarch64',
+        default=None)
+    parser.add_argument(
+            '--api',
+            dest='api',
+            choices=['vulkan', 'vulkansc'],
+            type=str.lower,
+            help="Api to grab the vulkan headers for",
+            default='vulkan')
 
     args = parser.parse_args()
     save_cwd = os.getcwd()
@@ -689,6 +709,10 @@ def main():
 
     print('Starting builds in {d}'.format(d=abs_top_dir))
     for repo in repos:
+        # Only grab the vulkan header repo corresponding to our api
+        print(repo.name.lower())
+        if "vulkan" in repo.name.lower() and repo.name.lower().split('-')[0] != args.api:
+            continue
         # If the repo has a platform whitelist, skip the repo
         # unless we are building on a whitelisted platform.
         if not repo.on_build_platform:

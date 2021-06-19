@@ -2,8 +2,9 @@
  * See parameter_validation_generator.py for modifications
  *
  * Copyright (c) 2015-2021 The Khronos Group Inc.
- * Copyright (c) 2015-2021 LunarG, Inc.
+ * Copyright (c) 2015-2022 LunarG, Inc.
  * Copyright (C) 2015-2021 Google Inc.
+ * Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -3391,13 +3392,7 @@ bool StatelessValidation::ValidatePnextStructContents(const char *api_name, cons
 
         // No Validation code for VkPhysicalDeviceExternalMemoryHostPropertiesEXT structure members  -- Covers VUID-VkPhysicalDeviceExternalMemoryHostPropertiesEXT-sType-sType
 
-        // Validation code for VkPipelineCompilerControlCreateInfoAMD structure members
-        case VK_STRUCTURE_TYPE_PIPELINE_COMPILER_CONTROL_CREATE_INFO_AMD: { // Covers VUID-VkPipelineCompilerControlCreateInfoAMD-sType-sType
-            if (is_const_param) {
-                VkPipelineCompilerControlCreateInfoAMD *structure = (VkPipelineCompilerControlCreateInfoAMD *) header;
-                skip |= validate_reserved_flags("VkPipelineCompilerControlCreateInfoAMD", "compilerControlFlags", structure->compilerControlFlags, "VUID-VkPipelineCompilerControlCreateInfoAMD-compilerControlFlags-zerobitmask");
-            }
-        } break;
+        // No Validation code for VkPipelineCompilerControlCreateInfoAMD structure members  -- Covers VUID-VkPipelineCompilerControlCreateInfoAMD-sType-sType
 
         // No Validation code for VkPhysicalDeviceShaderCorePropertiesAMD structure members  -- Covers VUID-VkPhysicalDeviceShaderCorePropertiesAMD-sType-sType
 
@@ -11099,8 +11094,6 @@ bool StatelessValidation::PreCallValidateAcquireProfilingLockKHR(
     if (pInfo != NULL)
     {
         skip |= validate_struct_pnext("vkAcquireProfilingLockKHR", "pInfo->pNext", NULL, pInfo->pNext, 0, NULL, GeneratedVulkanHeaderVersion, "VUID-VkAcquireProfilingLockInfoKHR-pNext-pNext", kVUIDUndefined, false, true);
-
-        skip |= validate_reserved_flags("vkAcquireProfilingLockKHR", "pInfo->flags", pInfo->flags, "VUID-VkAcquireProfilingLockInfoKHR-flags-zerobitmask");
     }
     return skip;
 }
@@ -15870,8 +15863,6 @@ bool StatelessValidation::PreCallValidateCreatePrivateDataSlotEXT(
     if (pCreateInfo != NULL)
     {
         skip |= validate_struct_pnext("vkCreatePrivateDataSlotEXT", "pCreateInfo->pNext", NULL, pCreateInfo->pNext, 0, NULL, GeneratedVulkanHeaderVersion, "VUID-VkPrivateDataSlotCreateInfoEXT-pNext-pNext", kVUIDUndefined, false, true);
-
-        skip |= validate_reserved_flags("vkCreatePrivateDataSlotEXT", "pCreateInfo->flags", pCreateInfo->flags, "VUID-VkPrivateDataSlotCreateInfoEXT-flags-zerobitmask");
     }
     if (pAllocator != NULL)
     {

@@ -6,8 +6,9 @@
  *
  * Copyright (c) 2015-2021 The Khronos Group Inc.
  * Copyright (c) 2015-2021 Valve Corporation
- * Copyright (c) 2015-2021 LunarG, Inc.
+ * Copyright (c) 2015-2022 LunarG, Inc.
  * Copyright (c) 2015-2021 Google Inc.
+ * Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -223,12 +224,16 @@ struct InstanceExtensions {
     }
 
     uint32_t NormalizeApiVersion(uint32_t specified_version) {
+#if !defined(VULKANSC)
         if (specified_version < VK_API_VERSION_1_1)
             return VK_API_VERSION_1_0;
         else if (specified_version < VK_API_VERSION_1_2)
             return VK_API_VERSION_1_1;
         else
             return VK_API_VERSION_1_2;
+#else
+        return VKSC_API_VERSION_1_0;
+#endif
     }
 
     uint32_t InitFromInstanceCreateInfo(uint32_t requested_api_version, const VkInstanceCreateInfo *pCreateInfo) {

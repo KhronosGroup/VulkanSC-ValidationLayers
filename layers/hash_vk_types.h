@@ -1,6 +1,7 @@
 /* Copyright (c) 2019, 2021 The Khronos Group Inc.
  * Copyright (c) 2019, 2021 Valve Corporation
- * Copyright (c) 2019, 2021 LunarG, Inc.
+ * Copyright (c) 2019, 2022 LunarG, Inc.
+ * Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +23,11 @@
 // Includes everything needed for overloading std::hash
 #include "hash_util.h"
 
+#ifdef VULKANSC
+#include <vulkan/vulkan_sc.h>
+#else
 #include <vulkan/vulkan.h>
+#endif
 #include "vk_safe_struct.h"
 #include <vector>
 

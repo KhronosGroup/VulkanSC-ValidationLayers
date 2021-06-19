@@ -1,6 +1,7 @@
 # ~~~
 # Copyright (c) 2014-2021 Valve Corporation
-# Copyright (c) 2014-2021 LunarG, Inc.
+# Copyright (c) 2014-2022 LunarG, Inc.
+# Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -39,10 +40,26 @@ option(VVL_ENABLE_ASAN "Use address sanitization (specifically -fsanitize=addres
 
 option(BUILD_TESTS "Build the tests" OFF)
 
+option(VULKANSC "User defined variable for VulkanSC Mode to be passed in through cmake command line e.g. -DVULKANSC" OFF)
+
 # API_NAME allows renaming builds to avoid conflicts with installed SDKs.  It is referenced by layers/vk_loader_platform.h
-set(API_NAME "Vulkan" CACHE STRING "API name to use when building")
+if (VULKANSC)
+    set(API_NAME "VulkanSC" CACHE STRING "API name to use when building")
+    set(API_TYPE vulkansc)
+    add_definitions(-DVULKANSC)
+    if(BUILD_WSI_SCI_SUPPORT)
+        add_definitions(-DVK_USE_PLATFORM_SCI)
+    endif()
+    set(GENERATED_DIR "generated-vksc")
+else()
+    set(API_NAME "Vulkan" CACHE STRING "API name to use when building")
+    set(API_TYPE vulkan)
+    set(GENERATED_DIR "generated")
+endif()
 string(TOLOWER ${API_NAME} API_LOWERCASE)
 add_definitions(-DAPI_NAME="${API_NAME}")
+message(STATUS "API_NAME set to ${API_NAME}")
+message(STATUS "API_TYPE set to ${API_TYPE}")
 
 # Enable beta Vulkan extensions
 add_definitions(-DVK_ENABLE_BETA_EXTENSIONS)
@@ -79,7 +96,7 @@ if (UPDATE_DEPS)
     # Add a target so that update_deps.py will run when necessary
     # NOTE: This is triggered off of the timestamps of known_good.json and helper.cmake
     add_custom_command(OUTPUT ${CMAKE_CURRENT_LIST_DIR}/external/helper.cmake
-                       COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_LIST_DIR}/scripts/update_deps.py --dir ${CMAKE_CURRENT_LIST_DIR}/external --arch ${_target_arch} --config ${_build_type} --generator "${CMAKE_GENERATOR}" ${_build_tests_arg}
+                       COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_LIST_DIR}/scripts/update_deps.py --dir ${CMAKE_CURRENT_LIST_DIR}/external --api ${API_TYPE} --arch ${_target_arch} --config ${_build_type} --generator "${CMAKE_GENERATOR}" ${_build_tests_arg}
                        DEPENDS ${CMAKE_CURRENT_LIST_DIR}/scripts/known_good.json)
 
     add_custom_target(vvl_update_deps DEPENDS ${CMAKE_CURRENT_LIST_DIR}/external/helper.cmake)
@@ -87,7 +104,7 @@ if (UPDATE_DEPS)
     # Check if update_deps.py needs to be run on first cmake run
     if (${CMAKE_CURRENT_LIST_DIR}/scripts/known_good.json IS_NEWER_THAN ${CMAKE_CURRENT_LIST_DIR}/external/helper.cmake)
         execute_process(
-            COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_LIST_DIR}/scripts/update_deps.py --dir ${CMAKE_CURRENT_LIST_DIR}/external --arch ${_target_arch} --config ${_build_type} --generator "${CMAKE_GENERATOR}" ${_build_tests_arg}
+            COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_LIST_DIR}/scripts/update_deps.py --dir ${CMAKE_CURRENT_LIST_DIR}/external --api ${API_TYPE} --arch ${_target_arch} --config ${_build_type} --generator "${CMAKE_GENERATOR}" ${_build_tests_arg}
             WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
             RESULT_VARIABLE _update_deps_result
         )
@@ -146,10 +163,16 @@ set(LAYERS_HELPER_FOLDER "Helper Targets")
 # Options for Linux only
 if(UNIX AND NOT APPLE) # i.e. Linux
     include(FindPkgConfig)
-    option(BUILD_WSI_XCB_SUPPORT "Build XCB WSI support" ON)
-    option(BUILD_WSI_XLIB_SUPPORT "Build Xlib WSI support" ON)
-    option(BUILD_WSI_WAYLAND_SUPPORT "Build Wayland WSI support" ON)
-    set(DEMOS_WSI_SELECTION "XCB" CACHE STRING "Select WSI target for demos (XCB, XLIB, WAYLAND, DISPLAY)")
+    if(VULKANSC)
+        option(BUILD_WSI_XCB_SUPPORT "Build XCB WSI support" OFF)
+        option(BUILD_WSI_XLIB_SUPPORT "Build Xlib WSI support" OFF)
+        option(BUILD_WSI_WAYLAND_SUPPORT "Build Wayland WSI support" OFF)
+    else()
+        option(BUILD_WSI_XCB_SUPPORT "Build XCB WSI support" ON)
+        option(BUILD_WSI_XLIB_SUPPORT "Build Xlib WSI support" ON)
+        option(BUILD_WSI_WAYLAND_SUPPORT "Build Wayland WSI support" ON)
+        set(DEMOS_WSI_SELECTION "XCB" CACHE STRING "Select WSI target for demos (XCB, XLIB, WAYLAND, DISPLAY)")
+    endif()
 
     if(BUILD_WSI_XCB_SUPPORT)
         find_package(XCB REQUIRED)
@@ -365,7 +388,7 @@ install(TARGETS VkLayer_utils DESTINATION ${CMAKE_INSTALL_LIBDIR})
 set_target_properties(VkLayer_utils PROPERTIES LINKER_LANGUAGE CXX)
 target_include_directories(VkLayer_utils
                            PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/layers
-                                  ${CMAKE_CURRENT_SOURCE_DIR}/layers/generated
+                                  ${CMAKE_CURRENT_SOURCE_DIR}/layers/${GENERATED_DIR}
                                   ${CMAKE_CURRENT_BINARY_DIR}
                                   ${CMAKE_CURRENT_BINARY_DIR}/layers
                                   ${PROJECT_BINARY_DIR}
@@ -386,8 +409,12 @@ if(NOT TARGET uninstall)
     set_target_properties(uninstall PROPERTIES FOLDER ${LAYERS_HELPER_FOLDER})
 endif()
 
-# Fetch header version from vulkan_core.h ----------------------------------------------------------------------------------------
-file(STRINGS "${VulkanHeaders_INCLUDE_DIRS}/vulkan/vulkan_core.h" lines REGEX "^#define VK_HEADER_VERSION [0-9]+")
+# Fetch header version from vulkan_core.h or vulkan_sc_core.h --------------------------------------------------------------------
+set(VULKAN_CORE_HEADER "vulkan_core.h")
+if(VULKANSC)
+    set(VULKAN_CORE_HEADER "vulkan_sc_core.h")
+endif()
+file(STRINGS "${VulkanHeaders_INCLUDE_DIRS}/vulkan/${VULKAN_CORE_HEADER}" lines REGEX "^#define VK_HEADER_VERSION [0-9]+")
 list(LENGTH lines len)
 if(${len} EQUAL 1)
     string(REGEX MATCHALL
@@ -395,15 +422,15 @@ if(${len} EQUAL 1)
                  vk_header_version
                  ${lines})
 else()
-    message(FATAL_ERROR "Unable to fetch version from vulkan_core.h")
+    message(FATAL_ERROR "Unable to fetch version from ${VULKAN_CORE_HEADER}")
 endif()
 
 # Optional codegen target --------------------------------------------------------------------------------------------------------
 if(PYTHONINTERP_FOUND)
     add_custom_target(VulkanVL_generated_source
                       COMMAND ${PYTHON_EXECUTABLE} ${PROJECT_SOURCE_DIR}/scripts/generate_source.py
-                              ${VulkanRegistry_DIR} ${SPIRV_HEADERS_INSTALL_DIR}/include/spirv/unified1/ --incremental
-                      WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/layers/generated
+                              ${VulkanRegistry_DIR} ${SPIRV_HEADERS_INSTALL_DIR}/include/spirv/unified1/ --incremental -api ${API_LOWERCASE}
+                      WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/layers/${GENERATED_DIR}
                       )
 else()
     message("WARNING: VulkanVL_generated_source target requires python 3")

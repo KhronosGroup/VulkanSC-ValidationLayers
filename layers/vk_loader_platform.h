@@ -2,7 +2,8 @@
  *
  * Copyright (c) 2015-2021 The Khronos Group Inc.
  * Copyright (c) 2015-2021 Valve Corporation
- * Copyright (c) 2015-2021 LunarG, Inc.
+ * Copyright (c) 2015-2022 LunarG, Inc.
+ * Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,7 +34,7 @@
 #undef NOMINMAX
 #include "vulkan/vk_sdk_platform.h"
 
-#if defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__)
+#if defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__) || defined(__QNX__)
 /* Linux-specific common code: */
 
 // Headers:
@@ -53,7 +54,11 @@
 #define PATH_SEPARATOR ':'
 #define DIRECTORY_SYMBOL '/'
 
+#if defined(VULKANSC)
+#define VULKAN_DIR "/vulkansc/"
+#else
 #define VULKAN_DIR "/vulkan/"
+#endif
 #define VULKAN_ICDCONF_DIR "icd.d"
 #define VULKAN_ICD_DIR "icd"
 #define VULKAN_ELAYERCONF_DIR "explicit_layer.d"

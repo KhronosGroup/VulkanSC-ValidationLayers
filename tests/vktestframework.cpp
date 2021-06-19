@@ -1,7 +1,8 @@
 /*
  * Copyright (c) 2015-2021 The Khronos Group Inc.
  * Copyright (c) 2015-2021 Valve Corporation
- * Copyright (c) 2015-2021 LunarG, Inc.
+ * Copyright (c) 2015-2022 LunarG, Inc.
+ * Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -718,6 +719,7 @@ EShLanguage VkTestFramework::FindLanguage(const VkShaderStageFlagBits shader_typ
         case VK_SHADER_STAGE_COMPUTE_BIT:
             return EShLangCompute;
 
+#if defined(VK_NV_ray_tracing)
         case VK_SHADER_STAGE_RAYGEN_BIT_NV:
             return EShLangRayGenNV;
 
@@ -735,18 +737,22 @@ EShLanguage VkTestFramework::FindLanguage(const VkShaderStageFlagBits shader_typ
 
         case VK_SHADER_STAGE_CALLABLE_BIT_NV:
             return EShLangCallableNV;
+#endif
 
+#if defined(VK_NV_mesh_shader)
         case VK_SHADER_STAGE_TASK_BIT_NV:
             return EShLangTaskNV;
 
         case VK_SHADER_STAGE_MESH_BIT_NV:
             return EShLangMeshNV;
+#endif
 
         default:
             return EShLangVertex;
     }
 }
 
+#if !defined(VULKANSC)
 //
 // Compile a given string containing GLSL into SPV for use by VK
 // Return value of false means an error was encountered.
@@ -854,3 +860,4 @@ bool VkTestFramework::ASMtoSPV(const spv_target_env target_env, const uint32_t o
 
     return true;
 }
+#endif // !defined(VULKANSC)

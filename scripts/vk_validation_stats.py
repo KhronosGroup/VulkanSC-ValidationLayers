@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 # Copyright (c) 2015-2021 The Khronos Group Inc.
 # Copyright (c) 2015-2021 Valve Corporation
-# Copyright (c) 2015-2021 LunarG, Inc.
+# Copyright (c) 2015-2022 LunarG, Inc.
 # Copyright (c) 2015-2021 Google Inc.
+# Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -68,6 +69,10 @@ layer_source_files = [common_codegen.repo_relative(path) for path in [
     'layers/generated/object_tracker.cpp',
     'layers/generated/spirv_validation_helper.cpp',
     'layers/generated/command_validation.cpp',
+    'layers/generated-vksc/parameter_validation.cpp',
+    'layers/generated-vksc/object_tracker.cpp',
+    'layers/generated-vksc/spirv_validation_helper.cpp',
+    'layers/generated-vksc/command_validation.cpp',
 ]]
 
 test_source_files = glob.glob(os.path.join(common_codegen.repo_relative('tests'), '*.cpp'))
@@ -478,7 +483,7 @@ class OutputDatabase:
  * Vulkan
  *
  * Copyright (c) 2016-2021 Google Inc.
- * Copyright (c) 2016-2021 LunarG, Inc.
+ * Copyright (c) 2016-2022 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -643,8 +648,8 @@ static const vuid_spec_text_pair vuid_spec_text[] = {
                 assert features
 
                 def isDefined(feature, edition):
-                    def getVersion(f): return int(f.replace('VK_VERSION_1_', '', 1))
-                    def isVersion(f): return f.startswith('VK_VERSION_') and feature != 'VK_VERSION_1_0' and getVersion(feature) < 1024
+                    def getVersion(f): return int(re.sub(r'VK.*VERSION_1_', '', f))
+                    def isVersion(f): return (f.startswith('VK_VERSION_') or f.startswith('VKSC_VERSION_')) and feature != 'VK_VERSION_1_0' and getVersion(feature) < 1024
                     def isExtension(f): return f.startswith('VK_') and not isVersion(f)
                     def isKhr(f): return f.startswith('VK_KHR_')
 
