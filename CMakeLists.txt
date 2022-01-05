@@ -252,6 +252,7 @@ option(BUILD_LAYER_SUPPORT_FILES "Generate layer files" OFF) # For generating fi
 option(USE_ROBIN_HOOD_HASHING "Use robin-hood-hashing" ON)
 if (USE_ROBIN_HOOD_HASHING)
     find_package(robin_hood REQUIRED CONFIG)
+    add_definitions(-DUSE_ROBIN_HOOD_HASHING)
 endif()
 
 if(BUILD_LAYERS OR BUILD_TESTS)
