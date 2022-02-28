@@ -90,6 +90,24 @@ layer_data::optional<CB_SUBMISSION> QUEUE_STATE::NextSubmission(uint64_t until_s
     return result;
 }
 
+layer_data::unordered_set<QueryObject> QUEUE_STATE::GetQueriesUpdatedAfter() const {
+    layer_data::unordered_set<QueryObject> queries;
+    auto guard = ReadLock();
+
+    for (const auto &submission : submissions_) {
+        for (uint32_t j = 0; j < submission.cbs.size(); ++j) {
+            const auto next_cb_node = submission.cbs[j];
+            if (!next_cb_node) {
+                continue;
+            }
+            for (const auto &updatedQuery : next_cb_node->updatedQueries) {
+                queries.emplace(updatedQuery);
+            }
+        }
+    }
+    return queries;
+}
+
 void QUEUE_STATE::Retire(uint64_t until_seq) {
     SEMAPHORE_STATE::RetireResult other_queue_seqs;
 
@@ -119,13 +137,14 @@ void QUEUE_STATE::Retire(uint64_t until_seq) {
             other_queue_seqs.erase(self_update);
         }
 
+        layer_data::unordered_set<QueryObject> updated_after = GetQueriesUpdatedAfter();
         for (auto &cb_node : submission->cbs) {
             auto cb_guard = cb_node->WriteLock();
             for (auto *secondary_cmd_buffer : cb_node->linkedCommandBuffers) {
                 auto secondary_guard = secondary_cmd_buffer->WriteLock();
-                secondary_cmd_buffer->Retire(submission->perf_submit_pass);
+                secondary_cmd_buffer->Retire(submission->perf_submit_pass, updated_after);
             }
-            cb_node->Retire(submission->perf_submit_pass);
+            cb_node->Retire(submission->perf_submit_pass, updated_after);
             cb_node->EndUse();
         }
 

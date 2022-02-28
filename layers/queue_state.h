@@ -30,6 +30,7 @@
 #include <set>
 #include <vector>
 #include "vk_layer_utils.h"
+#include "query_state.h"
 
 class CMD_BUFFER_STATE;
 class QUEUE_STATE;
@@ -239,6 +240,7 @@ class QUEUE_STATE : public BASE_NODE {
 
   private:
     layer_data::optional<CB_SUBMISSION> NextSubmission(uint64_t until_seq);
+    layer_data::unordered_set<QueryObject> GetQueriesUpdatedAfter() const;
     ReadLockGuard ReadLock() const { return ReadLockGuard(lock_); }
     WriteLockGuard WriteLock() { return WriteLockGuard(lock_); }
 

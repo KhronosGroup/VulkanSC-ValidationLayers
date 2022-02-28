@@ -274,6 +274,7 @@ class CMD_BUFFER_STATE : public REFCOUNTED_NODE {
     layer_data::unordered_set<QueryObject> activeQueries;
     layer_data::unordered_set<QueryObject> startedQueries;
     layer_data::unordered_set<QueryObject> resetQueries;
+    layer_data::unordered_set<QueryObject> updatedQueries;
     CommandBufferImageLayoutMap image_layout_map;
     CommandBufferAliasedLayoutMap aliased_image_layout_map;  // storage for potentially aliased images
 
@@ -461,7 +462,7 @@ class CMD_BUFFER_STATE : public REFCOUNTED_NODE {
     void SetImageInitialLayout(const IMAGE_STATE &image_state, const VkImageSubresourceLayers &layers, VkImageLayout layout);
 
     void Submit(uint32_t perf_submit_pass);
-    void Retire(uint32_t perf_submit_pass);
+    void Retire(uint32_t perf_submit_pass, const layer_data::unordered_set<QueryObject> &queriesUpdatedAfter);
 
     uint32_t GetDynamicColorAttachmentCount() {
         if (activeRenderPass) {
