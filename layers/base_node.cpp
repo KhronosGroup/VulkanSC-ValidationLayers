@@ -30,6 +30,8 @@
 
 BASE_NODE::~BASE_NODE() { Destroy(); }
 
+#error this is a test
+
 void BASE_NODE::Destroy() {
     Invalidate();
     destroyed_ = true;
