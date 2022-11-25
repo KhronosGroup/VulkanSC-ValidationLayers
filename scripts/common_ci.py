@@ -1,8 +1,9 @@
 #!/usr/bin/python3 -i
 #
-# Copyright (c) 2015-2017, 2019-2021 The Khronos Group Inc.
-# Copyright (c) 2015-2017, 2019-2021 Valve Corporation
-# Copyright (c) 2015-2017, 2019-2021 LunarG, Inc.
+# Copyright (c) 2015-2017, 2019-2022 The Khronos Group Inc.
+# Copyright (c) 2015-2017, 2019-2022 Valve Corporation
+# Copyright (c) 2015-2017, 2019-2022 LunarG, Inc.
+# Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -105,11 +106,11 @@ def BuildVVL(args, build_tests=False):
 #
 # Prepare Loader for executing Layer Validation Tests
 def BuildLoader(args):
-    LOADER_DIR = RepoRelative("%s/Vulkan-Loader" % EXTERNAL_DIR_NAME)
+    LOADER_DIR = RepoRelative("%s/VulkanSC-Loader" % EXTERNAL_DIR_NAME)
     # Clone Loader repo
     if not os.path.exists(LOADER_DIR):
         print("Clone Loader Source Code")
-        clone_loader_cmd = 'git clone https://github.com/KhronosGroup/Vulkan-Loader.git'
+        clone_loader_cmd = 'git clone https://github.com/KhronosGroup/VulkanSC-Loader.git'
         RunShellCmd(clone_loader_cmd, EXTERNAL_DIR)
 
     print("Run update_deps.py for Loader Repository")
@@ -117,7 +118,7 @@ def BuildLoader(args):
     RunShellCmd(update_cmd, LOADER_DIR)
 
     print("Run CMake for Loader")
-    LOADER_BUILD_DIR = RepoRelative("%s/Vulkan-Loader/%s" % (EXTERNAL_DIR_NAME, BUILD_DIR_NAME))
+    LOADER_BUILD_DIR = RepoRelative("%s/VulkanSC-Loader/%s" % (EXTERNAL_DIR_NAME, BUILD_DIR_NAME))
     utils.make_dirs(LOADER_BUILD_DIR)
     cmake_cmd = f'cmake -C ../external/helper.cmake -DCMAKE_BUILD_TYPE={args.configuration.capitalize()} {args.cmake} ..'
     if IsWindows(): cmake_cmd = cmake_cmd + f' -A {args.arch}'
@@ -164,9 +165,9 @@ def RunVVLTests(args):
     lvt_env = dict(os.environ)
 
     if not IsWindows():
-        lvt_env['LD_LIBRARY_PATH'] = os.path.join(EXTERNAL_DIR, 'Vulkan-Loader', BUILD_DIR_NAME, 'loader')
+        lvt_env['LD_LIBRARY_PATH'] = os.path.join(EXTERNAL_DIR, 'VulkanSC-Loader', BUILD_DIR_NAME, 'loader')
     else:
-        loader_dll = os.path.join(EXTERNAL_DIR, 'Vulkan-Loader', BUILD_DIR_NAME, 'loader', args.configuration.capitalize(), 'vulkan-1.dll')
+        loader_dll = os.path.join(EXTERNAL_DIR, 'VulkanSC-Loader', BUILD_DIR_NAME, 'loader', args.configuration.capitalize(), 'vulkan-1.dll')
         loader_dll_dst = os.path.join(os.path.dirname(lvt_cmd), 'vulkan-1.dll')
         shutil.copyfile(loader_dll, loader_dll_dst)
 
