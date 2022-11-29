@@ -40,7 +40,7 @@ jobs:
         with:
           python-version: '3.7'
       - name: Execute Source Code Format Checking Script
-        run: python3 scripts/check_code_format.py --base-refspec=sc_main --target-refspec=FETCH_HEAD
+        run: python3 scripts/check_code_format.py --target-refspec=origin/sc_main
 
   linux:
     runs-on: ubuntu-20.04

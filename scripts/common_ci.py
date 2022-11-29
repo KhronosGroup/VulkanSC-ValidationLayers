@@ -140,6 +140,10 @@ def BuildMockICD(args):
 
     ICD_BUILD_DIR = RepoRelative("%s/Vulkan-Tools/%s" % (EXTERNAL_DIR_NAME,BUILD_DIR_NAME))
 
+    print("checking out known_good")
+    checkout_known_good_cmd = 'git checkout v1.2.198'
+    RunShellCmd(checkout_known_good_cmd, VT_DIR)
+
     print("Running update_deps.py for ICD")
     RunShellCmd(f'python3 scripts/update_deps.py --dir {EXTERNAL_DIR_NAME} --config {args.configuration} --arch {args.arch}', VT_DIR)
 
