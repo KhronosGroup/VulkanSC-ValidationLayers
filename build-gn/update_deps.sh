@@ -1,6 +1,7 @@
 #!/bin/sh
 
-# Copyright (c) 2019-2021 LunarG, Inc.
+# Copyright (c) 2019-2022 LunarG, Inc.
+# Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,7 +25,7 @@ scripts/update_deps.py --dir="external" --no-build
 cat << EOF > .gclient
 solutions = [
   { "name"        : ".",
-    "url"         : "https://github.com/KhronosGroup/Vulkan-ValidationLayers",
+    "url"         : "https://github.com/KhronosGroup/VulkanSC-ValidationLayers",
     "deps_file"   : "build-gn/DEPS",
     "managed"     : False,
     "custom_deps" : {
