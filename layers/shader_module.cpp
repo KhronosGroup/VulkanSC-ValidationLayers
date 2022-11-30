@@ -1,4 +1,5 @@
 /* Copyright (c) 2021 The Khronos Group Inc.
+ * Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -131,6 +132,7 @@ static unsigned ExecutionModelToShaderStageFlagBits(unsigned mode) {
             return VK_SHADER_STAGE_FRAGMENT_BIT;
         case spv::ExecutionModelGLCompute:
             return VK_SHADER_STAGE_COMPUTE_BIT;
+#if defined(VK_NV_ray_tracing)
         case spv::ExecutionModelRayGenerationNV:
             return VK_SHADER_STAGE_RAYGEN_BIT_NV;
         case spv::ExecutionModelAnyHitNV:
@@ -143,10 +145,13 @@ static unsigned ExecutionModelToShaderStageFlagBits(unsigned mode) {
             return VK_SHADER_STAGE_INTERSECTION_BIT_NV;
         case spv::ExecutionModelCallableNV:
             return VK_SHADER_STAGE_CALLABLE_BIT_NV;
+#endif
+#if defined(VK_NV_mesh_shader)
         case spv::ExecutionModelTaskNV:
             return VK_SHADER_STAGE_TASK_BIT_NV;
         case spv::ExecutionModelMeshNV:
             return VK_SHADER_STAGE_MESH_BIT_NV;
+#endif
         default:
             return 0;
     }

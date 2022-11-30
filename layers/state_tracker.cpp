@@ -1,9 +1,9 @@
 /* Copyright (c) 2015-2021 The Khronos Group Inc.
  * Copyright (c) 2015-2021 Valve Corporation
- * Copyright (c) 2015-2022 LunarG, Inc.
+ * Copyright (c) 2015-2023 LunarG, Inc.
  * Copyright (C) 2015-2021 Google Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
- * Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,10 +40,14 @@
 #include "cmd_buffer_state.h"
 #include "render_pass_state.h"
 
+#if defined(VK_KHR_ray_tracing_pipeline)
 extern template PIPELINE_STATE::PIPELINE_STATE(const ValidationStateTracker *, const VkRayTracingPipelineCreateInfoKHR *,
                                                std::shared_ptr<const PIPELINE_LAYOUT_STATE> &&);
+#endif
+#if defined(VK_NV_ray_tracing)
 extern template PIPELINE_STATE::PIPELINE_STATE(const ValidationStateTracker *, const VkRayTracingPipelineCreateInfoNV *,
                                                std::shared_ptr<const PIPELINE_LAYOUT_STATE> &&);
+#endif
 
 void ValidationStateTracker::InitDeviceValidationObject(bool add_obj, ValidationObject *inst_obj, ValidationObject *dev_obj) {
     if (add_obj) {
@@ -167,9 +171,11 @@ void ValidationStateTracker::PostCallRecordCreateImage(VkDevice device, const Vk
                                                        const VkAllocationCallbacks *pAllocator, VkImage *pImage, VkResult result) {
     if (VK_SUCCESS != result) return;
     VkFormatFeatureFlags format_features = 0;
+#if defined(VK_ANDROID_external_memory_android_hardware_buffer)
     if (IsExtEnabled(device_extensions.vk_android_external_memory_android_hardware_buffer)) {
         format_features = GetExternalFormatFeaturesANDROID(pCreateInfo);
     }
+#endif
     if (format_features == 0) {
         format_features = GetImageFormatFeatures(physical_device, device, *pImage, pCreateInfo->format, pCreateInfo->tiling);
     }
@@ -659,65 +665,85 @@ void ValidationStateTracker::PostCallRecordCreateDevice(VkPhysicalDevice gpu, co
 
     // Features from other extensions passesd in create info
     {
+#if defined(VK_NV_scissor_exclusive)
         const auto *exclusive_scissor_features = LvlFindInChain<VkPhysicalDeviceExclusiveScissorFeaturesNV>(pCreateInfo->pNext);
         if (exclusive_scissor_features) {
             state_tracker->enabled_features.exclusive_scissor_features = *exclusive_scissor_features;
         }
+#endif
 
+#if defined(VK_NV_shading_rate_image)
         const auto *shading_rate_image_features = LvlFindInChain<VkPhysicalDeviceShadingRateImageFeaturesNV>(pCreateInfo->pNext);
         if (shading_rate_image_features) {
             state_tracker->enabled_features.shading_rate_image_features = *shading_rate_image_features;
         }
+#endif
 
+#if defined(VK_NV_mesh_shader)
         const auto *mesh_shader_features = LvlFindInChain<VkPhysicalDeviceMeshShaderFeaturesNV>(pCreateInfo->pNext);
         if (mesh_shader_features) {
             state_tracker->enabled_features.mesh_shader_features = *mesh_shader_features;
         }
+#endif
 
+#if defined(VK_EXT_inline_uniform_block)
         const auto *inline_uniform_block_features =
             LvlFindInChain<VkPhysicalDeviceInlineUniformBlockFeaturesEXT>(pCreateInfo->pNext);
         if (inline_uniform_block_features) {
             state_tracker->enabled_features.inline_uniform_block_features = *inline_uniform_block_features;
         }
+#endif
 
+#if defined(VK_EXT_transform_feedback)
         const auto *transform_feedback_features = LvlFindInChain<VkPhysicalDeviceTransformFeedbackFeaturesEXT>(pCreateInfo->pNext);
         if (transform_feedback_features) {
             state_tracker->enabled_features.transform_feedback_features = *transform_feedback_features;
         }
+#endif
 
         const auto *vtx_attrib_div_features = LvlFindInChain<VkPhysicalDeviceVertexAttributeDivisorFeaturesEXT>(pCreateInfo->pNext);
         if (vtx_attrib_div_features) {
             state_tracker->enabled_features.vtx_attrib_divisor_features = *vtx_attrib_div_features;
         }
 
+#if defined(VK_EXT_buffer_device_address)
         const auto *buffer_device_address_ext_features =
             LvlFindInChain<VkPhysicalDeviceBufferDeviceAddressFeaturesEXT>(pCreateInfo->pNext);
         if (buffer_device_address_ext_features) {
             state_tracker->enabled_features.buffer_device_address_ext_features = *buffer_device_address_ext_features;
         }
+#endif
 
+#if defined(VK_NV_cooperative_matrix)
         const auto *cooperative_matrix_features = LvlFindInChain<VkPhysicalDeviceCooperativeMatrixFeaturesNV>(pCreateInfo->pNext);
         if (cooperative_matrix_features) {
             state_tracker->enabled_features.cooperative_matrix_features = *cooperative_matrix_features;
         }
+#endif
 
+#if defined(VK_NV_compute_shader_derivatives)
         const auto *compute_shader_derivatives_features =
             LvlFindInChain<VkPhysicalDeviceComputeShaderDerivativesFeaturesNV>(pCreateInfo->pNext);
         if (compute_shader_derivatives_features) {
             state_tracker->enabled_features.compute_shader_derivatives_features = *compute_shader_derivatives_features;
         }
+#endif
 
+#if defined(VK_NV_fragment_shader_barycentric)
         const auto *fragment_shader_barycentric_features =
             LvlFindInChain<VkPhysicalDeviceFragmentShaderBarycentricFeaturesNV>(pCreateInfo->pNext);
         if (fragment_shader_barycentric_features) {
             state_tracker->enabled_features.fragment_shader_barycentric_features = *fragment_shader_barycentric_features;
         }
+#endif
 
+#if defined(VK_NV_shader_image_footprint)
         const auto *shader_image_footprint_features =
             LvlFindInChain<VkPhysicalDeviceShaderImageFootprintFeaturesNV>(pCreateInfo->pNext);
         if (shader_image_footprint_features) {
             state_tracker->enabled_features.shader_image_footprint_features = *shader_image_footprint_features;
         }
+#endif
 
         const auto *fragment_shader_interlock_features =
             LvlFindInChain<VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT>(pCreateInfo->pNext);
@@ -737,68 +763,84 @@ void ValidationStateTracker::PostCallRecordCreateDevice(VkPhysicalDevice gpu, co
             state_tracker->enabled_features.texel_buffer_alignment_features = *texel_buffer_alignment_features;
         }
 
+#if defined(VK_KHR_pipeline_executable_properties)
         const auto *pipeline_exe_props_features =
             LvlFindInChain<VkPhysicalDevicePipelineExecutablePropertiesFeaturesKHR>(pCreateInfo->pNext);
         if (pipeline_exe_props_features) {
             state_tracker->enabled_features.pipeline_exe_props_features = *pipeline_exe_props_features;
         }
+#endif
 
+#if defined(VK_NV_dedicated_allocation_image_aliasing)
         const auto *dedicated_allocation_image_aliasing_features =
             LvlFindInChain<VkPhysicalDeviceDedicatedAllocationImageAliasingFeaturesNV>(pCreateInfo->pNext);
         if (dedicated_allocation_image_aliasing_features) {
             state_tracker->enabled_features.dedicated_allocation_image_aliasing_features =
                 *dedicated_allocation_image_aliasing_features;
         }
+#endif
 
         const auto *performance_query_features = LvlFindInChain<VkPhysicalDevicePerformanceQueryFeaturesKHR>(pCreateInfo->pNext);
         if (performance_query_features) {
             state_tracker->enabled_features.performance_query_features = *performance_query_features;
         }
 
+#if defined(VK_AMD_device_coherent_memory)
         const auto *device_coherent_memory_features = LvlFindInChain<VkPhysicalDeviceCoherentMemoryFeaturesAMD>(pCreateInfo->pNext);
         if (device_coherent_memory_features) {
             state_tracker->enabled_features.device_coherent_memory_features = *device_coherent_memory_features;
         }
+#endif
 
         const auto *ycbcr_image_array_features = LvlFindInChain<VkPhysicalDeviceYcbcrImageArraysFeaturesEXT>(pCreateInfo->pNext);
         if (ycbcr_image_array_features) {
             state_tracker->enabled_features.ycbcr_image_array_features = *ycbcr_image_array_features;
         }
 
+#if defined(VK_KHR_ray_query)
         const auto *ray_query_features = LvlFindInChain<VkPhysicalDeviceRayQueryFeaturesKHR>(pCreateInfo->pNext);
         if (ray_query_features) {
             state_tracker->enabled_features.ray_query_features = *ray_query_features;
         }
+#endif
 
+#if defined(VK_KHR_ray_tracing_pipeline)
         const auto *ray_tracing_pipeline_features =
             LvlFindInChain<VkPhysicalDeviceRayTracingPipelineFeaturesKHR>(pCreateInfo->pNext);
         if (ray_tracing_pipeline_features) {
             state_tracker->enabled_features.ray_tracing_pipeline_features = *ray_tracing_pipeline_features;
         }
+#endif
 
+#if defined(VK_KHR_acceleration_structure)
         const auto *ray_tracing_acceleration_structure_features =
             LvlFindInChain<VkPhysicalDeviceAccelerationStructureFeaturesKHR>(pCreateInfo->pNext);
         if (ray_tracing_acceleration_structure_features) {
             state_tracker->enabled_features.ray_tracing_acceleration_structure_features =
                 *ray_tracing_acceleration_structure_features;
         }
+#endif
 
         const auto *robustness2_features = LvlFindInChain<VkPhysicalDeviceRobustness2FeaturesEXT>(pCreateInfo->pNext);
         if (robustness2_features) {
             state_tracker->enabled_features.robustness2_features = *robustness2_features;
         }
 
+#if defined(VK_EXT_fragment_density_map)
         const auto *fragment_density_map_features =
             LvlFindInChain<VkPhysicalDeviceFragmentDensityMapFeaturesEXT>(pCreateInfo->pNext);
         if (fragment_density_map_features) {
             state_tracker->enabled_features.fragment_density_map_features = *fragment_density_map_features;
         }
+#endif
 
+#if defined(VK_EXT_fragment_density_map2)
         const auto *fragment_density_map_features2 =
             LvlFindInChain<VkPhysicalDeviceFragmentDensityMap2FeaturesEXT>(pCreateInfo->pNext);
         if (fragment_density_map_features2) {
             state_tracker->enabled_features.fragment_density_map2_features = *fragment_density_map_features2;
         }
+#endif
 
         const auto *astc_decode_features = LvlFindInChain<VkPhysicalDeviceASTCDecodeFeaturesEXT>(pCreateInfo->pNext);
         if (astc_decode_features) {
@@ -810,11 +852,13 @@ void ValidationStateTracker::PostCallRecordCreateDevice(VkPhysicalDevice gpu, co
             state_tracker->enabled_features.custom_border_color_features = *custom_border_color_features;
         }
 
+#if defined(VK_EXT_pipeline_creation_cache_control)
         const auto *pipeline_creation_cache_control_features =
             LvlFindInChain<VkPhysicalDevicePipelineCreationCacheControlFeaturesEXT>(pCreateInfo->pNext);
         if (pipeline_creation_cache_control_features) {
             state_tracker->enabled_features.pipeline_creation_cache_control_features = *pipeline_creation_cache_control_features;
         }
+#endif
 
         const auto *fragment_shading_rate_features =
             LvlFindInChain<VkPhysicalDeviceFragmentShadingRateFeaturesKHR>(pCreateInfo->pNext);
@@ -839,21 +883,27 @@ void ValidationStateTracker::PostCallRecordCreateDevice(VkPhysicalDevice gpu, co
             state_tracker->enabled_features.multiview_features = *multiview_features;
         }
 
+#if defined(VK_KHR_portability_subset)
         const auto *portability_features = LvlFindInChain<VkPhysicalDevicePortabilitySubsetFeaturesKHR>(pCreateInfo->pNext);
         if (portability_features) {
             state_tracker->enabled_features.portability_subset_features = *portability_features;
         }
+#endif
 
+#if defined(VK_INTEL_shader_integer_functions2)
         const auto *shader_integer_functions2_features =
             LvlFindInChain<VkPhysicalDeviceShaderIntegerFunctions2FeaturesINTEL>(pCreateInfo->pNext);
         if (shader_integer_functions2_features) {
             state_tracker->enabled_features.shader_integer_functions2_features = *shader_integer_functions2_features;
         }
+#endif
 
+#if defined(VK_NV_shader_sm_builtins)
         const auto *shader_sm_builtins_features = LvlFindInChain<VkPhysicalDeviceShaderSMBuiltinsFeaturesNV>(pCreateInfo->pNext);
         if (shader_sm_builtins_features) {
             state_tracker->enabled_features.shader_sm_builtins_features = *shader_sm_builtins_features;
         }
+#endif
 
         const auto *shader_atomic_float_features = LvlFindInChain<VkPhysicalDeviceShaderAtomicFloatFeaturesEXT>(pCreateInfo->pNext);
         if (shader_atomic_float_features) {
@@ -871,27 +921,33 @@ void ValidationStateTracker::PostCallRecordCreateDevice(VkPhysicalDevice gpu, co
             state_tracker->enabled_features.shader_clock_features = *shader_clock_features;
         }
 
+#if defined(VK_EXT_conditional_rendering)
         const auto *conditional_rendering_features =
             LvlFindInChain<VkPhysicalDeviceConditionalRenderingFeaturesEXT>(pCreateInfo->pNext);
         if (conditional_rendering_features) {
             state_tracker->enabled_features.conditional_rendering_features = *conditional_rendering_features;
         }
+#endif
 
+#if defined(VK_KHR_workgroup_memory_explicit_layout)
         const auto *workgroup_memory_explicit_layout_features =
             LvlFindInChain<VkPhysicalDeviceWorkgroupMemoryExplicitLayoutFeaturesKHR>(pCreateInfo->pNext);
         if (workgroup_memory_explicit_layout_features) {
             state_tracker->enabled_features.workgroup_memory_explicit_layout_features = *workgroup_memory_explicit_layout_features;
         }
+#endif
 
         const auto *synchronization2_features = LvlFindInChain<VkPhysicalDeviceSynchronization2FeaturesKHR>(pCreateInfo->pNext);
         if (synchronization2_features) {
             state_tracker->enabled_features.synchronization2_features = *synchronization2_features;
         }
 
+#if defined(VK_EXT_provoking_vertex)
         const auto *provoking_vertex_features = lvl_find_in_chain<VkPhysicalDeviceProvokingVertexFeaturesEXT>(pCreateInfo->pNext);
         if (provoking_vertex_features) {
             state_tracker->enabled_features.provoking_vertex_features = *provoking_vertex_features;
         }
+#endif
 
         const auto *vertex_input_dynamic_state_features =
             LvlFindInChain<VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT>(pCreateInfo->pNext);
@@ -899,70 +955,92 @@ void ValidationStateTracker::PostCallRecordCreateDevice(VkPhysicalDevice gpu, co
             state_tracker->enabled_features.vertex_input_dynamic_state_features = *vertex_input_dynamic_state_features;
         }
 
+#if defined(VK_NV_inherited_viewport_scissor)
         const auto *inherited_viewport_scissor_features =
             LvlFindInChain<VkPhysicalDeviceInheritedViewportScissorFeaturesNV>(pCreateInfo->pNext);
         if (inherited_viewport_scissor_features) {
             state_tracker->enabled_features.inherited_viewport_scissor_features = *inherited_viewport_scissor_features;
         }
+#endif
 
+#if defined(VK_EXT_multi_draw)
         const auto *multi_draw_features = LvlFindInChain<VkPhysicalDeviceMultiDrawFeaturesEXT>(pCreateInfo->pNext);
         if (multi_draw_features) {
             state_tracker->enabled_features.multi_draw_features = *multi_draw_features;
         }
+#endif
 
         const auto *color_write_features = LvlFindInChain<VkPhysicalDeviceColorWriteEnableFeaturesEXT>(pCreateInfo->pNext);
         if (color_write_features) {
             state_tracker->enabled_features.color_write_features = *color_write_features;
         }
 
+#if defined(VK_EXT_shader_atomic_float2)
         const auto *shader_atomic_float2_features =
             LvlFindInChain<VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT>(pCreateInfo->pNext);
         if (shader_atomic_float2_features) {
             state_tracker->enabled_features.shader_atomic_float2_features = *shader_atomic_float2_features;
         }
+#endif
 
+#if defined(VK_KHR_present_id)
         const auto *present_id_features = LvlFindInChain<VkPhysicalDevicePresentIdFeaturesKHR>(pCreateInfo->pNext);
         if (present_id_features) {
             state_tracker->enabled_features.present_id_features = *present_id_features;
         }
+#endif
 
+#if defined(VK_KHR_present_wait)
         const auto *present_wait_features = LvlFindInChain<VkPhysicalDevicePresentWaitFeaturesKHR>(pCreateInfo->pNext);
         if (present_wait_features) {
             state_tracker->enabled_features.present_wait_features = *present_wait_features;
         }
+#endif
 
+#if defined(VK_NV_ray_tracing_motion_blur)
         const auto *ray_tracing_motion_blur_features =
             LvlFindInChain<VkPhysicalDeviceRayTracingMotionBlurFeaturesNV>(pCreateInfo->pNext);
         if (ray_tracing_motion_blur_features) {
             state_tracker->enabled_features.ray_tracing_motion_blur_features = *ray_tracing_motion_blur_features;
         }
+#endif
 
+#if defined(VK_KHR_shader_integer_dot_product)
         const auto *shader_integer_dot_product_features =
             LvlFindInChain<VkPhysicalDeviceShaderIntegerDotProductFeaturesKHR>(pCreateInfo->pNext);
         if (shader_integer_dot_product_features) {
             state_tracker->enabled_features.shader_integer_dot_product_features = *shader_integer_dot_product_features;
         }
+#endif
 
+#if defined(VK_EXT_primitive_topology_list_restart)
         const auto *primitive_topology_list_restart_features =
             LvlFindInChain<VkPhysicalDevicePrimitiveTopologyListRestartFeaturesEXT>(pCreateInfo->pNext);
         if (primitive_topology_list_restart_features) {
             state_tracker->enabled_features.primitive_topology_list_restart_features = *primitive_topology_list_restart_features;
         }
+#endif
 
+#if defined(VK_EXT_rgba10x6_formats)
         const auto *rgba10x6_formats_features = LvlFindInChain<VkPhysicalDeviceRGBA10X6FormatsFeaturesEXT>(pCreateInfo->pNext);
         if (rgba10x6_formats_features) {
             state_tracker->enabled_features.rgba10x6_formats_features = *rgba10x6_formats_features;
         }
+#endif
 
+#if defined(VK_KHR_maintenance4)
         const auto *maintenance4_features = LvlFindInChain<VkPhysicalDeviceMaintenance4FeaturesKHR>(pCreateInfo->pNext);
         if (maintenance4_features) {
             state_tracker->enabled_features.maintenance4_features = *maintenance4_features;
         }
+#endif
 
+#if defined(VK_KHR_dynamic_rendering)
         const auto *dynamic_rendering_features = LvlFindInChain<VkPhysicalDeviceDynamicRenderingFeaturesKHR>(pCreateInfo->pNext);
         if (dynamic_rendering_features) {
             state_tracker->enabled_features.dynamic_rendering_features = *dynamic_rendering_features;
         }
+#endif
     }
 
     const auto *subgroup_size_control_features = LvlFindInChain<VkPhysicalDeviceSubgroupSizeControlFeaturesEXT>(pCreateInfo->pNext);
@@ -1126,31 +1204,58 @@ void ValidationStateTracker::PostCallRecordCreateDevice(VkPhysicalDevice gpu, co
     }
 
     // Extensions with properties to extract to DeviceExtensionProperties
+#if defined(VK_KHR_push_descriptor)
     GetPhysicalDeviceExtProperties(gpu, dev_ext.vk_khr_push_descriptor, &phys_dev_props->push_descriptor_props);
+#endif
+#if defined(VK_NV_shading_rate_image)
     GetPhysicalDeviceExtProperties(gpu, dev_ext.vk_nv_shading_rate_image, &phys_dev_props->shading_rate_image_props);
+#endif
+#if defined(VK_NV_mesh_shader)
     GetPhysicalDeviceExtProperties(gpu, dev_ext.vk_nv_mesh_shader, &phys_dev_props->mesh_shader_props);
+#endif
+#if defined(VK_EXT_inline_uniform_block)
     GetPhysicalDeviceExtProperties(gpu, dev_ext.vk_ext_inline_uniform_block, &phys_dev_props->inline_uniform_block_props);
+#endif
     GetPhysicalDeviceExtProperties(gpu, dev_ext.vk_ext_vertex_attribute_divisor, &phys_dev_props->vtx_attrib_divisor_props);
+#if defined(VK_EXT_transform_feedback)
     GetPhysicalDeviceExtProperties(gpu, dev_ext.vk_ext_transform_feedback, &phys_dev_props->transform_feedback_props);
+#endif
+#if defined(VK_NV_ray_tracing)
     GetPhysicalDeviceExtProperties(gpu, dev_ext.vk_nv_ray_tracing, &phys_dev_props->ray_tracing_propsNV);
+#endif
+#if defined(VK_KHR_ray_tracing_pipeline)
     GetPhysicalDeviceExtProperties(gpu, dev_ext.vk_khr_ray_tracing_pipeline, &phys_dev_props->ray_tracing_propsKHR);
+#endif
+#if defined(VK_KHR_acceleration_structure)
     GetPhysicalDeviceExtProperties(gpu, dev_ext.vk_khr_acceleration_structure, &phys_dev_props->acc_structure_props);
+#endif
     GetPhysicalDeviceExtProperties(gpu, dev_ext.vk_ext_texel_buffer_alignment, &phys_dev_props->texel_buffer_alignment_props);
+#if defined(VK_EXT_fragment_density_map)
     GetPhysicalDeviceExtProperties(gpu, dev_ext.vk_ext_fragment_density_map, &phys_dev_props->fragment_density_map_props);
+#endif
+#if defined(VK_EXT_fragment_density_map2)
     GetPhysicalDeviceExtProperties(gpu, dev_ext.vk_ext_fragment_density_map2, &phys_dev_props->fragment_density_map2_props);
+#endif
     GetPhysicalDeviceExtProperties(gpu, dev_ext.vk_khr_performance_query, &phys_dev_props->performance_query_props);
     GetPhysicalDeviceExtProperties(gpu, dev_ext.vk_ext_sample_locations, &phys_dev_props->sample_locations_props);
     GetPhysicalDeviceExtProperties(gpu, dev_ext.vk_ext_custom_border_color, &phys_dev_props->custom_border_color_props);
     GetPhysicalDeviceExtProperties(gpu, dev_ext.vk_khr_multiview, &phys_dev_props->multiview_props);
+#if defined(VK_KHR_portability_subset)
     GetPhysicalDeviceExtProperties(gpu, dev_ext.vk_khr_portability_subset, &phys_dev_props->portability_props);
+#endif
     GetPhysicalDeviceExtProperties(gpu, dev_ext.vk_khr_fragment_shading_rate, &phys_dev_props->fragment_shading_rate_props);
+#if defined(VK_EXT_provoking_vertex)
     GetPhysicalDeviceExtProperties(gpu, dev_ext.vk_ext_provoking_vertex, &phys_dev_props->provoking_vertex_props);
+#endif
+#if defined(VK_EXT_multi_draw)
     GetPhysicalDeviceExtProperties(gpu, dev_ext.vk_ext_multi_draw, &phys_dev_props->multi_draw_props);
+#endif
     GetPhysicalDeviceExtProperties(gpu, dev_ext.vk_ext_discard_rectangles, &phys_dev_props->discard_rectangle_props);
     GetPhysicalDeviceExtProperties(gpu, dev_ext.vk_ext_blend_operation_advanced, &phys_dev_props->blend_operation_advanced_props);
     GetPhysicalDeviceExtProperties(gpu, dev_ext.vk_ext_conservative_rasterization, &phys_dev_props->conservative_rasterization_props);
     GetPhysicalDeviceExtProperties(gpu, dev_ext.vk_ext_subgroup_size_control, &phys_dev_props->subgroup_size_control_props);
 
+#if defined(VK_NV_cooperative_matrix)
     if (IsExtEnabled(dev_ext.vk_nv_cooperative_matrix)) {
         // Get the needed cooperative_matrix properties
         auto cooperative_matrix_props = LvlInitStruct<VkPhysicalDeviceCooperativeMatrixPropertiesNV>();
@@ -1166,6 +1271,7 @@ void ValidationStateTracker::PostCallRecordCreateDevice(VkPhysicalDevice gpu, co
         instance_dispatch_table.GetPhysicalDeviceCooperativeMatrixPropertiesNV(gpu, &num_cooperative_matrix_properties,
                                                                                state_tracker->cooperative_matrix_properties.data());
     }
+#endif
 
     // Store queue family data
     if (pCreateInfo->pQueueCreateInfos != nullptr) {
@@ -1210,7 +1316,9 @@ void ValidationStateTracker::PreCallRecordDestroyDevice(VkDevice device, const V
     descriptor_pool_map_.clear();
     // All sets should be removed
     assert(descriptor_set_map_.empty());
+#if !defined(VULKANSC)
     desc_template_map_.clear();
+#endif
     descriptor_set_layout_map_.clear();
     // Because swapchains are associated with Surfaces, which are at instance level,
     // they need to be explicitly destroyed here to avoid continued references to
@@ -1355,6 +1463,7 @@ void ValidationStateTracker::PostCallRecordAllocateMemory(VkDevice device, const
     return;
 }
 
+#if !defined(VULKANSC)
 void ValidationStateTracker::PreCallRecordFreeMemory(VkDevice device, VkDeviceMemory mem, const VkAllocationCallbacks *pAllocator) {
     DEVICE_MEMORY_STATE *mem_info = GetDevMemState(mem);
     if (mem_info) {
@@ -1423,6 +1532,7 @@ void ValidationStateTracker::PostCallRecordQueueBindSparse(VkQueue queue, uint32
         queue_state->Retire(early_retire_seq);
     }
 }
+#endif
 
 void ValidationStateTracker::PostCallRecordCreateSemaphore(VkDevice device, const VkSemaphoreCreateInfo *pCreateInfo,
                                                            const VkAllocationCallbacks *pAllocator, VkSemaphore *pSemaphore,
@@ -1444,11 +1554,13 @@ void ValidationStateTracker::RecordImportSemaphoreState(VkSemaphore semaphore, V
     }
 }
 
+#if defined(VK_KHR_timeline_semaphore)
 void ValidationStateTracker::PostCallRecordSignalSemaphoreKHR(VkDevice device, const VkSemaphoreSignalInfo *pSignalInfo,
                                                               VkResult result) {
     auto *semaphore_state = GetSemaphoreState(pSignalInfo->semaphore);
     semaphore_state->payload = pSignalInfo->value;
 }
+#endif
 
 void ValidationStateTracker::RecordMappedMemory(VkDeviceMemory mem, VkDeviceSize offset, VkDeviceSize size, void **ppData) {
     auto mem_info = GetDevMemState(mem);
@@ -1494,10 +1606,12 @@ void ValidationStateTracker::PostCallRecordWaitSemaphores(VkDevice device, const
     RecordWaitSemaphores(device, pWaitInfo, timeout, result);
 }
 
+#if defined(VK_KHR_timeline_semaphore)
 void ValidationStateTracker::PostCallRecordWaitSemaphoresKHR(VkDevice device, const VkSemaphoreWaitInfo *pWaitInfo,
                                                              uint64_t timeout, VkResult result) {
     RecordWaitSemaphores(device, pWaitInfo, timeout, result);
 }
+#endif
 
 void ValidationStateTracker::RecordGetSemaphoreCounterValue(VkDevice device, VkSemaphore semaphore, uint64_t *pValue,
                                                             VkResult result) {
@@ -1513,10 +1627,12 @@ void ValidationStateTracker::PostCallRecordGetSemaphoreCounterValue(VkDevice dev
                                                                     VkResult result) {
     RecordGetSemaphoreCounterValue(device, semaphore, pValue, result);
 }
+#if defined(VK_KHR_timeline_semaphore)
 void ValidationStateTracker::PostCallRecordGetSemaphoreCounterValueKHR(VkDevice device, VkSemaphore semaphore, uint64_t *pValue,
                                                                        VkResult result) {
     RecordGetSemaphoreCounterValue(device, semaphore, pValue, result);
 }
+#endif
 
 void ValidationStateTracker::PostCallRecordGetFenceStatus(VkDevice device, VkFence fence, VkResult result) {
     if (VK_SUCCESS != result) return;
@@ -1554,10 +1670,12 @@ void ValidationStateTracker::PreCallRecordDestroyEvent(VkDevice device, VkEvent 
     Destroy<EVENT_STATE>(event);
 }
 
+#if !defined(VULKANSC)
 void ValidationStateTracker::PreCallRecordDestroyQueryPool(VkDevice device, VkQueryPool queryPool,
                                                            const VkAllocationCallbacks *pAllocator) {
     Destroy<QUERY_POOL_STATE>(queryPool);
 }
+#endif
 
 void ValidationStateTracker::UpdateBindBufferMemoryState(VkBuffer buffer, VkDeviceMemory mem, VkDeviceSize memoryOffset) {
     BUFFER_STATE *buffer_state = GetBufferState(buffer);
@@ -1583,12 +1701,14 @@ void ValidationStateTracker::PostCallRecordBindBufferMemory2(VkDevice device, ui
     }
 }
 
+#if defined(VK_KHR_bind_memory2)
 void ValidationStateTracker::PostCallRecordBindBufferMemory2KHR(VkDevice device, uint32_t bindInfoCount,
                                                                 const VkBindBufferMemoryInfo *pBindInfos, VkResult result) {
     for (uint32_t i = 0; i < bindInfoCount; i++) {
         UpdateBindBufferMemoryState(pBindInfos[i].buffer, pBindInfos[i].memory, pBindInfos[i].memoryOffset);
     }
 }
+#endif
 
 void ValidationStateTracker::RecordGetBufferMemoryRequirementsState(VkBuffer buffer) {
     BUFFER_STATE *buffer_state = GetBufferState(buffer);
@@ -1608,11 +1728,13 @@ void ValidationStateTracker::PostCallRecordGetBufferMemoryRequirements2(VkDevice
     RecordGetBufferMemoryRequirementsState(pInfo->buffer);
 }
 
+#if defined(VK_KHR_get_memory_requirements2)
 void ValidationStateTracker::PostCallRecordGetBufferMemoryRequirements2KHR(VkDevice device,
                                                                            const VkBufferMemoryRequirementsInfo2 *pInfo,
                                                                            VkMemoryRequirements2 *pMemoryRequirements) {
     RecordGetBufferMemoryRequirementsState(pInfo->buffer);
 }
+#endif
 
 void ValidationStateTracker::RecordGetImageMemoryRequirementsState(VkImage image, const VkImageMemoryRequirementsInfo2 *pInfo) {
     const VkImagePlaneMemoryRequirementsInfo *plane_info =
@@ -1645,12 +1767,15 @@ void ValidationStateTracker::PostCallRecordGetImageMemoryRequirements2(VkDevice 
     RecordGetImageMemoryRequirementsState(pInfo->image, pInfo);
 }
 
+#if defined(VK_KHR_get_memory_requirements2)
 void ValidationStateTracker::PostCallRecordGetImageMemoryRequirements2KHR(VkDevice device,
                                                                           const VkImageMemoryRequirementsInfo2 *pInfo,
                                                                           VkMemoryRequirements2 *pMemoryRequirements) {
     RecordGetImageMemoryRequirementsState(pInfo->image, pInfo);
 }
+#endif
 
+#if !defined(VULKANSC)
 void ValidationStateTracker::PostCallRecordGetImageSparseMemoryRequirements(
     VkDevice device, VkImage image, uint32_t *pSparseMemoryRequirementCount,
     VkSparseImageMemoryRequirements *pSparseMemoryRequirements) {
@@ -1664,13 +1789,16 @@ void ValidationStateTracker::PostCallRecordGetImageSparseMemoryRequirements2(
     auto image_state = GetImageState(pInfo->image);
     image_state->get_sparse_reqs_called = true;
 }
+#endif
 
+#if defined(VK_KHR_get_memory_requirements2)
 void ValidationStateTracker::PostCallRecordGetImageSparseMemoryRequirements2KHR(
     VkDevice device, const VkImageSparseMemoryRequirementsInfo2 *pInfo, uint32_t *pSparseMemoryRequirementCount,
     VkSparseImageMemoryRequirements2 *pSparseMemoryRequirements) {
     auto image_state = GetImageState(pInfo->image);
     image_state->get_sparse_reqs_called = true;
 }
+#endif
 
 #if !defined(VULKANSC)
 void ValidationStateTracker::PreCallRecordDestroyShaderModule(VkDevice device, VkShaderModule shaderModule,
@@ -1708,10 +1836,12 @@ void ValidationStateTracker::PreCallRecordDestroyDescriptorSetLayout(VkDevice de
     Destroy<cvdescriptorset::DescriptorSetLayout>(descriptorSetLayout);
 }
 
+#if !defined(VULKANSC)
 void ValidationStateTracker::PreCallRecordDestroyDescriptorPool(VkDevice device, VkDescriptorPool descriptorPool,
                                                                 const VkAllocationCallbacks *pAllocator) {
     Destroy<DESCRIPTOR_POOL_STATE>(descriptorPool);
 }
+#endif
 
 void ValidationStateTracker::PreCallRecordFreeCommandBuffers(VkDevice device, VkCommandPool commandPool,
                                                              uint32_t commandBufferCount, const VkCommandBuffer *pCommandBuffers) {
@@ -1767,10 +1897,12 @@ void ValidationStateTracker::PostCallRecordCreateQueryPool(VkDevice device, cons
     }
 }
 
+#if !defined(VULKANSC)
 void ValidationStateTracker::PreCallRecordDestroyCommandPool(VkDevice device, VkCommandPool commandPool,
                                                              const VkAllocationCallbacks *pAllocator) {
     Destroy<COMMAND_POOL_STATE>(commandPool);
 }
+#endif
 
 void ValidationStateTracker::PostCallRecordResetCommandPool(VkDevice device, VkCommandPool commandPool,
                                                             VkCommandPoolResetFlags flags, VkResult result) {
@@ -1825,12 +1957,15 @@ bool ValidationStateTracker::PreCallValidateCreateGraphicsPipelines(VkDevice dev
             cgpl_state->pipe_state.push_back(std::make_shared<PIPELINE_STATE>(this, &pCreateInfos[i],
                                                                               GetRenderPassShared(pCreateInfos[i].renderPass),
                                                                               GetPipelineLayoutShared(pCreateInfos[i].layout)));
-        } else if (enabled_features.dynamic_rendering_features.dynamicRendering) {
+        }
+#if defined(VK_KHR_dynamic_rendering)
+        else if (enabled_features.dynamic_rendering_features.dynamicRendering) {
             auto dynamic_rendering = LvlFindInChain<VkPipelineRenderingCreateInfoKHR>(pCreateInfos[i].pNext);
             cgpl_state->pipe_state.push_back(std::make_shared<PIPELINE_STATE>(this, &pCreateInfos[i],
                                                                               std::make_shared<RENDER_PASS_STATE>(dynamic_rendering),
                                                                               GetPipelineLayoutShared(pCreateInfos[i].layout)));
         }
+#endif
     }
     return false;
 }
@@ -2152,6 +2287,7 @@ void ValidationStateTracker::PreCallRecordCmdSetViewport(VkCommandBuffer command
     }
 }
 
+#if defined(VK_NV_scissor_exclusive)
 void ValidationStateTracker::PreCallRecordCmdSetExclusiveScissorNV(VkCommandBuffer commandBuffer, uint32_t firstExclusiveScissor,
                                                                    uint32_t exclusiveScissorCount,
                                                                    const VkRect2D *pExclusiveScissors) {
@@ -2160,7 +2296,9 @@ void ValidationStateTracker::PreCallRecordCmdSetExclusiveScissorNV(VkCommandBuff
     // TODO: We don't have VUIDs for validating that all exclusive scissors have been set.
     // cb_state->exclusiveScissorMask |= ((1u << exclusiveScissorCount) - 1u) << firstExclusiveScissor;
 }
+#endif
 
+#if defined(VK_NV_shading_rate_image)
 void ValidationStateTracker::PreCallRecordCmdBindShadingRateImageNV(VkCommandBuffer commandBuffer, VkImageView imageView,
                                                                     VkImageLayout imageLayout) {
     if (disabled[command_buffer_state]) return;
@@ -2182,6 +2320,7 @@ void ValidationStateTracker::PreCallRecordCmdSetViewportShadingRatePaletteNV(VkC
     // TODO: We don't have VUIDs for validating that all shading rate palettes have been set.
     // cb_state->shadingRatePaletteMask |= ((1u << viewportCount) - 1u) << firstViewport;
 }
+#endif
 
 #if defined(VK_NV_ray_tracing)
 void ValidationStateTracker::PostCallRecordCreateAccelerationStructureNV(VkDevice device,
@@ -2382,12 +2521,14 @@ void ValidationStateTracker::PreCallRecordDestroyAccelerationStructureNV(VkDevic
 }
 #endif
 
+#if defined(VK_NV_clip_space_w_scaling)
 void ValidationStateTracker::PreCallRecordCmdSetViewportWScalingNV(VkCommandBuffer commandBuffer, uint32_t firstViewport,
                                                                    uint32_t viewportCount,
                                                                    const VkViewportWScalingNV *pViewportWScalings) {
     CMD_BUFFER_STATE *cb_state = Get<CMD_BUFFER_STATE>(commandBuffer);
     cb_state->RecordStateCmd(CMD_SETVIEWPORTWSCALINGNV, CBSTATUS_VIEWPORT_W_SCALING_SET);
 }
+#endif
 
 void ValidationStateTracker::PreCallRecordCmdSetLineWidth(VkCommandBuffer commandBuffer, float lineWidth) {
     CMD_BUFFER_STATE *cb_state = Get<CMD_BUFFER_STATE>(commandBuffer);
@@ -2467,6 +2608,7 @@ void ValidationStateTracker::PreCallRecordCmdBindDescriptorSets(VkCommandBuffer 
     cb_state->lastBound[lv_bind_point].UpdateSamplerDescriptorsUsedByImage();
 }
 
+#if defined(VK_KHR_push_descriptor)
 void ValidationStateTracker::PreCallRecordCmdPushDescriptorSetKHR(VkCommandBuffer commandBuffer,
                                                                   VkPipelineBindPoint pipelineBindPoint, VkPipelineLayout layout,
                                                                   uint32_t set, uint32_t descriptorWriteCount,
@@ -2475,6 +2617,7 @@ void ValidationStateTracker::PreCallRecordCmdPushDescriptorSetKHR(VkCommandBuffe
     auto pipeline_layout = GetPipelineLayout(layout);
     cb_state->PushDescriptorSetState(pipelineBindPoint, pipeline_layout, set, descriptorWriteCount, pDescriptorWrites);
 }
+#endif
 
 void ValidationStateTracker::PostCallRecordCmdPushConstants(VkCommandBuffer commandBuffer, VkPipelineLayout layout,
                                                             VkShaderStageFlags stageFlags, uint32_t offset, uint32_t size,
@@ -2743,6 +2886,7 @@ void ValidationStateTracker::PostCallRecordCreateRenderPass(VkDevice device, con
     Add(std::make_shared<RENDER_PASS_STATE>(*pRenderPass, pCreateInfo));
 }
 
+#if defined(VK_KHR_create_renderpass2)
 void ValidationStateTracker::PostCallRecordCreateRenderPass2KHR(VkDevice device, const VkRenderPassCreateInfo2 *pCreateInfo,
                                                                 const VkAllocationCallbacks *pAllocator, VkRenderPass *pRenderPass,
                                                                 VkResult result) {
@@ -2750,6 +2894,7 @@ void ValidationStateTracker::PostCallRecordCreateRenderPass2KHR(VkDevice device,
 
     Add(std::make_shared<RENDER_PASS_STATE>(*pRenderPass, pCreateInfo));
 }
+#endif
 
 void ValidationStateTracker::PostCallRecordCreateRenderPass2(VkDevice device, const VkRenderPassCreateInfo2 *pCreateInfo,
                                                              const VkAllocationCallbacks *pAllocator, VkRenderPass *pRenderPass,
@@ -2766,13 +2911,16 @@ void ValidationStateTracker::PreCallRecordCmdBeginRenderPass(VkCommandBuffer com
     cb_state->BeginRenderPass(CMD_BEGINRENDERPASS, pRenderPassBegin, contents);
 }
 
+#if defined(VK_KHR_create_renderpass2)
 void ValidationStateTracker::PreCallRecordCmdBeginRenderPass2KHR(VkCommandBuffer commandBuffer,
                                                                  const VkRenderPassBeginInfo *pRenderPassBegin,
                                                                  const VkSubpassBeginInfo *pSubpassBeginInfo) {
     CMD_BUFFER_STATE *cb_state = Get<CMD_BUFFER_STATE>(commandBuffer);
     cb_state->BeginRenderPass(CMD_BEGINRENDERPASS2KHR, pRenderPassBegin, pSubpassBeginInfo->contents);
 }
+#endif
 
+#if defined(VK_EXT_transform_feedback)
 void ValidationStateTracker::PostCallRecordCmdBeginTransformFeedbackEXT(VkCommandBuffer commandBuffer, uint32_t firstCounterBuffer,
                                                                         uint32_t counterBufferCount,
                                                                         const VkBuffer *pCounterBuffers,
@@ -2791,7 +2939,9 @@ void ValidationStateTracker::PostCallRecordCmdEndTransformFeedbackEXT(VkCommandB
     cb_state->RecordCmd(CMD_ENDTRANSFORMFEEDBACKEXT);
     cb_state->transform_feedback_active = false;
 }
+#endif
 
+#if defined(VK_EXT_conditional_rendering)
 void ValidationStateTracker::PostCallRecordCmdBeginConditionalRenderingEXT(
     VkCommandBuffer commandBuffer, const VkConditionalRenderingBeginInfoEXT *pConditionalRenderingBegin) {
     auto *cb_state = Get<CMD_BUFFER_STATE>(commandBuffer);
@@ -2810,7 +2960,9 @@ void ValidationStateTracker::PostCallRecordCmdEndConditionalRenderingEXT(VkComma
     cb_state->conditional_rendering_inside_render_pass = false;
     cb_state->conditional_rendering_subpass = 0;
 }
+#endif
 
+#if defined(VK_KHR_dynamic_rendering)
 void ValidationStateTracker::RecordCmdBeginRenderingRenderPassState(VkCommandBuffer commandBuffer,
                                                                     const VkRenderingInfoKHR *pRenderingInfo) {
     auto *cb_state = Get<CMD_BUFFER_STATE>(commandBuffer);
@@ -2832,6 +2984,7 @@ void ValidationStateTracker::PreCallRecordCmdBeginRenderingKHR(VkCommandBuffer c
 void ValidationStateTracker::PreCallRecordCmdEndRenderingKHR(VkCommandBuffer commandBuffer) {
     RecordCmdEndRenderingRenderPassState(commandBuffer);
 }
+#endif
 
 void ValidationStateTracker::PreCallRecordCmdBeginRenderPass2(VkCommandBuffer commandBuffer,
                                                               const VkRenderPassBeginInfo *pRenderPassBegin,
@@ -2845,12 +2998,14 @@ void ValidationStateTracker::PostCallRecordCmdNextSubpass(VkCommandBuffer comman
     cb_state->NextSubpass(CMD_NEXTSUBPASS, contents);
 }
 
+#if defined(VK_KHR_create_renderpass2)
 void ValidationStateTracker::PostCallRecordCmdNextSubpass2KHR(VkCommandBuffer commandBuffer,
                                                               const VkSubpassBeginInfo *pSubpassBeginInfo,
                                                               const VkSubpassEndInfo *pSubpassEndInfo) {
     CMD_BUFFER_STATE *cb_state = Get<CMD_BUFFER_STATE>(commandBuffer);
     cb_state->NextSubpass(CMD_NEXTSUBPASS2KHR, pSubpassBeginInfo->contents);
 }
+#endif
 
 void ValidationStateTracker::PostCallRecordCmdNextSubpass2(VkCommandBuffer commandBuffer,
                                                            const VkSubpassBeginInfo *pSubpassBeginInfo,
@@ -2864,11 +3019,13 @@ void ValidationStateTracker::PostCallRecordCmdEndRenderPass(VkCommandBuffer comm
     cb_state->EndRenderPass(CMD_ENDRENDERPASS);
 }
 
+#if defined(VK_KHR_create_renderpass2)
 void ValidationStateTracker::PostCallRecordCmdEndRenderPass2KHR(VkCommandBuffer commandBuffer,
                                                                 const VkSubpassEndInfo *pSubpassEndInfo) {
     CMD_BUFFER_STATE *cb_state = Get<CMD_BUFFER_STATE>(commandBuffer);
     cb_state->EndRenderPass(CMD_ENDRENDERPASS2KHR);
 }
+#endif
 
 void ValidationStateTracker::PostCallRecordCmdEndRenderPass2(VkCommandBuffer commandBuffer,
                                                              const VkSubpassEndInfo *pSubpassEndInfo) {
@@ -2945,6 +3102,7 @@ void ValidationStateTracker::PostCallRecordBindImageMemory2(VkDevice device, uin
     }
 }
 
+#if defined(VK_KHR_bind_memory2)
 void ValidationStateTracker::PostCallRecordBindImageMemory2KHR(VkDevice device, uint32_t bindInfoCount,
                                                                const VkBindImageMemoryInfo *pBindInfos, VkResult result) {
     if (VK_SUCCESS != result) return;
@@ -2952,6 +3110,7 @@ void ValidationStateTracker::PostCallRecordBindImageMemory2KHR(VkDevice device, 
         UpdateBindImageMemoryState(pBindInfos[i]);
     }
 }
+#endif
 
 void ValidationStateTracker::PreCallRecordSetEvent(VkDevice device, VkEvent event) {
     auto event_state = GetEventState(event);
@@ -3088,10 +3247,12 @@ void ValidationStateTracker::PostCallRecordCreateSwapchainKHR(VkDevice device, c
     RecordCreateSwapchainState(result, pCreateInfo, pSwapchain, std::move(surface_state), old_swapchain_state);
 }
 
+#if !defined(VULKANSC)
 void ValidationStateTracker::PreCallRecordDestroySwapchainKHR(VkDevice device, VkSwapchainKHR swapchain,
                                                               const VkAllocationCallbacks *pAllocator) {
     Destroy<SWAPCHAIN_NODE>(swapchain);
 }
+#endif
 
 void ValidationStateTracker::PostCallRecordCreateDisplayModeKHR(VkPhysicalDevice physicalDevice, VkDisplayKHR display,
                                                                 const VkDisplayModeCreateInfoKHR *pCreateInfo,
@@ -3112,7 +3273,9 @@ void ValidationStateTracker::PostCallRecordQueuePresentKHR(VkQueue queue, const 
         }
     }
 
+#if defined(VK_KHR_present_id)
     const auto *present_id_info = LvlFindInChain<VkPresentIdKHR>(pPresentInfo->pNext);
+#endif
     for (uint32_t i = 0; i < pPresentInfo->swapchainCount; ++i) {
         // Note: this is imperfect, in that we can get confused about what did or didn't succeed-- but if the app does that, it's
         // confused itself just as much.
@@ -3122,11 +3285,13 @@ void ValidationStateTracker::PostCallRecordQueuePresentKHR(VkQueue queue, const 
         auto swapchain_data = GetSwapchainState(pPresentInfo->pSwapchains[i]);
         if (swapchain_data) {
             swapchain_data->PresentImage(pPresentInfo->pImageIndices[i]);
+#if defined(VK_KHR_present_id)
             if (present_id_info) {
                 if (i < present_id_info->swapchainCount && present_id_info->pPresentIds[i] > swapchain_data->max_present_id) {
                     swapchain_data->max_present_id = present_id_info->pPresentIds[i];
                 }
             }
+#endif
         }
     }
     // Note: even though presentation is directed to a queue, there is no direct ordering between QP and subsequent work, so QP (and
@@ -3234,12 +3399,14 @@ void ValidationStateTracker::PostCallRecordGetPhysicalDeviceQueueFamilyPropertie
     StateUpdateCommonGetPhysicalDeviceQueueFamilyProperties(pd_state, *pQueueFamilyPropertyCount);
 }
 
+#if defined(VK_KHR_get_physical_device_properties2)
 void ValidationStateTracker::PostCallRecordGetPhysicalDeviceQueueFamilyProperties2KHR(
     VkPhysicalDevice physicalDevice, uint32_t *pQueueFamilyPropertyCount, VkQueueFamilyProperties2 *pQueueFamilyProperties) {
     auto pd_state = Get<PHYSICAL_DEVICE_STATE>(physicalDevice);
     assert(pd_state);
     StateUpdateCommonGetPhysicalDeviceQueueFamilyProperties(pd_state, *pQueueFamilyPropertyCount);
 }
+#endif
 void ValidationStateTracker::PreCallRecordDestroySurfaceKHR(VkInstance instance, VkSurfaceKHR surface,
                                                             const VkAllocationCallbacks *pAllocator) {
     Destroy<SURFACE_STATE>(surface);
@@ -3590,6 +3757,7 @@ void ValidationStateTracker::PostCallRecordGetPhysicalDeviceDisplayPlaneProperti
     RecordGetPhysicalDeviceDisplayPlanePropertiesState(physicalDevice, pPropertyCount, pProperties);
 }
 
+#if defined(VK_EXT_transform_feedback)
 void ValidationStateTracker::PostCallRecordCmdBeginQueryIndexedEXT(VkCommandBuffer commandBuffer, VkQueryPool queryPool,
                                                                    uint32_t query, VkQueryControlFlags flags, uint32_t index) {
     QueryObject query_obj = {queryPool, query, index};
@@ -3605,6 +3773,7 @@ void ValidationStateTracker::PostCallRecordCmdEndQueryIndexedEXT(VkCommandBuffer
     cb_state->RecordCmd(CMD_ENDQUERYINDEXEDEXT);
     cb_state->EndQuery(query_obj);
 }
+#endif
 
 void ValidationStateTracker::RecordCreateSamplerYcbcrConversionState(const VkSamplerYcbcrConversionCreateInfo *create_info,
                                                                      VkSamplerYcbcrConversion ycbcr_conversion) {
@@ -3612,10 +3781,13 @@ void ValidationStateTracker::RecordCreateSamplerYcbcrConversionState(const VkSam
 
     if (create_info->format != VK_FORMAT_UNDEFINED) {
         format_features = GetPotentialFormatFeatures(create_info->format);
-    } else if (IsExtEnabled(device_extensions.vk_android_external_memory_android_hardware_buffer)) {
+    }
+#if defined(VK_ANDROID_external_memory_android_hardware_buffer)
+    else if (IsExtEnabled(device_extensions.vk_android_external_memory_android_hardware_buffer)) {
         // If format is VK_FORMAT_UNDEFINED, format_features will be set by external AHB features
         format_features = GetExternalFormatFeaturesANDROID(create_info);
     }
+#endif
 
     Add(std::make_shared<SAMPLER_YCBCR_CONVERSION_STATE>(ycbcr_conversion, create_info, format_features));
 }
@@ -3629,6 +3801,7 @@ void ValidationStateTracker::PostCallRecordCreateSamplerYcbcrConversion(VkDevice
     RecordCreateSamplerYcbcrConversionState(pCreateInfo, *pYcbcrConversion);
 }
 
+#if defined(VK_KHR_sampler_ycbcr_conversion)
 void ValidationStateTracker::PostCallRecordCreateSamplerYcbcrConversionKHR(VkDevice device,
                                                                            const VkSamplerYcbcrConversionCreateInfo *pCreateInfo,
                                                                            const VkAllocationCallbacks *pAllocator,
@@ -3637,17 +3810,20 @@ void ValidationStateTracker::PostCallRecordCreateSamplerYcbcrConversionKHR(VkDev
     if (VK_SUCCESS != result) return;
     RecordCreateSamplerYcbcrConversionState(pCreateInfo, *pYcbcrConversion);
 }
+#endif
 
 void ValidationStateTracker::PostCallRecordDestroySamplerYcbcrConversion(VkDevice device, VkSamplerYcbcrConversion ycbcrConversion,
                                                                          const VkAllocationCallbacks *pAllocator) {
     Destroy<SAMPLER_YCBCR_CONVERSION_STATE>(ycbcrConversion);
 }
 
+#if defined(VK_KHR_sampler_ycbcr_conversion)
 void ValidationStateTracker::PostCallRecordDestroySamplerYcbcrConversionKHR(VkDevice device,
                                                                             VkSamplerYcbcrConversion ycbcrConversion,
                                                                             const VkAllocationCallbacks *pAllocator) {
     Destroy<SAMPLER_YCBCR_CONVERSION_STATE>(ycbcrConversion);
 }
+#endif
 
 void ValidationStateTracker::RecordResetQueryPool(VkDevice device, VkQueryPool queryPool, uint32_t firstQuery,
                                                   uint32_t queryCount) {
@@ -3673,10 +3849,12 @@ void ValidationStateTracker::RecordResetQueryPool(VkDevice device, VkQueryPool q
     }
 }
 
+#if defined(VK_EXT_host_query_reset)
 void ValidationStateTracker::PostCallRecordResetQueryPoolEXT(VkDevice device, VkQueryPool queryPool, uint32_t firstQuery,
                                                              uint32_t queryCount) {
     RecordResetQueryPool(device, queryPool, firstQuery, queryCount);
 }
+#endif
 
 void ValidationStateTracker::PostCallRecordResetQueryPool(VkDevice device, VkQueryPool queryPool, uint32_t firstQuery,
                                                           uint32_t queryCount) {
@@ -3718,12 +3896,14 @@ void ValidationStateTracker::PostCallRecordCmdDraw(VkCommandBuffer commandBuffer
     cb_state->UpdateStateCmdDrawType(CMD_DRAW, VK_PIPELINE_BIND_POINT_GRAPHICS);
 }
 
+#if defined(VK_EXT_multi_draw)
 void ValidationStateTracker::PostCallRecordCmdDrawMultiEXT(VkCommandBuffer commandBuffer, uint32_t drawCount,
                                                            const VkMultiDrawInfoEXT *pVertexInfo, uint32_t instanceCount,
                                                            uint32_t firstInstance, uint32_t stride) {
     CMD_BUFFER_STATE *cb_state = Get<CMD_BUFFER_STATE>(commandBuffer);
     cb_state->UpdateStateCmdDrawType(CMD_DRAWMULTIEXT, VK_PIPELINE_BIND_POINT_GRAPHICS);
 }
+#endif
 
 void ValidationStateTracker::PostCallRecordCmdDrawIndexed(VkCommandBuffer commandBuffer, uint32_t indexCount,
                                                           uint32_t instanceCount, uint32_t firstIndex, int32_t vertexOffset,
@@ -3732,6 +3912,7 @@ void ValidationStateTracker::PostCallRecordCmdDrawIndexed(VkCommandBuffer comman
     cb_state->UpdateStateCmdDrawType(CMD_DRAWINDEXED, VK_PIPELINE_BIND_POINT_GRAPHICS);
 }
 
+#if defined(VK_EXT_multi_draw)
 void ValidationStateTracker::PostCallRecordCmdDrawMultiIndexedEXT(VkCommandBuffer commandBuffer, uint32_t drawCount,
                                                                   const VkMultiDrawIndexedInfoEXT *pIndexInfo,
                                                                   uint32_t instanceCount, uint32_t firstInstance, uint32_t stride,
@@ -3739,6 +3920,7 @@ void ValidationStateTracker::PostCallRecordCmdDrawMultiIndexedEXT(VkCommandBuffe
     CMD_BUFFER_STATE *cb_state = Get<CMD_BUFFER_STATE>(commandBuffer);
     cb_state->UpdateStateCmdDrawType(CMD_DRAWMULTIINDEXEDEXT, VK_PIPELINE_BIND_POINT_GRAPHICS);
 }
+#endif
 
 void ValidationStateTracker::PostCallRecordCmdDrawIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
                                                            uint32_t count, uint32_t stride) {
@@ -3775,11 +3957,13 @@ void ValidationStateTracker::PostCallRecordCmdDispatchIndirect(VkCommandBuffer c
     }
 }
 
+#if defined(VK_KHR_device_group)
 void ValidationStateTracker::PostCallRecordCmdDispatchBaseKHR(VkCommandBuffer commandBuffer, uint32_t, uint32_t, uint32_t, uint32_t,
                                                               uint32_t, uint32_t) {
     CMD_BUFFER_STATE *cb_state = Get<CMD_BUFFER_STATE>(commandBuffer);
     cb_state->UpdateStateCmdDrawDispatchType(CMD_DISPATCH, VK_PIPELINE_BIND_POINT_COMPUTE);
 }
+#endif
 
 void ValidationStateTracker::PostCallRecordCmdDispatchBase(VkCommandBuffer commandBuffer, uint32_t, uint32_t, uint32_t, uint32_t,
                                                            uint32_t, uint32_t) {
@@ -3800,6 +3984,7 @@ void ValidationStateTracker::RecordCmdDrawIndirectCount(VkCommandBuffer commandB
     }
 }
 
+#if defined(VK_KHR_draw_indirect_count)
 void ValidationStateTracker::PreCallRecordCmdDrawIndirectCountKHR(VkCommandBuffer commandBuffer, VkBuffer buffer,
                                                                   VkDeviceSize offset, VkBuffer countBuffer,
                                                                   VkDeviceSize countBufferOffset, uint32_t maxDrawCount,
@@ -3807,6 +3992,7 @@ void ValidationStateTracker::PreCallRecordCmdDrawIndirectCountKHR(VkCommandBuffe
     RecordCmdDrawIndirectCount(commandBuffer, buffer, offset, countBuffer, countBufferOffset, maxDrawCount, stride,
                                CMD_DRAWINDIRECTCOUNTKHR);
 }
+#endif
 
 void ValidationStateTracker::PreCallRecordCmdDrawIndirectCount(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
                                                                VkBuffer countBuffer, VkDeviceSize countBufferOffset,
@@ -3828,6 +4014,7 @@ void ValidationStateTracker::RecordCmdDrawIndexedIndirectCount(VkCommandBuffer c
     }
 }
 
+#if defined(VK_KHR_draw_indirect_count)
 void ValidationStateTracker::PreCallRecordCmdDrawIndexedIndirectCountKHR(VkCommandBuffer commandBuffer, VkBuffer buffer,
                                                                          VkDeviceSize offset, VkBuffer countBuffer,
                                                                          VkDeviceSize countBufferOffset, uint32_t maxDrawCount,
@@ -3835,6 +4022,7 @@ void ValidationStateTracker::PreCallRecordCmdDrawIndexedIndirectCountKHR(VkComma
     RecordCmdDrawIndexedIndirectCount(commandBuffer, buffer, offset, countBuffer, countBufferOffset, maxDrawCount, stride,
                                       CMD_DRAWINDEXEDINDIRECTCOUNTKHR);
 }
+#endif
 
 void ValidationStateTracker::PreCallRecordCmdDrawIndexedIndirectCount(VkCommandBuffer commandBuffer, VkBuffer buffer,
                                                                       VkDeviceSize offset, VkBuffer countBuffer,
@@ -3844,6 +4032,7 @@ void ValidationStateTracker::PreCallRecordCmdDrawIndexedIndirectCount(VkCommandB
                                       CMD_DRAWINDEXEDINDIRECTCOUNT);
 }
 
+#if defined(VK_NV_mesh_shader)
 void ValidationStateTracker::PreCallRecordCmdDrawMeshTasksNV(VkCommandBuffer commandBuffer, uint32_t taskCount,
                                                              uint32_t firstTask) {
     CMD_BUFFER_STATE *cb_state = Get<CMD_BUFFER_STATE>(commandBuffer);
@@ -3877,7 +4066,9 @@ void ValidationStateTracker::PreCallRecordCmdDrawMeshTasksIndirectCountNV(VkComm
         }
     }
 }
+#endif
 
+#if defined(VK_NV_ray_tracing)
 void ValidationStateTracker::PostCallRecordCmdTraceRaysNV(VkCommandBuffer commandBuffer, VkBuffer raygenShaderBindingTableBuffer,
                                               VkDeviceSize raygenShaderBindingOffset, VkBuffer missShaderBindingTableBuffer,
                                               VkDeviceSize missShaderBindingOffset, VkDeviceSize missShaderBindingStride,
@@ -3889,7 +4080,9 @@ void ValidationStateTracker::PostCallRecordCmdTraceRaysNV(VkCommandBuffer comman
     cb_state->UpdateStateCmdDrawDispatchType(CMD_TRACERAYSNV, VK_PIPELINE_BIND_POINT_RAY_TRACING_NV);
     cb_state->hasTraceRaysCmd = true;
 }
+#endif
 
+#if defined(VK_KHR_ray_tracing_pipeline)
 void ValidationStateTracker::PostCallRecordCmdTraceRaysKHR(VkCommandBuffer commandBuffer,
                                                const VkStridedDeviceAddressRegionKHR *pRaygenShaderBindingTable,
                                                const VkStridedDeviceAddressRegionKHR *pMissShaderBindingTable,
@@ -3911,7 +4104,9 @@ void ValidationStateTracker::PostCallRecordCmdTraceRaysIndirectKHR(VkCommandBuff
     cb_state->UpdateStateCmdDrawDispatchType(CMD_TRACERAYSINDIRECTKHR, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR);
     cb_state->hasTraceRaysCmd = true;
 }
+#endif
 
+#if !defined(VULKANSC)
 void ValidationStateTracker::PostCallRecordCreateShaderModule(VkDevice device, const VkShaderModuleCreateInfo *pCreateInfo,
                                                               const VkAllocationCallbacks *pAllocator,
                                                               VkShaderModule *pShaderModule, VkResult result,
@@ -3926,6 +4121,7 @@ void ValidationStateTracker::PostCallRecordCreateShaderModule(VkDevice device, c
                                       : std::make_shared<SHADER_MODULE_STATE>();
     Add(std::move(new_shader_module));
 }
+#endif
 
 void ValidationStateTracker::PostCallRecordGetSwapchainImagesKHR(VkDevice device, VkSwapchainKHR swapchain,
                                                                  uint32_t *pSwapchainImageCount, VkImage *pSwapchainImages,
@@ -3962,6 +4158,7 @@ void ValidationStateTracker::PostCallRecordGetSwapchainImagesKHR(VkDevice device
     }
 }
 
+#if defined(VK_KHR_acceleration_structure)
 void ValidationStateTracker::PostCallRecordCmdCopyAccelerationStructureKHR(VkCommandBuffer commandBuffer,
                                                                            const VkCopyAccelerationStructureInfoKHR *pInfo) {
     CMD_BUFFER_STATE *cb_state = Get<CMD_BUFFER_STATE>(commandBuffer);
@@ -3979,6 +4176,7 @@ void ValidationStateTracker::PostCallRecordCmdCopyAccelerationStructureKHR(VkCom
         }
     }
 }
+#endif
 
 void ValidationStateTracker::PreCallRecordCmdSetCullModeEXT(VkCommandBuffer commandBuffer, VkCullModeFlags cullMode) {
     CMD_BUFFER_STATE *cb_state = Get<CMD_BUFFER_STATE>(commandBuffer);
@@ -4094,6 +4292,7 @@ void ValidationStateTracker::PreCallRecordCmdSetSampleLocationsEXT(VkCommandBuff
     cb_state->RecordStateCmd(CMD_SETSAMPLELOCATIONSEXT, CBSTATUS_SAMPLE_LOCATIONS_SET);
 }
 
+#if defined(VK_NV_shading_rate_image)
 void ValidationStateTracker::PreCallRecordCmdSetCoarseSampleOrderNV(VkCommandBuffer commandBuffer,
                                                                     VkCoarseSampleOrderTypeNV sampleOrderType,
                                                                     uint32_t customSampleOrderCount,
@@ -4101,6 +4300,7 @@ void ValidationStateTracker::PreCallRecordCmdSetCoarseSampleOrderNV(VkCommandBuf
     CMD_BUFFER_STATE *cb_state = Get<CMD_BUFFER_STATE>(commandBuffer);
     cb_state->RecordStateCmd(CMD_SETCOARSESAMPLEORDERNV, CBSTATUS_COARSE_SAMPLE_ORDER_SET);
 }
+#endif
 
 void ValidationStateTracker::PreCallRecordCmdSetPatchControlPointsEXT(VkCommandBuffer commandBuffer, uint32_t patchControlPoints) {
     CMD_BUFFER_STATE *cb_state = Get<CMD_BUFFER_STATE>(commandBuffer);
@@ -4166,15 +4366,19 @@ void ValidationStateTracker::PostCallRecordGetBufferDeviceAddress(VkDevice devic
     RecordGetBufferDeviceAddress(pInfo, address);
 }
 
+#if defined(VK_KHR_buffer_device_address)
 void ValidationStateTracker::PostCallRecordGetBufferDeviceAddressKHR(VkDevice device, const VkBufferDeviceAddressInfo *pInfo,
                                                                      VkDeviceAddress address) {
     RecordGetBufferDeviceAddress(pInfo, address);
 }
+#endif
 
+#if defined(VK_EXT_buffer_device_address)
 void ValidationStateTracker::PostCallRecordGetBufferDeviceAddressEXT(VkDevice device, const VkBufferDeviceAddressInfo *pInfo,
                                                                      VkDeviceAddress address) {
     RecordGetBufferDeviceAddress(pInfo, address);
 }
+#endif
 
 std::shared_ptr<SWAPCHAIN_NODE> ValidationStateTracker::CreateSwapchainState(const VkSwapchainCreateInfoKHR *create_info,
                                                                              VkSwapchainKHR swapchain) {

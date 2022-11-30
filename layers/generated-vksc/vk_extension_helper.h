@@ -41,6 +41,9 @@
 
 #include <vulkan/vulkan_sc.h>
 #include "vk_layer_data.h"
+#if defined(VULKANSC)
+#include "vksc_compatibility.h"
+#endif
 #define VK_VERSION_1_1_NAME "VK_VERSION_1_1"
 
 // Suppress unused warning on Linux
@@ -79,6 +82,11 @@ struct InstanceExtensions {
     ExtEnabled vk_khr_get_display_properties2{kNotEnabled};
     ExtEnabled vk_khr_get_surface_capabilities2{kNotEnabled};
     ExtEnabled vk_khr_surface{kNotEnabled};
+    ExtEnabled vk_khr_device_group_creation{kNotEnabled};
+    ExtEnabled vk_khr_external_fence_capabilities{kNotEnabled};
+    ExtEnabled vk_khr_external_memory_capabilities{kNotEnabled};
+    ExtEnabled vk_khr_external_semaphore_capabilities{kNotEnabled};
+    ExtEnabled vk_khr_get_physical_device_properties2{kNotEnabled};
 
     struct InstanceReq {
         const ExtEnabled InstanceExtensions::* enabled;
@@ -145,6 +153,11 @@ struct InstanceExtensions {
     uint32_t InitFromInstanceCreateInfo(uint32_t requested_api_version, const VkInstanceCreateInfo *pCreateInfo) {
 
         static const std::vector<const char *> V_1_1_promoted_instance_apis = {
+            VK_KHR_DEVICE_GROUP_CREATION_EXTENSION_NAME,
+            VK_KHR_EXTERNAL_FENCE_CAPABILITIES_EXTENSION_NAME,
+            VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME,
+            VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_EXTENSION_NAME,
+            VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
         };
         static const std::vector<const char *> V_1_2_promoted_instance_apis = {
         };
@@ -255,6 +268,48 @@ struct DeviceExtensions : public InstanceExtensions {
     ExtEnabled vk_nv_external_sci_sync{kNotEnabled};
     ExtEnabled vk_nv_external_sci_sync2{kNotEnabled};
     ExtEnabled vk_nv_private_vendor_info{kNotEnabled};
+    ExtEnabled vk_khr_16bit_storage{kNotEnabled};
+    ExtEnabled vk_khr_bind_memory2{kNotEnabled};
+    ExtEnabled vk_khr_dedicated_allocation{kNotEnabled};
+    ExtEnabled vk_khr_descriptor_update_template{kNotEnabled};
+    ExtEnabled vk_khr_device_group{kNotEnabled};
+    ExtEnabled vk_khr_external_fence{kNotEnabled};
+    ExtEnabled vk_khr_external_memory{kNotEnabled};
+    ExtEnabled vk_khr_external_semaphore{kNotEnabled};
+    ExtEnabled vk_khr_get_memory_requirements2{kNotEnabled};
+    ExtEnabled vk_khr_maintenance1{kNotEnabled};
+    ExtEnabled vk_khr_maintenance2{kNotEnabled};
+    ExtEnabled vk_khr_maintenance3{kNotEnabled};
+    ExtEnabled vk_khr_multiview{kNotEnabled};
+    ExtEnabled vk_khr_relaxed_block_layout{kNotEnabled};
+    ExtEnabled vk_khr_sampler_ycbcr_conversion{kNotEnabled};
+    ExtEnabled vk_khr_shader_draw_parameters{kNotEnabled};
+    ExtEnabled vk_khr_storage_buffer_storage_class{kNotEnabled};
+    ExtEnabled vk_khr_variable_pointers{kNotEnabled};
+    ExtEnabled vk_khr_8bit_storage{kNotEnabled};
+    ExtEnabled vk_khr_buffer_device_address{kNotEnabled};
+    ExtEnabled vk_khr_create_renderpass2{kNotEnabled};
+    ExtEnabled vk_khr_depth_stencil_resolve{kNotEnabled};
+    ExtEnabled vk_khr_draw_indirect_count{kNotEnabled};
+    ExtEnabled vk_khr_driver_properties{kNotEnabled};
+    ExtEnabled vk_khr_image_format_list{kNotEnabled};
+    ExtEnabled vk_khr_imageless_framebuffer{kNotEnabled};
+    ExtEnabled vk_khr_sampler_mirror_clamp_to_edge{kNotEnabled};
+    ExtEnabled vk_khr_separate_depth_stencil_layouts{kNotEnabled};
+    ExtEnabled vk_khr_shader_atomic_int64{kNotEnabled};
+    ExtEnabled vk_khr_shader_float16_int8{kNotEnabled};
+    ExtEnabled vk_khr_shader_float_controls{kNotEnabled};
+    ExtEnabled vk_khr_shader_subgroup_extended_types{kNotEnabled};
+    ExtEnabled vk_khr_spirv_1_4{kNotEnabled};
+    ExtEnabled vk_khr_timeline_semaphore{kNotEnabled};
+    ExtEnabled vk_khr_uniform_buffer_standard_layout{kNotEnabled};
+    ExtEnabled vk_khr_vulkan_memory_model{kNotEnabled};
+    ExtEnabled vk_ext_descriptor_indexing{kNotEnabled};
+    ExtEnabled vk_ext_host_query_reset{kNotEnabled};
+    ExtEnabled vk_ext_sampler_filter_minmax{kNotEnabled};
+    ExtEnabled vk_ext_scalar_block_layout{kNotEnabled};
+    ExtEnabled vk_ext_separate_stencil_usage{kNotEnabled};
+    ExtEnabled vk_ext_shader_viewport_index_layer{kNotEnabled};
 
     struct DeviceReq {
         const ExtEnabled DeviceExtensions::* enabled;
@@ -379,8 +434,50 @@ struct DeviceExtensions : public InstanceExtensions {
 
 
         static const std::vector<const char *> V_1_1_promoted_device_apis = {
+            VK_KHR_16BIT_STORAGE_EXTENSION_NAME,
+            VK_KHR_BIND_MEMORY_2_EXTENSION_NAME,
+            VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME,
+            VK_KHR_DESCRIPTOR_UPDATE_TEMPLATE_EXTENSION_NAME,
+            VK_KHR_DEVICE_GROUP_EXTENSION_NAME,
+            VK_KHR_EXTERNAL_FENCE_EXTENSION_NAME,
+            VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME,
+            VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME,
+            VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME,
+            VK_KHR_MAINTENANCE_1_EXTENSION_NAME,
+            VK_KHR_MAINTENANCE_2_EXTENSION_NAME,
+            VK_KHR_MAINTENANCE_3_EXTENSION_NAME,
+            VK_KHR_MULTIVIEW_EXTENSION_NAME,
+            VK_KHR_RELAXED_BLOCK_LAYOUT_EXTENSION_NAME,
+            VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME,
+            VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME,
+            VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_EXTENSION_NAME,
+            VK_KHR_VARIABLE_POINTERS_EXTENSION_NAME,
         };
         static const std::vector<const char *> V_1_2_promoted_device_apis = {
+            VK_KHR_8BIT_STORAGE_EXTENSION_NAME,
+            VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME,
+            VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME,
+            VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME,
+            VK_KHR_DRAW_INDIRECT_COUNT_EXTENSION_NAME,
+            VK_KHR_DRIVER_PROPERTIES_EXTENSION_NAME,
+            VK_KHR_IMAGE_FORMAT_LIST_EXTENSION_NAME,
+            VK_KHR_IMAGELESS_FRAMEBUFFER_EXTENSION_NAME,
+            VK_KHR_SAMPLER_MIRROR_CLAMP_TO_EDGE_EXTENSION_NAME,
+            VK_KHR_SEPARATE_DEPTH_STENCIL_LAYOUTS_EXTENSION_NAME,
+            VK_KHR_SHADER_ATOMIC_INT64_EXTENSION_NAME,
+            VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME,
+            VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME,
+            VK_KHR_SHADER_SUBGROUP_EXTENDED_TYPES_EXTENSION_NAME,
+            VK_KHR_SPIRV_1_4_EXTENSION_NAME,
+            VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME,
+            VK_KHR_UNIFORM_BUFFER_STANDARD_LAYOUT_EXTENSION_NAME,
+            VK_KHR_VULKAN_MEMORY_MODEL_EXTENSION_NAME,
+            VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME,
+            VK_EXT_HOST_QUERY_RESET_EXTENSION_NAME,
+            VK_EXT_SAMPLER_FILTER_MINMAX_EXTENSION_NAME,
+            VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME,
+            VK_EXT_SEPARATE_STENCIL_USAGE_EXTENSION_NAME,
+            VK_EXT_SHADER_VIEWPORT_INDEX_LAYER_EXTENSION_NAME,
         };
 
         // Initialize struct data, robust to invalid pCreateInfo

@@ -1,7 +1,8 @@
 /* Copyright (c) 2021 The Khronos Group Inc.
  * Copyright (c) 2021 Valve Corporation
- * Copyright (c) 2021 LunarG, Inc.
+ * Copyright (c) 2021-2023 LunarG, Inc.
  * Copyright (C) 2021 Google Inc.
+ * Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -754,11 +755,13 @@ static const std::map<VkImageLayout, std::array<Entry, 2>> kImageLayoutErrors{
          {Key(Struct::VkImageMemoryBarrier), "VUID-VkImageMemoryBarrier-oldLayout-01213"},
          {Key(Struct::VkImageMemoryBarrier2KHR), "VUID-VkImageMemoryBarrier2KHR-oldLayout-01213"},
      }}},
+#if defined(VK_NV_shading_rate_image)
     {VK_IMAGE_LAYOUT_SHADING_RATE_OPTIMAL_NV,
      {{
          {Key(Struct::VkImageMemoryBarrier), "VUID-VkImageMemoryBarrier-oldLayout-02088"},
          {Key(Struct::VkImageMemoryBarrier2KHR), "VUID-VkImageMemoryBarrier2KHR-oldLayout-02088"},
      }}},
+#endif
     {VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL,
      {{
          {Key(Struct::VkImageMemoryBarrier), "VUID-VkImageMemoryBarrier-oldLayout-01658"},

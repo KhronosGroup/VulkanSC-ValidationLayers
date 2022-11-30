@@ -1,8 +1,8 @@
 /* Copyright (c) 2015-2021 The Khronos Group Inc.
  * Copyright (c) 2015-2021 Valve Corporation
- * Copyright (c) 2015-2022 LunarG, Inc.
+ * Copyright (c) 2015-2023 LunarG, Inc.
  * Copyright (C) 2015-2021 Google Inc.
- * Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -163,6 +163,7 @@ cvdescriptorset::DescriptorSetLayoutDef::DescriptorSetLayoutDef(const VkDescript
         sorted_bindings.emplace(p_create_info->pBindings + i, flags);
     }
 
+#if defined(VK_VALVE_mutable_descriptor_type)
     const auto *mutable_descriptor_type_create_info = LvlFindInChain<VkMutableDescriptorTypeCreateInfoVALVE>(p_create_info->pNext);
     if (mutable_descriptor_type_create_info) {
         mutable_types_.resize(mutable_descriptor_type_create_info->mutableDescriptorTypeListCount);
@@ -175,6 +176,7 @@ cvdescriptorset::DescriptorSetLayoutDef::DescriptorSetLayoutDef(const VkDescript
             std::sort(mutable_types_[i].begin(), mutable_types_[i].end());
         }
     }
+#endif
 
     // Store the create info in the sorted order from above
     uint32_t index = 0;
@@ -414,9 +416,9 @@ bool cvdescriptorset::VerifySetLayoutCompatibility(const debug_report_data *repo
         }
         error_str << report_data->FormatHandle(layout_dsl_handle)
                   << " from pipeline layout does not have the same binding flags at binding " << i << " ( "
-                  << string_VkDescriptorBindingFlagsEXT(ds_layout_flags[i]) << " ) as "
+                  << string_VkDescriptorBindingFlags(ds_layout_flags[i]) << " ) as "
                   << report_data->FormatHandle(bound_dsl_handle) << " ( "
-                  << string_VkDescriptorBindingFlagsEXT(bound_layout_flags[i]) << " ), which is bound";
+                  << string_VkDescriptorBindingFlags(bound_layout_flags[i]) << " ), which is bound";
         *error_msg = error_str.str();
         return false;
     }
@@ -474,7 +476,12 @@ bool cvdescriptorset::ValidateDescriptorSetLayoutCreateInfo(
 
     const auto *flags_create_info = LvlFindInChain<VkDescriptorSetLayoutBindingFlagsCreateInfo>(create_info->pNext);
 
+#if defined(VK_KHR_push_descriptor)
     const bool push_descriptor_set = !!(create_info->flags & VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR);
+#else
+    const bool push_descriptor_set = false;
+#endif
+#if defined(VK_KHR_push_descriptor)
     if (push_descriptor_set && !push_descriptor_ext) {
         skip |= val_obj->LogError(
             val_obj->device, kVUID_Core_DrawState_ExtensionNotEnabled,
@@ -482,6 +489,7 @@ bool cvdescriptorset::ValidateDescriptorSetLayoutCreateInfo(
             "VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR", "VkDescriptorSetLayoutCreateInfo::flags",
             VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
     }
+#endif
 
     const bool update_after_bind_set = !!(create_info->flags & VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT);
     if (update_after_bind_set && !descriptor_indexing_ext) {
@@ -492,11 +500,17 @@ bool cvdescriptorset::ValidateDescriptorSetLayoutCreateInfo(
             VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
     }
 
+#if defined(VK_EXT_inline_uniform_block)
     auto valid_type = [push_descriptor_set](const VkDescriptorType type) {
         return !push_descriptor_set ||
                ((type != VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC) && (type != VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC) &&
                 (type != VK_DESCRIPTOR_TYPE_INLINE_UNIFORM_BLOCK_EXT));
     };
+#else
+    auto valid_type = [](const VkDescriptorType type) {
+        return ((type != VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC) && (type != VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC));
+    };
+#endif
 
     uint32_t max_binding = 0;
 
@@ -526,7 +540,7 @@ bool cvdescriptorset::ValidateDescriptorSetLayoutCreateInfo(
                                       string_VkDescriptorType(binding_info.descriptorType));
         }
 
-#if !defined(VULKANSC)
+#if defined(VK_EXT_inline_uniform_block)
         if (binding_info.descriptorType == VK_DESCRIPTOR_TYPE_INLINE_UNIFORM_BLOCK_EXT) {
             if (!inline_uniform_block_features->inlineUniformBlock) {
                 skip |= val_obj->LogError(val_obj->device, "VUID-VkDescriptorSetLayoutBinding-descriptorType-04604",
@@ -573,12 +587,14 @@ bool cvdescriptorset::ValidateDescriptorSetLayoutCreateInfo(
             }
         }
 
+#if defined(VK_VALVE_mutable_descriptor_type)
         if (binding_info.descriptorType == VK_DESCRIPTOR_TYPE_MUTABLE_VALVE && binding_info.pImmutableSamplers != nullptr) {
             skip |= val_obj->LogError(val_obj->device, "VUID-VkDescriptorSetLayoutBinding-descriptorType-04605",
                                       "vkCreateDescriptorSetLayout(): pBindings[%u] has descriptorType "
                                       "VK_DESCRIPTOR_TYPE_MUTABLE_VALVE but pImmutableSamplers is not NULL.",
                                       i);
         }
+#endif
 
         total_descriptors += binding_info.descriptorCount;
     }
@@ -675,7 +691,7 @@ bool cvdescriptorset::ValidateDescriptorSetLayoutCreateInfo(
                                                   i, string_VkDescriptorType(binding_info.descriptorType));
                     }
 
-#if !defined(VULKANSC)
+#if defined(VK_EXT_inline_uniform_block)
                     if (binding_info.descriptorType == VK_DESCRIPTOR_TYPE_INLINE_UNIFORM_BLOCK_EXT &&
                         !inline_uniform_block_features->descriptorBindingInlineUniformBlockUpdateAfterBind) {
                         skip |= val_obj->LogError(
@@ -686,6 +702,8 @@ bool cvdescriptorset::ValidateDescriptorSetLayoutCreateInfo(
                             "for %s since descriptorBindingInlineUniformBlockUpdateAfterBind is not enabled.",
                             i, string_VkDescriptorType(binding_info.descriptorType));
                     }
+#endif
+#if defined(VK_KHR_acceleration_structure) || defined(VK_NV_ray_tracing)
                     if ((binding_info.descriptorType == VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR ||
                          binding_info.descriptorType == VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV) &&
                         !acceleration_structure_features->descriptorBindingAccelerationStructureUpdateAfterBind) {
@@ -699,8 +717,8 @@ bool cvdescriptorset::ValidateDescriptorSetLayoutCreateInfo(
                                                   "descriptorBindingAccelerationStructureUpdateAfterBind is not enabled.",
                                                   i, string_VkDescriptorType(binding_info.descriptorType));
                     }
-                }
 #endif
+                }
 
                 if (flags_create_info->pBindingFlags[i] & VK_DESCRIPTOR_BINDING_UPDATE_UNUSED_WHILE_PENDING_BIT) {
                     if (!core12_features->descriptorBindingUpdateUnusedWhilePending) {
@@ -876,26 +894,36 @@ cvdescriptorset::DescriptorSet::DescriptorSet(const VkDescriptorSet set, DESCRIP
                     descriptors_.back()->AddParent(this);
                 }
                 break;
+#if defined(VK_EXT_inline_uniform_block)
             case VK_DESCRIPTOR_TYPE_INLINE_UNIFORM_BLOCK_EXT:
                 for (uint32_t di = 0; di < layout_->GetDescriptorCountFromIndex(i); ++di) {
                     descriptors_.emplace_back(new ((free_descriptor++)->InlineUniform()) InlineUniformDescriptor(type));
                     descriptors_.back()->AddParent(this);
                 }
                 break;
+#endif
+#if defined(VK_NV_ray_tracing)
             case VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV:
+#endif
+#if defined(VK_KHR_acceleration_structure)
             case VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR:
+#endif
+#if defined(VK_NV_ray_tracing) || defined(VK_KHR_acceleration_structure)
                 for (uint32_t di = 0; di < layout_->GetDescriptorCountFromIndex(i); ++di) {
                     descriptors_.emplace_back(new ((free_descriptor++)->AccelerationStructure())
                                                   AccelerationStructureDescriptor(type));
                     descriptors_.back()->AddParent(this);
                 }
                 break;
+#endif
+#if defined(VK_VALVE_mutable_descriptor_type)
             case VK_DESCRIPTOR_TYPE_MUTABLE_VALVE:
                 for (uint32_t di = 0; di < layout_->GetDescriptorCountFromIndex(i); ++di) {
                     descriptors_.emplace_back(new ((free_descriptor++)->Mutable()) MutableDescriptor());
                     descriptors_.back()->AddParent(this);
                 }
                 break;
+#endif
             default:
                 if (IsDynamicDescriptor(type) && IsBufferDescriptor(type)) {
                     for (uint32_t di = 0; di < layout_->GetDescriptorCountFromIndex(i); ++di) {
@@ -1005,7 +1033,9 @@ bool CoreChecks::ValidateDescriptorSetBindingData(const CMD_BUFFER_STATE *cb_nod
     using ImageSamplerDescriptor = cvdescriptorset::ImageSamplerDescriptor;
     using SamplerDescriptor = cvdescriptorset::SamplerDescriptor;
     using TexelDescriptor = cvdescriptorset::TexelDescriptor;
+#if defined(VK_NV_ray_tracing) || defined(VK_KHR_acceleration_structure)
     using AccelerationStructureDescriptor = cvdescriptorset::AccelerationStructureDescriptor;
+#endif
     const auto binding = binding_info.first;
     bool skip = false;
     DescriptorSetLayout::ConstBindingIterator binding_it(descriptor_set->GetLayout().get(), binding);
@@ -1068,10 +1098,12 @@ bool CoreChecks::ValidateDescriptorSetBindingData(const CMD_BUFFER_STATE *cb_nod
                     const auto *texel_desc = static_cast<const TexelDescriptor *>(descriptor);
                     skip = ValidateTexelDescriptor(caller, vuids, cb_node, descriptor_set, *texel_desc, binding_info, index);
                 } break;
+#if defined(VK_NV_ray_tracing) || defined(VK_KHR_acceleration_structure)
                 case DescriptorClass::AccelerationStructure: {
                     const auto *accel_desc = static_cast<const AccelerationStructureDescriptor *>(descriptor);
                     skip = ValidateAccelerationDescriptor(caller, vuids, cb_node, descriptor_set, *accel_desc, binding_info, index);
                 } break;
+#endif
                 default:
                     break;
             }
@@ -1435,6 +1467,7 @@ bool CoreChecks::ValidateImageDescriptor(const char *caller, const DrawDispatchV
                     }
                 }
 
+#if defined(VK_IMG_filter_cubic)
                 if (IsExtEnabled(device_extensions.vk_img_filter_cubic)) {
                     if (image_view_state->create_info.viewType == VK_IMAGE_VIEW_TYPE_3D ||
                         image_view_state->create_info.viewType == VK_IMAGE_VIEW_TYPE_CUBE ||
@@ -1453,8 +1486,10 @@ bool CoreChecks::ValidateImageDescriptor(const char *caller, const DrawDispatchV
                                         string_VkImageViewType(image_view_state->create_info.viewType));
                     }
                 }
+#endif
             }
 
+#if defined(VK_NV_corner_sampled_image)
             if ((image_state->createInfo.flags & VK_IMAGE_CREATE_CORNER_SAMPLED_BIT_NV) &&
                 (sampler_state->createInfo.addressModeU != VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE ||
                  sampler_state->createInfo.addressModeV != VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE ||
@@ -1486,6 +1521,7 @@ bool CoreChecks::ValidateImageDescriptor(const char *caller, const DrawDispatchV
                                 report_data->FormatHandle(sampler_state->sampler()).c_str(), address_mode_letter.c_str(),
                                 string_VkSamplerAddressMode(address_mode));
             }
+#endif
 
             // UnnormalizedCoordinates sampler validations
             if (sampler_state->createInfo.unnormalizedCoordinates) {
@@ -1612,6 +1648,7 @@ bool CoreChecks::ValidateTexelDescriptor(const char *caller, const DrawDispatchV
     return false;
 }
 
+#if defined(VK_NV_ray_tracing) || defined(VK_KHR_acceleration_structure)
 bool CoreChecks::ValidateAccelerationDescriptor(const char *caller, const DrawDispatchVuid &vuids, const CMD_BUFFER_STATE *cb_node,
                                                 const cvdescriptorset::DescriptorSet *descriptor_set,
                                                 const cvdescriptorset::AccelerationStructureDescriptor &descriptor,
@@ -1678,6 +1715,7 @@ bool CoreChecks::ValidateAccelerationDescriptor(const char *caller, const DrawDi
     }
     return false;
 }
+#endif // defined(VK_NV_ray_tracing) || defined(VK_KHR_acceleration_structure)
 
 // If the validation is related to both of image and sampler,
 // please leave it in (descriptor_class == DescriptorClass::ImageSampler || descriptor_class ==
@@ -1860,7 +1898,11 @@ bool CoreChecks::ValidateCopyUpdate(const VkCopyDescriptorSet *update, const Des
     *error_code = "VUID-VkCopyDescriptorSet-srcSet-00349";
     auto src_type = src_set->GetTypeFromBinding(update->srcBinding);
     auto dst_type = dst_layout->GetTypeFromBinding(update->dstBinding);
-    if (src_type != VK_DESCRIPTOR_TYPE_MUTABLE_VALVE && dst_type != VK_DESCRIPTOR_TYPE_MUTABLE_VALVE && src_type != dst_type) {
+    if (
+#if defined(VK_VALVE_mutable_descriptor_type)
+        src_type != VK_DESCRIPTOR_TYPE_MUTABLE_VALVE && dst_type != VK_DESCRIPTOR_TYPE_MUTABLE_VALVE &&
+#endif
+        src_type != dst_type) {
         *error_code = "VUID-VkCopyDescriptorSet-dstBinding-02632";
         std::stringstream error_str;
         error_str << "Attempting copy update to descriptorSet " << report_data->FormatHandle(dst_set->GetSet()) << " binding #"
@@ -1895,6 +1937,7 @@ bool CoreChecks::ValidateCopyUpdate(const VkCopyDescriptorSet *update, const Des
         return false;
     }
 
+#if defined(VK_VALVE_mutable_descriptor_type)
     if (IsExtEnabled(device_extensions.vk_valve_mutable_descriptor_type)) {
         if (!(src_layout->GetCreateFlags() & (VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT |
                                               VK_DESCRIPTOR_SET_LAYOUT_CREATE_HOST_ONLY_POOL_BIT_VALVE)) &&
@@ -1910,7 +1953,9 @@ bool CoreChecks::ValidateCopyUpdate(const VkCopyDescriptorSet *update, const Des
             *error_msg = error_str.str();
             return false;
         }
-    } else {
+    } else
+#endif
+    {
         if (!(src_layout->GetCreateFlags() & VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT) &&
             (dst_layout->GetCreateFlags() & VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT)) {
             *error_code = "VUID-VkCopyDescriptorSet-srcSet-04886";
@@ -1941,6 +1986,7 @@ bool CoreChecks::ValidateCopyUpdate(const VkCopyDescriptorSet *update, const Des
         return false;
     }
 
+#if defined(VK_VALVE_mutable_descriptor_type)
     if (IsExtEnabled(device_extensions.vk_valve_mutable_descriptor_type)) {
         if (!(src_set->GetPoolState()->createInfo.flags &
               (VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT | VK_DESCRIPTOR_POOL_CREATE_HOST_ONLY_BIT_VALVE)) &&
@@ -1957,7 +2003,9 @@ bool CoreChecks::ValidateCopyUpdate(const VkCopyDescriptorSet *update, const Des
             *error_msg = error_str.str();
             return false;
         }
-    } else {
+    } else
+#endif
+    {
         if (!(src_set->GetPoolState()->createInfo.flags & VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT) &&
             (dst_set->GetPoolState()->createInfo.flags & VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT)) {
             *error_code = "VUID-VkCopyDescriptorSet-srcSet-04888";
@@ -1973,6 +2021,7 @@ bool CoreChecks::ValidateCopyUpdate(const VkCopyDescriptorSet *update, const Des
         }
     }
 
+#if defined(VK_EXT_inline_uniform_block)
     if (src_type == VK_DESCRIPTOR_TYPE_INLINE_UNIFORM_BLOCK_EXT) {
         if ((update->srcArrayElement % 4) != 0) {
             *error_code = "VUID-VkCopyDescriptorSet-srcBinding-02223";
@@ -1999,7 +2048,9 @@ bool CoreChecks::ValidateCopyUpdate(const VkCopyDescriptorSet *update, const Des
             return false;
         }
     }
+#endif
 
+#if defined(VK_VALVE_mutable_descriptor_type)
     if (dst_type == VK_DESCRIPTOR_TYPE_MUTABLE_VALVE) {
         if (src_type != VK_DESCRIPTOR_TYPE_MUTABLE_VALVE) {
             if (!dst_layout->IsTypeMutable(src_type, update->dstBinding)) {
@@ -2059,6 +2110,7 @@ bool CoreChecks::ValidateCopyUpdate(const VkCopyDescriptorSet *update, const Des
     if (dst_type == VK_DESCRIPTOR_TYPE_MUTABLE_VALVE) {
         dst_type = dst_set->GetDescriptorFromGlobalIndex(update->dstBinding)->active_descriptor_type;
     }
+#endif // defined(VK_VALVE_mutable_descriptor_type)
 
     // Update parameters all look good and descriptor updated so verify update contents
     if (!VerifyCopyUpdateContents(update, src_set, src_type, src_start_idx, dst_set, dst_type, dst_start_idx, func_name, error_code,
@@ -2659,6 +2711,7 @@ void cvdescriptorset::TexelDescriptor::CopyUpdate(DescriptorSet *set_state, cons
     ReplaceStatePtr(set_state, buffer_view_state_, static_cast<const TexelDescriptor *>(src)->buffer_view_state_);
 }
 
+#if defined(VK_NV_ray_tracing) || defined(VK_KHR_acceleration_structure)
 cvdescriptorset::AccelerationStructureDescriptor::AccelerationStructureDescriptor(const VkDescriptorType type)
     : Descriptor(AccelerationStructure), acc_(VK_NULL_HANDLE), acc_nv_(VK_NULL_HANDLE) {
     is_khr_ = false;
@@ -2697,6 +2750,7 @@ void cvdescriptorset::AccelerationStructureDescriptor::CopyUpdate(DescriptorSet 
         ReplaceStatePtr(set_state, acc_state_nv_, dev_data->GetConstCastShared<ACCELERATION_STRUCTURE_STATE>(acc_nv_));
     }
 }
+#endif
 
 cvdescriptorset::MutableDescriptor::MutableDescriptor() : Descriptor(Mutable) { active_descriptor_class_ = NoDescriptorClass; }
 
@@ -2736,6 +2790,7 @@ bool CoreChecks::ValidateUpdateDescriptorSets(uint32_t write_count, const VkWrit
             }
         }
         if (p_wds[i].pNext) {
+#if defined(VK_KHR_acceleration_structure)
             const auto *pnext_struct = LvlFindInChain<VkWriteDescriptorSetAccelerationStructureKHR>(p_wds[i].pNext);
             if (pnext_struct) {
                 for (uint32_t j = 0; j < pnext_struct->accelerationStructureCount; ++j) {
@@ -2753,6 +2808,8 @@ bool CoreChecks::ValidateUpdateDescriptorSets(uint32_t write_count, const VkWrit
                     }
                 }
             }
+#endif
+#if defined(VK_NV_ray_tracing)
             const auto *pnext_struct_nv = LvlFindInChain<VkWriteDescriptorSetAccelerationStructureNV>(p_wds[i].pNext);
             if (pnext_struct_nv) {
                 for (uint32_t j = 0; j < pnext_struct_nv->accelerationStructureCount; ++j) {
@@ -2768,6 +2825,7 @@ bool CoreChecks::ValidateUpdateDescriptorSets(uint32_t write_count, const VkWrit
                     }
                 }
             }
+#endif
         }
     }
     // Now validate copy updates
@@ -2883,6 +2941,7 @@ cvdescriptorset::DecodedTemplateUpdate::DecodedTemplateUpdate(const ValidationSt
                 case VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER:
                     write_entry.pTexelBufferView = reinterpret_cast<VkBufferView *>(update_entry);
                     break;
+#if defined(VK_EXT_inline_uniform_block)
                 case VK_DESCRIPTOR_TYPE_INLINE_UNIFORM_BLOCK_EXT: {
                     VkWriteDescriptorSetInlineUniformBlockEXT *inline_info = &inline_infos[i];
                     inline_info->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_INLINE_UNIFORM_BLOCK_EXT;
@@ -2896,6 +2955,8 @@ cvdescriptorset::DecodedTemplateUpdate::DecodedTemplateUpdate(const ValidationSt
                     j = create_info.pDescriptorUpdateEntries[i].descriptorCount;
                     break;
                 }
+#endif
+#if defined(VK_KHR_acceleration_structure)
                 case VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR: {
                     VkWriteDescriptorSetAccelerationStructureKHR *inline_info_khr = &inline_infos_khr[i];
                     inline_info_khr->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
@@ -2905,6 +2966,8 @@ cvdescriptorset::DecodedTemplateUpdate::DecodedTemplateUpdate(const ValidationSt
                     write_entry.pNext = inline_info_khr;
                     break;
                 }
+#endif
+#if defined(VK_NV_ray_tracing)
                 case VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV: {
                     VkWriteDescriptorSetAccelerationStructureNV *inline_info_nv = &inline_infos_nv[i];
                     inline_info_nv->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_NV;
@@ -2914,6 +2977,7 @@ cvdescriptorset::DecodedTemplateUpdate::DecodedTemplateUpdate(const ValidationSt
                     write_entry.pNext = inline_info_nv;
                     break;
                 }
+#endif
                 default:
                     assert(0);
                     break;
@@ -3110,6 +3174,7 @@ bool CoreChecks::ValidateBufferUpdate(VkDescriptorBufferInfo const *buffer_info,
     }
     return true;
 }
+#if defined(VK_NV_ray_tracing)
 template <typename T>
 bool CoreChecks::ValidateAccelerationStructureUpdate(T acc_node, const char *func_name, std::string *error_code,
                                                      std::string *error_msg) const {
@@ -3123,6 +3188,7 @@ bool CoreChecks::ValidateAccelerationStructureUpdate(T acc_node, const char *fun
     }
     return true;
 }
+#endif
 
 // Verify that the contents of the update are ok, but don't perform actual update
 bool CoreChecks::VerifyCopyUpdateContents(const VkCopyDescriptorSet *update, const DescriptorSet *src_set,
@@ -3305,6 +3371,7 @@ bool CoreChecks::ValidateAllocateDescriptorSets(const VkDescriptorSetAllocateInf
                     "vkAllocateDescriptorSets(): Descriptor set layout create flags and pool create flags mismatch for index (%d)",
                     i);
             }
+#if defined(VK_VALVE_mutable_descriptor_type)
             if (layout->GetCreateFlags() & VK_DESCRIPTOR_SET_LAYOUT_CREATE_HOST_ONLY_POOL_BIT_VALVE &&
                 !(pool_state->createInfo.flags & VK_DESCRIPTOR_POOL_CREATE_HOST_ONLY_BIT_VALVE)) {
                 skip |= LogError(device, "VUID-VkDescriptorSetAllocateInfo-pSetLayouts-04610",
@@ -3313,6 +3380,7 @@ bool CoreChecks::ValidateAllocateDescriptorSets(const VkDescriptorSetAllocateInf
                                  "with the VK_DESCRIPTOR_POOL_CREATE_HOST_ONLY_BIT_VALVE bit.",
                                  i);
             }
+#endif
         }
     }
     if (!IsExtEnabled(device_extensions.vk_khr_maintenance1)) {
@@ -3505,7 +3573,11 @@ bool CoreChecks::ValidateWriteUpdate(const DescriptorSet *dest_set, const VkWrit
     // We know that binding is valid, verify update and do update on each descriptor
     auto start_idx = dest.GetGlobalIndexRange().start + update->dstArrayElement;
     auto type = dest.GetType();
-    if ((type != VK_DESCRIPTOR_TYPE_MUTABLE_VALVE) && (type != update->descriptorType)) {
+    if (
+#if defined(VK_VALVE_mutable_descriptor_type)
+        (type != VK_DESCRIPTOR_TYPE_MUTABLE_VALVE) &&
+#endif
+        (type != update->descriptorType)) {
         *error_code = "VUID-VkWriteDescriptorSet-descriptorType-00319";
         std::stringstream error_str;
         error_str << "Attempting write update to " << dest_set->StringifySetAndLayout() << " binding #" << update->dstBinding
@@ -3514,6 +3586,7 @@ bool CoreChecks::ValidateWriteUpdate(const DescriptorSet *dest_set, const VkWrit
         *error_msg = error_str.str();
         return false;
     }
+#if defined(VK_EXT_inline_uniform_block)
     if (type == VK_DESCRIPTOR_TYPE_INLINE_UNIFORM_BLOCK_EXT) {
         if ((update->dstArrayElement % 4) != 0) {
             *error_code = "VUID-VkWriteDescriptorSet-descriptorType-02219";
@@ -3563,6 +3636,7 @@ bool CoreChecks::ValidateWriteUpdate(const DescriptorSet *dest_set, const VkWrit
             return false;
         }
     }
+#endif
     // Verify all bindings update share identical properties across all items
     if (update->descriptorCount > 0) {
         // Save first binding information and error if something different is found
@@ -3637,6 +3711,7 @@ bool CoreChecks::ValidateWriteUpdate(const DescriptorSet *dest_set, const VkWrit
         *error_msg = error_str.str();
         return false;
     }
+#if defined(VK_VALVE_mutable_descriptor_type)
     const auto orig_binding = DescriptorSetLayout::ConstBindingIterator(dest_set->GetLayout().get(), update->dstBinding);
     if (!orig_binding.AtEnd() && orig_binding.GetType() == VK_DESCRIPTOR_TYPE_MUTABLE_VALVE) {
         // Check if the new descriptor descriptor type is in the list of allowed mutable types for this binding
@@ -3650,6 +3725,7 @@ bool CoreChecks::ValidateWriteUpdate(const DescriptorSet *dest_set, const VkWrit
             return false;
         }
     }
+#endif
     // All checks passed, update is clean
     return true;
 }
@@ -3740,6 +3816,7 @@ bool CoreChecks::VerifyWriteUpdateContents(const DescriptorSet *dest_set, const 
                     // Verify portability
                     auto sampler_state = GetSamplerState(sampler);
                     if (sampler_state) {
+#if defined(VK_KHR_portability_subset)
                         if (IsExtEnabled(device_extensions.vk_khr_portability_subset)) {
                             if ((VK_FALSE == enabled_features.portability_subset_features.mutableComparisonSamplers) &&
                                 (VK_FALSE != sampler_state->createInfo.compareEnable)) {
@@ -3747,6 +3824,7 @@ bool CoreChecks::VerifyWriteUpdateContents(const DescriptorSet *dest_set, const 
                                          "%s (portability error): sampler comparison not available.", func_name);
                             }
                         }
+#endif
                     }
                 }
             }
@@ -3842,8 +3920,11 @@ bool CoreChecks::VerifyWriteUpdateContents(const DescriptorSet *dest_set, const 
             }
             break;
         }
+#if defined(VK_EXT_inline_uniform_block)
         case VK_DESCRIPTOR_TYPE_INLINE_UNIFORM_BLOCK_EXT:
             break;
+#endif
+#if defined(VK_NV_ray_tracing)
         case VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV: {
             const auto *acc_info = LvlFindInChain<VkWriteDescriptorSetAccelerationStructureNV>(update->pNext);
             for (uint32_t di = 0; di < update->descriptorCount; ++di) {
@@ -3858,9 +3939,12 @@ bool CoreChecks::VerifyWriteUpdateContents(const DescriptorSet *dest_set, const 
             }
 
         } break;
+#endif
+#if defined(VK_KHR_acceleration_structure)
         // KHR acceleration structures don't require memory to be bound manually to them.
         case VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR:
             break;
+#endif
         default:
             assert(0);  // We've already verified update type so should never get here
             break;

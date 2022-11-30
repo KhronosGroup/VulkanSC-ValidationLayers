@@ -1221,7 +1221,8 @@ void ValidationObject::InitObjectDispatchVectors() {
     init_object_dispatch_vector(InterceptId ## name, \
                                 typeid(&ValidationObject::name), \
                                 typeid(&ThreadSafety::name), \
-                                typeid(&StatelessValidation::name));
+                                typeid(&StatelessValidation::name), \
+                                typeid(&CoreChecks::name));
 #endif
 
 #if !defined(VULKANSC)
@@ -1275,7 +1276,8 @@ void ValidationObject::InitObjectDispatchVectors() {
     auto init_object_dispatch_vector = [this](InterceptId id,
                                               const std::type_info& vo_typeid,
                                               const std::type_info& tt_typeid,
-                                              const std::type_info& tpv_typeid) {
+                                              const std::type_info& tpv_typeid,
+                                              const std::type_info& tcv_typeid) {
         for (auto item : this->object_dispatch) {
             auto intercept_vector = &this->intercept_vectors[id];
             switch (item->container_type) {
@@ -1284,6 +1286,9 @@ void ValidationObject::InitObjectDispatchVectors() {
                 break;
             case LayerObjectTypeParameterValidation:
                 if (tpv_typeid != vo_typeid) intercept_vector->push_back(item);
+                break;
+            case LayerObjectTypeCoreValidation:
+                if (tcv_typeid != vo_typeid) intercept_vector->push_back(item);
                 break;
             case LayerObjectTypeInstance:
             case LayerObjectTypeDevice:

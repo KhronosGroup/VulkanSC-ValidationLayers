@@ -1,8 +1,9 @@
 /* Copyright (c) 2015-2021 The Khronos Group Inc.
  * Copyright (c) 2015-2021 Valve Corporation
- * Copyright (c) 2015-2021 LunarG, Inc.
+ * Copyright (c) 2015-2023 LunarG, Inc.
  * Copyright (C) 2015-2021 Google Inc.
  * Modifications Copyright (C) 2020-2021 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -744,26 +745,44 @@ struct DispatchVuidsCmdDispatchBase: DrawDispatchVuid {
 // This LUT is created to allow a static listing of each VUID that is covered by drawdispatch commands
 static const std::map<CMD_TYPE, DrawDispatchVuid> kDrawdispatchVuid = {
     {CMD_DRAW, DispatchVuidsCmdDraw()},
+#if defined(VK_EXT_multi_draw)
     {CMD_DRAWMULTIEXT, DispatchVuidsCmdDrawMultiEXT()},
+#endif
     {CMD_DRAWINDEXED, DispatchVuidsCmdDrawIndexed()},
+#if defined(VK_EXT_multi_draw)
     {CMD_DRAWMULTIINDEXEDEXT, DispatchVuidsCmdDrawMultiIndexedEXT()},
+#endif
     {CMD_DRAWINDIRECT, DispatchVuidsCmdDrawIndirect()},
     {CMD_DRAWINDEXEDINDIRECT, DispatchVuidsCmdDrawIndexedIndirect()},
     {CMD_DISPATCH, DispatchVuidsCmdDispatch()},
     {CMD_DISPATCHINDIRECT, DispatchVuidsCmdDispatchIndirect()},
     {CMD_DRAWINDIRECTCOUNT, DispatchVuidsCmdDrawIndirectCount()},
+#if defined(VK_KHR_draw_indirect_count)
     {CMD_DRAWINDIRECTCOUNTKHR, DispatchVuidsCmdDrawIndirectCount()},
+#endif
     {CMD_DRAWINDEXEDINDIRECTCOUNT, DispatchVuidsCmdDrawIndexedIndirectCount()},
+#if defined(VK_KHR_draw_indirect_count)
     {CMD_DRAWINDEXEDINDIRECTCOUNTKHR, DispatchVuidsCmdDrawIndexedIndirectCount()},
+#endif
+#if defined(VK_NV_ray_tracing)
     {CMD_TRACERAYSNV, DispatchVuidsCmdTraceRaysNV()},
+#endif
+#if defined(VK_KHR_ray_tracing_pipeline)
     {CMD_TRACERAYSKHR, DispatchVuidsCmdTraceRaysKHR()},
     {CMD_TRACERAYSINDIRECTKHR, DispatchVuidsCmdTraceRaysIndirectKHR()},
+#endif
+#if defined(VK_NV_mesh_shader)
     {CMD_DRAWMESHTASKSNV, DispatchVuidsCmdDrawMeshTasksNV()},
     {CMD_DRAWMESHTASKSINDIRECTNV, DispatchVuidsCmdDrawMeshTasksIndirectNV()},
     {CMD_DRAWMESHTASKSINDIRECTCOUNTNV, DispatchVuidsCmdDrawMeshTasksIndirectCountNV()},
+#endif
+#if defined(VK_EXT_transform_feedback)
     {CMD_DRAWINDIRECTBYTECOUNTEXT, DispatchVuidsCmdDrawIndirectByteCountEXT()},
+#endif
     {CMD_DISPATCHBASE, DispatchVuidsCmdDispatchBase()},
+#if defined(VK_KHR_device_group)
     {CMD_DISPATCHBASEKHR, DispatchVuidsCmdDispatchBase()},
+#endif
     // Used if invalid cmd_type is used
     {CMD_NONE, DrawDispatchVuid()}
 };
@@ -786,7 +805,9 @@ bool CoreChecks::ValidateCmdDrawType(VkCommandBuffer cmd_buffer, bool indexed, V
     if (cb_state) {
         skip |= ValidateCmd(cb_state, cmd_type);
         skip |= ValidateCmdBufDrawState(cb_state, cmd_type, indexed, bind_point);
+#if defined(VK_KHR_ray_tracing_pipeline)
         skip |= ValidateCmdRayQueryState(cb_state, cmd_type, bind_point);
+#endif
     }
     return skip;
 }
@@ -821,6 +842,7 @@ bool CoreChecks::PreCallValidateCmdDraw(VkCommandBuffer commandBuffer, uint32_t 
     return skip;
 }
 
+#if defined(VK_EXT_multi_draw)
 bool CoreChecks::PreCallValidateCmdDrawMultiEXT(VkCommandBuffer commandBuffer, uint32_t drawCount,
                                                 const VkMultiDrawInfoEXT *pVertexInfo, uint32_t instanceCount,
                                                 uint32_t firstInstance, uint32_t stride) const {
@@ -841,6 +863,7 @@ bool CoreChecks::PreCallValidateCmdDrawMultiEXT(VkCommandBuffer commandBuffer, u
     skip |= ValidateCmdDrawType(commandBuffer, false, VK_PIPELINE_BIND_POINT_GRAPHICS, CMD_DRAWMULTIEXT);
     return skip;
 }
+#endif
 
 bool CoreChecks::ValidateCmdDrawIndexedBufferSize(VkCommandBuffer commandBuffer, uint32_t indexCount,
     uint32_t firstIndex, const char *caller, const char *first_index_vuid) const {
@@ -881,6 +904,7 @@ bool CoreChecks::PreCallValidateCmdDrawIndexed(VkCommandBuffer commandBuffer, ui
     return skip;
 }
 
+#if defined(VK_EXT_multi_draw)
 bool CoreChecks::PreCallValidateCmdDrawMultiIndexedEXT(VkCommandBuffer commandBuffer, uint32_t drawCount,
                                                        const VkMultiDrawIndexedInfoEXT *pIndexInfo, uint32_t instanceCount,
                                                        uint32_t firstInstance, uint32_t stride,
@@ -907,6 +931,7 @@ bool CoreChecks::PreCallValidateCmdDrawMultiIndexedEXT(VkCommandBuffer commandBu
     }
     return skip;
 }
+#endif
 
 bool CoreChecks::PreCallValidateCmdDrawIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
                                                 uint32_t drawCount, uint32_t stride) const {
@@ -986,6 +1011,7 @@ bool CoreChecks::PreCallValidateCmdDispatchBase(VkCommandBuffer commandBuffer, u
     return skip;
 }
 
+#if defined(VK_KHR_device_group)
 bool CoreChecks::PreCallValidateCmdDispatchBaseKHR(VkCommandBuffer commandBuffer, uint32_t baseGroupX, uint32_t baseGroupY,
                                                    uint32_t baseGroupZ, uint32_t groupCountX, uint32_t groupCountY,
                                                    uint32_t groupCountZ) const {
@@ -994,6 +1020,7 @@ bool CoreChecks::PreCallValidateCmdDispatchBaseKHR(VkCommandBuffer commandBuffer
     skip |= ValidateBaseGroups(commandBuffer, baseGroupX, baseGroupY, baseGroupZ, "vkCmdDispatchBaseKHR()");
     return skip;
 }
+#endif
 
 bool CoreChecks::PreCallValidateCmdDispatchIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset) const {
     bool skip = ValidateCmdDrawType(commandBuffer, false, VK_PIPELINE_BIND_POINT_COMPUTE, CMD_DISPATCHINDIRECT);
@@ -1037,12 +1064,14 @@ bool CoreChecks::ValidateCmdDrawIndirectCount(VkCommandBuffer commandBuffer, VkB
     return skip;
 }
 
+#if defined(VK_KHR_draw_indirect_count)
 bool CoreChecks::PreCallValidateCmdDrawIndirectCountKHR(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
                                                         VkBuffer countBuffer, VkDeviceSize countBufferOffset, uint32_t maxDrawCount,
                                                         uint32_t stride) const {
     return ValidateCmdDrawIndirectCount(commandBuffer, buffer, offset, countBuffer, countBufferOffset, maxDrawCount, stride,
                                         CMD_DRAWINDIRECTCOUNTKHR);
 }
+#endif
 
 bool CoreChecks::PreCallValidateCmdDrawIndirectCount(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
                                                      VkBuffer countBuffer, VkDeviceSize countBufferOffset, uint32_t maxDrawCount,
@@ -1082,12 +1111,14 @@ bool CoreChecks::ValidateCmdDrawIndexedIndirectCount(VkCommandBuffer commandBuff
     return skip;
 }
 
+#if defined(VK_KHR_draw_indirect_count)
 bool CoreChecks::PreCallValidateCmdDrawIndexedIndirectCountKHR(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
                                                                VkBuffer countBuffer, VkDeviceSize countBufferOffset,
                                                                uint32_t maxDrawCount, uint32_t stride) const {
     return ValidateCmdDrawIndexedIndirectCount(commandBuffer, buffer, offset, countBuffer, countBufferOffset, maxDrawCount, stride,
                                                CMD_DRAWINDEXEDINDIRECTCOUNTKHR);
 }
+#endif
 
 bool CoreChecks::PreCallValidateCmdDrawIndexedIndirectCount(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
                                                             VkBuffer countBuffer, VkDeviceSize countBufferOffset,
@@ -1096,6 +1127,7 @@ bool CoreChecks::PreCallValidateCmdDrawIndexedIndirectCount(VkCommandBuffer comm
                                                CMD_DRAWINDEXEDINDIRECTCOUNT);
 }
 
+#if defined(VK_EXT_transform_feedback)
 bool CoreChecks::PreCallValidateCmdDrawIndirectByteCountEXT(VkCommandBuffer commandBuffer, uint32_t instanceCount,
                                                             uint32_t firstInstance, VkBuffer counterBuffer,
                                                             VkDeviceSize counterBufferOffset, uint32_t counterOffset,
@@ -1116,7 +1148,9 @@ bool CoreChecks::PreCallValidateCmdDrawIndirectByteCountEXT(VkCommandBuffer comm
     skip |= ValidateIndirectCmd(commandBuffer, counterBuffer, CMD_DRAWINDIRECTBYTECOUNTEXT);
     return skip;
 }
+#endif
 
+#if defined(VK_NV_ray_tracing)
 bool CoreChecks::PreCallValidateCmdTraceRaysNV(VkCommandBuffer commandBuffer, VkBuffer raygenShaderBindingTableBuffer,
                                                VkDeviceSize raygenShaderBindingOffset, VkBuffer missShaderBindingTableBuffer,
                                                VkDeviceSize missShaderBindingOffset, VkDeviceSize missShaderBindingStride,
@@ -1163,7 +1197,9 @@ bool CoreChecks::PreCallValidateCmdTraceRaysNV(VkCommandBuffer commandBuffer, Vk
     }
     return skip;
 }
+#endif
 
+#if defined(VK_KHR_ray_tracing_pipeline)
 bool CoreChecks::PreCallValidateCmdTraceRaysKHR(VkCommandBuffer commandBuffer,
                                                 const VkStridedDeviceAddressRegionKHR *pRaygenShaderBindingTable,
                                                 const VkStridedDeviceAddressRegionKHR *pMissShaderBindingTable,
@@ -1278,7 +1314,9 @@ bool CoreChecks::PreCallValidateCmdTraceRaysIndirectKHR(VkCommandBuffer commandB
     }
     return skip;
 }
+#endif
 
+#if defined(VK_NV_mesh_shader)
 bool CoreChecks::PreCallValidateCmdDrawMeshTasksNV(VkCommandBuffer commandBuffer, uint32_t taskCount, uint32_t firstTask) const {
     bool skip = ValidateCmdDrawType(commandBuffer, false, VK_PIPELINE_BIND_POINT_GRAPHICS, CMD_DRAWMESHTASKSNV);
     return skip;
@@ -1318,3 +1356,4 @@ bool CoreChecks::PreCallValidateCmdDrawMeshTasksIndirectCountNV(VkCommandBuffer 
     }
     return skip;
 }
+#endif

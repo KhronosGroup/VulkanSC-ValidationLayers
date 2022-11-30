@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2019-2021 Valve Corporation
- * Copyright (c) 2019-2021 LunarG, Inc.
+ * Copyright (c) 2019-2023 LunarG, Inc.
+ * Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,25 +34,35 @@ VkPipelineStageFlags2KHR DisabledPipelineStages(const DeviceFeatures &features) 
     if (!features.core.tessellationShader) {
         result |= VK_PIPELINE_STAGE_TESSELLATION_CONTROL_SHADER_BIT | VK_PIPELINE_STAGE_TESSELLATION_EVALUATION_SHADER_BIT;
     }
+#if defined(VK_EXT_conditional_rendering)
     if (!features.conditional_rendering_features.conditionalRendering) {
         result |= VK_PIPELINE_STAGE_CONDITIONAL_RENDERING_BIT_EXT;
     }
+#endif
+#if defined(VK_EXT_fragment_density_map)
     if (!features.fragment_density_map_features.fragmentDensityMap) {
         result |= VK_PIPELINE_STAGE_FRAGMENT_DENSITY_PROCESS_BIT_EXT;
     }
+#endif
+#if defined(VK_EXT_transform_feedback)
     if (!features.transform_feedback_features.transformFeedback) {
         result |= VK_PIPELINE_STAGE_TRANSFORM_FEEDBACK_BIT_EXT;
     }
+#endif
+#if defined(VK_NV_mesh_shader)
     if (!features.mesh_shader_features.meshShader) {
         result |= VK_PIPELINE_STAGE_MESH_SHADER_BIT_NV;
     }
     if (!features.mesh_shader_features.taskShader) {
         result |= VK_PIPELINE_STAGE_TASK_SHADER_BIT_NV;
     }
+#endif
+#if defined(VK_NV_shading_rate_image)
     if (!features.fragment_shading_rate_features.pipelineFragmentShadingRate &&
         !features.shading_rate_image_features.shadingRateImage) {
         result |= VK_PIPELINE_STAGE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR;
     }
+#endif
     // TODO: VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR
     // TODO: VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR
     return result;

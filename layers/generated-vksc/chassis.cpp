@@ -62,12 +62,10 @@ bool wrap_handles = true;
 // Global list of sType,size identifiers
 std::vector<std::pair<uint32_t, uint32_t>> custom_stype_info{};
 
-#if !defined(VULKANSC)
 #ifdef INSTRUMENT_OPTICK
 static const bool use_optick_instrumentation = true;
 #else
 static const bool use_optick_instrumentation = false;
-#endif
 #endif
 
 namespace vulkan_layer_chassis {
@@ -316,10 +314,12 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateInstance(const VkInstanceCreateInfo *pCreat
 #if !defined(VULKANSC)
     auto object_tracker_obj = new ObjectLifetimes;
     object_tracker_obj->RegisterValidationObject(!local_disables[object_tracking], api_version, report_data, local_object_dispatch);
+#endif
 
     auto core_checks_obj = use_optick_instrumentation ? new CoreChecksOptickInstrumented : new CoreChecks;
     core_checks_obj->RegisterValidationObject(!local_disables[core_checks], api_version, report_data, local_object_dispatch);
 
+#if !defined(VULKANSC)
     auto best_practices_obj = new BestPractices;
     best_practices_obj->RegisterValidationObject(local_enables[best_practices], api_version, report_data, local_object_dispatch);
 
@@ -378,8 +378,8 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateInstance(const VkInstanceCreateInfo *pCreat
     object_tracker_obj->FinalizeInstanceValidationObject(framework, *pInstance);
 #endif
     parameter_validation_obj->FinalizeInstanceValidationObject(framework, *pInstance);
-#if !defined(VULKANSC)
     core_checks_obj->FinalizeInstanceValidationObject(framework, *pInstance);
+#if !defined(VULKANSC)
     best_practices_obj->FinalizeInstanceValidationObject(framework, *pInstance);
     gpu_assisted_obj->FinalizeInstanceValidationObject(framework, *pInstance);
     debug_printf_obj->FinalizeInstanceValidationObject(framework, *pInstance);
@@ -398,8 +398,9 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateInstance(const VkInstanceCreateInfo *pCreat
         object_tracker_obj,
 #endif
         parameter_validation_obj,
+        core_checks_obj,
 #if !defined(VULKANSC)
-        core_checks_obj, best_practices_obj, gpu_assisted_obj, debug_printf_obj,
+        best_practices_obj, gpu_assisted_obj, debug_printf_obj,
         sync_validation_obj,
 #endif
     };
@@ -527,10 +528,12 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateDevice(VkPhysicalDevice gpu, const VkDevice
 #if !defined(VULKANSC)
     auto object_tracker_obj = new ObjectLifetimes;
     object_tracker_obj->InitDeviceValidationObject(!disables[object_tracking], instance_interceptor, device_interceptor);
+#endif
 
     auto core_checks_obj = use_optick_instrumentation ? new CoreChecksOptickInstrumented : new CoreChecks;
     core_checks_obj->InitDeviceValidationObject(!disables[core_checks], instance_interceptor, device_interceptor);
 
+#if !defined(VULKANSC)
     auto best_practices_obj = new BestPractices;
     best_practices_obj->InitDeviceValidationObject(enables[best_practices], instance_interceptor, device_interceptor);
 
@@ -550,7 +553,10 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateDevice(VkPhysicalDevice gpu, const VkDevice
         stateless_validation_obj,
 #if !defined(VULKANSC)
         object_tracker_obj,
-        core_checks_obj, best_practices_obj, gpu_assisted_obj, debug_printf_obj,
+#endif
+        core_checks_obj,
+#if !defined(VULKANSC)
+        best_practices_obj, gpu_assisted_obj, debug_printf_obj,
         sync_validation_obj,
 #endif
     };

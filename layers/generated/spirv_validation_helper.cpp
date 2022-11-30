@@ -5,6 +5,7 @@
 /***************************************************************************
  *
  * Copyright (c) 2020-2021 The Khronos Group Inc.
+ * Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -643,6 +644,7 @@ bool CoreChecks::ValidateShaderCapabilitiesAndExtensions(SHADER_MODULE_STATE con
             } else if (it->second.property) {
                 // support is or'ed as only one has to be supported (if applicable)
                 switch (insn.word(1)) {
+
                     case spv::CapabilityDenormFlushToZero:
                         has_support |= ((phys_dev_props_core12.shaderDenormFlushToZeroFloat16 & VK_TRUE) != 0);
                         has_support |= ((phys_dev_props_core12.shaderDenormFlushToZeroFloat32 & VK_TRUE) != 0);
@@ -707,6 +709,7 @@ bool CoreChecks::ValidateShaderCapabilitiesAndExtensions(SHADER_MODULE_STATE con
         }
 
         // Portability checks
+#if defined(VK_KHR_portability_subset)
         if (IsExtEnabled(device_extensions.vk_khr_portability_subset)) {
             if ((VK_FALSE == enabled_features.portability_subset_features.shaderSampleRateInterpolationFunctions) &&
                 (spv::CapabilityInterpolationFunction == insn.word(1))) {
@@ -715,6 +718,7 @@ bool CoreChecks::ValidateShaderCapabilitiesAndExtensions(SHADER_MODULE_STATE con
                                     "by this platform");
             }
         }
+#endif
     } else if (insn.opcode() == spv::OpExtension) {
         static const std::string spv_prefix = "SPV_";
         std::string extension_name = (char const *)&insn.word(1);

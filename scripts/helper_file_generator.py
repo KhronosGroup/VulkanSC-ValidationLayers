@@ -300,12 +300,6 @@ void CoreChecksOptickInstrumented::PreCallRecordQueuePresentKHR(VkQueue queue, c
             if alias:
                 self.object_type_aliases.append((name,alias))
             else:
-                # VkShaderModule is only kept in the Vulkan SC registry
-                # for compatibility. We avoid adding it to object types
-                # here to avoid conflicts with VK_OBJECT_TYPE_SHADER_MODULE
-                # being removed.
-                if name == 'VkShaderModule' and self.genOpts.apiname == 'vulkansc':
-                    return
                 self.object_types.append(name)
                 self.object_guards[name] = self.featureExtraProtect
 
@@ -819,6 +813,17 @@ void CoreChecksOptickInstrumented::PreCallRecordQueuePresentKHR(VkQueue queue, c
             'VK_EXT_shader_viewport_index_layer',
             ]
 
+        # Used to convert between layer's extension naming and the extension's define
+        promoted_ext_special_defines = {
+            'VK_KHR_get_physical_device_properties2' : 'VK_KHR_get_physical_device_properties_2',
+            'VK_KHR_bind_memory2' : 'VK_KHR_bind_memory_2',
+            'VK_KHR_get_memory_requirements2' : 'VK_KHR_get_memory_requirements_2',
+            'VK_KHR_maintenance1' : 'VK_KHR_maintenance_1',
+            'VK_KHR_maintenance2' : 'VK_KHR_maintenance_2',
+            'VK_KHR_maintenance3' : 'VK_KHR_maintenance_3',
+            'VK_KHR_create_renderpass2' : 'VK_KHR_create_renderpass_2',
+            }
+
         vk_header = ''
         if self.genOpts.apiname == 'vulkan':
             vk_header = '#include <vulkan/vulkan.h>'
@@ -837,6 +842,9 @@ void CoreChecksOptickInstrumented::PreCallRecordQueuePresentKHR(VkQueue queue, c
             '',
             vk_header,
             '#include "vk_layer_data.h"',
+            '#if defined(VULKANSC)',
+            '#include "vksc_compatibility.h"',
+            '#endif',
             ''
             '#define VK_VERSION_1_1_NAME "VK_VERSION_1_1"',
             '',
@@ -879,20 +887,6 @@ void CoreChecksOptickInstrumented::PreCallRecordQueuePresentKHR(VkQueue queue, c
 
             extension_items = sorted(extension_dict.items())
 
-            #Remove unsupported extensions for vksc
-            if self.genOpts.apiname == 'vulkansc':
-                temp_ext_list_1_1 = promoted_1_1_ext_list.copy()
-                temp_ext_list_1_2 = promoted_1_2_ext_list.copy()
-                for extension in self.registry.extensions:
-                    if len(list(extension)) == 0:
-                        continue
-                    for promoted_ext in temp_ext_list_1_1:
-                        if self.genOpts.apiname not in extension.get('supported') and extension.get('name') == promoted_ext:
-                            promoted_1_1_ext_list.remove(promoted_ext)
-                    for promoted_ext in temp_ext_list_1_2:
-                        if self.genOpts.apiname not in extension.get('supported') and extension.get('name') == promoted_ext:
-                            promoted_1_2_ext_list.remove(promoted_ext)
-
             field_name = { ext_name: re.sub('_extension_name', '', ext_name.lower()) for ext_name, info in extension_items }
 
             # Add in pseudo-extensions for core API versions so real extensions can depend on them
@@ -915,6 +909,12 @@ void CoreChecksOptickInstrumented::PreCallRecordQueuePresentKHR(VkQueue queue, c
             struct.extend([ '    ExtEnabled vk_feature_version_1_1{kNotEnabled};'])
             struct.extend([ '    ExtEnabled vk_feature_version_1_2{kNotEnabled};'])
             struct.extend([ '    ExtEnabled %s{kNotEnabled};' % field_name[ext_name] for ext_name, info in extension_items])
+
+            # Add promoted extensions into generated-vksc/vk_extension_helper.h
+            # for compatibility.
+            if self.genOpts.apiname == 'vulkansc':
+                struct.extend([ '    ExtEnabled %s{kNotEnabled};' % ext_name.lower() for ext_name in promoted_1_1_ext_list])
+                struct.extend([ '    ExtEnabled %s{kNotEnabled};' % ext_name.lower() for ext_name in promoted_1_2_ext_list])
 
             # Construct the extension information map -- mapping name to data member (field), and required extensions
             # The map is contained within a static function member for portability reasons.
@@ -953,6 +953,7 @@ void CoreChecksOptickInstrumented::PreCallRecordQueuePresentKHR(VkQueue queue, c
                 return info_format % (info['define'], ext_name.lower(), '{%s}' % (req_indent + reqs) if reqs else '')
 
             struct.extend([Guarded(info['ifdef'], format_info(ext_name, info)) for ext_name, info in extension_items])
+
             struct.extend([
                 '        };',
                 '',
@@ -1000,11 +1001,11 @@ void CoreChecksOptickInstrumented::PreCallRecordQueuePresentKHR(VkQueue queue, c
             struct.extend([
                 '',
                 '        static const std::vector<const char *> V_1_1_promoted_%s_apis = {' % type.lower() ])
-            struct.extend(['            %s,' % extension_dict[ext_name]['define'] for ext_name in promoted_1_1_ext_list])
+            struct.extend(['            %s_EXTENSION_NAME,' % (promoted_ext_special_defines[ext_name].upper() if ext_name in promoted_ext_special_defines.keys() else ext_name.upper()) for ext_name in promoted_1_1_ext_list])
             struct.extend([
                 '        };',
                 '        static const std::vector<const char *> V_1_2_promoted_%s_apis = {' % type.lower() ])
-            struct.extend(['            %s,' % extension_dict[ext_name]['define'] for ext_name in promoted_1_2_ext_list])
+            struct.extend(['            %s_EXTENSION_NAME,' % (promoted_ext_special_defines[ext_name].upper() if ext_name in promoted_ext_special_defines.keys() else ext_name.upper()) for ext_name in promoted_1_2_ext_list])
             if self.genOpts.apiname == 'vulkansc':
                 struct.extend([
                     '        };',
@@ -1110,12 +1111,8 @@ void CoreChecksOptickInstrumented::PreCallRecordQueuePresentKHR(VkQueue queue, c
             fixup_name = item[2:]
             enum_entry = 'kVulkanObjectType%s' % fixup_name
             enum_entry_map[item] = enum_entry
-            if fixup_name == 'SemaphoreSciSyncPoolNV':
-                object_types_header += '#ifdef VK_USE_PLATFORM_SCI\n'
             object_types_header += '    ' + enum_entry
             object_types_header += ' = %d,\n' % enum_num
-            if fixup_name == 'SemaphoreSciSyncPoolNV':
-                object_types_header += '#endif // VK_USE_PLATFORM_SCI\n'
             enum_num += 1
             type_list.append(enum_entry)
             object_type_info[enum_entry] = { 'VkType': item , 'Guard': self.object_guards[item]}
@@ -1177,11 +1174,7 @@ void CoreChecksOptickInstrumented::PreCallRecordQueuePresentKHR(VkQueue queue, c
 
         for object_type in type_list:
             kenum_type = vko_dict[kenum_to_key(object_type)]
-            if object_type == 'kVulkanObjectTypeSemaphoreSciSyncPoolNV':
-                object_types_header += '#ifdef VK_USE_PLATFORM_SCI\n'
             object_types_header += '        case %s: return %s;\n' % (object_type, kenum_type)
-            if object_type == 'kVulkanObjectTypeSemaphoreSciSyncPoolNV':
-                object_types_header += '#endif // VK_USE_PLATFORM_SCI\n'
             object_type_info[object_type]['VkoType'] = kenum_type
         object_types_header += '        default: return VK_OBJECT_TYPE_UNKNOWN;\n'
         object_types_header += '    }\n'
@@ -1195,11 +1188,7 @@ void CoreChecksOptickInstrumented::PreCallRecordQueuePresentKHR(VkQueue queue, c
 
         for object_type in type_list:
             kenum_type = vko_dict[kenum_to_key(object_type)]
-            if object_type == 'kVulkanObjectTypeSemaphoreSciSyncPoolNV':
-                object_types_header += '#ifdef VK_USE_PLATFORM_SCI\n'
             object_types_header += '        case %s: return %s;\n' % (kenum_type, object_type)
-            if object_type == 'kVulkanObjectTypeSemaphoreSciSyncPoolNV':
-                object_types_header += '#endif // VK_USE_PLATFORM_SCI\n'
         object_types_header += '        default: return kVulkanObjectTypeUnknown;\n'
         object_types_header += '    }\n'
         object_types_header += '};\n'

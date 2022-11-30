@@ -1,8 +1,9 @@
 /* Copyright (c) 2015-2021 The Khronos Group Inc.
  * Copyright (c) 2015-2021 Valve Corporation
- * Copyright (c) 2015-2021 LunarG, Inc.
+ * Copyright (c) 2015-2023 LunarG, Inc.
  * Copyright (C) 2015-2021 Google Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -390,6 +391,7 @@ PIPELINE_STATE::PIPELINE_STATE(const ValidationStateTracker *state_data, const V
     assert(active_shaders == VK_SHADER_STAGE_COMPUTE_BIT);
 }
 
+#if defined(VK_KHR_ray_tracing_pipeline)
 template <typename CreateInfoStruct>
 PIPELINE_STATE::PIPELINE_STATE(const ValidationStateTracker *state_data, const CreateInfoStruct *pCreateInfo,
                                std::shared_ptr<const PIPELINE_LAYOUT_STATE> &&layout)
@@ -406,11 +408,16 @@ PIPELINE_STATE::PIPELINE_STATE(const ValidationStateTracker *state_data, const C
                  ~(VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
                    VK_SHADER_STAGE_MISS_BIT_KHR | VK_SHADER_STAGE_INTERSECTION_BIT_KHR | VK_SHADER_STAGE_CALLABLE_BIT_KHR)));
 }
+#endif
 
+#if defined(VK_NV_ray_tracing)
 template PIPELINE_STATE::PIPELINE_STATE(const ValidationStateTracker *, const VkRayTracingPipelineCreateInfoNV *,
                                         std::shared_ptr<const PIPELINE_LAYOUT_STATE> &&);
+#endif
+#if defined(VK_KHR_ray_tracing_pipeline)
 template PIPELINE_STATE::PIPELINE_STATE(const ValidationStateTracker *, const VkRayTracingPipelineCreateInfoKHR *,
                                         std::shared_ptr<const PIPELINE_LAYOUT_STATE> &&);
+#endif
 
 void LAST_BOUND_STATE::UpdateSamplerDescriptorsUsedByImage() {
     if (!pipeline_state) return;

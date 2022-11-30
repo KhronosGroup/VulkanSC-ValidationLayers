@@ -41,6 +41,9 @@
 
 #include <vulkan/vulkan.h>
 #include "vk_layer_data.h"
+#if defined(VULKANSC)
+#include "vksc_compatibility.h"
+#endif
 #define VK_VERSION_1_1_NAME "VK_VERSION_1_1"
 
 // Suppress unused warning on Linux
