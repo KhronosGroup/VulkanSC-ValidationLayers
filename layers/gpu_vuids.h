@@ -1,6 +1,7 @@
 /* Copyright (c) 2021 The Khronos Group Inc.
  * Copyright (c) 2021 Valve Corporation
- * Copyright (c) 2021 LunarG, Inc.
+ * Copyright (c) 2021-2023 LunarG, Inc.
+ * Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -158,26 +159,44 @@ struct GpuVuidsCmdDispatchBase : GpuVuid {
 // This LUT is created to allow a static listing of each VUID that is covered by drawdispatch commands
 static const std::map<CMD_TYPE, GpuVuid> gpu_vuid = {
     {CMD_DRAW, GpuVuidsCmdDraw()},
+#if defined(VK_EXT_multi_draw)
     {CMD_DRAWMULTIEXT, GpuVuidsCmdDrawMultiEXT()},
+#endif
     {CMD_DRAWINDEXED, GpuVuidsCmdDrawIndexed()},
+#if defined(VK_EXT_multi_draw)
     {CMD_DRAWMULTIINDEXEDEXT, GpuVuidsCmdDrawMultiIndexedEXT()},
+#endif
     {CMD_DRAWINDIRECT, GpuVuidsCmdDrawIndirect()},
     {CMD_DRAWINDEXEDINDIRECT, GpuVuidsCmdDrawIndexedIndirect()},
     {CMD_DISPATCH, GpuVuidsCmdDispatch()},
     {CMD_DISPATCHINDIRECT, GpuVuidsCmdDispatchIndirect()},
     {CMD_DRAWINDIRECTCOUNT, GpuVuidsCmdDrawIndirectCount()},
+#if defined(VK_KHR_draw_indirect_count)
     {CMD_DRAWINDIRECTCOUNTKHR, GpuVuidsCmdDrawIndirectCount()},
+#endif
     {CMD_DRAWINDEXEDINDIRECTCOUNT, GpuVuidsCmdDrawIndexedIndirectCount()},
+#if defined(VK_KHR_draw_indirect_count)
     {CMD_DRAWINDEXEDINDIRECTCOUNTKHR, GpuVuidsCmdDrawIndexedIndirectCount()},
+#endif
+#if defined(VK_NV_ray_tracing)
     {CMD_TRACERAYSNV, GpuVuidsCmdTraceRaysNV()},
+#endif
+#if defined(VK_KHR_ray_tracing_pipeline)
     {CMD_TRACERAYSKHR, GpuVuidsCmdTraceRaysKHR()},
     {CMD_TRACERAYSINDIRECTKHR, GpuVuidsCmdTraceRaysIndirectKHR()},
+#endif
+#if defined(VK_NV_mesh_shader)
     {CMD_DRAWMESHTASKSNV, GpuVuidsCmdDrawMeshTasksNV()},
     {CMD_DRAWMESHTASKSINDIRECTNV, GpuVuidsCmdDrawMeshTasksIndirectNV()},
     {CMD_DRAWMESHTASKSINDIRECTCOUNTNV, GpuVuidsCmdDrawMeshTasksIndirectCountNV()},
+#endif
+#if defined(VK_EXT_transform_feedback)
     {CMD_DRAWINDIRECTBYTECOUNTEXT, GpuVuidsCmdDrawIndirectByteCountEXT()},
+#endif
     {CMD_DISPATCHBASE, GpuVuidsCmdDispatchBase()},
+#if defined(VK_KHR_device_group)
     {CMD_DISPATCHBASEKHR, GpuVuidsCmdDispatchBase()},
+#endif
     // Used if invalid cmd_type is used
     {CMD_NONE, GpuVuid()}
 };

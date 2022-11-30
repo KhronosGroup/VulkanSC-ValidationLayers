@@ -1,9 +1,9 @@
 /* Copyright (c) 2015-2021 The Khronos Group Inc.
  * Copyright (c) 2015-2021 Valve Corporation
- * Copyright (c) 2015-2022 LunarG, Inc.
+ * Copyright (c) 2015-2023 LunarG, Inc.
  * Copyright (C) 2015-2021 Google Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
- * Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -105,8 +105,8 @@ class IMAGE_STATE : public BINDABLE {
 #if !defined(VULKANSC)
     using SparseReqs = std::vector<VkSparseImageMemoryRequirements>;
     const SparseReqs sparse_requirements;
-#endif
     const bool sparse_metadata_required;  // Track if sparse metadata aspect is required for this image
+#endif
     bool get_sparse_reqs_called;          // Track if GetImageSparseMemoryRequirements() has been called for this image
     bool sparse_metadata_bound;           // Track if sparse metadata aspect is bound to this image
 

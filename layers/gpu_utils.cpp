@@ -1,6 +1,7 @@
 /* Copyright (c) 2020-2021 The Khronos Group Inc.
  * Copyright (c) 2020-2021 Valve Corporation
- * Copyright (c) 2020-2021 LunarG, Inc.
+ * Copyright (c) 2020-2023 LunarG, Inc.
+ * Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -60,9 +61,11 @@ UtilDescriptorSetManager::UtilDescriptorSetManager(VkDevice device, uint32_t num
     : device(device), numBindingsInSet(numBindingsInSet) {}
 
 UtilDescriptorSetManager::~UtilDescriptorSetManager() {
+#if !defined(VULKANSC)
     for (auto &pool : desc_pool_map_) {
         DispatchDestroyDescriptorPool(device, pool.first, NULL);
     }
+#endif
     desc_pool_map_.clear();
 }
 
@@ -141,7 +144,9 @@ void UtilDescriptorSetManager::PutBackDescriptorSet(VkDescriptorPool desc_pool, 
         }
         desc_pool_map_[desc_pool].used--;
         if (0 == desc_pool_map_[desc_pool].used) {
+#if !defined(VULKANSC)
             DispatchDestroyDescriptorPool(device, desc_pool, NULL);
+#endif
             desc_pool_map_.erase(desc_pool);
         }
     }
@@ -161,9 +166,11 @@ static VKAPI_ATTR VkResult VKAPI_CALL gpuVkAllocateMemory(VkDevice device, const
                                                           const VkAllocationCallbacks *pAllocator, VkDeviceMemory *pMemory) {
     return DispatchAllocateMemory(device, pAllocateInfo, pAllocator, pMemory);
 }
+#if !defined(VULKANSC)
 static VKAPI_ATTR void VKAPI_CALL gpuVkFreeMemory(VkDevice device, VkDeviceMemory memory, const VkAllocationCallbacks *pAllocator) {
     DispatchFreeMemory(device, memory, pAllocator);
 }
+#endif
 static VKAPI_ATTR VkResult VKAPI_CALL gpuVkMapMemory(VkDevice device, VkDeviceMemory memory, VkDeviceSize offset, VkDeviceSize size,
                                                      VkMemoryMapFlags flags, void **ppData) {
     return DispatchMapMemory(device, memory, offset, size, flags, ppData);
@@ -222,7 +229,9 @@ VkResult UtilInitializeVma(VkPhysicalDevice physical_device, VkDevice device, Vm
     functions.vkGetPhysicalDeviceMemoryProperties =
         static_cast<PFN_vkGetPhysicalDeviceMemoryProperties>(gpuVkGetPhysicalDeviceMemoryProperties);
     functions.vkAllocateMemory = static_cast<PFN_vkAllocateMemory>(gpuVkAllocateMemory);
+#if !defined(VULKANSC)
     functions.vkFreeMemory = static_cast<PFN_vkFreeMemory>(gpuVkFreeMemory);
+#endif
     functions.vkMapMemory = static_cast<PFN_vkMapMemory>(gpuVkMapMemory);
     functions.vkUnmapMemory = static_cast<PFN_vkUnmapMemory>(gpuVkUnmapMemory);
     functions.vkFlushMappedMemoryRanges = static_cast<PFN_vkFlushMappedMemoryRanges>(gpuVkFlushMappedMemoryRanges);
@@ -372,9 +381,13 @@ void UtilGenerateCommonMessage(const debug_report_data *report_data, const VkCom
             strm << "Draw ";
         } else if (pipeline_bind_point == VK_PIPELINE_BIND_POINT_COMPUTE) {
             strm << "Compute ";
-        } else if (pipeline_bind_point == VK_PIPELINE_BIND_POINT_RAY_TRACING_NV) {
+        }
+#if defined(VK_NV_ray_tracing)
+        else if (pipeline_bind_point == VK_PIPELINE_BIND_POINT_RAY_TRACING_NV) {
             strm << "Ray Trace ";
-        } else {
+        }
+#endif
+        else {
             assert(false);
             strm << "Unknown Pipeline Operation ";
         }

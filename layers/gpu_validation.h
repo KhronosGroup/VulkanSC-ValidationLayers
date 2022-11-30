@@ -1,7 +1,7 @@
 /* Copyright (c) 2018-2021 The Khronos Group Inc.
  * Copyright (c) 2018-2021 Valve Corporation
- * Copyright (c) 2018-2022 LunarG, Inc.
- * Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2018-2023 LunarG, Inc.
+ * Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -214,9 +214,9 @@ class GpuAssisted : public ValidationStateTracker {
                                    VkBuffer* pBuffer, void* cb_state_data) override;
     void PostCallRecordCreateBuffer(VkDevice device, const VkBufferCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator,
                                     VkBuffer* pBuffer, VkResult result) override;
+#if defined(VK_NV_ray_tracing)
     void CreateAccelerationStructureBuildValidationState(GpuAssisted* device_GpuAssisted);
     void DestroyAccelerationStructureBuildValidationState();
-#if defined(VK_NV_ray_tracing)
     void PreCallRecordCmdBuildAccelerationStructureNV(VkCommandBuffer commandBuffer, const VkAccelerationStructureInfoNV* pInfo,
                                                       VkBuffer instanceData, VkDeviceSize instanceOffset, VkBool32 update,
                                                       VkAccelerationStructureNV dst, VkAccelerationStructureNV src,

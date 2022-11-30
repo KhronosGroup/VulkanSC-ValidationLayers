@@ -1,6 +1,7 @@
 #!/usr/bin/python3 -i
 #
 # Copyright (c) 2020-2021 The Khronos Group Inc.
+# Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -103,32 +104,32 @@ class SpirvValidationHelperOutputGenerator(OutputGenerator):
         # If a new SPIR-V Capability is added to uses a new feature struct, it will need to be
         # added here with the name added in 'DeviceFeatures' struct
         self.featureMap = [
-          # {'vulkan' : <Vulkan Spec Feature Struct Name>, 'layer' : <Name of variable in CoreChecks DeviceFeatures>},
-            {'vulkan' : 'VkPhysicalDeviceFeatures', 'layer' : 'core'},
-            {'vulkan' : 'VkPhysicalDeviceVulkan11Features', 'layer' : 'core11'},
-            {'vulkan' : 'VkPhysicalDeviceVulkan12Features', 'layer' : 'core12'},
-            {'vulkan' : 'VkPhysicalDeviceTransformFeedbackFeaturesEXT', 'layer' : 'transform_feedback_features'},
-            {'vulkan' : 'VkPhysicalDeviceCooperativeMatrixFeaturesNV', 'layer' : 'cooperative_matrix_features'},
-            {'vulkan' : 'VkPhysicalDeviceComputeShaderDerivativesFeaturesNV', 'layer' : 'compute_shader_derivatives_features'},
-            {'vulkan' : 'VkPhysicalDeviceFragmentShaderBarycentricFeaturesNV', 'layer' : 'fragment_shader_barycentric_features'},
-            {'vulkan' : 'VkPhysicalDeviceShaderImageFootprintFeaturesNV', 'layer' : 'shader_image_footprint_features'},
-            {'vulkan' : 'VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT', 'layer' : 'fragment_shader_interlock_features'},
-            {'vulkan' : 'VkPhysicalDeviceShaderDemoteToHelperInvocationFeaturesEXT', 'layer' : 'demote_to_helper_invocation_features'},
-            {'vulkan' : 'VkPhysicalDeviceRayQueryFeaturesKHR', 'layer' : 'ray_query_features'},
-            {'vulkan' : 'VkPhysicalDeviceRayTracingPipelineFeaturesKHR', 'layer' : 'ray_tracing_pipeline_features'},
-            {'vulkan' : 'VkPhysicalDeviceAccelerationStructureFeaturesKHR', 'layer' : 'ray_tracing_acceleration_structure_features'},
-            {'vulkan' : 'VkPhysicalDeviceFragmentDensityMapFeaturesEXT', 'layer' : 'fragment_density_map_features'},
-            {'vulkan' : 'VkPhysicalDeviceBufferDeviceAddressFeaturesEXT', 'layer' : 'buffer_device_address_ext_features'},
-            {'vulkan' : 'VkPhysicalDeviceFragmentShadingRateFeaturesKHR', 'layer' : 'fragment_shading_rate_features'},
-            {'vulkan' : 'VkPhysicalDeviceShaderIntegerFunctions2FeaturesINTEL', 'layer' : 'shader_integer_functions2_features'},
-            {'vulkan' : 'VkPhysicalDeviceShaderSMBuiltinsFeaturesNV', 'layer' : 'shader_sm_builtins_features'},
-            {'vulkan' : 'VkPhysicalDeviceShadingRateImageFeaturesNV', 'layer' : 'shading_rate_image_features'},
-            {'vulkan' : 'VkPhysicalDeviceShaderAtomicFloatFeaturesEXT', 'layer' : 'shader_atomic_float_features'},
-            {'vulkan' : 'VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT', 'layer' : 'shader_image_atomic_int64_features'},
-            {'vulkan' : 'VkPhysicalDeviceWorkgroupMemoryExplicitLayoutFeaturesKHR', 'layer' : 'workgroup_memory_explicit_layout_features'},
-            {'vulkan' : 'VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT', 'layer' : 'shader_atomic_float2_features'},
-            {'vulkan' : 'VkPhysicalDeviceRayTracingMotionBlurFeaturesNV', 'layer' : 'ray_tracing_motion_blur_features'},
-            {'vulkan' : 'VkPhysicalDeviceShaderIntegerDotProductFeaturesKHR', 'layer' : 'shader_integer_dot_product_features'},
+          # {'vulkan' : <Vulkan Spec Feature Struct Name>, 'layer' : <Name of variable in CoreChecks DeviceFeatures>}, 'apis' : list of apis that support the feature
+            {'vulkan' : 'VkPhysicalDeviceFeatures', 'layer' : 'core', 'apis': ['vulkan', 'vulkansc']},
+            {'vulkan' : 'VkPhysicalDeviceVulkan11Features', 'layer' : 'core11', 'apis': ['vulkan', 'vulkansc']},
+            {'vulkan' : 'VkPhysicalDeviceVulkan12Features', 'layer' : 'core12', 'apis': ['vulkan', 'vulkansc']},
+            {'vulkan' : 'VkPhysicalDeviceTransformFeedbackFeaturesEXT', 'layer' : 'transform_feedback_features', 'apis': ['vulkan']},
+            {'vulkan' : 'VkPhysicalDeviceCooperativeMatrixFeaturesNV', 'layer' : 'cooperative_matrix_features', 'apis': ['vulkan']},
+            {'vulkan' : 'VkPhysicalDeviceComputeShaderDerivativesFeaturesNV', 'layer' : 'compute_shader_derivatives_features', 'apis': ['vulkan']},
+            {'vulkan' : 'VkPhysicalDeviceFragmentShaderBarycentricFeaturesNV', 'layer' : 'fragment_shader_barycentric_features', 'apis': ['vulkan']},
+            {'vulkan' : 'VkPhysicalDeviceShaderImageFootprintFeaturesNV', 'layer' : 'shader_image_footprint_features', 'apis': ['vulkan']},
+            {'vulkan' : 'VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT', 'layer' : 'fragment_shader_interlock_features', 'apis': ['vulkan', 'vulkansc']},
+            {'vulkan' : 'VkPhysicalDeviceShaderDemoteToHelperInvocationFeaturesEXT', 'layer' : 'demote_to_helper_invocation_features', 'apis': ['vulkan', 'vulkansc']},
+            {'vulkan' : 'VkPhysicalDeviceRayQueryFeaturesKHR', 'layer' : 'ray_query_features', 'apis': ['vulkan']},
+            {'vulkan' : 'VkPhysicalDeviceRayTracingPipelineFeaturesKHR', 'layer' : 'ray_tracing_pipeline_features', 'apis': ['vulkan']},
+            {'vulkan' : 'VkPhysicalDeviceAccelerationStructureFeaturesKHR', 'layer' : 'ray_tracing_acceleration_structure_features', 'apis': ['vulkan']},
+            {'vulkan' : 'VkPhysicalDeviceFragmentDensityMapFeaturesEXT', 'layer' : 'fragment_density_map_features', 'apis': ['vulkan']},
+            {'vulkan' : 'VkPhysicalDeviceBufferDeviceAddressFeaturesEXT', 'layer' : 'buffer_device_address_ext_features', 'apis': ['vulkan']},
+            {'vulkan' : 'VkPhysicalDeviceFragmentShadingRateFeaturesKHR', 'layer' : 'fragment_shading_rate_features', 'apis': ['vulkan', 'vulkansc']},
+            {'vulkan' : 'VkPhysicalDeviceShaderIntegerFunctions2FeaturesINTEL', 'layer' : 'shader_integer_functions2_features', 'apis': ['vulkan']},
+            {'vulkan' : 'VkPhysicalDeviceShaderSMBuiltinsFeaturesNV', 'layer' : 'shader_sm_builtins_features', 'apis': ['vulkan']},
+            {'vulkan' : 'VkPhysicalDeviceShadingRateImageFeaturesNV', 'layer' : 'shading_rate_image_features', 'apis': ['vulkan']},
+            {'vulkan' : 'VkPhysicalDeviceShaderAtomicFloatFeaturesEXT', 'layer' : 'shader_atomic_float_features', 'apis': ['vulkan', 'vulkansc']},
+            {'vulkan' : 'VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT', 'layer' : 'shader_image_atomic_int64_features', 'apis': ['vulkan', 'vulkansc']},
+            {'vulkan' : 'VkPhysicalDeviceWorkgroupMemoryExplicitLayoutFeaturesKHR', 'layer' : 'workgroup_memory_explicit_layout_features', 'apis': ['vulkan']},
+            {'vulkan' : 'VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT', 'layer' : 'shader_atomic_float2_features', 'apis': ['vulkan']},
+            {'vulkan' : 'VkPhysicalDeviceRayTracingMotionBlurFeaturesNV', 'layer' : 'ray_tracing_motion_blur_features', 'apis': ['vulkan']},
+            {'vulkan' : 'VkPhysicalDeviceShaderIntegerDotProductFeaturesKHR', 'layer' : 'shader_integer_dot_product_features', 'apis': ['vulkan']},
         ]
 
         # Promoted features structure in state_tracker.cpp are put in the VkPhysicalDeviceVulkan*Features structs
@@ -157,6 +158,57 @@ class SpirvValidationHelperOutputGenerator(OutputGenerator):
             "VkPhysicalDeviceVulkanMemoryModelFeatures",
         ]
 
+        self.extensions_promoted_to_core = [
+            'VK_KHR_device_group_creation',
+            'VK_KHR_external_fence_capabilities',
+            'VK_KHR_external_memory_capabilities',
+            'VK_KHR_external_semaphore_capabilities',
+            'VK_KHR_get_physical_device_properties2',
+            'VK_KHR_16bit_storage',
+            'VK_KHR_bind_memory2',
+            'VK_KHR_dedicated_allocation',
+            'VK_KHR_descriptor_update_template',
+            'VK_KHR_device_group',
+            'VK_KHR_external_fence',
+            'VK_KHR_external_memory',
+            'VK_KHR_external_semaphore',
+            'VK_KHR_get_memory_requirements2',
+            'VK_KHR_maintenance1',
+            'VK_KHR_maintenance2',
+            'VK_KHR_maintenance3',
+            'VK_KHR_multiview',
+            'VK_KHR_relaxed_block_layout',
+            'VK_KHR_sampler_ycbcr_conversion',
+            'VK_KHR_shader_draw_parameters',
+            'VK_KHR_storage_buffer_storage_class',
+            'VK_KHR_variable_pointers',
+            'VK_KHR_8bit_storage',
+            'VK_KHR_buffer_device_address',
+            'VK_KHR_create_renderpass2',
+            'VK_KHR_depth_stencil_resolve',
+            'VK_KHR_draw_indirect_count',
+            'VK_KHR_driver_properties',
+            'VK_KHR_image_format_list',
+            'VK_KHR_imageless_framebuffer',
+            'VK_KHR_sampler_mirror_clamp_to_edge',
+            'VK_KHR_separate_depth_stencil_layouts',
+            'VK_KHR_shader_atomic_int64',
+            'VK_KHR_shader_float16_int8',
+            'VK_KHR_shader_float_controls',
+            'VK_KHR_shader_subgroup_extended_types',
+            'VK_KHR_spirv_1_4',
+            'VK_KHR_timeline_semaphore',
+            'VK_KHR_uniform_buffer_standard_layout',
+            'VK_KHR_vulkan_memory_model',
+            'VK_EXT_descriptor_indexing',
+            'VK_EXT_host_query_reset',
+            'VK_EXT_sampler_filter_minmax',
+            'VK_EXT_scalar_block_layout',
+            'VK_EXT_separate_stencil_usage',
+            'VK_EXT_shader_viewport_index_layer',
+        ]
+
+
         # Properties are harder to handle genearted without generating a template for every property struct type
         # The simpler solution is create strings that will be printed out as static comparisons at compile time
         # The Map is used to map Vulkan property structs with the state tracker variable name
@@ -180,6 +232,7 @@ class SpirvValidationHelperOutputGenerator(OutputGenerator):
         copyright += '/***************************************************************************\n'
         copyright += ' *\n'
         copyright += ' * Copyright (c) 2020-2021 The Khronos Group Inc.\n'
+        copyright += ' * Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.\n'
         copyright += ' *\n'
         copyright += ' * Licensed under the Apache License, Version 2.0 (the "License");\n'
         copyright += ' * you may not use this file except in compliance with the License.\n'
@@ -240,6 +293,7 @@ class SpirvValidationHelperOutputGenerator(OutputGenerator):
                 'feature' : None,
                 'extension' : None,
                 'property' : None,
+                'requires' : None,
             }
             if 'version' in elem.attrib:
                 enable['version'] = elem.attrib['version']
@@ -250,13 +304,16 @@ class SpirvValidationHelperOutputGenerator(OutputGenerator):
                     'feature' : elem.attrib['feature'],
                     'struct' : elem.attrib['struct']
                 }
+                if 'requires' in elem.attrib:
+                    enable['requires'] = elem.attrib['requires'].split(',')
             elif 'extension' in elem.attrib:
                 enable['extension'] = elem.attrib['extension']
             elif 'property' in elem.attrib:
                 enable['property'] =  {
                     'property' : elem.attrib['property'],
                     'member' : elem.attrib['member'],
-                    'value' : elem.attrib['value']
+                    'value' : elem.attrib['value'],
+                    'requires' : elem.attrib['requires']
                 }
             else:
                 self.logMsg('error', 'No known attributes in <enable> for ' + name)
@@ -299,8 +356,9 @@ class SpirvValidationHelperOutputGenerator(OutputGenerator):
         output += '\n'
         output += '    // Constructors to populate FeaturePointer based on given pointer to member\n'
         for feature in self.featureMap:
-            output += '    FeaturePointer(VkBool32 ' + feature['vulkan'] + '::*ptr)\n'
-            output += '        : IsEnabled([=](const DeviceFeatures &features) { return features.' + feature['layer'] + '.*ptr; }) {}\n'
+            if self.genOpts.apiname in feature['apis']:
+                output += '    FeaturePointer(VkBool32 ' + feature['vulkan'] + '::*ptr)\n'
+                output += '        : IsEnabled([=](const DeviceFeatures &features) { return features.' + feature['layer'] + '.*ptr; }) {}\n'
         output += '};\n'
         return output
     #
@@ -323,10 +381,10 @@ class SpirvValidationHelperOutputGenerator(OutputGenerator):
             version = enable['version'].replace('VK_VERSION', 'VK_API_VERSION')
             output = '{' + version + ', nullptr, nullptr, ""}'
         elif enable['feature'] != None:
-            output = '{0, &' + enable['feature']['struct'] + '::'  + enable['feature']['feature'] + ', nullptr, ""}'
+            output += '{0, &' + enable['feature']['struct'] + '::'  + enable['feature']['feature'] + ', nullptr, ""}'
         elif enable['extension'] != None:
             # All fields in DeviceExtensions should just be the extension name lowercase
-            output = '{0, nullptr, &DeviceExtensions::' + enable['extension'].lower() + ', ""}'
+            output += '{0, nullptr, &DeviceExtensions::' + enable['extension'].lower() + ', ""}'
         elif enable['property'] != None:
             propertyStruct = enable['property']['property']
             # Need to make sure to return a boolean value to prevent compiler warning for implicit conversions
@@ -338,7 +396,8 @@ class SpirvValidationHelperOutputGenerator(OutputGenerator):
             self.propertyInfo[name].append({
                 "logic" : propertyLogic,
                 "struct" : propertyStruct,
-                "isExtension" : isExtension
+                "isExtension" : isExtension,
+                "requires" :  enable['property']['requires'].split(',') if enable['property']['requires'] else None
             })
             # For properties, this string is just for human readableness
             output = '{0, nullptr, nullptr, "' + propertyLogic + '"}'
@@ -357,7 +416,30 @@ class SpirvValidationHelperOutputGenerator(OutputGenerator):
                 # Prepend with comment and comment out line if in exclude list as explained in declaration
                 if name in self.capabilityExcludeList:
                     output += '    // Not found in current SPIR-V Headers\n    //'
+                # Add defines based on required extensions for vksc
+                reqCount = 0
+                if enable['requires'] != None and self.genOpts.apiname == 'vulkansc':
+                    for require in enable['requires']:
+                        # Don't add defines for VK_VERSION_1* or extensions promoted to core
+                        if 'VK_VERSION_1' in require or require in self.extensions_promoted_to_core:
+                            continue
+                        if reqCount == 0:
+                            output += '#if '
+                        else:
+                            output += ' && '
+                        output += 'defined('+require+')'
+                        reqCount += 1
+                    if reqCount != 0:
+                        output += '\n'
+                if enable['extension'] != None and self.genOpts.apiname == 'vulkansc':
+                    # Don't add defines for promoted extensions
+                    output += '#if defined('+enable['extension']+')\n'
                 output += '    {spv::Capability' + name + ', ' + self.createMapValue(name, enable, False) + '},\n'
+                if reqCount != 0 and self.genOpts.apiname == 'vulkansc':
+                    output += '#endif\n'
+                if enable['extension'] != None and self.genOpts.apiname == 'vulkansc':
+                    output += '#endif\n'
+
         output += '};\n'
         output += '// clang-format on\n'
         return output
@@ -373,7 +455,29 @@ class SpirvValidationHelperOutputGenerator(OutputGenerator):
                 # Prepend with comment and comment out line if in exclude list as explained in declaration
                 if name in self.extensionExcludeList:
                     output += '    // Not found in current SPIR-V Headers\n    //'
+                # Add defines based on required extensions for vksc
+                reqCount = 0
+                if enable['requires'] != None and self.genOpts.apiname == 'vulkansc':
+                    for require in enable['requires']:
+                        # Don't add defines for VK_VERSION_1* or extensions promoted to core
+                        if 'VK_VERSION_1' in require or require in self.extensions_promoted_to_core:
+                            continue
+                        if reqCount == 0:
+                            output += '#if '
+                        else:
+                            output += ' && '
+                        output += 'defined('+require+')'
+                        reqCount += 1
+                    if reqCount != 0:
+                        output += '\n'
+                if enable['extension'] != None and self.genOpts.apiname == 'vulkansc':
+                    # Don't add defines for promoted extensions
+                    output += '#if defined('+enable['extension']+')\n'
                 output += '    {\"' + name + '\", ' + self.createMapValue(name, enable, True) + '},\n'
+                if reqCount != 0 and self.genOpts.apiname == 'vulkansc':
+                    output += '#endif\n'
+                if enable['extension'] != None and self.genOpts.apiname == 'vulkansc':
+                    output += '#endif\n'
         output += '};\n'
         output += '// clang-format on\n'
         return output
@@ -414,12 +518,23 @@ bool CoreChecks::ValidateShaderCapabilitiesAndExtensions(SHADER_MODULE_STATE con
                 }
             } else if (it->second.property) {
                 // support is or'ed as only one has to be supported (if applicable)
-                switch (insn.word(1)) {'''
+                switch (insn.word(1)) {\n'''
 
         for name, infos in sorted(self.propertyInfo.items()):
             # Only capabilities here (all items in array are the same)
             if infos[0]['isExtension'] == True:
                 continue
+
+            # Add defines based on required extensions for vksc
+            if infos[0]['requires'] != None and self.genOpts.apiname == 'vulkansc':
+                output += '#if '
+                first = True
+                for require in infos[0]['requires']:
+                    if first:
+                        first = False
+                    else:
+                        output += ' && '
+                    output += 'defined('+require+')'
 
             # use triple-tick syntax to keep tab alignment for generated code
             output += '''
@@ -432,6 +547,9 @@ bool CoreChecks::ValidateShaderCapabilitiesAndExtensions(SHADER_MODULE_STATE con
                         has_support |= ({});'''.format(logic)
             output += '''
                         break;'''
+
+            if infos[0]['requires'] != None and self.genOpts.apiname == 'vulkansc':
+                output += '\n#endif\n'
 
         output += '''
                     default:
@@ -446,6 +564,7 @@ bool CoreChecks::ValidateShaderCapabilitiesAndExtensions(SHADER_MODULE_STATE con
         }
 
         // Portability checks
+#if defined(VK_KHR_portability_subset)
         if (IsExtEnabled(device_extensions.vk_khr_portability_subset)) {
             if ((VK_FALSE == enabled_features.portability_subset_features.shaderSampleRateInterpolationFunctions) &&
                 (spv::CapabilityInterpolationFunction == insn.word(1))) {
@@ -454,6 +573,7 @@ bool CoreChecks::ValidateShaderCapabilitiesAndExtensions(SHADER_MODULE_STATE con
                                     "by this platform");
             }
         }
+#endif
     } else if (insn.opcode() == spv::OpExtension) {
         static const std::string spv_prefix = "SPV_";
         std::string extension_name = (char const *)&insn.word(1);
@@ -499,6 +619,18 @@ bool CoreChecks::ValidateShaderCapabilitiesAndExtensions(SHADER_MODULE_STATE con
             if infos[0]['isExtension'] == False:
                 continue
 
+            # Add defines based on required extensions for vksc
+            if infos[0]['requires'] != None and self.genOpts.apiname == 'vulkansc':
+                output += '#if '
+                first = True
+                for require in infos[0]['requires']:
+                    if first:
+                        first = False
+                    else:
+                        output += ' && '
+                    output += 'defined('+require+')'
+                output += '\n'
+
             # use triple-tick syntax to keep tab alignment for generated code
             output += '''
                     case spv::Capability{}:'''.format(name)
@@ -510,6 +642,9 @@ bool CoreChecks::ValidateShaderCapabilitiesAndExtensions(SHADER_MODULE_STATE con
                     has_support |= ({});'''.format(logic)
             output += '''
                     break;'''
+
+            if infos[0]['requires'] != None and self.genOpts.apiname == 'vulkansc':
+                output += '#endif\n'
 
         output += '''
                     default:

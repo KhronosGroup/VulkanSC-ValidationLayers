@@ -1,6 +1,6 @@
 //
 // Copyright (c) 2017-2018 Advanced Micro Devices, Inc. All rights reserved.
-// Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -14155,7 +14155,9 @@ void VmaAllocator_T::ImportVulkanFunctions(const VmaVulkanFunctions* pVulkanFunc
     m_VulkanFunctions.vkGetPhysicalDeviceProperties = &vkGetPhysicalDeviceProperties;
     m_VulkanFunctions.vkGetPhysicalDeviceMemoryProperties = &vkGetPhysicalDeviceMemoryProperties;
     m_VulkanFunctions.vkAllocateMemory = &vkAllocateMemory;
+#if !defined(VULKANSC)
     m_VulkanFunctions.vkFreeMemory = &vkFreeMemory;
+#endif
     m_VulkanFunctions.vkMapMemory = &vkMapMemory;
     m_VulkanFunctions.vkUnmapMemory = &vkUnmapMemory;
     m_VulkanFunctions.vkFlushMappedMemoryRanges = &vkFlushMappedMemoryRanges;
@@ -14188,7 +14190,9 @@ void VmaAllocator_T::ImportVulkanFunctions(const VmaVulkanFunctions* pVulkanFunc
         VMA_COPY_IF_NOT_NULL(vkGetPhysicalDeviceProperties);
         VMA_COPY_IF_NOT_NULL(vkGetPhysicalDeviceMemoryProperties);
         VMA_COPY_IF_NOT_NULL(vkAllocateMemory);
+#if !defined(VULKANSC)
         VMA_COPY_IF_NOT_NULL(vkFreeMemory);
+#endif
         VMA_COPY_IF_NOT_NULL(vkMapMemory);
         VMA_COPY_IF_NOT_NULL(vkUnmapMemory);
         VMA_COPY_IF_NOT_NULL(vkFlushMappedMemoryRanges);
@@ -14215,7 +14219,9 @@ void VmaAllocator_T::ImportVulkanFunctions(const VmaVulkanFunctions* pVulkanFunc
     VMA_ASSERT(m_VulkanFunctions.vkGetPhysicalDeviceProperties != VMA_NULL);
     VMA_ASSERT(m_VulkanFunctions.vkGetPhysicalDeviceMemoryProperties != VMA_NULL);
     VMA_ASSERT(m_VulkanFunctions.vkAllocateMemory != VMA_NULL);
+#if !defined(VULKANSC)
     VMA_ASSERT(m_VulkanFunctions.vkFreeMemory != VMA_NULL);
+#endif
     VMA_ASSERT(m_VulkanFunctions.vkMapMemory != VMA_NULL);
     VMA_ASSERT(m_VulkanFunctions.vkUnmapMemory != VMA_NULL);
     VMA_ASSERT(m_VulkanFunctions.vkFlushMappedMemoryRanges != VMA_NULL);
@@ -14792,7 +14798,7 @@ VkResult VmaAllocator_T::ResizeAllocation(
         }
     default:
         VMA_ASSERT(0);
-        return VK_ERROR_VALIDATION_FAILED_EXT;
+            return VK_ERROR_VALIDATION_FAILED_EXT;
     }
 }
 
@@ -15181,7 +15187,9 @@ void VmaAllocator_T::FreeVulkanMemory(uint32_t memoryType, VkDeviceSize size, Vk
         (*m_DeviceMemoryCallbacks.pfnFree)(this, memoryType, hMemory, size);
     }
 
+#if !defined(VULKANSC)
     (*m_VulkanFunctions.vkFreeMemory)(m_hDevice, hMemory, GetAllocationCallbacks());
+#endif
 
     const uint32_t heapIndex = MemoryTypeIndexToHeapIndex(memoryType);
     if(m_HeapSizeLimit[heapIndex] != VK_WHOLE_SIZE)

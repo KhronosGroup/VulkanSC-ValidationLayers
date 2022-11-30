@@ -1,7 +1,7 @@
 # ~~~
 # Copyright (c) 2014-2021 Valve Corporation
-# Copyright (c) 2014-2022 LunarG, Inc.
-# Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2014-2023 LunarG, Inc.
+# Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -154,32 +154,6 @@ if(CMAKE_C_COMPILER_ID MATCHES "Clang")
     set_source_files_properties(generated/parameter_validation.cpp PROPERTIES COMPILE_FLAGS "-Wno-unused-const-variable")
 endif()
 
-if(VULKANSC)
-# Currently only building parameter_validation for vksc layers
-# but chassis.cpp is needed for library entry points. Other
-# files are included because they have been cleared of errors
-# and xxhash.* are included to avoid unresolved symbol errors
-# at runtime.
-set(CHASSIS_LIBRARY_FILES
-    ${GENERATED_DIR}/chassis.cpp
-    ${GENERATED_DIR}/layer_chassis_dispatch.cpp
-    ${GENERATED_DIR}/vk_safe_struct.cpp
-    ${GENERATED_DIR}/vk_safe_struct.h
-    layer_options.cpp
-    xxhash.h
-    xxhash.c
-    #state_tracker.cpp
-    #state_tracker.h
-    #image_layout_map.cpp
-    #image_layout_map.h
-    #range_vector.h
-    #vk_layer_settings_ext.h
-    #subresource_adapter.cpp
-    #subresource_adapter.h
-    #sync_utils.cpp
-    #sync_utils.h)
-    )
-else()
 set(CHASSIS_LIBRARY_FILES
     ${GENERATED_DIR}/chassis.cpp
     ${GENERATED_DIR}/layer_chassis_dispatch.cpp
@@ -196,7 +170,6 @@ set(CHASSIS_LIBRARY_FILES
     subresource_adapter.h
     sync_utils.cpp
     sync_utils.h)
-endif()
 
 set(CORE_VALIDATION_LIBRARY_FILES
     core_validation.cpp
@@ -315,12 +288,12 @@ if(BUILD_LAYERS)
     if(VULKANSC)
     AddVkLayer(khronos_validation "${KHRONOS_LAYER_COMPILE_DEFINITIONS}"
         ${CHASSIS_LIBRARY_FILES}
-        #${CORE_VALIDATION_LIBRARY_FILES}
+        ${CORE_VALIDATION_LIBRARY_FILES}
         #${OBJECT_LIFETIMES_LIBRARY_FILES}
         ${THREAD_SAFETY_LIBRARY_FILES}
         ${STATELESS_VALIDATION_LIBRARY_FILES}
         #${BEST_PRACTICES_LIBRARY_FILES}
-        #${GPU_UTILITY_LIBRARY_FILES}
+        ${GPU_UTILITY_LIBRARY_FILES}
         #${GPU_ASSISTED_LIBRARY_FILES}
         #${DEBUG_PRINTF_LIBRARY_FILES}
         #${SYNC_VALIDATION_LIBRARY_FILES}

@@ -1,8 +1,9 @@
 /* Copyright (c) 2015-2021 The Khronos Group Inc.
  * Copyright (c) 2015-2021 Valve Corporation
- * Copyright (c) 2015-2021 LunarG, Inc.
+ * Copyright (c) 2015-2023 LunarG, Inc.
  * Copyright (C) 2015-2021 Google Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -159,9 +160,11 @@ static IMAGE_STATE::MemoryReqs GetMemoryRequirements(const ValidationStateTracke
                     case kEnabledByApiLevel:
                         DispatchGetImageMemoryRequirements2(dev_data->device, &mem_req_info2, &mem_reqs2);
                         break;
+#if defined(VK_KHR_get_memory_requirements2)
                     case kEnabledByCreateinfo:
                         DispatchGetImageMemoryRequirements2KHR(dev_data->device, &mem_req_info2, &mem_reqs2);
                         break;
+#endif
                     default:
                         // The VK_KHR_sampler_ycbcr_conversion extension requires VK_KHR_get_memory_requirements2,
                         // so validation of this vkCreateImage call should have already failed.
@@ -174,6 +177,7 @@ static IMAGE_STATE::MemoryReqs GetMemoryRequirements(const ValidationStateTracke
     return result;
 }
 
+#if !defined(VULKANSC)
 static IMAGE_STATE::SparseReqs GetSparseRequirements(const ValidationStateTracker *dev_data, VkImage img,
                                                      const VkImageCreateInfo *create_info) {
     IMAGE_STATE::SparseReqs result;
@@ -196,6 +200,7 @@ static bool SparseMetaDataRequired(const IMAGE_STATE::SparseReqs &sparse_reqs) {
     }
     return result;
 }
+#endif
 
 IMAGE_STATE::IMAGE_STATE(const ValidationStateTracker *dev_data, VkImage img, const VkImageCreateInfo *pCreateInfo,
                          VkFormatFeatureFlags ff)
@@ -213,8 +218,10 @@ IMAGE_STATE::IMAGE_STATE(const ValidationStateTracker *dev_data, VkImage img, co
       disjoint((pCreateInfo->flags & VK_IMAGE_CREATE_DISJOINT_BIT) != 0),
       requirements(GetMemoryRequirements(dev_data, img, pCreateInfo, disjoint, IsExternalAHB())),
       memory_requirements_checked{{false, false, false}},
+#if !defined(VULKANSC)
       sparse_requirements(GetSparseRequirements(dev_data, img, pCreateInfo)),
       sparse_metadata_required(SparseMetaDataRequired(sparse_requirements)),
+#endif
       get_sparse_reqs_called(false),
       sparse_metadata_bound(false),
       subresource_encoder(full_range),
@@ -237,8 +244,10 @@ IMAGE_STATE::IMAGE_STATE(const ValidationStateTracker *dev_data, VkImage img, co
       disjoint((pCreateInfo->flags & VK_IMAGE_CREATE_DISJOINT_BIT) != 0),
       requirements{},
       memory_requirements_checked{false, false, false},
+#if !defined(VULKANSC)
       sparse_requirements{},
       sparse_metadata_required(false),
+#endif
       get_sparse_reqs_called(false),
       sparse_metadata_bound(false),
       subresource_encoder(full_range),
@@ -384,11 +393,14 @@ VkExtent3D IMAGE_STATE::GetSubresourceExtent(const VkImageSubresourceLayers &sub
         extent.height /= divisors.height;
     }
 
+#if defined(VK_NV_corner_sampled_image)
     if (createInfo.flags & VK_IMAGE_CREATE_CORNER_SAMPLED_BIT_NV) {
         extent.width = (0 == extent.width ? 0 : std::max(2U, 1 + ((extent.width - 1) >> mip)));
         extent.height = (0 == extent.height ? 0 : std::max(2U, 1 + ((extent.height - 1) >> mip)));
         extent.depth = (0 == extent.depth ? 0 : std::max(2U, 1 + ((extent.depth - 1) >> mip)));
-    } else {
+    } else
+#endif
+    {
         extent.width = (0 == extent.width ? 0 : std::max(1U, extent.width >> mip));
         extent.height = (0 == extent.height ? 0 : std::max(1U, extent.height >> mip));
         extent.depth = (0 == extent.depth ? 0 : std::max(1U, extent.depth >> mip));

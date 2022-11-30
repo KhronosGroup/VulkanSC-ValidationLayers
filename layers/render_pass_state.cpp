@@ -1,8 +1,9 @@
 /* Copyright (c) 2015-2021 The Khronos Group Inc.
  * Copyright (c) 2015-2021 Valve Corporation
- * Copyright (c) 2015-2021 LunarG, Inc.
+ * Copyright (c) 2015-2023 LunarG, Inc.
  * Copyright (C) 2015-2021 Google Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -254,6 +255,7 @@ RENDER_PASS_STATE::RENDER_PASS_STATE(VkRenderPass rp, VkRenderPassCreateInfo con
     InitRenderPassState(this);
 }
 
+#if defined(VK_KHR_dynamic_rendering)
 const VkPipelineRenderingCreateInfoKHR VkPipelineRenderingCreateInfoKHR_default = {
     VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR,
     nullptr,
@@ -269,6 +271,7 @@ RENDER_PASS_STATE::RENDER_PASS_STATE(VkPipelineRenderingCreateInfoKHR const *pPi
       use_dynamic_rendering(true),
       use_dynamic_rendering_inherited(false),
       rendering_create_info(pPipelineRenderingCreateInfo ? pPipelineRenderingCreateInfo : &VkPipelineRenderingCreateInfoKHR_default) {}
+#endif
 
 bool RENDER_PASS_STATE::UsesColorAttachment(uint32_t subpass_num) const {
     bool result = false;
@@ -297,6 +300,7 @@ bool RENDER_PASS_STATE::UsesDepthStencilAttachment(uint32_t subpass_num) const {
     return result;
 }
 
+#if defined(VK_KHR_dynamic_rendering)
 RENDER_PASS_STATE::RENDER_PASS_STATE(VkRenderingInfoKHR const *pRenderingInfo)
     : BASE_NODE(static_cast<VkRenderPass>(VK_NULL_HANDLE), kVulkanObjectTypeRenderPass),
       use_dynamic_rendering(true),
@@ -308,6 +312,7 @@ RENDER_PASS_STATE::RENDER_PASS_STATE(VkCommandBufferInheritanceRenderingInfoKHR 
     use_dynamic_rendering(true),
     use_dynamic_rendering_inherited(true),
     inheritance_rendering_info(pInheritanceRenderingInfo) {}
+#endif
 
 FRAMEBUFFER_STATE::FRAMEBUFFER_STATE(VkFramebuffer fb, const VkFramebufferCreateInfo *pCreateInfo,
                                      std::shared_ptr<RENDER_PASS_STATE> &&rpstate,

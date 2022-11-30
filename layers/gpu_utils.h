@@ -1,7 +1,7 @@
 /* Copyright (c) 2020-2021 The Khronos Group Inc.
  * Copyright (c) 2020-2021 Valve Corporation
- * Copyright (c) 2020-2022 LunarG, Inc.
- * Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2020-2023 LunarG, Inc.
+ * Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -114,7 +114,9 @@ void UtilPreCallRecordDestroyDevice(ObjectType *object_ptr) {
                                    &queue_barrier_command_info.barrier_command_buffer);
         queue_barrier_command_info.barrier_command_buffer = VK_NULL_HANDLE;
 
+#if !defined(VULKANSC)
         DispatchDestroyCommandPool(object_ptr->device, queue_barrier_command_info.barrier_command_pool, NULL);
+#endif
         queue_barrier_command_info.barrier_command_pool = VK_NULL_HANDLE;
     }
     object_ptr->queue_barrier_command_infos.clear();
@@ -437,7 +439,9 @@ void UtilSubmitBarrier(VkQueue queue, ObjectType *object_ptr) {
                                                 &queue_barrier_command_info.barrier_command_buffer);
         if (result != VK_SUCCESS) {
             object_ptr->ReportSetupProblem(object_ptr->device, "Unable to create barrier command buffer.");
+#if !defined(VULKANSC)
             DispatchDestroyCommandPool(object_ptr->device, queue_barrier_command_info.barrier_command_pool, nullptr);
+#endif
             queue_barrier_command_info.barrier_command_pool = VK_NULL_HANDLE;
             queue_barrier_command_info.barrier_command_buffer = VK_NULL_HANDLE;
             return;

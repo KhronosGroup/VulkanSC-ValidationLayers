@@ -1,8 +1,9 @@
 /* Copyright (c) 2015-2021 The Khronos Group Inc.
  * Copyright (c) 2015-2021 Valve Corporation
- * Copyright (c) 2015-2021 LunarG, Inc.
+ * Copyright (c) 2015-2023 LunarG, Inc.
  * Copyright (C) 2015-2021 Google Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -95,14 +96,20 @@ VkDynamicState ConvertToDynamicState(CBStatusFlagBits flag) {
             return VK_DYNAMIC_STATE_VIEWPORT;
         case CBSTATUS_SCISSOR_SET:
             return VK_DYNAMIC_STATE_SCISSOR;
+#if defined(VK_NV_scissor_exclusive)
         case CBSTATUS_EXCLUSIVE_SCISSOR_SET:
             return VK_DYNAMIC_STATE_EXCLUSIVE_SCISSOR_NV;
+#endif
+#if defined(VK_NV_shading_rate_image)
         case CBSTATUS_SHADING_RATE_PALETTE_SET:
             return VK_DYNAMIC_STATE_VIEWPORT_SHADING_RATE_PALETTE_NV;
+#endif
         case CBSTATUS_LINE_STIPPLE_SET:
             return VK_DYNAMIC_STATE_LINE_STIPPLE_EXT;
+#if defined(VK_NV_clip_space_w_scaling)
         case CBSTATUS_VIEWPORT_W_SCALING_SET:
             return VK_DYNAMIC_STATE_VIEWPORT_W_SCALING_NV;
+#endif
         case CBSTATUS_CULL_MODE_SET:
             return VK_DYNAMIC_STATE_CULL_MODE_EXT;
         case CBSTATUS_FRONT_FACE_SET:
@@ -131,8 +138,10 @@ VkDynamicState ConvertToDynamicState(CBStatusFlagBits flag) {
             return VK_DYNAMIC_STATE_DISCARD_RECTANGLE_EXT;
         case CBSTATUS_SAMPLE_LOCATIONS_SET:
             return VK_DYNAMIC_STATE_SAMPLE_LOCATIONS_EXT;
+#if defined(VK_NV_shading_rate_image)
         case CBSTATUS_COARSE_SAMPLE_ORDER_SET:
             return VK_DYNAMIC_STATE_VIEWPORT_COARSE_SAMPLE_ORDER_NV;
+#endif
         case CBSTATUS_PATCH_CONTROL_POINTS_SET:
             return VK_DYNAMIC_STATE_PATCH_CONTROL_POINTS_EXT;
         case CBSTATUS_RASTERIZER_DISCARD_ENABLE_SET:
@@ -172,18 +181,26 @@ CBStatusFlagBits ConvertToCBStatusFlagBits(VkDynamicState state) {
             return CBSTATUS_STENCIL_WRITE_MASK_SET;
         case VK_DYNAMIC_STATE_STENCIL_REFERENCE:
             return CBSTATUS_STENCIL_REFERENCE_SET;
+#if defined(VK_NV_clip_space_w_scaling)
         case VK_DYNAMIC_STATE_VIEWPORT_W_SCALING_NV:
             return CBSTATUS_VIEWPORT_W_SCALING_SET;
+#endif
         case VK_DYNAMIC_STATE_DISCARD_RECTANGLE_EXT:
             return CBSTATUS_DISCARD_RECTANGLE_SET;
         case VK_DYNAMIC_STATE_SAMPLE_LOCATIONS_EXT:
             return CBSTATUS_SAMPLE_LOCATIONS_SET;
+#if defined(VK_NV_shading_rate_image)
         case VK_DYNAMIC_STATE_VIEWPORT_SHADING_RATE_PALETTE_NV:
             return CBSTATUS_SHADING_RATE_PALETTE_SET;
+#endif
+#if defined(VK_NV_shading_rate_image)
         case VK_DYNAMIC_STATE_VIEWPORT_COARSE_SAMPLE_ORDER_NV:
             return CBSTATUS_COARSE_SAMPLE_ORDER_SET;
+#endif
+#if defined(VK_NV_scissor_exclusive)
         case VK_DYNAMIC_STATE_EXCLUSIVE_SCISSOR_NV:
             return CBSTATUS_EXCLUSIVE_SCISSOR_SET;
+#endif
         case VK_DYNAMIC_STATE_LINE_STIPPLE_EXT:
             return CBSTATUS_LINE_STIPPLE_SET;
         case VK_DYNAMIC_STATE_CULL_MODE_EXT:
@@ -681,6 +698,7 @@ void CMD_BUFFER_STATE::EndRenderPass(CMD_TYPE cmd_type) {
     activeFramebuffer = VK_NULL_HANDLE;
 }
 
+#if defined(VK_KHR_dynamic_rendering)
 void CMD_BUFFER_STATE::BeginRendering(CMD_TYPE cmd_type, const VkRenderingInfoKHR *pRenderingInfo) {
     RecordCmd(cmd_type);
     activeRenderPass = std::make_shared<RENDER_PASS_STATE>(pRenderingInfo);
@@ -748,6 +766,7 @@ void CMD_BUFFER_STATE::BeginRendering(CMD_TYPE cmd_type, const VkRenderingInfoKH
         }
     }
 }
+#endif
 
 void CMD_BUFFER_STATE::Begin(const VkCommandBufferBeginInfo *pBeginInfo) {
     if (CB_RECORDED == state || CB_INVALID_COMPLETE == state) {
@@ -791,6 +810,7 @@ void CMD_BUFFER_STATE::Begin(const VkCommandBufferBeginInfo *pBeginInfo) {
                     }
                 }
             }
+#if defined(VK_KHR_dynamic_rendering)
             else
             {
                 auto inheritance_rendering_info = lvl_find_in_chain<VkCommandBufferInheritanceRenderingInfoKHR>(beginInfo.pInheritanceInfo->pNext);
@@ -798,7 +818,9 @@ void CMD_BUFFER_STATE::Begin(const VkCommandBufferBeginInfo *pBeginInfo) {
                     activeRenderPass = std::make_shared<RENDER_PASS_STATE>(inheritance_rendering_info);
                 }
             }
+#endif
 
+#if defined(VK_NV_inherited_viewport_scissor)
             // Check for VkCommandBufferInheritanceViewportScissorInfoNV (VK_NV_inherited_viewport_scissor)
             auto p_inherited_viewport_scissor_info =
                 LvlFindInChain<VkCommandBufferInheritanceViewportScissorInfoNV>(beginInfo.pInheritanceInfo->pNext);
@@ -807,6 +829,7 @@ void CMD_BUFFER_STATE::Begin(const VkCommandBufferBeginInfo *pBeginInfo) {
                 inheritedViewportDepths.assign(pViewportDepths,
                                                pViewportDepths + p_inherited_viewport_scissor_info->viewportDepthCount);
             }
+#endif
         }
     }
 

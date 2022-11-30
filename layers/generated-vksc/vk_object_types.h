@@ -52,26 +52,25 @@ typedef enum VulkanObjectType {
     kVulkanObjectTypeQueryPool = 12,
     kVulkanObjectTypeBufferView = 13,
     kVulkanObjectTypeImageView = 14,
-    kVulkanObjectTypePipelineCache = 15,
-    kVulkanObjectTypePipelineLayout = 16,
-    kVulkanObjectTypePipeline = 17,
-    kVulkanObjectTypeRenderPass = 18,
-    kVulkanObjectTypeDescriptorSetLayout = 19,
-    kVulkanObjectTypeSampler = 20,
-    kVulkanObjectTypeDescriptorSet = 21,
-    kVulkanObjectTypeDescriptorPool = 22,
-    kVulkanObjectTypeFramebuffer = 23,
-    kVulkanObjectTypeCommandPool = 24,
-    kVulkanObjectTypeSamplerYcbcrConversion = 25,
-    kVulkanObjectTypeSurfaceKHR = 26,
-    kVulkanObjectTypeSwapchainKHR = 27,
-    kVulkanObjectTypeDisplayKHR = 28,
-    kVulkanObjectTypeDisplayModeKHR = 29,
-    kVulkanObjectTypeDebugUtilsMessengerEXT = 30,
-#ifdef VK_USE_PLATFORM_SCI
-    kVulkanObjectTypeSemaphoreSciSyncPoolNV = 31,
-#endif // VK_USE_PLATFORM_SCI
-    kVulkanObjectTypeMax = 32,
+    kVulkanObjectTypeShaderModule = 15,
+    kVulkanObjectTypePipelineCache = 16,
+    kVulkanObjectTypePipelineLayout = 17,
+    kVulkanObjectTypePipeline = 18,
+    kVulkanObjectTypeRenderPass = 19,
+    kVulkanObjectTypeDescriptorSetLayout = 20,
+    kVulkanObjectTypeSampler = 21,
+    kVulkanObjectTypeDescriptorSet = 22,
+    kVulkanObjectTypeDescriptorPool = 23,
+    kVulkanObjectTypeFramebuffer = 24,
+    kVulkanObjectTypeCommandPool = 25,
+    kVulkanObjectTypeSamplerYcbcrConversion = 26,
+    kVulkanObjectTypeSurfaceKHR = 27,
+    kVulkanObjectTypeSwapchainKHR = 28,
+    kVulkanObjectTypeDisplayKHR = 29,
+    kVulkanObjectTypeDisplayModeKHR = 30,
+    kVulkanObjectTypeDebugUtilsMessengerEXT = 31,
+    kVulkanObjectTypeSemaphoreSciSyncPoolNV = 32,
+    kVulkanObjectTypeMax = 33,
     // Aliases for backwards compatibilty of "promoted" types
 } VulkanObjectType;
 
@@ -92,6 +91,7 @@ static const char * const object_string[kVulkanObjectTypeMax] = {
     "VkQueryPool",
     "VkBufferView",
     "VkImageView",
+    "VkShaderModule",
     "VkPipelineCache",
     "VkPipelineLayout",
     "VkPipeline",
@@ -128,6 +128,7 @@ static inline VkObjectType ConvertVulkanObjectToCoreObject(VulkanObjectType inte
         case kVulkanObjectTypeQueryPool: return VK_OBJECT_TYPE_QUERY_POOL;
         case kVulkanObjectTypeBufferView: return VK_OBJECT_TYPE_BUFFER_VIEW;
         case kVulkanObjectTypeImageView: return VK_OBJECT_TYPE_IMAGE_VIEW;
+        case kVulkanObjectTypeShaderModule: return VK_OBJECT_TYPE_SHADER_MODULE;
         case kVulkanObjectTypePipelineCache: return VK_OBJECT_TYPE_PIPELINE_CACHE;
         case kVulkanObjectTypePipelineLayout: return VK_OBJECT_TYPE_PIPELINE_LAYOUT;
         case kVulkanObjectTypePipeline: return VK_OBJECT_TYPE_PIPELINE;
@@ -144,9 +145,7 @@ static inline VkObjectType ConvertVulkanObjectToCoreObject(VulkanObjectType inte
         case kVulkanObjectTypeDisplayKHR: return VK_OBJECT_TYPE_DISPLAY_KHR;
         case kVulkanObjectTypeDisplayModeKHR: return VK_OBJECT_TYPE_DISPLAY_MODE_KHR;
         case kVulkanObjectTypeDebugUtilsMessengerEXT: return VK_OBJECT_TYPE_DEBUG_UTILS_MESSENGER_EXT;
-#ifdef VK_USE_PLATFORM_SCI
         case kVulkanObjectTypeSemaphoreSciSyncPoolNV: return VK_OBJECT_TYPE_SEMAPHORE_SCI_SYNC_POOL_NV;
-#endif // VK_USE_PLATFORM_SCI
         default: return VK_OBJECT_TYPE_UNKNOWN;
     }
 };
@@ -168,6 +167,7 @@ static inline VulkanObjectType ConvertCoreObjectToVulkanObject(VkObjectType vulk
         case VK_OBJECT_TYPE_QUERY_POOL: return kVulkanObjectTypeQueryPool;
         case VK_OBJECT_TYPE_BUFFER_VIEW: return kVulkanObjectTypeBufferView;
         case VK_OBJECT_TYPE_IMAGE_VIEW: return kVulkanObjectTypeImageView;
+        case VK_OBJECT_TYPE_SHADER_MODULE: return kVulkanObjectTypeShaderModule;
         case VK_OBJECT_TYPE_PIPELINE_CACHE: return kVulkanObjectTypePipelineCache;
         case VK_OBJECT_TYPE_PIPELINE_LAYOUT: return kVulkanObjectTypePipelineLayout;
         case VK_OBJECT_TYPE_PIPELINE: return kVulkanObjectTypePipeline;
@@ -184,9 +184,7 @@ static inline VulkanObjectType ConvertCoreObjectToVulkanObject(VkObjectType vulk
         case VK_OBJECT_TYPE_DISPLAY_KHR: return kVulkanObjectTypeDisplayKHR;
         case VK_OBJECT_TYPE_DISPLAY_MODE_KHR: return kVulkanObjectTypeDisplayModeKHR;
         case VK_OBJECT_TYPE_DEBUG_UTILS_MESSENGER_EXT: return kVulkanObjectTypeDebugUtilsMessengerEXT;
-#ifdef VK_USE_PLATFORM_SCI
         case VK_OBJECT_TYPE_SEMAPHORE_SCI_SYNC_POOL_NV: return kVulkanObjectTypeSemaphoreSciSyncPoolNV;
-#endif // VK_USE_PLATFORM_SCI
         default: return kVulkanObjectTypeUnknown;
     }
 };
@@ -506,6 +504,16 @@ template <> struct VulkanObjectTypeInfo<kVulkanObjectTypeSemaphoreSciSyncPoolNV>
     typedef VkSemaphoreSciSyncPoolNV Type;
 };
 #endif
+template <> struct VkHandleInfo<VkShaderModule> {
+    static const VulkanObjectType kVulkanObjectType = kVulkanObjectTypeShaderModule;
+    static const VkObjectType kVkObjectType = VK_OBJECT_TYPE_SHADER_MODULE;
+    static const char* Typename() {
+        return "VkShaderModule";
+    }
+};
+template <> struct VulkanObjectTypeInfo<kVulkanObjectTypeShaderModule> {
+    typedef VkShaderModule Type;
+};
 template <> struct VkHandleInfo<VkSurfaceKHR> {
     static const VulkanObjectType kVulkanObjectType = kVulkanObjectTypeSurfaceKHR;
     static const VkObjectType kVkObjectType = VK_OBJECT_TYPE_SURFACE_KHR;

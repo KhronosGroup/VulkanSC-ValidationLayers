@@ -51,6 +51,9 @@
 #include "vk_extension_helper.h"
 #include "vk_safe_struct.h"
 #include "vk_typemap_helper.h"
+#if defined(VULKANSC)
+#include "vksc_compatibility.h"
+#endif
 
 
 extern std::atomic<uint64_t> global_unique_id;
