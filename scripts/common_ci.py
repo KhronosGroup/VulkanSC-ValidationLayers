@@ -135,7 +135,7 @@ def BuildLoader(args):
     utils.make_dirs(LOADER_BUILD_DIR)
     cmake_cmd = f'cmake -C ../external/helper.cmake -DCMAKE_BUILD_TYPE={args.configuration.capitalize()} {args.cmake} ..'
     if IsWindows(): cmake_cmd = cmake_cmd + f' -A {args.arch}'
-    if args.api == 'vulkansc': cmake_cmd = cmake_cmd + ' -DVulkanSC=TRUE'
+    if args.api == 'vulkansc': cmake_cmd = cmake_cmd + ' -DVULKANSC=ON'
     RunShellCmd(cmake_cmd, LOADER_BUILD_DIR)
 
     print("Build Loader")
