@@ -36,6 +36,7 @@ jobs:
         arch: [ x64, Win32 ]
         config: [ debug, release ]
         os: [ windows-2019 ]
+        api: [ vulkan, vulkansc ]
         exclude:
           - arch: Win32
             config: release
@@ -47,4 +48,4 @@ jobs:
         with:
           python-version: '3.7'
       - name: Build and Test Vulkan-ValidationLayers
-        run: python3 scripts/github_ci_build_desktop.py --config ${{ matrix.config }} --arch ${{ matrix.arch }}
+        run: python3 scripts/github_ci_build_desktop.py --config ${{ matrix.config }} --arch ${{ matrix.arch }} --api ${{ matrix.api }}

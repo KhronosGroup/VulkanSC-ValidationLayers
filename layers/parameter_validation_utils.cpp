@@ -2431,6 +2431,8 @@ bool StatelessValidation::manual_PreCallValidateCreateGraphicsPipelines(VkDevice
                                          i);
                     }
 
+#if defined(VK_NV_viewport_swizzle) || defined(VK_NV_clip_space_w_scaling) || \
+    defined(VK_NV_scissor_exclusive) || defined(VK_NV_shading_rate_image)
                     const VkStructureType allowed_structs_vk_pipeline_viewport_state_create_info[] = {
 #if defined(VK_NV_viewport_swizzle)
                         VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_SWIZZLE_STATE_CREATE_INFO_NV,
@@ -2446,14 +2448,22 @@ bool StatelessValidation::manual_PreCallValidateCreateGraphicsPipelines(VkDevice
                         VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_COARSE_SAMPLE_ORDER_STATE_CREATE_INFO_NV,
 #endif
                     };
+#endif
                     skip |= validate_struct_pnext(
                         "vkCreateGraphicsPipelines",
                         ParameterName("pCreateInfos[%i].pViewportState->pNext", ParameterName::IndexVector{i}),
                         "VkPipelineViewportSwizzleStateCreateInfoNV, VkPipelineViewportWScalingStateCreateInfoNV, "
                         "VkPipelineViewportExclusiveScissorStateCreateInfoNV, VkPipelineViewportShadingRateImageStateCreateInfoNV, "
                         "VkPipelineViewportCoarseSampleOrderStateCreateInfoNV",
-                        viewport_state.pNext, ARRAY_SIZE(allowed_structs_vk_pipeline_viewport_state_create_info),
-                        allowed_structs_vk_pipeline_viewport_state_create_info, 65,
+                        viewport_state.pNext,
+#if defined(VK_NV_viewport_swizzle) || defined(VK_NV_clip_space_w_scaling) || \
+    defined(VK_NV_scissor_exclusive) || defined(VK_NV_shading_rate_image)
+                        ARRAY_SIZE(allowed_structs_vk_pipeline_viewport_state_create_info),
+                        allowed_structs_vk_pipeline_viewport_state_create_info,
+#else
+                        0, nullptr,
+#endif
+                        65,
                         "VUID-VkPipelineViewportStateCreateInfo-pNext-pNext",
                         "VUID-VkPipelineViewportStateCreateInfo-sType-unique");
 
@@ -4320,6 +4330,8 @@ bool StatelessValidation::manual_PreCallValidateBeginCommandBuffer(VkCommandBuff
                                      "VUID-VkCommandBufferInheritanceInfo-sType-sType");
 
         if (info) {
+#if defined(VK_EXT_conditional_rendering) || defined(VK_KHR_dynamic_rendering) || \
+    defined(VK_AMD_mixed_attachment_samples) || defined(VK_NV_inherited_viewport_scissor)
             const VkStructureType allowed_structs_vk_command_buffer_inheritance_info[] = {
 #if defined(VK_EXT_conditional_rendering)
                 VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_CONDITIONAL_RENDERING_INFO_EXT,
@@ -4334,10 +4346,18 @@ bool StatelessValidation::manual_PreCallValidateBeginCommandBuffer(VkCommandBuff
                 VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_VIEWPORT_SCISSOR_INFO_NV
 #endif
             };
+#endif
             skip |= validate_struct_pnext(
                 cmd_name, "pBeginInfo->pInheritanceInfo->pNext", "VkCommandBufferInheritanceConditionalRenderingInfoEXT",
-                info->pNext, ARRAY_SIZE(allowed_structs_vk_command_buffer_inheritance_info),
-                allowed_structs_vk_command_buffer_inheritance_info, GeneratedVulkanHeaderVersion,
+                info->pNext,
+#if defined(VK_EXT_conditional_rendering) || defined(VK_KHR_dynamic_rendering) || \
+    defined(VK_AMD_mixed_attachment_samples) || defined(VK_NV_inherited_viewport_scissor)
+                ARRAY_SIZE(allowed_structs_vk_command_buffer_inheritance_info),
+                allowed_structs_vk_command_buffer_inheritance_info,
+#else
+                0, nullptr,
+#endif
+                GeneratedVulkanHeaderVersion,
                 "VUID-VkCommandBufferInheritanceInfo-pNext-pNext", "VUID-VkCommandBufferInheritanceInfo-sType-unique");
 
             skip |= validate_bool32(cmd_name, "pBeginInfo->pInheritanceInfo->occlusionQueryEnable", info->occlusionQueryEnable);

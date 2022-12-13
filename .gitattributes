@@ -17,3 +17,5 @@
 # Generated source files will always have LF (unix) line endings on checkout.
 layers/generated/*.cpp text eol=lf
 layers/generated/*.h text eol=lf
+layers/generated-vksc/*.cpp text eol=lf
+layers/generated-vksc/*.h text eol=lf
