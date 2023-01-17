@@ -5,6 +5,8 @@
 The source code for The Vulkan-ValidationLayer components is sponsored by Khronos and LunarG.
 * [Khronos Vulkan-ValidationLayers](https://github.com/KhronosGroup/Vulkan-ValidationLayers)
 
+The source code for the VulkanSC-ValidationLayer components is sponsored by Khronos.
+* [Khronos VulkanSC-ValidationLayers](https://github.com/KhronosGroup/VulkanSC-ValidationLayers)
 
 ### **The Vulkan Ecosystem Needs Your Help**
 
@@ -14,7 +16,7 @@ opportunities always exist for anyone to help by contributing additional validat
 and tests.
 
 There are a couple of methods to identify areas of need:
-* Examine the [issues list](https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues)
+* Examine the [issues list](https://github.com/KhronosGroup/VulkanSC-ValidationLayers/issues)
 in this repository and look for issues that are of interest
 * Examine the Validation Layer 'Coverage - html' page at [the Vulkan SDK
 documentation page](https://vulkan.lunarg.com/doc/sdk/) -- it lists all published Vulkan VUIDs and their status.
@@ -109,9 +111,9 @@ that to be accepted into the repository, the pull request must [pass all tests](
 * Take a look at the [overview for creating tests](docs/creating_tests.md).
 
 #### **GitHub Cloud CI Testing**
-Pull Requests to GitHub are tested in the cloud on Linux and Windows VMs. The Linux VMs use [Github Actions](https://github.com/KhronosGroup/Vulkan-ValidationLayers/actions) with the sequence of commands driven by the [ci_build.yml](https://github.com/KhronosGroup/Vulkan-ValidationLayers/blob/master/.github/workflows/ci_build.yml) file. The Windows VMs use [AppVeyor](https://ci.appveyor.com/project/Khronoswebmaster/vulkan-validationlayers/branch/master) with the sequence of commands driven by the [.appveyor.yml](https://github.com/KhronosGroup/Vulkan-ValidationLayers/blob/master/.appveyor.yml) file.
+Pull Requests to GitHub are tested in the cloud on Linux and Windows VMs. The Linux and Windows VMs use [Github Actions](https://github.com/KhronosGroup/VulkanSC-ValidationLayers/actions) with the sequence of commands driven by the [ci_build.yml](https://github.com/KhronosGroup/VulkanSC-ValidationLayers/blob/sc_main/.github/workflows/ci_build.yml) file.
 
-The Linux testing includes iterating on all of the validation layer tests over multiple [different device](https://github.com/KhronosGroup/Vulkan-ValidationLayers/tree/master/tests/device_profiles) profiles using the [devsim layer](https://github.com/LunarG/VulkanTools/tree/master/layersvt) in combination with the [mock icd](https://github.com/KhronosGroup/Vulkan-Tools/tree/master/icd). This is a fast way to simulate testing across different devices. Any new tests must pass across all device profiles.
+The Linux testing includes iterating on all of the validation layer tests over multiple [different device](https://github.com/KhronosGroup/VulkanSC-ValidationLayers/tree/sc_main/tests/device_profiles) profiles using the [devsim layer](https://github.com/LunarG/VulkanTools/tree/master/layersvt) in combination with the [mock icd](https://github.com/KhronosGroup/Vulkan-Tools/tree/master/icd). This is a fast way to simulate testing across different devices. Any new tests must pass across all device profiles.
 
 #### **Special Considerations for Validation Layers**
 * **Validation Tests:**  If you are submitting a change that adds a new validation check, you should also construct a "negative" test function.
@@ -139,7 +141,7 @@ generator scripts in the `scripts` directory. All changes to these scripts _must
 corresponding generated output to keep the repository self-consistent. This requirement is enforced by
 the continuous integration testing. Regenerate source files after modifying any of the generator
 scripts and before building and testing your changes. More details can be found in
-[BUILD.md](https://github.com/KhronosGroup/Vulkan-ValidationLayers/blob/master/BUILD.md#generated-source-code).
+[BUILD.md](https://github.com/KhronosGroup/VulkanSC-ValidationLayers/blob/sc_main/BUILD.md#generated-source-code).
 
 #### Coding Conventions for [CMake](http://cmake.org) files
 
@@ -171,7 +173,7 @@ or other contribution to GitHub.
 
 ### **License and Copyrights**
 
-All contributions made to the Vulkan-ValidationLayers repository are Khronos branded and as such,
+All contributions made to the VulkanSC-ValidationLayers repository are Khronos branded and as such,
 any new files need to have the Khronos license (Apache 2.0 style) and copyright included.
 Please see an existing file in this repository for an example.
 
