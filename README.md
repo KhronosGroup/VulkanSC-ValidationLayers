@@ -4,13 +4,10 @@ This project provides the Khronos Vulkan validation layers for Windows, Linux, A
 and the Khronos Vulkan SC Development validation layers for Windows, Linux, and QNX.
 
 ## CI Build Status
-| Build Status |
-|:------------|
-| [![Build Status](https://github.com/KhronosGroup/VulkanSC-ValidationLayers/actions/workflows/build_windows.yml/badge.svg?branch=sc_main)](https://github.com/KhronosGroup/VulkanSC-ValidationLayers/actions) |
-| [![Build Status](https://github.com/KhronosGroup/VulkanSC-ValidationLayers/actions/workflows/build_linux.yml/badge.svg?branch=sc_main)](https://github.com/KhronosGroup/VulkanSC-ValidationLayers/actions) |
-| [![Build Status](https://github.com/KhronosGroup/VulkanSC-ValidationLayers/actions/workflows/build_linux_gn.yml/badge.svg?branch=sc_main)](https://github.com/KhronosGroup/VulkanSC-ValidationLayers/actions) |
-| [![Build Status](https://github.com/KhronosGroup/VulkanSC-ValidationLayers/actions/workflows/build_android.yml/badge.svg?branch=sc_main)](https://github.com/KhronosGroup/VulkanSC-ValidationLayers/actions) |
 
+![Build Status](https://github.com/KhronosGroup/VulkanSC-ValidationLayers/actions/workflows/build_windows.yml/badge.svg?branch=sc_main)
+![Build Status](https://github.com/KhronosGroup/VulkanSC-ValidationLayers/actions/workflows/build_linux.yml/badge.svg?branch=sc_main)
+![Build Status](https://github.com/KhronosGroup/VulkanSC-ValidationLayers/actions/workflows/build_android.yml/badge.svg?branch=sc_main)
 
 ## Introduction
 
