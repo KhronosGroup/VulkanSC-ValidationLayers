@@ -35,3 +35,17 @@ build-android/third_party
 *.includes
 .vscode/
 .DS_Store
+.editorconfig
+scripts/.vs
+.*.sw[op]
+# BUILD.gn artifacts
+.cipd/
+.gclient
+.gclient_entries
+.gclient_previous_sync_commits
+out/
+third_party/
+buildtools/
+depot_tools/
+testing/
+tools/
