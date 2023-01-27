@@ -4,9 +4,9 @@
 
 /* Copyright (c) 2015-2021 The Khronos Group Inc.
  * Copyright (c) 2015-2021 Valve Corporation
- * Copyright (c) 2015-2022 LunarG, Inc.
+ * Copyright (c) 2015-2023 LunarG, Inc.
  * Copyright (c) 2015-2021 Google Inc.
- * Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -7088,28 +7088,6 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateSemaphoreSciSyncPoolNV(
     }
     return result;
 }
-
-VKAPI_ATTR void VKAPI_CALL DestroySemaphoreSciSyncPoolNV(
-    VkDevice                                    device,
-    VkSemaphoreSciSyncPoolNV                    semaphorePool,
-    const VkAllocationCallbacks*                pAllocator) {
-    auto layer_data = GetLayerDataPtr(get_dispatch_key(device), layer_data_map);
-    bool skip = false;
-    for (auto intercept : layer_data->intercept_vectors[InterceptIdPreCallValidateDestroySemaphoreSciSyncPoolNV]) {
-        auto lock = intercept->ReadLock();
-        skip |= (const_cast<const ValidationObject*>(intercept))->PreCallValidateDestroySemaphoreSciSyncPoolNV(device, semaphorePool, pAllocator);
-        if (skip) return;
-    }
-    for (auto intercept : layer_data->intercept_vectors[InterceptIdPreCallRecordDestroySemaphoreSciSyncPoolNV]) {
-        auto lock = intercept->WriteLock();
-        intercept->PreCallRecordDestroySemaphoreSciSyncPoolNV(device, semaphorePool, pAllocator);
-    }
-    DispatchDestroySemaphoreSciSyncPoolNV(device, semaphorePool, pAllocator);
-    for (auto intercept : layer_data->intercept_vectors[InterceptIdPostCallRecordDestroySemaphoreSciSyncPoolNV]) {
-        auto lock = intercept->WriteLock();
-        intercept->PostCallRecordDestroySemaphoreSciSyncPoolNV(device, semaphorePool, pAllocator);
-    }
-}
 #endif // VK_USE_PLATFORM_SCI
 
 // Map of intercepted ApiName to its associated function data
@@ -7413,9 +7391,6 @@ const layer_data::unordered_map<std::string, function_data> name_to_funcptr_map 
     {"vkCmdSetColorWriteEnableEXT", {kFuncTypeDev, (void*)CmdSetColorWriteEnableEXT}},
 #ifdef VK_USE_PLATFORM_SCI
     {"vkCreateSemaphoreSciSyncPoolNV", {kFuncTypeDev, (void*)CreateSemaphoreSciSyncPoolNV}},
-#endif
-#ifdef VK_USE_PLATFORM_SCI
-    {"vkDestroySemaphoreSciSyncPoolNV", {kFuncTypeDev, (void*)DestroySemaphoreSciSyncPoolNV}},
 #endif
 };
 

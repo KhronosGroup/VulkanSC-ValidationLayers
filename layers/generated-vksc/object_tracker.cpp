@@ -6,9 +6,9 @@
  *
  * Copyright (c) 2015-2021 The Khronos Group Inc.
  * Copyright (c) 2015-2021 Valve Corporation
- * Copyright (c) 2015-2022 LunarG, Inc.
+ * Copyright (c) 2015-2023 LunarG, Inc.
  * Copyright (c) 2015-2021 Google Inc.
- * Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -3635,29 +3635,6 @@ void ObjectLifetimes::PostCallRecordCreateSemaphoreSciSyncPoolNV(
     VkResult                                    result) {
     if (result != VK_SUCCESS) return;
     CreateObject(*pSemaphorePool, kVulkanObjectTypeSemaphoreSciSyncPoolNV, pAllocator);
-
-}
-#endif // VK_USE_PLATFORM_SCI
-
-#ifdef VK_USE_PLATFORM_SCI
-
-bool ObjectLifetimes::PreCallValidateDestroySemaphoreSciSyncPoolNV(
-    VkDevice                                    device,
-    VkSemaphoreSciSyncPoolNV                    semaphorePool,
-    const VkAllocationCallbacks*                pAllocator) const {
-    bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkDestroySemaphoreSciSyncPoolNV-device-parameter", kVUIDUndefined);
-    skip |= ValidateObject(semaphorePool, kVulkanObjectTypeSemaphoreSciSyncPoolNV, true, "VUID-vkDestroySemaphoreSciSyncPoolNV-semaphorePool-parameter", "VUID-vkDestroySemaphoreSciSyncPoolNV-semaphorePool-parent");
-    skip |= ValidateDestroyObject(semaphorePool, kVulkanObjectTypeSemaphoreSciSyncPoolNV, pAllocator, kVUIDUndefined, kVUIDUndefined);
-
-    return skip;
-}
-
-void ObjectLifetimes::PreCallRecordDestroySemaphoreSciSyncPoolNV(
-    VkDevice                                    device,
-    VkSemaphoreSciSyncPoolNV                    semaphorePool,
-    const VkAllocationCallbacks*                pAllocator) {
-    RecordDestroyObject(semaphorePool, kVulkanObjectTypeSemaphoreSciSyncPoolNV);
 
 }
 #endif // VK_USE_PLATFORM_SCI

@@ -6,7 +6,8 @@
  *
  * Copyright (c) 2015-2021 The Khronos Group Inc.
  * Copyright (c) 2015-2021 Valve Corporation
- * Copyright (c) 2015-2022 LunarG, Inc.
+ * Copyright (c) 2015-2023 LunarG, Inc.
+ * Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -122,19 +123,6 @@ void BestPractices::PostCallRecordEnumerateInstanceLayerProperties(
         static const std::vector<VkResult> error_codes = {VK_ERROR_OUT_OF_HOST_MEMORY,VK_ERROR_OUT_OF_DEVICE_MEMORY};
         static const std::vector<VkResult> success_codes = {VK_INCOMPLETE};
         ValidateReturnCodes("vkEnumerateInstanceLayerProperties", result, error_codes, success_codes);
-    }
-}
-
-void BestPractices::PostCallRecordEnumerateDeviceLayerProperties(
-    VkPhysicalDevice                            physicalDevice,
-    uint32_t*                                   pPropertyCount,
-    VkLayerProperties*                          pProperties,
-    VkResult                                    result) {
-    ValidationStateTracker::PostCallRecordEnumerateDeviceLayerProperties(physicalDevice, pPropertyCount, pProperties, result);
-    if (result != VK_SUCCESS) {
-        static const std::vector<VkResult> error_codes = {VK_ERROR_OUT_OF_HOST_MEMORY,VK_ERROR_OUT_OF_DEVICE_MEMORY};
-        static const std::vector<VkResult> success_codes = {VK_INCOMPLETE};
-        ValidateReturnCodes("vkEnumerateDeviceLayerProperties", result, error_codes, success_codes);
     }
 }
 

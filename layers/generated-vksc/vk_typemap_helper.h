@@ -6,9 +6,9 @@
  *
  * Copyright (c) 2015-2021 The Khronos Group Inc.
  * Copyright (c) 2015-2021 Valve Corporation
- * Copyright (c) 2015-2022 LunarG, Inc.
+ * Copyright (c) 2015-2023 LunarG, Inc.
  * Copyright (c) 2015-2021 Google Inc.
- * Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -2890,13 +2890,13 @@ template <> struct LvlSTypeMap<VK_STRUCTURE_TYPE_MEMORY_SCI_BUF_PROPERTIES_NV> {
 
 #endif // VK_USE_PLATFORM_SCI
 #ifdef VK_USE_PLATFORM_SCI
-// Map type VkPhysicalDeviceExternalSciBufFeaturesNV to id VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_SCI_BUF_FEATURES_NV
-template <> struct LvlTypeMap<VkPhysicalDeviceExternalSciBufFeaturesNV> {
-    static const VkStructureType kSType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_SCI_BUF_FEATURES_NV;
+// Map type VkPhysicalDeviceExternalMemorySciBufFeaturesNV to id VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_MEMORY_SCI_BUF_FEATURES_NV
+template <> struct LvlTypeMap<VkPhysicalDeviceExternalMemorySciBufFeaturesNV> {
+    static const VkStructureType kSType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_MEMORY_SCI_BUF_FEATURES_NV;
 };
 
-template <> struct LvlSTypeMap<VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_SCI_BUF_FEATURES_NV> {
-    typedef VkPhysicalDeviceExternalSciBufFeaturesNV Type;
+template <> struct LvlSTypeMap<VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_MEMORY_SCI_BUF_FEATURES_NV> {
+    typedef VkPhysicalDeviceExternalMemorySciBufFeaturesNV Type;
 };
 
 #endif // VK_USE_PLATFORM_SCI

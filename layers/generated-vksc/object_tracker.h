@@ -6,9 +6,9 @@
  *
  * Copyright (c) 2015-2021 The Khronos Group Inc.
  * Copyright (c) 2015-2021 Valve Corporation
- * Copyright (c) 2015-2022 LunarG, Inc.
+ * Copyright (c) 2015-2023 LunarG, Inc.
  * Copyright (c) 2015-2021 Google Inc.
- * Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1578,17 +1578,6 @@ void PostCallRecordCreateSemaphoreSciSyncPoolNV(
     const VkAllocationCallbacks*                pAllocator,
     VkSemaphoreSciSyncPoolNV*                   pSemaphorePool,
     VkResult                                    result) override;
-#endif // VK_USE_PLATFORM_SCI
-
-#ifdef VK_USE_PLATFORM_SCI
-bool PreCallValidateDestroySemaphoreSciSyncPoolNV(
-    VkDevice                                    device,
-    VkSemaphoreSciSyncPoolNV                    semaphorePool,
-    const VkAllocationCallbacks*                pAllocator) const override;
-void PreCallRecordDestroySemaphoreSciSyncPoolNV(
-    VkDevice                                    device,
-    VkSemaphoreSciSyncPoolNV                    semaphorePool,
-    const VkAllocationCallbacks*                pAllocator) override;
 #endif // VK_USE_PLATFORM_SCI
 
 

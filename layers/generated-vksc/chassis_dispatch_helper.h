@@ -4,9 +4,9 @@
 
 /* Copyright (c) 2015-2021 The Khronos Group Inc.
  * Copyright (c) 2015-2021 Valve Corporation
- * Copyright (c) 2015-2022 LunarG, Inc.
+ * Copyright (c) 2015-2023 LunarG, Inc.
  * Copyright (c) 2015-2021 Google Inc.
- * Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -660,9 +660,6 @@ typedef enum InterceptId{
     InterceptIdPreCallValidateCreateSemaphoreSciSyncPoolNV,
     InterceptIdPreCallRecordCreateSemaphoreSciSyncPoolNV,
     InterceptIdPostCallRecordCreateSemaphoreSciSyncPoolNV,
-    InterceptIdPreCallValidateDestroySemaphoreSciSyncPoolNV,
-    InterceptIdPreCallRecordDestroySemaphoreSciSyncPoolNV,
-    InterceptIdPostCallRecordDestroySemaphoreSciSyncPoolNV,
     InterceptIdCount,
 } InterceptId;
 
@@ -1412,11 +1409,6 @@ void ValidationObject::InitObjectDispatchVectors() {
     BUILD_DISPATCH_VECTOR(PreCallValidateCreateSemaphoreSciSyncPoolNV);
     BUILD_DISPATCH_VECTOR(PreCallRecordCreateSemaphoreSciSyncPoolNV);
     BUILD_DISPATCH_VECTOR(PostCallRecordCreateSemaphoreSciSyncPoolNV);
-#endif
-#ifdef VK_USE_PLATFORM_SCI
-    BUILD_DISPATCH_VECTOR(PreCallValidateDestroySemaphoreSciSyncPoolNV);
-    BUILD_DISPATCH_VECTOR(PreCallRecordDestroySemaphoreSciSyncPoolNV);
-    BUILD_DISPATCH_VECTOR(PostCallRecordDestroySemaphoreSciSyncPoolNV);
 #endif
 };
 
