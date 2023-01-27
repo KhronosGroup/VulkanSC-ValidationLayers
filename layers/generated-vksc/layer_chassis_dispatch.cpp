@@ -4,9 +4,9 @@
 
 /* Copyright (c) 2015-2021 The Khronos Group Inc.
  * Copyright (c) 2015-2021 Valve Corporation
- * Copyright (c) 2015-2022 LunarG, Inc.
+ * Copyright (c) 2015-2023 LunarG, Inc.
  * Copyright (c) 2015-2021 Google Inc.
- * Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -5320,26 +5320,5 @@ VkResult DispatchCreateSemaphoreSciSyncPoolNV(
         *pSemaphorePool = layer_data->WrapNew(*pSemaphorePool);
     }
     return result;
-}
-#endif // VK_USE_PLATFORM_SCI
-
-#ifdef VK_USE_PLATFORM_SCI
-
-void DispatchDestroySemaphoreSciSyncPoolNV(
-    VkDevice                                    device,
-    VkSemaphoreSciSyncPoolNV                    semaphorePool,
-    const VkAllocationCallbacks*                pAllocator)
-{
-    auto layer_data = GetLayerDataPtr(get_dispatch_key(device), layer_data_map);
-    if (!wrap_handles) return layer_data->device_dispatch_table.DestroySemaphoreSciSyncPoolNV(device, semaphorePool, pAllocator);
-    uint64_t semaphorePool_id = reinterpret_cast<uint64_t &>(semaphorePool);
-    auto iter = unique_id_mapping.pop(semaphorePool_id);
-    if (iter != unique_id_mapping.end()) {
-        semaphorePool = (VkSemaphoreSciSyncPoolNV)iter->second;
-    } else {
-        semaphorePool = (VkSemaphoreSciSyncPoolNV)0;
-    }
-    layer_data->device_dispatch_table.DestroySemaphoreSciSyncPoolNV(device, semaphorePool, pAllocator);
-
 }
 #endif // VK_USE_PLATFORM_SCI

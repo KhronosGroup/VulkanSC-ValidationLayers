@@ -6,9 +6,9 @@
  *
  * Copyright (c) 2015-2021 The Khronos Group Inc.
  * Copyright (c) 2015-2021 Valve Corporation
- * Copyright (c) 2015-2022 LunarG, Inc.
+ * Copyright (c) 2015-2023 LunarG, Inc.
  * Copyright (c) 2015-2021 Google Inc.
- * Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25595,7 +25595,7 @@ void safe_VkMemorySciBufPropertiesNV::initialize(const safe_VkMemorySciBufProper
 #ifdef VK_USE_PLATFORM_SCI
 
 
-safe_VkPhysicalDeviceExternalSciBufFeaturesNV::safe_VkPhysicalDeviceExternalSciBufFeaturesNV(const VkPhysicalDeviceExternalSciBufFeaturesNV* in_struct) :
+safe_VkPhysicalDeviceExternalMemorySciBufFeaturesNV::safe_VkPhysicalDeviceExternalMemorySciBufFeaturesNV(const VkPhysicalDeviceExternalMemorySciBufFeaturesNV* in_struct) :
     sType(in_struct->sType),
     sciBufImport(in_struct->sciBufImport),
     sciBufExport(in_struct->sciBufExport)
@@ -25603,12 +25603,12 @@ safe_VkPhysicalDeviceExternalSciBufFeaturesNV::safe_VkPhysicalDeviceExternalSciB
     pNext = SafePnextCopy(in_struct->pNext);
 }
 
-safe_VkPhysicalDeviceExternalSciBufFeaturesNV::safe_VkPhysicalDeviceExternalSciBufFeaturesNV() :
-    sType(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_SCI_BUF_FEATURES_NV),
+safe_VkPhysicalDeviceExternalMemorySciBufFeaturesNV::safe_VkPhysicalDeviceExternalMemorySciBufFeaturesNV() :
+    sType(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_MEMORY_SCI_BUF_FEATURES_NV),
     pNext(nullptr)
 {}
 
-safe_VkPhysicalDeviceExternalSciBufFeaturesNV::safe_VkPhysicalDeviceExternalSciBufFeaturesNV(const safe_VkPhysicalDeviceExternalSciBufFeaturesNV& copy_src)
+safe_VkPhysicalDeviceExternalMemorySciBufFeaturesNV::safe_VkPhysicalDeviceExternalMemorySciBufFeaturesNV(const safe_VkPhysicalDeviceExternalMemorySciBufFeaturesNV& copy_src)
 {
     sType = copy_src.sType;
     sciBufImport = copy_src.sciBufImport;
@@ -25616,7 +25616,7 @@ safe_VkPhysicalDeviceExternalSciBufFeaturesNV::safe_VkPhysicalDeviceExternalSciB
     pNext = SafePnextCopy(copy_src.pNext);
 }
 
-safe_VkPhysicalDeviceExternalSciBufFeaturesNV& safe_VkPhysicalDeviceExternalSciBufFeaturesNV::operator=(const safe_VkPhysicalDeviceExternalSciBufFeaturesNV& copy_src)
+safe_VkPhysicalDeviceExternalMemorySciBufFeaturesNV& safe_VkPhysicalDeviceExternalMemorySciBufFeaturesNV::operator=(const safe_VkPhysicalDeviceExternalMemorySciBufFeaturesNV& copy_src)
 {
     if (&copy_src == this) return *this;
 
@@ -25631,13 +25631,13 @@ safe_VkPhysicalDeviceExternalSciBufFeaturesNV& safe_VkPhysicalDeviceExternalSciB
     return *this;
 }
 
-safe_VkPhysicalDeviceExternalSciBufFeaturesNV::~safe_VkPhysicalDeviceExternalSciBufFeaturesNV()
+safe_VkPhysicalDeviceExternalMemorySciBufFeaturesNV::~safe_VkPhysicalDeviceExternalMemorySciBufFeaturesNV()
 {
     if (pNext)
         FreePnextChain(pNext);
 }
 
-void safe_VkPhysicalDeviceExternalSciBufFeaturesNV::initialize(const VkPhysicalDeviceExternalSciBufFeaturesNV* in_struct)
+void safe_VkPhysicalDeviceExternalMemorySciBufFeaturesNV::initialize(const VkPhysicalDeviceExternalMemorySciBufFeaturesNV* in_struct)
 {
     sType = in_struct->sType;
     sciBufImport = in_struct->sciBufImport;
@@ -25645,7 +25645,7 @@ void safe_VkPhysicalDeviceExternalSciBufFeaturesNV::initialize(const VkPhysicalD
     pNext = SafePnextCopy(in_struct->pNext);
 }
 
-void safe_VkPhysicalDeviceExternalSciBufFeaturesNV::initialize(const safe_VkPhysicalDeviceExternalSciBufFeaturesNV* copy_src)
+void safe_VkPhysicalDeviceExternalMemorySciBufFeaturesNV::initialize(const safe_VkPhysicalDeviceExternalMemorySciBufFeaturesNV* copy_src)
 {
     sType = copy_src->sType;
     sciBufImport = copy_src->sciBufImport;
@@ -26735,8 +26735,8 @@ void *SafePnextCopy(const void *pNext) {
         case VK_STRUCTURE_TYPE_IMPORT_MEMORY_SCI_BUF_INFO_NV:
             safe_pNext = new safe_VkImportMemorySciBufInfoNV(reinterpret_cast<const VkImportMemorySciBufInfoNV *>(pNext));
             break;
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_SCI_BUF_FEATURES_NV:
-            safe_pNext = new safe_VkPhysicalDeviceExternalSciBufFeaturesNV(reinterpret_cast<const VkPhysicalDeviceExternalSciBufFeaturesNV *>(pNext));
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_MEMORY_SCI_BUF_FEATURES_NV:
+            safe_pNext = new safe_VkPhysicalDeviceExternalMemorySciBufFeaturesNV(reinterpret_cast<const VkPhysicalDeviceExternalMemorySciBufFeaturesNV *>(pNext));
             break;
         case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_SCI_SYNC_2_FEATURES_NV:
             safe_pNext = new safe_VkPhysicalDeviceExternalSciSync2FeaturesNV(reinterpret_cast<const VkPhysicalDeviceExternalSciSync2FeaturesNV *>(pNext));
@@ -27300,8 +27300,8 @@ void FreePnextChain(const void *pNext) {
         case VK_STRUCTURE_TYPE_IMPORT_MEMORY_SCI_BUF_INFO_NV:
             delete reinterpret_cast<const safe_VkImportMemorySciBufInfoNV *>(header);
             break;
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_SCI_BUF_FEATURES_NV:
-            delete reinterpret_cast<const safe_VkPhysicalDeviceExternalSciBufFeaturesNV *>(header);
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_MEMORY_SCI_BUF_FEATURES_NV:
+            delete reinterpret_cast<const safe_VkPhysicalDeviceExternalMemorySciBufFeaturesNV *>(header);
             break;
         case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_SCI_SYNC_2_FEATURES_NV:
             delete reinterpret_cast<const safe_VkPhysicalDeviceExternalSciSync2FeaturesNV *>(header);

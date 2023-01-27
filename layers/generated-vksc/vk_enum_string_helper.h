@@ -6,9 +6,9 @@
  *
  * Copyright (c) 2015-2021 The Khronos Group Inc.
  * Copyright (c) 2015-2021 Valve Corporation
- * Copyright (c) 2015-2022 LunarG, Inc.
+ * Copyright (c) 2015-2023 LunarG, Inc.
  * Copyright (c) 2015-2021 Google Inc.
- * Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -472,8 +472,8 @@ static inline const char* string_VkStructureType(VkStructureType input_value)
             return "VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_IMAGE_FORMAT_INFO";
         case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_MEMORY_HOST_PROPERTIES_EXT:
             return "VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_MEMORY_HOST_PROPERTIES_EXT";
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_SCI_BUF_FEATURES_NV:
-            return "VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_SCI_BUF_FEATURES_NV";
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_MEMORY_SCI_BUF_FEATURES_NV:
+            return "VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_MEMORY_SCI_BUF_FEATURES_NV";
         case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_SCI_SYNC_2_FEATURES_NV:
             return "VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_SCI_SYNC_2_FEATURES_NV";
         case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_SCI_SYNC_FEATURES_NV:
@@ -998,10 +998,8 @@ static inline const char* string_VkObjectType(VkObjectType input_value)
             return "VK_OBJECT_TYPE_SAMPLER_YCBCR_CONVERSION";
         case VK_OBJECT_TYPE_SEMAPHORE:
             return "VK_OBJECT_TYPE_SEMAPHORE";
-#ifdef VK_USE_PLATFORM_SCI
         case VK_OBJECT_TYPE_SEMAPHORE_SCI_SYNC_POOL_NV:
             return "VK_OBJECT_TYPE_SEMAPHORE_SCI_SYNC_POOL_NV";
-#endif // VK_USE_PLATFORM_SCI
         case VK_OBJECT_TYPE_SHADER_MODULE:
             return "VK_OBJECT_TYPE_SHADER_MODULE";
         case VK_OBJECT_TYPE_SURFACE_KHR:

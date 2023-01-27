@@ -6,9 +6,9 @@
  *
  * Copyright (c) 2015-2021 The Khronos Group Inc.
  * Copyright (c) 2015-2021 Valve Corporation
- * Copyright (c) 2015-2022 LunarG, Inc.
+ * Copyright (c) 2015-2023 LunarG, Inc.
  * Copyright (c) 2015-2021 Google Inc.
- * Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -4427,24 +4427,6 @@ void CoreChecksOptickInstrumented::PreCallRecordCreateSemaphoreSciSyncPoolNV(VkD
 void CoreChecksOptickInstrumented::PostCallRecordCreateSemaphoreSciSyncPoolNV(VkDevice device, const VkSemaphoreSciSyncPoolCreateInfoNV* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSemaphoreSciSyncPoolNV* pSemaphorePool, VkResult result) {
     OPTICK_EVENT();
     CoreChecks::PostCallRecordCreateSemaphoreSciSyncPoolNV(device, pCreateInfo, pAllocator, pSemaphorePool, result);
-}
-
-#endif // VK_USE_PLATFORM_SCI
-#ifdef VK_USE_PLATFORM_SCI
-bool CoreChecksOptickInstrumented::PreCallValidateDestroySemaphoreSciSyncPoolNV(VkDevice device, VkSemaphoreSciSyncPoolNV semaphorePool, const VkAllocationCallbacks* pAllocator) const {
-    OPTICK_EVENT();
-    auto result = CoreChecks::PreCallValidateDestroySemaphoreSciSyncPoolNV(device, semaphorePool, pAllocator);
-    return result;
-}
-
-void CoreChecksOptickInstrumented::PreCallRecordDestroySemaphoreSciSyncPoolNV(VkDevice device, VkSemaphoreSciSyncPoolNV semaphorePool, const VkAllocationCallbacks* pAllocator) {
-    OPTICK_EVENT();
-    CoreChecks::PreCallRecordDestroySemaphoreSciSyncPoolNV(device, semaphorePool, pAllocator);
-}
-
-void CoreChecksOptickInstrumented::PostCallRecordDestroySemaphoreSciSyncPoolNV(VkDevice device, VkSemaphoreSciSyncPoolNV semaphorePool, const VkAllocationCallbacks* pAllocator) {
-    OPTICK_EVENT();
-    CoreChecks::PostCallRecordDestroySemaphoreSciSyncPoolNV(device, semaphorePool, pAllocator);
 }
 
 #endif // VK_USE_PLATFORM_SCI

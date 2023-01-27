@@ -4,9 +4,9 @@
 
 /* Copyright (c) 2015-2021 The Khronos Group Inc.
  * Copyright (c) 2015-2021 Valve Corporation
- * Copyright (c) 2015-2022 LunarG, Inc.
+ * Copyright (c) 2015-2023 LunarG, Inc.
  * Copyright (c) 2015-2021 Google Inc.
- * Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1647,11 +1647,6 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateSemaphoreSciSyncPoolNV(
     const VkSemaphoreSciSyncPoolCreateInfoNV*   pCreateInfo,
     const VkAllocationCallbacks*                pAllocator,
     VkSemaphoreSciSyncPoolNV*                   pSemaphorePool);
-
-VKAPI_ATTR void VKAPI_CALL DestroySemaphoreSciSyncPoolNV(
-    VkDevice                                    device,
-    VkSemaphoreSciSyncPoolNV                    semaphorePool,
-    const VkAllocationCallbacks*                pAllocator);
 #endif // VK_USE_PLATFORM_SCI
 
 
@@ -2877,11 +2872,6 @@ class ValidationObject {
         virtual bool PreCallValidateCreateSemaphoreSciSyncPoolNV(VkDevice device, const VkSemaphoreSciSyncPoolCreateInfoNV* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSemaphoreSciSyncPoolNV* pSemaphorePool) const { return false; };
         virtual void PreCallRecordCreateSemaphoreSciSyncPoolNV(VkDevice device, const VkSemaphoreSciSyncPoolCreateInfoNV* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSemaphoreSciSyncPoolNV* pSemaphorePool) {};
         virtual void PostCallRecordCreateSemaphoreSciSyncPoolNV(VkDevice device, const VkSemaphoreSciSyncPoolCreateInfoNV* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSemaphoreSciSyncPoolNV* pSemaphorePool, VkResult result) {};
-#endif
-#ifdef VK_USE_PLATFORM_SCI
-        virtual bool PreCallValidateDestroySemaphoreSciSyncPoolNV(VkDevice device, VkSemaphoreSciSyncPoolNV semaphorePool, const VkAllocationCallbacks* pAllocator) const { return false; };
-        virtual void PreCallRecordDestroySemaphoreSciSyncPoolNV(VkDevice device, VkSemaphoreSciSyncPoolNV semaphorePool, const VkAllocationCallbacks* pAllocator) {};
-        virtual void PostCallRecordDestroySemaphoreSciSyncPoolNV(VkDevice device, VkSemaphoreSciSyncPoolNV semaphorePool, const VkAllocationCallbacks* pAllocator) {};
 #endif
 
 #if defined(VK_EXT_validation_cache)

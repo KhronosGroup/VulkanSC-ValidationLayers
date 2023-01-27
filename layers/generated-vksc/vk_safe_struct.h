@@ -6,9 +6,9 @@
  *
  * Copyright (c) 2015-2021 The Khronos Group Inc.
  * Copyright (c) 2015-2021 Valve Corporation
- * Copyright (c) 2015-2022 LunarG, Inc.
+ * Copyright (c) 2015-2023 LunarG, Inc.
  * Copyright (c) 2015-2021 Google Inc.
- * Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -5768,20 +5768,20 @@ struct safe_VkMemorySciBufPropertiesNV {
 #endif // VK_USE_PLATFORM_SCI
 
 #ifdef VK_USE_PLATFORM_SCI
-struct safe_VkPhysicalDeviceExternalSciBufFeaturesNV {
+struct safe_VkPhysicalDeviceExternalMemorySciBufFeaturesNV {
     VkStructureType sType;
-    const void* pNext;
+    void* pNext;
     VkBool32 sciBufImport;
     VkBool32 sciBufExport;
-    safe_VkPhysicalDeviceExternalSciBufFeaturesNV(const VkPhysicalDeviceExternalSciBufFeaturesNV* in_struct);
-    safe_VkPhysicalDeviceExternalSciBufFeaturesNV(const safe_VkPhysicalDeviceExternalSciBufFeaturesNV& copy_src);
-    safe_VkPhysicalDeviceExternalSciBufFeaturesNV& operator=(const safe_VkPhysicalDeviceExternalSciBufFeaturesNV& copy_src);
-    safe_VkPhysicalDeviceExternalSciBufFeaturesNV();
-    ~safe_VkPhysicalDeviceExternalSciBufFeaturesNV();
-    void initialize(const VkPhysicalDeviceExternalSciBufFeaturesNV* in_struct);
-    void initialize(const safe_VkPhysicalDeviceExternalSciBufFeaturesNV* copy_src);
-    VkPhysicalDeviceExternalSciBufFeaturesNV *ptr() { return reinterpret_cast<VkPhysicalDeviceExternalSciBufFeaturesNV *>(this); }
-    VkPhysicalDeviceExternalSciBufFeaturesNV const *ptr() const { return reinterpret_cast<VkPhysicalDeviceExternalSciBufFeaturesNV const *>(this); }
+    safe_VkPhysicalDeviceExternalMemorySciBufFeaturesNV(const VkPhysicalDeviceExternalMemorySciBufFeaturesNV* in_struct);
+    safe_VkPhysicalDeviceExternalMemorySciBufFeaturesNV(const safe_VkPhysicalDeviceExternalMemorySciBufFeaturesNV& copy_src);
+    safe_VkPhysicalDeviceExternalMemorySciBufFeaturesNV& operator=(const safe_VkPhysicalDeviceExternalMemorySciBufFeaturesNV& copy_src);
+    safe_VkPhysicalDeviceExternalMemorySciBufFeaturesNV();
+    ~safe_VkPhysicalDeviceExternalMemorySciBufFeaturesNV();
+    void initialize(const VkPhysicalDeviceExternalMemorySciBufFeaturesNV* in_struct);
+    void initialize(const safe_VkPhysicalDeviceExternalMemorySciBufFeaturesNV* copy_src);
+    VkPhysicalDeviceExternalMemorySciBufFeaturesNV *ptr() { return reinterpret_cast<VkPhysicalDeviceExternalMemorySciBufFeaturesNV *>(this); }
+    VkPhysicalDeviceExternalMemorySciBufFeaturesNV const *ptr() const { return reinterpret_cast<VkPhysicalDeviceExternalMemorySciBufFeaturesNV const *>(this); }
 };
 #endif // VK_USE_PLATFORM_SCI
 

@@ -4,7 +4,8 @@
 /*
  * Copyright (c) 2015-2021 The Khronos Group Inc.
  * Copyright (c) 2015-2021 Valve Corporation
- * Copyright (c) 2015-2022 LunarG, Inc.
+ * Copyright (c) 2015-2023 LunarG, Inc.
+ * Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -429,9 +430,6 @@ typedef struct VkLayerDispatchTable_ {
     // ---- VK_NV_external_sci_sync2 extension commands
 #ifdef VK_USE_PLATFORM_SCI
     PFN_vkCreateSemaphoreSciSyncPoolNV CreateSemaphoreSciSyncPoolNV;
-#endif // VK_USE_PLATFORM_SCI
-#ifdef VK_USE_PLATFORM_SCI
-    PFN_vkDestroySemaphoreSciSyncPoolNV DestroySemaphoreSciSyncPoolNV;
 #endif // VK_USE_PLATFORM_SCI
 } VkLayerDispatchTable;
 
