@@ -954,6 +954,22 @@ void CoreChecksOptickInstrumented::PreCallRecordQueuePresentKHR(VkQueue queue, c
 
             struct.extend([Guarded(info['ifdef'], format_info(ext_name, info)) for ext_name, info in extension_items])
 
+            # Add in promoted extensions that will be missing for vksc
+            if self.genOpts.apiname == 'vulkansc':
+                # Just use default info as we won't use it for vksc
+                for ext_name in promoted_1_1_ext_list:
+                    if ext_name in promoted_ext_special_defines.keys():
+                        info = { 'define': promoted_ext_special_defines[ext_name].upper()+'_EXTENSION_NAME', 'ifdef':'', 'reqs': [] }
+                    else:
+                        info = { 'define': ext_name.upper()+'_EXTENSION_NAME', 'ifdef':'', 'reqs': [] }
+                    struct.extend([format_info(ext_name, info)])
+                for ext_name in promoted_1_2_ext_list:
+                    if ext_name in promoted_ext_special_defines.keys():
+                        info = { 'define': promoted_ext_special_defines[ext_name].upper()+'_EXTENSION_NAME', 'ifdef':'', 'reqs': [] }
+                    else:
+                        info = { 'define': ext_name.upper()+'_EXTENSION_NAME', 'ifdef':'', 'reqs': [] }
+                    struct.extend([format_info(ext_name, info)])
+
             struct.extend([
                 '        };',
                 '',
