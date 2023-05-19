@@ -1500,7 +1500,6 @@ VKAPI_ATTR VkResult VKAPI_CALL AllocateDescriptorSets(
     const VkDescriptorSetAllocateInfo*          pAllocateInfo,
     VkDescriptorSet*                            pDescriptorSets) {
     auto layer_data = GetLayerDataPtr(get_dispatch_key(device), layer_data_map);
-#if !defined(VULKANSC)
     bool skip = false;
 
     cvdescriptorset::AllocateDescriptorSetsData ads_state[LayerObjectTypeMaxEnum];
@@ -1517,22 +1516,16 @@ VKAPI_ATTR VkResult VKAPI_CALL AllocateDescriptorSets(
             return VK_ERROR_VALIDATION_FAILED;
 #endif
     }
-#endif
     for (auto intercept : layer_data->object_dispatch) {
         auto lock = intercept->WriteLock();
         intercept->PreCallRecordAllocateDescriptorSets(device, pAllocateInfo, pDescriptorSets);
     }
-#if !defined(VULKANSC)
     VkResult result = DispatchAllocateDescriptorSets(device, pAllocateInfo, pDescriptorSets);
     for (auto intercept : layer_data->object_dispatch) {
         auto lock = intercept->WriteLock();
         intercept->PostCallRecordAllocateDescriptorSets(device, pAllocateInfo, pDescriptorSets,
             result, &(ads_state[intercept->container_type]));
     }
-#endif
-#if defined(VULKANSC)
-    VkResult result = VK_SUCCESS;
-#endif
     return result;
 }
 
