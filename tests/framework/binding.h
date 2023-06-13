@@ -26,6 +26,7 @@
 
 #include "lvt_function_pointers.h"
 #include "test_common.h"
+#include "vk_extension_helper.h"
 
 namespace vk_testing {
 
@@ -557,7 +558,7 @@ class Buffer : public internal::NonDispHandle<VkBuffer> {
         return barrier;
     }
 
-    [[nodiscard]] VkDeviceAddress address(uint32_t vk_api_version = VK_API_VERSION_1_2) const;
+    [[nodiscard]] VkDeviceAddress address(APIVersion vk_api_version = VK_API_VERSION_1_2) const;
 
   private:
     VkBufferCreateInfo create_info_;

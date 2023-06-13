@@ -397,6 +397,9 @@ VKAPI_ATTR bool LogMsg(const debug_report_data *debug_data, VkFlags msg_flags, c
         // Construct and append the specification text and link to the appropriate version of the spec
         if (nullptr != spec_text) {
             std::string spec_link = "https://www.khronos.org/registry/vulkan/specs/_MAGIC_KHRONOS_SPEC_TYPE_/html/vkspec.html";
+#ifdef VULKANSC_SPEC_LINK
+            spec_link = "https://www.khronos.org/registry/VulkanSC/specs/_MAGIC_KHRONOS_SPEC_TYPE_/html/vkspec.html";
+#endif
 #ifdef ANNOTATED_SPEC_LINK
             spec_link = ANNOTATED_SPEC_LINK;
 #endif
@@ -413,6 +416,9 @@ VKAPI_ATTR bool LogMsg(const debug_report_data *debug_data, VkFlags msg_flags, c
             str_plus_spec_text.append(spec_text);
             if (0 == spec_type.compare("default")) {
                 str_plus_spec_text.append(" (https://github.com/KhronosGroup/Vulkan-Docs/search?q=)");
+#ifdef VULKANSC_SPEC_LINK
+                str_plus_spec_text.append(" (https://github.com/KhronosGroup/VulkanSC-Docs/search?q=)");
+#endif
             } else {
                 str_plus_spec_text.append(" (");
                 str_plus_spec_text.append(spec_link);

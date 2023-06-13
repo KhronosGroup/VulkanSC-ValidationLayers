@@ -104,6 +104,16 @@ struct PipelineStageState {
                        std::shared_ptr<const SHADER_MODULE_STATE> &module_state, const SHADER_MODULE_STATE::EntryPoint *entrypoint);
 };
 
+class PIPELINE_CACHE_STATE : public BASE_NODE {
+  public:
+    PIPELINE_CACHE_STATE(VkPipelineCache pipeline_cache, const VkPipelineCacheCreateInfo *pCreateInfo)
+        : BASE_NODE(pipeline_cache, kVulkanObjectTypePipelineCache), create_info(pCreateInfo) {}
+
+    VkPipelineCache pipelineCache() const { return handle_.Cast<VkPipelineCache>(); }
+
+    const safe_VkPipelineCacheCreateInfo create_info;
+};
+
 class PIPELINE_STATE : public BASE_NODE {
   public:
     union CreateInfo {

@@ -1,6 +1,7 @@
 #!/usr/bin/python3 -i
 #
 # Copyright (c) 2022-2023 The Khronos Group Inc.
+# Copyright (c) 2023-2023 RasterGrid Kft.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,6 +29,7 @@ class FormatUtilsOutputGeneratorOptions(GeneratorOptions):
                  directory = '.',
                  genpath = None,
                  apiname = 'vulkan',
+                 mergeApiNames = None,
                  profile = None,
                  versions = '.*',
                  emitversions = '.*',
@@ -54,6 +56,7 @@ class FormatUtilsOutputGeneratorOptions(GeneratorOptions):
                 directory = directory,
                 genpath = genpath,
                 apiname = apiname,
+                mergeApiNames = mergeApiNames,
                 profile = profile,
                 versions = versions,
                 emitversions = emitversions,

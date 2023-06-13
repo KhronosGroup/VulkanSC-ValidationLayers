@@ -3,6 +3,7 @@
 # Copyright (c) 2015-2023 Valve Corporation
 # Copyright (c) 2015-2023 LunarG, Inc.
 # Copyright (c) 2015-2023 Google Inc.
+# Copyright (c) 2023-2023 RasterGrid Kft.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -36,43 +37,6 @@ vuid_prefixes = ['VUID-', 'UNASSIGNED-', 'kVUID_']
 
 # Hard-coded flags that could be command line args, if we decide that's useful
 ignore_unassigned = True # These are not found in layer code unless they appear explicitly (most don't), so produce false positives
-
-layer_source_files = [common_codegen.repo_relative(path) for path in [
-    'layers/core_checks/android_validation.cpp',
-    'layers/core_checks/buffer_validation.cpp',
-    'layers/state_tracker/cmd_buffer_state.cpp', # some Video VUIDs are in here
-    'layers/core_checks/cmd_buffer_dynamic_validation.cpp',
-    'layers/core_checks/cmd_buffer_validation.cpp',
-    'layers/core_checks/copy_blit_resolve_validation.cpp',
-    'layers/state_tracker/descriptor_sets.cpp',
-    'layers/core_checks/descriptor_validation.cpp',
-    'layers/core_checks/device_validation.cpp',
-    'layers/core_checks/device_memory_validation.cpp',
-    'layers/core_checks/drawdispatch_validation.cpp',
-    'layers/core_checks/external_object_validation.cpp',
-    'layers/gpu_validation/gpu_vuids.h',
-    'layers/stateless/parameter_validation_utils.cpp',
-    'layers/core_checks/image_validation.cpp',
-    'layers/core_checks/image_layout_validation.cpp',
-    'layers/core_checks/pipeline_validation.cpp',
-    'layers/object_tracker/object_tracker_utils.cpp',
-    'layers/core_checks/query_validation.cpp',
-    'layers/core_checks/queue_validation.cpp',
-    'layers/core_checks/ray_tracing_validation.cpp',
-    'layers/core_checks/render_pass_validation.cpp',
-    'layers/state_tracker/shader_module.cpp',
-    'layers/core_checks/shader_validation.cpp',
-    'layers/core_checks/synchronization_validation.cpp',
-    'layers/stateless/stateless_validation.h',
-    'layers/sync/sync_validation.cpp',
-    'layers/sync/sync_vuid_maps.cpp',
-    'layers/core_checks/video_validation.cpp',
-    'layers/core_checks/wsi_validation.cpp',
-    'layers/generated/parameter_validation.cpp',
-    'layers/generated/object_tracker.cpp',
-    'layers/generated/spirv_validation_helper.cpp',
-    'layers/generated/command_validation.cpp',
-]]
 
 test_source_files = glob.glob(os.path.join(common_codegen.repo_relative('tests'), '*.cpp'))
 
@@ -629,8 +593,8 @@ static const vuid_spec_text_pair vuid_spec_text[] = {
                 assert features
 
                 def isDefined(feature, edition):
-                    def getVersion(f): return int(f.replace('VK_VERSION_1_', '', 1))
-                    def isVersion(f): return f.startswith('VK_VERSION_') and feature != 'VK_VERSION_1_0' and getVersion(feature) < 1024
+                    def getVersion(f): return int(f.replace('VK_VERSION_1_', '', 1).replace('VKSC_VERSION_1_', '', 1))
+                    def isVersion(f): return (f.startswith('VK_VERSION_') or f.startswith('VKSC_VERSION_')) and feature != 'VK_VERSION_1_0' and getVersion(feature) < 1024
                     def isExtension(f): return f.startswith('VK_') and not isVersion(f)
                     def isKhr(f): return f.startswith('VK_KHR_')
 
@@ -737,6 +701,10 @@ def main(argv):
 
     parser = argparse.ArgumentParser()
     parser.add_argument('json_file', help="registry file 'validusage.json'")
+    parser.add_argument('-api',
+                        default='vulkan',
+                        choices=['vulkan'],
+                        help='Specify API name to use')
     parser.add_argument('-c', action='store_true',
                         help='report consistency warnings')
     parser.add_argument('-todo', action='store_true',
@@ -786,6 +754,46 @@ def main(argv):
                 print("  %s" % vuid)
                 for ext in val_json.vuid_db[vuid]:
                     print("    with extension: %s" % ext['ext'])
+
+    layer_source_files = [common_codegen.repo_relative(path) for path in [
+        'layers/core_checks/android_validation.cpp',
+        'layers/core_checks/buffer_validation.cpp',
+        'layers/state_tracker/cmd_buffer_state.cpp', # some Video VUIDs are in here
+        'layers/core_checks/cmd_buffer_dynamic_validation.cpp',
+        'layers/core_checks/cmd_buffer_validation.cpp',
+        'layers/core_checks/copy_blit_resolve_validation.cpp',
+        'layers/state_tracker/descriptor_sets.cpp',
+        'layers/core_checks/descriptor_validation.cpp',
+        'layers/core_checks/device_validation.cpp',
+        'layers/core_checks/device_memory_validation.cpp',
+        'layers/core_checks/drawdispatch_validation.cpp',
+        'layers/core_checks/external_object_validation.cpp',
+        'layers/gpu_validation/gpu_vuids.h',
+        'layers/stateless/parameter_validation_utils.cpp',
+        'layers/core_checks/image_validation.cpp',
+        'layers/core_checks/image_layout_validation.cpp',
+        'layers/core_checks/pipeline_validation.cpp',
+        'layers/object_tracker/object_tracker_utils.cpp',
+        'layers/core_checks/query_validation.cpp',
+        'layers/core_checks/queue_validation.cpp',
+        'layers/core_checks/ray_tracing_validation.cpp',
+        'layers/core_checks/render_pass_validation.cpp',
+        'layers/state_tracker/shader_module.cpp',
+        'layers/core_checks/shader_validation.cpp',
+        'layers/core_checks/synchronization_validation.cpp',
+        'layers/stateless/stateless_validation.h',
+        'layers/sync/sync_validation.cpp',
+        'layers/sync/sync_vuid_maps.cpp',
+        'layers/core_checks/video_validation.cpp',
+        'layers/core_checks/wsi_validation.cpp',
+        f'layers/{args.api}/generated/parameter_validation.cpp',
+        f'layers/{args.api}/generated/object_tracker.cpp',
+        f'layers/{args.api}/generated/spirv_validation_helper.cpp',
+        f'layers/{args.api}/generated/command_validation.cpp',
+    ]]
+
+    if args.api == 'vulkansc':
+        layer_source_files.extend(glob.glob(os.path.join(common_codegen.repo_relative('layers/vulkansc/core_checks/'), '*.cpp')))
 
     # Parse layer source files
     val_source = ValidationSource(layer_source_files)

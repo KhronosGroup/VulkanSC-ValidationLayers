@@ -14,6 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ~~~
+if (VULKANSC)
+    add_subdirectory(vulkansc)
+    return() # Return early
+endif()
+
 include(GoogleTest) # gtest_discover_tests
 
 # GoogleTest is required for testing framework
@@ -26,9 +31,9 @@ add_executable(vk_layer_validation_tests)
 
 target_sources(vk_layer_validation_tests PRIVATE
     ${VVL_SOURCE_DIR}/layers/utils/convert_to_renderpass2.cpp
-    ${VVL_SOURCE_DIR}/layers/generated/lvt_function_pointers.cpp
-    ${VVL_SOURCE_DIR}/layers/generated/vk_format_utils.cpp
-    ${VVL_SOURCE_DIR}/layers/generated/vk_safe_struct.cpp
+    ${VVL_SOURCE_DIR}/layers/vulkan/generated/lvt_function_pointers.cpp
+    ${VVL_SOURCE_DIR}/layers/vulkan/generated/vk_format_utils.cpp
+    ${VVL_SOURCE_DIR}/layers/vulkan/generated/vk_safe_struct.cpp
     framework/layer_validation_tests.h
     framework/layer_validation_tests.cpp
     framework/test_common.h
@@ -108,11 +113,8 @@ else()
     gtest_discover_tests(vk_layer_validation_tests DISCOVERY_TIMEOUT 100)
 endif()
 
-add_dependencies(vk_layer_validation_tests VkLayer_khronos_validation)
-target_include_directories(vk_layer_validation_tests PRIVATE
-    ${VVL_SOURCE_DIR}/layers
-    .
-)
+add_dependencies(vk_layer_validation_tests vvl)
+target_include_directories(vk_layer_validation_tests PRIVATE .)
 
 if(${CMAKE_CXX_COMPILER_ID} MATCHES "(GNU|Clang)")
     target_compile_options(vk_layer_validation_tests PRIVATE
@@ -133,7 +135,7 @@ elseif(MSVC)
     target_compile_options(vk_layer_validation_tests PRIVATE /wd4267)
 
     if(MSVC_IDE)
-        set_target_properties(vk_layer_validation_tests PROPERTIES VS_DEBUGGER_ENVIRONMENT "VK_LAYER_PATH=$<TARGET_FILE_DIR:VkLayer_khronos_validation>")
+        set_target_properties(vk_layer_validation_tests PROPERTIES VS_DEBUGGER_ENVIRONMENT "VK_LAYER_PATH=$<TARGET_FILE_DIR:vvl>")
     endif()
 
     if (CMAKE_SIZEOF_VOID_P EQUAL 4)

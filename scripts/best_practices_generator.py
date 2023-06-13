@@ -3,6 +3,7 @@
 # Copyright (c) 2015-2023 The Khronos Group Inc.
 # Copyright (c) 2015-2023 Valve Corporation
 # Copyright (c) 2015-2023 LunarG, Inc.
+# Copyright (c) 2023-2023 RasterGrid Kft.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -32,6 +33,7 @@ class BestPracticesOutputGeneratorOptions(GeneratorOptions):
                  directory = '.',
                  genpath = None,
                  apiname = 'vulkan',
+                 mergeApiNames = None,
                  profile = None,
                  versions = '.*',
                  emitversions = '.*',
@@ -57,6 +59,7 @@ class BestPracticesOutputGeneratorOptions(GeneratorOptions):
                 directory = directory,
                 genpath = genpath,
                 apiname = apiname,
+                mergeApiNames = mergeApiNames,
                 profile = profile,
                 versions = versions,
                 emitversions = emitversions,

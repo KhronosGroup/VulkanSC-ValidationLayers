@@ -27,10 +27,11 @@ LOCAL_SRC_FILES += $(SRC_DIR)/layers/vk_layer_config.cpp
 LOCAL_SRC_FILES += $(SRC_DIR)/layers/utils/vk_layer_extension_utils.cpp
 LOCAL_SRC_FILES += $(SRC_DIR)/layers/error_message/logging.cpp
 LOCAL_SRC_FILES += $(SRC_DIR)/layers/utils/vk_layer_utils.cpp
-LOCAL_SRC_FILES += $(SRC_DIR)/layers/generated/vk_format_utils.cpp
+LOCAL_SRC_FILES += $(SRC_DIR)/layers/vulkan/generated/vk_format_utils.cpp
 LOCAL_SRC_FILES += $(SRC_DIR)/layers/external/xxhash.cpp
 LOCAL_C_INCLUDES += $(VULKAN_INCLUDE) \
-                    $(LOCAL_PATH)/$(SRC_DIR)/layers/generated \
+                    $(LOCAL_PATH)/$(SRC_DIR)/layers/vulkan \
+                    $(LOCAL_PATH)/$(SRC_DIR)/layers/vulkan/generated \
                     $(LOCAL_PATH)/$(SRC_DIR)/layers \
                     $(LOCAL_PATH)/$(SRC_DIR)/layers/external \
                     $(LOCAL_PATH)/$(THIRD_PARTY)/robin-hood-hashing/src/include
@@ -72,41 +73,42 @@ LOCAL_SRC_FILES += $(SRC_DIR)/layers/state_tracker/shader_module.cpp
 LOCAL_SRC_FILES += $(SRC_DIR)/layers/state_tracker/shader_instruction.cpp
 LOCAL_SRC_FILES += $(SRC_DIR)/layers/core_checks/shader_validation.cpp
 LOCAL_SRC_FILES += $(SRC_DIR)/layers/core_checks/synchronization_validation.cpp
-LOCAL_SRC_FILES += $(SRC_DIR)/layers/generated/spirv_validation_helper.cpp
-LOCAL_SRC_FILES += $(SRC_DIR)/layers/generated/spirv_grammar_helper.cpp
-LOCAL_SRC_FILES += $(SRC_DIR)/layers/generated/command_validation.cpp
+LOCAL_SRC_FILES += $(SRC_DIR)/layers/vulkan/generated/spirv_validation_helper.cpp
+LOCAL_SRC_FILES += $(SRC_DIR)/layers/vulkan/generated/spirv_grammar_helper.cpp
+LOCAL_SRC_FILES += $(SRC_DIR)/layers/vulkan/generated/command_validation.cpp
 LOCAL_SRC_FILES += $(SRC_DIR)/layers/gpu_validation/gpu_validation.cpp
 LOCAL_SRC_FILES += $(SRC_DIR)/layers/gpu_validation/gpu_utils.cpp
 LOCAL_SRC_FILES += $(SRC_DIR)/layers/gpu_validation/debug_printf.cpp
 LOCAL_SRC_FILES += $(SRC_DIR)/layers/best_practices/best_practices_utils.cpp
-LOCAL_SRC_FILES += $(SRC_DIR)/layers/generated/best_practices.cpp
+LOCAL_SRC_FILES += $(SRC_DIR)/layers/vulkan/generated/best_practices.cpp
 LOCAL_SRC_FILES += $(SRC_DIR)/layers/sync/sync_utils.cpp
 LOCAL_SRC_FILES += $(SRC_DIR)/layers/sync/sync_vuid_maps.cpp
 LOCAL_SRC_FILES += $(SRC_DIR)/layers/error_message/core_error_location.cpp
-LOCAL_SRC_FILES += $(SRC_DIR)/layers/generated/sync_validation_types.cpp
+LOCAL_SRC_FILES += $(SRC_DIR)/layers/vulkan/generated/sync_validation_types.cpp
 LOCAL_SRC_FILES += $(SRC_DIR)/layers/sync/sync_validation.cpp
 LOCAL_SRC_FILES += $(SRC_DIR)/layers/utils/convert_to_renderpass2.cpp
-LOCAL_SRC_FILES += $(SRC_DIR)/layers/generated/layer_chassis_dispatch.cpp
-LOCAL_SRC_FILES += $(SRC_DIR)/layers/generated/chassis.cpp
-LOCAL_SRC_FILES += $(SRC_DIR)/layers/generated/valid_param_values.cpp
+LOCAL_SRC_FILES += $(SRC_DIR)/layers/vulkan/generated/layer_chassis_dispatch.cpp
+LOCAL_SRC_FILES += $(SRC_DIR)/layers/vulkan/generated/chassis.cpp
+LOCAL_SRC_FILES += $(SRC_DIR)/layers/vulkan/generated/valid_param_values.cpp
 LOCAL_SRC_FILES += $(SRC_DIR)/layers/layer_options.cpp
 LOCAL_SRC_FILES += $(SRC_DIR)/layers/core_checks/query_validation.cpp
 LOCAL_SRC_FILES += $(SRC_DIR)/layers/core_checks/queue_validation.cpp
 LOCAL_SRC_FILES += $(SRC_DIR)/layers/core_checks/ray_tracing_validation.cpp
 LOCAL_SRC_FILES += $(SRC_DIR)/layers/core_checks/wsi_validation.cpp
-LOCAL_SRC_FILES += $(SRC_DIR)/layers/generated/parameter_validation.cpp
+LOCAL_SRC_FILES += $(SRC_DIR)/layers/vulkan/generated/parameter_validation.cpp
 LOCAL_SRC_FILES += $(SRC_DIR)/layers/stateless/parameter_validation_utils.cpp
-LOCAL_SRC_FILES += $(SRC_DIR)/layers/generated/object_tracker.cpp
+LOCAL_SRC_FILES += $(SRC_DIR)/layers/vulkan/generated/object_tracker.cpp
 LOCAL_SRC_FILES += $(SRC_DIR)/layers/object_tracker/object_tracker_utils.cpp
-LOCAL_SRC_FILES += $(SRC_DIR)/layers/generated/thread_safety.cpp
-LOCAL_SRC_FILES += $(SRC_DIR)/layers/generated/vk_safe_struct.cpp
+LOCAL_SRC_FILES += $(SRC_DIR)/layers/vulkan/generated/thread_safety.cpp
+LOCAL_SRC_FILES += $(SRC_DIR)/layers/vulkan/generated/vk_safe_struct.cpp
 LOCAL_SRC_FILES += $(SRC_DIR)/layers/state_tracker/image_layout_map.cpp
 LOCAL_SRC_FILES += $(SRC_DIR)/layers/containers/subresource_adapter.cpp
 LOCAL_SRC_FILES += $(SRC_DIR)/layers/external/vma/vma.cpp
 LOCAL_C_INCLUDES += $(VULKAN_INCLUDE) \
                     $(LOCAL_PATH)/$(SRC_DIR)/layers \
                     $(LOCAL_PATH)/$(SRC_DIR)/layers/external \
-                    $(LOCAL_PATH)/$(SRC_DIR)/layers/generated \
+                    $(LOCAL_PATH)/$(SRC_DIR)/layers/vulkan \
+                    $(LOCAL_PATH)/$(SRC_DIR)/layers/vulkan/generated \
                     $(LOCAL_PATH)/$(THIRD_PARTY)/shaderc/third_party/spirv-tools/external/spirv-headers/include \
                     $(LOCAL_PATH)/$(THIRD_PARTY)/robin-hood-hashing/src/include
 LOCAL_STATIC_LIBRARIES += layer_utils glslang SPIRV-Tools SPIRV-Tools-opt
@@ -166,10 +168,11 @@ LOCAL_SRC_FILES += $(SRC_DIR)/tests/framework/layer_validation_tests.cpp \
                    $(SRC_DIR)/tests/framework/render.cpp \
                    $(SRC_DIR)/tests/framework/ray_tracing_objects.cpp \
                    $(SRC_DIR)/layers/utils/convert_to_renderpass2.cpp \
-                   $(SRC_DIR)/layers/generated/vk_safe_struct.cpp \
-                   $(SRC_DIR)/layers/generated/lvt_function_pointers.cpp
+                   $(SRC_DIR)/layers/vulkan/generated/vk_safe_struct.cpp \
+                   $(SRC_DIR)/layers/vulkan/generated/lvt_function_pointers.cpp
 LOCAL_C_INCLUDES += $(VULKAN_INCLUDE) \
-                    $(LOCAL_PATH)/$(SRC_DIR)/layers/generated \
+                    $(LOCAL_PATH)/$(SRC_DIR)/layers/vulkan \
+                    $(LOCAL_PATH)/$(SRC_DIR)/layers/vulkan/generated \
                     $(LOCAL_PATH)/$(SRC_DIR)/layers \
                     $(LOCAL_PATH)/$(SRC_DIR)/libs \
                     $(LOCAL_PATH)/$(THIRD_PARTY)/robin-hood-hashing/src/include
@@ -233,10 +236,11 @@ LOCAL_SRC_FILES += $(SRC_DIR)/tests/framework/layer_validation_tests.cpp \
                    $(SRC_DIR)/tests/framework/render.cpp \
                    $(SRC_DIR)/tests/framework/ray_tracing_objects.cpp \
                    $(SRC_DIR)/layers/utils/convert_to_renderpass2.cpp \
-                   $(SRC_DIR)/layers/generated/vk_safe_struct.cpp \
-                   $(SRC_DIR)/layers/generated/lvt_function_pointers.cpp
+                   $(SRC_DIR)/layers/vulkan/generated/vk_safe_struct.cpp \
+                   $(SRC_DIR)/layers/vulkan/generated/lvt_function_pointers.cpp
 LOCAL_C_INCLUDES += $(VULKAN_INCLUDE) \
-                    $(LOCAL_PATH)/$(SRC_DIR)/layers/generated \
+                    $(LOCAL_PATH)/$(SRC_DIR)/layers/vulkan \
+                    $(LOCAL_PATH)/$(SRC_DIR)/layers/vulkan/generated \
                     $(LOCAL_PATH)/$(SRC_DIR)/layers \
                     $(LOCAL_PATH)/$(SRC_DIR)/libs \
                     $(LOCAL_PATH)/$(THIRD_PARTY)/robin-hood-hashing/src/include

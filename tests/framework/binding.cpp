@@ -682,7 +682,7 @@ void Buffer::bind_memory(const Device &dev, VkMemoryPropertyFlags mem_props, VkD
     bind_memory(internal_mem_, mem_offset);
 }
 
-VkDeviceAddress Buffer::address(uint32_t vk_api_version /*= VK_API_VERSION_1_2*/) const {
+VkDeviceAddress Buffer::address(APIVersion vk_api_version /*= VK_API_VERSION_1_2*/) const {
     auto bdai = LvlInitStruct<VkBufferDeviceAddressInfo>();
     bdai.buffer = handle();
     if (vk_api_version < VK_API_VERSION_1_2) {

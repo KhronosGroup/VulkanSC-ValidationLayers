@@ -4,6 +4,7 @@
 # Copyright (c) 2015-2023 Valve Corporation
 # Copyright (c) 2015-2023 LunarG, Inc.
 # Copyright (c) 2015-2023 Google Inc.
+# Copyright (c) 2023-2023 RasterGrid Kft.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -64,6 +65,7 @@ class ObjectTrackerGeneratorOptions(GeneratorOptions):
                  directory = '.',
                  genpath = None,
                  apiname = 'vulkan',
+                 mergeApiNames = None,
                  profile = None,
                  versions = '.*',
                  emitversions = '.*',
@@ -90,6 +92,7 @@ class ObjectTrackerGeneratorOptions(GeneratorOptions):
                 directory = directory,
                 genpath = genpath,
                 apiname = apiname,
+                mergeApiNames = mergeApiNames,
                 profile = profile,
                 versions = versions,
                 emitversions = emitversions,
@@ -329,18 +332,42 @@ class ObjectTrackerOutputGenerator(OutputGenerator):
     # Generate the object tracker undestroyed object validation function
     def GenReportFunc(self):
         output_func = ''
+        error_code = {
+            'instance': 'VUID-vkDestroyInstance-instance-00629',
+            'device': 'VUID-vkDestroyDevice-device-00378'
+        }
+        if self.genOpts.apiname == 'vulkansc':
+            error_code['device'] = 'VUID-vkDestroyDevice-device-05137'
         for objtype in ['instance', 'device']:
             upper_objtype = objtype.capitalize();
-            output_func += 'bool ObjectLifetimes::ReportUndestroyed%sObjects(Vk%s %s, const std::string& error_code) const {\n' % (upper_objtype, upper_objtype, objtype)
+            output_func += 'bool ObjectLifetimes::ReportUndestroyed%sObjects(Vk%s %s) const {\n' % (upper_objtype, upper_objtype, objtype)
             output_func += '    bool skip = false;\n'
+            output_func += '    const std::string error_code = "%s";\n' % error_code[objtype]
             if objtype == 'device':
-                output_func += '    skip |= ReportLeaked%sObjects(%s, kVulkanObjectTypeCommandBuffer, error_code);\n' % (upper_objtype, objtype)
+                comment_prefix = ''
+                if self.genOpts.apiname == 'vulkansc':
+                    comment_prefix = '// Implicitly freed/destroyed -- do not report: '
+                output_func += '    %sskip |= ReportLeaked%sObjects(%s, kVulkanObjectTypeCommandBuffer, error_code);\n' % (comment_prefix, upper_objtype, objtype)
             for handle in self.object_types:
                 if self.handle_types.IsNonDispatchable(handle) and not self.is_aliased_type[handle]:
                     if (objtype == 'device' and self.handle_parents.IsParentDevice(handle)) or (objtype == 'instance' and not self.handle_parents.IsParentDevice(handle)):
                         comment_prefix = ''
                         if (handle == 'VkDisplayKHR' or handle == 'VkDisplayModeKHR'):
                             comment_prefix = '// No destroy API -- do not report: '
+                        if self.genOpts.apiname == 'vulkansc':
+                            # Device memory, swapchains, and pool objects are implicitly freed or destroyed
+                            implicitly_destroyed = [
+                                'VkDeviceMemory',
+                                'VkSwapchainKHR',
+                                'VkCommandPool',
+                                'VkDescriptorPool',
+                                'VkSemaphoreSciSyncPoolNV',
+                                'VkQueryPool',
+                                # Same goes for objects allocated from one of the pools
+                                'VkDescriptorSet'
+                            ]
+                            if handle in implicitly_destroyed:
+                                comment_prefix = '// Implicitly freed/destroyed -- do not report: '
                         output_func += '    %sskip |= ReportLeaked%sObjects(%s, %s, error_code);\n' % (comment_prefix, upper_objtype, objtype, self.GetVulkanObjType(handle))
             output_func += '    return skip;\n'
             output_func += '}\n'
@@ -430,6 +457,7 @@ class ObjectTrackerOutputGenerator(OutputGenerator):
         copyright += ' * Copyright (c) 2015-2023 Valve Corporation\n'
         copyright += ' * Copyright (c) 2015-2023 LunarG, Inc.\n'
         copyright += ' * Copyright (c) 2015-2023 Google Inc.\n'
+        copyright += ' * Copyright (c) 2023-2023 RasterGrid Kft.\n'
         copyright += ' *\n'
         copyright += ' * Licensed under the Apache License, Version 2.0 (the "License");\n'
         copyright += ' * you may not use this file except in compliance with the License.\n'
@@ -783,6 +811,9 @@ class ObjectTrackerOutputGenerator(OutputGenerator):
                 param = -2
             compatalloc_vuid = self.get_alloc_vuid(cmd_info[param].name, cmd_info[param].type, "compatalloc")
             nullalloc_vuid = self.get_alloc_vuid(cmd_info[param].name, cmd_info[param].type, "nullalloc")
+            if self.genOpts.apiname == 'vulkansc':
+                compatalloc_vuid = "kVUIDUndefined"
+                nullalloc_vuid = "kVUIDUndefined"
             if cmd_info[param].type in self.handle_types:
                 if object_array == True:
                     # This API is freeing an array of handles -- add loop control

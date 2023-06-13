@@ -8,6 +8,7 @@
 1. [Linux Build](#building-on-linux)
 1. [Android Build](#building-on-android)
 1. [MacOS build](#building-on-macos)
+1. [Vulkan SC build](#building-vulkan-sc-validation-layers)
 1. [Installed Files](#installed-files)
 
 ## Requirements
@@ -24,10 +25,10 @@ While it's not technically required, it's practically required for most users.
 The following will be enough for most people, for more detailed instructions, see below.
 
 ```bash
-git clone https://github.com/KhronosGroup/Vulkan-ValidationLayers.git
-cd Vulkan-ValidationLayers
+git clone https://github.com/KhronosGroup/VulkanSC-ValidationLayers.git
+cd VulkanSC-ValidationLayers
 
-cmake -S . -B build -D UPDATE_DEPS=ON -D BUILD_WERROR=ON -D BUILD_TESTS=ON -D CMAKE_BUILD_TYPE=Debug
+cmake -S . -B build -D UPDATE_DEPS=ON -D BUILD_WERROR=ON -D BUILD_TESTS=ON -D CMAKE_BUILD_TYPE=Debug -D VULKANSC=ON
 cmake --build . --config Debug
 
 # CMake 3.21+
@@ -37,7 +38,7 @@ cmake --build . --config Debug
 
 ## Generated source code
 
-This repository contains generated source code in the `layers/generated`
+This repository contains generated source code in the `layers/vulkan/generated`
 directory which is not intended to be modified directly.
 
 Please see the [Generated Code documentation](./docs/generated_code.md) for more information
@@ -46,9 +47,9 @@ Please see the [Generated Code documentation](./docs/generated_code.md) for more
 
 ### Display Drivers
 
-This repository does not contain a Vulkan-capable driver. You will need to
-obtain and install a Vulkan driver from your graphics hardware vendor or from
-some other suitable source if you intend to run Vulkan applications.
+This repository does not contain a Vulkan- or Vulkan SC-capable driver. You will need to
+obtain and install an appropriate driver from your graphics hardware vendor or from
+some other suitable source if you intend to run Vulkan or Vulkan SC applications.
 
 ### Building dependencies with script and Known-Good revisions
 
@@ -87,6 +88,10 @@ version of that dependency.
 > Note: All test will be downloaded, built, and installed with `update_deps.py`
 
 - [Vulkan Headers repository](https://github.com/KhronosGroup/Vulkan-Headers)
+    - For Vulkan builds
+    - You must clone the headers repository and build its `install` target
+- [Vulkan SC Headers repository](https://github.com/KhronosGroup/VulkanSC-Headers)
+    - For Vulkan SC builds
     - You must clone the headers repository and build its `install` target
 - [SPIRV-Headers repository](https://github.com/KhronosGroup/SPIRV-Headers)
     - You must clone the headers repository and build its `install` target
@@ -103,6 +108,9 @@ version of that dependency.
 For running the tests:
 
 - [Vulkan-Loader repository](https://github.com/KhronosGroup/Vulkan-Loader.git)
+    - For Vulkan builds
+- [VulkanSC-Loader repository](https://github.com/KhronosGroup/VulkanSC-Loader.git)
+    - For Vulkan SC builds
 - [glslang repository](https://github.com/KhronosGroup/glslang)
     - You must clone the headers repository and build its `install` target
 - [Google Test](https://github.com/google/googletest)
@@ -129,7 +137,7 @@ directories and place them in any location (see option `--dir` in the
   the current directory when it is invoked. In this case, they are built in
   the `build` directory.
 - The `build` directory is also being used to build this
-  (Vulkan-ValidationLayers) repository. But there shouldn't be any conflicts
+  (VulkanSC-ValidationLayers) repository. But there shouldn't be any conflicts
   inside the `build` directory between the dependent repositories and the
   build files for this repository.
 - The `--dir` option for `update_deps.py` can be used to relocate the
@@ -439,19 +447,26 @@ cmake --open .
 
 Within Xcode, you can select Debug or Release builds in the Build Settings of the project.
 
+## Building Vulkan SC Validation Layers
+
+Commands for building the Vulkan SC version of the validation layers are similar to the instructions in the sections above with a few minor differences:
+
+1) When running `update_deps.py` and/or `generate_source.py`, the option `--api vulkansc` should be specified.
+2) When running `cmake -C helper.cmake ...`, the option `-DVULKANSC=ON` should be passed in. In addition, if SCI WSI support is needed, the option `-DBUILD_WSI_SCI_SUPPORT=ON` should also be specified.
+
 ## Installed Files
 
 The installation depends on the target platform
 
 For UNIX operating systems:
 
-- *install_dir*`/lib` : The Vulkan validation layer library
-- *install_dir*`/share/vulkan/explicit_layer.d` : The VkLayer_khronos_validation.json manifest
+- *install_dir*`/lib` : The validation layer library
+- *install_dir*`/share/vulkan/explicit_layer.d` : The JSON manifest
 
 For WIN32/MINGW:
 
-- *install_dir*`/bin` : The Vulkan validation layer library
-- *install_dir*`/bin` : The VkLayer_khronos_validation.json manifest
+- *install_dir*`/bin` : The validation layer library
+- *install_dir*`/bin` : The JSON manifest
 
 ### Software Installation
 

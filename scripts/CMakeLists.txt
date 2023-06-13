@@ -14,6 +14,12 @@
 # limitations under the License.
 # ~~~
 
+# TODO: Vulkan SC - Remove this at the next downstreaming as it will be unnecessary
+set(API_TYPE "vulkan")
+if(VULKANSC)
+    set(API_TYPE "vulkansc")
+endif()
+
 option(UPDATE_DEPS "Run update_deps.py for user")
 if (UPDATE_DEPS)
     find_package(PythonInterp 3 REQUIRED)
@@ -67,7 +73,7 @@ if (UPDATE_DEPS)
     add_custom_command(
         OUTPUT ${_helper_file}
         COMMAND ${PYTHON_EXECUTABLE} ${update_dep_py}
-            --dir ${_update_deps_dir} --arch ${_target_arch} --config ${_build_type} --generator "${CMAKE_GENERATOR}" ${optional_args}
+            --dir ${_update_deps_dir} --arch ${_target_arch} --config ${_build_type} --generator "${CMAKE_GENERATOR}" ${optional_args} --api ${API_TYPE}
         DEPENDS ${known_good_json}
     )
 
@@ -77,7 +83,7 @@ if (UPDATE_DEPS)
     if (${known_good_json} IS_NEWER_THAN ${_helper_file})
         execute_process(
             COMMAND ${PYTHON_EXECUTABLE} ${update_dep_py}
-                --dir ${_update_deps_dir} --arch ${_target_arch} --config ${_build_type} --generator "${CMAKE_GENERATOR}" ${optional_args}
+                --dir ${_update_deps_dir} --arch ${_target_arch} --config ${_build_type} --generator "${CMAKE_GENERATOR}" ${optional_args} --api ${API_TYPE}
             WORKING_DIRECTORY ${VVL_SOURCE_DIR}
             RESULT_VARIABLE _update_deps_result
         )

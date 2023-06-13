@@ -13,11 +13,25 @@
         },
         {
             "name": "Vulkan-Headers",
-            "url": "https://github.com/KhronosGroup/Vulkan-Headers.git",
+            "api": "vulkan",
+            "url": "https://github.com/KhronosGroup/VulkanSC-Headers.git",
             "sub_dir": "Vulkan-Headers",
             "build_dir": "Vulkan-Headers/build",
             "install_dir": "Vulkan-Headers/build/install",
-            "commit": "v1.3.245"
+            "commit": "sc_beta-upstream-cherry-picked-reg-tools"
+        },
+        {
+            "name": "Vulkan-Headers",
+            "api": "vulkansc",
+            "url": "https://github.com/KhronosGroup/VulkanSC-Headers.git",
+            "sub_dir": "Vulkan-Headers",
+            "build_dir": "Vulkan-Headers/build",
+            "install_dir": "Vulkan-Headers/build/install",
+            "cmake_options": [
+                "-DVULKANSC=TRUE",
+                "-DGEN_VULKANSC_COMBINED=TRUE"
+            ],
+            "commit": "sc_beta"
         },
         {
             "name": "SPIRV-Headers",

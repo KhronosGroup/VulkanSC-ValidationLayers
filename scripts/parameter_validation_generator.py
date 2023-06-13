@@ -4,6 +4,7 @@
 # Copyright (c) 2015-2023 Valve Corporation
 # Copyright (c) 2015-2023 LunarG, Inc.
 # Copyright (c) 2015-2023 Google Inc.
+# Copyright (c) 2023-2023 RasterGrid Kft.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -77,6 +78,7 @@ class ParameterValidationGeneratorOptions(GeneratorOptions):
                  directory = '.',
                  genpath = None,
                  apiname = 'vulkan',
+                 mergeApiNames = None,
                  profile = None,
                  versions = '.*',
                  emitversions = '.*',
@@ -100,6 +102,7 @@ class ParameterValidationGeneratorOptions(GeneratorOptions):
                 directory = directory,
                 genpath = genpath,
                 apiname = apiname,
+                mergeApiNames = mergeApiNames,
                 profile = profile,
                 versions = versions,
                 emitversions = emitversions,
@@ -467,6 +470,7 @@ class ParameterValidationOutputGenerator(OutputGenerator):
         for node in root.findall('feature'):
             version_name = node.get('name')
             version_name = version_name.replace('VK_', 'VK_API_')
+            version_name = version_name.replace('VKSC_', 'VKSC_API_')
             for enum_item in node.iter('enum'):
                 if enum_item.get('extends') == "VkStructureType":
                     struct_type_id = enum_item.get('name')
@@ -562,7 +566,7 @@ class ParameterValidationOutputGenerator(OutputGenerator):
             api_func += '    bool skip = false;\n'
             api_func += '    const auto &target_pdev = physical_device_properties_map.find(pdev);\n'
             api_func += '    if (target_pdev != physical_device_properties_map.end()) {\n'
-            api_func += '        auto effective_api_version = std::min(target_pdev->second->apiVersion, api_version);\n'
+            api_func += '        auto effective_api_version = std::min(APIVersion(target_pdev->second->apiVersion), api_version);\n'
             api_func += '        if (effective_api_version < promoted_version) {\n'
             api_func += '            skip = LogError(instance,\n'
             api_func += '                            kVUID_PVError_ApiVersionViolation, "Attempted to call %s() with an effective API version of %s, "\n'
@@ -620,7 +624,7 @@ class ParameterValidationOutputGenerator(OutputGenerator):
                         ver_info = None
                 api_check = False
                 if ver_info is not None:
-                    if 'VK_API_VERSION_' in ver_info:
+                    if 'VK_API_VERSION_' in ver_info or 'VKSC_API_VERSION_' in ver_info:
                         api_check = True
                         api_version = ver_info;
                         pnext_check += '            if (api_version < %s) {\n' % ver_info
@@ -630,6 +634,9 @@ class ParameterValidationOutputGenerator(OutputGenerator):
                         pnext_check += '                           "current effective API version is %s.",\n'
                         pnext_check += '                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());\n'
                         pnext_check += '            }\n'
+                    elif ver_info not in self.extension_names:
+                        # Extension not supported in the target API
+                        continue
                     else:
                         # Dependent on enabled extension
                         ext_name = ver_info
@@ -713,7 +720,7 @@ class ParameterValidationOutputGenerator(OutputGenerator):
         # Get base list of extension dependencies for all items in this extension
         base_required_extension_expressions = []
         base_req_exts = []
-        if "VK_VERSION_1" not in self.featureName:
+        if "VK_VERSION_1" not in self.featureName and "VKSC_VERSION_1" not in self.featureName:
             index = 0
             while interface[0][index].tag == 'comment':
                 index += 1
@@ -951,7 +958,8 @@ class ParameterValidationOutputGenerator(OutputGenerator):
                             enum_map_key = set(['core'])
                             extnumber = enum.get('extnumber')
 
-                            if extnumber is not None:
+                            # Ignore extensions that are disabled and only used for their enum range for core enums
+                            if extnumber is not None and self.extension_number_map[extnumber].get('supported') != 'disabled':
                                 # Find the actual, "promoted to" extension
                                 ext = self.extension_number_map[extnumber]
                                 enum_map_key = set([ext.get('name')])
@@ -1594,6 +1602,11 @@ std::vector<{groupName}> ValidationObject::ValidParamValues() const {{
                 if value.noautovalidity and value.type not in AllocatorFunctions and not countRequiredVuid:
                     # Log a diagnostic message when validation cannot be automatically generated and must be implemented manually
                     self.logMsg('diag', 'ParameterValidation: No validation for {} {}'.format(structTypeName if structTypeName else funcName, value.name))
+                elif self.genOpts.apiname == 'vulkansc' and value.type == 'VkAllocationCallbacks' and value.name == 'pAllocator':
+                    # In case of Vulkan SC all allocation callback structure pointers are expected to be NULL
+                    usedLines.append('if (pAllocator != nullptr) {\n')
+                    usedLines.append('    skip |= LogError(instance, "VUID-{0}-pAllocator-null", "{0}(): pAllocator must be NULL");\n'.format(funcName))
+                    usedLines.append('}\n')
                 elif countRequiredVuid:
                     usedLines.append('skip |= ValidateArray("{}", {ppp}"{ldn}"{pps}, "", {pf}{ln}, &{pf}{vn}, true, false, {}, kVUIDUndefined);\n'.format(
                         funcName, countRequiredVuid, pf=valuePrefix, ldn=lenDisplayName, ln=value.len, vn=value.name, **postProcSpec))
@@ -1745,6 +1758,7 @@ std::vector<{groupName}> ValidationObject::ValidParamValues() const {{
                 if isinstance(command.promotion_info, list):
                     version_flag = command.promotion_info[1]
                     version_id = version_flag.replace('VK_VERSION', 'VK_API_VERSION')
+                    version_id = version_id.replace('VKSC_VERSION', 'VKSC_API_VERSION')
                     cmdDef += '%s if (CheckPromotedApiAgainstVulkanVersion(%s, "%s", %s)) return true;\n' % (indent, command.promotion_info[0], command.name, version_id)
                 for line in lines:
                     if type(line) is list:

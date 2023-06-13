@@ -54,7 +54,7 @@ add_library(layer_utils STATIC
         ${SRC_DIR}/layers/utils/vk_layer_extension_utils.cpp
         ${SRC_DIR}/layers/error_message/logging.cpp
         ${SRC_DIR}/layers/utils/vk_layer_utils.cpp
-        ${SRC_DIR}/layers/generated/vk_format_utils.cpp
+        ${SRC_DIR}/layers/vulkan/generated/vk_format_utils.cpp
         ${SRC_DIR}/layers/external/xxhash.cpp)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_clone}")
 
@@ -97,9 +97,9 @@ add_library(VkLayer_khronos_validation SHARED
         ${SRC_DIR}/layers/state_tracker/shader_instruction.cpp
         ${SRC_DIR}/layers/core_checks/shader_validation.cpp
         ${SRC_DIR}/layers/core_checks/synchronization_validation.cpp
-        ${SRC_DIR}/layers/generated/spirv_validation_helper.cpp
-        ${SRC_DIR}/layers/generated/spirv_grammar_helper.cpp
-        ${SRC_DIR}/layers/generated/command_validation.cpp
+        ${SRC_DIR}/layers/vulkan/generated/spirv_validation_helper.cpp
+        ${SRC_DIR}/layers/vulkan/generated/spirv_grammar_helper.cpp
+        ${SRC_DIR}/layers/vulkan/generated/command_validation.cpp
         ${SRC_DIR}/layers/gpu_validation/gpu_validation.cpp
         ${SRC_DIR}/layers/gpu_validation/gpu_utils.cpp
         ${SRC_DIR}/layers/gpu_validation/debug_printf.cpp
@@ -107,7 +107,7 @@ add_library(VkLayer_khronos_validation SHARED
         ${SRC_DIR}/layers/sync/sync_utils.cpp
         ${SRC_DIR}/layers/sync/sync_vuid_maps.cpp
         ${SRC_DIR}/layers/error_message/core_error_location.cpp
-        ${SRC_DIR}/layers/generated/sync_validation_types.cpp
+        ${SRC_DIR}/layers/vulkan/generated/sync_validation_types.cpp
         ${SRC_DIR}/layers/sync/sync_validation.cpp
         ${COMMON_DIR}/include/layer_chassis_dispatch.cpp
         ${COMMON_DIR}/include/chassis.cpp

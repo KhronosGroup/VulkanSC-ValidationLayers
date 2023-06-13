@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 #
 # Copyright (c) 2013-2023 The Khronos Group Inc.
+# Copyright (c) 2023-2023 RasterGrid Kft.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -47,8 +48,21 @@ def makeGenOpts(args):
     global genOpts
     genOpts = {}
 
+    # API to generate sources for
+    apiname = args.api
+
+    mergeApiNames = None
+    # If Vulkan SC is built then we generate merged API definitions for
+    # sources/headers that contain just common definitions, not API-specific
+    # validation code
+    if args.api == 'vulkansc':
+        mergeApiNames = 'vulkan'
+
     # Default class of extensions to include, or None
-    defaultExtensions = args.defaultExtensions
+    if args.defaultExtensions is not None:
+        defaultExtensions = args.defaultExtensions
+    else:
+        defaultExtensions = apiname
 
     # Additional extensions to include (list of extensions)
     extensions = args.extension
@@ -107,6 +121,9 @@ def makeGenOpts(args):
             conventions       = conventions,
             filename          = 'thread_safety.h',
             directory         = directory,
+            apiname           = apiname,
+            mergeApiNames     = mergeApiNames,
+            defaultExtensions = defaultExtensions,
             versions          = featuresPat,
             emitversions      = featuresPat,
             addExtensions     = addExtensionsPat,
@@ -121,6 +138,9 @@ def makeGenOpts(args):
             conventions       = conventions,
             filename          = 'thread_safety.cpp',
             directory         = directory,
+            apiname           = apiname,
+            mergeApiNames     = mergeApiNames,
+            defaultExtensions = defaultExtensions,
             versions          = featuresPat,
             emitversions      = featuresPat,
             addExtensions     = addExtensionsPat,
@@ -135,6 +155,8 @@ def makeGenOpts(args):
             conventions       = conventions,
             filename          = 'parameter_validation.cpp',
             directory         = directory,
+            apiname           = apiname,
+            defaultExtensions = defaultExtensions,
             versions          = featuresPat,
             emitversions      = featuresPat,
             addExtensions     = addExtensionsPat,
@@ -150,6 +172,8 @@ def makeGenOpts(args):
             conventions       = conventions,
             filename          = 'parameter_validation.h',
             directory         = directory,
+            apiname           = apiname,
+            defaultExtensions = defaultExtensions,
             versions          = featuresPat,
             emitversions      = featuresPat,
             addExtensions     = addExtensionsPat,
@@ -165,6 +189,9 @@ def makeGenOpts(args):
             conventions       = conventions,
             filename          = 'enum_flag_bits.h',
             directory         = directory,
+            apiname           = apiname,
+            mergeApiNames     = mergeApiNames,
+            defaultExtensions = defaultExtensions,
             versions          = featuresPat,
             emitversions      = featuresPat,
             addExtensions     = addExtensionsPat,
@@ -180,6 +207,9 @@ def makeGenOpts(args):
             conventions       = conventions,
             filename          = 'object_tracker.cpp',
             directory         = directory,
+            apiname           = apiname,
+            mergeApiNames     = mergeApiNames,
+            defaultExtensions = defaultExtensions,
             versions          = featuresPat,
             emitversions      = featuresPat,
             addExtensions     = addExtensionsPat,
@@ -195,6 +225,9 @@ def makeGenOpts(args):
             conventions       = conventions,
             filename          = 'object_tracker.h',
             directory         = directory,
+            apiname           = apiname,
+            mergeApiNames     = mergeApiNames,
+            defaultExtensions = defaultExtensions,
             versions          = featuresPat,
             emitversions      = featuresPat,
             addExtensions     = addExtensionsPat,
@@ -210,6 +243,9 @@ def makeGenOpts(args):
             conventions       = conventions,
             filename          = 'vk_dispatch_table_helper.h',
             directory         = directory,
+            apiname           = apiname,
+            mergeApiNames     = mergeApiNames,
+            defaultExtensions = defaultExtensions,
             versions          = featuresPat,
             emitversions      = featuresPat,
             addExtensions     = addExtensionsPat,
@@ -224,6 +260,9 @@ def makeGenOpts(args):
             conventions       = conventions,
             filename          = 'lvt_function_pointers.h',
             directory         = directory,
+            apiname           = apiname,
+            mergeApiNames     = mergeApiNames,
+            defaultExtensions = defaultExtensions,
             versions          = featuresPat,
             emitversions      = featuresPat,
             addExtensions     = addExtensionsPat,
@@ -239,6 +278,8 @@ def makeGenOpts(args):
             conventions       = conventions,
             filename          = 'lvt_function_pointers.cpp',
             directory         = directory,
+            apiname           = apiname,
+            defaultExtensions = defaultExtensions,
             versions          = featuresPat,
             emitversions      = featuresPat,
             addExtensions     = addExtensionsPat,
@@ -254,6 +295,9 @@ def makeGenOpts(args):
             conventions       = conventions,
             filename          = 'vk_layer_dispatch_table.h',
             directory         = directory,
+            apiname           = apiname,
+            mergeApiNames     = mergeApiNames,
+            defaultExtensions = defaultExtensions,
             versions          = featuresPat,
             emitversions      = featuresPat,
             addExtensions     = addExtensionsPat,
@@ -268,6 +312,9 @@ def makeGenOpts(args):
             conventions       = conventions,
             filename          = 'vk_enum_string_helper.h',
             directory         = directory,
+            apiname           = apiname,
+            mergeApiNames     = mergeApiNames,
+            defaultExtensions = defaultExtensions,
             versions          = featuresPat,
             emitversions      = featuresPat,
             addExtensions     = addExtensionsPat,
@@ -283,6 +330,9 @@ def makeGenOpts(args):
             conventions       = conventions,
             filename          = 'vk_safe_struct.h',
             directory         = directory,
+            apiname           = apiname,
+            mergeApiNames     = mergeApiNames,
+            defaultExtensions = defaultExtensions,
             versions          = featuresPat,
             emitversions      = featuresPat,
             addExtensions     = addExtensionsPat,
@@ -298,6 +348,9 @@ def makeGenOpts(args):
             conventions       = conventions,
             filename          = 'vk_safe_struct.cpp',
             directory         = directory,
+            apiname           = apiname,
+            mergeApiNames     = mergeApiNames,
+            defaultExtensions = defaultExtensions,
             versions          = featuresPat,
             emitversions      = featuresPat,
             addExtensions     = addExtensionsPat,
@@ -313,6 +366,9 @@ def makeGenOpts(args):
             conventions       = conventions,
             filename          = 'vk_object_types.h',
             directory         = directory,
+            apiname           = apiname,
+            mergeApiNames     = mergeApiNames,
+            defaultExtensions = defaultExtensions,
             versions          = featuresPat,
             emitversions      = featuresPat,
             addExtensions     = addExtensionsPat,
@@ -328,6 +384,9 @@ def makeGenOpts(args):
             conventions       = conventions,
             filename          = 'vk_extension_helper.h',
             directory         = directory,
+            apiname           = apiname,
+            mergeApiNames     = mergeApiNames,
+            defaultExtensions = defaultExtensions,
             versions          = featuresPat,
             emitversions      = featuresPat,
             addExtensions     = addExtensionsPat,
@@ -343,6 +402,9 @@ def makeGenOpts(args):
             conventions       = conventions,
             filename          = 'vk_typemap_helper.h',
             directory         = directory,
+            apiname           = apiname,
+            mergeApiNames     = mergeApiNames,
+            defaultExtensions = defaultExtensions,
             versions          = featuresPat,
             emitversions      = featuresPat,
             addExtensions     = addExtensionsPat,
@@ -359,6 +421,9 @@ def makeGenOpts(args):
             conventions       = conventions,
             filename          = 'chassis.h',
             directory         = directory,
+            apiname           = apiname,
+            mergeApiNames     = mergeApiNames,
+            defaultExtensions = defaultExtensions,
             versions          = featuresPat,
             emitversions      = featuresPat,
             addExtensions     = addExtensionsPat,
@@ -375,6 +440,8 @@ def makeGenOpts(args):
             conventions       = conventions,
             filename          = 'chassis.cpp',
             directory         = directory,
+            apiname           = apiname,
+            defaultExtensions = defaultExtensions,
             versions          = featuresPat,
             emitversions      = featuresPat,
             addExtensions     = addExtensionsPat,
@@ -392,6 +459,9 @@ def makeGenOpts(args):
             conventions       = conventions,
             filename          = 'chassis_dispatch_helper.h',
             directory         = directory,
+            apiname           = apiname,
+            mergeApiNames     = mergeApiNames,
+            defaultExtensions = defaultExtensions,
             versions          = featuresPat,
             emitversions      = featuresPat,
             addExtensions     = addExtensionsPat,
@@ -409,6 +479,9 @@ def makeGenOpts(args):
             conventions       = conventions,
             filename          = 'layer_chassis_dispatch.cpp',
             directory         = directory,
+            apiname           = apiname,
+            mergeApiNames     = mergeApiNames,
+            defaultExtensions = defaultExtensions,
             versions          = featuresPat,
             emitversions      = featuresPat,
             addExtensions     = addExtensionsPat,
@@ -423,6 +496,9 @@ def makeGenOpts(args):
             conventions       = conventions,
             filename          = 'layer_chassis_dispatch.h',
             directory         = directory,
+            apiname           = apiname,
+            mergeApiNames     = mergeApiNames,
+            defaultExtensions = defaultExtensions,
             versions          = featuresPat,
             emitversions      = featuresPat,
             addExtensions     = addExtensionsPat,
@@ -437,6 +513,9 @@ def makeGenOpts(args):
             conventions       = conventions,
             filename          = 'best_practices.cpp',
             directory         = directory,
+            apiname           = apiname,
+            mergeApiNames     = mergeApiNames,
+            defaultExtensions = defaultExtensions,
             versions          = featuresPat,
             emitversions      = featuresPat,
             addExtensions     = addExtensionsPat,
@@ -451,6 +530,9 @@ def makeGenOpts(args):
             conventions       = conventions,
             filename          = 'best_practices.h',
             directory         = directory,
+            apiname           = apiname,
+            mergeApiNames     = mergeApiNames,
+            defaultExtensions = defaultExtensions,
             versions          = featuresPat,
             emitversions      = featuresPat,
             addExtensions     = addExtensionsPat,
@@ -467,6 +549,8 @@ def makeGenOpts(args):
             conventions       = conventions,
             filename          = 'sync_validation_types.h',
             directory         = directory,
+            apiname           = apiname,
+            defaultExtensions = defaultExtensions,
             versions          = featuresPat,
             emitversions      = featuresPat,
             addExtensions     = addExtensionsPat,
@@ -482,6 +566,8 @@ def makeGenOpts(args):
             conventions       = conventions,
             filename          = 'sync_validation_types.cpp',
             directory         = directory,
+            apiname           = apiname,
+            defaultExtensions = defaultExtensions,
             versions          = featuresPat,
             emitversions      = featuresPat,
             addExtensions     = addExtensionsPat,
@@ -498,6 +584,8 @@ def makeGenOpts(args):
             conventions       = conventions,
             filename          = 'spirv_validation_helper.cpp',
             directory         = directory,
+            apiname           = apiname,
+            defaultExtensions = defaultExtensions,
             versions          = featuresPat,
             emitversions      = featuresPat,
             addExtensions     = addExtensionsPat,
@@ -515,6 +603,8 @@ def makeGenOpts(args):
             conventions       = conventions,
             filename          = 'spirv_grammar_helper.cpp',
             directory         = directory,
+            apiname           = apiname,
+            defaultExtensions = defaultExtensions,
             grammar           = args.grammar)
         ]
 
@@ -526,6 +616,8 @@ def makeGenOpts(args):
             conventions       = conventions,
             filename          = 'spirv_grammar_helper.h',
             directory         = directory,
+            apiname           = apiname,
+            defaultExtensions = defaultExtensions,
             grammar           = args.grammar)
         ]
 
@@ -536,6 +628,9 @@ def makeGenOpts(args):
             conventions       = conventions,
             filename          = 'command_validation.cpp',
             directory         = directory,
+            apiname           = apiname,
+            mergeApiNames     = mergeApiNames,
+            defaultExtensions = defaultExtensions,
             versions          = featuresPat,
             emitversions      = featuresPat,
             addExtensions     = addExtensionsPat,
@@ -551,6 +646,9 @@ def makeGenOpts(args):
             conventions       = conventions,
             filename          = 'command_validation.h',
             directory         = directory,
+            apiname           = apiname,
+            mergeApiNames     = mergeApiNames,
+            defaultExtensions = defaultExtensions,
             versions          = featuresPat,
             emitversions      = featuresPat,
             addExtensions     = addExtensionsPat,
@@ -566,6 +664,9 @@ def makeGenOpts(args):
             conventions       = conventions,
             filename          = 'vk_format_utils.cpp',
             directory         = directory,
+            apiname           = apiname,
+            mergeApiNames     = mergeApiNames,
+            defaultExtensions = defaultExtensions,
             emitFormats       = emitFormatsPat)
         ]
 
@@ -576,6 +677,9 @@ def makeGenOpts(args):
             conventions       = conventions,
             filename          = 'vk_format_utils.h',
             directory         = directory,
+            apiname           = apiname,
+            mergeApiNames     = mergeApiNames,
+            defaultExtensions = defaultExtensions,
             emitFormats       = emitFormatsPat)
         ]
 
@@ -627,8 +731,12 @@ def genTarget(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('-defaultExtensions', action='store',
+    parser.add_argument('-api', action='store',
                         default='vulkan',
+                        choices=['vulkan', 'vulkansc'],
+                        help='Specify API name to generate')
+    parser.add_argument('-defaultExtensions', action='store',
+                        default=None,
                         help='Specify a single class of extensions to add to targets')
     parser.add_argument('-extension', action='append',
                         default=[],
@@ -753,7 +861,8 @@ if __name__ == '__main__':
     endTimer(args.time, '* Time to make ElementTree =')
 
     # Filter out non-Vulkan extensions
-    [exts.remove(e) for exts in tree.findall('extensions') for e in exts.findall('extension') if (sup := e.get('supported')) is not None and options.apiname not in sup.split(',')]
+    if args.api == 'vulkan':
+        [exts.remove(e) for exts in tree.findall('extensions') for e in exts.findall('extension') if (sup := e.get('supported')) is not None and options.apiname not in sup.split(',')]
 
     # Load the XML tree into the registry object
     startTimer(args.time)

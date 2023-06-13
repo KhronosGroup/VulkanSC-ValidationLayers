@@ -4,6 +4,7 @@
 # Copyright (c) 2015-2023 Valve Corporation
 # Copyright (c) 2015-2023 LunarG, Inc.
 # Copyright (c) 2015-2023 Google Inc.
+# Copyright (c) 2023-2023 RasterGrid Kft.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -33,6 +34,7 @@ class HelperFileOutputGeneratorOptions(GeneratorOptions):
                  directory = '.',
                  genpath = None,
                  apiname = 'vulkan',
+                 mergeApiNames = None,
                  profile = None,
                  versions = '.*',
                  emitversions = '.*',
@@ -59,6 +61,7 @@ class HelperFileOutputGeneratorOptions(GeneratorOptions):
                 directory = directory,
                 genpath = genpath,
                 apiname = apiname,
+                mergeApiNames = mergeApiNames,
                 profile = profile,
                 versions = versions,
                 emitversions = emitversions,
@@ -131,6 +134,110 @@ class HelperFileOutputGenerator(OutputGenerator):
         self.custom_bit_flag_print = {
             'VkShaderStageFlags' : ['VK_SHADER_STAGE_ALL', 'VK_SHADER_STAGE_ALL_GRAPHICS']
         }
+
+    vk_api_version_definition = """
+#define VVL_UNRECOGNIZED_API_VERSION 0xFFFFFFFF
+
+class APIVersion {
+  public:
+    APIVersion() : api_version_(VVL_UNRECOGNIZED_API_VERSION) {}
+
+    APIVersion(uint32_t api_version) : api_version_(api_version) {}
+
+    APIVersion& operator=(uint32_t api_version) {
+        api_version_ = api_version;
+        return *this;
+    }
+
+    bool valid() const { return api_version_ != VVL_UNRECOGNIZED_API_VERSION; }
+    uint32_t value() const { return api_version_; }
+    uint32_t major() const { return VK_API_VERSION_MAJOR(api_version_); }
+    uint32_t minor() const { return VK_API_VERSION_MINOR(api_version_); }
+    uint32_t patch() const { return VK_API_VERSION_PATCH(api_version_); }
+
+    bool operator<(APIVersion api_version) const { return api_version_ < api_version.api_version_; }
+    bool operator<=(APIVersion api_version) const { return api_version_ <= api_version.api_version_; }
+    bool operator>(APIVersion api_version) const { return api_version_ > api_version.api_version_; }
+    bool operator>=(APIVersion api_version) const { return api_version_ >= api_version.api_version_; }
+    bool operator==(APIVersion api_version) const { return api_version_ == api_version.api_version_; }
+    bool operator!=(APIVersion api_version) const { return api_version_ != api_version.api_version_; }
+
+  private:
+    uint32_t api_version_;
+};
+
+static inline APIVersion NormalizeApiVersion(APIVersion specified_version) {
+    if (specified_version < VK_API_VERSION_1_1)
+        return VK_API_VERSION_1_0;
+    else if (specified_version < VK_API_VERSION_1_2)
+        return VK_API_VERSION_1_1;
+    else if (specified_version < VK_API_VERSION_1_3)
+        return VK_API_VERSION_1_2;
+    else
+        return VK_API_VERSION_1_3;
+}
+"""
+
+    vksc_api_version_definition = """
+#define VVL_UNRECOGNIZED_API_VERSION 0xFFFFFFFF
+
+// API version class to handle Vulkan SC and Vulkan API version relations
+class APIVersion {
+  public:
+    APIVersion() : api_version_(VVL_UNRECOGNIZED_API_VERSION) {}
+
+    APIVersion(uint32_t api_version) : api_version_(ConvertVersion(api_version)) {}
+
+    APIVersion& operator=(uint32_t api_version) {
+        api_version_ = ConvertVersion(api_version);
+        return *this;
+    }
+
+    bool valid() const { return api_version_ != VVL_UNRECOGNIZED_API_VERSION; }
+    uint32_t value() const { return api_version_; }
+    uint32_t major() const { return VK_API_VERSION_MAJOR(api_version_); }
+    uint32_t minor() const { return VK_API_VERSION_MINOR(api_version_); }
+    uint32_t patch() const { return VK_API_VERSION_PATCH(api_version_); }
+
+    bool operator<(APIVersion api_version) const { return api_version_ < api_version.api_version_; }
+    bool operator<=(APIVersion api_version) const { return api_version_ <= api_version.api_version_; }
+    bool operator>(APIVersion api_version) const { return api_version_ > api_version.api_version_; }
+    bool operator>=(APIVersion api_version) const { return api_version_ >= api_version.api_version_; }
+    bool operator==(APIVersion api_version) const { return api_version_ == api_version.api_version_; }
+    bool operator!=(APIVersion api_version) const { return api_version_ != api_version.api_version_; }
+
+  private:
+    uint32_t ConvertVersion(uint32_t api_version) {
+        if (VK_API_VERSION_VARIANT(api_version) == VKSC_API_VARIANT) {
+            return api_version;
+        } else {
+            if (api_version <= VK_API_VERSION_1_2) {
+                // Vulkan SC 1.0 includes Vulkan 1.2
+                return VKSC_API_VERSION_1_0;
+            } else {
+                // Newer Vulkan versions are unsupported
+                return VVL_UNRECOGNIZED_API_VERSION;
+            }
+        }
+    }
+
+    uint32_t api_version_;
+};
+
+static inline APIVersion NormalizeApiVersion(APIVersion specified_version) {
+    if (specified_version <= VKSC_API_VERSION_1_0)
+        return VKSC_API_VERSION_1_0;
+    else
+        return VVL_UNRECOGNIZED_API_VERSION;
+}
+"""
+
+    #
+    # Generate APIVersion definition
+    def genAPIVersionDefinition(self):
+        if self.genOpts.apiname == 'vulkansc':
+            return self.vksc_api_version_definition
+        return self.vk_api_version_definition
 
     #
     # Called once at the beginning of each run
@@ -618,8 +725,9 @@ class HelperFileOutputGenerator(OutputGenerator):
             '    return (extension == kEnabledByCreateinfo);',
             '};',
             '#define VK_VERSION_1_2_NAME "VK_VERSION_1_2"',
-            '#define VK_VERSION_1_3_NAME "VK_VERSION_1_3"',
-            '']
+            '#define VK_VERSION_1_3_NAME "VK_VERSION_1_3"']
+
+        output.append(self.genAPIVersionDefinition())
 
         for type in ['Instance', 'Device']:
             struct_type = '%sExtensions' % type
@@ -725,25 +833,15 @@ class HelperFileOutputGenerator(OutputGenerator):
 
             if type == 'Instance':
                 struct.extend([
-                    '    uint32_t NormalizeApiVersion(uint32_t specified_version) {',
-                    '        if (specified_version < VK_API_VERSION_1_1)',
-                    '            return VK_API_VERSION_1_0;',
-                    '        else if (specified_version < VK_API_VERSION_1_2)',
-                    '            return VK_API_VERSION_1_1;',
-                    '        else if (specified_version < VK_API_VERSION_1_3)',
-                    '            return VK_API_VERSION_1_2;',
-                    '        else',
-                    '            return VK_API_VERSION_1_3;',
-                    '    }',
                     '',
-                    '    uint32_t InitFromInstanceCreateInfo(uint32_t requested_api_version, const VkInstanceCreateInfo *pCreateInfo) {'])
+                    '    APIVersion InitFromInstanceCreateInfo(APIVersion requested_api_version, const VkInstanceCreateInfo *pCreateInfo) {'])
             else:
                 struct.extend([
                     '    %s() = default;' % struct_type,
                     '    %s(const %s& instance_ext) : %s(instance_ext) {}' % (struct_type, instance_struct_type, instance_struct_type),
                     '',
-                    '    uint32_t InitFromDeviceCreateInfo(const %s *instance_extensions, uint32_t requested_api_version,' % instance_struct_type,
-                    '                                      const VkDeviceCreateInfo *pCreateInfo = nullptr) {',
+                    '    APIVersion InitFromDeviceCreateInfo(const %s *instance_extensions, APIVersion requested_api_version,' % instance_struct_type,
+                    '                                        const VkDeviceCreateInfo *pCreateInfo = nullptr) {',
                     '        // Initialize: this to defaults,  base class fields to input.',
                     '        assert(instance_extensions);',
                     '        *this = %s(*instance_extensions);' % struct_type,
@@ -764,7 +862,7 @@ class HelperFileOutputGenerator(OutputGenerator):
                 '        };',
                 '',
                 '        // Initialize struct data, robust to invalid pCreateInfo',
-                '        uint32_t api_version = NormalizeApiVersion(requested_api_version);',
+                '        auto api_version = NormalizeApiVersion(requested_api_version);',
                 '        if (api_version >= VK_API_VERSION_1_1) {',
                 '            auto info = get_info("VK_VERSION_1_1");',
                 '            if (info.state) this->*(info.state) = kEnabledByCreateinfo;',

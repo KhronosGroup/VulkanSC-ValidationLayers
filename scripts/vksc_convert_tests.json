@@ -1,0 +1,419 @@
+{
+    "VkLayerTest": {
+        "*": "VkCompatibleLayerTest",
+
+        "@disabled-alreadyPromoted": [
+            "The test cases below depend on pre-Vulkan 1.2 support, hence do not apply to Vulkan SC"
+        ],
+        "DescriptorIndexingSetLayoutWithoutExtension": false,
+
+        "@disabled-depends-AllocationCallbacks": [
+            "The test cases below are disabled as they test allocator callbacks which aren't supported in Vulkan SC"
+        ],
+        "DestroyInstanceAllocationCallbacksCompatibility": false,
+        "InvalidAllocationCallbacks": false,
+
+        "@disabled-depends-vkFreeMemory": "Test cases test the removed vkFreeMemory command's effects",
+        "InvalidCmdBarrierBufferDestroyed": false,
+        "InvalidCmdBarrierImageDestroyed": false,
+        "Sync2InvalidCmdBarrierBufferDestroyed": false,
+        "Sync2InvalidCmdBarrierImageDestroyed": false,
+        "FramebufferAttachmentMemoryFreed": false,
+        "DescriptorImageUpdateNoMemoryBound": false,
+        "@VertexBufferInvalid-comment": "TODO: Vulkan SC - only a small subset of the subtests rely on vkFreeMemory",
+        "VertexBufferInvalid": false,
+
+        "@disabled-depends-vkMergePipelineCaches": "Test cases test the removed vkMergePipelineCaches command's effects",
+        "MergePipelineCachesInvalidDst": false,
+
+        "@disabled-depends-derivativePipelines": [
+            "Test cases depend on derivative pipelines which aren't supported in Vulkan SC"
+        ],
+        "CreateComputesPipelineWithBadBasePointer": false,
+        "CreateGraphicsPipelineWithBadBasePointer": false,
+
+        "@disabled-depends-descriptorUpdateTemplates": [
+            "Test cases depend on descriptor update templates which aren't supported in Vulkan SC"
+        ],
+        "DescriptorUpdateTemplateEntryWithInlineUniformBlock": false,
+        "CreateDescriptorUpdateTemplate": false,
+
+        "@disabled-depends-splitInstanceBindRegions": [
+            "Test cases depend on split-instance bind regions image create flag which isn't supported in Vulkan SC"
+        ],
+        "InvalidImageCreateFlagWithPhysicalDeviceCount": false,
+
+        "@disabled-depends-VkShaderModule-and-SPIRV": [
+            "These cases depend on VkShaderModule and SPIR-V compilation and thus do not apply to Vulkan SC"
+        ],
+        "InvalidSPIRVCodeSize": false,
+        "InvalidSPIRVMagic": false,
+
+        "@disabled-replaced": "These test cases are replaced with Vulkan SC specific ones",
+        "LeakAnObject": false,
+        "SpecLinks": false,
+        "CreateImageMiscErrors": false,
+        "BindInvalidMemory": false,
+
+        "@disabled-assumes-preVulkan12": [
+            "These tests assume support for a pre-Vulkan 1.2 version, but that's not possible",
+            "in Vulkan SC where version 1.0 inherits Vulkan 1.2 support, including e.g. GPDP2 support"
+        ],
+        "UnsupportedPnextApiVersion": false,
+        "DeviceFeature2AndVertexAttributeDivisorExtensionUnenabled": false,
+        "UsePnextOnlyStructWithoutExtensionEnabled": false,
+        "CopyImageDepthStencilFormatMismatch": false,
+        "CreateImageViewBreaksParameterCompatibilityRequirements": false,
+        "CreateImageViewInvalidSubresourceRange": false,
+        "InvalidImageViewLayerCount": false,
+        "InvalidRenderArea": false,
+        "CreateImageSharingModeConcurrentInvalidQueueFamilies": false,
+        "InvalidQueueFamilyIndex": false,
+        "QueueSubmitBinarySemaphoreNotSignaled": false,
+        "TestUsingDisabledMultiviewFeatures": false,
+
+        "@disabled-depends-deprecated-debug-markers": [
+            "Test case depends on the deprecated VK_EXT_debug_marker extension that is not supported in Vulkan SC"
+        ],
+        "DebugMarkerNameTest": false,
+
+        "@disabled-depends-maintenance1": [
+            "TODO: Vulkan SC - These tests depend on the VK_KHR_maintenance1 extension string itself",
+            "which is not present in Vulkan SC as it is part of Vulkan SC 1.0 core (inherited from Vulkan 1.1)"
+        ],
+        "CopyImageLayerCountMismatch": false,
+
+        "@disabled-depends-GPDP2-KHR": [
+            "TODO: Vulkan SC - These tests expect the KHR entry points of GPDP2 to be present",
+            "or that the extension string is present.",
+            "However, that's specific to an extension that is not there in Vulkan SC,",
+            "as the corresponding APIs are part of Vulkan SC 1.0 core (inherited from Vulkan 1.1)"
+        ],
+        "ImageFormatInfoDrmFormatModifier": false,
+        "InvalidSampleLocations": false,
+        "TestPipelineRasterizationConservativeStateCreateInfo": false,
+
+        "@disabled-depends-vkCreateRenderPass2KHR": [
+            "TODO: Vulkan SC - These tests expect the vkCreateRenderPass2KHR command to be present",
+            "However, that's specific to an extension that is not there in Vulkan SC,",
+            "as the corresponding APIs are part of Vulkan SC 1.0 core (inherited from Vulkan 1.2)"
+        ],
+        "IncompatibleFragmentRateShadingAttachmentInExecuteCommands": false,
+
+        "@disabled-depends-vkCmdDispatchBaseKHR": [
+            "TODO: Vulkan SC - These tests expect the vkCmdDispatchBaseKHR command to be present",
+            "However, that's specific to an extension that is not there in Vulkan SC,",
+            "as the corresponding APIs are part of Vulkan SC 1.0 core (inherited from Vulkan 1.1)"
+        ],
+        "ComputeImageLayout_1_1": false,
+
+        "@disabled-depends-SPIRV-validation": [
+            "TODO: Vulkan SC - These tests rely on being able to validate against SPIR-V contents",
+            "which is not possible on Vulkan SC without actual SPIR-V data as debug information"
+        ],
+        "DrawTimeImageViewTypeMismatchWithPipeline": false,
+        "DrawTimeImageMultisampleMismatchWithPipeline": false,
+        "DrawTimeImageComponentTypeMismatchWithPipeline": false,
+        "DrawWithoutUpdatePushConstants": false,
+        "DynamicOffsetWithNullBuffer": false,
+        "@DescriptorSetCompatibility": "TODO: Vulkan SC - only a small subset of the subtests are SPIR-V dependent",
+        "DescriptorSetCompatibility": false,
+        "SubpassInputNotBoundDescriptorSet": false,
+        "ImageDescriptorLayoutMismatch": false,
+        "ImageSubresourceOverlapBetweenAttachmentsAndDescriptorSets": false,
+        "ImageSubresourceOverlapBetweenRenderPassAndDescriptorSets": false,
+        "TestDescriptorReadFromWriteAttachment": false,
+        "TestDescriptorWriteFromReadAttachment": false,
+        "InvalidCmdBufferBufferViewDestroyed": false,
+        "PointSizeFailure": false,
+        "PointSizeGeomShaderDontWrite": false,
+        "PointSizeGeomShaderWrite": false,
+        "BuiltinBlockOrderMismatchVsGs": false,
+        "BuiltinBlockSizeMismatchVsGs": false,
+        "MissingStorageImageFormatRead": false,
+        "MissingStorageImageFormatWrite": false,
+        "MissingNonReadableDecorationStorageImageFormatRead": false,
+        "MissingNonWritableDecorationStorageImageFormatWrite": false,
+        "SubpassInputWithoutFormat": false,
+        "CreatePipelineVertexOutputNotConsumed": false,
+        "CreatePipelineCheckShaderSpecializationApplied": false,
+        "CreatePipelineCheckShaderBadSpecializationOffsetOutOfBounds": false,
+        "CreatePipelineCheckShaderBadSpecializationSizeOutOfBounds": false,
+        "CreatePipelineCheckShaderDescriptorTypeMismatch": false,
+        "CreatePipelineCheckShaderDescriptorNotAccessible": false,
+        "CreatePipelineCheckShaderPushConstantNotDeclared": false,
+        "CreatePipelineCheckShaderNotEnabled": false,
+        "CreatePipelineFragmentInputNotProvided": false,
+        "CreatePipelineFragmentInputNotProvidedInBlock": false,
+        "CreatePipelineVsFsTypeMismatch": false,
+        "CreatePipelineVsFsTypeMismatchInBlock": false,
+        "CreatePipelineVsFsMismatchByLocation": false,
+        "CreatePipelineVsFsMismatchByComponent": false,
+        "CreatePipelineAttribNotConsumed": false,
+        "CreatePipelineAttribLocationMismatch": false,
+        "CreatePipelineAttribNotProvided": false,
+        "CreatePipelineAttribTypeMismatch": false,
+        "CreatePipelineMissingEntrypoint": false,
+        "CreatePipelineTessPatchDecorationMismatch": false,
+        "CreatePipelineFragmentOutputNotWritten": false,
+        "CreatePipelineFragmentOutputNotConsumed": false,
+        "CreatePipelineFragmentNoOutputLocation0ButAlphaToCoverageEnabled": false,
+        "CreatePipelineFragmentNoAlphaLocation0ButAlphaToCoverageEnabled": false,
+        "CreatePipelineFragmentOutputTypeMismatch": false,
+        "NoUniformBufferStandardLayout10": false,
+        "NoUniformBufferStandardLayout12": false,
+        "NoScalarBlockLayout10": false,
+        "NoScalarBlockLayout12": false,
+        "TestShaderInputOutputMismatch": false,
+        "CreatePipelineExceedMaxVertexOutputComponents": false,
+        "CreatePipelineExceedMaxComponentsBlocks": false,
+        "CreatePipelineExceedMaxTessellationControlInputOutputComponents": false,
+        "CreatePipelineExceedMaxTessellationEvaluationInputOutputComponents": false,
+        "CreatePipelineExceedMaxGeometryInputOutputComponents": false,
+        "CreatePipelineExceedMaxFragmentInputComponents": false,
+        "CreatePipelineExceedMaxGeometryInstanceVertexCount": false,
+        "CreatePipelineUniformBlockNotProvided": false,
+        "CreatePipelinePushConstantsNotInLayout": false,
+        "CreatePipelineInputAttachmentMissing": false,
+        "CreatePipelineInputAttachmentMissingArray": false,
+        "CreatePipelineInputAttachmentSharingVariable": false,
+        "CreateComputePipelineMissingDescriptor": false,
+        "CreateComputePipelineDescriptorTypeMismatch": false,
+        "SubgroupSupportedProperties": false,
+        "CreatePipelineCheckFragmentShaderInterlockEnabled": false,
+        "CreatePipelineCheckDemoteToHelperInvocation": false,
+        "CreatePipelineDynamicUniformIndex": false,
+        "VertexStoresAndAtomicsFeatureDisable": false,
+        "FragmentStoresAndAtomicsFeatureDisable": false,
+        "ShaderDrawParametersNotEnabled10": false,
+        "ShaderDrawParametersNotEnabled11": false,
+        "WorkgroupMemoryExplicitLayout": false,
+        "SpecializationInvalidSizeZero": false,
+        "ValidateGeometryShaderEnabled": false,
+        "ValidateTessellationShaderEnabled": false,
+        "ShaderImageAtomicInt64": false,
+        "ShaderAtomicFloat2": false,
+        "ComputeSharedMemoryOverLimit": false,
+        "ComputeSharedMemoryBooleanOverLimit": false,
+        "ComputeSharedMemorySpecConstantDefault": false,
+        "ComputeSharedMemorySpecConstantSet": false,
+        "TestInvalidShaderInputAndOutputComponents": false,
+        "ComputeWorkGroupSizeSpecConstant": false,
+        "ComputeWorkGroupSizeConstantDefault": false,
+        "ComputeWorkGroupSizeSpecConstantDefault": false,
+        "TestShaderZeroInitializeWorkgroupMemory": false,
+        "TestMinAndMaxTexelGatherOffset": false,
+        "TestMinAndMaxTexelOffset": false,
+        "StorageImageWriteLessComponent": false,
+        "StorageImageWriteSpecConstantLessComponent": false,
+        "StorageTexelBufferWriteLessComponent": false,
+        "CreateShaderModuleCheckBadCapability": false,
+        "StorageImageUnknownWriteLessComponent": false,
+        "ConservativeRasterizationPostDepthCoverage": false,
+        "UnnormalizedCoordinatesCombinedSampler": false,
+        "UnnormalizedCoordinatesSeparateSampler": false,
+        "UnnormalizedCoordinatesSeparateSamplerSharedImage": false,
+        "UnnormalizedCoordinatesSeparateSamplerSharedSampler": false,
+        "UnnormalizedCoordinatesInBoundsAccess": false,
+        "NotCompatibleForSet": false,
+        "DispatchWithUnboundSet": false,
+
+        "@disabled-may-depend-SPIRV-validation": [
+            "TODO: Vulkan SC - These tests also likely rely on SPIR-V validation",
+            "Needs further investigation"
+        ],
+        "WriteDescriptorSetConsecutiveUpdates": false,
+        "InvalidCmdBufferDescriptorSetBufferDestroyed": false,
+        "InvalidDrawDescriptorSetBufferDestroyed": false,
+        "InvalidCmdBufferDescriptorSetImageSamplerDestroyed": false,
+        "InvalidDescriptorSetSamplerDestroyed": false,
+        "DescriptorPoolInUseResetSignaled": false,
+        "DescriptorPoolInUseDestroyedSignaled": false,
+        "ImageViewInUseDestroyedSignaled": false,
+        "BufferViewInUseDestroyedSignaled": false,
+        "SamplerInUseDestroyedSignaled": false,
+
+        "@disabled-depends-WSI": [
+            "The test cases below are disabled because they depend on WSI functionalities",
+            "without actually verifying support for them"
+        ],
+        "TestSurfaceSupportByPhysicalDevice": false,
+        "TestCreatingWin32Surface": false,
+        "QueuePresentWaitingSameSemaphore": false,
+        "QueuePresentBinarySemaphoreNotSignaled": false,
+        "SwapchainAcquireImageNoSync": false,
+        "SwapchainAcquireImageNoSync2KHR": false,
+        "SwapchainAcquireTooManyImages": false,
+        "GetSwapchainImageAndTryDestroy": false,
+        "SwapchainAcquireTooManyImages2KHR": false,
+        "WarningSwapchainCreateInfoPreTransform": false,
+        "LeakASwapchain": false,
+        "GetSwapchainImagesCountButNotImages": false,
+
+        "@disabled-depends-VK_EXT_image_view_min_lod": "Test cases use unsupported extension in Vulkan SC",
+        "ImageViewMinLodFeature": false,
+
+        "@disabled-depends-VK_EXT_border_color_swizzle": "Test cases use unsupported extension in Vulkan SC",
+        "ValidateCreateSamplerWithBorderColorSwizzle": false,
+
+        "@disabled-depends-VK_NV_inherited_viewport_scissor": "Test cases use unsupported extension in Vulkan SC",
+        "ViewportInheritance": false,
+        "ViewportInheritanceMissingFeature": false,
+        "ViewportInheritanceMultiViewport": false,
+        "ViewportInheritanceScissorMissingFeature": false,
+
+        "@disabled-depends-VK_EXT_validation_cache": "Test cases use unsupported extension in Vulkan SC",
+        "ValidationCacheTestBadMerge": false
+    },
+    "VkLayerQueryTest": {
+        "*": "VkCompatibleLayerQueryTest",
+
+        "@disabled-depends-vkDestroyQueryPool": "Test cases test the removed vkDestroyQueryPool command's effects",
+        "InvalidCmdBufferQueryPoolDestroyed": false,
+        "QueryPoolInUseDestroyedSignaled": false,
+        "DestroyActiveQueryPool": false,
+
+        "@disabled-depends-GPDP2-KHR": [
+            "TODO: Vulkan SC - These tests expect the KHR entry points of GPDP2 to be present",
+            "or that the extension string is present.",
+            "However, that's specific to an extension that is not there in Vulkan SC,",
+            "as the corresponding APIs are part of Vulkan SC 1.0 core (inherited from Vulkan 1.1)"
+        ],
+        "HostQueryResetWrongDevice": false,
+        "HostQueryResetBadRange": false,
+        "HostQueryResetInvalidQueryPool": false
+    },
+    "VkSyncValTest": {
+        "*": "VkCompatibleSyncValTest",
+
+        "@disabled-depends-WSI": [
+            "The test cases below are disabled because they depend on various WSI functionalities"
+        ],
+        "SyncQSPresentAcquire": false,
+
+        "@StageAccessExpansion-comment": [
+            "TODO: Vulkan SC - This test fails to generate the appropriate sync hazard error",
+            "or report additional hazards than expected",
+            "Most likely a dependency on the SPIR-V code to be able to detect the right hazards"
+        ],
+        "SyncCmdDispatchDrawHazards": false,
+        "StageAccessExpansion": false,
+        "RenderPassAsyncHazard": false
+    },
+    "VkPositiveLayerTest": {
+        "*": "VkCompatiblePositiveLayerTest",
+
+        "@disabled-replaced": "These test cases are replaced with Vulkan SC specific ones",
+        "ValidationInstanceExtensions": false,
+
+        "@disabled-depends-vkTrimCommandBuffer": "Test case looks for removed entry point",
+        "GetDevProcAddrExtensions": false,
+
+        "@disabled-depends-sparse": [
+            "Test cases depend on sparse binding which isn't supported in Vulkan SC"
+        ],
+        "BindSparse": false,
+        "BindSparseFreeMemory": false,
+        "BindSparseMetadata": false,
+        "CorrectSparseBufferOverlapCopy": false,
+
+        "@disabled-temporary-instance-extensions": [
+            "TODO: Vulkan SC - This test relies on the generated instance extension list which",
+            "contains a combined set currently, so this may need some test framework tweaks to",
+            "get it working"
+        ],
+        "ExtensionsInCreateInstance": false,
+
+        "@disabled-temporary-other": [
+            "TODO: Vulkan SC - These tests fail for some reason",
+            "Needs further investigation"
+        ],
+        "RenderPassSingleMipTransition": false,
+        "BindImageMemoryMultiThreaded": false,
+
+        "@disabled-depends-WSI": [
+            "The test cases below are disabled because they depend on WSI functionalities",
+            "without actually verifying support for them"
+        ],
+        "TestPhysicalDeviceSurfaceSupport": false,
+        "CreateSurface": false
+    },
+    "RenderPassCreatePotentialFormatFeaturesTest": {
+        "*": "VkCompatibleRenderPassCreatePotentialFormatFeaturesTest"
+    },
+    "DynamicRenderingCommandBufferInheritanceRenderingInfoTest": {
+        "*": "VkCompatibleDynamicRenderingCommandBufferInheritanceRenderingInfoTest"
+    },
+    "VkVideoLayerTest": {
+        "*": "VkCompatibleVideoLayerTest"
+    },
+    "VkPositiveVideoLayerTest": {
+        "*": "VkCompatiblePositiveVideoLayerTest"
+    },
+    "VkGraphicsLibraryLayerTest": {
+        "*": "VkCompatibleGraphicsLibraryLayerTest"
+    },
+    "VkPositiveGraphicsLibraryLayerTest": {
+        "*": "VkCompatiblePositiveGraphicsLibraryLayerTest"
+    },
+    "VkPositiveWsiTest": {
+        "*": "VkCompatiblePositiveWsiTest"
+    },
+    "VkPortabilitySubsetTest": {
+        "*": "VkCompatiblePortabilitySubsetTest"
+    },
+    "VkBestPracticesLayerTest": {
+        "@disabled": [
+            "We disable all best practices tests because Vulkan SC does not currently have best practices layers enabled"
+        ],
+        "*": false
+    },
+    "VkPositiveBestPracticesLayerTest": {
+        "@disabled": [
+            "We disable all best practices tests because Vulkan SC does not currently have best practices layers enabled"
+        ],
+        "*": false
+    },
+    "VkAmdBestPracticesLayerTest": {
+        "@disabled": [
+            "We disable all best practices tests because Vulkan SC does not currently have best practices layers enabled"
+        ],
+        "*": false
+    },
+    "VkArmBestPracticesLayerTest": {
+        "@disabled": [
+            "We disable all best practices tests because Vulkan SC does not currently have best practices layers enabled"
+        ],
+        "*": false
+    },
+    "VkNvidiaBestPracticesLayerTest": {
+        "@disabled": [
+            "We disable all best practices tests because Vulkan SC does not currently have best practices layers enabled"
+        ],
+        "*": false
+    },
+    "VkVideoBestPracticesLayerTest": {
+        "@disabled": [
+            "We disable all best practices tests because Vulkan SC does not currently have best practices layers enabled"
+        ],
+        "*": false
+    },
+    "VkGpuAssistedLayerTest": {
+        "@disabled": [
+            "We disable all GPU assisted validation test cases as they are not applicable to Vulkan SC"
+        ],
+        "*": false
+    },
+    "PositiveGpuAssistedLayer": {
+        "@disabled": [
+            "We disable all GPU assisted validation test cases as they are not applicable to Vulkan SC"
+        ],
+        "*": false
+    },
+    "VkDebugPrintfTest": {
+        "@disabled": [
+            "We disable all debug printf validation test cases as they are not applicable to Vulkan SC"
+        ],
+        "*": false
+    }
+}

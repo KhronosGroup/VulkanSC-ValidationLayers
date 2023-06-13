@@ -1,6 +1,7 @@
 #!/usr/bin/python3 -i
 #
 # Copyright (c) 2020-2023 The Khronos Group Inc.
+# Copyright (c) 2023-2023 RasterGrid Kft.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,6 +31,7 @@ class SpirvValidationHelperOutputGeneratorOptions(GeneratorOptions):
                  directory = '.',
                  genpath = None,
                  apiname = 'vulkan',
+                 mergeApiNames = None,
                  profile = None,
                  versions = '.*',
                  emitversions = '.*',
@@ -56,6 +58,7 @@ class SpirvValidationHelperOutputGeneratorOptions(GeneratorOptions):
                 directory = directory,
                 genpath = genpath,
                 apiname = apiname,
+                mergeApiNames = mergeApiNames,
                 profile = profile,
                 versions = versions,
                 emitversions = emitversions,
@@ -362,6 +365,7 @@ class SpirvValidationHelperOutputGenerator(OutputGenerator):
         if enable['version'] != None:
             # Version should be VK_VERSION_x_x as defined in header but need to get as VK_API_VERSION_x_x
             version = enable['version'].replace('VK_VERSION', 'VK_API_VERSION')
+            version = version.replace('VKSC_VERSION', 'VKSC_API_VERSION')
             output = '{' + version + ', nullptr, nullptr, ""}'
         elif enable['feature'] != None:
             output = '{0, &' + enable['feature']['struct'] + '::'  + enable['feature']['feature'] + ', nullptr, ""}'

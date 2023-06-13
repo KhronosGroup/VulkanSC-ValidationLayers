@@ -1,6 +1,7 @@
 # ~~~
 # Copyright (c) 2016-2023 Valve Corporation
 # Copyright (c) 2016-2023 LunarG, Inc.
+# Copyright (c) 2023-2023 RasterGrid Kft.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -64,6 +65,6 @@ configure_file("${CMAKE_CURRENT_SOURCE_DIR}/VkLayer_device_profile_api.json.in" 
 
 # It's much simpler for development if the device profile layer is in the same location as the validation layer
 add_custom_command(TARGET VkLayer_device_profile_api POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:VkLayer_device_profile_api> $<TARGET_FILE_DIR:VkLayer_khronos_validation>
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${INTERMEDIATE_FILE} "$<TARGET_FILE_DIR:VkLayer_khronos_validation>/VkLayer_device_profile_api.json"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:VkLayer_device_profile_api> $<TARGET_FILE_DIR:vvl>
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${INTERMEDIATE_FILE} "$<TARGET_FILE_DIR:vvl>/VkLayer_device_profile_api.json"
 )

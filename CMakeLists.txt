@@ -1,6 +1,7 @@
 # ~~~
 # Copyright (c) 2014-2023 Valve Corporation
 # Copyright (c) 2014-2023 LunarG, Inc.
+# Copyright (c) 2023-2023 RasterGrid Kft.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,6 +18,9 @@
 cmake_minimum_required(VERSION 3.17.2)
 
 project(VVL LANGUAGES CXX)
+
+option(VULKANSC "Build Vulkan SC validation layers" OFF)
+option(BUILD_WSI_SCI_SUPPORT "Build SCI WSI support" OFF)
 
 add_subdirectory(scripts)
 
@@ -61,6 +65,10 @@ else()
     if(BUILD_WSI_WAYLAND_SUPPORT)
         pkg_check_modules(WAYlAND_CLIENT QUIET REQUIRED IMPORTED_TARGET wayland-client)
         target_compile_definitions(Vulkan::Headers INTERFACE VK_USE_PLATFORM_WAYLAND_KHR)
+    endif()
+
+    if(BUILD_WSI_SCI_SUPPORT)
+        target_compile_definitions(Vulkan::Headers INTERFACE VK_USE_PLATFORM_SCI)
     endif()
 endif()
 
@@ -135,7 +143,7 @@ elseif(MSVC)
     add_compile_options($<$<BOOL:${MSVC_IDE}>:/MP>) # Speed up Visual Studio builds
 endif()
 
-option(BUILD_LAYERS "Build VkLayer_khronos_validation" ON)
+option(BUILD_LAYERS "Build validation layers" ON)
 option(BUILD_LAYER_SUPPORT_FILES "Install VkLayer_utils")
 
 if(BUILD_LAYERS OR BUILD_LAYER_SUPPORT_FILES)

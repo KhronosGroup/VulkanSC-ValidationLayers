@@ -17,6 +17,7 @@
 
 #include "../layers/vk_lunarg_device_profile_api_layer.h"
 #include "vk_layer_settings_ext.h"
+#include "vk_extension_helper.h"
 
 #if defined(ANDROID)
 #include <android/log.h>
@@ -42,6 +43,7 @@
 #include <string>
 #include <unordered_set>
 #include <vector>
+#include <condition_variable>
 
 using std::string;
 using std::vector;
@@ -306,11 +308,11 @@ class VkLayerTest : public VkRenderFramework {
     bool IsDriver(VkDriverId driver_id);
 
   protected:
-    uint32_t m_instance_api_version = 0;
-    uint32_t m_target_api_version = 0;
+    APIVersion m_instance_api_version = 0;
+    APIVersion m_target_api_version = 0;
 
-    void SetTargetApiVersion(uint32_t target_api_version);
-    uint32_t DeviceValidationVersion() const;
+    void SetTargetApiVersion(APIVersion target_api_version);
+    APIVersion DeviceValidationVersion() const;
     bool LoadDeviceProfileLayer(
         PFN_vkSetPhysicalDeviceFormatPropertiesEXT &fpvkSetPhysicalDeviceFormatPropertiesEXT,
         PFN_vkGetOriginalPhysicalDeviceFormatPropertiesEXT &fpvkGetOriginalPhysicalDeviceFormatPropertiesEXT);
@@ -965,6 +967,6 @@ void GetSimpleGeometryForAccelerationStructureTests(const VkDeviceObj &device, V
                                                     VkGeometryNV *geometry, VkDeviceSize offset = 0, bool buffer_device_address = false);
 
 std::pair<VkBufferObj &&, VkAccelerationStructureGeometryKHR> GetSimpleAABB(const VkDeviceObj &device,
-                                                                            uint32_t vk_api_version = VK_API_VERSION_1_2);
+                                                                            APIVersion vk_api_version = VK_API_VERSION_1_2);
 
 void print_android(const char *c);

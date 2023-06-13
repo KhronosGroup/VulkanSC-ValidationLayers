@@ -3,6 +3,7 @@
 # Copyright (c) 2015-2023 The Khronos Group Inc.
 # Copyright (c) 2015-2023 Valve Corporation
 # Copyright (c) 2015-2023 LunarG, Inc.
+# Copyright (c) 2023-2023 RasterGrid Kft.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,6 +28,7 @@ funcptr_source_preamble = '''
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
+#include <string>
 
 #ifdef _WIN32
 // Dynamic Loading:
@@ -50,7 +52,7 @@ static void *get_proc_address(dl_handle library, const char *name) {
     assert(name);
     return (void *)GetProcAddress(library, name);
 }
-#elif defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__)
+#elif defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__QNX__)
 
 #include <dlfcn.h>
 
@@ -62,7 +64,7 @@ static inline dl_handle open_library(const char *libPath) {
     // variable to force all symbols to be resolved here.
     return dlopen(libPath, RTLD_LAZY | RTLD_LOCAL);
 }
-static inline const char *open_library_error(const char *libPath) { return dlerror(); }
+static inline const char *open_library_error(const char * /*libPath*/) { return dlerror(); }
 static inline void *get_proc_address(dl_handle library, const char *name) {
     assert(library);
     assert(name);
@@ -105,6 +107,7 @@ class LvtFileOutputGeneratorOptions(GeneratorOptions):
                  directory = '.',
                  genpath = None,
                  apiname = 'vulkan',
+                 mergeApiNames = None,
                  profile = None,
                  versions = '.*',
                  emitversions = '.*',
@@ -127,6 +130,7 @@ class LvtFileOutputGeneratorOptions(GeneratorOptions):
                 directory = directory,
                 genpath = genpath,
                 apiname = apiname,
+                mergeApiNames = mergeApiNames,
                 profile = profile,
                 versions = versions,
                 emitversions = emitversions,
@@ -261,25 +265,25 @@ class LvtFileOutputGenerator(OutputGenerator):
 
         table += '''
 
-void InitDispatchTable() {
+void InitDispatchTable(const char *api_name) {
 
-#if(WIN32)
-    const char filename[] = "vulkan-1.dll";
-    auto lib_handle = open_library(filename);
+#if defined(WIN32)
+    std::string filename = std::string(api_name) + "-1.dll";
+    auto lib_handle = open_library(filename.c_str());
 #elif(__APPLE__)
-    const char filename[] = "libvulkan.dylib";
-    auto lib_handle = open_library(filename);
+    std::string filename = std::string("lib") + api_name + ".dylib";
+    auto lib_handle = open_library(filename.c_str());
 #else
-    const char *filename = "libvulkan.so";
-    auto lib_handle = open_library(filename);
+    std::string filename = std::string("lib") + api_name + ".so";
+    auto lib_handle = open_library(filename.c_str());
     if (!lib_handle) {
-        filename = "libvulkan.so.1";
-        lib_handle = open_library(filename);
+        filename = std::string("lib") + api_name + ".so.1";
+        lib_handle = open_library(filename.c_str());
     }
 #endif
 
     if (lib_handle == nullptr) {
-        printf("%s\\n", open_library_error(filename));
+        printf("%s\\n", open_library_error(filename.c_str()));
         exit(1);
     }
 
@@ -313,7 +317,7 @@ void InitDispatchTable() {
             if item[1] is not None:
                 table += '#endif // %s\n' % item[1]
         table += '\n'
-        table += 'void InitDispatchTable();\n\n'
+        table += 'void InitDispatchTable(const char *api_name);\n\n'
         table += '} // namespace vk'
         return table
 

@@ -1,0 +1,211 @@
+# Copyright (c) 2021-2023 The Khronos Group Inc.
+# Copyright (c) 2021-2023 Valve Corporation
+# Copyright (c) 2021-2023 LunarG, Inc.
+# Copyright (c) 2023-2023 RasterGrid Kft.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: VVL (Build/Tests) - Vulkan SC
+
+# https://docs.github.com/en/actions/using-jobs/using-concurrency
+concurrency:
+  # github.head_ref is only defined on pull_request
+  # Fallback to the run ID, which is guaranteed to be both unique and defined for the run.
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id  }}
+  cancel-in-progress: true
+
+on:
+    push:
+    pull_request:
+        branches:
+            - main
+            - sc_main
+
+jobs:
+  linux:
+    runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false
+      matrix:
+        cc: [gcc, clang]
+        cxx: [g++, clang++]
+        config: [debug, release]
+        exclude:
+          - cc: gcc
+            cxx: clang++
+          - cc: clang
+            cxx: g++
+          - cc: clang
+            config: debug
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: lukka/get-cmake@latest
+        with:
+          cmakeVersion: 3.17.2
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.8'
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: vksc-${{ runner.os }}-${{ matrix.config }}-${{ matrix.cc }}-${{ matrix.cxx }}
+      - name: Install build dependencies
+        run: |
+          python3 -m pip install jsonschema pyparsing
+          sudo apt-get -qq update
+          sudo apt-get install -y libxkbcommon-dev libwayland-dev libmirclient-dev libxrandr-dev \
+                                libx11-xcb-dev libxcb-keysyms1 libxcb-keysyms1-dev libxcb-ewmh-dev \
+                                libxcb-randr0-dev
+      # Turn on ccache this way, which is easier than figuring out how to turn it on for all deps
+      # PATH changes need to be done in an action before any action that needs it
+      - name: Add ccache to PATH
+        run: echo "/usr/lib/ccache" >> $GITHUB_PATH
+      - name: Set PYTHONPATH
+        run: echo "PYTHONPATH=$GITHUB_WORKSPACE/external/${{ matrix.config }}/Vulkan-Headers/registry:$PYTHONPATH" >> $GITHUB_ENV
+      - name: Build VulkanSC-ValidationLayers
+        run: |
+          echo "PYTHONPATH = $PYTHONPATH"
+          python3 scripts/vksc_github_ci.py --build --config ${{ matrix.config }} --cmake='-DVVL_ENABLE_ASAN=ON'
+        env:
+          CC: ${{ matrix.cc }}
+          CXX: ${{ matrix.cxx }}
+      - name: Test VulkanSC-ValidationLayers - Mock ICD
+        run: python3 scripts/vksc_github_ci.py --test --config release
+
+  linux-cpp20:
+    runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.8'
+      - uses: lukka/get-cmake@latest
+      - name: Install build dependencies
+        run: |
+          python3 -m pip install jsonschema pyparsing
+          sudo apt-get -qq update
+          sudo apt-get install -y libxkbcommon-dev libwayland-dev libmirclient-dev libxrandr-dev \
+                                libx11-xcb-dev libxcb-keysyms1 libxcb-keysyms1-dev libxcb-ewmh-dev \
+                                libxcb-randr0-dev
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: vksc-${{ runner.os }}-release-cpp20
+      # Turn on ccache this way, which is easier than figuring out how to turn it on for all deps
+      # PATH changes need to be done in an action before any action that needs it
+      - name: Add ccache to PATH
+        run: echo "/usr/lib/ccache" >> $GITHUB_PATH
+      - name: Set PYTHONPATH
+        run: echo "PYTHONPATH=$GITHUB_WORKSPACE/external/release/Vulkan-Headers/build/install/share/vulkan/registry:$PYTHONPATH" >> $GITHUB_ENV
+      - name: Build VulkanSC-ValidationLayers
+        run: python3 scripts/vksc_github_ci.py --build --config release --cmake='-DVVL_CPP_STANDARD=20 -DVVL_ENABLE_ASAN=ON'
+        env:
+          CC: clang
+          CXX: clang++
+
+  windows:
+    runs-on: ${{matrix.os}}
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [ x64, Win32 ]
+        config: [ debug, release ]
+        os: [ windows-latest ]
+        exclude:
+          - arch: Win32
+            config: release
+          - arch: x64
+            config: debug
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.8'
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: ${{ matrix.arch }}
+      - name: Install build dependencies
+        run: |
+          python3 -m pip install jsonschema pyparsing
+      - name: Cache dependent components
+        # Speed up builds by caching the build/install artifacts so they can be retrieved without rebuilding.
+        # Note: Normally the build/install artifacts are enough to satisfy the dependencies.
+        #       But in this repo, there are extra tests and steps that require files that are not placed in build/install.
+        #       When adding new similar tests, make sure to add any other required directories/files to the cache list.
+        id: cache-deps
+        uses: actions/cache@v3
+        env:
+          cache-name: cache-vksc-windows
+        with:
+          path: |
+            external/${{ matrix.config }}/glslang/build/install
+            external/${{ matrix.config }}/Vulkan-Headers/build/install
+            external/${{ matrix.config }}/SPIRV-Headers/build/install
+            external/${{ matrix.config }}/SPIRV-Tools/build/install
+            external/${{ matrix.config }}/robin-hood-hashing/build/install
+            external/${{ matrix.config }}/googletest/build/install
+            external/${{ matrix.config }}/Vulkan-Headers/registry
+            external/${{ matrix.config }}/SPIRV-Headers/include
+            external/${{ matrix.config }}/mimalloc/build/install
+          key: vksc-${{ runner.os }}-build-${{ env.cache-name }}-${{ matrix.arch }}-${{ matrix.os }}-${{ matrix.config }}-${{ hashfiles('scripts/known_good.json') }}
+      - name: Set PYTHONPATH
+        run: echo "PYTHONPATH=$env:GITHUB_WORKSPACE\\external\\${{ matrix.config }}\\Vulkan-Headers\\registry;$env:PYTHONPATH" >> $env:GITHUB_ENV
+      - name: Build VulkanSC-ValidationLayers
+        run: python3 scripts/vksc_github_ci.py --build --config ${{ matrix.config }} --cmake='-DUPDATE_DEPS_SKIP_EXISTING_INSTALL=ON'
+
+  mingw:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.8'
+      - name: Install build dependencies
+        run: python -m pip install jsonschema pyparsing
+      - name: Cache dependent components
+        id: cache-deps
+        uses: actions/cache@v3
+        env:
+          cache-name: cache-vksc-mingw
+        with:
+          path: |
+            external/Debug/glslang/build/install
+            external/Debug/Vulkan-Headers/build/install
+            external/Debug/SPIRV-Headers/build/install
+            external/Debug/SPIRV-Tools/build/install
+            external/Debug/robin-hood-hashing/build/install
+            external/Debug/googletest/build/install
+            external/Debug/Vulkan-Headers/registry
+            external/Debug/SPIRV-Headers/include
+            external/Debug/mimalloc/build/install
+          key: vksc-mingw-Debug-${{ hashfiles('scripts/known_good.json') }}
+      - uses: lukka/get-cmake@latest
+      - name: GCC Version
+        run: gcc --version # If this fails MINGW is not setup correctly
+      - name: Configure
+        run: cmake -S. -B build -D BUILD_WERROR=ON -D UPDATE_DEPS=ON -D CMAKE_BUILD_TYPE=Debug -D UPDATE_DEPS_SKIP_EXISTING_INSTALL=ON -D VULKANSC=ON -G "Ninja"
+        env:
+          LDFLAGS: "-fuse-ld=lld" # MINGW linking is very slow. Use llvm linker instead.
+      - name: Build
+        run: cmake --build build
+      - name: Install
+        run: cmake --install build --prefix build/install
