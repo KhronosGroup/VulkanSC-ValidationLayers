@@ -33,8 +33,6 @@
     "VUID-VkPipelineCacheHeaderVersionSafetyCriticalOne-pipelineIndexStride-05078";
 [[maybe_unused]] static const char *kVUID_SC_PipelineCacheData_PipelineIndexOutOfBounds =
     "VUID-VkPipelineCacheHeaderVersionSafetyCriticalOne-pipelineIndexOffset-05079";
-[[maybe_unused]] static const char *kVUID_SC_PipelineCacheData_DuplicatePipelineIds =
-    "VUID-VkPipelineCacheCreateInfo-pInitialData-05139";
 [[maybe_unused]] static const char *kVUID_SC_PipelineCacheData_JsonOffsetAndSizeInconsistent =
     "VUID-VkPipelineCacheSafetyCriticalIndexEntry-jsonSize-05080";
 [[maybe_unused]] static const char *kVUID_SC_PipelineCacheData_JsonDataOutOfBounds =

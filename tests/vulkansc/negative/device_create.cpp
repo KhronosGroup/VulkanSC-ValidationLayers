@@ -357,7 +357,7 @@ TEST_F(VkSCPipelineCacheDataLayerTest, DuplicatePipelineIdentifier) {
     builder.AddPipelineEntry(header, "1265a236-e369-11ed-b5ea-0242ac120002", 8000);  // duplicate
     builder.AddPipelineEntry(header, "73ada7f2-9cc6-48ed-a193-24d0091f4f95", 4000);
 
-    m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "VUID-VkPipelineCacheCreateInfo-pInitialData-05139");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPipelineCacheCreateInfo-pInitialData-05139");
     TestPipelineCacheData({builder.MakeCreateInfo()});
 }
 
@@ -597,7 +597,7 @@ TEST_F(VkSCPipelineCacheDataLayerTest, MultipleProblems) {
     m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "VUID-VkPipelineCacheHeaderVersionOne-headerVersion-05076");
     m_errorMonitor->SetDesiredFailureMsg(kWarningBit,
                                          "VUID-VkPipelineCacheHeaderVersionSafetyCriticalOne-pipelineIndexStride-05078");
-    m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "VUID-VkPipelineCacheCreateInfo-pInitialData-05139");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPipelineCacheCreateInfo-pInitialData-05139");
     TestPipelineCacheData(create_infos);
     m_errorMonitor->VerifyFound();
 }

@@ -320,11 +320,11 @@ bool SCCoreChecks::ValidatePipelineCacheData(VkPhysicalDevice physicalDevice, co
 
         auto id = entry.PipelineID();
         if (!pipeline_ids.emplace(id).second) {
-            skip |= LogWarning(physicalDevice, kVUID_SC_PipelineCacheData_DuplicatePipelineIds,
-                               "vkCreateDevice(): the pipeline cache data specified in "
-                               "VkDeviceObjectReservationCreateInfo::pPipelineCacheCreateInfos[%u].pInitialData "
-                               "contains duplicate pipeline identifier {%s}.",
-                               index, id.toString().c_str());
+            skip |= LogError(physicalDevice, "VUID-VkPipelineCacheCreateInfo-pInitialData-05139",
+                             "vkCreateDevice(): the pipeline cache data specified in "
+                             "VkDeviceObjectReservationCreateInfo::pPipelineCacheCreateInfos[%u].pInitialData "
+                             "contains duplicate pipeline identifier {%s}.",
+                             index, id.toString().c_str());
         }
 
         if (entry->jsonSize == 0 && entry->jsonOffset != 0) {
