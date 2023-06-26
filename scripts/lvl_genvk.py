@@ -190,7 +190,6 @@ def makeGenOpts(args):
             filename          = 'enum_flag_bits.h',
             directory         = directory,
             apiname           = apiname,
-            mergeApiNames     = mergeApiNames,
             defaultExtensions = defaultExtensions,
             versions          = featuresPat,
             emitversions      = featuresPat,

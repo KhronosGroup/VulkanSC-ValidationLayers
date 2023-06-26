@@ -55,9 +55,11 @@ target_sources(vksc_layer_validation_tests PRIVATE
     negative/pipeline.cpp
     negative/others.cpp
     negative/ported.cpp
+    negative/implicit.cpp
     positive/instance.cpp
     positive/pipeline.cpp
     positive/others.cpp
+    positive/implicit.cpp
 )
 
 # gtest_discover_tests has problem with cross-compiling, but it is faster and more robust

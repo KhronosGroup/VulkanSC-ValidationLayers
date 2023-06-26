@@ -537,6 +537,22 @@ class ParameterValidationOutputGenerator(OutputGenerator):
             if self.headerVersion:
                 write('const uint32_t GeneratedVulkanHeaderVersion = {};'.format(self.headerVersion), file=self.outFile)
 
+            # TODO: We have to manually handle the generation of some AllVkXXFlagBits constants due to some code
+            # in the manually written parameter_validation_utils.cpp file and test cases referring to those, while
+            # Vulkan SC not having those flag types, or just the flag bits types defined for various reasons.
+            # The part of the parameter validation code that is not auto-generated and hence has such manual
+            # references to Vulkan-only types will likely be fixed in the future in the upstream code.
+            # See issue: https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/4847
+            if self.genOpts.apiname == 'vulkansc':
+                manual_vulkan_flag_bits = [
+                    'VkPipelineColorBlendStateCreateFlagBits',
+                    'VkPipelineDepthStencilStateCreateFlagBits',
+                    'VkBuildAccelerationStructureFlagBitsNV',
+                    'VkExternalMemoryHandleTypeFlagBitsNV'
+                ]
+                for flag_bits in manual_vulkan_flag_bits:
+                    write(f'const {flag_bits.replace("FlagBits", "Flags")} All{flag_bits} = 0;', file=self.outFile)
+
             # Don't need flag/enum lists if app can never call it to be validated
             # But need to save everything as not all information is known until endFile()
             for flag, string in self.flag_values_definitions.items():
