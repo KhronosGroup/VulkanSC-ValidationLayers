@@ -94,20 +94,8 @@ void SCCoreChecks::InitFilters() {
         "VUID-VkBindImageMemoryDeviceGroupInfo-extent-01641",
     };
 
-    // TODO: Vulkan SC - filter_message_ids currently is an array of VUID string hashes which is neither
-    // efficient nor accurate, but we'll have to use it until it is replaced with an unordered set.
-    std::unordered_set<uint32_t> filtered_vuid_hashes{};
     for (const auto& filtered_vuid : filtered_vuids) {
-        filtered_vuid_hashes.emplace(vvl_vuid_hash(filtered_vuid));
-    }
-    for (const auto& message_hash : report_data->filter_message_ids) {
-        auto it = filtered_vuid_hashes.find(message_hash);
-        if (it != filtered_vuid_hashes.end()) {
-            filtered_vuid_hashes.erase(it);
-        }
-    }
-    for (const auto& message_hash : filtered_vuid_hashes) {
-        report_data->filter_message_ids.push_back(message_hash);
+        report_data->filter_message_ids.insert(vvl_vuid_hash(filtered_vuid));
     }
 }
 
