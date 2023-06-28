@@ -97,18 +97,29 @@ class SCValidationStateTracker : public BASE {
                                          const VkAllocationCallbacks* pAllocator, VkRenderPass* pRenderPass,
                                          VkResult result) override;
     void PreCallRecordDestroyRenderPass(VkDevice device, VkRenderPass renderPass, const VkAllocationCallbacks* pAllocator) override;
+    void PostCallRecordCreatePrivateDataSlotEXT(VkDevice device, const VkPrivateDataSlotCreateInfo* pCreateInfo,
+                                                const VkAllocationCallbacks* pAllocator, VkPrivateDataSlot* pPrivateDataSlot,
+                                                VkResult result) override;
+    void PreCallRecordDestroyPrivateDataSlotEXT(VkDevice device, VkPrivateDataSlot privateDataSlot,
+                                                const VkAllocationCallbacks* pAllocator) override;
 
   protected:
+    // SC-specific features and properties
     SCDeviceFeatures enabled_sc_features_ = {};
     VkPhysicalDeviceVulkanSC10Properties phys_dev_props_sc_10_ = {};
+
+    // Object reservation limits
     VkDeviceObjectReservationCreateInfo sc_object_limits_ = {};
+    VkDevicePrivateDataCreateInfoEXT sc_private_data_slot_limits_ = {};
     VkPerformanceQueryReservationInfoKHR sc_perf_query_limits_ = {};
+
+    // Pipeline cache and pool related states
     vvl::unordered_map<const void*, std::unique_ptr<SCPipelineCacheData>> sc_pipeline_cache_map_ = {};
     vvl::unordered_map<VkDeviceSize, uint32_t> sc_pipeline_pool_size_map_ = {};
-
     mutable std::mutex sc_used_pipeline_pool_size_map_mutex_{};
     vvl::unordered_map<VkDeviceSize, uint32_t> sc_used_pipeline_pool_size_map_ = {};
 
+    // Object / sub-object count tracking
     struct {
         std::atomic_uint32_t command_buffers{0};
         std::atomic_uint32_t graphics_pipelines{0};
@@ -117,5 +128,6 @@ class SCValidationStateTracker : public BASE {
         std::atomic_uint32_t subpass_descriptions{0};
         std::atomic_uint32_t attachment_descriptions{0};
         std::atomic_uint32_t descriptor_set_layout_bindings{0};
-    } sc_reserved_objects{};
+        std::atomic_uint32_t private_data_slots{0};
+    } sc_reserved_objects_{};
 };

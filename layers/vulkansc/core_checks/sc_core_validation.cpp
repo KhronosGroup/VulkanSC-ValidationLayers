@@ -611,7 +611,7 @@ bool SCCoreChecks::PreCallValidateCreateCommandPool(VkDevice device, const VkCom
                          "greater than VkPhysicalDeviceVulkanSC10Properties::maxCommandPoolCommandBuffers (%u).",
                          mem_reservation_info->commandPoolMaxCommandBuffers, phys_dev_props_sc_10_.maxCommandPoolCommandBuffers);
         }
-        uint32_t reserved_command_buffers = sc_reserved_objects.command_buffers.load();
+        uint32_t reserved_command_buffers = sc_reserved_objects_.command_buffers.load();
         if (reserved_command_buffers + mem_reservation_info->commandPoolMaxCommandBuffers >
             sc_object_limits_.commandBufferRequestCount) {
             skip |= LogError(device, "VUID-VkCommandPoolMemoryReservationCreateInfo-commandPoolMaxCommandBuffers-05074",
@@ -642,7 +642,7 @@ bool SCCoreChecks::PreCallValidateCreateDescriptorSetLayout(VkDevice device, con
     if (pCreateInfo) {
         skip |= ValidateCombinedRequestCount(
             device, "vkCreateDescriptorSetLayout", "VUID-vkCreateDescriptorSetLayout-layoutbindings-device-05089",
-            "VkDescriptorSetLayout", "descriptor set layout bindings", sc_reserved_objects.descriptor_set_layout_bindings.load(),
+            "VkDescriptorSetLayout", "descriptor set layout bindings", sc_reserved_objects_.descriptor_set_layout_bindings.load(),
             "descriptorSetLayoutBinding", sc_object_limits_.descriptorSetLayoutBindingRequestCount, "pCreateInfo->bindingCount",
             pCreateInfo->bindingCount);
 
@@ -735,7 +735,7 @@ bool SCCoreChecks::PreCallValidateCreateComputePipelines(VkDevice device, VkPipe
                                                             ccpl_state_data);
 
     skip |= ValidateObjectRequestCount(device, "vkCreateComputePipelines", "VUID-vkCreateComputePipelines-device-05068",
-                                       "compute pipelines", sc_reserved_objects.compute_pipelines.load(), "computePipeline",
+                                       "compute pipelines", sc_reserved_objects_.compute_pipelines.load(), "computePipeline",
                                        sc_object_limits_.computePipelineRequestCount, "createInfoCount", count);
 
     skip |= ValidatePipelinePoolMemory(device, "vkCreateComputePipelines", count, pCreateInfos);
@@ -751,7 +751,7 @@ bool SCCoreChecks::PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPip
                                                              cgpl_state_data);
 
     skip |= ValidateObjectRequestCount(device, "vkCreateGraphicsPipelines", "VUID-vkCreateGraphicsPipelines-device-05068",
-                                       "graphics pipelines", sc_reserved_objects.graphics_pipelines.load(), "graphicsPipeline",
+                                       "graphics pipelines", sc_reserved_objects_.graphics_pipelines.load(), "graphicsPipeline",
                                        sc_object_limits_.graphicsPipelineRequestCount, "createInfoCount", count);
 
     skip |= ValidatePipelinePoolMemory(device, "vkCreateGraphicsPipelines", count, pCreateInfos);
@@ -842,11 +842,11 @@ bool SCCoreChecks::PreCallValidateCreateRenderPass(VkDevice device, const VkRend
 
     if (pCreateInfo) {
         skip |= ValidateCombinedRequestCount(device, "vkCreateRenderPass", "VUID-vkCreateRenderPass-subpasses-device-05089",
-                                             "VkRenderPass", "subpasses", sc_reserved_objects.subpass_descriptions.load(),
+                                             "VkRenderPass", "subpasses", sc_reserved_objects_.subpass_descriptions.load(),
                                              "subpassDescription", sc_object_limits_.subpassDescriptionRequestCount,
                                              "pCreateInfo->subpassCount", pCreateInfo->subpassCount);
         skip |= ValidateCombinedRequestCount(device, "vkCreateRenderPass", "VUID-vkCreateRenderPass-attachments-device-05089",
-                                             "VkRenderPass", "attachments", sc_reserved_objects.attachment_descriptions.load(),
+                                             "VkRenderPass", "attachments", sc_reserved_objects_.attachment_descriptions.load(),
                                              "attachmentDescription", sc_object_limits_.attachmentDescriptionRequestCount,
                                              "pCreateInfo->attachmentCount", pCreateInfo->attachmentCount);
     }
@@ -863,11 +863,11 @@ bool SCCoreChecks::PreCallValidateCreateRenderPass2(VkDevice device, const VkRen
 
     if (pCreateInfo) {
         skip |= ValidateCombinedRequestCount(device, "vkCreateRenderPass", "VUID-vkCreateRenderPass2-subpasses-device-05089",
-                                             "VkRenderPass", "subpasses", sc_reserved_objects.subpass_descriptions.load(),
+                                             "VkRenderPass", "subpasses", sc_reserved_objects_.subpass_descriptions.load(),
                                              "subpassDescription", sc_object_limits_.subpassDescriptionRequestCount,
                                              "pCreateInfo->subpassCount", pCreateInfo->subpassCount);
         skip |= ValidateCombinedRequestCount(device, "vkCreateRenderPass", "VUID-vkCreateRenderPass2-attachments-device-05089",
-                                             "VkRenderPass", "attachments", sc_reserved_objects.attachment_descriptions.load(),
+                                             "VkRenderPass", "attachments", sc_reserved_objects_.attachment_descriptions.load(),
                                              "attachmentDescription", sc_object_limits_.attachmentDescriptionRequestCount,
                                              "pCreateInfo->attachmentCount", pCreateInfo->attachmentCount);
     }
@@ -967,7 +967,7 @@ bool SCCoreChecks::PreCallValidateCreateImageView(VkDevice device, const VkImage
         }
 
         if (effective_array_layers > 1) {
-            uint32_t reserved_layered_image_views = sc_reserved_objects.layered_image_views.load();
+            uint32_t reserved_layered_image_views = sc_reserved_objects_.layered_image_views.load();
             if (reserved_layered_image_views >= sc_object_limits_.layeredImageViewRequestCount) {
                 skip |= LogError(device, "VUID-vkCreateImageView-subresourceRange-05063",
                                  "vkCreateImageView(): the number of image views with more than one "
@@ -1061,6 +1061,23 @@ bool SCCoreChecks::PreCallValidateCreateSharedSwapchainsKHR(VkDevice device, uin
     skip |= ValidateObjectRequestCount(device, "vkCreateSharedSwapchainsKHR", "VUID-vkCreateSharedSwapchainsKHR-device-05068",
                                        "swapchains", Count<SWAPCHAIN_NODE>(), "swapchain", sc_object_limits_.swapchainRequestCount,
                                        "swapchainCount", swapchainCount);
+
+    return skip;
+}
+
+bool SCCoreChecks::PreCallValidateCreatePrivateDataSlotEXT(VkDevice device, const VkPrivateDataSlotCreateInfoEXT* pCreateInfo,
+                                                           const VkAllocationCallbacks* pAllocator,
+                                                           VkPrivateDataSlotEXT* pPrivateDataSlot) const {
+    bool skip = BASE::PreCallValidateCreatePrivateDataSlotEXT(device, pCreateInfo, pAllocator, pPrivateDataSlot);
+
+    uint32_t reserved_private_data_slots = sc_reserved_objects_.private_data_slots.load();
+    if (reserved_private_data_slots >= sc_private_data_slot_limits_.privateDataSlotRequestCount) {
+        skip |= LogError(device, "VUID-vkCreatePrivateDataSlotEXT-device-05000",
+                         "vkCreatePrivateDataSlotEXT(): the number of private data slots currently allocated from "
+                         "the device (%u) plus one is greater than the total number of private data slots requested "
+                         "via VkDevicePrivateDataCreateInfoEXT::privateDataSlotRequestCount (%u).",
+                         reserved_private_data_slots, sc_private_data_slot_limits_.privateDataSlotRequestCount);
+    }
 
     return skip;
 }

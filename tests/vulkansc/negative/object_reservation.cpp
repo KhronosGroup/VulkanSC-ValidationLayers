@@ -22,13 +22,15 @@ class VkSCObjectReservationLayerTest : public VkSCLayerTest {
     using destroy_func_t = std::function<void(VkDeviceObj& device, uint32_t index, uint32_t destroy_count)>;
     using teardown_func_t = std::function<void(VkDeviceObj& device)>;
 
+    std::vector<const char*> device_extensions{};
+
     void TestObjectReservationLimit(uint32_t max_create_count, bool can_destroy, bool has_parent, void* device_features,
                                     caps_func_t caps_func, setup_func_t setup_func, create_func_t create_func,
                                     destroy_func_t destroy_func, teardown_func_t teardown_func) {
         auto sc_10_features = LvlInitStruct<VkPhysicalDeviceVulkanSC10Features>(device_features);
         auto object_reservation_info = LvlInitStruct<VkDeviceObjectReservationCreateInfo>(&sc_10_features);
 
-        const std::vector<uint32_t> tested_limits{0, 42, 111, 499};
+        const std::vector<uint32_t> tested_limits{0, 7, 13, 42, 111, 499};
         for (auto tested_limit : tested_limits) {
             const uint32_t over_limit = 5;
 
@@ -36,8 +38,7 @@ class VkSCObjectReservationLayerTest : public VkSCLayerTest {
                 continue;
             }
 
-            std::vector<const char*> extensions{};
-            VkDeviceObj device(0, gpu(), extensions, nullptr, &object_reservation_info);
+            VkDeviceObj device(0, gpu(), device_extensions, nullptr, &object_reservation_info);
 
             if (setup_func) {
                 if (!setup_func(device)) {
@@ -159,7 +160,7 @@ class VkSCObjectReservationLayerTest : public VkSCLayerTest {
 
                 // Create up to the desired limit minus max_create_count - 1
                 uint32_t object_count = 0;
-                uint32_t left_to_create = (tested_limit >= max_create_count) ? tested_limit + 1 - max_create_count : tested_limit;
+                uint32_t left_to_create = (tested_limit >= max_create_count) ? tested_limit + 1 - max_create_count : 0;
                 while (left_to_create >= max_create_count) {
                     create_func(device, object_count++, max_create_count, false);
                     left_to_create -= max_create_count;
@@ -173,20 +174,21 @@ class VkSCObjectReservationLayerTest : public VkSCLayerTest {
                 create_func(device, object_count, max_create_count, true);
 
                 // Now allocate one by one and try to reserve one more than remaining
-                for (uint32_t i = 1; i < std::min(max_create_count, tested_limit); ++i) {
+                uint32_t remaining_count = std::min(max_create_count - 1, tested_limit);
+                for (uint32_t i = 0; i < remaining_count; ++i) {
                     create_func(device, object_count++, 1, false);
-                    create_func(device, object_count, max_create_count - i, true);
+                    create_func(device, object_count, remaining_count - i + 1, true);
                 }
 
                 if (can_destroy) {
                     // Destroy one by one the allocations done in the previous step
-                    for (uint32_t i = 1; i < std::min(max_create_count, tested_limit); ++i) {
+                    for (uint32_t i = 0; i < remaining_count; ++i) {
                         destroy_func(device, --object_count, 0);
                     }
 
                     if (tested_limit > 0) {
                         // Expect to be able to create a single object instead of it with max_create_count - 1
-                        create_func(device, object_count++, max_create_count - 1, false);
+                        create_func(device, object_count++, std::min(max_create_count - 1, tested_limit), false);
 
                         // After that any attempts to create should fail
                         create_func(device, object_count, 1, true);
@@ -2079,6 +2081,85 @@ TEST_F(VkSCObjectReservationLayerTest, EventRequestCount) {
 
             vksc::DestroyEvent(device.handle(), data.events[index], nullptr);
             data.events[index] = VK_NULL_HANDLE;
+        },
+        // Teardown common device objects
+        nullptr);
+}
+
+TEST_F(VkSCObjectReservationLayerTest, PrivateDataSlotRequestCount) {
+    TEST_DESCRIPTION("Test VkDevicePrivateDataCreateInfoEXT::privateDataSlotRequestCount");
+
+    ASSERT_NO_FATAL_FAILURE(InitFramework());
+
+    if (!DeviceExtensionSupported(VK_EXT_PRIVATE_DATA_EXTENSION_NAME)) {
+        GTEST_SKIP() << "Test requires VK_EXT_private_data";
+    }
+
+    device_extensions.push_back(VK_EXT_PRIVATE_DATA_EXTENSION_NAME);
+
+    struct {
+        VkDevicePrivateDataCreateInfoEXT private_data_slot_reservation_info{};
+        std::vector<VkPrivateDataSlotEXT> private_data_slots{};
+
+        PFN_vkCreatePrivateDataSlotEXT pfn_vkCreatePrivateDataSlotEXT;
+        PFN_vkDestroyPrivateDataSlotEXT pfn_vkDestroyPrivateDataSlotEXT;
+    } data;
+
+    const uint32_t max_create_count = 1;
+    const bool can_destroy = true;
+    const bool has_parent = false;
+
+    TestObjectReservationLimit(
+        max_create_count, can_destroy, has_parent, nullptr,
+        // Init object reservation info
+        [&data](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
+            if (tested_limit > 50) {
+                // Do not try to test unreasonably large private data slot counts
+                return false;
+            }
+
+            data.private_data_slot_reservation_info = LvlInitStruct<VkDevicePrivateDataCreateInfoEXT>();
+            data.private_data_slot_reservation_info.privateDataSlotRequestCount = tested_limit;
+            data.private_data_slot_reservation_info.pNext = object_reservation_info.pNext;
+            object_reservation_info.pNext = &data.private_data_slot_reservation_info;
+
+            data.private_data_slots.clear();
+            data.private_data_slots.resize(tested_limit, VK_NULL_HANDLE);
+
+            return true;
+        },
+        // Setup common device objects
+        [&data](VkDeviceObj& device) {
+            // Load extension function pointers
+            data.pfn_vkCreatePrivateDataSlotEXT =
+                (PFN_vkCreatePrivateDataSlotEXT)vk::GetDeviceProcAddr(device.handle(), "vkCreatePrivateDataSlotEXT");
+            data.pfn_vkDestroyPrivateDataSlotEXT =
+                (PFN_vkDestroyPrivateDataSlotEXT)vk::GetDeviceProcAddr(device.handle(), "vkDestroyPrivateDataSlotEXT");
+
+            return data.pfn_vkCreatePrivateDataSlotEXT && data.pfn_vkDestroyPrivateDataSlotEXT;
+        },
+        // Create objects
+        [&data, this](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
+            VkPrivateDataSlotEXT private_data_slot = VK_NULL_HANDLE;
+
+            auto create_info = LvlInitStruct<VkPrivateDataSlotCreateInfoEXT>();
+
+            if (should_fail) {
+                m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreatePrivateDataSlotEXT-device-05000");
+                data.pfn_vkCreatePrivateDataSlotEXT(device.handle(), &create_info, nullptr, &private_data_slot);
+                m_errorMonitor->VerifyFound();
+            } else {
+                assert(index < data.private_data_slots.size());
+                data.pfn_vkCreatePrivateDataSlotEXT(device.handle(), &create_info, nullptr, &data.private_data_slots[index]);
+            }
+        },
+        // Destroy objects
+        [&data](VkDeviceObj& device, uint32_t index, uint32_t destroy_count) {
+            assert(index < data.private_data_slots.size());
+            assert(destroy_count == 1);
+
+            data.pfn_vkDestroyPrivateDataSlotEXT(device.handle(), data.private_data_slots[index], nullptr);
+            data.private_data_slots[index] = VK_NULL_HANDLE;
         },
         // Teardown common device objects
         nullptr);

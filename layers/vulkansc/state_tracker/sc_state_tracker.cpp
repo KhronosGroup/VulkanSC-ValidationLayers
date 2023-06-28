@@ -136,6 +136,14 @@ void SCValidationStateTracker<BASE>::CreateDevice(const VkDeviceCreateInfo *pCre
         object_reservation_info = LvlFindInChain<VkDeviceObjectReservationCreateInfo>(object_reservation_info->pNext);
     }
 
+    const auto *private_data_slot_reservation_info = LvlFindInChain<VkDevicePrivateDataCreateInfoEXT>(pCreateInfo->pNext);
+    while (private_data_slot_reservation_info != nullptr) {
+        sc_private_data_slot_limits_.privateDataSlotRequestCount += private_data_slot_reservation_info->privateDataSlotRequestCount;
+
+        private_data_slot_reservation_info =
+            LvlFindInChain<VkDevicePrivateDataCreateInfoEXT>(private_data_slot_reservation_info->pNext);
+    }
+
     const auto *perf_query_reservation_info = LvlFindInChain<VkPerformanceQueryReservationInfoKHR>(pCreateInfo->pNext);
     while (perf_query_reservation_info != nullptr) {
         sc_perf_query_limits_.maxPerformanceQueriesPerPool =
@@ -165,7 +173,7 @@ void SCValidationStateTracker<BASE>::PostCallRecordCreateCommandPool(VkDevice de
 
     const auto *mem_reservation_info = LvlFindInChain<VkCommandPoolMemoryReservationCreateInfo>(pCreateInfo->pNext);
     if (mem_reservation_info) {
-        sc_reserved_objects.command_buffers.fetch_add(mem_reservation_info->commandPoolMaxCommandBuffers);
+        sc_reserved_objects_.command_buffers.fetch_add(mem_reservation_info->commandPoolMaxCommandBuffers);
     }
 }
 
@@ -210,7 +218,7 @@ void SCValidationStateTracker<BASE>::PostCallRecordCreateGraphicsPipelines(
             ++created_count;
         }
     }
-    sc_reserved_objects.graphics_pipelines.fetch_add(created_count);
+    sc_reserved_objects_.graphics_pipelines.fetch_add(created_count);
 }
 
 template <typename BASE>
@@ -229,7 +237,7 @@ void SCValidationStateTracker<BASE>::PostCallRecordCreateComputePipelines(
             ++created_count;
         }
     }
-    sc_reserved_objects.compute_pipelines.fetch_add(created_count);
+    sc_reserved_objects_.compute_pipelines.fetch_add(created_count);
 }
 
 template <typename BASE>
@@ -239,11 +247,11 @@ void SCValidationStateTracker<BASE>::PreCallRecordDestroyPipeline(VkDevice devic
     if (pipeline_state) {
         switch (pipeline_state->pipeline_type) {
             case VK_PIPELINE_BIND_POINT_GRAPHICS:
-                sc_reserved_objects.graphics_pipelines--;
+                sc_reserved_objects_.graphics_pipelines--;
                 break;
 
             case VK_PIPELINE_BIND_POINT_COMPUTE:
-                sc_reserved_objects.compute_pipelines--;
+                sc_reserved_objects_.compute_pipelines--;
                 break;
 
             default:
@@ -266,7 +274,7 @@ void SCValidationStateTracker<BASE>::PostCallRecordCreateImageView(VkDevice devi
     if (result != VK_SUCCESS) return;
 
     if (pCreateInfo->subresourceRange.layerCount > 1) {
-        sc_reserved_objects.layered_image_views++;
+        sc_reserved_objects_.layered_image_views++;
     }
 }
 
@@ -276,7 +284,7 @@ void SCValidationStateTracker<BASE>::PreCallRecordDestroyImageView(VkDevice devi
     auto image_view_state = Get<IMAGE_VIEW_STATE>(imageView);
     if (image_view_state) {
         if (image_view_state->create_info.subresourceRange.layerCount > 1) {
-            sc_reserved_objects.layered_image_views--;
+            sc_reserved_objects_.layered_image_views--;
         }
     }
 
@@ -291,7 +299,7 @@ void SCValidationStateTracker<BASE>::PostCallRecordCreateDescriptorSetLayout(VkD
     BASE::PostCallRecordCreateDescriptorSetLayout(device, pCreateInfo, pAllocator, pSetLayout, result);
     if (result != VK_SUCCESS) return;
 
-    sc_reserved_objects.descriptor_set_layout_bindings.fetch_add(pCreateInfo->bindingCount);
+    sc_reserved_objects_.descriptor_set_layout_bindings.fetch_add(pCreateInfo->bindingCount);
 }
 
 template <typename BASE>
@@ -300,7 +308,7 @@ void SCValidationStateTracker<BASE>::PreCallRecordDestroyDescriptorSetLayout(VkD
                                                                              const VkAllocationCallbacks *pAllocator) {
     auto set_layout_state = Get<cvdescriptorset::DescriptorSetLayout>(descriptorSetLayout);
     if (set_layout_state) {
-        sc_reserved_objects.descriptor_set_layout_bindings.fetch_sub(set_layout_state->GetBindingCount());
+        sc_reserved_objects_.descriptor_set_layout_bindings.fetch_sub(set_layout_state->GetBindingCount());
     }
 
     BASE::PreCallRecordDestroyDescriptorSetLayout(device, descriptorSetLayout, pAllocator);
@@ -313,8 +321,8 @@ void SCValidationStateTracker<BASE>::PostCallRecordCreateRenderPass(VkDevice dev
     BASE::PostCallRecordCreateRenderPass(device, pCreateInfo, pAllocator, pRenderPass, result);
     if (result != VK_SUCCESS) return;
 
-    sc_reserved_objects.subpass_descriptions.fetch_add(pCreateInfo->subpassCount);
-    sc_reserved_objects.attachment_descriptions.fetch_add(pCreateInfo->attachmentCount);
+    sc_reserved_objects_.subpass_descriptions.fetch_add(pCreateInfo->subpassCount);
+    sc_reserved_objects_.attachment_descriptions.fetch_add(pCreateInfo->attachmentCount);
 }
 
 template <typename BASE>
@@ -324,8 +332,8 @@ void SCValidationStateTracker<BASE>::PostCallRecordCreateRenderPass2(VkDevice de
     BASE::PostCallRecordCreateRenderPass2(device, pCreateInfo, pAllocator, pRenderPass, result);
     if (result != VK_SUCCESS) return;
 
-    sc_reserved_objects.subpass_descriptions.fetch_add(pCreateInfo->subpassCount);
-    sc_reserved_objects.attachment_descriptions.fetch_add(pCreateInfo->attachmentCount);
+    sc_reserved_objects_.subpass_descriptions.fetch_add(pCreateInfo->subpassCount);
+    sc_reserved_objects_.attachment_descriptions.fetch_add(pCreateInfo->attachmentCount);
 }
 
 template <typename BASE>
@@ -333,9 +341,30 @@ void SCValidationStateTracker<BASE>::PreCallRecordDestroyRenderPass(VkDevice dev
                                                                     const VkAllocationCallbacks *pAllocator) {
     auto rp_state = Get<RENDER_PASS_STATE>(renderPass);
     if (rp_state) {
-        sc_reserved_objects.subpass_descriptions.fetch_sub(rp_state->createInfo.subpassCount);
-        sc_reserved_objects.attachment_descriptions.fetch_sub(rp_state->createInfo.attachmentCount);
+        sc_reserved_objects_.subpass_descriptions.fetch_sub(rp_state->createInfo.subpassCount);
+        sc_reserved_objects_.attachment_descriptions.fetch_sub(rp_state->createInfo.attachmentCount);
     }
 
     BASE::PreCallRecordDestroyRenderPass(device, renderPass, pAllocator);
+}
+
+template <typename BASE>
+void SCValidationStateTracker<BASE>::PostCallRecordCreatePrivateDataSlotEXT(VkDevice device,
+                                                                            const VkPrivateDataSlotCreateInfo *pCreateInfo,
+                                                                            const VkAllocationCallbacks *pAllocator,
+                                                                            VkPrivateDataSlot *pPrivateDataSlot, VkResult result) {
+    BASE::PostCallRecordCreatePrivateDataSlotEXT(device, pCreateInfo, pAllocator, pPrivateDataSlot, result);
+    if (result != VK_SUCCESS) return;
+
+    sc_reserved_objects_.private_data_slots++;
+}
+
+template <typename BASE>
+void SCValidationStateTracker<BASE>::PreCallRecordDestroyPrivateDataSlotEXT(VkDevice device, VkPrivateDataSlot privateDataSlot,
+                                                                            const VkAllocationCallbacks *pAllocator) {
+    if (privateDataSlot != VK_NULL_HANDLE) {
+        sc_reserved_objects_.private_data_slots--;
+    }
+
+    BASE::PreCallRecordDestroyPrivateDataSlotEXT(device, privateDataSlot, pAllocator);
 }
