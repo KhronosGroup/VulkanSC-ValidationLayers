@@ -64,8 +64,8 @@ static void InitDefaultObjectReservationInfo() {
     default_object_reservation_info.surfaceRequestCount = 0;
     default_object_reservation_info.swapchainRequestCount = 64;
     default_object_reservation_info.displayModeRequestCount = 0;
-    default_object_reservation_info.subpassDescriptionRequestCount = 1024;
-    default_object_reservation_info.attachmentDescriptionRequestCount = 1024;
+    default_object_reservation_info.subpassDescriptionRequestCount = 256;
+    default_object_reservation_info.attachmentDescriptionRequestCount = 256;
     default_object_reservation_info.descriptorSetLayoutBindingRequestCount = 1024;
 
     default_object_reservation_info.descriptorSetLayoutBindingLimit = 1024;

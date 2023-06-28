@@ -640,19 +640,42 @@ bool SCCoreChecks::PreCallValidateCreateDescriptorSetLayout(VkDevice device, con
                                        "descriptorSetLayout", sc_object_limits_.descriptorSetLayoutRequestCount, 1);
 
     if (pCreateInfo) {
+        if (pCreateInfo->bindingCount > phys_dev_props_sc_10_.maxDescriptorSetLayoutBindings) {
+            skip |= LogError(device, "VUID-VkDescriptorSetLayoutCreateInfo-bindingCount-05011",
+                             "vkCreateDescriptorSetLayout(): pCreateInfo->bindingCount (%u) exceeds the device limit "
+                             "VkPhysicalDeviceVulkanSC10Properties::maxDescriptorSetLayoutBindings (%u).",
+                             pCreateInfo->bindingCount, phys_dev_props_sc_10_.maxDescriptorSetLayoutBindings);
+        }
+
         skip |= ValidateCombinedRequestCount(
             device, "vkCreateDescriptorSetLayout", "VUID-vkCreateDescriptorSetLayout-layoutbindings-device-05089",
             "VkDescriptorSetLayout", "descriptor set layout bindings", sc_reserved_objects_.descriptor_set_layout_bindings.load(),
             "descriptorSetLayoutBinding", sc_object_limits_.descriptorSetLayoutBindingRequestCount, "pCreateInfo->bindingCount",
             pCreateInfo->bindingCount);
 
+        uint32_t requested_immutable_samplers = 0;
         for (uint32_t i = 0; i < pCreateInfo->bindingCount; ++i) {
-            if (pCreateInfo->pBindings[i].binding >= sc_object_limits_.descriptorSetLayoutBindingLimit) {
+            const auto& binding = pCreateInfo->pBindings[i];
+            if (binding.binding >= sc_object_limits_.descriptorSetLayoutBindingLimit) {
                 skip |= LogError(device, "VUID-VkDescriptorSetLayoutBinding-binding-05012",
                                  "vkCreateDescriptorSetLayout(): pCreateInfo->pBindings[%u].binding (%u) exceeds the limit "
                                  "requested in VkDeviceObjectReservationCreateInfo::descriptorSetLayoutBindingLimit (%u).",
-                                 i, pCreateInfo->pBindings[i].binding, sc_object_limits_.descriptorSetLayoutBindingLimit);
+                                 i, binding.binding, sc_object_limits_.descriptorSetLayoutBindingLimit);
             }
+
+            if ((binding.descriptorType == VK_DESCRIPTOR_TYPE_SAMPLER ||
+                 binding.descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER) &&
+                binding.pImmutableSamplers != nullptr) {
+                requested_immutable_samplers += binding.descriptorCount;
+            }
+        }
+
+        if (requested_immutable_samplers > sc_object_limits_.maxImmutableSamplersPerDescriptorSetLayout) {
+            skip |= LogError(device, "VUID-VkDescriptorSetLayoutCreateInfo-descriptorCount-05071",
+                             "vkCreateDescriptorSetLayout(): the total immutable samplers (%u) across the specified "
+                             "bindings exceeds the limit requested in VkDeviceObjectReservationCreateInfo::"
+                             "maxImmutableSamplersPerDescriptorSetLayout (%u).",
+                             requested_immutable_samplers, sc_object_limits_.maxImmutableSamplersPerDescriptorSetLayout);
         }
     }
 
