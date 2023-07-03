@@ -275,13 +275,13 @@ TEST_F(VkSCLayerTest, CreatePipelineCacheInvalidFlags) {
 
     create_info.flags = VK_PIPELINE_CACHE_CREATE_USE_APPLICATION_STORAGE_BIT;
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPipelineCacheCreateInfo-flags-05043");
-    m_errorMonitor->SetAllowedFailureMsg("VUID-VkPipelineCacheCreateInfo-pInitialData-05045");
+    m_errorMonitor->SetAllowedFailureMsg("VUID-vkCreatePipelineCache-pCreateInfo-05045");
     vksc::CreatePipelineCache(m_device->handle(), &create_info, nullptr, &pipeline_cache);
     m_errorMonitor->VerifyFound();
 
     create_info.flags = VK_PIPELINE_CACHE_CREATE_READ_ONLY_BIT;
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPipelineCacheCreateInfo-flags-05044");
-    m_errorMonitor->SetAllowedFailureMsg("VUID-VkPipelineCacheCreateInfo-pInitialData-05045");
+    m_errorMonitor->SetAllowedFailureMsg("VUID-vkCreatePipelineCache-pCreateInfo-05045");
     vksc::CreatePipelineCache(m_device->handle(), &create_info, nullptr, &pipeline_cache);
     m_errorMonitor->VerifyFound();
 }
@@ -306,7 +306,7 @@ TEST_F(VkSCLayerTest, CreatePipelineCacheNoMatch) {
 
     // Mismatch in initialDataSize
     create_info.initialDataSize += 8;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPipelineCacheCreateInfo-pInitialData-05045");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreatePipelineCache-pCreateInfo-05045");
     vksc::CreatePipelineCache(m_device->handle(), &create_info, nullptr, &pipeline_cache);
     m_errorMonitor->VerifyFound();
     create_info.initialDataSize -= 8;
@@ -314,14 +314,14 @@ TEST_F(VkSCLayerTest, CreatePipelineCacheNoMatch) {
     // Mismatch in pInitialData pointer (content is otherwise the same)
     auto pipeline_cache_data_copy = pipeline_cache_data;
     create_info.pInitialData = pipeline_cache_data_copy.data();
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPipelineCacheCreateInfo-pInitialData-05045");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreatePipelineCache-pCreateInfo-05045");
     vksc::CreatePipelineCache(m_device->handle(), &create_info, nullptr, &pipeline_cache);
     m_errorMonitor->VerifyFound();
     create_info.pInitialData = pipeline_cache_data.data();
 
     // Mismatch in pInitialData contents (pointer is the same)
     pipeline_cache_data[sizeof(VkPipelineCacheHeaderVersionSafetyCriticalOne)] ^= 1;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPipelineCacheCreateInfo-pInitialData-05045");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreatePipelineCache-pCreateInfo-05045");
     vksc::CreatePipelineCache(m_device->handle(), &create_info, nullptr, &pipeline_cache);
     m_errorMonitor->VerifyFound();
     pipeline_cache_data[sizeof(VkPipelineCacheHeaderVersionSafetyCriticalOne)] ^= 1;

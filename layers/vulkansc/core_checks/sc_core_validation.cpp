@@ -797,12 +797,12 @@ bool SCCoreChecks::PreCallValidateCreatePipelineCache(VkDevice device, const VkP
         auto it = sc_pipeline_cache_map_.find(pCreateInfo->pInitialData);
         if (it == sc_pipeline_cache_map_.end() || it->second->create_info.flags != pCreateInfo->flags ||
             it->second->create_info.initialDataSize != pCreateInfo->initialDataSize) {
-            skip |= LogError(device, "VUID-VkPipelineCacheCreateInfo-pInitialData-05045",
+            skip |= LogError(device, "VUID-vkCreatePipelineCache-pCreateInfo-05045",
                              "vkCreatePipelineCache(): pCreateInfo does not match any of the VkPipelineCacheCreateInfo "
                              "structures specified in VkDeviceObjectReservationCreateInfo::pPipelineCacheCreateInfos "
                              "at device creation time.");
         } else if (memcmp(it->second->raw_data.data(), pCreateInfo->pInitialData, pCreateInfo->initialDataSize) != 0) {
-            skip |= LogError(device, "VUID-VkPipelineCacheCreateInfo-pInitialData-05045",
+            skip |= LogError(device, "VUID-vkCreatePipelineCache-pCreateInfo-05045",
                              "vkCreatePipelineCache(): the data pointed to by pCreateInfo->pInitialData does not match "
                              "the data specified in VkDeviceObjectReservationCreateInfo::pPipelineCacheCreateInfos "
                              "at device creation time.");
