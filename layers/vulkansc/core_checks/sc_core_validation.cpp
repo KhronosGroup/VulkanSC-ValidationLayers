@@ -763,6 +763,20 @@ bool SCCoreChecks::PreCallValidateCreateComputePipelines(VkDevice device, VkPipe
 
     skip |= ValidatePipelinePoolMemory(device, "vkCreateComputePipelines", count, pCreateInfos);
 
+    if (pCreateInfos != nullptr) {
+        for (uint32_t i = 0; i < count; i++) {
+            if (pCreateInfos[i].basePipelineHandle != VK_NULL_HANDLE) {
+                skip |= LogError(device, "VUID-VkComputePipelineCreateInfo-basePipelineHandle-05024",
+                                 "vkCreateComputePipelines(): pCreateInfo[%u].basePipelineHandle is not VK_NULL_HANDLE.", i);
+            }
+            if (pCreateInfos[i].basePipelineIndex != 0) {
+                skip |= LogError(device, "VUID-VkComputePipelineCreateInfo-basePipelineIndex-05025",
+                                 "vkCreateComputePipelines(): pCreateInfo[%u].basePipelineIndex (%u) is not 0.", i,
+                                 pCreateInfos[i].basePipelineIndex);
+            }
+        }
+    }
+
     return skip;
 }
 
@@ -778,6 +792,20 @@ bool SCCoreChecks::PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPip
                                        sc_object_limits_.graphicsPipelineRequestCount, "createInfoCount", count);
 
     skip |= ValidatePipelinePoolMemory(device, "vkCreateGraphicsPipelines", count, pCreateInfos);
+
+    if (pCreateInfos != nullptr) {
+        for (uint32_t i = 0; i < count; i++) {
+            if (pCreateInfos[i].basePipelineHandle != VK_NULL_HANDLE) {
+                skip |= LogError(device, "VUID-VkGraphicsPipelineCreateInfo-basePipelineHandle-05024",
+                                 "vkCreateGraphicsPipelines(): pCreateInfo[%u].basePipelineHandle is not VK_NULL_HANDLE.", i);
+            }
+            if (pCreateInfos[i].basePipelineIndex != 0) {
+                skip |= LogError(device, "VUID-VkGraphicsPipelineCreateInfo-basePipelineIndex-05025",
+                                 "vkCreateGraphicsPipelines(): pCreateInfo[%u].basePipelineIndex (%u) is not 0.", i,
+                                 pCreateInfos[i].basePipelineIndex);
+            }
+        }
+    }
 
     return skip;
 }
@@ -872,6 +900,25 @@ bool SCCoreChecks::PreCallValidateCreateRenderPass(VkDevice device, const VkRend
                                              "VkRenderPass", "attachments", sc_reserved_objects_.attachment_descriptions.load(),
                                              "attachmentDescription", sc_object_limits_.attachmentDescriptionRequestCount,
                                              "pCreateInfo->attachmentCount", pCreateInfo->attachmentCount);
+
+        if (pCreateInfo->subpassCount > phys_dev_props_sc_10_.maxRenderPassSubpasses) {
+            skip |= LogError(device, "VUID-VkRenderPassCreateInfo-subpassCount-05050",
+                             "vkCreateRenderPass(): pCreateInfo->subpassCount (%u) exceeds the device limit "
+                             "VkPhysicalDeviceVulkanSC10Properties::maxRenderPassSubpasses (%u).",
+                             pCreateInfo->subpassCount, phys_dev_props_sc_10_.maxRenderPassSubpasses);
+        }
+        if (pCreateInfo->dependencyCount > phys_dev_props_sc_10_.maxRenderPassDependencies) {
+            skip |= LogError(device, "VUID-VkRenderPassCreateInfo-dependencyCount-05051",
+                             "vkCreateRenderPass(): pCreateInfo->dependencyCount (%u) exceeds the device limit "
+                             "VkPhysicalDeviceVulkanSC10Properties::maxRenderPassDependencies (%u).",
+                             pCreateInfo->dependencyCount, phys_dev_props_sc_10_.maxRenderPassDependencies);
+        }
+        if (pCreateInfo->attachmentCount > phys_dev_props_sc_10_.maxFramebufferAttachments) {
+            skip |= LogError(device, "VUID-VkRenderPassCreateInfo-attachmentCount-05052",
+                             "vkCreateRenderPass(): pCreateInfo->attachmentCount (%u) exceeds the device limit "
+                             "VkPhysicalDeviceVulkanSC10Properties::maxFramebufferAttachments (%u).",
+                             pCreateInfo->attachmentCount, phys_dev_props_sc_10_.maxFramebufferAttachments);
+        }
     }
 
     return skip;
@@ -893,6 +940,25 @@ bool SCCoreChecks::PreCallValidateCreateRenderPass2(VkDevice device, const VkRen
                                              "VkRenderPass", "attachments", sc_reserved_objects_.attachment_descriptions.load(),
                                              "attachmentDescription", sc_object_limits_.attachmentDescriptionRequestCount,
                                              "pCreateInfo->attachmentCount", pCreateInfo->attachmentCount);
+
+        if (pCreateInfo->subpassCount > phys_dev_props_sc_10_.maxRenderPassSubpasses) {
+            skip |= LogError(device, "VUID-VkRenderPassCreateInfo2-subpassCount-05055",
+                             "vkCreateRenderPass2(): pCreateInfo->subpassCount (%u) exceeds the device limit "
+                             "VkPhysicalDeviceVulkanSC10Properties::maxRenderPassSubpasses (%u).",
+                             pCreateInfo->subpassCount, phys_dev_props_sc_10_.maxRenderPassSubpasses);
+        }
+        if (pCreateInfo->dependencyCount > phys_dev_props_sc_10_.maxRenderPassDependencies) {
+            skip |= LogError(device, "VUID-VkRenderPassCreateInfo2-dependencyCount-05056",
+                             "vkCreateRenderPass2(): pCreateInfo->dependencyCount (%u) exceeds the device limit "
+                             "VkPhysicalDeviceVulkanSC10Properties::maxRenderPassDependencies (%u).",
+                             pCreateInfo->dependencyCount, phys_dev_props_sc_10_.maxRenderPassDependencies);
+        }
+        if (pCreateInfo->attachmentCount > phys_dev_props_sc_10_.maxFramebufferAttachments) {
+            skip |= LogError(device, "VUID-VkRenderPassCreateInfo2-attachmentCount-05057",
+                             "vkCreateRenderPass2(): pCreateInfo->attachmentCount (%u) exceeds the device limit "
+                             "VkPhysicalDeviceVulkanSC10Properties::maxFramebufferAttachments (%u).",
+                             pCreateInfo->attachmentCount, phys_dev_props_sc_10_.maxFramebufferAttachments);
+        }
     }
 
     return skip;
