@@ -11,64 +11,138 @@
 
 #include "../framework/vksc_layer_validation_tests.h"
 
-TEST_F(VkSCLayerTest, CreateComputePipelinesShaderModuleNotNull) {
-    TEST_DESCRIPTION("vkCreateComputePipelines - VkPipelineShaderStageCreateInfo::module must be VK_NULL_HANDLE");
+TEST_F(VkSCLayerTest, CreatePipelinesShaderModuleNotNull) {
+    TEST_DESCRIPTION("vkCreate*Pipelines - VkPipelineShaderStageCreateInfo::module must be VK_NULL_HANDLE");
 
     ASSERT_NO_FATAL_FAILURE(InitFramework());
     ASSERT_NO_FATAL_FAILURE(InitState());
 
     VkPipelineLayoutObj pipeline_layout(m_device);
     VkPipeline pipeline = VK_NULL_HANDLE;
-
     auto offline_info = vksc::GetDefaultPipelineOfflineCreateInfo();
-    auto create_info = LvlInitStruct<VkComputePipelineCreateInfo>(&offline_info);
-    create_info.stage = LvlInitStruct<VkPipelineShaderStageCreateInfo>();
-    create_info.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-    create_info.stage.module = (VkShaderModule)(size_t)0xBAADF00D;
-    create_info.stage.pName = "main";
-    create_info.layout = pipeline_layout.handle();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPipelineShaderStageCreateInfo-module-05026");
-    m_errorMonitor->SetAllowedFailureMsg("VUID-VkPipelineShaderStageCreateInfo-module-parameter");
-    vksc::CreateComputePipelines(m_device->handle(), GetDefaultPipelineCache(), 1, &create_info, nullptr, &pipeline);
-    m_errorMonitor->VerifyFound();
+    {
+        auto create_info = LvlInitStruct<VkComputePipelineCreateInfo>(&offline_info);
+        create_info.stage = LvlInitStruct<VkPipelineShaderStageCreateInfo>();
+        create_info.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+        // VkPipelineShaderStageCreateInfo::module must be VK_NULL_HANDLE
+        create_info.stage.module = (VkShaderModule)(size_t)0xBAADF00D;
+        create_info.stage.pName = "main";
+        create_info.layout = pipeline_layout.handle();
+
+        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPipelineShaderStageCreateInfo-module-05026");
+        m_errorMonitor->SetAllowedFailureMsg("VUID-VkPipelineShaderStageCreateInfo-module-parameter");
+        vksc::CreateComputePipelines(m_device->handle(), GetDefaultPipelineCache(), 1, &create_info, nullptr, &pipeline);
+        m_errorMonitor->VerifyFound();
+    }
+    {
+        VkRenderpassObj render_pass(m_device);
+
+        auto stage_info = LvlInitStruct<VkPipelineShaderStageCreateInfo>();
+        stage_info.stage = VK_SHADER_STAGE_VERTEX_BIT;
+        // VkPipelineShaderStageCreateInfo::module must be VK_NULL_HANDLE
+        stage_info.module = (VkShaderModule)(size_t)0xBAADF00D;
+        stage_info.pName = "main";
+
+        auto vi_state = LvlInitStruct<VkPipelineVertexInputStateCreateInfo>();
+        auto ia_state = LvlInitStruct<VkPipelineInputAssemblyStateCreateInfo>();
+        auto rs_state = LvlInitStruct<VkPipelineRasterizationStateCreateInfo>();
+        rs_state.rasterizerDiscardEnable = VK_TRUE;
+        rs_state.lineWidth = 1.f;
+
+        auto create_info = LvlInitStruct<VkGraphicsPipelineCreateInfo>(&offline_info);
+        create_info.stageCount = 1;
+        create_info.pStages = &stage_info;
+        create_info.pVertexInputState = &vi_state;
+        create_info.pInputAssemblyState = &ia_state;
+        create_info.pRasterizationState = &rs_state;
+        create_info.layout = pipeline_layout.handle();
+        create_info.renderPass = render_pass.handle();
+
+        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPipelineShaderStageCreateInfo-module-05026");
+        m_errorMonitor->SetAllowedFailureMsg("VUID-VkPipelineShaderStageCreateInfo-module-parameter");
+        vksc::CreateGraphicsPipelines(m_device->handle(), GetDefaultPipelineCache(), 1, &create_info, nullptr, &pipeline);
+        m_errorMonitor->VerifyFound();
+    }
 }
 
-TEST_F(VkSCLayerTest, CreateGraphicsPipelinesShaderModuleNotNull) {
-    TEST_DESCRIPTION("vkCreateGraphicsPipelines - VkPipelineShaderStageCreateInfo::module must be VK_NULL_HANDLE");
+TEST_F(VkSCLayerTest, CreatePipelinesWithBasePipeline) {
+    TEST_DESCRIPTION("Test vkCreate*Pipelines usage with a basePipeline");
 
     ASSERT_NO_FATAL_FAILURE(InitFramework());
     ASSERT_NO_FATAL_FAILURE(InitState());
 
     VkPipelineLayoutObj pipeline_layout(m_device);
-    VkRenderpassObj render_pass(m_device);
     VkPipeline pipeline = VK_NULL_HANDLE;
-
-    auto stage_info = LvlInitStruct<VkPipelineShaderStageCreateInfo>();
-    stage_info.stage = VK_SHADER_STAGE_VERTEX_BIT;
-    stage_info.module = (VkShaderModule)(size_t)0xBAADF00D;
-    stage_info.pName = "main";
-
-    auto vi_state = LvlInitStruct<VkPipelineVertexInputStateCreateInfo>();
-    auto ia_state = LvlInitStruct<VkPipelineInputAssemblyStateCreateInfo>();
-    auto rs_state = LvlInitStruct<VkPipelineRasterizationStateCreateInfo>();
-    rs_state.rasterizerDiscardEnable = VK_TRUE;
-    rs_state.lineWidth = 1.f;
-
     auto offline_info = vksc::GetDefaultPipelineOfflineCreateInfo();
-    auto create_info = LvlInitStruct<VkGraphicsPipelineCreateInfo>(&offline_info);
-    create_info.stageCount = 1;
-    create_info.pStages = &stage_info;
-    create_info.pVertexInputState = &vi_state;
-    create_info.pInputAssemblyState = &ia_state;
-    create_info.pRasterizationState = &rs_state;
-    create_info.layout = pipeline_layout.handle();
-    create_info.renderPass = render_pass.handle();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPipelineShaderStageCreateInfo-module-05026");
-    m_errorMonitor->SetAllowedFailureMsg("VUID-VkPipelineShaderStageCreateInfo-module-parameter");
-    vksc::CreateGraphicsPipelines(m_device->handle(), GetDefaultPipelineCache(), 1, &create_info, nullptr, &pipeline);
-    m_errorMonitor->VerifyFound();
+    {
+        // vkCreateComputePipelines
+        auto create_info = LvlInitStruct<VkComputePipelineCreateInfo>(&offline_info);
+        create_info.stage = LvlInitStruct<VkPipelineShaderStageCreateInfo>();
+        create_info.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+        create_info.stage.module = VK_NULL_HANDLE;
+        create_info.stage.pName = "main";
+        create_info.layout = pipeline_layout.handle();
+
+        {
+            // VkPipelineShaderStageCreateInfo::basePipelineHandle must be VK_NULL_HANDLE
+            create_info.basePipelineHandle = (VkPipeline)(size_t)0xBAADF00D;
+            create_info.basePipelineIndex = 0;
+            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkComputePipelineCreateInfo-basePipelineHandle-05024");
+            vksc::CreateComputePipelines(m_device->handle(), GetDefaultPipelineCache(), 1, &create_info, nullptr, &pipeline);
+            m_errorMonitor->VerifyFound();
+        }
+        {
+            // VkPipelineShaderStageCreateInfo::basePipelineIndex must be 0
+            create_info.basePipelineHandle = VK_NULL_HANDLE;
+            create_info.basePipelineIndex = (int32_t)0xBAADF00D;
+            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkComputePipelineCreateInfo-basePipelineIndex-05025");
+            vksc::CreateComputePipelines(m_device->handle(), GetDefaultPipelineCache(), 1, &create_info, nullptr, &pipeline);
+            m_errorMonitor->VerifyFound();
+        }
+    }
+    {
+        // vkCreateGraphicsPipelines
+        VkRenderpassObj render_pass(m_device);
+
+        auto stage_info = LvlInitStruct<VkPipelineShaderStageCreateInfo>();
+        stage_info.stage = VK_SHADER_STAGE_VERTEX_BIT;
+        stage_info.module = VK_NULL_HANDLE;
+        stage_info.pName = "main";
+
+        auto vi_state = LvlInitStruct<VkPipelineVertexInputStateCreateInfo>();
+        auto ia_state = LvlInitStruct<VkPipelineInputAssemblyStateCreateInfo>();
+        auto rs_state = LvlInitStruct<VkPipelineRasterizationStateCreateInfo>();
+        rs_state.rasterizerDiscardEnable = VK_TRUE;
+        rs_state.lineWidth = 1.f;
+
+        auto create_info = LvlInitStruct<VkGraphicsPipelineCreateInfo>(&offline_info);
+        create_info.stageCount = 1;
+        create_info.pStages = &stage_info;
+        create_info.pVertexInputState = &vi_state;
+        create_info.pInputAssemblyState = &ia_state;
+        create_info.pRasterizationState = &rs_state;
+        create_info.layout = pipeline_layout.handle();
+        create_info.renderPass = render_pass.handle();
+
+        {
+            // VkPipelineShaderStageCreateInfo::basePipelineHandle must be VK_NULL_HANDLE
+            create_info.basePipelineHandle = (VkPipeline)(size_t)0xBAADF00D;
+            create_info.basePipelineIndex = 0;
+            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-basePipelineHandle-05024");
+            vksc::CreateGraphicsPipelines(m_device->handle(), GetDefaultPipelineCache(), 1, &create_info, nullptr, &pipeline);
+            m_errorMonitor->VerifyFound();
+        }
+        {
+            // VkPipelineShaderStageCreateInfo::basePipelineIndex must be 0
+            create_info.basePipelineHandle = VK_NULL_HANDLE;
+            create_info.basePipelineIndex = (int32_t)0xBAADF00D;
+            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-basePipelineIndex-05025");
+            vksc::CreateGraphicsPipelines(m_device->handle(), GetDefaultPipelineCache(), 1, &create_info, nullptr, &pipeline);
+            m_errorMonitor->VerifyFound();
+        }
+    }
 }
 
 TEST_F(VkSCLayerTest, CreatePipelinePoolSize) {
@@ -266,6 +340,7 @@ TEST_F(VkSCLayerTest, CreatePipelinePoolSize) {
 
 TEST_F(VkSCLayerTest, CreatePipelineCacheInvalidFlags) {
     TEST_DESCRIPTION("vkCreatePipelineCache - missing required flags");
+    // NOTE: This test case implicitly tests the removed VUIDs: 00768, 007689
 
     ASSERT_NO_FATAL_FAILURE(InitFramework());
     ASSERT_NO_FATAL_FAILURE(InitState());

@@ -51,15 +51,16 @@ target_sources(vksc_layer_validation_tests PRIVATE
     ../framework/ray_tracing_objects.h
     ../framework/ray_tracing_objects.cpp
     negative/device_create.cpp
-    negative/object_reservation.cpp
-    negative/pipeline.cpp
-    negative/others.cpp
-    negative/ported.cpp
     negative/implicit.cpp
-    positive/instance.cpp
-    positive/pipeline.cpp
-    positive/others.cpp
+    negative/object_reservation.cpp
+    negative/others.cpp
+    negative/pipeline.cpp
+    negative/ported.cpp
+    negative/render_pass.cpp
     positive/implicit.cpp
+    positive/instance.cpp
+    positive/others.cpp
+    positive/pipeline.cpp
 )
 
 # gtest_discover_tests has problem with cross-compiling, but it is faster and more robust
