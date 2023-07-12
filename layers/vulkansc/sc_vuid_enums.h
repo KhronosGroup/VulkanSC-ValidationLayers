@@ -36,7 +36,7 @@
 [[maybe_unused]] static const char *kVUID_SC_PipelineCacheData_JsonOffsetAndSizeInconsistent =
     "VUID-VkPipelineCacheSafetyCriticalIndexEntry-jsonSize-05080";
 [[maybe_unused]] static const char *kVUID_SC_PipelineCacheData_JsonDataOutOfBounds =
-    "UNASSIGNED-VkPipelineCacheSafetyCriticalIndexEntry-jsonOffset-jsonSize";
+    "VUID-VkPipelineCacheSafetyCriticalIndexEntry-jsonSize-08991";
 [[maybe_unused]] static const char *kVUID_SC_PipelineCacheData_JsonSizeStageIndexCountInconsistent =
     "VUID-VkPipelineCacheSafetyCriticalIndexEntry-jsonSize-05081";
 [[maybe_unused]] static const char *kVUID_SC_PipelineCacheData_StageIndexOffsetStrideCountInconsistent =

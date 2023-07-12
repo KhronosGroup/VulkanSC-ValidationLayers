@@ -740,7 +740,7 @@ TEST_F(VkSCLayerTest, BindImageMemorySplitInstanceBindRegionCount) {
     ASSERT_VK_SUCCESS(result);
 
     // NOTE: We set up VkBindImageMemoryDeviceGroupInfo in a way that it also tests that none of the removed
-    // VUIDs 01633, 01636, 01637, 01638, 01639, 01640, and 01641.
+    // VUIDs 01633, 01636, 01637, 01638, 01639, 01640, and 01641 are triggered.
     VkRect2D split_instance_bind_region = {{4, 4}, {8, 8}};
     auto device_group_info = LvlInitStruct<VkBindImageMemoryDeviceGroupInfo>();
     device_group_info.splitInstanceBindRegionCount = 1;

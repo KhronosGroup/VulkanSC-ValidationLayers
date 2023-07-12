@@ -416,7 +416,7 @@ TEST_F(VkSCPipelineCacheDataLayerTest, JsonDataOutOfBounds) {
 
     entry->jsonOffset = builder.GetData().size() - 4;
 
-    m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "UNASSIGNED-VkPipelineCacheSafetyCriticalIndexEntry-jsonOffset-jsonSize");
+    m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "VUID-VkPipelineCacheSafetyCriticalIndexEntry-jsonSize-08991");
     TestPipelineCacheData({builder.MakeCreateInfo()});
 }
 
