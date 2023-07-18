@@ -16,7 +16,7 @@
  */
 #pragma once
 
-#include "vk_typemap_helper.h"
+#include "generated/vk_typemap_helper.h"
 #include "spirv-tools/libspirv.h"
 
 #include <assert.h>

@@ -17,23 +17,21 @@
 
 #include "../layers/vk_lunarg_device_profile_api_layer.h"
 #include "vk_layer_settings_ext.h"
-#include "vk_extension_helper.h"
 
-#if defined(ANDROID)
+#if defined(VK_USE_PLATFORM_ANDROID_KHR)
 #include <android/log.h>
-#if defined(VALIDATION_APK)
 #include <android_native_app_glue.h>
 #endif
-#endif
 
-#include "icd-spv.h"
 #include "test_common.h"
 #include "vk_layer_config.h"
 #include "containers/custom_containers.h"
-#include "vk_format_utils.h"
+#include "generated/vk_format_utils.h"
+#include "generated/vk_extension_helper.h"
 #include "render.h"
-#include "vk_typemap_helper.h"
-#include "utils/convert_to_renderpass2.h"
+#include "generated/vk_typemap_helper.h"
+#include "utils/convert_utils.h"
+#include "shader_templates.h"
 
 #include <algorithm>
 #include <cmath>
@@ -47,6 +45,16 @@
 
 using std::string;
 using std::vector;
+
+// MSVC and GCC define __SANITIZE_ADDRESS__ when compiling with address sanitization
+// However, clang doesn't. Instead you have to use __has_feature to check.
+#if defined(__clang__)
+#if __has_feature(address_sanitizer)
+#define VVL_ENABLE_ASAN 1
+#endif
+#elif defined(__SANITIZE_ADDRESS__)
+#define VVL_ENABLE_ASAN 1
+#endif
 
 #if defined(VVL_ENABLE_ASAN)
 #if __has_include(<sanitizer/lsan_interface.h>)
@@ -79,113 +87,6 @@ enum BsoFailSelect {
     BsoFailIndexBufferBadMapOffset,
     BsoFailLineStipple,
 };
-
-static const char bindStateMinimalShaderText[] = R"glsl(
-    #version 460
-    void main() {}
-)glsl";
-
-static const char bindStateVertShaderText[] = R"glsl(
-    #version 460
-    void main() {
-       gl_Position = vec4(1);
-    }
-)glsl";
-
-static const char bindStateVertPointSizeShaderText[] = R"glsl(
-    #version 460
-    out gl_PerVertex {
-        vec4 gl_Position;
-        float gl_PointSize;
-    };
-    void main() {
-        gl_Position = vec4(1);
-        gl_PointSize = 1.0;
-    }
-)glsl";
-
-static char const bindStateGeomShaderText[] = R"glsl(
-    #version 460
-    layout(triangles) in;
-    layout(triangle_strip, max_vertices=3) out;
-    void main() {
-       gl_Position = vec4(1);
-       EmitVertex();
-    }
-)glsl";
-
-static char const bindStateGeomPointSizeShaderText[] = R"glsl(
-    #version 460
-    layout (points) in;
-    layout (points) out;
-    layout (max_vertices = 1) out;
-    void main() {
-       gl_Position = vec4(1);
-       gl_PointSize = 1.0;
-       EmitVertex();
-    }
-)glsl";
-
-static const char bindStateTscShaderText[] = R"glsl(
-    #version 460
-    layout(vertices=3) out;
-    void main() {
-       gl_TessLevelOuter[0] = gl_TessLevelOuter[1] = gl_TessLevelOuter[2] = 1;
-       gl_TessLevelInner[0] = 1;
-    }
-)glsl";
-
-static const char bindStateTeshaderText[] = R"glsl(
-    #version 460
-    layout(triangles, equal_spacing, cw) in;
-    void main() { gl_Position = vec4(1); }
-)glsl";
-
-static const char bindStateFragShaderText[] = R"glsl(
-    #version 460
-    layout(location = 0) out vec4 uFragColor;
-    void main(){
-       uFragColor = vec4(0,1,0,1);
-    }
-)glsl";
-
-static const char bindStateFragSamplerShaderText[] = R"glsl(
-    #version 460
-    layout(set=0, binding=0) uniform sampler2D s;
-    layout(location=0) out vec4 x;
-    void main(){
-       x = texture(s, vec2(1));
-    }
-)glsl";
-
-static const char bindStateFragUniformShaderText[] = R"glsl(
-    #version 460
-    layout(set=0) layout(binding=0) uniform foo { int x; int y; } bar;
-    layout(location=0) out vec4 x;
-    void main(){
-       x = vec4(bar.y);
-    }
-)glsl";
-
-static char const bindStateFragSubpassLoadInputText[] = R"glsl(
-    #version 460
-    layout(input_attachment_index=0, set=0, binding=0) uniform subpassInput x;
-    void main() {
-        vec4 color = subpassLoad(x);
-    }
-)glsl";
-
-[[maybe_unused]] static const char *bindStateRTShaderText = R"glsl(
-    #version 460
-    #extension GL_EXT_ray_tracing : require // Requires SPIR-V 1.5 (Vulkan 1.2)
-    void main() {}
-)glsl";
-
-[[maybe_unused]] static const char *bindStateRTNVShaderText = R"glsl(
-    #version 460
-    #extension GL_NV_ray_tracing : require
-    void main() {}
-)glsl";
 
 // Static arrays helper
 template <class ElementT, size_t array_size>
@@ -231,7 +132,7 @@ VkImageViewCreateInfo SafeSaneImageViewCreateInfo(VkImage image, VkFormat format
 
 VkImageViewCreateInfo SafeSaneImageViewCreateInfo(const VkImageObj &image, VkFormat format, VkImageAspectFlags aspect_mask);
 
-bool CheckSynchronization2SupportAndInitState(VkRenderFramework *renderFramework);
+bool CheckSynchronization2SupportAndInitState(VkRenderFramework *render_framework, void *phys_dev_pnext = nullptr);
 
 // Dependent "false" type for the static assert, as GCC will evaluate
 // non-dependent static_asserts even for non-instantiated templates
@@ -255,7 +156,23 @@ T NearestSmaller(const T from) {
     return std::nextafter(from, negative_direction);
 }
 
-class VkLayerTest : public VkRenderFramework {
+// Defining VVL_TESTS_USE_CUSTOM_TEST_FRAMEWORK allows downstream users
+// to inject custom test framework changes. This includes the ability
+// to override the the base class of the VkLayerTest class so that
+// appropriate test framework customizations can be injected into the
+// class hierarchy at the closest possible place to the base class used
+// by all validation layer tests. Downstream users can provide their
+// own version of custom_test_framework.h to define the appropriate
+// custom base class to use through the VkLayerTestBase type identifier.
+#ifdef VVL_TESTS_USE_CUSTOM_TEST_FRAMEWORK
+#include "framework/custom_test_framework.h"
+#else
+using VkLayerTestBase = VkRenderFramework;
+#endif
+
+// VkLayerTest is the main GTest test class
+// It is the root for all other test class variations
+class VkLayerTest : public VkLayerTestBase {
   public:
     const char *kValidationLayerName = "VK_LAYER_KHRONOS_validation";
     const char *kSynchronization2LayerName = "VK_LAYER_KHRONOS_synchronization2";
@@ -310,6 +227,7 @@ class VkLayerTest : public VkRenderFramework {
   protected:
     APIVersion m_instance_api_version = 0;
     APIVersion m_target_api_version = 0;
+    APIVersion m_attempted_api_version = 0;
 
     void SetTargetApiVersion(APIVersion target_api_version);
     APIVersion DeviceValidationVersion() const;
@@ -334,6 +252,7 @@ VkPhysicalDeviceFeatures2 VkLayerTest::GetPhysicalDeviceFeatures2(VkPhysicalDevi
 template <>
 VkPhysicalDeviceProperties2 VkLayerTest::GetPhysicalDeviceProperties2(VkPhysicalDeviceProperties2 &props2);
 
+// TODO - Want to remove - don't add to any new tests
 class VkPositiveLayerTest : public VkLayerTest {
   public:
   protected:
@@ -374,7 +293,7 @@ class VkGpuAssistedLayerTest : public VkLayerTest {
     bool CanEnableGpuAV();
 };
 
-class VkDebugPrintfTest : public VkLayerTest {
+class NegativeDebugPrintf : public VkLayerTest {
   public:
     void InitDebugPrintfFramework();
 
@@ -391,6 +310,250 @@ class VkSyncValTest : public VkLayerTest {
         VK_VALIDATION_FEATURE_DISABLE_THREAD_SAFETY_EXT, VK_VALIDATION_FEATURE_DISABLE_API_PARAMETERS_EXT,
         VK_VALIDATION_FEATURE_DISABLE_OBJECT_LIFETIMES_EXT, VK_VALIDATION_FEATURE_DISABLE_CORE_CHECKS_EXT};
     VkValidationFeaturesEXT features_ = {VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT, nullptr, 1, enables_, 4, disables_};
+};
+
+class AndroidHardwareBufferTest : public VkLayerTest {};
+class NegativeAndroidHardwareBuffer : public AndroidHardwareBufferTest {};
+class PositiveAndroidHardwareBuffer : public AndroidHardwareBufferTest {};
+
+class AtomicTest : public VkLayerTest {};
+class NegativeAtomic : public AtomicTest {};
+class PositiveAtomic : public AtomicTest {};
+
+class BufferTest : public VkLayerTest {};
+class NegativeBuffer : public BufferTest {};
+class PositiveBuffer : public BufferTest {};
+
+class CommandTest : public VkLayerTest {};
+class NegativeCommand : public CommandTest {};
+class PositiveCommand : public CommandTest {};
+
+class DescriptorsTest : public VkLayerTest {};
+class NegativeDescriptors : public DescriptorsTest {};
+class PositiveDescriptors : public DescriptorsTest {};
+
+class DescriptorBufferTest : public VkLayerTest {};
+class NegativeDescriptorBuffer : public DescriptorBufferTest {};
+class PositiveDescriptorBuffer : public DescriptorBufferTest {};
+
+class NegativeDeviceQueue : public VkLayerTest {};
+
+class DynamicRenderingTest : public VkLayerTest {
+  public:
+    void InitBasicDynamicRendering(void *pNextFeatures = nullptr);
+};
+class NegativeDynamicRendering : public DynamicRenderingTest {};
+class PositiveDynamicRendering : public DynamicRenderingTest {};
+
+class DynamicStateTest : public VkLayerTest {
+  public:
+    void InitBasicExtendedDynamicState();  // enables VK_EXT_extended_dynamic_state
+    void InitBasicExtendedDynamicState3(VkPhysicalDeviceExtendedDynamicState3FeaturesEXT &features);
+};
+class NegativeDynamicState : public DynamicStateTest {
+    // helper functions for tests in this file
+  public:
+    // VK_EXT_extended_dynamic_state - not calling vkCmdSet before draw
+    void ExtendedDynamicStateDrawNotSet(VkDynamicState dynamic_state, const char *vuid);
+    // VK_EXT_extended_dynamic_state3 - Create a pipeline with dynamic state, but the feature disabled
+    void ExtendedDynamicState3PipelineFeatureDisabled(VkDynamicState dynamic_state, const char *vuid);
+    // VK_EXT_line_rasterization - Init with LineRasterization features off
+    void InitLineRasterizationFeatureDisabled();
+};
+class PositiveDynamicState : public DynamicStateTest {};
+
+class ExternalMemorySyncTest : public VkLayerTest {
+  public:
+    VkExternalMemoryHandleTypeFlags GetCompatibleHandleTypes(const VkBufferCreateInfo &buffer_create_info,
+                                                             VkExternalMemoryHandleTypeFlagBits handle_type);
+    VkExternalMemoryHandleTypeFlags GetCompatibleHandleTypes(const VkImageCreateInfo &image_create_info,
+                                                             VkExternalMemoryHandleTypeFlagBits handle_type);
+    VkExternalFenceHandleTypeFlags GetCompatibleHandleTypes(VkExternalFenceHandleTypeFlagBits handle_type);
+    VkExternalSemaphoreHandleTypeFlags GetCompatibleHandleTypes(VkExternalSemaphoreHandleTypeFlagBits handle_type);
+
+    VkExternalFenceHandleTypeFlags FindSupportedExternalFenceHandleTypes(VkExternalFenceFeatureFlags requested_features);
+    VkExternalSemaphoreHandleTypeFlags FindSupportedExternalSemaphoreHandleTypes(
+        VkExternalSemaphoreFeatureFlags requested_features);
+
+  protected:
+#ifdef VK_USE_PLATFORM_WIN32_KHR
+    using ExternalHandle = HANDLE;
+#else
+    using ExternalHandle = int;
+#endif
+};
+class NegativeExternalMemorySync : public ExternalMemorySyncTest {};
+class PositiveExternalMemorySync : public ExternalMemorySyncTest {};
+
+class FragmentShadingRateTest : public VkLayerTest {};
+class NegativeFragmentShadingRate : public FragmentShadingRateTest {};
+class PositiveFragmentShadingRate : public FragmentShadingRateTest {};
+
+class NegativeGeometryTessellation : public VkLayerTest {};
+
+class GraphicsLibraryTest : public VkLayerTest {
+  public:
+    void InitBasicGraphicsLibrary(void *pNextFeatures = nullptr);
+};
+class NegativeGraphicsLibrary : public GraphicsLibraryTest {};
+class PositiveGraphicsLibrary : public GraphicsLibraryTest {};
+
+class ImageTest : public VkLayerTest {
+  public:
+    VkImageCreateInfo DefaultImageInfo();
+};
+class NegativeImage : public ImageTest {};
+class PositiveImage : public ImageTest {};
+
+class ImagelessFramebufferTest : public VkLayerTest {};
+class NegativeImagelessFramebuffer : public ImagelessFramebufferTest {};
+class PositiveImagelessFramebuffer : public ImagelessFramebufferTest {};
+
+class NegativeInstanceless : public VkLayerTest {};
+
+class PositiveInstance : public VkLayerTest {};
+
+class MemoryTest : public VkLayerTest {};
+class NegativeMemory : public MemoryTest {};
+class PositiveMemory : public MemoryTest {};
+
+class MeshTest : public VkLayerTest {};
+class NegativeMesh : public MeshTest {};
+class PositiveMesh : public MeshTest {};
+
+class NegativeMultiview : public VkLayerTest {};
+
+class NegativeObjectLifetime : public VkLayerTest {};
+
+class NegativePipelineAdvancedBlend : public VkLayerTest {};
+
+class PipelineLayoutTest : public VkLayerTest {};
+class NegativePipelineLayout : public PipelineLayoutTest {};
+class PositivePipelineLayout : public PipelineLayoutTest {};
+
+class PipelineTopologyTest : public VkLayerTest {};
+class NegativePipelineTopology : public PipelineTopologyTest {};
+class PositivePipelineTopology : public PipelineTopologyTest {};
+
+class PipelineTest : public VkLayerTest {};
+class NegativePipeline : public PipelineTest {};
+class PositivePipeline : public PipelineTest {};
+
+class NegativePortabilitySubset : public VkLayerTest {};
+
+class ProtectedMemoryTest : public VkLayerTest {};
+class NegativeProtectedMemory : public ProtectedMemoryTest {};
+class PositiveProtectedMemory : public ProtectedMemoryTest {};
+
+class QueryTest : public VkLayerTest {};
+class NegativeQuery : public QueryTest {};
+class PositiveQuery : public QueryTest {};
+
+class RayTracingTest : public VkLayerTest {};
+class NegativeRayTracing : public RayTracingTest {};
+class PositiveRayTracing : public RayTracingTest {};
+
+class RayTracingPipelineTest : public VkLayerTest {};
+class NegativeRayTracingPipeline : public RayTracingPipelineTest {};
+class PositiveRayTracingPipeline : public RayTracingPipelineTest {};
+
+class RenderPassTest : public VkLayerTest {};
+class NegativeRenderPass : public RenderPassTest {};
+class PositiveRenderPass : public RenderPassTest {};
+
+class RobustnessTest : public VkLayerTest {};
+class NegativeRobustness : public RobustnessTest {};
+class PositiveRobustness : public RobustnessTest {};
+
+class SamplerTest : public VkLayerTest {};
+class NegativeSampler : public SamplerTest {};
+class PositiveSampler : public SamplerTest {};
+
+class ShaderComputeTest : public VkLayerTest {};
+class NegativeShaderCompute : public ShaderComputeTest {};
+class PositiveShaderCompute : public ShaderComputeTest {};
+
+class ShaderInterfaceTest : public VkLayerTest {};
+class NegativeShaderInterface : public ShaderInterfaceTest {};
+class PositiveShaderInterface : public ShaderInterfaceTest {};
+
+class PositiveShaderImageAccess : public VkLayerTest {};
+
+class ShaderLimitsTest : public VkLayerTest {};
+class NegativeShaderLimits : public ShaderLimitsTest {};
+class PositiveShaderLimits : public ShaderLimitsTest {};
+
+class NegativeShaderMesh : public VkLayerTest {};
+
+class ShaderPushConstantsTest : public VkLayerTest {};
+class NegativeShaderPushConstants : public ShaderPushConstantsTest {};
+class PositiveShaderPushConstants : public ShaderPushConstantsTest {};
+
+class ShaderSpirvTest : public VkLayerTest {};
+class NegativeShaderSpirv : public ShaderSpirvTest {};
+class PositiveShaderSpirv : public ShaderSpirvTest {};
+
+class ShaderStorageImageTest : public VkLayerTest {};
+class NegativeShaderStorageImage : public ShaderStorageImageTest {};
+class PositiveShaderStorageImage : public ShaderStorageImageTest {};
+
+class ShaderStorageTexelTest : public VkLayerTest {};
+class NegativeShaderStorageTexel : public ShaderStorageTexelTest {};
+class PositiveShaderStorageTexel : public ShaderStorageTexelTest {};
+
+class SparseTest : public VkLayerTest {};
+class NegativeSparse : public SparseTest {};
+class PositiveSparse : public SparseTest {};
+
+class NegativeSubgroup : public VkLayerTest {};
+
+class SubpassTest : public VkLayerTest {};
+class NegativeSubpass : public SubpassTest {};
+class PositiveSubpass : public SubpassTest {};
+
+class SyncObjectTest : public VkLayerTest {
+  protected:
+#ifdef VK_USE_PLATFORM_WIN32_KHR
+    using ExternalHandle = HANDLE;
+#else
+    using ExternalHandle = int;
+#endif
+};
+class NegativeSyncObject : public SyncObjectTest {};
+class PositiveSyncObject : public SyncObjectTest {};
+
+class NegativeTransformFeedback : public VkLayerTest {
+  public:
+    void InitBasicTransformFeedback(void *pNextFeatures = nullptr);
+};
+
+class PositiveTooling : public VkLayerTest {};
+
+class VertexInputTest : public VkLayerTest {};
+class NegativeVertexInput : public VertexInputTest {};
+class PositiveVertexInput : public VertexInputTest {};
+
+class NegativeViewportInheritance : public VkLayerTest {};
+
+class WsiTest : public VkLayerTest {};
+class NegativeWsi : public WsiTest {};
+class PositiveWsi : public WsiTest {};
+
+class YcbcrTest : public VkLayerTest {
+  public:
+    void InitBasicYcbcr(void *pNextFeatures = nullptr);
+};
+class NegativeYcbcr : public YcbcrTest {};
+class PositiveYcbcr : public YcbcrTest {};
+
+class CooperativeMatrixTest : public VkLayerTest {};
+class NegativeShaderCooperativeMatrix : public CooperativeMatrixTest {};
+class PositiveShaderCooperativeMatrix : public CooperativeMatrixTest {};
+
+class MultiDeviceTest : public VkLayerTest {
+  public:
+    ~MultiDeviceTest();
+    VkDeviceObj *m_second_device = nullptr;
 };
 
 class VkBufferTest {
@@ -424,30 +587,6 @@ class VkBufferTest {
     VkBuffer VulkanBuffer;
     VkDevice VulkanDevice;
     VkDeviceMemory VulkanMemory;
-};
-
-struct CreatePipelineHelper;
-class VkVerticesObj {
-  public:
-    VkVerticesObj(VkDeviceObj *aVulkanDevice, unsigned aAttributeCount, unsigned aBindingCount, unsigned aByteStride,
-                  VkDeviceSize aVertexCount, const float *aVerticies);
-    ~VkVerticesObj();
-    bool AddVertexInputToPipe(VkPipelineObj &aPipelineObj);
-    bool AddVertexInputToPipeHelpr(CreatePipelineHelper *pipelineHelper);
-    void BindVertexBuffers(VkCommandBuffer aCommandBuffer, unsigned aOffsetCount = 0, VkDeviceSize *aOffsetList = nullptr);
-
-  protected:
-    static uint32_t BindIdGenerator;
-
-    bool BoundCurrent;
-    unsigned AttributeCount;
-    unsigned BindingCount;
-    uint32_t BindId;
-
-    VkPipelineVertexInputStateCreateInfo PipelineVertexInputStateCreateInfo;
-    VkVertexInputAttributeDescription *VertexInputAttributeDescription;
-    VkVertexInputBindingDescription *VertexInputBindingDescription;
-    VkConstantBufferObj VulkanMemoryBuffer;
 };
 
 struct OneOffDescriptorSet {
@@ -862,29 +1001,37 @@ class ThreadTimeoutHelper {
 
     struct Guard {
         Guard(ThreadTimeoutHelper &timeout_helper) : timeout_helper_(timeout_helper) {}
+        Guard(const Guard &) = delete;
+        Guard &operator=(const Guard &) = delete;
+
         ~Guard() { timeout_helper_.OnThreadDone(); }
+
         ThreadTimeoutHelper &timeout_helper_;
     };
+    // Mandatory elision of copy/move operations guarantees the destructor is not called
+    // (even in the presence of copy/move constructor) and the object is constructed directly
+    // into the destination storage: https://en.cppreference.com/w/cpp/language/copy_elision
     Guard ThreadGuard() { return Guard(*this); }
 
   private:
     void OnThreadDone();
 
+    std::mutex active_thread_mutex_;
     int active_threads_;
+
     std::condition_variable cv_;
     std::mutex mutex_;
 };
 
 void ReleaseNullFence(ThreadTestData *);
 
-void TestRenderPassCreate(ErrorMonitor *error_monitor, const VkDevice device, const VkRenderPassCreateInfo *create_info,
+void TestRenderPassCreate(ErrorMonitor *error_monitor, const vk_testing::Device &device, const VkRenderPassCreateInfo &create_info,
                           bool rp2_supported, const char *rp1_vuid, const char *rp2_vuid);
-void PositiveTestRenderPassCreate(ErrorMonitor *error_monitor, const VkDevice device, const VkRenderPassCreateInfo *create_info,
-                                  bool rp2_supported);
-void PositiveTestRenderPass2KHRCreate(ErrorMonitor *error_monitor, const VkDevice device,
-                                      const VkRenderPassCreateInfo2KHR *create_info);
-void TestRenderPass2KHRCreate(ErrorMonitor *error_monitor, const VkDevice device, const VkRenderPassCreateInfo2KHR *create_info,
-                              const char *rp2_vuid);
+void PositiveTestRenderPassCreate(ErrorMonitor *error_monitor, const vk_testing::Device &device,
+                                  const VkRenderPassCreateInfo &create_info, bool rp2_supported);
+void PositiveTestRenderPass2KHRCreate(const vk_testing::Device &device, const VkRenderPassCreateInfo2KHR &create_info);
+void TestRenderPass2KHRCreate(ErrorMonitor &error_monitor, const vk_testing::Device &device,
+                              const VkRenderPassCreateInfo2KHR &create_info, const std::initializer_list<const char *> &vuids);
 void TestRenderPassBegin(ErrorMonitor *error_monitor, const VkDevice device, const VkCommandBuffer command_buffer,
                          const VkRenderPassBeginInfo *begin_info, bool rp2Supported, const char *rp1_vuid, const char *rp2_vuid);
 
@@ -918,6 +1065,9 @@ VkExternalMemoryHandleTypeFlags FindSupportedExternalMemoryHandleTypes(VkPhysica
                                                                        const VkBufferCreateInfo &buffer_create_info,
                                                                        VkExternalMemoryFeatureFlags requested_features);
 
+bool HandleTypeNeedsDedicatedAllocation(VkPhysicalDevice gpu, const VkBufferCreateInfo &buffer_create_info,
+                                        VkExternalMemoryHandleTypeFlagBits handle_type);
+
 VkExternalMemoryHandleTypeFlags FindSupportedExternalMemoryHandleTypes(VkPhysicalDevice gpu,
                                                                        const VkImageCreateInfo &image_create_info,
                                                                        VkExternalMemoryFeatureFlags requested_features);
@@ -926,22 +1076,10 @@ VkExternalMemoryHandleTypeFlagsNV FindSupportedExternalMemoryHandleTypesNV(const
                                                                            const VkImageCreateInfo &image_create_info,
                                                                            VkExternalMemoryFeatureFlagsNV requested_features);
 
-VkExternalFenceHandleTypeFlags FindSupportedExternalFenceHandleTypes(VkPhysicalDevice gpu,
-                                                                     VkExternalFenceFeatureFlags requested_features);
+bool HandleTypeNeedsDedicatedAllocation(VkPhysicalDevice gpu, const VkImageCreateInfo &image_create_info,
+                                        VkExternalMemoryHandleTypeFlagBits handle_type);
 
-VkExternalSemaphoreHandleTypeFlags FindSupportedExternalSemaphoreHandleTypes(VkPhysicalDevice gpu,
-                                                                             VkExternalSemaphoreFeatureFlags requested_features);
-
-VkExternalMemoryHandleTypeFlags GetCompatibleHandleTypes(VkPhysicalDevice gpu, const VkBufferCreateInfo &buffer_create_info,
-                                                         VkExternalMemoryHandleTypeFlagBits handle_type);
-
-VkExternalMemoryHandleTypeFlags GetCompatibleHandleTypes(VkPhysicalDevice gpu, const VkImageCreateInfo &image_create_info,
-                                                         VkExternalMemoryHandleTypeFlagBits handle_type);
-
-VkExternalFenceHandleTypeFlags GetCompatibleHandleTypes(VkPhysicalDevice gpu, VkExternalFenceHandleTypeFlagBits handle_type);
-
-VkExternalSemaphoreHandleTypeFlags GetCompatibleHandleTypes(VkPhysicalDevice gpu,
-                                                            VkExternalSemaphoreHandleTypeFlagBits handle_type);
+bool SemaphoreExportImportSupported(VkPhysicalDevice gpu, VkExternalSemaphoreHandleTypeFlagBits handle_type);
 
 void SetImageLayout(VkDeviceObj *device, VkImageAspectFlags aspect, VkImage image, VkImageLayout image_layout);
 

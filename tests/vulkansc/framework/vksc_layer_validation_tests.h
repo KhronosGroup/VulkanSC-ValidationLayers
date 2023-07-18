@@ -12,19 +12,13 @@
 
 #include "vksc_test_dispatch_helper.h"
 #include "vksc_test_pipeline_cache_helper.h"
+
 #include "../../framework/layer_validation_tests.h"
 
 class VkSCLayerTest : public VkLayerTest {
   public:
     static VkPhysicalDeviceVulkanSC10Features GetVulkanSC10Features(VkPhysicalDevice phys_dev);
     static VkPhysicalDeviceVulkanSC10Properties GetVulkanSC10Properties(VkPhysicalDevice phys_dev);
-
-    virtual ~VkSCLayerTest() override;
-
-    VkPipelineCache GetDefaultPipelineCache();
-
-  private:
-    VkPipelineCache default_pipeline_cache_{VK_NULL_HANDLE};
 };
 
 class VkSCPositiveLayerTest : public VkSCLayerTest {};

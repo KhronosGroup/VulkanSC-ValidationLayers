@@ -1,32 +1,28 @@
 // *** THIS FILE IS GENERATED - DO NOT EDIT ***
 // See object_tracker_generator.py for modifications
 
-
 /***************************************************************************
- *
- * Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (c) 2015-2023 Google Inc.
- * Copyright (c) 2023-2023 RasterGrid Kft.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- ****************************************************************************/
+*
+* Copyright (c) 2015-2023 The Khronos Group Inc.
+* Copyright (c) 2015-2023 Valve Corporation
+* Copyright (c) 2015-2023 LunarG, Inc.
+* Copyright (c) 2015-2023 Google Inc.
+* Copyright (c) 2015-2023 RasterGrid Kft.
+*
+* Licensed under the Apache License, Version 2.0 (the "License");
+* you may not use this file except in compliance with the License.
+* You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+****************************************************************************/
 
-
-
-
-
+// NOLINTBEGIN
 void PostCallRecordCreateInstance(
     const VkInstanceCreateInfo*                 pCreateInfo,
     const VkAllocationCallbacks*                pAllocator,
@@ -1433,7 +1429,6 @@ void PostCallRecordCreateSharedSwapchainsKHR(
     const VkAllocationCallbacks*                pAllocator,
     VkSwapchainKHR*                             pSwapchains,
     VkResult                                    result) override;
-
 #ifdef VK_USE_PLATFORM_XLIB_KHR
 bool PreCallValidateCreateXlibSurfaceKHR(
     VkInstance                                  instance,
@@ -1447,7 +1442,6 @@ void PostCallRecordCreateXlibSurfaceKHR(
     VkSurfaceKHR*                               pSurface,
     VkResult                                    result) override;
 #endif // VK_USE_PLATFORM_XLIB_KHR
-
 #ifdef VK_USE_PLATFORM_XLIB_KHR
 bool PreCallValidateGetPhysicalDeviceXlibPresentationSupportKHR(
     VkPhysicalDevice                            physicalDevice,
@@ -1455,7 +1449,6 @@ bool PreCallValidateGetPhysicalDeviceXlibPresentationSupportKHR(
     Display*                                    dpy,
     VisualID                                    visualID) const override;
 #endif // VK_USE_PLATFORM_XLIB_KHR
-
 #ifdef VK_USE_PLATFORM_XCB_KHR
 bool PreCallValidateCreateXcbSurfaceKHR(
     VkInstance                                  instance,
@@ -1469,7 +1462,6 @@ void PostCallRecordCreateXcbSurfaceKHR(
     VkSurfaceKHR*                               pSurface,
     VkResult                                    result) override;
 #endif // VK_USE_PLATFORM_XCB_KHR
-
 #ifdef VK_USE_PLATFORM_XCB_KHR
 bool PreCallValidateGetPhysicalDeviceXcbPresentationSupportKHR(
     VkPhysicalDevice                            physicalDevice,
@@ -1477,7 +1469,6 @@ bool PreCallValidateGetPhysicalDeviceXcbPresentationSupportKHR(
     xcb_connection_t*                           connection,
     xcb_visualid_t                              visual_id) const override;
 #endif // VK_USE_PLATFORM_XCB_KHR
-
 #ifdef VK_USE_PLATFORM_WAYLAND_KHR
 bool PreCallValidateCreateWaylandSurfaceKHR(
     VkInstance                                  instance,
@@ -1491,14 +1482,12 @@ void PostCallRecordCreateWaylandSurfaceKHR(
     VkSurfaceKHR*                               pSurface,
     VkResult                                    result) override;
 #endif // VK_USE_PLATFORM_WAYLAND_KHR
-
 #ifdef VK_USE_PLATFORM_WAYLAND_KHR
 bool PreCallValidateGetPhysicalDeviceWaylandPresentationSupportKHR(
     VkPhysicalDevice                            physicalDevice,
     uint32_t                                    queueFamilyIndex,
     struct wl_display*                          display) const override;
 #endif // VK_USE_PLATFORM_WAYLAND_KHR
-
 #ifdef VK_USE_PLATFORM_ANDROID_KHR
 bool PreCallValidateCreateAndroidSurfaceKHR(
     VkInstance                                  instance,
@@ -1512,7 +1501,6 @@ void PostCallRecordCreateAndroidSurfaceKHR(
     VkSurfaceKHR*                               pSurface,
     VkResult                                    result) override;
 #endif // VK_USE_PLATFORM_ANDROID_KHR
-
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 bool PreCallValidateCreateWin32SurfaceKHR(
     VkInstance                                  instance,
@@ -1526,7 +1514,6 @@ void PostCallRecordCreateWin32SurfaceKHR(
     VkSurfaceKHR*                               pSurface,
     VkResult                                    result) override;
 #endif // VK_USE_PLATFORM_WIN32_KHR
-
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 bool PreCallValidateGetPhysicalDeviceWin32PresentationSupportKHR(
     VkPhysicalDevice                            physicalDevice,
@@ -1670,14 +1657,12 @@ bool PreCallValidateGetPhysicalDeviceExternalBufferPropertiesKHR(
     VkPhysicalDevice                            physicalDevice,
     const VkPhysicalDeviceExternalBufferInfo*   pExternalBufferInfo,
     VkExternalBufferProperties*                 pExternalBufferProperties) const override;
-
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 bool PreCallValidateGetMemoryWin32HandleKHR(
     VkDevice                                    device,
     const VkMemoryGetWin32HandleInfoKHR*        pGetWin32HandleInfo,
     HANDLE*                                     pHandle) const override;
 #endif // VK_USE_PLATFORM_WIN32_KHR
-
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 bool PreCallValidateGetMemoryWin32HandlePropertiesKHR(
     VkDevice                                    device,
@@ -1698,13 +1683,11 @@ bool PreCallValidateGetPhysicalDeviceExternalSemaphorePropertiesKHR(
     VkPhysicalDevice                            physicalDevice,
     const VkPhysicalDeviceExternalSemaphoreInfo* pExternalSemaphoreInfo,
     VkExternalSemaphoreProperties*              pExternalSemaphoreProperties) const override;
-
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 bool PreCallValidateImportSemaphoreWin32HandleKHR(
     VkDevice                                    device,
     const VkImportSemaphoreWin32HandleInfoKHR*  pImportSemaphoreWin32HandleInfo) const override;
 #endif // VK_USE_PLATFORM_WIN32_KHR
-
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 bool PreCallValidateGetSemaphoreWin32HandleKHR(
     VkDevice                                    device,
@@ -1784,13 +1767,11 @@ bool PreCallValidateGetPhysicalDeviceExternalFencePropertiesKHR(
     VkPhysicalDevice                            physicalDevice,
     const VkPhysicalDeviceExternalFenceInfo*    pExternalFenceInfo,
     VkExternalFenceProperties*                  pExternalFenceProperties) const override;
-
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 bool PreCallValidateImportFenceWin32HandleKHR(
     VkDevice                                    device,
     const VkImportFenceWin32HandleInfoKHR*      pImportFenceWin32HandleInfo) const override;
 #endif // VK_USE_PLATFORM_WIN32_KHR
-
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 bool PreCallValidateGetFenceWin32HandleKHR(
     VkDevice                                    device,
@@ -1986,7 +1967,20 @@ bool PreCallValidateMapMemory2KHR(
 bool PreCallValidateUnmapMemory2KHR(
     VkDevice                                    device,
     const VkMemoryUnmapInfoKHR*                 pMemoryUnmapInfo) const override;
-
+#ifdef VK_ENABLE_BETA_EXTENSIONS
+bool PreCallValidateGetPhysicalDeviceVideoEncodeQualityLevelPropertiesKHR(
+    VkPhysicalDevice                            physicalDevice,
+    const VkPhysicalDeviceVideoEncodeQualityLevelInfoKHR* pQualityLevelInfo,
+    VkVideoEncodeQualityLevelPropertiesKHR*     pQualityLevelProperties) const override;
+#endif // VK_ENABLE_BETA_EXTENSIONS
+#ifdef VK_ENABLE_BETA_EXTENSIONS
+bool PreCallValidateGetEncodedVideoSessionParametersKHR(
+    VkDevice                                    device,
+    const VkVideoEncodeSessionParametersGetInfoKHR* pVideoSessionParametersInfo,
+    VkVideoEncodeSessionParametersFeedbackInfoKHR* pFeedbackInfo,
+    size_t*                                     pDataSize,
+    void*                                       pData) const override;
+#endif // VK_ENABLE_BETA_EXTENSIONS
 #ifdef VK_ENABLE_BETA_EXTENSIONS
 bool PreCallValidateCmdEncodeVideoKHR(
     VkCommandBuffer                             commandBuffer,
@@ -2069,6 +2063,10 @@ bool PreCallValidateGetDeviceImageSparseMemoryRequirementsKHR(
     const VkDeviceImageMemoryRequirements*      pInfo,
     uint32_t*                                   pSparseMemoryRequirementCount,
     VkSparseImageMemoryRequirements2*           pSparseMemoryRequirements) const override;
+bool PreCallValidateGetPhysicalDeviceCooperativeMatrixPropertiesKHR(
+    VkPhysicalDevice                            physicalDevice,
+    uint32_t*                                   pPropertyCount,
+    VkCooperativeMatrixPropertiesKHR*           pProperties) const override;
 bool PreCallValidateCreateDebugReportCallbackEXT(
     VkInstance                                  instance,
     const VkDebugReportCallbackCreateInfoEXT*   pCreateInfo,
@@ -2220,7 +2218,6 @@ bool PreCallValidateGetShaderInfoAMD(
     VkShaderInfoTypeAMD                         infoType,
     size_t*                                     pInfoSize,
     void*                                       pInfo) const override;
-
 #ifdef VK_USE_PLATFORM_GGP
 bool PreCallValidateCreateStreamDescriptorSurfaceGGP(
     VkInstance                                  instance,
@@ -2243,7 +2240,6 @@ bool PreCallValidateGetPhysicalDeviceExternalImageFormatPropertiesNV(
     VkImageCreateFlags                          flags,
     VkExternalMemoryHandleTypeFlagsNV           externalHandleType,
     VkExternalImageFormatPropertiesNV*          pExternalImageFormatProperties) const override;
-
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 bool PreCallValidateGetMemoryWin32HandleNV(
     VkDevice                                    device,
@@ -2251,7 +2247,6 @@ bool PreCallValidateGetMemoryWin32HandleNV(
     VkExternalMemoryHandleTypeFlagsNV           handleType,
     HANDLE*                                     pHandle) const override;
 #endif // VK_USE_PLATFORM_WIN32_KHR
-
 #ifdef VK_USE_PLATFORM_VI_NN
 bool PreCallValidateCreateViSurfaceNN(
     VkInstance                                  instance,
@@ -2278,14 +2273,12 @@ bool PreCallValidateCmdSetViewportWScalingNV(
 bool PreCallValidateReleaseDisplayEXT(
     VkPhysicalDevice                            physicalDevice,
     VkDisplayKHR                                display) const override;
-
 #ifdef VK_USE_PLATFORM_XLIB_XRANDR_EXT
 bool PreCallValidateAcquireXlibDisplayEXT(
     VkPhysicalDevice                            physicalDevice,
     Display*                                    dpy,
     VkDisplayKHR                                display) const override;
 #endif // VK_USE_PLATFORM_XLIB_XRANDR_EXT
-
 #ifdef VK_USE_PLATFORM_XLIB_XRANDR_EXT
 bool PreCallValidateGetRandROutputDisplayEXT(
     VkPhysicalDevice                            physicalDevice,
@@ -2361,7 +2354,6 @@ bool PreCallValidateSetHdrMetadataEXT(
     uint32_t                                    swapchainCount,
     const VkSwapchainKHR*                       pSwapchains,
     const VkHdrMetadataEXT*                     pMetadata) const override;
-
 #ifdef VK_USE_PLATFORM_IOS_MVK
 bool PreCallValidateCreateIOSSurfaceMVK(
     VkInstance                                  instance,
@@ -2375,7 +2367,6 @@ void PostCallRecordCreateIOSSurfaceMVK(
     VkSurfaceKHR*                               pSurface,
     VkResult                                    result) override;
 #endif // VK_USE_PLATFORM_IOS_MVK
-
 #ifdef VK_USE_PLATFORM_MACOS_MVK
 bool PreCallValidateCreateMacOSSurfaceMVK(
     VkInstance                                  instance,
@@ -2435,14 +2426,12 @@ bool PreCallValidateSubmitDebugUtilsMessageEXT(
     VkDebugUtilsMessageSeverityFlagBitsEXT      messageSeverity,
     VkDebugUtilsMessageTypeFlagsEXT             messageTypes,
     const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData) const override;
-
 #ifdef VK_USE_PLATFORM_ANDROID_KHR
 bool PreCallValidateGetAndroidHardwareBufferPropertiesANDROID(
     VkDevice                                    device,
     const struct AHardwareBuffer*               buffer,
     VkAndroidHardwareBufferPropertiesANDROID*   pProperties) const override;
 #endif // VK_USE_PLATFORM_ANDROID_KHR
-
 #ifdef VK_USE_PLATFORM_ANDROID_KHR
 bool PreCallValidateGetMemoryAndroidHardwareBufferANDROID(
     VkDevice                                    device,
@@ -2702,7 +2691,6 @@ bool PreCallValidateSetLocalDimmingAMD(
     VkDevice                                    device,
     VkSwapchainKHR                              swapChain,
     VkBool32                                    localDimmingEnable) const override;
-
 #ifdef VK_USE_PLATFORM_FUCHSIA
 bool PreCallValidateCreateImagePipeSurfaceFUCHSIA(
     VkInstance                                  instance,
@@ -2716,7 +2704,6 @@ void PostCallRecordCreateImagePipeSurfaceFUCHSIA(
     VkSurfaceKHR*                               pSurface,
     VkResult                                    result) override;
 #endif // VK_USE_PLATFORM_FUCHSIA
-
 #ifdef VK_USE_PLATFORM_METAL_EXT
 bool PreCallValidateCreateMetalSurfaceEXT(
     VkInstance                                  instance,
@@ -2745,7 +2732,6 @@ bool PreCallValidateGetPhysicalDeviceSupportedFramebufferMixedSamplesCombination
     VkPhysicalDevice                            physicalDevice,
     uint32_t*                                   pCombinationCount,
     VkFramebufferMixedSamplesCombinationNV*     pCombinations) const override;
-
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 bool PreCallValidateGetPhysicalDeviceSurfacePresentModes2EXT(
     VkPhysicalDevice                            physicalDevice,
@@ -2753,19 +2739,16 @@ bool PreCallValidateGetPhysicalDeviceSurfacePresentModes2EXT(
     uint32_t*                                   pPresentModeCount,
     VkPresentModeKHR*                           pPresentModes) const override;
 #endif // VK_USE_PLATFORM_WIN32_KHR
-
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 bool PreCallValidateAcquireFullScreenExclusiveModeEXT(
     VkDevice                                    device,
     VkSwapchainKHR                              swapchain) const override;
 #endif // VK_USE_PLATFORM_WIN32_KHR
-
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 bool PreCallValidateReleaseFullScreenExclusiveModeEXT(
     VkDevice                                    device,
     VkSwapchainKHR                              swapchain) const override;
 #endif // VK_USE_PLATFORM_WIN32_KHR
-
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 bool PreCallValidateGetDeviceGroupSurfacePresentModes2EXT(
     VkDevice                                    device,
@@ -2877,6 +2860,9 @@ void PreCallRecordDestroyIndirectCommandsLayoutNV(
     VkDevice                                    device,
     VkIndirectCommandsLayoutNV                  indirectCommandsLayout,
     const VkAllocationCallbacks*                pAllocator) override;
+bool PreCallValidateCmdSetDepthBias2EXT(
+    VkCommandBuffer                             commandBuffer,
+    const VkDepthBiasInfoEXT*                   pDepthBiasInfo) const override;
 bool PreCallValidateAcquireDrmDisplayEXT(
     VkPhysicalDevice                            physicalDevice,
     int32_t                                     drmFd,
@@ -2923,7 +2909,6 @@ bool PreCallValidateGetPrivateDataEXT(
     uint64_t                                    objectHandle,
     VkPrivateDataSlot                           privateDataSlot,
     uint64_t*                                   pData) const override;
-
 #ifdef VK_USE_PLATFORM_METAL_EXT
 bool PreCallValidateExportMetalObjectsEXT(
     VkDevice                                    device,
@@ -2993,13 +2978,11 @@ bool PreCallValidateGetDeviceFaultInfoEXT(
     VkDevice                                    device,
     VkDeviceFaultCountsEXT*                     pFaultCounts,
     VkDeviceFaultInfoEXT*                       pFaultInfo) const override;
-
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 bool PreCallValidateAcquireWinrtDisplayNV(
     VkPhysicalDevice                            physicalDevice,
     VkDisplayKHR                                display) const override;
 #endif // VK_USE_PLATFORM_WIN32_KHR
-
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 bool PreCallValidateGetWinrtDisplayNV(
     VkPhysicalDevice                            physicalDevice,
@@ -3011,7 +2994,6 @@ void PostCallRecordGetWinrtDisplayNV(
     VkDisplayKHR*                               pDisplay,
     VkResult                                    result) override;
 #endif // VK_USE_PLATFORM_WIN32_KHR
-
 #ifdef VK_USE_PLATFORM_DIRECTFB_EXT
 bool PreCallValidateCreateDirectFBSurfaceEXT(
     VkInstance                                  instance,
@@ -3025,7 +3007,6 @@ void PostCallRecordCreateDirectFBSurfaceEXT(
     VkSurfaceKHR*                               pSurface,
     VkResult                                    result) override;
 #endif // VK_USE_PLATFORM_DIRECTFB_EXT
-
 #ifdef VK_USE_PLATFORM_DIRECTFB_EXT
 bool PreCallValidateGetPhysicalDeviceDirectFBPresentationSupportEXT(
     VkPhysicalDevice                            physicalDevice,
@@ -3038,14 +3019,12 @@ bool PreCallValidateCmdSetVertexInputEXT(
     const VkVertexInputBindingDescription2EXT*  pVertexBindingDescriptions,
     uint32_t                                    vertexAttributeDescriptionCount,
     const VkVertexInputAttributeDescription2EXT* pVertexAttributeDescriptions) const override;
-
 #ifdef VK_USE_PLATFORM_FUCHSIA
 bool PreCallValidateGetMemoryZirconHandleFUCHSIA(
     VkDevice                                    device,
     const VkMemoryGetZirconHandleInfoFUCHSIA*   pGetZirconHandleInfo,
     zx_handle_t*                                pZirconHandle) const override;
 #endif // VK_USE_PLATFORM_FUCHSIA
-
 #ifdef VK_USE_PLATFORM_FUCHSIA
 bool PreCallValidateGetMemoryZirconHandlePropertiesFUCHSIA(
     VkDevice                                    device,
@@ -3053,20 +3032,17 @@ bool PreCallValidateGetMemoryZirconHandlePropertiesFUCHSIA(
     zx_handle_t                                 zirconHandle,
     VkMemoryZirconHandlePropertiesFUCHSIA*      pMemoryZirconHandleProperties) const override;
 #endif // VK_USE_PLATFORM_FUCHSIA
-
 #ifdef VK_USE_PLATFORM_FUCHSIA
 bool PreCallValidateImportSemaphoreZirconHandleFUCHSIA(
     VkDevice                                    device,
     const VkImportSemaphoreZirconHandleInfoFUCHSIA* pImportSemaphoreZirconHandleInfo) const override;
 #endif // VK_USE_PLATFORM_FUCHSIA
-
 #ifdef VK_USE_PLATFORM_FUCHSIA
 bool PreCallValidateGetSemaphoreZirconHandleFUCHSIA(
     VkDevice                                    device,
     const VkSemaphoreGetZirconHandleInfoFUCHSIA* pGetZirconHandleInfo,
     zx_handle_t*                                pZirconHandle) const override;
 #endif // VK_USE_PLATFORM_FUCHSIA
-
 #ifdef VK_USE_PLATFORM_FUCHSIA
 bool PreCallValidateCreateBufferCollectionFUCHSIA(
     VkDevice                                    device,
@@ -3080,21 +3056,18 @@ void PostCallRecordCreateBufferCollectionFUCHSIA(
     VkBufferCollectionFUCHSIA*                  pCollection,
     VkResult                                    result) override;
 #endif // VK_USE_PLATFORM_FUCHSIA
-
 #ifdef VK_USE_PLATFORM_FUCHSIA
 bool PreCallValidateSetBufferCollectionImageConstraintsFUCHSIA(
     VkDevice                                    device,
     VkBufferCollectionFUCHSIA                   collection,
     const VkImageConstraintsInfoFUCHSIA*        pImageConstraintsInfo) const override;
 #endif // VK_USE_PLATFORM_FUCHSIA
-
 #ifdef VK_USE_PLATFORM_FUCHSIA
 bool PreCallValidateSetBufferCollectionBufferConstraintsFUCHSIA(
     VkDevice                                    device,
     VkBufferCollectionFUCHSIA                   collection,
     const VkBufferConstraintsInfoFUCHSIA*       pBufferConstraintsInfo) const override;
 #endif // VK_USE_PLATFORM_FUCHSIA
-
 #ifdef VK_USE_PLATFORM_FUCHSIA
 bool PreCallValidateDestroyBufferCollectionFUCHSIA(
     VkDevice                                    device,
@@ -3105,7 +3078,6 @@ void PreCallRecordDestroyBufferCollectionFUCHSIA(
     VkBufferCollectionFUCHSIA                   collection,
     const VkAllocationCallbacks*                pAllocator) override;
 #endif // VK_USE_PLATFORM_FUCHSIA
-
 #ifdef VK_USE_PLATFORM_FUCHSIA
 bool PreCallValidateGetBufferCollectionPropertiesFUCHSIA(
     VkDevice                                    device,
@@ -3130,60 +3102,51 @@ bool PreCallValidateGetPipelinePropertiesEXT(
     VkDevice                                    device,
     const VkPipelineInfoEXT*                    pPipelineInfo,
     VkBaseOutStructure*                         pPipelineProperties) const override;
-
 #ifdef VK_USE_PLATFORM_SCI
 bool PreCallValidateGetFenceSciSyncFenceNV(
     VkDevice                                    device,
     const VkFenceGetSciSyncInfoNV*              pGetSciSyncHandleInfo,
     void*                                       pHandle) const override;
 #endif // VK_USE_PLATFORM_SCI
-
 #ifdef VK_USE_PLATFORM_SCI
 bool PreCallValidateGetFenceSciSyncObjNV(
     VkDevice                                    device,
     const VkFenceGetSciSyncInfoNV*              pGetSciSyncHandleInfo,
     void*                                       pHandle) const override;
 #endif // VK_USE_PLATFORM_SCI
-
 #ifdef VK_USE_PLATFORM_SCI
 bool PreCallValidateImportFenceSciSyncFenceNV(
     VkDevice                                    device,
     const VkImportFenceSciSyncInfoNV*           pImportFenceSciSyncInfo) const override;
 #endif // VK_USE_PLATFORM_SCI
-
 #ifdef VK_USE_PLATFORM_SCI
 bool PreCallValidateImportFenceSciSyncObjNV(
     VkDevice                                    device,
     const VkImportFenceSciSyncInfoNV*           pImportFenceSciSyncInfo) const override;
 #endif // VK_USE_PLATFORM_SCI
-
 #ifdef VK_USE_PLATFORM_SCI
 bool PreCallValidateGetPhysicalDeviceSciSyncAttributesNV(
     VkPhysicalDevice                            physicalDevice,
     const VkSciSyncAttributesInfoNV*            pSciSyncAttributesInfo,
     NvSciSyncAttrList                           pAttributes) const override;
 #endif // VK_USE_PLATFORM_SCI
-
 #ifdef VK_USE_PLATFORM_SCI
 bool PreCallValidateGetSemaphoreSciSyncObjNV(
     VkDevice                                    device,
     const VkSemaphoreGetSciSyncInfoNV*          pGetSciSyncInfo,
     void*                                       pHandle) const override;
 #endif // VK_USE_PLATFORM_SCI
-
 #ifdef VK_USE_PLATFORM_SCI
 bool PreCallValidateImportSemaphoreSciSyncObjNV(
     VkDevice                                    device,
     const VkImportSemaphoreSciSyncInfoNV*       pImportSemaphoreSciSyncInfo) const override;
 #endif // VK_USE_PLATFORM_SCI
-
 #ifdef VK_USE_PLATFORM_SCI
 bool PreCallValidateGetMemorySciBufNV(
     VkDevice                                    device,
     const VkMemoryGetSciBufInfoNV*              pGetSciBufInfo,
     NvSciBufObj*                                pHandle) const override;
 #endif // VK_USE_PLATFORM_SCI
-
 #ifdef VK_USE_PLATFORM_SCI
 bool PreCallValidateGetPhysicalDeviceExternalMemorySciBufPropertiesNV(
     VkPhysicalDevice                            physicalDevice,
@@ -3191,7 +3154,6 @@ bool PreCallValidateGetPhysicalDeviceExternalMemorySciBufPropertiesNV(
     NvSciBufObj                                 handle,
     VkMemorySciBufPropertiesNV*                 pMemorySciBufProperties) const override;
 #endif // VK_USE_PLATFORM_SCI
-
 #ifdef VK_USE_PLATFORM_SCI
 bool PreCallValidateGetPhysicalDeviceSciBufAttributesNV(
     VkPhysicalDevice                            physicalDevice,
@@ -3212,7 +3174,6 @@ bool PreCallValidateCmdSetLogicOpEXT(
 bool PreCallValidateCmdSetPrimitiveRestartEnableEXT(
     VkCommandBuffer                             commandBuffer,
     VkBool32                                    primitiveRestartEnable) const override;
-
 #ifdef VK_USE_PLATFORM_SCREEN_QNX
 bool PreCallValidateCreateScreenSurfaceQNX(
     VkInstance                                  instance,
@@ -3226,7 +3187,6 @@ void PostCallRecordCreateScreenSurfaceQNX(
     VkSurfaceKHR*                               pSurface,
     VkResult                                    result) override;
 #endif // VK_USE_PLATFORM_SCREEN_QNX
-
 #ifdef VK_USE_PLATFORM_SCREEN_QNX
 bool PreCallValidateGetPhysicalDeviceScreenPresentationSupportQNX(
     VkPhysicalDevice                            physicalDevice,
@@ -3515,6 +3475,37 @@ bool PreCallValidateCmdOpticalFlowExecuteNV(
     VkCommandBuffer                             commandBuffer,
     VkOpticalFlowSessionNV                      session,
     const VkOpticalFlowExecuteInfoNV*           pExecuteInfo) const override;
+bool PreCallValidateCreateShadersEXT(
+    VkDevice                                    device,
+    uint32_t                                    createInfoCount,
+    const VkShaderCreateInfoEXT*                pCreateInfos,
+    const VkAllocationCallbacks*                pAllocator,
+    VkShaderEXT*                                pShaders) const override;
+void PostCallRecordCreateShadersEXT(
+    VkDevice                                    device,
+    uint32_t                                    createInfoCount,
+    const VkShaderCreateInfoEXT*                pCreateInfos,
+    const VkAllocationCallbacks*                pAllocator,
+    VkShaderEXT*                                pShaders,
+    VkResult                                    result) override;
+bool PreCallValidateDestroyShaderEXT(
+    VkDevice                                    device,
+    VkShaderEXT                                 shader,
+    const VkAllocationCallbacks*                pAllocator) const override;
+void PreCallRecordDestroyShaderEXT(
+    VkDevice                                    device,
+    VkShaderEXT                                 shader,
+    const VkAllocationCallbacks*                pAllocator) override;
+bool PreCallValidateGetShaderBinaryDataEXT(
+    VkDevice                                    device,
+    VkShaderEXT                                 shader,
+    size_t*                                     pDataSize,
+    void*                                       pData) const override;
+bool PreCallValidateCmdBindShadersEXT(
+    VkCommandBuffer                             commandBuffer,
+    uint32_t                                    stageCount,
+    const VkShaderStageFlagBits*                pStages,
+    const VkShaderEXT*                          pShaders) const override;
 bool PreCallValidateGetFramebufferTilePropertiesQCOM(
     VkDevice                                    device,
     VkFramebuffer                               framebuffer,
@@ -3524,7 +3515,6 @@ bool PreCallValidateGetDynamicRenderingTilePropertiesQCOM(
     VkDevice                                    device,
     const VkRenderingInfo*                      pRenderingInfo,
     VkTilePropertiesQCOM*                       pProperties) const override;
-
 #ifdef VK_USE_PLATFORM_SCI
 bool PreCallValidateCreateSemaphoreSciSyncPoolNV(
     VkDevice                                    device,
@@ -3538,7 +3528,6 @@ void PostCallRecordCreateSemaphoreSciSyncPoolNV(
     VkSemaphoreSciSyncPoolNV*                   pSemaphorePool,
     VkResult                                    result) override;
 #endif // VK_USE_PLATFORM_SCI
-
 #ifdef VK_USE_PLATFORM_SCI
 bool PreCallValidateDestroySemaphoreSciSyncPoolNV(
     VkDevice                                    device,
@@ -3549,6 +3538,15 @@ void PreCallRecordDestroySemaphoreSciSyncPoolNV(
     VkSemaphoreSciSyncPoolNV                    semaphorePool,
     const VkAllocationCallbacks*                pAllocator) override;
 #endif // VK_USE_PLATFORM_SCI
+bool PreCallValidateCmdSetAttachmentFeedbackLoopEnableEXT(
+    VkCommandBuffer                             commandBuffer,
+    VkImageAspectFlags                          aspectMask) const override;
+#ifdef VK_USE_PLATFORM_SCREEN_QNX
+bool PreCallValidateGetScreenBufferPropertiesQNX(
+    VkDevice                                    device,
+    const struct _screen_buffer*                buffer,
+    VkScreenBufferPropertiesQNX*                pProperties) const override;
+#endif // VK_USE_PLATFORM_SCREEN_QNX
 bool PreCallValidateCreateAccelerationStructureKHR(
     VkDevice                                    device,
     const VkAccelerationStructureCreateInfoKHR* pCreateInfo,
@@ -3717,3 +3715,5 @@ void PostCallRecordGetPhysicalDeviceDisplayProperties2KHR(VkPhysicalDevice physi
 void PostCallRecordGetDisplayModeProperties2KHR(VkPhysicalDevice physicalDevice, VkDisplayKHR display, uint32_t *pPropertyCount, VkDisplayModeProperties2KHR *pProperties, VkResult result) override;
 void PostCallRecordGetPhysicalDeviceDisplayPlanePropertiesKHR(VkPhysicalDevice physicalDevice, uint32_t* pPropertyCount, VkDisplayPlanePropertiesKHR* pProperties, VkResult result) override;
 void PostCallRecordGetPhysicalDeviceDisplayPlaneProperties2KHR(VkPhysicalDevice physicalDevice, uint32_t* pPropertyCount, VkDisplayPlaneProperties2KHR* pProperties, VkResult result) override;
+
+// NOLINTEND

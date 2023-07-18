@@ -19,8 +19,8 @@
 #include <assert.h>
 #include <vector>
 
-#include "vk_enum_string_helper.h"
-#include "chassis.h"
+#include "generated/vk_enum_string_helper.h"
+#include "generated/chassis.h"
 #include "vulkansc/sc_vuid_enums.h"
 #include "vulkansc/core_checks/sc_core_validation.h"
 

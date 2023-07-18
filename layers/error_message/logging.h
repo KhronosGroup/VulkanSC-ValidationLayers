@@ -28,9 +28,9 @@
 
 #include "vk_layer_config.h"
 #include "containers/custom_containers.h"
-#include "vk_layer_dispatch_table.h"
-#include "vk_object_types.h"
-#include "vk_typemap_helper.h"
+#include "generated/vk_layer_dispatch_table.h"
+#include "generated/vk_object_types.h"
+#include "generated/vk_typemap_helper.h"
 
 #if defined __ANDROID__
 #include <android/log.h>
@@ -239,21 +239,6 @@ typedef struct _debug_report_data {
 template debug_report_data *GetLayerDataPtr<debug_report_data>(void *data_key,
                                                                std::unordered_map<void *, debug_report_data *> &data_map);
 
-static inline VkDebugReportFlagsEXT DebugAnnotFlagsToReportFlags(VkDebugUtilsMessageSeverityFlagBitsEXT da_severity,
-                                                                 VkDebugUtilsMessageTypeFlagsEXT da_type) {
-    if (da_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) return VK_DEBUG_REPORT_ERROR_BIT_EXT;
-    if (da_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
-        if (da_type & VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT)
-            return VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT;
-        else
-            return VK_DEBUG_REPORT_WARNING_BIT_EXT;
-    }
-    if (da_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) return VK_DEBUG_REPORT_INFORMATION_BIT_EXT;
-    if (da_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) return VK_DEBUG_REPORT_DEBUG_BIT_EXT;
-
-    return 0;
-}
-
 static inline void DebugReportFlagsToAnnotFlags(VkDebugReportFlagsEXT dr_flags, VkDebugUtilsMessageSeverityFlagsEXT *da_severity,
                                                 VkDebugUtilsMessageTypeFlagsEXT *da_type) {
     *da_severity = 0;
@@ -264,7 +249,7 @@ static inline void DebugReportFlagsToAnnotFlags(VkDebugReportFlagsEXT dr_flags, 
         *da_type |= VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
         *da_severity |= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT;
     }
-    if ((dr_flags & kDebugBit) != 0) {
+    if ((dr_flags & kVerboseBit) != 0) {
         *da_type |= VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT;
         *da_severity |= VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT;
     }
@@ -296,13 +281,13 @@ static inline LogMessageTypeFlags DebugAnnotFlagsToMsgTypeFlags(VkDebugUtilsMess
     } else if ((da_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) != 0) {
         msg_type_flags |= kInformationBit;
     } else if ((da_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) != 0) {
-        msg_type_flags |= kDebugBit;
+        msg_type_flags |= kVerboseBit;
     }
     return msg_type_flags;
 }
 
 VKAPI_ATTR bool LogMsg(const debug_report_data *debug_data, VkFlags msg_flags, const LogObjectList &objects,
-                       const std::string &vuid_text, const char *format, va_list argptr);
+                       std::string_view vuid_text, const char *format, va_list argptr);
 
 VKAPI_ATTR VkResult LayerCreateMessengerCallback(debug_report_data *debug_data, bool default_callback,
                                                  const VkDebugUtilsMessengerCreateInfoEXT *create_info,

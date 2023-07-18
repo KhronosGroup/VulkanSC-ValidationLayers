@@ -1,6 +1,5 @@
 // *** THIS FILE IS GENERATED - DO NOT EDIT ***
-// See spirv_gramar_generator.py for modifications
-
+// See spirv_grammar_generator.py for modifications
 
 /***************************************************************************
  *
@@ -23,19 +22,20 @@
  *
  ****************************************************************************/
 
+// NOLINTBEGIN
+
 #pragma once
 #include <cstdint>
 #include <spirv/unified1/spirv.hpp>
 
-
 bool AtomicOperation(uint32_t opcode);
-
 bool GroupOperation(uint32_t opcode);
-
 
 bool ImageGatherOperation(uint32_t opcode);
 bool ImageFetchOperation(uint32_t opcode);
 bool ImageSampleOperation(uint32_t opcode);
+uint32_t ImageAccessOperandsPosition(uint32_t opcode);
+uint32_t SampledImageAccessOperandsPosition(uint32_t opcode);
 
 bool OpcodeHasType(uint32_t opcode);
 bool OpcodeHasResult(uint32_t opcode);
@@ -49,4 +49,8 @@ uint32_t ImageOperandsParamCount(uint32_t opcode);
 const char* string_SpvOpcode(uint32_t opcode);
 const char* string_SpvStorageClass(uint32_t storage_class);
 const char* string_SpvExecutionModel(uint32_t execution_model);
+const char* string_SpvDecoration(uint32_t decoration);
+const char* string_SpvBuiltIn(uint32_t built_in);
+const char* string_SpvDim(uint32_t dim);
 
+// NOLINTEND

@@ -24,17 +24,3 @@ VkPhysicalDeviceVulkanSC10Properties VkSCLayerTest::GetVulkanSC10Properties(VkPh
     vksc::GetPhysicalDeviceProperties2(phys_dev, &props2);
     return sc_10_props;
 }
-
-VkSCLayerTest::~VkSCLayerTest() {
-    if (m_device != nullptr && m_device->handle() != VK_NULL_HANDLE) {
-        vksc::DestroyPipelineCache(m_device->handle(), default_pipeline_cache_, nullptr);
-    }
-}
-
-VkPipelineCache VkSCLayerTest::GetDefaultPipelineCache() {
-    if (default_pipeline_cache_ == VK_NULL_HANDLE) {
-        vksc::CreatePipelineCache(m_device->handle(), &vksc::GetDefaultPipelineCacheCreateInfo(), nullptr,
-                                  &default_pipeline_cache_);
-    }
-    return default_pipeline_cache_;
-}

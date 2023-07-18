@@ -16,7 +16,7 @@
  */
 #pragma once
 
-#include "lvt_function_pointers.h"
+#include "generated/vk_function_pointers.h"
 
 namespace vksc {
 

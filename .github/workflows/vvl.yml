@@ -28,22 +28,48 @@ on:
         branches:
             - main
 
+permissions:
+  contents: read
+
 jobs:
   linux:
-    runs-on: ubuntu-20.04
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        cc: [gcc, clang]
-        cxx: [g++, clang++]
+        os: [ubuntu-22.04]
+        compiler: [{cc: gcc, cxx: g++}]
+        flags: [{c: "-fsanitize=address", ld: "-fsanitize=address"}, {c: "-fsanitize=thread", ld: "-fsanitize=thread"}]
         config: [debug, release]
-        exclude:
-          - cc: gcc
-            cxx: clang++
-          - cc: clang
-            cxx: g++
-          - cc: clang
-            config: debug
+        cpp_std: [17]
+        robin_hood: ["ON"]
+        include:
+          # Test Ubuntu-20.04 release build works.
+          - os: ubuntu-20.04
+            compiler: {cc: gcc, cxx: g++}
+            config: release
+            cpp_std: 17
+            robin_hood: "ON"
+          # Test C++ 20 support
+          - os: ubuntu-22.04
+            compiler: {cc: gcc, cxx: g++}
+            config: release
+            cpp_std: 20
+            robin_hood: "ON"
+          # Test clang support
+          - os: ubuntu-22.04
+            compiler: {cc: clang, cxx: clang++}
+            config: release
+            cpp_std: 17
+            robin_hood: "ON"
+          # Test with Robin Hood disabled
+          # Chromium build, and some package managers don't use it.
+          - os: ubuntu-22.04
+            compiler: {cc: clang, cxx: clang++}
+            config: release
+            cpp_std: 17
+            robin_hood: "OFF"
+            flags: [{c: "-fsanitize=address", ld: "-fsanitize=address"}]
 
     steps:
       - uses: actions/checkout@v3
@@ -52,129 +78,54 @@ jobs:
           cmakeVersion: 3.17.2
       - uses: actions/setup-python@v4
         with:
-          python-version: '3.8'
+          python-version: '3.10'
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1.2
         with:
-          key: ${{ runner.os }}-${{ matrix.config }}-${{ matrix.cc }}-${{ matrix.cxx }}
+          key: ${{ matrix.os }}-${{ matrix.config }}-${{ matrix.compiler.cc }}-${{ matrix.compiler.cxx }}-${{ matrix.cpp_std }}-${{ matrix.flags.c }}-${{ matrix.flags.ld }}-${{matrix.robin_hood}}
       - name: Install build dependencies
         run: |
           python3 -m pip install jsonschema pyparsing
           sudo apt-get -qq update
-          sudo apt-get install -y libxkbcommon-dev libwayland-dev libmirclient-dev libxrandr-dev \
-                                libx11-xcb-dev libxcb-keysyms1 libxcb-keysyms1-dev libxcb-ewmh-dev \
-                                libxcb-randr0-dev
-      # Turn on ccache this way, which is easier than figuring out how to turn it on for all deps
-      # PATH changes need to be done in an action before any action that needs it
-      - name: Add ccache to PATH
-        run: echo "/usr/lib/ccache" >> $GITHUB_PATH
-      - name: Set PYTHONPATH
-        run: echo "PYTHONPATH=$GITHUB_WORKSPACE/external/${{ matrix.config }}/Vulkan-Headers/registry:$PYTHONPATH" >> $GITHUB_ENV
+          sudo apt-get install -y libwayland-dev xorg-dev
       - name: Build Vulkan-ValidationLayers
-        run: |
-          echo "PYTHONPATH = $PYTHONPATH"
-          python3 scripts/github_ci_win_linux.py --build --config ${{ matrix.config }} --cmake='-DVVL_ENABLE_ASAN=ON'
+        run: python3 scripts/github_ci_win_linux.py --build --config ${{ matrix.config }} --cmake='-DVVL_CPP_STANDARD=${{ matrix.cpp_std }} -DUSE_ROBIN_HOOD_HASHING=${{matrix.robin_hood}}'
         env:
-          CC: ${{ matrix.cc }}
-          CXX: ${{ matrix.cxx }}
+          CC: ${{ matrix.compiler.cc }}
+          CXX: ${{ matrix.compiler.cxx }}
+          CFLAGS: ${{ matrix.flags.c }}
+          CXXFLAGS: ${{ matrix.flags.c }}
+          LDFLAGS: ${{ matrix.flags.ld }}
+          CMAKE_C_COMPILER_LAUNCHER: ccache
+          CMAKE_CXX_COMPILER_LAUNCHER: ccache
       - name: Test Vulkan-ValidationLayers - Pixel 6 Adreno profile
-        run: python3 scripts/github_ci_win_linux.py --test --config release
+        run: python3 scripts/github_ci_win_linux.py --test
         env:
-          VK_KHRONOS_PROFILES_PROFILE_FILE: tests/device_profiles/pixel_6_adreno.json
+          VK_KHRONOS_PROFILES_PROFILE_FILE: ${{ github.workspace }}/tests/device_profiles/pixel_6_adreno.json
       - name: Test Vulkan-ValidationLayers - Pixel 6 Mali profile
-        run: python3 scripts/github_ci_win_linux.py --test --config release
+        run: python3 scripts/github_ci_win_linux.py --test
         env:
-          VK_KHRONOS_PROFILES_PROFILE_FILE: tests/device_profiles/pixel_6_mali.json
+          VK_KHRONOS_PROFILES_PROFILE_FILE: ${{ github.workspace }}/tests/device_profiles/pixel_6_mali.json
       - name: Test Vulkan-ValidationLayers - NVIDIA Tegra X1 profile
-        run: python3 scripts/github_ci_win_linux.py --test --config release
+        run: python3 scripts/github_ci_win_linux.py --test
         env:
-          VK_KHRONOS_PROFILES_PROFILE_FILE: tests/device_profiles/nvidia_tegra_x1.json
+          VK_KHRONOS_PROFILES_PROFILE_FILE: ${{ github.workspace }}/tests/device_profiles/nvidia_tegra_x1.json
       - name: Test Vulkan-ValidationLayers - Max Profile
-        run: python3 scripts/github_ci_win_linux.py --test --config release
+        run: python3 scripts/github_ci_win_linux.py --test
         env:
-          VK_KHRONOS_PROFILES_PROFILE_FILE: tests/device_profiles/max_profile.json
-
-  linux-cpp20:
-    runs-on: ubuntu-20.04
-    strategy:
-      fail-fast: false
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-          python-version: '3.8'
-      - uses: lukka/get-cmake@latest
-      - name: Install build dependencies
-        run: |
-          python3 -m pip install jsonschema pyparsing
-          sudo apt-get -qq update
-          sudo apt-get install -y libxkbcommon-dev libwayland-dev libmirclient-dev libxrandr-dev \
-                                libx11-xcb-dev libxcb-keysyms1 libxcb-keysyms1-dev libxcb-ewmh-dev \
-                                libxcb-randr0-dev
-      - name: Setup ccache
-        uses: hendrikmuhs/ccache-action@v1.2
-        with:
-          key: ${{ runner.os }}-release-cpp20
-      # Turn on ccache this way, which is easier than figuring out how to turn it on for all deps
-      # PATH changes need to be done in an action before any action that needs it
-      - name: Add ccache to PATH
-        run: echo "/usr/lib/ccache" >> $GITHUB_PATH
-      - name: Set PYTHONPATH
-        run: echo "PYTHONPATH=$GITHUB_WORKSPACE/external/release/Vulkan-Headers/build/install/share/vulkan/registry:$PYTHONPATH" >> $GITHUB_ENV
-      - name: Build Vulkan-ValidationLayers
-        run: python3 scripts/github_ci_win_linux.py --build --config release --cmake='-DVVL_CPP_STANDARD=20 -DVVL_ENABLE_ASAN=ON'
-        env:
-          CC: clang
-          CXX: clang++
-      - name: Test Vulkan-ValidationLayers - Pixel 6 Adreno profile
-        run: python3 scripts/github_ci_win_linux.py --test --config release --cmake='-DVVL_CPP_STANDARD=20'
-        env:
-          VK_KHRONOS_PROFILES_PROFILE_FILE: tests/device_profiles/pixel_6_adreno.json
-      - name: Test Vulkan-ValidationLayers - Pixel 6 Mali profile
-        run: python3 scripts/github_ci_win_linux.py --test --config release --cmake='-DVVL_CPP_STANDARD=20'
-        env:
-          VK_KHRONOS_PROFILES_PROFILE_FILE: tests/device_profiles/pixel_6_mali.json
-      - name: Test Vulkan-ValidationLayers - NVIDIA Tegra X1 profile
-        run: python3 scripts/github_ci_win_linux.py --test --config release --cmake='-DVVL_CPP_STANDARD=20'
-        env:
-          VK_KHRONOS_PROFILES_PROFILE_FILE: tests/device_profiles/nvidia_tegra_x1.json
-      - name: Test Vulkan-ValidationLayers - Max Profile
-        run: python3 scripts/github_ci_win_linux.py --test --config release --cmake='-DVVL_CPP_STANDARD=20'
-        env:
-          VK_KHRONOS_PROFILES_PROFILE_FILE: tests/device_profiles/max_profile.json
+          VK_KHRONOS_PROFILES_PROFILE_FILE: ${{ github.workspace }}/tests/device_profiles/max_profile.json
 
   gn:
     runs-on: ubuntu-22.04
-    strategy:
-      fail-fast: false
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
-          python-version: '3.8'
-      - name: Cache dependent components
-        # Speed up builds by caching the build/install artifacts so they can be retrieved without rebuilding.
-        # Note: Normally the build/install artifacts are enough to satisfy the dependencies.
-        #       But in this repo, there are extra tests and steps that require files that are not placed in build/install.
-        #       When adding new similar tests, make sure to add any other required directories/files to the cache list.
-        id: cache-deps
-        uses: actions/cache@v3
-        env:
-          cache-name: cache-gn
-        with:
-          path: |
-            buildtools/
-            depot_tools/
-            testing/
-            tools/
-            third_party/
-          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashfiles('scripts/known_good.json') }}
+          python-version: '3.10'
       - name: Install build dependencies
         run: |
           sudo apt-get -qq update
-          sudo apt-get install -y libxkbcommon-dev libwayland-dev libxrandr-dev \
-                                  libx11-xcb-dev libxcb-keysyms1 libxcb-keysyms1-dev libxcb-ewmh-dev \
-                                  libxcb-randr0-dev
+          sudo apt-get install -y libwayland-dev xorg-dev
       - name: Build Vulkan-ValidationLayers Using Ninja
         run: python3 scripts/github_ci_gn.py
 
@@ -183,20 +134,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [ x64, Win32 ]
+        arch: [ amd64, amd64_x86 ] # 64 bit compiler, 64 bit compiler targeting 32 bit
         config: [ debug, release ]
         os: [ windows-latest ]
-        exclude:
-          - arch: Win32
-            config: release
-          - arch: x64
-            config: debug
 
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
-          python-version: '3.8'
+          python-version: '3.10'
       - uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: ${{ matrix.arch }}
@@ -204,14 +150,8 @@ jobs:
         run: |
           python3 -m pip install jsonschema pyparsing
       - name: Cache dependent components
-        # Speed up builds by caching the build/install artifacts so they can be retrieved without rebuilding.
-        # Note: Normally the build/install artifacts are enough to satisfy the dependencies.
-        #       But in this repo, there are extra tests and steps that require files that are not placed in build/install.
-        #       When adding new similar tests, make sure to add any other required directories/files to the cache list.
         id: cache-deps
         uses: actions/cache@v3
-        env:
-          cache-name: cache-windows
         with:
           path: |
             external/${{ matrix.config }}/glslang/build/install
@@ -223,133 +163,132 @@ jobs:
             external/${{ matrix.config }}/Vulkan-Headers/registry
             external/${{ matrix.config }}/SPIRV-Headers/include
             external/${{ matrix.config }}/mimalloc/build/install
-          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ matrix.arch }}-${{ matrix.os }}-${{ matrix.config }}-${{ hashfiles('scripts/known_good.json') }}
-      - name: Set PYTHONPATH
-        run: echo "PYTHONPATH=$env:GITHUB_WORKSPACE\\external\\${{ matrix.config }}\\Vulkan-Headers\\registry;$env:PYTHONPATH" >> $env:GITHUB_ENV
-      - name: Build and Test Vulkan-ValidationLayers
-        run: |
-          echo "PYTHONPATH = $env:PYTHONPATH"
-          python3 scripts/github_ci_build_desktop.py --config ${{ matrix.config }} --cmake='-DUPDATE_DEPS_SKIP_EXISTING_INSTALL=ON'
+          key: ${{ matrix.os }}-build-${{ matrix.arch }}-${{ matrix.os }}-${{ matrix.config }}-${{ hashfiles('scripts/known_good.json') }}
+      - name: Build
+        run: python3 scripts/github_ci_win_linux.py --build --config ${{ matrix.config }} --cmake='-DUPDATE_DEPS_SKIP_EXISTING_INSTALL=ON'
+      - name: Test Vulkan-ValidationLayers - Max Profile
+        run: python scripts/github_ci_win_linux.py --test
 
-  android:
-      runs-on: ubuntu-20.04
+  android_cmake:
+      runs-on: ubuntu-22.04
       strategy:
-        fail-fast: false
         matrix:
-          abi: [ arm64-v8a, armeabi-v7a ]
+          abi: [ arm64-v8a ]
+          build_tests: [ "ON" ]
+          stl_type: ["c++_shared"]
+          include:
+          - abi: armeabi-v7a
+            build_tests: "OFF"
+            stl_type: c++_static
 
       steps:
         - uses: actions/checkout@v3
-        - uses: actions/setup-python@v4
+        - uses: lukka/get-cmake@latest
+        - name: Setup ccache
+          uses: hendrikmuhs/ccache-action@v1.2
           with:
-            python-version: '3.8'
-        - name: Build ValidationLayers
-          run: python3 scripts/github_ci_android.py --abi ${{ matrix.abi }}
+            key: android-${{ matrix.abi }}-${{ matrix.build_tests }}-${{ matrix.stl_type }}
+        - name: Configure
+          run: |
+            cmake -S . -B build/ --toolchain $ANDROID_NDK_ROOT/build/cmake/android.toolchain.cmake \
+            -D ANDROID_PLATFORM=26 \
+            -D CMAKE_ANDROID_ARCH_ABI=${{ matrix.abi }} \
+            -D CMAKE_ANDROID_STL_TYPE=${{ matrix.stl_type }} \
+            -D CMAKE_ANDROID_RTTI=YES \
+            -D CMAKE_ANDROID_EXCEPTIONS=YES \
+            -D ANDROID_USE_LEGACY_TOOLCHAIN_FILE=NO \
+            -D CMAKE_BUILD_TYPE=Debug \
+            -D BUILD_TESTS=${{ matrix.build_tests }} \
+            -D UPDATE_DEPS=ON \
+            -D BUILD_WERROR=ON \
+            -G "Ninja"
+          env:
+            CMAKE_C_COMPILER_LAUNCHER: ccache
+            CMAKE_CXX_COMPILER_LAUNCHER: ccache
+        - name: Build
+          run: cmake --build build/
+        - name: Test
+          if: matrix.build_tests == 'ON'
+          working-directory: ./build
+          run: ctest --output-on-failure -C Debug
 
-  macos-12:
-    runs-on: macos-12
+  macos:
+    runs-on: macos-latest
     strategy:
-      fail-fast: false
       matrix:
-        config: [Debug, Release]
+        macos_version: ["min","latest"]
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
-          python-version: '3.8'
-      - uses: lukka/get-cmake@latest
-      - name: Cache dependent components
-        # Speed up builds by caching the build/install artifacts so they can be retrieved without rebuilding.
-        # Note: Normally the build/install artifacts are enough to satisfy the dependencies.
-        #       But in this repo, there are extra tests and steps that require files that are not placed in build/install.
-        #       When adding new similar tests, make sure to add any other required directories/files to the cache list.
-        id: cache-deps
-        uses: actions/cache@v3
-        env:
-          cache-name: cache-macos-12-xcode
-        with:
-          path: |
-            external/${{ matrix.config }}/glslang/build/install
-            external/${{ matrix.config }}/Vulkan-Headers/build/install
-            external/${{ matrix.config }}/SPIRV-Headers/build/install
-            external/${{ matrix.config }}/SPIRV-Tools/build/install
-            external/${{ matrix.config }}/robin-hood-hashing/build/install
-            external/${{ matrix.config }}/googletest/build/install
-            external/${{ matrix.config }}/Vulkan-Headers/registry
-            external/${{ matrix.config }}/SPIRV-Headers/include
-          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ matrix.config }}-${{ hashfiles('scripts/known_good.json') }}
-      - name: Generate build files and dependencies
-        run: cmake -S. -B build --preset dev -DCMAKE_BUILD_TYPE=${{matrix.config}} -DUPDATE_DEPS_SKIP_EXISTING_INSTALL=ON -G "Xcode"
-        env:
-          # Ensure we can build against 10.15: https://cmake.org/cmake/help/latest/envvar/MACOSX_DEPLOYMENT_TARGET.html
-          MACOSX_DEPLOYMENT_TARGET: 10.15
-      - name: Build Vulkan-ValidationLayers
-        run: cmake --build build --parallel $(sysctl -n hw.logicalcpu) --config ${{matrix.config}}
-      - name: Install Vulkan-ValidationLayers
-        run: cmake --install build --prefix build/install --config ${{matrix.config}}
-
-  macos-11:
-    runs-on: macos-11
-    strategy:
-      fail-fast: false
-      matrix:
-        config: [Debug, Release]
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-          python-version: '3.8'
+          python-version: '3.10'
       - uses: lukka/get-cmake@latest
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1.2
         with:
-          key: ${{ runner.os }}-macOS11-${{ matrix.config }}
-      # Turn on ccache this way, which is easier than figuring out how to turn it on for all deps
-      # PATH changes need to be done in an action before any action that needs it
-      - name: Add ccache to PATH
-        run: echo "/usr/lib/ccache:/usr/local/opt/ccache/libexec" >> $GITHUB_PATH
-      - name: Generate build files and dependencies
-        run: cmake -S. -B build --preset dev -DCMAKE_BUILD_TYPE=${{matrix.config}} -G "Ninja"
-      - name: Build Vulkan-ValidationLayers
-        run: cmake --build build --parallel $(sysctl -n hw.logicalcpu) --config ${{matrix.config}}
-      - name: Install Vulkan-ValidationLayers
-        run: cmake --install build --prefix build/install --config ${{matrix.config}}
+          key: macos-${{ matrix.macos_version }}
+      - name: Install python dependencies
+        run: python3 -m pip install jsonschema pyparsing
+      - name: Build
+        run: python3 scripts/github_ci_build_desktop.py --config release --osx ${{ matrix.macos_version }}
+        env:
+          CMAKE_C_COMPILER_LAUNCHER: ccache
+          CMAKE_CXX_COMPILER_LAUNCHER: ccache
 
   mingw:
     runs-on: windows-latest
     defaults:
       run:
         shell: bash
-    strategy:
-      fail-fast: false
     steps:
       - uses: actions/checkout@v3
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: mingw-ccache
       - uses: actions/setup-python@v4
         with:
-          python-version: '3.8'
-      - name: Cache dependent components
-        id: cache-deps
-        uses: actions/cache@v3
-        with:
-          path: |
-            external/Debug/glslang/build/install
-            external/Debug/Vulkan-Headers/build/install
-            external/Debug/SPIRV-Headers/build/install
-            external/Debug/SPIRV-Tools/build/install
-            external/Debug/robin-hood-hashing/build/install
-            external/Debug/googletest/build/install
-            external/Debug/Vulkan-Headers/registry
-            external/Debug/SPIRV-Headers/include
-            external/Debug/mimalloc/build/install
-          key: mingw-Debug-${{ hashfiles('scripts/known_good.json') }}
+          python-version: '3.10'
       - uses: lukka/get-cmake@latest
       - name: GCC Version
         run: gcc --version # If this fails MINGW is not setup correctly
       - name: Configure
-        run: cmake -S. -B build -D BUILD_WERROR=ON -D UPDATE_DEPS=ON -D CMAKE_BUILD_TYPE=Debug -D UPDATE_DEPS_SKIP_EXISTING_INSTALL=ON -G "Ninja"
+        run: cmake -S. -B build -D BUILD_WERROR=ON -D UPDATE_DEPS=ON -D CMAKE_BUILD_TYPE=Release
         env:
-          LDFLAGS: "-fuse-ld=lld" # MINGW linking is very slow. Use llvm linker instead.
+          LDFLAGS: -fuse-ld=lld # MINGW linking is very slow. Use llvm linker instead.
+          CMAKE_C_COMPILER_LAUNCHER: ccache
+          CMAKE_CXX_COMPILER_LAUNCHER: ccache
+          CMAKE_GENERATOR: Ninja
       - name: Build
-        run: cmake --build build
+        run: cmake --build build -- --quiet
       - name: Install
         run: cmake --install build --prefix build/install
+      - name: MinGW ccache stats # The Post Setup ccache doesn't work right on MinGW
+        run: ccache --show-stats
+
+  # Test to ensure we don't accidentally break the SDK, LunarG/VulkanTools, or Vulkan-Profiles
+  # If we do intentionally want to break them, we just need to update the integration test code to account for that.
+  integration_test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      - uses: lukka/get-cmake@latest
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: integration_test_ccache
+      - name: Install WSI dependencies
+        run: |
+          sudo apt-get -qq update
+          sudo apt-get install -y libwayland-dev xorg-dev
+      - name: Configure Integration Test
+        run: cmake -S tests/integration -B tests/integration/build
+        env:
+          CMAKE_C_COMPILER_LAUNCHER: ccache
+          CMAKE_CXX_COMPILER_LAUNCHER: ccache
+          CMAKE_GENERATOR: Ninja
+      - name: Build Integration Test
+        run: cmake --build tests/integration/build

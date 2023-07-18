@@ -1,59 +1,57 @@
 // *** THIS FILE IS GENERATED - DO NOT EDIT ***
 // See object_tracker_generator.py for modifications
 
-
 /***************************************************************************
- *
- * Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (c) 2015-2023 Google Inc.
- * Copyright (c) 2023-2023 RasterGrid Kft.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- ****************************************************************************/
+*
+* Copyright (c) 2015-2023 The Khronos Group Inc.
+* Copyright (c) 2015-2023 Valve Corporation
+* Copyright (c) 2015-2023 LunarG, Inc.
+* Copyright (c) 2015-2023 Google Inc.
+* Copyright (c) 2015-2023 RasterGrid Kft.
+*
+* Licensed under the Apache License, Version 2.0 (the "License");
+* you may not use this file except in compliance with the License.
+* You may obtain a copy of the License at
+*
+*     http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+****************************************************************************/
 
+// NOLINTBEGIN
 
 #include "chassis.h"
 #include "object_tracker/object_lifetime_validation.h"
-
 ReadLockGuard ObjectLifetimes::ReadLock() const { return ReadLockGuard(validation_object_mutex, std::defer_lock); }
 WriteLockGuard ObjectLifetimes::WriteLock() { return WriteLockGuard(validation_object_mutex, std::defer_lock); }
-
-
 
 // ObjectTracker undestroyed objects validation function
 bool ObjectLifetimes::ReportUndestroyedInstanceObjects(VkInstance instance) const {
     bool skip = false;
     const std::string error_code = "VUID-vkDestroyInstance-instance-00629";
     skip |= ReportLeakedInstanceObjects(instance, kVulkanObjectTypeSurfaceKHR, error_code);
-    // No destroy API -- do not report: skip |= ReportLeakedInstanceObjects(instance, kVulkanObjectTypeDisplayKHR, error_code);
-    // No destroy API -- do not report: skip |= ReportLeakedInstanceObjects(instance, kVulkanObjectTypeDisplayModeKHR, error_code);
+    // No destroy API or implicitly freed/destroyed -- do not report: skip |= ReportLeakedInstanceObjects(instance, kVulkanObjectTypeDisplayKHR, error_code);
+    skip |= ReportLeakedInstanceObjects(instance, kVulkanObjectTypeDisplayModeKHR, error_code);
     skip |= ReportLeakedInstanceObjects(instance, kVulkanObjectTypeDebugReportCallbackEXT, error_code);
     skip |= ReportLeakedInstanceObjects(instance, kVulkanObjectTypeDebugUtilsMessengerEXT, error_code);
     return skip;
 }
+
 bool ObjectLifetimes::ReportUndestroyedDeviceObjects(VkDevice device) const {
     bool skip = false;
     const std::string error_code = "VUID-vkDestroyDevice-device-05137";
-    // Implicitly freed/destroyed -- do not report: skip |= ReportLeakedDeviceObjects(device, kVulkanObjectTypeCommandBuffer, error_code);
+    // No destroy API or implicitly freed/destroyed -- do not report: skip |= ReportLeakedDeviceObjects(device, kVulkanObjectTypeCommandBuffer, error_code);
     skip |= ReportLeakedDeviceObjects(device, kVulkanObjectTypeBuffer, error_code);
     skip |= ReportLeakedDeviceObjects(device, kVulkanObjectTypeImage, error_code);
     skip |= ReportLeakedDeviceObjects(device, kVulkanObjectTypeSemaphore, error_code);
     skip |= ReportLeakedDeviceObjects(device, kVulkanObjectTypeFence, error_code);
-    // Implicitly freed/destroyed -- do not report: skip |= ReportLeakedDeviceObjects(device, kVulkanObjectTypeDeviceMemory, error_code);
+    // No destroy API or implicitly freed/destroyed -- do not report: skip |= ReportLeakedDeviceObjects(device, kVulkanObjectTypeDeviceMemory, error_code);
     skip |= ReportLeakedDeviceObjects(device, kVulkanObjectTypeEvent, error_code);
-    // Implicitly freed/destroyed -- do not report: skip |= ReportLeakedDeviceObjects(device, kVulkanObjectTypeQueryPool, error_code);
+    // No destroy API or implicitly freed/destroyed -- do not report: skip |= ReportLeakedDeviceObjects(device, kVulkanObjectTypeQueryPool, error_code);
     skip |= ReportLeakedDeviceObjects(device, kVulkanObjectTypeBufferView, error_code);
     skip |= ReportLeakedDeviceObjects(device, kVulkanObjectTypeImageView, error_code);
     skip |= ReportLeakedDeviceObjects(device, kVulkanObjectTypeShaderModule, error_code);
@@ -63,14 +61,14 @@ bool ObjectLifetimes::ReportUndestroyedDeviceObjects(VkDevice device) const {
     skip |= ReportLeakedDeviceObjects(device, kVulkanObjectTypeRenderPass, error_code);
     skip |= ReportLeakedDeviceObjects(device, kVulkanObjectTypeDescriptorSetLayout, error_code);
     skip |= ReportLeakedDeviceObjects(device, kVulkanObjectTypeSampler, error_code);
-    // Implicitly freed/destroyed -- do not report: skip |= ReportLeakedDeviceObjects(device, kVulkanObjectTypeDescriptorSet, error_code);
-    // Implicitly freed/destroyed -- do not report: skip |= ReportLeakedDeviceObjects(device, kVulkanObjectTypeDescriptorPool, error_code);
+    // No destroy API or implicitly freed/destroyed -- do not report: skip |= ReportLeakedDeviceObjects(device, kVulkanObjectTypeDescriptorSet, error_code);
+    // No destroy API or implicitly freed/destroyed -- do not report: skip |= ReportLeakedDeviceObjects(device, kVulkanObjectTypeDescriptorPool, error_code);
     skip |= ReportLeakedDeviceObjects(device, kVulkanObjectTypeFramebuffer, error_code);
-    // Implicitly freed/destroyed -- do not report: skip |= ReportLeakedDeviceObjects(device, kVulkanObjectTypeCommandPool, error_code);
+    // No destroy API or implicitly freed/destroyed -- do not report: skip |= ReportLeakedDeviceObjects(device, kVulkanObjectTypeCommandPool, error_code);
     skip |= ReportLeakedDeviceObjects(device, kVulkanObjectTypeSamplerYcbcrConversion, error_code);
     skip |= ReportLeakedDeviceObjects(device, kVulkanObjectTypeDescriptorUpdateTemplate, error_code);
     skip |= ReportLeakedDeviceObjects(device, kVulkanObjectTypePrivateDataSlot, error_code);
-    // Implicitly freed/destroyed -- do not report: skip |= ReportLeakedDeviceObjects(device, kVulkanObjectTypeSwapchainKHR, error_code);
+    skip |= ReportLeakedDeviceObjects(device, kVulkanObjectTypeSwapchainKHR, error_code);
     skip |= ReportLeakedDeviceObjects(device, kVulkanObjectTypeVideoSessionKHR, error_code);
     skip |= ReportLeakedDeviceObjects(device, kVulkanObjectTypeVideoSessionParametersKHR, error_code);
     skip |= ReportLeakedDeviceObjects(device, kVulkanObjectTypeDeferredOperationKHR, error_code);
@@ -84,7 +82,8 @@ bool ObjectLifetimes::ReportUndestroyedDeviceObjects(VkDevice device) const {
     skip |= ReportLeakedDeviceObjects(device, kVulkanObjectTypeBufferCollectionFUCHSIA, error_code);
     skip |= ReportLeakedDeviceObjects(device, kVulkanObjectTypeMicromapEXT, error_code);
     skip |= ReportLeakedDeviceObjects(device, kVulkanObjectTypeOpticalFlowSessionNV, error_code);
-    // Implicitly freed/destroyed -- do not report: skip |= ReportLeakedDeviceObjects(device, kVulkanObjectTypeSemaphoreSciSyncPoolNV, error_code);
+    skip |= ReportLeakedDeviceObjects(device, kVulkanObjectTypeShaderEXT, error_code);
+    // No destroy API or implicitly freed/destroyed -- do not report: skip |= ReportLeakedDeviceObjects(device, kVulkanObjectTypeSemaphoreSciSyncPoolNV, error_code);
     return skip;
 }
 
@@ -95,6 +94,7 @@ void ObjectLifetimes::DestroyLeakedInstanceObjects() {
     DestroyUndestroyedObjects(kVulkanObjectTypeDebugReportCallbackEXT);
     DestroyUndestroyedObjects(kVulkanObjectTypeDebugUtilsMessengerEXT);
 }
+
 void ObjectLifetimes::DestroyLeakedDeviceObjects() {
     DestroyUndestroyedObjects(kVulkanObjectTypeCommandBuffer);
     DestroyUndestroyedObjects(kVulkanObjectTypeBuffer);
@@ -134,16 +134,15 @@ void ObjectLifetimes::DestroyLeakedDeviceObjects() {
     DestroyUndestroyedObjects(kVulkanObjectTypeBufferCollectionFUCHSIA);
     DestroyUndestroyedObjects(kVulkanObjectTypeMicromapEXT);
     DestroyUndestroyedObjects(kVulkanObjectTypeOpticalFlowSessionNV);
+    DestroyUndestroyedObjects(kVulkanObjectTypeShaderEXT);
     DestroyUndestroyedObjects(kVulkanObjectTypeSemaphoreSciSyncPoolNV);
 }
-
-
 
 bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceFeatures(
     VkPhysicalDevice                            physicalDevice,
     VkPhysicalDeviceFeatures*                   pFeatures) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceFeatures-physicalDevice-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceFeatures-physicalDevice-parameter", kVUIDUndefined, "vkGetPhysicalDeviceFeatures");
 
     return skip;
 }
@@ -153,7 +152,7 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceFormatProperties(
     VkFormat                                    format,
     VkFormatProperties*                         pFormatProperties) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceFormatProperties-physicalDevice-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceFormatProperties-physicalDevice-parameter", kVUIDUndefined, "vkGetPhysicalDeviceFormatProperties");
 
     return skip;
 }
@@ -167,7 +166,7 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceImageFormatProperties(
     VkImageCreateFlags                          flags,
     VkImageFormatProperties*                    pImageFormatProperties) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceImageFormatProperties-physicalDevice-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceImageFormatProperties-physicalDevice-parameter", kVUIDUndefined, "vkGetPhysicalDeviceImageFormatProperties");
 
     return skip;
 }
@@ -176,7 +175,7 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceProperties(
     VkPhysicalDevice                            physicalDevice,
     VkPhysicalDeviceProperties*                 pProperties) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceProperties-physicalDevice-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceProperties-physicalDevice-parameter", kVUIDUndefined, "vkGetPhysicalDeviceProperties");
 
     return skip;
 }
@@ -185,7 +184,7 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceMemoryProperties(
     VkPhysicalDevice                            physicalDevice,
     VkPhysicalDeviceMemoryProperties*           pMemoryProperties) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceMemoryProperties-physicalDevice-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceMemoryProperties-physicalDevice-parameter", kVUIDUndefined, "vkGetPhysicalDeviceMemoryProperties");
 
     return skip;
 }
@@ -194,7 +193,7 @@ bool ObjectLifetimes::PreCallValidateGetInstanceProcAddr(
     VkInstance                                  instance,
     const char*                                 pName) const {
     bool skip = false;
-    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, true, "VUID-vkGetInstanceProcAddr-instance-parameter", kVUIDUndefined);
+    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, true, "VUID-vkGetInstanceProcAddr-instance-parameter", kVUIDUndefined, "vkGetInstanceProcAddr");
 
     return skip;
 }
@@ -203,7 +202,7 @@ bool ObjectLifetimes::PreCallValidateGetDeviceProcAddr(
     VkDevice                                    device,
     const char*                                 pName) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetDeviceProcAddr-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetDeviceProcAddr-device-parameter", kVUIDUndefined, "vkGetDeviceProcAddr");
 
     return skip;
 }
@@ -214,7 +213,7 @@ bool ObjectLifetimes::PreCallValidateEnumerateDeviceExtensionProperties(
     uint32_t*                                   pPropertyCount,
     VkExtensionProperties*                      pProperties) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkEnumerateDeviceExtensionProperties-physicalDevice-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkEnumerateDeviceExtensionProperties-physicalDevice-parameter", kVUIDUndefined, "vkEnumerateDeviceExtensionProperties");
 
     return skip;
 }
@@ -224,7 +223,7 @@ bool ObjectLifetimes::PreCallValidateEnumerateDeviceLayerProperties(
     uint32_t*                                   pPropertyCount,
     VkLayerProperties*                          pProperties) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkEnumerateDeviceLayerProperties-physicalDevice-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkEnumerateDeviceLayerProperties-physicalDevice-parameter", kVUIDUndefined, "vkEnumerateDeviceLayerProperties");
 
     return skip;
 }
@@ -235,27 +234,27 @@ bool ObjectLifetimes::PreCallValidateQueueSubmit(
     const VkSubmitInfo*                         pSubmits,
     VkFence                                     fence) const {
     bool skip = false;
-    skip |= ValidateObject(queue, kVulkanObjectTypeQueue, false, "VUID-vkQueueSubmit-queue-parameter", "VUID-vkQueueSubmit-commonparent");
+    skip |= ValidateObject(queue, kVulkanObjectTypeQueue, false, "VUID-vkQueueSubmit-queue-parameter", "VUID-vkQueueSubmit-commonparent", "vkQueueSubmit");
     if (pSubmits) {
         for (uint32_t index0 = 0; index0 < submitCount; ++index0) {
             if ((pSubmits[index0].waitSemaphoreCount > 0) && (pSubmits[index0].pWaitSemaphores)) {
                 for (uint32_t index1 = 0; index1 < pSubmits[index0].waitSemaphoreCount; ++index1) {
-                    skip |= ValidateObject(pSubmits[index0].pWaitSemaphores[index1], kVulkanObjectTypeSemaphore, false, "VUID-VkSubmitInfo-pWaitSemaphores-parameter", "VUID-VkSubmitInfo-commonparent");
+                    skip |= ValidateObject(pSubmits[index0].pWaitSemaphores[index1], kVulkanObjectTypeSemaphore, false, "VUID-VkSubmitInfo-pWaitSemaphores-parameter", "VUID-VkSubmitInfo-commonparent", "VkSubmitInfo");
                 }
             }
             if ((pSubmits[index0].commandBufferCount > 0) && (pSubmits[index0].pCommandBuffers)) {
                 for (uint32_t index1 = 0; index1 < pSubmits[index0].commandBufferCount; ++index1) {
-                    skip |= ValidateObject(pSubmits[index0].pCommandBuffers[index1], kVulkanObjectTypeCommandBuffer, false, "VUID-VkSubmitInfo-pCommandBuffers-parameter", "VUID-VkSubmitInfo-commonparent");
+                    skip |= ValidateObject(pSubmits[index0].pCommandBuffers[index1], kVulkanObjectTypeCommandBuffer, false, "VUID-VkSubmitInfo-pCommandBuffers-parameter", "VUID-VkSubmitInfo-commonparent", "VkSubmitInfo");
                 }
             }
             if ((pSubmits[index0].signalSemaphoreCount > 0) && (pSubmits[index0].pSignalSemaphores)) {
                 for (uint32_t index1 = 0; index1 < pSubmits[index0].signalSemaphoreCount; ++index1) {
-                    skip |= ValidateObject(pSubmits[index0].pSignalSemaphores[index1], kVulkanObjectTypeSemaphore, false, "VUID-VkSubmitInfo-pSignalSemaphores-parameter", "VUID-VkSubmitInfo-commonparent");
+                    skip |= ValidateObject(pSubmits[index0].pSignalSemaphores[index1], kVulkanObjectTypeSemaphore, false, "VUID-VkSubmitInfo-pSignalSemaphores-parameter", "VUID-VkSubmitInfo-commonparent", "VkSubmitInfo");
                 }
             }
         }
     }
-    skip |= ValidateObject(fence, kVulkanObjectTypeFence, true, "VUID-vkQueueSubmit-fence-parameter", "VUID-vkQueueSubmit-commonparent");
+    skip |= ValidateObject(fence, kVulkanObjectTypeFence, true, "VUID-vkQueueSubmit-fence-parameter", "VUID-vkQueueSubmit-commonparent", "vkQueueSubmit");
 
     return skip;
 }
@@ -263,7 +262,7 @@ bool ObjectLifetimes::PreCallValidateQueueSubmit(
 bool ObjectLifetimes::PreCallValidateQueueWaitIdle(
     VkQueue                                     queue) const {
     bool skip = false;
-    skip |= ValidateObject(queue, kVulkanObjectTypeQueue, false, "VUID-vkQueueWaitIdle-queue-parameter", kVUIDUndefined);
+    skip |= ValidateObject(queue, kVulkanObjectTypeQueue, false, "VUID-vkQueueWaitIdle-queue-parameter", kVUIDUndefined, "vkQueueWaitIdle");
 
     return skip;
 }
@@ -271,7 +270,7 @@ bool ObjectLifetimes::PreCallValidateQueueWaitIdle(
 bool ObjectLifetimes::PreCallValidateDeviceWaitIdle(
     VkDevice                                    device) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkDeviceWaitIdle-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkDeviceWaitIdle-device-parameter", kVUIDUndefined, "vkDeviceWaitIdle");
 
     return skip;
 }
@@ -282,7 +281,7 @@ bool ObjectLifetimes::PreCallValidateAllocateMemory(
     const VkAllocationCallbacks*                pAllocator,
     VkDeviceMemory*                             pMemory) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkAllocateMemory-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkAllocateMemory-device-parameter", kVUIDUndefined, "vkAllocateMemory");
 
     return skip;
 }
@@ -303,8 +302,8 @@ bool ObjectLifetimes::PreCallValidateFreeMemory(
     VkDeviceMemory                              memory,
     const VkAllocationCallbacks*                pAllocator) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(memory, kVulkanObjectTypeDeviceMemory, true, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkFreeMemory");
+    skip |= ValidateObject(memory, kVulkanObjectTypeDeviceMemory, true, kVUIDUndefined, kVUIDUndefined, "vkFreeMemory");
     skip |= ValidateDestroyObject(memory, kVulkanObjectTypeDeviceMemory, pAllocator, kVUIDUndefined, kVUIDUndefined);
 
     return skip;
@@ -326,8 +325,8 @@ bool ObjectLifetimes::PreCallValidateMapMemory(
     VkMemoryMapFlags                            flags,
     void**                                      ppData) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkMapMemory-device-parameter", kVUIDUndefined);
-    skip |= ValidateObject(memory, kVulkanObjectTypeDeviceMemory, false, "VUID-vkMapMemory-memory-parameter", "VUID-vkMapMemory-memory-parent");
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkMapMemory-device-parameter", kVUIDUndefined, "vkMapMemory");
+    skip |= ValidateObject(memory, kVulkanObjectTypeDeviceMemory, false, "VUID-vkMapMemory-memory-parameter", "VUID-vkMapMemory-memory-parent", "vkMapMemory");
 
     return skip;
 }
@@ -336,8 +335,8 @@ bool ObjectLifetimes::PreCallValidateUnmapMemory(
     VkDevice                                    device,
     VkDeviceMemory                              memory) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkUnmapMemory-device-parameter", kVUIDUndefined);
-    skip |= ValidateObject(memory, kVulkanObjectTypeDeviceMemory, false, "VUID-vkUnmapMemory-memory-parameter", "VUID-vkUnmapMemory-memory-parent");
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkUnmapMemory-device-parameter", kVUIDUndefined, "vkUnmapMemory");
+    skip |= ValidateObject(memory, kVulkanObjectTypeDeviceMemory, false, "VUID-vkUnmapMemory-memory-parameter", "VUID-vkUnmapMemory-memory-parent", "vkUnmapMemory");
 
     return skip;
 }
@@ -347,10 +346,10 @@ bool ObjectLifetimes::PreCallValidateFlushMappedMemoryRanges(
     uint32_t                                    memoryRangeCount,
     const VkMappedMemoryRange*                  pMemoryRanges) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkFlushMappedMemoryRanges-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkFlushMappedMemoryRanges-device-parameter", kVUIDUndefined, "vkFlushMappedMemoryRanges");
     if (pMemoryRanges) {
         for (uint32_t index0 = 0; index0 < memoryRangeCount; ++index0) {
-            skip |= ValidateObject(pMemoryRanges[index0].memory, kVulkanObjectTypeDeviceMemory, false, "VUID-VkMappedMemoryRange-memory-parameter", kVUIDUndefined);
+            skip |= ValidateObject(pMemoryRanges[index0].memory, kVulkanObjectTypeDeviceMemory, false, "VUID-VkMappedMemoryRange-memory-parameter", kVUIDUndefined, "VkMappedMemoryRange");
         }
     }
 
@@ -362,10 +361,10 @@ bool ObjectLifetimes::PreCallValidateInvalidateMappedMemoryRanges(
     uint32_t                                    memoryRangeCount,
     const VkMappedMemoryRange*                  pMemoryRanges) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkInvalidateMappedMemoryRanges-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkInvalidateMappedMemoryRanges-device-parameter", kVUIDUndefined, "vkInvalidateMappedMemoryRanges");
     if (pMemoryRanges) {
         for (uint32_t index0 = 0; index0 < memoryRangeCount; ++index0) {
-            skip |= ValidateObject(pMemoryRanges[index0].memory, kVulkanObjectTypeDeviceMemory, false, "VUID-VkMappedMemoryRange-memory-parameter", kVUIDUndefined);
+            skip |= ValidateObject(pMemoryRanges[index0].memory, kVulkanObjectTypeDeviceMemory, false, "VUID-VkMappedMemoryRange-memory-parameter", kVUIDUndefined, "VkMappedMemoryRange");
         }
     }
 
@@ -377,8 +376,8 @@ bool ObjectLifetimes::PreCallValidateGetDeviceMemoryCommitment(
     VkDeviceMemory                              memory,
     VkDeviceSize*                               pCommittedMemoryInBytes) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetDeviceMemoryCommitment-device-parameter", kVUIDUndefined);
-    skip |= ValidateObject(memory, kVulkanObjectTypeDeviceMemory, false, "VUID-vkGetDeviceMemoryCommitment-memory-parameter", "VUID-vkGetDeviceMemoryCommitment-memory-parent");
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetDeviceMemoryCommitment-device-parameter", kVUIDUndefined, "vkGetDeviceMemoryCommitment");
+    skip |= ValidateObject(memory, kVulkanObjectTypeDeviceMemory, false, "VUID-vkGetDeviceMemoryCommitment-memory-parameter", "VUID-vkGetDeviceMemoryCommitment-memory-parent", "vkGetDeviceMemoryCommitment");
 
     return skip;
 }
@@ -389,9 +388,9 @@ bool ObjectLifetimes::PreCallValidateBindBufferMemory(
     VkDeviceMemory                              memory,
     VkDeviceSize                                memoryOffset) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkBindBufferMemory-device-parameter", kVUIDUndefined);
-    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, false, "VUID-vkBindBufferMemory-buffer-parameter", "VUID-vkBindBufferMemory-buffer-parent");
-    skip |= ValidateObject(memory, kVulkanObjectTypeDeviceMemory, false, "VUID-vkBindBufferMemory-memory-parameter", "VUID-vkBindBufferMemory-memory-parent");
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkBindBufferMemory-device-parameter", kVUIDUndefined, "vkBindBufferMemory");
+    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, false, "VUID-vkBindBufferMemory-buffer-parameter", "VUID-vkBindBufferMemory-buffer-parent", "vkBindBufferMemory");
+    skip |= ValidateObject(memory, kVulkanObjectTypeDeviceMemory, false, "VUID-vkBindBufferMemory-memory-parameter", "VUID-vkBindBufferMemory-memory-parent", "vkBindBufferMemory");
 
     return skip;
 }
@@ -402,9 +401,9 @@ bool ObjectLifetimes::PreCallValidateBindImageMemory(
     VkDeviceMemory                              memory,
     VkDeviceSize                                memoryOffset) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkBindImageMemory-device-parameter", kVUIDUndefined);
-    skip |= ValidateObject(image, kVulkanObjectTypeImage, false, "VUID-vkBindImageMemory-image-parameter", "VUID-vkBindImageMemory-image-parent");
-    skip |= ValidateObject(memory, kVulkanObjectTypeDeviceMemory, false, "VUID-vkBindImageMemory-memory-parameter", "VUID-vkBindImageMemory-memory-parent");
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkBindImageMemory-device-parameter", kVUIDUndefined, "vkBindImageMemory");
+    skip |= ValidateObject(image, kVulkanObjectTypeImage, false, "VUID-vkBindImageMemory-image-parameter", "VUID-vkBindImageMemory-image-parent", "vkBindImageMemory");
+    skip |= ValidateObject(memory, kVulkanObjectTypeDeviceMemory, false, "VUID-vkBindImageMemory-memory-parameter", "VUID-vkBindImageMemory-memory-parent", "vkBindImageMemory");
 
     return skip;
 }
@@ -414,8 +413,8 @@ bool ObjectLifetimes::PreCallValidateGetBufferMemoryRequirements(
     VkBuffer                                    buffer,
     VkMemoryRequirements*                       pMemoryRequirements) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetBufferMemoryRequirements-device-parameter", kVUIDUndefined);
-    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, false, "VUID-vkGetBufferMemoryRequirements-buffer-parameter", "VUID-vkGetBufferMemoryRequirements-buffer-parent");
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetBufferMemoryRequirements-device-parameter", kVUIDUndefined, "vkGetBufferMemoryRequirements");
+    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, false, "VUID-vkGetBufferMemoryRequirements-buffer-parameter", "VUID-vkGetBufferMemoryRequirements-buffer-parent", "vkGetBufferMemoryRequirements");
 
     return skip;
 }
@@ -425,8 +424,8 @@ bool ObjectLifetimes::PreCallValidateGetImageMemoryRequirements(
     VkImage                                     image,
     VkMemoryRequirements*                       pMemoryRequirements) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetImageMemoryRequirements-device-parameter", kVUIDUndefined);
-    skip |= ValidateObject(image, kVulkanObjectTypeImage, false, "VUID-vkGetImageMemoryRequirements-image-parameter", "VUID-vkGetImageMemoryRequirements-image-parent");
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetImageMemoryRequirements-device-parameter", kVUIDUndefined, "vkGetImageMemoryRequirements");
+    skip |= ValidateObject(image, kVulkanObjectTypeImage, false, "VUID-vkGetImageMemoryRequirements-image-parameter", "VUID-vkGetImageMemoryRequirements-image-parent", "vkGetImageMemoryRequirements");
 
     return skip;
 }
@@ -437,8 +436,8 @@ bool ObjectLifetimes::PreCallValidateGetImageSparseMemoryRequirements(
     uint32_t*                                   pSparseMemoryRequirementCount,
     VkSparseImageMemoryRequirements*            pSparseMemoryRequirements) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(image, kVulkanObjectTypeImage, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetImageSparseMemoryRequirements");
+    skip |= ValidateObject(image, kVulkanObjectTypeImage, false, kVUIDUndefined, kVUIDUndefined, "vkGetImageSparseMemoryRequirements");
 
     return skip;
 }
@@ -453,7 +452,7 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceSparseImageFormatPropertie
     uint32_t*                                   pPropertyCount,
     VkSparseImageFormatProperties*              pProperties) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetPhysicalDeviceSparseImageFormatProperties");
 
     return skip;
 }
@@ -464,52 +463,52 @@ bool ObjectLifetimes::PreCallValidateQueueBindSparse(
     const VkBindSparseInfo*                     pBindInfo,
     VkFence                                     fence) const {
     bool skip = false;
-    skip |= ValidateObject(queue, kVulkanObjectTypeQueue, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(queue, kVulkanObjectTypeQueue, false, kVUIDUndefined, kVUIDUndefined, "vkQueueBindSparse");
     if (pBindInfo) {
         for (uint32_t index0 = 0; index0 < bindInfoCount; ++index0) {
             if ((pBindInfo[index0].waitSemaphoreCount > 0) && (pBindInfo[index0].pWaitSemaphores)) {
                 for (uint32_t index1 = 0; index1 < pBindInfo[index0].waitSemaphoreCount; ++index1) {
-                    skip |= ValidateObject(pBindInfo[index0].pWaitSemaphores[index1], kVulkanObjectTypeSemaphore, false, kVUIDUndefined, kVUIDUndefined);
+                    skip |= ValidateObject(pBindInfo[index0].pWaitSemaphores[index1], kVulkanObjectTypeSemaphore, false, kVUIDUndefined, kVUIDUndefined, "VkBindSparseInfo");
                 }
             }
             if (pBindInfo[index0].pBufferBinds) {
                 for (uint32_t index1 = 0; index1 < pBindInfo[index0].bufferBindCount; ++index1) {
-                    skip |= ValidateObject(pBindInfo[index0].pBufferBinds[index1].buffer, kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined);
+                    skip |= ValidateObject(pBindInfo[index0].pBufferBinds[index1].buffer, kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined, "VkSparseBufferMemoryBindInfo");
                     if (pBindInfo[index0].pBufferBinds[index1].pBinds) {
                         for (uint32_t index2 = 0; index2 < pBindInfo[index0].pBufferBinds[index1].bindCount; ++index2) {
-                            skip |= ValidateObject(pBindInfo[index0].pBufferBinds[index1].pBinds[index2].memory, kVulkanObjectTypeDeviceMemory, true, kVUIDUndefined, kVUIDUndefined);
+                            skip |= ValidateObject(pBindInfo[index0].pBufferBinds[index1].pBinds[index2].memory, kVulkanObjectTypeDeviceMemory, true, kVUIDUndefined, kVUIDUndefined, "VkSparseMemoryBind");
                         }
                     }
                 }
             }
             if (pBindInfo[index0].pImageOpaqueBinds) {
                 for (uint32_t index1 = 0; index1 < pBindInfo[index0].imageOpaqueBindCount; ++index1) {
-                    skip |= ValidateObject(pBindInfo[index0].pImageOpaqueBinds[index1].image, kVulkanObjectTypeImage, false, kVUIDUndefined, kVUIDUndefined);
+                    skip |= ValidateObject(pBindInfo[index0].pImageOpaqueBinds[index1].image, kVulkanObjectTypeImage, false, kVUIDUndefined, kVUIDUndefined, "VkSparseImageOpaqueMemoryBindInfo");
                     if (pBindInfo[index0].pImageOpaqueBinds[index1].pBinds) {
                         for (uint32_t index2 = 0; index2 < pBindInfo[index0].pImageOpaqueBinds[index1].bindCount; ++index2) {
-                            skip |= ValidateObject(pBindInfo[index0].pImageOpaqueBinds[index1].pBinds[index2].memory, kVulkanObjectTypeDeviceMemory, true, kVUIDUndefined, kVUIDUndefined);
+                            skip |= ValidateObject(pBindInfo[index0].pImageOpaqueBinds[index1].pBinds[index2].memory, kVulkanObjectTypeDeviceMemory, true, kVUIDUndefined, kVUIDUndefined, "VkSparseMemoryBind");
                         }
                     }
                 }
             }
             if (pBindInfo[index0].pImageBinds) {
                 for (uint32_t index1 = 0; index1 < pBindInfo[index0].imageBindCount; ++index1) {
-                    skip |= ValidateObject(pBindInfo[index0].pImageBinds[index1].image, kVulkanObjectTypeImage, false, kVUIDUndefined, kVUIDUndefined);
+                    skip |= ValidateObject(pBindInfo[index0].pImageBinds[index1].image, kVulkanObjectTypeImage, false, kVUIDUndefined, kVUIDUndefined, "VkSparseImageMemoryBindInfo");
                     if (pBindInfo[index0].pImageBinds[index1].pBinds) {
                         for (uint32_t index2 = 0; index2 < pBindInfo[index0].pImageBinds[index1].bindCount; ++index2) {
-                            skip |= ValidateObject(pBindInfo[index0].pImageBinds[index1].pBinds[index2].memory, kVulkanObjectTypeDeviceMemory, true, kVUIDUndefined, kVUIDUndefined);
+                            skip |= ValidateObject(pBindInfo[index0].pImageBinds[index1].pBinds[index2].memory, kVulkanObjectTypeDeviceMemory, true, kVUIDUndefined, kVUIDUndefined, "VkSparseImageMemoryBind");
                         }
                     }
                 }
             }
             if ((pBindInfo[index0].signalSemaphoreCount > 0) && (pBindInfo[index0].pSignalSemaphores)) {
                 for (uint32_t index1 = 0; index1 < pBindInfo[index0].signalSemaphoreCount; ++index1) {
-                    skip |= ValidateObject(pBindInfo[index0].pSignalSemaphores[index1], kVulkanObjectTypeSemaphore, false, kVUIDUndefined, kVUIDUndefined);
+                    skip |= ValidateObject(pBindInfo[index0].pSignalSemaphores[index1], kVulkanObjectTypeSemaphore, false, kVUIDUndefined, kVUIDUndefined, "VkBindSparseInfo");
                 }
             }
         }
     }
-    skip |= ValidateObject(fence, kVulkanObjectTypeFence, true, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(fence, kVulkanObjectTypeFence, true, kVUIDUndefined, kVUIDUndefined, "vkQueueBindSparse");
 
     return skip;
 }
@@ -520,7 +519,7 @@ bool ObjectLifetimes::PreCallValidateCreateFence(
     const VkAllocationCallbacks*                pAllocator,
     VkFence*                                    pFence) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreateFence-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreateFence-device-parameter", kVUIDUndefined, "vkCreateFence");
 
     return skip;
 }
@@ -541,8 +540,8 @@ bool ObjectLifetimes::PreCallValidateDestroyFence(
     VkFence                                     fence,
     const VkAllocationCallbacks*                pAllocator) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkDestroyFence-device-parameter", kVUIDUndefined);
-    skip |= ValidateObject(fence, kVulkanObjectTypeFence, true, "VUID-vkDestroyFence-fence-parameter", "VUID-vkDestroyFence-fence-parent");
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkDestroyFence-device-parameter", kVUIDUndefined, "vkDestroyFence");
+    skip |= ValidateObject(fence, kVulkanObjectTypeFence, true, "VUID-vkDestroyFence-fence-parameter", "VUID-vkDestroyFence-fence-parent", "vkDestroyFence");
     skip |= ValidateDestroyObject(fence, kVulkanObjectTypeFence, pAllocator, kVUIDUndefined, kVUIDUndefined);
 
     return skip;
@@ -561,10 +560,10 @@ bool ObjectLifetimes::PreCallValidateResetFences(
     uint32_t                                    fenceCount,
     const VkFence*                              pFences) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkResetFences-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkResetFences-device-parameter", kVUIDUndefined, "vkResetFences");
     if ((fenceCount > 0) && (pFences)) {
         for (uint32_t index0 = 0; index0 < fenceCount; ++index0) {
-            skip |= ValidateObject(pFences[index0], kVulkanObjectTypeFence, false, "VUID-vkResetFences-pFences-parameter", "VUID-vkResetFences-pFences-parent");
+            skip |= ValidateObject(pFences[index0], kVulkanObjectTypeFence, false, "VUID-vkResetFences-pFences-parameter", "VUID-vkResetFences-pFences-parent", "vkResetFences");
         }
     }
 
@@ -575,8 +574,8 @@ bool ObjectLifetimes::PreCallValidateGetFenceStatus(
     VkDevice                                    device,
     VkFence                                     fence) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetFenceStatus-device-parameter", kVUIDUndefined);
-    skip |= ValidateObject(fence, kVulkanObjectTypeFence, false, "VUID-vkGetFenceStatus-fence-parameter", "VUID-vkGetFenceStatus-fence-parent");
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetFenceStatus-device-parameter", kVUIDUndefined, "vkGetFenceStatus");
+    skip |= ValidateObject(fence, kVulkanObjectTypeFence, false, "VUID-vkGetFenceStatus-fence-parameter", "VUID-vkGetFenceStatus-fence-parent", "vkGetFenceStatus");
 
     return skip;
 }
@@ -588,10 +587,10 @@ bool ObjectLifetimes::PreCallValidateWaitForFences(
     VkBool32                                    waitAll,
     uint64_t                                    timeout) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkWaitForFences-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkWaitForFences-device-parameter", kVUIDUndefined, "vkWaitForFences");
     if ((fenceCount > 0) && (pFences)) {
         for (uint32_t index0 = 0; index0 < fenceCount; ++index0) {
-            skip |= ValidateObject(pFences[index0], kVulkanObjectTypeFence, false, "VUID-vkWaitForFences-pFences-parameter", "VUID-vkWaitForFences-pFences-parent");
+            skip |= ValidateObject(pFences[index0], kVulkanObjectTypeFence, false, "VUID-vkWaitForFences-pFences-parameter", "VUID-vkWaitForFences-pFences-parent", "vkWaitForFences");
         }
     }
 
@@ -604,7 +603,7 @@ bool ObjectLifetimes::PreCallValidateCreateSemaphore(
     const VkAllocationCallbacks*                pAllocator,
     VkSemaphore*                                pSemaphore) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreateSemaphore-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreateSemaphore-device-parameter", kVUIDUndefined, "vkCreateSemaphore");
 
     return skip;
 }
@@ -625,8 +624,8 @@ bool ObjectLifetimes::PreCallValidateDestroySemaphore(
     VkSemaphore                                 semaphore,
     const VkAllocationCallbacks*                pAllocator) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkDestroySemaphore-device-parameter", kVUIDUndefined);
-    skip |= ValidateObject(semaphore, kVulkanObjectTypeSemaphore, true, "VUID-vkDestroySemaphore-semaphore-parameter", "VUID-vkDestroySemaphore-semaphore-parent");
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkDestroySemaphore-device-parameter", kVUIDUndefined, "vkDestroySemaphore");
+    skip |= ValidateObject(semaphore, kVulkanObjectTypeSemaphore, true, "VUID-vkDestroySemaphore-semaphore-parameter", "VUID-vkDestroySemaphore-semaphore-parent", "vkDestroySemaphore");
     skip |= ValidateDestroyObject(semaphore, kVulkanObjectTypeSemaphore, pAllocator, kVUIDUndefined, kVUIDUndefined);
 
     return skip;
@@ -646,7 +645,7 @@ bool ObjectLifetimes::PreCallValidateCreateEvent(
     const VkAllocationCallbacks*                pAllocator,
     VkEvent*                                    pEvent) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreateEvent-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreateEvent-device-parameter", kVUIDUndefined, "vkCreateEvent");
 
     return skip;
 }
@@ -667,8 +666,8 @@ bool ObjectLifetimes::PreCallValidateDestroyEvent(
     VkEvent                                     event,
     const VkAllocationCallbacks*                pAllocator) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkDestroyEvent-device-parameter", kVUIDUndefined);
-    skip |= ValidateObject(event, kVulkanObjectTypeEvent, true, "VUID-vkDestroyEvent-event-parameter", "VUID-vkDestroyEvent-event-parent");
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkDestroyEvent-device-parameter", kVUIDUndefined, "vkDestroyEvent");
+    skip |= ValidateObject(event, kVulkanObjectTypeEvent, true, "VUID-vkDestroyEvent-event-parameter", "VUID-vkDestroyEvent-event-parent", "vkDestroyEvent");
     skip |= ValidateDestroyObject(event, kVulkanObjectTypeEvent, pAllocator, kVUIDUndefined, kVUIDUndefined);
 
     return skip;
@@ -686,8 +685,8 @@ bool ObjectLifetimes::PreCallValidateGetEventStatus(
     VkDevice                                    device,
     VkEvent                                     event) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetEventStatus-device-parameter", kVUIDUndefined);
-    skip |= ValidateObject(event, kVulkanObjectTypeEvent, false, "VUID-vkGetEventStatus-event-parameter", "VUID-vkGetEventStatus-event-parent");
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetEventStatus-device-parameter", kVUIDUndefined, "vkGetEventStatus");
+    skip |= ValidateObject(event, kVulkanObjectTypeEvent, false, "VUID-vkGetEventStatus-event-parameter", "VUID-vkGetEventStatus-event-parent", "vkGetEventStatus");
 
     return skip;
 }
@@ -696,8 +695,8 @@ bool ObjectLifetimes::PreCallValidateSetEvent(
     VkDevice                                    device,
     VkEvent                                     event) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkSetEvent-device-parameter", kVUIDUndefined);
-    skip |= ValidateObject(event, kVulkanObjectTypeEvent, false, "VUID-vkSetEvent-event-parameter", "VUID-vkSetEvent-event-parent");
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkSetEvent-device-parameter", kVUIDUndefined, "vkSetEvent");
+    skip |= ValidateObject(event, kVulkanObjectTypeEvent, false, "VUID-vkSetEvent-event-parameter", "VUID-vkSetEvent-event-parent", "vkSetEvent");
 
     return skip;
 }
@@ -706,8 +705,8 @@ bool ObjectLifetimes::PreCallValidateResetEvent(
     VkDevice                                    device,
     VkEvent                                     event) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkResetEvent-device-parameter", kVUIDUndefined);
-    skip |= ValidateObject(event, kVulkanObjectTypeEvent, false, "VUID-vkResetEvent-event-parameter", "VUID-vkResetEvent-event-parent");
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkResetEvent-device-parameter", kVUIDUndefined, "vkResetEvent");
+    skip |= ValidateObject(event, kVulkanObjectTypeEvent, false, "VUID-vkResetEvent-event-parameter", "VUID-vkResetEvent-event-parent", "vkResetEvent");
 
     return skip;
 }
@@ -718,7 +717,7 @@ bool ObjectLifetimes::PreCallValidateCreateQueryPool(
     const VkAllocationCallbacks*                pAllocator,
     VkQueryPool*                                pQueryPool) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreateQueryPool-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreateQueryPool-device-parameter", kVUIDUndefined, "vkCreateQueryPool");
 
     return skip;
 }
@@ -739,8 +738,8 @@ bool ObjectLifetimes::PreCallValidateDestroyQueryPool(
     VkQueryPool                                 queryPool,
     const VkAllocationCallbacks*                pAllocator) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(queryPool, kVulkanObjectTypeQueryPool, true, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkDestroyQueryPool");
+    skip |= ValidateObject(queryPool, kVulkanObjectTypeQueryPool, true, kVUIDUndefined, kVUIDUndefined, "vkDestroyQueryPool");
     skip |= ValidateDestroyObject(queryPool, kVulkanObjectTypeQueryPool, pAllocator, kVUIDUndefined, kVUIDUndefined);
 
     return skip;
@@ -764,8 +763,8 @@ bool ObjectLifetimes::PreCallValidateGetQueryPoolResults(
     VkDeviceSize                                stride,
     VkQueryResultFlags                          flags) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetQueryPoolResults-device-parameter", kVUIDUndefined);
-    skip |= ValidateObject(queryPool, kVulkanObjectTypeQueryPool, false, "VUID-vkGetQueryPoolResults-queryPool-parameter", "VUID-vkGetQueryPoolResults-queryPool-parent");
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetQueryPoolResults-device-parameter", kVUIDUndefined, "vkGetQueryPoolResults");
+    skip |= ValidateObject(queryPool, kVulkanObjectTypeQueryPool, false, "VUID-vkGetQueryPoolResults-queryPool-parameter", "VUID-vkGetQueryPoolResults-queryPool-parent", "vkGetQueryPoolResults");
 
     return skip;
 }
@@ -776,7 +775,7 @@ bool ObjectLifetimes::PreCallValidateCreateBuffer(
     const VkAllocationCallbacks*                pAllocator,
     VkBuffer*                                   pBuffer) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreateBuffer-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreateBuffer-device-parameter", kVUIDUndefined, "vkCreateBuffer");
 
     return skip;
 }
@@ -797,8 +796,8 @@ bool ObjectLifetimes::PreCallValidateDestroyBuffer(
     VkBuffer                                    buffer,
     const VkAllocationCallbacks*                pAllocator) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkDestroyBuffer-device-parameter", kVUIDUndefined);
-    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, true, "VUID-vkDestroyBuffer-buffer-parameter", "VUID-vkDestroyBuffer-buffer-parent");
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkDestroyBuffer-device-parameter", kVUIDUndefined, "vkDestroyBuffer");
+    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, true, "VUID-vkDestroyBuffer-buffer-parameter", "VUID-vkDestroyBuffer-buffer-parent", "vkDestroyBuffer");
     skip |= ValidateDestroyObject(buffer, kVulkanObjectTypeBuffer, pAllocator, kVUIDUndefined, kVUIDUndefined);
 
     return skip;
@@ -818,9 +817,9 @@ bool ObjectLifetimes::PreCallValidateCreateBufferView(
     const VkAllocationCallbacks*                pAllocator,
     VkBufferView*                               pView) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreateBufferView-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreateBufferView-device-parameter", kVUIDUndefined, "vkCreateBufferView");
     if (pCreateInfo) {
-        skip |= ValidateObject(pCreateInfo->buffer, kVulkanObjectTypeBuffer, false, "VUID-VkBufferViewCreateInfo-buffer-parameter", kVUIDUndefined);
+        skip |= ValidateObject(pCreateInfo->buffer, kVulkanObjectTypeBuffer, false, "VUID-VkBufferViewCreateInfo-buffer-parameter", kVUIDUndefined, "VkBufferViewCreateInfo");
     }
 
     return skip;
@@ -842,8 +841,8 @@ bool ObjectLifetimes::PreCallValidateDestroyBufferView(
     VkBufferView                                bufferView,
     const VkAllocationCallbacks*                pAllocator) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkDestroyBufferView-device-parameter", kVUIDUndefined);
-    skip |= ValidateObject(bufferView, kVulkanObjectTypeBufferView, true, "VUID-vkDestroyBufferView-bufferView-parameter", "VUID-vkDestroyBufferView-bufferView-parent");
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkDestroyBufferView-device-parameter", kVUIDUndefined, "vkDestroyBufferView");
+    skip |= ValidateObject(bufferView, kVulkanObjectTypeBufferView, true, "VUID-vkDestroyBufferView-bufferView-parameter", "VUID-vkDestroyBufferView-bufferView-parent", "vkDestroyBufferView");
     skip |= ValidateDestroyObject(bufferView, kVulkanObjectTypeBufferView, pAllocator, kVUIDUndefined, kVUIDUndefined);
 
     return skip;
@@ -863,7 +862,7 @@ bool ObjectLifetimes::PreCallValidateCreateImage(
     const VkAllocationCallbacks*                pAllocator,
     VkImage*                                    pImage) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreateImage-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreateImage-device-parameter", kVUIDUndefined, "vkCreateImage");
 
     return skip;
 }
@@ -884,8 +883,8 @@ bool ObjectLifetimes::PreCallValidateDestroyImage(
     VkImage                                     image,
     const VkAllocationCallbacks*                pAllocator) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkDestroyImage-device-parameter", kVUIDUndefined);
-    skip |= ValidateObject(image, kVulkanObjectTypeImage, true, "VUID-vkDestroyImage-image-parameter", "VUID-vkDestroyImage-image-parent");
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkDestroyImage-device-parameter", kVUIDUndefined, "vkDestroyImage");
+    skip |= ValidateObject(image, kVulkanObjectTypeImage, true, "VUID-vkDestroyImage-image-parameter", "VUID-vkDestroyImage-image-parent", "vkDestroyImage");
     skip |= ValidateDestroyObject(image, kVulkanObjectTypeImage, pAllocator, kVUIDUndefined, kVUIDUndefined);
 
     return skip;
@@ -905,8 +904,8 @@ bool ObjectLifetimes::PreCallValidateGetImageSubresourceLayout(
     const VkImageSubresource*                   pSubresource,
     VkSubresourceLayout*                        pLayout) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetImageSubresourceLayout-device-parameter", kVUIDUndefined);
-    skip |= ValidateObject(image, kVulkanObjectTypeImage, false, "VUID-vkGetImageSubresourceLayout-image-parameter", "VUID-vkGetImageSubresourceLayout-image-parent");
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetImageSubresourceLayout-device-parameter", kVUIDUndefined, "vkGetImageSubresourceLayout");
+    skip |= ValidateObject(image, kVulkanObjectTypeImage, false, "VUID-vkGetImageSubresourceLayout-image-parameter", "VUID-vkGetImageSubresourceLayout-image-parent", "vkGetImageSubresourceLayout");
 
     return skip;
 }
@@ -917,9 +916,9 @@ bool ObjectLifetimes::PreCallValidateCreateImageView(
     const VkAllocationCallbacks*                pAllocator,
     VkImageView*                                pView) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreateImageView-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreateImageView-device-parameter", kVUIDUndefined, "vkCreateImageView");
     if (pCreateInfo) {
-        skip |= ValidateObject(pCreateInfo->image, kVulkanObjectTypeImage, false, "VUID-VkImageViewCreateInfo-image-parameter", kVUIDUndefined);
+        skip |= ValidateObject(pCreateInfo->image, kVulkanObjectTypeImage, false, "VUID-VkImageViewCreateInfo-image-parameter", "VUID-VkImageViewCreateInfo-commonparent", "VkImageViewCreateInfo");
     }
 
     return skip;
@@ -941,8 +940,8 @@ bool ObjectLifetimes::PreCallValidateDestroyImageView(
     VkImageView                                 imageView,
     const VkAllocationCallbacks*                pAllocator) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkDestroyImageView-device-parameter", kVUIDUndefined);
-    skip |= ValidateObject(imageView, kVulkanObjectTypeImageView, true, "VUID-vkDestroyImageView-imageView-parameter", "VUID-vkDestroyImageView-imageView-parent");
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkDestroyImageView-device-parameter", kVUIDUndefined, "vkDestroyImageView");
+    skip |= ValidateObject(imageView, kVulkanObjectTypeImageView, true, "VUID-vkDestroyImageView-imageView-parameter", "VUID-vkDestroyImageView-imageView-parent", "vkDestroyImageView");
     skip |= ValidateDestroyObject(imageView, kVulkanObjectTypeImageView, pAllocator, kVUIDUndefined, kVUIDUndefined);
 
     return skip;
@@ -962,7 +961,7 @@ bool ObjectLifetimes::PreCallValidateCreateShaderModule(
     const VkAllocationCallbacks*                pAllocator,
     VkShaderModule*                             pShaderModule) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkCreateShaderModule");
 
     return skip;
 }
@@ -983,8 +982,8 @@ bool ObjectLifetimes::PreCallValidateDestroyShaderModule(
     VkShaderModule                              shaderModule,
     const VkAllocationCallbacks*                pAllocator) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(shaderModule, kVulkanObjectTypeShaderModule, true, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkDestroyShaderModule");
+    skip |= ValidateObject(shaderModule, kVulkanObjectTypeShaderModule, true, kVUIDUndefined, kVUIDUndefined, "vkDestroyShaderModule");
     skip |= ValidateDestroyObject(shaderModule, kVulkanObjectTypeShaderModule, pAllocator, kVUIDUndefined, kVUIDUndefined);
 
     return skip;
@@ -1004,7 +1003,7 @@ bool ObjectLifetimes::PreCallValidateCreatePipelineCache(
     const VkAllocationCallbacks*                pAllocator,
     VkPipelineCache*                            pPipelineCache) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreatePipelineCache-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreatePipelineCache-device-parameter", kVUIDUndefined, "vkCreatePipelineCache");
 
     return skip;
 }
@@ -1025,8 +1024,8 @@ bool ObjectLifetimes::PreCallValidateDestroyPipelineCache(
     VkPipelineCache                             pipelineCache,
     const VkAllocationCallbacks*                pAllocator) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkDestroyPipelineCache-device-parameter", kVUIDUndefined);
-    skip |= ValidateObject(pipelineCache, kVulkanObjectTypePipelineCache, true, "VUID-vkDestroyPipelineCache-pipelineCache-parameter", "VUID-vkDestroyPipelineCache-pipelineCache-parent");
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkDestroyPipelineCache-device-parameter", kVUIDUndefined, "vkDestroyPipelineCache");
+    skip |= ValidateObject(pipelineCache, kVulkanObjectTypePipelineCache, true, "VUID-vkDestroyPipelineCache-pipelineCache-parameter", "VUID-vkDestroyPipelineCache-pipelineCache-parent", "vkDestroyPipelineCache");
     skip |= ValidateDestroyObject(pipelineCache, kVulkanObjectTypePipelineCache, pAllocator, kVUIDUndefined, kVUIDUndefined);
 
     return skip;
@@ -1046,8 +1045,8 @@ bool ObjectLifetimes::PreCallValidateGetPipelineCacheData(
     size_t*                                     pDataSize,
     void*                                       pData) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(pipelineCache, kVulkanObjectTypePipelineCache, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetPipelineCacheData");
+    skip |= ValidateObject(pipelineCache, kVulkanObjectTypePipelineCache, false, kVUIDUndefined, kVUIDUndefined, "vkGetPipelineCacheData");
 
     return skip;
 }
@@ -1058,11 +1057,11 @@ bool ObjectLifetimes::PreCallValidateMergePipelineCaches(
     uint32_t                                    srcCacheCount,
     const VkPipelineCache*                      pSrcCaches) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(dstCache, kVulkanObjectTypePipelineCache, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkMergePipelineCaches");
+    skip |= ValidateObject(dstCache, kVulkanObjectTypePipelineCache, false, kVUIDUndefined, kVUIDUndefined, "vkMergePipelineCaches");
     if ((srcCacheCount > 0) && (pSrcCaches)) {
         for (uint32_t index0 = 0; index0 < srcCacheCount; ++index0) {
-            skip |= ValidateObject(pSrcCaches[index0], kVulkanObjectTypePipelineCache, false, kVUIDUndefined, kVUIDUndefined);
+            skip |= ValidateObject(pSrcCaches[index0], kVulkanObjectTypePipelineCache, false, kVUIDUndefined, kVUIDUndefined, "vkMergePipelineCaches");
         }
     }
 
@@ -1077,19 +1076,19 @@ bool ObjectLifetimes::PreCallValidateCreateGraphicsPipelines(
     const VkAllocationCallbacks*                pAllocator,
     VkPipeline*                                 pPipelines) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreateGraphicsPipelines-device-parameter", kVUIDUndefined);
-    skip |= ValidateObject(pipelineCache, kVulkanObjectTypePipelineCache, false, "VUID-vkCreateGraphicsPipelines-pipelineCache-parameter", "VUID-vkCreateGraphicsPipelines-pipelineCache-parent");
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreateGraphicsPipelines-device-parameter", kVUIDUndefined, "vkCreateGraphicsPipelines");
+    skip |= ValidateObject(pipelineCache, kVulkanObjectTypePipelineCache, false, "VUID-vkCreateGraphicsPipelines-pipelineCache-parameter", "VUID-vkCreateGraphicsPipelines-pipelineCache-parent", "vkCreateGraphicsPipelines");
     if (pCreateInfos) {
         for (uint32_t index0 = 0; index0 < createInfoCount; ++index0) {
             if (pCreateInfos[index0].pStages) {
                 for (uint32_t index1 = 0; index1 < pCreateInfos[index0].stageCount; ++index1) {
-                    skip |= ValidateObject(pCreateInfos[index0].pStages[index1].module, kVulkanObjectTypeShaderModule, true, "VUID-VkPipelineShaderStageCreateInfo-module-parameter", kVUIDUndefined);
+                    skip |= ValidateObject(pCreateInfos[index0].pStages[index1].module, kVulkanObjectTypeShaderModule, true, "VUID-VkPipelineShaderStageCreateInfo-module-parameter", kVUIDUndefined, "VkPipelineShaderStageCreateInfo");
                 }
             }
-            skip |= ValidateObject(pCreateInfos[index0].layout, kVulkanObjectTypePipelineLayout, true, kVUIDUndefined, "VUID-VkGraphicsPipelineCreateInfo-commonparent");
-            skip |= ValidateObject(pCreateInfos[index0].renderPass, kVulkanObjectTypeRenderPass, true, kVUIDUndefined, "VUID-VkGraphicsPipelineCreateInfo-commonparent");
+            skip |= ValidateObject(pCreateInfos[index0].layout, kVulkanObjectTypePipelineLayout, true, kVUIDUndefined, "VUID-VkGraphicsPipelineCreateInfo-commonparent", "VkGraphicsPipelineCreateInfo");
+            skip |= ValidateObject(pCreateInfos[index0].renderPass, kVulkanObjectTypeRenderPass, true, kVUIDUndefined, "VUID-VkGraphicsPipelineCreateInfo-commonparent", "VkGraphicsPipelineCreateInfo");
             if ((pCreateInfos[index0].flags & VK_PIPELINE_CREATE_DERIVATIVE_BIT) && (pCreateInfos[index0].basePipelineIndex == -1))
-                skip |= ValidateObject(pCreateInfos[index0].basePipelineHandle, kVulkanObjectTypePipeline, false, "VUID-VkGraphicsPipelineCreateInfo-flags-07984", "VUID-VkGraphicsPipelineCreateInfo-commonparent");
+                skip |= ValidateObject(pCreateInfos[index0].basePipelineHandle, kVulkanObjectTypePipeline, false, "VUID-VkGraphicsPipelineCreateInfo-flags-07984", "VUID-VkGraphicsPipelineCreateInfo-commonparent", "VkGraphicsPipelineCreateInfo");
         }
     }
 
@@ -1122,14 +1121,14 @@ bool ObjectLifetimes::PreCallValidateCreateComputePipelines(
     const VkAllocationCallbacks*                pAllocator,
     VkPipeline*                                 pPipelines) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreateComputePipelines-device-parameter", kVUIDUndefined);
-    skip |= ValidateObject(pipelineCache, kVulkanObjectTypePipelineCache, false, "VUID-vkCreateComputePipelines-pipelineCache-parameter", "VUID-vkCreateComputePipelines-pipelineCache-parent");
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreateComputePipelines-device-parameter", kVUIDUndefined, "vkCreateComputePipelines");
+    skip |= ValidateObject(pipelineCache, kVulkanObjectTypePipelineCache, false, "VUID-vkCreateComputePipelines-pipelineCache-parameter", "VUID-vkCreateComputePipelines-pipelineCache-parent", "vkCreateComputePipelines");
     if (pCreateInfos) {
         for (uint32_t index0 = 0; index0 < createInfoCount; ++index0) {
-            skip |= ValidateObject(pCreateInfos[index0].stage.module, kVulkanObjectTypeShaderModule, true, "VUID-VkPipelineShaderStageCreateInfo-module-parameter", kVUIDUndefined);
-            skip |= ValidateObject(pCreateInfos[index0].layout, kVulkanObjectTypePipelineLayout, false, "VUID-VkComputePipelineCreateInfo-layout-parameter", "VUID-VkComputePipelineCreateInfo-commonparent");
+            skip |= ValidateObject(pCreateInfos[index0].stage.module, kVulkanObjectTypeShaderModule, true, "VUID-VkPipelineShaderStageCreateInfo-module-parameter", kVUIDUndefined, "VkPipelineShaderStageCreateInfo");
+            skip |= ValidateObject(pCreateInfos[index0].layout, kVulkanObjectTypePipelineLayout, false, "VUID-VkComputePipelineCreateInfo-layout-parameter", "VUID-VkComputePipelineCreateInfo-commonparent", "VkComputePipelineCreateInfo");
             if ((pCreateInfos[index0].flags & VK_PIPELINE_CREATE_DERIVATIVE_BIT) && (pCreateInfos[index0].basePipelineIndex == -1))
-                skip |= ValidateObject(pCreateInfos[index0].basePipelineHandle, kVulkanObjectTypePipeline, false, "VUID-VkComputePipelineCreateInfo-flags-07984", "VUID-VkComputePipelineCreateInfo-commonparent");
+                skip |= ValidateObject(pCreateInfos[index0].basePipelineHandle, kVulkanObjectTypePipeline, false, "VUID-VkComputePipelineCreateInfo-flags-07984", "VUID-VkComputePipelineCreateInfo-commonparent", "VkComputePipelineCreateInfo");
         }
     }
 
@@ -1159,8 +1158,8 @@ bool ObjectLifetimes::PreCallValidateDestroyPipeline(
     VkPipeline                                  pipeline,
     const VkAllocationCallbacks*                pAllocator) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkDestroyPipeline-device-parameter", kVUIDUndefined);
-    skip |= ValidateObject(pipeline, kVulkanObjectTypePipeline, true, "VUID-vkDestroyPipeline-pipeline-parameter", "VUID-vkDestroyPipeline-pipeline-parent");
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkDestroyPipeline-device-parameter", kVUIDUndefined, "vkDestroyPipeline");
+    skip |= ValidateObject(pipeline, kVulkanObjectTypePipeline, true, "VUID-vkDestroyPipeline-pipeline-parameter", "VUID-vkDestroyPipeline-pipeline-parent", "vkDestroyPipeline");
     skip |= ValidateDestroyObject(pipeline, kVulkanObjectTypePipeline, pAllocator, kVUIDUndefined, kVUIDUndefined);
 
     return skip;
@@ -1180,11 +1179,11 @@ bool ObjectLifetimes::PreCallValidateCreatePipelineLayout(
     const VkAllocationCallbacks*                pAllocator,
     VkPipelineLayout*                           pPipelineLayout) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreatePipelineLayout-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreatePipelineLayout-device-parameter", kVUIDUndefined, "vkCreatePipelineLayout");
     if (pCreateInfo) {
         if ((pCreateInfo->setLayoutCount > 0) && (pCreateInfo->pSetLayouts)) {
             for (uint32_t index1 = 0; index1 < pCreateInfo->setLayoutCount; ++index1) {
-                skip |= ValidateObject(pCreateInfo->pSetLayouts[index1], kVulkanObjectTypeDescriptorSetLayout, true, "VUID-VkPipelineLayoutCreateInfo-pSetLayouts-parameter", kVUIDUndefined);
+                skip |= ValidateObject(pCreateInfo->pSetLayouts[index1], kVulkanObjectTypeDescriptorSetLayout, true, "VUID-VkPipelineLayoutCreateInfo-pSetLayouts-parameter", kVUIDUndefined, "VkPipelineLayoutCreateInfo");
             }
         }
     }
@@ -1208,8 +1207,8 @@ bool ObjectLifetimes::PreCallValidateDestroyPipelineLayout(
     VkPipelineLayout                            pipelineLayout,
     const VkAllocationCallbacks*                pAllocator) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkDestroyPipelineLayout-device-parameter", kVUIDUndefined);
-    skip |= ValidateObject(pipelineLayout, kVulkanObjectTypePipelineLayout, true, "VUID-vkDestroyPipelineLayout-pipelineLayout-parameter", "VUID-vkDestroyPipelineLayout-pipelineLayout-parent");
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkDestroyPipelineLayout-device-parameter", kVUIDUndefined, "vkDestroyPipelineLayout");
+    skip |= ValidateObject(pipelineLayout, kVulkanObjectTypePipelineLayout, true, "VUID-vkDestroyPipelineLayout-pipelineLayout-parameter", "VUID-vkDestroyPipelineLayout-pipelineLayout-parent", "vkDestroyPipelineLayout");
     skip |= ValidateDestroyObject(pipelineLayout, kVulkanObjectTypePipelineLayout, pAllocator, kVUIDUndefined, kVUIDUndefined);
 
     return skip;
@@ -1229,7 +1228,7 @@ bool ObjectLifetimes::PreCallValidateCreateSampler(
     const VkAllocationCallbacks*                pAllocator,
     VkSampler*                                  pSampler) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreateSampler-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreateSampler-device-parameter", kVUIDUndefined, "vkCreateSampler");
 
     return skip;
 }
@@ -1250,8 +1249,8 @@ bool ObjectLifetimes::PreCallValidateDestroySampler(
     VkSampler                                   sampler,
     const VkAllocationCallbacks*                pAllocator) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkDestroySampler-device-parameter", kVUIDUndefined);
-    skip |= ValidateObject(sampler, kVulkanObjectTypeSampler, true, "VUID-vkDestroySampler-sampler-parameter", "VUID-vkDestroySampler-sampler-parent");
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkDestroySampler-device-parameter", kVUIDUndefined, "vkDestroySampler");
+    skip |= ValidateObject(sampler, kVulkanObjectTypeSampler, true, "VUID-vkDestroySampler-sampler-parameter", "VUID-vkDestroySampler-sampler-parent", "vkDestroySampler");
     skip |= ValidateDestroyObject(sampler, kVulkanObjectTypeSampler, pAllocator, kVUIDUndefined, kVUIDUndefined);
 
     return skip;
@@ -1270,8 +1269,8 @@ bool ObjectLifetimes::PreCallValidateDestroyDescriptorSetLayout(
     VkDescriptorSetLayout                       descriptorSetLayout,
     const VkAllocationCallbacks*                pAllocator) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkDestroyDescriptorSetLayout-device-parameter", kVUIDUndefined);
-    skip |= ValidateObject(descriptorSetLayout, kVulkanObjectTypeDescriptorSetLayout, true, "VUID-vkDestroyDescriptorSetLayout-descriptorSetLayout-parameter", "VUID-vkDestroyDescriptorSetLayout-descriptorSetLayout-parent");
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkDestroyDescriptorSetLayout-device-parameter", kVUIDUndefined, "vkDestroyDescriptorSetLayout");
+    skip |= ValidateObject(descriptorSetLayout, kVulkanObjectTypeDescriptorSetLayout, true, "VUID-vkDestroyDescriptorSetLayout-descriptorSetLayout-parameter", "VUID-vkDestroyDescriptorSetLayout-descriptorSetLayout-parent", "vkDestroyDescriptorSetLayout");
     skip |= ValidateDestroyObject(descriptorSetLayout, kVulkanObjectTypeDescriptorSetLayout, pAllocator, kVUIDUndefined, kVUIDUndefined);
 
     return skip;
@@ -1291,7 +1290,7 @@ bool ObjectLifetimes::PreCallValidateCreateDescriptorPool(
     const VkAllocationCallbacks*                pAllocator,
     VkDescriptorPool*                           pDescriptorPool) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreateDescriptorPool-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreateDescriptorPool-device-parameter", kVUIDUndefined, "vkCreateDescriptorPool");
 
     return skip;
 }
@@ -1312,8 +1311,8 @@ bool ObjectLifetimes::PreCallValidateDestroyFramebuffer(
     VkFramebuffer                               framebuffer,
     const VkAllocationCallbacks*                pAllocator) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkDestroyFramebuffer-device-parameter", kVUIDUndefined);
-    skip |= ValidateObject(framebuffer, kVulkanObjectTypeFramebuffer, true, "VUID-vkDestroyFramebuffer-framebuffer-parameter", "VUID-vkDestroyFramebuffer-framebuffer-parent");
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkDestroyFramebuffer-device-parameter", kVUIDUndefined, "vkDestroyFramebuffer");
+    skip |= ValidateObject(framebuffer, kVulkanObjectTypeFramebuffer, true, "VUID-vkDestroyFramebuffer-framebuffer-parameter", "VUID-vkDestroyFramebuffer-framebuffer-parent", "vkDestroyFramebuffer");
     skip |= ValidateDestroyObject(framebuffer, kVulkanObjectTypeFramebuffer, pAllocator, kVUIDUndefined, kVUIDUndefined);
 
     return skip;
@@ -1333,7 +1332,7 @@ bool ObjectLifetimes::PreCallValidateCreateRenderPass(
     const VkAllocationCallbacks*                pAllocator,
     VkRenderPass*                               pRenderPass) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreateRenderPass-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreateRenderPass-device-parameter", kVUIDUndefined, "vkCreateRenderPass");
 
     return skip;
 }
@@ -1354,8 +1353,8 @@ bool ObjectLifetimes::PreCallValidateDestroyRenderPass(
     VkRenderPass                                renderPass,
     const VkAllocationCallbacks*                pAllocator) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkDestroyRenderPass-device-parameter", kVUIDUndefined);
-    skip |= ValidateObject(renderPass, kVulkanObjectTypeRenderPass, true, "VUID-vkDestroyRenderPass-renderPass-parameter", "VUID-vkDestroyRenderPass-renderPass-parent");
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkDestroyRenderPass-device-parameter", kVUIDUndefined, "vkDestroyRenderPass");
+    skip |= ValidateObject(renderPass, kVulkanObjectTypeRenderPass, true, "VUID-vkDestroyRenderPass-renderPass-parameter", "VUID-vkDestroyRenderPass-renderPass-parent", "vkDestroyRenderPass");
     skip |= ValidateDestroyObject(renderPass, kVulkanObjectTypeRenderPass, pAllocator, kVUIDUndefined, kVUIDUndefined);
 
     return skip;
@@ -1374,8 +1373,8 @@ bool ObjectLifetimes::PreCallValidateGetRenderAreaGranularity(
     VkRenderPass                                renderPass,
     VkExtent2D*                                 pGranularity) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetRenderAreaGranularity-device-parameter", kVUIDUndefined);
-    skip |= ValidateObject(renderPass, kVulkanObjectTypeRenderPass, false, "VUID-vkGetRenderAreaGranularity-renderPass-parameter", "VUID-vkGetRenderAreaGranularity-renderPass-parent");
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetRenderAreaGranularity-device-parameter", kVUIDUndefined, "vkGetRenderAreaGranularity");
+    skip |= ValidateObject(renderPass, kVulkanObjectTypeRenderPass, false, "VUID-vkGetRenderAreaGranularity-renderPass-parameter", "VUID-vkGetRenderAreaGranularity-renderPass-parent", "vkGetRenderAreaGranularity");
 
     return skip;
 }
@@ -1386,7 +1385,7 @@ bool ObjectLifetimes::PreCallValidateCreateCommandPool(
     const VkAllocationCallbacks*                pAllocator,
     VkCommandPool*                              pCommandPool) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreateCommandPool-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreateCommandPool-device-parameter", kVUIDUndefined, "vkCreateCommandPool");
 
     return skip;
 }
@@ -1407,8 +1406,8 @@ bool ObjectLifetimes::PreCallValidateResetCommandPool(
     VkCommandPool                               commandPool,
     VkCommandPoolResetFlags                     flags) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkResetCommandPool-device-parameter", kVUIDUndefined);
-    skip |= ValidateObject(commandPool, kVulkanObjectTypeCommandPool, false, "VUID-vkResetCommandPool-commandPool-parameter", "VUID-vkResetCommandPool-commandPool-parent");
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkResetCommandPool-device-parameter", kVUIDUndefined, "vkResetCommandPool");
+    skip |= ValidateObject(commandPool, kVulkanObjectTypeCommandPool, false, "VUID-vkResetCommandPool-commandPool-parameter", "VUID-vkResetCommandPool-commandPool-parent", "vkResetCommandPool");
 
     return skip;
 }
@@ -1416,7 +1415,7 @@ bool ObjectLifetimes::PreCallValidateResetCommandPool(
 bool ObjectLifetimes::PreCallValidateEndCommandBuffer(
     VkCommandBuffer                             commandBuffer) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkEndCommandBuffer-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkEndCommandBuffer-commandBuffer-parameter", kVUIDUndefined, "vkEndCommandBuffer");
 
     return skip;
 }
@@ -1425,7 +1424,7 @@ bool ObjectLifetimes::PreCallValidateResetCommandBuffer(
     VkCommandBuffer                             commandBuffer,
     VkCommandBufferResetFlags                   flags) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkResetCommandBuffer-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkResetCommandBuffer-commandBuffer-parameter", kVUIDUndefined, "vkResetCommandBuffer");
 
     return skip;
 }
@@ -1435,8 +1434,8 @@ bool ObjectLifetimes::PreCallValidateCmdBindPipeline(
     VkPipelineBindPoint                         pipelineBindPoint,
     VkPipeline                                  pipeline) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdBindPipeline-commandBuffer-parameter", "VUID-vkCmdBindPipeline-commonparent");
-    skip |= ValidateObject(pipeline, kVulkanObjectTypePipeline, false, "VUID-vkCmdBindPipeline-pipeline-parameter", "VUID-vkCmdBindPipeline-commonparent");
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdBindPipeline-commandBuffer-parameter", "VUID-vkCmdBindPipeline-commonparent", "vkCmdBindPipeline");
+    skip |= ValidateObject(pipeline, kVulkanObjectTypePipeline, false, "VUID-vkCmdBindPipeline-pipeline-parameter", "VUID-vkCmdBindPipeline-commonparent", "vkCmdBindPipeline");
 
     return skip;
 }
@@ -1447,7 +1446,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetViewport(
     uint32_t                                    viewportCount,
     const VkViewport*                           pViewports) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetViewport-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetViewport-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetViewport");
 
     return skip;
 }
@@ -1458,7 +1457,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetScissor(
     uint32_t                                    scissorCount,
     const VkRect2D*                             pScissors) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetScissor-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetScissor-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetScissor");
 
     return skip;
 }
@@ -1467,7 +1466,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetLineWidth(
     VkCommandBuffer                             commandBuffer,
     float                                       lineWidth) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetLineWidth-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetLineWidth-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetLineWidth");
 
     return skip;
 }
@@ -1478,7 +1477,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetDepthBias(
     float                                       depthBiasClamp,
     float                                       depthBiasSlopeFactor) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetDepthBias-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetDepthBias-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetDepthBias");
 
     return skip;
 }
@@ -1487,7 +1486,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetBlendConstants(
     VkCommandBuffer                             commandBuffer,
     const float                                 blendConstants[4]) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetBlendConstants-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetBlendConstants-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetBlendConstants");
 
     return skip;
 }
@@ -1497,7 +1496,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetDepthBounds(
     float                                       minDepthBounds,
     float                                       maxDepthBounds) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetDepthBounds-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetDepthBounds-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetDepthBounds");
 
     return skip;
 }
@@ -1507,7 +1506,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetStencilCompareMask(
     VkStencilFaceFlags                          faceMask,
     uint32_t                                    compareMask) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetStencilCompareMask-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetStencilCompareMask-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetStencilCompareMask");
 
     return skip;
 }
@@ -1517,7 +1516,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetStencilWriteMask(
     VkStencilFaceFlags                          faceMask,
     uint32_t                                    writeMask) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetStencilWriteMask-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetStencilWriteMask-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetStencilWriteMask");
 
     return skip;
 }
@@ -1527,7 +1526,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetStencilReference(
     VkStencilFaceFlags                          faceMask,
     uint32_t                                    reference) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetStencilReference-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetStencilReference-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetStencilReference");
 
     return skip;
 }
@@ -1542,11 +1541,11 @@ bool ObjectLifetimes::PreCallValidateCmdBindDescriptorSets(
     uint32_t                                    dynamicOffsetCount,
     const uint32_t*                             pDynamicOffsets) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdBindDescriptorSets-commandBuffer-parameter", "VUID-vkCmdBindDescriptorSets-commonparent");
-    skip |= ValidateObject(layout, kVulkanObjectTypePipelineLayout, false, "VUID-vkCmdBindDescriptorSets-layout-parameter", "VUID-vkCmdBindDescriptorSets-commonparent");
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdBindDescriptorSets-commandBuffer-parameter", "VUID-vkCmdBindDescriptorSets-commonparent", "vkCmdBindDescriptorSets");
+    skip |= ValidateObject(layout, kVulkanObjectTypePipelineLayout, false, "VUID-vkCmdBindDescriptorSets-layout-parameter", "VUID-vkCmdBindDescriptorSets-commonparent", "vkCmdBindDescriptorSets");
     if ((descriptorSetCount > 0) && (pDescriptorSets)) {
         for (uint32_t index0 = 0; index0 < descriptorSetCount; ++index0) {
-            skip |= ValidateObject(pDescriptorSets[index0], kVulkanObjectTypeDescriptorSet, true, "VUID-vkCmdBindDescriptorSets-pDescriptorSets-parameter", "VUID-vkCmdBindDescriptorSets-commonparent");
+            skip |= ValidateObject(pDescriptorSets[index0], kVulkanObjectTypeDescriptorSet, true, "VUID-vkCmdBindDescriptorSets-pDescriptorSets-parameter", "VUID-vkCmdBindDescriptorSets-commonparent", "vkCmdBindDescriptorSets");
         }
     }
 
@@ -1559,8 +1558,8 @@ bool ObjectLifetimes::PreCallValidateCmdBindIndexBuffer(
     VkDeviceSize                                offset,
     VkIndexType                                 indexType) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdBindIndexBuffer-commandBuffer-parameter", "VUID-vkCmdBindIndexBuffer-commonparent");
-    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdBindIndexBuffer-buffer-parameter", "VUID-vkCmdBindIndexBuffer-commonparent");
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdBindIndexBuffer-commandBuffer-parameter", "VUID-vkCmdBindIndexBuffer-commonparent", "vkCmdBindIndexBuffer");
+    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdBindIndexBuffer-buffer-parameter", "VUID-vkCmdBindIndexBuffer-commonparent", "vkCmdBindIndexBuffer");
 
     return skip;
 }
@@ -1572,10 +1571,10 @@ bool ObjectLifetimes::PreCallValidateCmdBindVertexBuffers(
     const VkBuffer*                             pBuffers,
     const VkDeviceSize*                         pOffsets) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdBindVertexBuffers-commandBuffer-parameter", "VUID-vkCmdBindVertexBuffers-commonparent");
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdBindVertexBuffers-commandBuffer-parameter", "VUID-vkCmdBindVertexBuffers-commonparent", "vkCmdBindVertexBuffers");
     if ((bindingCount > 0) && (pBuffers)) {
         for (uint32_t index0 = 0; index0 < bindingCount; ++index0) {
-            skip |= ValidateObject(pBuffers[index0], kVulkanObjectTypeBuffer, true, "VUID-vkCmdBindVertexBuffers-pBuffers-parameter", "VUID-vkCmdBindVertexBuffers-commonparent");
+            skip |= ValidateObject(pBuffers[index0], kVulkanObjectTypeBuffer, true, "VUID-vkCmdBindVertexBuffers-pBuffers-parameter", "VUID-vkCmdBindVertexBuffers-commonparent", "vkCmdBindVertexBuffers");
         }
     }
 
@@ -1589,7 +1588,7 @@ bool ObjectLifetimes::PreCallValidateCmdDraw(
     uint32_t                                    firstVertex,
     uint32_t                                    firstInstance) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdDraw-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdDraw-commandBuffer-parameter", kVUIDUndefined, "vkCmdDraw");
 
     return skip;
 }
@@ -1602,7 +1601,7 @@ bool ObjectLifetimes::PreCallValidateCmdDrawIndexed(
     int32_t                                     vertexOffset,
     uint32_t                                    firstInstance) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdDrawIndexed-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdDrawIndexed-commandBuffer-parameter", kVUIDUndefined, "vkCmdDrawIndexed");
 
     return skip;
 }
@@ -1614,8 +1613,8 @@ bool ObjectLifetimes::PreCallValidateCmdDrawIndirect(
     uint32_t                                    drawCount,
     uint32_t                                    stride) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdDrawIndirect-commandBuffer-parameter", "VUID-vkCmdDrawIndirect-commonparent");
-    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdDrawIndirect-buffer-parameter", "VUID-vkCmdDrawIndirect-commonparent");
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdDrawIndirect-commandBuffer-parameter", "VUID-vkCmdDrawIndirect-commonparent", "vkCmdDrawIndirect");
+    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdDrawIndirect-buffer-parameter", "VUID-vkCmdDrawIndirect-commonparent", "vkCmdDrawIndirect");
 
     return skip;
 }
@@ -1627,8 +1626,8 @@ bool ObjectLifetimes::PreCallValidateCmdDrawIndexedIndirect(
     uint32_t                                    drawCount,
     uint32_t                                    stride) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdDrawIndexedIndirect-commandBuffer-parameter", "VUID-vkCmdDrawIndexedIndirect-commonparent");
-    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdDrawIndexedIndirect-buffer-parameter", "VUID-vkCmdDrawIndexedIndirect-commonparent");
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdDrawIndexedIndirect-commandBuffer-parameter", "VUID-vkCmdDrawIndexedIndirect-commonparent", "vkCmdDrawIndexedIndirect");
+    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdDrawIndexedIndirect-buffer-parameter", "VUID-vkCmdDrawIndexedIndirect-commonparent", "vkCmdDrawIndexedIndirect");
 
     return skip;
 }
@@ -1639,7 +1638,7 @@ bool ObjectLifetimes::PreCallValidateCmdDispatch(
     uint32_t                                    groupCountY,
     uint32_t                                    groupCountZ) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdDispatch-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdDispatch-commandBuffer-parameter", kVUIDUndefined, "vkCmdDispatch");
 
     return skip;
 }
@@ -1649,8 +1648,8 @@ bool ObjectLifetimes::PreCallValidateCmdDispatchIndirect(
     VkBuffer                                    buffer,
     VkDeviceSize                                offset) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdDispatchIndirect-commandBuffer-parameter", "VUID-vkCmdDispatchIndirect-commonparent");
-    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdDispatchIndirect-buffer-parameter", "VUID-vkCmdDispatchIndirect-commonparent");
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdDispatchIndirect-commandBuffer-parameter", "VUID-vkCmdDispatchIndirect-commonparent", "vkCmdDispatchIndirect");
+    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdDispatchIndirect-buffer-parameter", "VUID-vkCmdDispatchIndirect-commonparent", "vkCmdDispatchIndirect");
 
     return skip;
 }
@@ -1662,9 +1661,9 @@ bool ObjectLifetimes::PreCallValidateCmdCopyBuffer(
     uint32_t                                    regionCount,
     const VkBufferCopy*                         pRegions) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdCopyBuffer-commandBuffer-parameter", "VUID-vkCmdCopyBuffer-commonparent");
-    skip |= ValidateObject(srcBuffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdCopyBuffer-srcBuffer-parameter", "VUID-vkCmdCopyBuffer-commonparent");
-    skip |= ValidateObject(dstBuffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdCopyBuffer-dstBuffer-parameter", "VUID-vkCmdCopyBuffer-commonparent");
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdCopyBuffer-commandBuffer-parameter", "VUID-vkCmdCopyBuffer-commonparent", "vkCmdCopyBuffer");
+    skip |= ValidateObject(srcBuffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdCopyBuffer-srcBuffer-parameter", "VUID-vkCmdCopyBuffer-commonparent", "vkCmdCopyBuffer");
+    skip |= ValidateObject(dstBuffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdCopyBuffer-dstBuffer-parameter", "VUID-vkCmdCopyBuffer-commonparent", "vkCmdCopyBuffer");
 
     return skip;
 }
@@ -1678,9 +1677,9 @@ bool ObjectLifetimes::PreCallValidateCmdCopyImage(
     uint32_t                                    regionCount,
     const VkImageCopy*                          pRegions) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdCopyImage-commandBuffer-parameter", "VUID-vkCmdCopyImage-commonparent");
-    skip |= ValidateObject(srcImage, kVulkanObjectTypeImage, false, "VUID-vkCmdCopyImage-srcImage-parameter", "VUID-vkCmdCopyImage-commonparent");
-    skip |= ValidateObject(dstImage, kVulkanObjectTypeImage, false, "VUID-vkCmdCopyImage-dstImage-parameter", "VUID-vkCmdCopyImage-commonparent");
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdCopyImage-commandBuffer-parameter", "VUID-vkCmdCopyImage-commonparent", "vkCmdCopyImage");
+    skip |= ValidateObject(srcImage, kVulkanObjectTypeImage, false, "VUID-vkCmdCopyImage-srcImage-parameter", "VUID-vkCmdCopyImage-commonparent", "vkCmdCopyImage");
+    skip |= ValidateObject(dstImage, kVulkanObjectTypeImage, false, "VUID-vkCmdCopyImage-dstImage-parameter", "VUID-vkCmdCopyImage-commonparent", "vkCmdCopyImage");
 
     return skip;
 }
@@ -1695,9 +1694,9 @@ bool ObjectLifetimes::PreCallValidateCmdBlitImage(
     const VkImageBlit*                          pRegions,
     VkFilter                                    filter) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdBlitImage-commandBuffer-parameter", "VUID-vkCmdBlitImage-commonparent");
-    skip |= ValidateObject(srcImage, kVulkanObjectTypeImage, false, "VUID-vkCmdBlitImage-srcImage-parameter", "VUID-vkCmdBlitImage-commonparent");
-    skip |= ValidateObject(dstImage, kVulkanObjectTypeImage, false, "VUID-vkCmdBlitImage-dstImage-parameter", "VUID-vkCmdBlitImage-commonparent");
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdBlitImage-commandBuffer-parameter", "VUID-vkCmdBlitImage-commonparent", "vkCmdBlitImage");
+    skip |= ValidateObject(srcImage, kVulkanObjectTypeImage, false, "VUID-vkCmdBlitImage-srcImage-parameter", "VUID-vkCmdBlitImage-commonparent", "vkCmdBlitImage");
+    skip |= ValidateObject(dstImage, kVulkanObjectTypeImage, false, "VUID-vkCmdBlitImage-dstImage-parameter", "VUID-vkCmdBlitImage-commonparent", "vkCmdBlitImage");
 
     return skip;
 }
@@ -1710,9 +1709,9 @@ bool ObjectLifetimes::PreCallValidateCmdCopyBufferToImage(
     uint32_t                                    regionCount,
     const VkBufferImageCopy*                    pRegions) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdCopyBufferToImage-commandBuffer-parameter", "VUID-vkCmdCopyBufferToImage-commonparent");
-    skip |= ValidateObject(srcBuffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdCopyBufferToImage-srcBuffer-parameter", "VUID-vkCmdCopyBufferToImage-commonparent");
-    skip |= ValidateObject(dstImage, kVulkanObjectTypeImage, false, "VUID-vkCmdCopyBufferToImage-dstImage-parameter", "VUID-vkCmdCopyBufferToImage-commonparent");
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdCopyBufferToImage-commandBuffer-parameter", "VUID-vkCmdCopyBufferToImage-commonparent", "vkCmdCopyBufferToImage");
+    skip |= ValidateObject(srcBuffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdCopyBufferToImage-srcBuffer-parameter", "VUID-vkCmdCopyBufferToImage-commonparent", "vkCmdCopyBufferToImage");
+    skip |= ValidateObject(dstImage, kVulkanObjectTypeImage, false, "VUID-vkCmdCopyBufferToImage-dstImage-parameter", "VUID-vkCmdCopyBufferToImage-commonparent", "vkCmdCopyBufferToImage");
 
     return skip;
 }
@@ -1725,9 +1724,9 @@ bool ObjectLifetimes::PreCallValidateCmdCopyImageToBuffer(
     uint32_t                                    regionCount,
     const VkBufferImageCopy*                    pRegions) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdCopyImageToBuffer-commandBuffer-parameter", "VUID-vkCmdCopyImageToBuffer-commonparent");
-    skip |= ValidateObject(srcImage, kVulkanObjectTypeImage, false, "VUID-vkCmdCopyImageToBuffer-srcImage-parameter", "VUID-vkCmdCopyImageToBuffer-commonparent");
-    skip |= ValidateObject(dstBuffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdCopyImageToBuffer-dstBuffer-parameter", "VUID-vkCmdCopyImageToBuffer-commonparent");
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdCopyImageToBuffer-commandBuffer-parameter", "VUID-vkCmdCopyImageToBuffer-commonparent", "vkCmdCopyImageToBuffer");
+    skip |= ValidateObject(srcImage, kVulkanObjectTypeImage, false, "VUID-vkCmdCopyImageToBuffer-srcImage-parameter", "VUID-vkCmdCopyImageToBuffer-commonparent", "vkCmdCopyImageToBuffer");
+    skip |= ValidateObject(dstBuffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdCopyImageToBuffer-dstBuffer-parameter", "VUID-vkCmdCopyImageToBuffer-commonparent", "vkCmdCopyImageToBuffer");
 
     return skip;
 }
@@ -1739,8 +1738,8 @@ bool ObjectLifetimes::PreCallValidateCmdUpdateBuffer(
     VkDeviceSize                                dataSize,
     const void*                                 pData) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdUpdateBuffer-commandBuffer-parameter", "VUID-vkCmdUpdateBuffer-commonparent");
-    skip |= ValidateObject(dstBuffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdUpdateBuffer-dstBuffer-parameter", "VUID-vkCmdUpdateBuffer-commonparent");
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdUpdateBuffer-commandBuffer-parameter", "VUID-vkCmdUpdateBuffer-commonparent", "vkCmdUpdateBuffer");
+    skip |= ValidateObject(dstBuffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdUpdateBuffer-dstBuffer-parameter", "VUID-vkCmdUpdateBuffer-commonparent", "vkCmdUpdateBuffer");
 
     return skip;
 }
@@ -1752,8 +1751,8 @@ bool ObjectLifetimes::PreCallValidateCmdFillBuffer(
     VkDeviceSize                                size,
     uint32_t                                    data) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdFillBuffer-commandBuffer-parameter", "VUID-vkCmdFillBuffer-commonparent");
-    skip |= ValidateObject(dstBuffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdFillBuffer-dstBuffer-parameter", "VUID-vkCmdFillBuffer-commonparent");
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdFillBuffer-commandBuffer-parameter", "VUID-vkCmdFillBuffer-commonparent", "vkCmdFillBuffer");
+    skip |= ValidateObject(dstBuffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdFillBuffer-dstBuffer-parameter", "VUID-vkCmdFillBuffer-commonparent", "vkCmdFillBuffer");
 
     return skip;
 }
@@ -1766,8 +1765,8 @@ bool ObjectLifetimes::PreCallValidateCmdClearColorImage(
     uint32_t                                    rangeCount,
     const VkImageSubresourceRange*              pRanges) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdClearColorImage-commandBuffer-parameter", "VUID-vkCmdClearColorImage-commonparent");
-    skip |= ValidateObject(image, kVulkanObjectTypeImage, false, "VUID-vkCmdClearColorImage-image-parameter", "VUID-vkCmdClearColorImage-commonparent");
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdClearColorImage-commandBuffer-parameter", "VUID-vkCmdClearColorImage-commonparent", "vkCmdClearColorImage");
+    skip |= ValidateObject(image, kVulkanObjectTypeImage, false, "VUID-vkCmdClearColorImage-image-parameter", "VUID-vkCmdClearColorImage-commonparent", "vkCmdClearColorImage");
 
     return skip;
 }
@@ -1780,8 +1779,8 @@ bool ObjectLifetimes::PreCallValidateCmdClearDepthStencilImage(
     uint32_t                                    rangeCount,
     const VkImageSubresourceRange*              pRanges) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdClearDepthStencilImage-commandBuffer-parameter", "VUID-vkCmdClearDepthStencilImage-commonparent");
-    skip |= ValidateObject(image, kVulkanObjectTypeImage, false, "VUID-vkCmdClearDepthStencilImage-image-parameter", "VUID-vkCmdClearDepthStencilImage-commonparent");
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdClearDepthStencilImage-commandBuffer-parameter", "VUID-vkCmdClearDepthStencilImage-commonparent", "vkCmdClearDepthStencilImage");
+    skip |= ValidateObject(image, kVulkanObjectTypeImage, false, "VUID-vkCmdClearDepthStencilImage-image-parameter", "VUID-vkCmdClearDepthStencilImage-commonparent", "vkCmdClearDepthStencilImage");
 
     return skip;
 }
@@ -1793,7 +1792,7 @@ bool ObjectLifetimes::PreCallValidateCmdClearAttachments(
     uint32_t                                    rectCount,
     const VkClearRect*                          pRects) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdClearAttachments-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdClearAttachments-commandBuffer-parameter", kVUIDUndefined, "vkCmdClearAttachments");
 
     return skip;
 }
@@ -1807,9 +1806,9 @@ bool ObjectLifetimes::PreCallValidateCmdResolveImage(
     uint32_t                                    regionCount,
     const VkImageResolve*                       pRegions) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdResolveImage-commandBuffer-parameter", "VUID-vkCmdResolveImage-commonparent");
-    skip |= ValidateObject(srcImage, kVulkanObjectTypeImage, false, "VUID-vkCmdResolveImage-srcImage-parameter", "VUID-vkCmdResolveImage-commonparent");
-    skip |= ValidateObject(dstImage, kVulkanObjectTypeImage, false, "VUID-vkCmdResolveImage-dstImage-parameter", "VUID-vkCmdResolveImage-commonparent");
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdResolveImage-commandBuffer-parameter", "VUID-vkCmdResolveImage-commonparent", "vkCmdResolveImage");
+    skip |= ValidateObject(srcImage, kVulkanObjectTypeImage, false, "VUID-vkCmdResolveImage-srcImage-parameter", "VUID-vkCmdResolveImage-commonparent", "vkCmdResolveImage");
+    skip |= ValidateObject(dstImage, kVulkanObjectTypeImage, false, "VUID-vkCmdResolveImage-dstImage-parameter", "VUID-vkCmdResolveImage-commonparent", "vkCmdResolveImage");
 
     return skip;
 }
@@ -1819,8 +1818,8 @@ bool ObjectLifetimes::PreCallValidateCmdSetEvent(
     VkEvent                                     event,
     VkPipelineStageFlags                        stageMask) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetEvent-commandBuffer-parameter", "VUID-vkCmdSetEvent-commonparent");
-    skip |= ValidateObject(event, kVulkanObjectTypeEvent, false, "VUID-vkCmdSetEvent-event-parameter", "VUID-vkCmdSetEvent-commonparent");
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetEvent-commandBuffer-parameter", "VUID-vkCmdSetEvent-commonparent", "vkCmdSetEvent");
+    skip |= ValidateObject(event, kVulkanObjectTypeEvent, false, "VUID-vkCmdSetEvent-event-parameter", "VUID-vkCmdSetEvent-commonparent", "vkCmdSetEvent");
 
     return skip;
 }
@@ -1830,8 +1829,8 @@ bool ObjectLifetimes::PreCallValidateCmdResetEvent(
     VkEvent                                     event,
     VkPipelineStageFlags                        stageMask) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdResetEvent-commandBuffer-parameter", "VUID-vkCmdResetEvent-commonparent");
-    skip |= ValidateObject(event, kVulkanObjectTypeEvent, false, "VUID-vkCmdResetEvent-event-parameter", "VUID-vkCmdResetEvent-commonparent");
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdResetEvent-commandBuffer-parameter", "VUID-vkCmdResetEvent-commonparent", "vkCmdResetEvent");
+    skip |= ValidateObject(event, kVulkanObjectTypeEvent, false, "VUID-vkCmdResetEvent-event-parameter", "VUID-vkCmdResetEvent-commonparent", "vkCmdResetEvent");
 
     return skip;
 }
@@ -1849,20 +1848,20 @@ bool ObjectLifetimes::PreCallValidateCmdWaitEvents(
     uint32_t                                    imageMemoryBarrierCount,
     const VkImageMemoryBarrier*                 pImageMemoryBarriers) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdWaitEvents-commandBuffer-parameter", "VUID-vkCmdWaitEvents-commonparent");
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdWaitEvents-commandBuffer-parameter", "VUID-vkCmdWaitEvents-commonparent", "vkCmdWaitEvents");
     if ((eventCount > 0) && (pEvents)) {
         for (uint32_t index0 = 0; index0 < eventCount; ++index0) {
-            skip |= ValidateObject(pEvents[index0], kVulkanObjectTypeEvent, false, "VUID-vkCmdWaitEvents-pEvents-parameter", "VUID-vkCmdWaitEvents-commonparent");
+            skip |= ValidateObject(pEvents[index0], kVulkanObjectTypeEvent, false, "VUID-vkCmdWaitEvents-pEvents-parameter", "VUID-vkCmdWaitEvents-commonparent", "vkCmdWaitEvents");
         }
     }
     if (pBufferMemoryBarriers) {
         for (uint32_t index0 = 0; index0 < bufferMemoryBarrierCount; ++index0) {
-            skip |= ValidateObject(pBufferMemoryBarriers[index0].buffer, kVulkanObjectTypeBuffer, false, "VUID-VkBufferMemoryBarrier-buffer-parameter", kVUIDUndefined);
+            skip |= ValidateObject(pBufferMemoryBarriers[index0].buffer, kVulkanObjectTypeBuffer, false, "VUID-VkBufferMemoryBarrier-buffer-parameter", kVUIDUndefined, "VkBufferMemoryBarrier");
         }
     }
     if (pImageMemoryBarriers) {
         for (uint32_t index0 = 0; index0 < imageMemoryBarrierCount; ++index0) {
-            skip |= ValidateObject(pImageMemoryBarriers[index0].image, kVulkanObjectTypeImage, false, "VUID-VkImageMemoryBarrier-image-parameter", kVUIDUndefined);
+            skip |= ValidateObject(pImageMemoryBarriers[index0].image, kVulkanObjectTypeImage, false, "VUID-VkImageMemoryBarrier-image-parameter", kVUIDUndefined, "VkImageMemoryBarrier");
         }
     }
 
@@ -1881,15 +1880,15 @@ bool ObjectLifetimes::PreCallValidateCmdPipelineBarrier(
     uint32_t                                    imageMemoryBarrierCount,
     const VkImageMemoryBarrier*                 pImageMemoryBarriers) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdPipelineBarrier-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdPipelineBarrier-commandBuffer-parameter", kVUIDUndefined, "vkCmdPipelineBarrier");
     if (pBufferMemoryBarriers) {
         for (uint32_t index0 = 0; index0 < bufferMemoryBarrierCount; ++index0) {
-            skip |= ValidateObject(pBufferMemoryBarriers[index0].buffer, kVulkanObjectTypeBuffer, false, "VUID-VkBufferMemoryBarrier-buffer-parameter", kVUIDUndefined);
+            skip |= ValidateObject(pBufferMemoryBarriers[index0].buffer, kVulkanObjectTypeBuffer, false, "VUID-VkBufferMemoryBarrier-buffer-parameter", kVUIDUndefined, "VkBufferMemoryBarrier");
         }
     }
     if (pImageMemoryBarriers) {
         for (uint32_t index0 = 0; index0 < imageMemoryBarrierCount; ++index0) {
-            skip |= ValidateObject(pImageMemoryBarriers[index0].image, kVulkanObjectTypeImage, false, "VUID-VkImageMemoryBarrier-image-parameter", kVUIDUndefined);
+            skip |= ValidateObject(pImageMemoryBarriers[index0].image, kVulkanObjectTypeImage, false, "VUID-VkImageMemoryBarrier-image-parameter", kVUIDUndefined, "VkImageMemoryBarrier");
         }
     }
 
@@ -1902,8 +1901,8 @@ bool ObjectLifetimes::PreCallValidateCmdBeginQuery(
     uint32_t                                    query,
     VkQueryControlFlags                         flags) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdBeginQuery-commandBuffer-parameter", "VUID-vkCmdBeginQuery-commonparent");
-    skip |= ValidateObject(queryPool, kVulkanObjectTypeQueryPool, false, "VUID-vkCmdBeginQuery-queryPool-parameter", "VUID-vkCmdBeginQuery-commonparent");
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdBeginQuery-commandBuffer-parameter", "VUID-vkCmdBeginQuery-commonparent", "vkCmdBeginQuery");
+    skip |= ValidateObject(queryPool, kVulkanObjectTypeQueryPool, false, "VUID-vkCmdBeginQuery-queryPool-parameter", "VUID-vkCmdBeginQuery-commonparent", "vkCmdBeginQuery");
 
     return skip;
 }
@@ -1913,8 +1912,8 @@ bool ObjectLifetimes::PreCallValidateCmdEndQuery(
     VkQueryPool                                 queryPool,
     uint32_t                                    query) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdEndQuery-commandBuffer-parameter", "VUID-vkCmdEndQuery-commonparent");
-    skip |= ValidateObject(queryPool, kVulkanObjectTypeQueryPool, false, "VUID-vkCmdEndQuery-queryPool-parameter", "VUID-vkCmdEndQuery-commonparent");
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdEndQuery-commandBuffer-parameter", "VUID-vkCmdEndQuery-commonparent", "vkCmdEndQuery");
+    skip |= ValidateObject(queryPool, kVulkanObjectTypeQueryPool, false, "VUID-vkCmdEndQuery-queryPool-parameter", "VUID-vkCmdEndQuery-commonparent", "vkCmdEndQuery");
 
     return skip;
 }
@@ -1925,8 +1924,8 @@ bool ObjectLifetimes::PreCallValidateCmdResetQueryPool(
     uint32_t                                    firstQuery,
     uint32_t                                    queryCount) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdResetQueryPool-commandBuffer-parameter", "VUID-vkCmdResetQueryPool-commonparent");
-    skip |= ValidateObject(queryPool, kVulkanObjectTypeQueryPool, false, "VUID-vkCmdResetQueryPool-queryPool-parameter", "VUID-vkCmdResetQueryPool-commonparent");
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdResetQueryPool-commandBuffer-parameter", "VUID-vkCmdResetQueryPool-commonparent", "vkCmdResetQueryPool");
+    skip |= ValidateObject(queryPool, kVulkanObjectTypeQueryPool, false, "VUID-vkCmdResetQueryPool-queryPool-parameter", "VUID-vkCmdResetQueryPool-commonparent", "vkCmdResetQueryPool");
 
     return skip;
 }
@@ -1937,8 +1936,8 @@ bool ObjectLifetimes::PreCallValidateCmdWriteTimestamp(
     VkQueryPool                                 queryPool,
     uint32_t                                    query) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdWriteTimestamp-commandBuffer-parameter", "VUID-vkCmdWriteTimestamp-commonparent");
-    skip |= ValidateObject(queryPool, kVulkanObjectTypeQueryPool, false, "VUID-vkCmdWriteTimestamp-queryPool-parameter", "VUID-vkCmdWriteTimestamp-commonparent");
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdWriteTimestamp-commandBuffer-parameter", "VUID-vkCmdWriteTimestamp-commonparent", "vkCmdWriteTimestamp");
+    skip |= ValidateObject(queryPool, kVulkanObjectTypeQueryPool, false, "VUID-vkCmdWriteTimestamp-queryPool-parameter", "VUID-vkCmdWriteTimestamp-commonparent", "vkCmdWriteTimestamp");
 
     return skip;
 }
@@ -1953,9 +1952,9 @@ bool ObjectLifetimes::PreCallValidateCmdCopyQueryPoolResults(
     VkDeviceSize                                stride,
     VkQueryResultFlags                          flags) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdCopyQueryPoolResults-commandBuffer-parameter", "VUID-vkCmdCopyQueryPoolResults-commonparent");
-    skip |= ValidateObject(queryPool, kVulkanObjectTypeQueryPool, false, "VUID-vkCmdCopyQueryPoolResults-queryPool-parameter", "VUID-vkCmdCopyQueryPoolResults-commonparent");
-    skip |= ValidateObject(dstBuffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdCopyQueryPoolResults-dstBuffer-parameter", "VUID-vkCmdCopyQueryPoolResults-commonparent");
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdCopyQueryPoolResults-commandBuffer-parameter", "VUID-vkCmdCopyQueryPoolResults-commonparent", "vkCmdCopyQueryPoolResults");
+    skip |= ValidateObject(queryPool, kVulkanObjectTypeQueryPool, false, "VUID-vkCmdCopyQueryPoolResults-queryPool-parameter", "VUID-vkCmdCopyQueryPoolResults-commonparent", "vkCmdCopyQueryPoolResults");
+    skip |= ValidateObject(dstBuffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdCopyQueryPoolResults-dstBuffer-parameter", "VUID-vkCmdCopyQueryPoolResults-commonparent", "vkCmdCopyQueryPoolResults");
 
     return skip;
 }
@@ -1968,8 +1967,8 @@ bool ObjectLifetimes::PreCallValidateCmdPushConstants(
     uint32_t                                    size,
     const void*                                 pValues) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdPushConstants-commandBuffer-parameter", "VUID-vkCmdPushConstants-commonparent");
-    skip |= ValidateObject(layout, kVulkanObjectTypePipelineLayout, false, "VUID-vkCmdPushConstants-layout-parameter", "VUID-vkCmdPushConstants-commonparent");
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdPushConstants-commandBuffer-parameter", "VUID-vkCmdPushConstants-commonparent", "vkCmdPushConstants");
+    skip |= ValidateObject(layout, kVulkanObjectTypePipelineLayout, false, "VUID-vkCmdPushConstants-layout-parameter", "VUID-vkCmdPushConstants-commonparent", "vkCmdPushConstants");
 
     return skip;
 }
@@ -1979,10 +1978,10 @@ bool ObjectLifetimes::PreCallValidateCmdBeginRenderPass(
     const VkRenderPassBeginInfo*                pRenderPassBegin,
     VkSubpassContents                           contents) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdBeginRenderPass-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdBeginRenderPass-commandBuffer-parameter", kVUIDUndefined, "vkCmdBeginRenderPass");
     if (pRenderPassBegin) {
-        skip |= ValidateObject(pRenderPassBegin->renderPass, kVulkanObjectTypeRenderPass, false, "VUID-VkRenderPassBeginInfo-renderPass-parameter", "VUID-VkRenderPassBeginInfo-commonparent");
-        skip |= ValidateObject(pRenderPassBegin->framebuffer, kVulkanObjectTypeFramebuffer, false, "VUID-VkRenderPassBeginInfo-framebuffer-parameter", "VUID-VkRenderPassBeginInfo-commonparent");
+        skip |= ValidateObject(pRenderPassBegin->renderPass, kVulkanObjectTypeRenderPass, false, "VUID-VkRenderPassBeginInfo-renderPass-parameter", "VUID-VkRenderPassBeginInfo-commonparent", "VkRenderPassBeginInfo");
+        skip |= ValidateObject(pRenderPassBegin->framebuffer, kVulkanObjectTypeFramebuffer, false, "VUID-VkRenderPassBeginInfo-framebuffer-parameter", "VUID-VkRenderPassBeginInfo-commonparent", "VkRenderPassBeginInfo");
     }
 
     return skip;
@@ -1992,7 +1991,7 @@ bool ObjectLifetimes::PreCallValidateCmdNextSubpass(
     VkCommandBuffer                             commandBuffer,
     VkSubpassContents                           contents) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdNextSubpass-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdNextSubpass-commandBuffer-parameter", kVUIDUndefined, "vkCmdNextSubpass");
 
     return skip;
 }
@@ -2000,7 +1999,7 @@ bool ObjectLifetimes::PreCallValidateCmdNextSubpass(
 bool ObjectLifetimes::PreCallValidateCmdEndRenderPass(
     VkCommandBuffer                             commandBuffer) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdEndRenderPass-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdEndRenderPass-commandBuffer-parameter", kVUIDUndefined, "vkCmdEndRenderPass");
 
     return skip;
 }
@@ -2010,10 +2009,10 @@ bool ObjectLifetimes::PreCallValidateCmdExecuteCommands(
     uint32_t                                    commandBufferCount,
     const VkCommandBuffer*                      pCommandBuffers) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdExecuteCommands-commandBuffer-parameter", "VUID-vkCmdExecuteCommands-commonparent");
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdExecuteCommands-commandBuffer-parameter", "VUID-vkCmdExecuteCommands-commonparent", "vkCmdExecuteCommands");
     if ((commandBufferCount > 0) && (pCommandBuffers)) {
         for (uint32_t index0 = 0; index0 < commandBufferCount; ++index0) {
-            skip |= ValidateObject(pCommandBuffers[index0], kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdExecuteCommands-pCommandBuffers-parameter", "VUID-vkCmdExecuteCommands-commonparent");
+            skip |= ValidateObject(pCommandBuffers[index0], kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdExecuteCommands-pCommandBuffers-parameter", "VUID-vkCmdExecuteCommands-commonparent", "vkCmdExecuteCommands");
         }
     }
 
@@ -2025,11 +2024,11 @@ bool ObjectLifetimes::PreCallValidateBindBufferMemory2(
     uint32_t                                    bindInfoCount,
     const VkBindBufferMemoryInfo*               pBindInfos) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkBindBufferMemory2-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkBindBufferMemory2-device-parameter", kVUIDUndefined, "vkBindBufferMemory2");
     if (pBindInfos) {
         for (uint32_t index0 = 0; index0 < bindInfoCount; ++index0) {
-            skip |= ValidateObject(pBindInfos[index0].buffer, kVulkanObjectTypeBuffer, false, "VUID-VkBindBufferMemoryInfo-buffer-parameter", "VUID-VkBindBufferMemoryInfo-commonparent");
-            skip |= ValidateObject(pBindInfos[index0].memory, kVulkanObjectTypeDeviceMemory, false, "VUID-VkBindBufferMemoryInfo-memory-parameter", "VUID-VkBindBufferMemoryInfo-commonparent");
+            skip |= ValidateObject(pBindInfos[index0].buffer, kVulkanObjectTypeBuffer, false, "VUID-VkBindBufferMemoryInfo-buffer-parameter", "VUID-VkBindBufferMemoryInfo-commonparent", "VkBindBufferMemoryInfo");
+            skip |= ValidateObject(pBindInfos[index0].memory, kVulkanObjectTypeDeviceMemory, false, "VUID-VkBindBufferMemoryInfo-memory-parameter", "VUID-VkBindBufferMemoryInfo-commonparent", "VkBindBufferMemoryInfo");
         }
     }
 
@@ -2041,11 +2040,11 @@ bool ObjectLifetimes::PreCallValidateBindImageMemory2(
     uint32_t                                    bindInfoCount,
     const VkBindImageMemoryInfo*                pBindInfos) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkBindImageMemory2-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkBindImageMemory2-device-parameter", kVUIDUndefined, "vkBindImageMemory2");
     if (pBindInfos) {
         for (uint32_t index0 = 0; index0 < bindInfoCount; ++index0) {
-            skip |= ValidateObject(pBindInfos[index0].image, kVulkanObjectTypeImage, false, "VUID-VkBindImageMemoryInfo-image-parameter", "VUID-VkBindImageMemoryInfo-commonparent");
-            skip |= ValidateObject(pBindInfos[index0].memory, kVulkanObjectTypeDeviceMemory, true, kVUIDUndefined, "VUID-VkBindImageMemoryInfo-commonparent");
+            skip |= ValidateObject(pBindInfos[index0].image, kVulkanObjectTypeImage, false, "VUID-VkBindImageMemoryInfo-image-parameter", "VUID-VkBindImageMemoryInfo-commonparent", "VkBindImageMemoryInfo");
+            skip |= ValidateObject(pBindInfos[index0].memory, kVulkanObjectTypeDeviceMemory, true, kVUIDUndefined, "VUID-VkBindImageMemoryInfo-commonparent", "VkBindImageMemoryInfo");
         }
     }
 
@@ -2059,7 +2058,7 @@ bool ObjectLifetimes::PreCallValidateGetDeviceGroupPeerMemoryFeatures(
     uint32_t                                    remoteDeviceIndex,
     VkPeerMemoryFeatureFlags*                   pPeerMemoryFeatures) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetDeviceGroupPeerMemoryFeatures-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetDeviceGroupPeerMemoryFeatures-device-parameter", kVUIDUndefined, "vkGetDeviceGroupPeerMemoryFeatures");
 
     return skip;
 }
@@ -2068,7 +2067,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetDeviceMask(
     VkCommandBuffer                             commandBuffer,
     uint32_t                                    deviceMask) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetDeviceMask-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetDeviceMask-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetDeviceMask");
 
     return skip;
 }
@@ -2082,7 +2081,7 @@ bool ObjectLifetimes::PreCallValidateCmdDispatchBase(
     uint32_t                                    groupCountY,
     uint32_t                                    groupCountZ) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdDispatchBase-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdDispatchBase-commandBuffer-parameter", kVUIDUndefined, "vkCmdDispatchBase");
 
     return skip;
 }
@@ -2092,7 +2091,7 @@ bool ObjectLifetimes::PreCallValidateEnumeratePhysicalDeviceGroups(
     uint32_t*                                   pPhysicalDeviceGroupCount,
     VkPhysicalDeviceGroupProperties*            pPhysicalDeviceGroupProperties) const {
     bool skip = false;
-    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, "VUID-vkEnumeratePhysicalDeviceGroups-instance-parameter", kVUIDUndefined);
+    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, "VUID-vkEnumeratePhysicalDeviceGroups-instance-parameter", kVUIDUndefined, "vkEnumeratePhysicalDeviceGroups");
 
     return skip;
 }
@@ -2116,9 +2115,9 @@ bool ObjectLifetimes::PreCallValidateGetImageMemoryRequirements2(
     const VkImageMemoryRequirementsInfo2*       pInfo,
     VkMemoryRequirements2*                      pMemoryRequirements) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetImageMemoryRequirements2-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetImageMemoryRequirements2-device-parameter", kVUIDUndefined, "vkGetImageMemoryRequirements2");
     if (pInfo) {
-        skip |= ValidateObject(pInfo->image, kVulkanObjectTypeImage, false, "VUID-VkImageMemoryRequirementsInfo2-image-parameter", kVUIDUndefined);
+        skip |= ValidateObject(pInfo->image, kVulkanObjectTypeImage, false, "VUID-VkImageMemoryRequirementsInfo2-image-parameter", kVUIDUndefined, "VkImageMemoryRequirementsInfo2");
     }
 
     return skip;
@@ -2129,9 +2128,9 @@ bool ObjectLifetimes::PreCallValidateGetBufferMemoryRequirements2(
     const VkBufferMemoryRequirementsInfo2*      pInfo,
     VkMemoryRequirements2*                      pMemoryRequirements) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetBufferMemoryRequirements2-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetBufferMemoryRequirements2-device-parameter", kVUIDUndefined, "vkGetBufferMemoryRequirements2");
     if (pInfo) {
-        skip |= ValidateObject(pInfo->buffer, kVulkanObjectTypeBuffer, false, "VUID-VkBufferMemoryRequirementsInfo2-buffer-parameter", kVUIDUndefined);
+        skip |= ValidateObject(pInfo->buffer, kVulkanObjectTypeBuffer, false, "VUID-VkBufferMemoryRequirementsInfo2-buffer-parameter", kVUIDUndefined, "VkBufferMemoryRequirementsInfo2");
     }
 
     return skip;
@@ -2143,9 +2142,9 @@ bool ObjectLifetimes::PreCallValidateGetImageSparseMemoryRequirements2(
     uint32_t*                                   pSparseMemoryRequirementCount,
     VkSparseImageMemoryRequirements2*           pSparseMemoryRequirements) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetImageSparseMemoryRequirements2");
     if (pInfo) {
-        skip |= ValidateObject(pInfo->image, kVulkanObjectTypeImage, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pInfo->image, kVulkanObjectTypeImage, false, kVUIDUndefined, kVUIDUndefined, "VkImageSparseMemoryRequirementsInfo2");
     }
 
     return skip;
@@ -2155,7 +2154,7 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceFeatures2(
     VkPhysicalDevice                            physicalDevice,
     VkPhysicalDeviceFeatures2*                  pFeatures) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceFeatures2-physicalDevice-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceFeatures2-physicalDevice-parameter", kVUIDUndefined, "vkGetPhysicalDeviceFeatures2");
 
     return skip;
 }
@@ -2164,7 +2163,7 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceProperties2(
     VkPhysicalDevice                            physicalDevice,
     VkPhysicalDeviceProperties2*                pProperties) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceProperties2-physicalDevice-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceProperties2-physicalDevice-parameter", kVUIDUndefined, "vkGetPhysicalDeviceProperties2");
 
     return skip;
 }
@@ -2174,7 +2173,7 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceFormatProperties2(
     VkFormat                                    format,
     VkFormatProperties2*                        pFormatProperties) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceFormatProperties2-physicalDevice-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceFormatProperties2-physicalDevice-parameter", kVUIDUndefined, "vkGetPhysicalDeviceFormatProperties2");
 
     return skip;
 }
@@ -2184,7 +2183,7 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceImageFormatProperties2(
     const VkPhysicalDeviceImageFormatInfo2*     pImageFormatInfo,
     VkImageFormatProperties2*                   pImageFormatProperties) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceImageFormatProperties2-physicalDevice-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceImageFormatProperties2-physicalDevice-parameter", kVUIDUndefined, "vkGetPhysicalDeviceImageFormatProperties2");
 
     return skip;
 }
@@ -2193,7 +2192,7 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceMemoryProperties2(
     VkPhysicalDevice                            physicalDevice,
     VkPhysicalDeviceMemoryProperties2*          pMemoryProperties) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceMemoryProperties2-physicalDevice-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceMemoryProperties2-physicalDevice-parameter", kVUIDUndefined, "vkGetPhysicalDeviceMemoryProperties2");
 
     return skip;
 }
@@ -2204,7 +2203,7 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceSparseImageFormatPropertie
     uint32_t*                                   pPropertyCount,
     VkSparseImageFormatProperties2*             pProperties) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetPhysicalDeviceSparseImageFormatProperties2");
 
     return skip;
 }
@@ -2214,8 +2213,8 @@ bool ObjectLifetimes::PreCallValidateTrimCommandPool(
     VkCommandPool                               commandPool,
     VkCommandPoolTrimFlags                      flags) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(commandPool, kVulkanObjectTypeCommandPool, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkTrimCommandPool");
+    skip |= ValidateObject(commandPool, kVulkanObjectTypeCommandPool, false, kVUIDUndefined, kVUIDUndefined, "vkTrimCommandPool");
 
     return skip;
 }
@@ -2226,7 +2225,7 @@ bool ObjectLifetimes::PreCallValidateCreateSamplerYcbcrConversion(
     const VkAllocationCallbacks*                pAllocator,
     VkSamplerYcbcrConversion*                   pYcbcrConversion) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreateSamplerYcbcrConversion-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreateSamplerYcbcrConversion-device-parameter", kVUIDUndefined, "vkCreateSamplerYcbcrConversion");
 
     return skip;
 }
@@ -2247,8 +2246,8 @@ bool ObjectLifetimes::PreCallValidateDestroySamplerYcbcrConversion(
     VkSamplerYcbcrConversion                    ycbcrConversion,
     const VkAllocationCallbacks*                pAllocator) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkDestroySamplerYcbcrConversion-device-parameter", kVUIDUndefined);
-    skip |= ValidateObject(ycbcrConversion, kVulkanObjectTypeSamplerYcbcrConversion, true, "VUID-vkDestroySamplerYcbcrConversion-ycbcrConversion-parameter", "VUID-vkDestroySamplerYcbcrConversion-ycbcrConversion-parent");
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkDestroySamplerYcbcrConversion-device-parameter", kVUIDUndefined, "vkDestroySamplerYcbcrConversion");
+    skip |= ValidateObject(ycbcrConversion, kVulkanObjectTypeSamplerYcbcrConversion, true, "VUID-vkDestroySamplerYcbcrConversion-ycbcrConversion-parameter", "VUID-vkDestroySamplerYcbcrConversion-ycbcrConversion-parent", "vkDestroySamplerYcbcrConversion");
     skip |= ValidateDestroyObject(ycbcrConversion, kVulkanObjectTypeSamplerYcbcrConversion, pAllocator, kVUIDUndefined, kVUIDUndefined);
 
     return skip;
@@ -2267,8 +2266,8 @@ bool ObjectLifetimes::PreCallValidateDestroyDescriptorUpdateTemplate(
     VkDescriptorUpdateTemplate                  descriptorUpdateTemplate,
     const VkAllocationCallbacks*                pAllocator) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(descriptorUpdateTemplate, kVulkanObjectTypeDescriptorUpdateTemplate, true, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkDestroyDescriptorUpdateTemplate");
+    skip |= ValidateObject(descriptorUpdateTemplate, kVulkanObjectTypeDescriptorUpdateTemplate, true, kVUIDUndefined, kVUIDUndefined, "vkDestroyDescriptorUpdateTemplate");
     skip |= ValidateDestroyObject(descriptorUpdateTemplate, kVulkanObjectTypeDescriptorUpdateTemplate, pAllocator, kVUIDUndefined, kVUIDUndefined);
 
     return skip;
@@ -2288,9 +2287,9 @@ bool ObjectLifetimes::PreCallValidateUpdateDescriptorSetWithTemplate(
     VkDescriptorUpdateTemplate                  descriptorUpdateTemplate,
     const void*                                 pData) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(descriptorSet, kVulkanObjectTypeDescriptorSet, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(descriptorUpdateTemplate, kVulkanObjectTypeDescriptorUpdateTemplate, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkUpdateDescriptorSetWithTemplate");
+    skip |= ValidateObject(descriptorSet, kVulkanObjectTypeDescriptorSet, false, kVUIDUndefined, kVUIDUndefined, "vkUpdateDescriptorSetWithTemplate");
+    skip |= ValidateObject(descriptorUpdateTemplate, kVulkanObjectTypeDescriptorUpdateTemplate, false, kVUIDUndefined, kVUIDUndefined, "vkUpdateDescriptorSetWithTemplate");
 
     return skip;
 }
@@ -2300,7 +2299,7 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceExternalBufferProperties(
     const VkPhysicalDeviceExternalBufferInfo*   pExternalBufferInfo,
     VkExternalBufferProperties*                 pExternalBufferProperties) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceExternalBufferProperties-physicalDevice-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceExternalBufferProperties-physicalDevice-parameter", kVUIDUndefined, "vkGetPhysicalDeviceExternalBufferProperties");
 
     return skip;
 }
@@ -2310,7 +2309,7 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceExternalFenceProperties(
     const VkPhysicalDeviceExternalFenceInfo*    pExternalFenceInfo,
     VkExternalFenceProperties*                  pExternalFenceProperties) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceExternalFenceProperties-physicalDevice-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceExternalFenceProperties-physicalDevice-parameter", kVUIDUndefined, "vkGetPhysicalDeviceExternalFenceProperties");
 
     return skip;
 }
@@ -2320,7 +2319,7 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceExternalSemaphorePropertie
     const VkPhysicalDeviceExternalSemaphoreInfo* pExternalSemaphoreInfo,
     VkExternalSemaphoreProperties*              pExternalSemaphoreProperties) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceExternalSemaphoreProperties-physicalDevice-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceExternalSemaphoreProperties-physicalDevice-parameter", kVUIDUndefined, "vkGetPhysicalDeviceExternalSemaphoreProperties");
 
     return skip;
 }
@@ -2334,9 +2333,9 @@ bool ObjectLifetimes::PreCallValidateCmdDrawIndirectCount(
     uint32_t                                    maxDrawCount,
     uint32_t                                    stride) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdDrawIndirectCount-commandBuffer-parameter", "VUID-vkCmdDrawIndirectCount-commonparent");
-    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdDrawIndirectCount-buffer-parameter", "VUID-vkCmdDrawIndirectCount-commonparent");
-    skip |= ValidateObject(countBuffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdDrawIndirectCount-countBuffer-parameter", "VUID-vkCmdDrawIndirectCount-commonparent");
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdDrawIndirectCount-commandBuffer-parameter", "VUID-vkCmdDrawIndirectCount-commonparent", "vkCmdDrawIndirectCount");
+    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdDrawIndirectCount-buffer-parameter", "VUID-vkCmdDrawIndirectCount-commonparent", "vkCmdDrawIndirectCount");
+    skip |= ValidateObject(countBuffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdDrawIndirectCount-countBuffer-parameter", "VUID-vkCmdDrawIndirectCount-commonparent", "vkCmdDrawIndirectCount");
 
     return skip;
 }
@@ -2350,9 +2349,9 @@ bool ObjectLifetimes::PreCallValidateCmdDrawIndexedIndirectCount(
     uint32_t                                    maxDrawCount,
     uint32_t                                    stride) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdDrawIndexedIndirectCount-commandBuffer-parameter", "VUID-vkCmdDrawIndexedIndirectCount-commonparent");
-    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdDrawIndexedIndirectCount-buffer-parameter", "VUID-vkCmdDrawIndexedIndirectCount-commonparent");
-    skip |= ValidateObject(countBuffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdDrawIndexedIndirectCount-countBuffer-parameter", "VUID-vkCmdDrawIndexedIndirectCount-commonparent");
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdDrawIndexedIndirectCount-commandBuffer-parameter", "VUID-vkCmdDrawIndexedIndirectCount-commonparent", "vkCmdDrawIndexedIndirectCount");
+    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdDrawIndexedIndirectCount-buffer-parameter", "VUID-vkCmdDrawIndexedIndirectCount-commonparent", "vkCmdDrawIndexedIndirectCount");
+    skip |= ValidateObject(countBuffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdDrawIndexedIndirectCount-countBuffer-parameter", "VUID-vkCmdDrawIndexedIndirectCount-commonparent", "vkCmdDrawIndexedIndirectCount");
 
     return skip;
 }
@@ -2363,7 +2362,7 @@ bool ObjectLifetimes::PreCallValidateCreateRenderPass2(
     const VkAllocationCallbacks*                pAllocator,
     VkRenderPass*                               pRenderPass) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreateRenderPass2-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreateRenderPass2-device-parameter", kVUIDUndefined, "vkCreateRenderPass2");
 
     return skip;
 }
@@ -2384,10 +2383,10 @@ bool ObjectLifetimes::PreCallValidateCmdBeginRenderPass2(
     const VkRenderPassBeginInfo*                pRenderPassBegin,
     const VkSubpassBeginInfo*                   pSubpassBeginInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdBeginRenderPass2-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdBeginRenderPass2-commandBuffer-parameter", kVUIDUndefined, "vkCmdBeginRenderPass2");
     if (pRenderPassBegin) {
-        skip |= ValidateObject(pRenderPassBegin->renderPass, kVulkanObjectTypeRenderPass, false, "VUID-VkRenderPassBeginInfo-renderPass-parameter", "VUID-VkRenderPassBeginInfo-commonparent");
-        skip |= ValidateObject(pRenderPassBegin->framebuffer, kVulkanObjectTypeFramebuffer, false, "VUID-VkRenderPassBeginInfo-framebuffer-parameter", "VUID-VkRenderPassBeginInfo-commonparent");
+        skip |= ValidateObject(pRenderPassBegin->renderPass, kVulkanObjectTypeRenderPass, false, "VUID-VkRenderPassBeginInfo-renderPass-parameter", "VUID-VkRenderPassBeginInfo-commonparent", "VkRenderPassBeginInfo");
+        skip |= ValidateObject(pRenderPassBegin->framebuffer, kVulkanObjectTypeFramebuffer, false, "VUID-VkRenderPassBeginInfo-framebuffer-parameter", "VUID-VkRenderPassBeginInfo-commonparent", "VkRenderPassBeginInfo");
     }
 
     return skip;
@@ -2398,7 +2397,7 @@ bool ObjectLifetimes::PreCallValidateCmdNextSubpass2(
     const VkSubpassBeginInfo*                   pSubpassBeginInfo,
     const VkSubpassEndInfo*                     pSubpassEndInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdNextSubpass2-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdNextSubpass2-commandBuffer-parameter", kVUIDUndefined, "vkCmdNextSubpass2");
 
     return skip;
 }
@@ -2407,7 +2406,7 @@ bool ObjectLifetimes::PreCallValidateCmdEndRenderPass2(
     VkCommandBuffer                             commandBuffer,
     const VkSubpassEndInfo*                     pSubpassEndInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdEndRenderPass2-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdEndRenderPass2-commandBuffer-parameter", kVUIDUndefined, "vkCmdEndRenderPass2");
 
     return skip;
 }
@@ -2418,8 +2417,8 @@ bool ObjectLifetimes::PreCallValidateResetQueryPool(
     uint32_t                                    firstQuery,
     uint32_t                                    queryCount) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkResetQueryPool-device-parameter", kVUIDUndefined);
-    skip |= ValidateObject(queryPool, kVulkanObjectTypeQueryPool, false, "VUID-vkResetQueryPool-queryPool-parameter", "VUID-vkResetQueryPool-queryPool-parent");
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkResetQueryPool-device-parameter", kVUIDUndefined, "vkResetQueryPool");
+    skip |= ValidateObject(queryPool, kVulkanObjectTypeQueryPool, false, "VUID-vkResetQueryPool-queryPool-parameter", "VUID-vkResetQueryPool-queryPool-parent", "vkResetQueryPool");
 
     return skip;
 }
@@ -2429,8 +2428,8 @@ bool ObjectLifetimes::PreCallValidateGetSemaphoreCounterValue(
     VkSemaphore                                 semaphore,
     uint64_t*                                   pValue) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetSemaphoreCounterValue-device-parameter", kVUIDUndefined);
-    skip |= ValidateObject(semaphore, kVulkanObjectTypeSemaphore, false, "VUID-vkGetSemaphoreCounterValue-semaphore-parameter", "VUID-vkGetSemaphoreCounterValue-semaphore-parent");
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetSemaphoreCounterValue-device-parameter", kVUIDUndefined, "vkGetSemaphoreCounterValue");
+    skip |= ValidateObject(semaphore, kVulkanObjectTypeSemaphore, false, "VUID-vkGetSemaphoreCounterValue-semaphore-parameter", "VUID-vkGetSemaphoreCounterValue-semaphore-parent", "vkGetSemaphoreCounterValue");
 
     return skip;
 }
@@ -2440,11 +2439,11 @@ bool ObjectLifetimes::PreCallValidateWaitSemaphores(
     const VkSemaphoreWaitInfo*                  pWaitInfo,
     uint64_t                                    timeout) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkWaitSemaphores-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkWaitSemaphores-device-parameter", kVUIDUndefined, "vkWaitSemaphores");
     if (pWaitInfo) {
         if ((pWaitInfo->semaphoreCount > 0) && (pWaitInfo->pSemaphores)) {
             for (uint32_t index1 = 0; index1 < pWaitInfo->semaphoreCount; ++index1) {
-                skip |= ValidateObject(pWaitInfo->pSemaphores[index1], kVulkanObjectTypeSemaphore, false, "VUID-VkSemaphoreWaitInfo-pSemaphores-parameter", kVUIDUndefined);
+                skip |= ValidateObject(pWaitInfo->pSemaphores[index1], kVulkanObjectTypeSemaphore, false, "VUID-VkSemaphoreWaitInfo-pSemaphores-parameter", kVUIDUndefined, "VkSemaphoreWaitInfo");
             }
         }
     }
@@ -2456,9 +2455,9 @@ bool ObjectLifetimes::PreCallValidateSignalSemaphore(
     VkDevice                                    device,
     const VkSemaphoreSignalInfo*                pSignalInfo) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkSignalSemaphore-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkSignalSemaphore-device-parameter", kVUIDUndefined, "vkSignalSemaphore");
     if (pSignalInfo) {
-        skip |= ValidateObject(pSignalInfo->semaphore, kVulkanObjectTypeSemaphore, false, "VUID-VkSemaphoreSignalInfo-semaphore-parameter", kVUIDUndefined);
+        skip |= ValidateObject(pSignalInfo->semaphore, kVulkanObjectTypeSemaphore, false, "VUID-VkSemaphoreSignalInfo-semaphore-parameter", kVUIDUndefined, "VkSemaphoreSignalInfo");
     }
 
     return skip;
@@ -2468,7 +2467,7 @@ bool ObjectLifetimes::PreCallValidateGetBufferDeviceAddress(
     VkDevice                                    device,
     const VkBufferDeviceAddressInfo*            pInfo) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetBufferDeviceAddress-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetBufferDeviceAddress-device-parameter", kVUIDUndefined, "vkGetBufferDeviceAddress");
 
     return skip;
 }
@@ -2477,7 +2476,7 @@ bool ObjectLifetimes::PreCallValidateGetBufferOpaqueCaptureAddress(
     VkDevice                                    device,
     const VkBufferDeviceAddressInfo*            pInfo) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetBufferOpaqueCaptureAddress-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetBufferOpaqueCaptureAddress-device-parameter", kVUIDUndefined, "vkGetBufferOpaqueCaptureAddress");
 
     return skip;
 }
@@ -2486,7 +2485,7 @@ bool ObjectLifetimes::PreCallValidateGetDeviceMemoryOpaqueCaptureAddress(
     VkDevice                                    device,
     const VkDeviceMemoryOpaqueCaptureAddressInfo* pInfo) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetDeviceMemoryOpaqueCaptureAddress-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetDeviceMemoryOpaqueCaptureAddress-device-parameter", kVUIDUndefined, "vkGetDeviceMemoryOpaqueCaptureAddress");
 
     return skip;
 }
@@ -2496,7 +2495,7 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceToolProperties(
     uint32_t*                                   pToolCount,
     VkPhysicalDeviceToolProperties*             pToolProperties) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetPhysicalDeviceToolProperties");
 
     return skip;
 }
@@ -2507,7 +2506,7 @@ bool ObjectLifetimes::PreCallValidateCreatePrivateDataSlot(
     const VkAllocationCallbacks*                pAllocator,
     VkPrivateDataSlot*                          pPrivateDataSlot) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkCreatePrivateDataSlot");
 
     return skip;
 }
@@ -2528,8 +2527,8 @@ bool ObjectLifetimes::PreCallValidateDestroyPrivateDataSlot(
     VkPrivateDataSlot                           privateDataSlot,
     const VkAllocationCallbacks*                pAllocator) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(privateDataSlot, kVulkanObjectTypePrivateDataSlot, true, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkDestroyPrivateDataSlot");
+    skip |= ValidateObject(privateDataSlot, kVulkanObjectTypePrivateDataSlot, true, kVUIDUndefined, kVUIDUndefined, "vkDestroyPrivateDataSlot");
     skip |= ValidateDestroyObject(privateDataSlot, kVulkanObjectTypePrivateDataSlot, pAllocator, kVUIDUndefined, kVUIDUndefined);
 
     return skip;
@@ -2550,8 +2549,8 @@ bool ObjectLifetimes::PreCallValidateSetPrivateData(
     VkPrivateDataSlot                           privateDataSlot,
     uint64_t                                    data) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(privateDataSlot, kVulkanObjectTypePrivateDataSlot, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkSetPrivateData");
+    skip |= ValidateObject(privateDataSlot, kVulkanObjectTypePrivateDataSlot, false, kVUIDUndefined, kVUIDUndefined, "vkSetPrivateData");
 
     return skip;
 }
@@ -2563,8 +2562,8 @@ bool ObjectLifetimes::PreCallValidateGetPrivateData(
     VkPrivateDataSlot                           privateDataSlot,
     uint64_t*                                   pData) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(privateDataSlot, kVulkanObjectTypePrivateDataSlot, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetPrivateData");
+    skip |= ValidateObject(privateDataSlot, kVulkanObjectTypePrivateDataSlot, false, kVUIDUndefined, kVUIDUndefined, "vkGetPrivateData");
 
     return skip;
 }
@@ -2574,17 +2573,17 @@ bool ObjectLifetimes::PreCallValidateCmdSetEvent2(
     VkEvent                                     event,
     const VkDependencyInfo*                     pDependencyInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetEvent2-commandBuffer-parameter", "VUID-vkCmdSetEvent2-commonparent");
-    skip |= ValidateObject(event, kVulkanObjectTypeEvent, false, "VUID-vkCmdSetEvent2-event-parameter", "VUID-vkCmdSetEvent2-commonparent");
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetEvent2-commandBuffer-parameter", "VUID-vkCmdSetEvent2-commonparent", "vkCmdSetEvent2");
+    skip |= ValidateObject(event, kVulkanObjectTypeEvent, false, "VUID-vkCmdSetEvent2-event-parameter", "VUID-vkCmdSetEvent2-commonparent", "vkCmdSetEvent2");
     if (pDependencyInfo) {
         if (pDependencyInfo->pBufferMemoryBarriers) {
             for (uint32_t index1 = 0; index1 < pDependencyInfo->bufferMemoryBarrierCount; ++index1) {
-                skip |= ValidateObject(pDependencyInfo->pBufferMemoryBarriers[index1].buffer, kVulkanObjectTypeBuffer, false, "VUID-VkBufferMemoryBarrier2-buffer-parameter", kVUIDUndefined);
+                skip |= ValidateObject(pDependencyInfo->pBufferMemoryBarriers[index1].buffer, kVulkanObjectTypeBuffer, false, "VUID-VkBufferMemoryBarrier2-buffer-parameter", kVUIDUndefined, "VkBufferMemoryBarrier2");
             }
         }
         if (pDependencyInfo->pImageMemoryBarriers) {
             for (uint32_t index1 = 0; index1 < pDependencyInfo->imageMemoryBarrierCount; ++index1) {
-                skip |= ValidateObject(pDependencyInfo->pImageMemoryBarriers[index1].image, kVulkanObjectTypeImage, false, "VUID-VkImageMemoryBarrier2-image-parameter", kVUIDUndefined);
+                skip |= ValidateObject(pDependencyInfo->pImageMemoryBarriers[index1].image, kVulkanObjectTypeImage, false, "VUID-VkImageMemoryBarrier2-image-parameter", kVUIDUndefined, "VkImageMemoryBarrier2");
             }
         }
     }
@@ -2597,8 +2596,8 @@ bool ObjectLifetimes::PreCallValidateCmdResetEvent2(
     VkEvent                                     event,
     VkPipelineStageFlags2                       stageMask) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdResetEvent2-commandBuffer-parameter", "VUID-vkCmdResetEvent2-commonparent");
-    skip |= ValidateObject(event, kVulkanObjectTypeEvent, false, "VUID-vkCmdResetEvent2-event-parameter", "VUID-vkCmdResetEvent2-commonparent");
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdResetEvent2-commandBuffer-parameter", "VUID-vkCmdResetEvent2-commonparent", "vkCmdResetEvent2");
+    skip |= ValidateObject(event, kVulkanObjectTypeEvent, false, "VUID-vkCmdResetEvent2-event-parameter", "VUID-vkCmdResetEvent2-commonparent", "vkCmdResetEvent2");
 
     return skip;
 }
@@ -2609,22 +2608,22 @@ bool ObjectLifetimes::PreCallValidateCmdWaitEvents2(
     const VkEvent*                              pEvents,
     const VkDependencyInfo*                     pDependencyInfos) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdWaitEvents2-commandBuffer-parameter", "VUID-vkCmdWaitEvents2-commonparent");
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdWaitEvents2-commandBuffer-parameter", "VUID-vkCmdWaitEvents2-commonparent", "vkCmdWaitEvents2");
     if ((eventCount > 0) && (pEvents)) {
         for (uint32_t index0 = 0; index0 < eventCount; ++index0) {
-            skip |= ValidateObject(pEvents[index0], kVulkanObjectTypeEvent, false, "VUID-vkCmdWaitEvents2-pEvents-parameter", "VUID-vkCmdWaitEvents2-commonparent");
+            skip |= ValidateObject(pEvents[index0], kVulkanObjectTypeEvent, false, "VUID-vkCmdWaitEvents2-pEvents-parameter", "VUID-vkCmdWaitEvents2-commonparent", "vkCmdWaitEvents2");
         }
     }
     if (pDependencyInfos) {
         for (uint32_t index0 = 0; index0 < eventCount; ++index0) {
             if (pDependencyInfos[index0].pBufferMemoryBarriers) {
                 for (uint32_t index1 = 0; index1 < pDependencyInfos[index0].bufferMemoryBarrierCount; ++index1) {
-                    skip |= ValidateObject(pDependencyInfos[index0].pBufferMemoryBarriers[index1].buffer, kVulkanObjectTypeBuffer, false, "VUID-VkBufferMemoryBarrier2-buffer-parameter", kVUIDUndefined);
+                    skip |= ValidateObject(pDependencyInfos[index0].pBufferMemoryBarriers[index1].buffer, kVulkanObjectTypeBuffer, false, "VUID-VkBufferMemoryBarrier2-buffer-parameter", kVUIDUndefined, "VkBufferMemoryBarrier2");
                 }
             }
             if (pDependencyInfos[index0].pImageMemoryBarriers) {
                 for (uint32_t index1 = 0; index1 < pDependencyInfos[index0].imageMemoryBarrierCount; ++index1) {
-                    skip |= ValidateObject(pDependencyInfos[index0].pImageMemoryBarriers[index1].image, kVulkanObjectTypeImage, false, "VUID-VkImageMemoryBarrier2-image-parameter", kVUIDUndefined);
+                    skip |= ValidateObject(pDependencyInfos[index0].pImageMemoryBarriers[index1].image, kVulkanObjectTypeImage, false, "VUID-VkImageMemoryBarrier2-image-parameter", kVUIDUndefined, "VkImageMemoryBarrier2");
                 }
             }
         }
@@ -2637,16 +2636,16 @@ bool ObjectLifetimes::PreCallValidateCmdPipelineBarrier2(
     VkCommandBuffer                             commandBuffer,
     const VkDependencyInfo*                     pDependencyInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdPipelineBarrier2-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdPipelineBarrier2-commandBuffer-parameter", kVUIDUndefined, "vkCmdPipelineBarrier2");
     if (pDependencyInfo) {
         if (pDependencyInfo->pBufferMemoryBarriers) {
             for (uint32_t index1 = 0; index1 < pDependencyInfo->bufferMemoryBarrierCount; ++index1) {
-                skip |= ValidateObject(pDependencyInfo->pBufferMemoryBarriers[index1].buffer, kVulkanObjectTypeBuffer, false, "VUID-VkBufferMemoryBarrier2-buffer-parameter", kVUIDUndefined);
+                skip |= ValidateObject(pDependencyInfo->pBufferMemoryBarriers[index1].buffer, kVulkanObjectTypeBuffer, false, "VUID-VkBufferMemoryBarrier2-buffer-parameter", kVUIDUndefined, "VkBufferMemoryBarrier2");
             }
         }
         if (pDependencyInfo->pImageMemoryBarriers) {
             for (uint32_t index1 = 0; index1 < pDependencyInfo->imageMemoryBarrierCount; ++index1) {
-                skip |= ValidateObject(pDependencyInfo->pImageMemoryBarriers[index1].image, kVulkanObjectTypeImage, false, "VUID-VkImageMemoryBarrier2-image-parameter", kVUIDUndefined);
+                skip |= ValidateObject(pDependencyInfo->pImageMemoryBarriers[index1].image, kVulkanObjectTypeImage, false, "VUID-VkImageMemoryBarrier2-image-parameter", kVUIDUndefined, "VkImageMemoryBarrier2");
             }
         }
     }
@@ -2660,8 +2659,8 @@ bool ObjectLifetimes::PreCallValidateCmdWriteTimestamp2(
     VkQueryPool                                 queryPool,
     uint32_t                                    query) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdWriteTimestamp2-commandBuffer-parameter", "VUID-vkCmdWriteTimestamp2-commonparent");
-    skip |= ValidateObject(queryPool, kVulkanObjectTypeQueryPool, false, "VUID-vkCmdWriteTimestamp2-queryPool-parameter", "VUID-vkCmdWriteTimestamp2-commonparent");
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdWriteTimestamp2-commandBuffer-parameter", "VUID-vkCmdWriteTimestamp2-commonparent", "vkCmdWriteTimestamp2");
+    skip |= ValidateObject(queryPool, kVulkanObjectTypeQueryPool, false, "VUID-vkCmdWriteTimestamp2-queryPool-parameter", "VUID-vkCmdWriteTimestamp2-commonparent", "vkCmdWriteTimestamp2");
 
     return skip;
 }
@@ -2672,27 +2671,27 @@ bool ObjectLifetimes::PreCallValidateQueueSubmit2(
     const VkSubmitInfo2*                        pSubmits,
     VkFence                                     fence) const {
     bool skip = false;
-    skip |= ValidateObject(queue, kVulkanObjectTypeQueue, false, "VUID-vkQueueSubmit2-queue-parameter", "VUID-vkQueueSubmit2-commonparent");
+    skip |= ValidateObject(queue, kVulkanObjectTypeQueue, false, "VUID-vkQueueSubmit2-queue-parameter", "VUID-vkQueueSubmit2-commonparent", "vkQueueSubmit2");
     if (pSubmits) {
         for (uint32_t index0 = 0; index0 < submitCount; ++index0) {
             if (pSubmits[index0].pWaitSemaphoreInfos) {
                 for (uint32_t index1 = 0; index1 < pSubmits[index0].waitSemaphoreInfoCount; ++index1) {
-                    skip |= ValidateObject(pSubmits[index0].pWaitSemaphoreInfos[index1].semaphore, kVulkanObjectTypeSemaphore, false, "VUID-VkSemaphoreSubmitInfo-semaphore-parameter", kVUIDUndefined);
+                    skip |= ValidateObject(pSubmits[index0].pWaitSemaphoreInfos[index1].semaphore, kVulkanObjectTypeSemaphore, false, "VUID-VkSemaphoreSubmitInfo-semaphore-parameter", kVUIDUndefined, "VkSemaphoreSubmitInfo");
                 }
             }
             if (pSubmits[index0].pCommandBufferInfos) {
                 for (uint32_t index1 = 0; index1 < pSubmits[index0].commandBufferInfoCount; ++index1) {
-                    skip |= ValidateObject(pSubmits[index0].pCommandBufferInfos[index1].commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-VkCommandBufferSubmitInfo-commandBuffer-parameter", kVUIDUndefined);
+                    skip |= ValidateObject(pSubmits[index0].pCommandBufferInfos[index1].commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-VkCommandBufferSubmitInfo-commandBuffer-parameter", kVUIDUndefined, "VkCommandBufferSubmitInfo");
                 }
             }
             if (pSubmits[index0].pSignalSemaphoreInfos) {
                 for (uint32_t index1 = 0; index1 < pSubmits[index0].signalSemaphoreInfoCount; ++index1) {
-                    skip |= ValidateObject(pSubmits[index0].pSignalSemaphoreInfos[index1].semaphore, kVulkanObjectTypeSemaphore, false, "VUID-VkSemaphoreSubmitInfo-semaphore-parameter", kVUIDUndefined);
+                    skip |= ValidateObject(pSubmits[index0].pSignalSemaphoreInfos[index1].semaphore, kVulkanObjectTypeSemaphore, false, "VUID-VkSemaphoreSubmitInfo-semaphore-parameter", kVUIDUndefined, "VkSemaphoreSubmitInfo");
                 }
             }
         }
     }
-    skip |= ValidateObject(fence, kVulkanObjectTypeFence, true, "VUID-vkQueueSubmit2-fence-parameter", "VUID-vkQueueSubmit2-commonparent");
+    skip |= ValidateObject(fence, kVulkanObjectTypeFence, true, "VUID-vkQueueSubmit2-fence-parameter", "VUID-vkQueueSubmit2-commonparent", "vkQueueSubmit2");
 
     return skip;
 }
@@ -2701,10 +2700,10 @@ bool ObjectLifetimes::PreCallValidateCmdCopyBuffer2(
     VkCommandBuffer                             commandBuffer,
     const VkCopyBufferInfo2*                    pCopyBufferInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdCopyBuffer2-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdCopyBuffer2-commandBuffer-parameter", kVUIDUndefined, "vkCmdCopyBuffer2");
     if (pCopyBufferInfo) {
-        skip |= ValidateObject(pCopyBufferInfo->srcBuffer, kVulkanObjectTypeBuffer, false, "VUID-VkCopyBufferInfo2-srcBuffer-parameter", "VUID-VkCopyBufferInfo2-commonparent");
-        skip |= ValidateObject(pCopyBufferInfo->dstBuffer, kVulkanObjectTypeBuffer, false, "VUID-VkCopyBufferInfo2-dstBuffer-parameter", "VUID-VkCopyBufferInfo2-commonparent");
+        skip |= ValidateObject(pCopyBufferInfo->srcBuffer, kVulkanObjectTypeBuffer, false, "VUID-VkCopyBufferInfo2-srcBuffer-parameter", "VUID-VkCopyBufferInfo2-commonparent", "VkCopyBufferInfo2");
+        skip |= ValidateObject(pCopyBufferInfo->dstBuffer, kVulkanObjectTypeBuffer, false, "VUID-VkCopyBufferInfo2-dstBuffer-parameter", "VUID-VkCopyBufferInfo2-commonparent", "VkCopyBufferInfo2");
     }
 
     return skip;
@@ -2714,10 +2713,10 @@ bool ObjectLifetimes::PreCallValidateCmdCopyImage2(
     VkCommandBuffer                             commandBuffer,
     const VkCopyImageInfo2*                     pCopyImageInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdCopyImage2-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdCopyImage2-commandBuffer-parameter", kVUIDUndefined, "vkCmdCopyImage2");
     if (pCopyImageInfo) {
-        skip |= ValidateObject(pCopyImageInfo->srcImage, kVulkanObjectTypeImage, false, "VUID-VkCopyImageInfo2-srcImage-parameter", "VUID-VkCopyImageInfo2-commonparent");
-        skip |= ValidateObject(pCopyImageInfo->dstImage, kVulkanObjectTypeImage, false, "VUID-VkCopyImageInfo2-dstImage-parameter", "VUID-VkCopyImageInfo2-commonparent");
+        skip |= ValidateObject(pCopyImageInfo->srcImage, kVulkanObjectTypeImage, false, "VUID-VkCopyImageInfo2-srcImage-parameter", "VUID-VkCopyImageInfo2-commonparent", "VkCopyImageInfo2");
+        skip |= ValidateObject(pCopyImageInfo->dstImage, kVulkanObjectTypeImage, false, "VUID-VkCopyImageInfo2-dstImage-parameter", "VUID-VkCopyImageInfo2-commonparent", "VkCopyImageInfo2");
     }
 
     return skip;
@@ -2727,10 +2726,10 @@ bool ObjectLifetimes::PreCallValidateCmdCopyBufferToImage2(
     VkCommandBuffer                             commandBuffer,
     const VkCopyBufferToImageInfo2*             pCopyBufferToImageInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdCopyBufferToImage2-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdCopyBufferToImage2-commandBuffer-parameter", kVUIDUndefined, "vkCmdCopyBufferToImage2");
     if (pCopyBufferToImageInfo) {
-        skip |= ValidateObject(pCopyBufferToImageInfo->srcBuffer, kVulkanObjectTypeBuffer, false, "VUID-VkCopyBufferToImageInfo2-srcBuffer-parameter", "VUID-VkCopyBufferToImageInfo2-commonparent");
-        skip |= ValidateObject(pCopyBufferToImageInfo->dstImage, kVulkanObjectTypeImage, false, "VUID-VkCopyBufferToImageInfo2-dstImage-parameter", "VUID-VkCopyBufferToImageInfo2-commonparent");
+        skip |= ValidateObject(pCopyBufferToImageInfo->srcBuffer, kVulkanObjectTypeBuffer, false, "VUID-VkCopyBufferToImageInfo2-srcBuffer-parameter", "VUID-VkCopyBufferToImageInfo2-commonparent", "VkCopyBufferToImageInfo2");
+        skip |= ValidateObject(pCopyBufferToImageInfo->dstImage, kVulkanObjectTypeImage, false, "VUID-VkCopyBufferToImageInfo2-dstImage-parameter", "VUID-VkCopyBufferToImageInfo2-commonparent", "VkCopyBufferToImageInfo2");
     }
 
     return skip;
@@ -2740,10 +2739,10 @@ bool ObjectLifetimes::PreCallValidateCmdCopyImageToBuffer2(
     VkCommandBuffer                             commandBuffer,
     const VkCopyImageToBufferInfo2*             pCopyImageToBufferInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdCopyImageToBuffer2-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdCopyImageToBuffer2-commandBuffer-parameter", kVUIDUndefined, "vkCmdCopyImageToBuffer2");
     if (pCopyImageToBufferInfo) {
-        skip |= ValidateObject(pCopyImageToBufferInfo->srcImage, kVulkanObjectTypeImage, false, "VUID-VkCopyImageToBufferInfo2-srcImage-parameter", "VUID-VkCopyImageToBufferInfo2-commonparent");
-        skip |= ValidateObject(pCopyImageToBufferInfo->dstBuffer, kVulkanObjectTypeBuffer, false, "VUID-VkCopyImageToBufferInfo2-dstBuffer-parameter", "VUID-VkCopyImageToBufferInfo2-commonparent");
+        skip |= ValidateObject(pCopyImageToBufferInfo->srcImage, kVulkanObjectTypeImage, false, "VUID-VkCopyImageToBufferInfo2-srcImage-parameter", "VUID-VkCopyImageToBufferInfo2-commonparent", "VkCopyImageToBufferInfo2");
+        skip |= ValidateObject(pCopyImageToBufferInfo->dstBuffer, kVulkanObjectTypeBuffer, false, "VUID-VkCopyImageToBufferInfo2-dstBuffer-parameter", "VUID-VkCopyImageToBufferInfo2-commonparent", "VkCopyImageToBufferInfo2");
     }
 
     return skip;
@@ -2753,10 +2752,10 @@ bool ObjectLifetimes::PreCallValidateCmdBlitImage2(
     VkCommandBuffer                             commandBuffer,
     const VkBlitImageInfo2*                     pBlitImageInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdBlitImage2-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdBlitImage2-commandBuffer-parameter", kVUIDUndefined, "vkCmdBlitImage2");
     if (pBlitImageInfo) {
-        skip |= ValidateObject(pBlitImageInfo->srcImage, kVulkanObjectTypeImage, false, "VUID-VkBlitImageInfo2-srcImage-parameter", "VUID-VkBlitImageInfo2-commonparent");
-        skip |= ValidateObject(pBlitImageInfo->dstImage, kVulkanObjectTypeImage, false, "VUID-VkBlitImageInfo2-dstImage-parameter", "VUID-VkBlitImageInfo2-commonparent");
+        skip |= ValidateObject(pBlitImageInfo->srcImage, kVulkanObjectTypeImage, false, "VUID-VkBlitImageInfo2-srcImage-parameter", "VUID-VkBlitImageInfo2-commonparent", "VkBlitImageInfo2");
+        skip |= ValidateObject(pBlitImageInfo->dstImage, kVulkanObjectTypeImage, false, "VUID-VkBlitImageInfo2-dstImage-parameter", "VUID-VkBlitImageInfo2-commonparent", "VkBlitImageInfo2");
     }
 
     return skip;
@@ -2766,10 +2765,10 @@ bool ObjectLifetimes::PreCallValidateCmdResolveImage2(
     VkCommandBuffer                             commandBuffer,
     const VkResolveImageInfo2*                  pResolveImageInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdResolveImage2-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdResolveImage2-commandBuffer-parameter", kVUIDUndefined, "vkCmdResolveImage2");
     if (pResolveImageInfo) {
-        skip |= ValidateObject(pResolveImageInfo->srcImage, kVulkanObjectTypeImage, false, "VUID-VkResolveImageInfo2-srcImage-parameter", "VUID-VkResolveImageInfo2-commonparent");
-        skip |= ValidateObject(pResolveImageInfo->dstImage, kVulkanObjectTypeImage, false, "VUID-VkResolveImageInfo2-dstImage-parameter", "VUID-VkResolveImageInfo2-commonparent");
+        skip |= ValidateObject(pResolveImageInfo->srcImage, kVulkanObjectTypeImage, false, "VUID-VkResolveImageInfo2-srcImage-parameter", "VUID-VkResolveImageInfo2-commonparent", "VkResolveImageInfo2");
+        skip |= ValidateObject(pResolveImageInfo->dstImage, kVulkanObjectTypeImage, false, "VUID-VkResolveImageInfo2-dstImage-parameter", "VUID-VkResolveImageInfo2-commonparent", "VkResolveImageInfo2");
     }
 
     return skip;
@@ -2779,21 +2778,21 @@ bool ObjectLifetimes::PreCallValidateCmdBeginRendering(
     VkCommandBuffer                             commandBuffer,
     const VkRenderingInfo*                      pRenderingInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdBeginRendering");
     if (pRenderingInfo) {
         if (pRenderingInfo->pColorAttachments) {
             for (uint32_t index1 = 0; index1 < pRenderingInfo->colorAttachmentCount; ++index1) {
-                skip |= ValidateObject(pRenderingInfo->pColorAttachments[index1].imageView, kVulkanObjectTypeImageView, true, kVUIDUndefined, kVUIDUndefined);
-                skip |= ValidateObject(pRenderingInfo->pColorAttachments[index1].resolveImageView, kVulkanObjectTypeImageView, true, kVUIDUndefined, kVUIDUndefined);
+                skip |= ValidateObject(pRenderingInfo->pColorAttachments[index1].imageView, kVulkanObjectTypeImageView, true, kVUIDUndefined, kVUIDUndefined, "VkRenderingAttachmentInfo");
+                skip |= ValidateObject(pRenderingInfo->pColorAttachments[index1].resolveImageView, kVulkanObjectTypeImageView, true, kVUIDUndefined, kVUIDUndefined, "VkRenderingAttachmentInfo");
             }
         }
         if (pRenderingInfo->pDepthAttachment) {
-            skip |= ValidateObject(pRenderingInfo->pDepthAttachment->imageView, kVulkanObjectTypeImageView, true, kVUIDUndefined, kVUIDUndefined);
-            skip |= ValidateObject(pRenderingInfo->pDepthAttachment->resolveImageView, kVulkanObjectTypeImageView, true, kVUIDUndefined, kVUIDUndefined);
+            skip |= ValidateObject(pRenderingInfo->pDepthAttachment->imageView, kVulkanObjectTypeImageView, true, kVUIDUndefined, kVUIDUndefined, "VkRenderingAttachmentInfo");
+            skip |= ValidateObject(pRenderingInfo->pDepthAttachment->resolveImageView, kVulkanObjectTypeImageView, true, kVUIDUndefined, kVUIDUndefined, "VkRenderingAttachmentInfo");
         }
         if (pRenderingInfo->pStencilAttachment) {
-            skip |= ValidateObject(pRenderingInfo->pStencilAttachment->imageView, kVulkanObjectTypeImageView, true, kVUIDUndefined, kVUIDUndefined);
-            skip |= ValidateObject(pRenderingInfo->pStencilAttachment->resolveImageView, kVulkanObjectTypeImageView, true, kVUIDUndefined, kVUIDUndefined);
+            skip |= ValidateObject(pRenderingInfo->pStencilAttachment->imageView, kVulkanObjectTypeImageView, true, kVUIDUndefined, kVUIDUndefined, "VkRenderingAttachmentInfo");
+            skip |= ValidateObject(pRenderingInfo->pStencilAttachment->resolveImageView, kVulkanObjectTypeImageView, true, kVUIDUndefined, kVUIDUndefined, "VkRenderingAttachmentInfo");
         }
     }
 
@@ -2803,7 +2802,7 @@ bool ObjectLifetimes::PreCallValidateCmdBeginRendering(
 bool ObjectLifetimes::PreCallValidateCmdEndRendering(
     VkCommandBuffer                             commandBuffer) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdEndRendering");
 
     return skip;
 }
@@ -2812,7 +2811,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetCullMode(
     VkCommandBuffer                             commandBuffer,
     VkCullModeFlags                             cullMode) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetCullMode-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetCullMode-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetCullMode");
 
     return skip;
 }
@@ -2821,7 +2820,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetFrontFace(
     VkCommandBuffer                             commandBuffer,
     VkFrontFace                                 frontFace) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetFrontFace-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetFrontFace-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetFrontFace");
 
     return skip;
 }
@@ -2830,7 +2829,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetPrimitiveTopology(
     VkCommandBuffer                             commandBuffer,
     VkPrimitiveTopology                         primitiveTopology) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetPrimitiveTopology-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetPrimitiveTopology-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetPrimitiveTopology");
 
     return skip;
 }
@@ -2840,7 +2839,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetViewportWithCount(
     uint32_t                                    viewportCount,
     const VkViewport*                           pViewports) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetViewportWithCount-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetViewportWithCount-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetViewportWithCount");
 
     return skip;
 }
@@ -2850,7 +2849,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetScissorWithCount(
     uint32_t                                    scissorCount,
     const VkRect2D*                             pScissors) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetScissorWithCount-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetScissorWithCount-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetScissorWithCount");
 
     return skip;
 }
@@ -2864,10 +2863,10 @@ bool ObjectLifetimes::PreCallValidateCmdBindVertexBuffers2(
     const VkDeviceSize*                         pSizes,
     const VkDeviceSize*                         pStrides) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdBindVertexBuffers2-commandBuffer-parameter", "VUID-vkCmdBindVertexBuffers2-commonparent");
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdBindVertexBuffers2-commandBuffer-parameter", "VUID-vkCmdBindVertexBuffers2-commonparent", "vkCmdBindVertexBuffers2");
     if ((bindingCount > 0) && (pBuffers)) {
         for (uint32_t index0 = 0; index0 < bindingCount; ++index0) {
-            skip |= ValidateObject(pBuffers[index0], kVulkanObjectTypeBuffer, true, "VUID-vkCmdBindVertexBuffers2-pBuffers-parameter", "VUID-vkCmdBindVertexBuffers2-commonparent");
+            skip |= ValidateObject(pBuffers[index0], kVulkanObjectTypeBuffer, true, "VUID-vkCmdBindVertexBuffers2-pBuffers-parameter", "VUID-vkCmdBindVertexBuffers2-commonparent", "vkCmdBindVertexBuffers2");
         }
     }
 
@@ -2878,7 +2877,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetDepthTestEnable(
     VkCommandBuffer                             commandBuffer,
     VkBool32                                    depthTestEnable) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetDepthTestEnable-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetDepthTestEnable-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetDepthTestEnable");
 
     return skip;
 }
@@ -2887,7 +2886,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetDepthWriteEnable(
     VkCommandBuffer                             commandBuffer,
     VkBool32                                    depthWriteEnable) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetDepthWriteEnable-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetDepthWriteEnable-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetDepthWriteEnable");
 
     return skip;
 }
@@ -2896,7 +2895,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetDepthCompareOp(
     VkCommandBuffer                             commandBuffer,
     VkCompareOp                                 depthCompareOp) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetDepthCompareOp-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetDepthCompareOp-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetDepthCompareOp");
 
     return skip;
 }
@@ -2905,7 +2904,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetDepthBoundsTestEnable(
     VkCommandBuffer                             commandBuffer,
     VkBool32                                    depthBoundsTestEnable) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetDepthBoundsTestEnable-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetDepthBoundsTestEnable-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetDepthBoundsTestEnable");
 
     return skip;
 }
@@ -2914,7 +2913,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetStencilTestEnable(
     VkCommandBuffer                             commandBuffer,
     VkBool32                                    stencilTestEnable) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetStencilTestEnable-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetStencilTestEnable-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetStencilTestEnable");
 
     return skip;
 }
@@ -2927,7 +2926,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetStencilOp(
     VkStencilOp                                 depthFailOp,
     VkCompareOp                                 compareOp) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetStencilOp-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetStencilOp-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetStencilOp");
 
     return skip;
 }
@@ -2936,7 +2935,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetRasterizerDiscardEnable(
     VkCommandBuffer                             commandBuffer,
     VkBool32                                    rasterizerDiscardEnable) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetRasterizerDiscardEnable-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetRasterizerDiscardEnable-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetRasterizerDiscardEnable");
 
     return skip;
 }
@@ -2945,7 +2944,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetDepthBiasEnable(
     VkCommandBuffer                             commandBuffer,
     VkBool32                                    depthBiasEnable) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetDepthBiasEnable-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetDepthBiasEnable-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetDepthBiasEnable");
 
     return skip;
 }
@@ -2954,7 +2953,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetPrimitiveRestartEnable(
     VkCommandBuffer                             commandBuffer,
     VkBool32                                    primitiveRestartEnable) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetPrimitiveRestartEnable-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetPrimitiveRestartEnable-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetPrimitiveRestartEnable");
 
     return skip;
 }
@@ -2964,7 +2963,7 @@ bool ObjectLifetimes::PreCallValidateGetDeviceBufferMemoryRequirements(
     const VkDeviceBufferMemoryRequirements*     pInfo,
     VkMemoryRequirements2*                      pMemoryRequirements) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetDeviceBufferMemoryRequirements");
 
     return skip;
 }
@@ -2974,7 +2973,7 @@ bool ObjectLifetimes::PreCallValidateGetDeviceImageMemoryRequirements(
     const VkDeviceImageMemoryRequirements*      pInfo,
     VkMemoryRequirements2*                      pMemoryRequirements) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetDeviceImageMemoryRequirements");
 
     return skip;
 }
@@ -2985,7 +2984,7 @@ bool ObjectLifetimes::PreCallValidateGetDeviceImageSparseMemoryRequirements(
     uint32_t*                                   pSparseMemoryRequirementCount,
     VkSparseImageMemoryRequirements2*           pSparseMemoryRequirements) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetDeviceImageSparseMemoryRequirements");
 
     return skip;
 }
@@ -2996,9 +2995,9 @@ bool ObjectLifetimes::PreCallValidateGetCommandPoolMemoryConsumption(
     VkCommandBuffer                             commandBuffer,
     VkCommandPoolMemoryConsumption*             pConsumption) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetCommandPoolMemoryConsumption-device-parameter", kVUIDUndefined);
-    skip |= ValidateObject(commandPool, kVulkanObjectTypeCommandPool, false, "VUID-vkGetCommandPoolMemoryConsumption-commandPool-parameter", "VUID-vkGetCommandPoolMemoryConsumption-commandPool-parent");
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, true, "VUID-vkGetCommandPoolMemoryConsumption-commandBuffer-parameter", "VUID-vkGetCommandPoolMemoryConsumption-commandBuffer-parent");
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetCommandPoolMemoryConsumption-device-parameter", kVUIDUndefined, "vkGetCommandPoolMemoryConsumption");
+    skip |= ValidateObject(commandPool, kVulkanObjectTypeCommandPool, false, "VUID-vkGetCommandPoolMemoryConsumption-commandPool-parameter", "VUID-vkGetCommandPoolMemoryConsumption-commandPool-parent", "vkGetCommandPoolMemoryConsumption");
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, true, "VUID-vkGetCommandPoolMemoryConsumption-commandBuffer-parameter", "VUID-vkGetCommandPoolMemoryConsumption-commandBuffer-parent", "vkGetCommandPoolMemoryConsumption");
 
     return skip;
 }
@@ -3010,7 +3009,7 @@ bool ObjectLifetimes::PreCallValidateGetFaultData(
     uint32_t*                                   pFaultCount,
     VkFaultData*                                pFaults) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetFaultData-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetFaultData-device-parameter", kVUIDUndefined, "vkGetFaultData");
 
     return skip;
 }
@@ -3020,8 +3019,8 @@ bool ObjectLifetimes::PreCallValidateDestroySurfaceKHR(
     VkSurfaceKHR                                surface,
     const VkAllocationCallbacks*                pAllocator) const {
     bool skip = false;
-    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, "VUID-vkDestroySurfaceKHR-instance-parameter", kVUIDUndefined);
-    skip |= ValidateObject(surface, kVulkanObjectTypeSurfaceKHR, true, "VUID-vkDestroySurfaceKHR-surface-parameter", kVUIDUndefined);
+    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, "VUID-vkDestroySurfaceKHR-instance-parameter", kVUIDUndefined, "vkDestroySurfaceKHR");
+    skip |= ValidateObject(surface, kVulkanObjectTypeSurfaceKHR, true, "VUID-vkDestroySurfaceKHR-surface-parameter", kVUIDUndefined, "vkDestroySurfaceKHR");
     skip |= ValidateDestroyObject(surface, kVulkanObjectTypeSurfaceKHR, pAllocator, kVUIDUndefined, kVUIDUndefined);
 
     return skip;
@@ -3041,8 +3040,8 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceSurfaceSupportKHR(
     VkSurfaceKHR                                surface,
     VkBool32*                                   pSupported) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceSurfaceSupportKHR-physicalDevice-parameter", kVUIDUndefined);
-    skip |= ValidateObject(surface, kVulkanObjectTypeSurfaceKHR, false, "VUID-vkGetPhysicalDeviceSurfaceSupportKHR-surface-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceSurfaceSupportKHR-physicalDevice-parameter", kVUIDUndefined, "vkGetPhysicalDeviceSurfaceSupportKHR");
+    skip |= ValidateObject(surface, kVulkanObjectTypeSurfaceKHR, false, "VUID-vkGetPhysicalDeviceSurfaceSupportKHR-surface-parameter", kVUIDUndefined, "vkGetPhysicalDeviceSurfaceSupportKHR");
 
     return skip;
 }
@@ -3052,8 +3051,8 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceSurfaceCapabilitiesKHR(
     VkSurfaceKHR                                surface,
     VkSurfaceCapabilitiesKHR*                   pSurfaceCapabilities) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceSurfaceCapabilitiesKHR-physicalDevice-parameter", kVUIDUndefined);
-    skip |= ValidateObject(surface, kVulkanObjectTypeSurfaceKHR, false, "VUID-vkGetPhysicalDeviceSurfaceCapabilitiesKHR-surface-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceSurfaceCapabilitiesKHR-physicalDevice-parameter", kVUIDUndefined, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR");
+    skip |= ValidateObject(surface, kVulkanObjectTypeSurfaceKHR, false, "VUID-vkGetPhysicalDeviceSurfaceCapabilitiesKHR-surface-parameter", kVUIDUndefined, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR");
 
     return skip;
 }
@@ -3064,8 +3063,8 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceSurfaceFormatsKHR(
     uint32_t*                                   pSurfaceFormatCount,
     VkSurfaceFormatKHR*                         pSurfaceFormats) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceSurfaceFormatsKHR-physicalDevice-parameter", kVUIDUndefined);
-    skip |= ValidateObject(surface, kVulkanObjectTypeSurfaceKHR, true, "VUID-vkGetPhysicalDeviceSurfaceFormatsKHR-surface-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceSurfaceFormatsKHR-physicalDevice-parameter", kVUIDUndefined, "vkGetPhysicalDeviceSurfaceFormatsKHR");
+    skip |= ValidateObject(surface, kVulkanObjectTypeSurfaceKHR, true, "VUID-vkGetPhysicalDeviceSurfaceFormatsKHR-surface-parameter", kVUIDUndefined, "vkGetPhysicalDeviceSurfaceFormatsKHR");
 
     return skip;
 }
@@ -3076,8 +3075,8 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceSurfacePresentModesKHR(
     uint32_t*                                   pPresentModeCount,
     VkPresentModeKHR*                           pPresentModes) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceSurfacePresentModesKHR-physicalDevice-parameter", kVUIDUndefined);
-    skip |= ValidateObject(surface, kVulkanObjectTypeSurfaceKHR, true, "VUID-vkGetPhysicalDeviceSurfacePresentModesKHR-surface-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceSurfacePresentModesKHR-physicalDevice-parameter", kVUIDUndefined, "vkGetPhysicalDeviceSurfacePresentModesKHR");
+    skip |= ValidateObject(surface, kVulkanObjectTypeSurfaceKHR, true, "VUID-vkGetPhysicalDeviceSurfacePresentModesKHR-surface-parameter", kVUIDUndefined, "vkGetPhysicalDeviceSurfacePresentModesKHR");
 
     return skip;
 }
@@ -3088,10 +3087,10 @@ bool ObjectLifetimes::PreCallValidateCreateSwapchainKHR(
     const VkAllocationCallbacks*                pAllocator,
     VkSwapchainKHR*                             pSwapchain) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreateSwapchainKHR-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreateSwapchainKHR-device-parameter", kVUIDUndefined, "vkCreateSwapchainKHR");
     if (pCreateInfo) {
-        skip |= ValidateObject(pCreateInfo->surface, kVulkanObjectTypeSurfaceKHR, false, "VUID-VkSwapchainCreateInfoKHR-surface-parameter", kVUIDUndefined);
-        skip |= ValidateObject(pCreateInfo->oldSwapchain, kVulkanObjectTypeSwapchainKHR, true, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pCreateInfo->surface, kVulkanObjectTypeSurfaceKHR, false, "VUID-VkSwapchainCreateInfoKHR-surface-parameter", kVUIDUndefined, "VkSwapchainCreateInfoKHR");
+        skip |= ValidateObject(pCreateInfo->oldSwapchain, kVulkanObjectTypeSwapchainKHR, true, kVUIDUndefined, kVUIDUndefined, "VkSwapchainCreateInfoKHR");
     }
 
     return skip;
@@ -3116,10 +3115,10 @@ bool ObjectLifetimes::PreCallValidateAcquireNextImageKHR(
     VkFence                                     fence,
     uint32_t*                                   pImageIndex) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkAcquireNextImageKHR-device-parameter", kVUIDUndefined);
-    skip |= ValidateObject(swapchain, kVulkanObjectTypeSwapchainKHR, false, "VUID-vkAcquireNextImageKHR-swapchain-parameter", kVUIDUndefined);
-    skip |= ValidateObject(semaphore, kVulkanObjectTypeSemaphore, true, "VUID-vkAcquireNextImageKHR-semaphore-parameter", "VUID-vkAcquireNextImageKHR-semaphore-parent");
-    skip |= ValidateObject(fence, kVulkanObjectTypeFence, true, "VUID-vkAcquireNextImageKHR-fence-parameter", "VUID-vkAcquireNextImageKHR-fence-parent");
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkAcquireNextImageKHR-device-parameter", kVUIDUndefined, "vkAcquireNextImageKHR");
+    skip |= ValidateObject(swapchain, kVulkanObjectTypeSwapchainKHR, false, "VUID-vkAcquireNextImageKHR-swapchain-parameter", kVUIDUndefined, "vkAcquireNextImageKHR");
+    skip |= ValidateObject(semaphore, kVulkanObjectTypeSemaphore, true, "VUID-vkAcquireNextImageKHR-semaphore-parameter", "VUID-vkAcquireNextImageKHR-semaphore-parent", "vkAcquireNextImageKHR");
+    skip |= ValidateObject(fence, kVulkanObjectTypeFence, true, "VUID-vkAcquireNextImageKHR-fence-parameter", "VUID-vkAcquireNextImageKHR-fence-parent", "vkAcquireNextImageKHR");
 
     return skip;
 }
@@ -3128,16 +3127,16 @@ bool ObjectLifetimes::PreCallValidateQueuePresentKHR(
     VkQueue                                     queue,
     const VkPresentInfoKHR*                     pPresentInfo) const {
     bool skip = false;
-    skip |= ValidateObject(queue, kVulkanObjectTypeQueue, false, "VUID-vkQueuePresentKHR-queue-parameter", kVUIDUndefined);
+    skip |= ValidateObject(queue, kVulkanObjectTypeQueue, false, "VUID-vkQueuePresentKHR-queue-parameter", kVUIDUndefined, "vkQueuePresentKHR");
     if (pPresentInfo) {
         if ((pPresentInfo->waitSemaphoreCount > 0) && (pPresentInfo->pWaitSemaphores)) {
             for (uint32_t index1 = 0; index1 < pPresentInfo->waitSemaphoreCount; ++index1) {
-                skip |= ValidateObject(pPresentInfo->pWaitSemaphores[index1], kVulkanObjectTypeSemaphore, false, "VUID-VkPresentInfoKHR-pWaitSemaphores-parameter", "VUID-VkPresentInfoKHR-commonparent");
+                skip |= ValidateObject(pPresentInfo->pWaitSemaphores[index1], kVulkanObjectTypeSemaphore, false, "VUID-VkPresentInfoKHR-pWaitSemaphores-parameter", "VUID-VkPresentInfoKHR-commonparent", "VkPresentInfoKHR");
             }
         }
         if ((pPresentInfo->swapchainCount > 0) && (pPresentInfo->pSwapchains)) {
             for (uint32_t index1 = 0; index1 < pPresentInfo->swapchainCount; ++index1) {
-                skip |= ValidateObject(pPresentInfo->pSwapchains[index1], kVulkanObjectTypeSwapchainKHR, false, "VUID-VkPresentInfoKHR-pSwapchains-parameter", kVUIDUndefined);
+                skip |= ValidateObject(pPresentInfo->pSwapchains[index1], kVulkanObjectTypeSwapchainKHR, false, "VUID-VkPresentInfoKHR-pSwapchains-parameter", kVUIDUndefined, "VkPresentInfoKHR");
             }
         }
     }
@@ -3149,7 +3148,7 @@ bool ObjectLifetimes::PreCallValidateGetDeviceGroupPresentCapabilitiesKHR(
     VkDevice                                    device,
     VkDeviceGroupPresentCapabilitiesKHR*        pDeviceGroupPresentCapabilities) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetDeviceGroupPresentCapabilitiesKHR-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetDeviceGroupPresentCapabilitiesKHR-device-parameter", kVUIDUndefined, "vkGetDeviceGroupPresentCapabilitiesKHR");
 
     return skip;
 }
@@ -3159,8 +3158,8 @@ bool ObjectLifetimes::PreCallValidateGetDeviceGroupSurfacePresentModesKHR(
     VkSurfaceKHR                                surface,
     VkDeviceGroupPresentModeFlagsKHR*           pModes) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetDeviceGroupSurfacePresentModesKHR-device-parameter", "VUID-vkGetDeviceGroupSurfacePresentModesKHR-commonparent");
-    skip |= ValidateObject(surface, kVulkanObjectTypeSurfaceKHR, false, "VUID-vkGetDeviceGroupSurfacePresentModesKHR-surface-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetDeviceGroupSurfacePresentModesKHR-device-parameter", "VUID-vkGetDeviceGroupSurfacePresentModesKHR-commonparent", "vkGetDeviceGroupSurfacePresentModesKHR");
+    skip |= ValidateObject(surface, kVulkanObjectTypeSurfaceKHR, false, "VUID-vkGetDeviceGroupSurfacePresentModesKHR-surface-parameter", kVUIDUndefined, "vkGetDeviceGroupSurfacePresentModesKHR");
 
     return skip;
 }
@@ -3171,8 +3170,8 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDevicePresentRectanglesKHR(
     uint32_t*                                   pRectCount,
     VkRect2D*                                   pRects) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDevicePresentRectanglesKHR-physicalDevice-parameter", kVUIDUndefined);
-    skip |= ValidateObject(surface, kVulkanObjectTypeSurfaceKHR, false, "VUID-vkGetPhysicalDevicePresentRectanglesKHR-surface-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDevicePresentRectanglesKHR-physicalDevice-parameter", kVUIDUndefined, "vkGetPhysicalDevicePresentRectanglesKHR");
+    skip |= ValidateObject(surface, kVulkanObjectTypeSurfaceKHR, false, "VUID-vkGetPhysicalDevicePresentRectanglesKHR-surface-parameter", kVUIDUndefined, "vkGetPhysicalDevicePresentRectanglesKHR");
 
     return skip;
 }
@@ -3182,11 +3181,11 @@ bool ObjectLifetimes::PreCallValidateAcquireNextImage2KHR(
     const VkAcquireNextImageInfoKHR*            pAcquireInfo,
     uint32_t*                                   pImageIndex) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkAcquireNextImage2KHR-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkAcquireNextImage2KHR-device-parameter", kVUIDUndefined, "vkAcquireNextImage2KHR");
     if (pAcquireInfo) {
-        skip |= ValidateObject(pAcquireInfo->swapchain, kVulkanObjectTypeSwapchainKHR, false, "VUID-VkAcquireNextImageInfoKHR-swapchain-parameter", kVUIDUndefined);
-        skip |= ValidateObject(pAcquireInfo->semaphore, kVulkanObjectTypeSemaphore, true, "VUID-VkAcquireNextImageInfoKHR-semaphore-parameter", "VUID-VkAcquireNextImageInfoKHR-commonparent");
-        skip |= ValidateObject(pAcquireInfo->fence, kVulkanObjectTypeFence, true, "VUID-VkAcquireNextImageInfoKHR-fence-parameter", "VUID-VkAcquireNextImageInfoKHR-commonparent");
+        skip |= ValidateObject(pAcquireInfo->swapchain, kVulkanObjectTypeSwapchainKHR, false, "VUID-VkAcquireNextImageInfoKHR-swapchain-parameter", kVUIDUndefined, "VkAcquireNextImageInfoKHR");
+        skip |= ValidateObject(pAcquireInfo->semaphore, kVulkanObjectTypeSemaphore, true, "VUID-VkAcquireNextImageInfoKHR-semaphore-parameter", "VUID-VkAcquireNextImageInfoKHR-commonparent", "VkAcquireNextImageInfoKHR");
+        skip |= ValidateObject(pAcquireInfo->fence, kVulkanObjectTypeFence, true, "VUID-VkAcquireNextImageInfoKHR-fence-parameter", "VUID-VkAcquireNextImageInfoKHR-commonparent", "VkAcquireNextImageInfoKHR");
     }
 
     return skip;
@@ -3197,7 +3196,7 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceDisplayPlanePropertiesKHR(
     uint32_t*                                   pPropertyCount,
     VkDisplayPlanePropertiesKHR*                pProperties) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceDisplayPlanePropertiesKHR-physicalDevice-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceDisplayPlanePropertiesKHR-physicalDevice-parameter", kVUIDUndefined, "vkGetPhysicalDeviceDisplayPlanePropertiesKHR");
 
     return skip;
 }
@@ -3208,7 +3207,7 @@ bool ObjectLifetimes::PreCallValidateGetDisplayPlaneSupportedDisplaysKHR(
     uint32_t*                                   pDisplayCount,
     VkDisplayKHR*                               pDisplays) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetDisplayPlaneSupportedDisplaysKHR-physicalDevice-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetDisplayPlaneSupportedDisplaysKHR-physicalDevice-parameter", kVUIDUndefined, "vkGetDisplayPlaneSupportedDisplaysKHR");
 
     return skip;
 }
@@ -3235,8 +3234,8 @@ bool ObjectLifetimes::PreCallValidateCreateDisplayModeKHR(
     const VkAllocationCallbacks*                pAllocator,
     VkDisplayModeKHR*                           pMode) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkCreateDisplayModeKHR-physicalDevice-parameter", kVUIDUndefined);
-    skip |= ValidateObject(display, kVulkanObjectTypeDisplayKHR, false, "VUID-vkCreateDisplayModeKHR-display-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkCreateDisplayModeKHR-physicalDevice-parameter", kVUIDUndefined, "vkCreateDisplayModeKHR");
+    skip |= ValidateObject(display, kVulkanObjectTypeDisplayKHR, false, "VUID-vkCreateDisplayModeKHR-display-parameter", kVUIDUndefined, "vkCreateDisplayModeKHR");
 
     return skip;
 }
@@ -3259,8 +3258,8 @@ bool ObjectLifetimes::PreCallValidateGetDisplayPlaneCapabilitiesKHR(
     uint32_t                                    planeIndex,
     VkDisplayPlaneCapabilitiesKHR*              pCapabilities) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetDisplayPlaneCapabilitiesKHR-physicalDevice-parameter", kVUIDUndefined);
-    skip |= ValidateObject(mode, kVulkanObjectTypeDisplayModeKHR, false, "VUID-vkGetDisplayPlaneCapabilitiesKHR-mode-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetDisplayPlaneCapabilitiesKHR-physicalDevice-parameter", kVUIDUndefined, "vkGetDisplayPlaneCapabilitiesKHR");
+    skip |= ValidateObject(mode, kVulkanObjectTypeDisplayModeKHR, false, "VUID-vkGetDisplayPlaneCapabilitiesKHR-mode-parameter", kVUIDUndefined, "vkGetDisplayPlaneCapabilitiesKHR");
 
     return skip;
 }
@@ -3271,9 +3270,9 @@ bool ObjectLifetimes::PreCallValidateCreateDisplayPlaneSurfaceKHR(
     const VkAllocationCallbacks*                pAllocator,
     VkSurfaceKHR*                               pSurface) const {
     bool skip = false;
-    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, "VUID-vkCreateDisplayPlaneSurfaceKHR-instance-parameter", kVUIDUndefined);
+    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, "VUID-vkCreateDisplayPlaneSurfaceKHR-instance-parameter", kVUIDUndefined, "vkCreateDisplayPlaneSurfaceKHR");
     if (pCreateInfo) {
-        skip |= ValidateObject(pCreateInfo->displayMode, kVulkanObjectTypeDisplayModeKHR, false, "VUID-VkDisplaySurfaceCreateInfoKHR-displayMode-parameter", kVUIDUndefined);
+        skip |= ValidateObject(pCreateInfo->displayMode, kVulkanObjectTypeDisplayModeKHR, false, "VUID-VkDisplaySurfaceCreateInfoKHR-displayMode-parameter", kVUIDUndefined, "VkDisplaySurfaceCreateInfoKHR");
     }
 
     return skip;
@@ -3297,11 +3296,11 @@ bool ObjectLifetimes::PreCallValidateCreateSharedSwapchainsKHR(
     const VkAllocationCallbacks*                pAllocator,
     VkSwapchainKHR*                             pSwapchains) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreateSharedSwapchainsKHR-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreateSharedSwapchainsKHR-device-parameter", kVUIDUndefined, "vkCreateSharedSwapchainsKHR");
     if (pCreateInfos) {
         for (uint32_t index0 = 0; index0 < swapchainCount; ++index0) {
-            skip |= ValidateObject(pCreateInfos[index0].surface, kVulkanObjectTypeSurfaceKHR, false, "VUID-VkSwapchainCreateInfoKHR-surface-parameter", kVUIDUndefined);
-            skip |= ValidateObject(pCreateInfos[index0].oldSwapchain, kVulkanObjectTypeSwapchainKHR, true, kVUIDUndefined, kVUIDUndefined);
+            skip |= ValidateObject(pCreateInfos[index0].surface, kVulkanObjectTypeSurfaceKHR, false, "VUID-VkSwapchainCreateInfoKHR-surface-parameter", kVUIDUndefined, "VkSwapchainCreateInfoKHR");
+            skip |= ValidateObject(pCreateInfos[index0].oldSwapchain, kVulkanObjectTypeSwapchainKHR, true, kVUIDUndefined, kVUIDUndefined, "VkSwapchainCreateInfoKHR");
         }
     }
 
@@ -3323,7 +3322,6 @@ void ObjectLifetimes::PostCallRecordCreateSharedSwapchainsKHR(
     }
 
 }
-
 #ifdef VK_USE_PLATFORM_XLIB_KHR
 
 bool ObjectLifetimes::PreCallValidateCreateXlibSurfaceKHR(
@@ -3332,7 +3330,7 @@ bool ObjectLifetimes::PreCallValidateCreateXlibSurfaceKHR(
     const VkAllocationCallbacks*                pAllocator,
     VkSurfaceKHR*                               pSurface) const {
     bool skip = false;
-    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, kVUIDUndefined, kVUIDUndefined, "vkCreateXlibSurfaceKHR");
 
     return skip;
 }
@@ -3348,7 +3346,6 @@ void ObjectLifetimes::PostCallRecordCreateXlibSurfaceKHR(
 
 }
 #endif // VK_USE_PLATFORM_XLIB_KHR
-
 #ifdef VK_USE_PLATFORM_XLIB_KHR
 
 bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceXlibPresentationSupportKHR(
@@ -3357,12 +3354,11 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceXlibPresentationSupportKHR
     Display*                                    dpy,
     VisualID                                    visualID) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetPhysicalDeviceXlibPresentationSupportKHR");
 
     return skip;
 }
 #endif // VK_USE_PLATFORM_XLIB_KHR
-
 #ifdef VK_USE_PLATFORM_XCB_KHR
 
 bool ObjectLifetimes::PreCallValidateCreateXcbSurfaceKHR(
@@ -3371,7 +3367,7 @@ bool ObjectLifetimes::PreCallValidateCreateXcbSurfaceKHR(
     const VkAllocationCallbacks*                pAllocator,
     VkSurfaceKHR*                               pSurface) const {
     bool skip = false;
-    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, kVUIDUndefined, kVUIDUndefined, "vkCreateXcbSurfaceKHR");
 
     return skip;
 }
@@ -3387,7 +3383,6 @@ void ObjectLifetimes::PostCallRecordCreateXcbSurfaceKHR(
 
 }
 #endif // VK_USE_PLATFORM_XCB_KHR
-
 #ifdef VK_USE_PLATFORM_XCB_KHR
 
 bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceXcbPresentationSupportKHR(
@@ -3396,12 +3391,11 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceXcbPresentationSupportKHR(
     xcb_connection_t*                           connection,
     xcb_visualid_t                              visual_id) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetPhysicalDeviceXcbPresentationSupportKHR");
 
     return skip;
 }
 #endif // VK_USE_PLATFORM_XCB_KHR
-
 #ifdef VK_USE_PLATFORM_WAYLAND_KHR
 
 bool ObjectLifetimes::PreCallValidateCreateWaylandSurfaceKHR(
@@ -3410,7 +3404,7 @@ bool ObjectLifetimes::PreCallValidateCreateWaylandSurfaceKHR(
     const VkAllocationCallbacks*                pAllocator,
     VkSurfaceKHR*                               pSurface) const {
     bool skip = false;
-    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, kVUIDUndefined, kVUIDUndefined, "vkCreateWaylandSurfaceKHR");
 
     return skip;
 }
@@ -3426,7 +3420,6 @@ void ObjectLifetimes::PostCallRecordCreateWaylandSurfaceKHR(
 
 }
 #endif // VK_USE_PLATFORM_WAYLAND_KHR
-
 #ifdef VK_USE_PLATFORM_WAYLAND_KHR
 
 bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceWaylandPresentationSupportKHR(
@@ -3434,12 +3427,11 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceWaylandPresentationSupport
     uint32_t                                    queueFamilyIndex,
     struct wl_display*                          display) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetPhysicalDeviceWaylandPresentationSupportKHR");
 
     return skip;
 }
 #endif // VK_USE_PLATFORM_WAYLAND_KHR
-
 #ifdef VK_USE_PLATFORM_ANDROID_KHR
 
 bool ObjectLifetimes::PreCallValidateCreateAndroidSurfaceKHR(
@@ -3448,7 +3440,7 @@ bool ObjectLifetimes::PreCallValidateCreateAndroidSurfaceKHR(
     const VkAllocationCallbacks*                pAllocator,
     VkSurfaceKHR*                               pSurface) const {
     bool skip = false;
-    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, kVUIDUndefined, kVUIDUndefined, "vkCreateAndroidSurfaceKHR");
 
     return skip;
 }
@@ -3464,7 +3456,6 @@ void ObjectLifetimes::PostCallRecordCreateAndroidSurfaceKHR(
 
 }
 #endif // VK_USE_PLATFORM_ANDROID_KHR
-
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 
 bool ObjectLifetimes::PreCallValidateCreateWin32SurfaceKHR(
@@ -3473,7 +3464,7 @@ bool ObjectLifetimes::PreCallValidateCreateWin32SurfaceKHR(
     const VkAllocationCallbacks*                pAllocator,
     VkSurfaceKHR*                               pSurface) const {
     bool skip = false;
-    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, kVUIDUndefined, kVUIDUndefined, "vkCreateWin32SurfaceKHR");
 
     return skip;
 }
@@ -3489,14 +3480,13 @@ void ObjectLifetimes::PostCallRecordCreateWin32SurfaceKHR(
 
 }
 #endif // VK_USE_PLATFORM_WIN32_KHR
-
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 
 bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceWin32PresentationSupportKHR(
     VkPhysicalDevice                            physicalDevice,
     uint32_t                                    queueFamilyIndex) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetPhysicalDeviceWin32PresentationSupportKHR");
 
     return skip;
 }
@@ -3507,7 +3497,7 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceVideoCapabilitiesKHR(
     const VkVideoProfileInfoKHR*                pVideoProfile,
     VkVideoCapabilitiesKHR*                     pCapabilities) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetPhysicalDeviceVideoCapabilitiesKHR");
 
     return skip;
 }
@@ -3518,7 +3508,7 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceVideoFormatPropertiesKHR(
     uint32_t*                                   pVideoFormatPropertyCount,
     VkVideoFormatPropertiesKHR*                 pVideoFormatProperties) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetPhysicalDeviceVideoFormatPropertiesKHR");
 
     return skip;
 }
@@ -3529,7 +3519,7 @@ bool ObjectLifetimes::PreCallValidateCreateVideoSessionKHR(
     const VkAllocationCallbacks*                pAllocator,
     VkVideoSessionKHR*                          pVideoSession) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkCreateVideoSessionKHR");
 
     return skip;
 }
@@ -3550,8 +3540,8 @@ bool ObjectLifetimes::PreCallValidateDestroyVideoSessionKHR(
     VkVideoSessionKHR                           videoSession,
     const VkAllocationCallbacks*                pAllocator) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(videoSession, kVulkanObjectTypeVideoSessionKHR, true, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkDestroyVideoSessionKHR");
+    skip |= ValidateObject(videoSession, kVulkanObjectTypeVideoSessionKHR, true, kVUIDUndefined, kVUIDUndefined, "vkDestroyVideoSessionKHR");
     skip |= ValidateDestroyObject(videoSession, kVulkanObjectTypeVideoSessionKHR, pAllocator, kVUIDUndefined, kVUIDUndefined);
 
     return skip;
@@ -3571,8 +3561,8 @@ bool ObjectLifetimes::PreCallValidateGetVideoSessionMemoryRequirementsKHR(
     uint32_t*                                   pMemoryRequirementsCount,
     VkVideoSessionMemoryRequirementsKHR*        pMemoryRequirements) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(videoSession, kVulkanObjectTypeVideoSessionKHR, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetVideoSessionMemoryRequirementsKHR");
+    skip |= ValidateObject(videoSession, kVulkanObjectTypeVideoSessionKHR, false, kVUIDUndefined, kVUIDUndefined, "vkGetVideoSessionMemoryRequirementsKHR");
 
     return skip;
 }
@@ -3583,11 +3573,11 @@ bool ObjectLifetimes::PreCallValidateBindVideoSessionMemoryKHR(
     uint32_t                                    bindSessionMemoryInfoCount,
     const VkBindVideoSessionMemoryInfoKHR*      pBindSessionMemoryInfos) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(videoSession, kVulkanObjectTypeVideoSessionKHR, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkBindVideoSessionMemoryKHR");
+    skip |= ValidateObject(videoSession, kVulkanObjectTypeVideoSessionKHR, false, kVUIDUndefined, kVUIDUndefined, "vkBindVideoSessionMemoryKHR");
     if (pBindSessionMemoryInfos) {
         for (uint32_t index0 = 0; index0 < bindSessionMemoryInfoCount; ++index0) {
-            skip |= ValidateObject(pBindSessionMemoryInfos[index0].memory, kVulkanObjectTypeDeviceMemory, false, kVUIDUndefined, kVUIDUndefined);
+            skip |= ValidateObject(pBindSessionMemoryInfos[index0].memory, kVulkanObjectTypeDeviceMemory, false, kVUIDUndefined, kVUIDUndefined, "VkBindVideoSessionMemoryInfoKHR");
         }
     }
 
@@ -3600,10 +3590,10 @@ bool ObjectLifetimes::PreCallValidateCreateVideoSessionParametersKHR(
     const VkAllocationCallbacks*                pAllocator,
     VkVideoSessionParametersKHR*                pVideoSessionParameters) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkCreateVideoSessionParametersKHR");
     if (pCreateInfo) {
-        skip |= ValidateObject(pCreateInfo->videoSessionParametersTemplate, kVulkanObjectTypeVideoSessionParametersKHR, true, kVUIDUndefined, kVUIDUndefined);
-        skip |= ValidateObject(pCreateInfo->videoSession, kVulkanObjectTypeVideoSessionKHR, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pCreateInfo->videoSessionParametersTemplate, kVulkanObjectTypeVideoSessionParametersKHR, true, kVUIDUndefined, kVUIDUndefined, "VkVideoSessionParametersCreateInfoKHR");
+        skip |= ValidateObject(pCreateInfo->videoSession, kVulkanObjectTypeVideoSessionKHR, false, kVUIDUndefined, kVUIDUndefined, "VkVideoSessionParametersCreateInfoKHR");
     }
 
     return skip;
@@ -3625,8 +3615,8 @@ bool ObjectLifetimes::PreCallValidateUpdateVideoSessionParametersKHR(
     VkVideoSessionParametersKHR                 videoSessionParameters,
     const VkVideoSessionParametersUpdateInfoKHR* pUpdateInfo) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(videoSessionParameters, kVulkanObjectTypeVideoSessionParametersKHR, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkUpdateVideoSessionParametersKHR");
+    skip |= ValidateObject(videoSessionParameters, kVulkanObjectTypeVideoSessionParametersKHR, false, kVUIDUndefined, kVUIDUndefined, "vkUpdateVideoSessionParametersKHR");
 
     return skip;
 }
@@ -3636,8 +3626,8 @@ bool ObjectLifetimes::PreCallValidateDestroyVideoSessionParametersKHR(
     VkVideoSessionParametersKHR                 videoSessionParameters,
     const VkAllocationCallbacks*                pAllocator) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(videoSessionParameters, kVulkanObjectTypeVideoSessionParametersKHR, true, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkDestroyVideoSessionParametersKHR");
+    skip |= ValidateObject(videoSessionParameters, kVulkanObjectTypeVideoSessionParametersKHR, true, kVUIDUndefined, kVUIDUndefined, "vkDestroyVideoSessionParametersKHR");
     skip |= ValidateDestroyObject(videoSessionParameters, kVulkanObjectTypeVideoSessionParametersKHR, pAllocator, kVUIDUndefined, kVUIDUndefined);
 
     return skip;
@@ -3655,14 +3645,14 @@ bool ObjectLifetimes::PreCallValidateCmdBeginVideoCodingKHR(
     VkCommandBuffer                             commandBuffer,
     const VkVideoBeginCodingInfoKHR*            pBeginInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdBeginVideoCodingKHR");
     if (pBeginInfo) {
-        skip |= ValidateObject(pBeginInfo->videoSession, kVulkanObjectTypeVideoSessionKHR, false, kVUIDUndefined, kVUIDUndefined);
-        skip |= ValidateObject(pBeginInfo->videoSessionParameters, kVulkanObjectTypeVideoSessionParametersKHR, true, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pBeginInfo->videoSession, kVulkanObjectTypeVideoSessionKHR, false, kVUIDUndefined, kVUIDUndefined, "VkVideoBeginCodingInfoKHR");
+        skip |= ValidateObject(pBeginInfo->videoSessionParameters, kVulkanObjectTypeVideoSessionParametersKHR, true, kVUIDUndefined, kVUIDUndefined, "VkVideoBeginCodingInfoKHR");
         if (pBeginInfo->pReferenceSlots) {
             for (uint32_t index1 = 0; index1 < pBeginInfo->referenceSlotCount; ++index1) {
                 if (pBeginInfo->pReferenceSlots[index1].pPictureResource) {
-                    skip |= ValidateObject(pBeginInfo->pReferenceSlots[index1].pPictureResource->imageViewBinding, kVulkanObjectTypeImageView, false, kVUIDUndefined, kVUIDUndefined);
+                    skip |= ValidateObject(pBeginInfo->pReferenceSlots[index1].pPictureResource->imageViewBinding, kVulkanObjectTypeImageView, false, kVUIDUndefined, kVUIDUndefined, "VkVideoPictureResourceInfoKHR");
                 }
             }
         }
@@ -3675,7 +3665,7 @@ bool ObjectLifetimes::PreCallValidateCmdEndVideoCodingKHR(
     VkCommandBuffer                             commandBuffer,
     const VkVideoEndCodingInfoKHR*              pEndCodingInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdEndVideoCodingKHR");
 
     return skip;
 }
@@ -3684,7 +3674,7 @@ bool ObjectLifetimes::PreCallValidateCmdControlVideoCodingKHR(
     VkCommandBuffer                             commandBuffer,
     const VkVideoCodingControlInfoKHR*          pCodingControlInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdControlVideoCodingKHR");
 
     return skip;
 }
@@ -3693,19 +3683,19 @@ bool ObjectLifetimes::PreCallValidateCmdDecodeVideoKHR(
     VkCommandBuffer                             commandBuffer,
     const VkVideoDecodeInfoKHR*                 pDecodeInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdDecodeVideoKHR");
     if (pDecodeInfo) {
-        skip |= ValidateObject(pDecodeInfo->srcBuffer, kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined);
-        skip |= ValidateObject(pDecodeInfo->dstPictureResource.imageViewBinding, kVulkanObjectTypeImageView, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pDecodeInfo->srcBuffer, kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined, "VkVideoDecodeInfoKHR");
+        skip |= ValidateObject(pDecodeInfo->dstPictureResource.imageViewBinding, kVulkanObjectTypeImageView, false, kVUIDUndefined, kVUIDUndefined, "VkVideoPictureResourceInfoKHR");
         if (pDecodeInfo->pSetupReferenceSlot) {
             if (pDecodeInfo->pSetupReferenceSlot->pPictureResource) {
-                skip |= ValidateObject(pDecodeInfo->pSetupReferenceSlot->pPictureResource->imageViewBinding, kVulkanObjectTypeImageView, false, kVUIDUndefined, kVUIDUndefined);
+                skip |= ValidateObject(pDecodeInfo->pSetupReferenceSlot->pPictureResource->imageViewBinding, kVulkanObjectTypeImageView, false, kVUIDUndefined, kVUIDUndefined, "VkVideoPictureResourceInfoKHR");
             }
         }
         if (pDecodeInfo->pReferenceSlots) {
             for (uint32_t index1 = 0; index1 < pDecodeInfo->referenceSlotCount; ++index1) {
                 if (pDecodeInfo->pReferenceSlots[index1].pPictureResource) {
-                    skip |= ValidateObject(pDecodeInfo->pReferenceSlots[index1].pPictureResource->imageViewBinding, kVulkanObjectTypeImageView, false, kVUIDUndefined, kVUIDUndefined);
+                    skip |= ValidateObject(pDecodeInfo->pReferenceSlots[index1].pPictureResource->imageViewBinding, kVulkanObjectTypeImageView, false, kVUIDUndefined, kVUIDUndefined, "VkVideoPictureResourceInfoKHR");
                 }
             }
         }
@@ -3718,21 +3708,21 @@ bool ObjectLifetimes::PreCallValidateCmdBeginRenderingKHR(
     VkCommandBuffer                             commandBuffer,
     const VkRenderingInfo*                      pRenderingInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdBeginRenderingKHR");
     if (pRenderingInfo) {
         if (pRenderingInfo->pColorAttachments) {
             for (uint32_t index1 = 0; index1 < pRenderingInfo->colorAttachmentCount; ++index1) {
-                skip |= ValidateObject(pRenderingInfo->pColorAttachments[index1].imageView, kVulkanObjectTypeImageView, true, kVUIDUndefined, kVUIDUndefined);
-                skip |= ValidateObject(pRenderingInfo->pColorAttachments[index1].resolveImageView, kVulkanObjectTypeImageView, true, kVUIDUndefined, kVUIDUndefined);
+                skip |= ValidateObject(pRenderingInfo->pColorAttachments[index1].imageView, kVulkanObjectTypeImageView, true, kVUIDUndefined, kVUIDUndefined, "VkRenderingAttachmentInfo");
+                skip |= ValidateObject(pRenderingInfo->pColorAttachments[index1].resolveImageView, kVulkanObjectTypeImageView, true, kVUIDUndefined, kVUIDUndefined, "VkRenderingAttachmentInfo");
             }
         }
         if (pRenderingInfo->pDepthAttachment) {
-            skip |= ValidateObject(pRenderingInfo->pDepthAttachment->imageView, kVulkanObjectTypeImageView, true, kVUIDUndefined, kVUIDUndefined);
-            skip |= ValidateObject(pRenderingInfo->pDepthAttachment->resolveImageView, kVulkanObjectTypeImageView, true, kVUIDUndefined, kVUIDUndefined);
+            skip |= ValidateObject(pRenderingInfo->pDepthAttachment->imageView, kVulkanObjectTypeImageView, true, kVUIDUndefined, kVUIDUndefined, "VkRenderingAttachmentInfo");
+            skip |= ValidateObject(pRenderingInfo->pDepthAttachment->resolveImageView, kVulkanObjectTypeImageView, true, kVUIDUndefined, kVUIDUndefined, "VkRenderingAttachmentInfo");
         }
         if (pRenderingInfo->pStencilAttachment) {
-            skip |= ValidateObject(pRenderingInfo->pStencilAttachment->imageView, kVulkanObjectTypeImageView, true, kVUIDUndefined, kVUIDUndefined);
-            skip |= ValidateObject(pRenderingInfo->pStencilAttachment->resolveImageView, kVulkanObjectTypeImageView, true, kVUIDUndefined, kVUIDUndefined);
+            skip |= ValidateObject(pRenderingInfo->pStencilAttachment->imageView, kVulkanObjectTypeImageView, true, kVUIDUndefined, kVUIDUndefined, "VkRenderingAttachmentInfo");
+            skip |= ValidateObject(pRenderingInfo->pStencilAttachment->resolveImageView, kVulkanObjectTypeImageView, true, kVUIDUndefined, kVUIDUndefined, "VkRenderingAttachmentInfo");
         }
     }
 
@@ -3742,7 +3732,7 @@ bool ObjectLifetimes::PreCallValidateCmdBeginRenderingKHR(
 bool ObjectLifetimes::PreCallValidateCmdEndRenderingKHR(
     VkCommandBuffer                             commandBuffer) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdEndRenderingKHR");
 
     return skip;
 }
@@ -3751,7 +3741,7 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceFeatures2KHR(
     VkPhysicalDevice                            physicalDevice,
     VkPhysicalDeviceFeatures2*                  pFeatures) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceFeatures2-physicalDevice-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceFeatures2-physicalDevice-parameter", kVUIDUndefined, "vkGetPhysicalDeviceFeatures2KHR");
 
     return skip;
 }
@@ -3760,7 +3750,7 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceProperties2KHR(
     VkPhysicalDevice                            physicalDevice,
     VkPhysicalDeviceProperties2*                pProperties) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceProperties2-physicalDevice-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceProperties2-physicalDevice-parameter", kVUIDUndefined, "vkGetPhysicalDeviceProperties2KHR");
 
     return skip;
 }
@@ -3770,7 +3760,7 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceFormatProperties2KHR(
     VkFormat                                    format,
     VkFormatProperties2*                        pFormatProperties) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceFormatProperties2-physicalDevice-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceFormatProperties2-physicalDevice-parameter", kVUIDUndefined, "vkGetPhysicalDeviceFormatProperties2KHR");
 
     return skip;
 }
@@ -3780,7 +3770,7 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceImageFormatProperties2KHR(
     const VkPhysicalDeviceImageFormatInfo2*     pImageFormatInfo,
     VkImageFormatProperties2*                   pImageFormatProperties) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceImageFormatProperties2-physicalDevice-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceImageFormatProperties2-physicalDevice-parameter", kVUIDUndefined, "vkGetPhysicalDeviceImageFormatProperties2KHR");
 
     return skip;
 }
@@ -3789,7 +3779,7 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceMemoryProperties2KHR(
     VkPhysicalDevice                            physicalDevice,
     VkPhysicalDeviceMemoryProperties2*          pMemoryProperties) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceMemoryProperties2-physicalDevice-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceMemoryProperties2-physicalDevice-parameter", kVUIDUndefined, "vkGetPhysicalDeviceMemoryProperties2KHR");
 
     return skip;
 }
@@ -3800,7 +3790,7 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceSparseImageFormatPropertie
     uint32_t*                                   pPropertyCount,
     VkSparseImageFormatProperties2*             pProperties) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetPhysicalDeviceSparseImageFormatProperties2KHR");
 
     return skip;
 }
@@ -3812,7 +3802,7 @@ bool ObjectLifetimes::PreCallValidateGetDeviceGroupPeerMemoryFeaturesKHR(
     uint32_t                                    remoteDeviceIndex,
     VkPeerMemoryFeatureFlags*                   pPeerMemoryFeatures) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetDeviceGroupPeerMemoryFeatures-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetDeviceGroupPeerMemoryFeatures-device-parameter", kVUIDUndefined, "vkGetDeviceGroupPeerMemoryFeaturesKHR");
 
     return skip;
 }
@@ -3821,7 +3811,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetDeviceMaskKHR(
     VkCommandBuffer                             commandBuffer,
     uint32_t                                    deviceMask) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetDeviceMask-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetDeviceMask-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetDeviceMaskKHR");
 
     return skip;
 }
@@ -3835,7 +3825,7 @@ bool ObjectLifetimes::PreCallValidateCmdDispatchBaseKHR(
     uint32_t                                    groupCountY,
     uint32_t                                    groupCountZ) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdDispatchBase-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdDispatchBase-commandBuffer-parameter", kVUIDUndefined, "vkCmdDispatchBaseKHR");
 
     return skip;
 }
@@ -3845,8 +3835,8 @@ bool ObjectLifetimes::PreCallValidateTrimCommandPoolKHR(
     VkCommandPool                               commandPool,
     VkCommandPoolTrimFlags                      flags) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(commandPool, kVulkanObjectTypeCommandPool, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkTrimCommandPoolKHR");
+    skip |= ValidateObject(commandPool, kVulkanObjectTypeCommandPool, false, kVUIDUndefined, kVUIDUndefined, "vkTrimCommandPoolKHR");
 
     return skip;
 }
@@ -3856,7 +3846,7 @@ bool ObjectLifetimes::PreCallValidateEnumeratePhysicalDeviceGroupsKHR(
     uint32_t*                                   pPhysicalDeviceGroupCount,
     VkPhysicalDeviceGroupProperties*            pPhysicalDeviceGroupProperties) const {
     bool skip = false;
-    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, "VUID-vkEnumeratePhysicalDeviceGroups-instance-parameter", kVUIDUndefined);
+    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, "VUID-vkEnumeratePhysicalDeviceGroups-instance-parameter", kVUIDUndefined, "vkEnumeratePhysicalDeviceGroupsKHR");
 
     return skip;
 }
@@ -3880,11 +3870,10 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceExternalBufferPropertiesKH
     const VkPhysicalDeviceExternalBufferInfo*   pExternalBufferInfo,
     VkExternalBufferProperties*                 pExternalBufferProperties) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceExternalBufferProperties-physicalDevice-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceExternalBufferProperties-physicalDevice-parameter", kVUIDUndefined, "vkGetPhysicalDeviceExternalBufferPropertiesKHR");
 
     return skip;
 }
-
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 
 bool ObjectLifetimes::PreCallValidateGetMemoryWin32HandleKHR(
@@ -3892,15 +3881,14 @@ bool ObjectLifetimes::PreCallValidateGetMemoryWin32HandleKHR(
     const VkMemoryGetWin32HandleInfoKHR*        pGetWin32HandleInfo,
     HANDLE*                                     pHandle) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetMemoryWin32HandleKHR");
     if (pGetWin32HandleInfo) {
-        skip |= ValidateObject(pGetWin32HandleInfo->memory, kVulkanObjectTypeDeviceMemory, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pGetWin32HandleInfo->memory, kVulkanObjectTypeDeviceMemory, false, kVUIDUndefined, kVUIDUndefined, "VkMemoryGetWin32HandleInfoKHR");
     }
 
     return skip;
 }
 #endif // VK_USE_PLATFORM_WIN32_KHR
-
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 
 bool ObjectLifetimes::PreCallValidateGetMemoryWin32HandlePropertiesKHR(
@@ -3909,7 +3897,7 @@ bool ObjectLifetimes::PreCallValidateGetMemoryWin32HandlePropertiesKHR(
     HANDLE                                      handle,
     VkMemoryWin32HandlePropertiesKHR*           pMemoryWin32HandleProperties) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetMemoryWin32HandlePropertiesKHR");
 
     return skip;
 }
@@ -3920,9 +3908,9 @@ bool ObjectLifetimes::PreCallValidateGetMemoryFdKHR(
     const VkMemoryGetFdInfoKHR*                 pGetFdInfo,
     int*                                        pFd) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetMemoryFdKHR-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetMemoryFdKHR-device-parameter", kVUIDUndefined, "vkGetMemoryFdKHR");
     if (pGetFdInfo) {
-        skip |= ValidateObject(pGetFdInfo->memory, kVulkanObjectTypeDeviceMemory, false, "VUID-VkMemoryGetFdInfoKHR-memory-parameter", kVUIDUndefined);
+        skip |= ValidateObject(pGetFdInfo->memory, kVulkanObjectTypeDeviceMemory, false, "VUID-VkMemoryGetFdInfoKHR-memory-parameter", kVUIDUndefined, "VkMemoryGetFdInfoKHR");
     }
 
     return skip;
@@ -3934,7 +3922,7 @@ bool ObjectLifetimes::PreCallValidateGetMemoryFdPropertiesKHR(
     int                                         fd,
     VkMemoryFdPropertiesKHR*                    pMemoryFdProperties) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetMemoryFdPropertiesKHR-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetMemoryFdPropertiesKHR-device-parameter", kVUIDUndefined, "vkGetMemoryFdPropertiesKHR");
 
     return skip;
 }
@@ -3944,26 +3932,24 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceExternalSemaphorePropertie
     const VkPhysicalDeviceExternalSemaphoreInfo* pExternalSemaphoreInfo,
     VkExternalSemaphoreProperties*              pExternalSemaphoreProperties) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceExternalSemaphoreProperties-physicalDevice-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceExternalSemaphoreProperties-physicalDevice-parameter", kVUIDUndefined, "vkGetPhysicalDeviceExternalSemaphorePropertiesKHR");
 
     return skip;
 }
-
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 
 bool ObjectLifetimes::PreCallValidateImportSemaphoreWin32HandleKHR(
     VkDevice                                    device,
     const VkImportSemaphoreWin32HandleInfoKHR*  pImportSemaphoreWin32HandleInfo) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkImportSemaphoreWin32HandleKHR");
     if (pImportSemaphoreWin32HandleInfo) {
-        skip |= ValidateObject(pImportSemaphoreWin32HandleInfo->semaphore, kVulkanObjectTypeSemaphore, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pImportSemaphoreWin32HandleInfo->semaphore, kVulkanObjectTypeSemaphore, false, kVUIDUndefined, kVUIDUndefined, "VkImportSemaphoreWin32HandleInfoKHR");
     }
 
     return skip;
 }
 #endif // VK_USE_PLATFORM_WIN32_KHR
-
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 
 bool ObjectLifetimes::PreCallValidateGetSemaphoreWin32HandleKHR(
@@ -3971,9 +3957,9 @@ bool ObjectLifetimes::PreCallValidateGetSemaphoreWin32HandleKHR(
     const VkSemaphoreGetWin32HandleInfoKHR*     pGetWin32HandleInfo,
     HANDLE*                                     pHandle) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetSemaphoreWin32HandleKHR");
     if (pGetWin32HandleInfo) {
-        skip |= ValidateObject(pGetWin32HandleInfo->semaphore, kVulkanObjectTypeSemaphore, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pGetWin32HandleInfo->semaphore, kVulkanObjectTypeSemaphore, false, kVUIDUndefined, kVUIDUndefined, "VkSemaphoreGetWin32HandleInfoKHR");
     }
 
     return skip;
@@ -3984,9 +3970,9 @@ bool ObjectLifetimes::PreCallValidateImportSemaphoreFdKHR(
     VkDevice                                    device,
     const VkImportSemaphoreFdInfoKHR*           pImportSemaphoreFdInfo) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkImportSemaphoreFdKHR-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkImportSemaphoreFdKHR-device-parameter", kVUIDUndefined, "vkImportSemaphoreFdKHR");
     if (pImportSemaphoreFdInfo) {
-        skip |= ValidateObject(pImportSemaphoreFdInfo->semaphore, kVulkanObjectTypeSemaphore, false, "VUID-VkImportSemaphoreFdInfoKHR-semaphore-parameter", kVUIDUndefined);
+        skip |= ValidateObject(pImportSemaphoreFdInfo->semaphore, kVulkanObjectTypeSemaphore, false, "VUID-VkImportSemaphoreFdInfoKHR-semaphore-parameter", kVUIDUndefined, "VkImportSemaphoreFdInfoKHR");
     }
 
     return skip;
@@ -3997,9 +3983,9 @@ bool ObjectLifetimes::PreCallValidateGetSemaphoreFdKHR(
     const VkSemaphoreGetFdInfoKHR*              pGetFdInfo,
     int*                                        pFd) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetSemaphoreFdKHR-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetSemaphoreFdKHR-device-parameter", kVUIDUndefined, "vkGetSemaphoreFdKHR");
     if (pGetFdInfo) {
-        skip |= ValidateObject(pGetFdInfo->semaphore, kVulkanObjectTypeSemaphore, false, "VUID-VkSemaphoreGetFdInfoKHR-semaphore-parameter", kVUIDUndefined);
+        skip |= ValidateObject(pGetFdInfo->semaphore, kVulkanObjectTypeSemaphore, false, "VUID-VkSemaphoreGetFdInfoKHR-semaphore-parameter", kVUIDUndefined, "VkSemaphoreGetFdInfoKHR");
     }
 
     return skip;
@@ -4012,9 +3998,9 @@ bool ObjectLifetimes::PreCallValidateCmdPushDescriptorSetWithTemplateKHR(
     uint32_t                                    set,
     const void*                                 pData) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(descriptorUpdateTemplate, kVulkanObjectTypeDescriptorUpdateTemplate, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(layout, kVulkanObjectTypePipelineLayout, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdPushDescriptorSetWithTemplateKHR");
+    skip |= ValidateObject(descriptorUpdateTemplate, kVulkanObjectTypeDescriptorUpdateTemplate, false, kVUIDUndefined, kVUIDUndefined, "vkCmdPushDescriptorSetWithTemplateKHR");
+    skip |= ValidateObject(layout, kVulkanObjectTypePipelineLayout, false, kVUIDUndefined, kVUIDUndefined, "vkCmdPushDescriptorSetWithTemplateKHR");
 
     return skip;
 }
@@ -4024,8 +4010,8 @@ bool ObjectLifetimes::PreCallValidateDestroyDescriptorUpdateTemplateKHR(
     VkDescriptorUpdateTemplate                  descriptorUpdateTemplate,
     const VkAllocationCallbacks*                pAllocator) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(descriptorUpdateTemplate, kVulkanObjectTypeDescriptorUpdateTemplate, true, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkDestroyDescriptorUpdateTemplateKHR");
+    skip |= ValidateObject(descriptorUpdateTemplate, kVulkanObjectTypeDescriptorUpdateTemplate, true, kVUIDUndefined, kVUIDUndefined, "vkDestroyDescriptorUpdateTemplateKHR");
     skip |= ValidateDestroyObject(descriptorUpdateTemplate, kVulkanObjectTypeDescriptorUpdateTemplate, pAllocator, kVUIDUndefined, kVUIDUndefined);
 
     return skip;
@@ -4045,9 +4031,9 @@ bool ObjectLifetimes::PreCallValidateUpdateDescriptorSetWithTemplateKHR(
     VkDescriptorUpdateTemplate                  descriptorUpdateTemplate,
     const void*                                 pData) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(descriptorSet, kVulkanObjectTypeDescriptorSet, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(descriptorUpdateTemplate, kVulkanObjectTypeDescriptorUpdateTemplate, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkUpdateDescriptorSetWithTemplateKHR");
+    skip |= ValidateObject(descriptorSet, kVulkanObjectTypeDescriptorSet, false, kVUIDUndefined, kVUIDUndefined, "vkUpdateDescriptorSetWithTemplateKHR");
+    skip |= ValidateObject(descriptorUpdateTemplate, kVulkanObjectTypeDescriptorUpdateTemplate, false, kVUIDUndefined, kVUIDUndefined, "vkUpdateDescriptorSetWithTemplateKHR");
 
     return skip;
 }
@@ -4058,7 +4044,7 @@ bool ObjectLifetimes::PreCallValidateCreateRenderPass2KHR(
     const VkAllocationCallbacks*                pAllocator,
     VkRenderPass*                               pRenderPass) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreateRenderPass2-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreateRenderPass2-device-parameter", kVUIDUndefined, "vkCreateRenderPass2KHR");
 
     return skip;
 }
@@ -4079,10 +4065,10 @@ bool ObjectLifetimes::PreCallValidateCmdBeginRenderPass2KHR(
     const VkRenderPassBeginInfo*                pRenderPassBegin,
     const VkSubpassBeginInfo*                   pSubpassBeginInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdBeginRenderPass2-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdBeginRenderPass2-commandBuffer-parameter", kVUIDUndefined, "vkCmdBeginRenderPass2KHR");
     if (pRenderPassBegin) {
-        skip |= ValidateObject(pRenderPassBegin->renderPass, kVulkanObjectTypeRenderPass, false, "VUID-VkRenderPassBeginInfo-renderPass-parameter", "VUID-VkRenderPassBeginInfo-commonparent");
-        skip |= ValidateObject(pRenderPassBegin->framebuffer, kVulkanObjectTypeFramebuffer, false, "VUID-VkRenderPassBeginInfo-framebuffer-parameter", "VUID-VkRenderPassBeginInfo-commonparent");
+        skip |= ValidateObject(pRenderPassBegin->renderPass, kVulkanObjectTypeRenderPass, false, "VUID-VkRenderPassBeginInfo-renderPass-parameter", "VUID-VkRenderPassBeginInfo-commonparent", "VkRenderPassBeginInfo");
+        skip |= ValidateObject(pRenderPassBegin->framebuffer, kVulkanObjectTypeFramebuffer, false, "VUID-VkRenderPassBeginInfo-framebuffer-parameter", "VUID-VkRenderPassBeginInfo-commonparent", "VkRenderPassBeginInfo");
     }
 
     return skip;
@@ -4093,7 +4079,7 @@ bool ObjectLifetimes::PreCallValidateCmdNextSubpass2KHR(
     const VkSubpassBeginInfo*                   pSubpassBeginInfo,
     const VkSubpassEndInfo*                     pSubpassEndInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdNextSubpass2-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdNextSubpass2-commandBuffer-parameter", kVUIDUndefined, "vkCmdNextSubpass2KHR");
 
     return skip;
 }
@@ -4102,7 +4088,7 @@ bool ObjectLifetimes::PreCallValidateCmdEndRenderPass2KHR(
     VkCommandBuffer                             commandBuffer,
     const VkSubpassEndInfo*                     pSubpassEndInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdEndRenderPass2-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdEndRenderPass2-commandBuffer-parameter", kVUIDUndefined, "vkCmdEndRenderPass2KHR");
 
     return skip;
 }
@@ -4111,8 +4097,8 @@ bool ObjectLifetimes::PreCallValidateGetSwapchainStatusKHR(
     VkDevice                                    device,
     VkSwapchainKHR                              swapchain) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetSwapchainStatusKHR-device-parameter", kVUIDUndefined);
-    skip |= ValidateObject(swapchain, kVulkanObjectTypeSwapchainKHR, false, "VUID-vkGetSwapchainStatusKHR-swapchain-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetSwapchainStatusKHR-device-parameter", kVUIDUndefined, "vkGetSwapchainStatusKHR");
+    skip |= ValidateObject(swapchain, kVulkanObjectTypeSwapchainKHR, false, "VUID-vkGetSwapchainStatusKHR-swapchain-parameter", kVUIDUndefined, "vkGetSwapchainStatusKHR");
 
     return skip;
 }
@@ -4122,26 +4108,24 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceExternalFencePropertiesKHR
     const VkPhysicalDeviceExternalFenceInfo*    pExternalFenceInfo,
     VkExternalFenceProperties*                  pExternalFenceProperties) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceExternalFenceProperties-physicalDevice-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceExternalFenceProperties-physicalDevice-parameter", kVUIDUndefined, "vkGetPhysicalDeviceExternalFencePropertiesKHR");
 
     return skip;
 }
-
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 
 bool ObjectLifetimes::PreCallValidateImportFenceWin32HandleKHR(
     VkDevice                                    device,
     const VkImportFenceWin32HandleInfoKHR*      pImportFenceWin32HandleInfo) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkImportFenceWin32HandleKHR");
     if (pImportFenceWin32HandleInfo) {
-        skip |= ValidateObject(pImportFenceWin32HandleInfo->fence, kVulkanObjectTypeFence, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pImportFenceWin32HandleInfo->fence, kVulkanObjectTypeFence, false, kVUIDUndefined, kVUIDUndefined, "VkImportFenceWin32HandleInfoKHR");
     }
 
     return skip;
 }
 #endif // VK_USE_PLATFORM_WIN32_KHR
-
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 
 bool ObjectLifetimes::PreCallValidateGetFenceWin32HandleKHR(
@@ -4149,9 +4133,9 @@ bool ObjectLifetimes::PreCallValidateGetFenceWin32HandleKHR(
     const VkFenceGetWin32HandleInfoKHR*         pGetWin32HandleInfo,
     HANDLE*                                     pHandle) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetFenceWin32HandleKHR");
     if (pGetWin32HandleInfo) {
-        skip |= ValidateObject(pGetWin32HandleInfo->fence, kVulkanObjectTypeFence, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pGetWin32HandleInfo->fence, kVulkanObjectTypeFence, false, kVUIDUndefined, kVUIDUndefined, "VkFenceGetWin32HandleInfoKHR");
     }
 
     return skip;
@@ -4162,9 +4146,9 @@ bool ObjectLifetimes::PreCallValidateImportFenceFdKHR(
     VkDevice                                    device,
     const VkImportFenceFdInfoKHR*               pImportFenceFdInfo) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkImportFenceFdKHR-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkImportFenceFdKHR-device-parameter", kVUIDUndefined, "vkImportFenceFdKHR");
     if (pImportFenceFdInfo) {
-        skip |= ValidateObject(pImportFenceFdInfo->fence, kVulkanObjectTypeFence, false, "VUID-VkImportFenceFdInfoKHR-fence-parameter", kVUIDUndefined);
+        skip |= ValidateObject(pImportFenceFdInfo->fence, kVulkanObjectTypeFence, false, "VUID-VkImportFenceFdInfoKHR-fence-parameter", kVUIDUndefined, "VkImportFenceFdInfoKHR");
     }
 
     return skip;
@@ -4175,9 +4159,9 @@ bool ObjectLifetimes::PreCallValidateGetFenceFdKHR(
     const VkFenceGetFdInfoKHR*                  pGetFdInfo,
     int*                                        pFd) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetFenceFdKHR-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetFenceFdKHR-device-parameter", kVUIDUndefined, "vkGetFenceFdKHR");
     if (pGetFdInfo) {
-        skip |= ValidateObject(pGetFdInfo->fence, kVulkanObjectTypeFence, false, "VUID-VkFenceGetFdInfoKHR-fence-parameter", kVUIDUndefined);
+        skip |= ValidateObject(pGetFdInfo->fence, kVulkanObjectTypeFence, false, "VUID-VkFenceGetFdInfoKHR-fence-parameter", kVUIDUndefined, "VkFenceGetFdInfoKHR");
     }
 
     return skip;
@@ -4190,7 +4174,7 @@ bool ObjectLifetimes::PreCallValidateEnumeratePhysicalDeviceQueueFamilyPerforman
     VkPerformanceCounterKHR*                    pCounters,
     VkPerformanceCounterDescriptionKHR*         pCounterDescriptions) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkEnumeratePhysicalDeviceQueueFamilyPerformanceQueryCountersKHR-physicalDevice-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkEnumeratePhysicalDeviceQueueFamilyPerformanceQueryCountersKHR-physicalDevice-parameter", kVUIDUndefined, "vkEnumeratePhysicalDeviceQueueFamilyPerformanceQueryCountersKHR");
 
     return skip;
 }
@@ -4200,7 +4184,7 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceQueueFamilyPerformanceQuer
     const VkQueryPoolPerformanceCreateInfoKHR*  pPerformanceQueryCreateInfo,
     uint32_t*                                   pNumPasses) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceQueueFamilyPerformanceQueryPassesKHR-physicalDevice-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceQueueFamilyPerformanceQueryPassesKHR-physicalDevice-parameter", kVUIDUndefined, "vkGetPhysicalDeviceQueueFamilyPerformanceQueryPassesKHR");
 
     return skip;
 }
@@ -4209,7 +4193,7 @@ bool ObjectLifetimes::PreCallValidateAcquireProfilingLockKHR(
     VkDevice                                    device,
     const VkAcquireProfilingLockInfoKHR*        pInfo) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkAcquireProfilingLockKHR-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkAcquireProfilingLockKHR-device-parameter", kVUIDUndefined, "vkAcquireProfilingLockKHR");
 
     return skip;
 }
@@ -4217,7 +4201,7 @@ bool ObjectLifetimes::PreCallValidateAcquireProfilingLockKHR(
 bool ObjectLifetimes::PreCallValidateReleaseProfilingLockKHR(
     VkDevice                                    device) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkReleaseProfilingLockKHR-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkReleaseProfilingLockKHR-device-parameter", kVUIDUndefined, "vkReleaseProfilingLockKHR");
 
     return skip;
 }
@@ -4227,9 +4211,9 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceSurfaceCapabilities2KHR(
     const VkPhysicalDeviceSurfaceInfo2KHR*      pSurfaceInfo,
     VkSurfaceCapabilities2KHR*                  pSurfaceCapabilities) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceSurfaceCapabilities2KHR-physicalDevice-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceSurfaceCapabilities2KHR-physicalDevice-parameter", kVUIDUndefined, "vkGetPhysicalDeviceSurfaceCapabilities2KHR");
     if (pSurfaceInfo) {
-        skip |= ValidateObject(pSurfaceInfo->surface, kVulkanObjectTypeSurfaceKHR, true, "VUID-VkPhysicalDeviceSurfaceInfo2KHR-surface-parameter", kVUIDUndefined);
+        skip |= ValidateObject(pSurfaceInfo->surface, kVulkanObjectTypeSurfaceKHR, true, "VUID-VkPhysicalDeviceSurfaceInfo2KHR-surface-parameter", kVUIDUndefined, "VkPhysicalDeviceSurfaceInfo2KHR");
     }
 
     return skip;
@@ -4241,9 +4225,9 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceSurfaceFormats2KHR(
     uint32_t*                                   pSurfaceFormatCount,
     VkSurfaceFormat2KHR*                        pSurfaceFormats) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceSurfaceFormats2KHR-physicalDevice-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceSurfaceFormats2KHR-physicalDevice-parameter", kVUIDUndefined, "vkGetPhysicalDeviceSurfaceFormats2KHR");
     if (pSurfaceInfo) {
-        skip |= ValidateObject(pSurfaceInfo->surface, kVulkanObjectTypeSurfaceKHR, true, "VUID-VkPhysicalDeviceSurfaceInfo2KHR-surface-parameter", kVUIDUndefined);
+        skip |= ValidateObject(pSurfaceInfo->surface, kVulkanObjectTypeSurfaceKHR, true, "VUID-VkPhysicalDeviceSurfaceInfo2KHR-surface-parameter", kVUIDUndefined, "VkPhysicalDeviceSurfaceInfo2KHR");
     }
 
     return skip;
@@ -4254,7 +4238,7 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceDisplayPlaneProperties2KHR
     uint32_t*                                   pPropertyCount,
     VkDisplayPlaneProperties2KHR*               pProperties) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceDisplayPlaneProperties2KHR-physicalDevice-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceDisplayPlaneProperties2KHR-physicalDevice-parameter", kVUIDUndefined, "vkGetPhysicalDeviceDisplayPlaneProperties2KHR");
 
     return skip;
 }
@@ -4264,9 +4248,9 @@ bool ObjectLifetimes::PreCallValidateGetDisplayPlaneCapabilities2KHR(
     const VkDisplayPlaneInfo2KHR*               pDisplayPlaneInfo,
     VkDisplayPlaneCapabilities2KHR*             pCapabilities) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetDisplayPlaneCapabilities2KHR-physicalDevice-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetDisplayPlaneCapabilities2KHR-physicalDevice-parameter", kVUIDUndefined, "vkGetDisplayPlaneCapabilities2KHR");
     if (pDisplayPlaneInfo) {
-        skip |= ValidateObject(pDisplayPlaneInfo->mode, kVulkanObjectTypeDisplayModeKHR, false, "VUID-VkDisplayPlaneInfo2KHR-mode-parameter", kVUIDUndefined);
+        skip |= ValidateObject(pDisplayPlaneInfo->mode, kVulkanObjectTypeDisplayModeKHR, false, "VUID-VkDisplayPlaneInfo2KHR-mode-parameter", kVUIDUndefined, "VkDisplayPlaneInfo2KHR");
     }
 
     return skip;
@@ -4277,9 +4261,9 @@ bool ObjectLifetimes::PreCallValidateGetImageMemoryRequirements2KHR(
     const VkImageMemoryRequirementsInfo2*       pInfo,
     VkMemoryRequirements2*                      pMemoryRequirements) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetImageMemoryRequirements2-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetImageMemoryRequirements2-device-parameter", kVUIDUndefined, "vkGetImageMemoryRequirements2KHR");
     if (pInfo) {
-        skip |= ValidateObject(pInfo->image, kVulkanObjectTypeImage, false, "VUID-VkImageMemoryRequirementsInfo2-image-parameter", kVUIDUndefined);
+        skip |= ValidateObject(pInfo->image, kVulkanObjectTypeImage, false, "VUID-VkImageMemoryRequirementsInfo2-image-parameter", kVUIDUndefined, "VkImageMemoryRequirementsInfo2");
     }
 
     return skip;
@@ -4290,9 +4274,9 @@ bool ObjectLifetimes::PreCallValidateGetBufferMemoryRequirements2KHR(
     const VkBufferMemoryRequirementsInfo2*      pInfo,
     VkMemoryRequirements2*                      pMemoryRequirements) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetBufferMemoryRequirements2-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetBufferMemoryRequirements2-device-parameter", kVUIDUndefined, "vkGetBufferMemoryRequirements2KHR");
     if (pInfo) {
-        skip |= ValidateObject(pInfo->buffer, kVulkanObjectTypeBuffer, false, "VUID-VkBufferMemoryRequirementsInfo2-buffer-parameter", kVUIDUndefined);
+        skip |= ValidateObject(pInfo->buffer, kVulkanObjectTypeBuffer, false, "VUID-VkBufferMemoryRequirementsInfo2-buffer-parameter", kVUIDUndefined, "VkBufferMemoryRequirementsInfo2");
     }
 
     return skip;
@@ -4304,9 +4288,9 @@ bool ObjectLifetimes::PreCallValidateGetImageSparseMemoryRequirements2KHR(
     uint32_t*                                   pSparseMemoryRequirementCount,
     VkSparseImageMemoryRequirements2*           pSparseMemoryRequirements) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetImageSparseMemoryRequirements2KHR");
     if (pInfo) {
-        skip |= ValidateObject(pInfo->image, kVulkanObjectTypeImage, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pInfo->image, kVulkanObjectTypeImage, false, kVUIDUndefined, kVUIDUndefined, "VkImageSparseMemoryRequirementsInfo2");
     }
 
     return skip;
@@ -4318,7 +4302,7 @@ bool ObjectLifetimes::PreCallValidateCreateSamplerYcbcrConversionKHR(
     const VkAllocationCallbacks*                pAllocator,
     VkSamplerYcbcrConversion*                   pYcbcrConversion) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreateSamplerYcbcrConversion-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreateSamplerYcbcrConversion-device-parameter", kVUIDUndefined, "vkCreateSamplerYcbcrConversionKHR");
 
     return skip;
 }
@@ -4339,8 +4323,8 @@ bool ObjectLifetimes::PreCallValidateDestroySamplerYcbcrConversionKHR(
     VkSamplerYcbcrConversion                    ycbcrConversion,
     const VkAllocationCallbacks*                pAllocator) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkDestroySamplerYcbcrConversion-device-parameter", kVUIDUndefined);
-    skip |= ValidateObject(ycbcrConversion, kVulkanObjectTypeSamplerYcbcrConversion, true, "VUID-vkDestroySamplerYcbcrConversion-ycbcrConversion-parameter", "VUID-vkDestroySamplerYcbcrConversion-ycbcrConversion-parent");
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkDestroySamplerYcbcrConversion-device-parameter", kVUIDUndefined, "vkDestroySamplerYcbcrConversionKHR");
+    skip |= ValidateObject(ycbcrConversion, kVulkanObjectTypeSamplerYcbcrConversion, true, "VUID-vkDestroySamplerYcbcrConversion-ycbcrConversion-parameter", "VUID-vkDestroySamplerYcbcrConversion-ycbcrConversion-parent", "vkDestroySamplerYcbcrConversionKHR");
     skip |= ValidateDestroyObject(ycbcrConversion, kVulkanObjectTypeSamplerYcbcrConversion, pAllocator, kVUIDUndefined, kVUIDUndefined);
 
     return skip;
@@ -4359,11 +4343,11 @@ bool ObjectLifetimes::PreCallValidateBindBufferMemory2KHR(
     uint32_t                                    bindInfoCount,
     const VkBindBufferMemoryInfo*               pBindInfos) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkBindBufferMemory2-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkBindBufferMemory2-device-parameter", kVUIDUndefined, "vkBindBufferMemory2KHR");
     if (pBindInfos) {
         for (uint32_t index0 = 0; index0 < bindInfoCount; ++index0) {
-            skip |= ValidateObject(pBindInfos[index0].buffer, kVulkanObjectTypeBuffer, false, "VUID-VkBindBufferMemoryInfo-buffer-parameter", "VUID-VkBindBufferMemoryInfo-commonparent");
-            skip |= ValidateObject(pBindInfos[index0].memory, kVulkanObjectTypeDeviceMemory, false, "VUID-VkBindBufferMemoryInfo-memory-parameter", "VUID-VkBindBufferMemoryInfo-commonparent");
+            skip |= ValidateObject(pBindInfos[index0].buffer, kVulkanObjectTypeBuffer, false, "VUID-VkBindBufferMemoryInfo-buffer-parameter", "VUID-VkBindBufferMemoryInfo-commonparent", "VkBindBufferMemoryInfo");
+            skip |= ValidateObject(pBindInfos[index0].memory, kVulkanObjectTypeDeviceMemory, false, "VUID-VkBindBufferMemoryInfo-memory-parameter", "VUID-VkBindBufferMemoryInfo-commonparent", "VkBindBufferMemoryInfo");
         }
     }
 
@@ -4375,11 +4359,11 @@ bool ObjectLifetimes::PreCallValidateBindImageMemory2KHR(
     uint32_t                                    bindInfoCount,
     const VkBindImageMemoryInfo*                pBindInfos) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkBindImageMemory2-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkBindImageMemory2-device-parameter", kVUIDUndefined, "vkBindImageMemory2KHR");
     if (pBindInfos) {
         for (uint32_t index0 = 0; index0 < bindInfoCount; ++index0) {
-            skip |= ValidateObject(pBindInfos[index0].image, kVulkanObjectTypeImage, false, "VUID-VkBindImageMemoryInfo-image-parameter", "VUID-VkBindImageMemoryInfo-commonparent");
-            skip |= ValidateObject(pBindInfos[index0].memory, kVulkanObjectTypeDeviceMemory, true, kVUIDUndefined, "VUID-VkBindImageMemoryInfo-commonparent");
+            skip |= ValidateObject(pBindInfos[index0].image, kVulkanObjectTypeImage, false, "VUID-VkBindImageMemoryInfo-image-parameter", "VUID-VkBindImageMemoryInfo-commonparent", "VkBindImageMemoryInfo");
+            skip |= ValidateObject(pBindInfos[index0].memory, kVulkanObjectTypeDeviceMemory, true, kVUIDUndefined, "VUID-VkBindImageMemoryInfo-commonparent", "VkBindImageMemoryInfo");
         }
     }
 
@@ -4395,9 +4379,9 @@ bool ObjectLifetimes::PreCallValidateCmdDrawIndirectCountKHR(
     uint32_t                                    maxDrawCount,
     uint32_t                                    stride) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdDrawIndirectCount-commandBuffer-parameter", "VUID-vkCmdDrawIndirectCount-commonparent");
-    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdDrawIndirectCount-buffer-parameter", "VUID-vkCmdDrawIndirectCount-commonparent");
-    skip |= ValidateObject(countBuffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdDrawIndirectCount-countBuffer-parameter", "VUID-vkCmdDrawIndirectCount-commonparent");
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdDrawIndirectCount-commandBuffer-parameter", "VUID-vkCmdDrawIndirectCount-commonparent", "vkCmdDrawIndirectCountKHR");
+    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdDrawIndirectCount-buffer-parameter", "VUID-vkCmdDrawIndirectCount-commonparent", "vkCmdDrawIndirectCountKHR");
+    skip |= ValidateObject(countBuffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdDrawIndirectCount-countBuffer-parameter", "VUID-vkCmdDrawIndirectCount-commonparent", "vkCmdDrawIndirectCountKHR");
 
     return skip;
 }
@@ -4411,9 +4395,9 @@ bool ObjectLifetimes::PreCallValidateCmdDrawIndexedIndirectCountKHR(
     uint32_t                                    maxDrawCount,
     uint32_t                                    stride) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdDrawIndexedIndirectCount-commandBuffer-parameter", "VUID-vkCmdDrawIndexedIndirectCount-commonparent");
-    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdDrawIndexedIndirectCount-buffer-parameter", "VUID-vkCmdDrawIndexedIndirectCount-commonparent");
-    skip |= ValidateObject(countBuffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdDrawIndexedIndirectCount-countBuffer-parameter", "VUID-vkCmdDrawIndexedIndirectCount-commonparent");
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdDrawIndexedIndirectCount-commandBuffer-parameter", "VUID-vkCmdDrawIndexedIndirectCount-commonparent", "vkCmdDrawIndexedIndirectCountKHR");
+    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdDrawIndexedIndirectCount-buffer-parameter", "VUID-vkCmdDrawIndexedIndirectCount-commonparent", "vkCmdDrawIndexedIndirectCountKHR");
+    skip |= ValidateObject(countBuffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdDrawIndexedIndirectCount-countBuffer-parameter", "VUID-vkCmdDrawIndexedIndirectCount-commonparent", "vkCmdDrawIndexedIndirectCountKHR");
 
     return skip;
 }
@@ -4423,8 +4407,8 @@ bool ObjectLifetimes::PreCallValidateGetSemaphoreCounterValueKHR(
     VkSemaphore                                 semaphore,
     uint64_t*                                   pValue) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetSemaphoreCounterValue-device-parameter", kVUIDUndefined);
-    skip |= ValidateObject(semaphore, kVulkanObjectTypeSemaphore, false, "VUID-vkGetSemaphoreCounterValue-semaphore-parameter", "VUID-vkGetSemaphoreCounterValue-semaphore-parent");
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetSemaphoreCounterValue-device-parameter", kVUIDUndefined, "vkGetSemaphoreCounterValueKHR");
+    skip |= ValidateObject(semaphore, kVulkanObjectTypeSemaphore, false, "VUID-vkGetSemaphoreCounterValue-semaphore-parameter", "VUID-vkGetSemaphoreCounterValue-semaphore-parent", "vkGetSemaphoreCounterValueKHR");
 
     return skip;
 }
@@ -4434,11 +4418,11 @@ bool ObjectLifetimes::PreCallValidateWaitSemaphoresKHR(
     const VkSemaphoreWaitInfo*                  pWaitInfo,
     uint64_t                                    timeout) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkWaitSemaphores-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkWaitSemaphores-device-parameter", kVUIDUndefined, "vkWaitSemaphoresKHR");
     if (pWaitInfo) {
         if ((pWaitInfo->semaphoreCount > 0) && (pWaitInfo->pSemaphores)) {
             for (uint32_t index1 = 0; index1 < pWaitInfo->semaphoreCount; ++index1) {
-                skip |= ValidateObject(pWaitInfo->pSemaphores[index1], kVulkanObjectTypeSemaphore, false, "VUID-VkSemaphoreWaitInfo-pSemaphores-parameter", kVUIDUndefined);
+                skip |= ValidateObject(pWaitInfo->pSemaphores[index1], kVulkanObjectTypeSemaphore, false, "VUID-VkSemaphoreWaitInfo-pSemaphores-parameter", kVUIDUndefined, "VkSemaphoreWaitInfo");
             }
         }
     }
@@ -4450,9 +4434,9 @@ bool ObjectLifetimes::PreCallValidateSignalSemaphoreKHR(
     VkDevice                                    device,
     const VkSemaphoreSignalInfo*                pSignalInfo) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkSignalSemaphore-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkSignalSemaphore-device-parameter", kVUIDUndefined, "vkSignalSemaphoreKHR");
     if (pSignalInfo) {
-        skip |= ValidateObject(pSignalInfo->semaphore, kVulkanObjectTypeSemaphore, false, "VUID-VkSemaphoreSignalInfo-semaphore-parameter", kVUIDUndefined);
+        skip |= ValidateObject(pSignalInfo->semaphore, kVulkanObjectTypeSemaphore, false, "VUID-VkSemaphoreSignalInfo-semaphore-parameter", kVUIDUndefined, "VkSemaphoreSignalInfo");
     }
 
     return skip;
@@ -4463,7 +4447,7 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceFragmentShadingRatesKHR(
     uint32_t*                                   pFragmentShadingRateCount,
     VkPhysicalDeviceFragmentShadingRateKHR*     pFragmentShadingRates) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceFragmentShadingRatesKHR-physicalDevice-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceFragmentShadingRatesKHR-physicalDevice-parameter", kVUIDUndefined, "vkGetPhysicalDeviceFragmentShadingRatesKHR");
 
     return skip;
 }
@@ -4473,7 +4457,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetFragmentShadingRateKHR(
     const VkExtent2D*                           pFragmentSize,
     const VkFragmentShadingRateCombinerOpKHR    combinerOps[2]) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetFragmentShadingRateKHR-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetFragmentShadingRateKHR-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetFragmentShadingRateKHR");
 
     return skip;
 }
@@ -4484,8 +4468,8 @@ bool ObjectLifetimes::PreCallValidateWaitForPresentKHR(
     uint64_t                                    presentId,
     uint64_t                                    timeout) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(swapchain, kVulkanObjectTypeSwapchainKHR, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkWaitForPresentKHR");
+    skip |= ValidateObject(swapchain, kVulkanObjectTypeSwapchainKHR, false, kVUIDUndefined, kVUIDUndefined, "vkWaitForPresentKHR");
 
     return skip;
 }
@@ -4494,7 +4478,7 @@ bool ObjectLifetimes::PreCallValidateGetBufferDeviceAddressKHR(
     VkDevice                                    device,
     const VkBufferDeviceAddressInfo*            pInfo) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetBufferDeviceAddress-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetBufferDeviceAddress-device-parameter", kVUIDUndefined, "vkGetBufferDeviceAddressKHR");
 
     return skip;
 }
@@ -4503,7 +4487,7 @@ bool ObjectLifetimes::PreCallValidateGetBufferOpaqueCaptureAddressKHR(
     VkDevice                                    device,
     const VkBufferDeviceAddressInfo*            pInfo) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetBufferOpaqueCaptureAddress-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetBufferOpaqueCaptureAddress-device-parameter", kVUIDUndefined, "vkGetBufferOpaqueCaptureAddressKHR");
 
     return skip;
 }
@@ -4512,7 +4496,7 @@ bool ObjectLifetimes::PreCallValidateGetDeviceMemoryOpaqueCaptureAddressKHR(
     VkDevice                                    device,
     const VkDeviceMemoryOpaqueCaptureAddressInfo* pInfo) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetDeviceMemoryOpaqueCaptureAddress-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetDeviceMemoryOpaqueCaptureAddress-device-parameter", kVUIDUndefined, "vkGetDeviceMemoryOpaqueCaptureAddressKHR");
 
     return skip;
 }
@@ -4522,7 +4506,7 @@ bool ObjectLifetimes::PreCallValidateCreateDeferredOperationKHR(
     const VkAllocationCallbacks*                pAllocator,
     VkDeferredOperationKHR*                     pDeferredOperation) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkCreateDeferredOperationKHR");
 
     return skip;
 }
@@ -4542,8 +4526,8 @@ bool ObjectLifetimes::PreCallValidateDestroyDeferredOperationKHR(
     VkDeferredOperationKHR                      operation,
     const VkAllocationCallbacks*                pAllocator) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(operation, kVulkanObjectTypeDeferredOperationKHR, true, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkDestroyDeferredOperationKHR");
+    skip |= ValidateObject(operation, kVulkanObjectTypeDeferredOperationKHR, true, kVUIDUndefined, kVUIDUndefined, "vkDestroyDeferredOperationKHR");
     skip |= ValidateDestroyObject(operation, kVulkanObjectTypeDeferredOperationKHR, pAllocator, kVUIDUndefined, kVUIDUndefined);
 
     return skip;
@@ -4561,8 +4545,8 @@ bool ObjectLifetimes::PreCallValidateGetDeferredOperationMaxConcurrencyKHR(
     VkDevice                                    device,
     VkDeferredOperationKHR                      operation) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(operation, kVulkanObjectTypeDeferredOperationKHR, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetDeferredOperationMaxConcurrencyKHR");
+    skip |= ValidateObject(operation, kVulkanObjectTypeDeferredOperationKHR, false, kVUIDUndefined, kVUIDUndefined, "vkGetDeferredOperationMaxConcurrencyKHR");
 
     return skip;
 }
@@ -4571,8 +4555,8 @@ bool ObjectLifetimes::PreCallValidateGetDeferredOperationResultKHR(
     VkDevice                                    device,
     VkDeferredOperationKHR                      operation) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(operation, kVulkanObjectTypeDeferredOperationKHR, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetDeferredOperationResultKHR");
+    skip |= ValidateObject(operation, kVulkanObjectTypeDeferredOperationKHR, false, kVUIDUndefined, kVUIDUndefined, "vkGetDeferredOperationResultKHR");
 
     return skip;
 }
@@ -4581,8 +4565,8 @@ bool ObjectLifetimes::PreCallValidateDeferredOperationJoinKHR(
     VkDevice                                    device,
     VkDeferredOperationKHR                      operation) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(operation, kVulkanObjectTypeDeferredOperationKHR, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkDeferredOperationJoinKHR");
+    skip |= ValidateObject(operation, kVulkanObjectTypeDeferredOperationKHR, false, kVUIDUndefined, kVUIDUndefined, "vkDeferredOperationJoinKHR");
 
     return skip;
 }
@@ -4593,9 +4577,9 @@ bool ObjectLifetimes::PreCallValidateGetPipelineExecutablePropertiesKHR(
     uint32_t*                                   pExecutableCount,
     VkPipelineExecutablePropertiesKHR*          pProperties) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetPipelineExecutablePropertiesKHR");
     if (pPipelineInfo) {
-        skip |= ValidateObject(pPipelineInfo->pipeline, kVulkanObjectTypePipeline, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pPipelineInfo->pipeline, kVulkanObjectTypePipeline, false, kVUIDUndefined, kVUIDUndefined, "VkPipelineInfoKHR");
     }
 
     return skip;
@@ -4607,9 +4591,9 @@ bool ObjectLifetimes::PreCallValidateGetPipelineExecutableStatisticsKHR(
     uint32_t*                                   pStatisticCount,
     VkPipelineExecutableStatisticKHR*           pStatistics) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetPipelineExecutableStatisticsKHR");
     if (pExecutableInfo) {
-        skip |= ValidateObject(pExecutableInfo->pipeline, kVulkanObjectTypePipeline, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pExecutableInfo->pipeline, kVulkanObjectTypePipeline, false, kVUIDUndefined, kVUIDUndefined, "VkPipelineExecutableInfoKHR");
     }
 
     return skip;
@@ -4621,9 +4605,9 @@ bool ObjectLifetimes::PreCallValidateGetPipelineExecutableInternalRepresentation
     uint32_t*                                   pInternalRepresentationCount,
     VkPipelineExecutableInternalRepresentationKHR* pInternalRepresentations) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetPipelineExecutableInternalRepresentationsKHR");
     if (pExecutableInfo) {
-        skip |= ValidateObject(pExecutableInfo->pipeline, kVulkanObjectTypePipeline, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pExecutableInfo->pipeline, kVulkanObjectTypePipeline, false, kVUIDUndefined, kVUIDUndefined, "VkPipelineExecutableInfoKHR");
     }
 
     return skip;
@@ -4634,9 +4618,9 @@ bool ObjectLifetimes::PreCallValidateMapMemory2KHR(
     const VkMemoryMapInfoKHR*                   pMemoryMapInfo,
     void**                                      ppData) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkMapMemory2KHR");
     if (pMemoryMapInfo) {
-        skip |= ValidateObject(pMemoryMapInfo->memory, kVulkanObjectTypeDeviceMemory, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pMemoryMapInfo->memory, kVulkanObjectTypeDeviceMemory, false, kVUIDUndefined, kVUIDUndefined, "VkMemoryMapInfoKHR");
     }
 
     return skip;
@@ -4646,33 +4630,61 @@ bool ObjectLifetimes::PreCallValidateUnmapMemory2KHR(
     VkDevice                                    device,
     const VkMemoryUnmapInfoKHR*                 pMemoryUnmapInfo) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkUnmapMemory2KHR");
     if (pMemoryUnmapInfo) {
-        skip |= ValidateObject(pMemoryUnmapInfo->memory, kVulkanObjectTypeDeviceMemory, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pMemoryUnmapInfo->memory, kVulkanObjectTypeDeviceMemory, false, kVUIDUndefined, kVUIDUndefined, "VkMemoryUnmapInfoKHR");
     }
 
     return skip;
 }
+#ifdef VK_ENABLE_BETA_EXTENSIONS
 
+bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceVideoEncodeQualityLevelPropertiesKHR(
+    VkPhysicalDevice                            physicalDevice,
+    const VkPhysicalDeviceVideoEncodeQualityLevelInfoKHR* pQualityLevelInfo,
+    VkVideoEncodeQualityLevelPropertiesKHR*     pQualityLevelProperties) const {
+    bool skip = false;
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetPhysicalDeviceVideoEncodeQualityLevelPropertiesKHR");
+
+    return skip;
+}
+#endif // VK_ENABLE_BETA_EXTENSIONS
+#ifdef VK_ENABLE_BETA_EXTENSIONS
+
+bool ObjectLifetimes::PreCallValidateGetEncodedVideoSessionParametersKHR(
+    VkDevice                                    device,
+    const VkVideoEncodeSessionParametersGetInfoKHR* pVideoSessionParametersInfo,
+    VkVideoEncodeSessionParametersFeedbackInfoKHR* pFeedbackInfo,
+    size_t*                                     pDataSize,
+    void*                                       pData) const {
+    bool skip = false;
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetEncodedVideoSessionParametersKHR");
+    if (pVideoSessionParametersInfo) {
+        skip |= ValidateObject(pVideoSessionParametersInfo->videoSessionParameters, kVulkanObjectTypeVideoSessionParametersKHR, false, kVUIDUndefined, kVUIDUndefined, "VkVideoEncodeSessionParametersGetInfoKHR");
+    }
+
+    return skip;
+}
+#endif // VK_ENABLE_BETA_EXTENSIONS
 #ifdef VK_ENABLE_BETA_EXTENSIONS
 
 bool ObjectLifetimes::PreCallValidateCmdEncodeVideoKHR(
     VkCommandBuffer                             commandBuffer,
     const VkVideoEncodeInfoKHR*                 pEncodeInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdEncodeVideoKHR");
     if (pEncodeInfo) {
-        skip |= ValidateObject(pEncodeInfo->dstBuffer, kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined);
-        skip |= ValidateObject(pEncodeInfo->srcPictureResource.imageViewBinding, kVulkanObjectTypeImageView, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pEncodeInfo->dstBuffer, kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined, "VkVideoEncodeInfoKHR");
+        skip |= ValidateObject(pEncodeInfo->srcPictureResource.imageViewBinding, kVulkanObjectTypeImageView, false, kVUIDUndefined, kVUIDUndefined, "VkVideoPictureResourceInfoKHR");
         if (pEncodeInfo->pSetupReferenceSlot) {
             if (pEncodeInfo->pSetupReferenceSlot->pPictureResource) {
-                skip |= ValidateObject(pEncodeInfo->pSetupReferenceSlot->pPictureResource->imageViewBinding, kVulkanObjectTypeImageView, false, kVUIDUndefined, kVUIDUndefined);
+                skip |= ValidateObject(pEncodeInfo->pSetupReferenceSlot->pPictureResource->imageViewBinding, kVulkanObjectTypeImageView, false, kVUIDUndefined, kVUIDUndefined, "VkVideoPictureResourceInfoKHR");
             }
         }
         if (pEncodeInfo->pReferenceSlots) {
             for (uint32_t index1 = 0; index1 < pEncodeInfo->referenceSlotCount; ++index1) {
                 if (pEncodeInfo->pReferenceSlots[index1].pPictureResource) {
-                    skip |= ValidateObject(pEncodeInfo->pReferenceSlots[index1].pPictureResource->imageViewBinding, kVulkanObjectTypeImageView, false, kVUIDUndefined, kVUIDUndefined);
+                    skip |= ValidateObject(pEncodeInfo->pReferenceSlots[index1].pPictureResource->imageViewBinding, kVulkanObjectTypeImageView, false, kVUIDUndefined, kVUIDUndefined, "VkVideoPictureResourceInfoKHR");
                 }
             }
         }
@@ -4686,7 +4698,7 @@ bool ObjectLifetimes::PreCallValidateCmdRefreshObjectsKHR(
     VkCommandBuffer                             commandBuffer,
     const VkRefreshObjectListKHR*               pRefreshObjects) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdRefreshObjectsKHR-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdRefreshObjectsKHR-commandBuffer-parameter", kVUIDUndefined, "vkCmdRefreshObjectsKHR");
 
     return skip;
 }
@@ -4696,7 +4708,7 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceRefreshableObjectTypesKHR(
     uint32_t*                                   pRefreshableObjectTypeCount,
     VkObjectType*                               pRefreshableObjectTypes) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceRefreshableObjectTypesKHR-physicalDevice-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceRefreshableObjectTypesKHR-physicalDevice-parameter", kVUIDUndefined, "vkGetPhysicalDeviceRefreshableObjectTypesKHR");
 
     return skip;
 }
@@ -4706,17 +4718,17 @@ bool ObjectLifetimes::PreCallValidateCmdSetEvent2KHR(
     VkEvent                                     event,
     const VkDependencyInfo*                     pDependencyInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetEvent2-commandBuffer-parameter", "VUID-vkCmdSetEvent2-commonparent");
-    skip |= ValidateObject(event, kVulkanObjectTypeEvent, false, "VUID-vkCmdSetEvent2-event-parameter", "VUID-vkCmdSetEvent2-commonparent");
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetEvent2-commandBuffer-parameter", "VUID-vkCmdSetEvent2-commonparent", "vkCmdSetEvent2KHR");
+    skip |= ValidateObject(event, kVulkanObjectTypeEvent, false, "VUID-vkCmdSetEvent2-event-parameter", "VUID-vkCmdSetEvent2-commonparent", "vkCmdSetEvent2KHR");
     if (pDependencyInfo) {
         if (pDependencyInfo->pBufferMemoryBarriers) {
             for (uint32_t index1 = 0; index1 < pDependencyInfo->bufferMemoryBarrierCount; ++index1) {
-                skip |= ValidateObject(pDependencyInfo->pBufferMemoryBarriers[index1].buffer, kVulkanObjectTypeBuffer, false, "VUID-VkBufferMemoryBarrier2-buffer-parameter", kVUIDUndefined);
+                skip |= ValidateObject(pDependencyInfo->pBufferMemoryBarriers[index1].buffer, kVulkanObjectTypeBuffer, false, "VUID-VkBufferMemoryBarrier2-buffer-parameter", kVUIDUndefined, "VkBufferMemoryBarrier2");
             }
         }
         if (pDependencyInfo->pImageMemoryBarriers) {
             for (uint32_t index1 = 0; index1 < pDependencyInfo->imageMemoryBarrierCount; ++index1) {
-                skip |= ValidateObject(pDependencyInfo->pImageMemoryBarriers[index1].image, kVulkanObjectTypeImage, false, "VUID-VkImageMemoryBarrier2-image-parameter", kVUIDUndefined);
+                skip |= ValidateObject(pDependencyInfo->pImageMemoryBarriers[index1].image, kVulkanObjectTypeImage, false, "VUID-VkImageMemoryBarrier2-image-parameter", kVUIDUndefined, "VkImageMemoryBarrier2");
             }
         }
     }
@@ -4729,8 +4741,8 @@ bool ObjectLifetimes::PreCallValidateCmdResetEvent2KHR(
     VkEvent                                     event,
     VkPipelineStageFlags2                       stageMask) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdResetEvent2-commandBuffer-parameter", "VUID-vkCmdResetEvent2-commonparent");
-    skip |= ValidateObject(event, kVulkanObjectTypeEvent, false, "VUID-vkCmdResetEvent2-event-parameter", "VUID-vkCmdResetEvent2-commonparent");
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdResetEvent2-commandBuffer-parameter", "VUID-vkCmdResetEvent2-commonparent", "vkCmdResetEvent2KHR");
+    skip |= ValidateObject(event, kVulkanObjectTypeEvent, false, "VUID-vkCmdResetEvent2-event-parameter", "VUID-vkCmdResetEvent2-commonparent", "vkCmdResetEvent2KHR");
 
     return skip;
 }
@@ -4741,22 +4753,22 @@ bool ObjectLifetimes::PreCallValidateCmdWaitEvents2KHR(
     const VkEvent*                              pEvents,
     const VkDependencyInfo*                     pDependencyInfos) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdWaitEvents2-commandBuffer-parameter", "VUID-vkCmdWaitEvents2-commonparent");
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdWaitEvents2-commandBuffer-parameter", "VUID-vkCmdWaitEvents2-commonparent", "vkCmdWaitEvents2KHR");
     if ((eventCount > 0) && (pEvents)) {
         for (uint32_t index0 = 0; index0 < eventCount; ++index0) {
-            skip |= ValidateObject(pEvents[index0], kVulkanObjectTypeEvent, false, "VUID-vkCmdWaitEvents2-pEvents-parameter", "VUID-vkCmdWaitEvents2-commonparent");
+            skip |= ValidateObject(pEvents[index0], kVulkanObjectTypeEvent, false, "VUID-vkCmdWaitEvents2-pEvents-parameter", "VUID-vkCmdWaitEvents2-commonparent", "vkCmdWaitEvents2KHR");
         }
     }
     if (pDependencyInfos) {
         for (uint32_t index0 = 0; index0 < eventCount; ++index0) {
             if (pDependencyInfos[index0].pBufferMemoryBarriers) {
                 for (uint32_t index1 = 0; index1 < pDependencyInfos[index0].bufferMemoryBarrierCount; ++index1) {
-                    skip |= ValidateObject(pDependencyInfos[index0].pBufferMemoryBarriers[index1].buffer, kVulkanObjectTypeBuffer, false, "VUID-VkBufferMemoryBarrier2-buffer-parameter", kVUIDUndefined);
+                    skip |= ValidateObject(pDependencyInfos[index0].pBufferMemoryBarriers[index1].buffer, kVulkanObjectTypeBuffer, false, "VUID-VkBufferMemoryBarrier2-buffer-parameter", kVUIDUndefined, "VkBufferMemoryBarrier2");
                 }
             }
             if (pDependencyInfos[index0].pImageMemoryBarriers) {
                 for (uint32_t index1 = 0; index1 < pDependencyInfos[index0].imageMemoryBarrierCount; ++index1) {
-                    skip |= ValidateObject(pDependencyInfos[index0].pImageMemoryBarriers[index1].image, kVulkanObjectTypeImage, false, "VUID-VkImageMemoryBarrier2-image-parameter", kVUIDUndefined);
+                    skip |= ValidateObject(pDependencyInfos[index0].pImageMemoryBarriers[index1].image, kVulkanObjectTypeImage, false, "VUID-VkImageMemoryBarrier2-image-parameter", kVUIDUndefined, "VkImageMemoryBarrier2");
                 }
             }
         }
@@ -4769,16 +4781,16 @@ bool ObjectLifetimes::PreCallValidateCmdPipelineBarrier2KHR(
     VkCommandBuffer                             commandBuffer,
     const VkDependencyInfo*                     pDependencyInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdPipelineBarrier2-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdPipelineBarrier2-commandBuffer-parameter", kVUIDUndefined, "vkCmdPipelineBarrier2KHR");
     if (pDependencyInfo) {
         if (pDependencyInfo->pBufferMemoryBarriers) {
             for (uint32_t index1 = 0; index1 < pDependencyInfo->bufferMemoryBarrierCount; ++index1) {
-                skip |= ValidateObject(pDependencyInfo->pBufferMemoryBarriers[index1].buffer, kVulkanObjectTypeBuffer, false, "VUID-VkBufferMemoryBarrier2-buffer-parameter", kVUIDUndefined);
+                skip |= ValidateObject(pDependencyInfo->pBufferMemoryBarriers[index1].buffer, kVulkanObjectTypeBuffer, false, "VUID-VkBufferMemoryBarrier2-buffer-parameter", kVUIDUndefined, "VkBufferMemoryBarrier2");
             }
         }
         if (pDependencyInfo->pImageMemoryBarriers) {
             for (uint32_t index1 = 0; index1 < pDependencyInfo->imageMemoryBarrierCount; ++index1) {
-                skip |= ValidateObject(pDependencyInfo->pImageMemoryBarriers[index1].image, kVulkanObjectTypeImage, false, "VUID-VkImageMemoryBarrier2-image-parameter", kVUIDUndefined);
+                skip |= ValidateObject(pDependencyInfo->pImageMemoryBarriers[index1].image, kVulkanObjectTypeImage, false, "VUID-VkImageMemoryBarrier2-image-parameter", kVUIDUndefined, "VkImageMemoryBarrier2");
             }
         }
     }
@@ -4792,8 +4804,8 @@ bool ObjectLifetimes::PreCallValidateCmdWriteTimestamp2KHR(
     VkQueryPool                                 queryPool,
     uint32_t                                    query) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdWriteTimestamp2-commandBuffer-parameter", "VUID-vkCmdWriteTimestamp2-commonparent");
-    skip |= ValidateObject(queryPool, kVulkanObjectTypeQueryPool, false, "VUID-vkCmdWriteTimestamp2-queryPool-parameter", "VUID-vkCmdWriteTimestamp2-commonparent");
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdWriteTimestamp2-commandBuffer-parameter", "VUID-vkCmdWriteTimestamp2-commonparent", "vkCmdWriteTimestamp2KHR");
+    skip |= ValidateObject(queryPool, kVulkanObjectTypeQueryPool, false, "VUID-vkCmdWriteTimestamp2-queryPool-parameter", "VUID-vkCmdWriteTimestamp2-commonparent", "vkCmdWriteTimestamp2KHR");
 
     return skip;
 }
@@ -4804,27 +4816,27 @@ bool ObjectLifetimes::PreCallValidateQueueSubmit2KHR(
     const VkSubmitInfo2*                        pSubmits,
     VkFence                                     fence) const {
     bool skip = false;
-    skip |= ValidateObject(queue, kVulkanObjectTypeQueue, false, "VUID-vkQueueSubmit2-queue-parameter", "VUID-vkQueueSubmit2-commonparent");
+    skip |= ValidateObject(queue, kVulkanObjectTypeQueue, false, "VUID-vkQueueSubmit2-queue-parameter", "VUID-vkQueueSubmit2-commonparent", "vkQueueSubmit2KHR");
     if (pSubmits) {
         for (uint32_t index0 = 0; index0 < submitCount; ++index0) {
             if (pSubmits[index0].pWaitSemaphoreInfos) {
                 for (uint32_t index1 = 0; index1 < pSubmits[index0].waitSemaphoreInfoCount; ++index1) {
-                    skip |= ValidateObject(pSubmits[index0].pWaitSemaphoreInfos[index1].semaphore, kVulkanObjectTypeSemaphore, false, "VUID-VkSemaphoreSubmitInfo-semaphore-parameter", kVUIDUndefined);
+                    skip |= ValidateObject(pSubmits[index0].pWaitSemaphoreInfos[index1].semaphore, kVulkanObjectTypeSemaphore, false, "VUID-VkSemaphoreSubmitInfo-semaphore-parameter", kVUIDUndefined, "VkSemaphoreSubmitInfo");
                 }
             }
             if (pSubmits[index0].pCommandBufferInfos) {
                 for (uint32_t index1 = 0; index1 < pSubmits[index0].commandBufferInfoCount; ++index1) {
-                    skip |= ValidateObject(pSubmits[index0].pCommandBufferInfos[index1].commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-VkCommandBufferSubmitInfo-commandBuffer-parameter", kVUIDUndefined);
+                    skip |= ValidateObject(pSubmits[index0].pCommandBufferInfos[index1].commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-VkCommandBufferSubmitInfo-commandBuffer-parameter", kVUIDUndefined, "VkCommandBufferSubmitInfo");
                 }
             }
             if (pSubmits[index0].pSignalSemaphoreInfos) {
                 for (uint32_t index1 = 0; index1 < pSubmits[index0].signalSemaphoreInfoCount; ++index1) {
-                    skip |= ValidateObject(pSubmits[index0].pSignalSemaphoreInfos[index1].semaphore, kVulkanObjectTypeSemaphore, false, "VUID-VkSemaphoreSubmitInfo-semaphore-parameter", kVUIDUndefined);
+                    skip |= ValidateObject(pSubmits[index0].pSignalSemaphoreInfos[index1].semaphore, kVulkanObjectTypeSemaphore, false, "VUID-VkSemaphoreSubmitInfo-semaphore-parameter", kVUIDUndefined, "VkSemaphoreSubmitInfo");
                 }
             }
         }
     }
-    skip |= ValidateObject(fence, kVulkanObjectTypeFence, true, "VUID-vkQueueSubmit2-fence-parameter", "VUID-vkQueueSubmit2-commonparent");
+    skip |= ValidateObject(fence, kVulkanObjectTypeFence, true, "VUID-vkQueueSubmit2-fence-parameter", "VUID-vkQueueSubmit2-commonparent", "vkQueueSubmit2KHR");
 
     return skip;
 }
@@ -4836,8 +4848,8 @@ bool ObjectLifetimes::PreCallValidateCmdWriteBufferMarker2AMD(
     VkDeviceSize                                dstOffset,
     uint32_t                                    marker) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdWriteBufferMarker2AMD-commandBuffer-parameter", "VUID-vkCmdWriteBufferMarker2AMD-commonparent");
-    skip |= ValidateObject(dstBuffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdWriteBufferMarker2AMD-dstBuffer-parameter", "VUID-vkCmdWriteBufferMarker2AMD-commonparent");
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdWriteBufferMarker2AMD");
+    skip |= ValidateObject(dstBuffer, kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdWriteBufferMarker2AMD");
 
     return skip;
 }
@@ -4847,7 +4859,7 @@ bool ObjectLifetimes::PreCallValidateGetQueueCheckpointData2NV(
     uint32_t*                                   pCheckpointDataCount,
     VkCheckpointData2NV*                        pCheckpointData) const {
     bool skip = false;
-    skip |= ValidateObject(queue, kVulkanObjectTypeQueue, false, "VUID-vkGetQueueCheckpointData2NV-queue-parameter", kVUIDUndefined);
+    skip |= ValidateObject(queue, kVulkanObjectTypeQueue, false, kVUIDUndefined, kVUIDUndefined, "vkGetQueueCheckpointData2NV");
 
     return skip;
 }
@@ -4856,10 +4868,10 @@ bool ObjectLifetimes::PreCallValidateCmdCopyBuffer2KHR(
     VkCommandBuffer                             commandBuffer,
     const VkCopyBufferInfo2*                    pCopyBufferInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdCopyBuffer2-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdCopyBuffer2-commandBuffer-parameter", kVUIDUndefined, "vkCmdCopyBuffer2KHR");
     if (pCopyBufferInfo) {
-        skip |= ValidateObject(pCopyBufferInfo->srcBuffer, kVulkanObjectTypeBuffer, false, "VUID-VkCopyBufferInfo2-srcBuffer-parameter", "VUID-VkCopyBufferInfo2-commonparent");
-        skip |= ValidateObject(pCopyBufferInfo->dstBuffer, kVulkanObjectTypeBuffer, false, "VUID-VkCopyBufferInfo2-dstBuffer-parameter", "VUID-VkCopyBufferInfo2-commonparent");
+        skip |= ValidateObject(pCopyBufferInfo->srcBuffer, kVulkanObjectTypeBuffer, false, "VUID-VkCopyBufferInfo2-srcBuffer-parameter", "VUID-VkCopyBufferInfo2-commonparent", "VkCopyBufferInfo2");
+        skip |= ValidateObject(pCopyBufferInfo->dstBuffer, kVulkanObjectTypeBuffer, false, "VUID-VkCopyBufferInfo2-dstBuffer-parameter", "VUID-VkCopyBufferInfo2-commonparent", "VkCopyBufferInfo2");
     }
 
     return skip;
@@ -4869,10 +4881,10 @@ bool ObjectLifetimes::PreCallValidateCmdCopyImage2KHR(
     VkCommandBuffer                             commandBuffer,
     const VkCopyImageInfo2*                     pCopyImageInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdCopyImage2-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdCopyImage2-commandBuffer-parameter", kVUIDUndefined, "vkCmdCopyImage2KHR");
     if (pCopyImageInfo) {
-        skip |= ValidateObject(pCopyImageInfo->srcImage, kVulkanObjectTypeImage, false, "VUID-VkCopyImageInfo2-srcImage-parameter", "VUID-VkCopyImageInfo2-commonparent");
-        skip |= ValidateObject(pCopyImageInfo->dstImage, kVulkanObjectTypeImage, false, "VUID-VkCopyImageInfo2-dstImage-parameter", "VUID-VkCopyImageInfo2-commonparent");
+        skip |= ValidateObject(pCopyImageInfo->srcImage, kVulkanObjectTypeImage, false, "VUID-VkCopyImageInfo2-srcImage-parameter", "VUID-VkCopyImageInfo2-commonparent", "VkCopyImageInfo2");
+        skip |= ValidateObject(pCopyImageInfo->dstImage, kVulkanObjectTypeImage, false, "VUID-VkCopyImageInfo2-dstImage-parameter", "VUID-VkCopyImageInfo2-commonparent", "VkCopyImageInfo2");
     }
 
     return skip;
@@ -4882,10 +4894,10 @@ bool ObjectLifetimes::PreCallValidateCmdCopyBufferToImage2KHR(
     VkCommandBuffer                             commandBuffer,
     const VkCopyBufferToImageInfo2*             pCopyBufferToImageInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdCopyBufferToImage2-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdCopyBufferToImage2-commandBuffer-parameter", kVUIDUndefined, "vkCmdCopyBufferToImage2KHR");
     if (pCopyBufferToImageInfo) {
-        skip |= ValidateObject(pCopyBufferToImageInfo->srcBuffer, kVulkanObjectTypeBuffer, false, "VUID-VkCopyBufferToImageInfo2-srcBuffer-parameter", "VUID-VkCopyBufferToImageInfo2-commonparent");
-        skip |= ValidateObject(pCopyBufferToImageInfo->dstImage, kVulkanObjectTypeImage, false, "VUID-VkCopyBufferToImageInfo2-dstImage-parameter", "VUID-VkCopyBufferToImageInfo2-commonparent");
+        skip |= ValidateObject(pCopyBufferToImageInfo->srcBuffer, kVulkanObjectTypeBuffer, false, "VUID-VkCopyBufferToImageInfo2-srcBuffer-parameter", "VUID-VkCopyBufferToImageInfo2-commonparent", "VkCopyBufferToImageInfo2");
+        skip |= ValidateObject(pCopyBufferToImageInfo->dstImage, kVulkanObjectTypeImage, false, "VUID-VkCopyBufferToImageInfo2-dstImage-parameter", "VUID-VkCopyBufferToImageInfo2-commonparent", "VkCopyBufferToImageInfo2");
     }
 
     return skip;
@@ -4895,10 +4907,10 @@ bool ObjectLifetimes::PreCallValidateCmdCopyImageToBuffer2KHR(
     VkCommandBuffer                             commandBuffer,
     const VkCopyImageToBufferInfo2*             pCopyImageToBufferInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdCopyImageToBuffer2-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdCopyImageToBuffer2-commandBuffer-parameter", kVUIDUndefined, "vkCmdCopyImageToBuffer2KHR");
     if (pCopyImageToBufferInfo) {
-        skip |= ValidateObject(pCopyImageToBufferInfo->srcImage, kVulkanObjectTypeImage, false, "VUID-VkCopyImageToBufferInfo2-srcImage-parameter", "VUID-VkCopyImageToBufferInfo2-commonparent");
-        skip |= ValidateObject(pCopyImageToBufferInfo->dstBuffer, kVulkanObjectTypeBuffer, false, "VUID-VkCopyImageToBufferInfo2-dstBuffer-parameter", "VUID-VkCopyImageToBufferInfo2-commonparent");
+        skip |= ValidateObject(pCopyImageToBufferInfo->srcImage, kVulkanObjectTypeImage, false, "VUID-VkCopyImageToBufferInfo2-srcImage-parameter", "VUID-VkCopyImageToBufferInfo2-commonparent", "VkCopyImageToBufferInfo2");
+        skip |= ValidateObject(pCopyImageToBufferInfo->dstBuffer, kVulkanObjectTypeBuffer, false, "VUID-VkCopyImageToBufferInfo2-dstBuffer-parameter", "VUID-VkCopyImageToBufferInfo2-commonparent", "VkCopyImageToBufferInfo2");
     }
 
     return skip;
@@ -4908,10 +4920,10 @@ bool ObjectLifetimes::PreCallValidateCmdBlitImage2KHR(
     VkCommandBuffer                             commandBuffer,
     const VkBlitImageInfo2*                     pBlitImageInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdBlitImage2-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdBlitImage2-commandBuffer-parameter", kVUIDUndefined, "vkCmdBlitImage2KHR");
     if (pBlitImageInfo) {
-        skip |= ValidateObject(pBlitImageInfo->srcImage, kVulkanObjectTypeImage, false, "VUID-VkBlitImageInfo2-srcImage-parameter", "VUID-VkBlitImageInfo2-commonparent");
-        skip |= ValidateObject(pBlitImageInfo->dstImage, kVulkanObjectTypeImage, false, "VUID-VkBlitImageInfo2-dstImage-parameter", "VUID-VkBlitImageInfo2-commonparent");
+        skip |= ValidateObject(pBlitImageInfo->srcImage, kVulkanObjectTypeImage, false, "VUID-VkBlitImageInfo2-srcImage-parameter", "VUID-VkBlitImageInfo2-commonparent", "VkBlitImageInfo2");
+        skip |= ValidateObject(pBlitImageInfo->dstImage, kVulkanObjectTypeImage, false, "VUID-VkBlitImageInfo2-dstImage-parameter", "VUID-VkBlitImageInfo2-commonparent", "VkBlitImageInfo2");
     }
 
     return skip;
@@ -4921,10 +4933,10 @@ bool ObjectLifetimes::PreCallValidateCmdResolveImage2KHR(
     VkCommandBuffer                             commandBuffer,
     const VkResolveImageInfo2*                  pResolveImageInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdResolveImage2-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdResolveImage2-commandBuffer-parameter", kVUIDUndefined, "vkCmdResolveImage2KHR");
     if (pResolveImageInfo) {
-        skip |= ValidateObject(pResolveImageInfo->srcImage, kVulkanObjectTypeImage, false, "VUID-VkResolveImageInfo2-srcImage-parameter", "VUID-VkResolveImageInfo2-commonparent");
-        skip |= ValidateObject(pResolveImageInfo->dstImage, kVulkanObjectTypeImage, false, "VUID-VkResolveImageInfo2-dstImage-parameter", "VUID-VkResolveImageInfo2-commonparent");
+        skip |= ValidateObject(pResolveImageInfo->srcImage, kVulkanObjectTypeImage, false, "VUID-VkResolveImageInfo2-srcImage-parameter", "VUID-VkResolveImageInfo2-commonparent", "VkResolveImageInfo2");
+        skip |= ValidateObject(pResolveImageInfo->dstImage, kVulkanObjectTypeImage, false, "VUID-VkResolveImageInfo2-dstImage-parameter", "VUID-VkResolveImageInfo2-commonparent", "VkResolveImageInfo2");
     }
 
     return skip;
@@ -4934,7 +4946,7 @@ bool ObjectLifetimes::PreCallValidateCmdTraceRaysIndirect2KHR(
     VkCommandBuffer                             commandBuffer,
     VkDeviceAddress                             indirectDeviceAddress) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdTraceRaysIndirect2KHR");
 
     return skip;
 }
@@ -4944,7 +4956,7 @@ bool ObjectLifetimes::PreCallValidateGetDeviceBufferMemoryRequirementsKHR(
     const VkDeviceBufferMemoryRequirements*     pInfo,
     VkMemoryRequirements2*                      pMemoryRequirements) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetDeviceBufferMemoryRequirementsKHR");
 
     return skip;
 }
@@ -4954,7 +4966,7 @@ bool ObjectLifetimes::PreCallValidateGetDeviceImageMemoryRequirementsKHR(
     const VkDeviceImageMemoryRequirements*      pInfo,
     VkMemoryRequirements2*                      pMemoryRequirements) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetDeviceImageMemoryRequirementsKHR");
 
     return skip;
 }
@@ -4965,7 +4977,17 @@ bool ObjectLifetimes::PreCallValidateGetDeviceImageSparseMemoryRequirementsKHR(
     uint32_t*                                   pSparseMemoryRequirementCount,
     VkSparseImageMemoryRequirements2*           pSparseMemoryRequirements) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetDeviceImageSparseMemoryRequirementsKHR");
+
+    return skip;
+}
+
+bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceCooperativeMatrixPropertiesKHR(
+    VkPhysicalDevice                            physicalDevice,
+    uint32_t*                                   pPropertyCount,
+    VkCooperativeMatrixPropertiesKHR*           pProperties) const {
+    bool skip = false;
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetPhysicalDeviceCooperativeMatrixPropertiesKHR");
 
     return skip;
 }
@@ -4976,7 +4998,7 @@ bool ObjectLifetimes::PreCallValidateCreateDebugReportCallbackEXT(
     const VkAllocationCallbacks*                pAllocator,
     VkDebugReportCallbackEXT*                   pCallback) const {
     bool skip = false;
-    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, kVUIDUndefined, kVUIDUndefined, "vkCreateDebugReportCallbackEXT");
 
     return skip;
 }
@@ -4997,8 +5019,8 @@ bool ObjectLifetimes::PreCallValidateDestroyDebugReportCallbackEXT(
     VkDebugReportCallbackEXT                    callback,
     const VkAllocationCallbacks*                pAllocator) const {
     bool skip = false;
-    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(callback, kVulkanObjectTypeDebugReportCallbackEXT, true, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, kVUIDUndefined, kVUIDUndefined, "vkDestroyDebugReportCallbackEXT");
+    skip |= ValidateObject(callback, kVulkanObjectTypeDebugReportCallbackEXT, true, kVUIDUndefined, kVUIDUndefined, "vkDestroyDebugReportCallbackEXT");
     skip |= ValidateDestroyObject(callback, kVulkanObjectTypeDebugReportCallbackEXT, pAllocator, kVUIDUndefined, kVUIDUndefined);
 
     return skip;
@@ -5022,7 +5044,7 @@ bool ObjectLifetimes::PreCallValidateDebugReportMessageEXT(
     const char*                                 pLayerPrefix,
     const char*                                 pMessage) const {
     bool skip = false;
-    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, kVUIDUndefined, kVUIDUndefined, "vkDebugReportMessageEXT");
 
     return skip;
 }
@@ -5031,7 +5053,7 @@ bool ObjectLifetimes::PreCallValidateDebugMarkerSetObjectTagEXT(
     VkDevice                                    device,
     const VkDebugMarkerObjectTagInfoEXT*        pTagInfo) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkDebugMarkerSetObjectTagEXT");
 
     return skip;
 }
@@ -5040,7 +5062,7 @@ bool ObjectLifetimes::PreCallValidateDebugMarkerSetObjectNameEXT(
     VkDevice                                    device,
     const VkDebugMarkerObjectNameInfoEXT*       pNameInfo) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkDebugMarkerSetObjectNameEXT");
 
     return skip;
 }
@@ -5049,7 +5071,7 @@ bool ObjectLifetimes::PreCallValidateCmdDebugMarkerBeginEXT(
     VkCommandBuffer                             commandBuffer,
     const VkDebugMarkerMarkerInfoEXT*           pMarkerInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdDebugMarkerBeginEXT");
 
     return skip;
 }
@@ -5057,7 +5079,7 @@ bool ObjectLifetimes::PreCallValidateCmdDebugMarkerBeginEXT(
 bool ObjectLifetimes::PreCallValidateCmdDebugMarkerEndEXT(
     VkCommandBuffer                             commandBuffer) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdDebugMarkerEndEXT");
 
     return skip;
 }
@@ -5066,7 +5088,7 @@ bool ObjectLifetimes::PreCallValidateCmdDebugMarkerInsertEXT(
     VkCommandBuffer                             commandBuffer,
     const VkDebugMarkerMarkerInfoEXT*           pMarkerInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdDebugMarkerInsertEXT");
 
     return skip;
 }
@@ -5079,10 +5101,10 @@ bool ObjectLifetimes::PreCallValidateCmdBindTransformFeedbackBuffersEXT(
     const VkDeviceSize*                         pOffsets,
     const VkDeviceSize*                         pSizes) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdBindTransformFeedbackBuffersEXT");
     if ((bindingCount > 0) && (pBuffers)) {
         for (uint32_t index0 = 0; index0 < bindingCount; ++index0) {
-            skip |= ValidateObject(pBuffers[index0], kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined);
+            skip |= ValidateObject(pBuffers[index0], kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdBindTransformFeedbackBuffersEXT");
         }
     }
 
@@ -5096,10 +5118,10 @@ bool ObjectLifetimes::PreCallValidateCmdBeginTransformFeedbackEXT(
     const VkBuffer*                             pCounterBuffers,
     const VkDeviceSize*                         pCounterBufferOffsets) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdBeginTransformFeedbackEXT");
     if ((counterBufferCount > 0) && (pCounterBuffers)) {
         for (uint32_t index0 = 0; index0 < counterBufferCount; ++index0) {
-            skip |= ValidateObject(pCounterBuffers[index0], kVulkanObjectTypeBuffer, true, kVUIDUndefined, kVUIDUndefined);
+            skip |= ValidateObject(pCounterBuffers[index0], kVulkanObjectTypeBuffer, true, kVUIDUndefined, kVUIDUndefined, "vkCmdBeginTransformFeedbackEXT");
         }
     }
 
@@ -5113,10 +5135,10 @@ bool ObjectLifetimes::PreCallValidateCmdEndTransformFeedbackEXT(
     const VkBuffer*                             pCounterBuffers,
     const VkDeviceSize*                         pCounterBufferOffsets) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdEndTransformFeedbackEXT");
     if ((counterBufferCount > 0) && (pCounterBuffers)) {
         for (uint32_t index0 = 0; index0 < counterBufferCount; ++index0) {
-            skip |= ValidateObject(pCounterBuffers[index0], kVulkanObjectTypeBuffer, true, kVUIDUndefined, kVUIDUndefined);
+            skip |= ValidateObject(pCounterBuffers[index0], kVulkanObjectTypeBuffer, true, kVUIDUndefined, kVUIDUndefined, "vkCmdEndTransformFeedbackEXT");
         }
     }
 
@@ -5130,8 +5152,8 @@ bool ObjectLifetimes::PreCallValidateCmdBeginQueryIndexedEXT(
     VkQueryControlFlags                         flags,
     uint32_t                                    index) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(queryPool, kVulkanObjectTypeQueryPool, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdBeginQueryIndexedEXT");
+    skip |= ValidateObject(queryPool, kVulkanObjectTypeQueryPool, false, kVUIDUndefined, kVUIDUndefined, "vkCmdBeginQueryIndexedEXT");
 
     return skip;
 }
@@ -5142,8 +5164,8 @@ bool ObjectLifetimes::PreCallValidateCmdEndQueryIndexedEXT(
     uint32_t                                    query,
     uint32_t                                    index) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(queryPool, kVulkanObjectTypeQueryPool, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdEndQueryIndexedEXT");
+    skip |= ValidateObject(queryPool, kVulkanObjectTypeQueryPool, false, kVUIDUndefined, kVUIDUndefined, "vkCmdEndQueryIndexedEXT");
 
     return skip;
 }
@@ -5157,8 +5179,8 @@ bool ObjectLifetimes::PreCallValidateCmdDrawIndirectByteCountEXT(
     uint32_t                                    counterOffset,
     uint32_t                                    vertexStride) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(counterBuffer, kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdDrawIndirectByteCountEXT");
+    skip |= ValidateObject(counterBuffer, kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdDrawIndirectByteCountEXT");
 
     return skip;
 }
@@ -5169,7 +5191,7 @@ bool ObjectLifetimes::PreCallValidateCreateCuModuleNVX(
     const VkAllocationCallbacks*                pAllocator,
     VkCuModuleNVX*                              pModule) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkCreateCuModuleNVX");
 
     return skip;
 }
@@ -5191,9 +5213,9 @@ bool ObjectLifetimes::PreCallValidateCreateCuFunctionNVX(
     const VkAllocationCallbacks*                pAllocator,
     VkCuFunctionNVX*                            pFunction) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkCreateCuFunctionNVX");
     if (pCreateInfo) {
-        skip |= ValidateObject(pCreateInfo->module, kVulkanObjectTypeCuModuleNVX, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pCreateInfo->module, kVulkanObjectTypeCuModuleNVX, false, kVUIDUndefined, kVUIDUndefined, "VkCuFunctionCreateInfoNVX");
     }
 
     return skip;
@@ -5215,8 +5237,8 @@ bool ObjectLifetimes::PreCallValidateDestroyCuModuleNVX(
     VkCuModuleNVX                               module,
     const VkAllocationCallbacks*                pAllocator) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(module, kVulkanObjectTypeCuModuleNVX, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkDestroyCuModuleNVX");
+    skip |= ValidateObject(module, kVulkanObjectTypeCuModuleNVX, false, kVUIDUndefined, kVUIDUndefined, "vkDestroyCuModuleNVX");
     skip |= ValidateDestroyObject(module, kVulkanObjectTypeCuModuleNVX, pAllocator, kVUIDUndefined, kVUIDUndefined);
 
     return skip;
@@ -5235,8 +5257,8 @@ bool ObjectLifetimes::PreCallValidateDestroyCuFunctionNVX(
     VkCuFunctionNVX                             function,
     const VkAllocationCallbacks*                pAllocator) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(function, kVulkanObjectTypeCuFunctionNVX, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkDestroyCuFunctionNVX");
+    skip |= ValidateObject(function, kVulkanObjectTypeCuFunctionNVX, false, kVUIDUndefined, kVUIDUndefined, "vkDestroyCuFunctionNVX");
     skip |= ValidateDestroyObject(function, kVulkanObjectTypeCuFunctionNVX, pAllocator, kVUIDUndefined, kVUIDUndefined);
 
     return skip;
@@ -5254,9 +5276,9 @@ bool ObjectLifetimes::PreCallValidateCmdCuLaunchKernelNVX(
     VkCommandBuffer                             commandBuffer,
     const VkCuLaunchInfoNVX*                    pLaunchInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdCuLaunchKernelNVX");
     if (pLaunchInfo) {
-        skip |= ValidateObject(pLaunchInfo->function, kVulkanObjectTypeCuFunctionNVX, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pLaunchInfo->function, kVulkanObjectTypeCuFunctionNVX, false, kVUIDUndefined, kVUIDUndefined, "VkCuLaunchInfoNVX");
     }
 
     return skip;
@@ -5266,7 +5288,7 @@ bool ObjectLifetimes::PreCallValidateGetImageViewHandleNVX(
     VkDevice                                    device,
     const VkImageViewHandleInfoNVX*             pInfo) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetImageViewHandleNVX");
 
     return skip;
 }
@@ -5276,8 +5298,8 @@ bool ObjectLifetimes::PreCallValidateGetImageViewAddressNVX(
     VkImageView                                 imageView,
     VkImageViewAddressPropertiesNVX*            pProperties) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(imageView, kVulkanObjectTypeImageView, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetImageViewAddressNVX");
+    skip |= ValidateObject(imageView, kVulkanObjectTypeImageView, false, kVUIDUndefined, kVUIDUndefined, "vkGetImageViewAddressNVX");
 
     return skip;
 }
@@ -5291,9 +5313,9 @@ bool ObjectLifetimes::PreCallValidateCmdDrawIndirectCountAMD(
     uint32_t                                    maxDrawCount,
     uint32_t                                    stride) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdDrawIndirectCount-commandBuffer-parameter", "VUID-vkCmdDrawIndirectCount-commonparent");
-    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdDrawIndirectCount-buffer-parameter", "VUID-vkCmdDrawIndirectCount-commonparent");
-    skip |= ValidateObject(countBuffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdDrawIndirectCount-countBuffer-parameter", "VUID-vkCmdDrawIndirectCount-commonparent");
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdDrawIndirectCount-commandBuffer-parameter", "VUID-vkCmdDrawIndirectCount-commonparent", "vkCmdDrawIndirectCountAMD");
+    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdDrawIndirectCount-buffer-parameter", "VUID-vkCmdDrawIndirectCount-commonparent", "vkCmdDrawIndirectCountAMD");
+    skip |= ValidateObject(countBuffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdDrawIndirectCount-countBuffer-parameter", "VUID-vkCmdDrawIndirectCount-commonparent", "vkCmdDrawIndirectCountAMD");
 
     return skip;
 }
@@ -5307,9 +5329,9 @@ bool ObjectLifetimes::PreCallValidateCmdDrawIndexedIndirectCountAMD(
     uint32_t                                    maxDrawCount,
     uint32_t                                    stride) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdDrawIndexedIndirectCount-commandBuffer-parameter", "VUID-vkCmdDrawIndexedIndirectCount-commonparent");
-    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdDrawIndexedIndirectCount-buffer-parameter", "VUID-vkCmdDrawIndexedIndirectCount-commonparent");
-    skip |= ValidateObject(countBuffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdDrawIndexedIndirectCount-countBuffer-parameter", "VUID-vkCmdDrawIndexedIndirectCount-commonparent");
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdDrawIndexedIndirectCount-commandBuffer-parameter", "VUID-vkCmdDrawIndexedIndirectCount-commonparent", "vkCmdDrawIndexedIndirectCountAMD");
+    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdDrawIndexedIndirectCount-buffer-parameter", "VUID-vkCmdDrawIndexedIndirectCount-commonparent", "vkCmdDrawIndexedIndirectCountAMD");
+    skip |= ValidateObject(countBuffer, kVulkanObjectTypeBuffer, false, "VUID-vkCmdDrawIndexedIndirectCount-countBuffer-parameter", "VUID-vkCmdDrawIndexedIndirectCount-commonparent", "vkCmdDrawIndexedIndirectCountAMD");
 
     return skip;
 }
@@ -5322,12 +5344,11 @@ bool ObjectLifetimes::PreCallValidateGetShaderInfoAMD(
     size_t*                                     pInfoSize,
     void*                                       pInfo) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(pipeline, kVulkanObjectTypePipeline, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetShaderInfoAMD");
+    skip |= ValidateObject(pipeline, kVulkanObjectTypePipeline, false, kVUIDUndefined, kVUIDUndefined, "vkGetShaderInfoAMD");
 
     return skip;
 }
-
 #ifdef VK_USE_PLATFORM_GGP
 
 bool ObjectLifetimes::PreCallValidateCreateStreamDescriptorSurfaceGGP(
@@ -5336,7 +5357,7 @@ bool ObjectLifetimes::PreCallValidateCreateStreamDescriptorSurfaceGGP(
     const VkAllocationCallbacks*                pAllocator,
     VkSurfaceKHR*                               pSurface) const {
     bool skip = false;
-    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, kVUIDUndefined, kVUIDUndefined, "vkCreateStreamDescriptorSurfaceGGP");
 
     return skip;
 }
@@ -5363,11 +5384,10 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceExternalImageFormatPropert
     VkExternalMemoryHandleTypeFlagsNV           externalHandleType,
     VkExternalImageFormatPropertiesNV*          pExternalImageFormatProperties) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetPhysicalDeviceExternalImageFormatPropertiesNV");
 
     return skip;
 }
-
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 
 bool ObjectLifetimes::PreCallValidateGetMemoryWin32HandleNV(
@@ -5376,13 +5396,12 @@ bool ObjectLifetimes::PreCallValidateGetMemoryWin32HandleNV(
     VkExternalMemoryHandleTypeFlagsNV           handleType,
     HANDLE*                                     pHandle) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(memory, kVulkanObjectTypeDeviceMemory, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetMemoryWin32HandleNV");
+    skip |= ValidateObject(memory, kVulkanObjectTypeDeviceMemory, false, kVUIDUndefined, kVUIDUndefined, "vkGetMemoryWin32HandleNV");
 
     return skip;
 }
 #endif // VK_USE_PLATFORM_WIN32_KHR
-
 #ifdef VK_USE_PLATFORM_VI_NN
 
 bool ObjectLifetimes::PreCallValidateCreateViSurfaceNN(
@@ -5391,7 +5410,7 @@ bool ObjectLifetimes::PreCallValidateCreateViSurfaceNN(
     const VkAllocationCallbacks*                pAllocator,
     VkSurfaceKHR*                               pSurface) const {
     bool skip = false;
-    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, kVUIDUndefined, kVUIDUndefined, "vkCreateViSurfaceNN");
 
     return skip;
 }
@@ -5412,9 +5431,9 @@ bool ObjectLifetimes::PreCallValidateCmdBeginConditionalRenderingEXT(
     VkCommandBuffer                             commandBuffer,
     const VkConditionalRenderingBeginInfoEXT*   pConditionalRenderingBegin) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdBeginConditionalRenderingEXT");
     if (pConditionalRenderingBegin) {
-        skip |= ValidateObject(pConditionalRenderingBegin->buffer, kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pConditionalRenderingBegin->buffer, kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined, "VkConditionalRenderingBeginInfoEXT");
     }
 
     return skip;
@@ -5423,7 +5442,7 @@ bool ObjectLifetimes::PreCallValidateCmdBeginConditionalRenderingEXT(
 bool ObjectLifetimes::PreCallValidateCmdEndConditionalRenderingEXT(
     VkCommandBuffer                             commandBuffer) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdEndConditionalRenderingEXT");
 
     return skip;
 }
@@ -5434,7 +5453,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetViewportWScalingNV(
     uint32_t                                    viewportCount,
     const VkViewportWScalingNV*                 pViewportWScalings) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetViewportWScalingNV");
 
     return skip;
 }
@@ -5443,12 +5462,11 @@ bool ObjectLifetimes::PreCallValidateReleaseDisplayEXT(
     VkPhysicalDevice                            physicalDevice,
     VkDisplayKHR                                display) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkReleaseDisplayEXT-physicalDevice-parameter", kVUIDUndefined);
-    skip |= ValidateObject(display, kVulkanObjectTypeDisplayKHR, false, "VUID-vkReleaseDisplayEXT-display-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkReleaseDisplayEXT-physicalDevice-parameter", kVUIDUndefined, "vkReleaseDisplayEXT");
+    skip |= ValidateObject(display, kVulkanObjectTypeDisplayKHR, false, "VUID-vkReleaseDisplayEXT-display-parameter", kVUIDUndefined, "vkReleaseDisplayEXT");
 
     return skip;
 }
-
 #ifdef VK_USE_PLATFORM_XLIB_XRANDR_EXT
 
 bool ObjectLifetimes::PreCallValidateAcquireXlibDisplayEXT(
@@ -5456,13 +5474,12 @@ bool ObjectLifetimes::PreCallValidateAcquireXlibDisplayEXT(
     Display*                                    dpy,
     VkDisplayKHR                                display) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(display, kVulkanObjectTypeDisplayKHR, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined, "vkAcquireXlibDisplayEXT");
+    skip |= ValidateObject(display, kVulkanObjectTypeDisplayKHR, false, kVUIDUndefined, kVUIDUndefined, "vkAcquireXlibDisplayEXT");
 
     return skip;
 }
 #endif // VK_USE_PLATFORM_XLIB_XRANDR_EXT
-
 #ifdef VK_USE_PLATFORM_XLIB_XRANDR_EXT
 
 bool ObjectLifetimes::PreCallValidateGetRandROutputDisplayEXT(
@@ -5471,7 +5488,7 @@ bool ObjectLifetimes::PreCallValidateGetRandROutputDisplayEXT(
     RROutput                                    rrOutput,
     VkDisplayKHR*                               pDisplay) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetRandROutputDisplayEXT");
 
     return skip;
 }
@@ -5493,8 +5510,8 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceSurfaceCapabilities2EXT(
     VkSurfaceKHR                                surface,
     VkSurfaceCapabilities2EXT*                  pSurfaceCapabilities) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceSurfaceCapabilities2EXT-physicalDevice-parameter", kVUIDUndefined);
-    skip |= ValidateObject(surface, kVulkanObjectTypeSurfaceKHR, false, "VUID-vkGetPhysicalDeviceSurfaceCapabilities2EXT-surface-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceSurfaceCapabilities2EXT-physicalDevice-parameter", kVUIDUndefined, "vkGetPhysicalDeviceSurfaceCapabilities2EXT");
+    skip |= ValidateObject(surface, kVulkanObjectTypeSurfaceKHR, false, "VUID-vkGetPhysicalDeviceSurfaceCapabilities2EXT-surface-parameter", kVUIDUndefined, "vkGetPhysicalDeviceSurfaceCapabilities2EXT");
 
     return skip;
 }
@@ -5504,8 +5521,8 @@ bool ObjectLifetimes::PreCallValidateDisplayPowerControlEXT(
     VkDisplayKHR                                display,
     const VkDisplayPowerInfoEXT*                pDisplayPowerInfo) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkDisplayPowerControlEXT-device-parameter", "VUID-vkDisplayPowerControlEXT-commonparent");
-    skip |= ValidateObject(display, kVulkanObjectTypeDisplayKHR, false, "VUID-vkDisplayPowerControlEXT-display-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkDisplayPowerControlEXT-device-parameter", "VUID-vkDisplayPowerControlEXT-commonparent", "vkDisplayPowerControlEXT");
+    skip |= ValidateObject(display, kVulkanObjectTypeDisplayKHR, false, "VUID-vkDisplayPowerControlEXT-display-parameter", kVUIDUndefined, "vkDisplayPowerControlEXT");
 
     return skip;
 }
@@ -5516,7 +5533,7 @@ bool ObjectLifetimes::PreCallValidateRegisterDeviceEventEXT(
     const VkAllocationCallbacks*                pAllocator,
     VkFence*                                    pFence) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkRegisterDeviceEventEXT-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkRegisterDeviceEventEXT-device-parameter", kVUIDUndefined, "vkRegisterDeviceEventEXT");
 
     return skip;
 }
@@ -5539,8 +5556,8 @@ bool ObjectLifetimes::PreCallValidateRegisterDisplayEventEXT(
     const VkAllocationCallbacks*                pAllocator,
     VkFence*                                    pFence) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkRegisterDisplayEventEXT-device-parameter", "VUID-vkRegisterDisplayEventEXT-commonparent");
-    skip |= ValidateObject(display, kVulkanObjectTypeDisplayKHR, false, "VUID-vkRegisterDisplayEventEXT-display-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkRegisterDisplayEventEXT-device-parameter", "VUID-vkRegisterDisplayEventEXT-commonparent", "vkRegisterDisplayEventEXT");
+    skip |= ValidateObject(display, kVulkanObjectTypeDisplayKHR, false, "VUID-vkRegisterDisplayEventEXT-display-parameter", kVUIDUndefined, "vkRegisterDisplayEventEXT");
 
     return skip;
 }
@@ -5563,8 +5580,8 @@ bool ObjectLifetimes::PreCallValidateGetSwapchainCounterEXT(
     VkSurfaceCounterFlagBitsEXT                 counter,
     uint64_t*                                   pCounterValue) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetSwapchainCounterEXT-device-parameter", kVUIDUndefined);
-    skip |= ValidateObject(swapchain, kVulkanObjectTypeSwapchainKHR, false, "VUID-vkGetSwapchainCounterEXT-swapchain-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetSwapchainCounterEXT-device-parameter", kVUIDUndefined, "vkGetSwapchainCounterEXT");
+    skip |= ValidateObject(swapchain, kVulkanObjectTypeSwapchainKHR, false, "VUID-vkGetSwapchainCounterEXT-swapchain-parameter", kVUIDUndefined, "vkGetSwapchainCounterEXT");
 
     return skip;
 }
@@ -5574,8 +5591,8 @@ bool ObjectLifetimes::PreCallValidateGetRefreshCycleDurationGOOGLE(
     VkSwapchainKHR                              swapchain,
     VkRefreshCycleDurationGOOGLE*               pDisplayTimingProperties) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(swapchain, kVulkanObjectTypeSwapchainKHR, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetRefreshCycleDurationGOOGLE");
+    skip |= ValidateObject(swapchain, kVulkanObjectTypeSwapchainKHR, false, kVUIDUndefined, kVUIDUndefined, "vkGetRefreshCycleDurationGOOGLE");
 
     return skip;
 }
@@ -5586,8 +5603,8 @@ bool ObjectLifetimes::PreCallValidateGetPastPresentationTimingGOOGLE(
     uint32_t*                                   pPresentationTimingCount,
     VkPastPresentationTimingGOOGLE*             pPresentationTimings) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(swapchain, kVulkanObjectTypeSwapchainKHR, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetPastPresentationTimingGOOGLE");
+    skip |= ValidateObject(swapchain, kVulkanObjectTypeSwapchainKHR, false, kVUIDUndefined, kVUIDUndefined, "vkGetPastPresentationTimingGOOGLE");
 
     return skip;
 }
@@ -5598,7 +5615,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetDiscardRectangleEXT(
     uint32_t                                    discardRectangleCount,
     const VkRect2D*                             pDiscardRectangles) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetDiscardRectangleEXT-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetDiscardRectangleEXT-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetDiscardRectangleEXT");
 
     return skip;
 }
@@ -5607,7 +5624,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetDiscardRectangleEnableEXT(
     VkCommandBuffer                             commandBuffer,
     VkBool32                                    discardRectangleEnable) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetDiscardRectangleEnableEXT-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetDiscardRectangleEnableEXT-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetDiscardRectangleEnableEXT");
 
     return skip;
 }
@@ -5616,7 +5633,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetDiscardRectangleModeEXT(
     VkCommandBuffer                             commandBuffer,
     VkDiscardRectangleModeEXT                   discardRectangleMode) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetDiscardRectangleModeEXT-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetDiscardRectangleModeEXT-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetDiscardRectangleModeEXT");
 
     return skip;
 }
@@ -5627,16 +5644,15 @@ bool ObjectLifetimes::PreCallValidateSetHdrMetadataEXT(
     const VkSwapchainKHR*                       pSwapchains,
     const VkHdrMetadataEXT*                     pMetadata) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkSetHdrMetadataEXT-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkSetHdrMetadataEXT-device-parameter", kVUIDUndefined, "vkSetHdrMetadataEXT");
     if ((swapchainCount > 0) && (pSwapchains)) {
         for (uint32_t index0 = 0; index0 < swapchainCount; ++index0) {
-            skip |= ValidateObject(pSwapchains[index0], kVulkanObjectTypeSwapchainKHR, false, "VUID-vkSetHdrMetadataEXT-pSwapchains-parameter", kVUIDUndefined);
+            skip |= ValidateObject(pSwapchains[index0], kVulkanObjectTypeSwapchainKHR, false, "VUID-vkSetHdrMetadataEXT-pSwapchains-parameter", kVUIDUndefined, "vkSetHdrMetadataEXT");
         }
     }
 
     return skip;
 }
-
 #ifdef VK_USE_PLATFORM_IOS_MVK
 
 bool ObjectLifetimes::PreCallValidateCreateIOSSurfaceMVK(
@@ -5645,7 +5661,7 @@ bool ObjectLifetimes::PreCallValidateCreateIOSSurfaceMVK(
     const VkAllocationCallbacks*                pAllocator,
     VkSurfaceKHR*                               pSurface) const {
     bool skip = false;
-    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, kVUIDUndefined, kVUIDUndefined, "vkCreateIOSSurfaceMVK");
 
     return skip;
 }
@@ -5661,7 +5677,6 @@ void ObjectLifetimes::PostCallRecordCreateIOSSurfaceMVK(
 
 }
 #endif // VK_USE_PLATFORM_IOS_MVK
-
 #ifdef VK_USE_PLATFORM_MACOS_MVK
 
 bool ObjectLifetimes::PreCallValidateCreateMacOSSurfaceMVK(
@@ -5670,7 +5685,7 @@ bool ObjectLifetimes::PreCallValidateCreateMacOSSurfaceMVK(
     const VkAllocationCallbacks*                pAllocator,
     VkSurfaceKHR*                               pSurface) const {
     bool skip = false;
-    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, kVUIDUndefined, kVUIDUndefined, "vkCreateMacOSSurfaceMVK");
 
     return skip;
 }
@@ -5691,7 +5706,7 @@ bool ObjectLifetimes::PreCallValidateQueueBeginDebugUtilsLabelEXT(
     VkQueue                                     queue,
     const VkDebugUtilsLabelEXT*                 pLabelInfo) const {
     bool skip = false;
-    skip |= ValidateObject(queue, kVulkanObjectTypeQueue, false, "VUID-vkQueueBeginDebugUtilsLabelEXT-queue-parameter", kVUIDUndefined);
+    skip |= ValidateObject(queue, kVulkanObjectTypeQueue, false, "VUID-vkQueueBeginDebugUtilsLabelEXT-queue-parameter", kVUIDUndefined, "vkQueueBeginDebugUtilsLabelEXT");
 
     return skip;
 }
@@ -5699,7 +5714,7 @@ bool ObjectLifetimes::PreCallValidateQueueBeginDebugUtilsLabelEXT(
 bool ObjectLifetimes::PreCallValidateQueueEndDebugUtilsLabelEXT(
     VkQueue                                     queue) const {
     bool skip = false;
-    skip |= ValidateObject(queue, kVulkanObjectTypeQueue, false, "VUID-vkQueueEndDebugUtilsLabelEXT-queue-parameter", kVUIDUndefined);
+    skip |= ValidateObject(queue, kVulkanObjectTypeQueue, false, "VUID-vkQueueEndDebugUtilsLabelEXT-queue-parameter", kVUIDUndefined, "vkQueueEndDebugUtilsLabelEXT");
 
     return skip;
 }
@@ -5708,7 +5723,7 @@ bool ObjectLifetimes::PreCallValidateQueueInsertDebugUtilsLabelEXT(
     VkQueue                                     queue,
     const VkDebugUtilsLabelEXT*                 pLabelInfo) const {
     bool skip = false;
-    skip |= ValidateObject(queue, kVulkanObjectTypeQueue, false, "VUID-vkQueueInsertDebugUtilsLabelEXT-queue-parameter", kVUIDUndefined);
+    skip |= ValidateObject(queue, kVulkanObjectTypeQueue, false, "VUID-vkQueueInsertDebugUtilsLabelEXT-queue-parameter", kVUIDUndefined, "vkQueueInsertDebugUtilsLabelEXT");
 
     return skip;
 }
@@ -5717,7 +5732,7 @@ bool ObjectLifetimes::PreCallValidateCmdBeginDebugUtilsLabelEXT(
     VkCommandBuffer                             commandBuffer,
     const VkDebugUtilsLabelEXT*                 pLabelInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdBeginDebugUtilsLabelEXT-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdBeginDebugUtilsLabelEXT-commandBuffer-parameter", kVUIDUndefined, "vkCmdBeginDebugUtilsLabelEXT");
 
     return skip;
 }
@@ -5725,7 +5740,7 @@ bool ObjectLifetimes::PreCallValidateCmdBeginDebugUtilsLabelEXT(
 bool ObjectLifetimes::PreCallValidateCmdEndDebugUtilsLabelEXT(
     VkCommandBuffer                             commandBuffer) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdEndDebugUtilsLabelEXT-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdEndDebugUtilsLabelEXT-commandBuffer-parameter", kVUIDUndefined, "vkCmdEndDebugUtilsLabelEXT");
 
     return skip;
 }
@@ -5734,7 +5749,7 @@ bool ObjectLifetimes::PreCallValidateCmdInsertDebugUtilsLabelEXT(
     VkCommandBuffer                             commandBuffer,
     const VkDebugUtilsLabelEXT*                 pLabelInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdInsertDebugUtilsLabelEXT-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdInsertDebugUtilsLabelEXT-commandBuffer-parameter", kVUIDUndefined, "vkCmdInsertDebugUtilsLabelEXT");
 
     return skip;
 }
@@ -5745,7 +5760,7 @@ bool ObjectLifetimes::PreCallValidateCreateDebugUtilsMessengerEXT(
     const VkAllocationCallbacks*                pAllocator,
     VkDebugUtilsMessengerEXT*                   pMessenger) const {
     bool skip = false;
-    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, "VUID-vkCreateDebugUtilsMessengerEXT-instance-parameter", kVUIDUndefined);
+    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, "VUID-vkCreateDebugUtilsMessengerEXT-instance-parameter", kVUIDUndefined, "vkCreateDebugUtilsMessengerEXT");
 
     return skip;
 }
@@ -5766,8 +5781,8 @@ bool ObjectLifetimes::PreCallValidateDestroyDebugUtilsMessengerEXT(
     VkDebugUtilsMessengerEXT                    messenger,
     const VkAllocationCallbacks*                pAllocator) const {
     bool skip = false;
-    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, "VUID-vkDestroyDebugUtilsMessengerEXT-instance-parameter", kVUIDUndefined);
-    skip |= ValidateObject(messenger, kVulkanObjectTypeDebugUtilsMessengerEXT, true, "VUID-vkDestroyDebugUtilsMessengerEXT-messenger-parameter", kVUIDUndefined);
+    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, "VUID-vkDestroyDebugUtilsMessengerEXT-instance-parameter", kVUIDUndefined, "vkDestroyDebugUtilsMessengerEXT");
+    skip |= ValidateObject(messenger, kVulkanObjectTypeDebugUtilsMessengerEXT, true, "VUID-vkDestroyDebugUtilsMessengerEXT-messenger-parameter", kVUIDUndefined, "vkDestroyDebugUtilsMessengerEXT");
     skip |= ValidateDestroyObject(messenger, kVulkanObjectTypeDebugUtilsMessengerEXT, pAllocator, kVUIDUndefined, kVUIDUndefined);
 
     return skip;
@@ -5787,11 +5802,10 @@ bool ObjectLifetimes::PreCallValidateSubmitDebugUtilsMessageEXT(
     VkDebugUtilsMessageTypeFlagsEXT             messageTypes,
     const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData) const {
     bool skip = false;
-    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, "VUID-vkSubmitDebugUtilsMessageEXT-instance-parameter", kVUIDUndefined);
+    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, "VUID-vkSubmitDebugUtilsMessageEXT-instance-parameter", kVUIDUndefined, "vkSubmitDebugUtilsMessageEXT");
 
     return skip;
 }
-
 #ifdef VK_USE_PLATFORM_ANDROID_KHR
 
 bool ObjectLifetimes::PreCallValidateGetAndroidHardwareBufferPropertiesANDROID(
@@ -5799,12 +5813,11 @@ bool ObjectLifetimes::PreCallValidateGetAndroidHardwareBufferPropertiesANDROID(
     const struct AHardwareBuffer*               buffer,
     VkAndroidHardwareBufferPropertiesANDROID*   pProperties) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetAndroidHardwareBufferPropertiesANDROID");
 
     return skip;
 }
 #endif // VK_USE_PLATFORM_ANDROID_KHR
-
 #ifdef VK_USE_PLATFORM_ANDROID_KHR
 
 bool ObjectLifetimes::PreCallValidateGetMemoryAndroidHardwareBufferANDROID(
@@ -5812,9 +5825,9 @@ bool ObjectLifetimes::PreCallValidateGetMemoryAndroidHardwareBufferANDROID(
     const VkMemoryGetAndroidHardwareBufferInfoANDROID* pInfo,
     struct AHardwareBuffer**                    pBuffer) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetMemoryAndroidHardwareBufferANDROID");
     if (pInfo) {
-        skip |= ValidateObject(pInfo->memory, kVulkanObjectTypeDeviceMemory, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pInfo->memory, kVulkanObjectTypeDeviceMemory, false, kVUIDUndefined, kVUIDUndefined, "VkMemoryGetAndroidHardwareBufferInfoANDROID");
     }
 
     return skip;
@@ -5825,7 +5838,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetSampleLocationsEXT(
     VkCommandBuffer                             commandBuffer,
     const VkSampleLocationsInfoEXT*             pSampleLocationsInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetSampleLocationsEXT-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetSampleLocationsEXT-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetSampleLocationsEXT");
 
     return skip;
 }
@@ -5835,7 +5848,7 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceMultisamplePropertiesEXT(
     VkSampleCountFlagBits                       samples,
     VkMultisamplePropertiesEXT*                 pMultisampleProperties) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceMultisamplePropertiesEXT-physicalDevice-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceMultisamplePropertiesEXT-physicalDevice-parameter", kVUIDUndefined, "vkGetPhysicalDeviceMultisamplePropertiesEXT");
 
     return skip;
 }
@@ -5845,8 +5858,8 @@ bool ObjectLifetimes::PreCallValidateGetImageDrmFormatModifierPropertiesEXT(
     VkImage                                     image,
     VkImageDrmFormatModifierPropertiesEXT*      pProperties) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetImageDrmFormatModifierPropertiesEXT-device-parameter", kVUIDUndefined);
-    skip |= ValidateObject(image, kVulkanObjectTypeImage, false, "VUID-vkGetImageDrmFormatModifierPropertiesEXT-image-parameter", "VUID-vkGetImageDrmFormatModifierPropertiesEXT-image-parent");
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetImageDrmFormatModifierPropertiesEXT-device-parameter", kVUIDUndefined, "vkGetImageDrmFormatModifierPropertiesEXT");
+    skip |= ValidateObject(image, kVulkanObjectTypeImage, false, "VUID-vkGetImageDrmFormatModifierPropertiesEXT-image-parameter", "VUID-vkGetImageDrmFormatModifierPropertiesEXT-image-parent", "vkGetImageDrmFormatModifierPropertiesEXT");
 
     return skip;
 }
@@ -5857,7 +5870,7 @@ bool ObjectLifetimes::PreCallValidateCreateValidationCacheEXT(
     const VkAllocationCallbacks*                pAllocator,
     VkValidationCacheEXT*                       pValidationCache) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkCreateValidationCacheEXT");
 
     return skip;
 }
@@ -5878,8 +5891,8 @@ bool ObjectLifetimes::PreCallValidateDestroyValidationCacheEXT(
     VkValidationCacheEXT                        validationCache,
     const VkAllocationCallbacks*                pAllocator) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(validationCache, kVulkanObjectTypeValidationCacheEXT, true, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkDestroyValidationCacheEXT");
+    skip |= ValidateObject(validationCache, kVulkanObjectTypeValidationCacheEXT, true, kVUIDUndefined, kVUIDUndefined, "vkDestroyValidationCacheEXT");
     skip |= ValidateDestroyObject(validationCache, kVulkanObjectTypeValidationCacheEXT, pAllocator, kVUIDUndefined, kVUIDUndefined);
 
     return skip;
@@ -5899,11 +5912,11 @@ bool ObjectLifetimes::PreCallValidateMergeValidationCachesEXT(
     uint32_t                                    srcCacheCount,
     const VkValidationCacheEXT*                 pSrcCaches) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(dstCache, kVulkanObjectTypeValidationCacheEXT, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkMergeValidationCachesEXT");
+    skip |= ValidateObject(dstCache, kVulkanObjectTypeValidationCacheEXT, false, kVUIDUndefined, kVUIDUndefined, "vkMergeValidationCachesEXT");
     if ((srcCacheCount > 0) && (pSrcCaches)) {
         for (uint32_t index0 = 0; index0 < srcCacheCount; ++index0) {
-            skip |= ValidateObject(pSrcCaches[index0], kVulkanObjectTypeValidationCacheEXT, false, kVUIDUndefined, kVUIDUndefined);
+            skip |= ValidateObject(pSrcCaches[index0], kVulkanObjectTypeValidationCacheEXT, false, kVUIDUndefined, kVUIDUndefined, "vkMergeValidationCachesEXT");
         }
     }
 
@@ -5916,8 +5929,8 @@ bool ObjectLifetimes::PreCallValidateGetValidationCacheDataEXT(
     size_t*                                     pDataSize,
     void*                                       pData) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(validationCache, kVulkanObjectTypeValidationCacheEXT, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetValidationCacheDataEXT");
+    skip |= ValidateObject(validationCache, kVulkanObjectTypeValidationCacheEXT, false, kVUIDUndefined, kVUIDUndefined, "vkGetValidationCacheDataEXT");
 
     return skip;
 }
@@ -5927,8 +5940,8 @@ bool ObjectLifetimes::PreCallValidateCmdBindShadingRateImageNV(
     VkImageView                                 imageView,
     VkImageLayout                               imageLayout) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(imageView, kVulkanObjectTypeImageView, true, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdBindShadingRateImageNV");
+    skip |= ValidateObject(imageView, kVulkanObjectTypeImageView, true, kVUIDUndefined, kVUIDUndefined, "vkCmdBindShadingRateImageNV");
 
     return skip;
 }
@@ -5939,7 +5952,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetViewportShadingRatePaletteNV(
     uint32_t                                    viewportCount,
     const VkShadingRatePaletteNV*               pShadingRatePalettes) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetViewportShadingRatePaletteNV");
 
     return skip;
 }
@@ -5950,7 +5963,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetCoarseSampleOrderNV(
     uint32_t                                    customSampleOrderCount,
     const VkCoarseSampleOrderCustomNV*          pCustomSampleOrders) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetCoarseSampleOrderNV");
 
     return skip;
 }
@@ -5961,14 +5974,14 @@ bool ObjectLifetimes::PreCallValidateCreateAccelerationStructureNV(
     const VkAllocationCallbacks*                pAllocator,
     VkAccelerationStructureNV*                  pAccelerationStructure) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkCreateAccelerationStructureNV");
     if (pCreateInfo) {
         if (pCreateInfo->info.pGeometries) {
             for (uint32_t index2 = 0; index2 < pCreateInfo->info.geometryCount; ++index2) {
-                skip |= ValidateObject(pCreateInfo->info.pGeometries[index2].geometry.triangles.vertexData, kVulkanObjectTypeBuffer, true, kVUIDUndefined, kVUIDUndefined);
-                skip |= ValidateObject(pCreateInfo->info.pGeometries[index2].geometry.triangles.indexData, kVulkanObjectTypeBuffer, true, kVUIDUndefined, kVUIDUndefined);
-                skip |= ValidateObject(pCreateInfo->info.pGeometries[index2].geometry.triangles.transformData, kVulkanObjectTypeBuffer, true, kVUIDUndefined, kVUIDUndefined);
-                skip |= ValidateObject(pCreateInfo->info.pGeometries[index2].geometry.aabbs.aabbData, kVulkanObjectTypeBuffer, true, kVUIDUndefined, kVUIDUndefined);
+                skip |= ValidateObject(pCreateInfo->info.pGeometries[index2].geometry.triangles.vertexData, kVulkanObjectTypeBuffer, true, kVUIDUndefined, kVUIDUndefined, "VkGeometryTrianglesNV");
+                skip |= ValidateObject(pCreateInfo->info.pGeometries[index2].geometry.triangles.indexData, kVulkanObjectTypeBuffer, true, kVUIDUndefined, kVUIDUndefined, "VkGeometryTrianglesNV");
+                skip |= ValidateObject(pCreateInfo->info.pGeometries[index2].geometry.triangles.transformData, kVulkanObjectTypeBuffer, true, kVUIDUndefined, kVUIDUndefined, "VkGeometryTrianglesNV");
+                skip |= ValidateObject(pCreateInfo->info.pGeometries[index2].geometry.aabbs.aabbData, kVulkanObjectTypeBuffer, true, kVUIDUndefined, kVUIDUndefined, "VkGeometryAABBNV");
             }
         }
     }
@@ -5992,8 +6005,8 @@ bool ObjectLifetimes::PreCallValidateDestroyAccelerationStructureNV(
     VkAccelerationStructureNV                   accelerationStructure,
     const VkAllocationCallbacks*                pAllocator) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(accelerationStructure, kVulkanObjectTypeAccelerationStructureNV, true, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkDestroyAccelerationStructureNV");
+    skip |= ValidateObject(accelerationStructure, kVulkanObjectTypeAccelerationStructureNV, true, kVUIDUndefined, kVUIDUndefined, "vkDestroyAccelerationStructureNV");
     skip |= ValidateDestroyObject(accelerationStructure, kVulkanObjectTypeAccelerationStructureNV, pAllocator, kVUIDUndefined, kVUIDUndefined);
 
     return skip;
@@ -6012,9 +6025,9 @@ bool ObjectLifetimes::PreCallValidateGetAccelerationStructureMemoryRequirementsN
     const VkAccelerationStructureMemoryRequirementsInfoNV* pInfo,
     VkMemoryRequirements2KHR*                   pMemoryRequirements) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetAccelerationStructureMemoryRequirementsNV");
     if (pInfo) {
-        skip |= ValidateObject(pInfo->accelerationStructure, kVulkanObjectTypeAccelerationStructureNV, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pInfo->accelerationStructure, kVulkanObjectTypeAccelerationStructureNV, false, kVUIDUndefined, kVUIDUndefined, "VkAccelerationStructureMemoryRequirementsInfoNV");
     }
 
     return skip;
@@ -6025,11 +6038,11 @@ bool ObjectLifetimes::PreCallValidateBindAccelerationStructureMemoryNV(
     uint32_t                                    bindInfoCount,
     const VkBindAccelerationStructureMemoryInfoNV* pBindInfos) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkBindAccelerationStructureMemoryNV");
     if (pBindInfos) {
         for (uint32_t index0 = 0; index0 < bindInfoCount; ++index0) {
-            skip |= ValidateObject(pBindInfos[index0].accelerationStructure, kVulkanObjectTypeAccelerationStructureNV, false, kVUIDUndefined, kVUIDUndefined);
-            skip |= ValidateObject(pBindInfos[index0].memory, kVulkanObjectTypeDeviceMemory, false, kVUIDUndefined, kVUIDUndefined);
+            skip |= ValidateObject(pBindInfos[index0].accelerationStructure, kVulkanObjectTypeAccelerationStructureNV, false, kVUIDUndefined, kVUIDUndefined, "VkBindAccelerationStructureMemoryInfoNV");
+            skip |= ValidateObject(pBindInfos[index0].memory, kVulkanObjectTypeDeviceMemory, false, kVUIDUndefined, kVUIDUndefined, "VkBindAccelerationStructureMemoryInfoNV");
         }
     }
 
@@ -6047,21 +6060,21 @@ bool ObjectLifetimes::PreCallValidateCmdBuildAccelerationStructureNV(
     VkBuffer                                    scratch,
     VkDeviceSize                                scratchOffset) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdBuildAccelerationStructureNV");
     if (pInfo) {
         if (pInfo->pGeometries) {
             for (uint32_t index1 = 0; index1 < pInfo->geometryCount; ++index1) {
-                skip |= ValidateObject(pInfo->pGeometries[index1].geometry.triangles.vertexData, kVulkanObjectTypeBuffer, true, kVUIDUndefined, kVUIDUndefined);
-                skip |= ValidateObject(pInfo->pGeometries[index1].geometry.triangles.indexData, kVulkanObjectTypeBuffer, true, kVUIDUndefined, kVUIDUndefined);
-                skip |= ValidateObject(pInfo->pGeometries[index1].geometry.triangles.transformData, kVulkanObjectTypeBuffer, true, kVUIDUndefined, kVUIDUndefined);
-                skip |= ValidateObject(pInfo->pGeometries[index1].geometry.aabbs.aabbData, kVulkanObjectTypeBuffer, true, kVUIDUndefined, kVUIDUndefined);
+                skip |= ValidateObject(pInfo->pGeometries[index1].geometry.triangles.vertexData, kVulkanObjectTypeBuffer, true, kVUIDUndefined, kVUIDUndefined, "VkGeometryTrianglesNV");
+                skip |= ValidateObject(pInfo->pGeometries[index1].geometry.triangles.indexData, kVulkanObjectTypeBuffer, true, kVUIDUndefined, kVUIDUndefined, "VkGeometryTrianglesNV");
+                skip |= ValidateObject(pInfo->pGeometries[index1].geometry.triangles.transformData, kVulkanObjectTypeBuffer, true, kVUIDUndefined, kVUIDUndefined, "VkGeometryTrianglesNV");
+                skip |= ValidateObject(pInfo->pGeometries[index1].geometry.aabbs.aabbData, kVulkanObjectTypeBuffer, true, kVUIDUndefined, kVUIDUndefined, "VkGeometryAABBNV");
             }
         }
     }
-    skip |= ValidateObject(instanceData, kVulkanObjectTypeBuffer, true, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(dst, kVulkanObjectTypeAccelerationStructureNV, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(src, kVulkanObjectTypeAccelerationStructureNV, true, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(scratch, kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(instanceData, kVulkanObjectTypeBuffer, true, kVUIDUndefined, kVUIDUndefined, "vkCmdBuildAccelerationStructureNV");
+    skip |= ValidateObject(dst, kVulkanObjectTypeAccelerationStructureNV, false, kVUIDUndefined, kVUIDUndefined, "vkCmdBuildAccelerationStructureNV");
+    skip |= ValidateObject(src, kVulkanObjectTypeAccelerationStructureNV, true, kVUIDUndefined, kVUIDUndefined, "vkCmdBuildAccelerationStructureNV");
+    skip |= ValidateObject(scratch, kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdBuildAccelerationStructureNV");
 
     return skip;
 }
@@ -6072,9 +6085,9 @@ bool ObjectLifetimes::PreCallValidateCmdCopyAccelerationStructureNV(
     VkAccelerationStructureNV                   src,
     VkCopyAccelerationStructureModeKHR          mode) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(dst, kVulkanObjectTypeAccelerationStructureNV, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(src, kVulkanObjectTypeAccelerationStructureNV, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdCopyAccelerationStructureNV");
+    skip |= ValidateObject(dst, kVulkanObjectTypeAccelerationStructureNV, false, kVUIDUndefined, kVUIDUndefined, "vkCmdCopyAccelerationStructureNV");
+    skip |= ValidateObject(src, kVulkanObjectTypeAccelerationStructureNV, false, kVUIDUndefined, kVUIDUndefined, "vkCmdCopyAccelerationStructureNV");
 
     return skip;
 }
@@ -6096,11 +6109,11 @@ bool ObjectLifetimes::PreCallValidateCmdTraceRaysNV(
     uint32_t                                    height,
     uint32_t                                    depth) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(raygenShaderBindingTableBuffer, kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(missShaderBindingTableBuffer, kVulkanObjectTypeBuffer, true, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(hitShaderBindingTableBuffer, kVulkanObjectTypeBuffer, true, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(callableShaderBindingTableBuffer, kVulkanObjectTypeBuffer, true, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdTraceRaysNV");
+    skip |= ValidateObject(raygenShaderBindingTableBuffer, kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdTraceRaysNV");
+    skip |= ValidateObject(missShaderBindingTableBuffer, kVulkanObjectTypeBuffer, true, kVUIDUndefined, kVUIDUndefined, "vkCmdTraceRaysNV");
+    skip |= ValidateObject(hitShaderBindingTableBuffer, kVulkanObjectTypeBuffer, true, kVUIDUndefined, kVUIDUndefined, "vkCmdTraceRaysNV");
+    skip |= ValidateObject(callableShaderBindingTableBuffer, kVulkanObjectTypeBuffer, true, kVUIDUndefined, kVUIDUndefined, "vkCmdTraceRaysNV");
 
     return skip;
 }
@@ -6113,18 +6126,18 @@ bool ObjectLifetimes::PreCallValidateCreateRayTracingPipelinesNV(
     const VkAllocationCallbacks*                pAllocator,
     VkPipeline*                                 pPipelines) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(pipelineCache, kVulkanObjectTypePipelineCache, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkCreateRayTracingPipelinesNV");
+    skip |= ValidateObject(pipelineCache, kVulkanObjectTypePipelineCache, false, kVUIDUndefined, kVUIDUndefined, "vkCreateRayTracingPipelinesNV");
     if (pCreateInfos) {
         for (uint32_t index0 = 0; index0 < createInfoCount; ++index0) {
             if (pCreateInfos[index0].pStages) {
                 for (uint32_t index1 = 0; index1 < pCreateInfos[index0].stageCount; ++index1) {
-                    skip |= ValidateObject(pCreateInfos[index0].pStages[index1].module, kVulkanObjectTypeShaderModule, true, "VUID-VkPipelineShaderStageCreateInfo-module-parameter", kVUIDUndefined);
+                    skip |= ValidateObject(pCreateInfos[index0].pStages[index1].module, kVulkanObjectTypeShaderModule, true, "VUID-VkPipelineShaderStageCreateInfo-module-parameter", kVUIDUndefined, "VkPipelineShaderStageCreateInfo");
                 }
             }
-            skip |= ValidateObject(pCreateInfos[index0].layout, kVulkanObjectTypePipelineLayout, false, kVUIDUndefined, kVUIDUndefined);
+            skip |= ValidateObject(pCreateInfos[index0].layout, kVulkanObjectTypePipelineLayout, false, kVUIDUndefined, kVUIDUndefined, "VkRayTracingPipelineCreateInfoNV");
             if ((pCreateInfos[index0].flags & VK_PIPELINE_CREATE_DERIVATIVE_BIT) && (pCreateInfos[index0].basePipelineIndex == -1))
-                skip |= ValidateObject(pCreateInfos[index0].basePipelineHandle, kVulkanObjectTypePipeline, false, "VUID-VkRayTracingPipelineCreateInfoNV-flags-07984", kVUIDUndefined);
+                skip |= ValidateObject(pCreateInfos[index0].basePipelineHandle, kVulkanObjectTypePipeline, false, "VUID-VkRayTracingPipelineCreateInfoNV-flags-07984", kVUIDUndefined, "VkRayTracingPipelineCreateInfoNV");
         }
     }
 
@@ -6157,8 +6170,8 @@ bool ObjectLifetimes::PreCallValidateGetRayTracingShaderGroupHandlesKHR(
     size_t                                      dataSize,
     void*                                       pData) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(pipeline, kVulkanObjectTypePipeline, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetRayTracingShaderGroupHandlesKHR");
+    skip |= ValidateObject(pipeline, kVulkanObjectTypePipeline, false, kVUIDUndefined, kVUIDUndefined, "vkGetRayTracingShaderGroupHandlesKHR");
 
     return skip;
 }
@@ -6171,8 +6184,8 @@ bool ObjectLifetimes::PreCallValidateGetRayTracingShaderGroupHandlesNV(
     size_t                                      dataSize,
     void*                                       pData) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(pipeline, kVulkanObjectTypePipeline, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetRayTracingShaderGroupHandlesNV");
+    skip |= ValidateObject(pipeline, kVulkanObjectTypePipeline, false, kVUIDUndefined, kVUIDUndefined, "vkGetRayTracingShaderGroupHandlesNV");
 
     return skip;
 }
@@ -6183,8 +6196,8 @@ bool ObjectLifetimes::PreCallValidateGetAccelerationStructureHandleNV(
     size_t                                      dataSize,
     void*                                       pData) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(accelerationStructure, kVulkanObjectTypeAccelerationStructureNV, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetAccelerationStructureHandleNV");
+    skip |= ValidateObject(accelerationStructure, kVulkanObjectTypeAccelerationStructureNV, false, kVUIDUndefined, kVUIDUndefined, "vkGetAccelerationStructureHandleNV");
 
     return skip;
 }
@@ -6197,13 +6210,13 @@ bool ObjectLifetimes::PreCallValidateCmdWriteAccelerationStructuresPropertiesNV(
     VkQueryPool                                 queryPool,
     uint32_t                                    firstQuery) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdWriteAccelerationStructuresPropertiesNV");
     if ((accelerationStructureCount > 0) && (pAccelerationStructures)) {
         for (uint32_t index0 = 0; index0 < accelerationStructureCount; ++index0) {
-            skip |= ValidateObject(pAccelerationStructures[index0], kVulkanObjectTypeAccelerationStructureNV, false, kVUIDUndefined, kVUIDUndefined);
+            skip |= ValidateObject(pAccelerationStructures[index0], kVulkanObjectTypeAccelerationStructureNV, false, kVUIDUndefined, kVUIDUndefined, "vkCmdWriteAccelerationStructuresPropertiesNV");
         }
     }
-    skip |= ValidateObject(queryPool, kVulkanObjectTypeQueryPool, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(queryPool, kVulkanObjectTypeQueryPool, false, kVUIDUndefined, kVUIDUndefined, "vkCmdWriteAccelerationStructuresPropertiesNV");
 
     return skip;
 }
@@ -6213,8 +6226,8 @@ bool ObjectLifetimes::PreCallValidateCompileDeferredNV(
     VkPipeline                                  pipeline,
     uint32_t                                    shader) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(pipeline, kVulkanObjectTypePipeline, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkCompileDeferredNV");
+    skip |= ValidateObject(pipeline, kVulkanObjectTypePipeline, false, kVUIDUndefined, kVUIDUndefined, "vkCompileDeferredNV");
 
     return skip;
 }
@@ -6225,7 +6238,7 @@ bool ObjectLifetimes::PreCallValidateGetMemoryHostPointerPropertiesEXT(
     const void*                                 pHostPointer,
     VkMemoryHostPointerPropertiesEXT*           pMemoryHostPointerProperties) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetMemoryHostPointerPropertiesEXT-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetMemoryHostPointerPropertiesEXT-device-parameter", kVUIDUndefined, "vkGetMemoryHostPointerPropertiesEXT");
 
     return skip;
 }
@@ -6237,8 +6250,8 @@ bool ObjectLifetimes::PreCallValidateCmdWriteBufferMarkerAMD(
     VkDeviceSize                                dstOffset,
     uint32_t                                    marker) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(dstBuffer, kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdWriteBufferMarkerAMD");
+    skip |= ValidateObject(dstBuffer, kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdWriteBufferMarkerAMD");
 
     return skip;
 }
@@ -6248,7 +6261,7 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceCalibrateableTimeDomainsEX
     uint32_t*                                   pTimeDomainCount,
     VkTimeDomainEXT*                            pTimeDomains) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceCalibrateableTimeDomainsEXT-physicalDevice-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceCalibrateableTimeDomainsEXT-physicalDevice-parameter", kVUIDUndefined, "vkGetPhysicalDeviceCalibrateableTimeDomainsEXT");
 
     return skip;
 }
@@ -6260,7 +6273,7 @@ bool ObjectLifetimes::PreCallValidateGetCalibratedTimestampsEXT(
     uint64_t*                                   pTimestamps,
     uint64_t*                                   pMaxDeviation) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetCalibratedTimestampsEXT-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetCalibratedTimestampsEXT-device-parameter", kVUIDUndefined, "vkGetCalibratedTimestampsEXT");
 
     return skip;
 }
@@ -6270,7 +6283,7 @@ bool ObjectLifetimes::PreCallValidateCmdDrawMeshTasksNV(
     uint32_t                                    taskCount,
     uint32_t                                    firstTask) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdDrawMeshTasksNV");
 
     return skip;
 }
@@ -6282,8 +6295,8 @@ bool ObjectLifetimes::PreCallValidateCmdDrawMeshTasksIndirectNV(
     uint32_t                                    drawCount,
     uint32_t                                    stride) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdDrawMeshTasksIndirectNV");
+    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdDrawMeshTasksIndirectNV");
 
     return skip;
 }
@@ -6297,9 +6310,9 @@ bool ObjectLifetimes::PreCallValidateCmdDrawMeshTasksIndirectCountNV(
     uint32_t                                    maxDrawCount,
     uint32_t                                    stride) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(countBuffer, kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdDrawMeshTasksIndirectCountNV");
+    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdDrawMeshTasksIndirectCountNV");
+    skip |= ValidateObject(countBuffer, kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdDrawMeshTasksIndirectCountNV");
 
     return skip;
 }
@@ -6310,7 +6323,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetExclusiveScissorEnableNV(
     uint32_t                                    exclusiveScissorCount,
     const VkBool32*                             pExclusiveScissorEnables) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetExclusiveScissorEnableNV");
 
     return skip;
 }
@@ -6321,7 +6334,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetExclusiveScissorNV(
     uint32_t                                    exclusiveScissorCount,
     const VkRect2D*                             pExclusiveScissors) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetExclusiveScissorNV");
 
     return skip;
 }
@@ -6330,7 +6343,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetCheckpointNV(
     VkCommandBuffer                             commandBuffer,
     const void*                                 pCheckpointMarker) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetCheckpointNV");
 
     return skip;
 }
@@ -6340,7 +6353,7 @@ bool ObjectLifetimes::PreCallValidateGetQueueCheckpointDataNV(
     uint32_t*                                   pCheckpointDataCount,
     VkCheckpointDataNV*                         pCheckpointData) const {
     bool skip = false;
-    skip |= ValidateObject(queue, kVulkanObjectTypeQueue, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(queue, kVulkanObjectTypeQueue, false, kVUIDUndefined, kVUIDUndefined, "vkGetQueueCheckpointDataNV");
 
     return skip;
 }
@@ -6349,7 +6362,7 @@ bool ObjectLifetimes::PreCallValidateInitializePerformanceApiINTEL(
     VkDevice                                    device,
     const VkInitializePerformanceApiInfoINTEL*  pInitializeInfo) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkInitializePerformanceApiINTEL");
 
     return skip;
 }
@@ -6357,7 +6370,7 @@ bool ObjectLifetimes::PreCallValidateInitializePerformanceApiINTEL(
 bool ObjectLifetimes::PreCallValidateUninitializePerformanceApiINTEL(
     VkDevice                                    device) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkUninitializePerformanceApiINTEL");
 
     return skip;
 }
@@ -6366,7 +6379,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetPerformanceMarkerINTEL(
     VkCommandBuffer                             commandBuffer,
     const VkPerformanceMarkerInfoINTEL*         pMarkerInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetPerformanceMarkerINTEL");
 
     return skip;
 }
@@ -6375,7 +6388,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetPerformanceStreamMarkerINTEL(
     VkCommandBuffer                             commandBuffer,
     const VkPerformanceStreamMarkerInfoINTEL*   pMarkerInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetPerformanceStreamMarkerINTEL");
 
     return skip;
 }
@@ -6384,7 +6397,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetPerformanceOverrideINTEL(
     VkCommandBuffer                             commandBuffer,
     const VkPerformanceOverrideInfoINTEL*       pOverrideInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetPerformanceOverrideINTEL");
 
     return skip;
 }
@@ -6394,7 +6407,7 @@ bool ObjectLifetimes::PreCallValidateAcquirePerformanceConfigurationINTEL(
     const VkPerformanceConfigurationAcquireInfoINTEL* pAcquireInfo,
     VkPerformanceConfigurationINTEL*            pConfiguration) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkAcquirePerformanceConfigurationINTEL");
 
     return skip;
 }
@@ -6413,8 +6426,8 @@ bool ObjectLifetimes::PreCallValidateReleasePerformanceConfigurationINTEL(
     VkDevice                                    device,
     VkPerformanceConfigurationINTEL             configuration) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(configuration, kVulkanObjectTypePerformanceConfigurationINTEL, true, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkReleasePerformanceConfigurationINTEL");
+    skip |= ValidateObject(configuration, kVulkanObjectTypePerformanceConfigurationINTEL, true, kVUIDUndefined, kVUIDUndefined, "vkReleasePerformanceConfigurationINTEL");
     skip |= ValidateDestroyObject(configuration, kVulkanObjectTypePerformanceConfigurationINTEL, nullptr, kVUIDUndefined, kVUIDUndefined);
 
     return skip;
@@ -6431,8 +6444,8 @@ bool ObjectLifetimes::PreCallValidateQueueSetPerformanceConfigurationINTEL(
     VkQueue                                     queue,
     VkPerformanceConfigurationINTEL             configuration) const {
     bool skip = false;
-    skip |= ValidateObject(queue, kVulkanObjectTypeQueue, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(configuration, kVulkanObjectTypePerformanceConfigurationINTEL, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(queue, kVulkanObjectTypeQueue, false, kVUIDUndefined, kVUIDUndefined, "vkQueueSetPerformanceConfigurationINTEL");
+    skip |= ValidateObject(configuration, kVulkanObjectTypePerformanceConfigurationINTEL, false, kVUIDUndefined, kVUIDUndefined, "vkQueueSetPerformanceConfigurationINTEL");
 
     return skip;
 }
@@ -6442,7 +6455,7 @@ bool ObjectLifetimes::PreCallValidateGetPerformanceParameterINTEL(
     VkPerformanceParameterTypeINTEL             parameter,
     VkPerformanceValueINTEL*                    pValue) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetPerformanceParameterINTEL");
 
     return skip;
 }
@@ -6452,12 +6465,11 @@ bool ObjectLifetimes::PreCallValidateSetLocalDimmingAMD(
     VkSwapchainKHR                              swapChain,
     VkBool32                                    localDimmingEnable) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(swapChain, kVulkanObjectTypeSwapchainKHR, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkSetLocalDimmingAMD");
+    skip |= ValidateObject(swapChain, kVulkanObjectTypeSwapchainKHR, false, kVUIDUndefined, kVUIDUndefined, "vkSetLocalDimmingAMD");
 
     return skip;
 }
-
 #ifdef VK_USE_PLATFORM_FUCHSIA
 
 bool ObjectLifetimes::PreCallValidateCreateImagePipeSurfaceFUCHSIA(
@@ -6466,7 +6478,7 @@ bool ObjectLifetimes::PreCallValidateCreateImagePipeSurfaceFUCHSIA(
     const VkAllocationCallbacks*                pAllocator,
     VkSurfaceKHR*                               pSurface) const {
     bool skip = false;
-    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, kVUIDUndefined, kVUIDUndefined, "vkCreateImagePipeSurfaceFUCHSIA");
 
     return skip;
 }
@@ -6482,7 +6494,6 @@ void ObjectLifetimes::PostCallRecordCreateImagePipeSurfaceFUCHSIA(
 
 }
 #endif // VK_USE_PLATFORM_FUCHSIA
-
 #ifdef VK_USE_PLATFORM_METAL_EXT
 
 bool ObjectLifetimes::PreCallValidateCreateMetalSurfaceEXT(
@@ -6491,7 +6502,7 @@ bool ObjectLifetimes::PreCallValidateCreateMetalSurfaceEXT(
     const VkAllocationCallbacks*                pAllocator,
     VkSurfaceKHR*                               pSurface) const {
     bool skip = false;
-    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, kVUIDUndefined, kVUIDUndefined, "vkCreateMetalSurfaceEXT");
 
     return skip;
 }
@@ -6512,7 +6523,7 @@ bool ObjectLifetimes::PreCallValidateGetBufferDeviceAddressEXT(
     VkDevice                                    device,
     const VkBufferDeviceAddressInfo*            pInfo) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetBufferDeviceAddress-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetBufferDeviceAddress-device-parameter", kVUIDUndefined, "vkGetBufferDeviceAddressEXT");
 
     return skip;
 }
@@ -6522,7 +6533,7 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceToolPropertiesEXT(
     uint32_t*                                   pToolCount,
     VkPhysicalDeviceToolProperties*             pToolProperties) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetPhysicalDeviceToolPropertiesEXT");
 
     return skip;
 }
@@ -6532,7 +6543,7 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceCooperativeMatrixPropertie
     uint32_t*                                   pPropertyCount,
     VkCooperativeMatrixPropertiesNV*            pProperties) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetPhysicalDeviceCooperativeMatrixPropertiesNV");
 
     return skip;
 }
@@ -6542,11 +6553,10 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceSupportedFramebufferMixedS
     uint32_t*                                   pCombinationCount,
     VkFramebufferMixedSamplesCombinationNV*     pCombinations) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetPhysicalDeviceSupportedFramebufferMixedSamplesCombinationsNV");
 
     return skip;
 }
-
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 
 bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceSurfacePresentModes2EXT(
@@ -6555,41 +6565,38 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceSurfacePresentModes2EXT(
     uint32_t*                                   pPresentModeCount,
     VkPresentModeKHR*                           pPresentModes) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetPhysicalDeviceSurfacePresentModes2EXT");
     if (pSurfaceInfo) {
-        skip |= ValidateObject(pSurfaceInfo->surface, kVulkanObjectTypeSurfaceKHR, true, "VUID-VkPhysicalDeviceSurfaceInfo2KHR-surface-parameter", kVUIDUndefined);
+        skip |= ValidateObject(pSurfaceInfo->surface, kVulkanObjectTypeSurfaceKHR, true, "VUID-VkPhysicalDeviceSurfaceInfo2KHR-surface-parameter", kVUIDUndefined, "VkPhysicalDeviceSurfaceInfo2KHR");
     }
 
     return skip;
 }
 #endif // VK_USE_PLATFORM_WIN32_KHR
-
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 
 bool ObjectLifetimes::PreCallValidateAcquireFullScreenExclusiveModeEXT(
     VkDevice                                    device,
     VkSwapchainKHR                              swapchain) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(swapchain, kVulkanObjectTypeSwapchainKHR, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkAcquireFullScreenExclusiveModeEXT");
+    skip |= ValidateObject(swapchain, kVulkanObjectTypeSwapchainKHR, false, kVUIDUndefined, kVUIDUndefined, "vkAcquireFullScreenExclusiveModeEXT");
 
     return skip;
 }
 #endif // VK_USE_PLATFORM_WIN32_KHR
-
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 
 bool ObjectLifetimes::PreCallValidateReleaseFullScreenExclusiveModeEXT(
     VkDevice                                    device,
     VkSwapchainKHR                              swapchain) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(swapchain, kVulkanObjectTypeSwapchainKHR, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkReleaseFullScreenExclusiveModeEXT");
+    skip |= ValidateObject(swapchain, kVulkanObjectTypeSwapchainKHR, false, kVUIDUndefined, kVUIDUndefined, "vkReleaseFullScreenExclusiveModeEXT");
 
     return skip;
 }
 #endif // VK_USE_PLATFORM_WIN32_KHR
-
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 
 bool ObjectLifetimes::PreCallValidateGetDeviceGroupSurfacePresentModes2EXT(
@@ -6597,9 +6604,9 @@ bool ObjectLifetimes::PreCallValidateGetDeviceGroupSurfacePresentModes2EXT(
     const VkPhysicalDeviceSurfaceInfo2KHR*      pSurfaceInfo,
     VkDeviceGroupPresentModeFlagsKHR*           pModes) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetDeviceGroupSurfacePresentModes2EXT");
     if (pSurfaceInfo) {
-        skip |= ValidateObject(pSurfaceInfo->surface, kVulkanObjectTypeSurfaceKHR, true, "VUID-VkPhysicalDeviceSurfaceInfo2KHR-surface-parameter", kVUIDUndefined);
+        skip |= ValidateObject(pSurfaceInfo->surface, kVulkanObjectTypeSurfaceKHR, true, "VUID-VkPhysicalDeviceSurfaceInfo2KHR-surface-parameter", kVUIDUndefined, "VkPhysicalDeviceSurfaceInfo2KHR");
     }
 
     return skip;
@@ -6612,7 +6619,7 @@ bool ObjectLifetimes::PreCallValidateCreateHeadlessSurfaceEXT(
     const VkAllocationCallbacks*                pAllocator,
     VkSurfaceKHR*                               pSurface) const {
     bool skip = false;
-    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, "VUID-vkCreateHeadlessSurfaceEXT-instance-parameter", kVUIDUndefined);
+    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, "VUID-vkCreateHeadlessSurfaceEXT-instance-parameter", kVUIDUndefined, "vkCreateHeadlessSurfaceEXT");
 
     return skip;
 }
@@ -6633,7 +6640,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetLineStippleEXT(
     uint32_t                                    lineStippleFactor,
     uint16_t                                    lineStipplePattern) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetLineStippleEXT-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetLineStippleEXT-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetLineStippleEXT");
 
     return skip;
 }
@@ -6644,8 +6651,8 @@ bool ObjectLifetimes::PreCallValidateResetQueryPoolEXT(
     uint32_t                                    firstQuery,
     uint32_t                                    queryCount) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkResetQueryPool-device-parameter", kVUIDUndefined);
-    skip |= ValidateObject(queryPool, kVulkanObjectTypeQueryPool, false, "VUID-vkResetQueryPool-queryPool-parameter", "VUID-vkResetQueryPool-queryPool-parent");
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkResetQueryPool-device-parameter", kVUIDUndefined, "vkResetQueryPoolEXT");
+    skip |= ValidateObject(queryPool, kVulkanObjectTypeQueryPool, false, "VUID-vkResetQueryPool-queryPool-parameter", "VUID-vkResetQueryPool-queryPool-parent", "vkResetQueryPoolEXT");
 
     return skip;
 }
@@ -6654,7 +6661,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetCullModeEXT(
     VkCommandBuffer                             commandBuffer,
     VkCullModeFlags                             cullMode) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetCullMode-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetCullMode-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetCullModeEXT");
 
     return skip;
 }
@@ -6663,7 +6670,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetFrontFaceEXT(
     VkCommandBuffer                             commandBuffer,
     VkFrontFace                                 frontFace) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetFrontFace-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetFrontFace-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetFrontFaceEXT");
 
     return skip;
 }
@@ -6672,7 +6679,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetPrimitiveTopologyEXT(
     VkCommandBuffer                             commandBuffer,
     VkPrimitiveTopology                         primitiveTopology) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetPrimitiveTopology-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetPrimitiveTopology-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetPrimitiveTopologyEXT");
 
     return skip;
 }
@@ -6682,7 +6689,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetViewportWithCountEXT(
     uint32_t                                    viewportCount,
     const VkViewport*                           pViewports) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetViewportWithCount-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetViewportWithCount-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetViewportWithCountEXT");
 
     return skip;
 }
@@ -6692,7 +6699,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetScissorWithCountEXT(
     uint32_t                                    scissorCount,
     const VkRect2D*                             pScissors) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetScissorWithCount-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetScissorWithCount-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetScissorWithCountEXT");
 
     return skip;
 }
@@ -6706,10 +6713,10 @@ bool ObjectLifetimes::PreCallValidateCmdBindVertexBuffers2EXT(
     const VkDeviceSize*                         pSizes,
     const VkDeviceSize*                         pStrides) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdBindVertexBuffers2-commandBuffer-parameter", "VUID-vkCmdBindVertexBuffers2-commonparent");
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdBindVertexBuffers2-commandBuffer-parameter", "VUID-vkCmdBindVertexBuffers2-commonparent", "vkCmdBindVertexBuffers2EXT");
     if ((bindingCount > 0) && (pBuffers)) {
         for (uint32_t index0 = 0; index0 < bindingCount; ++index0) {
-            skip |= ValidateObject(pBuffers[index0], kVulkanObjectTypeBuffer, true, "VUID-vkCmdBindVertexBuffers2-pBuffers-parameter", "VUID-vkCmdBindVertexBuffers2-commonparent");
+            skip |= ValidateObject(pBuffers[index0], kVulkanObjectTypeBuffer, true, "VUID-vkCmdBindVertexBuffers2-pBuffers-parameter", "VUID-vkCmdBindVertexBuffers2-commonparent", "vkCmdBindVertexBuffers2EXT");
         }
     }
 
@@ -6720,7 +6727,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetDepthTestEnableEXT(
     VkCommandBuffer                             commandBuffer,
     VkBool32                                    depthTestEnable) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetDepthTestEnable-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetDepthTestEnable-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetDepthTestEnableEXT");
 
     return skip;
 }
@@ -6729,7 +6736,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetDepthWriteEnableEXT(
     VkCommandBuffer                             commandBuffer,
     VkBool32                                    depthWriteEnable) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetDepthWriteEnable-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetDepthWriteEnable-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetDepthWriteEnableEXT");
 
     return skip;
 }
@@ -6738,7 +6745,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetDepthCompareOpEXT(
     VkCommandBuffer                             commandBuffer,
     VkCompareOp                                 depthCompareOp) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetDepthCompareOp-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetDepthCompareOp-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetDepthCompareOpEXT");
 
     return skip;
 }
@@ -6747,7 +6754,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetDepthBoundsTestEnableEXT(
     VkCommandBuffer                             commandBuffer,
     VkBool32                                    depthBoundsTestEnable) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetDepthBoundsTestEnable-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetDepthBoundsTestEnable-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetDepthBoundsTestEnableEXT");
 
     return skip;
 }
@@ -6756,7 +6763,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetStencilTestEnableEXT(
     VkCommandBuffer                             commandBuffer,
     VkBool32                                    stencilTestEnable) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetStencilTestEnable-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetStencilTestEnable-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetStencilTestEnableEXT");
 
     return skip;
 }
@@ -6769,7 +6776,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetStencilOpEXT(
     VkStencilOp                                 depthFailOp,
     VkCompareOp                                 compareOp) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetStencilOp-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetStencilOp-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetStencilOpEXT");
 
     return skip;
 }
@@ -6778,9 +6785,9 @@ bool ObjectLifetimes::PreCallValidateReleaseSwapchainImagesEXT(
     VkDevice                                    device,
     const VkReleaseSwapchainImagesInfoEXT*      pReleaseInfo) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkReleaseSwapchainImagesEXT");
     if (pReleaseInfo) {
-        skip |= ValidateObject(pReleaseInfo->swapchain, kVulkanObjectTypeSwapchainKHR, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pReleaseInfo->swapchain, kVulkanObjectTypeSwapchainKHR, false, kVUIDUndefined, kVUIDUndefined, "VkReleaseSwapchainImagesInfoEXT");
     }
 
     return skip;
@@ -6791,10 +6798,10 @@ bool ObjectLifetimes::PreCallValidateGetGeneratedCommandsMemoryRequirementsNV(
     const VkGeneratedCommandsMemoryRequirementsInfoNV* pInfo,
     VkMemoryRequirements2*                      pMemoryRequirements) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetGeneratedCommandsMemoryRequirementsNV");
     if (pInfo) {
-        skip |= ValidateObject(pInfo->pipeline, kVulkanObjectTypePipeline, false, kVUIDUndefined, kVUIDUndefined);
-        skip |= ValidateObject(pInfo->indirectCommandsLayout, kVulkanObjectTypeIndirectCommandsLayoutNV, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pInfo->pipeline, kVulkanObjectTypePipeline, false, kVUIDUndefined, kVUIDUndefined, "VkGeneratedCommandsMemoryRequirementsInfoNV");
+        skip |= ValidateObject(pInfo->indirectCommandsLayout, kVulkanObjectTypeIndirectCommandsLayoutNV, false, kVUIDUndefined, kVUIDUndefined, "VkGeneratedCommandsMemoryRequirementsInfoNV");
     }
 
     return skip;
@@ -6804,18 +6811,18 @@ bool ObjectLifetimes::PreCallValidateCmdPreprocessGeneratedCommandsNV(
     VkCommandBuffer                             commandBuffer,
     const VkGeneratedCommandsInfoNV*            pGeneratedCommandsInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdPreprocessGeneratedCommandsNV");
     if (pGeneratedCommandsInfo) {
-        skip |= ValidateObject(pGeneratedCommandsInfo->pipeline, kVulkanObjectTypePipeline, false, kVUIDUndefined, kVUIDUndefined);
-        skip |= ValidateObject(pGeneratedCommandsInfo->indirectCommandsLayout, kVulkanObjectTypeIndirectCommandsLayoutNV, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pGeneratedCommandsInfo->pipeline, kVulkanObjectTypePipeline, false, kVUIDUndefined, kVUIDUndefined, "VkGeneratedCommandsInfoNV");
+        skip |= ValidateObject(pGeneratedCommandsInfo->indirectCommandsLayout, kVulkanObjectTypeIndirectCommandsLayoutNV, false, kVUIDUndefined, kVUIDUndefined, "VkGeneratedCommandsInfoNV");
         if (pGeneratedCommandsInfo->pStreams) {
             for (uint32_t index1 = 0; index1 < pGeneratedCommandsInfo->streamCount; ++index1) {
-                skip |= ValidateObject(pGeneratedCommandsInfo->pStreams[index1].buffer, kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined);
+                skip |= ValidateObject(pGeneratedCommandsInfo->pStreams[index1].buffer, kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined, "VkIndirectCommandsStreamNV");
             }
         }
-        skip |= ValidateObject(pGeneratedCommandsInfo->preprocessBuffer, kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined);
-        skip |= ValidateObject(pGeneratedCommandsInfo->sequencesCountBuffer, kVulkanObjectTypeBuffer, true, kVUIDUndefined, kVUIDUndefined);
-        skip |= ValidateObject(pGeneratedCommandsInfo->sequencesIndexBuffer, kVulkanObjectTypeBuffer, true, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pGeneratedCommandsInfo->preprocessBuffer, kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined, "VkGeneratedCommandsInfoNV");
+        skip |= ValidateObject(pGeneratedCommandsInfo->sequencesCountBuffer, kVulkanObjectTypeBuffer, true, kVUIDUndefined, kVUIDUndefined, "VkGeneratedCommandsInfoNV");
+        skip |= ValidateObject(pGeneratedCommandsInfo->sequencesIndexBuffer, kVulkanObjectTypeBuffer, true, kVUIDUndefined, kVUIDUndefined, "VkGeneratedCommandsInfoNV");
     }
 
     return skip;
@@ -6826,18 +6833,18 @@ bool ObjectLifetimes::PreCallValidateCmdExecuteGeneratedCommandsNV(
     VkBool32                                    isPreprocessed,
     const VkGeneratedCommandsInfoNV*            pGeneratedCommandsInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdExecuteGeneratedCommandsNV");
     if (pGeneratedCommandsInfo) {
-        skip |= ValidateObject(pGeneratedCommandsInfo->pipeline, kVulkanObjectTypePipeline, false, kVUIDUndefined, kVUIDUndefined);
-        skip |= ValidateObject(pGeneratedCommandsInfo->indirectCommandsLayout, kVulkanObjectTypeIndirectCommandsLayoutNV, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pGeneratedCommandsInfo->pipeline, kVulkanObjectTypePipeline, false, kVUIDUndefined, kVUIDUndefined, "VkGeneratedCommandsInfoNV");
+        skip |= ValidateObject(pGeneratedCommandsInfo->indirectCommandsLayout, kVulkanObjectTypeIndirectCommandsLayoutNV, false, kVUIDUndefined, kVUIDUndefined, "VkGeneratedCommandsInfoNV");
         if (pGeneratedCommandsInfo->pStreams) {
             for (uint32_t index1 = 0; index1 < pGeneratedCommandsInfo->streamCount; ++index1) {
-                skip |= ValidateObject(pGeneratedCommandsInfo->pStreams[index1].buffer, kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined);
+                skip |= ValidateObject(pGeneratedCommandsInfo->pStreams[index1].buffer, kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined, "VkIndirectCommandsStreamNV");
             }
         }
-        skip |= ValidateObject(pGeneratedCommandsInfo->preprocessBuffer, kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined);
-        skip |= ValidateObject(pGeneratedCommandsInfo->sequencesCountBuffer, kVulkanObjectTypeBuffer, true, kVUIDUndefined, kVUIDUndefined);
-        skip |= ValidateObject(pGeneratedCommandsInfo->sequencesIndexBuffer, kVulkanObjectTypeBuffer, true, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pGeneratedCommandsInfo->preprocessBuffer, kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined, "VkGeneratedCommandsInfoNV");
+        skip |= ValidateObject(pGeneratedCommandsInfo->sequencesCountBuffer, kVulkanObjectTypeBuffer, true, kVUIDUndefined, kVUIDUndefined, "VkGeneratedCommandsInfoNV");
+        skip |= ValidateObject(pGeneratedCommandsInfo->sequencesIndexBuffer, kVulkanObjectTypeBuffer, true, kVUIDUndefined, kVUIDUndefined, "VkGeneratedCommandsInfoNV");
     }
 
     return skip;
@@ -6849,8 +6856,8 @@ bool ObjectLifetimes::PreCallValidateCmdBindPipelineShaderGroupNV(
     VkPipeline                                  pipeline,
     uint32_t                                    groupIndex) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(pipeline, kVulkanObjectTypePipeline, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdBindPipelineShaderGroupNV");
+    skip |= ValidateObject(pipeline, kVulkanObjectTypePipeline, false, kVUIDUndefined, kVUIDUndefined, "vkCmdBindPipelineShaderGroupNV");
 
     return skip;
 }
@@ -6861,11 +6868,11 @@ bool ObjectLifetimes::PreCallValidateCreateIndirectCommandsLayoutNV(
     const VkAllocationCallbacks*                pAllocator,
     VkIndirectCommandsLayoutNV*                 pIndirectCommandsLayout) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkCreateIndirectCommandsLayoutNV");
     if (pCreateInfo) {
         if (pCreateInfo->pTokens) {
             for (uint32_t index1 = 0; index1 < pCreateInfo->tokenCount; ++index1) {
-                skip |= ValidateObject(pCreateInfo->pTokens[index1].pushconstantPipelineLayout, kVulkanObjectTypePipelineLayout, true, kVUIDUndefined, kVUIDUndefined);
+                skip |= ValidateObject(pCreateInfo->pTokens[index1].pushconstantPipelineLayout, kVulkanObjectTypePipelineLayout, true, kVUIDUndefined, kVUIDUndefined, "VkIndirectCommandsLayoutTokenNV");
             }
         }
     }
@@ -6889,8 +6896,8 @@ bool ObjectLifetimes::PreCallValidateDestroyIndirectCommandsLayoutNV(
     VkIndirectCommandsLayoutNV                  indirectCommandsLayout,
     const VkAllocationCallbacks*                pAllocator) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(indirectCommandsLayout, kVulkanObjectTypeIndirectCommandsLayoutNV, true, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkDestroyIndirectCommandsLayoutNV");
+    skip |= ValidateObject(indirectCommandsLayout, kVulkanObjectTypeIndirectCommandsLayoutNV, true, kVUIDUndefined, kVUIDUndefined, "vkDestroyIndirectCommandsLayoutNV");
     skip |= ValidateDestroyObject(indirectCommandsLayout, kVulkanObjectTypeIndirectCommandsLayoutNV, pAllocator, kVUIDUndefined, kVUIDUndefined);
 
     return skip;
@@ -6904,13 +6911,22 @@ void ObjectLifetimes::PreCallRecordDestroyIndirectCommandsLayoutNV(
 
 }
 
+bool ObjectLifetimes::PreCallValidateCmdSetDepthBias2EXT(
+    VkCommandBuffer                             commandBuffer,
+    const VkDepthBiasInfoEXT*                   pDepthBiasInfo) const {
+    bool skip = false;
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetDepthBias2EXT");
+
+    return skip;
+}
+
 bool ObjectLifetimes::PreCallValidateAcquireDrmDisplayEXT(
     VkPhysicalDevice                            physicalDevice,
     int32_t                                     drmFd,
     VkDisplayKHR                                display) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(display, kVulkanObjectTypeDisplayKHR, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined, "vkAcquireDrmDisplayEXT");
+    skip |= ValidateObject(display, kVulkanObjectTypeDisplayKHR, false, kVUIDUndefined, kVUIDUndefined, "vkAcquireDrmDisplayEXT");
 
     return skip;
 }
@@ -6921,7 +6937,7 @@ bool ObjectLifetimes::PreCallValidateGetDrmDisplayEXT(
     uint32_t                                    connectorId,
     VkDisplayKHR*                               display) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetDrmDisplayEXT");
 
     return skip;
 }
@@ -6943,7 +6959,7 @@ bool ObjectLifetimes::PreCallValidateCreatePrivateDataSlotEXT(
     const VkAllocationCallbacks*                pAllocator,
     VkPrivateDataSlot*                          pPrivateDataSlot) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkCreatePrivateDataSlotEXT");
 
     return skip;
 }
@@ -6964,8 +6980,8 @@ bool ObjectLifetimes::PreCallValidateDestroyPrivateDataSlotEXT(
     VkPrivateDataSlot                           privateDataSlot,
     const VkAllocationCallbacks*                pAllocator) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(privateDataSlot, kVulkanObjectTypePrivateDataSlot, true, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkDestroyPrivateDataSlotEXT");
+    skip |= ValidateObject(privateDataSlot, kVulkanObjectTypePrivateDataSlot, true, kVUIDUndefined, kVUIDUndefined, "vkDestroyPrivateDataSlotEXT");
     skip |= ValidateDestroyObject(privateDataSlot, kVulkanObjectTypePrivateDataSlot, pAllocator, kVUIDUndefined, kVUIDUndefined);
 
     return skip;
@@ -6986,8 +7002,8 @@ bool ObjectLifetimes::PreCallValidateSetPrivateDataEXT(
     VkPrivateDataSlot                           privateDataSlot,
     uint64_t                                    data) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(privateDataSlot, kVulkanObjectTypePrivateDataSlot, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkSetPrivateDataEXT");
+    skip |= ValidateObject(privateDataSlot, kVulkanObjectTypePrivateDataSlot, false, kVUIDUndefined, kVUIDUndefined, "vkSetPrivateDataEXT");
 
     return skip;
 }
@@ -6999,8 +7015,8 @@ bool ObjectLifetimes::PreCallValidateGetPrivateDataEXT(
     VkPrivateDataSlot                           privateDataSlot,
     uint64_t*                                   pData) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(privateDataSlot, kVulkanObjectTypePrivateDataSlot, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetPrivateDataEXT");
+    skip |= ValidateObject(privateDataSlot, kVulkanObjectTypePrivateDataSlot, false, kVUIDUndefined, kVUIDUndefined, "vkGetPrivateDataEXT");
 
     return skip;
 }
@@ -7010,8 +7026,8 @@ bool ObjectLifetimes::PreCallValidateGetDescriptorSetLayoutSizeEXT(
     VkDescriptorSetLayout                       layout,
     VkDeviceSize*                               pLayoutSizeInBytes) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(layout, kVulkanObjectTypeDescriptorSetLayout, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetDescriptorSetLayoutSizeEXT");
+    skip |= ValidateObject(layout, kVulkanObjectTypeDescriptorSetLayout, false, kVUIDUndefined, kVUIDUndefined, "vkGetDescriptorSetLayoutSizeEXT");
 
     return skip;
 }
@@ -7022,8 +7038,8 @@ bool ObjectLifetimes::PreCallValidateGetDescriptorSetLayoutBindingOffsetEXT(
     uint32_t                                    binding,
     VkDeviceSize*                               pOffset) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(layout, kVulkanObjectTypeDescriptorSetLayout, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetDescriptorSetLayoutBindingOffsetEXT");
+    skip |= ValidateObject(layout, kVulkanObjectTypeDescriptorSetLayout, false, kVUIDUndefined, kVUIDUndefined, "vkGetDescriptorSetLayoutBindingOffsetEXT");
 
     return skip;
 }
@@ -7033,7 +7049,7 @@ bool ObjectLifetimes::PreCallValidateCmdBindDescriptorBuffersEXT(
     uint32_t                                    bufferCount,
     const VkDescriptorBufferBindingInfoEXT*     pBindingInfos) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdBindDescriptorBuffersEXT");
 
     return skip;
 }
@@ -7047,8 +7063,8 @@ bool ObjectLifetimes::PreCallValidateCmdSetDescriptorBufferOffsetsEXT(
     const uint32_t*                             pBufferIndices,
     const VkDeviceSize*                         pOffsets) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(layout, kVulkanObjectTypePipelineLayout, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetDescriptorBufferOffsetsEXT");
+    skip |= ValidateObject(layout, kVulkanObjectTypePipelineLayout, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetDescriptorBufferOffsetsEXT");
 
     return skip;
 }
@@ -7059,8 +7075,8 @@ bool ObjectLifetimes::PreCallValidateCmdBindDescriptorBufferEmbeddedSamplersEXT(
     VkPipelineLayout                            layout,
     uint32_t                                    set) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(layout, kVulkanObjectTypePipelineLayout, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdBindDescriptorBufferEmbeddedSamplersEXT");
+    skip |= ValidateObject(layout, kVulkanObjectTypePipelineLayout, false, kVUIDUndefined, kVUIDUndefined, "vkCmdBindDescriptorBufferEmbeddedSamplersEXT");
 
     return skip;
 }
@@ -7070,9 +7086,9 @@ bool ObjectLifetimes::PreCallValidateGetBufferOpaqueCaptureDescriptorDataEXT(
     const VkBufferCaptureDescriptorDataInfoEXT* pInfo,
     void*                                       pData) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetBufferOpaqueCaptureDescriptorDataEXT");
     if (pInfo) {
-        skip |= ValidateObject(pInfo->buffer, kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pInfo->buffer, kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined, "VkBufferCaptureDescriptorDataInfoEXT");
     }
 
     return skip;
@@ -7083,9 +7099,9 @@ bool ObjectLifetimes::PreCallValidateGetImageOpaqueCaptureDescriptorDataEXT(
     const VkImageCaptureDescriptorDataInfoEXT*  pInfo,
     void*                                       pData) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetImageOpaqueCaptureDescriptorDataEXT");
     if (pInfo) {
-        skip |= ValidateObject(pInfo->image, kVulkanObjectTypeImage, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pInfo->image, kVulkanObjectTypeImage, false, kVUIDUndefined, kVUIDUndefined, "VkImageCaptureDescriptorDataInfoEXT");
     }
 
     return skip;
@@ -7096,9 +7112,9 @@ bool ObjectLifetimes::PreCallValidateGetImageViewOpaqueCaptureDescriptorDataEXT(
     const VkImageViewCaptureDescriptorDataInfoEXT* pInfo,
     void*                                       pData) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetImageViewOpaqueCaptureDescriptorDataEXT");
     if (pInfo) {
-        skip |= ValidateObject(pInfo->imageView, kVulkanObjectTypeImageView, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pInfo->imageView, kVulkanObjectTypeImageView, false, kVUIDUndefined, kVUIDUndefined, "VkImageViewCaptureDescriptorDataInfoEXT");
     }
 
     return skip;
@@ -7109,9 +7125,9 @@ bool ObjectLifetimes::PreCallValidateGetSamplerOpaqueCaptureDescriptorDataEXT(
     const VkSamplerCaptureDescriptorDataInfoEXT* pInfo,
     void*                                       pData) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetSamplerOpaqueCaptureDescriptorDataEXT");
     if (pInfo) {
-        skip |= ValidateObject(pInfo->sampler, kVulkanObjectTypeSampler, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pInfo->sampler, kVulkanObjectTypeSampler, false, kVUIDUndefined, kVUIDUndefined, "VkSamplerCaptureDescriptorDataInfoEXT");
     }
 
     return skip;
@@ -7122,10 +7138,10 @@ bool ObjectLifetimes::PreCallValidateGetAccelerationStructureOpaqueCaptureDescri
     const VkAccelerationStructureCaptureDescriptorDataInfoEXT* pInfo,
     void*                                       pData) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetAccelerationStructureOpaqueCaptureDescriptorDataEXT");
     if (pInfo) {
-        skip |= ValidateObject(pInfo->accelerationStructure, kVulkanObjectTypeAccelerationStructureKHR, true, kVUIDUndefined, kVUIDUndefined);
-        skip |= ValidateObject(pInfo->accelerationStructureNV, kVulkanObjectTypeAccelerationStructureNV, true, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pInfo->accelerationStructure, kVulkanObjectTypeAccelerationStructureKHR, true, kVUIDUndefined, kVUIDUndefined, "VkAccelerationStructureCaptureDescriptorDataInfoEXT");
+        skip |= ValidateObject(pInfo->accelerationStructureNV, kVulkanObjectTypeAccelerationStructureNV, true, kVUIDUndefined, kVUIDUndefined, "VkAccelerationStructureCaptureDescriptorDataInfoEXT");
     }
 
     return skip;
@@ -7136,7 +7152,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetFragmentShadingRateEnumNV(
     VkFragmentShadingRateNV                     shadingRate,
     const VkFragmentShadingRateCombinerOpKHR    combinerOps[2]) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetFragmentShadingRateEnumNV");
 
     return skip;
 }
@@ -7147,8 +7163,8 @@ bool ObjectLifetimes::PreCallValidateGetImageSubresourceLayout2EXT(
     const VkImageSubresource2EXT*               pSubresource,
     VkSubresourceLayout2EXT*                    pLayout) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(image, kVulkanObjectTypeImage, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetImageSubresourceLayout2EXT");
+    skip |= ValidateObject(image, kVulkanObjectTypeImage, false, kVUIDUndefined, kVUIDUndefined, "vkGetImageSubresourceLayout2EXT");
 
     return skip;
 }
@@ -7158,24 +7174,22 @@ bool ObjectLifetimes::PreCallValidateGetDeviceFaultInfoEXT(
     VkDeviceFaultCountsEXT*                     pFaultCounts,
     VkDeviceFaultInfoEXT*                       pFaultInfo) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetDeviceFaultInfoEXT");
 
     return skip;
 }
-
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 
 bool ObjectLifetimes::PreCallValidateAcquireWinrtDisplayNV(
     VkPhysicalDevice                            physicalDevice,
     VkDisplayKHR                                display) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(display, kVulkanObjectTypeDisplayKHR, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined, "vkAcquireWinrtDisplayNV");
+    skip |= ValidateObject(display, kVulkanObjectTypeDisplayKHR, false, kVUIDUndefined, kVUIDUndefined, "vkAcquireWinrtDisplayNV");
 
     return skip;
 }
 #endif // VK_USE_PLATFORM_WIN32_KHR
-
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 
 bool ObjectLifetimes::PreCallValidateGetWinrtDisplayNV(
@@ -7183,7 +7197,7 @@ bool ObjectLifetimes::PreCallValidateGetWinrtDisplayNV(
     uint32_t                                    deviceRelativeId,
     VkDisplayKHR*                               pDisplay) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetWinrtDisplayNV");
 
     return skip;
 }
@@ -7198,7 +7212,6 @@ void ObjectLifetimes::PostCallRecordGetWinrtDisplayNV(
 
 }
 #endif // VK_USE_PLATFORM_WIN32_KHR
-
 #ifdef VK_USE_PLATFORM_DIRECTFB_EXT
 
 bool ObjectLifetimes::PreCallValidateCreateDirectFBSurfaceEXT(
@@ -7207,7 +7220,7 @@ bool ObjectLifetimes::PreCallValidateCreateDirectFBSurfaceEXT(
     const VkAllocationCallbacks*                pAllocator,
     VkSurfaceKHR*                               pSurface) const {
     bool skip = false;
-    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, kVUIDUndefined, kVUIDUndefined, "vkCreateDirectFBSurfaceEXT");
 
     return skip;
 }
@@ -7223,7 +7236,6 @@ void ObjectLifetimes::PostCallRecordCreateDirectFBSurfaceEXT(
 
 }
 #endif // VK_USE_PLATFORM_DIRECTFB_EXT
-
 #ifdef VK_USE_PLATFORM_DIRECTFB_EXT
 
 bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceDirectFBPresentationSupportEXT(
@@ -7231,7 +7243,7 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceDirectFBPresentationSuppor
     uint32_t                                    queueFamilyIndex,
     IDirectFB*                                  dfb) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetPhysicalDeviceDirectFBPresentationSupportEXT");
 
     return skip;
 }
@@ -7244,11 +7256,10 @@ bool ObjectLifetimes::PreCallValidateCmdSetVertexInputEXT(
     uint32_t                                    vertexAttributeDescriptionCount,
     const VkVertexInputAttributeDescription2EXT* pVertexAttributeDescriptions) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetVertexInputEXT-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetVertexInputEXT-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetVertexInputEXT");
 
     return skip;
 }
-
 #ifdef VK_USE_PLATFORM_FUCHSIA
 
 bool ObjectLifetimes::PreCallValidateGetMemoryZirconHandleFUCHSIA(
@@ -7256,15 +7267,14 @@ bool ObjectLifetimes::PreCallValidateGetMemoryZirconHandleFUCHSIA(
     const VkMemoryGetZirconHandleInfoFUCHSIA*   pGetZirconHandleInfo,
     zx_handle_t*                                pZirconHandle) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetMemoryZirconHandleFUCHSIA");
     if (pGetZirconHandleInfo) {
-        skip |= ValidateObject(pGetZirconHandleInfo->memory, kVulkanObjectTypeDeviceMemory, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pGetZirconHandleInfo->memory, kVulkanObjectTypeDeviceMemory, false, kVUIDUndefined, kVUIDUndefined, "VkMemoryGetZirconHandleInfoFUCHSIA");
     }
 
     return skip;
 }
 #endif // VK_USE_PLATFORM_FUCHSIA
-
 #ifdef VK_USE_PLATFORM_FUCHSIA
 
 bool ObjectLifetimes::PreCallValidateGetMemoryZirconHandlePropertiesFUCHSIA(
@@ -7273,27 +7283,25 @@ bool ObjectLifetimes::PreCallValidateGetMemoryZirconHandlePropertiesFUCHSIA(
     zx_handle_t                                 zirconHandle,
     VkMemoryZirconHandlePropertiesFUCHSIA*      pMemoryZirconHandleProperties) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetMemoryZirconHandlePropertiesFUCHSIA");
 
     return skip;
 }
 #endif // VK_USE_PLATFORM_FUCHSIA
-
 #ifdef VK_USE_PLATFORM_FUCHSIA
 
 bool ObjectLifetimes::PreCallValidateImportSemaphoreZirconHandleFUCHSIA(
     VkDevice                                    device,
     const VkImportSemaphoreZirconHandleInfoFUCHSIA* pImportSemaphoreZirconHandleInfo) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkImportSemaphoreZirconHandleFUCHSIA");
     if (pImportSemaphoreZirconHandleInfo) {
-        skip |= ValidateObject(pImportSemaphoreZirconHandleInfo->semaphore, kVulkanObjectTypeSemaphore, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pImportSemaphoreZirconHandleInfo->semaphore, kVulkanObjectTypeSemaphore, false, kVUIDUndefined, kVUIDUndefined, "VkImportSemaphoreZirconHandleInfoFUCHSIA");
     }
 
     return skip;
 }
 #endif // VK_USE_PLATFORM_FUCHSIA
-
 #ifdef VK_USE_PLATFORM_FUCHSIA
 
 bool ObjectLifetimes::PreCallValidateGetSemaphoreZirconHandleFUCHSIA(
@@ -7301,15 +7309,14 @@ bool ObjectLifetimes::PreCallValidateGetSemaphoreZirconHandleFUCHSIA(
     const VkSemaphoreGetZirconHandleInfoFUCHSIA* pGetZirconHandleInfo,
     zx_handle_t*                                pZirconHandle) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetSemaphoreZirconHandleFUCHSIA");
     if (pGetZirconHandleInfo) {
-        skip |= ValidateObject(pGetZirconHandleInfo->semaphore, kVulkanObjectTypeSemaphore, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pGetZirconHandleInfo->semaphore, kVulkanObjectTypeSemaphore, false, kVUIDUndefined, kVUIDUndefined, "VkSemaphoreGetZirconHandleInfoFUCHSIA");
     }
 
     return skip;
 }
 #endif // VK_USE_PLATFORM_FUCHSIA
-
 #ifdef VK_USE_PLATFORM_FUCHSIA
 
 bool ObjectLifetimes::PreCallValidateCreateBufferCollectionFUCHSIA(
@@ -7318,7 +7325,7 @@ bool ObjectLifetimes::PreCallValidateCreateBufferCollectionFUCHSIA(
     const VkAllocationCallbacks*                pAllocator,
     VkBufferCollectionFUCHSIA*                  pCollection) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkCreateBufferCollectionFUCHSIA");
 
     return skip;
 }
@@ -7334,7 +7341,6 @@ void ObjectLifetimes::PostCallRecordCreateBufferCollectionFUCHSIA(
 
 }
 #endif // VK_USE_PLATFORM_FUCHSIA
-
 #ifdef VK_USE_PLATFORM_FUCHSIA
 
 bool ObjectLifetimes::PreCallValidateSetBufferCollectionImageConstraintsFUCHSIA(
@@ -7342,13 +7348,12 @@ bool ObjectLifetimes::PreCallValidateSetBufferCollectionImageConstraintsFUCHSIA(
     VkBufferCollectionFUCHSIA                   collection,
     const VkImageConstraintsInfoFUCHSIA*        pImageConstraintsInfo) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(collection, kVulkanObjectTypeBufferCollectionFUCHSIA, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkSetBufferCollectionImageConstraintsFUCHSIA");
+    skip |= ValidateObject(collection, kVulkanObjectTypeBufferCollectionFUCHSIA, false, kVUIDUndefined, kVUIDUndefined, "vkSetBufferCollectionImageConstraintsFUCHSIA");
 
     return skip;
 }
 #endif // VK_USE_PLATFORM_FUCHSIA
-
 #ifdef VK_USE_PLATFORM_FUCHSIA
 
 bool ObjectLifetimes::PreCallValidateSetBufferCollectionBufferConstraintsFUCHSIA(
@@ -7356,13 +7361,12 @@ bool ObjectLifetimes::PreCallValidateSetBufferCollectionBufferConstraintsFUCHSIA
     VkBufferCollectionFUCHSIA                   collection,
     const VkBufferConstraintsInfoFUCHSIA*       pBufferConstraintsInfo) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(collection, kVulkanObjectTypeBufferCollectionFUCHSIA, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkSetBufferCollectionBufferConstraintsFUCHSIA");
+    skip |= ValidateObject(collection, kVulkanObjectTypeBufferCollectionFUCHSIA, false, kVUIDUndefined, kVUIDUndefined, "vkSetBufferCollectionBufferConstraintsFUCHSIA");
 
     return skip;
 }
 #endif // VK_USE_PLATFORM_FUCHSIA
-
 #ifdef VK_USE_PLATFORM_FUCHSIA
 
 bool ObjectLifetimes::PreCallValidateDestroyBufferCollectionFUCHSIA(
@@ -7370,8 +7374,8 @@ bool ObjectLifetimes::PreCallValidateDestroyBufferCollectionFUCHSIA(
     VkBufferCollectionFUCHSIA                   collection,
     const VkAllocationCallbacks*                pAllocator) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(collection, kVulkanObjectTypeBufferCollectionFUCHSIA, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkDestroyBufferCollectionFUCHSIA");
+    skip |= ValidateObject(collection, kVulkanObjectTypeBufferCollectionFUCHSIA, false, kVUIDUndefined, kVUIDUndefined, "vkDestroyBufferCollectionFUCHSIA");
     skip |= ValidateDestroyObject(collection, kVulkanObjectTypeBufferCollectionFUCHSIA, pAllocator, kVUIDUndefined, kVUIDUndefined);
 
     return skip;
@@ -7385,7 +7389,6 @@ void ObjectLifetimes::PreCallRecordDestroyBufferCollectionFUCHSIA(
 
 }
 #endif // VK_USE_PLATFORM_FUCHSIA
-
 #ifdef VK_USE_PLATFORM_FUCHSIA
 
 bool ObjectLifetimes::PreCallValidateGetBufferCollectionPropertiesFUCHSIA(
@@ -7393,8 +7396,8 @@ bool ObjectLifetimes::PreCallValidateGetBufferCollectionPropertiesFUCHSIA(
     VkBufferCollectionFUCHSIA                   collection,
     VkBufferCollectionPropertiesFUCHSIA*        pProperties) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(collection, kVulkanObjectTypeBufferCollectionFUCHSIA, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetBufferCollectionPropertiesFUCHSIA");
+    skip |= ValidateObject(collection, kVulkanObjectTypeBufferCollectionFUCHSIA, false, kVUIDUndefined, kVUIDUndefined, "vkGetBufferCollectionPropertiesFUCHSIA");
 
     return skip;
 }
@@ -7405,8 +7408,8 @@ bool ObjectLifetimes::PreCallValidateGetDeviceSubpassShadingMaxWorkgroupSizeHUAW
     VkRenderPass                                renderpass,
     VkExtent2D*                                 pMaxWorkgroupSize) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(renderpass, kVulkanObjectTypeRenderPass, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetDeviceSubpassShadingMaxWorkgroupSizeHUAWEI");
+    skip |= ValidateObject(renderpass, kVulkanObjectTypeRenderPass, false, kVUIDUndefined, kVUIDUndefined, "vkGetDeviceSubpassShadingMaxWorkgroupSizeHUAWEI");
 
     return skip;
 }
@@ -7414,7 +7417,7 @@ bool ObjectLifetimes::PreCallValidateGetDeviceSubpassShadingMaxWorkgroupSizeHUAW
 bool ObjectLifetimes::PreCallValidateCmdSubpassShadingHUAWEI(
     VkCommandBuffer                             commandBuffer) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSubpassShadingHUAWEI");
 
     return skip;
 }
@@ -7424,8 +7427,8 @@ bool ObjectLifetimes::PreCallValidateCmdBindInvocationMaskHUAWEI(
     VkImageView                                 imageView,
     VkImageLayout                               imageLayout) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(imageView, kVulkanObjectTypeImageView, true, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdBindInvocationMaskHUAWEI");
+    skip |= ValidateObject(imageView, kVulkanObjectTypeImageView, true, kVUIDUndefined, kVUIDUndefined, "vkCmdBindInvocationMaskHUAWEI");
 
     return skip;
 }
@@ -7435,9 +7438,9 @@ bool ObjectLifetimes::PreCallValidateGetMemoryRemoteAddressNV(
     const VkMemoryGetRemoteAddressInfoNV*       pMemoryGetRemoteAddressInfo,
     VkRemoteAddressNV*                          pAddress) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetMemoryRemoteAddressNV");
     if (pMemoryGetRemoteAddressInfo) {
-        skip |= ValidateObject(pMemoryGetRemoteAddressInfo->memory, kVulkanObjectTypeDeviceMemory, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pMemoryGetRemoteAddressInfo->memory, kVulkanObjectTypeDeviceMemory, false, kVUIDUndefined, kVUIDUndefined, "VkMemoryGetRemoteAddressInfoNV");
     }
 
     return skip;
@@ -7448,11 +7451,10 @@ bool ObjectLifetimes::PreCallValidateGetPipelinePropertiesEXT(
     const VkPipelineInfoEXT*                    pPipelineInfo,
     VkBaseOutStructure*                         pPipelineProperties) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetPipelinePropertiesEXT");
 
     return skip;
 }
-
 #ifdef VK_USE_PLATFORM_SCI
 
 bool ObjectLifetimes::PreCallValidateGetFenceSciSyncFenceNV(
@@ -7460,15 +7462,14 @@ bool ObjectLifetimes::PreCallValidateGetFenceSciSyncFenceNV(
     const VkFenceGetSciSyncInfoNV*              pGetSciSyncHandleInfo,
     void*                                       pHandle) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetFenceSciSyncFenceNV-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetFenceSciSyncFenceNV-device-parameter", kVUIDUndefined, "vkGetFenceSciSyncFenceNV");
     if (pGetSciSyncHandleInfo) {
-        skip |= ValidateObject(pGetSciSyncHandleInfo->fence, kVulkanObjectTypeFence, false, "VUID-VkFenceGetSciSyncInfoNV-fence-parameter", kVUIDUndefined);
+        skip |= ValidateObject(pGetSciSyncHandleInfo->fence, kVulkanObjectTypeFence, false, "VUID-VkFenceGetSciSyncInfoNV-fence-parameter", kVUIDUndefined, "VkFenceGetSciSyncInfoNV");
     }
 
     return skip;
 }
 #endif // VK_USE_PLATFORM_SCI
-
 #ifdef VK_USE_PLATFORM_SCI
 
 bool ObjectLifetimes::PreCallValidateGetFenceSciSyncObjNV(
@@ -7476,45 +7477,42 @@ bool ObjectLifetimes::PreCallValidateGetFenceSciSyncObjNV(
     const VkFenceGetSciSyncInfoNV*              pGetSciSyncHandleInfo,
     void*                                       pHandle) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetFenceSciSyncObjNV-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetFenceSciSyncObjNV-device-parameter", kVUIDUndefined, "vkGetFenceSciSyncObjNV");
     if (pGetSciSyncHandleInfo) {
-        skip |= ValidateObject(pGetSciSyncHandleInfo->fence, kVulkanObjectTypeFence, false, "VUID-VkFenceGetSciSyncInfoNV-fence-parameter", kVUIDUndefined);
+        skip |= ValidateObject(pGetSciSyncHandleInfo->fence, kVulkanObjectTypeFence, false, "VUID-VkFenceGetSciSyncInfoNV-fence-parameter", kVUIDUndefined, "VkFenceGetSciSyncInfoNV");
     }
 
     return skip;
 }
 #endif // VK_USE_PLATFORM_SCI
-
 #ifdef VK_USE_PLATFORM_SCI
 
 bool ObjectLifetimes::PreCallValidateImportFenceSciSyncFenceNV(
     VkDevice                                    device,
     const VkImportFenceSciSyncInfoNV*           pImportFenceSciSyncInfo) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkImportFenceSciSyncFenceNV-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkImportFenceSciSyncFenceNV-device-parameter", kVUIDUndefined, "vkImportFenceSciSyncFenceNV");
     if (pImportFenceSciSyncInfo) {
-        skip |= ValidateObject(pImportFenceSciSyncInfo->fence, kVulkanObjectTypeFence, false, "VUID-VkImportFenceSciSyncInfoNV-fence-parameter", kVUIDUndefined);
+        skip |= ValidateObject(pImportFenceSciSyncInfo->fence, kVulkanObjectTypeFence, false, "VUID-VkImportFenceSciSyncInfoNV-fence-parameter", kVUIDUndefined, "VkImportFenceSciSyncInfoNV");
     }
 
     return skip;
 }
 #endif // VK_USE_PLATFORM_SCI
-
 #ifdef VK_USE_PLATFORM_SCI
 
 bool ObjectLifetimes::PreCallValidateImportFenceSciSyncObjNV(
     VkDevice                                    device,
     const VkImportFenceSciSyncInfoNV*           pImportFenceSciSyncInfo) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkImportFenceSciSyncObjNV-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkImportFenceSciSyncObjNV-device-parameter", kVUIDUndefined, "vkImportFenceSciSyncObjNV");
     if (pImportFenceSciSyncInfo) {
-        skip |= ValidateObject(pImportFenceSciSyncInfo->fence, kVulkanObjectTypeFence, false, "VUID-VkImportFenceSciSyncInfoNV-fence-parameter", kVUIDUndefined);
+        skip |= ValidateObject(pImportFenceSciSyncInfo->fence, kVulkanObjectTypeFence, false, "VUID-VkImportFenceSciSyncInfoNV-fence-parameter", kVUIDUndefined, "VkImportFenceSciSyncInfoNV");
     }
 
     return skip;
 }
 #endif // VK_USE_PLATFORM_SCI
-
 #ifdef VK_USE_PLATFORM_SCI
 
 bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceSciSyncAttributesNV(
@@ -7522,12 +7520,11 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceSciSyncAttributesNV(
     const VkSciSyncAttributesInfoNV*            pSciSyncAttributesInfo,
     NvSciSyncAttrList                           pAttributes) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceSciSyncAttributesNV-physicalDevice-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceSciSyncAttributesNV-physicalDevice-parameter", kVUIDUndefined, "vkGetPhysicalDeviceSciSyncAttributesNV");
 
     return skip;
 }
 #endif // VK_USE_PLATFORM_SCI
-
 #ifdef VK_USE_PLATFORM_SCI
 
 bool ObjectLifetimes::PreCallValidateGetSemaphoreSciSyncObjNV(
@@ -7535,30 +7532,28 @@ bool ObjectLifetimes::PreCallValidateGetSemaphoreSciSyncObjNV(
     const VkSemaphoreGetSciSyncInfoNV*          pGetSciSyncInfo,
     void*                                       pHandle) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetSemaphoreSciSyncObjNV-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetSemaphoreSciSyncObjNV-device-parameter", kVUIDUndefined, "vkGetSemaphoreSciSyncObjNV");
     if (pGetSciSyncInfo) {
-        skip |= ValidateObject(pGetSciSyncInfo->semaphore, kVulkanObjectTypeSemaphore, false, "VUID-VkSemaphoreGetSciSyncInfoNV-semaphore-parameter", kVUIDUndefined);
+        skip |= ValidateObject(pGetSciSyncInfo->semaphore, kVulkanObjectTypeSemaphore, false, "VUID-VkSemaphoreGetSciSyncInfoNV-semaphore-parameter", kVUIDUndefined, "VkSemaphoreGetSciSyncInfoNV");
     }
 
     return skip;
 }
 #endif // VK_USE_PLATFORM_SCI
-
 #ifdef VK_USE_PLATFORM_SCI
 
 bool ObjectLifetimes::PreCallValidateImportSemaphoreSciSyncObjNV(
     VkDevice                                    device,
     const VkImportSemaphoreSciSyncInfoNV*       pImportSemaphoreSciSyncInfo) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkImportSemaphoreSciSyncObjNV-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkImportSemaphoreSciSyncObjNV-device-parameter", kVUIDUndefined, "vkImportSemaphoreSciSyncObjNV");
     if (pImportSemaphoreSciSyncInfo) {
-        skip |= ValidateObject(pImportSemaphoreSciSyncInfo->semaphore, kVulkanObjectTypeSemaphore, false, "VUID-VkImportSemaphoreSciSyncInfoNV-semaphore-parameter", kVUIDUndefined);
+        skip |= ValidateObject(pImportSemaphoreSciSyncInfo->semaphore, kVulkanObjectTypeSemaphore, false, "VUID-VkImportSemaphoreSciSyncInfoNV-semaphore-parameter", kVUIDUndefined, "VkImportSemaphoreSciSyncInfoNV");
     }
 
     return skip;
 }
 #endif // VK_USE_PLATFORM_SCI
-
 #ifdef VK_USE_PLATFORM_SCI
 
 bool ObjectLifetimes::PreCallValidateGetMemorySciBufNV(
@@ -7566,15 +7561,14 @@ bool ObjectLifetimes::PreCallValidateGetMemorySciBufNV(
     const VkMemoryGetSciBufInfoNV*              pGetSciBufInfo,
     NvSciBufObj*                                pHandle) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetMemorySciBufNV-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetMemorySciBufNV-device-parameter", kVUIDUndefined, "vkGetMemorySciBufNV");
     if (pGetSciBufInfo) {
-        skip |= ValidateObject(pGetSciBufInfo->memory, kVulkanObjectTypeDeviceMemory, false, "VUID-VkMemoryGetSciBufInfoNV-memory-parameter", kVUIDUndefined);
+        skip |= ValidateObject(pGetSciBufInfo->memory, kVulkanObjectTypeDeviceMemory, false, "VUID-VkMemoryGetSciBufInfoNV-memory-parameter", kVUIDUndefined, "VkMemoryGetSciBufInfoNV");
     }
 
     return skip;
 }
 #endif // VK_USE_PLATFORM_SCI
-
 #ifdef VK_USE_PLATFORM_SCI
 
 bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceExternalMemorySciBufPropertiesNV(
@@ -7583,19 +7577,18 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceExternalMemorySciBufProper
     NvSciBufObj                                 handle,
     VkMemorySciBufPropertiesNV*                 pMemorySciBufProperties) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceExternalMemorySciBufPropertiesNV-physicalDevice-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceExternalMemorySciBufPropertiesNV-physicalDevice-parameter", kVUIDUndefined, "vkGetPhysicalDeviceExternalMemorySciBufPropertiesNV");
 
     return skip;
 }
 #endif // VK_USE_PLATFORM_SCI
-
 #ifdef VK_USE_PLATFORM_SCI
 
 bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceSciBufAttributesNV(
     VkPhysicalDevice                            physicalDevice,
     NvSciBufAttrList                            pAttributes) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceSciBufAttributesNV-physicalDevice-parameter", kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, "VUID-vkGetPhysicalDeviceSciBufAttributesNV-physicalDevice-parameter", kVUIDUndefined, "vkGetPhysicalDeviceSciBufAttributesNV");
 
     return skip;
 }
@@ -7605,7 +7598,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetPatchControlPointsEXT(
     VkCommandBuffer                             commandBuffer,
     uint32_t                                    patchControlPoints) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetPatchControlPointsEXT-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetPatchControlPointsEXT-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetPatchControlPointsEXT");
 
     return skip;
 }
@@ -7614,7 +7607,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetRasterizerDiscardEnableEXT(
     VkCommandBuffer                             commandBuffer,
     VkBool32                                    rasterizerDiscardEnable) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetRasterizerDiscardEnable-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetRasterizerDiscardEnable-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetRasterizerDiscardEnableEXT");
 
     return skip;
 }
@@ -7623,7 +7616,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetDepthBiasEnableEXT(
     VkCommandBuffer                             commandBuffer,
     VkBool32                                    depthBiasEnable) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetDepthBiasEnable-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetDepthBiasEnable-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetDepthBiasEnableEXT");
 
     return skip;
 }
@@ -7632,7 +7625,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetLogicOpEXT(
     VkCommandBuffer                             commandBuffer,
     VkLogicOp                                   logicOp) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetLogicOpEXT-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetLogicOpEXT-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetLogicOpEXT");
 
     return skip;
 }
@@ -7641,11 +7634,10 @@ bool ObjectLifetimes::PreCallValidateCmdSetPrimitiveRestartEnableEXT(
     VkCommandBuffer                             commandBuffer,
     VkBool32                                    primitiveRestartEnable) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetPrimitiveRestartEnable-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetPrimitiveRestartEnable-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetPrimitiveRestartEnableEXT");
 
     return skip;
 }
-
 #ifdef VK_USE_PLATFORM_SCREEN_QNX
 
 bool ObjectLifetimes::PreCallValidateCreateScreenSurfaceQNX(
@@ -7654,7 +7646,7 @@ bool ObjectLifetimes::PreCallValidateCreateScreenSurfaceQNX(
     const VkAllocationCallbacks*                pAllocator,
     VkSurfaceKHR*                               pSurface) const {
     bool skip = false;
-    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(instance, kVulkanObjectTypeInstance, false, kVUIDUndefined, kVUIDUndefined, "vkCreateScreenSurfaceQNX");
 
     return skip;
 }
@@ -7670,7 +7662,6 @@ void ObjectLifetimes::PostCallRecordCreateScreenSurfaceQNX(
 
 }
 #endif // VK_USE_PLATFORM_SCREEN_QNX
-
 #ifdef VK_USE_PLATFORM_SCREEN_QNX
 
 bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceScreenPresentationSupportQNX(
@@ -7678,7 +7669,7 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceScreenPresentationSupportQ
     uint32_t                                    queueFamilyIndex,
     struct _screen_window*                      window) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetPhysicalDeviceScreenPresentationSupportQNX");
 
     return skip;
 }
@@ -7689,7 +7680,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetColorWriteEnableEXT(
     uint32_t                                    attachmentCount,
     const VkBool32*                             pColorWriteEnables) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetColorWriteEnableEXT-commandBuffer-parameter", kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, "VUID-vkCmdSetColorWriteEnableEXT-commandBuffer-parameter", kVUIDUndefined, "vkCmdSetColorWriteEnableEXT");
 
     return skip;
 }
@@ -7702,7 +7693,7 @@ bool ObjectLifetimes::PreCallValidateCmdDrawMultiEXT(
     uint32_t                                    firstInstance,
     uint32_t                                    stride) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdDrawMultiEXT");
 
     return skip;
 }
@@ -7716,7 +7707,7 @@ bool ObjectLifetimes::PreCallValidateCmdDrawMultiIndexedEXT(
     uint32_t                                    stride,
     const int32_t*                              pVertexOffset) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdDrawMultiIndexedEXT");
 
     return skip;
 }
@@ -7727,9 +7718,9 @@ bool ObjectLifetimes::PreCallValidateCreateMicromapEXT(
     const VkAllocationCallbacks*                pAllocator,
     VkMicromapEXT*                              pMicromap) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkCreateMicromapEXT");
     if (pCreateInfo) {
-        skip |= ValidateObject(pCreateInfo->buffer, kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pCreateInfo->buffer, kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined, "VkMicromapCreateInfoEXT");
     }
 
     return skip;
@@ -7751,8 +7742,8 @@ bool ObjectLifetimes::PreCallValidateDestroyMicromapEXT(
     VkMicromapEXT                               micromap,
     const VkAllocationCallbacks*                pAllocator) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(micromap, kVulkanObjectTypeMicromapEXT, true, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkDestroyMicromapEXT");
+    skip |= ValidateObject(micromap, kVulkanObjectTypeMicromapEXT, true, kVUIDUndefined, kVUIDUndefined, "vkDestroyMicromapEXT");
     skip |= ValidateDestroyObject(micromap, kVulkanObjectTypeMicromapEXT, pAllocator, kVUIDUndefined, kVUIDUndefined);
 
     return skip;
@@ -7771,10 +7762,10 @@ bool ObjectLifetimes::PreCallValidateCmdBuildMicromapsEXT(
     uint32_t                                    infoCount,
     const VkMicromapBuildInfoEXT*               pInfos) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdBuildMicromapsEXT");
     if (pInfos) {
         for (uint32_t index0 = 0; index0 < infoCount; ++index0) {
-            skip |= ValidateObject(pInfos[index0].dstMicromap, kVulkanObjectTypeMicromapEXT, true, kVUIDUndefined, kVUIDUndefined);
+            skip |= ValidateObject(pInfos[index0].dstMicromap, kVulkanObjectTypeMicromapEXT, true, kVUIDUndefined, "VUID-VkMicromapBuildInfoEXT-commonparent", "VkMicromapBuildInfoEXT");
         }
     }
 
@@ -7787,11 +7778,11 @@ bool ObjectLifetimes::PreCallValidateBuildMicromapsEXT(
     uint32_t                                    infoCount,
     const VkMicromapBuildInfoEXT*               pInfos) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(deferredOperation, kVulkanObjectTypeDeferredOperationKHR, true, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkBuildMicromapsEXT");
+    skip |= ValidateObject(deferredOperation, kVulkanObjectTypeDeferredOperationKHR, true, kVUIDUndefined, kVUIDUndefined, "vkBuildMicromapsEXT");
     if (pInfos) {
         for (uint32_t index0 = 0; index0 < infoCount; ++index0) {
-            skip |= ValidateObject(pInfos[index0].dstMicromap, kVulkanObjectTypeMicromapEXT, true, kVUIDUndefined, kVUIDUndefined);
+            skip |= ValidateObject(pInfos[index0].dstMicromap, kVulkanObjectTypeMicromapEXT, true, kVUIDUndefined, "VUID-VkMicromapBuildInfoEXT-commonparent", "VkMicromapBuildInfoEXT");
         }
     }
 
@@ -7803,11 +7794,11 @@ bool ObjectLifetimes::PreCallValidateCopyMicromapEXT(
     VkDeferredOperationKHR                      deferredOperation,
     const VkCopyMicromapInfoEXT*                pInfo) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(deferredOperation, kVulkanObjectTypeDeferredOperationKHR, true, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkCopyMicromapEXT");
+    skip |= ValidateObject(deferredOperation, kVulkanObjectTypeDeferredOperationKHR, true, kVUIDUndefined, kVUIDUndefined, "vkCopyMicromapEXT");
     if (pInfo) {
-        skip |= ValidateObject(pInfo->src, kVulkanObjectTypeMicromapEXT, false, kVUIDUndefined, kVUIDUndefined);
-        skip |= ValidateObject(pInfo->dst, kVulkanObjectTypeMicromapEXT, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pInfo->src, kVulkanObjectTypeMicromapEXT, false, kVUIDUndefined, kVUIDUndefined, "VkCopyMicromapInfoEXT");
+        skip |= ValidateObject(pInfo->dst, kVulkanObjectTypeMicromapEXT, false, kVUIDUndefined, kVUIDUndefined, "VkCopyMicromapInfoEXT");
     }
 
     return skip;
@@ -7818,10 +7809,10 @@ bool ObjectLifetimes::PreCallValidateCopyMicromapToMemoryEXT(
     VkDeferredOperationKHR                      deferredOperation,
     const VkCopyMicromapToMemoryInfoEXT*        pInfo) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(deferredOperation, kVulkanObjectTypeDeferredOperationKHR, true, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkCopyMicromapToMemoryEXT");
+    skip |= ValidateObject(deferredOperation, kVulkanObjectTypeDeferredOperationKHR, true, kVUIDUndefined, kVUIDUndefined, "vkCopyMicromapToMemoryEXT");
     if (pInfo) {
-        skip |= ValidateObject(pInfo->src, kVulkanObjectTypeMicromapEXT, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pInfo->src, kVulkanObjectTypeMicromapEXT, false, kVUIDUndefined, kVUIDUndefined, "VkCopyMicromapToMemoryInfoEXT");
     }
 
     return skip;
@@ -7832,10 +7823,10 @@ bool ObjectLifetimes::PreCallValidateCopyMemoryToMicromapEXT(
     VkDeferredOperationKHR                      deferredOperation,
     const VkCopyMemoryToMicromapInfoEXT*        pInfo) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(deferredOperation, kVulkanObjectTypeDeferredOperationKHR, true, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkCopyMemoryToMicromapEXT");
+    skip |= ValidateObject(deferredOperation, kVulkanObjectTypeDeferredOperationKHR, true, kVUIDUndefined, kVUIDUndefined, "vkCopyMemoryToMicromapEXT");
     if (pInfo) {
-        skip |= ValidateObject(pInfo->dst, kVulkanObjectTypeMicromapEXT, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pInfo->dst, kVulkanObjectTypeMicromapEXT, false, kVUIDUndefined, kVUIDUndefined, "VkCopyMemoryToMicromapInfoEXT");
     }
 
     return skip;
@@ -7850,10 +7841,10 @@ bool ObjectLifetimes::PreCallValidateWriteMicromapsPropertiesEXT(
     void*                                       pData,
     size_t                                      stride) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkWriteMicromapsPropertiesEXT");
     if ((micromapCount > 0) && (pMicromaps)) {
         for (uint32_t index0 = 0; index0 < micromapCount; ++index0) {
-            skip |= ValidateObject(pMicromaps[index0], kVulkanObjectTypeMicromapEXT, false, kVUIDUndefined, kVUIDUndefined);
+            skip |= ValidateObject(pMicromaps[index0], kVulkanObjectTypeMicromapEXT, false, kVUIDUndefined, kVUIDUndefined, "vkWriteMicromapsPropertiesEXT");
         }
     }
 
@@ -7864,10 +7855,10 @@ bool ObjectLifetimes::PreCallValidateCmdCopyMicromapEXT(
     VkCommandBuffer                             commandBuffer,
     const VkCopyMicromapInfoEXT*                pInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdCopyMicromapEXT");
     if (pInfo) {
-        skip |= ValidateObject(pInfo->src, kVulkanObjectTypeMicromapEXT, false, kVUIDUndefined, kVUIDUndefined);
-        skip |= ValidateObject(pInfo->dst, kVulkanObjectTypeMicromapEXT, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pInfo->src, kVulkanObjectTypeMicromapEXT, false, kVUIDUndefined, kVUIDUndefined, "VkCopyMicromapInfoEXT");
+        skip |= ValidateObject(pInfo->dst, kVulkanObjectTypeMicromapEXT, false, kVUIDUndefined, kVUIDUndefined, "VkCopyMicromapInfoEXT");
     }
 
     return skip;
@@ -7877,9 +7868,9 @@ bool ObjectLifetimes::PreCallValidateCmdCopyMicromapToMemoryEXT(
     VkCommandBuffer                             commandBuffer,
     const VkCopyMicromapToMemoryInfoEXT*        pInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdCopyMicromapToMemoryEXT");
     if (pInfo) {
-        skip |= ValidateObject(pInfo->src, kVulkanObjectTypeMicromapEXT, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pInfo->src, kVulkanObjectTypeMicromapEXT, false, kVUIDUndefined, kVUIDUndefined, "VkCopyMicromapToMemoryInfoEXT");
     }
 
     return skip;
@@ -7889,9 +7880,9 @@ bool ObjectLifetimes::PreCallValidateCmdCopyMemoryToMicromapEXT(
     VkCommandBuffer                             commandBuffer,
     const VkCopyMemoryToMicromapInfoEXT*        pInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdCopyMemoryToMicromapEXT");
     if (pInfo) {
-        skip |= ValidateObject(pInfo->dst, kVulkanObjectTypeMicromapEXT, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pInfo->dst, kVulkanObjectTypeMicromapEXT, false, kVUIDUndefined, kVUIDUndefined, "VkCopyMemoryToMicromapInfoEXT");
     }
 
     return skip;
@@ -7905,13 +7896,13 @@ bool ObjectLifetimes::PreCallValidateCmdWriteMicromapsPropertiesEXT(
     VkQueryPool                                 queryPool,
     uint32_t                                    firstQuery) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdWriteMicromapsPropertiesEXT");
     if ((micromapCount > 0) && (pMicromaps)) {
         for (uint32_t index0 = 0; index0 < micromapCount; ++index0) {
-            skip |= ValidateObject(pMicromaps[index0], kVulkanObjectTypeMicromapEXT, false, kVUIDUndefined, kVUIDUndefined);
+            skip |= ValidateObject(pMicromaps[index0], kVulkanObjectTypeMicromapEXT, false, kVUIDUndefined, kVUIDUndefined, "vkCmdWriteMicromapsPropertiesEXT");
         }
     }
-    skip |= ValidateObject(queryPool, kVulkanObjectTypeQueryPool, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(queryPool, kVulkanObjectTypeQueryPool, false, kVUIDUndefined, kVUIDUndefined, "vkCmdWriteMicromapsPropertiesEXT");
 
     return skip;
 }
@@ -7921,7 +7912,7 @@ bool ObjectLifetimes::PreCallValidateGetDeviceMicromapCompatibilityEXT(
     const VkMicromapVersionInfoEXT*             pVersionInfo,
     VkAccelerationStructureCompatibilityKHR*    pCompatibility) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetDeviceMicromapCompatibilityEXT");
 
     return skip;
 }
@@ -7932,9 +7923,9 @@ bool ObjectLifetimes::PreCallValidateGetMicromapBuildSizesEXT(
     const VkMicromapBuildInfoEXT*               pBuildInfo,
     VkMicromapBuildSizesInfoEXT*                pSizeInfo) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetMicromapBuildSizesEXT");
     if (pBuildInfo) {
-        skip |= ValidateObject(pBuildInfo->dstMicromap, kVulkanObjectTypeMicromapEXT, true, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pBuildInfo->dstMicromap, kVulkanObjectTypeMicromapEXT, true, kVUIDUndefined, "VUID-VkMicromapBuildInfoEXT-commonparent", "VkMicromapBuildInfoEXT");
     }
 
     return skip;
@@ -7946,7 +7937,7 @@ bool ObjectLifetimes::PreCallValidateCmdDrawClusterHUAWEI(
     uint32_t                                    groupCountY,
     uint32_t                                    groupCountZ) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdDrawClusterHUAWEI");
 
     return skip;
 }
@@ -7956,8 +7947,8 @@ bool ObjectLifetimes::PreCallValidateCmdDrawClusterIndirectHUAWEI(
     VkBuffer                                    buffer,
     VkDeviceSize                                offset) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdDrawClusterIndirectHUAWEI");
+    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdDrawClusterIndirectHUAWEI");
 
     return skip;
 }
@@ -7967,8 +7958,8 @@ bool ObjectLifetimes::PreCallValidateSetDeviceMemoryPriorityEXT(
     VkDeviceMemory                              memory,
     float                                       priority) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(memory, kVulkanObjectTypeDeviceMemory, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkSetDeviceMemoryPriorityEXT");
+    skip |= ValidateObject(memory, kVulkanObjectTypeDeviceMemory, false, kVUIDUndefined, kVUIDUndefined, "vkSetDeviceMemoryPriorityEXT");
 
     return skip;
 }
@@ -7978,9 +7969,9 @@ bool ObjectLifetimes::PreCallValidateGetDescriptorSetLayoutHostMappingInfoVALVE(
     const VkDescriptorSetBindingReferenceVALVE* pBindingReference,
     VkDescriptorSetLayoutHostMappingInfoVALVE*  pHostMapping) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetDescriptorSetLayoutHostMappingInfoVALVE");
     if (pBindingReference) {
-        skip |= ValidateObject(pBindingReference->descriptorSetLayout, kVulkanObjectTypeDescriptorSetLayout, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pBindingReference->descriptorSetLayout, kVulkanObjectTypeDescriptorSetLayout, false, kVUIDUndefined, kVUIDUndefined, "VkDescriptorSetBindingReferenceVALVE");
     }
 
     return skip;
@@ -7991,8 +7982,8 @@ bool ObjectLifetimes::PreCallValidateGetDescriptorSetHostMappingVALVE(
     VkDescriptorSet                             descriptorSet,
     void**                                      ppData) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(descriptorSet, kVulkanObjectTypeDescriptorSet, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetDescriptorSetHostMappingVALVE");
+    skip |= ValidateObject(descriptorSet, kVulkanObjectTypeDescriptorSet, false, kVUIDUndefined, kVUIDUndefined, "vkGetDescriptorSetHostMappingVALVE");
 
     return skip;
 }
@@ -8003,7 +7994,7 @@ bool ObjectLifetimes::PreCallValidateCmdCopyMemoryIndirectNV(
     uint32_t                                    copyCount,
     uint32_t                                    stride) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdCopyMemoryIndirectNV");
 
     return skip;
 }
@@ -8017,8 +8008,8 @@ bool ObjectLifetimes::PreCallValidateCmdCopyMemoryToImageIndirectNV(
     VkImageLayout                               dstImageLayout,
     const VkImageSubresourceLayers*             pImageSubresources) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(dstImage, kVulkanObjectTypeImage, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdCopyMemoryToImageIndirectNV");
+    skip |= ValidateObject(dstImage, kVulkanObjectTypeImage, false, kVUIDUndefined, kVUIDUndefined, "vkCmdCopyMemoryToImageIndirectNV");
 
     return skip;
 }
@@ -8028,7 +8019,7 @@ bool ObjectLifetimes::PreCallValidateCmdDecompressMemoryNV(
     uint32_t                                    decompressRegionCount,
     const VkDecompressMemoryRegionNV*           pDecompressMemoryRegions) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdDecompressMemoryNV");
 
     return skip;
 }
@@ -8039,7 +8030,7 @@ bool ObjectLifetimes::PreCallValidateCmdDecompressMemoryIndirectCountNV(
     VkDeviceAddress                             indirectCommandsCountAddress,
     uint32_t                                    stride) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdDecompressMemoryIndirectCountNV");
 
     return skip;
 }
@@ -8048,7 +8039,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetTessellationDomainOriginEXT(
     VkCommandBuffer                             commandBuffer,
     VkTessellationDomainOrigin                  domainOrigin) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetTessellationDomainOriginEXT");
 
     return skip;
 }
@@ -8057,7 +8048,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetDepthClampEnableEXT(
     VkCommandBuffer                             commandBuffer,
     VkBool32                                    depthClampEnable) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetDepthClampEnableEXT");
 
     return skip;
 }
@@ -8066,7 +8057,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetPolygonModeEXT(
     VkCommandBuffer                             commandBuffer,
     VkPolygonMode                               polygonMode) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetPolygonModeEXT");
 
     return skip;
 }
@@ -8075,7 +8066,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetRasterizationSamplesEXT(
     VkCommandBuffer                             commandBuffer,
     VkSampleCountFlagBits                       rasterizationSamples) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetRasterizationSamplesEXT");
 
     return skip;
 }
@@ -8085,7 +8076,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetSampleMaskEXT(
     VkSampleCountFlagBits                       samples,
     const VkSampleMask*                         pSampleMask) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetSampleMaskEXT");
 
     return skip;
 }
@@ -8094,7 +8085,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetAlphaToCoverageEnableEXT(
     VkCommandBuffer                             commandBuffer,
     VkBool32                                    alphaToCoverageEnable) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetAlphaToCoverageEnableEXT");
 
     return skip;
 }
@@ -8103,7 +8094,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetAlphaToOneEnableEXT(
     VkCommandBuffer                             commandBuffer,
     VkBool32                                    alphaToOneEnable) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetAlphaToOneEnableEXT");
 
     return skip;
 }
@@ -8112,7 +8103,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetLogicOpEnableEXT(
     VkCommandBuffer                             commandBuffer,
     VkBool32                                    logicOpEnable) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetLogicOpEnableEXT");
 
     return skip;
 }
@@ -8123,7 +8114,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetColorBlendEnableEXT(
     uint32_t                                    attachmentCount,
     const VkBool32*                             pColorBlendEnables) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetColorBlendEnableEXT");
 
     return skip;
 }
@@ -8134,7 +8125,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetColorBlendEquationEXT(
     uint32_t                                    attachmentCount,
     const VkColorBlendEquationEXT*              pColorBlendEquations) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetColorBlendEquationEXT");
 
     return skip;
 }
@@ -8145,7 +8136,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetColorWriteMaskEXT(
     uint32_t                                    attachmentCount,
     const VkColorComponentFlags*                pColorWriteMasks) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetColorWriteMaskEXT");
 
     return skip;
 }
@@ -8154,7 +8145,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetRasterizationStreamEXT(
     VkCommandBuffer                             commandBuffer,
     uint32_t                                    rasterizationStream) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetRasterizationStreamEXT");
 
     return skip;
 }
@@ -8163,7 +8154,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetConservativeRasterizationModeEXT(
     VkCommandBuffer                             commandBuffer,
     VkConservativeRasterizationModeEXT          conservativeRasterizationMode) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetConservativeRasterizationModeEXT");
 
     return skip;
 }
@@ -8172,7 +8163,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetExtraPrimitiveOverestimationSizeEXT(
     VkCommandBuffer                             commandBuffer,
     float                                       extraPrimitiveOverestimationSize) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetExtraPrimitiveOverestimationSizeEXT");
 
     return skip;
 }
@@ -8181,7 +8172,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetDepthClipEnableEXT(
     VkCommandBuffer                             commandBuffer,
     VkBool32                                    depthClipEnable) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetDepthClipEnableEXT");
 
     return skip;
 }
@@ -8190,7 +8181,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetSampleLocationsEnableEXT(
     VkCommandBuffer                             commandBuffer,
     VkBool32                                    sampleLocationsEnable) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetSampleLocationsEnableEXT");
 
     return skip;
 }
@@ -8201,7 +8192,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetColorBlendAdvancedEXT(
     uint32_t                                    attachmentCount,
     const VkColorBlendAdvancedEXT*              pColorBlendAdvanced) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetColorBlendAdvancedEXT");
 
     return skip;
 }
@@ -8210,7 +8201,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetProvokingVertexModeEXT(
     VkCommandBuffer                             commandBuffer,
     VkProvokingVertexModeEXT                    provokingVertexMode) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetProvokingVertexModeEXT");
 
     return skip;
 }
@@ -8219,7 +8210,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetLineRasterizationModeEXT(
     VkCommandBuffer                             commandBuffer,
     VkLineRasterizationModeEXT                  lineRasterizationMode) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetLineRasterizationModeEXT");
 
     return skip;
 }
@@ -8228,7 +8219,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetLineStippleEnableEXT(
     VkCommandBuffer                             commandBuffer,
     VkBool32                                    stippledLineEnable) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetLineStippleEnableEXT");
 
     return skip;
 }
@@ -8237,7 +8228,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetDepthClipNegativeOneToOneEXT(
     VkCommandBuffer                             commandBuffer,
     VkBool32                                    negativeOneToOne) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetDepthClipNegativeOneToOneEXT");
 
     return skip;
 }
@@ -8246,7 +8237,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetViewportWScalingEnableNV(
     VkCommandBuffer                             commandBuffer,
     VkBool32                                    viewportWScalingEnable) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetViewportWScalingEnableNV");
 
     return skip;
 }
@@ -8257,7 +8248,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetViewportSwizzleNV(
     uint32_t                                    viewportCount,
     const VkViewportSwizzleNV*                  pViewportSwizzles) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetViewportSwizzleNV");
 
     return skip;
 }
@@ -8266,7 +8257,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetCoverageToColorEnableNV(
     VkCommandBuffer                             commandBuffer,
     VkBool32                                    coverageToColorEnable) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetCoverageToColorEnableNV");
 
     return skip;
 }
@@ -8275,7 +8266,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetCoverageToColorLocationNV(
     VkCommandBuffer                             commandBuffer,
     uint32_t                                    coverageToColorLocation) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetCoverageToColorLocationNV");
 
     return skip;
 }
@@ -8284,7 +8275,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetCoverageModulationModeNV(
     VkCommandBuffer                             commandBuffer,
     VkCoverageModulationModeNV                  coverageModulationMode) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetCoverageModulationModeNV");
 
     return skip;
 }
@@ -8293,7 +8284,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetCoverageModulationTableEnableNV(
     VkCommandBuffer                             commandBuffer,
     VkBool32                                    coverageModulationTableEnable) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetCoverageModulationTableEnableNV");
 
     return skip;
 }
@@ -8303,7 +8294,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetCoverageModulationTableNV(
     uint32_t                                    coverageModulationTableCount,
     const float*                                pCoverageModulationTable) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetCoverageModulationTableNV");
 
     return skip;
 }
@@ -8312,7 +8303,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetShadingRateImageEnableNV(
     VkCommandBuffer                             commandBuffer,
     VkBool32                                    shadingRateImageEnable) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetShadingRateImageEnableNV");
 
     return skip;
 }
@@ -8321,7 +8312,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetRepresentativeFragmentTestEnableNV(
     VkCommandBuffer                             commandBuffer,
     VkBool32                                    representativeFragmentTestEnable) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetRepresentativeFragmentTestEnableNV");
 
     return skip;
 }
@@ -8330,7 +8321,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetCoverageReductionModeNV(
     VkCommandBuffer                             commandBuffer,
     VkCoverageReductionModeNV                   coverageReductionMode) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetCoverageReductionModeNV");
 
     return skip;
 }
@@ -8340,8 +8331,8 @@ bool ObjectLifetimes::PreCallValidateGetShaderModuleIdentifierEXT(
     VkShaderModule                              shaderModule,
     VkShaderModuleIdentifierEXT*                pIdentifier) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(shaderModule, kVulkanObjectTypeShaderModule, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetShaderModuleIdentifierEXT");
+    skip |= ValidateObject(shaderModule, kVulkanObjectTypeShaderModule, false, kVUIDUndefined, kVUIDUndefined, "vkGetShaderModuleIdentifierEXT");
 
     return skip;
 }
@@ -8351,7 +8342,7 @@ bool ObjectLifetimes::PreCallValidateGetShaderModuleCreateInfoIdentifierEXT(
     const VkShaderModuleCreateInfo*             pCreateInfo,
     VkShaderModuleIdentifierEXT*                pIdentifier) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetShaderModuleCreateInfoIdentifierEXT");
 
     return skip;
 }
@@ -8362,7 +8353,7 @@ bool ObjectLifetimes::PreCallValidateGetPhysicalDeviceOpticalFlowImageFormatsNV(
     uint32_t*                                   pFormatCount,
     VkOpticalFlowImageFormatPropertiesNV*       pImageFormatProperties) const {
     bool skip = false;
-    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(physicalDevice, kVulkanObjectTypePhysicalDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetPhysicalDeviceOpticalFlowImageFormatsNV");
 
     return skip;
 }
@@ -8373,7 +8364,7 @@ bool ObjectLifetimes::PreCallValidateCreateOpticalFlowSessionNV(
     const VkAllocationCallbacks*                pAllocator,
     VkOpticalFlowSessionNV*                     pSession) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkCreateOpticalFlowSessionNV");
 
     return skip;
 }
@@ -8394,8 +8385,8 @@ bool ObjectLifetimes::PreCallValidateDestroyOpticalFlowSessionNV(
     VkOpticalFlowSessionNV                      session,
     const VkAllocationCallbacks*                pAllocator) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(session, kVulkanObjectTypeOpticalFlowSessionNV, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkDestroyOpticalFlowSessionNV");
+    skip |= ValidateObject(session, kVulkanObjectTypeOpticalFlowSessionNV, false, kVUIDUndefined, kVUIDUndefined, "vkDestroyOpticalFlowSessionNV");
     skip |= ValidateDestroyObject(session, kVulkanObjectTypeOpticalFlowSessionNV, pAllocator, kVUIDUndefined, kVUIDUndefined);
 
     return skip;
@@ -8416,9 +8407,9 @@ bool ObjectLifetimes::PreCallValidateBindOpticalFlowSessionImageNV(
     VkImageView                                 view,
     VkImageLayout                               layout) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(session, kVulkanObjectTypeOpticalFlowSessionNV, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(view, kVulkanObjectTypeImageView, true, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkBindOpticalFlowSessionImageNV");
+    skip |= ValidateObject(session, kVulkanObjectTypeOpticalFlowSessionNV, false, kVUIDUndefined, kVUIDUndefined, "vkBindOpticalFlowSessionImageNV");
+    skip |= ValidateObject(view, kVulkanObjectTypeImageView, true, kVUIDUndefined, kVUIDUndefined, "vkBindOpticalFlowSessionImageNV");
 
     return skip;
 }
@@ -8428,8 +8419,93 @@ bool ObjectLifetimes::PreCallValidateCmdOpticalFlowExecuteNV(
     VkOpticalFlowSessionNV                      session,
     const VkOpticalFlowExecuteInfoNV*           pExecuteInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(session, kVulkanObjectTypeOpticalFlowSessionNV, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdOpticalFlowExecuteNV");
+    skip |= ValidateObject(session, kVulkanObjectTypeOpticalFlowSessionNV, false, kVUIDUndefined, kVUIDUndefined, "vkCmdOpticalFlowExecuteNV");
+
+    return skip;
+}
+
+bool ObjectLifetimes::PreCallValidateCreateShadersEXT(
+    VkDevice                                    device,
+    uint32_t                                    createInfoCount,
+    const VkShaderCreateInfoEXT*                pCreateInfos,
+    const VkAllocationCallbacks*                pAllocator,
+    VkShaderEXT*                                pShaders) const {
+    bool skip = false;
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkCreateShadersEXT");
+    if (pCreateInfos) {
+        for (uint32_t index0 = 0; index0 < createInfoCount; ++index0) {
+            if ((pCreateInfos[index0].setLayoutCount > 0) && (pCreateInfos[index0].pSetLayouts)) {
+                for (uint32_t index1 = 0; index1 < pCreateInfos[index0].setLayoutCount; ++index1) {
+                    skip |= ValidateObject(pCreateInfos[index0].pSetLayouts[index1], kVulkanObjectTypeDescriptorSetLayout, false, kVUIDUndefined, kVUIDUndefined, "VkShaderCreateInfoEXT");
+                }
+            }
+        }
+    }
+
+    return skip;
+}
+
+void ObjectLifetimes::PostCallRecordCreateShadersEXT(
+    VkDevice                                    device,
+    uint32_t                                    createInfoCount,
+    const VkShaderCreateInfoEXT*                pCreateInfos,
+    const VkAllocationCallbacks*                pAllocator,
+    VkShaderEXT*                                pShaders,
+    VkResult                                    result) {
+    if (result != VK_SUCCESS) return;
+    if (pShaders) {
+        for (uint32_t index = 0; index < createInfoCount; index++) {
+            CreateObject(pShaders[index], kVulkanObjectTypeShaderEXT, pAllocator);
+        }
+    }
+
+}
+
+bool ObjectLifetimes::PreCallValidateDestroyShaderEXT(
+    VkDevice                                    device,
+    VkShaderEXT                                 shader,
+    const VkAllocationCallbacks*                pAllocator) const {
+    bool skip = false;
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkDestroyShaderEXT");
+    skip |= ValidateObject(shader, kVulkanObjectTypeShaderEXT, false, kVUIDUndefined, kVUIDUndefined, "vkDestroyShaderEXT");
+    skip |= ValidateDestroyObject(shader, kVulkanObjectTypeShaderEXT, pAllocator, kVUIDUndefined, kVUIDUndefined);
+
+    return skip;
+}
+
+void ObjectLifetimes::PreCallRecordDestroyShaderEXT(
+    VkDevice                                    device,
+    VkShaderEXT                                 shader,
+    const VkAllocationCallbacks*                pAllocator) {
+    RecordDestroyObject(shader, kVulkanObjectTypeShaderEXT);
+
+}
+
+bool ObjectLifetimes::PreCallValidateGetShaderBinaryDataEXT(
+    VkDevice                                    device,
+    VkShaderEXT                                 shader,
+    size_t*                                     pDataSize,
+    void*                                       pData) const {
+    bool skip = false;
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetShaderBinaryDataEXT");
+    skip |= ValidateObject(shader, kVulkanObjectTypeShaderEXT, false, kVUIDUndefined, kVUIDUndefined, "vkGetShaderBinaryDataEXT");
+
+    return skip;
+}
+
+bool ObjectLifetimes::PreCallValidateCmdBindShadersEXT(
+    VkCommandBuffer                             commandBuffer,
+    uint32_t                                    stageCount,
+    const VkShaderStageFlagBits*                pStages,
+    const VkShaderEXT*                          pShaders) const {
+    bool skip = false;
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdBindShadersEXT");
+    if ((stageCount > 0) && (pShaders)) {
+        for (uint32_t index0 = 0; index0 < stageCount; ++index0) {
+            skip |= ValidateObject(pShaders[index0], kVulkanObjectTypeShaderEXT, true, kVUIDUndefined, kVUIDUndefined, "vkCmdBindShadersEXT");
+        }
+    }
 
     return skip;
 }
@@ -8440,8 +8516,8 @@ bool ObjectLifetimes::PreCallValidateGetFramebufferTilePropertiesQCOM(
     uint32_t*                                   pPropertiesCount,
     VkTilePropertiesQCOM*                       pProperties) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(framebuffer, kVulkanObjectTypeFramebuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetFramebufferTilePropertiesQCOM");
+    skip |= ValidateObject(framebuffer, kVulkanObjectTypeFramebuffer, false, kVUIDUndefined, kVUIDUndefined, "vkGetFramebufferTilePropertiesQCOM");
 
     return skip;
 }
@@ -8451,27 +8527,26 @@ bool ObjectLifetimes::PreCallValidateGetDynamicRenderingTilePropertiesQCOM(
     const VkRenderingInfo*                      pRenderingInfo,
     VkTilePropertiesQCOM*                       pProperties) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetDynamicRenderingTilePropertiesQCOM");
     if (pRenderingInfo) {
         if (pRenderingInfo->pColorAttachments) {
             for (uint32_t index1 = 0; index1 < pRenderingInfo->colorAttachmentCount; ++index1) {
-                skip |= ValidateObject(pRenderingInfo->pColorAttachments[index1].imageView, kVulkanObjectTypeImageView, true, kVUIDUndefined, kVUIDUndefined);
-                skip |= ValidateObject(pRenderingInfo->pColorAttachments[index1].resolveImageView, kVulkanObjectTypeImageView, true, kVUIDUndefined, kVUIDUndefined);
+                skip |= ValidateObject(pRenderingInfo->pColorAttachments[index1].imageView, kVulkanObjectTypeImageView, true, kVUIDUndefined, kVUIDUndefined, "VkRenderingAttachmentInfo");
+                skip |= ValidateObject(pRenderingInfo->pColorAttachments[index1].resolveImageView, kVulkanObjectTypeImageView, true, kVUIDUndefined, kVUIDUndefined, "VkRenderingAttachmentInfo");
             }
         }
         if (pRenderingInfo->pDepthAttachment) {
-            skip |= ValidateObject(pRenderingInfo->pDepthAttachment->imageView, kVulkanObjectTypeImageView, true, kVUIDUndefined, kVUIDUndefined);
-            skip |= ValidateObject(pRenderingInfo->pDepthAttachment->resolveImageView, kVulkanObjectTypeImageView, true, kVUIDUndefined, kVUIDUndefined);
+            skip |= ValidateObject(pRenderingInfo->pDepthAttachment->imageView, kVulkanObjectTypeImageView, true, kVUIDUndefined, kVUIDUndefined, "VkRenderingAttachmentInfo");
+            skip |= ValidateObject(pRenderingInfo->pDepthAttachment->resolveImageView, kVulkanObjectTypeImageView, true, kVUIDUndefined, kVUIDUndefined, "VkRenderingAttachmentInfo");
         }
         if (pRenderingInfo->pStencilAttachment) {
-            skip |= ValidateObject(pRenderingInfo->pStencilAttachment->imageView, kVulkanObjectTypeImageView, true, kVUIDUndefined, kVUIDUndefined);
-            skip |= ValidateObject(pRenderingInfo->pStencilAttachment->resolveImageView, kVulkanObjectTypeImageView, true, kVUIDUndefined, kVUIDUndefined);
+            skip |= ValidateObject(pRenderingInfo->pStencilAttachment->imageView, kVulkanObjectTypeImageView, true, kVUIDUndefined, kVUIDUndefined, "VkRenderingAttachmentInfo");
+            skip |= ValidateObject(pRenderingInfo->pStencilAttachment->resolveImageView, kVulkanObjectTypeImageView, true, kVUIDUndefined, kVUIDUndefined, "VkRenderingAttachmentInfo");
         }
     }
 
     return skip;
 }
-
 #ifdef VK_USE_PLATFORM_SCI
 
 bool ObjectLifetimes::PreCallValidateCreateSemaphoreSciSyncPoolNV(
@@ -8480,7 +8555,7 @@ bool ObjectLifetimes::PreCallValidateCreateSemaphoreSciSyncPoolNV(
     const VkAllocationCallbacks*                pAllocator,
     VkSemaphoreSciSyncPoolNV*                   pSemaphorePool) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreateSemaphoreSciSyncPoolNV-device-parameter", kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkCreateSemaphoreSciSyncPoolNV-device-parameter", kVUIDUndefined, "vkCreateSemaphoreSciSyncPoolNV");
 
     return skip;
 }
@@ -8496,7 +8571,6 @@ void ObjectLifetimes::PostCallRecordCreateSemaphoreSciSyncPoolNV(
 
 }
 #endif // VK_USE_PLATFORM_SCI
-
 #ifdef VK_USE_PLATFORM_SCI
 
 bool ObjectLifetimes::PreCallValidateDestroySemaphoreSciSyncPoolNV(
@@ -8504,8 +8578,8 @@ bool ObjectLifetimes::PreCallValidateDestroySemaphoreSciSyncPoolNV(
     VkSemaphoreSciSyncPoolNV                    semaphorePool,
     const VkAllocationCallbacks*                pAllocator) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(semaphorePool, kVulkanObjectTypeSemaphoreSciSyncPoolNV, true, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkDestroySemaphoreSciSyncPoolNV");
+    skip |= ValidateObject(semaphorePool, kVulkanObjectTypeSemaphoreSciSyncPoolNV, true, kVUIDUndefined, kVUIDUndefined, "vkDestroySemaphoreSciSyncPoolNV");
     skip |= ValidateDestroyObject(semaphorePool, kVulkanObjectTypeSemaphoreSciSyncPoolNV, pAllocator, kVUIDUndefined, kVUIDUndefined);
 
     return skip;
@@ -8520,15 +8594,36 @@ void ObjectLifetimes::PreCallRecordDestroySemaphoreSciSyncPoolNV(
 }
 #endif // VK_USE_PLATFORM_SCI
 
+bool ObjectLifetimes::PreCallValidateCmdSetAttachmentFeedbackLoopEnableEXT(
+    VkCommandBuffer                             commandBuffer,
+    VkImageAspectFlags                          aspectMask) const {
+    bool skip = false;
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetAttachmentFeedbackLoopEnableEXT");
+
+    return skip;
+}
+#ifdef VK_USE_PLATFORM_SCREEN_QNX
+
+bool ObjectLifetimes::PreCallValidateGetScreenBufferPropertiesQNX(
+    VkDevice                                    device,
+    const struct _screen_buffer*                buffer,
+    VkScreenBufferPropertiesQNX*                pProperties) const {
+    bool skip = false;
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, "VUID-vkGetScreenBufferPropertiesQNX-device-parameter", kVUIDUndefined, "vkGetScreenBufferPropertiesQNX");
+
+    return skip;
+}
+#endif // VK_USE_PLATFORM_SCREEN_QNX
+
 bool ObjectLifetimes::PreCallValidateCreateAccelerationStructureKHR(
     VkDevice                                    device,
     const VkAccelerationStructureCreateInfoKHR* pCreateInfo,
     const VkAllocationCallbacks*                pAllocator,
     VkAccelerationStructureKHR*                 pAccelerationStructure) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkCreateAccelerationStructureKHR");
     if (pCreateInfo) {
-        skip |= ValidateObject(pCreateInfo->buffer, kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pCreateInfo->buffer, kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined, "VkAccelerationStructureCreateInfoKHR");
     }
 
     return skip;
@@ -8550,8 +8645,8 @@ bool ObjectLifetimes::PreCallValidateDestroyAccelerationStructureKHR(
     VkAccelerationStructureKHR                  accelerationStructure,
     const VkAllocationCallbacks*                pAllocator) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(accelerationStructure, kVulkanObjectTypeAccelerationStructureKHR, true, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkDestroyAccelerationStructureKHR");
+    skip |= ValidateObject(accelerationStructure, kVulkanObjectTypeAccelerationStructureKHR, true, kVUIDUndefined, kVUIDUndefined, "vkDestroyAccelerationStructureKHR");
     skip |= ValidateDestroyObject(accelerationStructure, kVulkanObjectTypeAccelerationStructureKHR, pAllocator, kVUIDUndefined, kVUIDUndefined);
 
     return skip;
@@ -8570,11 +8665,11 @@ bool ObjectLifetimes::PreCallValidateCopyAccelerationStructureKHR(
     VkDeferredOperationKHR                      deferredOperation,
     const VkCopyAccelerationStructureInfoKHR*   pInfo) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(deferredOperation, kVulkanObjectTypeDeferredOperationKHR, true, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkCopyAccelerationStructureKHR");
+    skip |= ValidateObject(deferredOperation, kVulkanObjectTypeDeferredOperationKHR, true, kVUIDUndefined, kVUIDUndefined, "vkCopyAccelerationStructureKHR");
     if (pInfo) {
-        skip |= ValidateObject(pInfo->src, kVulkanObjectTypeAccelerationStructureKHR, false, kVUIDUndefined, kVUIDUndefined);
-        skip |= ValidateObject(pInfo->dst, kVulkanObjectTypeAccelerationStructureKHR, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pInfo->src, kVulkanObjectTypeAccelerationStructureKHR, false, kVUIDUndefined, kVUIDUndefined, "VkCopyAccelerationStructureInfoKHR");
+        skip |= ValidateObject(pInfo->dst, kVulkanObjectTypeAccelerationStructureKHR, false, kVUIDUndefined, kVUIDUndefined, "VkCopyAccelerationStructureInfoKHR");
     }
 
     return skip;
@@ -8585,10 +8680,10 @@ bool ObjectLifetimes::PreCallValidateCopyAccelerationStructureToMemoryKHR(
     VkDeferredOperationKHR                      deferredOperation,
     const VkCopyAccelerationStructureToMemoryInfoKHR* pInfo) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(deferredOperation, kVulkanObjectTypeDeferredOperationKHR, true, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkCopyAccelerationStructureToMemoryKHR");
+    skip |= ValidateObject(deferredOperation, kVulkanObjectTypeDeferredOperationKHR, true, kVUIDUndefined, kVUIDUndefined, "vkCopyAccelerationStructureToMemoryKHR");
     if (pInfo) {
-        skip |= ValidateObject(pInfo->src, kVulkanObjectTypeAccelerationStructureKHR, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pInfo->src, kVulkanObjectTypeAccelerationStructureKHR, false, kVUIDUndefined, kVUIDUndefined, "VkCopyAccelerationStructureToMemoryInfoKHR");
     }
 
     return skip;
@@ -8599,10 +8694,10 @@ bool ObjectLifetimes::PreCallValidateCopyMemoryToAccelerationStructureKHR(
     VkDeferredOperationKHR                      deferredOperation,
     const VkCopyMemoryToAccelerationStructureInfoKHR* pInfo) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(deferredOperation, kVulkanObjectTypeDeferredOperationKHR, true, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkCopyMemoryToAccelerationStructureKHR");
+    skip |= ValidateObject(deferredOperation, kVulkanObjectTypeDeferredOperationKHR, true, kVUIDUndefined, kVUIDUndefined, "vkCopyMemoryToAccelerationStructureKHR");
     if (pInfo) {
-        skip |= ValidateObject(pInfo->dst, kVulkanObjectTypeAccelerationStructureKHR, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pInfo->dst, kVulkanObjectTypeAccelerationStructureKHR, false, kVUIDUndefined, kVUIDUndefined, "VkCopyMemoryToAccelerationStructureInfoKHR");
     }
 
     return skip;
@@ -8617,10 +8712,10 @@ bool ObjectLifetimes::PreCallValidateWriteAccelerationStructuresPropertiesKHR(
     void*                                       pData,
     size_t                                      stride) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkWriteAccelerationStructuresPropertiesKHR");
     if ((accelerationStructureCount > 0) && (pAccelerationStructures)) {
         for (uint32_t index0 = 0; index0 < accelerationStructureCount; ++index0) {
-            skip |= ValidateObject(pAccelerationStructures[index0], kVulkanObjectTypeAccelerationStructureKHR, false, kVUIDUndefined, kVUIDUndefined);
+            skip |= ValidateObject(pAccelerationStructures[index0], kVulkanObjectTypeAccelerationStructureKHR, false, kVUIDUndefined, kVUIDUndefined, "vkWriteAccelerationStructuresPropertiesKHR");
         }
     }
 
@@ -8631,10 +8726,10 @@ bool ObjectLifetimes::PreCallValidateCmdCopyAccelerationStructureKHR(
     VkCommandBuffer                             commandBuffer,
     const VkCopyAccelerationStructureInfoKHR*   pInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdCopyAccelerationStructureKHR");
     if (pInfo) {
-        skip |= ValidateObject(pInfo->src, kVulkanObjectTypeAccelerationStructureKHR, false, kVUIDUndefined, kVUIDUndefined);
-        skip |= ValidateObject(pInfo->dst, kVulkanObjectTypeAccelerationStructureKHR, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pInfo->src, kVulkanObjectTypeAccelerationStructureKHR, false, kVUIDUndefined, kVUIDUndefined, "VkCopyAccelerationStructureInfoKHR");
+        skip |= ValidateObject(pInfo->dst, kVulkanObjectTypeAccelerationStructureKHR, false, kVUIDUndefined, kVUIDUndefined, "VkCopyAccelerationStructureInfoKHR");
     }
 
     return skip;
@@ -8644,9 +8739,9 @@ bool ObjectLifetimes::PreCallValidateCmdCopyAccelerationStructureToMemoryKHR(
     VkCommandBuffer                             commandBuffer,
     const VkCopyAccelerationStructureToMemoryInfoKHR* pInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdCopyAccelerationStructureToMemoryKHR");
     if (pInfo) {
-        skip |= ValidateObject(pInfo->src, kVulkanObjectTypeAccelerationStructureKHR, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pInfo->src, kVulkanObjectTypeAccelerationStructureKHR, false, kVUIDUndefined, kVUIDUndefined, "VkCopyAccelerationStructureToMemoryInfoKHR");
     }
 
     return skip;
@@ -8656,9 +8751,9 @@ bool ObjectLifetimes::PreCallValidateCmdCopyMemoryToAccelerationStructureKHR(
     VkCommandBuffer                             commandBuffer,
     const VkCopyMemoryToAccelerationStructureInfoKHR* pInfo) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdCopyMemoryToAccelerationStructureKHR");
     if (pInfo) {
-        skip |= ValidateObject(pInfo->dst, kVulkanObjectTypeAccelerationStructureKHR, false, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pInfo->dst, kVulkanObjectTypeAccelerationStructureKHR, false, kVUIDUndefined, kVUIDUndefined, "VkCopyMemoryToAccelerationStructureInfoKHR");
     }
 
     return skip;
@@ -8668,7 +8763,7 @@ bool ObjectLifetimes::PreCallValidateGetAccelerationStructureDeviceAddressKHR(
     VkDevice                                    device,
     const VkAccelerationStructureDeviceAddressInfoKHR* pInfo) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetAccelerationStructureDeviceAddressKHR");
 
     return skip;
 }
@@ -8681,13 +8776,13 @@ bool ObjectLifetimes::PreCallValidateCmdWriteAccelerationStructuresPropertiesKHR
     VkQueryPool                                 queryPool,
     uint32_t                                    firstQuery) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdWriteAccelerationStructuresPropertiesKHR");
     if ((accelerationStructureCount > 0) && (pAccelerationStructures)) {
         for (uint32_t index0 = 0; index0 < accelerationStructureCount; ++index0) {
-            skip |= ValidateObject(pAccelerationStructures[index0], kVulkanObjectTypeAccelerationStructureKHR, false, kVUIDUndefined, kVUIDUndefined);
+            skip |= ValidateObject(pAccelerationStructures[index0], kVulkanObjectTypeAccelerationStructureKHR, false, kVUIDUndefined, kVUIDUndefined, "vkCmdWriteAccelerationStructuresPropertiesKHR");
         }
     }
-    skip |= ValidateObject(queryPool, kVulkanObjectTypeQueryPool, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(queryPool, kVulkanObjectTypeQueryPool, false, kVUIDUndefined, kVUIDUndefined, "vkCmdWriteAccelerationStructuresPropertiesKHR");
 
     return skip;
 }
@@ -8697,7 +8792,7 @@ bool ObjectLifetimes::PreCallValidateGetDeviceAccelerationStructureCompatibility
     const VkAccelerationStructureVersionInfoKHR* pVersionInfo,
     VkAccelerationStructureCompatibilityKHR*    pCompatibility) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetDeviceAccelerationStructureCompatibilityKHR");
 
     return skip;
 }
@@ -8709,10 +8804,10 @@ bool ObjectLifetimes::PreCallValidateGetAccelerationStructureBuildSizesKHR(
     const uint32_t*                             pMaxPrimitiveCounts,
     VkAccelerationStructureBuildSizesInfoKHR*   pSizeInfo) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetAccelerationStructureBuildSizesKHR");
     if (pBuildInfo) {
-        skip |= ValidateObject(pBuildInfo->srcAccelerationStructure, kVulkanObjectTypeAccelerationStructureKHR, true, kVUIDUndefined, kVUIDUndefined);
-        skip |= ValidateObject(pBuildInfo->dstAccelerationStructure, kVulkanObjectTypeAccelerationStructureKHR, true, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateObject(pBuildInfo->srcAccelerationStructure, kVulkanObjectTypeAccelerationStructureKHR, true, kVUIDUndefined, kVUIDUndefined, "VkAccelerationStructureBuildGeometryInfoKHR");
+        skip |= ValidateObject(pBuildInfo->dstAccelerationStructure, kVulkanObjectTypeAccelerationStructureKHR, true, kVUIDUndefined, kVUIDUndefined, "VkAccelerationStructureBuildGeometryInfoKHR");
     }
 
     return skip;
@@ -8728,7 +8823,7 @@ bool ObjectLifetimes::PreCallValidateCmdTraceRaysKHR(
     uint32_t                                    height,
     uint32_t                                    depth) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdTraceRaysKHR");
 
     return skip;
 }
@@ -8741,8 +8836,8 @@ bool ObjectLifetimes::PreCallValidateGetRayTracingCaptureReplayShaderGroupHandle
     size_t                                      dataSize,
     void*                                       pData) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(pipeline, kVulkanObjectTypePipeline, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetRayTracingCaptureReplayShaderGroupHandlesKHR");
+    skip |= ValidateObject(pipeline, kVulkanObjectTypePipeline, false, kVUIDUndefined, kVUIDUndefined, "vkGetRayTracingCaptureReplayShaderGroupHandlesKHR");
 
     return skip;
 }
@@ -8755,7 +8850,7 @@ bool ObjectLifetimes::PreCallValidateCmdTraceRaysIndirectKHR(
     const VkStridedDeviceAddressRegionKHR*      pCallableShaderBindingTable,
     VkDeviceAddress                             indirectDeviceAddress) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdTraceRaysIndirectKHR");
 
     return skip;
 }
@@ -8766,8 +8861,8 @@ bool ObjectLifetimes::PreCallValidateGetRayTracingShaderGroupStackSizeKHR(
     uint32_t                                    group,
     VkShaderGroupShaderKHR                      groupShader) const {
     bool skip = false;
-    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(pipeline, kVulkanObjectTypePipeline, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(device, kVulkanObjectTypeDevice, false, kVUIDUndefined, kVUIDUndefined, "vkGetRayTracingShaderGroupStackSizeKHR");
+    skip |= ValidateObject(pipeline, kVulkanObjectTypePipeline, false, kVUIDUndefined, kVUIDUndefined, "vkGetRayTracingShaderGroupStackSizeKHR");
 
     return skip;
 }
@@ -8776,7 +8871,7 @@ bool ObjectLifetimes::PreCallValidateCmdSetRayTracingPipelineStackSizeKHR(
     VkCommandBuffer                             commandBuffer,
     uint32_t                                    pipelineStackSize) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdSetRayTracingPipelineStackSizeKHR");
 
     return skip;
 }
@@ -8787,7 +8882,7 @@ bool ObjectLifetimes::PreCallValidateCmdDrawMeshTasksEXT(
     uint32_t                                    groupCountY,
     uint32_t                                    groupCountZ) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdDrawMeshTasksEXT");
 
     return skip;
 }
@@ -8799,8 +8894,8 @@ bool ObjectLifetimes::PreCallValidateCmdDrawMeshTasksIndirectEXT(
     uint32_t                                    drawCount,
     uint32_t                                    stride) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdDrawMeshTasksIndirectEXT");
+    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdDrawMeshTasksIndirectEXT");
 
     return skip;
 }
@@ -8814,11 +8909,11 @@ bool ObjectLifetimes::PreCallValidateCmdDrawMeshTasksIndirectCountEXT(
     uint32_t                                    maxDrawCount,
     uint32_t                                    stride) const {
     bool skip = false;
-    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined);
-    skip |= ValidateObject(countBuffer, kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateObject(commandBuffer, kVulkanObjectTypeCommandBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdDrawMeshTasksIndirectCountEXT");
+    skip |= ValidateObject(buffer, kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdDrawMeshTasksIndirectCountEXT");
+    skip |= ValidateObject(countBuffer, kVulkanObjectTypeBuffer, false, kVUIDUndefined, kVUIDUndefined, "vkCmdDrawMeshTasksIndirectCountEXT");
 
     return skip;
 }
 
-
+// NOLINTEND

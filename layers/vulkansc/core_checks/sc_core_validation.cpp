@@ -34,13 +34,13 @@
 #include <string>
 #include <valarray>
 
-#include "vk_enum_string_helper.h"
-#include "chassis.h"
+#include "generated/vk_enum_string_helper.h"
+#include "generated/chassis.h"
 #include "vulkansc/sc_vuid_enums.h"
 #include "vulkansc/core_checks/sc_core_validation.h"
 #include "vulkansc/state_tracker/sc_pipeline_state.h"
 #include "utils/vk_layer_utils.h"
-#include "enum_flag_bits.h"
+#include "generated/enum_flag_bits.h"
 
 void SCCoreChecks::PreCallRecordCreateInstance(const VkInstanceCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator,
                                                VkInstance* pInstance) {
@@ -442,7 +442,7 @@ bool SCCoreChecks::ValidatePipelineShaderStage(const PIPELINE_STATE& pipeline, c
     skip |= ValidateSpecializations(module_state, create_info->pSpecializationInfo, pipeline);
 
     if (IsExtEnabled(device_extensions.vk_ext_subgroup_size_control)) {
-        skip |= ValidateShaderSubgroupSizeControl(module_state, create_info->flags);
+        skip |= ValidateShaderSubgroupSizeControl(module_state, create_info->stage, create_info->flags);
     }
 
     return skip;

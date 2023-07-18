@@ -21,6 +21,7 @@
 #include "state_tracker/pipeline_state.h"
 #include "state_tracker/descriptor_sets.h"
 #include <limits>
+#include <string_view>
 
 static VkImageSubresourceRange MakeImageFullRange(const VkImageCreateInfo &create_info) {
     const auto format = create_info.format;
@@ -89,7 +90,7 @@ VkImageSubresourceRange NormalizeSubresourceRange(const VkImageCreateInfo &image
     return NormalizeSubresourceRange(image_create_info, subres_range);
 }
 
-static VkExternalMemoryHandleTypeFlags GetExternalHandleType(const VkImageCreateInfo *pCreateInfo) {
+static VkExternalMemoryHandleTypeFlags GetExternalHandleTypes(const VkImageCreateInfo *pCreateInfo) {
     const auto *external_memory_info = LvlFindInChain<VkExternalMemoryImageCreateInfo>(pCreateInfo->pNext);
     return external_memory_info ? external_memory_info->handleTypes : 0;
 }
@@ -148,10 +149,9 @@ static IMAGE_STATE::MemoryReqs GetMemoryRequirements(const ValidationStateTracke
     return result;
 }
 
-static IMAGE_STATE::SparseReqs GetSparseRequirements(const ValidationStateTracker *dev_data, VkImage img,
-                                                     const VkImageCreateInfo *create_info) {
+static IMAGE_STATE::SparseReqs GetSparseRequirements(const ValidationStateTracker *dev_data, VkImage img, bool sparse_residency) {
     IMAGE_STATE::SparseReqs result;
-    if (create_info->flags & VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT) {
+    if (sparse_residency) {
         uint32_t count = 0;
         DispatchGetImageSparseMemoryRequirements(dev_data->device, img, &count, nullptr);
         result.resize(count);
@@ -188,7 +188,7 @@ static bool GetMetalExport(const VkImageCreateInfo *info, VkExportMetalObjectTyp
 IMAGE_STATE::IMAGE_STATE(const ValidationStateTracker *dev_data, VkImage img, const VkImageCreateInfo *pCreateInfo,
                          VkFormatFeatureFlags2KHR ff)
     : BINDABLE(img, kVulkanObjectTypeImage, (pCreateInfo->flags & VK_IMAGE_CREATE_SPARSE_BINDING_BIT) != 0,
-               (pCreateInfo->flags & VK_IMAGE_CREATE_PROTECTED_BIT) == 0, GetExternalHandleType(pCreateInfo)),
+               (pCreateInfo->flags & VK_IMAGE_CREATE_PROTECTED_BIT) == 0, GetExternalHandleTypes(pCreateInfo)),
       safe_create_info(pCreateInfo),
       createInfo(*safe_create_info.ptr()),
       shared_presentable(false),
@@ -201,8 +201,8 @@ IMAGE_STATE::IMAGE_STATE(const ValidationStateTracker *dev_data, VkImage img, co
       format_features(ff),
       disjoint((pCreateInfo->flags & VK_IMAGE_CREATE_DISJOINT_BIT) != 0),
       requirements(GetMemoryRequirements(dev_data, img, pCreateInfo, disjoint, IsExternalAHB())),
-      memory_requirements_checked{{false, false, false}},
-      sparse_requirements(GetSparseRequirements(dev_data, img, pCreateInfo)),
+      sparse_residency((pCreateInfo->flags & VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT) != 0),
+      sparse_requirements(GetSparseRequirements(dev_data, img, sparse_residency)),
       sparse_metadata_required(SparseMetaDataRequired(sparse_requirements)),
       get_sparse_reqs_called(false),
       sparse_metadata_bound(false),
@@ -220,7 +220,7 @@ IMAGE_STATE::IMAGE_STATE(const ValidationStateTracker *dev_data, VkImage img, co
 IMAGE_STATE::IMAGE_STATE(const ValidationStateTracker *dev_data, VkImage img, const VkImageCreateInfo *pCreateInfo,
                          VkSwapchainKHR swapchain, uint32_t swapchain_index, VkFormatFeatureFlags2KHR ff)
     : BINDABLE(img, kVulkanObjectTypeImage, (pCreateInfo->flags & VK_IMAGE_CREATE_SPARSE_BINDING_BIT) != 0,
-               (pCreateInfo->flags & VK_IMAGE_CREATE_PROTECTED_BIT) == 0, GetExternalHandleType(pCreateInfo)),
+               (pCreateInfo->flags & VK_IMAGE_CREATE_PROTECTED_BIT) == 0, GetExternalHandleTypes(pCreateInfo)),
       safe_create_info(pCreateInfo),
       createInfo(*safe_create_info.ptr()),
       shared_presentable(false),
@@ -233,7 +233,7 @@ IMAGE_STATE::IMAGE_STATE(const ValidationStateTracker *dev_data, VkImage img, co
       format_features(ff),
       disjoint((pCreateInfo->flags & VK_IMAGE_CREATE_DISJOINT_BIT) != 0),
       requirements{},
-      memory_requirements_checked{false, false, false},
+      sparse_residency(false),
       sparse_requirements{},
       sparse_metadata_required(false),
       get_sparse_reqs_called(false),
@@ -302,7 +302,7 @@ bool IMAGE_STATE::IsCreateInfoDedicatedAllocationImageAliasingCompatible(const V
     return is_compatible;
 }
 
-bool IMAGE_STATE::IsCompatibleAliasing(IMAGE_STATE *other_image_state) const {
+bool IMAGE_STATE::IsCompatibleAliasing(const IMAGE_STATE *other_image_state) const {
     if (!IsSwapchainImage() && !other_image_state->IsSwapchainImage() &&
         !(createInfo.flags & other_image_state->createInfo.flags & VK_IMAGE_CREATE_ALIAS_BIT)) {
         return false;
@@ -325,54 +325,33 @@ void IMAGE_STATE::SetInitialLayoutMap() {
     if (layout_range_map) {
         return;
     }
-    if ((createInfo.flags & VK_IMAGE_CREATE_ALIAS_BIT) != 0) {
-        // Look for another aliasing image and point at its layout state.
-        // ObjectBindings() is thread safe since returns by value, and once
-        // the weak_ptr is successfully locked, the other image state won't
-        // be freed out from under us.
-        for (auto const &memory_state : GetBoundMemoryStates()) {
-            for (auto &entry : memory_state->ObjectBindings()) {
-                if (entry.first.type == kVulkanObjectTypeImage) {
-                    auto base_node = entry.second.lock();
-                    if (base_node) {
-                        auto other_image = static_cast<IMAGE_STATE *>(base_node.get());
-                        if (other_image != this && other_image->IsCompatibleAliasing(this)) {
-                            layout_range_map = other_image->layout_range_map;
-                            break;
-                        }
-                    }
-                }
-            }
-        }
+
+    std::shared_ptr<GlobalImageLayoutRangeMap> layout_map;
+    auto get_layout_map = [&layout_map](const IMAGE_STATE &other_image) {
+        layout_map = other_image.layout_range_map;
+        return true;
+    };
+
+    // See if an alias already has a layout map
+    if (HasAliasFlag()) {
+        AnyImageAliasOf(get_layout_map);
     } else if (bind_swapchain) {
         // Swapchains can also alias if multiple images are bound (or retrieved
         // with vkGetSwapchainImages()) for a (single swapchain, index) pair.
-        // ObjectBindings() is thread safe since returns by value, and once
-        // the weak_ptr is successfully locked, the other image state won't
-        // be freed out from under us.
-        for (auto &entry : bind_swapchain->ObjectBindings()) {
-            if (entry.first.type == kVulkanObjectTypeImage) {
-                auto base_node = entry.second.lock();
-                if (base_node) {
-                    auto other_image = static_cast<IMAGE_STATE *>(base_node.get());
-                    if (other_image != this && other_image->IsCompatibleAliasing(this)) {
-                        layout_range_map = other_image->layout_range_map;
-                        break;
-                    }
-                }
-            }
-        }
+        AnyAliasBindingOf(bind_swapchain->ObjectBindings(), get_layout_map);
     }
-    // ... otherwise set up the new map.
-    if (!layout_range_map) {
+
+    if (!layout_map) {
+        // otherwise set up a new map.
         // set up the new map completely before making it available
-        auto new_map = std::make_shared<GlobalImageLayoutRangeMap>(subresource_encoder.SubresourceCount());
+        layout_map = std::make_shared<GlobalImageLayoutRangeMap>(subresource_encoder.SubresourceCount());
         auto range_gen = subresource_adapter::RangeGenerator(subresource_encoder);
         for (; range_gen->non_empty(); ++range_gen) {
-            new_map->insert(new_map->end(), std::make_pair(*range_gen, createInfo.initialLayout));
+            layout_map->insert(layout_map->end(), std::make_pair(*range_gen, createInfo.initialLayout));
         }
-        layout_range_map = std::move(new_map);
     }
+    // And store in the object
+    layout_range_map = std::move(layout_map);
 }
 
 void IMAGE_STATE::SetSwapchain(std::shared_ptr<SWAPCHAIN_NODE> &swapchain, uint32_t swapchain_index) {
@@ -380,16 +359,6 @@ void IMAGE_STATE::SetSwapchain(std::shared_ptr<SWAPCHAIN_NODE> &swapchain, uint3
     bind_swapchain = swapchain;
     swapchain_image_index = swapchain_index;
     bind_swapchain->AddParent(this);
-}
-
-VkDeviceSize IMAGE_STATE::GetFakeBaseAddress() const {
-    if (!IsSwapchainImage()) {
-        return BINDABLE::GetFakeBaseAddress();
-    }
-    if (!bind_swapchain) {
-        return 0;
-    }
-    return bind_swapchain->images[swapchain_image_index].fake_base_address;
 }
 
 static VkSamplerYcbcrConversion GetSamplerConversion(const VkImageViewCreateInfo *ci) {
@@ -433,8 +402,7 @@ IMAGE_VIEW_STATE::IMAGE_VIEW_STATE(const std::shared_ptr<IMAGE_STATE> &im, VkIma
       // When the image has a external format the views format must be VK_FORMAT_UNDEFINED and it is required to use a sampler
       // Ycbcr conversion. Thus we can't extract any meaningful information from the format parameter. As a Sampler Ycbcr
       // conversion must be used the shader type is always float.
-      descriptor_format_bits(im->HasAHBFormat() ? static_cast<unsigned>(DESCRIPTOR_REQ_COMPONENT_TYPE_FLOAT)
-                                                : DescriptorRequirementsBitsFromFormat(ci->format)),
+      descriptor_format_bits(im->HasAHBFormat() ? static_cast<unsigned>(NumericTypeFloat) : GetFormatType(ci->format)),
       samplerConversion(GetSamplerConversion(ci)),
       filter_cubic_props(cubic_props),
       min_lod(GetImageViewMinLod(ci)),
@@ -573,9 +541,10 @@ SWAPCHAIN_NODE::SWAPCHAIN_NODE(ValidationStateTracker *dev_data_, const VkSwapch
 void SWAPCHAIN_NODE::PresentImage(uint32_t image_index, uint64_t present_id) {
     if (image_index >= images.size()) return;
     assert(acquired_images > 0);
-    acquired_images--;
-    images[image_index].acquired = false;
-    if (shared_presentable) {
+    if (!shared_presentable) {
+        acquired_images--;
+        images[image_index].acquired = false;
+    } else {
         IMAGE_STATE *image_state = images[image_index].image_state;
         if (image_state) {
             image_state->layout_locked = true;
@@ -686,62 +655,159 @@ void SURFACE_STATE::SetPresentModes(VkPhysicalDevice phys_dev, vvl::span<const V
 }
 
 // Helper for data obtained from vkGetPhysicalDeviceSurfacePresentModesKHR
-std::vector<VkPresentModeKHR> SURFACE_STATE::GetPresentModes(VkPhysicalDevice phys_dev) const {
+std::vector<VkPresentModeKHR> SURFACE_STATE::GetPresentModes(VkPhysicalDevice phys_dev,
+                                                             const ValidationObject *validation_obj) const {
     auto guard = Lock();
     assert(phys_dev);
     std::vector<VkPresentModeKHR> result;
-    if (present_modes_data_.find(phys_dev) != present_modes_data_.end()) {
-        for (auto mode = present_modes_data_[phys_dev].begin(); mode != present_modes_data_[phys_dev].end(); mode++) {
+    if (auto search = present_modes_data_.find(phys_dev); search != present_modes_data_.end()) {
+        for (auto mode = search->second.begin(); mode != search->second.end(); mode++) {
             result.push_back(mode->first);
         }
         return result;
     }
+
+    const auto log_internal_error = [validation_obj](VkResult err, auto &&...objects) {
+        if (validation_obj) {
+            LogObjectList obj_list(std::forward<decltype(objects)>(objects)...);
+            validation_obj->LogInternalError(VVL_PRETTY_FUNCTION, obj_list, "vkGetPhysicalDeviceSurfacePresentModesKHR", err);
+        }
+    };
+
     uint32_t count = 0;
-    DispatchGetPhysicalDeviceSurfacePresentModesKHR(phys_dev, surface(), &count, nullptr);
+    if (const VkResult err = DispatchGetPhysicalDeviceSurfacePresentModesKHR(phys_dev, surface(), &count, nullptr);
+        !IsValueIn(err, {VK_SUCCESS, VK_INCOMPLETE})) {
+        log_internal_error(err, phys_dev, surface());
+        return result;
+    }
     result.resize(count);
-    DispatchGetPhysicalDeviceSurfacePresentModesKHR(phys_dev, surface(), &count, result.data());
+    if (const VkResult err = DispatchGetPhysicalDeviceSurfacePresentModesKHR(phys_dev, surface(), &count, result.data());
+        err != VK_SUCCESS) {
+        log_internal_error(err, phys_dev, surface());
+        return result;
+    }
     return result;
 }
 
-void SURFACE_STATE::SetFormats(VkPhysicalDevice phys_dev, std::vector<VkSurfaceFormatKHR> &&fmts) {
+void SURFACE_STATE::SetFormats(VkPhysicalDevice phys_dev, std::vector<safe_VkSurfaceFormat2KHR> &&fmts) {
     auto guard = Lock();
     assert(phys_dev);
     formats_[phys_dev] = std::move(fmts);
 }
 
-std::vector<VkSurfaceFormatKHR> SURFACE_STATE::GetFormats(VkPhysicalDevice phys_dev) const {
+vvl::span<const safe_VkSurfaceFormat2KHR> SURFACE_STATE::GetFormats(bool get_surface_capabilities2, VkPhysicalDevice phys_dev,
+                                                                    const void *surface_info2_pnext,
+                                                                    const ValidationObject *validation_obj) const {
     auto guard = Lock();
     assert(phys_dev);
-    auto iter = formats_.find(phys_dev);
-    if (iter != formats_.end()) {
-        return iter->second;
+
+    if (const auto search = formats_.find(phys_dev); search != formats_.end()) {
+        vvl::span<const safe_VkSurfaceFormat2KHR>(search->second);
     }
-    std::vector<VkSurfaceFormatKHR> result;
-    uint32_t count = 0;
-    DispatchGetPhysicalDeviceSurfaceFormatsKHR(phys_dev, surface(), &count, nullptr);
-    result.resize(count);
-    DispatchGetPhysicalDeviceSurfaceFormatsKHR(phys_dev, surface(), &count, result.data());
-    formats_[phys_dev] = result;
-    return result;
+
+    std::vector<safe_VkSurfaceFormat2KHR> result;
+    if (get_surface_capabilities2) {
+        const auto log_internal_error = [validation_obj](VkResult err, auto &&...objects) {
+            if (validation_obj) {
+                LogObjectList obj_list(std::forward<decltype(objects)>(objects)...);
+                validation_obj->LogInternalError(VVL_PRETTY_FUNCTION, obj_list, "vkGetPhysicalDeviceSurfaceFormats2KHR", err);
+            }
+        };
+
+        uint32_t count = 0;
+        const auto surface_info2 = GetSurfaceInfo2(surface_info2_pnext);
+        if (const VkResult err = DispatchGetPhysicalDeviceSurfaceFormats2KHR(phys_dev, &surface_info2, &count, nullptr);
+            !IsValueIn(err, {VK_SUCCESS, VK_INCOMPLETE})) {
+            log_internal_error(err, phys_dev, surface_info2.surface);
+            return result;
+        }
+        std::vector<VkSurfaceFormat2KHR> formats2(count);
+
+        if (const VkResult err = DispatchGetPhysicalDeviceSurfaceFormats2KHR(phys_dev, &surface_info2, &count, formats2.data());
+            err != VK_SUCCESS) {
+            log_internal_error(err, phys_dev, surface_info2.surface);
+            result.clear();
+        } else {
+            result.resize(count);
+            for (uint32_t surface_format_index = 0; surface_format_index < count; ++surface_format_index) {
+                result.emplace_back(safe_VkSurfaceFormat2KHR(&formats2[surface_format_index]));
+            }
+        }
+
+    } else {
+        const auto log_internal_error = [validation_obj](VkResult err, auto &&...objects) {
+            if (validation_obj) {
+                LogObjectList obj_list(std::forward<decltype(objects)>(objects)...);
+                validation_obj->LogInternalError(VVL_PRETTY_FUNCTION, obj_list, "vkGetPhysicalDeviceSurfaceFormatsKHR", err);
+            }
+        };
+
+        std::vector<VkSurfaceFormatKHR> formats;
+        uint32_t count = 0;
+        if (const VkResult err = DispatchGetPhysicalDeviceSurfaceFormatsKHR(phys_dev, surface(), &count, nullptr);
+            !IsValueIn(err, {VK_SUCCESS, VK_INCOMPLETE})) {
+            log_internal_error(err, phys_dev, surface());
+            return result;
+        }
+        formats.resize(count);
+
+        if (const VkResult err = DispatchGetPhysicalDeviceSurfaceFormatsKHR(phys_dev, surface(), &count, formats.data());
+            err != VK_SUCCESS) {
+            log_internal_error(err, phys_dev, surface());
+            result.clear();
+        } else {
+            result.reserve(count);
+            auto format2 = LvlInitStruct<VkSurfaceFormat2KHR>();
+            for (const auto &format : formats) {
+                format2.surfaceFormat = format;
+                result.emplace_back(safe_VkSurfaceFormat2KHR(&format2));
+            }
+        }
+    }
+    formats_[phys_dev] = std::move(result);
+    return vvl::span<const safe_VkSurfaceFormat2KHR>(formats_[phys_dev]);
 }
 
-void SURFACE_STATE::SetCapabilities(VkPhysicalDevice phys_dev, const VkSurfaceCapabilitiesKHR &caps) {
+void SURFACE_STATE::SetCapabilities(VkPhysicalDevice phys_dev, const safe_VkSurfaceCapabilities2KHR &caps) {
     auto guard = Lock();
     assert(phys_dev);
     capabilities_[phys_dev] = caps;
 }
 
-VkSurfaceCapabilitiesKHR SURFACE_STATE::GetCapabilities(VkPhysicalDevice phys_dev) const {
+safe_VkSurfaceCapabilities2KHR SURFACE_STATE::GetCapabilities(bool get_surface_capabilities2, VkPhysicalDevice phys_dev,
+                                                              const void *surface_info2_pnext,
+                                                              const ValidationObject *validation_obj) const {
     auto guard = Lock();
     assert(phys_dev);
-    auto iter = capabilities_.find(phys_dev);
-    if (iter != capabilities_.end()) {
-        return iter->second;
+
+    if (auto search = capabilities_.find(phys_dev); search != capabilities_.end()) {
+        return search->second;
     }
-    VkSurfaceCapabilitiesKHR result{};
-    DispatchGetPhysicalDeviceSurfaceCapabilitiesKHR(phys_dev, surface(), &result);
-    capabilities_[phys_dev] = result;
-    return result;
+
+    const auto log_internal_error = [validation_obj](VkResult err, auto &&...objects) {
+        if (validation_obj) {
+            LogObjectList obj_list(std::forward<decltype(objects)>(objects)...);
+            validation_obj->LogInternalError(VVL_PRETTY_FUNCTION, obj_list, "vkGetPhysicalDeviceSurfaceCapabilities2KHR", err);
+        }
+    };
+
+    auto surface_caps2 = LvlInitStruct<VkSurfaceCapabilities2KHR>();
+    if (get_surface_capabilities2) {
+        const auto surface_info2 = GetSurfaceInfo2(surface_info2_pnext);
+        if (const VkResult err = DispatchGetPhysicalDeviceSurfaceCapabilities2KHR(phys_dev, &surface_info2, &surface_caps2);
+            err != VK_SUCCESS) {
+            log_internal_error(err, phys_dev, surface_info2.surface);
+        }
+    } else {
+        VkSurfaceCapabilitiesKHR caps{};
+        if (const VkResult err = DispatchGetPhysicalDeviceSurfaceCapabilitiesKHR(phys_dev, surface(), &caps); err != VK_SUCCESS) {
+            log_internal_error(err, phys_dev, surface());
+        }
+        surface_caps2.surfaceCapabilities = caps;
+    }
+    safe_VkSurfaceCapabilities2KHR safe_surface_caps2(&surface_caps2);
+    capabilities_[phys_dev] = safe_surface_caps2;
+    return safe_surface_caps2;
 }
 
 void SURFACE_STATE::SetCompatibleModes(VkPhysicalDevice phys_dev, const VkPresentModeKHR present_mode,

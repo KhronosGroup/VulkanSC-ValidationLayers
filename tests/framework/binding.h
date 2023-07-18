@@ -24,9 +24,9 @@
 #include <memory>
 #include <vector>
 
-#include "lvt_function_pointers.h"
+#include "generated/vk_function_pointers.h"
+#include "generated/vk_extension_helper.h"
 #include "test_common.h"
-#include "vk_extension_helper.h"
 
 namespace vk_testing {
 
@@ -327,22 +327,16 @@ class DeviceMemory : public internal::NonDispHandle<VkDeviceMemory> {
     // vkUnmapMemory()
     void unmap() const;
 	const auto &get_memory_allocate_info() { return memory_allocate_info_; }
-	
-	static VkMemoryAllocateInfo get_resource_alloc_info(const vk_testing::Device &dev, const VkMemoryRequirements &reqs,
-                                                        VkMemoryPropertyFlags mem_props, void *alloc_info_pnext = nullptr);
-                                                        
-  private:
-    VkMemoryAllocateInfo memory_allocate_info_{};
+
+        static VkMemoryAllocateInfo get_resource_alloc_info(const vk_testing::Device &dev, const VkMemoryRequirements &reqs,
+                                                            VkMemoryPropertyFlags mem_props, void *alloc_info_pnext = nullptr);
+
+      private:
+        VkMemoryAllocateInfo memory_allocate_info_{};
 };
 
 class Fence : public internal::NonDispHandle<VkFence> {
   public:
-#ifdef _WIN32
-    using ExternalHandle = HANDLE;
-#else
-    using ExternalHandle = int;
-#endif
-
     Fence() = default;
     Fence(const Device &dev) { init(dev, create_info()); }
     Fence(const Device &dev, const VkFenceCreateInfo &info) { init(dev, info); }
@@ -358,8 +352,12 @@ class Fence : public internal::NonDispHandle<VkFence> {
 
     VkResult reset();
 
-    VkResult export_handle(ExternalHandle &handle, VkExternalFenceHandleTypeFlagBits handle_type);
-    VkResult import_handle(ExternalHandle handle, VkExternalFenceHandleTypeFlagBits handle_type, VkFenceImportFlags flags = 0);
+#ifdef VK_USE_PLATFORM_WIN32_KHR
+    VkResult export_handle(HANDLE &win32_handle, VkExternalFenceHandleTypeFlagBits handle_type);
+    VkResult import_handle(HANDLE win32_handle, VkExternalFenceHandleTypeFlagBits handle_type, VkFenceImportFlags flags = 0);
+#endif
+    VkResult export_handle(int &fd_handle, VkExternalFenceHandleTypeFlagBits handle_type);
+    VkResult import_handle(int fd_handle, VkExternalFenceHandleTypeFlagBits handle_type, VkFenceImportFlags flags = 0);
 
     static VkFenceCreateInfo create_info(VkFenceCreateFlags flags);
     static VkFenceCreateInfo create_info();
@@ -367,12 +365,6 @@ class Fence : public internal::NonDispHandle<VkFence> {
 
 class Semaphore : public internal::NonDispHandle<VkSemaphore> {
   public:
-#ifdef _WIN32
-    using ExternalHandle = HANDLE;
-#else
-    using ExternalHandle = int;
-#endif
-
     Semaphore() = default;
     Semaphore(const Device &dev) { init(dev, LvlInitStruct<VkSemaphoreCreateInfo>()); }
     Semaphore(const Device &dev, const VkSemaphoreCreateInfo &info) { init(dev, info); }
@@ -382,9 +374,13 @@ class Semaphore : public internal::NonDispHandle<VkSemaphore> {
     // vkCreateSemaphore()
     void init(const Device &dev, const VkSemaphoreCreateInfo &info);
 
-    VkResult export_handle(ExternalHandle &ext_handle, VkExternalSemaphoreHandleTypeFlagBits handle_type);
-    VkResult import_handle(ExternalHandle ext_handle, VkExternalSemaphoreHandleTypeFlagBits handle_type,
+#ifdef VK_USE_PLATFORM_WIN32_KHR
+    VkResult export_handle(HANDLE &win32_handle, VkExternalSemaphoreHandleTypeFlagBits handle_type);
+    VkResult import_handle(HANDLE win32_handle, VkExternalSemaphoreHandleTypeFlagBits handle_type,
                            VkSemaphoreImportFlags flags = 0);
+#endif
+    VkResult export_handle(int &fd_handle, VkExternalSemaphoreHandleTypeFlagBits handle_type);
+    VkResult import_handle(int fd_handle, VkExternalSemaphoreHandleTypeFlagBits handle_type, VkSemaphoreImportFlags flags = 0);
 
     static VkSemaphoreCreateInfo create_info(VkFlags flags);
 };
@@ -516,10 +512,12 @@ class Buffer : public internal::NonDispHandle<VkBuffer> {
     // vkGetObjectMemoryRequirements()
     VkMemoryRequirements memory_requirements() const;
 
-    // vkBindObjectMemory()
+    // Allocate and bind memory
+    // The assumption that this object was created in no_mem configuration
+    void allocate_and_bind_memory(const Device &dev, VkMemoryPropertyFlags mem_props = 0, void *alloc_info_pnext = nullptr);
+
+    // Bind to existing memory object
     void bind_memory(const DeviceMemory &mem, VkDeviceSize mem_offset);
-    // Bind to internal_mem_ reference
-    void bind_memory(const Device &dev, VkMemoryPropertyFlags mem_props, VkDeviceSize mem_offset);
 
     const VkBufferCreateInfo &create_info() const { return create_info_; }
     static VkBufferCreateInfo create_info(VkDeviceSize size, VkFlags usage, const std::vector<uint32_t> *queue_families = nullptr,
@@ -611,7 +609,11 @@ class Image : public internal::NonDispHandle<VkImage> {
     // vkGetObjectMemoryRequirements()
     VkMemoryRequirements memory_requirements() const;
 
-    // vkBindObjectMemory()
+    // Allocate and bind memory
+    // The assumption that this object was created in no_mem configuration
+    void allocate_and_bind_memory(const Device &dev, VkMemoryPropertyFlags mem_props = 0, void *alloc_info_pnext = nullptr);
+
+    // Bind to existing memory object
     void bind_memory(const DeviceMemory &mem, VkDeviceSize mem_offset);
 
     // vkGetImageSubresourceLayout()
@@ -940,7 +942,9 @@ class CommandBuffer : public internal::Handle<VkCommandBuffer> {
 class RenderPass : public internal::NonDispHandle<VkRenderPass> {
   public:
     RenderPass() = default;
+    // vkCreateRenderPass()
     RenderPass(const Device &dev, const VkRenderPassCreateInfo &info) { init(dev, info); }
+    // vkCreateRenderPass2()
     RenderPass(const Device &dev, const VkRenderPassCreateInfo2 &info, bool khr = false) { init(dev, info, khr); }
     ~RenderPass() noexcept;
     void destroy() noexcept;
@@ -966,10 +970,10 @@ class Framebuffer : public internal::NonDispHandle<VkFramebuffer> {
 class SamplerYcbcrConversion : public internal::NonDispHandle<VkSamplerYcbcrConversion> {
   public:
     SamplerYcbcrConversion() = default;
-    SamplerYcbcrConversion(const Device &dev, VkFormat format, bool khr) : khr_(khr) {
+    SamplerYcbcrConversion(const Device &dev, VkFormat format, bool khr = false) : khr_(khr) {
         init(dev, DefaultConversionInfo(format), khr);
     }
-    SamplerYcbcrConversion(const Device &dev, const VkSamplerYcbcrConversionCreateInfo &info, bool khr) : khr_(khr) {
+    SamplerYcbcrConversion(const Device &dev, const VkSamplerYcbcrConversionCreateInfo &info, bool khr = false) : khr_(khr) {
         init(dev, info, khr);
     }
     ~SamplerYcbcrConversion() noexcept;
@@ -1227,25 +1231,31 @@ struct GraphicsPipelineFromLibraries {
     VkPipelineLibraryCreateInfoKHR link_info;
     vk_testing::Pipeline pipe;
 
-    GraphicsPipelineFromLibraries(const Device &dev, vvl::span<VkPipeline> libs, VkGraphicsPipelineCreateInfo *ci = nullptr)
-        : libs(libs) {
-        link_info = LvlInitStruct<VkPipelineLibraryCreateInfoKHR>();
-        link_info.libraryCount = static_cast<uint32_t>(libs.size());
-        link_info.pLibraries = libs.data();
+    GraphicsPipelineFromLibraries(const Device &dev, vvl::span<VkPipeline> libs, VkPipelineLayout layout)
+        : GraphicsPipelineFromLibraries(libs) {
+        auto exe_pipe_ci = LvlInitStruct<VkGraphicsPipelineCreateInfo>(&link_info);
+        exe_pipe_ci.layout = layout;
+        pipe.init(dev, exe_pipe_ci);
+        pipe.initialized();
+    }
 
-        if (ci) {
-            link_info.pNext = ci->pNext;
-            ci->pNext = &link_info;
-            pipe.init(dev, *ci);
-        } else {
-            auto exe_pipe_ci = LvlInitStruct<VkGraphicsPipelineCreateInfo>(&link_info);
-            pipe.init(dev, exe_pipe_ci);
-        }
+    GraphicsPipelineFromLibraries(const Device &dev, vvl::span<VkPipeline> libs, VkGraphicsPipelineCreateInfo &ci)
+        : GraphicsPipelineFromLibraries(libs) {
+        link_info.pNext = ci.pNext;
+        ci.pNext = &link_info;
+        pipe.init(dev, ci);
         pipe.initialized();
     }
 
     operator VkPipeline() const { return pipe.handle(); }
     operator bool() const { return pipe.initialized(); }
+
+  private:
+    GraphicsPipelineFromLibraries(vvl::span<VkPipeline> libs) : libs(libs) {
+        link_info = LvlInitStruct<VkPipelineLibraryCreateInfoKHR>();
+        link_info.libraryCount = static_cast<uint32_t>(libs.size());
+        link_info.pLibraries = libs.data();
+    }
 };
 
 }  // namespace vk_testing

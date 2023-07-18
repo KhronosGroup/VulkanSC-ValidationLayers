@@ -38,19 +38,10 @@
 [[maybe_unused]] static const char *kVUID_Core_DrawState_QueueForwardProgress = "UNASSIGNED-CoreValidation-DrawState-QueueForwardProgress";
 [[maybe_unused]] static const char *kVUID_Core_DrawState_InvalidImageView = "UNASSIGNED-CoreValidation-DrawState-InvalidImageView";
 
-[[maybe_unused]] static const char *kVUID_Core_Shader_InputNotProduced = "UNASSIGNED-CoreValidation-Shader-InputNotProduced";
-[[maybe_unused]] static const char *kVUID_Core_Shader_InterfaceTypeMismatch = "UNASSIGNED-CoreValidation-Shader-InterfaceTypeMismatch";
-[[maybe_unused]] static const char *kVUID_Core_Shader_AtomicFeature = "UNASSIGNED-CoreValidation-Shader-AtomicFeature";
-[[maybe_unused]] static const char *kVUID_Core_Shader_OutputNotConsumed = "UNASSIGNED-CoreValidation-Shader-OutputNotConsumed";
-[[maybe_unused]] static const char *kVUID_Core_Shader_NoAlphaAtLocation0WithAlphaToCoverage = "UNASSIGNED-CoreValidation-Shader-NoAlphaAtLocation0WithAlphaToCoverage";
-
 [[maybe_unused]] static const char *kVUID_Core_BindImageMemory_Swapchain = "UNASSIGNED-CoreValidation-BindImageMemory-Swapchain";
 
-[[maybe_unused]] static const char *kVUID_Core_PushDescriptorUpdate_TemplateType = "UNASSIGNED-CoreValidation-vkCmdPushDescriptorSetWithTemplateKHR-descriptorUpdateTemplate-templateType";
-[[maybe_unused]] static const char *kVUID_Core_PushDescriptorUpdate_Template_SetMismatched = "UNASSIGNED-CoreValidation-vkCmdPushDescriptorSetWithTemplateKHR-set";
-[[maybe_unused]] static const char *kVUID_Core_PushDescriptorUpdate_Template_LayoutMismatched = "UNASSIGNED-CoreValidation-vkCmdPushDescriptorSetWithTemplateKHR-layout";
-
 // TODO - Need to be moved to Best Practice
+[[maybe_unused]] static const char *kVUID_Core_Shader_OutputNotConsumed = "UNASSIGNED-CoreValidation-Shader-OutputNotConsumed";
 [[maybe_unused]] static const char *kVUID_Core_Swapchain_PriorCount = "UNASSIGNED-CoreValidation-SwapchainPriorCount";
 [[maybe_unused]] static const char *kVUID_Core_Swapchain_PreTransform = "UNASSIGNED-CoreValidation-SwapchainPreTransform";
 [[maybe_unused]] static const char *kVUID_Core_Image_InvalidFormatLimitsViolation = "UNASSIGNED-CoreValidation-Image-InvalidFormatLimitsViolation";

@@ -19,12 +19,12 @@
 #include <algorithm>
 #include <cmath>
 
-#include "vk_enum_string_helper.h"
-#include "vk_format_utils.h"
+#include "generated/vk_enum_string_helper.h"
+#include "generated/vk_format_utils.h"
+#include "generated/vk_typemap_helper.h"
 #include "utils/vk_layer_utils.h"
-#include "vk_typemap_helper.h"
 
-#include "chassis.h"
+#include "generated/chassis.h"
 #include "vulkansc/state_tracker/sc_state_tracker.h"
 #include "core_checks/core_validation.h"
 

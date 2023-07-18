@@ -40,7 +40,9 @@ test suites, within them a dictionary of individual test cases or the
 value of the entries indicating the test suite name to replace the
 source test suite name so that appropriate custom test framework
 utilities get applied to them. If the value is "false" instead of a
-test suite, then the test case is disabled
+test suite, then the test case is disabled.
+For test suite names starting with "Negative" and "Positive" we just
+use the original name by default.
 
 Program Options
 ---------------
@@ -70,11 +72,13 @@ test CMake build to determine the set of test case source files.
 import argparse, os, json, pathlib, re
 
 def convert_test_file(args, filename, data, converted_cases):
-    with open(f'{args.testdir}/{filename}', 'r') as input, open(f'{args.testdir}/vulkansc/converted/{filename}', 'w') as output:
+    result = True
+    missing_group_rule = set()
+    missing_case_rule = set()
+
+    with open(f'{args.testdir}/unit/{filename}', 'r') as input, open(f'{args.testdir}/vulkansc/converted/{filename}', 'w') as output:
         output.write('// *** THIS FILE IS GENERATED - DO NOT EDIT ***\n')
         output.write('// See vksc_convert_tests.py for modifications\n')
-        output.write('\n')
-        output.write('#include "../../framework/vksc_compatible_layer_validation_tests.h"\n')
         output.write('\n')
         for line in input:
             m = re.search('\s*TEST_F\(\s*(\w+)\s*,\s*(\w+)\s*\)', line)
@@ -86,30 +90,51 @@ def convert_test_file(args, filename, data, converted_cases):
 
                 if test_suite in data:
                     group_data = data[test_suite]
+                elif test_suite.startswith('Negative') or test_suite.startswith('Positive'):
+                    # Just default to using the name of the test group
+                    group_data = {
+                        '*': test_suite
+                    }
                 else:
-                    print(f'ERROR: Could not find rule for test suite "{test_suite}" in file "{filename}"')
-                    exit(1)
+                    if test_suite not in missing_group_rule:
+                        print(f'ERROR: Could not find rule for test suite "{test_suite}" in file "{filename}"')
+                        missing_group_rule.add(test_suite)
+                    result = False
+                    output.write(line)
+                    continue
 
                 if test_case in group_data:
                     case_data = group_data[test_case]
                 elif '*' in group_data:
                     case_data = group_data['*']
+                elif test_suite.startswith('Negative') or test_suite.startswith('Positive'):
+                    # Just default to using the name of the test group
+                    case_data = test_suite
                 else:
-                    print(f'ERROR: Could not find rule for test case "{test_suite}.{test_case}" in file "{filename}"')
-                    exit(1)
+                    full_case_name = f"{test_suite}.{test_case}"
+                    if full_case_name not in missing_case_rule:
+                        print(f'ERROR: Could not find rule for test case "{full_case_name}" in file "{filename}"')
+                        missing_case_rule.add(full_case_name)
+                    result = False
+                    output.write(line)
+                    continue
 
                 if not test_suite in converted_cases:
                     converted_cases[test_suite] = {}
                 if not test_case in converted_cases[test_suite]:
                     converted_cases[test_suite][test_case] = True
                 else:
-                    print(f'ERROR: Duplicate test case test case "{test_suite}.{test_case}" in file "{filename}"')
-                    exit(1)
+                    print(f'ERROR: Duplicate test case "{test_suite}.{test_case}" in file "{filename}"')
+                    result = False
+                    output.write(line)
+                    continue
 
                 if case_data == False:
                     output.write(line.replace(test_case, f"DISABLED_{test_case}"))
                 else:
                     output.write(line.replace(test_suite, case_data))
+
+    return result
 
 
 if __name__ == '__main__':
@@ -143,37 +168,29 @@ if __name__ == '__main__':
     filenames = []
     converted_cases = {}
 
-    for filename in sorted(os.listdir(f'{args.testdir}/negative')):
-        full_filename = f'negative/{filename}'
-        filenames.append(full_filename)
-        convert_test_file(args, full_filename, data, converted_cases)
-
-    for filename in sorted(os.listdir(f'{args.testdir}/positive')):
-        full_filename = f'positive/{filename}'
-        filenames.append(full_filename)
-        convert_test_file(args, full_filename, data, converted_cases)
+    result = True
+    for filename in sorted(os.listdir(f'{args.testdir}/unit')):
+        filenames.append(filename)
+        if not convert_test_file(args, filename, data, converted_cases):
+            result = False
 
     for test_suite in data:
         if not test_suite in converted_cases:
             print(f'ERROR: Could not find test suite for rule "{test_suite}"')
-            exit(1)
+            result = False
         for test_case in data[test_suite]:
             if not test_case.startswith('@') and test_case != "*":
                 if not test_case in converted_cases[test_suite]:
                     print(f'ERROR: Could not find test case for rule "{test_suite}.{test_case}"')
-                    exit(1)
+                    result = False
 
-    for filename in sorted(os.listdir(f'{args.testdir}/vulkansc/converted/negative')):
-        full_filename = f'negative/{filename}'
-        if not full_filename in filenames:
-            print(f'WARNING: Deleting no longer existing converted test case file "{full_filename}"')
-            os.remove(f'{args.testdir}/vulkansc/converted/{full_filename}')
+    if not result:
+        exit(1)
 
-    for filename in sorted(os.listdir(f'{args.testdir}/vulkansc/converted/positive')):
-        full_filename = f'positive/{filename}'
-        if not full_filename in filenames:
-            print(f'WARNING: Deleting no longer existing converted test case file "{full_filename}"')
-            os.remove(f'{args.testdir}/vulkansc/converted/{full_filename}')
+    for filename in sorted(os.listdir(f'{args.testdir}/vulkansc/converted')):
+        if not filename in filenames:
+            print(f'WARNING: Deleting no longer existing converted test case file "{filename}"')
+            os.remove(f'{args.testdir}/vulkansc/converted/{filename}')
 
 
     with open(f'{args.testdir}/vulkansc/convertedTests.cmake', 'w') as cmake:

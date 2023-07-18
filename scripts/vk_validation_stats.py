@@ -17,7 +17,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import argparse
-import common_codegen
 import csv
 import glob
 import html
@@ -32,20 +31,15 @@ from collections import defaultdict
 from collections import OrderedDict
 from dataclasses import dataclass
 
+# helper to define paths relative to the repo root
+def repo_relative(path):
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), '..', path))
+
 verbose_mode = False
 vuid_prefixes = ['VUID-', 'UNASSIGNED-', 'kVUID_']
 
 # Hard-coded flags that could be command line args, if we decide that's useful
 ignore_unassigned = True # These are not found in layer code unless they appear explicitly (most don't), so produce false positives
-
-test_source_files = glob.glob(os.path.join(common_codegen.repo_relative('tests'), '*.cpp'))
-
-unassigned_vuid_files = [common_codegen.repo_relative(path) for path in [
-    'layers/best_practices/best_practices_error_enums.h',
-    'layers/stateless/stateless_validation.h',
-    'layers/error_message/validation_error_enums.h',
-    'layers/object_tracker/object_lifetime_validation.h'
-]]
 
 # These files should not change unless event there is a major refactoring in SPIR-V Tools
 # Paths are relative from root of SPIR-V Tools repo
@@ -147,7 +141,7 @@ class ValidationJSON:
             print("Warning: duplicate VUIDs found in validusage.json")
 
 
-def buildKvuidDict():
+def buildKvuidDict(unassigned_vuid_files):
     kvuid_dict = {}
 
     for uf in unassigned_vuid_files:
@@ -168,8 +162,9 @@ def buildKvuidDict():
     return kvuid_dict
 
 class ValidationSource:
-    def __init__(self, source_file_list):
+    def __init__(self, source_file_list, unassigned_vuid_files):
         self.source_files = source_file_list
+        self.unassigned_vuid_files = unassigned_vuid_files
         self.vuid_count_dict = {} # dict of vuid values to the count of how much they're used, and location of where they're used
         self.duplicated_checks = 0
         self.explicit_vuids = set()
@@ -178,7 +173,7 @@ class ValidationSource:
         self.all_vuids = set()
 
     def parse(self, spirv_val):
-        kvuid_dict = buildKvuidDict()
+        kvuid_dict = buildKvuidDict(self.unassigned_vuid_files)
 
         if spirv_val and spirv_val.enabled:
             self.source_files.extend(spirv_val.source_files)
@@ -250,11 +245,10 @@ class ValidationSource:
 
 # Class to parse the validation layer test source and store testnames
 class ValidationTests:
-    def __init__(self, test_file_list, test_group_name=['VkLayerTest', 'VkPositiveLayerTest', 'VkBestPracticesLayerTest']):
+    def __init__(self, test_file_list, unassigned_vuid_files):
         self.test_files = test_file_list
-        self.test_trigger_txt_list = []
-        for tg in test_group_name:
-            self.test_trigger_txt_list.append('TEST_F(%s' % tg)
+        self.unassigned_vuid_files = unassigned_vuid_files
+        self.test_trigger_txt_list = ['TEST_F(']
         self.explicit_vuids = set()
         self.implicit_vuids = set()
         self.unassigned_vuids = set()
@@ -264,7 +258,7 @@ class ValidationTests:
 
     # Parse test files into internal data struct
     def parse(self, spirv_val):
-        kvuid_dict = buildKvuidDict()
+        kvuid_dict = buildKvuidDict(self.unassigned_vuid_files)
 
         if spirv_val and spirv_val.enabled:
             self.test_files.extend(spirv_val.test_files)
@@ -299,6 +293,8 @@ class ValidationTests:
                         if ('' == testname):
                             grab_next_line = True
                             continue
+                        testgroup = line.split(',')[0][line.index('(') + 1:]
+                        testname = testgroup + '.' + testname
                         #self.test_to_vuids[testname] = []
                     if grab_next_line: # test name on its own line
                         grab_next_line = False
@@ -361,7 +357,6 @@ class Consistency:
             unassigned = set({uv for uv in undef_set if uv.startswith('UNASSIGNED-')})
             undef_set = undef_set - unassigned
         if (len(undef_set) > 0):
-            ok = False
             print("\nFollowing VUIDs found in layer tests are not defined in validusage.json (%d):" % len(undef_set))
             undef = list(undef_set)
             undef.sort()
@@ -381,7 +376,6 @@ class Consistency:
                     unassigned.add(vuid)
             undef_set = undef_set - unassigned
         if (len(undef_set) > 0):
-            ok = False
             print("\nFollowing VUIDs found in tests but are not checked in layer code (%d):" % len(undef_set))
             undef = list(undef_set)
             undef.sort()
@@ -593,14 +587,16 @@ static const vuid_spec_text_pair vuid_spec_text[] = {
                 assert features
 
                 def isDefined(feature, edition):
-                    def getVersion(f): return int(f.replace('VK_VERSION_1_', '', 1).replace('VKSC_VERSION_1_', '', 1))
-                    def isVersion(f): return (f.startswith('VK_VERSION_') or f.startswith('VKSC_VERSION_')) and feature != 'VK_VERSION_1_0' and getVersion(feature) < 1024
+                    def getVersion(f): return int(f.replace('VK_VERSION_1_', '', 1))
+                    def isVersion(f): return f.startswith('VK_VERSION_') and feature != 'VK_VERSION_1_0' and getVersion(feature) < 1024
+                    def isScVersion(f): return f.startswith('VKSC_VERSION_')
                     def isExtension(f): return f.startswith('VK_') and not isVersion(f)
                     def isKhr(f): return f.startswith('VK_KHR_')
 
-                    assert isExtension(feature) or isVersion(feature)
+                    assert isExtension(feature) or isVersion(feature) or isScVersion(feature)
 
                     if isVersion(feature) and getVersion(feature) <= edition['version']: return True
+                    elif isScVersion(feature): return True
                     elif isExtension(feature) and edition['ext']: return True
                     elif isKhr(feature) and edition['khr']: return True
                     else: return False
@@ -648,7 +644,11 @@ static const vuid_spec_text_pair vuid_spec_text[] = {
                 else: spec_url_id = '1.%s' % spec_list[0]['version']
 
                 # Escape quotes and backslashes when generating C strings for source code
-                db_text = db_entry['text'].replace('\\', '\\\\').replace('"', '\\"')
+                db_text = db_entry['text'].replace('\\', '\\\\').replace('"', '\\"').strip()
+                html_remove_tags = re.compile('<.*?>|&([a-z0-9]+|#[0-9]{1,6}|#x[0-9a-f]{1,6});')
+                db_text = re.sub(html_remove_tags, '', db_text)
+                # In future we could use the `/n` to add new lines to a pretty print in the console
+                db_text = db_text.replace('\n', ' ')
                 hfile.write('    {"%s", "%s", "%s"},\n' % (vuid, db_text, spec_url_id))
                 # For multiply-defined VUIDs, include versions with extension appended
                 if len(self.vj.vuid_db[vuid]) > 1:
@@ -657,7 +657,7 @@ static const vuid_spec_text_pair vuid_spec_text[] = {
 
 class SpirvValidation:
     def __init__(self, repo_path):
-        self.enabled = (repo_path != None)
+        self.enabled = (repo_path is not None)
         self.repo_path = repo_path
         self.version = 'unknown'
         self.source_files = []
@@ -669,7 +669,7 @@ class SpirvValidation:
         self.test_implicit_vuids = set()
 
     def load(self, verbose):
-        if self.enabled == False:
+        if self.enabled is False:
             return
         # Get hash from git if available
         try:
@@ -731,6 +731,44 @@ def main(argv):
                         help='show your work (to stdout)')
     args = parser.parse_args()
 
+    # We need python modules found in the registry directory. This assumes that the validusage.json file is in that directory,
+    # and hasn't been copied elsewhere.
+    registry_dir = os.path.dirname(args.json_file)
+    sys.path.insert(0, registry_dir)
+
+    layer_source_files = [repo_relative(path) for path in [
+        'layers/error_message/unimplementable_validation.h',
+        'layers/state_tracker/cmd_buffer_state.cpp', # some Video VUIDs are in here
+        'layers/state_tracker/descriptor_sets.cpp',
+        'layers/state_tracker/shader_module.cpp',
+        'layers/gpu_validation/gpu_vuids.h',
+        'layers/stateless/stateless_validation.h',
+        f'layers/{args.api}/generated/stateless_validation_helper.cpp',
+        f'layers/{args.api}/generated/object_tracker.cpp',
+        f'layers/{args.api}/generated/spirv_validation_helper.cpp',
+        f'layers/{args.api}/generated/command_validation.cpp',
+    ]]
+    # Be careful not to add vk_validation_error_messages.h or it will show 100% test coverage
+    layer_source_files.extend(glob.glob(os.path.join(repo_relative('layers/core_checks/'), '*.cpp')))
+    layer_source_files.extend(glob.glob(os.path.join(repo_relative('layers/stateless/'), '*.cpp')))
+    layer_source_files.extend(glob.glob(os.path.join(repo_relative('layers/sync/'), '*.cpp')))
+    layer_source_files.extend(glob.glob(os.path.join(repo_relative('layers/object_tracker/'), '*.cpp')))
+
+    test_source_files = glob.glob(os.path.join(repo_relative('tests/unit'), '*.cpp'))
+
+    if args.api == 'vulkansc':
+        layer_source_files.extend(glob.glob(os.path.join(repo_relative('layers/vulkansc/core_checks/'), '*.cpp')))
+        test_source_files = glob.glob(os.path.join(repo_relative('tests/vulkansc/converted'), '*.cpp'))
+        test_source_files.extend(glob.glob(os.path.join(repo_relative('tests/vulkansc/negative'), '*.cpp')))
+        test_source_files.extend(glob.glob(os.path.join(repo_relative('tests/vulkansc/positive'), '*.cpp')))
+
+    unassigned_vuid_files = [repo_relative(path) for path in [
+        'layers/best_practices/best_practices_error_enums.h',
+        'layers/stateless/stateless_validation.h',
+        'layers/error_message/validation_error_enums.h',
+        'layers/object_tracker/object_lifetime_validation.h'
+    ]]
+
     global verbose_mode
     verbose_mode = args.verbose
 
@@ -755,48 +793,8 @@ def main(argv):
                 for ext in val_json.vuid_db[vuid]:
                     print("    with extension: %s" % ext['ext'])
 
-    layer_source_files = [common_codegen.repo_relative(path) for path in [
-        'layers/core_checks/android_validation.cpp',
-        'layers/core_checks/buffer_validation.cpp',
-        'layers/state_tracker/cmd_buffer_state.cpp', # some Video VUIDs are in here
-        'layers/core_checks/cmd_buffer_dynamic_validation.cpp',
-        'layers/core_checks/cmd_buffer_validation.cpp',
-        'layers/core_checks/copy_blit_resolve_validation.cpp',
-        'layers/state_tracker/descriptor_sets.cpp',
-        'layers/core_checks/descriptor_validation.cpp',
-        'layers/core_checks/device_validation.cpp',
-        'layers/core_checks/device_memory_validation.cpp',
-        'layers/core_checks/drawdispatch_validation.cpp',
-        'layers/core_checks/external_object_validation.cpp',
-        'layers/gpu_validation/gpu_vuids.h',
-        'layers/stateless/parameter_validation_utils.cpp',
-        'layers/core_checks/image_validation.cpp',
-        'layers/core_checks/image_layout_validation.cpp',
-        'layers/core_checks/pipeline_validation.cpp',
-        'layers/object_tracker/object_tracker_utils.cpp',
-        'layers/core_checks/query_validation.cpp',
-        'layers/core_checks/queue_validation.cpp',
-        'layers/core_checks/ray_tracing_validation.cpp',
-        'layers/core_checks/render_pass_validation.cpp',
-        'layers/state_tracker/shader_module.cpp',
-        'layers/core_checks/shader_validation.cpp',
-        'layers/core_checks/synchronization_validation.cpp',
-        'layers/stateless/stateless_validation.h',
-        'layers/sync/sync_validation.cpp',
-        'layers/sync/sync_vuid_maps.cpp',
-        'layers/core_checks/video_validation.cpp',
-        'layers/core_checks/wsi_validation.cpp',
-        f'layers/{args.api}/generated/parameter_validation.cpp',
-        f'layers/{args.api}/generated/object_tracker.cpp',
-        f'layers/{args.api}/generated/spirv_validation_helper.cpp',
-        f'layers/{args.api}/generated/command_validation.cpp',
-    ]]
-
-    if args.api == 'vulkansc':
-        layer_source_files.extend(glob.glob(os.path.join(common_codegen.repo_relative('layers/vulkansc/core_checks/'), '*.cpp')))
-
     # Parse layer source files
-    val_source = ValidationSource(layer_source_files)
+    val_source = ValidationSource(layer_source_files, unassigned_vuid_files)
     val_source.parse(spirv_val)
     exp_checks = len(val_source.explicit_vuids)
     imp_checks = len(val_source.implicit_vuids)
@@ -816,7 +814,7 @@ def main(argv):
         print("  %d checks are implemented more that once" % val_source.duplicated_checks)
 
     # Parse test files
-    val_tests = ValidationTests(test_source_files)
+    val_tests = ValidationTests(test_source_files, unassigned_vuid_files)
     val_tests.parse(spirv_val)
     exp_tests = len(val_tests.explicit_vuids)
     imp_tests = len(val_tests.implicit_vuids)
@@ -860,7 +858,7 @@ def main(argv):
 
     # Report status of a single VUID
     if args.vuid:
-        print("\n\nChecking status of <%s>" % args.vuid);
+        print("\n\nChecking status of <%s>" % args.vuid)
         if args.vuid not in val_json.all_vuids and not args.vuid.startswith('UNASSIGNED-'):
             print('  Not a valid VUID string.')
         else:
@@ -878,7 +876,7 @@ def main(argv):
                 print('  Not implemented.')
             if args.vuid in val_tests.all_vuids:
                 print('  Has a test!')
-                test_list = val_tests.vuid_to_tests[get_vuid_status]
+                test_list = val_tests.vuid_to_tests[args.vuid]
                 for test in test_list:
                     print('    => %s' % test)
             else:

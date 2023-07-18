@@ -27,8 +27,8 @@
 #include <bitset>
 #include <iomanip>
 #include "cast_utils.h"
-#include "vk_extension_helper.h"
-#include "vk_format_utils.h"
+#include "generated/vk_extension_helper.h"
+#include "generated/vk_format_utils.h"
 #include "error_message/logging.h"
 
 #ifndef WIN32
@@ -40,7 +40,19 @@
 #define STRINGIFY(s) STRINGIFY_HELPER(s)
 #define STRINGIFY_HELPER(s) #s
 
+#if defined __PRETTY_FUNCTION__
+#define VVL_PRETTY_FUNCTION __PRETTY_FUNCTION__
+#else
+// For MSVC
+#if defined(__FUNCSIG__)
+#define VVL_PRETTY_FUNCTION __FUNCSIG__
+#else
+#define VVL_PRETTY_FUNCTION __FILE__ ":" STRINGIFY(__LINE__)
+#endif
+#endif
+
 #ifdef __cplusplus
+
 static inline VkExtent3D CastTo3D(const VkExtent2D &d2) {
     VkExtent3D d3 = {d2.width, d2.height, 1};
     return d3;
@@ -205,6 +217,29 @@ constexpr T Align(T x, T p2) {
 // Returns the 0-based index of the LSB. An input mask of 0 yields -1
 static inline int LeastSignificantBit(uint32_t mask) { return u_ffs(static_cast<int>(mask)) - 1; }
 
+// Compute a binomial coefficient
+template <typename T>
+constexpr T binom(T n, T k) {
+    static_assert(std::numeric_limits<T>::is_integer, "Unsigned integer required.");
+    static_assert(std::is_unsigned<T>::value, "Unsigned integer required.");
+    assert(n >= k);
+    if (n == 0) {
+        return 0;
+    }
+    if (k == 0) {
+        return 1;
+    }
+
+    T numerator = 1;
+    T denominator = 1;
+    for (T i = 1; i <= k; ++i) {
+        numerator *= n - i + 1;
+        denominator *= i;
+    }
+
+    return numerator / denominator;
+}
+
 template <typename FlagBits, typename Flags>
 FlagBits LeastSignificantFlag(Flags flags) {
     const int bit_shift = LeastSignificantBit(flags);
@@ -271,6 +306,12 @@ static inline bool IsImageLayoutReadOnly(VkImageLayout layout) {
                        [layout](const VkImageLayout read_only_layout) { return layout == read_only_layout; });
 }
 
+static inline bool IsImageLayoutDepthOnly(VkImageLayout layout) {
+    constexpr std::array depth_only_layouts = {VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL};
+    return std::any_of(depth_only_layouts.begin(), depth_only_layouts.end(),
+                       [layout](const VkImageLayout read_only_layout) { return layout == read_only_layout; });
+}
+
 static inline bool IsImageLayoutDepthReadOnly(VkImageLayout layout) {
     constexpr std::array read_only_layouts = {
         VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
@@ -279,6 +320,13 @@ static inline bool IsImageLayoutDepthReadOnly(VkImageLayout layout) {
         VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL,
     };
     return std::any_of(read_only_layouts.begin(), read_only_layouts.end(),
+                       [layout](const VkImageLayout read_only_layout) { return layout == read_only_layout; });
+}
+
+static inline bool IsImageLayoutStencilOnly(VkImageLayout layout) {
+    constexpr std::array depth_only_layouts = {VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL,
+                                               VK_IMAGE_LAYOUT_STENCIL_READ_ONLY_OPTIMAL};
+    return std::any_of(depth_only_layouts.begin(), depth_only_layouts.end(),
                        [layout](const VkImageLayout read_only_layout) { return layout == read_only_layout; });
 }
 
@@ -340,6 +388,33 @@ static inline uint32_t GetPlaneIndex(VkImageAspectFlags aspect) {
     }
 }
 
+// vkspec.html#formats-planes-image-aspect
+static inline bool IsValidPlaneAspect(VkFormat format, VkImageAspectFlags aspect_mask) {
+    const uint32_t planes = FormatPlaneCount(format);
+    constexpr VkImageAspectFlags valid_planes =
+        VK_IMAGE_ASPECT_PLANE_0_BIT | VK_IMAGE_ASPECT_PLANE_1_BIT | VK_IMAGE_ASPECT_PLANE_2_BIT;
+
+    if (((aspect_mask & valid_planes) == aspect_mask) && (aspect_mask != 0)) {
+        if ((planes == 3) || ((planes == 2) && ((aspect_mask & VK_IMAGE_ASPECT_PLANE_2_BIT) == 0))) {
+            return true;
+        }
+    }
+    return false;  // Expects calls to make sure it is a multi-planar format
+}
+
+static inline bool IsOnlyOneValidPlaneAspect(VkFormat format, VkImageAspectFlags aspect_mask) {
+    const bool multiple_bits = aspect_mask != 0 && !IsPowerOfTwo(aspect_mask);
+    return !multiple_bits && IsValidPlaneAspect(format, aspect_mask);
+}
+
+static inline bool IsMultiplePlaneAspect(VkImageAspectFlags aspect_mask) {
+    // If checking for multiple planes, there will already be another check if valid for plane count
+    constexpr VkImageAspectFlags valid_planes =
+        VK_IMAGE_ASPECT_PLANE_0_BIT | VK_IMAGE_ASPECT_PLANE_1_BIT | VK_IMAGE_ASPECT_PLANE_2_BIT;
+    const VkImageAspectFlags planes = aspect_mask & valid_planes;
+    return planes != 0 && !IsPowerOfTwo(planes);
+}
+
 // all "advanced blend operation" found in spec
 static inline bool IsAdvanceBlendOperation(const VkBlendOp blend_op) {
     return (static_cast<int>(blend_op) >= VK_BLEND_OP_ZERO_EXT) && (static_cast<int>(blend_op) <= VK_BLEND_OP_BLUE_EXT);
@@ -359,6 +434,8 @@ static inline bool IsBetweenInclusive(VkDeviceSize value, VkDeviceSize min, VkDe
 static inline bool IsBetweenInclusive(const VkExtent2D &value, const VkExtent2D &min, const VkExtent2D &max) {
     return IsBetweenInclusive(value.width, min.width, max.width) && IsBetweenInclusive(value.height, min.height, max.height);
 }
+
+static inline bool IsBetweenInclusive(float value, float min, float max) { return (value >= min) && (value <= max); }
 
 // Check if value is integer multiple of granularity
 static inline bool IsIntegerMultipleOf(VkDeviceSize value, VkDeviceSize granularity) {
@@ -388,6 +465,18 @@ static inline VkDeviceSize SafeDivision(VkDeviceSize dividend, VkDeviceSize divi
         result = dividend / divisor;
     }
     return result;
+}
+
+inline std::optional<VkDeviceSize> ComputeValidSize(VkDeviceSize offset, VkDeviceSize size, VkDeviceSize whole_size) {
+    std::optional<VkDeviceSize> valid_size;
+    if (offset < whole_size) {
+        if (size == VK_WHOLE_SIZE) {
+            valid_size.emplace(whole_size - offset);
+        } else if ((offset + size) <= whole_size) {
+            valid_size.emplace(size);
+        }
+    }
+    return valid_size;
 }
 
 // Only 32 bit fields should need a bit count
@@ -457,6 +546,21 @@ constexpr uint32_t ResolveRemainingLayers(const VkImageCreateInfo &ci, VkImageSu
     return (range.layerCount == VK_REMAINING_ARRAY_LAYERS) ? (ci.arrayLayers - range.baseArrayLayer) : range.layerCount;
 }
 
+// Find whether or not an element is in list
+// Two definitions, to be able to do the following calls:
+// IsValueIn(1, {1, 2, 3});
+// std::array arr {1, 2, 3};
+// IsValueIn(1, arr);
+template <typename T, typename RANGE>
+bool IsValueIn(const T &v, const RANGE &range) {
+    return std::find(std::begin(range), std::end(range), v) != std::end(range);
+}
+
+template <typename T>
+bool IsValueIn(const T &v, const std::initializer_list<T> &list) {
+    return IsValueIn<T, decltype(list)>(v, list);
+}
+
 extern "C" {
 #endif
 
@@ -497,6 +601,11 @@ class LockedSharedPtr : public std::shared_ptr<T> {
   private:
     Guard guard_;
 };
+
+// https://en.cppreference.com/w/cpp/thread/hardware_destructive_interference_size
+// https://en.wikipedia.org/wiki/False_sharing
+// TODO use C++20 to check for std::hardware_destructive_interference_size feature support.
+constexpr std::size_t get_hardware_destructive_interference_size() { return 64; }
 
 // Limited concurrent_unordered_map that supports internally-synchronized
 // insert/erase/access. Splits locking across N buckets and uses shared_mutex
@@ -653,11 +762,10 @@ class vl_concurrent_unordered_map {
     static const int BUCKETS = (1 << BUCKETSLOG2);
 
     vvl::unordered_map<Key, T, Hash> maps[BUCKETS];
-    struct {
-        mutable std::shared_mutex lock;
-        // Put each lock on its own cache line to avoid false cache line sharing.
-        char padding[(-int(sizeof(std::shared_mutex))) & 63];
-    } locks[BUCKETS];
+    struct alignas(get_hardware_destructive_interference_size()) AlignedSharedMutex {
+        std::shared_mutex lock;
+    };
+    mutable std::array<AlignedSharedMutex, BUCKETS> locks;
 
     uint32_t ConcurrentMapHashObject(const Key &object) const {
         uint64_t u64 = (uint64_t)(uintptr_t)object;
@@ -667,4 +775,41 @@ class vl_concurrent_unordered_map {
         return hash;
     }
 };
+
+static constexpr VkPipelineStageFlags2KHR kFramebufferStagePipelineStageFlags =
+    (VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+     VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+
+static constexpr VkAccessFlags2 kShaderTileImageAllowedAccessFlags =
+    VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+    VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+
+static constexpr bool HasNonFramebufferStagePipelineStageFlags(VkPipelineStageFlags2KHR inflags) {
+    return (inflags & ~kFramebufferStagePipelineStageFlags) != 0;
+}
+
+static constexpr bool HasFramebufferStagePipelineStageFlags(VkPipelineStageFlags2KHR inflags) {
+    return (inflags & kFramebufferStagePipelineStageFlags) != 0;
+}
+
+static constexpr bool HasNonShaderTileImageAccessFlags(VkAccessFlags2 in_flags) {
+    return ((in_flags & ~kShaderTileImageAllowedAccessFlags) != 0);
+}
+
+namespace vvl {
+
+static inline void ToLower(std::string &str) {
+    // std::tolower() returns int which can cause compiler warnings
+    transform(str.begin(), str.end(), str.begin(),
+              [](char c) { return static_cast<char>(std::tolower(c)); });
+}
+
+static inline void ToUpper(std::string &str) {
+    // std::toupper() returns int which can cause compiler warnings
+    transform(str.begin(), str.end(), str.begin(),
+              [](char c) { return static_cast<char>(std::toupper(c)); });
+}
+
+}  // namespace vvl
+
 #endif

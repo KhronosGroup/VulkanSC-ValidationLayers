@@ -11,15 +11,13 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 #include "utils/cast_utils.h"
-#include "enum_flag_bits.h"
+#include "generated/enum_flag_bits.h"
 #include "layer_validation_tests.h"
 #include "utils/vk_layer_utils.h"
 
 #ifdef VK_USE_PLATFORM_WAYLAND_KHR
 #include "wayland-client.h"
 #endif
-
-#include <array>
 
 // Global list of sType,size identifiers
 std::vector<std::pair<uint32_t, uint32_t>> custom_stype_info{};
@@ -186,17 +184,25 @@ void UpdateDescriptor(ThreadTestData *data) {
 
 bool ThreadTimeoutHelper::WaitForThreads(int timeout_in_seconds) {
     std::unique_lock lock(mutex_);
-    return cv_.wait_for(lock, std::chrono::seconds{timeout_in_seconds}, [this] { return active_threads_ == 0; });
+    return cv_.wait_for(lock, std::chrono::seconds{timeout_in_seconds}, [this] {
+        std::lock_guard lock_guard(active_thread_mutex_);
+        return active_threads_ == 0;
+    });
 }
 
 void ThreadTimeoutHelper::OnThreadDone() {
     bool last_worker = false;
     {
-        std::lock_guard lock(mutex_);
+        std::lock_guard lock(active_thread_mutex_);
         active_threads_--;
-        if (!active_threads_) last_worker = true;
+        assert(active_threads_ >= 0);
+        if (!active_threads_) {
+            last_worker = true;
+        }
     }
-    if (last_worker) cv_.notify_one();
+    if (last_worker) {
+        cv_.notify_one();
+    }
 }
 
 void ReleaseNullFence(ThreadTestData *data) {
@@ -208,89 +214,63 @@ void ReleaseNullFence(ThreadTestData *data) {
     }
 }
 
-void TestRenderPassCreate(ErrorMonitor *error_monitor, const VkDevice device, const VkRenderPassCreateInfo *create_info,
+void TestRenderPassCreate(ErrorMonitor *error_monitor, const vk_testing::Device &device, const VkRenderPassCreateInfo &create_info,
                           bool rp2_supported, const char *rp1_vuid, const char *rp2_vuid) {
-    VkRenderPass render_pass = VK_NULL_HANDLE;
-    VkResult err;
-
-    if (nullptr != rp1_vuid) {
+    if (rp1_vuid) {
         // If the second VUID is not provided, set it equal to the first VUID.  In this way,
         // we can check both vkCreateRenderPass and vkCreateRenderPass2 with the same VUID
         // if rp2_supported is true;
-        if (rp2_supported && nullptr == rp2_vuid) {
+        if (rp2_supported && !rp2_vuid) {
             rp2_vuid = rp1_vuid;
         }
 
         error_monitor->SetDesiredFailureMsg(kErrorBit, rp1_vuid);
-        err = vk::CreateRenderPass(device, create_info, nullptr, &render_pass);
-        if (err == VK_SUCCESS) vk::DestroyRenderPass(device, render_pass, nullptr);
+        vk_testing::RenderPass rp(device, create_info);
         error_monitor->VerifyFound();
     }
 
-    if (rp2_supported && nullptr != rp2_vuid) {
-        safe_VkRenderPassCreateInfo2 create_info2 = ConvertVkRenderPassCreateInfoToV2KHR(*create_info);
+    if (rp2_supported && rp2_vuid) {
+        safe_VkRenderPassCreateInfo2 create_info2 = ConvertVkRenderPassCreateInfoToV2KHR(create_info);
 
-        PFN_vkCreateRenderPass2KHR vkCreateRenderPass2KHR =
-            (PFN_vkCreateRenderPass2KHR)vk::GetDeviceProcAddr(device, "vkCreateRenderPass2KHR");
-        // For API version >= 1.2 where the extension was not enabled
+        const auto vkCreateRenderPass2KHR =
+            reinterpret_cast<PFN_vkCreateRenderPass2KHR>(vk::GetDeviceProcAddr(device, "vkCreateRenderPass2KHR"));
+        // For API version < 1.2 where the extension was not enabled
         if (vkCreateRenderPass2KHR) {
             error_monitor->SetDesiredFailureMsg(kErrorBit, rp2_vuid);
-            err = vkCreateRenderPass2KHR(device, create_info2.ptr(), nullptr, &render_pass);
-            if (err == VK_SUCCESS) vk::DestroyRenderPass(device, render_pass, nullptr);
+            vk_testing::RenderPass rp2_khr(device, *create_info2.ptr(), true);
             error_monitor->VerifyFound();
         }
 
-        // For api version >= 1.2, try core entrypoint
-        PFN_vkCreateRenderPass2 vkCreateRenderPass2 = (PFN_vkCreateRenderPass2)vk::GetDeviceProcAddr(device, "vkCreateRenderPass2");
+        const auto vkCreateRenderPass2 =
+            reinterpret_cast<PFN_vkCreateRenderPass2>(vk::GetDeviceProcAddr(device, "vkCreateRenderPass2"));
+        // For API version >= 1.2, try core entrypoint
         if (vkCreateRenderPass2) {
             error_monitor->SetDesiredFailureMsg(kErrorBit, rp2_vuid);
-            err = vkCreateRenderPass2(device, create_info2.ptr(), nullptr, &render_pass);
-            if (err == VK_SUCCESS) vk::DestroyRenderPass(device, render_pass, nullptr);
+            vk_testing::RenderPass rp2_core(device, *create_info2.ptr(), false);
             error_monitor->VerifyFound();
         }
     }
 }
 
-void PositiveTestRenderPassCreate(ErrorMonitor *error_monitor, const VkDevice device, const VkRenderPassCreateInfo *create_info,
-                                  bool rp2_supported) {
-    VkRenderPass render_pass = VK_NULL_HANDLE;
-    VkResult err;
-
-    err = vk::CreateRenderPass(device, create_info, nullptr, &render_pass);
-    if (err == VK_SUCCESS) vk::DestroyRenderPass(device, render_pass, nullptr);
-
+void PositiveTestRenderPassCreate(ErrorMonitor *error_monitor, const vk_testing::Device &device,
+                                  const VkRenderPassCreateInfo &create_info, bool rp2_supported) {
+    vk_testing::RenderPass rp(device, create_info);
     if (rp2_supported) {
-        PFN_vkCreateRenderPass2KHR vkCreateRenderPass2KHR =
-            (PFN_vkCreateRenderPass2KHR)vk::GetDeviceProcAddr(device, "vkCreateRenderPass2KHR");
-        safe_VkRenderPassCreateInfo2 create_info2 = ConvertVkRenderPassCreateInfoToV2KHR(*create_info);
-
-        err = vkCreateRenderPass2KHR(device, create_info2.ptr(), nullptr, &render_pass);
-        if (err == VK_SUCCESS) vk::DestroyRenderPass(device, render_pass, nullptr);
+        vk_testing::RenderPass rp2(device, *ConvertVkRenderPassCreateInfoToV2KHR(create_info).ptr(), true);
     }
 }
 
-void PositiveTestRenderPass2KHRCreate(ErrorMonitor *error_monitor, const VkDevice device,
-                                      const VkRenderPassCreateInfo2KHR *create_info) {
-    VkRenderPass render_pass = VK_NULL_HANDLE;
-    VkResult err;
-    PFN_vkCreateRenderPass2KHR vkCreateRenderPass2KHR =
-        (PFN_vkCreateRenderPass2KHR)vk::GetDeviceProcAddr(device, "vkCreateRenderPass2KHR");
-
-    err = vkCreateRenderPass2KHR(device, create_info, nullptr, &render_pass);
-    if (err == VK_SUCCESS) vk::DestroyRenderPass(device, render_pass, nullptr);
+void PositiveTestRenderPass2KHRCreate(const vk_testing::Device &device, const VkRenderPassCreateInfo2KHR &create_info) {
+    vk_testing::RenderPass rp(device, create_info, true);
 }
 
-void TestRenderPass2KHRCreate(ErrorMonitor *error_monitor, const VkDevice device, const VkRenderPassCreateInfo2KHR *create_info,
-                              const char *rp2_vuid) {
-    VkRenderPass render_pass = VK_NULL_HANDLE;
-    VkResult err;
-    PFN_vkCreateRenderPass2KHR vkCreateRenderPass2KHR =
-        (PFN_vkCreateRenderPass2KHR)vk::GetDeviceProcAddr(device, "vkCreateRenderPass2KHR");
-
-    error_monitor->SetDesiredFailureMsg(kErrorBit, rp2_vuid);
-    err = vkCreateRenderPass2KHR(device, create_info, nullptr, &render_pass);
-    if (err == VK_SUCCESS) vk::DestroyRenderPass(device, render_pass, nullptr);
-    error_monitor->VerifyFound();
+void TestRenderPass2KHRCreate(ErrorMonitor &error_monitor, const vk_testing::Device &device,
+                              const VkRenderPassCreateInfo2KHR &create_info, const std::initializer_list<const char *> &vuids) {
+    for (auto vuid : vuids) {
+        error_monitor.SetDesiredFailureMsg(kErrorBit, vuid);
+    }
+    vk_testing::RenderPass rp(device, create_info, true);
+    error_monitor.VerifyFound();
 }
 
 void TestRenderPassBegin(ErrorMonitor *error_monitor, const VkDevice device, const VkCommandBuffer command_buffer,
@@ -306,12 +286,10 @@ void TestRenderPassBegin(ErrorMonitor *error_monitor, const VkDevice device, con
         vk::ResetCommandBuffer(command_buffer, 0);
     }
     if (rp2Supported && rp2_vuid) {
-        PFN_vkCmdBeginRenderPass2KHR vkCmdBeginRenderPass2KHR =
-            (PFN_vkCmdBeginRenderPass2KHR)vk::GetDeviceProcAddr(device, "vkCmdBeginRenderPass2KHR");
         VkSubpassBeginInfoKHR subpass_begin_info = {VK_STRUCTURE_TYPE_SUBPASS_BEGIN_INFO_KHR, nullptr, VK_SUBPASS_CONTENTS_INLINE};
         vk::BeginCommandBuffer(command_buffer, &cmd_begin_info);
         error_monitor->SetDesiredFailureMsg(kErrorBit, rp2_vuid);
-        vkCmdBeginRenderPass2KHR(command_buffer, begin_info, &subpass_begin_info);
+        vk::CmdBeginRenderPass2KHR(command_buffer, begin_info, &subpass_begin_info);
         error_monitor->VerifyFound();
         vk::ResetCommandBuffer(command_buffer, 0);
 
@@ -405,14 +383,6 @@ VkFormat FindFormatLinearWithoutMips(VkPhysicalDevice gpu, VkImageCreateInfo ima
 
     for (VkFormat format = first_vk_format; format <= last_vk_format; format = static_cast<VkFormat>(format + 1)) {
         image_ci.format = format;
-
-        // WORKAROUND for profile and mock_icd not containing valid format limits yet
-        VkFormatProperties format_props;
-        vk::GetPhysicalDeviceFormatProperties(gpu, format, &format_props);
-        const VkFormatFeatureFlags core_filter = 0x1FFF;
-        const auto features = (image_ci.tiling == VK_IMAGE_TILING_LINEAR) ? format_props.linearTilingFeatures & core_filter
-                                                                          : format_props.optimalTilingFeatures & core_filter;
-        if (!(features & core_filter)) continue;
 
         VkImageFormatProperties img_limits;
         if (VK_SUCCESS == GPDIFPHelper(gpu, &image_ci, &img_limits) && img_limits.maxMipLevels == 1) return format;
@@ -524,6 +494,20 @@ VkExternalMemoryHandleTypeFlags FindSupportedExternalMemoryHandleTypes(VkPhysica
     return supported_types;
 }
 
+bool HandleTypeNeedsDedicatedAllocation(VkPhysicalDevice gpu, const VkBufferCreateInfo &buffer_create_info,
+                                        VkExternalMemoryHandleTypeFlagBits handle_type) {
+    auto external_info = LvlInitStruct<VkPhysicalDeviceExternalBufferInfo>();
+    external_info.flags = buffer_create_info.flags;
+    external_info.usage = buffer_create_info.usage;
+    external_info.handleType = handle_type;
+
+    auto external_properties = LvlInitStruct<VkExternalBufferProperties>();
+    vk::GetPhysicalDeviceExternalBufferProperties(gpu, &external_info, &external_properties);
+
+    const auto external_features = external_properties.externalMemoryProperties.externalMemoryFeatures;
+    return (external_features & VK_EXTERNAL_MEMORY_FEATURE_DEDICATED_ONLY_BIT) != 0;
+}
+
 VkExternalMemoryHandleTypeFlags FindSupportedExternalMemoryHandleTypes(VkPhysicalDevice gpu,
                                                                        const VkImageCreateInfo &image_create_info,
                                                                        VkExternalMemoryFeatureFlags requested_features) {
@@ -550,6 +534,26 @@ VkExternalMemoryHandleTypeFlags FindSupportedExternalMemoryHandleTypes(VkPhysica
     return supported_types;
 }
 
+bool HandleTypeNeedsDedicatedAllocation(VkPhysicalDevice gpu, const VkImageCreateInfo &image_create_info,
+                                        VkExternalMemoryHandleTypeFlagBits handle_type) {
+    auto external_info = LvlInitStruct<VkPhysicalDeviceExternalImageFormatInfo>();
+    external_info.handleType = handle_type;
+    auto image_info = LvlInitStruct<VkPhysicalDeviceImageFormatInfo2>(&external_info);
+    image_info.format = image_create_info.format;
+    image_info.type = image_create_info.imageType;
+    image_info.tiling = image_create_info.tiling;
+    image_info.usage = image_create_info.usage;
+    image_info.flags = image_create_info.flags;
+
+    auto external_properties = LvlInitStruct<VkExternalImageFormatProperties>();
+    auto image_properties = LvlInitStruct<VkImageFormatProperties2>(&external_properties);
+    VkResult result = vk::GetPhysicalDeviceImageFormatProperties2(gpu, &image_info, &image_properties);
+    if (result != VK_SUCCESS) return false;
+
+    const auto external_features = external_properties.externalMemoryProperties.externalMemoryFeatures;
+    return (external_features & VK_EXTERNAL_MEMORY_FEATURE_DEDICATED_ONLY_BIT) != 0;
+}
+
 VkExternalMemoryHandleTypeFlagsNV FindSupportedExternalMemoryHandleTypesNV(const VkLayerTest &test,
                                                                            const VkImageCreateInfo &image_create_info,
                                                                            VkExternalMemoryFeatureFlagsNV requested_features) {
@@ -572,80 +576,15 @@ VkExternalMemoryHandleTypeFlagsNV FindSupportedExternalMemoryHandleTypesNV(const
     return supported_types;
 }
 
-VkExternalFenceHandleTypeFlags FindSupportedExternalFenceHandleTypes(VkPhysicalDevice gpu,
-                                                                     VkExternalFenceFeatureFlags requested_features) {
-    VkExternalFenceHandleTypeFlags supported_types = 0;
-    IterateFlags<VkExternalFenceHandleTypeFlagBits>(
-        AllVkExternalFenceHandleTypeFlagBits, [&](VkExternalFenceHandleTypeFlagBits flag) {
-            auto external_info = LvlInitStruct<VkPhysicalDeviceExternalFenceInfo>();
-            external_info.handleType = flag;
-            auto external_properties = LvlInitStruct<VkExternalFenceProperties>();
-            vk::GetPhysicalDeviceExternalFenceProperties(gpu, &external_info, &external_properties);
-            if ((external_properties.externalFenceFeatures & requested_features) == requested_features) {
-                supported_types |= flag;
-            }
-        });
-    return supported_types;
-}
+bool SemaphoreExportImportSupported(VkPhysicalDevice gpu, VkExternalSemaphoreHandleTypeFlagBits handle_type) {
+    constexpr auto export_import_flags =
+        VK_EXTERNAL_SEMAPHORE_FEATURE_EXPORTABLE_BIT_KHR | VK_EXTERNAL_SEMAPHORE_FEATURE_IMPORTABLE_BIT_KHR;
 
-VkExternalSemaphoreHandleTypeFlags FindSupportedExternalSemaphoreHandleTypes(VkPhysicalDevice gpu,
-                                                                             VkExternalSemaphoreFeatureFlags requested_features) {
-    VkExternalSemaphoreHandleTypeFlags supported_types = 0;
-    IterateFlags<VkExternalSemaphoreHandleTypeFlagBits>(
-        AllVkExternalSemaphoreHandleTypeFlagBits, [&](VkExternalSemaphoreHandleTypeFlagBits flag) {
-            auto external_info = LvlInitStruct<VkPhysicalDeviceExternalSemaphoreInfo>();
-            external_info.handleType = flag;
-            auto external_properties = LvlInitStruct<VkExternalSemaphoreProperties>();
-            vk::GetPhysicalDeviceExternalSemaphoreProperties(gpu, &external_info, &external_properties);
-            if ((external_properties.externalSemaphoreFeatures & requested_features) == requested_features) {
-                supported_types |= flag;
-            }
-        });
-    return supported_types;
-}
-
-VkExternalMemoryHandleTypeFlags GetCompatibleHandleTypes(VkPhysicalDevice gpu, const VkBufferCreateInfo &buffer_create_info,
-                                                         VkExternalMemoryHandleTypeFlagBits handle_type) {
-    auto external_info = LvlInitStruct<VkPhysicalDeviceExternalBufferInfo>();
-    external_info.flags = buffer_create_info.flags;
-    external_info.usage = buffer_create_info.usage;
-    external_info.handleType = handle_type;
-    auto external_buffer_properties = LvlInitStruct<VkExternalBufferProperties>();
-    vk::GetPhysicalDeviceExternalBufferProperties(gpu, &external_info, &external_buffer_properties);
-    return external_buffer_properties.externalMemoryProperties.compatibleHandleTypes;
-}
-
-VkExternalMemoryHandleTypeFlags GetCompatibleHandleTypes(VkPhysicalDevice gpu, const VkImageCreateInfo &image_create_info,
-                                                         VkExternalMemoryHandleTypeFlagBits handle_type) {
-    auto external_info = LvlInitStruct<VkPhysicalDeviceExternalImageFormatInfo>();
-    external_info.handleType = handle_type;
-    auto image_info = LvlInitStruct<VkPhysicalDeviceImageFormatInfo2>(&external_info);
-    image_info.format = image_create_info.format;
-    image_info.type = image_create_info.imageType;
-    image_info.tiling = image_create_info.tiling;
-    image_info.usage = image_create_info.usage;
-    image_info.flags = image_create_info.flags;
-    auto external_properties = LvlInitStruct<VkExternalImageFormatProperties>();
-    auto image_properties = LvlInitStruct<VkImageFormatProperties2>(&external_properties);
-    if (vk::GetPhysicalDeviceImageFormatProperties2(gpu, &image_info, &image_properties) != VK_SUCCESS) return 0;
-    return external_properties.externalMemoryProperties.compatibleHandleTypes;
-}
-
-VkExternalFenceHandleTypeFlags GetCompatibleHandleTypes(VkPhysicalDevice gpu, VkExternalFenceHandleTypeFlagBits handle_type) {
-    auto external_info = LvlInitStruct<VkPhysicalDeviceExternalFenceInfo>();
-    external_info.handleType = handle_type;
-    auto external_properties = LvlInitStruct<VkExternalFenceProperties>();
-    vk::GetPhysicalDeviceExternalFenceProperties(gpu, &external_info, &external_properties);
-    return external_properties.compatibleHandleTypes;
-}
-
-VkExternalSemaphoreHandleTypeFlags GetCompatibleHandleTypes(VkPhysicalDevice gpu,
-                                                            VkExternalSemaphoreHandleTypeFlagBits handle_type) {
-    auto external_info = LvlInitStruct<VkPhysicalDeviceExternalSemaphoreInfo>();
-    external_info.handleType = handle_type;
-    auto external_properties = LvlInitStruct<VkExternalSemaphoreProperties>();
-    vk::GetPhysicalDeviceExternalSemaphoreProperties(gpu, &external_info, &external_properties);
-    return external_properties.compatibleHandleTypes;
+    auto info = LvlInitStruct<VkPhysicalDeviceExternalSemaphoreInfo>();
+    info.handleType = handle_type;
+    auto properties = LvlInitStruct<VkExternalSemaphoreProperties>();
+    vk::GetPhysicalDeviceExternalSemaphoreProperties(gpu, &info, &properties);
+    return (properties.externalSemaphoreFeatures & export_import_flags) == export_import_flags;
 }
 
 void AllocateDisjointMemory(VkDeviceObj *device, PFN_vkGetImageMemoryRequirements2KHR fp, VkImage mp_image,
@@ -796,23 +735,23 @@ VkImageViewCreateInfo SafeSaneImageViewCreateInfo(const VkImageObj &image, VkFor
     return SafeSaneImageViewCreateInfo(image.handle(), format, aspect_mask);
 }
 
-bool CheckSynchronization2SupportAndInitState(VkRenderFramework *framework) {
+bool CheckSynchronization2SupportAndInitState(VkRenderFramework *render_framework, void *phys_dev_pnext /*= nullptr*/) {
     PFN_vkGetPhysicalDeviceFeatures2 vkGetPhysicalDeviceFeatures2 =
-        (PFN_vkGetPhysicalDeviceFeatures2)vk::GetInstanceProcAddr(framework->instance(), "vkGetPhysicalDeviceFeatures2");
+        (PFN_vkGetPhysicalDeviceFeatures2)vk::GetInstanceProcAddr(render_framework->instance(), "vkGetPhysicalDeviceFeatures2");
 
     {
         auto sync2_features = LvlInitStruct<VkPhysicalDeviceSynchronization2FeaturesKHR>();
         auto features2 = LvlInitStruct<VkPhysicalDeviceFeatures2>(&sync2_features);
-        vkGetPhysicalDeviceFeatures2(framework->gpu(), &features2);
+        vkGetPhysicalDeviceFeatures2(render_framework->gpu(), &features2);
         if (!sync2_features.synchronization2) {
             return false;
         }
     }
 
-    auto sync2_features = LvlInitStruct<VkPhysicalDeviceSynchronization2FeaturesKHR>();
+    auto sync2_features = LvlInitStruct<VkPhysicalDeviceSynchronization2FeaturesKHR>(phys_dev_pnext);
     sync2_features.synchronization2 = VK_TRUE;
     auto features2 = LvlInitStruct<VkPhysicalDeviceFeatures2>(&sync2_features);
-    framework->InitState(nullptr, &features2, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+    render_framework->InitState(nullptr, &features2, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
     return true;
 }
 
@@ -821,8 +760,8 @@ void VkLayerTest::VKTriangleTest(BsoFailSelect failCase) {
 
     ASSERT_NO_FATAL_FAILURE(InitViewport());
 
-    VkShaderObj vs(this, bindStateVertShaderText, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj ps(this, bindStateFragShaderText, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(this, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj ps(this, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     VkPipelineObj pipelineobj(m_device);
     pipelineobj.AddDefaultColorAttachment();
@@ -1031,10 +970,11 @@ void VkLayerTest::Init(VkPhysicalDeviceFeatures *features, VkPhysicalDeviceFeatu
 VkCommandBufferObj *VkLayerTest::CommandBuffer() { return m_commandBuffer; }
 
 VkLayerTest::VkLayerTest() {
-    // TODO: not quite sure why most of this is here instead of in super
-
-    // Add default instance extensions to the list
-    m_instance_extension_names.push_back(debug_reporter_.debug_extension_name);
+#if !defined(VK_USE_PLATFORM_ANDROID_KHR)
+    m_instance_extension_names.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+#else
+    m_instance_extension_names.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+#endif
 
     instance_layers_.push_back(kValidationLayerName);
 
@@ -1073,7 +1013,7 @@ void VkLayerTest::AddSurfaceExtension() {
     AddWsiExtensions(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
 #endif
 
-#if defined(VK_USE_PLATFORM_ANDROID_KHR) && defined(VALIDATION_APK)
+#if defined(VK_USE_PLATFORM_ANDROID_KHR)
     AddWsiExtensions(VK_KHR_ANDROID_SURFACE_EXTENSION_NAME);
 #endif
 
@@ -1090,6 +1030,10 @@ void VkLayerTest::AddSurfaceExtension() {
 
 void VkLayerTest::SetTargetApiVersion(APIVersion target_api_version) {
     if (target_api_version == 0) target_api_version = VK_API_VERSION_1_0;
+    // If we set target twice, make sure higest version always wins
+    if (target_api_version < m_attempted_api_version) return;
+
+    m_attempted_api_version = target_api_version;  // used to know if request failed
 
     m_target_api_version = std::min(target_api_version, m_instance_api_version);
     app_info_.apiVersion = m_target_api_version.value();
@@ -1456,89 +1400,6 @@ void VkBufferTest::TestDoubleDestroy() {
     vk::DestroyBuffer(VulkanDevice, VulkanBuffer, nullptr);
 }
 
-uint32_t VkVerticesObj::BindIdGenerator;
-
-VkVerticesObj::VkVerticesObj(VkDeviceObj *aVulkanDevice, unsigned aAttributeCount, unsigned aBindingCount, unsigned aByteStride,
-                             VkDeviceSize aVertexCount, const float *aVerticies)
-    : BoundCurrent(false),
-      AttributeCount(aAttributeCount),
-      BindingCount(aBindingCount),
-      BindId(BindIdGenerator),
-      PipelineVertexInputStateCreateInfo(),
-      VulkanMemoryBuffer(aVulkanDevice, static_cast<int>(aByteStride * aVertexCount), reinterpret_cast<const void *>(aVerticies),
-                         VK_BUFFER_USAGE_VERTEX_BUFFER_BIT) {
-    BindIdGenerator++;  // NB: This can wrap w/misuse
-
-    VertexInputAttributeDescription = new VkVertexInputAttributeDescription[AttributeCount];
-    VertexInputBindingDescription = new VkVertexInputBindingDescription[BindingCount];
-
-    PipelineVertexInputStateCreateInfo.pVertexAttributeDescriptions = VertexInputAttributeDescription;
-    PipelineVertexInputStateCreateInfo.vertexAttributeDescriptionCount = AttributeCount;
-    PipelineVertexInputStateCreateInfo.pVertexBindingDescriptions = VertexInputBindingDescription;
-    PipelineVertexInputStateCreateInfo.vertexBindingDescriptionCount = BindingCount;
-    PipelineVertexInputStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-
-    unsigned i = 0;
-    do {
-        VertexInputAttributeDescription[i].binding = BindId;
-        VertexInputAttributeDescription[i].location = i;
-        VertexInputAttributeDescription[i].format = VK_FORMAT_R32G32B32_SFLOAT;
-        VertexInputAttributeDescription[i].offset = sizeof(float) * aByteStride;
-        i++;
-    } while (AttributeCount < i);
-
-    i = 0;
-    do {
-        VertexInputBindingDescription[i].binding = BindId;
-        VertexInputBindingDescription[i].stride = aByteStride;
-        VertexInputBindingDescription[i].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-        i++;
-    } while (BindingCount < i);
-}
-
-VkVerticesObj::~VkVerticesObj() {
-    if (VertexInputAttributeDescription) {
-        delete[] VertexInputAttributeDescription;
-    }
-    if (VertexInputBindingDescription) {
-        delete[] VertexInputBindingDescription;
-    }
-}
-
-bool VkVerticesObj::AddVertexInputToPipe(VkPipelineObj &aPipelineObj) {
-    aPipelineObj.AddVertexInputAttribs(VertexInputAttributeDescription, AttributeCount);
-    aPipelineObj.AddVertexInputBindings(VertexInputBindingDescription, BindingCount);
-    return true;
-}
-
-bool VkVerticesObj::AddVertexInputToPipeHelpr(CreatePipelineHelper *pipelineHelper) {
-    pipelineHelper->vi_ci_.pVertexBindingDescriptions = VertexInputBindingDescription;
-    pipelineHelper->vi_ci_.vertexBindingDescriptionCount = BindingCount;
-    pipelineHelper->vi_ci_.pVertexAttributeDescriptions = VertexInputAttributeDescription;
-    pipelineHelper->vi_ci_.vertexAttributeDescriptionCount = AttributeCount;
-    return true;
-}
-
-void VkVerticesObj::BindVertexBuffers(VkCommandBuffer aCommandBuffer, unsigned aOffsetCount, VkDeviceSize *aOffsetList) {
-    VkDeviceSize *offsetList;
-    unsigned offsetCount;
-
-    if (aOffsetCount) {
-        offsetList = aOffsetList;
-        offsetCount = aOffsetCount;
-    } else {
-        offsetList = new VkDeviceSize[1]();
-        offsetCount = 1;
-    }
-
-    vk::CmdBindVertexBuffers(aCommandBuffer, BindId, offsetCount, &VulkanMemoryBuffer.handle(), offsetList);
-    BoundCurrent = true;
-
-    if (!aOffsetCount) {
-        delete[] offsetList;
-    }
-}
-
 OneOffDescriptorSet::OneOffDescriptorSet(VkDeviceObj *device, const Bindings &bindings,
                                          VkDescriptorSetLayoutCreateFlags layout_flags, void *layout_pnext,
                                          VkDescriptorPoolCreateFlags poolFlags, void *allocate_pnext, int buffer_info_size,
@@ -1705,11 +1566,11 @@ void CreatePipelineHelper::InitDynamicStateInfo() {
     // during late bind
 }
 
-void CreatePipelineHelper::InitShaderInfo() { ResetShaderInfo(bindStateVertShaderText, bindStateFragShaderText); }
+void CreatePipelineHelper::InitShaderInfo() { ResetShaderInfo(kVertexMinimalGlsl, kFragmentMinimalGlsl); }
 
 void CreatePipelineHelper::ResetShaderInfo(const char *vertex_shader_text, const char *fragment_shader_text) {
-    vs_.reset(new VkShaderObj(&layer_test_, vertex_shader_text, VK_SHADER_STAGE_VERTEX_BIT));
-    fs_.reset(new VkShaderObj(&layer_test_, fragment_shader_text, VK_SHADER_STAGE_FRAGMENT_BIT));
+    vs_ = std::make_unique<VkShaderObj>(&layer_test_, vertex_shader_text, VK_SHADER_STAGE_VERTEX_BIT);
+    fs_ = std::make_unique<VkShaderObj>(&layer_test_, fragment_shader_text, VK_SHADER_STAGE_FRAGMENT_BIT);
     // We shouldn't need a fragment shader but add it to be able to run on more devices
     shader_stages_ = {vs_->GetStageCreateInfo(), fs_->GetStageCreateInfo()};
 }
@@ -1764,8 +1625,8 @@ void CreatePipelineHelper::InitGraphicsPipelineInfo() {
     gp_ci_.pInputAssemblyState = &ia_ci_;
     gp_ci_.pTessellationState = nullptr;
     gp_ci_.pViewportState = &vp_state_ci_;
-    gp_ci_.pRasterizationState = &rs_state_ci_;
     gp_ci_.pMultisampleState = &pipe_ms_state_ci_;
+    gp_ci_.pRasterizationState = &rs_state_ci_;
     gp_ci_.pDepthStencilState = nullptr;
     gp_ci_.pColorBlendState = &cb_ci_;
     gp_ci_.pDynamicState = nullptr;
@@ -1838,8 +1699,12 @@ void CreatePipelineHelper::InitPreRasterLibInfo(uint32_t count, const VkPipeline
     gp_ci_.flags = VK_PIPELINE_CREATE_LIBRARY_BIT_KHR;
     gp_ci_.pViewportState = &vp_state_ci_;
     gp_ci_.pRasterizationState = &rs_state_ci_;
+
+    // If using Dynamic Rendering, will need to be set to null
+    // otherwise needs to be shared across libraries in the same executable pipeline
     gp_ci_.renderPass = layer_test_.renderPass();
     gp_ci_.subpass = 0;
+
     gp_ci_.stageCount = count;
     gp_ci_.pStages = info;
 
@@ -1864,9 +1729,9 @@ void CreatePipelineHelper::InitFragmentLibInfo(uint32_t count, const VkPipelineS
     gp_ci_.flags = VK_PIPELINE_CREATE_LIBRARY_BIT_KHR;
     //  gp_ci_.pTessellationState = nullptr; // TODO
     gp_ci_.pViewportState = &vp_state_ci_;
-    gp_ci_.pRasterizationState = &rs_state_ci_;
 
-    // TODO renderPass _can_ be null
+    // If using Dynamic Rendering, will need to be set to null
+    // otherwise needs to be shared across libraries in the same executable pipeline
     gp_ci_.renderPass = layer_test_.renderPass();
     gp_ci_.subpass = 0;
 
@@ -1897,6 +1762,10 @@ void CreatePipelineHelper::InitFragmentOutputLibInfo(void *p_next) {
     gp_ci_.flags = VK_PIPELINE_CREATE_LIBRARY_BIT_KHR | VK_PIPELINE_CREATE_RETAIN_LINK_TIME_OPTIMIZATION_INFO_BIT_EXT;
     gp_ci_.pColorBlendState = &cb_ci_;
     gp_ci_.pMultisampleState = &pipe_ms_state_ci_;
+    gp_ci_.pRasterizationState = &rs_state_ci_;
+
+    // If using Dynamic Rendering, will need to be set to null
+    // otherwise needs to be shared across libraries in the same executable pipeline
     gp_ci_.renderPass = layer_test_.renderPass();
     gp_ci_.subpass = 0;
 
@@ -1974,7 +1843,7 @@ void CreateComputePipelineHelper::InitPipelineLayoutInfo() {
 }
 
 void CreateComputePipelineHelper::InitShaderInfo() {
-    cs_.reset(new VkShaderObj(&layer_test_, bindStateMinimalShaderText, VK_SHADER_STAGE_COMPUTE_BIT));
+    cs_ = std::make_unique<VkShaderObj>(&layer_test_, kMinimalShaderGlsl, VK_SHADER_STAGE_COMPUTE_BIT);
     // We shouldn't need a fragment shader but add it to be able to run on more devices
 }
 
@@ -2168,9 +2037,10 @@ void CreateNVRayTracingPipelineHelper::InitShaderInfoKHR() {
         }
     )glsl";
 
-    rgs_.reset(new VkShaderObj(&layer_test_, rayGenShaderText, VK_SHADER_STAGE_RAYGEN_BIT_KHR, SPV_ENV_VULKAN_1_2));
-    chs_.reset(new VkShaderObj(&layer_test_, closestHitShaderText, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, SPV_ENV_VULKAN_1_2));
-    mis_.reset(new VkShaderObj(&layer_test_, missShaderText, VK_SHADER_STAGE_MISS_BIT_KHR, SPV_ENV_VULKAN_1_2));
+    rgs_ = std::make_unique<VkShaderObj>(&layer_test_, rayGenShaderText, VK_SHADER_STAGE_RAYGEN_BIT_KHR, SPV_ENV_VULKAN_1_2);
+    chs_ =
+        std::make_unique<VkShaderObj>(&layer_test_, closestHitShaderText, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, SPV_ENV_VULKAN_1_2);
+    mis_ = std::make_unique<VkShaderObj>(&layer_test_, missShaderText, VK_SHADER_STAGE_MISS_BIT_KHR, SPV_ENV_VULKAN_1_2);
 
     shader_stages_ = {rgs_->GetStageCreateInfo(), chs_->GetStageCreateInfo(), mis_->GetStageCreateInfo()};
 }
@@ -2220,9 +2090,9 @@ void CreateNVRayTracingPipelineHelper::InitShaderInfo() {  // DONE
         }
     )glsl";
 
-    rgs_.reset(new VkShaderObj(&layer_test_, rayGenShaderText, VK_SHADER_STAGE_RAYGEN_BIT_NV));
-    chs_.reset(new VkShaderObj(&layer_test_, closestHitShaderText, VK_SHADER_STAGE_CLOSEST_HIT_BIT_NV));
-    mis_.reset(new VkShaderObj(&layer_test_, missShaderText, VK_SHADER_STAGE_MISS_BIT_NV));
+    rgs_ = std::make_unique<VkShaderObj>(&layer_test_, rayGenShaderText, VK_SHADER_STAGE_RAYGEN_BIT_NV);
+    chs_ = std::make_unique<VkShaderObj>(&layer_test_, closestHitShaderText, VK_SHADER_STAGE_CLOSEST_HIT_BIT_NV);
+    mis_ = std::make_unique<VkShaderObj>(&layer_test_, missShaderText, VK_SHADER_STAGE_MISS_BIT_NV);
 
     shader_stages_ = {rgs_->GetStageCreateInfo(), chs_->GetStageCreateInfo(), mis_->GetStageCreateInfo()};
 }
@@ -2609,6 +2479,7 @@ std::pair<VkBufferObj &&, VkAccelerationStructureGeometryKHR> GetSimpleAABB(cons
 }
 
 void VkLayerTest::OOBRayTracingShadersTestBody(bool gpu_assisted) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_NV_RAY_TRACING_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME);
     AddOptionalExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
@@ -3378,7 +3249,7 @@ void VkLayerTest::OOBRayTracingShadersTestBody(bool gpu_assisted) {
                                       test.variable_length ? pipeline_layout_variable.handle() : pipeline_layout.handle(), 0, 1,
                                       test.variable_length ? &ds_variable.set_ : &ds.set_, 0, nullptr);
         } else {
-            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdTraceRaysNV-None-02697");
+            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdTraceRaysNV-None-08600");
         }
 
         if (gpu_assisted) {
@@ -3617,7 +3488,7 @@ void print_android(const char *c) {
 #endif  // VK_USE_PLATFORM_ANDROID_KHR
 }
 
-#if defined(ANDROID) && defined(VALIDATION_APK)
+#if defined(VK_USE_PLATFORM_ANDROID_KHR)
 const char *appTag = "VulkanLayerValidationTests";
 static bool initialized = false;
 static bool active = false;
@@ -3828,6 +3699,13 @@ void android_main(struct android_app *app) {
 #include <crtdbg.h>
 #endif
 
+// Defining VVL_TESTS_USE_CUSTOM_TEST_FRAMEWORK allows downstream users
+// to inject custom test framework changes. This includes the ability
+// to override the main entry point of the test executable in order to
+// add custom command line arguments and use a custom test environment
+// class. This #ifndef thus makes sure that when the definition is
+// present we do not include the default main entry point.
+#ifndef VVL_TESTS_USE_CUSTOM_TEST_FRAMEWORK
 int main(int argc, char **argv) {
     int result;
 
@@ -3853,3 +3731,4 @@ int main(int argc, char **argv) {
     VkTestFramework::Finish();
     return result;
 }
+#endif

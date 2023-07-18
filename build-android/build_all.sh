@@ -14,9 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if [ -z "${ANDROID_SDK_HOME}" ];
-then echo "Please set ANDROID_SDK_HOME, exiting"; exit 1;
-else echo "ANDROID_SDK_HOME is ${ANDROID_SDK_HOME}";
+if [ -z "${ANDROID_SDK_ROOT}" ];
+then echo "Please set ANDROID_SDK_ROOT, exiting"; exit 1;
+else echo "ANDROID_SDK_ROOT is ${ANDROID_SDK_ROOT}";
 fi
 
 if [ -z "${ANDROID_NDK_HOME}" ];
@@ -45,12 +45,35 @@ findtool apksigner
 set -ev
 
 LAYER_BUILD_DIR=$PWD
-DEMO_BUILD_DIR=$PWD/../demos/android
 echo LAYER_BUILD_DIR="${LAYER_BUILD_DIR}"
-echo DEMO_BUILD_DIR="${DEMO_BUILD_DIR}"
+
+#
+# Android builds and c++ libraries:
+#
+#   https://developer.android.com/ndk/guides/cpp-support recommends using
+#   c++_shared for applications that use more than one shared library.
+#   If multiple libraries using c++_static are loaded several copies of
+#   the globals will be present in the C++ runtime. This also happens
+#   if the same library is dlopen/dlclosed several times, as when running
+#   the Layer Validation Tests. Some of the c++ runtime globals are
+#   thread_local, so each copy consumes a TLS key. There are only 128 TLS
+#   keys allowed on android, and the unit tests can hit this because of
+#   repeatedly loading and unloading VVL.
+#
+#   The drawback to using c++shared is that the layer library can no longer
+#   be installed manually, but must be installed in an APK. It is still
+#   common practice to load layer libraries manually, so this script will
+#   build the layer library using c++static by default.
+#
+# To build the layer libaries for running the layer validation tests on Android, c++_shared needs to be used for APP_STL. To do this set
+# ANDROID_STL_TYPE to 'SHARED' in your environment
+if [ -z "${ANDROID_STL_TYPE}" ]; then
+    export ANDROID_STL_TYPE=STATIC
+fi
+echo "Building Layer using ${ANDROID_STL_TYPE}";
 
 function create_APK() {
-    aapt package -f -M AndroidManifest.xml -I "$ANDROID_SDK_HOME/platforms/android-26/android.jar" -S res -F bin/$1-unaligned.apk bin/libs
+    aapt package -f -M AndroidManifest.xml -I "$ANDROID_SDK_ROOT/platforms/android-26/android.jar" -S res -F bin/$1-unaligned.apk bin/libs
     # If zipalign was run after signing, it won't be a valid signature
     zipalign -f 4 bin/$1-unaligned.apk bin/$1.apk
     # jarsigner used to be used until it was removed from the Android SDK

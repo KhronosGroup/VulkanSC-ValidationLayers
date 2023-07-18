@@ -16,7 +16,7 @@
  * Author: Daniel Rakos <daniel.rakos@rastergrid.com>
  */
 
-#include "chassis.h"
+#include "generated/chassis.h"
 
 // Default implementation for ValidParamValues in case of enum types not supported in Vulkan SC.
 // Needed only for cases when manual validation code refers to such types.

@@ -19,7 +19,7 @@
 #include "spirv-tools/optimizer.hpp"
 #include "spirv-tools/instrument.hpp"
 #include <iostream>
-#include "layer_chassis_dispatch.h"
+#include "generated/layer_chassis_dispatch.h"
 
 // Perform initializations that can be done at Create Device time.
 void DebugPrintf::CreateDevice(const VkDeviceCreateInfo *pCreateInfo) {
@@ -34,11 +34,11 @@ void DebugPrintf::CreateDevice(const VkDeviceCreateInfo *pCreateInfo) {
     output_buffer_size = *size_string ? atoi(size_string) : 1024;
 
     std::string verbose_string = getLayerOption("khronos_validation.printf_verbose");
-    transform(verbose_string.begin(), verbose_string.end(), verbose_string.begin(), ::tolower);
+    vvl::ToLower(verbose_string);
     verbose = !verbose_string.compare("true");
 
     std::string stdout_string = getLayerOption("khronos_validation.printf_to_stdout");
-    transform(stdout_string.begin(), stdout_string.end(), stdout_string.begin(), ::tolower);
+    vvl::ToLower(stdout_string);
     use_stdout = !stdout_string.compare("true");
     if (getenv("DEBUG_PRINTF_TO_STDOUT")) use_stdout = true;
 
@@ -65,6 +65,11 @@ void DebugPrintf::CreateDevice(const VkDeviceCreateInfo *pCreateInfo) {
                            "Debug Printf disabled.");
         aborted = true;
         return;
+    }
+
+    if (IsExtEnabled(device_extensions.vk_ext_shader_object)) {
+        ReportSetupProblem(
+            device, "VK_EXT_shader_object is enabled, but Debug Printf does not currently support printing from shader_objects");
     }
 }
 
@@ -321,6 +326,7 @@ void DebugPrintf::AnalyzeAndGenerateMessages(VkCommandBuffer command_buffer, VkQ
             pipeline_handle = it->second.pipeline;
             pgm = it->second.pgm;
         }
+        assert(pgm.size() != 0);
         // Search through the shader source for the printf format string for this invocation
         const auto format_string = FindFormatString(pgm, debug_record->format_string_id);
         // Break the format string into strings with 1 or 0 value
@@ -653,6 +659,12 @@ void DebugPrintf::AllocateDebugPrintfResources(const VkCommandBuffer cmd_buffer,
     const auto &last_bound = cb_node->lastBound[lv_bind_point];
     const auto *pipeline_state = last_bound.pipeline_state;
 
+    if (!pipeline_state) {
+        ReportSetupProblem(device, "Pipeline state not found, aborting Debug Printf");
+        aborted = true;
+        return;
+    }
+
     // Allocate memory for the output block that the gpu will use to return values for printf
     DPFDeviceMemoryBlock output_block = {};
     VkBufferCreateInfo buffer_info = LvlInitStruct<VkBufferCreateInfo>();
@@ -689,27 +701,20 @@ void DebugPrintf::AllocateDebugPrintfResources(const VkCommandBuffer cmd_buffer,
     desc_writes.dstBinding = 3;
     DispatchUpdateDescriptorSets(device, desc_count, &desc_writes, 0, NULL);
 
-    if (pipeline_state) {
-        const auto pipeline_layout = pipeline_state->PipelineLayoutState();
-        // If GPL is used, it's possible the pipeline layout used at pipeline creation time is null. If CmdBindDescriptorSets has
-        // not been called yet (i.e., state.pipeline_null), then fall back to the layout associated with pre-raster state.
-        // PipelineLayoutState should be used for the purposes of determining the number of sets in the layout, but this layout
-        // may be a "pseudo layout" used to represent the union of pre-raster and fragment shader layouts, and therefore have a
-        // null handle.
-        const auto pipeline_layout_handle =
-            (last_bound.pipeline_layout) ? last_bound.pipeline_layout : pipeline_state->PreRasterPipelineLayoutState()->layout();
-        if (pipeline_layout->set_layouts.size() <= desc_set_bind_index) {
-            DispatchCmdBindDescriptorSets(cmd_buffer, bind_point, pipeline_layout_handle, desc_set_bind_index, 1, desc_sets.data(),
-                                          0, nullptr);
-        }
-        // Record buffer and memory info in CB state tracking
-        cb_node->buffer_infos.emplace_back(output_block, desc_sets[0], desc_pool, bind_point);
-    } else {
-        ReportSetupProblem(device, "Unable to find pipeline state");
-        vmaDestroyBuffer(vmaAllocator, output_block.buffer, output_block.allocation);
-        aborted = true;
-        return;
+    const auto pipeline_layout = pipeline_state->PipelineLayoutState();
+    // If GPL is used, it's possible the pipeline layout used at pipeline creation time is null. If CmdBindDescriptorSets has
+    // not been called yet (i.e., state.pipeline_null), then fall back to the layout associated with pre-raster state.
+    // PipelineLayoutState should be used for the purposes of determining the number of sets in the layout, but this layout
+    // may be a "pseudo layout" used to represent the union of pre-raster and fragment shader layouts, and therefore have a
+    // null handle.
+    const auto pipeline_layout_handle =
+        (last_bound.pipeline_layout) ? last_bound.pipeline_layout : pipeline_state->PreRasterPipelineLayoutState()->layout();
+    if (pipeline_layout->set_layouts.size() <= desc_set_bind_index) {
+        DispatchCmdBindDescriptorSets(cmd_buffer, bind_point, pipeline_layout_handle, desc_set_bind_index, 1, desc_sets.data(), 0,
+                                      nullptr);
     }
+    // Record buffer and memory info in CB state tracking
+    cb_node->buffer_infos.emplace_back(output_block, desc_sets[0], desc_pool, bind_point);
 }
 
 std::shared_ptr<CMD_BUFFER_STATE> DebugPrintf::CreateCmdBufferState(VkCommandBuffer cb,

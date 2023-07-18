@@ -19,24 +19,17 @@ if (VULKANSC)
     return() # Return early
 endif()
 
-include(GoogleTest) # gtest_discover_tests
-
-# GoogleTest is required for testing framework
-find_package(GTest REQUIRED CONFIG)
-
-# glslang is required for testing framework
-find_package(glslang CONFIG REQUIRED)
-
-add_executable(vk_layer_validation_tests)
-
+if (ANDROID)
+    add_library(vk_layer_validation_tests MODULE)
+else()
+    add_executable(vk_layer_validation_tests)
+endif()
 target_sources(vk_layer_validation_tests PRIVATE
-    ${VVL_SOURCE_DIR}/layers/utils/convert_to_renderpass2.cpp
-    ${VVL_SOURCE_DIR}/layers/vulkan/generated/lvt_function_pointers.cpp
-    ${VVL_SOURCE_DIR}/layers/vulkan/generated/vk_format_utils.cpp
-    ${VVL_SOURCE_DIR}/layers/vulkan/generated/vk_safe_struct.cpp
+    framework/android_hardware_buffer.h
     framework/layer_validation_tests.h
     framework/layer_validation_tests.cpp
     framework/test_common.h
+    framework/shader_templates.h
     framework/error_monitor.cpp
     framework/error_monitor.h
     framework/video_objects.h
@@ -47,102 +40,156 @@ target_sources(vk_layer_validation_tests PRIVATE
     framework/test_framework.cpp
     framework/ray_tracing_objects.h
     framework/ray_tracing_objects.cpp
-    positive/android_hardware_buffer.cpp
-    positive/best_practices.cpp
-    positive/command.cpp
-    positive/descriptors.cpp
-    positive/dynamic_rendering.cpp
-    positive/gpu_av.cpp
-    positive/graphics_library.cpp
-    positive/image_buffer.cpp
-    positive/instance.cpp
-    positive/memory.cpp
-    positive/other.cpp
-    positive/pipeline.cpp
-    positive/ray_tracing.cpp
-    positive/ray_tracing_pipeline.cpp
-    positive/render_pass.cpp
-    positive/shaderval.cpp
-    positive/sync.cpp
-    positive/tooling.cpp
-    positive/video.cpp
-    positive/wsi.cpp
-    negative/amd_best_practices.cpp
-    negative/android_hardware_buffer.cpp
-    negative/arm_best_practices.cpp
-    negative/best_practices.cpp
-    negative/buffer.cpp
-    negative/command.cpp
-    negative/debug_printf.cpp
-    negative/descriptor_renderpass_framebuffer.cpp
-    negative/dynamic_rendering.cpp
-    negative/external_memory_sync.cpp
-    negative/gpu_av.cpp
-    negative/graphics_library.cpp
-    negative/image.cpp
-    negative/imageless_framebuffer.cpp
-    negative/instanceless.cpp
-    negative/memory.cpp
-    negative/nvidia_best_practices.cpp
-    negative/object_lifetime.cpp
-    negative/others.cpp
-    negative/pipeline_shader.cpp
-    negative/portability_subset.cpp
-    negative/query.cpp
-    negative/ray_tracing.cpp
-    negative/ray_tracing_gpu.cpp
-    negative/ray_tracing_pipeline.cpp
-    negative/sampler.cpp
-    negative/sparse.cpp
-    negative/sync_object.cpp
-    negative/sync_val.cpp
-    negative/video.cpp
-    negative/viewport_inheritance.cpp
-    negative/wsi.cpp
-    negative/ycbcr.cpp
+    unit/amd_best_practices.cpp
+    unit/android_hardware_buffer.cpp
+    unit/android_hardware_buffer_positive.cpp
+    unit/arm_best_practices.cpp
+    unit/atomics.cpp
+    unit/atomics_positive.cpp
+    unit/best_practices.cpp
+    unit/best_practices_positive.cpp
+    unit/buffer.cpp
+    unit/buffer_positive.cpp
+    unit/command.cpp
+    unit/command_positive.cpp
+    unit/debug_printf.cpp
+    unit/descriptor_buffer.cpp
+    unit/descriptor_buffer_positive.cpp
+    unit/descriptors.cpp
+    unit/descriptors_positive.cpp
+    unit/device_queue.cpp
+    unit/dynamic_rendering.cpp
+    unit/dynamic_rendering_positive.cpp
+    unit/dynamic_state.cpp
+    unit/dynamic_state_positive.cpp
+    unit/external_memory_sync.cpp
+    unit/external_memory_sync_positive.cpp
+    unit/format_utils_positive.cpp
+    unit/fragment_shading_rate.cpp
+    unit/fragment_shading_rate_positive.cpp
+    unit/geometry_tessellation.cpp
+    unit/gpu_av.cpp
+    unit/gpu_av_positive.cpp
+    unit/graphics_library.cpp
+    unit/graphics_library_positive.cpp
+    unit/image.cpp
+    unit/image_positive.cpp
+    unit/imageless_framebuffer.cpp
+    unit/imageless_framebuffer_positive.cpp
+    unit/instance_positive.cpp
+    unit/instanceless.cpp
+    unit/layer_utils_positive.cpp
+    unit/memory.cpp
+    unit/memory_positive.cpp
+    unit/mesh.cpp
+    unit/mesh_positive.cpp
+    unit/multi_device.cpp
+    unit/multiview.cpp
+    unit/nvidia_best_practices.cpp
+    unit/object_lifetime.cpp
+    unit/other_positive.cpp
+    unit/others.cpp
+    unit/pipeline.cpp
+    unit/pipeline_advanced_blend.cpp
+    unit/pipeline_layout.cpp
+    unit/pipeline_layout_positive.cpp
+    unit/pipeline_positive.cpp
+    unit/pipeline_topology.cpp
+    unit/pipeline_topology_positive.cpp
+    unit/portability_subset.cpp
+    unit/protected_memory.cpp
+    unit/protected_memory_positive.cpp
+    unit/query.cpp
+    unit/query_positive.cpp
+    unit/ray_tracing.cpp
+    unit/ray_tracing_gpu.cpp
+    unit/ray_tracing_pipeline.cpp
+    unit/ray_tracing_pipeline_positive.cpp
+    unit/ray_tracing_positive.cpp
+    unit/render_pass_positive.cpp
+    unit/renderpass.cpp
+    unit/robustness.cpp
+    unit/robustness_positive.cpp
+    unit/sampler.cpp
+    unit/sampler_positive.cpp
+    unit/shader_compute.cpp
+    unit/shader_compute_positive.cpp
+    unit/shader_cooperative_matrix.cpp
+    unit/shader_cooperative_matrix_positive.cpp
+    unit/shader_image_access_positive.cpp
+    unit/shader_interface.cpp
+    unit/shader_interface_positive.cpp
+    unit/shader_limits.cpp
+    unit/shader_limits_positive.cpp
+    unit/shader_mesh.cpp
+    unit/shader_push_constants.cpp
+    unit/shader_push_constants_positive.cpp
+    unit/shader_spirv.cpp
+    unit/shader_spirv_positive.cpp
+    unit/shader_storage_image.cpp
+    unit/shader_storage_image_positive.cpp
+    unit/shader_storage_texel.cpp
+    unit/shader_storage_texel_positive.cpp
+    unit/sparse.cpp
+    unit/sparse_positive.cpp
+    unit/subgroups.cpp
+    unit/subpass.cpp
+    unit/subpass_positive.cpp
+    unit/sync_object.cpp
+    unit/sync_object_positive.cpp
+    unit/sync_val.cpp
+    unit/sync_val_positive.cpp
+    unit/tooling_positive.cpp
+    unit/transform_feedback.cpp
+    unit/vertex_input.cpp
+    unit/vertex_input_positive.cpp
+    unit/video.cpp
+    unit/video_positive.cpp
+    unit/viewport_inheritance.cpp
+    unit/wsi.cpp
+    unit/wsi_positive.cpp
+    unit/ycbcr.cpp
+    unit/ycbcr_positive.cpp
+    containers/small_vector.cpp
 )
+get_target_property(TEST_SOURCES vk_layer_validation_tests SOURCES)
+source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${TEST_SOURCES})
 
-if (VVL_ENABLE_ASAN)
-    target_compile_definitions(vk_layer_validation_tests PRIVATE VVL_ENABLE_ASAN=1)
-endif()
-
-# gtest_discover_tests has problem with cross-compiling, but it is faster and more robust
-if (CMAKE_CROSSCOMPILING)
-    gtest_add_tests(TARGET vk_layer_validation_tests)
-else()
-    gtest_discover_tests(vk_layer_validation_tests DISCOVERY_TIMEOUT 100)
-endif()
+# TODO: Remove once Android.mk is gone.
+target_compile_definitions(vk_layer_validation_tests PRIVATE VVL_TESTS_USE_CMAKE)
 
 add_dependencies(vk_layer_validation_tests vvl)
-target_include_directories(vk_layer_validation_tests PRIVATE .)
+
+target_compile_options(vk_layer_validation_tests PRIVATE "$<IF:$<CXX_COMPILER_ID:MSVC>,/wd4100,-Wno-unused-parameter>")
 
 if(${CMAKE_CXX_COMPILER_ID} MATCHES "(GNU|Clang)")
     target_compile_options(vk_layer_validation_tests PRIVATE
         -Wno-sign-compare
         -Wno-shorten-64-to-32
-        -Wno-unused-parameter
         -Wno-missing-field-initializers
     )
     if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
         target_compile_options(vk_layer_validation_tests PRIVATE
             -Wno-sign-conversion
             -Wno-implicit-int-conversion
-            -Wno-enum-enum-conversion
         )
     endif()
 elseif(MSVC)
-    # Disable some signed/unsigned mismatch warnings.
-    target_compile_options(vk_layer_validation_tests PRIVATE /wd4267)
+    target_compile_options(vk_layer_validation_tests PRIVATE
+        /wd4389 # signed/unsigned mismatch
+        /wd4267 # Disable some signed/unsigned mismatch warnings.
+    )
 
-    if(MSVC_IDE)
-        set_target_properties(vk_layer_validation_tests PROPERTIES VS_DEBUGGER_ENVIRONMENT "VK_LAYER_PATH=$<TARGET_FILE_DIR:vvl>")
-    endif()
+    set_target_properties(vk_layer_validation_tests PROPERTIES VS_DEBUGGER_ENVIRONMENT "VK_LAYER_PATH=$<TARGET_FILE_DIR:vvl>")
 
     if (CMAKE_SIZEOF_VOID_P EQUAL 4)
         # Due to IHV driver issues, we need the extra 2GB of virtual address space for 32 bit testing
         target_link_options(vk_layer_validation_tests PRIVATE /LARGEADDRESSAWARE)
     endif()
 endif()
+
+find_package(GTest REQUIRED CONFIG QUIET)
+find_package(glslang REQUIRED CONFIG QUIET)
 
 target_link_libraries(vk_layer_validation_tests PRIVATE
     VkLayer_utils
@@ -157,15 +204,24 @@ target_link_libraries(vk_layer_validation_tests PRIVATE
     VVL-SPIRV-LIBS
     GTest::gtest
     GTest::gtest_main
-    ${CMAKE_DL_LIBS}
     $<TARGET_NAME_IF_EXISTS:PkgConfig::XCB>
     $<TARGET_NAME_IF_EXISTS:PkgConfig::X11>
     $<TARGET_NAME_IF_EXISTS:PkgConfig::WAYlAND_CLIENT>
 )
 
-option(INSTALL_TESTS "Install tests")
-if(INSTALL_TESTS)
-    install(TARGETS vk_layer_validation_tests)
+if (ANDROID)
+    add_subdirectory(android)
+    return()
 endif()
 
+install(TARGETS vk_layer_validation_tests)
+
+include(GoogleTest)
+gtest_discover_tests(vk_layer_validation_tests DISCOVERY_TIMEOUT 100)
+
 add_subdirectory(layers)
+
+option(VVL_SPIRV_HOPPER "Build SPIRV-Hopper" ON)
+if (VVL_SPIRV_HOPPER)
+    add_subdirectory(spirv_hopper)
+endif()

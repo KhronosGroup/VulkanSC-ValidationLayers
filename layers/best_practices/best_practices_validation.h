@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "chassis.h"
+#include "generated/chassis.h"
 #include "state_tracker/state_tracker.h"
 #include "state_tracker/image_state.h"
 #include "state_tracker/cmd_buffer_state.h"
@@ -211,13 +211,6 @@ class Image : public IMAGE_STATE {
     std::vector<std::vector<Usage>> usages_;
 };
 
-using ImageNoBinding = MEMORY_TRACKED_RESOURCE_STATE<Image, BindableNoMemoryTracker>;
-using ImageLinear = MEMORY_TRACKED_RESOURCE_STATE<Image, BindableLinearMemoryTracker>;
-template <bool IS_RESIDENT>
-using ImageSparse = MEMORY_TRACKED_RESOURCE_STATE<Image, BindableSparseMemoryTracker<IS_RESIDENT>>;
-template <unsigned PLANE_COUNT>
-using ImageMultiplanar = MEMORY_TRACKED_RESOURCE_STATE<Image, BindableMultiplanarMemoryTracker<PLANE_COUNT>>;
-
 class PhysicalDevice : public PHYSICAL_DEVICE_STATE {
   public:
     PhysicalDevice(VkPhysicalDevice phys_dev) : PHYSICAL_DEVICE_STATE(phys_dev) {}
@@ -377,6 +370,9 @@ class BestPractices : public ValidationStateTracker {
 
     std::string GetAPIVersionName(uint32_t version) const;
 
+    void LogPositiveSuccessCode(const char* api_name, VkResult result) const;
+    void LogErrorCode(const char* api_name, VkResult result) const;
+
     bool ValidateCmdDrawType(VkCommandBuffer cmd_buffer, const char* caller) const;
 
     void RecordCmdDrawType(VkCommandBuffer cmd_buffer, uint32_t draw_count, const char* caller);
@@ -454,7 +450,10 @@ class BestPractices : public ValidationStateTracker {
                                                const VkComputePipelineCreateInfo* pCreateInfos,
                                                const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,
                                                void* pipe_state) const override;
+
     bool ValidateCreateComputePipelineArm(const VkComputePipelineCreateInfo& createInfo) const;
+
+    bool ValidateCreateComputePipelineAmd(const VkComputePipelineCreateInfo& createInfo) const;
 
     bool CheckPipelineStageFlags(const std::string& api_name, VkPipelineStageFlags flags) const;
     bool CheckPipelineStageFlags(const std::string& api_name, VkPipelineStageFlags2KHR flags) const;
@@ -694,8 +693,6 @@ class BestPractices : public ValidationStateTracker {
     bool PreCallValidateCmdClearAttachments(VkCommandBuffer commandBuffer, uint32_t attachmentCount,
                                             const VkClearAttachment* pAttachments, uint32_t rectCount,
                                             const VkClearRect* pRects) const override;
-    void ValidateReturnCodes(const char* api_name, VkResult result, vvl::span<const VkResult> error_codes,
-                             vvl::span<const VkResult> success_codes) const;
     bool ValidateCmdResolveImage(VkCommandBuffer command_buffer, VkImage src_image, VkImage dst_image, CMD_TYPE cmd_type) const;
     bool PreCallValidateCmdResolveImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout,
                                         VkImage dstImage, VkImageLayout dstImageLayout, uint32_t regionCount,
@@ -893,8 +890,12 @@ class BestPractices : public ValidationStateTracker {
         VkCommandBuffer commandBuffer, uint32_t infoCount, const VkAccelerationStructureBuildGeometryInfoKHR* pInfos,
         const VkAccelerationStructureBuildRangeInfoKHR* const* ppBuildRangeInfos) const override;
 
+    bool ValidateFsOutputsAgainstRenderPass(const SHADER_MODULE_STATE& module_state, const EntryPoint& entrypoint,
+                                            const PIPELINE_STATE& pipeline, uint32_t subpass_index) const;
+    bool ValidateFsOutputsAgainstDynamicRenderingRenderPass(const SHADER_MODULE_STATE& module_state, const EntryPoint& entrypoint,
+                                                            const PIPELINE_STATE& pipeline) const;
 // Include code-generated functions
-#include "best_practices.h"
+#include "generated/best_practices.h"
   protected:
     std::shared_ptr<CMD_BUFFER_STATE> CreateCmdBufferState(VkCommandBuffer cb, const VkCommandBufferAllocateInfo* create_info,
                                                            const COMMAND_POOL_STATE* pool) final;
@@ -907,44 +908,14 @@ class BestPractices : public ValidationStateTracker {
     std::shared_ptr<PHYSICAL_DEVICE_STATE> CreatePhysicalDeviceState(VkPhysicalDevice phys_dev) final {
         return std::static_pointer_cast<PHYSICAL_DEVICE_STATE>(std::make_shared<bp_state::PhysicalDevice>(phys_dev));
     }
-
     std::shared_ptr<IMAGE_STATE> CreateImageState(VkImage img, const VkImageCreateInfo* pCreateInfo,
                                                   VkFormatFeatureFlags2KHR features) final {
-        std::shared_ptr<bp_state::Image> state;
-
-        if (pCreateInfo->flags & VK_IMAGE_CREATE_SPARSE_BINDING_BIT) {
-            if (pCreateInfo->flags & VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT) {
-                state = std::make_shared<bp_state::ImageSparse<true>>(this, img, pCreateInfo, features);
-            } else {
-                state = std::make_shared<bp_state::ImageSparse<false>>(this, img, pCreateInfo, features);
-            }
-        } else if (pCreateInfo->flags & VK_IMAGE_CREATE_DISJOINT_BIT) {
-            uint32_t plane_count = FormatPlaneCount(pCreateInfo->format);
-            switch (plane_count) {
-                case 3:
-                    state = std::make_shared<bp_state::ImageMultiplanar<3>>(this, img, pCreateInfo, features);
-                    break;
-                case 2:
-                    state = std::make_shared<bp_state::ImageMultiplanar<2>>(this, img, pCreateInfo, features);
-                    break;
-                case 1:
-                    state = std::make_shared<bp_state::ImageMultiplanar<1>>(this, img, pCreateInfo, features);
-                    break;
-                default:
-                    // Not supported
-                    assert(false);
-            }
-        } else {
-            state = std::make_shared<bp_state::ImageLinear>(this, img, pCreateInfo, features);
-        }
-
-        return state;
+        return CreateImageStateImpl<ImageStateBindingTraits<bp_state::Image>>(img, pCreateInfo, features);
     }
 
     std::shared_ptr<IMAGE_STATE> CreateImageState(VkImage img, const VkImageCreateInfo* pCreateInfo, VkSwapchainKHR swapchain,
                                                   uint32_t swapchain_index, VkFormatFeatureFlags2KHR features) final {
-        return std::static_pointer_cast<IMAGE_STATE>(
-            std::make_shared<bp_state::ImageNoBinding>(this, img, pCreateInfo, swapchain, swapchain_index, features));
+        return CreateImageStateImpl<ImageStateBindingTraits<bp_state::Image>>(img, pCreateInfo, swapchain, swapchain_index, features);
     }
 
     std::shared_ptr<DESCRIPTOR_POOL_STATE> CreateDescriptorPoolState(VkDescriptorPool pool,
@@ -990,6 +961,7 @@ class BestPractices : public ValidationStateTracker {
 
     // Check that vendor-specific checks are enabled for at least one of the vendors
     bool VendorCheckEnabled(BPVendorFlags vendors) const;
+    const char* VendorSpecificTag(BPVendorFlags vendors) const;
 
     void RecordCmdDrawTypeArm(bp_state::CommandBuffer& cmd_state, uint32_t draw_count, const char* caller);
     void RecordCmdDrawTypeNVIDIA(bp_state::CommandBuffer& cmd_state);

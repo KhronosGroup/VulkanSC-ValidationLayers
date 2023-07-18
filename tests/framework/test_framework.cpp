@@ -71,6 +71,9 @@ int fopen_s(FILE **pFile, const char *filename, const char *mode) {
 
 #endif
 
+#if !defined(VK_USE_PLATFORM_ANDROID_KHR)
+// NOTE: Android doesn't use environment variables like desktop does!
+//
 // Certain VK_* environment variables accept lists.
 // Return a vector of std::string containing each member in the list.
 //
@@ -175,60 +178,42 @@ static void CheckEnvironmentVariables() {
         std::exit(EXIT_FAILURE);
     }
 }
+#endif
 
 // Set up environment for GLSL compiler
 // Must be done once per process
 void TestEnvironment::SetUp() {
+#if !defined(VK_USE_PLATFORM_ANDROID_KHR)
     // Helps ensure common developer environment variables are set correctly
     CheckEnvironmentVariables();
+#endif
 
     // Initialize GLSL to SPV compiler utility
     glslang::InitializeProcess();
 
     vk_testing::set_error_callback(test_error_callback);
 
-    vk::InitDispatchTable("vulkan");
+    vk::InitCore("vulkan");
 }
 
 void TestEnvironment::TearDown() { glslang::FinalizeProcess(); }
 
-bool VkTestFramework::optionMatch(const char *option, char *optionLine) {
-    if (strncmp(option, optionLine, strlen(option)) == 0)
-        return true;
-    else
-        return false;
-}
-
 void VkTestFramework::InitArgs(int *argc, char *argv[]) {
-    int i, n;
-
-    for (i = 1, n = 1; i < *argc; i++) {
-        if (optionMatch("--strip-SPV", argv[i]))
+    for (int i = 1; i < *argc; ++i) {
+        const std::string_view current_argument = argv[i];
+        if (current_argument == "--strip-SPV") {
             m_strip_spv = true;
-        else if (optionMatch("--canonicalize-SPV", argv[i]))
+        } else if (current_argument == "--canonicalize-SPV") {
             m_canonicalize_spv = true;
-        else if (optionMatch("--device-index", argv[i]) && ((i + 1) < *argc)) {
+        } else if (current_argument == "--print-vu") {
+            m_print_vu = true;
+        } else if (current_argument == "--device-index" && ((i + 1) < *argc)) {
             m_phys_device_index = std::atoi(argv[++i]);
-        } else if (optionMatch("--help", argv[i]) || optionMatch("-h", argv[i])) {
+        } else if ((current_argument == "--help") || (current_argument == "-h")) {
             printf("\nOther options:\n");
             printf(
-                "\t--show-images\n"
-                "\t\tDisplay test images in viewer after tests complete.\n");
-            printf(
-                "\t--save-images\n"
-                "\t\tSave tests images as ppm files in current working directory.\n"
-                "\t\tUsed to generate golden images for compare-images.\n");
-            printf(
-                "\t--compare-images\n"
-                "\t\tCompare test images to 'golden' image in golden folder.\n"
-                "\t\tAlso saves the generated test image in current working\n"
-                "\t\t\tdirectory but only if the image is different from the golden\n"
-                "\t\tSetting RENDERTEST_GOLDEN_DIR environment variable can specify\n"
-                "\t\t\tdifferent directory for golden images\n"
-                "\t\tSignal test failure if different.\n");
-            printf(
-                "\t--no-SPV\n"
-                "\t\tUse built-in GLSL compiler rather than SPV code path.\n");
+                "\t--print-vu\n"
+                "\t\tPrints all VUs - help see what new VU will look like.\n");
             printf(
                 "\t--strip-SPV\n"
                 "\t\tStrip SPIR-V debug information (line numbers, names, etc).\n");
@@ -246,14 +231,6 @@ void VkTestFramework::InitArgs(int *argc, char *argv[]) {
             printf("\nUse --help or -h for option list.\n");
             exit(0);
         }
-
-        /*
-         * Since the above "consume" inputs, update argv
-         * so that it contains the trimmed list of args for glutInit
-         */
-
-        argv[n] = argv[i];
-        n++;
     }
 }
 
@@ -357,6 +334,15 @@ static const char *DefaultConfig =
     "MaxTaskWorkGroupSizeY_NV 1\n"
     "MaxTaskWorkGroupSizeZ_NV 1\n"
     "MaxMeshViewCountNV 4\n"
+    "MaxMeshOutputVerticesEXT 256\n"
+    "MaxMeshOutputPrimitivesEXT 512\n"
+    "MaxMeshWorkGroupSizeX_EXT 32\n"
+    "MaxMeshWorkGroupSizeY_EXT 1\n"
+    "MaxMeshWorkGroupSizeZ_EXT 1\n"
+    "MaxTaskWorkGroupSizeX_EXT 32\n"
+    "MaxTaskWorkGroupSizeY_EXT 1\n"
+    "MaxTaskWorkGroupSizeZ_EXT 1\n"
+    "MaxMeshViewCountEXT 4\n"
 
     "nonInductiveForLoops 1\n"
     "whileLoops 1\n"
@@ -599,6 +585,24 @@ void VkTestFramework::ProcessConfigFile(VkPhysicalDeviceLimits const *const devi
             Resources.maxTaskWorkGroupSizeZ_NV = value;
         else if (strcmp(token, "MaxMeshViewCountNV") == 0)
             Resources.maxMeshViewCountNV = value;
+        else if (strcmp(token, "MaxMeshOutputVerticesEXT") == 0)
+            Resources.maxMeshOutputVerticesEXT = value;
+        else if (strcmp(token, "MaxMeshOutputPrimitivesEXT") == 0)
+            Resources.maxMeshOutputPrimitivesEXT = value;
+        else if (strcmp(token, "MaxMeshWorkGroupSizeX_EXT") == 0)
+            Resources.maxMeshWorkGroupSizeX_EXT = value;
+        else if (strcmp(token, "MaxMeshWorkGroupSizeY_EXT") == 0)
+            Resources.maxMeshWorkGroupSizeY_EXT = value;
+        else if (strcmp(token, "MaxMeshWorkGroupSizeZ_EXT") == 0)
+            Resources.maxMeshWorkGroupSizeZ_EXT = value;
+        else if (strcmp(token, "MaxTaskWorkGroupSizeX_EXT") == 0)
+            Resources.maxTaskWorkGroupSizeX_EXT = value;
+        else if (strcmp(token, "MaxTaskWorkGroupSizeY_EXT") == 0)
+            Resources.maxTaskWorkGroupSizeY_EXT = value;
+        else if (strcmp(token, "MaxTaskWorkGroupSizeZ_EXT") == 0)
+            Resources.maxTaskWorkGroupSizeZ_EXT = value;
+        else if (strcmp(token, "MaxMeshViewCountEXT") == 0)
+            Resources.maxMeshViewCountEXT = value;
 
         else if (strcmp(token, "nonInductiveForLoops") == 0)
             Resources.limits.nonInductiveForLoops = (value != 0);
@@ -644,30 +648,30 @@ char **VkTestFramework::ReadFileData(const char *fileName) {
     int errorCode = fopen_s(&in, fileName, "r");
 #endif
 
-    char *fdata;
     size_t count = 0;
     const int maxSourceStrings = 5;
     char **return_data = (char **)malloc(sizeof(char *) * (maxSourceStrings + 1));
 
     if (errorCode) {
         printf("Error: unable to open input file: %s\n", fileName);
-        return 0;
+        return nullptr;
     }
 
     while (fgetc(in) != EOF) count++;
 
     if (fseek(in, 0, SEEK_SET) != 0) {
         printf("Error fseek to start of file\n");
-        return 0;
+        return nullptr;
     }
 
-    if (!(fdata = (char *)malloc(count + 2))) {
+    char *fdata = (char *)malloc(count + 2);
+    if (fdata == nullptr) {
         printf("Error allocating memory\n");
-        return 0;
+        return nullptr;
     }
     if (fread(fdata, 1, count, in) != count) {
         printf("Error reading input file: %s\n", fileName);
-        return 0;
+        return nullptr;
     }
     fdata[count] = '\0';
     fclose(in);

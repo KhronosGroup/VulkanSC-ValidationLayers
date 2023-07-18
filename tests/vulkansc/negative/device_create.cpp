@@ -247,7 +247,7 @@ TEST_F(VkSCPipelineCacheDataLayerTest, HeaderTooSmall) {
 
     builder.AddBlob(4);
 
-    auto create_info = builder.MakeCreateInfo();
+    create_info = builder.MakeCreateInfo();
     m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "UNASSIGNED-SC-PipelineCacheData-tooSmall");
     TestPipelineCacheData({create_info});
 
@@ -267,7 +267,7 @@ TEST_F(VkSCPipelineCacheDataLayerTest, InvalidHeaderSize) {
     auto header = builder.AddDefaultHeaderVersionSCOne();
     builder.AddPipelineEntry(header, "1265a236-e369-11ed-b5ea-0242ac120002", 4000);
 
-    auto create_info = builder.MakeCreateInfo();
+    create_info = builder.MakeCreateInfo();
 
     header->headerVersionOne.headerSize = 52;
     m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "VUID-VkPipelineCacheHeaderVersionOne-headerSize-05075");
@@ -286,7 +286,7 @@ TEST_F(VkSCPipelineCacheDataLayerTest, InvalidHeaderVersion) {
     auto header = builder.AddDefaultHeaderVersionSCOne();
     builder.AddPipelineEntry(header, "1265a236-e369-11ed-b5ea-0242ac120002", 4000);
 
-    auto create_info = builder.MakeCreateInfo();
+    create_info = builder.MakeCreateInfo();
 
     header->headerVersionOne.headerVersion = VK_PIPELINE_CACHE_HEADER_VERSION_ONE;
     m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "VUID-VkPipelineCacheHeaderVersionOne-headerVersion-05076");
@@ -301,7 +301,7 @@ TEST_F(VkSCPipelineCacheDataLayerTest, InvalidValidationVersion) {
     auto header = builder.AddDefaultHeaderVersionSCOne();
     builder.AddPipelineEntry(header, "1265a236-e369-11ed-b5ea-0242ac120002", 4000);
 
-    auto create_info = builder.MakeCreateInfo();
+    create_info = builder.MakeCreateInfo();
 
     header->validationVersion = static_cast<VkPipelineCacheValidationVersion>(2);
     m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "VUID-VkPipelineCacheHeaderVersionSafetyCriticalOne-validationVersion-05077");
@@ -318,7 +318,7 @@ TEST_F(VkSCPipelineCacheDataLayerTest, InvalidPipelineIndexStride) {
     builder.AddPipelineEntry<PrivData>(header, "1265a236-e369-11ed-b5ea-0242ac120002", 4000);
 
     // Should succeed even with a stride larger than 56
-    auto create_info = builder.MakeCreateInfo();
+    create_info = builder.MakeCreateInfo();
     TestPipelineCacheData({create_info});
 
     // But fail with a smaller one
@@ -337,7 +337,7 @@ TEST_F(VkSCPipelineCacheDataLayerTest, PipelineIndexOutOfBounds) {
     builder.AddPipelineEntry(header, "1265a236-e369-11ed-b5ea-0242ac120002", 4000);
     builder.AddPipelineEntry(header, "1de725b8-e36d-11ed-b5ea-0242ac120002", 4000);
 
-    auto create_info = builder.MakeCreateInfo();
+    create_info = builder.MakeCreateInfo();
     create_info.initialDataSize -= 4;
     m_errorMonitor->SetDesiredFailureMsg(kWarningBit,
                                          "VUID-VkPipelineCacheHeaderVersionSafetyCriticalOne-pipelineIndexOffset-05079");
@@ -434,7 +434,7 @@ TEST_F(VkSCPipelineCacheDataLayerTest, InvalidStageIndexStride) {
                                          {builder.sample_vertex_shader_spv, builder.sample_fragment_shader_spv});
 
     // Should succeed even with a stride larger than 16
-    auto create_info = builder.MakeCreateInfo();
+    create_info = builder.MakeCreateInfo();
     TestPipelineCacheData({create_info});
 
     // But fail with a smaller one
@@ -455,7 +455,7 @@ TEST_F(VkSCPipelineCacheDataLayerTest, StageIndexOutOfBounds) {
     builder.AddStageValidation(entry, builder.sample_graphics_pipeline_json, SPV_ENV_VULKAN_1_2,
                                {builder.sample_vertex_shader_spv, builder.sample_fragment_shader_spv});
 
-    auto create_info = builder.MakeCreateInfo();
+    create_info = builder.MakeCreateInfo();
     create_info.initialDataSize = static_cast<size_t>(entry->stageIndexOffset + entry->stageIndexStride + 12);
     m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "VUID-VkPipelineCacheSafetyCriticalIndexEntry-stageIndexCount-05084");
     TestPipelineCacheData({create_info});

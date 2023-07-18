@@ -18,7 +18,7 @@
 #pragma once
 
 #include "state_tracker/pipeline_layout_state.h"
-#include "vk_safe_struct.h"
+#include "generated/vk_safe_struct.h"
 
 // Graphics pipeline sub-state as defined by VK_KHR_graphics_pipeline_library
 //
@@ -38,6 +38,8 @@ static inline VkGraphicsPipelineLibraryFlagsEXT GetGraphicsLibType(const CreateI
 struct PipelineSubState {
     PipelineSubState(const PIPELINE_STATE &p) : parent(p) {}
     const PIPELINE_STATE &parent;
+
+    VkPipelineLayoutCreateFlags PipelineLayoutCreateFlags() const;
 };
 
 struct VertexInputState : public PipelineSubState {
@@ -163,18 +165,16 @@ struct FragmentOutputState : public PipelineSubState {
     FragmentOutputState(const PIPELINE_STATE &p, const CreateInfo &create_info, std::shared_ptr<const RENDER_PASS_STATE> rp)
         : FragmentOutputState(p, rp, create_info.subpass) {
         if (create_info.pColorBlendState) {
-            if (create_info.pColorBlendState) {
-                const auto &cbci = *create_info.pColorBlendState;
-                color_blend_state = ToSafeColorBlendState(cbci);
-                // In case of being dynamic state
-                if (cbci.pAttachments) {
-                    dual_source_blending = GetDualSourceBlending(color_blend_state.get());
-                    if (cbci.attachmentCount) {
-                        attachments.reserve(cbci.attachmentCount);
-                        std::copy(cbci.pAttachments, cbci.pAttachments + cbci.attachmentCount, std::back_inserter(attachments));
-                    }
-                    blend_constants_enabled = IsBlendConstantsEnabled(attachments);
+            const auto &cbci = *create_info.pColorBlendState;
+            color_blend_state = ToSafeColorBlendState(cbci);
+            // In case of being dynamic state
+            if (cbci.pAttachments) {
+                dual_source_blending = GetDualSourceBlending(color_blend_state.get());
+                if (cbci.attachmentCount) {
+                    attachments.reserve(cbci.attachmentCount);
+                    std::copy(cbci.pAttachments, cbci.pAttachments + cbci.attachmentCount, std::back_inserter(attachments));
                 }
+                blend_constants_enabled = IsBlendConstantsEnabled(attachments);
             }
         }
 

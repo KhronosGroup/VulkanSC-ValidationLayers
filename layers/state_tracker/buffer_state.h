@@ -28,10 +28,9 @@ class BUFFER_STATE : public BINDABLE {
   public:
     const safe_VkBufferCreateInfo safe_create_info;
     const VkBufferCreateInfo &createInfo;
-    VkDeviceAddress deviceAddress;
     const VkMemoryRequirements requirements;
     const VkMemoryRequirements *const memory_requirements_pointer = &requirements;
-    bool memory_requirements_checked;
+    VkDeviceAddress deviceAddress = 0;
 
     vvl::unordered_set<std::shared_ptr<const VideoProfileDesc>> supported_video_profiles;
 
@@ -40,6 +39,17 @@ class BUFFER_STATE : public BINDABLE {
     BUFFER_STATE(BUFFER_STATE const &rh_obj) = delete;
 
     VkBuffer buffer() const { return handle_.Cast<VkBuffer>(); }
+    std::optional<VkDeviceSize> ComputeValidSize(VkDeviceSize offset, VkDeviceSize size) const {
+        return ::ComputeValidSize(offset, size, createInfo.size);
+    }
+    VkDeviceSize ComputeSize(VkDeviceSize offset, VkDeviceSize size) const {
+        std::optional<VkDeviceSize> valid_size = ComputeValidSize(offset, size);
+        return valid_size.has_value() ? *valid_size : VkDeviceSize(0);
+    }
+    static VkDeviceSize ComputeSize(const std::shared_ptr<const BUFFER_STATE> &buffer_state, VkDeviceSize offset,
+                                    VkDeviceSize size) {
+        return buffer_state ? buffer_state->ComputeSize(offset, size) : VkDeviceSize(0);
+    }
 
     sparse_container::range<VkDeviceAddress> DeviceAddressRange() const { return {deviceAddress, deviceAddress + createInfo.size}; }
 };
@@ -107,4 +117,12 @@ class BUFFER_VIEW_STATE : public BASE_NODE {
         BASE_NODE::Destroy();
     }
     bool Invalid() const override { return Destroyed() || !buffer_state || buffer_state->Invalid(); }
+
+    VkDeviceSize Size() const {
+        VkDeviceSize size = create_info.range;
+        if (size == VK_WHOLE_SIZE) {
+            size = buffer_state->createInfo.size - create_info.offset;
+        }
+        return size;
+    }
 };

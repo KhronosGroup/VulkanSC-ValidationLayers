@@ -18,7 +18,7 @@
  */
 #pragma once
 #include "state_tracker/base_node.h"
-#include "vk_safe_struct.h"
+#include "generated/vk_safe_struct.h"
 
 class IMAGE_VIEW_STATE;
 
@@ -77,6 +77,7 @@ class RENDER_PASS_STATE : public BASE_NODE {
     const bool use_dynamic_rendering;
     const bool use_dynamic_rendering_inherited;
     const bool has_multiview_enabled;
+    const bool rasterization_enabled{true};
     const safe_VkRenderingInfo dynamic_rendering_begin_rendering_info;
     const safe_VkPipelineRenderingCreateInfo dynamic_rendering_pipeline_create_info;
     const safe_VkCommandBufferInheritanceRenderingInfo inheritance_rendering_info;
@@ -100,8 +101,8 @@ class RENDER_PASS_STATE : public BASE_NODE {
     RENDER_PASS_STATE(VkRenderPass rp, VkRenderPassCreateInfo2 const *pCreateInfo);
     RENDER_PASS_STATE(VkRenderPass rp, VkRenderPassCreateInfo const *pCreateInfo);
 
-    RENDER_PASS_STATE(VkPipelineRenderingCreateInfo const *pPipelineRenderingCreateInfo);
-    RENDER_PASS_STATE(VkRenderingInfo const *pRenderingInfo);
+    RENDER_PASS_STATE(VkPipelineRenderingCreateInfo const *pPipelineRenderingCreateInfo, bool rasterization_enabled);
+    RENDER_PASS_STATE(VkRenderingInfo const *pRenderingInfo, bool rasterization_enabled);
     RENDER_PASS_STATE(VkCommandBufferInheritanceRenderingInfo const *pInheritanceRenderingInfo);
 
     VkRenderPass renderPass() const { return handle_.Cast<VkRenderPass>(); }

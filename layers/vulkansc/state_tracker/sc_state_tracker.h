@@ -17,16 +17,16 @@
  */
 
 #pragma once
-#include "chassis.h"
+#include "generated/chassis.h"
 #include "error_message/validation_error_enums.h"
 #include "state_tracker/state_tracker.h"
 #include "vulkansc/state_tracker/sc_device_state.h"
 #include "vulkansc/state_tracker/sc_pipeline_state.h"
 #include "vulkansc/state_tracker/sc_cmd_buffer_state.h"
-#include "layer_chassis_dispatch.h"
+#include "generated/layer_chassis_dispatch.h"
 #include "error_message/logging.h"
 #include "vulkan/vk_layer.h"
-#include "vk_typemap_helper.h"
+#include "generated/vk_typemap_helper.h"
 
 #include <atomic>
 

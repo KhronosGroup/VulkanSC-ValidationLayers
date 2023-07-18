@@ -102,7 +102,6 @@ config("vulkan_layer_config") {
     "layers",
     "layers/external",
     "layers/vulkan",
-    "layers/vulkan/generated",
   ]
   if (is_clang) {
     cflags = [ "-Wno-extra-semi" ]
@@ -111,32 +110,36 @@ config("vulkan_layer_config") {
 
 core_validation_sources = [
   "layers/utils/android_ndk_types.h",
-  "layers/utils/convert_to_renderpass2.cpp",
-  "layers/utils/convert_to_renderpass2.h",
-  "layers/core_checks/android_validation.cpp",
-  "layers/core_checks/buffer_validation.cpp",
-  "layers/core_checks/buffer_address_validation.h",
-  "layers/core_checks/cmd_buffer_dynamic_validation.cpp",
-  "layers/core_checks/cmd_buffer_validation.cpp",
-  "layers/core_checks/copy_blit_resolve_validation.cpp",
+  "layers/utils/convert_utils.cpp",
+  "layers/utils/convert_utils.h",
+  "layers/core_checks/cc_android.cpp",
+  "layers/core_checks/cc_buffer.cpp",
+  "layers/core_checks/cc_buffer_address.h",
+  "layers/core_checks/cc_cmd_buffer_dynamic.cpp",
+  "layers/core_checks/cc_cmd_buffer.cpp",
+  "layers/core_checks/cc_copy_blit_resolve.cpp",
   "layers/core_checks/core_validation.h",
-  "layers/core_checks/descriptor_validation.cpp",
-  "layers/core_checks/device_memory_validation.cpp",
-  "layers/core_checks/device_validation.cpp",
-  "layers/core_checks/drawdispatch_validation.cpp",
-  "layers/core_checks/external_object_validation.cpp",
-  "layers/core_checks/image_validation.cpp",
-  "layers/core_checks/image_layout_validation.cpp",
-  "layers/core_checks/pipeline_validation.cpp",
-  "layers/core_checks/query_validation.cpp",
-  "layers/core_checks/queue_validation.cpp",
-  "layers/core_checks/ray_tracing_validation.cpp",
-  "layers/core_checks/render_pass_validation.cpp",
-  "layers/core_checks/shader_validation.cpp",
-  "layers/core_checks/shader_validation.h",
-  "layers/core_checks/synchronization_validation.cpp",
-  "layers/core_checks/video_validation.cpp",
-  "layers/core_checks/wsi_validation.cpp",
+  "layers/core_checks/cc_descriptor.cpp",
+  "layers/core_checks/cc_device_memory.cpp",
+  "layers/core_checks/cc_device.cpp",
+  "layers/core_checks/cc_drawdispatch.cpp",
+  "layers/core_checks/cc_external_object.cpp",
+  "layers/core_checks/cc_image.cpp",
+  "layers/core_checks/cc_image_layout.cpp",
+  "layers/core_checks/cc_pipeline_compute.cpp",
+  "layers/core_checks/cc_pipeline_graphics.cpp",
+  "layers/core_checks/cc_pipeline_ray_tracing.cpp",
+  "layers/core_checks/cc_pipeline.cpp",
+  "layers/core_checks/cc_query.cpp",
+  "layers/core_checks/cc_queue.cpp",
+  "layers/core_checks/cc_ray_tracing.cpp",
+  "layers/core_checks/cc_render_pass.cpp",
+  "layers/core_checks/cc_shader.cpp",
+  "layers/core_checks/cc_shader.h",
+  "layers/core_checks/cc_synchronization.cpp",
+  "layers/core_checks/cc_video.cpp",
+  "layers/core_checks/cc_wsi.cpp",
+  "layers/core_checks/cc_ycbcr.cpp",
   "layers/error_message/core_error_location.cpp",
   "layers/error_message/core_error_location.h",
   "layers/error_message/validation_error_enums.h",
@@ -145,6 +148,8 @@ core_validation_sources = [
   "layers/external/vma/vma.h",
   "layers/vulkan/generated/command_validation.cpp",
   "layers/vulkan/generated/command_validation.h",
+  "layers/vulkan/generated/dynamic_state_helper.cpp",
+  "layers/vulkan/generated/dynamic_state_helper.h",
   "layers/vulkan/generated/gpu_as_inspection_comp.h",
   "layers/vulkan/generated/gpu_pre_dispatch_comp.h",
   "layers/vulkan/generated/gpu_pre_draw_vert.h",
@@ -159,6 +164,8 @@ core_validation_sources = [
   "layers/gpu_validation/gpu_validation.cpp",
   "layers/gpu_validation/gpu_validation.h",
   "layers/gpu_validation/gpu_vuids.h",
+  "layers/gpu_validation/gv_descriptor_sets.cpp",
+  "layers/gpu_validation/gv_descriptor_sets.h",
   "layers/containers/qfo_transfer.h",
   "layers/containers/range_vector.h",
   "layers/state_tracker/base_node.cpp",
@@ -215,17 +222,36 @@ object_lifetimes_sources = [
 ]
 
 stateless_validation_sources = [
-  "layers/vulkan/generated/parameter_validation.cpp",
-  "layers/vulkan/generated/parameter_validation.h",
+  "layers/vulkan/generated/stateless_validation_helper.cpp",
+  "layers/vulkan/generated/stateless_validation_helper.h",
   "layers/vulkan/generated/enum_flag_bits.h",
   "layers/stateless/parameter_name.h",
-  "layers/stateless/parameter_validation_utils.cpp",
+  "layers/stateless/sl_buffer.cpp",
+  "layers/stateless/sl_cmd_buffer_dynamic.cpp",
+  "layers/stateless/sl_cmd_buffer.cpp",
+  "layers/stateless/sl_descriptor.cpp",
+  "layers/stateless/sl_device_memory.cpp",
+  "layers/stateless/sl_external_object.cpp",
+  "layers/stateless/sl_framebuffer.cpp",
+  "layers/stateless/sl_image.cpp",
+  "layers/stateless/sl_instance_device.cpp",
+  "layers/stateless/sl_pipeline.cpp",
+  "layers/stateless/sl_ray_tracing.cpp",
+  "layers/stateless/sl_render_pass.cpp",
+  "layers/stateless/sl_synchronization.cpp",
+  "layers/stateless/sl_utils.cpp",
+  "layers/stateless/sl_wsi.cpp",
   "layers/stateless/stateless_validation.h",
 ]
 
 thread_safety_sources = [
   "layers/vulkan/generated/thread_safety.cpp",
-  "layers/vulkan/generated/thread_safety.h",
+  "layers/vulkan/generated/thread_safety_commands.h",
+  "layers/vulkan/generated/thread_safety_counter_bodies.h",
+  "layers/vulkan/generated/thread_safety_counter_definitions.h",
+  "layers/vulkan/generated/thread_safety_counter_instances.h",
+  "layers/thread_tracker/thread_safety_validation.cpp",
+  "layers/thread_tracker/thread_safety_validation.h",
 ]
 
 unique_objects_sources = []
@@ -233,6 +259,21 @@ unique_objects_sources = []
 best_practices_sources = [
   "layers/best_practices/best_practices_error_enums.h",
   "layers/best_practices/best_practices_utils.cpp",
+  "layers/best_practices/bp_buffer.cpp",
+  "layers/best_practices/bp_cmd_buffer.cpp",
+  "layers/best_practices/bp_copy_blit_resolve.cpp",
+  "layers/best_practices/bp_descriptor.cpp",
+  "layers/best_practices/bp_device_memory.cpp",
+  "layers/best_practices/bp_drawdispatch.cpp",
+  "layers/best_practices/bp_framebuffer.cpp",
+  "layers/best_practices/bp_image.cpp",
+  "layers/best_practices/bp_instance_device.cpp",
+  "layers/best_practices/bp_pipeline.cpp",
+  "layers/best_practices/bp_ray_tracing.cpp",
+  "layers/best_practices/bp_render_pass.cpp",
+  "layers/best_practices/bp_synchronization.cpp",
+  "layers/best_practices/bp_video.cpp",
+  "layers/best_practices/bp_wsi.cpp",
   "layers/best_practices/best_practices_validation.h",
   "layers/vulkan/generated/best_practices.cpp",
   "layers/vulkan/generated/best_practices.h",
@@ -247,15 +288,20 @@ chassis_sources = [
   "$vulkan_headers_dir/include/vulkan/vk_layer.h",
   "$vulkan_headers_dir/include/vulkan/vulkan.h",
   "layers/vulkan/generated/chassis.cpp",
-  "layers/vulkan/generated/valid_param_values.cpp",
-  "layers/vulkan/generated/valid_param_values.h",
+  "layers/vulkan/generated/valid_enum_values.cpp",
+  "layers/vulkan/generated/valid_enum_values.h",
   "layers/vulkan/generated/chassis.h",
   "layers/vulkan/generated/chassis_dispatch_helper.h",
   "layers/vulkan/generated/layer_chassis_dispatch.cpp",
+  "layers/layer_chassis_dispatch_manual.cpp",
   "layers/vulkan/generated/layer_chassis_dispatch.h",
   "layers/vulkan/generated/vk_dispatch_table_helper.h",
   "layers/vulkan/generated/vk_extension_helper.h",
-  "layers/vulkan/generated/vk_safe_struct.cpp",
+  "layers/vulkan/generated/vk_safe_struct_utils.cpp",
+  "layers/vulkan/generated/vk_safe_struct_core.cpp",
+  "layers/vulkan/generated/vk_safe_struct_khr.cpp",
+  "layers/vulkan/generated/vk_safe_struct_ext.cpp",
+  "layers/vulkan/generated/vk_safe_struct_vendor.cpp",
   "layers/layer_options.cpp",
   "layers/layer_options.h",
   "layers/vk_layer_settings_ext.h",
@@ -321,7 +367,7 @@ source_set("vulkan_layer_utils") {
   include_dirs = [
     "layers",
     "layers/external",
-    "layers/vulkan/generated",
+    "layers/vulkan",
   ]
   sources = [
     "$vulkan_headers_dir/include/vulkan/vk_layer.h",
@@ -332,6 +378,7 @@ source_set("vulkan_layer_utils") {
     "layers/vulkan/generated/vk_extension_helper.h",
     "layers/vulkan/generated/vk_format_utils.cpp",
     "layers/vulkan/generated/vk_format_utils.h",
+    "layers/vulkan/generated/layer_chassis_dispatch.h",
     "layers/vulkan/generated/vk_layer_dispatch_table.h",
     "layers/vulkan/generated/vk_object_types.h",
     "layers/vulkan/generated/vk_safe_struct.h",
@@ -347,6 +394,8 @@ source_set("vulkan_layer_utils") {
     "layers/utils/vk_layer_extension_utils.h",
     "layers/error_message/logging.h",
     "layers/error_message/logging.cpp",
+    "layers/utils/ray_tracing_utils.cpp",
+    "layers/utils/ray_tracing_utils.h",
     "layers/utils/vk_layer_utils.cpp",
     "layers/utils/vk_layer_utils.h",
     "layers/external/xxhash.cpp",
@@ -406,6 +455,7 @@ foreach(layer_info, layers) {
     } else {
       configs -= [ "//build/config/compiler:chromium_code" ]
       configs += [ "//build/config/compiler:no_chromium_code" ]
+      configs -= [ "//build/config/compiler:no_rtti" ]
       configs += [ "//build/config/compiler:rtti" ]
     }
     configs -= vulkan_undefine_configs
@@ -454,8 +504,4 @@ group("vulkan_validation_layers") {
       data_deps += [ ":VkLayer_$name" ]
     }
   }
-}
-
-group("tests") {
-  # TODO(fxbug.dev/13288)
 }

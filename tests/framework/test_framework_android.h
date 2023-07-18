@@ -24,8 +24,6 @@
 // Can be used by tests to record additional details / description of test
 #define TEST_DESCRIPTION(desc) RecordProperty("description", desc)
 
-#define ICD_SPV_MAGIC 0x07230203
-
 class VkTestFramework : public ::testing::Test {
   public:
     static void InitArgs(int *argc, char *argv[]);
@@ -35,11 +33,10 @@ class VkTestFramework : public ::testing::Test {
                            const char *pshader, std::vector<uint32_t> &spv, bool debug = false,
                            const spv_target_env spv_ev = SPV_ENV_VULKAN_1_0);
     virtual bool ASMtoSPV(const spv_target_env target_env, const uint32_t options, const char *pasm, std::vector<uint32_t> &spv);
-    bool SetAllocationInfoImportAHB(vk_testing::Device *device, VkAndroidHardwareBufferPropertiesANDROID ahb_props,
-                                    VkMemoryAllocateInfo &info);
 
     static inline int m_phys_device_index = -1;
     static inline ANativeWindow *window = nullptr;
+    static inline bool m_print_vu = false;
 };
 
 class TestEnvironment : public ::testing::Environment {

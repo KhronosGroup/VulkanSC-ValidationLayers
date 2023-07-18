@@ -19,7 +19,7 @@
 
 #include "utils/hash_util.h"
 #include "state_tracker/pipeline_state.h"
-#include "layer_chassis_dispatch.h"
+#include "generated/layer_chassis_dispatch.h"
 #include <vector>
 #include <unordered_map>
 

@@ -196,7 +196,12 @@ void QUEUE_STATE::ThreadFunc() {
     };
 
     // Roll this queue forward, one submission at a time.
-    while ((submission = NextSubmission())) {
+    while (true) {
+        submission = NextSubmission();
+        if (submission == nullptr) {
+            break;
+        }
+
         submission->EndUse();
         for (auto &wait : submission->wait_semaphores) {
             wait.semaphore->Retire(this, wait.payload);
@@ -285,9 +290,7 @@ void FENCE_STATE::Reset() {
     if (scope_ == kSyncScopeExternalTemporary) {
         scope_ = kSyncScopeInternal;
     }
-    if (scope_ == kSyncScopeInternal) {
-        state_ = FENCE_UNSIGNALED;
-    }
+    state_ = FENCE_UNSIGNALED;
     completed_ = std::promise<void>();
     waiter_ = std::shared_future<void>(completed_.get_future());
 }
@@ -295,11 +298,10 @@ void FENCE_STATE::Reset() {
 void FENCE_STATE::Import(VkExternalFenceHandleTypeFlagBits handle_type, VkFenceImportFlags flags) {
     auto guard = WriteLock();
     if (scope_ != kSyncScopeExternalPermanent) {
-        if ((handle_type == VK_EXTERNAL_FENCE_HANDLE_TYPE_SYNC_FD_BIT || flags & VK_FENCE_IMPORT_TEMPORARY_BIT) &&
-            scope_ == kSyncScopeInternal) {
-            scope_ = kSyncScopeExternalTemporary;
-        } else {
+        if (handle_type != VK_EXTERNAL_FENCE_HANDLE_TYPE_SYNC_FD_BIT && (flags & VK_FENCE_IMPORT_TEMPORARY_BIT) == 0) {
             scope_ = kSyncScopeExternalPermanent;
+        } else if (scope_ == kSyncScopeInternal) {
+            scope_ = kSyncScopeExternalTemporary;
         }
     }
 }
@@ -309,9 +311,14 @@ void FENCE_STATE::Export(VkExternalFenceHandleTypeFlagBits handle_type) {
     if (handle_type != VK_EXTERNAL_FENCE_HANDLE_TYPE_SYNC_FD_BIT) {
         // Export with reference transference becomes external
         scope_ = kSyncScopeExternalPermanent;
-    } else if (scope_ == kSyncScopeInternal) {
+    } else {
         // Export with copy transference has a side effect of resetting the fence
+        if (scope_ == kSyncScopeExternalTemporary) {
+            scope_ = kSyncScopeInternal;
+        }
         state_ = FENCE_UNSIGNALED;
+        completed_ = std::promise<void>();
+        waiter_ = std::shared_future<void>(completed_.get_future());
     }
 }
 
@@ -349,11 +356,11 @@ void SEMAPHORE_STATE::EnqueueWait(QUEUE_STATE *queue, uint64_t queue_seq, uint64
     }
 }
 
-void SEMAPHORE_STATE::EnqueueAcquire() {
+void SEMAPHORE_STATE::EnqueueAcquire(const char *func_name) {
     auto guard = WriteLock();
     assert(type == VK_SEMAPHORE_TYPE_BINARY);
     auto payload = next_payload_++;
-    SemOp acquire(kBinaryAcquire, nullptr, 0, payload);
+    SemOp acquire(kBinaryAcquire, nullptr, 0, payload, func_name);
     timeline_.emplace(payload, acquire);
 }
 
@@ -481,7 +488,7 @@ void SEMAPHORE_STATE::Retire(QUEUE_STATE *current_queue, uint64_t payload) {
 }
 
 std::shared_future<void> SEMAPHORE_STATE::Wait(uint64_t payload) {
-    auto guard = ReadLock();
+    auto guard = WriteLock();
     if (payload <= completed_.payload) {
         std::promise<void> already_done;
         auto result = already_done.get_future();
@@ -510,8 +517,18 @@ void SEMAPHORE_STATE::NotifyAndWait(uint64_t payload) {
         }
     } else {
         // For external timeline semaphores we should bump the completed payload to whatever the driver
-        // tells us.
-        EnqueueSignal(nullptr, 0, payload);
+        // tells us. That value may originate from an external process that imported the semaphore and
+        // might not be signaled through the application queues.
+        //
+        // However, there is one exception. The current process can still signal the semaphore, even if
+        // it was imported. The queue's semaphore signal should not be overwritten by a potentially
+        // external signal. Otherwise, queue information (queue/seq) can be lost, which may prevent the
+        // advancement of the queue simulation.
+        const auto it = timeline_.find(payload);
+        const bool already_signaled = it != timeline_.end() && it->second.signal_op.has_value();
+        if (!already_signaled) {
+            EnqueueSignal(nullptr, 0, payload);
+        }
         Retire(nullptr, payload);
     }
 }

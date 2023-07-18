@@ -19,14 +19,12 @@
 
 #include "render.h"
 
-#include <algorithm>
 #include <cassert>
 #include <cstring>
-#include <utility>
-#include <vector>
 
-#include "vk_format_utils.h"
-#include "vk_extension_helper.h"
+#include "generated/vk_format_utils.h"
+#include "generated/vk_extension_helper.h"
+#include "utils/vk_layer_utils.h"
 #include "vk_layer_settings_ext.h"
 #include "layer_validation_tests.h"
 
@@ -37,48 +35,6 @@ using std::vector;
 template <typename C, typename F>
 typename C::iterator RemoveIf(C &container, F &&fn) {
     return container.erase(std::remove_if(container.begin(), container.end(), std::forward<F>(fn)), container.end());
-}
-
-void DebugReporter::Create(VkInstance instance) noexcept {
-    assert(instance);
-    assert(!debug_obj_);
-
-    auto DebugCreate = reinterpret_cast<DebugCreateFnType>(vk::GetInstanceProcAddr(instance, debug_create_fn_name_));
-    if (!DebugCreate) return;
-
-    const VkResult err = DebugCreate(instance, &debug_create_info_, nullptr, &debug_obj_);
-    if (err) debug_obj_ = VK_NULL_HANDLE;
-}
-
-void DebugReporter::Destroy(VkInstance instance) noexcept {
-    assert(instance);
-    assert(debug_obj_);  // valid to call with null object, but probably bug
-
-    auto DebugDestroy = reinterpret_cast<DebugDestroyFnType>(vk::GetInstanceProcAddr(instance, debug_destroy_fn_name_));
-    assert(DebugDestroy);
-
-    DebugDestroy(instance, debug_obj_, nullptr);
-    debug_obj_ = VK_NULL_HANDLE;
-}
-
-#ifdef VK_USE_PLATFORM_ANDROID_KHR
-VKAPI_ATTR VkBool32 VKAPI_CALL DebugReporter::DebugCallback(VkDebugReportFlagsEXT message_flags, VkDebugReportObjectTypeEXT,
-                                                            uint64_t, size_t, int32_t, const char *, const char *message,
-                                                            void *user_data) {
-#else
-VKAPI_ATTR VkBool32 VKAPI_CALL DebugReporter::DebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
-                                                            VkDebugUtilsMessageTypeFlagsEXT message_types,
-                                                            const VkDebugUtilsMessengerCallbackDataEXT *callback_data,
-                                                            void *user_data) {
-    const auto message_flags = DebugAnnotFlagsToReportFlags(message_severity, message_types);
-    const char *message = callback_data->pMessage;
-#endif
-    ErrorMonitor *errMonitor = (ErrorMonitor *)user_data;
-
-    if (message_flags & errMonitor->GetMessageFlags()) {
-        return errMonitor->CheckForDesiredMsg(message);
-    }
-    return VK_FALSE;
 }
 
 VkRenderFramework::VkRenderFramework()
@@ -93,6 +49,7 @@ VkRenderFramework::VkRenderFramework()
       m_height(256),  // default window height
       m_render_target_fmt(VK_FORMAT_R8G8B8A8_UNORM),
       m_depth_stencil_fmt(VK_FORMAT_UNDEFINED),
+      m_depth_stencil_layout(VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL),
       m_clear_via_load_op(true),
       m_depth_clear_color(1.0),
       m_stencil_clear_color(0),
@@ -110,7 +67,7 @@ VkRenderFramework::VkRenderFramework()
 
 VkRenderFramework::~VkRenderFramework() {
     ShutdownFramework();
-    debug_reporter_.error_monitor_.Finish();
+    m_errorMonitor->Finish();
 }
 
 VkPhysicalDevice VkRenderFramework::gpu() const {
@@ -186,34 +143,22 @@ bool VkRenderFramework::DeviceExtensionSupported(const char *extension_name, con
 }
 
 VkInstanceCreateInfo VkRenderFramework::GetInstanceCreateInfo() const {
-#ifdef VK_USE_PLATFORM_METAL_EXT
-    return {
-        VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-        &debug_reporter_.debug_create_info_,
-        VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR,
-        &app_info_,
-        static_cast<uint32_t>(instance_layers_.size()),
-        instance_layers_.data(),
-        static_cast<uint32_t>(m_instance_extension_names.size()),
-        m_instance_extension_names.data(),
-    };
-#else
-    return {
-        VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-        &debug_reporter_.debug_create_info_,
-        0,
-        &app_info_,
-        static_cast<uint32_t>(instance_layers_.size()),
-        instance_layers_.data(),
-        static_cast<uint32_t>(m_instance_extension_names.size()),
-        m_instance_extension_names.data(),
-    };
+    auto info = LvlInitStruct<VkInstanceCreateInfo>();
+    info.pNext = m_errorMonitor->GetDebugCreateInfo();
+#if defined(VK_USE_PLATFORM_METAL_EXT)
+    info.flags = VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
 #endif
+    info.pApplicationInfo = &app_info_;
+    info.enabledLayerCount = size32(instance_layers_);
+    info.ppEnabledLayerNames = instance_layers_.data();
+    info.enabledExtensionCount = size32(m_instance_extension_names);
+    info.ppEnabledExtensionNames = m_instance_extension_names.data();
+    return info;
 }
 
 inline void CheckDisableCoreValidation(VkValidationFeaturesEXT &features) {
     auto disable = GetEnvironment("VK_LAYER_TESTS_DISABLE_CORE_VALIDATION");
-    std::transform(disable.begin(), disable.end(), disable.begin(), ::tolower);
+    vvl::ToLower(disable);
     if (disable == "false" || disable == "0" || disable == "FALSE") {       // default is to change nothing, unless flag is correctly specified
         features.disabledValidationFeatureCount = 0;                        // remove all disables to get all validation messages
     }
@@ -221,14 +166,14 @@ inline void CheckDisableCoreValidation(VkValidationFeaturesEXT &features) {
 
 void *VkRenderFramework::SetupValidationSettings(void *first_pnext) {
     auto validation = GetEnvironment("VK_LAYER_TESTS_VALIDATION_FEATURES");
-    std::transform(validation.begin(), validation.end(), validation.begin(), ::tolower);
+    vvl::ToLower(validation);
     VkValidationFeaturesEXT *features = LvlFindModInChain<VkValidationFeaturesEXT>(first_pnext);
     if (features) {
         CheckDisableCoreValidation(*features);
     }
     if (validation == "all" || validation == "core" || validation == "none") {
         if (!features) {
-            features = &validation_features;
+            features = &m_validation_features;
             features->sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT;
             features->pNext = first_pnext;
             first_pnext = features;
@@ -277,10 +222,16 @@ void VkRenderFramework::InitFramework(void * /*unused compatibility parameter*/,
         m_instance_extension_names.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     }
 
+    // Beginning with the 1.3.216 Vulkan SDK, the VK_KHR_PORTABILITY_subset extension is mandatory.
 #ifdef VK_USE_PLATFORM_METAL_EXT
     AddRequiredExtensions(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
-    // Beginning with the 1.3.216 Vulkan SDK, the VK_KHR_PORTABILITY_subset extension is mandatory.
     AddRequiredExtensions(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
+#else
+    // Note by default VK_KHRONOS_PROFILES_EMULATE_PORTABILITY is true.
+    if (auto str = GetEnvironment("VK_KHRONOS_PROFILES_EMULATE_PORTABILITY"); !str.empty() && str != "false") {
+        AddRequiredExtensions(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+        AddRequiredExtensions(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
+    }
 #endif
 
     RemoveIf(instance_layers_, LayerNotSupportedWithReporting);
@@ -306,6 +257,11 @@ void VkRenderFramework::InitFramework(void * /*unused compatibility parameter*/,
 
     ASSERT_VK_SUCCESS(vk::CreateInstance(&ici, nullptr, &instance_));
     if (instance_pnext) reinterpret_cast<VkBaseOutStructure *>(last_pnext)->pNext = nullptr;  // reset back borrowed pNext chain
+
+    vk::ResetAllExtensions();
+    for (const char *instance_ext_name : m_instance_extension_names) {
+        vk::InitInstanceExtension(instance_, instance_ext_name);
+    }
 
     // Choose a physical device
     uint32_t gpu_count = 0;
@@ -347,7 +303,7 @@ void VkRenderFramework::InitFramework(void * /*unused compatibility parameter*/,
         }
     }
 
-    debug_reporter_.Create(instance_);
+    m_errorMonitor->CreateCallback(instance_);
 
     if (print_driver_info && !driver_printed) {
         auto driver_properties = LvlInitStruct<VkPhysicalDeviceDriverProperties>();
@@ -525,16 +481,17 @@ void VkRenderFramework::ShutdownFramework() {
     delete m_device;
     m_device = nullptr;
 
-    debug_reporter_.Destroy(instance_);
+    m_errorMonitor->DestroyCallback(instance_);
 
     DestroySurface(m_surface);
     DestroySurfaceContext(m_surface_context);
 
     vk::DestroyInstance(instance_, nullptr);
     instance_ = NULL;  // In case we want to re-initialize
+    vk::ResetAllExtensions();
 }
 
-ErrorMonitor &VkRenderFramework::Monitor() { return debug_reporter_.error_monitor_; }
+ErrorMonitor &VkRenderFramework::Monitor() { return monitor_; }
 
 void VkRenderFramework::GetPhysicalDeviceFeatures(VkPhysicalDeviceFeatures *features) {
     vk::GetPhysicalDeviceFeatures(gpu(), features);
@@ -592,6 +549,11 @@ void VkRenderFramework::InitState(VkPhysicalDeviceFeatures *features, void *crea
     RemoveIf(m_device_extension_names, ExtensionNotSupportedWithReporting);
 
     m_device = new VkDeviceObj(0, gpu_, m_device_extension_names, features, create_device_pnext);
+
+    for (const char *device_ext_name : m_device_extension_names) {
+        vk::InitDeviceExtension(instance_, *m_device, device_ext_name);
+    }
+
     m_device->SetDeviceQueue();
 
     m_depthStencil = new VkDepthStencilObj(m_device);
@@ -676,7 +638,7 @@ bool VkRenderFramework::CreateSurface(SurfaceContext &surface_context, VkSurface
     }
 #endif
 
-#if defined(VK_USE_PLATFORM_ANDROID_KHR) && defined(VALIDATION_APK)
+#if defined(VK_USE_PLATFORM_ANDROID_KHR)
     if (IsExtensionsEnabled(VK_KHR_ANDROID_SURFACE_EXTENSION_NAME)) {
         VkAndroidSurfaceCreateInfoKHR surface_create_info = LvlInitStruct<VkAndroidSurfaceCreateInfoKHR>();
         surface_create_info.window = VkTestFramework::window;
@@ -963,8 +925,8 @@ void VkRenderFramework::InitRenderTarget(uint32_t targets, VkImageView *dsBindin
         att.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
         att.stencilLoadOp = (m_clear_via_load_op) ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
         att.stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
-        att.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-        att.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        att.initialLayout = m_depth_stencil_layout;
+        att.finalLayout = m_depth_stencil_layout;
         attachments.push_back(att);
 
         clear.depthStencil.depth = m_depth_clear_color;
@@ -974,7 +936,7 @@ void VkRenderFramework::InitRenderTarget(uint32_t targets, VkImageView *dsBindin
         bindings.push_back(*dsBinding);
 
         ds_reference.attachment = targets;
-        ds_reference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        ds_reference.layout = m_depth_stencil_layout;
         subpass.pDepthStencilAttachment = &ds_reference;
     } else {
         subpass.pDepthStencilAttachment = NULL;
@@ -1461,17 +1423,6 @@ bool VkImageObj::IsCompatible(const VkImageUsageFlags usages, const VkFormatFeat
     if ((usages & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) && !(features & VK_FORMAT_FEATURE_2_COLOR_ATTACHMENT_BIT)) return false;
     if ((usages & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT) && !(features & VK_FORMAT_FEATURE_2_DEPTH_STENCIL_ATTACHMENT_BIT))
         return false;
-
-    if (m_device->IsEnabledExtension(VK_KHR_MAINTENANCE_1_EXTENSION_NAME)) {
-        // WORKAROUND: for Profile not reporting extended enums, and possibly some drivers too
-        const auto all_nontransfer_feature_flags =
-            all_feature_flags ^ (VK_FORMAT_FEATURE_2_TRANSFER_SRC_BIT_KHR | VK_FORMAT_FEATURE_2_TRANSFER_DST_BIT_KHR);
-        const bool transfer_probably_supported_anyway = (features & all_nontransfer_feature_flags) > 0;
-        if (!transfer_probably_supported_anyway) {
-            if ((usages & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) && !(features & VK_FORMAT_FEATURE_2_TRANSFER_SRC_BIT_KHR)) return false;
-            if ((usages & VK_IMAGE_USAGE_TRANSFER_DST_BIT) && !(features & VK_FORMAT_FEATURE_2_TRANSFER_DST_BIT_KHR)) return false;
-        }
-    }
 
     return true;
 }
@@ -2091,8 +2042,9 @@ void VkPipelineObj::SetScissor(const vector<VkRect2D> &scissors) {
 
 void VkPipelineObj::MakeDynamic(VkDynamicState state) {
     /* Only add a state once */
-    for (auto it = m_dynamic_state_enables.begin(); it != m_dynamic_state_enables.end(); it++) {
-        if ((*it) == state) return;
+    if (const auto search = std::find(m_dynamic_state_enables.begin(), m_dynamic_state_enables.end(), state);
+        search != m_dynamic_state_enables.end()) {
+        return;
     }
     m_dynamic_state_enables.push_back(state);
 }
@@ -2101,10 +2053,7 @@ void VkPipelineObj::SetMSAA(const VkPipelineMultisampleStateCreateInfo *ms_state
 
 void VkPipelineObj::SetInputAssembly(const VkPipelineInputAssemblyStateCreateInfo *ia_state) { m_ia_state = *ia_state; }
 
-void VkPipelineObj::SetRasterization(const VkPipelineRasterizationStateCreateInfo *rs_state) {
-    m_rs_state = *rs_state;
-    m_rs_state.pNext = &m_line_state;
-}
+void VkPipelineObj::SetRasterization(const VkPipelineRasterizationStateCreateInfo *rs_state) { m_rs_state = *rs_state; }
 
 void VkPipelineObj::SetTessellation(const VkPipelineTessellationStateCreateInfo *te_state) { m_te_state = te_state; }
 
@@ -2333,7 +2282,7 @@ void VkCommandBufferObj::EndRendering() {
 }
 
 void VkCommandBufferObj::BeginVideoCoding(const VkVideoBeginCodingInfoKHR &beginInfo) {
-    static PFN_vkCmdBeginVideoCodingKHR vkCmdBeginVideoCodingKHR =
+    PFN_vkCmdBeginVideoCodingKHR vkCmdBeginVideoCodingKHR =
         (PFN_vkCmdBeginVideoCodingKHR)vk::GetDeviceProcAddr(m_device->device(), "vkCmdBeginVideoCodingKHR");
     ASSERT_NE(vkCmdBeginVideoCodingKHR, nullptr);
 
@@ -2341,7 +2290,7 @@ void VkCommandBufferObj::BeginVideoCoding(const VkVideoBeginCodingInfoKHR &begin
 }
 
 void VkCommandBufferObj::ControlVideoCoding(const VkVideoCodingControlInfoKHR &controlInfo) {
-    static PFN_vkCmdControlVideoCodingKHR vkCmdControlVideoCodingKHR =
+    PFN_vkCmdControlVideoCodingKHR vkCmdControlVideoCodingKHR =
         (PFN_vkCmdControlVideoCodingKHR)vk::GetDeviceProcAddr(m_device->device(), "vkCmdControlVideoCodingKHR");
     ASSERT_NE(vkCmdControlVideoCodingKHR, nullptr);
 
@@ -2349,7 +2298,7 @@ void VkCommandBufferObj::ControlVideoCoding(const VkVideoCodingControlInfoKHR &c
 }
 
 void VkCommandBufferObj::DecodeVideo(const VkVideoDecodeInfoKHR &decodeInfo) {
-    static PFN_vkCmdDecodeVideoKHR vkCmdDecodeVideoKHR =
+    PFN_vkCmdDecodeVideoKHR vkCmdDecodeVideoKHR =
         (PFN_vkCmdDecodeVideoKHR)vk::GetDeviceProcAddr(m_device->device(), "vkCmdDecodeVideoKHR");
     ASSERT_NE(vkCmdDecodeVideoKHR, nullptr);
 
@@ -2357,7 +2306,7 @@ void VkCommandBufferObj::DecodeVideo(const VkVideoDecodeInfoKHR &decodeInfo) {
 }
 
 void VkCommandBufferObj::EndVideoCoding(const VkVideoEndCodingInfoKHR &endInfo) {
-    static PFN_vkCmdEndVideoCodingKHR vkCmdEndVideoCodingKHR =
+    PFN_vkCmdEndVideoCodingKHR vkCmdEndVideoCodingKHR =
         (PFN_vkCmdEndVideoCodingKHR)vk::GetDeviceProcAddr(m_device->device(), "vkCmdEndVideoCodingKHR");
     ASSERT_NE(vkCmdEndVideoCodingKHR, nullptr);
 

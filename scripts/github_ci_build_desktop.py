@@ -14,12 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import argparse
-import shutil
 import subprocess
 import sys
-import platform
 
 import common_ci
 
@@ -30,10 +26,13 @@ def main():
     args = parser.parse_args()
 
     config = args.configuration
+    osx = args.osx
+
+    common_ci.SetupDarwin(osx)
 
     try:
         common_ci.BuildVVL(config = config, cmake_args = args.cmake, build_tests = "OFF")
-        common_ci.CheckVVLCodegenConsistency(config = config)
+        common_ci.CheckVVL(config = config)
 
     except subprocess.CalledProcessError as proc_error:
         print('Command "%s" failed with return code %s' % (' '.join(proc_error.cmd), proc_error.returncode))

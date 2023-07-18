@@ -24,14 +24,16 @@ namespace core_error {
 struct Location;
 }
 
+struct DeviceExtensions;
 struct SubresourceRangeErrorCodes;
+struct DeviceExtensions;
 
 namespace sync_vuid_maps {
 using core_error::Location;
 
 extern const std::map<VkPipelineStageFlags2KHR, std::string> kFeatureNameMap;
 
-const std::string &GetBadFeatureVUID(const Location &loc, VkPipelineStageFlags2KHR bit);
+const std::string &GetBadFeatureVUID(const Location &loc, VkPipelineStageFlags2 bit, const DeviceExtensions &device_extensions);
 
 const std::string &GetBadAccessFlagsVUID(const Location &loc, VkAccessFlags2KHR bit);
 
@@ -69,12 +71,12 @@ enum class ImageError {
     kBadSync2OldLayout,
     kBadSync2NewLayout,
     kNotColorAspect,
-    kNotColorAspectYcbcr,
     kBadMultiplanarAspect,
     kBadPlaneCount,
     kNotDepthOrStencilAspect,
     kNotDepthAndStencilAspect,
-    kNotSeparateDepthAndStencilAspect,
+    kSeparateDepthWithStencilLayout,
+    kSeparateStencilhWithDepthLayout,
     kRenderPassMismatch,
     kRenderPassLayoutChange,
 };
@@ -92,8 +94,7 @@ const SubresourceRangeErrorCodes &GetSubResourceVUIDs(const Location &loc);
 enum class SubmitError {
     kTimelineSemSmallValue,
     kSemAlreadySignalled,
-    kOldBinaryCannotBeSignalled,  // timeline semaphores not supported
-    kBinaryCannotBeSignalled,     // timeline semaphores supported
+    kBinaryCannotBeSignalled,
     kTimelineSemMaxDiff,
     kProtectedFeatureDisabled,
     kBadUnprotectedSubmit,
@@ -108,5 +109,11 @@ enum class SubmitError {
 };
 
 const std::string &GetQueueSubmitVUID(const Location &loc, SubmitError error);
+
+enum class ShaderTileImageError { kShaderTileImageFeatureError, kShaderTileImageBarrierError };
+
+const std::string &GetShaderTileImageVUID(const Location &loc, ShaderTileImageError error);
+
+const char *GetAccessMaskRayQueryVUIDSelector(const Location &loc, const DeviceExtensions &device_extensions);
 
 }  // namespace sync_vuid_maps

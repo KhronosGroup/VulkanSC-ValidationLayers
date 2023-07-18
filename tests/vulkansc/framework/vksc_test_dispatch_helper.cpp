@@ -17,7 +17,8 @@
 
 #include "vksc_test_dispatch_helper.h"
 #include "vksc_test_pipeline_cache_helper.h"
-#include "vk_typemap_helper.h"
+#include "vksc_render_framework.h"
+#include "generated/vk_typemap_helper.h"
 
 #include <assert.h>
 
@@ -186,6 +187,11 @@ static VKAPI_ATTR VkResult VKAPI_CALL CreatePipelineCache(VkDevice device, const
 template <typename CREATE_INFO, typename CREATE_FUNC>
 static VkResult CreatePipelines(VkDevice device, VkPipelineCache pipeline_cache, uint32_t create_info_count,
                                 const CREATE_INFO* create_infos, VkPipeline* pipelines, CREATE_FUNC create_func) {
+    // If the application did not provide a pipeline cache, let's use a default one
+    if (pipeline_cache == VK_NULL_HANDLE) {
+        pipeline_cache = VkSCRenderFramework::Instance().GetDefaultPipelineCache();
+    }
+
     // When running Vulkan validation layer tests against the Vulkan SC validation layers
     // we need to manually inject the default offline pipeline creation info, if not present.
     bool need_to_chain_offline_info = false;
@@ -200,6 +206,10 @@ static VkResult CreatePipelines(VkDevice device, VkPipelineCache pipeline_cache,
             auto create_info = create_infos[0];
             offline_info.pNext = create_info.pNext;
             create_info.pNext = &offline_info;
+
+            // Make sure basePipelineIndex is not -1, as in Vulkan that's the "default" value
+            create_info.basePipelineIndex = 0;
+
             return create_func(device, pipeline_cache, 1, &create_info, nullptr, pipelines);
         } else {
             std::vector<VkPipelineOfflineCreateInfo> offline_info(create_info_count, vksc::GetDefaultPipelineOfflineCreateInfo());
@@ -208,6 +218,9 @@ static VkResult CreatePipelines(VkDevice device, VkPipelineCache pipeline_cache,
                 create_info_vec[i] = create_infos[i];
                 offline_info[i].pNext = create_info_vec[i].pNext;
                 create_info_vec[i].pNext = &offline_info[i];
+
+                // Make sure basePipelineIndex is not -1, as in Vulkan that's the "default" value
+                create_info_vec[i].basePipelineIndex = 0;
             }
             return create_func(device, pipeline_cache, create_info_count, create_info_vec.data(), nullptr, pipelines);
         }
@@ -254,60 +267,6 @@ static VKAPI_ATTR VkResult VKAPI_CALL CreateCommandPool(VkDevice device, const V
 
 }  // namespace compatibility
 
-// Destroy and free commands removed in Vulkan SC are permanently attached to placeholder
-// implementations to enable running Vulkan validation layer tests against the Vulkan SC
-// validation layers.
-PFN_vkFreeMemory FreeMemory = compatibility::FreeMemory;
-PFN_vkDestroyQueryPool DestroyQueryPool = compatibility::DestroyQueryPool;
-PFN_vkDestroyDescriptorPool DestroyDescriptorPool = compatibility::DestroyDescriptorPool;
-PFN_vkDestroyCommandPool DestroyCommandPool = compatibility::DestroyCommandPool;
-PFN_vkDestroySwapchainKHR DestroySwapchainKHR = compatibility::DestroySwapchainKHR;
-PFN_vkCreateShaderModule CreateShaderModule = compatibility::CreateShaderModule;
-PFN_vkDestroyShaderModule DestroyShaderModule = compatibility::DestroyShaderModule;
-
-// Other removed functions are unavailable by default.
-PFN_vkGetImageSparseMemoryRequirements GetImageSparseMemoryRequirements = nullptr;
-PFN_vkGetPhysicalDeviceSparseImageFormatProperties GetPhysicalDeviceSparseImageFormatProperties = nullptr;
-PFN_vkQueueBindSparse QueueBindSparse = nullptr;
-PFN_vkGetPipelineCacheData GetPipelineCacheData = nullptr;
-PFN_vkMergePipelineCaches MergePipelineCaches = nullptr;
-PFN_vkGetImageSparseMemoryRequirements2 GetImageSparseMemoryRequirements2 = nullptr;
-PFN_vkGetPhysicalDeviceSparseImageFormatProperties2 GetPhysicalDeviceSparseImageFormatProperties2 = nullptr;
-PFN_vkTrimCommandPool TrimCommandPool = nullptr;
-PFN_vkCreateDescriptorUpdateTemplate CreateDescriptorUpdateTemplate = nullptr;
-PFN_vkDestroyDescriptorUpdateTemplate DestroyDescriptorUpdateTemplate = nullptr;
-PFN_vkUpdateDescriptorSetWithTemplate UpdateDescriptorSetWithTemplate = nullptr;
-#ifdef VK_USE_PLATFORM_XLIB_KHR
-PFN_vkCreateXlibSurfaceKHR CreateXlibSurfaceKHR = nullptr;
-#endif  // VK_USE_PLATFORM_XLIB_KHR
-#ifdef VK_USE_PLATFORM_XLIB_KHR
-PFN_vkGetPhysicalDeviceXlibPresentationSupportKHR GetPhysicalDeviceXlibPresentationSupportKHR = nullptr;
-#endif  // VK_USE_PLATFORM_XLIB_KHR
-#ifdef VK_USE_PLATFORM_XCB_KHR
-PFN_vkCreateXcbSurfaceKHR CreateXcbSurfaceKHR = nullptr;
-#endif  // VK_USE_PLATFORM_XCB_KHR
-#ifdef VK_USE_PLATFORM_XCB_KHR
-PFN_vkGetPhysicalDeviceXcbPresentationSupportKHR GetPhysicalDeviceXcbPresentationSupportKHR = nullptr;
-#endif  // VK_USE_PLATFORM_XCB_KHR
-#ifdef VK_USE_PLATFORM_WAYLAND_KHR
-PFN_vkCreateWaylandSurfaceKHR CreateWaylandSurfaceKHR = nullptr;
-#endif  // VK_USE_PLATFORM_WAYLAND_KHR
-#ifdef VK_USE_PLATFORM_WAYLAND_KHR
-PFN_vkGetPhysicalDeviceWaylandPresentationSupportKHR GetPhysicalDeviceWaylandPresentationSupportKHR = nullptr;
-#endif  // VK_USE_PLATFORM_WAYLAND_KHR
-#ifdef VK_USE_PLATFORM_ANDROID_KHR
-PFN_vkCreateAndroidSurfaceKHR CreateAndroidSurfaceKHR = nullptr;
-#endif  // VK_USE_PLATFORM_ANDROID_KHR
-#ifdef VK_USE_PLATFORM_WIN32_KHR
-PFN_vkCreateWin32SurfaceKHR CreateWin32SurfaceKHR = nullptr;
-#endif  // VK_USE_PLATFORM_WIN32_KHR
-#ifdef VK_USE_PLATFORM_WIN32_KHR
-PFN_vkGetPhysicalDeviceWin32PresentationSupportKHR GetPhysicalDeviceWin32PresentationSupportKHR = nullptr;
-#endif  // VK_USE_PLATFORM_WIN32_KHR
-#ifdef VK_USE_PLATFORM_MACOS_MVK
-PFN_vkCreateMacOSSurfaceMVK CreateMacOSSurfaceMVK = nullptr;
-#endif  // VK_USE_PLATFORM_MACOS_MVK
-
 }  // namespace vk
 
 namespace vksc {
@@ -319,6 +278,16 @@ PFN_vkCreateGraphicsPipelines CreateGraphicsPipelines = nullptr;
 PFN_vkCreateCommandPool CreateCommandPool = nullptr;
 
 void PatchDispatchTable() {
+#define VK_ONLY__SWAP_COMPAT_EP(name) vk::name = vk::compatibility::name
+
+    VK_ONLY__SWAP_COMPAT_EP(FreeMemory);
+    VK_ONLY__SWAP_COMPAT_EP(DestroyQueryPool);
+    VK_ONLY__SWAP_COMPAT_EP(DestroyDescriptorPool);
+    VK_ONLY__SWAP_COMPAT_EP(DestroyCommandPool);
+    VK_ONLY__SWAP_COMPAT_EP(DestroySwapchainKHR);
+    VK_ONLY__SWAP_COMPAT_EP(CreateShaderModule);
+    VK_ONLY__SWAP_COMPAT_EP(DestroyShaderModule);
+
 #define VKSC__SWAP_COMPAT_EP(name) \
     vksc::name = vk::name;         \
     vk::name = vk::compatibility::name;

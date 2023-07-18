@@ -66,48 +66,15 @@ TEST_F(VkSCLayerTest, LeakAnObject) {
     m_errorMonitor->SetUnexpectedError("UNASSIGNED-ObjectTracker-ObjectLeak");
 }
 
-TEST_F(VkSCLayerTest, CreateImageMiscErrors) {
+TEST_F(ImageTest, ImageMisc) {
     TEST_DESCRIPTION("Misc leftover valid usage errors in VkImageCreateInfo struct");
 
     VkPhysicalDeviceFeatures features{};
     ASSERT_NO_FATAL_FAILURE(Init(&features));
 
-    VkImageCreateInfo tmp_img_ci = LvlInitStruct<VkImageCreateInfo>();
-    tmp_img_ci.flags = 0;                          // assumably any is supported
-    tmp_img_ci.imageType = VK_IMAGE_TYPE_2D;       // any is supported
-    tmp_img_ci.format = VK_FORMAT_R8G8B8A8_UNORM;  // has mandatory support for all usages
-    tmp_img_ci.extent = {64, 64, 1};               // limit is 256 for 3D, or 4096
-    tmp_img_ci.mipLevels = 1;                      // any is supported
-    tmp_img_ci.arrayLayers = 1;                    // limit is 256
-    tmp_img_ci.samples = VK_SAMPLE_COUNT_1_BIT;    // needs to be 1 if TILING_LINEAR
-    // if VK_IMAGE_TILING_LINEAR imageType must be 2D, usage must be TRANSFER, and levels layers samplers all 1
-    tmp_img_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
-    tmp_img_ci.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;  // depends on format
-    tmp_img_ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    const VkImageCreateInfo safe_image_ci = tmp_img_ci;
+    const VkImageCreateInfo safe_image_ci = DefaultImageInfo();
 
     ASSERT_VK_SUCCESS(GPDIFPHelper(gpu(), &safe_image_ci));
-
-    {
-        VkImageCreateInfo image_ci = safe_image_ci;
-        image_ci.format = VK_FORMAT_UNDEFINED;
-        CreateImageTest(*this, &image_ci, "VUID-VkImageCreateInfo-format-00943");
-    }
-
-    {
-        VkImageCreateInfo image_ci = safe_image_ci;
-        image_ci.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
-        image_ci.arrayLayers = 6;
-        image_ci.imageType = VK_IMAGE_TYPE_1D;
-        image_ci.extent = {64, 1, 1};
-        CreateImageTest(*this, &image_ci, "VUID-VkImageCreateInfo-flags-00949");
-
-        image_ci = safe_image_ci;
-        image_ci.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
-        image_ci.imageType = VK_IMAGE_TYPE_3D;
-        image_ci.extent = {4, 4, 4};
-        CreateImageTest(*this, &image_ci, "VUID-VkImageCreateInfo-flags-00949");
-    }
 
     {
         VkImageCreateInfo image_ci = safe_image_ci;
@@ -177,7 +144,7 @@ TEST_F(VkSCLayerTest, CreateImageMiscErrors) {
     }
 }
 
-TEST_F(VkSCLayerTest, BindInvalidMemory) {
+TEST_F(NegativeMemory, BindMemory) {
     VkResult err;
     bool pass;
 
@@ -400,47 +367,5 @@ TEST_F(VkSCLayerTest, BindInvalidMemory) {
 
         vk::DestroyImage(device(), image, NULL);
         vk::DestroyBuffer(device(), buffer, NULL);
-    }
-
-    // Try to bind memory to an image created with sparse memory flags
-    {
-        VkImageCreateInfo sparse_image_create_info = image_create_info;
-        sparse_image_create_info.flags |= VK_IMAGE_CREATE_SPARSE_BINDING_BIT;
-        VkImageFormatProperties image_format_properties = {};
-        err = vk::GetPhysicalDeviceImageFormatProperties(m_device->phy().handle(), sparse_image_create_info.format,
-                                                         sparse_image_create_info.imageType, sparse_image_create_info.tiling,
-                                                         sparse_image_create_info.usage, sparse_image_create_info.flags,
-                                                         &image_format_properties);
-        if (!m_device->phy().features().sparseResidencyImage2D || err == VK_ERROR_FORMAT_NOT_SUPPORTED) {
-            // most likely means sparse formats aren't supported here; skip this test.
-        } else {
-            ASSERT_VK_SUCCESS(err);
-            if (image_format_properties.maxExtent.width == 0) {
-                GTEST_SKIP() << "Sparse image format not supported";
-            } else {
-                VkImage sparse_image = VK_NULL_HANDLE;
-                err = vk::CreateImage(m_device->device(), &sparse_image_create_info, NULL, &sparse_image);
-                ASSERT_VK_SUCCESS(err);
-                VkMemoryRequirements sparse_mem_reqs = {};
-                vk::GetImageMemoryRequirements(m_device->device(), sparse_image, &sparse_mem_reqs);
-                if (sparse_mem_reqs.memoryTypeBits != 0) {
-                    VkMemoryAllocateInfo sparse_mem_alloc = LvlInitStruct<VkMemoryAllocateInfo>();
-                    sparse_mem_alloc.allocationSize = sparse_mem_reqs.size;
-                    sparse_mem_alloc.memoryTypeIndex = 0;
-                    pass = m_device->phy().set_memory_type(sparse_mem_reqs.memoryTypeBits, &sparse_mem_alloc, 0);
-                    ASSERT_TRUE(pass);
-                    VkDeviceMemory sparse_mem = VK_NULL_HANDLE;
-                    err = vk::AllocateMemory(m_device->device(), &sparse_mem_alloc, NULL, &sparse_mem);
-                    ASSERT_VK_SUCCESS(err);
-                    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkBindImageMemory-image-01045");
-                    err = vk::BindImageMemory(m_device->device(), sparse_image, sparse_mem, 0);
-                    // This may very well return an error.
-                    (void)err;
-                    m_errorMonitor->VerifyFound();
-                    vk::FreeMemory(m_device->device(), sparse_mem, NULL);
-                }
-                vk::DestroyImage(m_device->device(), sparse_image, NULL);
-            }
-        }
     }
 }

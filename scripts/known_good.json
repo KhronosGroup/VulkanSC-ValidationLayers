@@ -2,11 +2,11 @@
     "repos": [
         {
             "name": "glslang",
-            "url": "https://github.com/KhronosGroup/glslang.git",
+            "url": "https://github.com/archimedus/glslang.git",
             "sub_dir": "glslang",
             "build_dir": "glslang/build",
             "install_dir": "glslang/build/install",
-            "commit": "14e5a04e70057972eef8a40df422e30a3b70e4b5",
+            "commit": "a7260ca8a6a81cddacef5d6b3d80398cd67b94b5",
             "optional": [
                 "tests"
             ]
@@ -14,11 +14,11 @@
         {
             "name": "Vulkan-Headers",
             "api": "vulkan",
-            "url": "https://github.com/KhronosGroup/VulkanSC-Headers.git",
+            "url": "https://github.com/KhronosGroup/Vulkan-Headers.git",
             "sub_dir": "Vulkan-Headers",
             "build_dir": "Vulkan-Headers/build",
             "install_dir": "Vulkan-Headers/build/install",
-            "commit": "sc_beta-upstream-cherry-picked-reg-tools"
+            "commit": "v1.3.257"
         },
         {
             "name": "Vulkan-Headers",
@@ -31,7 +31,7 @@
                 "-DVULKANSC=TRUE",
                 "-DGEN_VULKANSC_COMBINED=TRUE"
             ],
-            "commit": "fece0e8e98d139ebc6eed30b430ed31c1ece2233"
+            "commit": "e8febd2664a72d0e4d029585822ea3fa127f916e"
         },
         {
             "name": "SPIRV-Headers",
@@ -39,10 +39,7 @@
             "sub_dir": "SPIRV-Headers",
             "build_dir": "SPIRV-Headers/build",
             "install_dir": "SPIRV-Headers/build/install",
-            "commit": "1feaf4414eb2b353764d01d88f8aa4bcc67b60db",
-            "cmake_options": [
-                "-D SPIRV_HEADERS_SKIP_EXAMPLES=ON"
-            ]
+            "commit": "3469b164e25cee24435029a569933cb42578db5d"
         },
         {
             "name": "SPIRV-Tools",
@@ -51,9 +48,23 @@
             "build_dir": "SPIRV-Tools/build",
             "install_dir": "SPIRV-Tools/build/install",
             "cmake_options": [
-                "-DSPIRV-Headers_SOURCE_DIR={repo_dir}/../SPIRV-Headers"
+                "-DSPIRV-Headers_SOURCE_DIR={repo_dir}/../SPIRV-Headers",
+                "-DSPIRV_WERROR=OFF",
+                "-DSPIRV_SKIP_TESTS=ON",
+                "-DSPIRV_SKIP_EXECUTABLES=ON"
             ],
-            "commit": "44d72a9b36702f093dd20815561a56778b2d181e"
+            "commit": "04cdb2d344706052c7a2d359294e830ebac63e74"
+        },
+        {
+            "name": "SPIRV-Reflect",
+            "url": "https://github.com/KhronosGroup/SPIRV-Reflect.git",
+            "sub_dir": "SPIRV-Reflect",
+            "install_dir": "SPIRV-Reflect",
+            "build_step": "skip",
+            "commit": "87442baff70befd0523a0e7148fc4e68b71f4bb9",
+            "optional": [
+                "tests"
+            ]
         },
         {
             "name": "robin-hood-hashing",
@@ -77,7 +88,7 @@
                 "-Dgtest_force_shared_crt=ON",
                 "-DBUILD_SHARED_LIBS=OFF"
             ],
-            "commit": "v1.12.0",
+            "commit": "ec4fed93217bc2830959bb8e86798c1d86956949",
             "optional": [
                 "tests"
             ]
@@ -105,6 +116,7 @@
         "Vulkan-Headers": "VULKAN_HEADERS_INSTALL_DIR",
         "SPIRV-Headers": "SPIRV_HEADERS_INSTALL_DIR",
         "SPIRV-Tools": "SPIRV_TOOLS_INSTALL_DIR",
+        "SPIRV-Reflect": "SPIRV_REFLECT_INSTALL_DIR",
         "robin-hood-hashing": "ROBIN_HOOD_HASHING_INSTALL_DIR",
         "googletest": "GOOGLETEST_INSTALL_DIR",
         "mimalloc": "MIMALLOC_INSTALL_DIR"

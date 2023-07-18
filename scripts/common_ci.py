@@ -25,7 +25,7 @@ import argparse
 
 if sys.version_info[0] != 3:
     print("This script requires Python 3. Run script with [-h] option for more details.")
-    sys_exit(0)
+    sys.exit(0)
 
 # Use Ninja for all platforms for performance/simplicity
 os.environ['CMAKE_GENERATOR'] = "Ninja"
@@ -50,13 +50,25 @@ TEST_INSTALL_DIR = RepoRelative("build/install")
 
 def externalDir(config): return os.path.join(RepoRelative(EXTERNAL_DIR_NAME), config)
 
+# Returns true if we are running in GitHub actions
+# https://docs.github.com/en/actions/learn-github-actions/variables#default-environment-variables
+def IsGHA():
+    if 'GITHUB_ACTION' in os.environ:
+        return True
+    return False
+
 # Runs a command in a directory and returns its return code.
 # Directory is project root by default, or a relative path from project root
 def RunShellCmd(command, start_dir = PROJECT_ROOT, env=None, verbose=False):
     if start_dir != PROJECT_ROOT:
         start_dir = RepoRelative(start_dir)
     cmd_list = command.split(" ")
-    if verbose or ('VVL_CI_VERBOSE' in os.environ and os.environ['VVL_CI_VERBOSE'] != '0'):
+
+    # Helps a lot when debugging CI issues
+    if IsGHA():
+        verbose = True
+
+    if verbose:
         print(f'CICMD({cmd_list}, env={env})')
     subprocess.check_call(cmd_list, cwd=start_dir, env=env)
 
@@ -65,11 +77,36 @@ def RunShellCmd(command, start_dir = PROJECT_ROOT, env=None, verbose=False):
 def IsWindows(): return 'windows' == platform.system().lower()
 
 #
-# Verify consistency of generated source code
-def CheckVVLCodegenConsistency(config):
-    print("Check Generated Source Code Consistency")
+# Set MACOSX_DEPLOYMENT_TARGET
+def SetupDarwin(osx):
+    if platform.system() != "Darwin":
+        return
+
+    # By default it will use the latest MacOS SDK available on the system.
+    if osx == 'latest':
+        return
+
+    # Currently the Vulkan SDK targets 10.15 as the minimum for MacOS support.
+    # If we need to we can raise the minimim like we did for C++17 support.
+    os.environ['MACOSX_DEPLOYMENT_TARGET'] = "10.15"
+    print(f"Targeting {os.environ['MACOSX_DEPLOYMENT_TARGET']} MacOS Deployment Target", flush=True)
+
+#
+# Run VVL scripts
+def CheckVVL(config):
     ext_dir = externalDir(config)
-    gen_check_cmd = f'python3 scripts/generate_source.py --verify {ext_dir}/Vulkan-Headers/registry {ext_dir}/SPIRV-Headers/include/spirv/unified1/'
+    vulkan_registry = ext_dir + "/Vulkan-Headers/registry"
+    spirv_unified = ext_dir + "/SPIRV-Headers/include/spirv/unified1/"
+
+    # Verify consistency of generated source code
+    print("Check Generated Source Code Consistency")
+    gen_check_cmd = f'python scripts/generate_source.py --verify {vulkan_registry} {spirv_unified}'
+    RunShellCmd(gen_check_cmd)
+
+    print('Run vk_validation_stats.py')
+    valid_usage_json = vulkan_registry + "/validusage.json"
+    text_file = RepoRelative(f'{VVL_BUILD_DIR}/layers/vuid_coverage_database.txt')
+    gen_check_cmd = f'python scripts/vk_validation_stats.py {valid_usage_json} -text {text_file}'
     RunShellCmd(gen_check_cmd)
 
 #
@@ -98,13 +135,6 @@ def BuildVVL(config, cmake_args, build_tests):
     install_cmd = f'cmake --install {VVL_BUILD_DIR} --prefix {TEST_INSTALL_DIR}'
     RunShellCmd(install_cmd)
 
-    print('Run vk_validation_stats.py')
-    ext_dir = externalDir(config)
-    stats_script = RepoRelative('scripts/vk_validation_stats.py')
-    validusage = os.path.join(ext_dir, 'Vulkan-Headers', 'registry', 'validusage.json')
-    outfile = os.path.join('layers', 'vuid_coverage_database.txt')
-    RunShellCmd(f'{sys.executable} {stats_script} {validusage} -text {outfile}', VVL_BUILD_DIR)
-
 #
 # Prepare Loader for executing Layer Validation Tests
 def BuildLoader():
@@ -119,11 +149,16 @@ def BuildLoader():
     LOADER_BUILD_DIR = RepoRelative("%s/Vulkan-Loader/%s" % (EXTERNAL_DIR_NAME, BUILD_DIR_NAME))
 
     print("Run CMake for Loader")
-    cmake_cmd = f'cmake -S {LOADER_DIR} -B {LOADER_BUILD_DIR} '
-    cmake_cmd += '-D UPDATE_DEPS=ON -D BUILD_TESTS=OFF -D CMAKE_BUILD_TYPE=Release'
-    # This enables better stack traces from leak sanitizer by using the loader feature which prevents unloading of libraries at shutdown.
-    if not IsWindows():
-        cmake_cmd += ' -D LOADER_ENABLE_ADDRESS_SANITIZER=ON -D LOADER_DISABLE_DYNAMIC_LIBRARY_UNLOADING=ON'
+    cmake_cmd = f'cmake -S {LOADER_DIR} -B {LOADER_BUILD_DIR}'
+    cmake_cmd += ' -D UPDATE_DEPS=ON -D BUILD_TESTS=OFF -D CMAKE_BUILD_TYPE=Release'
+
+    # This enables better stack traces from tools like leak sanitizer by using the loader feature which prevents unloading of libraries at shutdown.
+    cmake_cmd += ' -D LOADER_DISABLE_DYNAMIC_LIBRARY_UNLOADING=ON'
+
+    # GitHub actions runs our test as admin on Windows
+    if IsGHA() and IsWindows():
+        cmake_cmd += ' -D LOADER_USE_UNSAFE_FILE_SEARCH=ON'
+
     RunShellCmd(cmake_cmd)
 
     print("Build Loader")
@@ -145,13 +180,9 @@ def BuildMockICD():
 
     ICD_BUILD_DIR = RepoRelative("%s/Vulkan-Tools/%s" % (EXTERNAL_DIR_NAME,BUILD_DIR_NAME))
 
-    print("Running update_deps.py for ICD")
-    RunShellCmd(f'python3 scripts/update_deps.py --dir {EXTERNAL_DIR_NAME} --config release', VT_DIR)
-
     print("Run CMake for ICD")
     cmake_cmd = f'cmake -S {VT_DIR} -B {ICD_BUILD_DIR} -D CMAKE_BUILD_TYPE=Release '
-    cmake_cmd += '-DBUILD_CUBE=NO -DBUILD_VULKANINFO=NO -D INSTALL_ICD=ON '
-    cmake_cmd += f'-C {VT_DIR}/{EXTERNAL_DIR_NAME}/helper.cmake'
+    cmake_cmd += '-DBUILD_CUBE=NO -DBUILD_VULKANINFO=NO -D INSTALL_ICD=ON -D UPDATE_DEPS=ON'
     RunShellCmd(cmake_cmd)
 
     print("Build Mock ICD")
@@ -192,36 +223,64 @@ def BuildProfileLayer():
 
 #
 # Run the Layer Validation Tests
-def RunVVLTests(config):
-    print("Run Vulkan-ValidationLayer Tests using Mock ICD")
-
-    if IsWindows():
-        print("Not implemented yet")
-        exit(-1)
-
-    lvt_cmd = os.path.join(PROJECT_ROOT, BUILD_DIR_NAME, 'tests', 'vk_layer_validation_tests')
+def RunVVLTests():
+    print("Run VVL Tests using Mock ICD")
 
     lvt_env = dict(os.environ)
 
     # Because we installed everything to TEST_INSTALL_DIR all the libraries/json files are in pre-determined locations
-    # defined by GNUInstallDirs. This makes adding the LD_LIBRARY_PATH and VK_LAYER_PATH trivial/robust.
-    lvt_env['LD_LIBRARY_PATH'] = os.path.join(TEST_INSTALL_DIR, 'lib')
-    lvt_env['VK_LAYER_PATH'] = os.path.join(TEST_INSTALL_DIR, 'share/vulkan/explicit_layer.d')
-    lvt_env['VK_DRIVER_FILES'] = os.path.join(TEST_INSTALL_DIR, 'share/vulkan/icd.d/VkICD_mock_icd.json')
+    # defined by GNUInstallDirs. This makes setting VK_LAYER_PATH and other environment variables trivial/robust.
+    if IsWindows():
+        lvt_env['VK_LAYER_PATH'] = os.path.join(TEST_INSTALL_DIR, 'bin')
+        lvt_env['VK_DRIVER_FILES'] = os.path.join(TEST_INSTALL_DIR, 'bin\\VkICD_mock_icd.json')
+    else:
+        lvt_env['LD_LIBRARY_PATH'] = os.path.join(TEST_INSTALL_DIR, 'lib')
+        lvt_env['VK_LAYER_PATH'] = os.path.join(TEST_INSTALL_DIR, 'share/vulkan/explicit_layer.d')
+        lvt_env['VK_DRIVER_FILES'] = os.path.join(TEST_INSTALL_DIR, 'share/vulkan/icd.d/VkICD_mock_icd.json')
+
+    # Useful for debugging
+    # lvt_env['VK_LOADER_DEBUG'] = 'error,warn,info'
+    # lvt_env['VK_LAYER_TESTS_PRINT_DRIVER'] = '1'
 
     lvt_env['VK_INSTANCE_LAYERS'] = 'VK_LAYER_KHRONOS_validation' + os.pathsep + 'VK_LAYER_KHRONOS_profiles'
     lvt_env['VK_KHRONOS_PROFILES_SIMULATE_CAPABILITIES'] = 'SIMULATE_API_VERSION_BIT,SIMULATE_FEATURES_BIT,SIMULATE_PROPERTIES_BIT,SIMULATE_EXTENSIONS_BIT,SIMULATE_FORMATS_BIT,SIMULATE_QUEUE_FAMILY_PROPERTIES_BIT'
-    lvt_env['VK_KHRONOS_PROFILES_EMULATE_PORTABILITY'] = 'false'
+
+    # By default use the max_profile.json
+    if "VK_KHRONOS_PROFILES_PROFILE_FILE" not in os.environ:
+        lvt_env['VK_KHRONOS_PROFILES_PROFILE_FILE'] = RepoRelative('tests/device_profiles/max_profile.json')
+
+    # By default set portability to false
+    if "VK_KHRONOS_PROFILES_EMULATE_PORTABILITY" not in os.environ:
+        lvt_env['VK_KHRONOS_PROFILES_EMULATE_PORTABILITY'] = 'false'
+
     lvt_env['VK_KHRONOS_PROFILES_DEBUG_REPORTS'] = 'DEBUG_REPORT_ERROR_BIT'
 
-    RunShellCmd(lvt_cmd, env=lvt_env)
-    print("Re-Running multithreaded tests with VK_LAYER_FINE_GRAINED_LOCKING=1:")
-    lvt_env['VK_LAYER_FINE_GRAINED_LOCKING'] = '1'
-    RunShellCmd(lvt_cmd + ' --gtest_filter=*Thread*', env=lvt_env)
+    lvt_cmd = os.path.join(TEST_INSTALL_DIR, 'bin', 'vk_layer_validation_tests')
+
+    # The following test(s) fail with thread sanitization enabled.
+    failing_tsan_tests = '-VkPositiveLayerTest.QueueThreading'
+    failing_tsan_tests += ':NegativeCommand.SecondaryCommandBufferRerecordedExplicitReset'
+    failing_tsan_tests += ':NegativeCommand.SecondaryCommandBufferRerecordedNoReset'
+    failing_tsan_tests += ':NegativeSyncVal.CopyOptimalImageHazards'
+    failing_tsan_tests += ':NegativeViewportInheritance.BasicUsage'
+    failing_tsan_tests += ':NegativeViewportInheritance.MultiViewport'
+    # NOTE: These test(s) fails sporadically.
+    # These need extra care to prevent a regression in the future.
+    failing_tsan_tests += ':PositiveSyncObject.WaitTimelineSemThreadRace'
+    failing_tsan_tests += ':PositiveQuery.ResetQueryPoolFromDifferentCB'
+
+    RunShellCmd(lvt_cmd + f" --gtest_filter={failing_tsan_tests}", env=lvt_env)
+
+    print("Re-Running multithreaded tests with VK_LAYER_FINE_GRAINED_LOCKING disabled", flush=True)
+    lvt_env['VK_LAYER_FINE_GRAINED_LOCKING'] = '0'
+    RunShellCmd(lvt_cmd + f' --gtest_filter=*Thread*:{failing_tsan_tests}', env=lvt_env)
 
 def GetArgParser():
     configs = ['release', 'debug']
     default_config = configs[0]
+
+    osx_choices = ['min', 'latest']
+    osx_default = osx_choices[1]
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -240,4 +299,8 @@ def GetArgParser():
     parser.add_argument(
         '--test', dest='test',
         action='store_true', help='Tests the layers')
+    parser.add_argument(
+        '--osx', dest='osx', action='store',
+        choices=osx_choices, default=osx_default,
+        help='Sets MACOSX_DEPLOYMENT_TARGET on Apple platforms.')
     return parser

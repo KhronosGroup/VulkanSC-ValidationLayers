@@ -1,9 +1,6 @@
 /*
- * Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (c) 2015-2023 Google, Inc.
- * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (c) 2023 Valve Corporation
+ * Copyright (c) 2023 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -158,16 +155,17 @@ class BuildGeometryInfoKHR {
     BuildGeometryInfoKHR& SetSrcAS(std::shared_ptr<AccelerationStructureKHR> src_as);
     BuildGeometryInfoKHR& SetDstAS(std::shared_ptr<AccelerationStructureKHR> dst_as);
     BuildGeometryInfoKHR& SetScratchBuffer(vk_testing::Buffer&& scratch_buffer);
+    BuildGeometryInfoKHR& SetDeviceScratchOffset(VkDeviceAddress offset);
     BuildGeometryInfoKHR& SetBottomLevelAS(std::shared_ptr<BuildGeometryInfoKHR> bottom_level_as);
+    // Should be 0 or 1
     BuildGeometryInfoKHR& SetInfoCount(uint32_t info_count);
     BuildGeometryInfoKHR& SetNullInfos(bool use_null_infos);
     BuildGeometryInfoKHR& SetNullBuildRangeInfos(bool use_null_build_range_infos);
 
     // Those functions call Build() on internal resources (geometries, src and dst acceleration structures, scratch buffer),
     // then one the build acceleration structure function.
-    void BuildCmdBuffer(VkInstance instance, const vk_testing::Device& device, VkCommandBuffer cmd_buffer,
-                        bool use_ppGeometries = true);
-    void BuildCmdBufferIndirect(VkInstance instance, const vk_testing::Device& device, VkCommandBuffer cmd_buffer);
+    void BuildCmdBuffer(const vk_testing::Device& device, VkCommandBuffer cmd_buffer, bool use_ppGeometries = true);
+    void BuildCmdBufferIndirect(const vk_testing::Device& device, VkCommandBuffer cmd_buffer);
     void BuildHost(VkInstance instance, const vk_testing::Device& device);
     void VkCmdBuildAccelerationStructuresKHR(const vk_testing::Device& device, VkCommandBuffer cmd_buffer,
                                              bool use_ppGeometries = true);
@@ -179,12 +177,15 @@ class BuildGeometryInfoKHR {
     auto& GetGeometries() { return geometries_; }
     auto& GetSrcAS() { return src_as_; }
     auto& GetDstAS() { return dst_as_; }
-    auto& GetBottomLevelAS() { return bottom_level_as_; }
+    auto& GetBottomLevelAS() { return blas_; }
     const auto& GetScratchBuffer() const { return device_scratch_; }
     VkAccelerationStructureBuildSizesInfoKHR GetSizeInfo(VkDevice device, bool use_ppGeometries = true);
 
   private:
-    void BuildCommon(VkInstance instance, const vk_testing::Device& device, bool is_on_device_build, bool use_ppGeometries = true);
+    friend void BuildAccelerationStructuresKHR(const vk_testing::Device& device, VkCommandBuffer cmd_buffer,
+                                               std::vector<BuildGeometryInfoKHR>& infos);
+
+    void BuildCommon(const vk_testing::Device& device, bool is_on_device_build, bool use_ppGeometries = true);
 
     APIVersion vk_api_version_;
     uint32_t vk_info_count_ = 1;
@@ -193,10 +194,15 @@ class BuildGeometryInfoKHR {
     VkAccelerationStructureBuildGeometryInfoKHR vk_info_;
     std::vector<GeometryKHR> geometries_;
     std::shared_ptr<AccelerationStructureKHR> src_as_, dst_as_;
+    VkDeviceAddress device_scratch_offset_ = 0;
     vk_testing::Buffer device_scratch_;
     std::unique_ptr<uint8_t[]> host_scratch_;
-    std::shared_ptr<BuildGeometryInfoKHR> bottom_level_as_;
+    std::shared_ptr<BuildGeometryInfoKHR> blas_;
 };
+
+// Helper functions
+void BuildAccelerationStructuresKHR(const vk_testing::Device& device, VkCommandBuffer cmd_buffer,
+                                    std::vector<BuildGeometryInfoKHR>& infos);
 
 // Helper functions providing simple, valid objects.
 // Calling Build() on them without further modifications results in a usable and valid Vulkan object.
@@ -224,6 +230,7 @@ GeometryKHR GeometrySimpleHostInstance(APIVersion vk_api_version, VkAcceleration
 std::shared_ptr<AccelerationStructureKHR> AccelStructNull(APIVersion vk_api_version);
 std::shared_ptr<AccelerationStructureKHR> AccelStructSimpleOnDeviceBottomLevel(APIVersion vk_api_version, VkDeviceSize size);
 std::shared_ptr<AccelerationStructureKHR> AccelStructSimpleOnHostBottomLevel(APIVersion vk_api_version, VkDeviceSize size);
+std::shared_ptr<AccelerationStructureKHR> AccelStructSimpleOnDeviceTopLevel(APIVersion vk_api_version, VkDeviceSize size);
 
 BuildGeometryInfoKHR BuildGeometryInfoSimpleOnDeviceBottomLevel(APIVersion vk_api_version, const vk_testing::Device& device,
                                                                 GeometryKHR::Type geometry_type = GeometryKHR::Type::Triangle);
