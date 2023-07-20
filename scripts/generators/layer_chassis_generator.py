@@ -575,6 +575,40 @@ class ValidationObject {
             return WriteLockGuard(validation_object_mutex);
         }
 
+        // If the Record phase calls a function that blocks, we might need to release
+        // the lock that protects Record itself in order to avoid mutual waiting.
+        static thread_local WriteLockGuard* record_guard;
+
+        // Should be used instead of WriteLock() if the Record phase wants to release
+        // its lock during the blocking operation.
+        void GetWriteLockForBlockingOperation(WriteLockGuard& write_lock) {
+
+            // This assert detects recursive calls. It is here mostly for documentation purposes
+            // because WriteLock() also triggers errors during recursion.
+            // Recursion is not allowed since record_guard is a thread-local variable and it can
+            // reference only one frame of the callstack.
+            assert(record_guard == nullptr);
+
+            write_lock = WriteLock();
+            // Initialize record_guard only when Record is actually protected by the
+            // mutex. It's not the case when fine grained locking is enabled.
+            record_guard = write_lock.owns_lock() ? &write_lock : nullptr;
+        }
+
+        // The following Begin/End methods should be called during the Record phase
+        // around blocking operation that causes mutual waiting (deadlock).
+        void BeginBlockingOperation() {
+            if (record_guard) {
+                record_guard->unlock();
+            }
+        }
+        void EndBlockingOperation() {
+            if (record_guard) {
+                record_guard->lock();
+                record_guard = nullptr;
+            }
+        }
+
         ValidationObject* GetValidationObject(std::vector<ValidationObject*>& object_dispatch, LayerObjectTypeId object_type) {
             for (auto validation_object : object_dispatch) {
                 if (validation_object->container_type == object_type) {
@@ -810,6 +844,8 @@ class ValidationObject {
 #include "chassis.h"
 #include "layer_options.h"
 #include "layer_chassis_dispatch.h"
+
+thread_local WriteLockGuard* ValidationObject::record_guard{};
 
 small_unordered_map<void*, ValidationObject*, 2> layer_data_map;
 
@@ -1788,7 +1824,26 @@ VKAPI_ATTR VkResult VKAPI_CALL GetValidationCacheDataEXT(
                 out.append('    for (ValidationObject* intercept : layer_data->object_dispatch) {\n')
 
             returnParam = ', result' if command.returnType == 'VkResult' or command.returnType == 'VkDeviceAddress' else ''
-            out.append('        auto lock = intercept->WriteLock();\n')
+
+            # These commands perform blocking operations during PostRecord phase. We might need to
+            # release ValidationObject's lock for the period of blocking operation to avoid deadlocks.
+            # The released mutex can be re-acquired by the command that sets wait finish condition.
+            # This functionality is needed when fine grained locking is disabled or not implemented.
+            commands_with_blocking_operations = [
+                'vkWaitSemaphores',
+                'vkWaitSemaphoresKHR',
+
+                # Note that get semaphore counter API commands do not block, but here we consider only
+                # PostRecord phase which might block
+                'vkGetSemaphoreCounterValue',
+                'vkGetSemaphoreCounterValueKHR',
+            ]
+
+            if command.name not in commands_with_blocking_operations:
+                out.append('        auto lock = intercept->WriteLock();\n')
+            else:
+                out.append('        WriteLockGuard lock;\n')
+                out.append('        intercept->GetWriteLockForBlockingOperation(lock);\n')
             out.append(f'        intercept->PostCallRecord{command.name[2:]}({paramsList}{returnParam});\n')
             out.append('    }\n')
             # Return result variable, if any.

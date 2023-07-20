@@ -23,7 +23,6 @@
 #include "state_tracker/state_tracker.h"
 #include "state_tracker/image_layout_map.h"
 #include "gpu_validation/gpu_validation.h"
-#include "cc_shader.h"
 #include "error_message/core_error_location.h"
 #include "containers/qfo_transfer.h"
 #include "state_tracker/cmd_buffer_state.h"
@@ -1518,6 +1517,13 @@ class CoreChecks : public ValidationStateTracker {
     bool PreCallValidateResetCommandBuffer(VkCommandBuffer commandBuffer, VkCommandBufferResetFlags flags) const override;
     bool PreCallValidateCmdBindPipeline(VkCommandBuffer commandBuffer, VkPipelineBindPoint pipelineBindPoint,
                                         VkPipeline pipeline) const override;
+    bool PreCallValidateCreateShadersEXT(VkDevice device, uint32_t createInfoCount, const VkShaderCreateInfoEXT* pCreateInfos,
+                                         const VkAllocationCallbacks* pAllocator, VkShaderEXT* pShaders) const override;
+    bool PreCallValidateDestroyShaderEXT(VkDevice device, VkShaderEXT shader,
+                                         const VkAllocationCallbacks* pAllocator) const override;
+    bool PreCallValidateCmdBindShadersEXT(VkCommandBuffer commandBuffer, uint32_t stageCount, const VkShaderStageFlagBits* pStages,
+                                          const VkShaderEXT* pShaders) const override;
+    bool PreCallValidateGetShaderBinaryDataEXT(VkDevice device, VkShaderEXT shader, size_t* pDataSize, void* pData) const override;
     bool ForbidInheritedViewportScissor(const CMD_BUFFER_STATE& cb_state, const char* vuid, const CMD_TYPE cmd_type) const;
     bool PreCallValidateCmdSetViewport(VkCommandBuffer commandBuffer, uint32_t firstViewport, uint32_t viewportCount,
                                        const VkViewport* pViewports) const override;

@@ -76,5 +76,11 @@ template<> std::vector<VkTimeDomainEXT> ValidationObject::ValidParamValues() con
 template<> std::vector<VkValidationFeatureEnableEXT> ValidationObject::ValidParamValues() const;
 template<> std::vector<VkValidationFeatureDisableEXT> ValidationObject::ValidParamValues() const;
 template<> std::vector<VkLineRasterizationModeEXT> ValidationObject::ValidParamValues() const;
+#ifdef VK_USE_PLATFORM_SCI
+template<> std::vector<VkSciSyncClientTypeNV> ValidationObject::ValidParamValues() const;
+#endif //VK_USE_PLATFORM_SCI
+#ifdef VK_USE_PLATFORM_SCI
+template<> std::vector<VkSciSyncPrimitiveTypeNV> ValidationObject::ValidParamValues() const;
+#endif //VK_USE_PLATFORM_SCI
 
 // NOLINTEND

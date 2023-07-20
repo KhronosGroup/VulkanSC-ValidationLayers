@@ -2596,7 +2596,7 @@ TEST_F(VkLayerTest, ZeroBitmask) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkLayerTest, InstanceCreateEnumeratePortability) {
+TEST_F(VkLayerTest, DISABLED_InstanceCreateEnumeratePortability) {
     TEST_DESCRIPTION("Validate creating instances with VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR.");
 
     auto ici = GetInstanceCreateInfo();

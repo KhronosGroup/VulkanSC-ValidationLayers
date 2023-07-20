@@ -25,7 +25,6 @@
 namespace vksc {
 
 static VkDeviceObjectReservationCreateInfo default_object_reservation_info{};
-static VkDevicePrivateDataCreateInfoEXT default_private_data_reservation_info{};
 static VkPerformanceQueryReservationInfoKHR default_perf_query_reservation_info{};
 
 static void InitDefaultObjectReservationInfo() {
@@ -78,11 +77,14 @@ static void InitDefaultObjectReservationInfo() {
     default_object_reservation_info.maxTimestampQueriesPerPool = 256;
     default_object_reservation_info.maxImmutableSamplersPerDescriptorSetLayout = 256;
 
+    // TODO: Vulkan SC - Enable this once private data support actually arrives to Vulkan SC
+#if 0
     // Private data reservation info
     default_private_data_reservation_info = LvlInitStruct<VkDevicePrivateDataCreateInfoEXT>();
     default_private_data_reservation_info.privateDataSlotRequestCount = 16;
     default_private_data_reservation_info.pNext = default_object_reservation_info.pNext;
     default_object_reservation_info.pNext = &default_private_data_reservation_info;
+#endif
 
     // Performance query reservation info
     default_perf_query_reservation_info = LvlInitStruct<VkPerformanceQueryReservationInfoKHR>();

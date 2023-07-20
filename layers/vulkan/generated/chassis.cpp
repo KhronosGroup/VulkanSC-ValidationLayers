@@ -32,6 +32,8 @@
 #include "layer_options.h"
 #include "layer_chassis_dispatch.h"
 
+thread_local WriteLockGuard* ValidationObject::record_guard{};
+
 small_unordered_map<void*, ValidationObject*, 2> layer_data_map;
 
 // Global unique object identifier.
@@ -4557,7 +4559,8 @@ VKAPI_ATTR VkResult VKAPI_CALL GetSemaphoreCounterValue(
     }
     VkResult result = DispatchGetSemaphoreCounterValue(device, semaphore, pValue);
     for (ValidationObject* intercept : layer_data->intercept_vectors[InterceptIdPostCallRecordGetSemaphoreCounterValue]) {
-        auto lock = intercept->WriteLock();
+        WriteLockGuard lock;
+        intercept->GetWriteLockForBlockingOperation(lock);
         intercept->PostCallRecordGetSemaphoreCounterValue(device, semaphore, pValue, result);
     }
     return result;
@@ -4580,7 +4583,8 @@ VKAPI_ATTR VkResult VKAPI_CALL WaitSemaphores(
     }
     VkResult result = DispatchWaitSemaphores(device, pWaitInfo, timeout);
     for (ValidationObject* intercept : layer_data->intercept_vectors[InterceptIdPostCallRecordWaitSemaphores]) {
-        auto lock = intercept->WriteLock();
+        WriteLockGuard lock;
+        intercept->GetWriteLockForBlockingOperation(lock);
         intercept->PostCallRecordWaitSemaphores(device, pWaitInfo, timeout, result);
     }
     return result;
@@ -7901,7 +7905,8 @@ VKAPI_ATTR VkResult VKAPI_CALL GetSemaphoreCounterValueKHR(
     }
     VkResult result = DispatchGetSemaphoreCounterValueKHR(device, semaphore, pValue);
     for (ValidationObject* intercept : layer_data->intercept_vectors[InterceptIdPostCallRecordGetSemaphoreCounterValueKHR]) {
-        auto lock = intercept->WriteLock();
+        WriteLockGuard lock;
+        intercept->GetWriteLockForBlockingOperation(lock);
         intercept->PostCallRecordGetSemaphoreCounterValueKHR(device, semaphore, pValue, result);
     }
     return result;
@@ -7924,7 +7929,8 @@ VKAPI_ATTR VkResult VKAPI_CALL WaitSemaphoresKHR(
     }
     VkResult result = DispatchWaitSemaphoresKHR(device, pWaitInfo, timeout);
     for (ValidationObject* intercept : layer_data->intercept_vectors[InterceptIdPostCallRecordWaitSemaphoresKHR]) {
-        auto lock = intercept->WriteLock();
+        WriteLockGuard lock;
+        intercept->GetWriteLockForBlockingOperation(lock);
         intercept->PostCallRecordWaitSemaphoresKHR(device, pWaitInfo, timeout, result);
     }
     return result;

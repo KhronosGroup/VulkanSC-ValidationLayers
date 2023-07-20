@@ -100,6 +100,8 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/shader_limits.cpp
     converted/shader_limits_positive.cpp
     converted/shader_mesh.cpp
+    converted/shader_object.cpp
+    converted/shader_object_positive.cpp
     converted/shader_push_constants.cpp
     converted/shader_push_constants_positive.cpp
     converted/shader_spirv.cpp

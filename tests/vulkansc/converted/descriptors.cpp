@@ -2900,7 +2900,7 @@ TEST_F(NegativeDescriptors, PushDescriptorImageLayout) {
     }
 }
 
-TEST_F(NegativeDescriptors, PushDescriptorSetLayoutWithoutExtension) {
+TEST_F(NegativeDescriptors, DISABLED_PushDescriptorSetLayoutWithoutExtension) {
     TEST_DESCRIPTION("Create a push descriptor set layout without loading the needed extension.");
     ASSERT_NO_FATAL_FAILURE(Init());
 

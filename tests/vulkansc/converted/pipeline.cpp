@@ -508,7 +508,7 @@ TEST_F(NegativePipeline, SamplePNext) {
                                       "VUID-VkPipelineMultisampleStateCreateInfo-pNext-pNext");
 }
 
-TEST_F(NegativePipeline, SubpassRasterizationSamples) {
+TEST_F(NegativePipeline, DISABLED_SubpassRasterizationSamples) {
     TEST_DESCRIPTION("Test creating two pipelines referring to the same subpass but with different rasterization samples count");
 
     ASSERT_NO_FATAL_FAILURE(InitFramework());
@@ -2369,7 +2369,7 @@ TEST_F(NegativePipeline, DISABLED_ShaderDrawParametersNotEnabled11) {
     }
 }
 
-TEST_F(NegativePipeline, CreateFlags) {
+TEST_F(NegativePipeline, DISABLED_CreateFlags) {
     TEST_DESCRIPTION("Create a graphics pipeline with invalid VkPipelineCreateFlags.");
 
     ASSERT_NO_FATAL_FAILURE(Init());
@@ -2401,7 +2401,7 @@ TEST_F(NegativePipeline, CreateFlags) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-flags-04947");
 }
 
-TEST_F(NegativePipeline, CreateFlagsCompute) {
+TEST_F(NegativePipeline, DISABLED_CreateFlagsCompute) {
     TEST_DESCRIPTION("Create a compute pipeline with invalid VkPipelineCreateFlags.");
 
     ASSERT_NO_FATAL_FAILURE(Init());

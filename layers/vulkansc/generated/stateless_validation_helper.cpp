@@ -44,6 +44,423 @@ bool StatelessValidation::ValidatePnextStructContents(const char *api_name, cons
             }
         } break;
 
+        // Validation code for VkPhysicalDevice16BitStorageFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_16BIT_STORAGE_FEATURES: { // Covers VUID-VkPhysicalDevice16BitStorageFeatures-sType-sType
+            if (api_version < VK_API_VERSION_1_1) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_16BIT_STORAGE_FEATURES) which was added in VK_API_VERSION_1_1 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkPhysicalDevice16BitStorageFeatures *structure = (VkPhysicalDevice16BitStorageFeatures *) header;
+                skip |= ValidateBool32("VkPhysicalDevice16BitStorageFeatures", "storageBuffer16BitAccess", structure->storageBuffer16BitAccess);
+
+                skip |= ValidateBool32("VkPhysicalDevice16BitStorageFeatures", "uniformAndStorageBuffer16BitAccess", structure->uniformAndStorageBuffer16BitAccess);
+
+                skip |= ValidateBool32("VkPhysicalDevice16BitStorageFeatures", "storagePushConstant16", structure->storagePushConstant16);
+
+                skip |= ValidateBool32("VkPhysicalDevice16BitStorageFeatures", "storageInputOutput16", structure->storageInputOutput16);
+            }
+        } break;
+
+        // Validation code for VkMemoryDedicatedRequirements structure members
+        case VK_STRUCTURE_TYPE_MEMORY_DEDICATED_REQUIREMENTS: { // Covers VUID-VkMemoryDedicatedRequirements-sType-sType
+            if (api_version < VK_API_VERSION_1_1) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_MEMORY_DEDICATED_REQUIREMENTS) which was added in VK_API_VERSION_1_1 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+        } break;
+
+        // Validation code for VkMemoryDedicatedAllocateInfo structure members
+        case VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO: { // Covers VUID-VkMemoryDedicatedAllocateInfo-sType-sType
+            if (api_version < VK_API_VERSION_1_1) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO) which was added in VK_API_VERSION_1_1 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+        } break;
+
+        // Validation code for VkMemoryAllocateFlagsInfo structure members
+        case VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO: { // Covers VUID-VkMemoryAllocateFlagsInfo-sType-sType
+            if (api_version < VK_API_VERSION_1_1) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO) which was added in VK_API_VERSION_1_1 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkMemoryAllocateFlagsInfo *structure = (VkMemoryAllocateFlagsInfo *) header;
+                skip |= ValidateFlags("VkMemoryAllocateFlagsInfo", "flags", "VkMemoryAllocateFlagBits", AllVkMemoryAllocateFlagBits, structure->flags, kOptionalFlags, "VUID-VkMemoryAllocateFlagsInfo-flags-parameter");
+            }
+        } break;
+
+        // Validation code for VkDeviceGroupRenderPassBeginInfo structure members
+        case VK_STRUCTURE_TYPE_DEVICE_GROUP_RENDER_PASS_BEGIN_INFO: { // Covers VUID-VkDeviceGroupRenderPassBeginInfo-sType-sType
+            if (api_version < VK_API_VERSION_1_1) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_DEVICE_GROUP_RENDER_PASS_BEGIN_INFO) which was added in VK_API_VERSION_1_1 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkDeviceGroupRenderPassBeginInfo *structure = (VkDeviceGroupRenderPassBeginInfo *) header;
+                skip |= ValidateArray("VkDeviceGroupRenderPassBeginInfo", "deviceRenderAreaCount", "pDeviceRenderAreas", structure->deviceRenderAreaCount, &structure->pDeviceRenderAreas, false, true, kVUIDUndefined, "VUID-VkDeviceGroupRenderPassBeginInfo-pDeviceRenderAreas-parameter");
+
+                if (structure->pDeviceRenderAreas != nullptr)
+                {
+                    for (uint32_t deviceRenderAreaIndex = 0; deviceRenderAreaIndex < structure->deviceRenderAreaCount; ++deviceRenderAreaIndex)
+                    {
+                    }
+                }
+            }
+        } break;
+
+        // Validation code for VkDeviceGroupCommandBufferBeginInfo structure members
+        case VK_STRUCTURE_TYPE_DEVICE_GROUP_COMMAND_BUFFER_BEGIN_INFO: { // Covers VUID-VkDeviceGroupCommandBufferBeginInfo-sType-sType
+            if (api_version < VK_API_VERSION_1_1) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_DEVICE_GROUP_COMMAND_BUFFER_BEGIN_INFO) which was added in VK_API_VERSION_1_1 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+        } break;
+
+        // Validation code for VkDeviceGroupSubmitInfo structure members
+        case VK_STRUCTURE_TYPE_DEVICE_GROUP_SUBMIT_INFO: { // Covers VUID-VkDeviceGroupSubmitInfo-sType-sType
+            if (api_version < VK_API_VERSION_1_1) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_DEVICE_GROUP_SUBMIT_INFO) which was added in VK_API_VERSION_1_1 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkDeviceGroupSubmitInfo *structure = (VkDeviceGroupSubmitInfo *) header;
+                skip |= ValidateArray("VkDeviceGroupSubmitInfo", "waitSemaphoreCount", "pWaitSemaphoreDeviceIndices", structure->waitSemaphoreCount, &structure->pWaitSemaphoreDeviceIndices, false, true, kVUIDUndefined, "VUID-VkDeviceGroupSubmitInfo-pWaitSemaphoreDeviceIndices-parameter");
+
+                skip |= ValidateArray("VkDeviceGroupSubmitInfo", "commandBufferCount", "pCommandBufferDeviceMasks", structure->commandBufferCount, &structure->pCommandBufferDeviceMasks, false, true, kVUIDUndefined, "VUID-VkDeviceGroupSubmitInfo-pCommandBufferDeviceMasks-parameter");
+
+                skip |= ValidateArray("VkDeviceGroupSubmitInfo", "signalSemaphoreCount", "pSignalSemaphoreDeviceIndices", structure->signalSemaphoreCount, &structure->pSignalSemaphoreDeviceIndices, false, true, kVUIDUndefined, "VUID-VkDeviceGroupSubmitInfo-pSignalSemaphoreDeviceIndices-parameter");
+            }
+        } break;
+
+        // Validation code for VkBindBufferMemoryDeviceGroupInfo structure members
+        case VK_STRUCTURE_TYPE_BIND_BUFFER_MEMORY_DEVICE_GROUP_INFO: { // Covers VUID-VkBindBufferMemoryDeviceGroupInfo-sType-sType
+            if (api_version < VK_API_VERSION_1_1) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_BIND_BUFFER_MEMORY_DEVICE_GROUP_INFO) which was added in VK_API_VERSION_1_1 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkBindBufferMemoryDeviceGroupInfo *structure = (VkBindBufferMemoryDeviceGroupInfo *) header;
+                skip |= ValidateArray("VkBindBufferMemoryDeviceGroupInfo", "deviceIndexCount", "pDeviceIndices", structure->deviceIndexCount, &structure->pDeviceIndices, false, true, kVUIDUndefined, "VUID-VkBindBufferMemoryDeviceGroupInfo-pDeviceIndices-parameter");
+            }
+        } break;
+
+        // Validation code for VkBindImageMemoryDeviceGroupInfo structure members
+        case VK_STRUCTURE_TYPE_BIND_IMAGE_MEMORY_DEVICE_GROUP_INFO: { // Covers VUID-VkBindImageMemoryDeviceGroupInfo-sType-sType
+            if (api_version < VK_API_VERSION_1_1) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_BIND_IMAGE_MEMORY_DEVICE_GROUP_INFO) which was added in VK_API_VERSION_1_1 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkBindImageMemoryDeviceGroupInfo *structure = (VkBindImageMemoryDeviceGroupInfo *) header;
+                skip |= ValidateArray("VkBindImageMemoryDeviceGroupInfo", "deviceIndexCount", "pDeviceIndices", structure->deviceIndexCount, &structure->pDeviceIndices, false, true, kVUIDUndefined, "VUID-VkBindImageMemoryDeviceGroupInfo-pDeviceIndices-parameter");
+
+                skip |= ValidateArray("VkBindImageMemoryDeviceGroupInfo", "splitInstanceBindRegionCount", "pSplitInstanceBindRegions", structure->splitInstanceBindRegionCount, &structure->pSplitInstanceBindRegions, false, true, kVUIDUndefined, "VUID-VkBindImageMemoryDeviceGroupInfo-pSplitInstanceBindRegions-parameter");
+
+                if (structure->pSplitInstanceBindRegions != nullptr)
+                {
+                    for (uint32_t splitInstanceBindRegionIndex = 0; splitInstanceBindRegionIndex < structure->splitInstanceBindRegionCount; ++splitInstanceBindRegionIndex)
+                    {
+                    }
+                }
+            }
+        } break;
+
+        // Validation code for VkDeviceGroupDeviceCreateInfo structure members
+        case VK_STRUCTURE_TYPE_DEVICE_GROUP_DEVICE_CREATE_INFO: { // Covers VUID-VkDeviceGroupDeviceCreateInfo-sType-sType
+            if (api_version < VK_API_VERSION_1_1) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_DEVICE_GROUP_DEVICE_CREATE_INFO) which was added in VK_API_VERSION_1_1 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkDeviceGroupDeviceCreateInfo *structure = (VkDeviceGroupDeviceCreateInfo *) header;
+                skip |= ValidateArray("VkDeviceGroupDeviceCreateInfo", "physicalDeviceCount", "pPhysicalDevices", structure->physicalDeviceCount, &structure->pPhysicalDevices, false, true, kVUIDUndefined, "VUID-VkDeviceGroupDeviceCreateInfo-pPhysicalDevices-parameter");
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceFeatures2 structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2: { // Covers VUID-VkPhysicalDeviceFeatures2-sType-sType
+            if (api_version < VK_API_VERSION_1_1) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2) which was added in VK_API_VERSION_1_1 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkPhysicalDeviceFeatures2 *structure = (VkPhysicalDeviceFeatures2 *) header;
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.robustBufferAccess", structure->features.robustBufferAccess);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.fullDrawIndexUint32", structure->features.fullDrawIndexUint32);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.imageCubeArray", structure->features.imageCubeArray);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.independentBlend", structure->features.independentBlend);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.geometryShader", structure->features.geometryShader);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.tessellationShader", structure->features.tessellationShader);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.sampleRateShading", structure->features.sampleRateShading);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.dualSrcBlend", structure->features.dualSrcBlend);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.logicOp", structure->features.logicOp);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.multiDrawIndirect", structure->features.multiDrawIndirect);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.drawIndirectFirstInstance", structure->features.drawIndirectFirstInstance);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.depthClamp", structure->features.depthClamp);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.depthBiasClamp", structure->features.depthBiasClamp);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.fillModeNonSolid", structure->features.fillModeNonSolid);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.depthBounds", structure->features.depthBounds);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.wideLines", structure->features.wideLines);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.largePoints", structure->features.largePoints);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.alphaToOne", structure->features.alphaToOne);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.multiViewport", structure->features.multiViewport);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.samplerAnisotropy", structure->features.samplerAnisotropy);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.textureCompressionETC2", structure->features.textureCompressionETC2);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.textureCompressionASTC_LDR", structure->features.textureCompressionASTC_LDR);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.textureCompressionBC", structure->features.textureCompressionBC);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.occlusionQueryPrecise", structure->features.occlusionQueryPrecise);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.pipelineStatisticsQuery", structure->features.pipelineStatisticsQuery);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.vertexPipelineStoresAndAtomics", structure->features.vertexPipelineStoresAndAtomics);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.fragmentStoresAndAtomics", structure->features.fragmentStoresAndAtomics);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.shaderTessellationAndGeometryPointSize", structure->features.shaderTessellationAndGeometryPointSize);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.shaderImageGatherExtended", structure->features.shaderImageGatherExtended);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.shaderStorageImageExtendedFormats", structure->features.shaderStorageImageExtendedFormats);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.shaderStorageImageMultisample", structure->features.shaderStorageImageMultisample);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.shaderStorageImageReadWithoutFormat", structure->features.shaderStorageImageReadWithoutFormat);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.shaderStorageImageWriteWithoutFormat", structure->features.shaderStorageImageWriteWithoutFormat);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.shaderUniformBufferArrayDynamicIndexing", structure->features.shaderUniformBufferArrayDynamicIndexing);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.shaderSampledImageArrayDynamicIndexing", structure->features.shaderSampledImageArrayDynamicIndexing);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.shaderStorageBufferArrayDynamicIndexing", structure->features.shaderStorageBufferArrayDynamicIndexing);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.shaderStorageImageArrayDynamicIndexing", structure->features.shaderStorageImageArrayDynamicIndexing);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.shaderClipDistance", structure->features.shaderClipDistance);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.shaderCullDistance", structure->features.shaderCullDistance);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.shaderFloat64", structure->features.shaderFloat64);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.shaderInt64", structure->features.shaderInt64);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.shaderInt16", structure->features.shaderInt16);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.shaderResourceResidency", structure->features.shaderResourceResidency);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.shaderResourceMinLod", structure->features.shaderResourceMinLod);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.sparseBinding", structure->features.sparseBinding);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.sparseResidencyBuffer", structure->features.sparseResidencyBuffer);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.sparseResidencyImage2D", structure->features.sparseResidencyImage2D);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.sparseResidencyImage3D", structure->features.sparseResidencyImage3D);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.sparseResidency2Samples", structure->features.sparseResidency2Samples);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.sparseResidency4Samples", structure->features.sparseResidency4Samples);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.sparseResidency8Samples", structure->features.sparseResidency8Samples);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.sparseResidency16Samples", structure->features.sparseResidency16Samples);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.sparseResidencyAliased", structure->features.sparseResidencyAliased);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.variableMultisampleRate", structure->features.variableMultisampleRate);
+
+                skip |= ValidateBool32("VkPhysicalDeviceFeatures2", "features.inheritedQueries", structure->features.inheritedQueries);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDevicePointClippingProperties structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_POINT_CLIPPING_PROPERTIES: { // Covers VUID-VkPhysicalDevicePointClippingProperties-sType-sType
+            if (api_version < VK_API_VERSION_1_1) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_POINT_CLIPPING_PROPERTIES) which was added in VK_API_VERSION_1_1 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+        } break;
+
+        // Validation code for VkRenderPassInputAttachmentAspectCreateInfo structure members
+        case VK_STRUCTURE_TYPE_RENDER_PASS_INPUT_ATTACHMENT_ASPECT_CREATE_INFO: { // Covers VUID-VkRenderPassInputAttachmentAspectCreateInfo-sType-sType
+            if (api_version < VK_API_VERSION_1_1) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_RENDER_PASS_INPUT_ATTACHMENT_ASPECT_CREATE_INFO) which was added in VK_API_VERSION_1_1 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkRenderPassInputAttachmentAspectCreateInfo *structure = (VkRenderPassInputAttachmentAspectCreateInfo *) header;
+                skip |= ValidateArray("VkRenderPassInputAttachmentAspectCreateInfo", "aspectReferenceCount", "pAspectReferences", structure->aspectReferenceCount, &structure->pAspectReferences, true, true, "VUID-VkRenderPassInputAttachmentAspectCreateInfo-aspectReferenceCount-arraylength", "VUID-VkRenderPassInputAttachmentAspectCreateInfo-pAspectReferences-parameter");
+
+                if (structure->pAspectReferences != nullptr)
+                {
+                    for (uint32_t aspectReferenceIndex = 0; aspectReferenceIndex < structure->aspectReferenceCount; ++aspectReferenceIndex)
+                    {
+                        skip |= ValidateFlags("VkRenderPassInputAttachmentAspectCreateInfo", ParameterName("pAspectReferences[%i].aspectMask", ParameterName::IndexVector{ aspectReferenceIndex }), "VkImageAspectFlagBits", AllVkImageAspectFlagBits, structure->pAspectReferences[aspectReferenceIndex].aspectMask, kRequiredFlags, "VUID-VkInputAttachmentAspectReference-aspectMask-parameter", "VUID-VkInputAttachmentAspectReference-aspectMask-requiredbitmask");
+                    }
+                }
+            }
+        } break;
+
+        // Validation code for VkImageViewUsageCreateInfo structure members
+        case VK_STRUCTURE_TYPE_IMAGE_VIEW_USAGE_CREATE_INFO: { // Covers VUID-VkImageViewUsageCreateInfo-sType-sType
+            if (api_version < VK_API_VERSION_1_1) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_IMAGE_VIEW_USAGE_CREATE_INFO) which was added in VK_API_VERSION_1_1 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkImageViewUsageCreateInfo *structure = (VkImageViewUsageCreateInfo *) header;
+                skip |= ValidateFlags("VkImageViewUsageCreateInfo", "usage", "VkImageUsageFlagBits", AllVkImageUsageFlagBits, structure->usage, kRequiredFlags, "VUID-VkImageViewUsageCreateInfo-usage-parameter", "VUID-VkImageViewUsageCreateInfo-usage-requiredbitmask");
+            }
+        } break;
+
+        // Validation code for VkPipelineTessellationDomainOriginStateCreateInfo structure members
+        case VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_DOMAIN_ORIGIN_STATE_CREATE_INFO: { // Covers VUID-VkPipelineTessellationDomainOriginStateCreateInfo-sType-sType
+            if (api_version < VK_API_VERSION_1_1) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_DOMAIN_ORIGIN_STATE_CREATE_INFO) which was added in VK_API_VERSION_1_1 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkPipelineTessellationDomainOriginStateCreateInfo *structure = (VkPipelineTessellationDomainOriginStateCreateInfo *) header;
+                skip |= ValidateRangedEnum("VkPipelineTessellationDomainOriginStateCreateInfo", "domainOrigin", "VkTessellationDomainOrigin", structure->domainOrigin, "VUID-VkPipelineTessellationDomainOriginStateCreateInfo-domainOrigin-parameter");
+            }
+        } break;
+
+        // Validation code for VkRenderPassMultiviewCreateInfo structure members
+        case VK_STRUCTURE_TYPE_RENDER_PASS_MULTIVIEW_CREATE_INFO: { // Covers VUID-VkRenderPassMultiviewCreateInfo-sType-sType
+            if (api_version < VK_API_VERSION_1_1) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_RENDER_PASS_MULTIVIEW_CREATE_INFO) which was added in VK_API_VERSION_1_1 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkRenderPassMultiviewCreateInfo *structure = (VkRenderPassMultiviewCreateInfo *) header;
+                skip |= ValidateArray("VkRenderPassMultiviewCreateInfo", "subpassCount", "pViewMasks", structure->subpassCount, &structure->pViewMasks, false, true, kVUIDUndefined, "VUID-VkRenderPassMultiviewCreateInfo-pViewMasks-parameter");
+
+                skip |= ValidateArray("VkRenderPassMultiviewCreateInfo", "dependencyCount", "pViewOffsets", structure->dependencyCount, &structure->pViewOffsets, false, true, kVUIDUndefined, "VUID-VkRenderPassMultiviewCreateInfo-pViewOffsets-parameter");
+
+                skip |= ValidateArray("VkRenderPassMultiviewCreateInfo", "correlationMaskCount", "pCorrelationMasks", structure->correlationMaskCount, &structure->pCorrelationMasks, false, true, kVUIDUndefined, "VUID-VkRenderPassMultiviewCreateInfo-pCorrelationMasks-parameter");
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceMultiviewFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_FEATURES: { // Covers VUID-VkPhysicalDeviceMultiviewFeatures-sType-sType
+            if (api_version < VK_API_VERSION_1_1) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_FEATURES) which was added in VK_API_VERSION_1_1 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkPhysicalDeviceMultiviewFeatures *structure = (VkPhysicalDeviceMultiviewFeatures *) header;
+                skip |= ValidateBool32("VkPhysicalDeviceMultiviewFeatures", "multiview", structure->multiview);
+
+                skip |= ValidateBool32("VkPhysicalDeviceMultiviewFeatures", "multiviewGeometryShader", structure->multiviewGeometryShader);
+
+                skip |= ValidateBool32("VkPhysicalDeviceMultiviewFeatures", "multiviewTessellationShader", structure->multiviewTessellationShader);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceMultiviewProperties structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_PROPERTIES: { // Covers VUID-VkPhysicalDeviceMultiviewProperties-sType-sType
+            if (api_version < VK_API_VERSION_1_1) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_PROPERTIES) which was added in VK_API_VERSION_1_1 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceVariablePointersFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VARIABLE_POINTERS_FEATURES: { // Covers VUID-VkPhysicalDeviceVariablePointersFeatures-sType-sType
+            if (api_version < VK_API_VERSION_1_1) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VARIABLE_POINTERS_FEATURES) which was added in VK_API_VERSION_1_1 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkPhysicalDeviceVariablePointersFeatures *structure = (VkPhysicalDeviceVariablePointersFeatures *) header;
+                skip |= ValidateBool32("VkPhysicalDeviceVariablePointersFeatures", "variablePointersStorageBuffer", structure->variablePointersStorageBuffer);
+
+                skip |= ValidateBool32("VkPhysicalDeviceVariablePointersFeatures", "variablePointers", structure->variablePointers);
+            }
+        } break;
+
         // Validation code for VkPhysicalDeviceProtectedMemoryFeatures structure members
         case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROTECTED_MEMORY_FEATURES: { // Covers VUID-VkPhysicalDeviceProtectedMemoryFeatures-sType-sType
             if (api_version < VK_API_VERSION_1_1) {
@@ -82,6 +499,200 @@ bool StatelessValidation::ValidatePnextStructContents(const char *api_name, cons
             if (is_const_param) {
                 VkProtectedSubmitInfo *structure = (VkProtectedSubmitInfo *) header;
                 skip |= ValidateBool32("VkProtectedSubmitInfo", "protectedSubmit", structure->protectedSubmit);
+            }
+        } break;
+
+        // Validation code for VkSamplerYcbcrConversionInfo structure members
+        case VK_STRUCTURE_TYPE_SAMPLER_YCBCR_CONVERSION_INFO: { // Covers VUID-VkSamplerYcbcrConversionInfo-sType-sType
+            if (api_version < VK_API_VERSION_1_1) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_SAMPLER_YCBCR_CONVERSION_INFO) which was added in VK_API_VERSION_1_1 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkSamplerYcbcrConversionInfo *structure = (VkSamplerYcbcrConversionInfo *) header;
+                skip |= ValidateRequiredHandle("VkSamplerYcbcrConversionInfo", "conversion", structure->conversion);
+            }
+        } break;
+
+        // Validation code for VkBindImagePlaneMemoryInfo structure members
+        case VK_STRUCTURE_TYPE_BIND_IMAGE_PLANE_MEMORY_INFO: { // Covers VUID-VkBindImagePlaneMemoryInfo-sType-sType
+            if (api_version < VK_API_VERSION_1_1) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_BIND_IMAGE_PLANE_MEMORY_INFO) which was added in VK_API_VERSION_1_1 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkBindImagePlaneMemoryInfo *structure = (VkBindImagePlaneMemoryInfo *) header;
+                skip |= ValidateFlags("VkBindImagePlaneMemoryInfo", "planeAspect", "VkImageAspectFlagBits", AllVkImageAspectFlagBits, structure->planeAspect, kRequiredSingleBit, "VUID-VkBindImagePlaneMemoryInfo-planeAspect-parameter", "VUID-VkBindImagePlaneMemoryInfo-planeAspect-parameter");
+            }
+        } break;
+
+        // Validation code for VkImagePlaneMemoryRequirementsInfo structure members
+        case VK_STRUCTURE_TYPE_IMAGE_PLANE_MEMORY_REQUIREMENTS_INFO: { // Covers VUID-VkImagePlaneMemoryRequirementsInfo-sType-sType
+            if (api_version < VK_API_VERSION_1_1) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_IMAGE_PLANE_MEMORY_REQUIREMENTS_INFO) which was added in VK_API_VERSION_1_1 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkImagePlaneMemoryRequirementsInfo *structure = (VkImagePlaneMemoryRequirementsInfo *) header;
+                skip |= ValidateFlags("VkImagePlaneMemoryRequirementsInfo", "planeAspect", "VkImageAspectFlagBits", AllVkImageAspectFlagBits, structure->planeAspect, kRequiredSingleBit, "VUID-VkImagePlaneMemoryRequirementsInfo-planeAspect-parameter", "VUID-VkImagePlaneMemoryRequirementsInfo-planeAspect-parameter");
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceSamplerYcbcrConversionFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_YCBCR_CONVERSION_FEATURES: { // Covers VUID-VkPhysicalDeviceSamplerYcbcrConversionFeatures-sType-sType
+            if (api_version < VK_API_VERSION_1_1) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_YCBCR_CONVERSION_FEATURES) which was added in VK_API_VERSION_1_1 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkPhysicalDeviceSamplerYcbcrConversionFeatures *structure = (VkPhysicalDeviceSamplerYcbcrConversionFeatures *) header;
+                skip |= ValidateBool32("VkPhysicalDeviceSamplerYcbcrConversionFeatures", "samplerYcbcrConversion", structure->samplerYcbcrConversion);
+            }
+        } break;
+
+        // Validation code for VkSamplerYcbcrConversionImageFormatProperties structure members
+        case VK_STRUCTURE_TYPE_SAMPLER_YCBCR_CONVERSION_IMAGE_FORMAT_PROPERTIES: { // Covers VUID-VkSamplerYcbcrConversionImageFormatProperties-sType-sType
+            if (api_version < VK_API_VERSION_1_1) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_SAMPLER_YCBCR_CONVERSION_IMAGE_FORMAT_PROPERTIES) which was added in VK_API_VERSION_1_1 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceExternalImageFormatInfo structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_IMAGE_FORMAT_INFO: { // Covers VUID-VkPhysicalDeviceExternalImageFormatInfo-sType-sType
+            if (api_version < VK_API_VERSION_1_1) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_IMAGE_FORMAT_INFO) which was added in VK_API_VERSION_1_1 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkPhysicalDeviceExternalImageFormatInfo *structure = (VkPhysicalDeviceExternalImageFormatInfo *) header;
+                skip |= ValidateFlags("VkPhysicalDeviceExternalImageFormatInfo", "handleType", "VkExternalMemoryHandleTypeFlagBits", AllVkExternalMemoryHandleTypeFlagBits, structure->handleType, kOptionalSingleBit, "VUID-VkPhysicalDeviceExternalImageFormatInfo-handleType-parameter");
+            }
+        } break;
+
+        // Validation code for VkExternalImageFormatProperties structure members
+        case VK_STRUCTURE_TYPE_EXTERNAL_IMAGE_FORMAT_PROPERTIES: { // Covers VUID-VkExternalImageFormatProperties-sType-sType
+            if (api_version < VK_API_VERSION_1_1) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_EXTERNAL_IMAGE_FORMAT_PROPERTIES) which was added in VK_API_VERSION_1_1 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceIDProperties structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES: { // Covers VUID-VkPhysicalDeviceIDProperties-sType-sType
+            if (api_version < VK_API_VERSION_1_1) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES) which was added in VK_API_VERSION_1_1 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+        } break;
+
+        // Validation code for VkExternalMemoryImageCreateInfo structure members
+        case VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO: { // Covers VUID-VkExternalMemoryImageCreateInfo-sType-sType
+            if (api_version < VK_API_VERSION_1_1) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO) which was added in VK_API_VERSION_1_1 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkExternalMemoryImageCreateInfo *structure = (VkExternalMemoryImageCreateInfo *) header;
+                skip |= ValidateFlags("VkExternalMemoryImageCreateInfo", "handleTypes", "VkExternalMemoryHandleTypeFlagBits", AllVkExternalMemoryHandleTypeFlagBits, structure->handleTypes, kOptionalFlags, "VUID-VkExternalMemoryImageCreateInfo-handleTypes-parameter");
+            }
+        } break;
+
+        // Validation code for VkExternalMemoryBufferCreateInfo structure members
+        case VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO: { // Covers VUID-VkExternalMemoryBufferCreateInfo-sType-sType
+            if (api_version < VK_API_VERSION_1_1) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO) which was added in VK_API_VERSION_1_1 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkExternalMemoryBufferCreateInfo *structure = (VkExternalMemoryBufferCreateInfo *) header;
+                skip |= ValidateFlags("VkExternalMemoryBufferCreateInfo", "handleTypes", "VkExternalMemoryHandleTypeFlagBits", AllVkExternalMemoryHandleTypeFlagBits, structure->handleTypes, kOptionalFlags, "VUID-VkExternalMemoryBufferCreateInfo-handleTypes-parameter");
+            }
+        } break;
+
+        // Validation code for VkExportMemoryAllocateInfo structure members
+        case VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO: { // Covers VUID-VkExportMemoryAllocateInfo-sType-sType
+            if (api_version < VK_API_VERSION_1_1) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO) which was added in VK_API_VERSION_1_1 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkExportMemoryAllocateInfo *structure = (VkExportMemoryAllocateInfo *) header;
+                skip |= ValidateFlags("VkExportMemoryAllocateInfo", "handleTypes", "VkExternalMemoryHandleTypeFlagBits", AllVkExternalMemoryHandleTypeFlagBits, structure->handleTypes, kOptionalFlags, "VUID-VkExportMemoryAllocateInfo-handleTypes-parameter");
+            }
+        } break;
+
+        // Validation code for VkExportFenceCreateInfo structure members
+        case VK_STRUCTURE_TYPE_EXPORT_FENCE_CREATE_INFO: { // Covers VUID-VkExportFenceCreateInfo-sType-sType
+            if (api_version < VK_API_VERSION_1_1) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_EXPORT_FENCE_CREATE_INFO) which was added in VK_API_VERSION_1_1 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkExportFenceCreateInfo *structure = (VkExportFenceCreateInfo *) header;
+                skip |= ValidateFlags("VkExportFenceCreateInfo", "handleTypes", "VkExternalFenceHandleTypeFlagBits", AllVkExternalFenceHandleTypeFlagBits, structure->handleTypes, kOptionalFlags, "VUID-VkExportFenceCreateInfo-handleTypes-parameter");
+            }
+        } break;
+
+        // Validation code for VkExportSemaphoreCreateInfo structure members
+        case VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO: { // Covers VUID-VkExportSemaphoreCreateInfo-sType-sType
+            if (api_version < VK_API_VERSION_1_1) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO) which was added in VK_API_VERSION_1_1 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkExportSemaphoreCreateInfo *structure = (VkExportSemaphoreCreateInfo *) header;
+                skip |= ValidateFlags("VkExportSemaphoreCreateInfo", "handleTypes", "VkExternalSemaphoreHandleTypeFlagBits", AllVkExternalSemaphoreHandleTypeFlagBits, structure->handleTypes, kOptionalFlags, "VUID-VkExportSemaphoreCreateInfo-handleTypes-parameter");
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceMaintenance3Properties structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_3_PROPERTIES: { // Covers VUID-VkPhysicalDeviceMaintenance3Properties-sType-sType
+            if (api_version < VK_API_VERSION_1_1) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_3_PROPERTIES) which was added in VK_API_VERSION_1_1 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
             }
         } break;
 
@@ -266,6 +877,545 @@ bool StatelessValidation::ValidatePnextStructContents(const char *api_name, cons
             }
         } break;
 
+        // Validation code for VkImageFormatListCreateInfo structure members
+        case VK_STRUCTURE_TYPE_IMAGE_FORMAT_LIST_CREATE_INFO: { // Covers VUID-VkImageFormatListCreateInfo-sType-sType
+            if (api_version < VK_API_VERSION_1_2) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_IMAGE_FORMAT_LIST_CREATE_INFO) which was added in VK_API_VERSION_1_2 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkImageFormatListCreateInfo *structure = (VkImageFormatListCreateInfo *) header;
+                skip |= ValidateRangedEnumArray("VkImageFormatListCreateInfo", "viewFormatCount", "pViewFormats", "VkFormat", structure->viewFormatCount, structure->pViewFormats, false, true);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDevice8BitStorageFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_8BIT_STORAGE_FEATURES: { // Covers VUID-VkPhysicalDevice8BitStorageFeatures-sType-sType
+            if (api_version < VK_API_VERSION_1_2) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_8BIT_STORAGE_FEATURES) which was added in VK_API_VERSION_1_2 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkPhysicalDevice8BitStorageFeatures *structure = (VkPhysicalDevice8BitStorageFeatures *) header;
+                skip |= ValidateBool32("VkPhysicalDevice8BitStorageFeatures", "storageBuffer8BitAccess", structure->storageBuffer8BitAccess);
+
+                skip |= ValidateBool32("VkPhysicalDevice8BitStorageFeatures", "uniformAndStorageBuffer8BitAccess", structure->uniformAndStorageBuffer8BitAccess);
+
+                skip |= ValidateBool32("VkPhysicalDevice8BitStorageFeatures", "storagePushConstant8", structure->storagePushConstant8);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceDriverProperties structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES: { // Covers VUID-VkPhysicalDeviceDriverProperties-sType-sType
+            if (api_version < VK_API_VERSION_1_2) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES) which was added in VK_API_VERSION_1_2 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceShaderAtomicInt64Features structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_INT64_FEATURES: { // Covers VUID-VkPhysicalDeviceShaderAtomicInt64Features-sType-sType
+            if (api_version < VK_API_VERSION_1_2) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_INT64_FEATURES) which was added in VK_API_VERSION_1_2 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkPhysicalDeviceShaderAtomicInt64Features *structure = (VkPhysicalDeviceShaderAtomicInt64Features *) header;
+                skip |= ValidateBool32("VkPhysicalDeviceShaderAtomicInt64Features", "shaderBufferInt64Atomics", structure->shaderBufferInt64Atomics);
+
+                skip |= ValidateBool32("VkPhysicalDeviceShaderAtomicInt64Features", "shaderSharedInt64Atomics", structure->shaderSharedInt64Atomics);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceShaderFloat16Int8Features structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES: { // Covers VUID-VkPhysicalDeviceShaderFloat16Int8Features-sType-sType
+            if (api_version < VK_API_VERSION_1_2) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES) which was added in VK_API_VERSION_1_2 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkPhysicalDeviceShaderFloat16Int8Features *structure = (VkPhysicalDeviceShaderFloat16Int8Features *) header;
+                skip |= ValidateBool32("VkPhysicalDeviceShaderFloat16Int8Features", "shaderFloat16", structure->shaderFloat16);
+
+                skip |= ValidateBool32("VkPhysicalDeviceShaderFloat16Int8Features", "shaderInt8", structure->shaderInt8);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceFloatControlsProperties structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FLOAT_CONTROLS_PROPERTIES: { // Covers VUID-VkPhysicalDeviceFloatControlsProperties-sType-sType
+            if (api_version < VK_API_VERSION_1_2) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FLOAT_CONTROLS_PROPERTIES) which was added in VK_API_VERSION_1_2 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+        } break;
+
+        // Validation code for VkDescriptorSetLayoutBindingFlagsCreateInfo structure members
+        case VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO: { // Covers VUID-VkDescriptorSetLayoutBindingFlagsCreateInfo-sType-sType
+            if (api_version < VK_API_VERSION_1_2) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO) which was added in VK_API_VERSION_1_2 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkDescriptorSetLayoutBindingFlagsCreateInfo *structure = (VkDescriptorSetLayoutBindingFlagsCreateInfo *) header;
+                skip |= ValidateFlagsArray("VkDescriptorSetLayoutBindingFlagsCreateInfo", "bindingCount", "pBindingFlags", "VkDescriptorBindingFlagBits", AllVkDescriptorBindingFlagBits, structure->bindingCount, structure->pBindingFlags, false, "VUID-VkDescriptorSetLayoutBindingFlagsCreateInfo-pBindingFlags-parameter");
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceDescriptorIndexingFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES: { // Covers VUID-VkPhysicalDeviceDescriptorIndexingFeatures-sType-sType
+            if (api_version < VK_API_VERSION_1_2) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES) which was added in VK_API_VERSION_1_2 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkPhysicalDeviceDescriptorIndexingFeatures *structure = (VkPhysicalDeviceDescriptorIndexingFeatures *) header;
+                skip |= ValidateBool32("VkPhysicalDeviceDescriptorIndexingFeatures", "shaderInputAttachmentArrayDynamicIndexing", structure->shaderInputAttachmentArrayDynamicIndexing);
+
+                skip |= ValidateBool32("VkPhysicalDeviceDescriptorIndexingFeatures", "shaderUniformTexelBufferArrayDynamicIndexing", structure->shaderUniformTexelBufferArrayDynamicIndexing);
+
+                skip |= ValidateBool32("VkPhysicalDeviceDescriptorIndexingFeatures", "shaderStorageTexelBufferArrayDynamicIndexing", structure->shaderStorageTexelBufferArrayDynamicIndexing);
+
+                skip |= ValidateBool32("VkPhysicalDeviceDescriptorIndexingFeatures", "shaderUniformBufferArrayNonUniformIndexing", structure->shaderUniformBufferArrayNonUniformIndexing);
+
+                skip |= ValidateBool32("VkPhysicalDeviceDescriptorIndexingFeatures", "shaderSampledImageArrayNonUniformIndexing", structure->shaderSampledImageArrayNonUniformIndexing);
+
+                skip |= ValidateBool32("VkPhysicalDeviceDescriptorIndexingFeatures", "shaderStorageBufferArrayNonUniformIndexing", structure->shaderStorageBufferArrayNonUniformIndexing);
+
+                skip |= ValidateBool32("VkPhysicalDeviceDescriptorIndexingFeatures", "shaderStorageImageArrayNonUniformIndexing", structure->shaderStorageImageArrayNonUniformIndexing);
+
+                skip |= ValidateBool32("VkPhysicalDeviceDescriptorIndexingFeatures", "shaderInputAttachmentArrayNonUniformIndexing", structure->shaderInputAttachmentArrayNonUniformIndexing);
+
+                skip |= ValidateBool32("VkPhysicalDeviceDescriptorIndexingFeatures", "shaderUniformTexelBufferArrayNonUniformIndexing", structure->shaderUniformTexelBufferArrayNonUniformIndexing);
+
+                skip |= ValidateBool32("VkPhysicalDeviceDescriptorIndexingFeatures", "shaderStorageTexelBufferArrayNonUniformIndexing", structure->shaderStorageTexelBufferArrayNonUniformIndexing);
+
+                skip |= ValidateBool32("VkPhysicalDeviceDescriptorIndexingFeatures", "descriptorBindingUniformBufferUpdateAfterBind", structure->descriptorBindingUniformBufferUpdateAfterBind);
+
+                skip |= ValidateBool32("VkPhysicalDeviceDescriptorIndexingFeatures", "descriptorBindingSampledImageUpdateAfterBind", structure->descriptorBindingSampledImageUpdateAfterBind);
+
+                skip |= ValidateBool32("VkPhysicalDeviceDescriptorIndexingFeatures", "descriptorBindingStorageImageUpdateAfterBind", structure->descriptorBindingStorageImageUpdateAfterBind);
+
+                skip |= ValidateBool32("VkPhysicalDeviceDescriptorIndexingFeatures", "descriptorBindingStorageBufferUpdateAfterBind", structure->descriptorBindingStorageBufferUpdateAfterBind);
+
+                skip |= ValidateBool32("VkPhysicalDeviceDescriptorIndexingFeatures", "descriptorBindingUniformTexelBufferUpdateAfterBind", structure->descriptorBindingUniformTexelBufferUpdateAfterBind);
+
+                skip |= ValidateBool32("VkPhysicalDeviceDescriptorIndexingFeatures", "descriptorBindingStorageTexelBufferUpdateAfterBind", structure->descriptorBindingStorageTexelBufferUpdateAfterBind);
+
+                skip |= ValidateBool32("VkPhysicalDeviceDescriptorIndexingFeatures", "descriptorBindingUpdateUnusedWhilePending", structure->descriptorBindingUpdateUnusedWhilePending);
+
+                skip |= ValidateBool32("VkPhysicalDeviceDescriptorIndexingFeatures", "descriptorBindingPartiallyBound", structure->descriptorBindingPartiallyBound);
+
+                skip |= ValidateBool32("VkPhysicalDeviceDescriptorIndexingFeatures", "descriptorBindingVariableDescriptorCount", structure->descriptorBindingVariableDescriptorCount);
+
+                skip |= ValidateBool32("VkPhysicalDeviceDescriptorIndexingFeatures", "runtimeDescriptorArray", structure->runtimeDescriptorArray);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceDescriptorIndexingProperties structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_PROPERTIES: { // Covers VUID-VkPhysicalDeviceDescriptorIndexingProperties-sType-sType
+            if (api_version < VK_API_VERSION_1_2) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_PROPERTIES) which was added in VK_API_VERSION_1_2 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+        } break;
+
+        // Validation code for VkDescriptorSetVariableDescriptorCountAllocateInfo structure members
+        case VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO: { // Covers VUID-VkDescriptorSetVariableDescriptorCountAllocateInfo-sType-sType
+            if (api_version < VK_API_VERSION_1_2) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO) which was added in VK_API_VERSION_1_2 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkDescriptorSetVariableDescriptorCountAllocateInfo *structure = (VkDescriptorSetVariableDescriptorCountAllocateInfo *) header;
+                skip |= ValidateArray("VkDescriptorSetVariableDescriptorCountAllocateInfo", "descriptorSetCount", "pDescriptorCounts", structure->descriptorSetCount, &structure->pDescriptorCounts, false, true, kVUIDUndefined, "VUID-VkDescriptorSetVariableDescriptorCountAllocateInfo-pDescriptorCounts-parameter");
+            }
+        } break;
+
+        // Validation code for VkDescriptorSetVariableDescriptorCountLayoutSupport structure members
+        case VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_LAYOUT_SUPPORT: { // Covers VUID-VkDescriptorSetVariableDescriptorCountLayoutSupport-sType-sType
+            if (api_version < VK_API_VERSION_1_2) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_LAYOUT_SUPPORT) which was added in VK_API_VERSION_1_2 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+        } break;
+
+        // Validation code for VkSubpassDescriptionDepthStencilResolve structure members
+        case VK_STRUCTURE_TYPE_SUBPASS_DESCRIPTION_DEPTH_STENCIL_RESOLVE: { // Covers VUID-VkSubpassDescriptionDepthStencilResolve-sType-sType
+            if (api_version < VK_API_VERSION_1_2) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_SUBPASS_DESCRIPTION_DEPTH_STENCIL_RESOLVE) which was added in VK_API_VERSION_1_2 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkSubpassDescriptionDepthStencilResolve *structure = (VkSubpassDescriptionDepthStencilResolve *) header;
+                skip |= ValidateStructType("VkSubpassDescriptionDepthStencilResolve", "pDepthStencilResolveAttachment", "VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2", structure->pDepthStencilResolveAttachment, VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2, false, "VUID-VkSubpassDescriptionDepthStencilResolve-pDepthStencilResolveAttachment-parameter", "VUID-VkAttachmentReference2-sType-sType");
+
+                if (structure->pDepthStencilResolveAttachment != nullptr)
+                {
+                    skip |= ValidateRangedEnum("VkSubpassDescriptionDepthStencilResolve", "pDepthStencilResolveAttachment->layout", "VkImageLayout", structure->pDepthStencilResolveAttachment->layout, "VUID-VkAttachmentReference2-layout-parameter");
+                }
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceDepthStencilResolveProperties structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DEPTH_STENCIL_RESOLVE_PROPERTIES: { // Covers VUID-VkPhysicalDeviceDepthStencilResolveProperties-sType-sType
+            if (api_version < VK_API_VERSION_1_2) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DEPTH_STENCIL_RESOLVE_PROPERTIES) which was added in VK_API_VERSION_1_2 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceScalarBlockLayoutFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SCALAR_BLOCK_LAYOUT_FEATURES: { // Covers VUID-VkPhysicalDeviceScalarBlockLayoutFeatures-sType-sType
+            if (api_version < VK_API_VERSION_1_2) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SCALAR_BLOCK_LAYOUT_FEATURES) which was added in VK_API_VERSION_1_2 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkPhysicalDeviceScalarBlockLayoutFeatures *structure = (VkPhysicalDeviceScalarBlockLayoutFeatures *) header;
+                skip |= ValidateBool32("VkPhysicalDeviceScalarBlockLayoutFeatures", "scalarBlockLayout", structure->scalarBlockLayout);
+            }
+        } break;
+
+        // Validation code for VkImageStencilUsageCreateInfo structure members
+        case VK_STRUCTURE_TYPE_IMAGE_STENCIL_USAGE_CREATE_INFO: { // Covers VUID-VkImageStencilUsageCreateInfo-sType-sType
+            if (api_version < VK_API_VERSION_1_2) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_IMAGE_STENCIL_USAGE_CREATE_INFO) which was added in VK_API_VERSION_1_2 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkImageStencilUsageCreateInfo *structure = (VkImageStencilUsageCreateInfo *) header;
+                skip |= ValidateFlags("VkImageStencilUsageCreateInfo", "stencilUsage", "VkImageUsageFlagBits", AllVkImageUsageFlagBits, structure->stencilUsage, kRequiredFlags, "VUID-VkImageStencilUsageCreateInfo-stencilUsage-parameter", "VUID-VkImageStencilUsageCreateInfo-stencilUsage-requiredbitmask");
+            }
+        } break;
+
+        // Validation code for VkSamplerReductionModeCreateInfo structure members
+        case VK_STRUCTURE_TYPE_SAMPLER_REDUCTION_MODE_CREATE_INFO: { // Covers VUID-VkSamplerReductionModeCreateInfo-sType-sType
+            if (api_version < VK_API_VERSION_1_2) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_SAMPLER_REDUCTION_MODE_CREATE_INFO) which was added in VK_API_VERSION_1_2 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkSamplerReductionModeCreateInfo *structure = (VkSamplerReductionModeCreateInfo *) header;
+                skip |= ValidateRangedEnum("VkSamplerReductionModeCreateInfo", "reductionMode", "VkSamplerReductionMode", structure->reductionMode, "VUID-VkSamplerReductionModeCreateInfo-reductionMode-parameter");
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceSamplerFilterMinmaxProperties structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_FILTER_MINMAX_PROPERTIES: { // Covers VUID-VkPhysicalDeviceSamplerFilterMinmaxProperties-sType-sType
+            if (api_version < VK_API_VERSION_1_2) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_FILTER_MINMAX_PROPERTIES) which was added in VK_API_VERSION_1_2 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceVulkanMemoryModelFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_MEMORY_MODEL_FEATURES: { // Covers VUID-VkPhysicalDeviceVulkanMemoryModelFeatures-sType-sType
+            if (api_version < VK_API_VERSION_1_2) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_MEMORY_MODEL_FEATURES) which was added in VK_API_VERSION_1_2 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkPhysicalDeviceVulkanMemoryModelFeatures *structure = (VkPhysicalDeviceVulkanMemoryModelFeatures *) header;
+                skip |= ValidateBool32("VkPhysicalDeviceVulkanMemoryModelFeatures", "vulkanMemoryModel", structure->vulkanMemoryModel);
+
+                skip |= ValidateBool32("VkPhysicalDeviceVulkanMemoryModelFeatures", "vulkanMemoryModelDeviceScope", structure->vulkanMemoryModelDeviceScope);
+
+                skip |= ValidateBool32("VkPhysicalDeviceVulkanMemoryModelFeatures", "vulkanMemoryModelAvailabilityVisibilityChains", structure->vulkanMemoryModelAvailabilityVisibilityChains);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceImagelessFramebufferFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGELESS_FRAMEBUFFER_FEATURES: { // Covers VUID-VkPhysicalDeviceImagelessFramebufferFeatures-sType-sType
+            if (api_version < VK_API_VERSION_1_2) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGELESS_FRAMEBUFFER_FEATURES) which was added in VK_API_VERSION_1_2 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkPhysicalDeviceImagelessFramebufferFeatures *structure = (VkPhysicalDeviceImagelessFramebufferFeatures *) header;
+                skip |= ValidateBool32("VkPhysicalDeviceImagelessFramebufferFeatures", "imagelessFramebuffer", structure->imagelessFramebuffer);
+            }
+        } break;
+
+        // Validation code for VkFramebufferAttachmentsCreateInfo structure members
+        case VK_STRUCTURE_TYPE_FRAMEBUFFER_ATTACHMENTS_CREATE_INFO: { // Covers VUID-VkFramebufferAttachmentsCreateInfo-sType-sType
+            if (api_version < VK_API_VERSION_1_2) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_FRAMEBUFFER_ATTACHMENTS_CREATE_INFO) which was added in VK_API_VERSION_1_2 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkFramebufferAttachmentsCreateInfo *structure = (VkFramebufferAttachmentsCreateInfo *) header;
+                skip |= ValidateStructTypeArray("VkFramebufferAttachmentsCreateInfo", "attachmentImageInfoCount", "pAttachmentImageInfos", "VK_STRUCTURE_TYPE_FRAMEBUFFER_ATTACHMENT_IMAGE_INFO", structure->attachmentImageInfoCount, structure->pAttachmentImageInfos, VK_STRUCTURE_TYPE_FRAMEBUFFER_ATTACHMENT_IMAGE_INFO, false, true, "VUID-VkFramebufferAttachmentImageInfo-sType-sType", "VUID-VkFramebufferAttachmentsCreateInfo-pAttachmentImageInfos-parameter", kVUIDUndefined);
+
+                if (structure->pAttachmentImageInfos != nullptr)
+                {
+                    for (uint32_t attachmentImageInfoIndex = 0; attachmentImageInfoIndex < structure->attachmentImageInfoCount; ++attachmentImageInfoIndex)
+                    {
+                        skip |= ValidateFlags("VkFramebufferAttachmentsCreateInfo", ParameterName("pAttachmentImageInfos[%i].flags", ParameterName::IndexVector{ attachmentImageInfoIndex }), "VkImageCreateFlagBits", AllVkImageCreateFlagBits, structure->pAttachmentImageInfos[attachmentImageInfoIndex].flags, kOptionalFlags, "VUID-VkFramebufferAttachmentImageInfo-flags-parameter");
+
+                        skip |= ValidateFlags("VkFramebufferAttachmentsCreateInfo", ParameterName("pAttachmentImageInfos[%i].usage", ParameterName::IndexVector{ attachmentImageInfoIndex }), "VkImageUsageFlagBits", AllVkImageUsageFlagBits, structure->pAttachmentImageInfos[attachmentImageInfoIndex].usage, kRequiredFlags, "VUID-VkFramebufferAttachmentImageInfo-usage-parameter", "VUID-VkFramebufferAttachmentImageInfo-usage-requiredbitmask");
+
+                        skip |= ValidateRangedEnumArray("VkFramebufferAttachmentsCreateInfo", ParameterName("pAttachmentImageInfos[%i].viewFormatCount", ParameterName::IndexVector{ attachmentImageInfoIndex }), ParameterName("pAttachmentImageInfos[%i].pViewFormats", ParameterName::IndexVector{ attachmentImageInfoIndex }), "VkFormat", structure->pAttachmentImageInfos[attachmentImageInfoIndex].viewFormatCount, structure->pAttachmentImageInfos[attachmentImageInfoIndex].pViewFormats, false, true);
+                    }
+                }
+            }
+        } break;
+
+        // Validation code for VkRenderPassAttachmentBeginInfo structure members
+        case VK_STRUCTURE_TYPE_RENDER_PASS_ATTACHMENT_BEGIN_INFO: { // Covers VUID-VkRenderPassAttachmentBeginInfo-sType-sType
+            if (api_version < VK_API_VERSION_1_2) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_RENDER_PASS_ATTACHMENT_BEGIN_INFO) which was added in VK_API_VERSION_1_2 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkRenderPassAttachmentBeginInfo *structure = (VkRenderPassAttachmentBeginInfo *) header;
+                skip |= ValidateArray("VkRenderPassAttachmentBeginInfo", "attachmentCount", "pAttachments", structure->attachmentCount, &structure->pAttachments, false, true, kVUIDUndefined, "VUID-VkRenderPassAttachmentBeginInfo-pAttachments-parameter");
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceUniformBufferStandardLayoutFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_UNIFORM_BUFFER_STANDARD_LAYOUT_FEATURES: { // Covers VUID-VkPhysicalDeviceUniformBufferStandardLayoutFeatures-sType-sType
+            if (api_version < VK_API_VERSION_1_2) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_UNIFORM_BUFFER_STANDARD_LAYOUT_FEATURES) which was added in VK_API_VERSION_1_2 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkPhysicalDeviceUniformBufferStandardLayoutFeatures *structure = (VkPhysicalDeviceUniformBufferStandardLayoutFeatures *) header;
+                skip |= ValidateBool32("VkPhysicalDeviceUniformBufferStandardLayoutFeatures", "uniformBufferStandardLayout", structure->uniformBufferStandardLayout);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceShaderSubgroupExtendedTypesFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_SUBGROUP_EXTENDED_TYPES_FEATURES: { // Covers VUID-VkPhysicalDeviceShaderSubgroupExtendedTypesFeatures-sType-sType
+            if (api_version < VK_API_VERSION_1_2) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_SUBGROUP_EXTENDED_TYPES_FEATURES) which was added in VK_API_VERSION_1_2 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceSeparateDepthStencilLayoutsFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SEPARATE_DEPTH_STENCIL_LAYOUTS_FEATURES: { // Covers VUID-VkPhysicalDeviceSeparateDepthStencilLayoutsFeatures-sType-sType
+            if (api_version < VK_API_VERSION_1_2) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SEPARATE_DEPTH_STENCIL_LAYOUTS_FEATURES) which was added in VK_API_VERSION_1_2 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkPhysicalDeviceSeparateDepthStencilLayoutsFeatures *structure = (VkPhysicalDeviceSeparateDepthStencilLayoutsFeatures *) header;
+                skip |= ValidateBool32("VkPhysicalDeviceSeparateDepthStencilLayoutsFeatures", "separateDepthStencilLayouts", structure->separateDepthStencilLayouts);
+            }
+        } break;
+
+        // Validation code for VkAttachmentReferenceStencilLayout structure members
+        case VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_STENCIL_LAYOUT: { // Covers VUID-VkAttachmentReferenceStencilLayout-sType-sType
+            if (api_version < VK_API_VERSION_1_2) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_STENCIL_LAYOUT) which was added in VK_API_VERSION_1_2 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkAttachmentReferenceStencilLayout *structure = (VkAttachmentReferenceStencilLayout *) header;
+                skip |= ValidateRangedEnum("VkAttachmentReferenceStencilLayout", "stencilLayout", "VkImageLayout", structure->stencilLayout, "VUID-VkAttachmentReferenceStencilLayout-stencilLayout-parameter");
+            }
+        } break;
+
+        // Validation code for VkAttachmentDescriptionStencilLayout structure members
+        case VK_STRUCTURE_TYPE_ATTACHMENT_DESCRIPTION_STENCIL_LAYOUT: { // Covers VUID-VkAttachmentDescriptionStencilLayout-sType-sType
+            if (api_version < VK_API_VERSION_1_2) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_ATTACHMENT_DESCRIPTION_STENCIL_LAYOUT) which was added in VK_API_VERSION_1_2 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkAttachmentDescriptionStencilLayout *structure = (VkAttachmentDescriptionStencilLayout *) header;
+                skip |= ValidateRangedEnum("VkAttachmentDescriptionStencilLayout", "stencilInitialLayout", "VkImageLayout", structure->stencilInitialLayout, "VUID-VkAttachmentDescriptionStencilLayout-stencilInitialLayout-parameter");
+
+                skip |= ValidateRangedEnum("VkAttachmentDescriptionStencilLayout", "stencilFinalLayout", "VkImageLayout", structure->stencilFinalLayout, "VUID-VkAttachmentDescriptionStencilLayout-stencilFinalLayout-parameter");
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceHostQueryResetFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES: { // Covers VUID-VkPhysicalDeviceHostQueryResetFeatures-sType-sType
+            if (api_version < VK_API_VERSION_1_2) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES) which was added in VK_API_VERSION_1_2 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkPhysicalDeviceHostQueryResetFeatures *structure = (VkPhysicalDeviceHostQueryResetFeatures *) header;
+                skip |= ValidateBool32("VkPhysicalDeviceHostQueryResetFeatures", "hostQueryReset", structure->hostQueryReset);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceTimelineSemaphoreFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES: { // Covers VUID-VkPhysicalDeviceTimelineSemaphoreFeatures-sType-sType
+            if (api_version < VK_API_VERSION_1_2) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES) which was added in VK_API_VERSION_1_2 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkPhysicalDeviceTimelineSemaphoreFeatures *structure = (VkPhysicalDeviceTimelineSemaphoreFeatures *) header;
+                skip |= ValidateBool32("VkPhysicalDeviceTimelineSemaphoreFeatures", "timelineSemaphore", structure->timelineSemaphore);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceTimelineSemaphoreProperties structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_PROPERTIES: { // Covers VUID-VkPhysicalDeviceTimelineSemaphoreProperties-sType-sType
+            if (api_version < VK_API_VERSION_1_2) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_PROPERTIES) which was added in VK_API_VERSION_1_2 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+        } break;
+
+        // Validation code for VkSemaphoreTypeCreateInfo structure members
+        case VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO: { // Covers VUID-VkSemaphoreTypeCreateInfo-sType-sType
+            if (api_version < VK_API_VERSION_1_2) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO) which was added in VK_API_VERSION_1_2 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkSemaphoreTypeCreateInfo *structure = (VkSemaphoreTypeCreateInfo *) header;
+                skip |= ValidateRangedEnum("VkSemaphoreTypeCreateInfo", "semaphoreType", "VkSemaphoreType", structure->semaphoreType, "VUID-VkSemaphoreTypeCreateInfo-semaphoreType-parameter");
+            }
+        } break;
+
+        // Validation code for VkTimelineSemaphoreSubmitInfo structure members
+        case VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO: { // Covers VUID-VkTimelineSemaphoreSubmitInfo-sType-sType
+            if (api_version < VK_API_VERSION_1_2) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO) which was added in VK_API_VERSION_1_2 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceBufferDeviceAddressFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES: { // Covers VUID-VkPhysicalDeviceBufferDeviceAddressFeatures-sType-sType
+            if (api_version < VK_API_VERSION_1_2) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES) which was added in VK_API_VERSION_1_2 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkPhysicalDeviceBufferDeviceAddressFeatures *structure = (VkPhysicalDeviceBufferDeviceAddressFeatures *) header;
+                skip |= ValidateBool32("VkPhysicalDeviceBufferDeviceAddressFeatures", "bufferDeviceAddress", structure->bufferDeviceAddress);
+
+                skip |= ValidateBool32("VkPhysicalDeviceBufferDeviceAddressFeatures", "bufferDeviceAddressCaptureReplay", structure->bufferDeviceAddressCaptureReplay);
+
+                skip |= ValidateBool32("VkPhysicalDeviceBufferDeviceAddressFeatures", "bufferDeviceAddressMultiDevice", structure->bufferDeviceAddressMultiDevice);
+            }
+        } break;
+
+        // Validation code for VkBufferOpaqueCaptureAddressCreateInfo structure members
+        case VK_STRUCTURE_TYPE_BUFFER_OPAQUE_CAPTURE_ADDRESS_CREATE_INFO: { // Covers VUID-VkBufferOpaqueCaptureAddressCreateInfo-sType-sType
+            if (api_version < VK_API_VERSION_1_2) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_BUFFER_OPAQUE_CAPTURE_ADDRESS_CREATE_INFO) which was added in VK_API_VERSION_1_2 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+        } break;
+
+        // Validation code for VkMemoryOpaqueCaptureAddressAllocateInfo structure members
+        case VK_STRUCTURE_TYPE_MEMORY_OPAQUE_CAPTURE_ADDRESS_ALLOCATE_INFO: { // Covers VUID-VkMemoryOpaqueCaptureAddressAllocateInfo-sType-sType
+            if (api_version < VK_API_VERSION_1_2) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_MEMORY_OPAQUE_CAPTURE_ADDRESS_ALLOCATE_INFO) which was added in VK_API_VERSION_1_2 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+        } break;
+
         // Validation code for VkPhysicalDeviceVulkan13Features structure members
         case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES: { // Covers VUID-VkPhysicalDeviceVulkan13Features-sType-sType
             if (api_version < VK_API_VERSION_1_3) {
@@ -320,6 +1470,34 @@ bool StatelessValidation::ValidatePnextStructContents(const char *api_name, cons
             }
         } break;
 
+        // Validation code for VkPipelineCreationFeedbackCreateInfo structure members
+        case VK_STRUCTURE_TYPE_PIPELINE_CREATION_FEEDBACK_CREATE_INFO: { // Covers VUID-VkPipelineCreationFeedbackCreateInfo-sType-sType
+            if (api_version < VK_API_VERSION_1_3) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_PIPELINE_CREATION_FEEDBACK_CREATE_INFO) which was added in VK_API_VERSION_1_3 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkPipelineCreationFeedbackCreateInfo *structure = (VkPipelineCreationFeedbackCreateInfo *) header;
+                skip |= ValidateRequiredPointer("VkPipelineCreationFeedbackCreateInfo", "pPipelineCreationFeedback", structure->pPipelineCreationFeedback, kVUIDUndefined);
+
+                if (structure->pPipelineCreationFeedback != nullptr)
+                {
+                }
+
+                skip |= ValidateArray("VkPipelineCreationFeedbackCreateInfo", "pipelineStageCreationFeedbackCount", "pPipelineStageCreationFeedbacks", structure->pipelineStageCreationFeedbackCount, &structure->pPipelineStageCreationFeedbacks, false, true, kVUIDUndefined, kVUIDUndefined);
+
+                if (structure->pPipelineStageCreationFeedbacks != nullptr)
+                {
+                    for (uint32_t pipelineStageCreationFeedbackIndex = 0; pipelineStageCreationFeedbackIndex < structure->pipelineStageCreationFeedbackCount; ++pipelineStageCreationFeedbackIndex)
+                    {
+                    }
+                }
+            }
+        } break;
+
         // Validation code for VkPhysicalDeviceShaderTerminateInvocationFeatures structure members
         case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_TERMINATE_INVOCATION_FEATURES: { // Covers VUID-VkPhysicalDeviceShaderTerminateInvocationFeatures-sType-sType
             if (is_const_param) {
@@ -351,6 +1529,47 @@ bool StatelessValidation::ValidatePnextStructContents(const char *api_name, cons
             if (is_const_param) {
                 VkPhysicalDeviceShaderDemoteToHelperInvocationFeatures *structure = (VkPhysicalDeviceShaderDemoteToHelperInvocationFeatures *) header;
                 skip |= ValidateBool32("VkPhysicalDeviceShaderDemoteToHelperInvocationFeatures", "shaderDemoteToHelperInvocation", structure->shaderDemoteToHelperInvocation);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDevicePrivateDataFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRIVATE_DATA_FEATURES: { // Covers VUID-VkPhysicalDevicePrivateDataFeatures-sType-sType
+            if (api_version < VK_API_VERSION_1_3) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRIVATE_DATA_FEATURES) which was added in VK_API_VERSION_1_3 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkPhysicalDevicePrivateDataFeatures *structure = (VkPhysicalDevicePrivateDataFeatures *) header;
+                skip |= ValidateBool32("VkPhysicalDevicePrivateDataFeatures", "privateData", structure->privateData);
+            }
+        } break;
+
+        // Validation code for VkDevicePrivateDataCreateInfo structure members
+        case VK_STRUCTURE_TYPE_DEVICE_PRIVATE_DATA_CREATE_INFO: { // Covers VUID-VkDevicePrivateDataCreateInfo-sType-sType
+            if (api_version < VK_API_VERSION_1_3) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_DEVICE_PRIVATE_DATA_CREATE_INFO) which was added in VK_API_VERSION_1_3 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+        } break;
+
+        // Validation code for VkPhysicalDevicePipelineCreationCacheControlFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PIPELINE_CREATION_CACHE_CONTROL_FEATURES: { // Covers VUID-VkPhysicalDevicePipelineCreationCacheControlFeatures-sType-sType
+            if (api_version < VK_API_VERSION_1_3) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PIPELINE_CREATION_CACHE_CONTROL_FEATURES) which was added in VK_API_VERSION_1_3 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkPhysicalDevicePipelineCreationCacheControlFeatures *structure = (VkPhysicalDevicePipelineCreationCacheControlFeatures *) header;
+                skip |= ValidateBool32("VkPhysicalDevicePipelineCreationCacheControlFeatures", "pipelineCreationCacheControl", structure->pipelineCreationCacheControl);
             }
         } break;
 
@@ -391,6 +1610,21 @@ bool StatelessValidation::ValidatePnextStructContents(const char *api_name, cons
             if (is_const_param) {
                 VkPhysicalDeviceSynchronization2Features *structure = (VkPhysicalDeviceSynchronization2Features *) header;
                 skip |= ValidateBool32("VkPhysicalDeviceSynchronization2Features", "synchronization2", structure->synchronization2);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceZeroInitializeWorkgroupMemoryFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ZERO_INITIALIZE_WORKGROUP_MEMORY_FEATURES: { // Covers VUID-VkPhysicalDeviceZeroInitializeWorkgroupMemoryFeatures-sType-sType
+            if (api_version < VK_API_VERSION_1_3) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ZERO_INITIALIZE_WORKGROUP_MEMORY_FEATURES) which was added in VK_API_VERSION_1_3 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkPhysicalDeviceZeroInitializeWorkgroupMemoryFeatures *structure = (VkPhysicalDeviceZeroInitializeWorkgroupMemoryFeatures *) header;
+                skip |= ValidateBool32("VkPhysicalDeviceZeroInitializeWorkgroupMemoryFeatures", "shaderZeroInitializeWorkgroupMemory", structure->shaderZeroInitializeWorkgroupMemory);
             }
         } break;
 
@@ -456,6 +1690,60 @@ bool StatelessValidation::ValidatePnextStructContents(const char *api_name, cons
             }
         } break;
 
+        // Validation code for VkPhysicalDeviceInlineUniformBlockFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INLINE_UNIFORM_BLOCK_FEATURES: { // Covers VUID-VkPhysicalDeviceInlineUniformBlockFeatures-sType-sType
+            if (api_version < VK_API_VERSION_1_3) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INLINE_UNIFORM_BLOCK_FEATURES) which was added in VK_API_VERSION_1_3 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkPhysicalDeviceInlineUniformBlockFeatures *structure = (VkPhysicalDeviceInlineUniformBlockFeatures *) header;
+                skip |= ValidateBool32("VkPhysicalDeviceInlineUniformBlockFeatures", "inlineUniformBlock", structure->inlineUniformBlock);
+
+                skip |= ValidateBool32("VkPhysicalDeviceInlineUniformBlockFeatures", "descriptorBindingInlineUniformBlockUpdateAfterBind", structure->descriptorBindingInlineUniformBlockUpdateAfterBind);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceInlineUniformBlockProperties structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INLINE_UNIFORM_BLOCK_PROPERTIES: { // Covers VUID-VkPhysicalDeviceInlineUniformBlockProperties-sType-sType
+            if (api_version < VK_API_VERSION_1_3) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INLINE_UNIFORM_BLOCK_PROPERTIES) which was added in VK_API_VERSION_1_3 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+        } break;
+
+        // Validation code for VkWriteDescriptorSetInlineUniformBlock structure members
+        case VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_INLINE_UNIFORM_BLOCK: { // Covers VUID-VkWriteDescriptorSetInlineUniformBlock-sType-sType
+            if (api_version < VK_API_VERSION_1_3) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_INLINE_UNIFORM_BLOCK) which was added in VK_API_VERSION_1_3 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkWriteDescriptorSetInlineUniformBlock *structure = (VkWriteDescriptorSetInlineUniformBlock *) header;
+                skip |= ValidateArray("VkWriteDescriptorSetInlineUniformBlock", "dataSize", "pData", structure->dataSize, &structure->pData, true, true, kVUIDUndefined, kVUIDUndefined);
+            }
+        } break;
+
+        // Validation code for VkDescriptorPoolInlineUniformBlockCreateInfo structure members
+        case VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_INLINE_UNIFORM_BLOCK_CREATE_INFO: { // Covers VUID-VkDescriptorPoolInlineUniformBlockCreateInfo-sType-sType
+            if (api_version < VK_API_VERSION_1_3) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_INLINE_UNIFORM_BLOCK_CREATE_INFO) which was added in VK_API_VERSION_1_3 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+        } break;
+
         // Validation code for VkPhysicalDeviceTextureCompressionASTCHDRFeatures structure members
         case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TEXTURE_COMPRESSION_ASTC_HDR_FEATURES: { // Covers VUID-VkPhysicalDeviceTextureCompressionASTCHDRFeatures-sType-sType
             if (is_const_param) {
@@ -473,6 +1761,81 @@ bool StatelessValidation::ValidatePnextStructContents(const char *api_name, cons
             }
         } break;
 
+        // Validation code for VkPipelineRenderingCreateInfo structure members
+        case VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO: { // Covers VUID-VkPipelineRenderingCreateInfo-sType-sType
+            if (api_version < VK_API_VERSION_1_3) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO) which was added in VK_API_VERSION_1_3 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceDynamicRenderingFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES: { // Covers VUID-VkPhysicalDeviceDynamicRenderingFeatures-sType-sType
+            if (api_version < VK_API_VERSION_1_3) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES) which was added in VK_API_VERSION_1_3 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkPhysicalDeviceDynamicRenderingFeatures *structure = (VkPhysicalDeviceDynamicRenderingFeatures *) header;
+                skip |= ValidateBool32("VkPhysicalDeviceDynamicRenderingFeatures", "dynamicRendering", structure->dynamicRendering);
+            }
+        } break;
+
+        // Validation code for VkCommandBufferInheritanceRenderingInfo structure members
+        case VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_RENDERING_INFO: { // Covers VUID-VkCommandBufferInheritanceRenderingInfo-sType-sType
+            if (api_version < VK_API_VERSION_1_3) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_RENDERING_INFO) which was added in VK_API_VERSION_1_3 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkCommandBufferInheritanceRenderingInfo *structure = (VkCommandBufferInheritanceRenderingInfo *) header;
+                skip |= ValidateFlags("VkCommandBufferInheritanceRenderingInfo", "flags", "VkRenderingFlagBits", AllVkRenderingFlagBits, structure->flags, kOptionalFlags, kVUIDUndefined);
+
+                skip |= ValidateRangedEnumArray("VkCommandBufferInheritanceRenderingInfo", "colorAttachmentCount", "pColorAttachmentFormats", "VkFormat", structure->colorAttachmentCount, structure->pColorAttachmentFormats, true, true);
+
+                skip |= ValidateRangedEnum("VkCommandBufferInheritanceRenderingInfo", "depthAttachmentFormat", "VkFormat", structure->depthAttachmentFormat, kVUIDUndefined);
+
+                skip |= ValidateRangedEnum("VkCommandBufferInheritanceRenderingInfo", "stencilAttachmentFormat", "VkFormat", structure->stencilAttachmentFormat, kVUIDUndefined);
+
+                skip |= ValidateFlags("VkCommandBufferInheritanceRenderingInfo", "rasterizationSamples", "VkSampleCountFlagBits", AllVkSampleCountFlagBits, structure->rasterizationSamples, kOptionalSingleBit, kVUIDUndefined);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceShaderIntegerDotProductFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_INTEGER_DOT_PRODUCT_FEATURES: { // Covers VUID-VkPhysicalDeviceShaderIntegerDotProductFeatures-sType-sType
+            if (api_version < VK_API_VERSION_1_3) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_INTEGER_DOT_PRODUCT_FEATURES) which was added in VK_API_VERSION_1_3 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkPhysicalDeviceShaderIntegerDotProductFeatures *structure = (VkPhysicalDeviceShaderIntegerDotProductFeatures *) header;
+                skip |= ValidateBool32("VkPhysicalDeviceShaderIntegerDotProductFeatures", "shaderIntegerDotProduct", structure->shaderIntegerDotProduct);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceShaderIntegerDotProductProperties structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_INTEGER_DOT_PRODUCT_PROPERTIES: { // Covers VUID-VkPhysicalDeviceShaderIntegerDotProductProperties-sType-sType
+            if (api_version < VK_API_VERSION_1_3) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_INTEGER_DOT_PRODUCT_PROPERTIES) which was added in VK_API_VERSION_1_3 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+        } break;
+
         // Validation code for VkPhysicalDeviceTexelBufferAlignmentProperties structure members
         case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TEXEL_BUFFER_ALIGNMENT_PROPERTIES: { // Covers VUID-VkPhysicalDeviceTexelBufferAlignmentProperties-sType-sType
             if (is_const_param) {
@@ -483,6 +1846,43 @@ bool StatelessValidation::ValidatePnextStructContents(const char *api_name, cons
                                "VK_EXT_texel_buffer_alignment has not been enabled.",
                                api_name, parameter_name.get_name().c_str());
                 }
+            }
+        } break;
+
+        // Validation code for VkFormatProperties3 structure members
+        case VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_3: { // Covers VUID-VkFormatProperties3-sType-sType
+            if (api_version < VK_API_VERSION_1_3) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_3) which was added in VK_API_VERSION_1_3 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceMaintenance4Features structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_4_FEATURES: { // Covers VUID-VkPhysicalDeviceMaintenance4Features-sType-sType
+            if (api_version < VK_API_VERSION_1_3) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_4_FEATURES) which was added in VK_API_VERSION_1_3 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
+            }
+            if (is_const_param) {
+                VkPhysicalDeviceMaintenance4Features *structure = (VkPhysicalDeviceMaintenance4Features *) header;
+                skip |= ValidateBool32("VkPhysicalDeviceMaintenance4Features", "maintenance4", structure->maintenance4);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceMaintenance4Properties structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_4_PROPERTIES: { // Covers VUID-VkPhysicalDeviceMaintenance4Properties-sType-sType
+            if (api_version < VK_API_VERSION_1_3) {
+                skip |= LogError(
+                           instance, pnext_vuid,
+                           "%s: Includes a pNext pointer (%s) to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_4_PROPERTIES) which was added in VK_API_VERSION_1_3 but the "
+                           "current effective API version is %s.",
+                           api_name, parameter_name.get_name().c_str(), StringAPIVersion(api_version).c_str());
             }
         } break;
 
@@ -1152,6 +2552,56 @@ bool StatelessValidation::ValidatePnextStructContents(const char *api_name, cons
                 skip |= ValidateBool32("VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT", "vertexInputDynamicState", structure->vertexInputDynamicState);
             }
         } break;
+#ifdef VK_USE_PLATFORM_SCI
+
+        // No Validation code for VkExportFenceSciSyncInfoNV structure members  -- Covers VUID-VkExportFenceSciSyncInfoNV-sType-sType
+#endif // VK_USE_PLATFORM_SCI
+#ifdef VK_USE_PLATFORM_SCI
+
+        // No Validation code for VkExportSemaphoreSciSyncInfoNV structure members  -- Covers VUID-VkExportSemaphoreSciSyncInfoNV-sType-sType
+#endif // VK_USE_PLATFORM_SCI
+#ifdef VK_USE_PLATFORM_SCI
+
+        // Validation code for VkPhysicalDeviceExternalSciSyncFeaturesNV structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_SCI_SYNC_FEATURES_NV: { // Covers VUID-VkPhysicalDeviceExternalSciSyncFeaturesNV-sType-sType
+            if (is_const_param) {
+                VkPhysicalDeviceExternalSciSyncFeaturesNV *structure = (VkPhysicalDeviceExternalSciSyncFeaturesNV *) header;
+                skip |= ValidateBool32("VkPhysicalDeviceExternalSciSyncFeaturesNV", "sciSyncFence", structure->sciSyncFence);
+
+                skip |= ValidateBool32("VkPhysicalDeviceExternalSciSyncFeaturesNV", "sciSyncSemaphore", structure->sciSyncSemaphore);
+
+                skip |= ValidateBool32("VkPhysicalDeviceExternalSciSyncFeaturesNV", "sciSyncImport", structure->sciSyncImport);
+
+                skip |= ValidateBool32("VkPhysicalDeviceExternalSciSyncFeaturesNV", "sciSyncExport", structure->sciSyncExport);
+            }
+        } break;
+#endif // VK_USE_PLATFORM_SCI
+#ifdef VK_USE_PLATFORM_SCI
+
+        // No Validation code for VkExportMemorySciBufInfoNV structure members  -- Covers VUID-VkExportMemorySciBufInfoNV-sType-sType
+#endif // VK_USE_PLATFORM_SCI
+#ifdef VK_USE_PLATFORM_SCI
+
+        // Validation code for VkImportMemorySciBufInfoNV structure members
+        case VK_STRUCTURE_TYPE_IMPORT_MEMORY_SCI_BUF_INFO_NV: { // Covers VUID-VkImportMemorySciBufInfoNV-sType-sType
+            if (is_const_param) {
+                VkImportMemorySciBufInfoNV *structure = (VkImportMemorySciBufInfoNV *) header;
+                skip |= ValidateFlags("VkImportMemorySciBufInfoNV", "handleType", "VkExternalMemoryHandleTypeFlagBits", AllVkExternalMemoryHandleTypeFlagBits, structure->handleType, kRequiredSingleBit, "VUID-VkImportMemorySciBufInfoNV-handleType-parameter", "VUID-VkImportMemorySciBufInfoNV-handleType-parameter");
+            }
+        } break;
+#endif // VK_USE_PLATFORM_SCI
+#ifdef VK_USE_PLATFORM_SCI
+
+        // Validation code for VkPhysicalDeviceExternalMemorySciBufFeaturesNV structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_MEMORY_SCI_BUF_FEATURES_NV: { // Covers VUID-VkPhysicalDeviceExternalMemorySciBufFeaturesNV-sType-sType
+            if (is_const_param) {
+                VkPhysicalDeviceExternalMemorySciBufFeaturesNV *structure = (VkPhysicalDeviceExternalMemorySciBufFeaturesNV *) header;
+                skip |= ValidateBool32("VkPhysicalDeviceExternalMemorySciBufFeaturesNV", "sciBufImport", structure->sciBufImport);
+
+                skip |= ValidateBool32("VkPhysicalDeviceExternalMemorySciBufFeaturesNV", "sciBufExport", structure->sciBufExport);
+            }
+        } break;
+#endif // VK_USE_PLATFORM_SCI
 
         // Validation code for VkPhysicalDeviceExtendedDynamicState2FeaturesEXT structure members
         case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_2_FEATURES_EXT: { // Covers VUID-VkPhysicalDeviceExtendedDynamicState2FeaturesEXT-sType-sType
@@ -1180,6 +2630,40 @@ bool StatelessValidation::ValidatePnextStructContents(const char *api_name, cons
                 skip |= ValidateBool32Array("VkPipelineColorWriteCreateInfoEXT", "attachmentCount", "pColorWriteEnables", structure->attachmentCount, structure->pColorWriteEnables, false, true);
             }
         } break;
+
+        // No Validation code for VkApplicationParametersEXT structure members  -- Covers VUID-VkApplicationParametersEXT-sType-sType
+#ifdef VK_USE_PLATFORM_SCI
+
+        // Validation code for VkPhysicalDeviceExternalSciSync2FeaturesNV structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_SCI_SYNC_2_FEATURES_NV: { // Covers VUID-VkPhysicalDeviceExternalSciSync2FeaturesNV-sType-sType
+            if (is_const_param) {
+                VkPhysicalDeviceExternalSciSync2FeaturesNV *structure = (VkPhysicalDeviceExternalSciSync2FeaturesNV *) header;
+                skip |= ValidateBool32("VkPhysicalDeviceExternalSciSync2FeaturesNV", "sciSyncFence", structure->sciSyncFence);
+
+                skip |= ValidateBool32("VkPhysicalDeviceExternalSciSync2FeaturesNV", "sciSyncSemaphore2", structure->sciSyncSemaphore2);
+
+                skip |= ValidateBool32("VkPhysicalDeviceExternalSciSync2FeaturesNV", "sciSyncImport", structure->sciSyncImport);
+
+                skip |= ValidateBool32("VkPhysicalDeviceExternalSciSync2FeaturesNV", "sciSyncExport", structure->sciSyncExport);
+            }
+        } break;
+#endif // VK_USE_PLATFORM_SCI
+#ifdef VK_USE_PLATFORM_SCI
+
+        // Validation code for VkSemaphoreSciSyncCreateInfoNV structure members
+        case VK_STRUCTURE_TYPE_SEMAPHORE_SCI_SYNC_CREATE_INFO_NV: { // Covers VUID-VkSemaphoreSciSyncCreateInfoNV-sType-sType
+            if (is_const_param) {
+                VkSemaphoreSciSyncCreateInfoNV *structure = (VkSemaphoreSciSyncCreateInfoNV *) header;
+                skip |= ValidateRequiredHandle("VkSemaphoreSciSyncCreateInfoNV", "semaphorePool", structure->semaphorePool);
+
+                skip |= ValidateRequiredPointer("VkSemaphoreSciSyncCreateInfoNV", "pFence", structure->pFence, "VUID-VkSemaphoreSciSyncCreateInfoNV-pFence-parameter");
+            }
+        } break;
+#endif // VK_USE_PLATFORM_SCI
+#ifdef VK_USE_PLATFORM_SCI
+
+        // No Validation code for VkDeviceSemaphoreSciSyncPoolReservationCreateInfoNV structure members  -- Covers VUID-VkDeviceSemaphoreSciSyncPoolReservationCreateInfoNV-sType-sType
+#endif // VK_USE_PLATFORM_SCI
 #ifdef VK_USE_PLATFORM_SCREEN_QNX
 
         // No Validation code for VkScreenBufferFormatPropertiesQNX structure members  -- Covers VUID-VkScreenBufferFormatPropertiesQNX-sType-sType
@@ -1220,13 +2704,15 @@ bool StatelessValidation::PreCallValidateCreateInstance(
 
         skip |= ValidateStructPnext("vkCreateInstance", "pCreateInfo->pNext", "VkDebugUtilsMessengerCreateInfoEXT, VkValidationFeaturesEXT, VkInstanceLayerSettingsEXT", pCreateInfo->pNext, allowed_structs_VkInstanceCreateInfo.size(), allowed_structs_VkInstanceCreateInfo.data(), GeneratedVulkanHeaderVersion, "VUID-VkInstanceCreateInfo-pNext-pNext", "VUID-VkInstanceCreateInfo-sType-unique", false, true);
 
-        skip |= ValidateFlags("vkCreateInstance", "pCreateInfo->flags", "VkInstanceCreateFlagBits", AllVkInstanceCreateFlagBits, pCreateInfo->flags, kOptionalFlags, kVUIDUndefined);
+        skip |= ValidateReservedFlags("vkCreateInstance", "pCreateInfo->flags", pCreateInfo->flags, "VUID-VkInstanceCreateInfo-flags-zerobitmask");
 
         skip |= ValidateStructType("vkCreateInstance", "pCreateInfo->pApplicationInfo", "VK_STRUCTURE_TYPE_APPLICATION_INFO", pCreateInfo->pApplicationInfo, VK_STRUCTURE_TYPE_APPLICATION_INFO, false, "VUID-VkInstanceCreateInfo-pApplicationInfo-parameter", "VUID-VkApplicationInfo-sType-sType");
 
         if (pCreateInfo->pApplicationInfo != nullptr)
         {
-            skip |= ValidateStructPnext("vkCreateInstance", "pCreateInfo->pApplicationInfo->pNext", nullptr, pCreateInfo->pApplicationInfo->pNext, 0, nullptr, GeneratedVulkanHeaderVersion, "VUID-VkApplicationInfo-pNext-pNext", "VUID-VkApplicationInfo-sType-unique", false, true);
+            constexpr std::array allowed_structs_VkApplicationInfo = { VK_STRUCTURE_TYPE_APPLICATION_PARAMETERS_EXT };
+
+            skip |= ValidateStructPnext("vkCreateInstance", "pCreateInfo->pApplicationInfo->pNext", "VkApplicationParametersEXT", pCreateInfo->pApplicationInfo->pNext, allowed_structs_VkApplicationInfo.size(), allowed_structs_VkApplicationInfo.data(), GeneratedVulkanHeaderVersion, "VUID-VkApplicationInfo-pNext-pNext", "VUID-VkApplicationInfo-sType-unique", false, true);
         }
 
         skip |= ValidateStringArray("vkCreateInstance", "pCreateInfo->enabledLayerCount", "pCreateInfo->ppEnabledLayerNames", pCreateInfo->enabledLayerCount, pCreateInfo->ppEnabledLayerNames, false, true, kVUIDUndefined, "VUID-VkInstanceCreateInfo-ppEnabledLayerNames-parameter");
@@ -1354,9 +2840,9 @@ bool StatelessValidation::PreCallValidateCreateDevice(
     skip |= ValidateStructType("vkCreateDevice", "pCreateInfo", "VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO", pCreateInfo, VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO, true, "VUID-vkCreateDevice-pCreateInfo-parameter", "VUID-VkDeviceCreateInfo-sType-sType");
     if (pCreateInfo != nullptr)
     {
-        constexpr std::array allowed_structs_VkDeviceCreateInfo = { VK_STRUCTURE_TYPE_DEVICE_GROUP_DEVICE_CREATE_INFO, VK_STRUCTURE_TYPE_DEVICE_OBJECT_RESERVATION_CREATE_INFO, VK_STRUCTURE_TYPE_DEVICE_PRIVATE_DATA_CREATE_INFO, VK_STRUCTURE_TYPE_FAULT_CALLBACK_INFO, VK_STRUCTURE_TYPE_PERFORMANCE_QUERY_RESERVATION_INFO_KHR, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_16BIT_STORAGE_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_4444_FORMATS_FEATURES_EXT, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_8BIT_STORAGE_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ASTC_DECODE_FEATURES_EXT, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BLEND_OPERATION_ADVANCED_FEATURES_EXT, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COLOR_WRITE_ENABLE_FEATURES_EXT, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_CUSTOM_BORDER_COLOR_FEATURES_EXT, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DEPTH_CLIP_ENABLE_FEATURES_EXT, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_2_FEATURES_EXT, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_MEMORY_SCREEN_BUFFER_FEATURES_QNX, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADER_INTERLOCK_FEATURES_EXT, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_FEATURES_KHR, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_ROBUSTNESS_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGELESS_FRAMEBUFFER_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INDEX_TYPE_UINT8_FEATURES_EXT, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INLINE_UNIFORM_BLOCK_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_LINE_RASTERIZATION_FEATURES_EXT, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_4_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PERFORMANCE_QUERY_FEATURES_KHR, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PIPELINE_CREATION_CACHE_CONTROL_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRIVATE_DATA_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROTECTED_MEMORY_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_YCBCR_CONVERSION_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SCALAR_BLOCK_LAYOUT_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SEPARATE_DEPTH_STENCIL_LAYOUTS_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_FLOAT_FEATURES_EXT, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_INT64_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_CLOCK_FEATURES_KHR, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DEMOTE_TO_HELPER_INVOCATION_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DRAW_PARAMETERS_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_IMAGE_ATOMIC_INT64_FEATURES_EXT, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_INTEGER_DOT_PRODUCT_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_SUBGROUP_EXTENDED_TYPES_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_TERMINATE_INVOCATION_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_SIZE_CONTROL_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TEXEL_BUFFER_ALIGNMENT_FEATURES_EXT, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TEXTURE_COMPRESSION_ASTC_HDR_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_UNIFORM_BUFFER_STANDARD_LAYOUT_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VARIABLE_POINTERS_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_ATTRIBUTE_DIVISOR_FEATURES_EXT, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_INPUT_DYNAMIC_STATE_FEATURES_EXT, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_MEMORY_MODEL_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_SC_1_0_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_YCBCR_2_PLANE_444_FORMATS_FEATURES_EXT, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_YCBCR_IMAGE_ARRAYS_FEATURES_EXT, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ZERO_INITIALIZE_WORKGROUP_MEMORY_FEATURES };
+        constexpr std::array allowed_structs_VkDeviceCreateInfo = { VK_STRUCTURE_TYPE_APPLICATION_PARAMETERS_EXT, VK_STRUCTURE_TYPE_DEVICE_GROUP_DEVICE_CREATE_INFO, VK_STRUCTURE_TYPE_DEVICE_OBJECT_RESERVATION_CREATE_INFO, VK_STRUCTURE_TYPE_DEVICE_PRIVATE_DATA_CREATE_INFO, VK_STRUCTURE_TYPE_DEVICE_SEMAPHORE_SCI_SYNC_POOL_RESERVATION_CREATE_INFO_NV, VK_STRUCTURE_TYPE_FAULT_CALLBACK_INFO, VK_STRUCTURE_TYPE_PERFORMANCE_QUERY_RESERVATION_INFO_KHR, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_16BIT_STORAGE_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_4444_FORMATS_FEATURES_EXT, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_8BIT_STORAGE_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ASTC_DECODE_FEATURES_EXT, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BLEND_OPERATION_ADVANCED_FEATURES_EXT, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COLOR_WRITE_ENABLE_FEATURES_EXT, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_CUSTOM_BORDER_COLOR_FEATURES_EXT, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DEPTH_CLIP_ENABLE_FEATURES_EXT, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_2_FEATURES_EXT, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_MEMORY_SCI_BUF_FEATURES_NV, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_MEMORY_SCREEN_BUFFER_FEATURES_QNX, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_SCI_SYNC_2_FEATURES_NV, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_SCI_SYNC_FEATURES_NV, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADER_INTERLOCK_FEATURES_EXT, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_FEATURES_KHR, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_ROBUSTNESS_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGELESS_FRAMEBUFFER_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INDEX_TYPE_UINT8_FEATURES_EXT, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INLINE_UNIFORM_BLOCK_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_LINE_RASTERIZATION_FEATURES_EXT, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_4_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PERFORMANCE_QUERY_FEATURES_KHR, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PIPELINE_CREATION_CACHE_CONTROL_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRIVATE_DATA_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROTECTED_MEMORY_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_YCBCR_CONVERSION_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SCALAR_BLOCK_LAYOUT_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SEPARATE_DEPTH_STENCIL_LAYOUTS_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_FLOAT_FEATURES_EXT, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_INT64_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_CLOCK_FEATURES_KHR, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DEMOTE_TO_HELPER_INVOCATION_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DRAW_PARAMETERS_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_IMAGE_ATOMIC_INT64_FEATURES_EXT, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_INTEGER_DOT_PRODUCT_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_SUBGROUP_EXTENDED_TYPES_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_TERMINATE_INVOCATION_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_SIZE_CONTROL_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TEXEL_BUFFER_ALIGNMENT_FEATURES_EXT, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TEXTURE_COMPRESSION_ASTC_HDR_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_UNIFORM_BUFFER_STANDARD_LAYOUT_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VARIABLE_POINTERS_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_ATTRIBUTE_DIVISOR_FEATURES_EXT, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_INPUT_DYNAMIC_STATE_FEATURES_EXT, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_MEMORY_MODEL_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_SC_1_0_FEATURES, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_YCBCR_2_PLANE_444_FORMATS_FEATURES_EXT, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_YCBCR_IMAGE_ARRAYS_FEATURES_EXT, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ZERO_INITIALIZE_WORKGROUP_MEMORY_FEATURES };
 
-        skip |= ValidateStructPnext("vkCreateDevice", "pCreateInfo->pNext", "VkDeviceGroupDeviceCreateInfo, VkDeviceObjectReservationCreateInfo, VkDevicePrivateDataCreateInfo, VkFaultCallbackInfo, VkPerformanceQueryReservationInfoKHR, VkPhysicalDevice16BitStorageFeatures, VkPhysicalDevice4444FormatsFeaturesEXT, VkPhysicalDevice8BitStorageFeatures, VkPhysicalDeviceASTCDecodeFeaturesEXT, VkPhysicalDeviceBlendOperationAdvancedFeaturesEXT, VkPhysicalDeviceBufferDeviceAddressFeatures, VkPhysicalDeviceColorWriteEnableFeaturesEXT, VkPhysicalDeviceCustomBorderColorFeaturesEXT, VkPhysicalDeviceDepthClipEnableFeaturesEXT, VkPhysicalDeviceDescriptorIndexingFeatures, VkPhysicalDeviceDynamicRenderingFeatures, VkPhysicalDeviceExtendedDynamicState2FeaturesEXT, VkPhysicalDeviceExtendedDynamicStateFeaturesEXT, VkPhysicalDeviceExternalMemoryScreenBufferFeaturesQNX, VkPhysicalDeviceFeatures2, VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT, VkPhysicalDeviceFragmentShadingRateFeaturesKHR, VkPhysicalDeviceHostQueryResetFeatures, VkPhysicalDeviceImageRobustnessFeatures, VkPhysicalDeviceImagelessFramebufferFeatures, VkPhysicalDeviceIndexTypeUint8FeaturesEXT, VkPhysicalDeviceInlineUniformBlockFeatures, VkPhysicalDeviceLineRasterizationFeaturesEXT, VkPhysicalDeviceMaintenance4Features, VkPhysicalDeviceMultiviewFeatures, VkPhysicalDevicePerformanceQueryFeaturesKHR, VkPhysicalDevicePipelineCreationCacheControlFeatures, VkPhysicalDevicePrivateDataFeatures, VkPhysicalDeviceProtectedMemoryFeatures, VkPhysicalDeviceRobustness2FeaturesEXT, VkPhysicalDeviceSamplerYcbcrConversionFeatures, VkPhysicalDeviceScalarBlockLayoutFeatures, VkPhysicalDeviceSeparateDepthStencilLayoutsFeatures, VkPhysicalDeviceShaderAtomicFloatFeaturesEXT, VkPhysicalDeviceShaderAtomicInt64Features, VkPhysicalDeviceShaderClockFeaturesKHR, VkPhysicalDeviceShaderDemoteToHelperInvocationFeatures, VkPhysicalDeviceShaderDrawParametersFeatures, VkPhysicalDeviceShaderFloat16Int8Features, VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT, VkPhysicalDeviceShaderIntegerDotProductFeatures, VkPhysicalDeviceShaderSubgroupExtendedTypesFeatures, VkPhysicalDeviceShaderTerminateInvocationFeatures, VkPhysicalDeviceSubgroupSizeControlFeatures, VkPhysicalDeviceSynchronization2Features, VkPhysicalDeviceTexelBufferAlignmentFeaturesEXT, VkPhysicalDeviceTextureCompressionASTCHDRFeatures, VkPhysicalDeviceTimelineSemaphoreFeatures, VkPhysicalDeviceUniformBufferStandardLayoutFeatures, VkPhysicalDeviceVariablePointersFeatures, VkPhysicalDeviceVertexAttributeDivisorFeaturesEXT, VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT, VkPhysicalDeviceVulkan11Features, VkPhysicalDeviceVulkan12Features, VkPhysicalDeviceVulkan13Features, VkPhysicalDeviceVulkanMemoryModelFeatures, VkPhysicalDeviceVulkanSC10Features, VkPhysicalDeviceYcbcr2Plane444FormatsFeaturesEXT, VkPhysicalDeviceYcbcrImageArraysFeaturesEXT, VkPhysicalDeviceZeroInitializeWorkgroupMemoryFeatures", pCreateInfo->pNext, allowed_structs_VkDeviceCreateInfo.size(), allowed_structs_VkDeviceCreateInfo.data(), GeneratedVulkanHeaderVersion, "VUID-VkDeviceCreateInfo-pNext-pNext", "VUID-VkDeviceCreateInfo-sType-unique", true, true);
+        skip |= ValidateStructPnext("vkCreateDevice", "pCreateInfo->pNext", "VkApplicationParametersEXT, VkDeviceGroupDeviceCreateInfo, VkDeviceObjectReservationCreateInfo, VkDevicePrivateDataCreateInfo, VkDeviceSemaphoreSciSyncPoolReservationCreateInfoNV, VkFaultCallbackInfo, VkPerformanceQueryReservationInfoKHR, VkPhysicalDevice16BitStorageFeatures, VkPhysicalDevice4444FormatsFeaturesEXT, VkPhysicalDevice8BitStorageFeatures, VkPhysicalDeviceASTCDecodeFeaturesEXT, VkPhysicalDeviceBlendOperationAdvancedFeaturesEXT, VkPhysicalDeviceBufferDeviceAddressFeatures, VkPhysicalDeviceColorWriteEnableFeaturesEXT, VkPhysicalDeviceCustomBorderColorFeaturesEXT, VkPhysicalDeviceDepthClipEnableFeaturesEXT, VkPhysicalDeviceDescriptorIndexingFeatures, VkPhysicalDeviceDynamicRenderingFeatures, VkPhysicalDeviceExtendedDynamicState2FeaturesEXT, VkPhysicalDeviceExtendedDynamicStateFeaturesEXT, VkPhysicalDeviceExternalMemorySciBufFeaturesNV, VkPhysicalDeviceExternalMemoryScreenBufferFeaturesQNX, VkPhysicalDeviceExternalSciSync2FeaturesNV, VkPhysicalDeviceExternalSciSyncFeaturesNV, VkPhysicalDeviceFeatures2, VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT, VkPhysicalDeviceFragmentShadingRateFeaturesKHR, VkPhysicalDeviceHostQueryResetFeatures, VkPhysicalDeviceImageRobustnessFeatures, VkPhysicalDeviceImagelessFramebufferFeatures, VkPhysicalDeviceIndexTypeUint8FeaturesEXT, VkPhysicalDeviceInlineUniformBlockFeatures, VkPhysicalDeviceLineRasterizationFeaturesEXT, VkPhysicalDeviceMaintenance4Features, VkPhysicalDeviceMultiviewFeatures, VkPhysicalDevicePerformanceQueryFeaturesKHR, VkPhysicalDevicePipelineCreationCacheControlFeatures, VkPhysicalDevicePrivateDataFeatures, VkPhysicalDeviceProtectedMemoryFeatures, VkPhysicalDeviceRobustness2FeaturesEXT, VkPhysicalDeviceSamplerYcbcrConversionFeatures, VkPhysicalDeviceScalarBlockLayoutFeatures, VkPhysicalDeviceSeparateDepthStencilLayoutsFeatures, VkPhysicalDeviceShaderAtomicFloatFeaturesEXT, VkPhysicalDeviceShaderAtomicInt64Features, VkPhysicalDeviceShaderClockFeaturesKHR, VkPhysicalDeviceShaderDemoteToHelperInvocationFeatures, VkPhysicalDeviceShaderDrawParametersFeatures, VkPhysicalDeviceShaderFloat16Int8Features, VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT, VkPhysicalDeviceShaderIntegerDotProductFeatures, VkPhysicalDeviceShaderSubgroupExtendedTypesFeatures, VkPhysicalDeviceShaderTerminateInvocationFeatures, VkPhysicalDeviceSubgroupSizeControlFeatures, VkPhysicalDeviceSynchronization2Features, VkPhysicalDeviceTexelBufferAlignmentFeaturesEXT, VkPhysicalDeviceTextureCompressionASTCHDRFeatures, VkPhysicalDeviceTimelineSemaphoreFeatures, VkPhysicalDeviceUniformBufferStandardLayoutFeatures, VkPhysicalDeviceVariablePointersFeatures, VkPhysicalDeviceVertexAttributeDivisorFeaturesEXT, VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT, VkPhysicalDeviceVulkan11Features, VkPhysicalDeviceVulkan12Features, VkPhysicalDeviceVulkan13Features, VkPhysicalDeviceVulkanMemoryModelFeatures, VkPhysicalDeviceVulkanSC10Features, VkPhysicalDeviceYcbcr2Plane444FormatsFeaturesEXT, VkPhysicalDeviceYcbcrImageArraysFeaturesEXT, VkPhysicalDeviceZeroInitializeWorkgroupMemoryFeatures", pCreateInfo->pNext, allowed_structs_VkDeviceCreateInfo.size(), allowed_structs_VkDeviceCreateInfo.data(), GeneratedVulkanHeaderVersion, "VUID-VkDeviceCreateInfo-pNext-pNext", "VUID-VkDeviceCreateInfo-sType-unique", true, true);
 
         skip |= ValidateReservedFlags("vkCreateDevice", "pCreateInfo->flags", pCreateInfo->flags, "VUID-VkDeviceCreateInfo-flags-zerobitmask");
 
@@ -1571,9 +3057,9 @@ bool StatelessValidation::PreCallValidateAllocateMemory(
     skip |= ValidateStructType("vkAllocateMemory", "pAllocateInfo", "VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO", pAllocateInfo, VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO, true, "VUID-vkAllocateMemory-pAllocateInfo-parameter", "VUID-VkMemoryAllocateInfo-sType-sType");
     if (pAllocateInfo != nullptr)
     {
-        constexpr std::array allowed_structs_VkMemoryAllocateInfo = { VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO, VK_STRUCTURE_TYPE_IMPORT_MEMORY_FD_INFO_KHR, VK_STRUCTURE_TYPE_IMPORT_MEMORY_HOST_POINTER_INFO_EXT, VK_STRUCTURE_TYPE_IMPORT_SCREEN_BUFFER_INFO_QNX, VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO, VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO, VK_STRUCTURE_TYPE_MEMORY_OPAQUE_CAPTURE_ADDRESS_ALLOCATE_INFO };
+        constexpr std::array allowed_structs_VkMemoryAllocateInfo = { VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO, VK_STRUCTURE_TYPE_EXPORT_MEMORY_SCI_BUF_INFO_NV, VK_STRUCTURE_TYPE_IMPORT_MEMORY_FD_INFO_KHR, VK_STRUCTURE_TYPE_IMPORT_MEMORY_HOST_POINTER_INFO_EXT, VK_STRUCTURE_TYPE_IMPORT_MEMORY_SCI_BUF_INFO_NV, VK_STRUCTURE_TYPE_IMPORT_SCREEN_BUFFER_INFO_QNX, VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO, VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO, VK_STRUCTURE_TYPE_MEMORY_OPAQUE_CAPTURE_ADDRESS_ALLOCATE_INFO };
 
-        skip |= ValidateStructPnext("vkAllocateMemory", "pAllocateInfo->pNext", "VkExportMemoryAllocateInfo, VkImportMemoryFdInfoKHR, VkImportMemoryHostPointerInfoEXT, VkImportScreenBufferInfoQNX, VkMemoryAllocateFlagsInfo, VkMemoryDedicatedAllocateInfo, VkMemoryOpaqueCaptureAddressAllocateInfo", pAllocateInfo->pNext, allowed_structs_VkMemoryAllocateInfo.size(), allowed_structs_VkMemoryAllocateInfo.data(), GeneratedVulkanHeaderVersion, "VUID-VkMemoryAllocateInfo-pNext-pNext", "VUID-VkMemoryAllocateInfo-sType-unique", false, true);
+        skip |= ValidateStructPnext("vkAllocateMemory", "pAllocateInfo->pNext", "VkExportMemoryAllocateInfo, VkExportMemorySciBufInfoNV, VkImportMemoryFdInfoKHR, VkImportMemoryHostPointerInfoEXT, VkImportMemorySciBufInfoNV, VkImportScreenBufferInfoQNX, VkMemoryAllocateFlagsInfo, VkMemoryDedicatedAllocateInfo, VkMemoryOpaqueCaptureAddressAllocateInfo", pAllocateInfo->pNext, allowed_structs_VkMemoryAllocateInfo.size(), allowed_structs_VkMemoryAllocateInfo.data(), GeneratedVulkanHeaderVersion, "VUID-VkMemoryAllocateInfo-pNext-pNext", "VUID-VkMemoryAllocateInfo-sType-unique", false, true);
     }
     if (pAllocator != nullptr) {
         skip |= LogError(instance, "VUID-vkAllocateMemory-pAllocator-null", "vkAllocateMemory(): pAllocator must be NULL");
@@ -1709,9 +3195,9 @@ bool StatelessValidation::PreCallValidateCreateFence(
     skip |= ValidateStructType("vkCreateFence", "pCreateInfo", "VK_STRUCTURE_TYPE_FENCE_CREATE_INFO", pCreateInfo, VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, true, "VUID-vkCreateFence-pCreateInfo-parameter", "VUID-VkFenceCreateInfo-sType-sType");
     if (pCreateInfo != nullptr)
     {
-        constexpr std::array allowed_structs_VkFenceCreateInfo = { VK_STRUCTURE_TYPE_EXPORT_FENCE_CREATE_INFO };
+        constexpr std::array allowed_structs_VkFenceCreateInfo = { VK_STRUCTURE_TYPE_EXPORT_FENCE_CREATE_INFO, VK_STRUCTURE_TYPE_EXPORT_FENCE_SCI_SYNC_INFO_NV };
 
-        skip |= ValidateStructPnext("vkCreateFence", "pCreateInfo->pNext", "VkExportFenceCreateInfo", pCreateInfo->pNext, allowed_structs_VkFenceCreateInfo.size(), allowed_structs_VkFenceCreateInfo.data(), GeneratedVulkanHeaderVersion, "VUID-VkFenceCreateInfo-pNext-pNext", "VUID-VkFenceCreateInfo-sType-unique", false, true);
+        skip |= ValidateStructPnext("vkCreateFence", "pCreateInfo->pNext", "VkExportFenceCreateInfo, VkExportFenceSciSyncInfoNV", pCreateInfo->pNext, allowed_structs_VkFenceCreateInfo.size(), allowed_structs_VkFenceCreateInfo.data(), GeneratedVulkanHeaderVersion, "VUID-VkFenceCreateInfo-pNext-pNext", "VUID-VkFenceCreateInfo-sType-unique", false, true);
 
         skip |= ValidateFlags("vkCreateFence", "pCreateInfo->flags", "VkFenceCreateFlagBits", AllVkFenceCreateFlagBits, pCreateInfo->flags, kOptionalFlags, "VUID-VkFenceCreateInfo-flags-parameter");
     }
@@ -1771,9 +3257,9 @@ bool StatelessValidation::PreCallValidateCreateSemaphore(
     skip |= ValidateStructType("vkCreateSemaphore", "pCreateInfo", "VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO", pCreateInfo, VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, true, "VUID-vkCreateSemaphore-pCreateInfo-parameter", "VUID-VkSemaphoreCreateInfo-sType-sType");
     if (pCreateInfo != nullptr)
     {
-        constexpr std::array allowed_structs_VkSemaphoreCreateInfo = { VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO, VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO };
+        constexpr std::array allowed_structs_VkSemaphoreCreateInfo = { VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO, VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_SCI_SYNC_INFO_NV, VK_STRUCTURE_TYPE_SEMAPHORE_SCI_SYNC_CREATE_INFO_NV, VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO };
 
-        skip |= ValidateStructPnext("vkCreateSemaphore", "pCreateInfo->pNext", "VkExportSemaphoreCreateInfo, VkSemaphoreTypeCreateInfo", pCreateInfo->pNext, allowed_structs_VkSemaphoreCreateInfo.size(), allowed_structs_VkSemaphoreCreateInfo.data(), GeneratedVulkanHeaderVersion, "VUID-VkSemaphoreCreateInfo-pNext-pNext", "VUID-VkSemaphoreCreateInfo-sType-unique", false, true);
+        skip |= ValidateStructPnext("vkCreateSemaphore", "pCreateInfo->pNext", "VkExportSemaphoreCreateInfo, VkExportSemaphoreSciSyncInfoNV, VkSemaphoreSciSyncCreateInfoNV, VkSemaphoreTypeCreateInfo", pCreateInfo->pNext, allowed_structs_VkSemaphoreCreateInfo.size(), allowed_structs_VkSemaphoreCreateInfo.data(), GeneratedVulkanHeaderVersion, "VUID-VkSemaphoreCreateInfo-pNext-pNext", "VUID-VkSemaphoreCreateInfo-sType-unique", false, true);
 
         skip |= ValidateReservedFlags("vkCreateSemaphore", "pCreateInfo->flags", pCreateInfo->flags, "VUID-VkSemaphoreCreateInfo-flags-zerobitmask");
     }
@@ -2047,7 +3533,7 @@ bool StatelessValidation::PreCallValidateCreateImageView(
 
         skip |= ValidateStructPnext("vkCreateImageView", "pCreateInfo->pNext", "VkImageViewASTCDecodeModeEXT, VkImageViewUsageCreateInfo, VkSamplerYcbcrConversionInfo", pCreateInfo->pNext, allowed_structs_VkImageViewCreateInfo.size(), allowed_structs_VkImageViewCreateInfo.data(), GeneratedVulkanHeaderVersion, "VUID-VkImageViewCreateInfo-pNext-pNext", "VUID-VkImageViewCreateInfo-sType-unique", false, true);
 
-        skip |= ValidateFlags("vkCreateImageView", "pCreateInfo->flags", "VkImageViewCreateFlagBits", AllVkImageViewCreateFlagBits, pCreateInfo->flags, kOptionalFlags, kVUIDUndefined);
+        skip |= ValidateReservedFlags("vkCreateImageView", "pCreateInfo->flags", pCreateInfo->flags, "VUID-VkImageViewCreateInfo-flags-zerobitmask");
 
         skip |= ValidateRequiredHandle("vkCreateImageView", "pCreateInfo->image", pCreateInfo->image);
 
@@ -2235,7 +3721,7 @@ bool StatelessValidation::PreCallValidateCreatePipelineLayout(
     {
         skip |= ValidateStructPnext("vkCreatePipelineLayout", "pCreateInfo->pNext", nullptr, pCreateInfo->pNext, 0, nullptr, GeneratedVulkanHeaderVersion, "VUID-VkPipelineLayoutCreateInfo-pNext-pNext", kVUIDUndefined, false, true);
 
-        skip |= ValidateFlags("vkCreatePipelineLayout", "pCreateInfo->flags", "VkPipelineLayoutCreateFlagBits", AllVkPipelineLayoutCreateFlagBits, pCreateInfo->flags, kOptionalFlags, kVUIDUndefined);
+        skip |= ValidateReservedFlags("vkCreatePipelineLayout", "pCreateInfo->flags", pCreateInfo->flags, "VUID-VkPipelineLayoutCreateInfo-flags-zerobitmask");
 
         skip |= ValidateArray("vkCreatePipelineLayout", "pCreateInfo->pushConstantRangeCount", "pCreateInfo->pPushConstantRanges", pCreateInfo->pushConstantRangeCount, &pCreateInfo->pPushConstantRanges, false, true, kVUIDUndefined, "VUID-VkPipelineLayoutCreateInfo-pPushConstantRanges-parameter");
 
@@ -2279,7 +3765,7 @@ bool StatelessValidation::PreCallValidateCreateSampler(
 
         skip |= ValidateStructPnext("vkCreateSampler", "pCreateInfo->pNext", "VkSamplerCustomBorderColorCreateInfoEXT, VkSamplerReductionModeCreateInfo, VkSamplerYcbcrConversionInfo", pCreateInfo->pNext, allowed_structs_VkSamplerCreateInfo.size(), allowed_structs_VkSamplerCreateInfo.data(), GeneratedVulkanHeaderVersion, "VUID-VkSamplerCreateInfo-pNext-pNext", "VUID-VkSamplerCreateInfo-sType-unique", false, true);
 
-        skip |= ValidateFlags("vkCreateSampler", "pCreateInfo->flags", "VkSamplerCreateFlagBits", AllVkSamplerCreateFlagBits, pCreateInfo->flags, kOptionalFlags, kVUIDUndefined);
+        skip |= ValidateReservedFlags("vkCreateSampler", "pCreateInfo->flags", pCreateInfo->flags, "VUID-VkSamplerCreateInfo-flags-zerobitmask");
 
         skip |= ValidateRangedEnum("vkCreateSampler", "pCreateInfo->magFilter", "VkFilter", pCreateInfo->magFilter, "VUID-VkSamplerCreateInfo-magFilter-parameter");
 
@@ -2525,7 +4011,7 @@ bool StatelessValidation::PreCallValidateCreateRenderPass(
 
         skip |= ValidateStructPnext("vkCreateRenderPass", "pCreateInfo->pNext", "VkRenderPassInputAttachmentAspectCreateInfo, VkRenderPassMultiviewCreateInfo", pCreateInfo->pNext, allowed_structs_VkRenderPassCreateInfo.size(), allowed_structs_VkRenderPassCreateInfo.data(), GeneratedVulkanHeaderVersion, "VUID-VkRenderPassCreateInfo-pNext-pNext", "VUID-VkRenderPassCreateInfo-sType-unique", false, true);
 
-        skip |= ValidateFlags("vkCreateRenderPass", "pCreateInfo->flags", "VkRenderPassCreateFlagBits", AllVkRenderPassCreateFlagBits, pCreateInfo->flags, kOptionalFlags, kVUIDUndefined);
+        skip |= ValidateReservedFlags("vkCreateRenderPass", "pCreateInfo->flags", pCreateInfo->flags, "VUID-VkRenderPassCreateInfo-flags-zerobitmask");
 
         skip |= ValidateArray("vkCreateRenderPass", "pCreateInfo->attachmentCount", "pCreateInfo->pAttachments", pCreateInfo->attachmentCount, &pCreateInfo->pAttachments, false, true, kVUIDUndefined, "VUID-VkRenderPassCreateInfo-pAttachments-parameter");
 
@@ -2559,7 +4045,7 @@ bool StatelessValidation::PreCallValidateCreateRenderPass(
         {
             for (uint32_t subpassIndex = 0; subpassIndex < pCreateInfo->subpassCount; ++subpassIndex)
             {
-                skip |= ValidateFlags("vkCreateRenderPass", ParameterName("pCreateInfo->pSubpasses[%i].flags", ParameterName::IndexVector{ subpassIndex }), "VkSubpassDescriptionFlagBits", AllVkSubpassDescriptionFlagBits, pCreateInfo->pSubpasses[subpassIndex].flags, kOptionalFlags, kVUIDUndefined);
+                skip |= ValidateReservedFlags("vkCreateRenderPass", ParameterName("pCreateInfo->pSubpasses[%i].flags", ParameterName::IndexVector{ subpassIndex }), pCreateInfo->pSubpasses[subpassIndex].flags, "VUID-VkSubpassDescription-flags-zerobitmask");
 
                 skip |= ValidateRangedEnum("vkCreateRenderPass", ParameterName("pCreateInfo->pSubpasses[%i].pipelineBindPoint", ParameterName::IndexVector{ subpassIndex }), "VkPipelineBindPoint", pCreateInfo->pSubpasses[subpassIndex].pipelineBindPoint, "VUID-VkSubpassDescription-pipelineBindPoint-parameter");
 
@@ -3949,7 +5435,7 @@ bool StatelessValidation::PreCallValidateCreateRenderPass2(
     {
         skip |= ValidateStructPnext("vkCreateRenderPass2", "pCreateInfo->pNext", nullptr, pCreateInfo->pNext, 0, nullptr, GeneratedVulkanHeaderVersion, "VUID-VkRenderPassCreateInfo2-pNext-pNext", kVUIDUndefined, false, true);
 
-        skip |= ValidateFlags("vkCreateRenderPass2", "pCreateInfo->flags", "VkRenderPassCreateFlagBits", AllVkRenderPassCreateFlagBits, pCreateInfo->flags, kOptionalFlags, kVUIDUndefined);
+        skip |= ValidateReservedFlags("vkCreateRenderPass2", "pCreateInfo->flags", pCreateInfo->flags, "VUID-VkRenderPassCreateInfo2-flags-zerobitmask");
 
         skip |= ValidateStructTypeArray("vkCreateRenderPass2", "pCreateInfo->attachmentCount", "pCreateInfo->pAttachments", "VK_STRUCTURE_TYPE_ATTACHMENT_DESCRIPTION_2", pCreateInfo->attachmentCount, pCreateInfo->pAttachments, VK_STRUCTURE_TYPE_ATTACHMENT_DESCRIPTION_2, false, true, "VUID-VkAttachmentDescription2-sType-sType", "VUID-VkRenderPassCreateInfo2-pAttachments-parameter", kVUIDUndefined);
 
@@ -3991,7 +5477,7 @@ bool StatelessValidation::PreCallValidateCreateRenderPass2(
 
                 skip |= ValidateStructPnext("vkCreateRenderPass2", ParameterName("pCreateInfo->pSubpasses[%i].pNext", ParameterName::IndexVector{ subpassIndex }), "VkFragmentShadingRateAttachmentInfoKHR, VkSubpassDescriptionDepthStencilResolve", pCreateInfo->pSubpasses[subpassIndex].pNext, allowed_structs_VkSubpassDescription2.size(), allowed_structs_VkSubpassDescription2.data(), GeneratedVulkanHeaderVersion, "VUID-VkSubpassDescription2-pNext-pNext", "VUID-VkSubpassDescription2-sType-unique", false, true);
 
-                skip |= ValidateFlags("vkCreateRenderPass2", ParameterName("pCreateInfo->pSubpasses[%i].flags", ParameterName::IndexVector{ subpassIndex }), "VkSubpassDescriptionFlagBits", AllVkSubpassDescriptionFlagBits, pCreateInfo->pSubpasses[subpassIndex].flags, kOptionalFlags, kVUIDUndefined);
+                skip |= ValidateReservedFlags("vkCreateRenderPass2", ParameterName("pCreateInfo->pSubpasses[%i].flags", ParameterName::IndexVector{ subpassIndex }), pCreateInfo->pSubpasses[subpassIndex].flags, "VUID-VkSubpassDescription2-flags-zerobitmask");
 
                 skip |= ValidateRangedEnum("vkCreateRenderPass2", ParameterName("pCreateInfo->pSubpasses[%i].pipelineBindPoint", ParameterName::IndexVector{ subpassIndex }), "VkPipelineBindPoint", pCreateInfo->pSubpasses[subpassIndex].pipelineBindPoint, "VUID-VkSubpassDescription2-pipelineBindPoint-parameter");
 
@@ -6015,6 +7501,40 @@ bool StatelessValidation::PreCallValidateCmdSetFragmentShadingRateKHR(
     return skip;
 }
 
+bool StatelessValidation::PreCallValidateCmdRefreshObjectsKHR(
+    VkCommandBuffer                             commandBuffer,
+    const VkRefreshObjectListKHR*               pRefreshObjects) const {
+    bool skip = false;
+    if (!IsExtEnabled(device_extensions.vk_khr_object_refresh)) skip |= OutputExtensionError("vkCmdRefreshObjectsKHR", "VK_KHR_object_refresh");
+    skip |= ValidateStructType("vkCmdRefreshObjectsKHR", "pRefreshObjects", "VK_STRUCTURE_TYPE_REFRESH_OBJECT_LIST_KHR", pRefreshObjects, VK_STRUCTURE_TYPE_REFRESH_OBJECT_LIST_KHR, true, "VUID-vkCmdRefreshObjectsKHR-pRefreshObjects-parameter", "VUID-VkRefreshObjectListKHR-sType-sType");
+    if (pRefreshObjects != nullptr)
+    {
+        skip |= ValidateStructPnext("vkCmdRefreshObjectsKHR", "pRefreshObjects->pNext", nullptr, pRefreshObjects->pNext, 0, nullptr, GeneratedVulkanHeaderVersion, "VUID-VkRefreshObjectListKHR-pNext-pNext", kVUIDUndefined, false, true);
+
+        skip |= ValidateArray("vkCmdRefreshObjectsKHR", "pRefreshObjects->objectCount", "pRefreshObjects->pObjects", pRefreshObjects->objectCount, &pRefreshObjects->pObjects, true, true, "VUID-VkRefreshObjectListKHR-objectCount-arraylength", "VUID-VkRefreshObjectListKHR-pObjects-parameter");
+
+        if (pRefreshObjects->pObjects != nullptr)
+        {
+            for (uint32_t objectIndex = 0; objectIndex < pRefreshObjects->objectCount; ++objectIndex)
+            {
+                skip |= ValidateRangedEnum("vkCmdRefreshObjectsKHR", ParameterName("pRefreshObjects->pObjects[%i].objectType", ParameterName::IndexVector{ objectIndex }), "VkObjectType", pRefreshObjects->pObjects[objectIndex].objectType, "VUID-VkRefreshObjectKHR-objectType-parameter");
+
+                skip |= ValidateReservedFlags("vkCmdRefreshObjectsKHR", ParameterName("pRefreshObjects->pObjects[%i].flags", ParameterName::IndexVector{ objectIndex }), pRefreshObjects->pObjects[objectIndex].flags, "VUID-VkRefreshObjectKHR-flags-zerobitmask");
+            }
+        }
+    }
+    return skip;
+}
+
+bool StatelessValidation::PreCallValidateGetPhysicalDeviceRefreshableObjectTypesKHR(
+    VkPhysicalDevice                            physicalDevice,
+    uint32_t*                                   pRefreshableObjectTypeCount,
+    VkObjectType*                               pRefreshableObjectTypes) const {
+    bool skip = false;
+    skip |= ValidateArray("vkGetPhysicalDeviceRefreshableObjectTypesKHR", "pRefreshableObjectTypeCount", "pRefreshableObjectTypes", pRefreshableObjectTypeCount, &pRefreshableObjectTypes, true, false, false, kVUIDUndefined, "VUID-vkGetPhysicalDeviceRefreshableObjectTypesKHR-pRefreshableObjectTypes-parameter");
+    return skip;
+}
+
 bool StatelessValidation::PreCallValidateCmdSetEvent2KHR(
     VkCommandBuffer                             commandBuffer,
     VkEvent                                     event,
@@ -7267,6 +8787,195 @@ bool StatelessValidation::PreCallValidateCmdSetVertexInputEXT(
     return skip;
 }
 
+#ifdef VK_USE_PLATFORM_SCI
+bool StatelessValidation::PreCallValidateGetFenceSciSyncFenceNV(
+    VkDevice                                    device,
+    const VkFenceGetSciSyncInfoNV*              pGetSciSyncHandleInfo,
+    void*                                       pHandle) const {
+    bool skip = false;
+    if (!(IsExtEnabled(device_extensions.vk_nv_external_sci_sync) || IsExtEnabled(device_extensions.vk_nv_external_sci_sync2))) skip |= OutputExtensionError("vkGetFenceSciSyncFenceNV", "VK_NV_external_sci_sync || VK_NV_external_sci_sync2");
+    skip |= ValidateStructType("vkGetFenceSciSyncFenceNV", "pGetSciSyncHandleInfo", "VK_STRUCTURE_TYPE_FENCE_GET_SCI_SYNC_INFO_NV", pGetSciSyncHandleInfo, VK_STRUCTURE_TYPE_FENCE_GET_SCI_SYNC_INFO_NV, true, "VUID-vkGetFenceSciSyncFenceNV-pGetSciSyncHandleInfo-parameter", "VUID-VkFenceGetSciSyncInfoNV-sType-sType");
+    if (pGetSciSyncHandleInfo != nullptr)
+    {
+        skip |= ValidateStructPnext("vkGetFenceSciSyncFenceNV", "pGetSciSyncHandleInfo->pNext", nullptr, pGetSciSyncHandleInfo->pNext, 0, nullptr, GeneratedVulkanHeaderVersion, "VUID-VkFenceGetSciSyncInfoNV-pNext-pNext", kVUIDUndefined, false, true);
+
+        skip |= ValidateRequiredHandle("vkGetFenceSciSyncFenceNV", "pGetSciSyncHandleInfo->fence", pGetSciSyncHandleInfo->fence);
+
+        skip |= ValidateFlags("vkGetFenceSciSyncFenceNV", "pGetSciSyncHandleInfo->handleType", "VkExternalFenceHandleTypeFlagBits", AllVkExternalFenceHandleTypeFlagBits, pGetSciSyncHandleInfo->handleType, kRequiredSingleBit, "VUID-VkFenceGetSciSyncInfoNV-handleType-parameter", "VUID-VkFenceGetSciSyncInfoNV-handleType-parameter");
+    }
+    skip |= ValidateRequiredPointer("vkGetFenceSciSyncFenceNV", "pHandle", pHandle, "VUID-vkGetFenceSciSyncFenceNV-pHandle-parameter");
+    return skip;
+}
+#endif // VK_USE_PLATFORM_SCI
+
+#ifdef VK_USE_PLATFORM_SCI
+bool StatelessValidation::PreCallValidateGetFenceSciSyncObjNV(
+    VkDevice                                    device,
+    const VkFenceGetSciSyncInfoNV*              pGetSciSyncHandleInfo,
+    void*                                       pHandle) const {
+    bool skip = false;
+    if (!(IsExtEnabled(device_extensions.vk_nv_external_sci_sync) || IsExtEnabled(device_extensions.vk_nv_external_sci_sync2))) skip |= OutputExtensionError("vkGetFenceSciSyncObjNV", "VK_NV_external_sci_sync || VK_NV_external_sci_sync2");
+    skip |= ValidateStructType("vkGetFenceSciSyncObjNV", "pGetSciSyncHandleInfo", "VK_STRUCTURE_TYPE_FENCE_GET_SCI_SYNC_INFO_NV", pGetSciSyncHandleInfo, VK_STRUCTURE_TYPE_FENCE_GET_SCI_SYNC_INFO_NV, true, "VUID-vkGetFenceSciSyncObjNV-pGetSciSyncHandleInfo-parameter", "VUID-VkFenceGetSciSyncInfoNV-sType-sType");
+    if (pGetSciSyncHandleInfo != nullptr)
+    {
+        skip |= ValidateStructPnext("vkGetFenceSciSyncObjNV", "pGetSciSyncHandleInfo->pNext", nullptr, pGetSciSyncHandleInfo->pNext, 0, nullptr, GeneratedVulkanHeaderVersion, "VUID-VkFenceGetSciSyncInfoNV-pNext-pNext", kVUIDUndefined, false, true);
+
+        skip |= ValidateRequiredHandle("vkGetFenceSciSyncObjNV", "pGetSciSyncHandleInfo->fence", pGetSciSyncHandleInfo->fence);
+
+        skip |= ValidateFlags("vkGetFenceSciSyncObjNV", "pGetSciSyncHandleInfo->handleType", "VkExternalFenceHandleTypeFlagBits", AllVkExternalFenceHandleTypeFlagBits, pGetSciSyncHandleInfo->handleType, kRequiredSingleBit, "VUID-VkFenceGetSciSyncInfoNV-handleType-parameter", "VUID-VkFenceGetSciSyncInfoNV-handleType-parameter");
+    }
+    skip |= ValidateRequiredPointer("vkGetFenceSciSyncObjNV", "pHandle", pHandle, "VUID-vkGetFenceSciSyncObjNV-pHandle-parameter");
+    return skip;
+}
+#endif // VK_USE_PLATFORM_SCI
+
+#ifdef VK_USE_PLATFORM_SCI
+bool StatelessValidation::PreCallValidateImportFenceSciSyncFenceNV(
+    VkDevice                                    device,
+    const VkImportFenceSciSyncInfoNV*           pImportFenceSciSyncInfo) const {
+    bool skip = false;
+    if (!(IsExtEnabled(device_extensions.vk_nv_external_sci_sync) || IsExtEnabled(device_extensions.vk_nv_external_sci_sync2))) skip |= OutputExtensionError("vkImportFenceSciSyncFenceNV", "VK_NV_external_sci_sync || VK_NV_external_sci_sync2");
+    skip |= ValidateStructType("vkImportFenceSciSyncFenceNV", "pImportFenceSciSyncInfo", "VK_STRUCTURE_TYPE_IMPORT_FENCE_SCI_SYNC_INFO_NV", pImportFenceSciSyncInfo, VK_STRUCTURE_TYPE_IMPORT_FENCE_SCI_SYNC_INFO_NV, true, "VUID-vkImportFenceSciSyncFenceNV-pImportFenceSciSyncInfo-parameter", "VUID-VkImportFenceSciSyncInfoNV-sType-sType");
+    if (pImportFenceSciSyncInfo != nullptr)
+    {
+        skip |= ValidateStructPnext("vkImportFenceSciSyncFenceNV", "pImportFenceSciSyncInfo->pNext", nullptr, pImportFenceSciSyncInfo->pNext, 0, nullptr, GeneratedVulkanHeaderVersion, "VUID-VkImportFenceSciSyncInfoNV-pNext-pNext", kVUIDUndefined, false, true);
+
+        skip |= ValidateRequiredHandle("vkImportFenceSciSyncFenceNV", "pImportFenceSciSyncInfo->fence", pImportFenceSciSyncInfo->fence);
+
+        skip |= ValidateFlags("vkImportFenceSciSyncFenceNV", "pImportFenceSciSyncInfo->handleType", "VkExternalFenceHandleTypeFlagBits", AllVkExternalFenceHandleTypeFlagBits, pImportFenceSciSyncInfo->handleType, kRequiredSingleBit, "VUID-VkImportFenceSciSyncInfoNV-handleType-parameter", "VUID-VkImportFenceSciSyncInfoNV-handleType-parameter");
+
+        skip |= ValidateRequiredPointer("vkImportFenceSciSyncFenceNV", "pImportFenceSciSyncInfo->handle", pImportFenceSciSyncInfo->handle, "VUID-VkImportFenceSciSyncInfoNV-handle-parameter");
+    }
+    return skip;
+}
+#endif // VK_USE_PLATFORM_SCI
+
+#ifdef VK_USE_PLATFORM_SCI
+bool StatelessValidation::PreCallValidateImportFenceSciSyncObjNV(
+    VkDevice                                    device,
+    const VkImportFenceSciSyncInfoNV*           pImportFenceSciSyncInfo) const {
+    bool skip = false;
+    if (!(IsExtEnabled(device_extensions.vk_nv_external_sci_sync) || IsExtEnabled(device_extensions.vk_nv_external_sci_sync2))) skip |= OutputExtensionError("vkImportFenceSciSyncObjNV", "VK_NV_external_sci_sync || VK_NV_external_sci_sync2");
+    skip |= ValidateStructType("vkImportFenceSciSyncObjNV", "pImportFenceSciSyncInfo", "VK_STRUCTURE_TYPE_IMPORT_FENCE_SCI_SYNC_INFO_NV", pImportFenceSciSyncInfo, VK_STRUCTURE_TYPE_IMPORT_FENCE_SCI_SYNC_INFO_NV, true, "VUID-vkImportFenceSciSyncObjNV-pImportFenceSciSyncInfo-parameter", "VUID-VkImportFenceSciSyncInfoNV-sType-sType");
+    if (pImportFenceSciSyncInfo != nullptr)
+    {
+        skip |= ValidateStructPnext("vkImportFenceSciSyncObjNV", "pImportFenceSciSyncInfo->pNext", nullptr, pImportFenceSciSyncInfo->pNext, 0, nullptr, GeneratedVulkanHeaderVersion, "VUID-VkImportFenceSciSyncInfoNV-pNext-pNext", kVUIDUndefined, false, true);
+
+        skip |= ValidateRequiredHandle("vkImportFenceSciSyncObjNV", "pImportFenceSciSyncInfo->fence", pImportFenceSciSyncInfo->fence);
+
+        skip |= ValidateFlags("vkImportFenceSciSyncObjNV", "pImportFenceSciSyncInfo->handleType", "VkExternalFenceHandleTypeFlagBits", AllVkExternalFenceHandleTypeFlagBits, pImportFenceSciSyncInfo->handleType, kRequiredSingleBit, "VUID-VkImportFenceSciSyncInfoNV-handleType-parameter", "VUID-VkImportFenceSciSyncInfoNV-handleType-parameter");
+
+        skip |= ValidateRequiredPointer("vkImportFenceSciSyncObjNV", "pImportFenceSciSyncInfo->handle", pImportFenceSciSyncInfo->handle, "VUID-VkImportFenceSciSyncInfoNV-handle-parameter");
+    }
+    return skip;
+}
+#endif // VK_USE_PLATFORM_SCI
+
+#ifdef VK_USE_PLATFORM_SCI
+bool StatelessValidation::PreCallValidateGetPhysicalDeviceSciSyncAttributesNV(
+    VkPhysicalDevice                            physicalDevice,
+    const VkSciSyncAttributesInfoNV*            pSciSyncAttributesInfo,
+    NvSciSyncAttrList                           pAttributes) const {
+    bool skip = false;
+    skip |= ValidateStructType("vkGetPhysicalDeviceSciSyncAttributesNV", "pSciSyncAttributesInfo", "VK_STRUCTURE_TYPE_SCI_SYNC_ATTRIBUTES_INFO_NV", pSciSyncAttributesInfo, VK_STRUCTURE_TYPE_SCI_SYNC_ATTRIBUTES_INFO_NV, true, "VUID-vkGetPhysicalDeviceSciSyncAttributesNV-pSciSyncAttributesInfo-parameter", "VUID-VkSciSyncAttributesInfoNV-sType-sType");
+    if (pSciSyncAttributesInfo != nullptr)
+    {
+        skip |= ValidateStructPnext("vkGetPhysicalDeviceSciSyncAttributesNV", "pSciSyncAttributesInfo->pNext", nullptr, pSciSyncAttributesInfo->pNext, 0, nullptr, GeneratedVulkanHeaderVersion, "VUID-VkSciSyncAttributesInfoNV-pNext-pNext", kVUIDUndefined, true, true);
+
+        skip |= ValidateRangedEnum("vkGetPhysicalDeviceSciSyncAttributesNV", "pSciSyncAttributesInfo->clientType", "VkSciSyncClientTypeNV", pSciSyncAttributesInfo->clientType, "VUID-VkSciSyncAttributesInfoNV-clientType-parameter");
+
+        skip |= ValidateRangedEnum("vkGetPhysicalDeviceSciSyncAttributesNV", "pSciSyncAttributesInfo->primitiveType", "VkSciSyncPrimitiveTypeNV", pSciSyncAttributesInfo->primitiveType, "VUID-VkSciSyncAttributesInfoNV-primitiveType-parameter");
+    }
+    return skip;
+}
+#endif // VK_USE_PLATFORM_SCI
+
+#ifdef VK_USE_PLATFORM_SCI
+bool StatelessValidation::PreCallValidateGetSemaphoreSciSyncObjNV(
+    VkDevice                                    device,
+    const VkSemaphoreGetSciSyncInfoNV*          pGetSciSyncInfo,
+    void*                                       pHandle) const {
+    bool skip = false;
+    if (!IsExtEnabled(device_extensions.vk_nv_external_sci_sync)) skip |= OutputExtensionError("vkGetSemaphoreSciSyncObjNV", "VK_NV_external_sci_sync");
+    skip |= ValidateStructType("vkGetSemaphoreSciSyncObjNV", "pGetSciSyncInfo", "VK_STRUCTURE_TYPE_SEMAPHORE_GET_SCI_SYNC_INFO_NV", pGetSciSyncInfo, VK_STRUCTURE_TYPE_SEMAPHORE_GET_SCI_SYNC_INFO_NV, true, "VUID-vkGetSemaphoreSciSyncObjNV-pGetSciSyncInfo-parameter", "VUID-VkSemaphoreGetSciSyncInfoNV-sType-sType");
+    if (pGetSciSyncInfo != nullptr)
+    {
+        skip |= ValidateStructPnext("vkGetSemaphoreSciSyncObjNV", "pGetSciSyncInfo->pNext", nullptr, pGetSciSyncInfo->pNext, 0, nullptr, GeneratedVulkanHeaderVersion, "VUID-VkSemaphoreGetSciSyncInfoNV-pNext-pNext", kVUIDUndefined, false, true);
+
+        skip |= ValidateRequiredHandle("vkGetSemaphoreSciSyncObjNV", "pGetSciSyncInfo->semaphore", pGetSciSyncInfo->semaphore);
+
+        skip |= ValidateFlags("vkGetSemaphoreSciSyncObjNV", "pGetSciSyncInfo->handleType", "VkExternalSemaphoreHandleTypeFlagBits", AllVkExternalSemaphoreHandleTypeFlagBits, pGetSciSyncInfo->handleType, kRequiredSingleBit, "VUID-VkSemaphoreGetSciSyncInfoNV-handleType-parameter", "VUID-VkSemaphoreGetSciSyncInfoNV-handleType-parameter");
+    }
+    skip |= ValidateRequiredPointer("vkGetSemaphoreSciSyncObjNV", "pHandle", pHandle, "VUID-vkGetSemaphoreSciSyncObjNV-pHandle-parameter");
+    return skip;
+}
+#endif // VK_USE_PLATFORM_SCI
+
+#ifdef VK_USE_PLATFORM_SCI
+bool StatelessValidation::PreCallValidateImportSemaphoreSciSyncObjNV(
+    VkDevice                                    device,
+    const VkImportSemaphoreSciSyncInfoNV*       pImportSemaphoreSciSyncInfo) const {
+    bool skip = false;
+    if (!IsExtEnabled(device_extensions.vk_nv_external_sci_sync)) skip |= OutputExtensionError("vkImportSemaphoreSciSyncObjNV", "VK_NV_external_sci_sync");
+    skip |= ValidateStructType("vkImportSemaphoreSciSyncObjNV", "pImportSemaphoreSciSyncInfo", "VK_STRUCTURE_TYPE_IMPORT_SEMAPHORE_SCI_SYNC_INFO_NV", pImportSemaphoreSciSyncInfo, VK_STRUCTURE_TYPE_IMPORT_SEMAPHORE_SCI_SYNC_INFO_NV, true, "VUID-vkImportSemaphoreSciSyncObjNV-pImportSemaphoreSciSyncInfo-parameter", "VUID-VkImportSemaphoreSciSyncInfoNV-sType-sType");
+    if (pImportSemaphoreSciSyncInfo != nullptr)
+    {
+        skip |= ValidateStructPnext("vkImportSemaphoreSciSyncObjNV", "pImportSemaphoreSciSyncInfo->pNext", nullptr, pImportSemaphoreSciSyncInfo->pNext, 0, nullptr, GeneratedVulkanHeaderVersion, "VUID-VkImportSemaphoreSciSyncInfoNV-pNext-pNext", kVUIDUndefined, false, true);
+
+        skip |= ValidateRequiredHandle("vkImportSemaphoreSciSyncObjNV", "pImportSemaphoreSciSyncInfo->semaphore", pImportSemaphoreSciSyncInfo->semaphore);
+
+        skip |= ValidateFlags("vkImportSemaphoreSciSyncObjNV", "pImportSemaphoreSciSyncInfo->handleType", "VkExternalSemaphoreHandleTypeFlagBits", AllVkExternalSemaphoreHandleTypeFlagBits, pImportSemaphoreSciSyncInfo->handleType, kRequiredSingleBit, "VUID-VkImportSemaphoreSciSyncInfoNV-handleType-parameter", "VUID-VkImportSemaphoreSciSyncInfoNV-handleType-parameter");
+
+        skip |= ValidateRequiredPointer("vkImportSemaphoreSciSyncObjNV", "pImportSemaphoreSciSyncInfo->handle", pImportSemaphoreSciSyncInfo->handle, "VUID-VkImportSemaphoreSciSyncInfoNV-handle-parameter");
+    }
+    return skip;
+}
+#endif // VK_USE_PLATFORM_SCI
+
+#ifdef VK_USE_PLATFORM_SCI
+bool StatelessValidation::PreCallValidateGetMemorySciBufNV(
+    VkDevice                                    device,
+    const VkMemoryGetSciBufInfoNV*              pGetSciBufInfo,
+    NvSciBufObj*                                pHandle) const {
+    bool skip = false;
+    if (!IsExtEnabled(device_extensions.vk_nv_external_memory_sci_buf)) skip |= OutputExtensionError("vkGetMemorySciBufNV", "VK_NV_external_memory_sci_buf");
+    skip |= ValidateStructType("vkGetMemorySciBufNV", "pGetSciBufInfo", "VK_STRUCTURE_TYPE_MEMORY_GET_SCI_BUF_INFO_NV", pGetSciBufInfo, VK_STRUCTURE_TYPE_MEMORY_GET_SCI_BUF_INFO_NV, true, "VUID-vkGetMemorySciBufNV-pGetSciBufInfo-parameter", "VUID-VkMemoryGetSciBufInfoNV-sType-sType");
+    if (pGetSciBufInfo != nullptr)
+    {
+        skip |= ValidateStructPnext("vkGetMemorySciBufNV", "pGetSciBufInfo->pNext", nullptr, pGetSciBufInfo->pNext, 0, nullptr, GeneratedVulkanHeaderVersion, "VUID-VkMemoryGetSciBufInfoNV-pNext-pNext", kVUIDUndefined, false, true);
+
+        skip |= ValidateRequiredHandle("vkGetMemorySciBufNV", "pGetSciBufInfo->memory", pGetSciBufInfo->memory);
+
+        skip |= ValidateFlags("vkGetMemorySciBufNV", "pGetSciBufInfo->handleType", "VkExternalMemoryHandleTypeFlagBits", AllVkExternalMemoryHandleTypeFlagBits, pGetSciBufInfo->handleType, kRequiredSingleBit, "VUID-VkMemoryGetSciBufInfoNV-handleType-parameter", "VUID-VkMemoryGetSciBufInfoNV-handleType-parameter");
+    }
+    skip |= ValidateRequiredPointer("vkGetMemorySciBufNV", "pHandle", pHandle, "VUID-vkGetMemorySciBufNV-pHandle-parameter");
+    return skip;
+}
+#endif // VK_USE_PLATFORM_SCI
+
+#ifdef VK_USE_PLATFORM_SCI
+bool StatelessValidation::PreCallValidateGetPhysicalDeviceExternalMemorySciBufPropertiesNV(
+    VkPhysicalDevice                            physicalDevice,
+    VkExternalMemoryHandleTypeFlagBits          handleType,
+    NvSciBufObj                                 handle,
+    VkMemorySciBufPropertiesNV*                 pMemorySciBufProperties) const {
+    bool skip = false;
+    skip |= ValidateFlags("vkGetPhysicalDeviceExternalMemorySciBufPropertiesNV", "handleType", "VkExternalMemoryHandleTypeFlagBits", AllVkExternalMemoryHandleTypeFlagBits, handleType, kRequiredSingleBit, "VUID-vkGetPhysicalDeviceExternalMemorySciBufPropertiesNV-handleType-parameter", "VUID-vkGetPhysicalDeviceExternalMemorySciBufPropertiesNV-handleType-parameter");
+    skip |= ValidateStructType("vkGetPhysicalDeviceExternalMemorySciBufPropertiesNV", "pMemorySciBufProperties", "VK_STRUCTURE_TYPE_MEMORY_SCI_BUF_PROPERTIES_NV", pMemorySciBufProperties, VK_STRUCTURE_TYPE_MEMORY_SCI_BUF_PROPERTIES_NV, true, "VUID-vkGetPhysicalDeviceExternalMemorySciBufPropertiesNV-pMemorySciBufProperties-parameter", "VUID-VkMemorySciBufPropertiesNV-sType-sType");
+    return skip;
+}
+#endif // VK_USE_PLATFORM_SCI
+
+#ifdef VK_USE_PLATFORM_SCI
+bool StatelessValidation::PreCallValidateGetPhysicalDeviceSciBufAttributesNV(
+    VkPhysicalDevice                            physicalDevice,
+    NvSciBufAttrList                            pAttributes) const {
+    bool skip = false;
+    // No xml-driven validation
+    return skip;
+}
+#endif // VK_USE_PLATFORM_SCI
+
 bool StatelessValidation::PreCallValidateCmdSetPatchControlPointsEXT(
     VkCommandBuffer                             commandBuffer,
     uint32_t                                    patchControlPoints) const {
@@ -7321,6 +9030,27 @@ bool StatelessValidation::PreCallValidateCmdSetColorWriteEnableEXT(
     skip |= ValidateBool32Array("vkCmdSetColorWriteEnableEXT", "attachmentCount", "pColorWriteEnables", attachmentCount, pColorWriteEnables, true, true);
     return skip;
 }
+
+#ifdef VK_USE_PLATFORM_SCI
+bool StatelessValidation::PreCallValidateCreateSemaphoreSciSyncPoolNV(
+    VkDevice                                    device,
+    const VkSemaphoreSciSyncPoolCreateInfoNV*   pCreateInfo,
+    const VkAllocationCallbacks*                pAllocator,
+    VkSemaphoreSciSyncPoolNV*                   pSemaphorePool) const {
+    bool skip = false;
+    if (!IsExtEnabled(device_extensions.vk_nv_external_sci_sync2)) skip |= OutputExtensionError("vkCreateSemaphoreSciSyncPoolNV", "VK_NV_external_sci_sync2");
+    skip |= ValidateStructType("vkCreateSemaphoreSciSyncPoolNV", "pCreateInfo", "VK_STRUCTURE_TYPE_SEMAPHORE_SCI_SYNC_POOL_CREATE_INFO_NV", pCreateInfo, VK_STRUCTURE_TYPE_SEMAPHORE_SCI_SYNC_POOL_CREATE_INFO_NV, true, "VUID-vkCreateSemaphoreSciSyncPoolNV-pCreateInfo-parameter", "VUID-VkSemaphoreSciSyncPoolCreateInfoNV-sType-sType");
+    if (pCreateInfo != nullptr)
+    {
+        skip |= ValidateStructPnext("vkCreateSemaphoreSciSyncPoolNV", "pCreateInfo->pNext", nullptr, pCreateInfo->pNext, 0, nullptr, GeneratedVulkanHeaderVersion, "VUID-VkSemaphoreSciSyncPoolCreateInfoNV-pNext-pNext", kVUIDUndefined, false, true);
+    }
+    if (pAllocator != nullptr) {
+        skip |= LogError(instance, "VUID-vkCreateSemaphoreSciSyncPoolNV-pAllocator-null", "vkCreateSemaphoreSciSyncPoolNV(): pAllocator must be NULL");
+    }
+    skip |= ValidateRequiredPointer("vkCreateSemaphoreSciSyncPoolNV", "pSemaphorePool", pSemaphorePool, "VUID-vkCreateSemaphoreSciSyncPoolNV-pSemaphorePool-parameter");
+    return skip;
+}
+#endif // VK_USE_PLATFORM_SCI
 
 #ifdef VK_USE_PLATFORM_SCREEN_QNX
 bool StatelessValidation::PreCallValidateGetScreenBufferPropertiesQNX(

@@ -251,6 +251,7 @@ struct StageInteraceVariable : public VariableBase {
     const bool is_per_task_nv;  // VK_NV_mesh_shader
 
     const bool is_array_interface;
+    uint32_t array_size = 1;  // flatten size of all dimensions; 1 if no array
     const Instruction &base_type;
     const bool is_builtin;
     bool nested_struct;
@@ -264,7 +265,7 @@ struct StageInteraceVariable : public VariableBase {
   protected:
     static bool IsPerTaskNV(const StageInteraceVariable &variable);
     static bool IsArrayInterface(const StageInteraceVariable &variable);
-    static const Instruction &FindBaseType(const StageInteraceVariable &variable, const SHADER_MODULE_STATE &module_state);
+    static const Instruction &FindBaseType(StageInteraceVariable &variable, const SHADER_MODULE_STATE &module_state);
     static bool IsBuiltin(const StageInteraceVariable &variable, const SHADER_MODULE_STATE &module_state);
     static std::vector<InterfaceSlot> GetInterfaceSlots(StageInteraceVariable &variable, const SHADER_MODULE_STATE &module_state);
     static std::vector<uint32_t> GetBuiltinBlock(const StageInteraceVariable &variable, const SHADER_MODULE_STATE &module_state);
@@ -541,7 +542,7 @@ struct SHADER_MODULE_STATE : public BASE_NODE {
                 insn = FindDef(insn->Word(1));
             } else if (insn->Opcode() == spv::OpTypePointer) {
                 insn = FindDef(insn->Word(3));
-            } else if (insn->Opcode() == spv::OpTypeArray || insn->Opcode() == spv::OpTypeRuntimeArray) {
+            } else if (insn->IsArray()) {
                 insn = FindDef(insn->Word(2));
             } else if (insn->Opcode() == spv::OpTypeStruct) {
                 return GetTypeStructInfo(insn->Word(1));
@@ -578,6 +579,7 @@ struct SHADER_MODULE_STATE : public BASE_NODE {
     const Instruction *GetBaseTypeInstruction(uint32_t type) const;
     uint32_t GetTypeId(uint32_t id) const;
     uint32_t GetTexelComponentCount(const Instruction &insn) const;
+    uint32_t GetFlattenArraySize(const Instruction &insn) const;
 
     bool HasCapability(spv::Capability find_capability) const {
         return std::any_of(static_data_.capability_list.begin(), static_data_.capability_list.end(),

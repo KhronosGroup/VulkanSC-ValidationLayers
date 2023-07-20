@@ -1078,6 +1078,13 @@ bool PreCallValidateCmdSetFragmentShadingRateKHR(
     VkCommandBuffer                             commandBuffer,
     const VkExtent2D*                           pFragmentSize,
     const VkFragmentShadingRateCombinerOpKHR    combinerOps[2]) const override;
+bool PreCallValidateCmdRefreshObjectsKHR(
+    VkCommandBuffer                             commandBuffer,
+    const VkRefreshObjectListKHR*               pRefreshObjects) const override;
+bool PreCallValidateGetPhysicalDeviceRefreshableObjectTypesKHR(
+    VkPhysicalDevice                            physicalDevice,
+    uint32_t*                                   pRefreshableObjectTypeCount,
+    VkObjectType*                               pRefreshableObjectTypes) const override;
 bool PreCallValidateCmdSetEvent2KHR(
     VkCommandBuffer                             commandBuffer,
     VkEvent                                     event,
@@ -1299,6 +1306,63 @@ bool PreCallValidateCmdSetVertexInputEXT(
     const VkVertexInputBindingDescription2EXT*  pVertexBindingDescriptions,
     uint32_t                                    vertexAttributeDescriptionCount,
     const VkVertexInputAttributeDescription2EXT* pVertexAttributeDescriptions) const override;
+#ifdef VK_USE_PLATFORM_SCI
+bool PreCallValidateGetFenceSciSyncFenceNV(
+    VkDevice                                    device,
+    const VkFenceGetSciSyncInfoNV*              pGetSciSyncHandleInfo,
+    void*                                       pHandle) const override;
+#endif // VK_USE_PLATFORM_SCI
+#ifdef VK_USE_PLATFORM_SCI
+bool PreCallValidateGetFenceSciSyncObjNV(
+    VkDevice                                    device,
+    const VkFenceGetSciSyncInfoNV*              pGetSciSyncHandleInfo,
+    void*                                       pHandle) const override;
+#endif // VK_USE_PLATFORM_SCI
+#ifdef VK_USE_PLATFORM_SCI
+bool PreCallValidateImportFenceSciSyncFenceNV(
+    VkDevice                                    device,
+    const VkImportFenceSciSyncInfoNV*           pImportFenceSciSyncInfo) const override;
+#endif // VK_USE_PLATFORM_SCI
+#ifdef VK_USE_PLATFORM_SCI
+bool PreCallValidateImportFenceSciSyncObjNV(
+    VkDevice                                    device,
+    const VkImportFenceSciSyncInfoNV*           pImportFenceSciSyncInfo) const override;
+#endif // VK_USE_PLATFORM_SCI
+#ifdef VK_USE_PLATFORM_SCI
+bool PreCallValidateGetPhysicalDeviceSciSyncAttributesNV(
+    VkPhysicalDevice                            physicalDevice,
+    const VkSciSyncAttributesInfoNV*            pSciSyncAttributesInfo,
+    NvSciSyncAttrList                           pAttributes) const override;
+#endif // VK_USE_PLATFORM_SCI
+#ifdef VK_USE_PLATFORM_SCI
+bool PreCallValidateGetSemaphoreSciSyncObjNV(
+    VkDevice                                    device,
+    const VkSemaphoreGetSciSyncInfoNV*          pGetSciSyncInfo,
+    void*                                       pHandle) const override;
+#endif // VK_USE_PLATFORM_SCI
+#ifdef VK_USE_PLATFORM_SCI
+bool PreCallValidateImportSemaphoreSciSyncObjNV(
+    VkDevice                                    device,
+    const VkImportSemaphoreSciSyncInfoNV*       pImportSemaphoreSciSyncInfo) const override;
+#endif // VK_USE_PLATFORM_SCI
+#ifdef VK_USE_PLATFORM_SCI
+bool PreCallValidateGetMemorySciBufNV(
+    VkDevice                                    device,
+    const VkMemoryGetSciBufInfoNV*              pGetSciBufInfo,
+    NvSciBufObj*                                pHandle) const override;
+#endif // VK_USE_PLATFORM_SCI
+#ifdef VK_USE_PLATFORM_SCI
+bool PreCallValidateGetPhysicalDeviceExternalMemorySciBufPropertiesNV(
+    VkPhysicalDevice                            physicalDevice,
+    VkExternalMemoryHandleTypeFlagBits          handleType,
+    NvSciBufObj                                 handle,
+    VkMemorySciBufPropertiesNV*                 pMemorySciBufProperties) const override;
+#endif // VK_USE_PLATFORM_SCI
+#ifdef VK_USE_PLATFORM_SCI
+bool PreCallValidateGetPhysicalDeviceSciBufAttributesNV(
+    VkPhysicalDevice                            physicalDevice,
+    NvSciBufAttrList                            pAttributes) const override;
+#endif // VK_USE_PLATFORM_SCI
 bool PreCallValidateCmdSetPatchControlPointsEXT(
     VkCommandBuffer                             commandBuffer,
     uint32_t                                    patchControlPoints) const override;
@@ -1318,6 +1382,13 @@ bool PreCallValidateCmdSetColorWriteEnableEXT(
     VkCommandBuffer                             commandBuffer,
     uint32_t                                    attachmentCount,
     const VkBool32*                             pColorWriteEnables) const override;
+#ifdef VK_USE_PLATFORM_SCI
+bool PreCallValidateCreateSemaphoreSciSyncPoolNV(
+    VkDevice                                    device,
+    const VkSemaphoreSciSyncPoolCreateInfoNV*   pCreateInfo,
+    const VkAllocationCallbacks*                pAllocator,
+    VkSemaphoreSciSyncPoolNV*                   pSemaphorePool) const override;
+#endif // VK_USE_PLATFORM_SCI
 #ifdef VK_USE_PLATFORM_SCREEN_QNX
 bool PreCallValidateGetScreenBufferPropertiesQNX(
     VkDevice                                    device,

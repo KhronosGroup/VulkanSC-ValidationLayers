@@ -235,7 +235,8 @@ target_sources(vvl PRIVATE
     core_checks/cc_ray_tracing.cpp
     core_checks/cc_render_pass.cpp
     core_checks/cc_shader.cpp
-    core_checks/cc_shader.h
+    core_checks/cc_shader_interface.cpp
+    core_checks/cc_shader_object.cpp
     core_checks/cc_synchronization.cpp
     core_checks/cc_video.cpp
     core_checks/cc_wsi.cpp
@@ -333,6 +334,7 @@ target_sources(vvl PRIVATE
     stateless/sl_pipeline.cpp
     stateless/sl_ray_tracing.cpp
     stateless/sl_render_pass.cpp
+    stateless/sl_shader_object.cpp
     stateless/sl_synchronization.cpp
     stateless/sl_utils.cpp
     stateless/sl_wsi.cpp
@@ -345,6 +347,8 @@ target_sources(vvl PRIVATE
     sync/sync_vuid_maps.h
     thread_tracker/thread_safety_validation.cpp
     thread_tracker/thread_safety_validation.h
+    utils/shader_utils.cpp
+    utils/shader_utils.h
     layer_options.cpp
     vk_layer_settings_ext.h
 )

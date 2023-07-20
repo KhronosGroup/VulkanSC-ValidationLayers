@@ -30,7 +30,13 @@
         "DebugMarkerNameTest": false,
 
         "@disabled-depends-VK_EXT_validation_cache": "Test cases use unsupported extension in Vulkan SC",
-        "ValidationCacheTestBadMerge": false
+        "ValidationCacheTestBadMerge": false,
+
+        "@disabled-depends-VK_KHR_portability_enumeration": [
+            "Test case depends on support for VK_KHR_portability_enumeration without actually checking support for it",
+            "or enabling it in the first place, and this extension is not supported in Vulkan SC"
+        ],
+        "InstanceCreateEnumeratePortability": false
     },
     "VkPositiveLayerTest": {
         "*": "VkPositiveLayerTest",
@@ -125,7 +131,13 @@
         "DrawDescriptorSetBufferDestroyed": false,
         "CmdBufferDescriptorSetImageSamplerDestroyed": false,
         "DescriptorSetSamplerDestroyed": false,
-        "DescriptorPoolInUseResetSignaled": false
+        "DescriptorPoolInUseResetSignaled": false,
+
+        "@disabled-depends-VK_KHR_push_descriptors": [
+            "Test case depends on support for VK_KHR_push_descriptors without actually checking support for it",
+            "or enabling it in the first place, and this extension is not supported in Vulkan SC"
+        ],
+        "PushDescriptorSetLayoutWithoutExtension": false
     },
     "NegativeDynamicState": {
         "@disabled-depends-GPDP2-KHR": [
@@ -268,7 +280,19 @@
         "MissingEntrypoint": false,
         "ShaderDrawParametersNotEnabled10": false,
         "ShaderDrawParametersNotEnabled11": false,
-        "NotCompatibleForSet": false
+        "NotCompatibleForSet": false,
+
+        "@disabled-depends-VK_QCOM_render_pass_shader_resolve": [
+            "Test case depends on support for VK_QCOM_render_pass_shader_resolve without actually checking support for it",
+            "or enabling it in the first place, and this extension is not supported in Vulkan SC"
+        ],
+        "SubpassRasterizationSamples": false,
+
+        "@disabled-depends-on-misc-unsupported-extensions": [
+            "Test cases depends on miscellaneous extensions not supported in Vulkan SC"
+        ],
+        "CreateFlags": false,
+        "CreateFlagsCompute": false
     },
     "NegativePipelineLayout": {
         "@disabled-depends-SPIRV-validation": [
@@ -372,7 +396,20 @@
         "MaxComponentsBlocks": false,
         "MaxFragmentInputComponents": false,
         "AlphaToCoverageOutputLocation0": false,
-        "AlphaToCoverageOutputNoAlpha": false
+        "AlphaToCoverageOutputNoAlpha": false,
+        "VsFsTypeMismatchBlockStruct": false,
+        "VsFsTypeMismatchBlockStruct64bit": false,
+        "VsFsTypeMismatchBlockArrayOfStruct": false,
+        "VsFsTypeMismatchBlockStructInnerArraySize": false,
+        "VsFsTypeMismatchBlockStructOuterArraySize": false,
+        "VsFsTypeMismatchBlockStructArraySizeVertex": false,
+        "VsFsTypeMismatchBlockStructOuter2DArraySize": false,
+        "VsFsTypeMismatchBlockNestedStructType64bit": false,
+        "VsFsTypeMismatchBlockNestedStructArray": false,
+        "MultidimensionalArray": false,
+        "MultidimensionalArrayDim": false,
+        "MultidimensionalArray64bit": false,
+        "PackingInsideArray": false
     },
     "PositiveShaderInterface": {
         "@disabled-depends-SPIRV-validation": [
