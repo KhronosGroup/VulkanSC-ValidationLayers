@@ -12,17 +12,16 @@
 #include "../framework/vksc_layer_validation_tests.h"
 
 TEST_F(VkSCLayerTest, CreateRenderPassMaxRenderPassSubpassesExceeded) {
-    TEST_DESCRIPTION(
-        "vkCreateRenderPass - VkRenderPassCreateInfo::subpassCount must be "
-        "less than or equal to maxRenderPassSubpasses");
+    TEST_DESCRIPTION("vkCreateRenderPass - subpassCount exceeds maxRenderPassSubpasses");
+
     ASSERT_NO_FATAL_FAILURE(InitFramework());
 
-    const auto limit = GetVulkanSC10Properties(gpu()).maxRenderPassSubpasses;
-    const auto subpass_count = limit + 1;
+    const auto subpass_count = GetVulkanSC10Properties(gpu()).maxRenderPassSubpasses + 1;
     auto sc_10_features = LvlInitStruct<VkPhysicalDeviceVulkanSC10Features>();
     auto object_reservation_info = vksc::GetDefaultObjectReservationCreateInfo();
     object_reservation_info.pNext = &sc_10_features;
     object_reservation_info.subpassDescriptionRequestCount = subpass_count;
+
     ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &object_reservation_info));
 
     VkRenderPass render_pass{VK_NULL_HANDLE};
@@ -58,13 +57,10 @@ TEST_F(VkSCLayerTest, CreateRenderPassMaxRenderPassSubpassesExceeded) {
 }
 
 TEST_F(VkSCLayerTest, CreateRenderPassMaxRenderPassDependenciesExceeded) {
-    TEST_DESCRIPTION(
-        "vkCreateRenderPass - VkRenderPassCreateInfo::dependencyCount must be "
-        "less than or equal to maxRenderPassDependencies");
+    TEST_DESCRIPTION("vkCreateRenderPass - dependencyCount exceeds maxRenderPassDependencies");
     ASSERT_NO_FATAL_FAILURE(InitFramework());
 
-    const auto limit = GetVulkanSC10Properties(gpu()).maxRenderPassDependencies;
-    const auto dependency_count = limit + 1;
+    const auto dependency_count = GetVulkanSC10Properties(gpu()).maxRenderPassDependencies + 1;
     auto sc_10_features = LvlInitStruct<VkPhysicalDeviceVulkanSC10Features>();
     auto object_reservation_info = vksc::GetDefaultObjectReservationCreateInfo();
     object_reservation_info.pNext = &sc_10_features;
@@ -125,14 +121,11 @@ TEST_F(VkSCLayerTest, CreateRenderPassMaxRenderPassDependenciesExceeded) {
 }
 
 TEST_F(VkSCLayerTest, CreateRenderPassMaxFramebufferAttachmentsExceeded) {
-    TEST_DESCRIPTION(
-        "vkCreateRenderPass - VkRenderPassCreateInfo::attachmentCount must be "
-        "less than or equal to maxFramebufferAttachments");
+    TEST_DESCRIPTION("vkCreateRenderPass - attachmentCount exceeds maxFramebufferAttachments");
 
     ASSERT_NO_FATAL_FAILURE(InitFramework());
 
-    const auto limit = GetVulkanSC10Properties(gpu()).maxFramebufferAttachments;
-    const auto attachments_count = limit + 1;
+    const auto attachments_count = GetVulkanSC10Properties(gpu()).maxFramebufferAttachments + 1;
     auto sc_10_features = LvlInitStruct<VkPhysicalDeviceVulkanSC10Features>();
     auto object_reservation_info = vksc::GetDefaultObjectReservationCreateInfo();
     object_reservation_info.pNext = &sc_10_features;
@@ -186,6 +179,158 @@ TEST_F(VkSCLayerTest, CreateRenderPassMaxFramebufferAttachmentsExceeded) {
         create_info.subpassCount = 1;
 
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkRenderPassCreateInfo2-attachmentCount-05057");
+        vksc::CreateRenderPass2(device(), &create_info, nullptr, &render_pass);
+        m_errorMonitor->VerifyFound();
+    }
+}
+
+TEST_F(VkSCLayerTest, CreateRenderPassMaxSubpassInputAttachmentsExceeded) {
+    TEST_DESCRIPTION("vkCreateRenderPass - inputAttachmentCount exceeds maxSubpassInputAttachments");
+
+    ASSERT_NO_FATAL_FAILURE(Init());
+
+    const auto subpass_count = 2;
+    const auto input_attachment_count = GetVulkanSC10Properties(gpu()).maxSubpassInputAttachments + 1;
+
+    VkRenderPass render_pass{VK_NULL_HANDLE};
+    {
+        std::vector<VkAttachmentDescription> attachments(input_attachment_count);
+        for (auto& attachment : attachments) {
+            attachment.format = VK_FORMAT_R8G8B8A8_UNORM;
+            attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+            attachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+            attachment.initialLayout = VK_IMAGE_LAYOUT_GENERAL;
+            attachment.finalLayout = VK_IMAGE_LAYOUT_GENERAL;
+        }
+        std::vector<VkAttachmentReference> input_attachments(input_attachment_count);
+        for (uint32_t i = 0; i < input_attachments.size(); ++i) {
+            input_attachments[i].layout = VK_IMAGE_LAYOUT_GENERAL;
+            input_attachments[i].attachment = i;
+        }
+        std::vector<VkSubpassDescription> subpasses{subpass_count, VkSubpassDescription{}};
+        for (auto& subpass : subpasses) {
+            subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+            subpass.pInputAttachments = input_attachments.data();
+            subpass.inputAttachmentCount = input_attachments.size();
+        }
+
+        auto create_info = LvlInitStruct<VkRenderPassCreateInfo>();
+        create_info.pAttachments = attachments.data();
+        create_info.attachmentCount = attachments.size();
+        create_info.pSubpasses = subpasses.data();
+        create_info.subpassCount = subpasses.size();
+
+        m_errorMonitor->SetAllowedFailureMsg("VUID-vkCreateRenderPass2-attachments-device-05089");
+        for (int i = 0; i < subpass_count; ++i)
+            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSubpassDescription-inputAttachmentCount-05053");
+        vksc::CreateRenderPass(device(), &create_info, nullptr, &render_pass);
+        m_errorMonitor->VerifyFound();
+    }
+    {
+        std::vector<VkAttachmentDescription2> attachments(input_attachment_count, LvlInitStruct<VkAttachmentDescription2>());
+        for (auto& attachment : attachments) {
+            attachment.format = VK_FORMAT_R8G8B8A8_UNORM;
+            attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+            attachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+            attachment.initialLayout = VK_IMAGE_LAYOUT_GENERAL;
+            attachment.finalLayout = VK_IMAGE_LAYOUT_GENERAL;
+        }
+        std::vector<VkAttachmentReference2> input_attachments(input_attachment_count, LvlInitStruct<VkAttachmentReference2>());
+        for (uint32_t i = 0; i < input_attachments.size(); ++i) {
+            input_attachments[i].layout = VK_IMAGE_LAYOUT_GENERAL;
+            input_attachments[i].attachment = i;
+            input_attachments[i].aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        }
+        std::vector<VkSubpassDescription2> subpasses(subpass_count, LvlInitStruct<VkSubpassDescription2>());
+        for (auto& subpass : subpasses) {
+            subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+            subpass.pInputAttachments = input_attachments.data();
+            subpass.inputAttachmentCount = input_attachments.size();
+        }
+
+        auto create_info = LvlInitStruct<VkRenderPassCreateInfo2>();
+        create_info.pAttachments = attachments.data();
+        create_info.attachmentCount = attachments.size();
+        create_info.pSubpasses = subpasses.data();
+        create_info.subpassCount = subpasses.size();
+
+        m_errorMonitor->SetAllowedFailureMsg("VUID-vkCreateRenderPass2-attachments-device-05089");
+        for (int i = 0; i < subpass_count; ++i)
+            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSubpassDescription2-inputAttachmentCount-05058");
+        vksc::CreateRenderPass2(device(), &create_info, nullptr, &render_pass);
+        m_errorMonitor->VerifyFound();
+    }
+}
+
+TEST_F(VkSCLayerTest, CreateRenderPassMaxSubpassPreserveAttachmentsExceeded) {
+    TEST_DESCRIPTION("vkCreateRenderPass - preserveAttachmentCount exceeds maxSubpassPreserveAttachments");
+
+    ASSERT_NO_FATAL_FAILURE(Init());
+
+    const auto subpass_count = 2;
+    const auto preserve_attachment_count = GetVulkanSC10Properties(gpu()).maxSubpassPreserveAttachments + 1;
+
+    VkRenderPass render_pass{VK_NULL_HANDLE};
+
+    {
+        std::vector<VkAttachmentDescription> attachments(preserve_attachment_count);
+        for (auto& attachment : attachments) {
+            attachment.format = VK_FORMAT_R8G8B8A8_UNORM;
+            attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+            attachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+            attachment.initialLayout = VK_IMAGE_LAYOUT_GENERAL;
+            attachment.finalLayout = VK_IMAGE_LAYOUT_GENERAL;
+        }
+        std::vector<uint32_t> preserve_attachments(preserve_attachment_count, 0u);
+        std::vector<VkSubpassDescription> subpasses{subpass_count, VkSubpassDescription{}};
+        for (auto& subpass : subpasses) {
+            subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+            subpass.pPreserveAttachments = preserve_attachments.data();
+            subpass.preserveAttachmentCount = preserve_attachments.size();
+        }
+
+        auto create_info = LvlInitStruct<VkRenderPassCreateInfo>();
+        create_info.pAttachments = attachments.data();
+        create_info.attachmentCount = attachments.size();
+        create_info.pSubpasses = subpasses.data();
+        create_info.subpassCount = subpasses.size();
+
+        m_errorMonitor->SetAllowedFailureMsg("VUID-vkCreateRenderPass2-attachments-device-05089");
+        for (int i = 0; i < subpass_count; ++i)
+            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSubpassDescription-preserveAttachmentCount-05054");
+        vksc::CreateRenderPass(device(), &create_info, nullptr, &render_pass);
+        m_errorMonitor->VerifyFound();
+    }
+    {
+        std::vector<VkAttachmentDescription2> attachments(preserve_attachment_count, LvlInitStruct<VkAttachmentDescription2>());
+        for (auto& attachment : attachments) {
+            attachment.format = VK_FORMAT_R8G8B8A8_UNORM;
+            attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+            attachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+            attachment.initialLayout = VK_IMAGE_LAYOUT_GENERAL;
+            attachment.finalLayout = VK_IMAGE_LAYOUT_GENERAL;
+        }
+        std::vector<uint32_t> preserve_attachments(preserve_attachment_count, 0u);
+        std::vector<VkSubpassDescription2> subpasses(subpass_count, LvlInitStruct<VkSubpassDescription2>());
+        for (auto& subpass : subpasses) {
+            subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+            subpass.pPreserveAttachments = preserve_attachments.data();
+            subpass.preserveAttachmentCount = preserve_attachments.size();
+        }
+
+        auto create_info = LvlInitStruct<VkRenderPassCreateInfo2>();
+        create_info.pAttachments = attachments.data();
+        create_info.attachmentCount = attachments.size();
+        create_info.pSubpasses = subpasses.data();
+        create_info.subpassCount = subpasses.size();
+
+        m_errorMonitor->SetAllowedFailureMsg("VUID-vkCreateRenderPass2-attachments-device-05089");
+        for (int i = 0; i < subpass_count; ++i)
+            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSubpassDescription2-preserveAttachmentCount-05059");
         vksc::CreateRenderPass2(device(), &create_info, nullptr, &render_pass);
         m_errorMonitor->VerifyFound();
     }

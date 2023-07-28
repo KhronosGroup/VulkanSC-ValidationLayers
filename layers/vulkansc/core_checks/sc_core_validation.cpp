@@ -984,6 +984,22 @@ bool SCCoreChecks::PreCallValidateCreateRenderPass(VkDevice device, const VkRend
                              "VkPhysicalDeviceVulkanSC10Properties::maxFramebufferAttachments (%u).",
                              pCreateInfo->attachmentCount, phys_dev_props_sc_10_.maxFramebufferAttachments);
         }
+        for (uint32_t subpass_idx = 0; subpass_idx < pCreateInfo->subpassCount; ++subpass_idx) {
+            const auto& subpass = pCreateInfo->pSubpasses[subpass_idx];
+            if (subpass.inputAttachmentCount > phys_dev_props_sc_10_.maxSubpassInputAttachments) {
+                skip |= LogError(device, "VUID-VkSubpassDescription-inputAttachmentCount-05053",
+                                 "vkCreateRenderPass(): pCreateInfo->pSubpasses[%u]->inputAttachmentCount (%u) "
+                                 "exceeds the device limit VkPhysicalDeviceVulkanSC10Properties::maxSubpassInputAttachments (%u).",
+                                 subpass_idx, subpass.inputAttachmentCount, phys_dev_props_sc_10_.maxSubpassInputAttachments);
+            }
+            if (subpass.preserveAttachmentCount > phys_dev_props_sc_10_.maxSubpassPreserveAttachments) {
+                skip |=
+                    LogError(device, "VUID-VkSubpassDescription-preserveAttachmentCount-05054",
+                             "vkCreateRenderPass(): pCreateInfo->pSubpasses[%u]->preserveAttachmentCount (%u) "
+                             "exceeds the device limit VkPhysicalDeviceVulkanSC10Properties::maxSubpassPreserveAttachments (%u).",
+                             subpass_idx, subpass.preserveAttachmentCount, phys_dev_props_sc_10_.maxSubpassPreserveAttachments);
+            }
+        }
     }
 
     return skip;
@@ -1024,6 +1040,22 @@ bool SCCoreChecks::PreCallValidateCreateRenderPass2(VkDevice device, const VkRen
                              "VkPhysicalDeviceVulkanSC10Properties::maxFramebufferAttachments (%u).",
                              pCreateInfo->attachmentCount, phys_dev_props_sc_10_.maxFramebufferAttachments);
         }
+        for (uint32_t subpass_idx = 0; subpass_idx < pCreateInfo->subpassCount; ++subpass_idx) {
+            const auto& subpass = pCreateInfo->pSubpasses[subpass_idx];
+            if (subpass.inputAttachmentCount > phys_dev_props_sc_10_.maxSubpassInputAttachments) {
+                skip |= LogError(device, "VUID-VkSubpassDescription2-inputAttachmentCount-05058",
+                                 "vkCreateRenderPass2(): pCreateInfo->pSubpasses[%u]->inputAttachmentCount (%u) "
+                                 "exceeds the device limit VkPhysicalDeviceVulkanSC10Properties::maxSubpassInputAttachments (%u).",
+                                 subpass_idx, subpass.inputAttachmentCount, phys_dev_props_sc_10_.maxSubpassInputAttachments);
+            }
+            if (subpass.preserveAttachmentCount > phys_dev_props_sc_10_.maxSubpassPreserveAttachments) {
+                skip |=
+                    LogError(device, "VUID-VkSubpassDescription2-preserveAttachmentCount-05059",
+                             "vkCreateRenderPass2(): pCreateInfo->pSubpasses[%u]->preserveAttachmentCount (%u) "
+                             "exceeds the device limit VkPhysicalDeviceVulkanSC10Properties::maxSubpassPreserveAttachments (%u).",
+                             subpass_idx, subpass.preserveAttachmentCount, phys_dev_props_sc_10_.maxSubpassPreserveAttachments);
+            }
+        }
     }
 
     return skip;
@@ -1035,6 +1067,15 @@ bool SCCoreChecks::PreCallValidateCreateFramebuffer(VkDevice device, const VkFra
 
     skip |= ValidateObjectRequestCount(device, "vkCreateFramebuffer", "VUID-vkCreateFramebuffer-device-05068", "framebuffers",
                                        Count<FRAMEBUFFER_STATE>(), "framebuffer", sc_object_limits_.framebufferRequestCount, 1);
+
+    if (pCreateInfo) {
+        if (pCreateInfo->attachmentCount > phys_dev_props_sc_10_.maxFramebufferAttachments) {
+            skip |= LogError(device, "VUID-VkFramebufferCreateInfo-attachmentCount-05060",
+                             "vkCreateFramebuffer(): pCreateInfo->attachmentCount (%u) exceeds the "
+                             "device limit VkPhysicalDeviceVulkanSC10Properties::maxFramebufferAttachments (%u).",
+                             pCreateInfo->attachmentCount, phys_dev_props_sc_10_.maxFramebufferAttachments);
+        }
+    }
 
     return skip;
 }

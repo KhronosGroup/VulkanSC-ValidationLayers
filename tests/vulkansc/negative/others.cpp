@@ -755,3 +755,46 @@ TEST_F(VkSCLayerTest, BindImageMemorySplitInstanceBindRegionCount) {
     vksc::BindImageMemory2(m_device->handle(), 1, &bind_info);
     m_errorMonitor->VerifyFound();
 }
+
+TEST_F(VkSCLayerTest, CreateFramebufferMaxFramebufferAttachmentsExceeded) {
+    TEST_DESCRIPTION("vkCreateFramebuffer - attachmentCount exceeds maxFramebufferAttachments");
+
+    ASSERT_NO_FATAL_FAILURE(Init());
+
+    const auto attachment_count = GetVulkanSC10Properties(gpu()).maxFramebufferAttachments + 1;
+
+    const VkAttachmentDescription attachment{0,
+                                             VK_FORMAT_R8G8B8A8_UNORM,
+                                             VK_SAMPLE_COUNT_1_BIT,
+                                             VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+                                             VK_ATTACHMENT_STORE_OP_DONT_CARE,
+                                             VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+                                             VK_ATTACHMENT_STORE_OP_DONT_CARE,
+                                             VK_IMAGE_LAYOUT_UNDEFINED,
+                                             VK_IMAGE_LAYOUT_GENERAL};
+    const VkSubpassDescription subpass = {};
+
+    auto renderpass_ci = LvlInitStruct<VkRenderPassCreateInfo>();
+    renderpass_ci.attachmentCount = 1;
+    renderpass_ci.pAttachments = &attachment;
+    renderpass_ci.subpassCount = 1;
+    renderpass_ci.pSubpasses = &subpass;
+    vk_testing::RenderPass render_pass(*m_device, renderpass_ci);
+
+    std::vector<VkImageView> image_views(attachment_count, VK_NULL_HANDLE);
+
+    auto create_info = LvlInitStruct<VkFramebufferCreateInfo>();
+    create_info.renderPass = render_pass.handle();
+    create_info.attachmentCount = attachment_count;
+    create_info.pAttachments = image_views.data();
+    create_info.width = 128;
+    create_info.height = 128;
+    create_info.layers = 1;
+
+    VkFramebuffer framebuffer = VK_NULL_HANDLE;
+
+    m_errorMonitor->SetAllowedFailureMsg("VUID-VkFramebufferCreateInfo-attachmentCount-00876");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkFramebufferCreateInfo-attachmentCount-05060");
+    vksc::CreateFramebuffer(device(), &create_info, nullptr, &framebuffer);
+    m_errorMonitor->VerifyFound();
+}
