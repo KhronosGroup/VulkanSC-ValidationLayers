@@ -1148,14 +1148,20 @@ bool SCCoreChecks::PreCallValidateCreateImageView(VkDevice device, const VkImage
         const uint32_t effective_array_layers = ResolveRemainingLayers(image_state->createInfo, pCreateInfo->subresourceRange);
 
         if (effective_mip_levels > sc_object_limits_.maxImageViewMipLevels) {
-            skip |= LogError(device, "VUID-VkImageViewCreateInfo-subresourceRange-05064",
+            const char* vuid = pCreateInfo->subresourceRange.levelCount == VK_REMAINING_MIP_LEVELS
+                                   ? "VUID-VkImageViewCreateInfo-subresourceRange-05200"
+                                   : "VUID-VkImageViewCreateInfo-subresourceRange-05064";
+            skip |= LogError(device, vuid,
                              "vkCreateImageView(): the requested mip level count (%u) exceeds the limit "
                              "requested in VkDeviceObjectReservationCreateInfo::maxImageViewMipLevels (%u).",
                              effective_mip_levels, sc_object_limits_.maxImageViewMipLevels);
         }
 
         if (effective_array_layers > sc_object_limits_.maxImageViewArrayLayers) {
-            skip |= LogError(device, "VUID-VkImageViewCreateInfo-subresourceRange-05065",
+            const char* vuid = pCreateInfo->subresourceRange.layerCount == VK_REMAINING_ARRAY_LAYERS
+                                   ? "VUID-VkImageViewCreateInfo-subresourceRange-05201"
+                                   : "VUID-VkImageViewCreateInfo-subresourceRange-05065";
+            skip |= LogError(device, vuid,
                              "vkCreateImageView(): the requested array layer count (%u) exceeds the limit "
                              "requested in VkDeviceObjectReservationCreateInfo::maxImageViewArrayLayers (%u).",
                              effective_array_layers, sc_object_limits_.maxImageViewArrayLayers);
@@ -1173,7 +1179,10 @@ bool SCCoreChecks::PreCallValidateCreateImageView(VkDevice device, const VkImage
             }
 
             if (effective_mip_levels > sc_object_limits_.maxLayeredImageViewMipLevels) {
-                skip |= LogError(device, "VUID-VkImageViewCreateInfo-subresourceRange-05066",
+                const char* vuid = pCreateInfo->subresourceRange.levelCount == VK_REMAINING_MIP_LEVELS
+                                       ? "VUID-VkImageViewCreateInfo-subresourceRange-05202"
+                                       : "VUID-VkImageViewCreateInfo-subresourceRange-05066";
+                skip |= LogError(device, vuid,
                                  "vkCreateImageView(): the requested mip level count (%u) exceeds the limit "
                                  "requested in VkDeviceObjectReservationCreateInfo::maxLayeredImageViewMipLevels (%u).",
                                  effective_mip_levels, sc_object_limits_.maxLayeredImageViewMipLevels);

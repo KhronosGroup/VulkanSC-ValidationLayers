@@ -570,13 +570,13 @@ TEST_F(VkSCLayerTest, CreateImageViewExceededMaxMipLevels) {
 
     create_info.subresourceRange.layerCount--;
     create_info.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageViewCreateInfo-subresourceRange-05064");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageViewCreateInfo-subresourceRange-05200");
     vksc::CreateImageView(m_device->device(), &create_info, nullptr, &image_view);
     m_errorMonitor->VerifyFound();
 
     create_info.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageViewCreateInfo-subresourceRange-05064");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageViewCreateInfo-subresourceRange-05066");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageViewCreateInfo-subresourceRange-05200");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageViewCreateInfo-subresourceRange-05202");
     vksc::CreateImageView(m_device->device(), &create_info, nullptr, &image_view);
     m_errorMonitor->VerifyFound();
 
@@ -624,7 +624,7 @@ TEST_F(VkSCLayerTest, CreateImageViewExceededMaxArrayLayers) {
     m_errorMonitor->VerifyFound();
 
     create_info.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageViewCreateInfo-subresourceRange-05065");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageViewCreateInfo-subresourceRange-05201");
     vksc::CreateImageView(m_device->device(), &create_info, nullptr, &image_view);
     m_errorMonitor->VerifyFound();
 
