@@ -146,14 +146,14 @@ bool BestPractices::PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPi
 
         // Only validate pipelines that contain shader stages
         if (pipeline.pre_raster_state && pipeline.fragment_shader_state) {
-            if (fragment_stage && fragment_stage->entrypoint && fragment_stage->module_state->has_valid_spirv) {
+            if (fragment_stage && fragment_stage->entrypoint && fragment_stage->module_state->spirv) {
                 const auto& rp_state = pipeline.RenderPassState();
                 if (rp_state && rp_state->UsesDynamicRendering()) {
-                    skip |= ValidateFsOutputsAgainstDynamicRenderingRenderPass(*fragment_stage->module_state.get(),
+                    skip |= ValidateFsOutputsAgainstDynamicRenderingRenderPass(*fragment_stage->module_state->spirv.get(),
                                                                                *fragment_stage->entrypoint, pipeline);
                 } else {
-                    skip |= ValidateFsOutputsAgainstRenderPass(*fragment_stage->module_state.get(), *fragment_stage->entrypoint,
-                                                               pipeline, pipeline.Subpass());
+                    skip |= ValidateFsOutputsAgainstRenderPass(*fragment_stage->module_state->spirv.get(),
+                                                               *fragment_stage->entrypoint, pipeline, pipeline.Subpass());
                 }
             }
         }
@@ -296,7 +296,7 @@ bool BestPractices::PreCallValidateCreateComputePipelines(VkDevice device, VkPip
         if (IsExtEnabled(device_extensions.vk_khr_maintenance4)) {
             auto module_state = Get<SHADER_MODULE_STATE>(createInfo.stage.module);
             if (module_state &&
-                module_state->static_data_.has_builtin_workgroup_size) {  // No module if creating from module identifier
+                module_state->spirv->static_data_.has_builtin_workgroup_size) {  // No module if creating from module identifier
                 skip |= LogWarning(device, kVUID_BestPractices_SpirvDeprecated_WorkgroupSize,
                                    "vkCreateComputePipelines(): pCreateInfos[ %" PRIu32
                                    "] is using the Workgroup built-in which SPIR-V 1.6 deprecated. The VK_KHR_maintenance4 "
@@ -312,15 +312,16 @@ bool BestPractices::PreCallValidateCreateComputePipelines(VkDevice device, VkPip
 bool BestPractices::ValidateCreateComputePipelineArm(const VkComputePipelineCreateInfo& createInfo) const {
     bool skip = false;
     auto module_state = Get<SHADER_MODULE_STATE>(createInfo.stage.module);
-    if (!module_state) {  // No module if creating from module identifier
-        return false;
+    if (!module_state || !module_state->spirv) {
+        return false;  // No module if creating from module identifier
     }
+
     // Generate warnings about work group sizes based on active resources.
-    auto entrypoint = module_state->FindEntrypoint(createInfo.stage.pName, createInfo.stage.stage);
+    auto entrypoint = module_state->spirv->FindEntrypoint(createInfo.stage.pName, createInfo.stage.stage);
     if (!entrypoint) return false;
 
     uint32_t x = {}, y = {}, z = {};
-    if (!module_state->FindLocalSize(*entrypoint, x, y, z)) {
+    if (!module_state->spirv->FindLocalSize(*entrypoint, x, y, z)) {
         return false;
     }
 
@@ -381,16 +382,16 @@ bool BestPractices::ValidateCreateComputePipelineArm(const VkComputePipelineCrea
 bool BestPractices::ValidateCreateComputePipelineAmd(const VkComputePipelineCreateInfo& createInfo) const {
     bool skip = false;
     auto module_state = Get<SHADER_MODULE_STATE>(createInfo.stage.module);
-    if (!module_state) {
+    if (!module_state || !module_state->spirv) {
         return false;
     }
-    auto entrypoint = module_state->FindEntrypoint(createInfo.stage.pName, createInfo.stage.stage);
+    auto entrypoint = module_state->spirv->FindEntrypoint(createInfo.stage.pName, createInfo.stage.stage);
     if (!entrypoint) {
         return false;
     }
 
     uint32_t x = {}, y = {}, z = {};
-    if (!module_state->FindLocalSize(*entrypoint, x, y, z)) {
+    if (!module_state->spirv->FindLocalSize(*entrypoint, x, y, z)) {
         return false;
     }
 
@@ -654,7 +655,7 @@ bool BestPractices::PreCallValidateCmdBindPipeline(VkCommandBuffer commandBuffer
     return skip;
 }
 
-bool BestPractices::ValidateFsOutputsAgainstRenderPass(const SHADER_MODULE_STATE& module_state, const EntryPoint& entrypoint,
+bool BestPractices::ValidateFsOutputsAgainstRenderPass(const SPIRV_MODULE_STATE& module_state, const EntryPoint& entrypoint,
                                                        const PIPELINE_STATE& pipeline, uint32_t subpass_index) const {
     bool skip = false;
 
@@ -707,14 +708,14 @@ bool BestPractices::ValidateFsOutputsAgainstRenderPass(const SHADER_MODULE_STATE
             if (attachment && !output) {
                 const auto& attachments = pipeline.Attachments();
                 if (location < attachments.size() && attachments[location].colorWriteMask != 0) {
-                    skip |= LogWarning(module_state.vk_shader_module(), kVUID_BestPractices_Shader_InputNotProduced,
+                    skip |= LogWarning(module_state.handle(), kVUID_BestPractices_Shader_InputNotProduced,
                                        "vkCreateGraphicsPipelines(): pCreateInfos[%" PRIu32 "] Attachment %" PRIu32
                                        " not written by fragment shader; undefined values will be written to attachment",
                                        pipeline.create_index, location);
                 }
             } else if (!attachment && output) {
                 if (!(alpha_to_coverage_enabled && location == 0)) {
-                    skip |= LogWarning(module_state.vk_shader_module(), kVUID_BestPractices_Shader_OutputNotConsumed,
+                    skip |= LogWarning(module_state.handle(), kVUID_BestPractices_Shader_OutputNotConsumed,
                                        "vkCreateGraphicsPipelines(): pCreateInfos[%" PRIu32
                                        "] fragment shader writes to output location %" PRIu32 " with no matching attachment",
                                        pipeline.create_index, location);
@@ -726,7 +727,7 @@ bool BestPractices::ValidateFsOutputsAgainstRenderPass(const SHADER_MODULE_STATE
                 // Type checking
                 if (!(output_type & attachment_type)) {
                     skip |= LogWarning(
-                        module_state.vk_shader_module(), kVUID_BestPractices_Shader_FragmentOutputMismatch,
+                        module_state.handle(), kVUID_BestPractices_Shader_FragmentOutputMismatch,
                         "vkCreateGraphicsPipelines(): pCreateInfos[%" PRIu32 "] Attachment %" PRIu32
                         " of type `%s` does not match fragment shader output type of `%s`; resulting values are undefined",
                         pipeline.create_index, location, string_VkFormat(attachment->format),
@@ -741,7 +742,7 @@ bool BestPractices::ValidateFsOutputsAgainstRenderPass(const SHADER_MODULE_STATE
     return skip;
 }
 
-bool BestPractices::ValidateFsOutputsAgainstDynamicRenderingRenderPass(const SHADER_MODULE_STATE& module_state,
+bool BestPractices::ValidateFsOutputsAgainstDynamicRenderingRenderPass(const SPIRV_MODULE_STATE& module_state,
                                                                        const EntryPoint& entrypoint,
                                                                        const PIPELINE_STATE& pipeline) const {
     bool skip = false;
@@ -767,7 +768,7 @@ bool BestPractices::ValidateFsOutputsAgainstDynamicRenderingRenderPass(const SHA
         const auto& rp_state = pipeline.RenderPassState();
         const auto& attachments = pipeline.Attachments();
         if (!output && location < attachments.size() && attachments[location].colorWriteMask != 0) {
-            skip |= LogWarning(module_state.vk_shader_module(), kVUID_BestPractices_Shader_InputNotProduced,
+            skip |= LogWarning(module_state.handle(), kVUID_BestPractices_Shader_InputNotProduced,
                                "vkCreateGraphicsPipelines(): pCreateInfos[%" PRIu32 "] Attachment %" PRIu32
                                " not written by fragment shader; undefined values will be written to attachment",
                                pipeline.create_index, location);
@@ -780,7 +781,7 @@ bool BestPractices::ValidateFsOutputsAgainstDynamicRenderingRenderPass(const SHA
             // Type checking
             if (!(output_type & attachment_type)) {
                 skip |= LogWarning(
-                    module_state.vk_shader_module(), kVUID_BestPractices_Shader_FragmentOutputMismatch,
+                    module_state.handle(), kVUID_BestPractices_Shader_FragmentOutputMismatch,
                     "vkCreateGraphicsPipelines(): pCreateInfos[%" PRIu32 "] Attachment %" PRIu32
                     " of type `%s` does not match fragment shader output type of `%s`; resulting values are undefined",
                     pipeline.create_index, location, string_VkFormat(format), module_state.DescribeType(output->type_id).c_str());

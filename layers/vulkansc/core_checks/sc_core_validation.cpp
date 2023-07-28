@@ -439,10 +439,75 @@ bool SCCoreChecks::ValidatePipelineShaderStage(const PIPELINE_STATE& pipeline, c
     const auto* create_info = stage_state.create_info;
     const SHADER_MODULE_STATE& module_state = *stage_state.module_state.get();
 
-    skip |= ValidateSpecializations(module_state, create_info->pSpecializationInfo, pipeline);
+    // TODO: Vulkan SC - Recent refactoring upstream caused validation that does not depend on SPIR-V data
+    // to now require SPIR-V data for being executed. This is a regression that makes us lose some
+    // coverage of non-SPIR-V depended VUs, so for now we simply replicate the checks done by
+    // ValidateSpecialization and ValidateShaderSubgroupSizeControl until the regression is fixed upstream.
+
+    // skip |= ValidateSpecializations(module_state, create_info->pSpecializationInfo, pipeline);
+    {
+        auto spec = create_info->pSpecializationInfo;
+        if (spec) {
+            for (auto i = 0u; i < spec->mapEntryCount; i++) {
+                if (spec->pMapEntries[i].offset >= spec->dataSize) {
+                    skip |=
+                        LogError(module_state.Handle(), "VUID-VkSpecializationInfo-offset-00773",
+                                 "%s(): pCreateInfos[%" PRIu32
+                                 "] Specialization entry %u (for constant id %u) references memory outside provided specialization "
+                                 "data (bytes %u..%zu; %zu bytes provided).",
+                                 pipeline.GetCreateFunctionName(), pipeline.create_index, i, spec->pMapEntries[i].constantID,
+                                 spec->pMapEntries[i].offset, spec->pMapEntries[i].offset + spec->dataSize - 1, spec->dataSize);
+
+                    continue;
+                }
+                if (spec->pMapEntries[i].offset + spec->pMapEntries[i].size > spec->dataSize) {
+                    skip |= LogError(
+                        module_state.Handle(), "VUID-VkSpecializationInfo-pMapEntries-00774",
+                        "%s(): pCreateInfos[%" PRIu32
+                        "] Specialization entry %u (for constant id %u) references memory outside provided specialization "
+                        "data (bytes %u..%zu; %zu bytes provided).",
+                        pipeline.GetCreateFunctionName(), pipeline.create_index, i, spec->pMapEntries[i].constantID,
+                        spec->pMapEntries[i].offset, spec->pMapEntries[i].offset + spec->pMapEntries[i].size - 1, spec->dataSize);
+                }
+                for (uint32_t j = i + 1; j < spec->mapEntryCount; ++j) {
+                    if (spec->pMapEntries[i].constantID == spec->pMapEntries[j].constantID) {
+                        skip |= LogError(module_state.Handle(), "VUID-VkSpecializationInfo-constantID-04911",
+                                         "%s(): pCreateInfos[%" PRIu32 "] Specialization entry %" PRIu32 " and %" PRIu32
+                                         " have the same constantID (%" PRIu32 ").",
+                                         pipeline.GetCreateFunctionName(), pipeline.create_index, i, j,
+                                         spec->pMapEntries[i].constantID);
+                    }
+                }
+            }
+        }
+    }
 
     if (IsExtEnabled(device_extensions.vk_ext_subgroup_size_control)) {
-        skip |= ValidateShaderSubgroupSizeControl(module_state, create_info->stage, create_info->flags);
+        // skip |= ValidateShaderSubgroupSizeControl(module_state, create_info->stage, create_info->flags);
+        auto stage = create_info->stage;
+        auto flags = create_info->flags;
+
+        if ((flags & VK_PIPELINE_SHADER_STAGE_CREATE_ALLOW_VARYING_SUBGROUP_SIZE_BIT_EXT) != 0 &&
+            !enabled_features.core13.subgroupSizeControl) {
+            skip |= LogError(module_state.Handle(), "VUID-VkPipelineShaderStageCreateInfo-flags-02784",
+                             "VkPipelineShaderStageCreateInfo flags contain "
+                             "VK_PIPELINE_SHADER_STAGE_CREATE_ALLOW_VARYING_SUBGROUP_SIZE_BIT_EXT, "
+                             "but the VkPhysicalDeviceSubgroupSizeControlFeaturesEXT::subgroupSizeControl feature is not enabled.");
+        }
+
+        if ((flags & VK_PIPELINE_SHADER_STAGE_CREATE_REQUIRE_FULL_SUBGROUPS_BIT_EXT) != 0) {
+            if (!enabled_features.core13.computeFullSubgroups) {
+                skip |= LogError(module_state.Handle(), "VUID-VkPipelineShaderStageCreateInfo-flags-02785",
+                                 "VkPipelineShaderStageCreateInfo flags contain "
+                                 "VK_PIPELINE_SHADER_STAGE_CREATE_REQUIRE_FULL_SUBGROUPS_BIT_EXT, but the "
+                                 "VkPhysicalDeviceSubgroupSizeControlFeaturesEXT::computeFullSubgroups feature is not enabled");
+            } else if ((stage & (VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_COMPUTE_BIT)) == 0) {
+                skip |= LogError(module_state.Handle(), "VUID-VkPipelineShaderStageCreateInfo-flags-08988",
+                                 "VkPipelineShaderStageCreateInfo flags contain "
+                                 "VK_PIPELINE_SHADER_STAGE_CREATE_REQUIRE_FULL_SUBGROUPS_BIT_EXT, but the stage is %s.",
+                                 string_VkShaderStageFlagBits(stage));
+            }
+        }
     }
 
     return skip;

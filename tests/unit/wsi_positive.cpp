@@ -397,11 +397,7 @@ TEST_F(PositiveWsi, TransferImageToSwapchainDeviceGroup) {
 
     vk::BindImageMemory2(m_device->device(), 1, &bind_info);
 
-    uint32_t swapchain_images_count = 0;
-    vk::GetSwapchainImagesKHR(device(), m_swapchain, &swapchain_images_count, nullptr);
-    std::vector<VkImage> swapchain_images;
-    swapchain_images.resize(swapchain_images_count);
-    vk::GetSwapchainImagesKHR(device(), m_swapchain, &swapchain_images_count, swapchain_images.data());
+    const auto swapchain_images = GetSwapchainImages(m_swapchain);
 
     vk_testing::Fence fence;
     fence.init(*m_device, VkFenceObj::create_info());
@@ -446,6 +442,122 @@ TEST_F(PositiveWsi, TransferImageToSwapchainDeviceGroup) {
     m_commandBuffer->QueueCommandBuffer();
 }
 
+TEST_F(PositiveWsi, SwapchainAcquireImageAndPresent) {
+    TEST_DESCRIPTION("Test acquiring swapchain image and then presenting it.");
+    AddSurfaceExtension();
+    ASSERT_NO_FATAL_FAILURE(InitFramework());
+    if (!AreRequiredExtensionsEnabled()) {
+        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
+    }
+    ASSERT_NO_FATAL_FAILURE(InitState());
+    if (!InitSwapchain()) {
+        GTEST_SKIP() << "Cannot create surface or swapchain";
+    }
+    const vk_testing::Semaphore acquire_semaphore(*m_device);
+    const vk_testing::Semaphore submit_semaphore(*m_device);
+
+    const auto swapchain_images = GetSwapchainImages(m_swapchain);
+
+    uint32_t image_index = 0;
+    ASSERT_VK_SUCCESS(
+        vk::AcquireNextImageKHR(device(), m_swapchain, kWaitTimeout, acquire_semaphore, VK_NULL_HANDLE, &image_index));
+
+    auto img_barrier = LvlInitStruct<VkImageMemoryBarrier>();
+    img_barrier.srcAccessMask = 0;
+    img_barrier.dstAccessMask = 0;
+    img_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    img_barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    img_barrier.image = swapchain_images[image_index];
+    img_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    img_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    img_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    img_barrier.subresourceRange.baseArrayLayer = 0;
+    img_barrier.subresourceRange.baseMipLevel = 0;
+    img_barrier.subresourceRange.layerCount = 1;
+    img_barrier.subresourceRange.levelCount = 1;
+
+    m_commandBuffer->begin();
+    vk::CmdPipelineBarrier(*m_commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0, nullptr,
+                           0, nullptr, 1, &img_barrier);
+    m_commandBuffer->end();
+
+    constexpr VkPipelineStageFlags stage_mask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+
+    auto submit_info = LvlInitStruct<VkSubmitInfo>();
+    submit_info.commandBufferCount = 1;
+    submit_info.pCommandBuffers = &m_commandBuffer->handle();
+    submit_info.waitSemaphoreCount = 1;
+    submit_info.pWaitSemaphores = &acquire_semaphore.handle();
+    submit_info.pWaitDstStageMask = &stage_mask;
+    submit_info.signalSemaphoreCount = 1;
+    submit_info.pSignalSemaphores = &submit_semaphore.handle();
+    ASSERT_VK_SUCCESS(vk::QueueSubmit(m_device->m_queue, 1, &submit_info, VK_NULL_HANDLE));
+
+    auto present = LvlInitStruct<VkPresentInfoKHR>();
+    present.waitSemaphoreCount = 1;
+    present.pWaitSemaphores = &submit_semaphore.handle();
+    present.swapchainCount = 1;
+    present.pSwapchains = &m_swapchain;
+    present.pImageIndices = &image_index;
+    ASSERT_VK_SUCCESS(vk::QueuePresentKHR(m_device->m_queue, &present));
+    ASSERT_VK_SUCCESS(vk::QueueWaitIdle(m_device->m_queue));
+}
+
+TEST_F(PositiveWsi, SwapchainAcquireImageAndWaitForFence) {
+    TEST_DESCRIPTION("Test waiting on swapchain image with a fence.");
+    AddSurfaceExtension();
+    ASSERT_NO_FATAL_FAILURE(InitFramework());
+    if (!AreRequiredExtensionsEnabled()) {
+        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
+    }
+    ASSERT_NO_FATAL_FAILURE(InitState());
+    if (!InitSwapchain()) {
+        GTEST_SKIP() << "Cannot create surface or swapchain";
+    }
+
+    const VkFenceObj fence(*m_device);
+    const auto swapchain_images = GetSwapchainImages(m_swapchain);
+
+    uint32_t image_index = 0;
+    ASSERT_VK_SUCCESS(vk::AcquireNextImageKHR(device(), m_swapchain, kWaitTimeout, VK_NULL_HANDLE, fence, &image_index));
+    ASSERT_VK_SUCCESS(vk::WaitForFences(device(), 1, &fence.handle(), VK_TRUE, kWaitTimeout));
+
+    auto img_barrier = LvlInitStruct<VkImageMemoryBarrier>();
+    img_barrier.srcAccessMask = 0;
+    img_barrier.dstAccessMask = 0;
+    img_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    img_barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    img_barrier.image = swapchain_images[image_index];
+    img_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    img_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    img_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    img_barrier.subresourceRange.baseArrayLayer = 0;
+    img_barrier.subresourceRange.baseMipLevel = 0;
+    img_barrier.subresourceRange.layerCount = 1;
+    img_barrier.subresourceRange.levelCount = 1;
+
+    m_commandBuffer->begin();
+    vk::CmdPipelineBarrier(m_commandBuffer->handle(), VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0,
+                           nullptr, 0, nullptr, 1, &img_barrier);
+    m_commandBuffer->end();
+
+    constexpr VkPipelineStageFlags stage_mask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+
+    auto submit_info = LvlInitStruct<VkSubmitInfo>();
+    submit_info.commandBufferCount = 1;
+    submit_info.pCommandBuffers = &m_commandBuffer->handle();
+    submit_info.pWaitDstStageMask = &stage_mask;
+    ASSERT_VK_SUCCESS(vk::QueueSubmit(m_device->m_queue, 1, &submit_info, VK_NULL_HANDLE));
+    ASSERT_VK_SUCCESS(vk::QueueWaitIdle(m_device->m_queue));
+
+    auto present = LvlInitStruct<VkPresentInfoKHR>();
+    present.swapchainCount = 1;
+    present.pSwapchains = &m_swapchain;
+    present.pImageIndices = &image_index;
+    ASSERT_VK_SUCCESS(vk::QueuePresentKHR(m_device->m_queue, &present));
+    ASSERT_VK_SUCCESS(vk::QueueWaitIdle(m_device->m_queue));
+}
+
 TEST_F(PositiveWsi, SwapchainImageLayout) {
     AddSurfaceExtension();
     AddRequiredExtensions(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
@@ -457,12 +569,9 @@ TEST_F(PositiveWsi, SwapchainImageLayout) {
     if (!InitSwapchain()) {
         GTEST_SKIP() << "Cannot create surface or swapchain, skipping CmdCopySwapchainImage test";
     }
-    uint32_t image_index, image_count;
-    vk::GetSwapchainImagesKHR(m_device->handle(), m_swapchain, &image_count, nullptr);
-    std::vector<VkImage> swapchainImages(image_count, VK_NULL_HANDLE);
-    vk::GetSwapchainImagesKHR(m_device->handle(), m_swapchain, &image_count, swapchainImages.data());
-    auto fenceci = LvlInitStruct<VkFenceCreateInfo>();
-    vk_testing::Fence fence(*m_device, fenceci);
+    const auto swapchainImages = GetSwapchainImages(m_swapchain);
+    const vk_testing::Fence fence(*m_device);
+    uint32_t image_index = 0;
     ASSERT_VK_SUCCESS(
         vk::AcquireNextImageKHR(m_device->handle(), m_swapchain, kWaitTimeout, VK_NULL_HANDLE, fence.handle(), &image_index));
     VkAttachmentDescription attach[] = {
@@ -611,11 +720,7 @@ TEST_F(PositiveWsi, SwapchainPresentShared) {
     swapchain_create_info.oldSwapchain = 0;
 
     vk::CreateSwapchainKHR(device(), &swapchain_create_info, nullptr, &m_swapchain);
-
-    uint32_t image_count;
-    vk::GetSwapchainImagesKHR(device(), m_swapchain, &image_count, nullptr);
-    std::vector<VkImage> images(image_count);
-    vk::GetSwapchainImagesKHR(device(), m_swapchain, &image_count, images.data());
+    const auto images = GetSwapchainImages(m_swapchain);
 
     uint32_t image_index;
     VkFenceObj fence;
@@ -761,13 +866,8 @@ TEST_F(PositiveWsi, SwapchainImageFormatProps) {
 
     ASSERT_VK_SUCCESS(pipeline.CreateVKPipeline(pipeline_layout.handle(), render_pass.handle()));
 
-    uint32_t image_count;
-    ASSERT_VK_SUCCESS(vk::GetSwapchainImagesKHR(device(), m_swapchain, &image_count, nullptr));
-    std::vector<VkImage> swapchain_images(image_count);
-    ASSERT_VK_SUCCESS(vk::GetSwapchainImagesKHR(device(), m_swapchain, &image_count, swapchain_images.data()));
-
-    VkFenceObj fence;
-    fence.init(*DeviceObj(), VkFenceObj::create_info());
+    const auto swapchain_images = GetSwapchainImages(m_swapchain);
+    const VkFenceObj fence(*m_device);
 
     uint32_t image_index;
     ASSERT_VK_SUCCESS(vk::AcquireNextImageKHR(device(), m_swapchain, kWaitTimeout, VK_NULL_HANDLE, fence.handle(), &image_index));
@@ -1024,11 +1124,7 @@ TEST_F(PositiveWsi, ProtectedSwapchainImageColorAttachment) {
     ASSERT_VK_SUCCESS(vk::CreateSwapchainKHR(device(), &swapchain_create_info, nullptr, &m_swapchain));
 
     // Get VkImage from swapchain which should be protected
-    uint32_t image_count;
-    std::vector<VkImage> swapchain_images;
-    vk::GetSwapchainImagesKHR(device(), m_swapchain, &image_count, nullptr);
-    swapchain_images.resize(image_count, VK_NULL_HANDLE);
-    vk::GetSwapchainImagesKHR(device(), m_swapchain, &image_count, swapchain_images.data());
+    const auto swapchain_images = GetSwapchainImages(m_swapchain);
     VkImage protected_image = swapchain_images.at(0);  // only need 1 image to test
 
     // Create a protected image view

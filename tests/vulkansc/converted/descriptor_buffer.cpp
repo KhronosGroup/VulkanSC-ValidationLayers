@@ -22,27 +22,8 @@
 
 TEST_F(NegativeDescriptorBuffer, SetLayout) {
     TEST_DESCRIPTION("Descriptor buffer set layout tests.");
-    SetTargetApiVersion(VK_API_VERSION_1_2);
-
-    AddRequiredExtensions(VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME);
-    AddOptionalExtensions(VK_EXT_MUTABLE_DESCRIPTOR_TYPE_EXTENSION_NAME);
-    AddOptionalExtensions(VK_EXT_INLINE_UNIFORM_BLOCK_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-
-    if (DeviceValidationVersion() < VK_API_VERSION_1_2) {
-        GTEST_SKIP() << "At least Vulkan version 1.2 is required";
-    }
-
-    auto descriptor_buffer_features = LvlInitStruct<VkPhysicalDeviceDescriptorBufferFeaturesEXT>();
-    auto mutable_descriptor_features = LvlInitStruct<VkPhysicalDeviceMutableDescriptorTypeFeaturesEXT>(&descriptor_buffer_features);
-    auto inline_uniform_features = LvlInitStruct<VkPhysicalDeviceInlineUniformBlockFeaturesEXT>(&mutable_descriptor_features);
-    GetPhysicalDeviceFeatures2(inline_uniform_features);
-
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &inline_uniform_features));
+    InitBasicDescriptorBuffer();
+    if (::testing::Test::IsSkipped()) return;
 
     vk_testing::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
 
@@ -82,31 +63,6 @@ TEST_F(NegativeDescriptorBuffer, SetLayout) {
         const auto dslci = LvlInitStruct<VkDescriptorSetLayoutCreateInfo>(nullptr, flags, 1U, &binding);
         VkDescriptorSetLayout dsl;
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDescriptorSetLayoutCreateInfo-flags-08002");
-        vk::CreateDescriptorSetLayout(m_device->device(), &dslci, nullptr, &dsl);
-        m_errorMonitor->VerifyFound();
-    }
-    if (IsExtensionsEnabled(VK_EXT_MUTABLE_DESCRIPTOR_TYPE_EXTENSION_NAME)) {
-        const VkDescriptorSetLayoutBinding binding{0, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
-        const VkDescriptorSetLayoutCreateFlags flags =
-            VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT | VK_DESCRIPTOR_SET_LAYOUT_CREATE_HOST_ONLY_POOL_BIT_VALVE;
-        const auto dslci = LvlInitStruct<VkDescriptorSetLayoutCreateInfo>(nullptr, flags, 1U, &binding);
-        VkDescriptorSetLayout dsl;
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDescriptorSetLayoutCreateInfo-flags-08003");
-        vk::CreateDescriptorSetLayout(m_device->device(), &dslci, nullptr, &dsl);
-        m_errorMonitor->VerifyFound();
-    }
-
-    if (IsExtensionsEnabled(VK_EXT_INLINE_UNIFORM_BLOCK_EXTENSION_NAME)) {
-        auto inlineUniformProps = LvlInitStruct<VkPhysicalDeviceInlineUniformBlockPropertiesEXT>();
-        GetPhysicalDeviceProperties2(inlineUniformProps);
-
-        const VkDescriptorSetLayoutBinding binding{0, VK_DESCRIPTOR_TYPE_INLINE_UNIFORM_BLOCK_EXT,
-                                                   inlineUniformProps.maxInlineUniformBlockSize + 4, VK_SHADER_STAGE_FRAGMENT_BIT,
-                                                   nullptr};
-        const auto dslci = LvlInitStruct<VkDescriptorSetLayoutCreateInfo>(nullptr, 0U, 1U, &binding);
-        VkDescriptorSetLayout dsl;
-
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDescriptorSetLayoutBinding-descriptorType-08004");
         vk::CreateDescriptorSetLayout(m_device->device(), &dslci, nullptr, &dsl);
         m_errorMonitor->VerifyFound();
     }
@@ -181,6 +137,48 @@ TEST_F(NegativeDescriptorBuffer, SetLayout) {
         vk::AllocateDescriptorSets(m_device->device(), &alloc_info, &ds);
         m_errorMonitor->VerifyFound();
     }
+}
+
+TEST_F(NegativeDescriptorBuffer, SetLayoutInlineUniformBlockEXT) {
+    TEST_DESCRIPTION("Descriptor buffer set layout tests.");
+    AddRequiredExtensions(VK_EXT_INLINE_UNIFORM_BLOCK_EXTENSION_NAME);
+    auto inline_uniform_features = LvlInitStruct<VkPhysicalDeviceInlineUniformBlockFeaturesEXT>();
+    InitBasicDescriptorBuffer(&inline_uniform_features);
+    if (::testing::Test::IsSkipped()) return;
+
+    vk_testing::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
+
+    auto inlineUniformProps = LvlInitStruct<VkPhysicalDeviceInlineUniformBlockPropertiesEXT>();
+    GetPhysicalDeviceProperties2(inlineUniformProps);
+
+    const VkDescriptorSetLayoutBinding binding{0, VK_DESCRIPTOR_TYPE_INLINE_UNIFORM_BLOCK_EXT,
+                                               inlineUniformProps.maxInlineUniformBlockSize + 4, VK_SHADER_STAGE_FRAGMENT_BIT,
+                                               nullptr};
+    const auto dslci = LvlInitStruct<VkDescriptorSetLayoutCreateInfo>(nullptr, 0U, 1U, &binding);
+    VkDescriptorSetLayout dsl;
+
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDescriptorSetLayoutBinding-descriptorType-08004");
+    vk::CreateDescriptorSetLayout(m_device->device(), &dslci, nullptr, &dsl);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeDescriptorBuffer, SetLayoutMutableDescriptorEXT) {
+    TEST_DESCRIPTION("Descriptor buffer set layout tests.");
+    AddRequiredExtensions(VK_EXT_MUTABLE_DESCRIPTOR_TYPE_EXTENSION_NAME);
+    auto mutable_descriptor_features = LvlInitStruct<VkPhysicalDeviceMutableDescriptorTypeFeaturesEXT>();
+    InitBasicDescriptorBuffer(&mutable_descriptor_features);
+    if (::testing::Test::IsSkipped()) return;
+
+    vk_testing::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
+
+    const VkDescriptorSetLayoutBinding binding{0, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
+    const VkDescriptorSetLayoutCreateFlags flags =
+        VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT | VK_DESCRIPTOR_SET_LAYOUT_CREATE_HOST_ONLY_POOL_BIT_VALVE;
+    const auto dslci = LvlInitStruct<VkDescriptorSetLayoutCreateInfo>(nullptr, flags, 1U, &binding);
+    VkDescriptorSetLayout dsl;
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDescriptorSetLayoutCreateInfo-flags-08003");
+    vk::CreateDescriptorSetLayout(m_device->device(), &dslci, nullptr, &dsl);
+    m_errorMonitor->VerifyFound();
 }
 
 TEST_F(NegativeDescriptorBuffer, NotEnabled) {
@@ -686,6 +684,7 @@ TEST_F(NegativeDescriptorBuffer, BindingAndOffsets) {
         m_errorMonitor->VerifyFound();
     }
 
+    // VUID-vkCmdSetDescriptorBufferOffsetsEXT VUs
     {
         buffCI = LvlInitStruct<VkBufferCreateInfo>();
         buffCI.size = 4096;
@@ -748,6 +747,24 @@ TEST_F(NegativeDescriptorBuffer, BindingAndOffsets) {
                 m_errorMonitor->VerifyFound();
                 command_buffer.end();
             }
+        }
+
+        {
+            const VkDescriptorSetLayoutBinding binding = {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT,
+                                                          nullptr};
+            const VkDescriptorSetLayoutObj set_layout_no_flag(m_device, {binding});
+            const VkPipelineLayoutObj pipeline_layout_2(m_device, {&set_layout_no_flag, &set_layout_no_flag});
+
+            const uint32_t indices_2[2] = {0, 0};
+            const VkDeviceSize offsets_2[2] = {0, 0};
+            vk::CmdBindDescriptorBuffersEXT(*m_commandBuffer, 1, &dbbi2);
+            // complain about set layout for set 0
+            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdSetDescriptorBufferOffsetsEXT-firstSet-09006");
+            // complain about set layout for set 1
+            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdSetDescriptorBufferOffsetsEXT-firstSet-09006");
+            vk::CmdSetDescriptorBufferOffsetsEXT(*m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_2, 0, 2,
+                                                 indices_2, offsets_2);
+            m_errorMonitor->VerifyFound();
         }
     }
 
@@ -819,25 +836,10 @@ TEST_F(NegativeDescriptorBuffer, BindingAndOffsets) {
 
 TEST_F(NegativeDescriptorBuffer, InconsistentBuffer) {
     TEST_DESCRIPTION("Dispatch pipeline with descriptor set bound while descriptor buffer expected");
-    SetTargetApiVersion(VK_API_VERSION_1_2);
-
-    AddRequiredExtensions(VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-
-    if (DeviceValidationVersion() < VK_API_VERSION_1_2) {
-        GTEST_SKIP() << "At least Vulkan version 1.2 is required";
-    }
-
-    auto descriptor_buffer_features = LvlInitStruct<VkPhysicalDeviceDescriptorBufferFeaturesEXT>();
-    auto buffer_device_address_features = LvlInitStruct<VkPhysicalDeviceBufferDeviceAddressFeatures>(&descriptor_buffer_features);
-    GetPhysicalDeviceFeatures2(buffer_device_address_features);
-
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &buffer_device_address_features, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    auto buffer_device_address_features = LvlInitStruct<VkPhysicalDeviceBufferDeviceAddressFeatures>();
+    InitBasicDescriptorBuffer(&buffer_device_address_features);
+    if (::testing::Test::IsSkipped()) return;
 
     const VkDescriptorSetLayoutBinding binding{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr};
 
@@ -892,25 +894,10 @@ TEST_F(NegativeDescriptorBuffer, InconsistentBuffer) {
 
 TEST_F(NegativeDescriptorBuffer, InconsistentSet) {
     TEST_DESCRIPTION("Dispatch pipeline with descriptor buffer bound while of descriptor set expected");
-    SetTargetApiVersion(VK_API_VERSION_1_2);
-
-    AddRequiredExtensions(VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-
-    if (DeviceValidationVersion() < VK_API_VERSION_1_2) {
-        GTEST_SKIP() << "At least Vulkan version 1.2 is required";
-    }
-
-    auto descriptor_buffer_features = LvlInitStruct<VkPhysicalDeviceDescriptorBufferFeaturesEXT>();
-    auto buffer_device_address_features = LvlInitStruct<VkPhysicalDeviceBufferDeviceAddressFeatures>(&descriptor_buffer_features);
-    GetPhysicalDeviceFeatures2(buffer_device_address_features);
-
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &buffer_device_address_features, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    auto buffer_device_address_features = LvlInitStruct<VkPhysicalDeviceBufferDeviceAddressFeatures>();
+    InitBasicDescriptorBuffer(&buffer_device_address_features);
+    if (::testing::Test::IsSkipped()) return;
 
     const VkDescriptorSetLayoutBinding binding{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr};
     auto dslci = LvlInitStruct<VkDescriptorSetLayoutCreateInfo>();
@@ -963,26 +950,10 @@ TEST_F(NegativeDescriptorBuffer, InconsistentSet) {
 
 TEST_F(NegativeDescriptorBuffer, BindPoint) {
     TEST_DESCRIPTION("Descriptor buffer invalid bind point.");
-
-    SetTargetApiVersion(VK_API_VERSION_1_2);
-
-    AddRequiredExtensions(VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME);
-    AddOptionalExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-
-    if (DeviceValidationVersion() < VK_API_VERSION_1_2) {
-        GTEST_SKIP() << "At least Vulkan version 1.2 is required";
-    }
-
-    auto descriptor_buffer_features = LvlInitStruct<VkPhysicalDeviceDescriptorBufferFeaturesEXT>();
-    auto buffer_device_address_features = LvlInitStruct<VkPhysicalDeviceBufferDeviceAddressFeatures>(&descriptor_buffer_features);
-    GetPhysicalDeviceFeatures2(buffer_device_address_features);
-
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &buffer_device_address_features, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
+    auto buffer_device_address_features = LvlInitStruct<VkPhysicalDeviceBufferDeviceAddressFeatures>();
+    InitBasicDescriptorBuffer(&buffer_device_address_features);
+    if (::testing::Test::IsSkipped()) return;
 
     auto descriptor_buffer_properties = LvlInitStruct<VkPhysicalDeviceDescriptorBufferPropertiesEXT>();
     GetPhysicalDeviceProperties2(descriptor_buffer_properties);
@@ -1037,31 +1008,16 @@ TEST_F(NegativeDescriptorBuffer, BindPoint) {
 
 TEST_F(NegativeDescriptorBuffer, DescriptorGetInfo) {
     TEST_DESCRIPTION("Descriptor buffer vkDescriptorGetInfo().");
-    SetTargetApiVersion(VK_API_VERSION_1_2);
-
-    AddRequiredExtensions(VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
     AddOptionalExtensions(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
     AddOptionalExtensions(VK_NV_RAY_TRACING_EXTENSION_NAME);
     AddOptionalExtensions(VK_EXT_FRAGMENT_DENSITY_MAP_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
+    auto buffer_device_address_features = LvlInitStruct<VkPhysicalDeviceBufferDeviceAddressFeatures>();
+    InitBasicDescriptorBuffer(&buffer_device_address_features);
+    if (::testing::Test::IsSkipped()) return;
 
     const bool acceleration_structure = IsExtensionsEnabled(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
     const bool nv_ray_tracing = IsExtensionsEnabled(VK_NV_RAY_TRACING_EXTENSION_NAME);
-
-    if (DeviceValidationVersion() < VK_API_VERSION_1_2) {
-        GTEST_SKIP() << "At least Vulkan version 1.2 is required";
-    }
-
-    auto descriptor_buffer_features = LvlInitStruct<VkPhysicalDeviceDescriptorBufferFeaturesEXT>();
-    auto buffer_device_address_features = LvlInitStruct<VkPhysicalDeviceBufferDeviceAddressFeatures>(&descriptor_buffer_features);
-    GetPhysicalDeviceFeatures2(buffer_device_address_features);
-
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &buffer_device_address_features, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
 
     uint8_t buffer[128];
 
@@ -1252,28 +1208,12 @@ TEST_F(NegativeDescriptorBuffer, DescriptorGetInfo) {
 
 TEST_F(NegativeDescriptorBuffer, Various) {
     TEST_DESCRIPTION("Descriptor buffer various tests.");
-    SetTargetApiVersion(VK_API_VERSION_1_2);
-
-    AddRequiredExtensions(VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME);
     AddOptionalExtensions(VK_EXT_MUTABLE_DESCRIPTOR_TYPE_EXTENSION_NAME);
     AddOptionalExtensions(VK_EXT_INLINE_UNIFORM_BLOCK_EXTENSION_NAME);
     AddOptionalExtensions(VK_NV_RAY_TRACING_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-
-    if (DeviceValidationVersion() < VK_API_VERSION_1_2) {
-        GTEST_SKIP() << "At least Vulkan version 1.2 is required";
-    }
-
+    InitBasicDescriptorBuffer();
+    if (::testing::Test::IsSkipped()) return;
     const bool nv_ray_tracing = IsExtensionsEnabled(VK_NV_RAY_TRACING_EXTENSION_NAME);
-
-    auto descriptor_buffer_features = LvlInitStruct<VkPhysicalDeviceDescriptorBufferFeaturesEXT>();
-    GetPhysicalDeviceFeatures2(descriptor_buffer_features);
-
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &descriptor_buffer_features));
 
     auto descriptor_buffer_properties = LvlInitStruct<VkPhysicalDeviceDescriptorBufferPropertiesEXT>();
     GetPhysicalDeviceProperties2(descriptor_buffer_properties);
@@ -1477,20 +1417,8 @@ TEST_F(NegativeDescriptorBuffer, ExtensionCombination) {
 
 TEST_F(NegativeDescriptorBuffer, SetBufferAddressSpaceLimits) {
     TEST_DESCRIPTION("Create VkBuffer with extension.");
-    SetTargetApiVersion(VK_API_VERSION_1_2);
-    AddRequiredExtensions(VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-    if (DeviceValidationVersion() < VK_API_VERSION_1_2) {
-        GTEST_SKIP() << "At least Vulkan version 1.2 is required";
-    }
-
-    // descriptorBuffer guaranteed to be enabled if extension is
-    auto descriptor_buffer_features = LvlInitStruct<VkPhysicalDeviceDescriptorBufferFeaturesEXT>();
-    GetPhysicalDeviceFeatures2(descriptor_buffer_features);
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &descriptor_buffer_features));
+    InitBasicDescriptorBuffer();
+    if (::testing::Test::IsSkipped()) return;
 
     auto descriptor_buffer_properties = LvlInitStruct<VkPhysicalDeviceDescriptorBufferPropertiesEXT>();
     GetPhysicalDeviceProperties2(descriptor_buffer_properties);
@@ -1519,19 +1447,8 @@ TEST_F(NegativeDescriptorBuffer, SetBufferAddressSpaceLimits) {
 // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/5826
 TEST_F(NegativeDescriptorBuffer, NullHandle) {
     TEST_DESCRIPTION("Descriptor buffer various tests.");
-    SetTargetApiVersion(VK_API_VERSION_1_2);
-    AddRequiredExtensions(VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-    if (DeviceValidationVersion() < VK_API_VERSION_1_2) {
-        GTEST_SKIP() << "At least Vulkan version 1.2 is required";
-    }
-
-    auto descriptor_buffer_features = LvlInitStruct<VkPhysicalDeviceDescriptorBufferFeaturesEXT>();
-    GetPhysicalDeviceFeatures2(descriptor_buffer_features);
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &descriptor_buffer_features));
+    InitBasicDescriptorBuffer();
+    if (::testing::Test::IsSkipped()) return;
 
     auto descriptor_buffer_properties = LvlInitStruct<VkPhysicalDeviceDescriptorBufferPropertiesEXT>();
     GetPhysicalDeviceProperties2(descriptor_buffer_properties);
@@ -1553,19 +1470,8 @@ TEST_F(NegativeDescriptorBuffer, NullHandle) {
 
 TEST_F(NegativeDescriptorBuffer, BufferUsage) {
     TEST_DESCRIPTION("Wrong Usage for buffer createion.");
-    SetTargetApiVersion(VK_API_VERSION_1_2);
-    AddRequiredExtensions(VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-    if (DeviceValidationVersion() < VK_API_VERSION_1_2) {
-        GTEST_SKIP() << "At least Vulkan version 1.2 is required";
-    }
-
-    auto descriptor_buffer_features = LvlInitStruct<VkPhysicalDeviceDescriptorBufferFeaturesEXT>();
-    GetPhysicalDeviceFeatures2(descriptor_buffer_features);
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &descriptor_buffer_features));
+    InitBasicDescriptorBuffer();
+    if (::testing::Test::IsSkipped()) return;
 
     auto descriptor_buffer_properties = LvlInitStruct<VkPhysicalDeviceDescriptorBufferPropertiesEXT>();
     GetPhysicalDeviceProperties2(descriptor_buffer_properties);

@@ -573,7 +573,6 @@ class CoreChecks : public ValidationStateTracker {
     const DrawDispatchVuid& GetDrawDispatchVuid(CMD_TYPE cmd_type) const;
     bool ValidateCmdDrawInstance(const CMD_BUFFER_STATE& cb_state, uint32_t instanceCount, uint32_t firstInstance,
                                  CMD_TYPE cmd_type) const;
-    bool ValidateActionCmd(const CMD_BUFFER_STATE& cb_state, VkPipelineBindPoint bind_point, CMD_TYPE cmd_type) const;
     bool ValidateGraphicsIndexedCmd(const CMD_BUFFER_STATE& cb_state, CMD_TYPE cmd_type) const;
     bool ValidateCmdNextSubpass(RenderPassCreateVersion rp_version, VkCommandBuffer commandBuffer, CMD_TYPE cmd_type) const;
     bool ValidateInsertMemoryRange(const VulkanTypedHandle& typed_handle, const DEVICE_MEMORY_STATE* mem_info,
@@ -745,8 +744,8 @@ class CoreChecks : public ValidationStateTracker {
     bool ValidatePipelineRenderpassDraw(const LAST_BOUND_STATE& last_bound_state, CMD_TYPE cmd_type) const;
     bool ValidatePipelineDynamicRenderpassDraw(const LAST_BOUND_STATE& last_bound_state, CMD_TYPE cmd_type) const;
     bool ValidatePipelineDrawtimeState(const LAST_BOUND_STATE& last_bound_state, CMD_TYPE cmd_type) const;
-    bool ValidateCmdBufDrawState(const CMD_BUFFER_STATE& cb_state, CMD_TYPE cmd_type, const VkPipelineBindPoint bind_point) const;
-    bool ValidateCmdRayQueryState(const CMD_BUFFER_STATE& cb_state, CMD_TYPE cmd_type, const VkPipelineBindPoint bind_point) const;
+    bool ValidateActionState(const CMD_BUFFER_STATE& cb_state,const VkPipelineBindPoint bind_point,  CMD_TYPE cmd_type) const;
+    bool ValidateCmdRayQueryState(const CMD_BUFFER_STATE& cb_state, const VkPipelineBindPoint bind_point, CMD_TYPE cmd_type) const;
     static bool ValidateEventStageMask(const CMD_BUFFER_STATE& cb_state, size_t eventCount, size_t firstEventIndex,
                                        VkPipelineStageFlags2KHR sourceStageMask, EventToStageMap* localEventToStageMap);
     bool ValidateQueueFamilyIndices(const Location& loc, const CMD_BUFFER_STATE& cb_state, VkQueue queue) const;
@@ -874,68 +873,68 @@ class CoreChecks : public ValidationStateTracker {
     bool PreCallValidateCreateShaderModule(VkDevice device, const VkShaderModuleCreateInfo* pCreateInfo,
                                            const VkAllocationCallbacks* pAllocator, VkShaderModule* pShaderModule) const override;
     virtual bool ValidatePipelineShaderStage(const PIPELINE_STATE& pipeline, const PipelineStageState& stage_state) const;
-    bool ValidatePointSizeShaderState(const PIPELINE_STATE& pipeline, const SHADER_MODULE_STATE& module_state,
+    bool ValidatePointSizeShaderState(const PIPELINE_STATE& pipeline, const SPIRV_MODULE_STATE& module_state,
                                       const EntryPoint& entrypoint, VkShaderStageFlagBits stage) const;
-    bool ValidatePrimitiveRateShaderState(const PIPELINE_STATE& pipeline, const SHADER_MODULE_STATE& module_state,
+    bool ValidatePrimitiveRateShaderState(const PIPELINE_STATE& pipeline, const SPIRV_MODULE_STATE& module_state,
                                           const EntryPoint& entrypoint, VkShaderStageFlagBits stage) const;
-    bool ValidateTexelOffsetLimits(const SHADER_MODULE_STATE& module_state, const Instruction& insn) const;
+    bool ValidateTexelOffsetLimits(const SPIRV_MODULE_STATE& module_state, const Instruction& insn) const;
 
     // Auto-generated helper functions
     bool ValidateShaderCapabilitiesAndExtensions(const Instruction& insn) const;
     VkFormat CompatibleSpirvImageFormat(uint32_t spirv_image_format) const;
 
-    bool ValidateShaderStageInputOutputLimits(const SHADER_MODULE_STATE& module_state, VkShaderStageFlagBits stage,
+    bool ValidateShaderStageInputOutputLimits(const SPIRV_MODULE_STATE& module_state, VkShaderStageFlagBits stage,
                                               const PIPELINE_STATE& pipeline, const EntryPoint& entrypoint) const;
-    bool ValidateShaderStorageImageFormatsVariables(const SHADER_MODULE_STATE& module_state, const Instruction* insn) const;
-    bool ValidateShaderStageMaxResources(const SHADER_MODULE_STATE& module_state, VkShaderStageFlagBits stage,
+    bool ValidateShaderStorageImageFormatsVariables(const SPIRV_MODULE_STATE& module_state, const Instruction* insn) const;
+    bool ValidateShaderStageMaxResources(const SPIRV_MODULE_STATE& module_state, VkShaderStageFlagBits stage,
                                          const PIPELINE_STATE& pipeline) const;
-    bool ValidateShaderStageGroupNonUniform(const SHADER_MODULE_STATE& module_state, VkShaderStageFlagBits stage) const;
-    bool ValidateMemoryScope(const SHADER_MODULE_STATE& module_state, const Instruction& insn) const;
-    bool ValidateCooperativeMatrix(const SHADER_MODULE_STATE& module_state,
+    bool ValidateShaderStageGroupNonUniform(const SPIRV_MODULE_STATE& module_state, VkShaderStageFlagBits stage) const;
+    bool ValidateMemoryScope(const SPIRV_MODULE_STATE& module_state, const Instruction& insn) const;
+    bool ValidateCooperativeMatrix(const SPIRV_MODULE_STATE& module_state,
                                    safe_VkPipelineShaderStageCreateInfo const* create_info) const;
-    bool ValidateCooperativeMatrixKHR(const SHADER_MODULE_STATE& module_state,
+    bool ValidateCooperativeMatrixKHR(const SPIRV_MODULE_STATE& module_state,
                                       safe_VkPipelineShaderStageCreateInfo const* create_info, const uint32_t local_size_x) const;
-    bool ValidateShaderResolveQCOM(const SHADER_MODULE_STATE& module_state, VkShaderStageFlagBits stage,
+    bool ValidateShaderResolveQCOM(const SPIRV_MODULE_STATE& module_state, VkShaderStageFlagBits stage,
                                    const PIPELINE_STATE& pipeline) const;
-    bool ValidateShaderSubgroupSizeControl(const SHADER_MODULE_STATE& module_state, VkShaderStageFlagBits stage,
+    bool ValidateShaderSubgroupSizeControl(const SPIRV_MODULE_STATE& module_state, VkShaderStageFlagBits stage,
                                            VkPipelineShaderStageCreateFlags flags) const;
-    bool ValidateWorkgroupSharedMemory(const SHADER_MODULE_STATE& module_state, VkShaderStageFlagBits stage,
+    bool ValidateWorkgroupSharedMemory(const SPIRV_MODULE_STATE& module_state, VkShaderStageFlagBits stage,
                                        uint32_t total_workgroup_shared_memory) const;
-    bool ValidateShaderTileImage(const SHADER_MODULE_STATE& module_state, const EntryPoint& entrypoint,
+    bool ValidateShaderTileImage(const SPIRV_MODULE_STATE& module_state, const EntryPoint& entrypoint,
                                  const PIPELINE_STATE& pipeline, const VkShaderStageFlagBits stage) const;
-    bool ValidateAtomicsTypes(const SHADER_MODULE_STATE& module_state) const;
-    bool ValidateExecutionModes(const SHADER_MODULE_STATE& module_state, const EntryPoint& entrypoint, VkShaderStageFlagBits stage,
+    bool ValidateAtomicsTypes(const SPIRV_MODULE_STATE& module_state) const;
+    bool ValidateExecutionModes(const SPIRV_MODULE_STATE& module_state, const EntryPoint& entrypoint, VkShaderStageFlagBits stage,
                                 const PIPELINE_STATE& pipeline) const;
-    bool ValidateInterfaceVertexInput(const PIPELINE_STATE& pipeline, const SHADER_MODULE_STATE& module_state,
+    bool ValidateInterfaceVertexInput(const PIPELINE_STATE& pipeline, const SPIRV_MODULE_STATE& module_state,
                                       const EntryPoint& entrypoint) const;
-    bool ValidateInterfaceFragmentOutput(const PIPELINE_STATE& pipeline, const SHADER_MODULE_STATE& module_state,
+    bool ValidateInterfaceFragmentOutput(const PIPELINE_STATE& pipeline, const SPIRV_MODULE_STATE& module_state,
                                          const EntryPoint& entrypoint) const;
-    bool ValidateShaderInputAttachment(const SHADER_MODULE_STATE& module_state, const PIPELINE_STATE& pipeline,
+    bool ValidateShaderInputAttachment(const SPIRV_MODULE_STATE& module_state, const PIPELINE_STATE& pipeline,
                                        const ResourceInterfaceVariable& variable) const;
-    bool ValidateConservativeRasterization(const SHADER_MODULE_STATE& module_state, const EntryPoint& entrypoint,
+    bool ValidateConservativeRasterization(const SPIRV_MODULE_STATE& module_state, const EntryPoint& entrypoint,
                                            const PIPELINE_STATE& pipeline) const;
-    bool ValidatePushConstantUsage(const PIPELINE_STATE& pipeline, const SHADER_MODULE_STATE& module_state,
+    bool ValidatePushConstantUsage(const PIPELINE_STATE& pipeline, const SPIRV_MODULE_STATE& module_state,
                                    const EntryPoint& entrypoint) const;
-    bool ValidateBuiltinLimits(const SHADER_MODULE_STATE& module_state, const EntryPoint& entrypoint,
+    bool ValidateBuiltinLimits(const SPIRV_MODULE_STATE& module_state, const EntryPoint& entrypoint,
                                const PIPELINE_STATE& pipeline) const;
-    bool ValidateSpecializations(const SHADER_MODULE_STATE& module_state, const safe_VkSpecializationInfo* spec,
+    bool ValidateSpecializations(const SPIRV_MODULE_STATE& module_state, const safe_VkSpecializationInfo* spec,
                                  const PIPELINE_STATE& pipeline) const;
-    bool RequirePropertyFlag(const SHADER_MODULE_STATE& module_state, VkBool32 check, char const* flag, char const* structure,
+    bool RequirePropertyFlag(const SPIRV_MODULE_STATE& module_state, VkBool32 check, char const* flag, char const* structure,
                              const char* vuid) const;
-    bool RequireFeature(const SHADER_MODULE_STATE& module_state, VkBool32 feature, char const* feature_name,
+    bool RequireFeature(const SPIRV_MODULE_STATE& module_state, VkBool32 feature, char const* feature_name,
                         const char* vuid) const;
-    bool ValidateInterfaceBetweenStages(const SHADER_MODULE_STATE& producer, const EntryPoint& producer_entrypoint,
-                                        const SHADER_MODULE_STATE& consumer, const EntryPoint& consumer_entrypoint,
+    bool ValidateInterfaceBetweenStages(const SPIRV_MODULE_STATE& producer, const EntryPoint& producer_entrypoint,
+                                        const SPIRV_MODULE_STATE& consumer, const EntryPoint& consumer_entrypoint,
                                         uint32_t pipe_index) const;
-    bool ValidateVariables(const SHADER_MODULE_STATE& module_state) const;
-    bool ValidateShaderDescriptorVariable(const SHADER_MODULE_STATE& module_state, VkShaderStageFlagBits stage,
+    bool ValidateVariables(const SPIRV_MODULE_STATE& module_state) const;
+    bool ValidateShaderDescriptorVariable(const SPIRV_MODULE_STATE& module_state, VkShaderStageFlagBits stage,
                                           const PIPELINE_STATE& pipeline, const EntryPoint& entrypoint) const;
-    bool ValidateTransformFeedback(const SHADER_MODULE_STATE& module_state, const EntryPoint& entrypoint,
+    bool ValidateTransformFeedback(const SPIRV_MODULE_STATE& module_state, const EntryPoint& entrypoint,
                                    const PIPELINE_STATE& pipeline) const;
-    bool ValidateTransformFeedbackDecorations(const SHADER_MODULE_STATE& module_state, const PIPELINE_STATE& pipeline) const;
+    bool ValidateTransformFeedbackDecorations(const SPIRV_MODULE_STATE& module_state, const PIPELINE_STATE& pipeline) const;
     virtual bool ValidateShaderModuleId(const PIPELINE_STATE& pipeline) const;
-    bool ValidateShaderClock(const SHADER_MODULE_STATE& module_state) const;
-    bool ValidateImageWrite(const SHADER_MODULE_STATE& module_state) const;
+    bool ValidateShaderClock(const SPIRV_MODULE_STATE& module_state) const;
+    bool ValidateImageWrite(const SPIRV_MODULE_STATE& module_state) const;
 
     template <typename RegionType>
     bool ValidateCopyImageTransferGranularityRequirements(const CMD_BUFFER_STATE& cb_state, const IMAGE_STATE& src_image_state,
@@ -1447,8 +1446,6 @@ class CoreChecks : public ValidationStateTracker {
                                          const VkAllocationCallbacks* pAllocator) const override;
     bool ValidatePerformanceQueryResults(const char* cmd_name, const QUERY_POOL_STATE& query_pool_state, uint32_t firstQuery,
                                          uint32_t queryCount, VkQueryResultFlags flags) const;
-    bool ValidateGetQueryPoolPerformanceResults(VkQueryPool queryPool, uint32_t firstQuery, uint32_t queryCount, void* pData,
-                                                VkDeviceSize stride, VkQueryResultFlags flags, const char* apiName) const;
     bool PreCallValidateGetQueryPoolResults(VkDevice device, VkQueryPool queryPool, uint32_t firstQuery, uint32_t queryCount,
                                             size_t dataSize, void* pData, VkDeviceSize stride,
                                             VkQueryResultFlags flags) const override;
@@ -1711,8 +1708,8 @@ class CoreChecks : public ValidationStateTracker {
     void EnqueueVerifyEndQuery(CMD_BUFFER_STATE& cb_state, const QueryObject& query_obj);
     bool PreCallValidateCmdEndQuery(VkCommandBuffer commandBuffer, VkQueryPool queryPool, uint32_t slot) const override;
     void PreCallRecordCmdEndQuery(VkCommandBuffer commandBuffer, VkQueryPool queryPool, uint32_t slot) override;
-    bool ValidateQueryPoolIndex(VkQueryPool queryPool, uint32_t firstQuery, uint32_t queryCount, const char* func_name,
-                                const char* first_vuid, const char* sum_vuid) const;
+    bool ValidateQueryPoolIndex(const QUERY_POOL_STATE& query_pool_state, uint32_t firstQuery, uint32_t queryCount,
+                                const char* func_name, const char* first_vuid, const char* sum_vuid) const;
     bool PreCallValidateCmdResetQueryPool(VkCommandBuffer commandBuffer, VkQueryPool queryPool, uint32_t firstQuery,
                                           uint32_t queryCount) const override;
     bool PreCallValidateCmdCopyQueryPoolResults(VkCommandBuffer commandBuffer, VkQueryPool queryPool, uint32_t firstQuery,
@@ -1723,6 +1720,8 @@ class CoreChecks : public ValidationStateTracker {
                                               VkQueryResultFlags flags) override;
     bool PreCallValidateCmdPushConstants(VkCommandBuffer commandBuffer, VkPipelineLayout layout, VkShaderStageFlags stageFlags,
                                          uint32_t offset, uint32_t size, const void* pValues) const override;
+    bool ValidateCmdWriteTimestamp(const CMD_BUFFER_STATE& cb_state, VkQueryPool queryPool, uint32_t query,
+                                   CMD_TYPE cmd_type) const;
     bool PreCallValidateCmdWriteTimestamp(VkCommandBuffer commandBuffer, VkPipelineStageFlagBits pipelineStage,
                                           VkQueryPool queryPool, uint32_t query) const override;
 
@@ -1732,6 +1731,7 @@ class CoreChecks : public ValidationStateTracker {
                                               uint32_t query) const override;
     bool PreCallValidateCmdWriteTimestamp2(VkCommandBuffer commandBuffer, VkPipelineStageFlags2 stage, VkQueryPool queryPool,
                                            uint32_t query) const override;
+    void RecordCmdWriteTimestamp2(CMD_BUFFER_STATE& cb_state, VkQueryPool queryPool, uint32_t query, CMD_TYPE cmd_type) const;
     void PreCallRecordCmdWriteTimestamp(VkCommandBuffer commandBuffer, VkPipelineStageFlagBits pipelineStage, VkQueryPool queryPool,
                                         uint32_t slot) override;
     void PreCallRecordCmdWriteTimestamp2KHR(VkCommandBuffer commandBuffer, VkPipelineStageFlags2KHR stage, VkQueryPool queryPool,
@@ -1990,10 +1990,10 @@ class CoreChecks : public ValidationStateTracker {
     bool ValidateGetSemaphoreCounterValue(VkDevice device, VkSemaphore sempahore, uint64_t* pValue, const char* apiName) const;
     bool PreCallValidateGetSemaphoreCounterValueKHR(VkDevice device, VkSemaphore sempahore, uint64_t* pValue) const override;
     bool PreCallValidateGetSemaphoreCounterValue(VkDevice device, VkSemaphore sempahore, uint64_t* pValue) const override;
-    bool ValidateComputeWorkGroupSizes(const SHADER_MODULE_STATE& module_state, const EntryPoint& entrypoint,
+    bool ValidateComputeWorkGroupSizes(const SPIRV_MODULE_STATE& module_state, const EntryPoint& entrypoint,
                                        const PipelineStageState& stage_state, uint32_t local_size_x, uint32_t local_size_y,
                                        uint32_t local_size_z) const;
-    bool ValidateTaskMeshWorkGroupSizes(const SHADER_MODULE_STATE& module_state, const EntryPoint& entrypoint,
+    bool ValidateTaskMeshWorkGroupSizes(const SPIRV_MODULE_STATE& module_state, const EntryPoint& entrypoint,
                                         const PipelineStageState& stage_state, uint32_t local_size_x, uint32_t local_size_y,
                                         uint32_t local_size_z) const;
 

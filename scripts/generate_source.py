@@ -326,6 +326,7 @@ def main(argv):
     parser.add_argument('registry', metavar='REGISTRY_PATH', help='path to the Vulkan-Headers registry directory')
     parser.add_argument('grammar', metavar='GRAMMAR_PATH', help='path to the SPIRV-Headers grammar directory')
     parser.add_argument('--generated-version', help='sets the header version used to generate the repo')
+    parser.add_argument('-o', help='Create target and related files in specified directory.', dest='output_directory')
     group = parser.add_mutually_exclusive_group()
     group.add_argument('--target', nargs='+', help='only generate file names passed in')
     group.add_argument('-i', '--incremental', action='store_true', help='only update repo files that change')
@@ -360,6 +361,9 @@ def main(argv):
     else:
         # generate directly in the repo
         gen_dir = repo_dir
+
+    if args.output_directory is not None:
+      gen_dir = args.output_directory;
 
     registry = os.path.abspath(os.path.join(args.registry,  'vk.xml'))
     grammar = os.path.abspath(os.path.join(args.grammar, 'spirv.core.grammar.json'))

@@ -55,6 +55,8 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/debug_printf.cpp
     unit/descriptor_buffer.cpp
     unit/descriptor_buffer_positive.cpp
+    unit/descriptor_indexing.cpp
+    unit/descriptor_indexing_positive.cpp
     unit/descriptors.cpp
     unit/descriptors_positive.cpp
     unit/device_queue.cpp
@@ -114,8 +116,9 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/sampler_positive.cpp
     unit/shader_compute.cpp
     unit/shader_compute_positive.cpp
-    unit/shader_cooperative_matrix.cpp
-    unit/shader_cooperative_matrix_positive.cpp
+    # // TODO - Add once glslang support lands
+    # unit/shader_cooperative_matrix.cpp
+    # unit/shader_cooperative_matrix_positive.cpp
     unit/shader_image_access_positive.cpp
     unit/shader_interface.cpp
     unit/shader_interface_positive.cpp

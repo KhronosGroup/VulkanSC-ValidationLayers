@@ -33,6 +33,8 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/debug_printf.cpp
     converted/descriptor_buffer.cpp
     converted/descriptor_buffer_positive.cpp
+    converted/descriptor_indexing.cpp
+    converted/descriptor_indexing_positive.cpp
     converted/descriptors.cpp
     converted/descriptors_positive.cpp
     converted/device_queue.cpp

@@ -332,9 +332,20 @@ class DescriptorsTest : public VkLayerTest {};
 class NegativeDescriptors : public DescriptorsTest {};
 class PositiveDescriptors : public DescriptorsTest {};
 
-class DescriptorBufferTest : public VkLayerTest {};
+class DescriptorBufferTest : public VkLayerTest {
+  public:
+    void InitBasicDescriptorBuffer(void *pNextFeatures = nullptr);
+};
 class NegativeDescriptorBuffer : public DescriptorBufferTest {};
 class PositiveDescriptorBuffer : public DescriptorBufferTest {};
+
+class DescriptorIndexingTest : public VkLayerTest {
+  public:
+    void InitBasicDescriptorIndexing(void *pNextFeatures = nullptr);
+    VkPhysicalDeviceDescriptorIndexingFeatures descriptor_indexing_features;
+};
+class NegativeDescriptorIndexing : public DescriptorIndexingTest {};
+class PositiveDescriptorIndexing : public DescriptorIndexingTest {};
 
 class NegativeDeviceQueue : public VkLayerTest {};
 
@@ -457,7 +468,10 @@ class ProtectedMemoryTest : public VkLayerTest {};
 class NegativeProtectedMemory : public ProtectedMemoryTest {};
 class PositiveProtectedMemory : public ProtectedMemoryTest {};
 
-class QueryTest : public VkLayerTest {};
+class QueryTest : public VkLayerTest {
+  public:
+    bool HasZeroTimestampValidBits();
+};
 class NegativeQuery : public QueryTest {};
 class PositiveQuery : public QueryTest {};
 

@@ -3749,7 +3749,7 @@ TEST_F(NegativeDynamicState, CmdSetDiscardRectangleEXTRectangleCount) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeDynamicState, DiscardRectanglesVersion) {
+TEST_F(NegativeDynamicState, DISABLED_DiscardRectanglesVersion) {
     TEST_DESCRIPTION("check version of VK_EXT_discard_rectangles");
 
     AddRequiredExtensions(VK_EXT_DISCARD_RECTANGLES_EXTENSION_NAME);

@@ -4167,8 +4167,7 @@ VKAPI_ATTR VkResult VKAPI_CALL GetSemaphoreCounterValue(
     }
     VkResult result = DispatchGetSemaphoreCounterValue(device, semaphore, pValue);
     for (ValidationObject* intercept : layer_data->intercept_vectors[InterceptIdPostCallRecordGetSemaphoreCounterValue]) {
-        WriteLockGuard lock;
-        intercept->GetWriteLockForBlockingOperation(lock);
+        ValidationObject::BlockingOperationGuard lock(intercept);
         intercept->PostCallRecordGetSemaphoreCounterValue(device, semaphore, pValue, result);
     }
     return result;
@@ -4191,8 +4190,7 @@ VKAPI_ATTR VkResult VKAPI_CALL WaitSemaphores(
     }
     VkResult result = DispatchWaitSemaphores(device, pWaitInfo, timeout);
     for (ValidationObject* intercept : layer_data->intercept_vectors[InterceptIdPostCallRecordWaitSemaphores]) {
-        WriteLockGuard lock;
-        intercept->GetWriteLockForBlockingOperation(lock);
+        ValidationObject::BlockingOperationGuard lock(intercept);
         intercept->PostCallRecordWaitSemaphores(device, pWaitInfo, timeout, result);
     }
     return result;

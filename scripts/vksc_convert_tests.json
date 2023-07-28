@@ -99,12 +99,13 @@
         "DrawTimeImageMultisampleMismatchWithPipeline": false,
         "DrawTimeImageComponentTypeMismatchWithPipeline": false
     },
-    "NegativeDescriptors": {
+    "NegativeDescriptorIndexing": {
         "@disabled-alreadyPromoted": [
             "The test cases below depend on pre-Vulkan 1.2 support, hence do not apply to Vulkan SC"
         ],
-        "DescriptorIndexingSetLayoutWithoutExtension": false,
-
+        "SetLayoutWithoutExtension": false
+    },
+    "NegativeDescriptors": {
         "@disabled-depends-vkFreeMemory": "Test cases test the removed vkFreeMemory command's effects",
         "DescriptorImageUpdateNoMemoryBound": false,
 
@@ -146,7 +147,10 @@
             "However, that's specific to an extension that is not there in Vulkan SC,",
             "as the corresponding APIs are part of Vulkan SC 1.0 core (inherited from Vulkan 1.1)"
         ],
-        "SampleLocations": false
+        "SampleLocations": false,
+
+        "@disabled-dependency-incorrect": "This test case has incorrect dependency handling",
+        "DiscardRectanglesVersion": false
     },
     "NegativeGeometryTessellation": {
         "@disabled-depends-SPIRV-validation": [
@@ -318,6 +322,7 @@
         "CmdBufferQueryPoolDestroyed": false,
         "PoolInUseDestroyedSignaled": false,
         "DestroyActiveQueryPool": false,
+        "DestroyWithoutQueryPool": false,
 
         "@disabled-depends-GPDP2-KHR": [
             "TODO: Vulkan SC - These tests expect the KHR entry points of GPDP2 to be present",

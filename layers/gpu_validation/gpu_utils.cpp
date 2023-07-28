@@ -889,8 +889,8 @@ void GpuAssistedBase::PreCallRecordPipelineCreations(uint32_t count, const Creat
 
                 VkShaderModule shader_module;
                 auto create_info = LvlInitStruct<VkShaderModuleCreateInfo>();
-                create_info.pCode = module_state->words_.data();
-                create_info.codeSize = module_state->words_.size() * sizeof(uint32_t);
+                create_info.pCode = module_state->spirv->words_.data();
+                create_info.codeSize = module_state->spirv->words_.size() * sizeof(uint32_t);
                 VkResult result = DispatchCreateShaderModule(device, &create_info, pAllocator, &shader_module);
                 if (result == VK_SUCCESS) {
                     SetShaderModule(new_pipeline_ci, *stage.create_info, shader_module, i);
@@ -915,7 +915,7 @@ void GpuAssistedBase::PreCallRecordPipelineCreations(uint32_t count, const Creat
                         const VkShaderStageFlagBits stage = stage_state.create_info->stage;
                         auto &csm_state = cgpl_state.shader_states[pipeline][stage];
                         const auto pass =
-                            InstrumentShader(module_state->words_, csm_state.instrumented_pgm, &csm_state.unique_shader_id);
+                            InstrumentShader(module_state->spirv->words_, csm_state.instrumented_pgm, &csm_state.unique_shader_id);
                         if (pass) {
                             module_state->gpu_validation_shader_id = csm_state.unique_shader_id;
 
@@ -976,7 +976,7 @@ void GpuAssistedBase::PostCallRecordPipelineCreations(const uint32_t count, cons
                 // The core_validation ShaderModule tracker saves the binary too, but discards it when the ShaderModule
                 // is destroyed.  Applications may destroy ShaderModules after they are placed in a pipeline and before
                 // the pipeline is used, so we have to keep another copy.
-                if (module_state && module_state->has_valid_spirv) code = module_state->words_;
+                if (module_state && module_state->spirv) code = module_state->spirv->words_;
 
                 shader_map.insert_or_assign(module_state->gpu_validation_shader_id, pipeline_state->pipeline(),
                                             shader_module.Cast<VkShaderModule>(), std::move(code));
@@ -1101,7 +1101,7 @@ void UtilGenerateCommonMessage(const debug_report_data *report_data, const VkCom
 
 // Read the contents of the SPIR-V OpSource instruction and any following continuation instructions.
 // Split the single string into a vector of strings, one for each line, for easier processing.
-void ReadOpSource(const SHADER_MODULE_STATE &module_state, const uint32_t reported_file_id,
+void ReadOpSource(const SPIRV_MODULE_STATE &module_state, const uint32_t reported_file_id,
                   std::vector<std::string> &opsource_lines) {
     const std::vector<Instruction> &instructions = module_state.GetInstructions();
     for (size_t i = 0; i < instructions.size(); i++) {
@@ -1181,7 +1181,7 @@ void UtilGenerateSourceMessages(vvl::span<const uint32_t> pgm, const uint32_t *d
     using namespace spvtools;
     std::ostringstream filename_stream;
     std::ostringstream source_stream;
-    SHADER_MODULE_STATE module_state(pgm);
+    SPIRV_MODULE_STATE module_state(pgm);
     if (module_state.words_.empty()) {
         return;
     }
