@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 #
-# Copyright (c) 2013-2023 The Khronos Group Inc.
+# Copyright (c) 2023-2023 The Khronos Group Inc.
 # Copyright (c) 2023-2023 RasterGrid Kft.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -29,7 +29,7 @@ discrepancies and to disable non-applicable test cases.
 Python Compatibility
 --------------------
 
-This program can be used with Python 3.7 and newer.
+This program can be used with Python 3.10 and newer.
 
 Convertion database
 -------------------
@@ -69,14 +69,14 @@ test CMake build to determine the set of test case source files.
 
 """
 
-import argparse, os, json, pathlib, re
+import argparse, os, json, pathlib, re, filecmp
 
 def convert_test_file(args, filename, data, converted_cases):
     result = True
     missing_group_rule = set()
     missing_case_rule = set()
 
-    with open(f'{args.testdir}/unit/{filename}', 'r') as input, open(f'{args.testdir}/vulkansc/converted/{filename}', 'w') as output:
+    with open(f'{args.testdir}/unit/{filename}', 'r') as input, open(f'{args.testdir}/vulkansc/converted/{filename}.tmp', 'w') as output:
         output.write('// *** THIS FILE IS GENERATED - DO NOT EDIT ***\n')
         output.write('// See vksc_convert_tests.py for modifications\n')
         output.write('\n')
@@ -188,10 +188,20 @@ if __name__ == '__main__':
         exit(1)
 
     for filename in sorted(os.listdir(f'{args.testdir}/vulkansc/converted')):
+        if filename.endswith('.tmp'):
+            continue
         if not filename in filenames:
             print(f'WARNING: Deleting no longer existing converted test case file "{filename}"')
             os.remove(f'{args.testdir}/vulkansc/converted/{filename}')
 
+    for filename in filenames:
+        temp_filename = f'{args.testdir}/vulkansc/converted/{filename}.tmp'
+        repo_filename = f'{args.testdir}/vulkansc/converted/{filename}'
+        if not os.path.exists(repo_filename) or not filecmp.cmp(temp_filename, repo_filename, shallow=False):
+            print(f'Updating converted test case file "{filename}"')
+            os.replace(temp_filename, repo_filename)
+        else:
+            os.remove(temp_filename)
 
     with open(f'{args.testdir}/vulkansc/convertedTests.cmake', 'w') as cmake:
         cmake.write('# *** THIS FILE IS GENERATED - DO NOT EDIT ***\n')
@@ -217,3 +227,5 @@ if __name__ == '__main__':
         for filename in filenames:
             cmake.write(f'    converted/{filename}\n')
         cmake.write(')\n')
+
+    print('DONE!')
