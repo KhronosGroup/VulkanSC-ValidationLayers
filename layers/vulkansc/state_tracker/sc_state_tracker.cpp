@@ -368,3 +368,27 @@ void SCValidationStateTracker<BASE>::PreCallRecordDestroyPrivateDataSlotEXT(VkDe
 
     BASE::PreCallRecordDestroyPrivateDataSlotEXT(device, privateDataSlot, pAllocator);
 }
+
+template <typename BASE>
+void SCValidationStateTracker<BASE>::PostCallRecordBeginCommandBuffer(VkCommandBuffer commandBuffer,
+                                                                      const VkCommandBufferBeginInfo *pBeginInfo, VkResult result) {
+    BASE::PostCallRecordBeginCommandBuffer(commandBuffer, pBeginInfo, result);
+    if (result != VK_SUCCESS) return;
+
+    auto cb_state = Get<CMD_BUFFER_STATE>(commandBuffer);
+    if (cb_state) {
+        auto cp_state = Get<SC_COMMAND_POOL_STATE>(cb_state->command_pool->commandPool());
+        cp_state->command_buffers_recording++;
+    }
+}
+
+template <typename BASE>
+void SCValidationStateTracker<BASE>::PreCallRecordEndCommandBuffer(VkCommandBuffer commandBuffer) {
+    auto cb_state = Get<CMD_BUFFER_STATE>(commandBuffer);
+    if (cb_state) {
+        auto cp_state = Get<SC_COMMAND_POOL_STATE>(cb_state->command_pool->commandPool());
+        cp_state->command_buffers_recording--;
+    }
+
+    BASE::PreCallRecordEndCommandBuffer(commandBuffer);
+}

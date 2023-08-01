@@ -18,13 +18,16 @@
 #pragma once
 #include "state_tracker/cmd_buffer_state.h"
 
+#include <atomic>
+
 class SC_COMMAND_POOL_STATE : public COMMAND_POOL_STATE {
   public:
     uint32_t max_command_buffers;
+    std::atomic_uint32_t command_buffers_recording;
 
     SC_COMMAND_POOL_STATE(ValidationStateTracker *dev, VkCommandPool cp, const VkCommandPoolCreateInfo *pCreateInfo,
                           VkQueueFlags flags)
-        : COMMAND_POOL_STATE(dev, cp, pCreateInfo, flags), max_command_buffers(0) {
+        : COMMAND_POOL_STATE(dev, cp, pCreateInfo, flags), max_command_buffers(0), command_buffers_recording(0) {
         const auto *mem_reservation_info = LvlFindInChain<VkCommandPoolMemoryReservationCreateInfo>(pCreateInfo->pNext);
         if (mem_reservation_info) {
             max_command_buffers = mem_reservation_info->commandPoolMaxCommandBuffers;

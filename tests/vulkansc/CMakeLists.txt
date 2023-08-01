@@ -46,6 +46,7 @@ target_sources(vksc_layer_validation_tests PRIVATE
     ../framework/test_framework.cpp
     ../framework/ray_tracing_objects.h
     ../framework/ray_tracing_objects.cpp
+    negative/command.cpp
     negative/device_create.cpp
     negative/implicit.cpp
     negative/object_reservation.cpp

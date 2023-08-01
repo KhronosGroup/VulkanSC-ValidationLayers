@@ -290,9 +290,15 @@ static VKAPI_ATTR VkResult VKAPI_CALL CreateCommandPool(VkDevice device, const V
 
 static VKAPI_ATTR VkResult VKAPI_CALL BeginCommandBuffer(VkCommandBuffer commandBuffer,
                                                          const VkCommandBufferBeginInfo* pBeginInfo) {
-    static auto policy = VkSCRenderFramework::DispatchHelper()->CreateDispatchPolicy().SkipOnMessage(
-        "VUID-vkBeginCommandBuffer-commandPoolResetCommandBuffer-05136",
-        "Test requires VkPhysicalDeviceVulkanSC10Properties::commandPoolResetCommandBuffer");
+    static auto policy =
+        VkSCRenderFramework::DispatchHelper()
+            ->CreateDispatchPolicy()
+            .SkipOnMessage("VUID-vkBeginCommandBuffer-commandPoolResetCommandBuffer-05136",
+                           "Test requires VkPhysicalDeviceVulkanSC10Properties::commandPoolResetCommandBuffer")
+            .SkipOnMessage("VUID-vkBeginCommandBuffer-commandPoolMultipleCommandBuffersRecording-05007",
+                           "Test requires VkPhysicalDeviceVulkanSC10Properties::commandPoolMultipleCommandBuffersRecording")
+            .SkipOnMessage("VUID-vkBeginCommandBuffer-commandBufferSimultaneousUse-05008",
+                           "Test requires VkPhysicalDeviceVulkanSC10Properties::commandBufferSimultaneousUse");
     VkSCRenderFramework::DispatchHelper()->BeginDispatchPolicy(policy);
     VkResult result = vksc::BeginCommandBuffer(commandBuffer, pBeginInfo);
     VkSCRenderFramework::DispatchHelper()->EndDispatchPolicy(policy);
@@ -416,7 +422,6 @@ void TestDispatchHelper::EndDispatchPolicy(DispatchPolicy& policy) {
 
     if (tls_skip_message_ != nullptr) {
         SkipUnsupportedTest(tls_skip_message_);
-        tls_skip_message_ = nullptr;
     }
 }
 

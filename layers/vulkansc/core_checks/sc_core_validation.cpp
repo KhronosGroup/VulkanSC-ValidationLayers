@@ -1310,13 +1310,29 @@ bool SCCoreChecks::PreCallValidateBeginCommandBuffer(VkCommandBuffer commandBuff
     auto cb_state = GetRead<CMD_BUFFER_STATE>(commandBuffer);
     if (!cb_state) return false;
 
-    if (!phys_dev_props_sc_10_.commandPoolResetCommandBuffer) {
-        if (cb_state->state != CbState::New) {
-            skip |= LogError(commandBuffer, "VUID-vkBeginCommandBuffer-commandPoolResetCommandBuffer-05136",
-                             "vkBeginCommandBuffer(): call attempts to implicitly reset %s but "
-                             "VkPhysicalDeviceVulkanSC10Properties::commandPoolResetCommandBuffer is not supported.",
-                             report_data->FormatHandle(commandBuffer).c_str());
-        }
+    auto cp_state = Get<SC_COMMAND_POOL_STATE>(cb_state->command_pool->commandPool());
+
+    if (cb_state->state != CbState::New && !phys_dev_props_sc_10_.commandPoolResetCommandBuffer) {
+        skip |= LogError(commandBuffer, "VUID-vkBeginCommandBuffer-commandPoolResetCommandBuffer-05136",
+                         "vkBeginCommandBuffer(): call attempts to implicitly reset %s but "
+                         "VkPhysicalDeviceVulkanSC10Properties::commandPoolResetCommandBuffer is not supported.",
+                         report_data->FormatHandle(commandBuffer).c_str());
+    }
+
+    if (cp_state->command_buffers_recording.load() > 0 && !phys_dev_props_sc_10_.commandPoolMultipleCommandBuffersRecording) {
+        skip |= LogError(commandBuffer, "VUID-vkBeginCommandBuffer-commandPoolMultipleCommandBuffersRecording-05007",
+                         "vkBeginCommandBuffer(): %s %s was allocated from is already recording another command "
+                         "buffer but VkPhysicalDeviceVulkanSC10Properties::commandPoolMultipleCommandBuffersRecording "
+                         "is not supported.",
+                         report_data->FormatHandle(cp_state->Handle()).c_str(), report_data->FormatHandle(commandBuffer).c_str());
+    }
+
+    if ((pBeginInfo->flags & VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT) && !phys_dev_props_sc_10_.commandBufferSimultaneousUse) {
+        skip |= LogError(commandBuffer, "VUID-vkBeginCommandBuffer-commandBufferSimultaneousUse-05008",
+                         "vkBeginCommandBuffer(): pBeginInfo->flags (%s) includes "
+                         "VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT but "
+                         "VkPhysicalDeviceVulkanSC10Properties::commandBufferSimultaneousUse is not supported.",
+                         string_VkCommandBufferUsageFlags(pBeginInfo->flags).c_str());
     }
 
     return skip;

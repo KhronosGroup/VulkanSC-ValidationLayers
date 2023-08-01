@@ -48,8 +48,25 @@ class SCValidationStateTracker : public BASE {
     }
 
     template <typename State, typename Traits = typename state_object::Traits<State>>
+    typename Traits::SharedType Get(typename Traits::HandleType handle) {
+        return BASE::template Get<State, Traits>(handle);
+    }
+
+    template <typename State, typename Traits = typename state_object::Traits<State>>
     typename Traits::ConstSharedType Get(typename Traits::HandleType handle) const {
         return BASE::template Get<State, Traits>(handle);
+    }
+
+    template <typename State, typename Traits = typename state_object::Traits<State>,
+              typename ReadLockedType = typename Traits::ReadLockedType>
+    ReadLockedType GetRead(typename Traits::HandleType handle) const {
+        return BASE::template GetRead<State, Traits, ReadLockedType>(handle);
+    }
+
+    template <typename State, typename Traits = state_object::Traits<State>,
+              typename WriteLockedType = typename Traits::WriteLockedType>
+    WriteLockedType GetWrite(typename Traits::HandleType handle) {
+        return BASE::template GetWrite<State, Traits, WriteLockedType>(handle);
     }
 
     template <typename CreateInfo>
@@ -102,6 +119,9 @@ class SCValidationStateTracker : public BASE {
                                                 VkResult result) override;
     void PreCallRecordDestroyPrivateDataSlotEXT(VkDevice device, VkPrivateDataSlot privateDataSlot,
                                                 const VkAllocationCallbacks* pAllocator) override;
+    void PostCallRecordBeginCommandBuffer(VkCommandBuffer commandBuffer, const VkCommandBufferBeginInfo* pBeginInfo,
+                                          VkResult result) override;
+    void PreCallRecordEndCommandBuffer(VkCommandBuffer commandBuffer) override;
 
   protected:
     // SC-specific features and properties
