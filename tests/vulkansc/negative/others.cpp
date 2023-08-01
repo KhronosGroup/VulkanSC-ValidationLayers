@@ -798,3 +798,37 @@ TEST_F(VkSCLayerTest, CreateFramebufferMaxFramebufferAttachmentsExceeded) {
     vksc::CreateFramebuffer(device(), &create_info, nullptr, &framebuffer);
     m_errorMonitor->VerifyFound();
 }
+
+TEST_F(VkSCLayerTest, ResetCommandBufferNotSupported) {
+    TEST_DESCRIPTION("vkReset/BeginCommandBuffer - commandPoolResetCommandBuffer not supported");
+
+    ASSERT_NO_FATAL_FAILURE(Init());
+
+    if (GetVulkanSC10Properties(gpu()).commandPoolResetCommandBuffer) {
+        GTEST_SKIP() << "Only applicable if commandPoolResetCommandBuffer is not supported";
+    }
+
+    auto mem_reservation_info = LvlInitStruct<VkCommandPoolMemoryReservationCreateInfo>();
+    mem_reservation_info.commandPoolReservedSize = 1024 * 1024;
+    mem_reservation_info.commandPoolMaxCommandBuffers = 1;
+    auto create_info = LvlInitStruct<VkCommandPoolCreateInfo>(&mem_reservation_info);
+    create_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    vk_testing::CommandPool cmd_pool(*m_device, create_info);
+
+    auto alloc_info = LvlInitStruct<VkCommandBufferAllocateInfo>();
+    alloc_info.commandPool = cmd_pool.handle();
+    alloc_info.commandBufferCount = 1;
+    vk_testing::CommandBuffer cmd_buffer(*m_device, alloc_info);
+
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkResetCommandBuffer-commandPoolResetCommandBuffer-05135");
+    vksc::ResetCommandBuffer(cmd_buffer.handle(), 0);
+    m_errorMonitor->VerifyFound();
+
+    auto begin_info = LvlInitStruct<VkCommandBufferBeginInfo>();
+    vksc::BeginCommandBuffer(cmd_buffer.handle(), &begin_info);
+    vksc::EndCommandBuffer(cmd_buffer.handle());
+
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkBeginCommandBuffer-commandPoolResetCommandBuffer-05136");
+    vksc::BeginCommandBuffer(cmd_buffer.handle(), &begin_info);
+    m_errorMonitor->VerifyFound();
+}

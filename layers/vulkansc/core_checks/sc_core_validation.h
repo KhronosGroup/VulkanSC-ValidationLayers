@@ -193,5 +193,8 @@ class SCCoreChecks : public SCValidationStateTracker<CoreChecks> {
                                                  VkPrivateDataSlotEXT* pPrivateDataSlot) const override;
     bool PreCallValidateBindImageMemory2(VkDevice device, uint32_t bindInfoCount,
                                          const VkBindImageMemoryInfo* pBindInfos) const override;
+    bool PreCallValidateBeginCommandBuffer(VkCommandBuffer commandBuffer,
+                                           const VkCommandBufferBeginInfo* pBeginInfo) const override;
+    bool PreCallValidateResetCommandBuffer(VkCommandBuffer commandBuffer, VkCommandBufferResetFlags flags) const override;
 
 };  // Class SCCoreChecks

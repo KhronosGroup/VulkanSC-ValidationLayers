@@ -20,7 +20,14 @@
 #include "vksc_render_framework.h"
 #include "generated/vk_typemap_helper.h"
 
+#include "gtest/gtest.h"
+
+#include <functional>
+#include <vector>
+#include <tuple>
+
 #include <assert.h>
+#include <string.h>
 
 namespace vksc {
 
@@ -146,6 +153,22 @@ static VKAPI_ATTR void VKAPI_CALL DestroyShaderModule(VkDevice device, VkShaderM
     assert(shaderModule == VK_NULL_HANDLE);
 }
 
+static VKAPI_ATTR VkResult VKAPI_CALL CreateInstance(const VkInstanceCreateInfo* pCreateInfo,
+                                                     const VkAllocationCallbacks* pAllocator, VkInstance* pInstance) {
+    VkResult result = vksc::CreateInstance(pCreateInfo, pAllocator, pInstance);
+    if (result == VK_SUCCESS && VkSCRenderFramework::DispatchHelper() != nullptr) {
+        VkSCRenderFramework::DispatchHelper()->RegisterInstance(*pInstance);
+    }
+    return result;
+}
+
+static VKAPI_ATTR void VKAPI_CALL DestroyInstance(VkInstance instance, const VkAllocationCallbacks* pAllocator) {
+    if (VkSCRenderFramework::DispatchHelper() != nullptr) {
+        VkSCRenderFramework::DispatchHelper()->UnregisterInstance(instance);
+    }
+    vksc::DestroyInstance(instance, pAllocator);
+}
+
 static VKAPI_ATTR VkResult VKAPI_CALL CreateDevice(VkPhysicalDevice physicalDevice, const VkDeviceCreateInfo* pCreateInfo,
                                                    const VkAllocationCallbacks* pAllocator, VkDevice* pDevice) {
     // When running Vulkan validation layer tests against the Vulkan SC validation layers
@@ -265,7 +288,26 @@ static VKAPI_ATTR VkResult VKAPI_CALL CreateCommandPool(VkDevice device, const V
     return vksc::CreateCommandPool(device, &create_info, pAllocator, pCommandPool);
 }
 
-#undef VKSC_TEST
+static VKAPI_ATTR VkResult VKAPI_CALL BeginCommandBuffer(VkCommandBuffer commandBuffer,
+                                                         const VkCommandBufferBeginInfo* pBeginInfo) {
+    static auto policy = VkSCRenderFramework::DispatchHelper()->CreateDispatchPolicy().SkipOnMessage(
+        "VUID-vkBeginCommandBuffer-commandPoolResetCommandBuffer-05136",
+        "Test requires VkPhysicalDeviceVulkanSC10Properties::commandPoolResetCommandBuffer");
+    VkSCRenderFramework::DispatchHelper()->BeginDispatchPolicy(policy);
+    VkResult result = vksc::BeginCommandBuffer(commandBuffer, pBeginInfo);
+    VkSCRenderFramework::DispatchHelper()->EndDispatchPolicy(policy);
+    return result;
+}
+
+static VKAPI_ATTR VkResult VKAPI_CALL ResetCommandBuffer(VkCommandBuffer commandBuffer, VkCommandBufferResetFlags flags) {
+    static auto policy = VkSCRenderFramework::DispatchHelper()->CreateDispatchPolicy().SkipOnMessage(
+        "VUID-vkResetCommandBuffer-commandPoolResetCommandBuffer-05135",
+        "Test requires VkPhysicalDeviceVulkanSC10Properties::commandPoolResetCommandBuffer");
+    VkSCRenderFramework::DispatchHelper()->BeginDispatchPolicy(policy);
+    VkResult result = vksc::ResetCommandBuffer(commandBuffer, flags);
+    VkSCRenderFramework::DispatchHelper()->EndDispatchPolicy(policy);
+    return result;
+}
 
 }  // namespace compatibility
 
@@ -273,13 +315,17 @@ static VKAPI_ATTR VkResult VKAPI_CALL CreateCommandPool(VkDevice device, const V
 
 namespace vksc {
 
+PFN_vkCreateInstance CreateInstance = nullptr;
+PFN_vkDestroyInstance DestroyInstance = nullptr;
 PFN_vkCreateDevice CreateDevice = nullptr;
 PFN_vkCreatePipelineCache CreatePipelineCache = nullptr;
 PFN_vkCreateComputePipelines CreateComputePipelines = nullptr;
 PFN_vkCreateGraphicsPipelines CreateGraphicsPipelines = nullptr;
 PFN_vkCreateCommandPool CreateCommandPool = nullptr;
+PFN_vkBeginCommandBuffer BeginCommandBuffer = nullptr;
+PFN_vkResetCommandBuffer ResetCommandBuffer = nullptr;
 
-void PatchDispatchTable() {
+void TestDispatchHelper::PatchDispatchTable() {
 #define VK_ONLY__SWAP_COMPAT_EP(name) vk::name = vk::compatibility::name
 
     VK_ONLY__SWAP_COMPAT_EP(FreeMemory);
@@ -294,14 +340,116 @@ void PatchDispatchTable() {
     vksc::name = vk::name;         \
     vk::name = vk::compatibility::name;
 
+    VKSC__SWAP_COMPAT_EP(CreateInstance);
+    VKSC__SWAP_COMPAT_EP(DestroyInstance);
     VKSC__SWAP_COMPAT_EP(CreateDevice);
     VKSC__SWAP_COMPAT_EP(CreatePipelineCache);
     VKSC__SWAP_COMPAT_EP(CreateComputePipelines);
     VKSC__SWAP_COMPAT_EP(CreateGraphicsPipelines);
     VKSC__SWAP_COMPAT_EP(CreateCommandPool);
+    VKSC__SWAP_COMPAT_EP(BeginCommandBuffer);
+    VKSC__SWAP_COMPAT_EP(ResetCommandBuffer);
 
     InitDefaultPipelineCacheData();
     InitDefaultObjectReservationInfo();
+}
+
+TestDispatchHelper::TestDispatchHelper(VkSCRenderFramework* test_case) : test_case_(test_case) {}
+
+TestDispatchHelper::~TestDispatchHelper() {
+    // Destroy all debug messengers
+    for (const auto& it : messengers_) {
+        auto pfn_destroy_messenger = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
+            vksc::GetInstanceProcAddr(it.first, "vkDestroyDebugUtilsMessengerEXT"));
+
+        pfn_destroy_messenger(it.first, it.second, nullptr);
+    }
+    messengers_.clear();
+}
+
+void TestDispatchHelper::RegisterInstance(VkInstance instance) {
+    // Create debug messenger for the instance (needed by some of the compatibility utilities)
+    VkDebugUtilsMessengerEXT messenger = VK_NULL_HANDLE;
+
+    auto create_info = LvlInitStruct<VkDebugUtilsMessengerCreateInfoEXT>();
+    create_info.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+                                  VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT;
+    create_info.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+    create_info.pfnUserCallback = DebugCallback;
+    create_info.pUserData = this;
+
+    auto pfn_create_messenger =
+        reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(vksc::GetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT"));
+    if (pfn_create_messenger && pfn_create_messenger(instance, &create_info, nullptr, &messenger) == VK_SUCCESS) {
+        messengers_.insert({instance, messenger});
+    } else {
+        // If we failed to register the debug messenger then consider the config invalid
+        messengers_valid_ = false;
+    }
+}
+
+void TestDispatchHelper::UnregisterInstance(VkInstance instance) {
+    // Destroy debug messenger for the instance if it was created
+    auto it = messengers_.find(instance);
+    if (it != messengers_.end()) {
+        auto pfn_destroy_messenger = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
+            vksc::GetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT"));
+        pfn_destroy_messenger(instance, it->second, nullptr);
+        messengers_.erase(instance);
+    } else {
+        // If we failed to unregister the debug messenger then consider the config invalid
+        messengers_valid_ = false;
+    }
+}
+
+void TestDispatchHelper::BeginDispatchPolicy(DispatchPolicy& policy) {
+    assert(tls_dispatch_policy_ == nullptr);
+    tls_skip_message_ = nullptr;
+    tls_dispatch_policy_ = &policy;
+}
+
+void TestDispatchHelper::EndDispatchPolicy(DispatchPolicy& policy) {
+    assert(MessengersValid());
+
+    assert(tls_dispatch_policy_ == &policy);
+    tls_dispatch_policy_ = nullptr;
+
+    if (tls_skip_message_ != nullptr) {
+        SkipUnsupportedTest(tls_skip_message_);
+        tls_skip_message_ = nullptr;
+    }
+}
+
+VKAPI_ATTR VkBool32 VKAPI_CALL TestDispatchHelper::DebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
+                                                                 VkDebugUtilsMessageTypeFlagsEXT message_types,
+                                                                 const VkDebugUtilsMessengerCallbackDataEXT* callback_data,
+                                                                 void* user_data) {
+    auto self = reinterpret_cast<TestDispatchHelper*>(user_data);
+    if (tls_dispatch_policy_ != nullptr) {
+        // Check VUIDs that, if triggered, should cause the test case to be skipped
+        for (const auto& skip_on_vuid : tls_dispatch_policy_->skip_on_vuids_) {
+            if (strstr(callback_data->pMessage, skip_on_vuid.first)) {
+                // Prevent the VUID from causing a test failure
+                self->test_case_->Monitor().SetAllowedFailureMsg(skip_on_vuid.first);
+                // Set the skip message to the first one received
+                if (tls_skip_message_ == nullptr) {
+                    tls_skip_message_ = skip_on_vuid.second;
+                }
+                return VK_FALSE;
+            }
+        }
+    }
+    return VK_FALSE;
+}
+
+void TestDispatchHelper::SkipUnsupportedTest(const char* message) {
+    // Reset message monitor to avoid unfilled expectations due to the test skipping
+    test_case_->Monitor().Reset();
+    // We also allow any failure message from here to handle cascading effects
+    test_case_->Monitor().SetAllowedFailureMsg("");
+
+    GTEST_MESSAGE_AT_(__FILE__, __LINE__, "", ::testing::TestPartResult::kSkip) << message;
+    throw testing::AssertionException(testing::TestPartResult(testing::TestPartResult::kSkip, __FILE__, __LINE__, ""));
 }
 
 }  // namespace vksc

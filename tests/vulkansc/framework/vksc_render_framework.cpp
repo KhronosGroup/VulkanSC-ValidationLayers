@@ -10,10 +10,9 @@
  */
 
 #include "vksc_render_framework.h"
-#include "vksc_test_dispatch_helper.h"
 #include "vksc_test_pipeline_cache_helper.h"
 
-VkSCRenderFramework::VkSCRenderFramework() {
+VkSCRenderFramework::VkSCRenderFramework() : dispatch_helper_(this) {
     assert(s_instance == nullptr);
     s_instance = this;
 }

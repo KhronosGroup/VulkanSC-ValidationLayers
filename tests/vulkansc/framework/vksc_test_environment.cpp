@@ -150,7 +150,8 @@ void VkSCTestEnvironment::SetUp() {
     vk_testing::set_error_callback(test_error_callback);
 
     vk::InitCore("vulkansc");
-    vksc::PatchDispatchTable();
+
+    vksc::TestDispatchHelper::PatchDispatchTable();
 }
 
 void VkSCTestEnvironment::TearDown() {}

@@ -11,6 +11,7 @@
 #pragma once
 
 #include "../../framework/render.h"
+#include "vksc_test_dispatch_helper.h"
 
 class VkSCRenderFramework : public VkRenderFramework {
   public:
@@ -30,8 +31,17 @@ class VkSCRenderFramework : public VkRenderFramework {
         return *s_instance;
     }
 
+    static vksc::TestDispatchHelper *DispatchHelper() {
+        if (s_instance != nullptr) {
+            return &s_instance->dispatch_helper_;
+        } else {
+            return nullptr;
+        }
+    }
 
   private:
+    vksc::TestDispatchHelper dispatch_helper_;
+
     VkPipelineCache default_pipeline_cache_{VK_NULL_HANDLE};
 
     inline static VkSCRenderFramework* s_instance{nullptr};

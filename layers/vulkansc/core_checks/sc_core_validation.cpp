@@ -1302,3 +1302,34 @@ bool SCCoreChecks::PreCallValidateBindImageMemory2(VkDevice device, uint32_t bin
 
     return skip;
 }
+
+bool SCCoreChecks::PreCallValidateBeginCommandBuffer(VkCommandBuffer commandBuffer,
+                                                     const VkCommandBufferBeginInfo* pBeginInfo) const {
+    bool skip = BASE::PreCallValidateBeginCommandBuffer(commandBuffer, pBeginInfo);
+
+    auto cb_state = GetRead<CMD_BUFFER_STATE>(commandBuffer);
+    if (!cb_state) return false;
+
+    if (!phys_dev_props_sc_10_.commandPoolResetCommandBuffer) {
+        if (cb_state->state != CbState::New) {
+            skip |= LogError(commandBuffer, "VUID-vkBeginCommandBuffer-commandPoolResetCommandBuffer-05136",
+                             "vkBeginCommandBuffer(): call attempts to implicitly reset %s but "
+                             "VkPhysicalDeviceVulkanSC10Properties::commandPoolResetCommandBuffer is not supported.",
+                             report_data->FormatHandle(commandBuffer).c_str());
+        }
+    }
+
+    return skip;
+}
+
+bool SCCoreChecks::PreCallValidateResetCommandBuffer(VkCommandBuffer commandBuffer, VkCommandBufferResetFlags flags) const {
+    bool skip = BASE::PreCallValidateResetCommandBuffer(commandBuffer, flags);
+
+    if (!phys_dev_props_sc_10_.commandPoolResetCommandBuffer) {
+        skip |= LogError(commandBuffer, "VUID-vkResetCommandBuffer-commandPoolResetCommandBuffer-05135",
+                         "vkResetCommandBuffer(): VkPhysicalDeviceVulkanSC10Properties::commandPoolResetCommandBuffer "
+                         "is not supported.");
+    }
+
+    return skip;
+}
