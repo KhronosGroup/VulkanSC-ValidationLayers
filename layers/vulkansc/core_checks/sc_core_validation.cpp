@@ -92,6 +92,9 @@ void SCCoreChecks::InitFilters() {
         "VUID-VkBindImageMemoryDeviceGroupInfo-offset-01639",
         "VUID-VkBindImageMemoryDeviceGroupInfo-extent-01640",
         "VUID-VkBindImageMemoryDeviceGroupInfo-extent-01641",
+
+        // Filter VUIDs replaced by Vulkan SC specific ones
+        "VUID-VkCommandBufferBeginInfo-flags-00055",
     };
 
     for (const auto& filtered_vuid : filtered_vuids) {
@@ -1333,6 +1336,38 @@ bool SCCoreChecks::PreCallValidateBeginCommandBuffer(VkCommandBuffer commandBuff
                          "VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT but "
                          "VkPhysicalDeviceVulkanSC10Properties::commandBufferSimultaneousUse is not supported.",
                          string_VkCommandBufferUsageFlags(pBeginInfo->flags).c_str());
+    }
+
+    if (pBeginInfo->pInheritanceInfo != nullptr && pBeginInfo->flags & VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT) {
+        auto framebuffer = Get<FRAMEBUFFER_STATE>(pBeginInfo->pInheritanceInfo->framebuffer);
+        if (framebuffer) {
+            if (framebuffer->createInfo.renderPass != pBeginInfo->pInheritanceInfo->renderPass) {
+                const char* vuid = phys_dev_props_sc_10_.secondaryCommandBufferNullOrImagelessFramebuffer
+                                       ? "VUID-VkCommandBufferBeginInfo-flags-05009"
+                                       : "VUID-VkCommandBufferBeginInfo-flags-05010";
+                auto render_pass = Get<RENDER_PASS_STATE>(pBeginInfo->pInheritanceInfo->renderPass);
+                // renderPass that framebuffer was created with must be compatible with local renderPass
+                skip |= ValidateRenderPassCompatibility("framebuffer", *framebuffer->rp_state.get(), "command buffer",
+                                                        *render_pass.get(), "vkBeginCommandBuffer()", vuid);
+
+                if ((framebuffer->createInfo.flags & VK_FRAMEBUFFER_CREATE_IMAGELESS_BIT) != 0 &&
+                    !phys_dev_props_sc_10_.secondaryCommandBufferNullOrImagelessFramebuffer) {
+                    skip |= LogError(commandBuffer, "VUID-VkCommandBufferBeginInfo-flags-05010",
+                                     "vkBeginCommandBuffer(): VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT is set in "
+                                     "pBeginInfo->flags and pBeginInfo->pInheritanceInfo->framebuffer (%s) was created "
+                                     "with VK_FRAMEBUFFER_CREATE_IMAGELESS_BIT but "
+                                     "VkPhysicalDeviceVulkanSC10Properties::secondaryCommandBufferNullOrImagelessFramebuffer "
+                                     "is not supported.",
+                                     report_data->FormatHandle(framebuffer->Handle()).c_str());
+                }
+            }
+        } else if (!phys_dev_props_sc_10_.secondaryCommandBufferNullOrImagelessFramebuffer) {
+            skip |= LogError(commandBuffer, "VUID-VkCommandBufferBeginInfo-flags-05010",
+                             "vkBeginCommandBuffer(): VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT is set in "
+                             "pBeginInfo->flags and pBeginInfo->pInheritanceInfo->framebuffer is VK_NULL_HANDLE but "
+                             "VkPhysicalDeviceVulkanSC10Properties::secondaryCommandBufferNullOrImagelessFramebuffer "
+                             "is not supported.");
+        }
     }
 
     return skip;

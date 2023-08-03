@@ -298,7 +298,9 @@ static VKAPI_ATTR VkResult VKAPI_CALL BeginCommandBuffer(VkCommandBuffer command
             .SkipOnMessage("VUID-vkBeginCommandBuffer-commandPoolMultipleCommandBuffersRecording-05007",
                            "Test requires VkPhysicalDeviceVulkanSC10Properties::commandPoolMultipleCommandBuffersRecording")
             .SkipOnMessage("VUID-vkBeginCommandBuffer-commandBufferSimultaneousUse-05008",
-                           "Test requires VkPhysicalDeviceVulkanSC10Properties::commandBufferSimultaneousUse");
+                           "Test requires VkPhysicalDeviceVulkanSC10Properties::commandBufferSimultaneousUse")
+            .SkipOnMessage("VUID-VkCommandBufferBeginInfo-flags-05010",
+                           "Test requires VkPhysicalDeviceVulkanSC10Properties::secondaryCommandBufferNullOrImagelessFramebuffer");
     VkSCRenderFramework::DispatchHelper()->BeginDispatchPolicy(policy);
     VkResult result = vksc::BeginCommandBuffer(commandBuffer, pBeginInfo);
     VkSCRenderFramework::DispatchHelper()->EndDispatchPolicy(policy);

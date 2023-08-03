@@ -232,3 +232,116 @@ TEST_F(VkSCLayerTest, SimulatenousUseNotSupported) {
     vksc::BeginCommandBuffer(cmd_buffer.handle(), &begin_info);
     m_errorMonitor->VerifyFound();
 }
+
+TEST_F(VkSCLayerTest, SecondaryCommandBufferNullOrImagelessFramebuffer) {
+    TEST_DESCRIPTION("vkBeginCommandBuffer - test effects of secondaryCommandBufferNullOrImagelessFramebuffer");
+
+    ASSERT_NO_FATAL_FAILURE(InitFramework());
+
+    auto imageless_fb_features = LvlInitStruct<VkPhysicalDeviceImagelessFramebufferFeaturesKHR>();
+    auto features2 = GetPhysicalDeviceFeatures2(imageless_fb_features);
+
+    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features2));
+
+    auto mem_reservation_info = LvlInitStruct<VkCommandPoolMemoryReservationCreateInfo>();
+    mem_reservation_info.commandPoolReservedSize = 1024 * 1024;
+    mem_reservation_info.commandPoolMaxCommandBuffers = 1;
+    auto create_info = LvlInitStruct<VkCommandPoolCreateInfo>(&mem_reservation_info);
+    create_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    vk_testing::CommandPool cmd_pool(*m_device, create_info);
+
+    auto alloc_info = LvlInitStruct<VkCommandBufferAllocateInfo>();
+    alloc_info.commandPool = cmd_pool.handle();
+    alloc_info.level = VK_COMMAND_BUFFER_LEVEL_SECONDARY;
+    alloc_info.commandBufferCount = 1;
+    vk_testing::CommandBuffer cmd_buffer(*m_device, alloc_info);
+
+    VkAttachmentDescription attachment{0,
+                                       VK_FORMAT_R8G8B8A8_UNORM,
+                                       VK_SAMPLE_COUNT_1_BIT,
+                                       VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+                                       VK_ATTACHMENT_STORE_OP_DONT_CARE,
+                                       VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+                                       VK_ATTACHMENT_STORE_OP_DONT_CARE,
+                                       VK_IMAGE_LAYOUT_UNDEFINED,
+                                       VK_IMAGE_LAYOUT_GENERAL};
+    VkSubpassDescription subpasses[2] = {};
+
+    auto renderpass_ci = LvlInitStruct<VkRenderPassCreateInfo>();
+    renderpass_ci.subpassCount = 1;
+    renderpass_ci.pSubpasses = &subpasses[0];
+    renderpass_ci.attachmentCount = 1;
+    renderpass_ci.pAttachments = &attachment;
+    vk_testing::RenderPass renderpass1(*m_device, renderpass_ci);
+
+    renderpass_ci.subpassCount = 2;
+    vk_testing::RenderPass renderpass2(*m_device, renderpass_ci);
+
+    auto image_ci = LvlInitStruct<VkImageCreateInfo>();
+    image_ci.imageType = VK_IMAGE_TYPE_2D;
+    image_ci.format = VK_FORMAT_R8G8B8A8_UNORM;
+    image_ci.extent = {128, 128, 1};
+    image_ci.mipLevels = 1;
+    image_ci.arrayLayers = 1;
+    image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_ci.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    image_ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    vk_testing::Image image(*m_device, image_ci);
+
+    auto image_view_ci = LvlInitStruct<VkImageViewCreateInfo>();
+    image_view_ci.image = image.handle();
+    image_view_ci.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    image_view_ci.format = VK_FORMAT_R8G8B8A8_UNORM;
+    image_view_ci.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    vk_testing::ImageView image_view(*m_device, image_view_ci);
+
+    VkImageView fb_attachment = image_view.handle();
+    auto framebuffer_ci = LvlInitStruct<VkFramebufferCreateInfo>();
+    framebuffer_ci.renderPass = renderpass1;
+    framebuffer_ci.attachmentCount = 1;
+    framebuffer_ci.pAttachments = &fb_attachment;
+    framebuffer_ci.width = 128;
+    framebuffer_ci.height = 128;
+    framebuffer_ci.layers = 1;
+    vk_testing::Framebuffer framebuffer(*m_device, framebuffer_ci);
+
+    auto inherit_info = LvlInitStruct<VkCommandBufferInheritanceInfo>();
+    inherit_info.framebuffer = framebuffer;
+    inherit_info.renderPass = renderpass2;
+
+    auto begin_info = LvlInitStruct<VkCommandBufferBeginInfo>();
+    begin_info.flags = VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
+    begin_info.pInheritanceInfo = &inherit_info;
+
+    const char *expected_vuid = GetVulkanSC10Properties(gpu()).secondaryCommandBufferNullOrImagelessFramebuffer
+                                    ? "VUID-VkCommandBufferBeginInfo-flags-05009"
+                                    : "VUID-VkCommandBufferBeginInfo-flags-05010";
+
+    // Check with incompatible render pass
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, expected_vuid);
+    vksc::BeginCommandBuffer(cmd_buffer.handle(), &begin_info);
+    m_errorMonitor->VerifyFound();
+
+    if (!GetVulkanSC10Properties(gpu()).secondaryCommandBufferNullOrImagelessFramebuffer) {
+        // Check with no framebuffer
+        inherit_info.framebuffer = VK_NULL_HANDLE;
+
+        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, expected_vuid);
+        vksc::BeginCommandBuffer(cmd_buffer.handle(), &begin_info);
+        m_errorMonitor->VerifyFound();
+
+        // Check with framebuffer created with VK_FRAMEBUFFER_CREATE_IMAGELESS_BIT
+        if (imageless_fb_features.imagelessFramebuffer) {
+            auto attachment_info = LvlInitStruct<VkFramebufferAttachmentsCreateInfo>();
+            framebuffer_ci.pNext = &attachment_info;
+            framebuffer_ci.flags = VK_FRAMEBUFFER_CREATE_IMAGELESS_BIT;
+            vk_testing::Framebuffer imageless_framebuffer(*m_device, framebuffer_ci);
+            inherit_info.framebuffer = imageless_framebuffer;
+
+            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, expected_vuid);
+            vksc::BeginCommandBuffer(cmd_buffer.handle(), &begin_info);
+            m_errorMonitor->VerifyFound();
+        }
+    }
+}
