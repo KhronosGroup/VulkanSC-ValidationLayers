@@ -1062,7 +1062,7 @@ TEST_F(VkPositiveLayerTest, DestroySwapchainWithBoundImages) {
 // Without device to test with, blocking this test from non-Android platforms for now
 TEST_F(PositiveWsi, DISABLED_ProtectedSwapchainImageColorAttachment) {
 #else
-TEST_F(PositiveWsi, ProtectedSwapchainImageColorAttachment) {
+TEST_F(InvalidTestGroup, ProtectedSwapchainImageColorAttachment) {
 #endif
     TEST_DESCRIPTION(
         "Make sure images from protected swapchain are considered protected image when writing to it as a color attachment");

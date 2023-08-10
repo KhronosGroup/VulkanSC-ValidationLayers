@@ -118,6 +118,12 @@ target_link_libraries(vksc_layer_validation_tests PRIVATE
 install(TARGETS vksc_layer_validation_tests)
 
 include(GoogleTest)
-gtest_discover_tests(vksc_layer_validation_tests DISCOVERY_TIMEOUT 100)
+# gtest_discover_tests requires running the output binaries which will not
+# work with cross-compiling, thus we fall back to using gtest_add_tests
+if (CMAKE_CROSSCOMPILING)
+    gtest_add_tests(TARGET vksc_layer_validation_tests)
+else()
+    gtest_discover_tests(vksc_layer_validation_tests DISCOVERY_TIMEOUT 100)
+endif()
 
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../layers ${CMAKE_CURRENT_BINARY_DIR}/../layers)

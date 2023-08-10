@@ -74,6 +74,14 @@ Times to NOT use it
 
 #define VVL_UNRECOGNIZED_API_VERSION 0xFFFFFFFF
 
+// Undefine sysmacro.h major/minor macros
+#ifdef major
+#undef major
+#endif
+#ifdef minor
+#undef minor
+#endif
+
 // API version class to handle Vulkan SC and Vulkan API version relations
 class APIVersion {
   public:

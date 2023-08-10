@@ -742,7 +742,7 @@ TEST_F(NegativeSampler, FilterMinmax) {
     vk::DestroySamplerYcbcrConversionKHR(m_device->handle(), conversion, nullptr);
 }
 
-TEST_F(NegativeSampler, CustomBorderColor) {
+TEST_F(NegativeSampler, DISABLED_CustomBorderColor) {
     TEST_DESCRIPTION("Tests for VUs for VK_EXT_custom_border_color");
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_CUSTOM_BORDER_COLOR_EXTENSION_NAME);

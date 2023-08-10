@@ -17,7 +17,11 @@
 // In the future, we can consider refactoring the upstream test cases to separate out sub-cases
 // which don't apply to Vulkan SC or parameterize them accordingly.
 
-TEST_F(VkSCLayerTest, SpecLinks) {
+class VkSCPortedLayerTest : public VkLayerTest {};
+class VkSCPortedNegativeImage : public NegativeImage {};
+class VkSCPortedNegativeMemory : public NegativeMemory {};
+
+TEST_F(VkSCPortedLayerTest, SpecLinks) {
     TEST_DESCRIPTION("Test that spec links in a typical error message are well-formed");
     ASSERT_NO_FATAL_FAILURE(Init());
 
@@ -26,7 +30,7 @@ TEST_F(VkSCLayerTest, SpecLinks) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkSCLayerTest, LeakAnObject) {
+TEST_F(VkSCPortedLayerTest, LeakAnObject) {
     TEST_DESCRIPTION("Create a fence and destroy its device without first destroying the fence.");
 
     ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
@@ -66,7 +70,7 @@ TEST_F(VkSCLayerTest, LeakAnObject) {
     m_errorMonitor->SetUnexpectedError("UNASSIGNED-ObjectTracker-ObjectLeak");
 }
 
-TEST_F(ImageTest, ImageMisc) {
+TEST_F(VkSCPortedNegativeImage, ImageMisc) {
     TEST_DESCRIPTION("Misc leftover valid usage errors in VkImageCreateInfo struct");
 
     VkPhysicalDeviceFeatures features{};
@@ -144,7 +148,7 @@ TEST_F(ImageTest, ImageMisc) {
     }
 }
 
-TEST_F(NegativeMemory, BindMemory) {
+TEST_F(VkSCPortedNegativeMemory, BindMemory) {
     VkResult err;
     bool pass;
 

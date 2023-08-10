@@ -366,7 +366,13 @@
         "MirrorClampToEdgeNotEnabled": false,
 
         "@disabled-depends-VK_EXT_border_color_swizzle": "Test cases use unsupported extension in Vulkan SC",
-        "BorderColorSwizzle": false
+        "BorderColorSwizzle": false,
+
+        "@disabled-temporary-QNX-stack-size": [
+            "This test case uses too much stack space for QNX systems and hence it's currently disabled",
+            "The test itself is skipped on Vulkan SC anyway, thus this does not limit test coverage"
+        ],
+        "CustomBorderColor": false
     },
     "NegativeShaderCompute": {
         "@disabled-depends-SPIRV-validation": [
@@ -588,6 +594,11 @@
         "GetSwapchainImagesCountButNotImages": false
     },
     "PositiveWsi": {
+        "@rename-dead-code": [
+            "These tests need renaming due to the limitations of gtest_add_tests"
+        ],
+        "ProtectedSwapchainImageColorAttachment": "InvalidTestGroup",
+
         "@disabled-depends-WSI": [
             "The test cases below are disabled because they depend on WSI functionalities",
             "without actually verifying support for them"

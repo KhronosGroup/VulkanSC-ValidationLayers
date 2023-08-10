@@ -81,6 +81,14 @@ class APISpecific:
             # Vulkan SC specific APIVersion class and related utilities
             case 'vulkansc':
                 return '''
+// Undefine sysmacro.h major/minor macros
+#ifdef major
+#undef major
+#endif
+#ifdef minor
+#undef minor
+#endif
+
 // API version class to handle Vulkan SC and Vulkan API version relations
 class APIVersion {
   public:

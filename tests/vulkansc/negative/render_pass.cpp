@@ -222,6 +222,7 @@ TEST_F(VkSCLayerTest, CreateRenderPassMaxSubpassInputAttachmentsExceeded) {
         create_info.subpassCount = subpasses.size();
 
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkCreateRenderPass2-attachments-device-05089");
+        m_errorMonitor->SetAllowedFailureMsg("VUID-VkRenderPassCreateInfo-attachmentCount-05052");
         for (int i = 0; i < subpass_count; ++i)
             m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSubpassDescription-inputAttachmentCount-05053");
         vksc::CreateRenderPass(device(), &create_info, nullptr, &render_pass);
@@ -257,6 +258,7 @@ TEST_F(VkSCLayerTest, CreateRenderPassMaxSubpassInputAttachmentsExceeded) {
         create_info.subpassCount = subpasses.size();
 
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkCreateRenderPass2-attachments-device-05089");
+        m_errorMonitor->SetAllowedFailureMsg("VUID-VkRenderPassCreateInfo2-attachmentCount-05057");
         for (int i = 0; i < subpass_count; ++i)
             m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSubpassDescription2-inputAttachmentCount-05058");
         vksc::CreateRenderPass2(device(), &create_info, nullptr, &render_pass);
