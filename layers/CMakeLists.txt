@@ -22,7 +22,7 @@ set(LAYER_NAME "VkLayer_khronos_validation")
 
 if(VULKANSC)
     set(LAYER_NAME "VkSCLayer_khronos_validation")
-    add_definitions(-DVULKANSC_SPEC_LINK)
+    add_definitions(-DVULKANSC)
 endif()
 
 add_library(VkLayer_utils STATIC)

@@ -68,7 +68,7 @@ class APISpecific:
                     'VkDescriptorSet',
                     'VkQueryPool',
                     'VkDisplayKHR',
-                    'VkDisplayModeKHR'
+                    'VkDisplayModeKHR',
                     'VkSwapchainKHR',
                     'VkSemaphoreSciSyncPoolNV'
                 }
@@ -76,8 +76,8 @@ class APISpecific:
             # Vulkan specific implicitly destroyed handle types
             case 'vulkan':
                 implicitly_destroyed_set = {
-                'VkDisplayKHR',
-                'VkDisplayModeKHR'
+                    'VkDisplayKHR',
+                    'VkDisplayModeKHR'
                 }
 
         return handleType in implicitly_destroyed_set

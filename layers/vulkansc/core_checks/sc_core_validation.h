@@ -51,6 +51,9 @@ class SCCoreChecks : public SCValidationStateTracker<CoreChecks> {
     bool ValidatePipelineCacheData(VkPhysicalDevice physicalDevice, const VkPipelineCacheCreateInfo& create_info,
                                    uint32_t index) const;
 
+    bool ValidateSwapchainCreateInfo(VkDevice device, const VkSwapchainCreateInfoKHR& create_info, const char* api_name,
+                                     const char* where) const;
+
     // Functions removed in Vulkan SC
     template <typename VkHandle>
     bool ValidateRemovedCommand(VkHandle handle, const char* cmd) const;

@@ -269,6 +269,9 @@
         "CreateComputesPipelineWithBadBasePointer": false,
         "CreateGraphicsPipelineWithBadBasePointer": false,
 
+        "@disabled-depends-Vulkan-behavior": "Test cases depend on Vulkan behavior that is changed in Vulkan SC",
+        "NullStagepName": false,
+
         "@disabled-depends-GPDP2-KHR": [
             "TODO: Vulkan SC - These tests expect the KHR entry points of GPDP2 to be present",
             "or that the extension string is present.",

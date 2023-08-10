@@ -14,8 +14,7 @@
 TEST_F(VkSCLayerTest, CreateCommandPoolMissingMemoryReservationInfo) {
     TEST_DESCRIPTION("vkCreateCommandPool - missing VkCommandPoolMemoryReservationCreateInfo");
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    ASSERT_NO_FATAL_FAILURE(Init());
 
     auto create_info = LvlInitStruct<VkCommandPoolCreateInfo>();
     VkCommandPool cmd_pool = VK_NULL_HANDLE;
@@ -28,8 +27,7 @@ TEST_F(VkSCLayerTest, CreateCommandPoolMissingMemoryReservationInfo) {
 TEST_F(VkSCLayerTest, CreateCommandPoolInvalidReservedSize) {
     TEST_DESCRIPTION("vkCreateCommandPool - commandPoolReservedSize is zero");
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    ASSERT_NO_FATAL_FAILURE(Init());
 
     auto mem_reservation_info = LvlInitStruct<VkCommandPoolMemoryReservationCreateInfo>();
     mem_reservation_info.commandPoolReservedSize = 0;
@@ -46,8 +44,7 @@ TEST_F(VkSCLayerTest, CreateCommandPoolInvalidReservedSize) {
 TEST_F(VkSCLayerTest, CreateCommandPoolInvalidMaxCommandBuffers) {
     TEST_DESCRIPTION("vkCreateCommandPool - commandPoolMaxCommandBuffers is zero or greater than maxCommandPoolCommandBuffers");
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    ASSERT_NO_FATAL_FAILURE(Init());
 
     auto mem_reservation_info = LvlInitStruct<VkCommandPoolMemoryReservationCreateInfo>();
     mem_reservation_info.commandPoolReservedSize = 16 * 1024 * 1024;
@@ -72,8 +69,7 @@ TEST_F(VkSCLayerTest, CreateCommandPoolInvalidMaxCommandBuffers) {
 TEST_F(VkSCLayerTest, AllocateCommandBuffersExceededMaxCommandBuffers) {
     TEST_DESCRIPTION("vkAllocateCommandBuffers - cannot allocate more command buffers from pool than commandPoolMaxCommandBuffers");
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    ASSERT_NO_FATAL_FAILURE(Init());
 
     const uint32_t max_cmd_buffers = 13;
 

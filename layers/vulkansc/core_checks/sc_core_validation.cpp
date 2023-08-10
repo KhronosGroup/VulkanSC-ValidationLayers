@@ -77,11 +77,9 @@ void SCCoreChecks::InitFilters() {
         "VUID-VkImageCreateInfo-None-01925",
         "VUID-VkImageCreateInfo-None-01891",
 
-        // Filter VUIDs specific to split-instance bind regions image creation which is not supported in Vulkan SC
+        // Filter VUIDs related to split-instance bind regions which is not supported in Vulkan SC
         "VUID-VkImageCreateInfo-physicalDeviceCount-01421",
         "VUID-VkImageCreateInfo-flags-02259",
-
-        // Filter VUIDs requiring images created with split-instance bind regions which is not supported in Vulkan SC
         "VUID-VkBindImageMemoryInfo-pNext-01627",
         "VUID-VkBindImageMemoryInfo-pNext-01628",
         "VUID-VkBindImageMemoryInfo-pNext-01629",
@@ -92,9 +90,14 @@ void SCCoreChecks::InitFilters() {
         "VUID-VkBindImageMemoryDeviceGroupInfo-offset-01639",
         "VUID-VkBindImageMemoryDeviceGroupInfo-extent-01640",
         "VUID-VkBindImageMemoryDeviceGroupInfo-extent-01641",
+        "VUID-VkSwapchainCreateInfoKHR-physicalDeviceCount-01429",
 
         // Filter VUIDs replaced by Vulkan SC specific ones
         "VUID-VkCommandBufferBeginInfo-flags-00055",
+        "VUID-VkSwapchainCreateInfoKHR-oldSwapchain-01933",
+
+        // Filter other VUIDs that are not applicable to Vulkan SC
+        "VUID-vkDestroySurfaceKHR-surface-01266",
     };
 
     for (const auto& filtered_vuid : filtered_vuids) {
@@ -418,6 +421,25 @@ bool SCCoreChecks::ValidatePipelineCacheData(VkPhysicalDevice physicalDevice, co
                 }
             }
         }
+    }
+
+    return skip;
+}
+
+bool SCCoreChecks::ValidateSwapchainCreateInfo(VkDevice device, const VkSwapchainCreateInfoKHR& create_info, const char* api_name,
+                                               const char* where) const {
+    bool skip = false;
+
+    if (create_info.flags & VK_SWAPCHAIN_CREATE_SPLIT_INSTANCE_BIND_REGIONS_BIT_KHR) {
+        skip |= LogError(device, "VUID-VkSwapchainCreateInfoKHR-flags-05072",
+                         "%s(): flags (%s) contains unsupported flag "
+                         "VK_SWAPCHAIN_CREATE_SPLIT_INSTANCE_BIND_REGIONS_BIT_KHR in %s.",
+                         api_name, string_VkSwapchainCreateFlagsKHR(create_info.flags).c_str(), where);
+    }
+
+    if (create_info.oldSwapchain != VK_NULL_HANDLE) {
+        skip |= LogError(device, "VUID-VkSwapchainCreateInfoKHR-oldSwapchain-05073",
+                         "%s(): oldSwapchain is not VK_NULL_HANDLE in %s.", api_name, where);
     }
 
     return skip;
@@ -1256,6 +1278,8 @@ bool SCCoreChecks::PreCallValidateCreateSwapchainKHR(VkDevice device, const VkSw
     skip |= ValidateObjectRequestCount(device, "vkCreateSwapchainKHR", "VUID-vkCreateSwapchainKHR-device-05068", "swapchains",
                                        Count<SWAPCHAIN_NODE>(), "swapchain", sc_object_limits_.swapchainRequestCount, 1);
 
+    skip |= ValidateSwapchainCreateInfo(device, *pCreateInfo, "vkCreateSwapchainKHR", "pCreateInfo");
+
     return skip;
 }
 
@@ -1268,6 +1292,12 @@ bool SCCoreChecks::PreCallValidateCreateSharedSwapchainsKHR(VkDevice device, uin
     skip |= ValidateObjectRequestCount(device, "vkCreateSharedSwapchainsKHR", "VUID-vkCreateSharedSwapchainsKHR-device-05068",
                                        "swapchains", Count<SWAPCHAIN_NODE>(), "swapchain", sc_object_limits_.swapchainRequestCount,
                                        "swapchainCount", swapchainCount);
+
+    char where[64];
+    for (uint32_t i = 0; i < swapchainCount; i++) {
+        snprintf(where, sizeof(where), "pCreateInfos[%u]", i);
+        skip |= ValidateSwapchainCreateInfo(device, pCreateInfos[i], "vkCreateSharedSwapchainKHR", where);
+    }
 
     return skip;
 }

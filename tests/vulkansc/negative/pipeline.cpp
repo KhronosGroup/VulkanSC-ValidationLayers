@@ -14,8 +14,7 @@
 TEST_F(VkSCLayerTest, CreatePipelinesShaderModuleNotNull) {
     TEST_DESCRIPTION("vkCreate*Pipelines - VkPipelineShaderStageCreateInfo::module must be VK_NULL_HANDLE");
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    ASSERT_NO_FATAL_FAILURE(Init());
 
     VkPipelineLayoutObj pipeline_layout(m_device);
     VkPipeline pipeline = VK_NULL_HANDLE;
@@ -69,8 +68,7 @@ TEST_F(VkSCLayerTest, CreatePipelinesShaderModuleNotNull) {
 TEST_F(VkSCLayerTest, CreatePipelinesWithBasePipeline) {
     TEST_DESCRIPTION("Test vkCreate*Pipelines usage with a basePipeline");
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    ASSERT_NO_FATAL_FAILURE(Init());
 
     VkPipelineLayoutObj pipeline_layout(m_device);
     VkPipeline pipeline = VK_NULL_HANDLE;
@@ -342,8 +340,7 @@ TEST_F(VkSCLayerTest, CreatePipelineCacheInvalidFlags) {
     TEST_DESCRIPTION("vkCreatePipelineCache - missing required flags");
     // NOTE: This test case implicitly tests the removed VUIDs: 00768, 007689
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    ASSERT_NO_FATAL_FAILURE(Init());
 
     VkPipelineCache pipeline_cache = VK_NULL_HANDLE;
     auto create_info = vksc::GetDefaultPipelineCacheCreateInfo();

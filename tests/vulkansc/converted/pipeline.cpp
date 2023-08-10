@@ -1176,7 +1176,7 @@ TEST_F(NegativePipeline, DepthStencilRequired) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativePipeline, NullStagepName) {
+TEST_F(NegativePipeline, DISABLED_NullStagepName) {
     TEST_DESCRIPTION("Test that an error is produced for a stage with a null pName pointer");
 
     ASSERT_NO_FATAL_FAILURE(Init());

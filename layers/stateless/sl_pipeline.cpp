@@ -763,10 +763,12 @@ bool StatelessValidation::manual_PreCallValidateCreateGraphicsPipelines(VkDevice
                 for (uint32_t stage_index = 0; stage_index < create_info.stageCount; ++stage_index) {
                     active_shaders |= create_info.pStages[stage_index].stage;
 
+#ifndef VULKANSC
                     skip |= ValidateRequiredPointer(
                         "vkCreateGraphicsPipelines",
                         ParameterName("pCreateInfos[%i].stage[%i].pName", ParameterName::IndexVector{i, stage_index}),
                         create_info.pStages[stage_index].pName, "VUID-VkPipelineShaderStageCreateInfo-pName-parameter");
+#endif
 
                     if (create_info.pStages[stage_index].pName) {
                         skip |= ValidateString(
@@ -1823,9 +1825,11 @@ bool StatelessValidation::manual_PreCallValidateCreateComputePipelines(VkDevice 
                                                                        VkPipeline *pPipelines) const {
     bool skip = false;
     for (uint32_t i = 0; i < createInfoCount; i++) {
-        skip |=
-            ValidateString("vkCreateComputePipelines", ParameterName("pCreateInfos[%i].stage.pName", ParameterName::IndexVector{i}),
-                           "VUID-VkPipelineShaderStageCreateInfo-pName-parameter", pCreateInfos[i].stage.pName);
+        if (pCreateInfos[i].stage.pName) {
+            skip |= ValidateString("vkCreateComputePipelines",
+                                   ParameterName("pCreateInfos[%i].stage.pName", ParameterName::IndexVector{i}),
+                                   "VUID-VkPipelineShaderStageCreateInfo-pName-parameter", pCreateInfos[i].stage.pName);
+        }
         auto feedback_struct = LvlFindInChain<VkPipelineCreationFeedbackCreateInfoEXT>(pCreateInfos[i].pNext);
         if (feedback_struct) {
             const uint32_t feedback_count = feedback_struct->pipelineStageCreationFeedbackCount;

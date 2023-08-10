@@ -54,6 +54,7 @@ target_sources(vksc_layer_validation_tests PRIVATE
     negative/pipeline.cpp
     negative/ported.cpp
     negative/render_pass.cpp
+    negative/wsi.cpp
     positive/implicit.cpp
     positive/instance.cpp
     positive/others.cpp
