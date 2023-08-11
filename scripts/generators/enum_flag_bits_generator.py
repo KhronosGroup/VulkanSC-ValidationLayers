@@ -45,6 +45,11 @@ class APISpecific:
                     'const VkImageCompressionFlagsEXT AllVkImageCompressionFlagBitsEXT = 0;\n',
                     'const VkBuildAccelerationStructureFlagsNV AllVkBuildAccelerationStructureFlagBitsNV = 0;\n',
                     'const VkExternalMemoryHandleTypeFlagsNV AllVkExternalMemoryHandleTypeFlagBitsNV = 0;\n',
+                    # The following is required to be able to build on Mac as the VVL code has a hard-coded
+                    # expectation on the value of this constant
+                    '#ifdef VK_USE_PLATFORM_METAL_EXT\n' +
+                    'const VkExportMetalObjectTypeFlagsEXT AllVkExportMetalObjectTypeFlagBitsEXT = 0x3F;\n' +
+                    '#endif //VK_USE_PLATFORM_METAL_EXT\n',
                 ]
 
             # Vulkan specific manual constant generation

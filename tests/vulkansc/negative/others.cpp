@@ -11,8 +11,6 @@
 
 #include "../framework/vksc_layer_validation_tests.h"
 
-#include <malloc.h>
-#include <cstdlib>
 
 TEST_F(VkSCLayerTest, AllocationCallbacksMustBeNull) {
     TEST_DESCRIPTION("Test that pAllocator is always NULL for Create/Allocate/Destroy commands");

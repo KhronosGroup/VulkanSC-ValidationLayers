@@ -11,9 +11,6 @@
 
 #include "../framework/vksc_layer_validation_tests.h"
 
-#include <malloc.h>
-#include <cstdlib>
-
 // NOTE: The test cases in this file contain tests for implicit VUs that are auto-generated, but
 // they deserve their own test cases because these implicit VUs are different in Vulkan SC compared
 // to Vulkan.
