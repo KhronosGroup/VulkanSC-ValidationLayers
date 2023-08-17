@@ -49,7 +49,7 @@ class VkSCObjectReservationLayerTest : public VkSCLayerTest {
                 }
             }
 
-            if (max_create_count == 1) {
+            if (max_create_count == 0) {
                 // Commands can only create a single object at a time
 
                 // Create up to the desired limit
@@ -187,8 +187,10 @@ class VkSCObjectReservationLayerTest : public VkSCLayerTest {
                     }
 
                     if (tested_limit > 0) {
-                        // Expect to be able to create a single object instead of it with max_create_count - 1
-                        create_func(device, object_count++, std::min(max_create_count - 1, tested_limit), false);
+                        if (max_create_count > 1) {
+                            // Expect to be able to create a single object instead of it with max_create_count - 1
+                            create_func(device, object_count++, std::min(max_create_count - 1, tested_limit), false);
+                        }
 
                         // After that any attempts to create should fail
                         create_func(device, object_count, 1, true);
@@ -230,7 +232,7 @@ TEST_F(VkSCObjectReservationLayerTest, CommandPoolRequestCount) {
         std::vector<VkCommandPool> cmd_pools{};
     } data;
 
-    const uint32_t max_create_count = 1;
+    const uint32_t max_create_count = 0;  // Not a multi-create API
     const bool can_destroy = false;
     const bool has_parent = false;
 
@@ -335,7 +337,7 @@ TEST_F(VkSCObjectReservationLayerTest, DescriptorSetLayoutRequestCount) {
         std::vector<VkDescriptorSetLayout> descriptor_set_layouts{};
     } data;
 
-    const uint32_t max_create_count = 1;
+    const uint32_t max_create_count = 0;  // Not a multi-create API
     const bool can_destroy = true;
     const bool has_parent = false;
 
@@ -464,7 +466,7 @@ TEST_F(VkSCObjectReservationLayerTest, PipelineLayoutRequestCount) {
         std::vector<VkPipelineLayout> pipeline_layouts{};
     } data;
 
-    const uint32_t max_create_count = 1;
+    const uint32_t max_create_count = 0;  // Not a multi-create API
     const bool can_destroy = true;
     const bool has_parent = false;
 
@@ -538,7 +540,7 @@ TEST_F(VkSCObjectReservationLayerTest, DescriptorPoolRequestCount) {
         std::vector<VkDescriptorPool> descriptor_pools{};
     } data;
 
-    const uint32_t max_create_count = 1;
+    const uint32_t max_create_count = 0;  // Not a multi-create API
     const bool can_destroy = false;
     const bool has_parent = false;
 
@@ -702,7 +704,7 @@ TEST_F(VkSCObjectReservationLayerTest, DeviceMemoryRequestCount) {
         std::vector<VkDeviceMemory> device_memories{};
     } data;
 
-    const uint32_t max_create_count = 1;
+    const uint32_t max_create_count = 0;  // Not a multi-create API
     const bool can_destroy = false;
     const bool has_parent = false;
 
@@ -751,7 +753,7 @@ TEST_F(VkSCObjectReservationLayerTest, PipelineCacheRequestCount) {
         std::vector<VkPipelineCache> pipeline_caches{};
     } data;
 
-    const uint32_t max_create_count = 1;
+    const uint32_t max_create_count = 0;  // Not a multi-create API
     const bool can_destroy = true;
     const bool has_parent = false;
 
@@ -1033,7 +1035,7 @@ TEST_F(VkSCObjectReservationLayerTest, QueryPoolRequestCount) {
         std::vector<VkQueryPool> query_pools{};
     } data;
 
-    const uint32_t max_create_count = 1;
+    const uint32_t max_create_count = 0;  // Not a multi-create API
     const bool can_destroy = false;
     const bool has_parent = false;
 
@@ -1085,7 +1087,7 @@ TEST_F(VkSCObjectReservationLayerTest, RenderPassRequestCount) {
         std::vector<VkRenderPass> render_passes{};
     } data;
 
-    const uint32_t max_create_count = 1;
+    const uint32_t max_create_count = 0;  // Not a multi-create API
     const bool can_destroy = true;
     const bool has_parent = false;
 
@@ -1366,7 +1368,7 @@ TEST_F(VkSCObjectReservationLayerTest, FramebufferRequestCount) {
         std::vector<VkFramebuffer> framebuffers{};
     } data;
 
-    const uint32_t max_create_count = 1;
+    const uint32_t max_create_count = 0;  // Not a multi-create API
     const bool can_destroy = true;
     const bool has_parent = false;
 
@@ -1440,7 +1442,7 @@ TEST_F(VkSCObjectReservationLayerTest, BufferRequestCount) {
         std::vector<VkBuffer> buffers{};
     } data;
 
-    const uint32_t max_create_count = 1;
+    const uint32_t max_create_count = 0;  // Not a multi-create API
     const bool can_destroy = true;
     const bool has_parent = false;
 
@@ -1496,7 +1498,7 @@ TEST_F(VkSCObjectReservationLayerTest, BufferViewRequestCount) {
         std::vector<VkBufferView> buffer_views{};
     } data;
 
-    const uint32_t max_create_count = 1;
+    const uint32_t max_create_count = 0;  // Not a multi-create API
     const bool can_destroy = true;
     const bool has_parent = false;
 
@@ -1563,7 +1565,7 @@ TEST_F(VkSCObjectReservationLayerTest, ImageRequestCount) {
         std::vector<VkImage> images{};
     } data;
 
-    const uint32_t max_create_count = 1;
+    const uint32_t max_create_count = 0;  // Not a multi-create API
     const bool can_destroy = true;
     const bool has_parent = false;
 
@@ -1625,7 +1627,7 @@ TEST_F(VkSCObjectReservationLayerTest, ImageViewRequestCount) {
         std::vector<VkImageView> image_views{};
     } data;
 
-    const uint32_t max_create_count = 1;
+    const uint32_t max_create_count = 0;  // Not a multi-create API
     const bool can_destroy = true;
     const bool has_parent = false;
 
@@ -1704,7 +1706,7 @@ TEST_F(VkSCObjectReservationLayerTest, LayeredImageViewRequestCount) {
         std::vector<VkImageView> layered_image_views{};
     } data;
 
-    const uint32_t max_create_count = 1;
+    const uint32_t max_create_count = 0;  // Not a multi-create API
     const bool can_destroy = true;
     const bool has_parent = false;
 
@@ -1806,7 +1808,7 @@ TEST_F(VkSCObjectReservationLayerTest, SamplerRequestCount) {
         std::vector<VkSampler> samplers{};
     } data;
 
-    const uint32_t max_create_count = 1;
+    const uint32_t max_create_count = 0;  // Not a multi-create API
     const bool can_destroy = true;
     const bool has_parent = false;
 
@@ -1882,7 +1884,7 @@ TEST_F(VkSCObjectReservationLayerTest, SamplerYcbcrConversionRequestCount) {
         GTEST_SKIP() << "Test requires a YCbCr format supporting sampled image usage";
     }
 
-    const uint32_t max_create_count = 1;
+    const uint32_t max_create_count = 0;  // Not a multi-create API
     const bool can_destroy = true;
     const bool has_parent = false;
 
@@ -1936,7 +1938,7 @@ TEST_F(VkSCObjectReservationLayerTest, FenceRequestCount) {
         std::vector<VkFence> fences{};
     } data;
 
-    const uint32_t max_create_count = 1;
+    const uint32_t max_create_count = 0;  // Not a multi-create API
     const bool can_destroy = true;
     const bool has_parent = false;
 
@@ -1989,7 +1991,7 @@ TEST_F(VkSCObjectReservationLayerTest, SemaphoreRequestCount) {
         std::vector<VkSemaphore> semaphores{};
     } data;
 
-    const uint32_t max_create_count = 1;
+    const uint32_t max_create_count = 0;  // Not a multi-create API
     const bool can_destroy = true;
     const bool has_parent = false;
 
@@ -2042,7 +2044,7 @@ TEST_F(VkSCObjectReservationLayerTest, EventRequestCount) {
         std::vector<VkEvent> events{};
     } data;
 
-    const uint32_t max_create_count = 1;
+    const uint32_t max_create_count = 0;  // Not a multi-create API
     const bool can_destroy = true;
     const bool has_parent = false;
 
@@ -2105,7 +2107,7 @@ TEST_F(VkSCObjectReservationLayerTest, PrivateDataSlotRequestCount) {
         PFN_vkDestroyPrivateDataSlotEXT pfn_vkDestroyPrivateDataSlotEXT;
     } data;
 
-    const uint32_t max_create_count = 1;
+    const uint32_t max_create_count = 0;  // Not a multi-create API
     const bool can_destroy = true;
     const bool has_parent = false;
 

@@ -26,7 +26,7 @@ TEST_F(VkSCPortedLayerTest, SpecLinks) {
     ASSERT_NO_FATAL_FAILURE(Init());
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "registry/VulkanSC/specs");
-    vk::GetPhysicalDeviceFeatures(gpu(), NULL);
+    vksc::GetPhysicalDeviceFeatures(gpu(), NULL);
     m_errorMonitor->VerifyFound();
 }
 

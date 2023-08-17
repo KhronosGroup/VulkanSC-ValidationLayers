@@ -261,16 +261,18 @@ TEST_F(VkSCLayerTest, SecondaryCommandBufferNullOrImagelessFramebuffer) {
                                        VK_ATTACHMENT_STORE_OP_DONT_CARE,
                                        VK_IMAGE_LAYOUT_UNDEFINED,
                                        VK_IMAGE_LAYOUT_GENERAL};
-    VkSubpassDescription subpasses[2] = {};
+    VkSubpassDescription subpass = {};
+    VkAttachmentReference attachment_ref = {0, VK_IMAGE_LAYOUT_GENERAL};
 
     auto renderpass_ci = LvlInitStruct<VkRenderPassCreateInfo>();
     renderpass_ci.subpassCount = 1;
-    renderpass_ci.pSubpasses = &subpasses[0];
+    renderpass_ci.pSubpasses = &subpass;
     renderpass_ci.attachmentCount = 1;
     renderpass_ci.pAttachments = &attachment;
     vk_testing::RenderPass renderpass1(*m_device, renderpass_ci);
 
-    renderpass_ci.subpassCount = 2;
+    subpass.colorAttachmentCount = 1;
+    subpass.pColorAttachments = &attachment_ref;
     vk_testing::RenderPass renderpass2(*m_device, renderpass_ci);
 
     auto image_ci = LvlInitStruct<VkImageCreateInfo>();

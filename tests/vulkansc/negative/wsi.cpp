@@ -25,7 +25,7 @@ class VkSCWSITest : public VkSCLayerTest {
         if (surface_ == VK_NULL_HANDLE) {
             VkResult result = VK_ERROR_INITIALIZATION_FAILED;
 
-            if (IsExtensionsEnabled(VK_EXT_HEADLESS_SURFACE_EXTENSION_NAME)) {
+            if (DeviceExtensionSupported(VK_EXT_HEADLESS_SURFACE_EXTENSION_NAME)) {
                 auto create_info = LvlInitStruct<VkHeadlessSurfaceCreateInfoEXT>();
                 result = vksc::CreateHeadlessSurfaceEXT(instance(), &create_info, nullptr, &surface_);
             }

@@ -155,7 +155,18 @@ static VKAPI_ATTR void VKAPI_CALL DestroyShaderModule(VkDevice device, VkShaderM
 
 static VKAPI_ATTR VkResult VKAPI_CALL CreateInstance(const VkInstanceCreateInfo* pCreateInfo,
                                                      const VkAllocationCallbacks* pAllocator, VkInstance* pInstance) {
-    VkResult result = vksc::CreateInstance(pCreateInfo, pAllocator, pInstance);
+    // Override requested Vulkan API version with corresponding Vulkan SC API version
+    auto create_info = *pCreateInfo;
+    auto app_info = LvlInitStruct<VkApplicationInfo>();
+    if (create_info.pApplicationInfo != nullptr) {
+        app_info = *create_info.pApplicationInfo;
+    }
+    create_info.pApplicationInfo = &app_info;
+    if (VK_API_VERSION_VARIANT(app_info.apiVersion) != VKSC_API_VARIANT) {
+        assert(app_info.apiVersion <= VK_API_VERSION_1_2);
+        app_info.apiVersion = VKSC_API_VERSION_1_0;
+    }
+    VkResult result = vksc::CreateInstance(&create_info, pAllocator, pInstance);
     if (result == VK_SUCCESS && VkSCRenderFramework::DispatchHelper() != nullptr) {
         VkSCRenderFramework::DispatchHelper()->RegisterInstance(*pInstance);
     }
