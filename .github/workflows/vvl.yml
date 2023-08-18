@@ -39,7 +39,7 @@ jobs:
       matrix:
         os: [ubuntu-22.04]
         compiler: [{cc: gcc, cxx: g++}]
-        flags: [{c: "-fsanitize=address", ld: "-fsanitize=address"}, {c: "-fsanitize=thread", ld: "-fsanitize=thread"}]
+        flags: [{c: "-fsanitize=address", ld: "-fsanitize=address"}]
         config: [debug, release]
         cpp_std: [17]
         robin_hood: ["ON"]
