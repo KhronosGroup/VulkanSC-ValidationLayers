@@ -36,6 +36,8 @@ extern PFN_vkCreateGraphicsPipelines CreateGraphicsPipelines;
 extern PFN_vkCreateCommandPool CreateCommandPool;
 extern PFN_vkBeginCommandBuffer BeginCommandBuffer;
 extern PFN_vkResetCommandBuffer ResetCommandBuffer;
+extern PFN_vkCreateRenderPass CreateRenderPass;
+extern PFN_vkCreateRenderPass2 CreateRenderPass2;
 
 const VkDeviceObjectReservationCreateInfo& GetDefaultObjectReservationCreateInfo();
 

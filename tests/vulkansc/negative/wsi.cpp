@@ -25,7 +25,7 @@ class VkSCWSITest : public VkSCLayerTest {
         if (surface_ == VK_NULL_HANDLE) {
             VkResult result = VK_ERROR_INITIALIZATION_FAILED;
 
-            if (DeviceExtensionSupported(VK_EXT_HEADLESS_SURFACE_EXTENSION_NAME)) {
+            if (InstanceExtensionSupported(VK_EXT_HEADLESS_SURFACE_EXTENSION_NAME)) {
                 auto create_info = LvlInitStruct<VkHeadlessSurfaceCreateInfoEXT>();
                 result = vksc::CreateHeadlessSurfaceEXT(instance(), &create_info, nullptr, &surface_);
             }
@@ -105,7 +105,7 @@ TEST_F(VkSCWSITest, CreateSwapchainSplitInstanceBindRegionsNotAllowed) {
 
     ASSERT_NO_FATAL_FAILURE(Init());
 
-    if (!WSISurface()) {
+    if (!WSISurface() || !DeviceExtensionSupported(VK_KHR_SWAPCHAIN_EXTENSION_NAME)) {
         GTEST_SKIP() << "Test requires WSI support";
     }
 
@@ -125,7 +125,7 @@ TEST_F(VkSCWSITest, CreateSwapchainOldSwapchainNotNull) {
 
     ASSERT_NO_FATAL_FAILURE(Init());
 
-    if (!WSISurface()) {
+    if (!WSISurface() || !DeviceExtensionSupported(VK_KHR_SWAPCHAIN_EXTENSION_NAME)) {
         GTEST_SKIP() << "Test requires WSI support";
     }
 

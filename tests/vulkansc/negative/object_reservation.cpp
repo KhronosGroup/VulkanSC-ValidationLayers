@@ -30,7 +30,7 @@ class VkSCObjectReservationLayerTest : public VkSCLayerTest {
         auto sc_10_features = LvlInitStruct<VkPhysicalDeviceVulkanSC10Features>(device_features);
         auto object_reservation_info = LvlInitStruct<VkDeviceObjectReservationCreateInfo>(&sc_10_features);
 
-        const std::vector<uint32_t> tested_limits{0, 7, 13, 42, 111, 499};
+        const std::vector<uint32_t> tested_limits{0, 1, 7, 13, 42, 111, 499};
         for (auto tested_limit : tested_limits) {
             const uint32_t over_limit = 5;
 
@@ -239,7 +239,7 @@ TEST_F(VkSCObjectReservationLayerTest, CommandPoolRequestCount) {
     TestObjectReservationLimit(
         max_create_count, can_destroy, has_parent, nullptr,
         // Init object reservation info
-        [&data](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
+        [&](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
             object_reservation_info.commandPoolRequestCount = tested_limit;
             object_reservation_info.commandBufferRequestCount = tested_limit + 1;
 
@@ -251,7 +251,7 @@ TEST_F(VkSCObjectReservationLayerTest, CommandPoolRequestCount) {
         // Setup common device objects
         nullptr,
         // Create objects
-        [&data, this](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
             VkCommandPool cmd_pool = VK_NULL_HANDLE;
 
             auto mem_reservation_info = LvlInitStruct<VkCommandPoolMemoryReservationCreateInfo>();
@@ -291,7 +291,7 @@ TEST_F(VkSCObjectReservationLayerTest, CommandBufferRequestCount) {
     TestObjectReservationLimit(
         max_create_count, can_destroy, has_parent, nullptr,
         // Init object reservation info
-        [&data](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
+        [&](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
             object_reservation_info.commandPoolRequestCount = tested_limit + 1;
             object_reservation_info.commandBufferRequestCount = tested_limit;
 
@@ -303,7 +303,7 @@ TEST_F(VkSCObjectReservationLayerTest, CommandBufferRequestCount) {
         // Setup common device objects
         nullptr,
         // Create objects
-        [&data, this](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
             VkCommandPool cmd_pool = VK_NULL_HANDLE;
 
             auto mem_reservation_info = LvlInitStruct<VkCommandPoolMemoryReservationCreateInfo>();
@@ -344,7 +344,7 @@ TEST_F(VkSCObjectReservationLayerTest, DescriptorSetLayoutRequestCount) {
     TestObjectReservationLimit(
         max_create_count, can_destroy, has_parent, nullptr,
         // Init object reservation info
-        [&data](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
+        [&](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
             object_reservation_info.descriptorSetLayoutRequestCount = tested_limit;
             object_reservation_info.descriptorSetLayoutBindingRequestCount = tested_limit + 1;
             object_reservation_info.descriptorSetLayoutBindingLimit = 1;
@@ -357,7 +357,7 @@ TEST_F(VkSCObjectReservationLayerTest, DescriptorSetLayoutRequestCount) {
         // Setup common device objects
         nullptr,
         // Create objects
-        [&data, this](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
             VkDescriptorSetLayout descriptor_set_layout = VK_NULL_HANDLE;
 
             VkDescriptorSetLayoutBinding binding{};
@@ -379,7 +379,7 @@ TEST_F(VkSCObjectReservationLayerTest, DescriptorSetLayoutRequestCount) {
             }
         },
         // Destroy objects
-        [&data](VkDeviceObj& device, uint32_t index, uint32_t destroy_count) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t destroy_count) {
             assert(index < data.descriptor_set_layouts.size());
             assert(destroy_count == 1);
 
@@ -406,7 +406,7 @@ TEST_F(VkSCObjectReservationLayerTest, DescriptorSetLayoutBindingRequestCount) {
     TestObjectReservationLimit(
         max_create_count, can_destroy, has_parent, nullptr,
         // Init object reservation info
-        [&data](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
+        [&](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
             object_reservation_info.descriptorSetLayoutRequestCount = tested_limit + 1;
             object_reservation_info.descriptorSetLayoutBindingRequestCount = tested_limit;
             object_reservation_info.descriptorSetLayoutBindingLimit = 4;
@@ -419,7 +419,7 @@ TEST_F(VkSCObjectReservationLayerTest, DescriptorSetLayoutBindingRequestCount) {
         // Setup common device objects
         nullptr,
         // Create objects
-        [&data, this](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
             VkDescriptorSetLayout descriptor_set_layout = VK_NULL_HANDLE;
 
             uint32_t binding_count = 0;
@@ -445,7 +445,7 @@ TEST_F(VkSCObjectReservationLayerTest, DescriptorSetLayoutBindingRequestCount) {
             }
         },
         // Destroy objects
-        [&data](VkDeviceObj& device, uint32_t index, uint32_t destroy_count) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t destroy_count) {
             assert(index < data.descriptor_set_layouts.size());
             assert(destroy_count == 0);
 
@@ -473,7 +473,7 @@ TEST_F(VkSCObjectReservationLayerTest, PipelineLayoutRequestCount) {
     TestObjectReservationLimit(
         max_create_count, can_destroy, has_parent, nullptr,
         // Init object reservation info
-        [&data](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
+        [&](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
             object_reservation_info.pipelineLayoutRequestCount = tested_limit;
             object_reservation_info.descriptorSetLayoutRequestCount = 1;
             object_reservation_info.descriptorSetLayoutBindingRequestCount = 1;
@@ -485,7 +485,7 @@ TEST_F(VkSCObjectReservationLayerTest, PipelineLayoutRequestCount) {
             return true;
         },
         // Setup common device objects
-        [&data](VkDeviceObj& device) {
+        [&](VkDeviceObj& device) {
             VkResult result = VK_SUCCESS;
 
             VkDescriptorSetLayoutBinding binding{};
@@ -503,7 +503,7 @@ TEST_F(VkSCObjectReservationLayerTest, PipelineLayoutRequestCount) {
             return true;
         },
         // Create objects
-        [&data, this](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
             VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
 
             auto create_info = LvlInitStruct<VkPipelineLayoutCreateInfo>();
@@ -520,7 +520,7 @@ TEST_F(VkSCObjectReservationLayerTest, PipelineLayoutRequestCount) {
             }
         },
         // Destroy objects
-        [&data](VkDeviceObj& device, uint32_t index, uint32_t destroy_count) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t destroy_count) {
             assert(index < data.pipeline_layouts.size());
             assert(destroy_count == 1);
 
@@ -528,7 +528,7 @@ TEST_F(VkSCObjectReservationLayerTest, PipelineLayoutRequestCount) {
             data.pipeline_layouts[index] = VK_NULL_HANDLE;
         },
         // Teardown common device objects
-        [&data](VkDeviceObj& device) { vksc::DestroyDescriptorSetLayout(device.handle(), data.descriptor_set_layout, nullptr); });
+        [&](VkDeviceObj& device) { vksc::DestroyDescriptorSetLayout(device.handle(), data.descriptor_set_layout, nullptr); });
 }
 
 TEST_F(VkSCObjectReservationLayerTest, DescriptorPoolRequestCount) {
@@ -547,7 +547,7 @@ TEST_F(VkSCObjectReservationLayerTest, DescriptorPoolRequestCount) {
     TestObjectReservationLimit(
         max_create_count, can_destroy, has_parent, nullptr,
         // Init object reservation info
-        [&data](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
+        [&](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
             object_reservation_info.descriptorPoolRequestCount = tested_limit;
             object_reservation_info.descriptorSetRequestCount = tested_limit + 1;
 
@@ -559,7 +559,7 @@ TEST_F(VkSCObjectReservationLayerTest, DescriptorPoolRequestCount) {
         // Setup common device objects
         nullptr,
         // Create objects
-        [&data, this](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
             VkDescriptorPool descriptor_pool = VK_NULL_HANDLE;
 
             VkDescriptorPoolSize pool_size{};
@@ -605,7 +605,7 @@ TEST_F(VkSCObjectReservationLayerTest, DescriptorSetRequestCount) {
     TestObjectReservationLimit(
         max_create_count, can_destroy, has_parent, nullptr,
         // Init object reservation info
-        [&data](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
+        [&](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
             object_reservation_info.descriptorPoolRequestCount = tested_limit + 1;
             object_reservation_info.descriptorSetRequestCount = tested_limit;
             object_reservation_info.descriptorSetLayoutRequestCount = 1;
@@ -620,7 +620,7 @@ TEST_F(VkSCObjectReservationLayerTest, DescriptorSetRequestCount) {
             return true;
         },
         // Setup common device objects
-        [&data](VkDeviceObj& device) {
+        [&](VkDeviceObj& device) {
             VkResult result = VK_SUCCESS;
 
             VkDescriptorSetLayoutBinding binding{};
@@ -638,7 +638,7 @@ TEST_F(VkSCObjectReservationLayerTest, DescriptorSetRequestCount) {
             return true;
         },
         // Create objects
-        [&data, this](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
             std::vector<VkDescriptorSet> descriptor_sets(create_count, VK_NULL_HANDLE);
             std::vector<VkDescriptorSetLayout> set_layouts(create_count, data.descriptor_set_layout);
 
@@ -684,7 +684,7 @@ TEST_F(VkSCObjectReservationLayerTest, DescriptorSetRequestCount) {
             }
         },
         // Destroy objects
-        [&data](VkDeviceObj& device, uint32_t index, uint32_t destroy_count) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t destroy_count) {
             assert(index < data.descriptor_pools.size());
 
             if (data.descriptor_pools[index] != VK_NULL_HANDLE) {
@@ -692,7 +692,7 @@ TEST_F(VkSCObjectReservationLayerTest, DescriptorSetRequestCount) {
             }
         },
         // Teardown common device objects
-        [&data](VkDeviceObj& device) { vksc::DestroyDescriptorSetLayout(device.handle(), data.descriptor_set_layout, nullptr); });
+        [&](VkDeviceObj& device) { vksc::DestroyDescriptorSetLayout(device.handle(), data.descriptor_set_layout, nullptr); });
 }
 
 TEST_F(VkSCObjectReservationLayerTest, DeviceMemoryRequestCount) {
@@ -711,7 +711,7 @@ TEST_F(VkSCObjectReservationLayerTest, DeviceMemoryRequestCount) {
     TestObjectReservationLimit(
         max_create_count, can_destroy, has_parent, nullptr,
         // Init object reservation info
-        [&data](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
+        [&](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
             object_reservation_info.deviceMemoryRequestCount = tested_limit;
 
             data.device_memories.clear();
@@ -722,7 +722,7 @@ TEST_F(VkSCObjectReservationLayerTest, DeviceMemoryRequestCount) {
         // Setup common device objects
         nullptr,
         // Create objects
-        [&data, this](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
             VkDeviceMemory device_memory = VK_NULL_HANDLE;
 
             auto alloc_info = LvlInitStruct<VkMemoryAllocateInfo>();
@@ -760,7 +760,7 @@ TEST_F(VkSCObjectReservationLayerTest, PipelineCacheRequestCount) {
     TestObjectReservationLimit(
         max_create_count, can_destroy, has_parent, nullptr,
         // Init object reservation info
-        [&data](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
+        [&](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
             object_reservation_info.pipelineCacheCreateInfoCount = 1;
             object_reservation_info.pPipelineCacheCreateInfos = &vksc::GetDefaultPipelineCacheCreateInfo();
 
@@ -774,7 +774,7 @@ TEST_F(VkSCObjectReservationLayerTest, PipelineCacheRequestCount) {
         // Setup common device objects
         nullptr,
         // Create objects
-        [&data, this](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
             VkPipelineCache pipeline_cache = VK_NULL_HANDLE;
 
             auto create_info = vksc::GetDefaultPipelineCacheCreateInfo();
@@ -789,7 +789,7 @@ TEST_F(VkSCObjectReservationLayerTest, PipelineCacheRequestCount) {
             }
         },
         // Destroy objects
-        [&data](VkDeviceObj& device, uint32_t index, uint32_t destroy_count) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t destroy_count) {
             assert(index < data.pipeline_caches.size());
             assert(destroy_count == 1);
 
@@ -819,7 +819,7 @@ TEST_F(VkSCObjectReservationLayerTest, ComputePipelineRequestCount) {
     TestObjectReservationLimit(
         max_create_count, can_destroy, has_parent, nullptr,
         // Init object reservation info
-        [&data](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
+        [&](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
             object_reservation_info.pipelineCacheCreateInfoCount = 1;
             object_reservation_info.pPipelineCacheCreateInfos = &vksc::GetDefaultPipelineCacheCreateInfo();
 
@@ -841,7 +841,7 @@ TEST_F(VkSCObjectReservationLayerTest, ComputePipelineRequestCount) {
             return true;
         },
         // Setup common device objects
-        [&data](VkDeviceObj& device) {
+        [&](VkDeviceObj& device) {
             VkResult result = VK_SUCCESS;
 
             {
@@ -859,7 +859,7 @@ TEST_F(VkSCObjectReservationLayerTest, ComputePipelineRequestCount) {
             return true;
         },
         // Create objects
-        [&data, this](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
             std::vector<VkPipeline> pipelines(create_count, VK_NULL_HANDLE);
 
             auto offline_info = vksc::GetDefaultPipelineOfflineCreateInfo();
@@ -884,7 +884,7 @@ TEST_F(VkSCObjectReservationLayerTest, ComputePipelineRequestCount) {
             }
         },
         // Destroy objects
-        [&data](VkDeviceObj& device, uint32_t index, uint32_t destroy_count) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t destroy_count) {
             assert(index < data.pipelines.size());
             assert(destroy_count == 1);
 
@@ -892,7 +892,7 @@ TEST_F(VkSCObjectReservationLayerTest, ComputePipelineRequestCount) {
             data.pipelines[index] = VK_NULL_HANDLE;
         },
         // Teardown common device objects
-        [&data](VkDeviceObj& device) {
+        [&](VkDeviceObj& device) {
             vksc::DestroyPipelineCache(device.handle(), data.pipeline_cache, nullptr);
             vksc::DestroyPipelineLayout(device.handle(), data.pipeline_layout, nullptr);
         });
@@ -918,7 +918,7 @@ TEST_F(VkSCObjectReservationLayerTest, GraphicsPipelineRequestCount) {
     TestObjectReservationLimit(
         max_create_count, can_destroy, has_parent, nullptr,
         // Init object reservation info
-        [&data](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
+        [&](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
             object_reservation_info.pipelineCacheCreateInfoCount = 1;
             object_reservation_info.pPipelineCacheCreateInfos = &vksc::GetDefaultPipelineCacheCreateInfo();
 
@@ -943,7 +943,7 @@ TEST_F(VkSCObjectReservationLayerTest, GraphicsPipelineRequestCount) {
             return true;
         },
         // Setup common device objects
-        [&data](VkDeviceObj& device) {
+        [&](VkDeviceObj& device) {
             VkResult result = VK_SUCCESS;
 
             {
@@ -973,7 +973,7 @@ TEST_F(VkSCObjectReservationLayerTest, GraphicsPipelineRequestCount) {
             return true;
         },
         // Create objects
-        [&data, this](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
             std::vector<VkPipeline> pipelines(create_count, VK_NULL_HANDLE);
 
             auto stage_info = LvlInitStruct<VkPipelineShaderStageCreateInfo>();
@@ -1011,7 +1011,7 @@ TEST_F(VkSCObjectReservationLayerTest, GraphicsPipelineRequestCount) {
             }
         },
         // Destroy objects
-        [&data](VkDeviceObj& device, uint32_t index, uint32_t destroy_count) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t destroy_count) {
             assert(index < data.pipelines.size());
             assert(destroy_count == 1);
 
@@ -1019,7 +1019,7 @@ TEST_F(VkSCObjectReservationLayerTest, GraphicsPipelineRequestCount) {
             data.pipelines[index] = VK_NULL_HANDLE;
         },
         // Teardown common device objects
-        [&data](VkDeviceObj& device) {
+        [&](VkDeviceObj& device) {
             vksc::DestroyRenderPass(device.handle(), data.render_pass, nullptr);
             vksc::DestroyPipelineCache(device.handle(), data.pipeline_cache, nullptr);
             vksc::DestroyPipelineLayout(device.handle(), data.pipeline_layout, nullptr);
@@ -1042,7 +1042,7 @@ TEST_F(VkSCObjectReservationLayerTest, QueryPoolRequestCount) {
     TestObjectReservationLimit(
         max_create_count, can_destroy, has_parent, nullptr,
         // Init object reservation info
-        [&data](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
+        [&](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
             object_reservation_info.queryPoolRequestCount = tested_limit;
             object_reservation_info.maxOcclusionQueriesPerPool = 8;
 
@@ -1054,7 +1054,7 @@ TEST_F(VkSCObjectReservationLayerTest, QueryPoolRequestCount) {
         // Setup common device objects
         nullptr,
         // Create objects
-        [&data, this](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
             VkQueryPool query_pool = VK_NULL_HANDLE;
 
             auto create_info = LvlInitStruct<VkQueryPoolCreateInfo>();
@@ -1082,7 +1082,6 @@ TEST_F(VkSCObjectReservationLayerTest, RenderPassRequestCount) {
     ASSERT_NO_FATAL_FAILURE(InitFramework());
 
     struct {
-        bool allow_exceeding_subpass_description_limit{false};
         bool use_create_render_pass2{};
         std::vector<VkRenderPass> render_passes{};
     } data;
@@ -1094,15 +1093,9 @@ TEST_F(VkSCObjectReservationLayerTest, RenderPassRequestCount) {
     TestObjectReservationLimit(
         max_create_count, can_destroy, has_parent, nullptr,
         // Init object reservation info
-        [&data](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
+        [&](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
             object_reservation_info.renderPassRequestCount = tested_limit;
-            object_reservation_info.subpassDescriptionRequestCount = tested_limit + 1;
-
-            if (tested_limit == 0) {
-                // Cannot request subpass descriptions if not requesting render passes
-                object_reservation_info.subpassDescriptionRequestCount = 0;
-                data.allow_exceeding_subpass_description_limit = true;
-            }
+            object_reservation_info.subpassDescriptionRequestCount = tested_limit;
 
             data.render_passes.clear();
             data.render_passes.resize(tested_limit, VK_NULL_HANDLE);
@@ -1112,7 +1105,7 @@ TEST_F(VkSCObjectReservationLayerTest, RenderPassRequestCount) {
         // Setup common device objects
         nullptr,
         // Create objects
-        [&data, this](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
             VkRenderPass render_pass = VK_NULL_HANDLE;
 
             // Use CreateRenderPass2 for every second create call
@@ -1126,9 +1119,7 @@ TEST_F(VkSCObjectReservationLayerTest, RenderPassRequestCount) {
                 create_info.pSubpasses = &subpass;
 
                 if (should_fail) {
-                    if (data.allow_exceeding_subpass_description_limit) {
-                        m_errorMonitor->SetAllowedFailureMsg("VUID-vkCreateRenderPass2-subpasses-device-05089");
-                    }
+                    m_errorMonitor->SetAllowedFailureMsg("VUID-vkCreateRenderPass2-subpasses-device-05089");
                     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateRenderPass2-device-05068");
                     vksc::CreateRenderPass2(device.handle(), &create_info, nullptr, &render_pass);
                     m_errorMonitor->VerifyFound();
@@ -1145,9 +1136,7 @@ TEST_F(VkSCObjectReservationLayerTest, RenderPassRequestCount) {
                 create_info.pSubpasses = &subpass;
 
                 if (should_fail) {
-                    if (data.allow_exceeding_subpass_description_limit) {
-                        m_errorMonitor->SetAllowedFailureMsg("VUID-vkCreateRenderPass-subpasses-device-05089");
-                    }
+                    m_errorMonitor->SetAllowedFailureMsg("VUID-vkCreateRenderPass-subpasses-device-05089");
                     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateRenderPass-device-05068");
                     vksc::CreateRenderPass(device.handle(), &create_info, nullptr, &render_pass);
                     m_errorMonitor->VerifyFound();
@@ -1158,7 +1147,7 @@ TEST_F(VkSCObjectReservationLayerTest, RenderPassRequestCount) {
             }
         },
         // Destroy objects
-        [&data](VkDeviceObj& device, uint32_t index, uint32_t destroy_count) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t destroy_count) {
             assert(index < data.render_passes.size());
             assert(destroy_count == 1);
 
@@ -1186,7 +1175,7 @@ TEST_F(VkSCObjectReservationLayerTest, SubpassDescriptionRequestCount) {
     TestObjectReservationLimit(
         max_create_count, can_destroy, has_parent, nullptr,
         // Init object reservation info
-        [&data](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
+        [&](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
             object_reservation_info.renderPassRequestCount = tested_limit + 1;
             object_reservation_info.subpassDescriptionRequestCount = tested_limit;
 
@@ -1198,7 +1187,7 @@ TEST_F(VkSCObjectReservationLayerTest, SubpassDescriptionRequestCount) {
         // Setup common device objects
         nullptr,
         // Create objects
-        [&data, this](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
             VkRenderPass render_pass = VK_NULL_HANDLE;
 
             // Use CreateRenderPass2 for every second create call
@@ -1242,7 +1231,7 @@ TEST_F(VkSCObjectReservationLayerTest, SubpassDescriptionRequestCount) {
             }
         },
         // Destroy objects
-        [&data](VkDeviceObj& device, uint32_t index, uint32_t destroy_count) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t destroy_count) {
             assert(index < data.render_passes.size());
             assert(destroy_count == 0);
 
@@ -1270,7 +1259,7 @@ TEST_F(VkSCObjectReservationLayerTest, AttachmentDescriptionRequestCount) {
     TestObjectReservationLimit(
         max_create_count, can_destroy, has_parent, nullptr,
         // Init object reservation info
-        [&data](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
+        [&](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
             object_reservation_info.renderPassRequestCount = tested_limit + 1;
             object_reservation_info.subpassDescriptionRequestCount = tested_limit + 1;
             object_reservation_info.attachmentDescriptionRequestCount = tested_limit;
@@ -1283,7 +1272,7 @@ TEST_F(VkSCObjectReservationLayerTest, AttachmentDescriptionRequestCount) {
         // Setup common device objects
         nullptr,
         // Create objects
-        [&data, this](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
             VkRenderPass render_pass = VK_NULL_HANDLE;
 
             // Use CreateRenderPass2 for every second create call
@@ -1347,7 +1336,7 @@ TEST_F(VkSCObjectReservationLayerTest, AttachmentDescriptionRequestCount) {
             }
         },
         // Destroy objects
-        [&data](VkDeviceObj& device, uint32_t index, uint32_t destroy_count) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t destroy_count) {
             assert(index < data.render_passes.size());
             assert(destroy_count == 0);
 
@@ -1375,7 +1364,7 @@ TEST_F(VkSCObjectReservationLayerTest, FramebufferRequestCount) {
     TestObjectReservationLimit(
         max_create_count, can_destroy, has_parent, nullptr,
         // Init object reservation info
-        [&data](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
+        [&](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
             object_reservation_info.renderPassRequestCount = 1;
             object_reservation_info.subpassDescriptionRequestCount = 1;
             object_reservation_info.framebufferRequestCount = tested_limit;
@@ -1387,7 +1376,7 @@ TEST_F(VkSCObjectReservationLayerTest, FramebufferRequestCount) {
             return true;
         },
         // Setup common device objects
-        [&data](VkDeviceObj& device) {
+        [&](VkDeviceObj& device) {
             VkResult result = VK_SUCCESS;
 
             VkSubpassDescription subpass{};
@@ -1403,7 +1392,7 @@ TEST_F(VkSCObjectReservationLayerTest, FramebufferRequestCount) {
             return true;
         },
         // Create objects
-        [&data, this](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
             VkFramebuffer framebuffer = VK_NULL_HANDLE;
 
             auto create_info = LvlInitStruct<VkFramebufferCreateInfo>();
@@ -1422,7 +1411,7 @@ TEST_F(VkSCObjectReservationLayerTest, FramebufferRequestCount) {
             }
         },
         // Destroy objects
-        [&data](VkDeviceObj& device, uint32_t index, uint32_t destroy_count) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t destroy_count) {
             assert(index < data.framebuffers.size());
             assert(destroy_count == 1);
 
@@ -1430,7 +1419,7 @@ TEST_F(VkSCObjectReservationLayerTest, FramebufferRequestCount) {
             data.framebuffers[index] = VK_NULL_HANDLE;
         },
         // Teardown common device objects
-        [&data](VkDeviceObj& device) { vksc::DestroyRenderPass(device.handle(), data.render_pass, nullptr); });
+        [&](VkDeviceObj& device) { vksc::DestroyRenderPass(device.handle(), data.render_pass, nullptr); });
 }
 
 TEST_F(VkSCObjectReservationLayerTest, BufferRequestCount) {
@@ -1449,7 +1438,7 @@ TEST_F(VkSCObjectReservationLayerTest, BufferRequestCount) {
     TestObjectReservationLimit(
         max_create_count, can_destroy, has_parent, nullptr,
         // Init object reservation info
-        [&data](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
+        [&](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
             object_reservation_info.bufferRequestCount = tested_limit;
 
             data.buffers.clear();
@@ -1460,7 +1449,7 @@ TEST_F(VkSCObjectReservationLayerTest, BufferRequestCount) {
         // Setup common device objects
         nullptr,
         // Create objects
-        [&data, this](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
             VkBuffer buffer = VK_NULL_HANDLE;
 
             auto create_info = LvlInitStruct<VkBufferCreateInfo>();
@@ -1477,7 +1466,7 @@ TEST_F(VkSCObjectReservationLayerTest, BufferRequestCount) {
             }
         },
         // Destroy objects
-        [&data](VkDeviceObj& device, uint32_t index, uint32_t destroy_count) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t destroy_count) {
             assert(index < data.buffers.size());
             assert(destroy_count == 1);
 
@@ -1505,7 +1494,7 @@ TEST_F(VkSCObjectReservationLayerTest, BufferViewRequestCount) {
     TestObjectReservationLimit(
         max_create_count, can_destroy, has_parent, nullptr,
         // Init object reservation info
-        [&data](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
+        [&](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
             object_reservation_info.deviceMemoryRequestCount = 1;
             object_reservation_info.bufferRequestCount = 1;
             object_reservation_info.bufferViewRequestCount = tested_limit;
@@ -1516,7 +1505,7 @@ TEST_F(VkSCObjectReservationLayerTest, BufferViewRequestCount) {
             return true;
         },
         // Setup common device objects
-        [&data](VkDeviceObj& device) {
+        [&](VkDeviceObj& device) {
             auto create_info = LvlInitStruct<VkBufferCreateInfo>();
             create_info.size = 1024;
             create_info.usage = VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT;
@@ -1527,7 +1516,7 @@ TEST_F(VkSCObjectReservationLayerTest, BufferViewRequestCount) {
             return true;
         },
         // Create objects
-        [&data, this](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
             VkBufferView buffer_view = VK_NULL_HANDLE;
 
             auto create_info = LvlInitStruct<VkBufferViewCreateInfo>();
@@ -1545,7 +1534,7 @@ TEST_F(VkSCObjectReservationLayerTest, BufferViewRequestCount) {
             }
         },
         // Destroy objects
-        [&data](VkDeviceObj& device, uint32_t index, uint32_t destroy_count) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t destroy_count) {
             assert(index < data.buffer_views.size());
             assert(destroy_count == 1);
 
@@ -1553,7 +1542,7 @@ TEST_F(VkSCObjectReservationLayerTest, BufferViewRequestCount) {
             data.buffer_views[index] = VK_NULL_HANDLE;
         },
         // Teardown common device objects
-        [&data](VkDeviceObj& device) { data.buffer = nullptr; });
+        [&](VkDeviceObj& device) { data.buffer = nullptr; });
 }
 
 TEST_F(VkSCObjectReservationLayerTest, ImageRequestCount) {
@@ -1572,7 +1561,7 @@ TEST_F(VkSCObjectReservationLayerTest, ImageRequestCount) {
     TestObjectReservationLimit(
         max_create_count, can_destroy, has_parent, nullptr,
         // Init object reservation info
-        [&data](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
+        [&](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
             object_reservation_info.imageRequestCount = tested_limit;
 
             data.images.clear();
@@ -1583,7 +1572,7 @@ TEST_F(VkSCObjectReservationLayerTest, ImageRequestCount) {
         // Setup common device objects
         nullptr,
         // Create objects
-        [&data, this](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
             VkImage image = VK_NULL_HANDLE;
 
             auto create_info = LvlInitStruct<VkImageCreateInfo>();
@@ -1606,7 +1595,7 @@ TEST_F(VkSCObjectReservationLayerTest, ImageRequestCount) {
             }
         },
         // Destroy objects
-        [&data](VkDeviceObj& device, uint32_t index, uint32_t destroy_count) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t destroy_count) {
             assert(index < data.images.size());
             assert(destroy_count == 1);
 
@@ -1634,7 +1623,7 @@ TEST_F(VkSCObjectReservationLayerTest, ImageViewRequestCount) {
     TestObjectReservationLimit(
         max_create_count, can_destroy, has_parent, nullptr,
         // Init object reservation info
-        [&data](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
+        [&](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
             object_reservation_info.deviceMemoryRequestCount = 1;
             object_reservation_info.imageRequestCount = 1;
             object_reservation_info.imageViewRequestCount = tested_limit;
@@ -1647,7 +1636,7 @@ TEST_F(VkSCObjectReservationLayerTest, ImageViewRequestCount) {
             return true;
         },
         // Setup common device objects
-        [&data](VkDeviceObj& device) {
+        [&](VkDeviceObj& device) {
             auto create_info = LvlInitStruct<VkImageCreateInfo>();
             create_info.imageType = VK_IMAGE_TYPE_2D;
             create_info.format = VK_FORMAT_R8G8B8A8_UNORM;
@@ -1664,7 +1653,7 @@ TEST_F(VkSCObjectReservationLayerTest, ImageViewRequestCount) {
             return true;
         },
         // Create objects
-        [&data, this](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
             VkImageView image_view = VK_NULL_HANDLE;
 
             auto create_info = LvlInitStruct<VkImageViewCreateInfo>();
@@ -1683,7 +1672,7 @@ TEST_F(VkSCObjectReservationLayerTest, ImageViewRequestCount) {
             }
         },
         // Destroy objects
-        [&data](VkDeviceObj& device, uint32_t index, uint32_t destroy_count) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t destroy_count) {
             assert(index < data.image_views.size());
             assert(destroy_count == 1);
 
@@ -1691,7 +1680,7 @@ TEST_F(VkSCObjectReservationLayerTest, ImageViewRequestCount) {
             data.image_views[index] = VK_NULL_HANDLE;
         },
         // Teardown common device objects
-        [&data](VkDeviceObj& device) { data.image = nullptr; });
+        [&](VkDeviceObj& device) { data.image = nullptr; });
 }
 
 TEST_F(VkSCObjectReservationLayerTest, LayeredImageViewRequestCount) {
@@ -1713,7 +1702,7 @@ TEST_F(VkSCObjectReservationLayerTest, LayeredImageViewRequestCount) {
     TestObjectReservationLimit(
         max_create_count, can_destroy, has_parent, nullptr,
         // Init object reservation info
-        [&data](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
+        [&](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
             object_reservation_info.deviceMemoryRequestCount = 1;
             object_reservation_info.imageRequestCount = 1;
             object_reservation_info.imageViewRequestCount = tested_limit + data.layer_count + 1;
@@ -1730,7 +1719,7 @@ TEST_F(VkSCObjectReservationLayerTest, LayeredImageViewRequestCount) {
             return true;
         },
         // Setup common device objects
-        [&data](VkDeviceObj& device) {
+        [&](VkDeviceObj& device) {
             VkResult result = VK_SUCCESS;
 
             auto create_info = LvlInitStruct<VkImageCreateInfo>();
@@ -1760,7 +1749,7 @@ TEST_F(VkSCObjectReservationLayerTest, LayeredImageViewRequestCount) {
             return true;
         },
         // Create objects
-        [&data, this](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
             VkImageView image_view = VK_NULL_HANDLE;
 
             auto create_info = LvlInitStruct<VkImageViewCreateInfo>();
@@ -1783,7 +1772,7 @@ TEST_F(VkSCObjectReservationLayerTest, LayeredImageViewRequestCount) {
             }
         },
         // Destroy objects
-        [&data](VkDeviceObj& device, uint32_t index, uint32_t destroy_count) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t destroy_count) {
             assert(index < data.layered_image_views.size());
             assert(destroy_count == 1);
 
@@ -1791,7 +1780,7 @@ TEST_F(VkSCObjectReservationLayerTest, LayeredImageViewRequestCount) {
             data.layered_image_views[index] = VK_NULL_HANDLE;
         },
         // Teardown common device objects
-        [&data](VkDeviceObj& device) {
+        [&](VkDeviceObj& device) {
             for (uint32_t i = 0; i < data.layer_count; ++i) {
                 vksc::DestroyImageView(device.handle(), data.non_layered_image_views[i], nullptr);
             }
@@ -1815,7 +1804,7 @@ TEST_F(VkSCObjectReservationLayerTest, SamplerRequestCount) {
     TestObjectReservationLimit(
         max_create_count, can_destroy, has_parent, nullptr,
         // Init object reservation info
-        [&data](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
+        [&](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
             object_reservation_info.samplerRequestCount = tested_limit;
 
             data.samplers.clear();
@@ -1826,7 +1815,7 @@ TEST_F(VkSCObjectReservationLayerTest, SamplerRequestCount) {
         // Setup common device objects
         nullptr,
         // Create objects
-        [&data, this](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
             VkSampler sampler = VK_NULL_HANDLE;
 
             auto create_info = LvlInitStruct<VkSamplerCreateInfo>();
@@ -1843,7 +1832,7 @@ TEST_F(VkSCObjectReservationLayerTest, SamplerRequestCount) {
             }
         },
         // Destroy objects
-        [&data](VkDeviceObj& device, uint32_t index, uint32_t destroy_count) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t destroy_count) {
             assert(index < data.samplers.size());
             assert(destroy_count == 1);
 
@@ -1891,7 +1880,7 @@ TEST_F(VkSCObjectReservationLayerTest, SamplerYcbcrConversionRequestCount) {
     TestObjectReservationLimit(
         max_create_count, can_destroy, has_parent, &sampler_ycbcr_conversion_features,
         // Init object reservation info
-        [&data](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
+        [&](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
             object_reservation_info.samplerYcbcrConversionRequestCount = tested_limit;
 
             data.sampler_ycbcr_conversions.clear();
@@ -1902,7 +1891,7 @@ TEST_F(VkSCObjectReservationLayerTest, SamplerYcbcrConversionRequestCount) {
         // Setup common device objects
         nullptr,
         // Create objects
-        [&data, this](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
             VkSamplerYcbcrConversion sampler_ycbcr_conversion = VK_NULL_HANDLE;
 
             auto create_info = LvlInitStruct<VkSamplerYcbcrConversionCreateInfo>();
@@ -1918,7 +1907,7 @@ TEST_F(VkSCObjectReservationLayerTest, SamplerYcbcrConversionRequestCount) {
             }
         },
         // Destroy objects
-        [&data](VkDeviceObj& device, uint32_t index, uint32_t destroy_count) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t destroy_count) {
             assert(index < data.sampler_ycbcr_conversions.size());
             assert(destroy_count == 1);
 
@@ -1945,7 +1934,7 @@ TEST_F(VkSCObjectReservationLayerTest, FenceRequestCount) {
     TestObjectReservationLimit(
         max_create_count, can_destroy, has_parent, nullptr,
         // Init object reservation info
-        [&data](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
+        [&](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
             object_reservation_info.fenceRequestCount = tested_limit;
 
             data.fences.clear();
@@ -1956,7 +1945,7 @@ TEST_F(VkSCObjectReservationLayerTest, FenceRequestCount) {
         // Setup common device objects
         nullptr,
         // Create objects
-        [&data, this](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
             VkFence fence = VK_NULL_HANDLE;
 
             auto create_info = LvlInitStruct<VkFenceCreateInfo>();
@@ -1971,7 +1960,7 @@ TEST_F(VkSCObjectReservationLayerTest, FenceRequestCount) {
             }
         },
         // Destroy objects
-        [&data](VkDeviceObj& device, uint32_t index, uint32_t destroy_count) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t destroy_count) {
             assert(index < data.fences.size());
             assert(destroy_count == 1);
 
@@ -1998,7 +1987,7 @@ TEST_F(VkSCObjectReservationLayerTest, SemaphoreRequestCount) {
     TestObjectReservationLimit(
         max_create_count, can_destroy, has_parent, nullptr,
         // Init object reservation info
-        [&data](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
+        [&](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
             object_reservation_info.semaphoreRequestCount = tested_limit;
 
             data.semaphores.clear();
@@ -2009,7 +1998,7 @@ TEST_F(VkSCObjectReservationLayerTest, SemaphoreRequestCount) {
         // Setup common device objects
         nullptr,
         // Create objects
-        [&data, this](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
             VkSemaphore semaphore = VK_NULL_HANDLE;
 
             auto create_info = LvlInitStruct<VkSemaphoreCreateInfo>();
@@ -2024,7 +2013,7 @@ TEST_F(VkSCObjectReservationLayerTest, SemaphoreRequestCount) {
             }
         },
         // Destroy objects
-        [&data](VkDeviceObj& device, uint32_t index, uint32_t destroy_count) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t destroy_count) {
             assert(index < data.semaphores.size());
             assert(destroy_count == 1);
 
@@ -2051,7 +2040,7 @@ TEST_F(VkSCObjectReservationLayerTest, EventRequestCount) {
     TestObjectReservationLimit(
         max_create_count, can_destroy, has_parent, nullptr,
         // Init object reservation info
-        [&data](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
+        [&](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
             object_reservation_info.eventRequestCount = tested_limit;
 
             data.events.clear();
@@ -2062,7 +2051,7 @@ TEST_F(VkSCObjectReservationLayerTest, EventRequestCount) {
         // Setup common device objects
         nullptr,
         // Create objects
-        [&data, this](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
             VkEvent event = VK_NULL_HANDLE;
 
             auto create_info = LvlInitStruct<VkEventCreateInfo>();
@@ -2077,7 +2066,7 @@ TEST_F(VkSCObjectReservationLayerTest, EventRequestCount) {
             }
         },
         // Destroy objects
-        [&data](VkDeviceObj& device, uint32_t index, uint32_t destroy_count) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t destroy_count) {
             assert(index < data.events.size());
             assert(destroy_count == 1);
 
@@ -2114,7 +2103,7 @@ TEST_F(VkSCObjectReservationLayerTest, PrivateDataSlotRequestCount) {
     TestObjectReservationLimit(
         max_create_count, can_destroy, has_parent, nullptr,
         // Init object reservation info
-        [&data](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
+        [&](VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit) {
             if (tested_limit > 50) {
                 // Do not try to test unreasonably large private data slot counts
                 return false;
@@ -2131,7 +2120,7 @@ TEST_F(VkSCObjectReservationLayerTest, PrivateDataSlotRequestCount) {
             return true;
         },
         // Setup common device objects
-        [&data](VkDeviceObj& device) {
+        [&](VkDeviceObj& device) {
             // Load extension function pointers
             data.pfn_vkCreatePrivateDataSlotEXT =
                 (PFN_vkCreatePrivateDataSlotEXT)vk::GetDeviceProcAddr(device.handle(), "vkCreatePrivateDataSlotEXT");
@@ -2141,7 +2130,7 @@ TEST_F(VkSCObjectReservationLayerTest, PrivateDataSlotRequestCount) {
             return data.pfn_vkCreatePrivateDataSlotEXT && data.pfn_vkDestroyPrivateDataSlotEXT;
         },
         // Create objects
-        [&data, this](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t create_count, bool should_fail) {
             VkPrivateDataSlotEXT private_data_slot = VK_NULL_HANDLE;
 
             auto create_info = LvlInitStruct<VkPrivateDataSlotCreateInfoEXT>();
@@ -2156,7 +2145,7 @@ TEST_F(VkSCObjectReservationLayerTest, PrivateDataSlotRequestCount) {
             }
         },
         // Destroy objects
-        [&data](VkDeviceObj& device, uint32_t index, uint32_t destroy_count) {
+        [&](VkDeviceObj& device, uint32_t index, uint32_t destroy_count) {
             assert(index < data.private_data_slots.size());
             assert(destroy_count == 1);
 

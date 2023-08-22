@@ -71,7 +71,7 @@ static void InitDefaultObjectReservationInfo() {
     default_object_reservation_info.surfaceRequestCount = 0;
     default_object_reservation_info.swapchainRequestCount = 64;
     default_object_reservation_info.displayModeRequestCount = 0;
-    default_object_reservation_info.subpassDescriptionRequestCount = 256;
+    default_object_reservation_info.subpassDescriptionRequestCount = 64;
     default_object_reservation_info.attachmentDescriptionRequestCount = 256;
     default_object_reservation_info.descriptorSetLayoutBindingRequestCount = 1024;
 
@@ -328,6 +328,48 @@ static VKAPI_ATTR VkResult VKAPI_CALL ResetCommandBuffer(VkCommandBuffer command
     return result;
 }
 
+static VKAPI_ATTR VkResult VKAPI_CALL CreateRenderPass(VkDevice device, const VkRenderPassCreateInfo* pCreateInfo,
+                                                       const VkAllocationCallbacks* pAllocator, VkRenderPass* pRenderPass) {
+    static auto policy =
+        VkSCRenderFramework::DispatchHelper()
+            ->CreateDispatchPolicy()
+            .SkipOnMessage("VUID-VkRenderPassCreateInfo-subpassCount-05050",
+                           "Test requires higher limit for VkPhysicalDeviceVulkanSC10Properties::maxRenderPassSubpasses")
+            .SkipOnMessage("VUID-VkRenderPassCreateInfo-dependencyCount-05051",
+                           "Test requires higher limit for VkPhysicalDeviceVulkanSC10Properties::maxRenderPassDependencies")
+            .SkipOnMessage("VUID-VkRenderPassCreateInfo-attachmentCount-05052",
+                           "Test requires higher limit for VkPhysicalDeviceVulkanSC10Properties::maxFramebufferAttachments")
+            .SkipOnMessage("VUID-VkSubpassDescription-inputAttachmentCount-05053",
+                           "Test requires higher limit for VkPhysicalDeviceVulkanSC10Properties::maxSubpassInputAttachments")
+            .SkipOnMessage("VUID-VkSubpassDescription-preserveAttachmentCount-05054",
+                           "Test requires higher limit for VkPhysicalDeviceVulkanSC10Properties::maxSubpassPreserveAttachments");
+    VkSCRenderFramework::DispatchHelper()->BeginDispatchPolicy(policy);
+    VkResult result = vksc::CreateRenderPass(device, pCreateInfo, pAllocator, pRenderPass);
+    VkSCRenderFramework::DispatchHelper()->EndDispatchPolicy(policy);
+    return result;
+}
+
+static VKAPI_ATTR VkResult VKAPI_CALL CreateRenderPass2(VkDevice device, const VkRenderPassCreateInfo2* pCreateInfo,
+                                                        const VkAllocationCallbacks* pAllocator, VkRenderPass* pRenderPass) {
+    static auto policy =
+        VkSCRenderFramework::DispatchHelper()
+            ->CreateDispatchPolicy()
+            .SkipOnMessage("VUID-VkRenderPassCreateInfo2-subpassCount-05055",
+                           "Test requires higher limit for VkPhysicalDeviceVulkanSC10Properties::maxRenderPassSubpasses")
+            .SkipOnMessage("VUID-VkRenderPassCreateInfo2-dependencyCount-05056",
+                           "Test requires higher limit for VkPhysicalDeviceVulkanSC10Properties::maxRenderPassDependencies")
+            .SkipOnMessage("VUID-VkRenderPassCreateInfo2-attachmentCount-05057",
+                           "Test requires higher limit for VkPhysicalDeviceVulkanSC10Properties::maxFramebufferAttachments")
+            .SkipOnMessage("VUID-VkSubpassDescription2-inputAttachmentCount-05058",
+                           "Test requires higher limit for VkPhysicalDeviceVulkanSC10Properties::maxSubpassInputAttachments")
+            .SkipOnMessage("VUID-VkSubpassDescription2-preserveAttachmentCount-05059",
+                           "Test requires higher limit for VkPhysicalDeviceVulkanSC10Properties::maxSubpassPreserveAttachments");
+    VkSCRenderFramework::DispatchHelper()->BeginDispatchPolicy(policy);
+    VkResult result = vksc::CreateRenderPass2(device, pCreateInfo, pAllocator, pRenderPass);
+    VkSCRenderFramework::DispatchHelper()->EndDispatchPolicy(policy);
+    return result;
+}
+
 }  // namespace compatibility
 
 }  // namespace vk
@@ -343,6 +385,8 @@ PFN_vkCreateGraphicsPipelines CreateGraphicsPipelines = nullptr;
 PFN_vkCreateCommandPool CreateCommandPool = nullptr;
 PFN_vkBeginCommandBuffer BeginCommandBuffer = nullptr;
 PFN_vkResetCommandBuffer ResetCommandBuffer = nullptr;
+PFN_vkCreateRenderPass CreateRenderPass = nullptr;
+PFN_vkCreateRenderPass2 CreateRenderPass2 = nullptr;
 
 void TestDispatchHelper::PatchDispatchTable() {
 #define VK_ONLY__SWAP_COMPAT_EP(name) vk::name = vk::compatibility::name
@@ -368,6 +412,8 @@ void TestDispatchHelper::PatchDispatchTable() {
     VKSC__SWAP_COMPAT_EP(CreateCommandPool);
     VKSC__SWAP_COMPAT_EP(BeginCommandBuffer);
     VKSC__SWAP_COMPAT_EP(ResetCommandBuffer);
+    VKSC__SWAP_COMPAT_EP(CreateRenderPass);
+    VKSC__SWAP_COMPAT_EP(CreateRenderPass2);
 
     InitDefaultPipelineCacheData();
     InitDefaultObjectReservationInfo();
