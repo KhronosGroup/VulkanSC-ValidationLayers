@@ -268,6 +268,10 @@ TEST_F(VkSCLayerTest, CreateQueryPoolExceededMaxQueriesPerPool) {
     AddOptionalExtensions(VK_KHR_PERFORMANCE_QUERY_EXTENSION_NAME);
     ASSERT_NO_FATAL_FAILURE(InitFramework());
 
+    VkPhysicalDeviceFeatures features{};
+    vksc::GetPhysicalDeviceFeatures(gpu(), &features);
+    const auto supports_pipeline_stat_queries = features.pipelineStatisticsQuery;
+
     auto sc_10_features = LvlInitStruct<VkPhysicalDeviceVulkanSC10Features>();
     auto object_reservation_info1 = vksc::GetDefaultObjectReservationCreateInfo();
     auto object_reservation_info2 = vksc::GetDefaultObjectReservationCreateInfo();
@@ -281,9 +285,11 @@ TEST_F(VkSCLayerTest, CreateQueryPoolExceededMaxQueriesPerPool) {
     object_reservation_info2.maxOcclusionQueriesPerPool = 0;
     object_reservation_info3.maxOcclusionQueriesPerPool = 4;
 
-    object_reservation_info1.maxPipelineStatisticsQueriesPerPool = 6;
-    object_reservation_info2.maxPipelineStatisticsQueriesPerPool = 8;
-    object_reservation_info3.maxPipelineStatisticsQueriesPerPool = 2;
+    if (supports_pipeline_stat_queries) {
+        object_reservation_info1.maxPipelineStatisticsQueriesPerPool = 6;
+        object_reservation_info2.maxPipelineStatisticsQueriesPerPool = 8;
+        object_reservation_info3.maxPipelineStatisticsQueriesPerPool = 2;
+    }
 
     object_reservation_info1.maxTimestampQueriesPerPool = 0;
     object_reservation_info2.maxTimestampQueriesPerPool = 10;
@@ -343,7 +349,7 @@ TEST_F(VkSCLayerTest, CreateQueryPoolExceededMaxQueriesPerPool) {
     }
 
     // Test pipeline statistics queries
-    {
+    if (supports_pipeline_stat_queries) {
         vk_testing::QueryPool query_pool_obj{};
         VkQueryPool query_pool = VK_NULL_HANDLE;
 

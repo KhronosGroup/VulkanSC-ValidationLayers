@@ -177,7 +177,15 @@ class SC_PIPELINE_STATE : public PIPELINE_STATE {
     const VkPipelineOfflineCreateInfo *offline_info;
 
     template <typename CreateInfo, typename... Args>
-    SC_PIPELINE_STATE(const ValidationStateTracker *state_data, const CreateInfo *pCreateInfo, Args &&...args)
-        : PIPELINE_STATE(state_data, pCreateInfo, std::forward<Args>(args)...),
-          offline_info(LvlFindInChain<VkPipelineOfflineCreateInfo>(pCreateInfo->pNext)) {}
+    SC_PIPELINE_STATE(const ValidationStateTracker* state_data, const CreateInfo* pCreateInfo, Args&&... args)
+        : PIPELINE_STATE(state_data, pCreateInfo, std::forward<Args>(args)...), offline_info(FindOfflineCreateInfo(pCreateInfo)) {}
+
+  private:
+    const VkPipelineOfflineCreateInfo* FindOfflineCreateInfo(const VkGraphicsPipelineCreateInfo*) const {
+        return LvlFindInChain<VkPipelineOfflineCreateInfo>(create_info.graphics.pNext);
+    }
+
+    const VkPipelineOfflineCreateInfo* FindOfflineCreateInfo(const VkComputePipelineCreateInfo*) const {
+        return LvlFindInChain<VkPipelineOfflineCreateInfo>(create_info.compute.pNext);
+    }
 };

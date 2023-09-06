@@ -59,6 +59,7 @@ TEST_F(VkSCLayerTest, CreateCommandPoolInvalidMaxCommandBuffers) {
     vksc::CreateCommandPool(m_device->device(), &create_info, nullptr, &cmd_pool);
     m_errorMonitor->VerifyFound();
 
+    m_errorMonitor->SetAllowedFailureMsg("VUID-VkCommandPoolMemoryReservationCreateInfo-commandPoolMaxCommandBuffers-05074");
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit,
                                          "VUID-VkCommandPoolMemoryReservationCreateInfo-commandPoolMaxCommandBuffers-05090");
     mem_reservation_info.commandPoolMaxCommandBuffers = GetVulkanSC10Properties(gpu()).maxCommandPoolCommandBuffers + 1;
