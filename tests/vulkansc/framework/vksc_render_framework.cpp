@@ -12,7 +12,7 @@
 #include "vksc_render_framework.h"
 #include "vksc_test_pipeline_cache_helper.h"
 
-VkSCRenderFramework::VkSCRenderFramework() : dispatch_helper_(this) {
+VkSCRenderFramework::VkSCRenderFramework() : VkRenderFramework(), dispatch_helper_(this) {
     assert(s_instance == nullptr);
     s_instance = this;
 }
@@ -24,6 +24,29 @@ VkSCRenderFramework::~VkSCRenderFramework() {
 
     assert(s_instance == this);
     s_instance = nullptr;
+}
+
+void VkSCRenderFramework::InitFramework(void * /*unused compatibility parameter*/, void *instance_pnext) {
+    if (InstanceLayerSupported("VK_LAYER_KHRONOS_device_simulation") && getenv("VKSC_DEVSIM_PROFILE_FILE")) {
+        instance_layers_.push_back("VK_LAYER_KHRONOS_device_simulation");
+    }
+
+    VkRenderFramework::InitFramework(NULL, instance_pnext);
+
+    if (use_vk_compatibility_) {
+        // Make KHR entry points of core functions available if running a Vulkan test
+        vksc::TestDispatchHelper::InitCompatibilityInstanceExtensionEntryPoints(instance_);
+    }
+}
+
+void VkSCRenderFramework::InitState(VkPhysicalDeviceFeatures *features, void *create_device_pnext,
+                                    const VkCommandPoolCreateFlags flags) {
+    VkRenderFramework::InitState(features, create_device_pnext, flags);
+
+    if (use_vk_compatibility_) {
+        // Make KHR entry points of core functions available if running a Vulkan test
+        vksc::TestDispatchHelper::InitCompatibilityDeviceExtensionEntryPoints(instance_, *m_device);
+    }
 }
 
 VkPipelineCache VkSCRenderFramework::GetDefaultPipelineCache() {

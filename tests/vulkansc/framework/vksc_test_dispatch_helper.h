@@ -27,6 +27,8 @@ namespace vksc {
 
 using namespace ::vk;
 
+extern PFN_vkGetInstanceProcAddr GetInstanceProcAddr;
+extern PFN_vkGetDeviceProcAddr GetDeviceProcAddr;
 extern PFN_vkCreateInstance CreateInstance;
 extern PFN_vkDestroyInstance DestroyInstance;
 extern PFN_vkCreateDevice CreateDevice;
@@ -60,6 +62,8 @@ class TestDispatchHelper {
     };
 
     static void PatchDispatchTable();
+    static void InitCompatibilityInstanceExtensionEntryPoints(VkInstance instance);
+    static void InitCompatibilityDeviceExtensionEntryPoints(VkInstance instance, VkDevice device);
 
     TestDispatchHelper(VkSCRenderFramework* test_case);
     virtual ~TestDispatchHelper();

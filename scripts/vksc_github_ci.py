@@ -143,7 +143,7 @@ def BuildMockICD():
     cmake_cmd = f'cmake -S {VT_DIR} -B {ICD_BUILD_DIR} -D CMAKE_BUILD_TYPE=Release '
     cmake_cmd += '-DBUILD_CUBE=NO -DBUILD_VULKANINFO=NO -D INSTALL_ICD=ON '
     cmake_cmd += f'-C {VT_DIR}/{EXTERNAL_DIR_NAME}/helper.cmake'
-    cmake_cmd += f' -D VULKANSC=ON'
+    cmake_cmd += f' -D VULKANSC=ON -D BUILD_VKSC_DEVSIM=ON'
     RunShellCmd(cmake_cmd)
 
     print("Build Mock ICD")

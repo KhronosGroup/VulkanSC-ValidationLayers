@@ -11,6 +11,12 @@
 
 #include "vksc_layer_validation_tests.h"
 
+VkSCLayerTest::VkSCLayerTest() : VkLayerTest() {
+    app_info_.apiVersion = VKSC_API_VERSION_1_0;
+
+    DisableVulkanCompatibility();
+}
+
 VkPhysicalDeviceVulkanSC10Features VkSCLayerTest::GetVulkanSC10Features(VkPhysicalDevice phys_dev) {
     auto sc_10_features = LvlInitStruct<VkPhysicalDeviceVulkanSC10Features>();
     auto features2 = LvlInitStruct<VkPhysicalDeviceFeatures2>(&sc_10_features);

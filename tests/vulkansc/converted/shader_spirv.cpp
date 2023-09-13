@@ -2136,7 +2136,7 @@ TEST_F(NegativeShaderSpirv, DISABLED_NoScalarBlockLayout12) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeShaderSpirv, DeviceMemoryScope) {
+TEST_F(NegativeShaderSpirv, DISABLED_DeviceMemoryScope) {
     TEST_DESCRIPTION("Validate using Device memory scope in spirv.");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -2168,7 +2168,7 @@ TEST_F(NegativeShaderSpirv, DeviceMemoryScope) {
     CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-vulkanMemoryModel-06265");
 }
 
-TEST_F(NegativeShaderSpirv, QueueFamilyMemoryScope) {
+TEST_F(NegativeShaderSpirv, DISABLED_QueueFamilyMemoryScope) {
     TEST_DESCRIPTION("Validate using QueueFamily memory scope in spirv.");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);

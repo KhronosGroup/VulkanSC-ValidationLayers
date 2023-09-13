@@ -108,6 +108,95 @@ namespace vk {
 
 namespace compatibility {
 
+static const char* GetCompatibilityProcName(const char* pName) {
+    // Make KHR Vulkan entry points for Vulkan SC core features available, as many test
+    // cases do not actually check for the right pre-conditions to decide whether to use
+    // the core or extension entry points of promoted features
+#define VKSC__KHR_COMPAT_EP(name) std::make_pair<std::string, const char*>(std::string("vk" #name "KHR"), "vk" #name)
+#define VKSC__EXT_COMPAT_EP(name) std::make_pair<std::string, const char*>(std::string("vk" #name "EXT"), "vk" #name)
+
+    static std::unordered_map<std::string, const char*> compatibility_table = {
+
+        // VK_KHR_bind_memory2 -> Vulkan 1.1 -> Vulkan SC 1.0
+        VKSC__KHR_COMPAT_EP(BindBufferMemory2),
+        VKSC__KHR_COMPAT_EP(BindImageMemory2),
+
+        // VK_KHR_device_group -> Vulkan 1.1 -> Vulkan SC 1.0
+        VKSC__KHR_COMPAT_EP(GetDeviceGroupPeerMemoryFeatures),
+        VKSC__KHR_COMPAT_EP(CmdSetDeviceMask),
+        VKSC__KHR_COMPAT_EP(CmdDispatchBase),
+
+        // VK_KHR_device_group_creation -> Vulkan 1.1 -> Vulkan SC 1.0
+        VKSC__KHR_COMPAT_EP(EnumeratePhysicalDeviceGroups),
+
+        // VK_KHR_get_memory_requirements2 -> Vulkan 1.1 -> Vulkan SC 1.0
+        VKSC__KHR_COMPAT_EP(GetImageMemoryRequirements2),
+        VKSC__KHR_COMPAT_EP(GetBufferMemoryRequirements2),
+
+        // VK_KHR_get_physical_device_properties2 -> Vulkan 1.1 -> Vulkan SC 1.0
+        VKSC__KHR_COMPAT_EP(GetPhysicalDeviceFeatures2),
+        VKSC__KHR_COMPAT_EP(GetPhysicalDeviceProperties2),
+        VKSC__KHR_COMPAT_EP(GetPhysicalDeviceFormatProperties2),
+        VKSC__KHR_COMPAT_EP(GetPhysicalDeviceImageFormatProperties2),
+        VKSC__KHR_COMPAT_EP(GetPhysicalDeviceQueueFamilyProperties2),
+        VKSC__KHR_COMPAT_EP(GetPhysicalDeviceMemoryProperties2),
+
+        // VK_KHR_sampler_ycbcr_conversion -> Vulkan 1.1 -> Vulkan SC 1.0
+        VKSC__KHR_COMPAT_EP(CreateSamplerYcbcrConversion),
+        VKSC__KHR_COMPAT_EP(DestroySamplerYcbcrConversion),
+
+        // VK_KHR_external_memory_capabilities -> Vulkan 1.1 -> Vulkan SC 1.0
+        VKSC__KHR_COMPAT_EP(GetPhysicalDeviceExternalBufferProperties),
+
+        // VK_KHR_external_fence_capabilities -> Vulkan 1.1 -> Vulkan SC 1.0
+        VKSC__KHR_COMPAT_EP(GetPhysicalDeviceExternalFenceProperties),
+
+        // VK_KHR_external_semaphore_capabilities -> Vulkan 1.1 -> Vulkan SC 1.0
+        VKSC__KHR_COMPAT_EP(GetPhysicalDeviceExternalSemaphoreProperties),
+
+        // VK_KHR_maintenance3 -> Vulkan 1.1 -> Vulkan SC 1.0
+        VKSC__KHR_COMPAT_EP(GetDescriptorSetLayoutSupport),
+
+        // VK_KHR_draw_indirect_count -> Vulkan 1.2 -> Vulkan SC 1.0
+        VKSC__KHR_COMPAT_EP(CmdDrawIndirectCount),
+        VKSC__KHR_COMPAT_EP(CmdDrawIndexedIndirectCount),
+
+        // VK_KHR_create_renderpass2 -> Vulkan 1.2 -> Vulkan SC 1.0
+        VKSC__KHR_COMPAT_EP(CreateRenderPass2),
+        VKSC__KHR_COMPAT_EP(CmdBeginRenderPass2),
+        VKSC__KHR_COMPAT_EP(CmdNextSubpass2),
+        VKSC__KHR_COMPAT_EP(CmdEndRenderPass2),
+
+        // VK_EXT_host_query_reset -> Vulkan 1.2 -> Vulkan SC 1.0
+        VKSC__EXT_COMPAT_EP(ResetQueryPool),
+
+        // VK_KHR_timeline_semaphore -> Vulkan 1.2 -> Vulkan SC 1.0
+        VKSC__KHR_COMPAT_EP(GetSemaphoreCounterValue),
+        VKSC__KHR_COMPAT_EP(WaitSemaphores),
+        VKSC__KHR_COMPAT_EP(SignalSemaphore),
+
+        // VK_KHR_buffer_device_address -> Vulkan 1.2 -> Vulkan SC 1.0
+        VKSC__KHR_COMPAT_EP(GetBufferDeviceAddress),
+        VKSC__KHR_COMPAT_EP(GetBufferOpaqueCaptureAddress),
+        VKSC__KHR_COMPAT_EP(GetDeviceMemoryOpaqueCaptureAddress),
+    };
+
+    auto it = compatibility_table.find(pName);
+    if (it != compatibility_table.end()) {
+        return it->second;
+    } else {
+        return pName;
+    }
+}
+
+static VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL GetInstanceProcAddr(VkInstance instance, const char* pName) {
+    return vksc::GetInstanceProcAddr(instance, GetCompatibilityProcName(pName));
+}
+
+static VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL GetDeviceProcAddr(VkDevice device, const char* pName) {
+    return vksc::GetDeviceProcAddr(device, GetCompatibilityProcName(pName));
+}
+
 static VKAPI_ATTR void VKAPI_CALL FreeMemory(VkDevice device, VkDeviceMemory memory, const VkAllocationCallbacks* pAllocator) {
     // Vulkan SC removed vkFreeMemory(), but we provide an implementation here that is treated
     // as a no-op for Vulkan validation layer test compatibility.
@@ -376,6 +465,8 @@ static VKAPI_ATTR VkResult VKAPI_CALL CreateRenderPass2(VkDevice device, const V
 
 namespace vksc {
 
+PFN_vkGetInstanceProcAddr GetInstanceProcAddr = nullptr;
+PFN_vkGetDeviceProcAddr GetDeviceProcAddr = nullptr;
 PFN_vkCreateInstance CreateInstance = nullptr;
 PFN_vkDestroyInstance DestroyInstance = nullptr;
 PFN_vkCreateDevice CreateDevice = nullptr;
@@ -389,6 +480,8 @@ PFN_vkCreateRenderPass CreateRenderPass = nullptr;
 PFN_vkCreateRenderPass2 CreateRenderPass2 = nullptr;
 
 void TestDispatchHelper::PatchDispatchTable() {
+    // Add compatibility implementations for entry points that are not supported in Vulkan SC
+
 #define VK_ONLY__SWAP_COMPAT_EP(name) vk::name = vk::compatibility::name
 
     VK_ONLY__SWAP_COMPAT_EP(FreeMemory);
@@ -399,10 +492,15 @@ void TestDispatchHelper::PatchDispatchTable() {
     VK_ONLY__SWAP_COMPAT_EP(CreateShaderModule);
     VK_ONLY__SWAP_COMPAT_EP(DestroyShaderModule);
 
+    // Replace certain entry points with compatibility implementations to be able to run
+    // Vulkan validation test cases against Vulkan SC
+
 #define VKSC__SWAP_COMPAT_EP(name) \
     vksc::name = vk::name;         \
     vk::name = vk::compatibility::name;
 
+    VKSC__SWAP_COMPAT_EP(GetInstanceProcAddr);
+    VKSC__SWAP_COMPAT_EP(GetDeviceProcAddr);
     VKSC__SWAP_COMPAT_EP(CreateInstance);
     VKSC__SWAP_COMPAT_EP(DestroyInstance);
     VKSC__SWAP_COMPAT_EP(CreateDevice);
@@ -417,6 +515,33 @@ void TestDispatchHelper::PatchDispatchTable() {
 
     InitDefaultPipelineCacheData();
     InitDefaultObjectReservationInfo();
+}
+
+void TestDispatchHelper::InitCompatibilityInstanceExtensionEntryPoints(VkInstance instance) {
+    // Make KHR Vulkan entry points for Vulkan SC core features available, as many test
+    // cases do not actually check for the right pre-conditions to decide whether to use
+    // the core or extension entry points of promoted features
+    vk::InitInstanceExtension(instance, VK_KHR_DEVICE_GROUP_CREATION_EXTENSION_NAME);
+    vk::InitInstanceExtension(instance, VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+    vk::InitInstanceExtension(instance, VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME);
+    vk::InitInstanceExtension(instance, VK_KHR_EXTERNAL_FENCE_CAPABILITIES_EXTENSION_NAME);
+    vk::InitInstanceExtension(instance, VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_EXTENSION_NAME);
+}
+
+void TestDispatchHelper::InitCompatibilityDeviceExtensionEntryPoints(VkInstance instance, VkDevice device) {
+    // Make KHR Vulkan entry points for Vulkan SC core features available, as many test
+    // cases do not actually check for the right pre-conditions to decide whether to use
+    // the core or extension entry points of promoted features
+    vk::InitDeviceExtension(instance, device, VK_KHR_BIND_MEMORY_2_EXTENSION_NAME);
+    vk::InitDeviceExtension(instance, device, VK_KHR_DEVICE_GROUP_EXTENSION_NAME);
+    vk::InitDeviceExtension(instance, device, VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME);
+    vk::InitDeviceExtension(instance, device, VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME);
+    vk::InitDeviceExtension(instance, device, VK_KHR_MAINTENANCE3_EXTENSION_NAME);
+    vk::InitDeviceExtension(instance, device, VK_KHR_DRAW_INDIRECT_COUNT_EXTENSION_NAME);
+    vk::InitDeviceExtension(instance, device, VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME);
+    vk::InitDeviceExtension(instance, device, VK_EXT_HOST_QUERY_RESET_EXTENSION_NAME);
+    vk::InitDeviceExtension(instance, device, VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
+    vk::InitDeviceExtension(instance, device, VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
 }
 
 TestDispatchHelper::TestDispatchHelper(VkSCRenderFramework* test_case) : test_case_(test_case) {}

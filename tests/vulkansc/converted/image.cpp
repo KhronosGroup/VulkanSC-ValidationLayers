@@ -4725,7 +4725,7 @@ TEST_F(NegativeImage, DISABLED_CreateImageSharingModeConcurrentQueueFamilies) {
     }
 }
 
-TEST_F(NegativeImage, DISABLED_ImageFormatInfoDrmFormatModifier) {
+TEST_F(NegativeImage, ImageFormatInfoDrmFormatModifier) {
     TEST_DESCRIPTION("Validate VkPhysicalDeviceImageFormatInfo2.");
 
     AddRequiredExtensions(VK_EXT_IMAGE_DRM_FORMAT_MODIFIER_EXTENSION_NAME);

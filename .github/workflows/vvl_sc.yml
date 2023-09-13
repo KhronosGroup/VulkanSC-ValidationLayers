@@ -33,7 +33,7 @@ on:
 
 jobs:
   linux:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
       matrix:
@@ -60,9 +60,7 @@ jobs:
         run: |
           python3 -m pip install jsonschema pyparsing
           sudo apt-get -qq update
-          sudo apt-get install -y libxkbcommon-dev libwayland-dev libmirclient-dev libxrandr-dev \
-                                libx11-xcb-dev libxcb-keysyms1 libxcb-keysyms1-dev libxcb-ewmh-dev \
-                                libxcb-randr0-dev
+          sudo apt-get install -y libwayland-dev xorg-dev
       # Turn on ccache this way, which is easier than figuring out how to turn it on for all deps
       # PATH changes need to be done in an action before any action that needs it
       - name: Add ccache to PATH
@@ -76,11 +74,21 @@ jobs:
         env:
           CC: ${{ matrix.cc }}
           CXX: ${{ matrix.cxx }}
-      - name: Test VulkanSC-ValidationLayers - Mock ICD
+      - name: Test VulkanSC-ValidationLayers - Min Core
         run: python3 scripts/vksc_github_ci.py --test --config release
+        env:
+          VKSC_DEVSIM_PROFILE_FILE: ${{ github.workspace }}/tests/vulkansc/device_profiles/min_core.json
+      - name: Test VulkanSC-ValidationLayers - Max Core
+        run: python3 scripts/vksc_github_ci.py --test --config release
+        env:
+          VKSC_DEVSIM_PROFILE_FILE: ${{ github.workspace }}/tests/vulkansc/device_profiles/max_core.json
+      - name: Test VulkanSC-ValidationLayers - Max Profile
+        run: python3 scripts/vksc_github_ci.py --test --config release
+        env:
+          VKSC_DEVSIM_PROFILE_FILE: ${{ github.workspace }}/tests/vulkansc/device_profiles/max_profile.json
 
   linux-cpp20:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
     steps:
@@ -93,9 +101,7 @@ jobs:
         run: |
           python3 -m pip install jsonschema pyparsing
           sudo apt-get -qq update
-          sudo apt-get install -y libxkbcommon-dev libwayland-dev libmirclient-dev libxrandr-dev \
-                                libx11-xcb-dev libxcb-keysyms1 libxcb-keysyms1-dev libxcb-ewmh-dev \
-                                libxcb-randr0-dev
+          sudo apt-get install -y libwayland-dev xorg-dev
       # Turn on ccache this way, which is easier than figuring out how to turn it on for all deps
       # PATH changes need to be done in an action before any action that needs it
       - name: Add ccache to PATH

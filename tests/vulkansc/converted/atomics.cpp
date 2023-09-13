@@ -323,7 +323,7 @@ TEST_F(NegativeAtomic, DISABLED_ImageInt64) {
     }
 }
 
-TEST_F(NegativeAtomic, ImageInt64Drawtime64) {
+TEST_F(NegativeAtomic, DISABLED_ImageInt64Drawtime64) {
     TEST_DESCRIPTION("Test VK_EXT_shader_image_atomic_int64 draw time with 64 bit image view.");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_EXT_SHADER_IMAGE_ATOMIC_INT64_EXTENSION_NAME);
@@ -383,7 +383,7 @@ TEST_F(NegativeAtomic, ImageInt64Drawtime64) {
     m_commandBuffer->end();
 }
 
-TEST_F(NegativeAtomic, ImageInt64Drawtime32) {
+TEST_F(NegativeAtomic, DISABLED_ImageInt64Drawtime32) {
     TEST_DESCRIPTION("Test VK_EXT_shader_image_atomic_int64 draw time with 32 bit image view.");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_EXT_SHADER_IMAGE_ATOMIC_INT64_EXTENSION_NAME);
@@ -1238,7 +1238,7 @@ TEST_F(NegativeAtomic, Float2WidthMismatch) {
     CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit, std::vector<string>{"VUID-RuntimeSpirv-None-06338"});
 }
 
-TEST_F(NegativeAtomic, InvalidStorageOperation) {
+TEST_F(NegativeAtomic, DISABLED_InvalidStorageOperation) {
     TEST_DESCRIPTION(
         "If storage view use atomic operation, the view's format MUST support VK_FORMAT_FEATURE_STORAGE_IMAGE_ATOMIC_BIT or "
         "VK_FORMAT_FEATURE_STORAGE_TEXEL_BUFFER_ATOMIC_BIT ");

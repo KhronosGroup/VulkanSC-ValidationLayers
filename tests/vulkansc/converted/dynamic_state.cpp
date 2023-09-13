@@ -3244,7 +3244,7 @@ TEST_F(NegativeDynamicState, StateNotSetWithCommandBufferReset) {
     m_commandBuffer->end();
 }
 
-TEST_F(NegativeDynamicState, DISABLED_SampleLocations) {
+TEST_F(NegativeDynamicState, SampleLocations) {
     TEST_DESCRIPTION("Test invalid cases of VK_EXT_sample_location");
 
     AddRequiredExtensions(VK_EXT_SAMPLE_LOCATIONS_EXTENSION_NAME);

@@ -69,9 +69,12 @@
             "which is not possible on Vulkan SC without actual SPIR-V data as debug information"
         ],
         "ImageInt64": false,
+        "ImageInt64Drawtime32": false,
+        "ImageInt64Drawtime64": false,
         "Float2": false,
         "VertexStoresAndAtomicsFeatureDisable": false,
-        "FragmentStoresAndAtomicsFeatureDisable": false
+        "FragmentStoresAndAtomicsFeatureDisable": false,
+        "InvalidStorageOperation": false
     },
     "NegativeBuffer": {
         "@disabled-depends-vkFreeMemory": "Test cases test the removed vkFreeMemory command's effects",
@@ -141,14 +144,6 @@
         "PushDescriptorSetLayoutWithoutExtension": false
     },
     "NegativeDynamicState": {
-        "@disabled-depends-GPDP2-KHR": [
-            "TODO: Vulkan SC - These tests expect the KHR entry points of GPDP2 to be present",
-            "or that the extension string is present.",
-            "However, that's specific to an extension that is not there in Vulkan SC,",
-            "as the corresponding APIs are part of Vulkan SC 1.0 core (inherited from Vulkan 1.1)"
-        ],
-        "SampleLocations": false,
-
         "@disabled-dependency-incorrect": "This test case has incorrect dependency handling",
         "DiscardRectanglesVersion": false
     },
@@ -170,12 +165,12 @@
         "TessellationShaderEnabled": false
     },
     "NegativeFragmentShadingRate": {
-        "@disabled-depends-vkCreateRenderPass2KHR": [
-            "TODO: Vulkan SC - These tests expect the vkCreateRenderPass2KHR command to be present",
-            "However, that's specific to an extension that is not there in Vulkan SC,",
-            "as the corresponding APIs are part of Vulkan SC 1.0 core (inherited from Vulkan 1.2)"
+        "@disabled-depends-SPIRV-validation": [
+            "TODO: Vulkan SC - These tests rely on being able to validate against SPIR-V contents",
+            "which is not possible on Vulkan SC without actual SPIR-V data as debug information"
         ],
-        "IncompatibleFragmentRateShadingAttachmentInExecuteCommands": false
+        "PrimitiveFragmentShadingRateWriteMultiViewportLimitDynamic": false,
+        "PrimitiveWriteMultiViewportLimit": false
     },
     "NegativeImage": {
         "@disabled-assumes-preVulkan12": [
@@ -189,19 +184,9 @@
 
         "@disabled-replaced": "These test cases are replaced with Vulkan SC specific ones",
         "ImageMisc": false,
-
-        "@disabled-depends-GPDP2-KHR": [
-            "TODO: Vulkan SC - These tests expect the KHR entry points of GPDP2 to be present",
-            "or that the extension string is present.",
-            "However, that's specific to an extension that is not there in Vulkan SC,",
-            "as the corresponding APIs are part of Vulkan SC 1.0 core (inherited from Vulkan 1.1)"
-        ],
-        "ImageFormatInfoDrmFormatModifier": false,
-
-        "@disabled-depends-vkCmdDispatchBaseKHR": [
-            "TODO: Vulkan SC - These tests expect the vkCmdDispatchBaseKHR command to be present",
-            "However, that's specific to an extension that is not there in Vulkan SC,",
-            "as the corresponding APIs are part of Vulkan SC 1.0 core (inherited from Vulkan 1.1)"
+        "@disabled-depends-SPIRV-validation": [
+            "TODO: Vulkan SC - These tests rely on being able to validate against SPIR-V contents",
+            "which is not possible on Vulkan SC without actual SPIR-V data as debug information"
         ],
         "ComputeImageLayout11": false,
 
@@ -272,14 +257,6 @@
         "@disabled-depends-Vulkan-behavior": "Test cases depend on Vulkan behavior that is changed in Vulkan SC",
         "NullStagepName": false,
 
-        "@disabled-depends-GPDP2-KHR": [
-            "TODO: Vulkan SC - These tests expect the KHR entry points of GPDP2 to be present",
-            "or that the extension string is present.",
-            "However, that's specific to an extension that is not there in Vulkan SC,",
-            "as the corresponding APIs are part of Vulkan SC 1.0 core (inherited from Vulkan 1.1)"
-        ],
-        "RasterizationConservativeStateCreateInfo": false,
-
         "@disabled-depends-SPIRV-validation": [
             "TODO: Vulkan SC - These tests rely on being able to validate against SPIR-V contents",
             "which is not possible on Vulkan SC without actual SPIR-V data as debug information"
@@ -328,10 +305,9 @@
         "DestroyWithoutQueryPool": false,
 
         "@disabled-depends-GPDP2-KHR": [
-            "TODO: Vulkan SC - These tests expect the KHR entry points of GPDP2 to be present",
-            "or that the extension string is present.",
-            "However, that's specific to an extension that is not there in Vulkan SC,",
-            "as the corresponding APIs are part of Vulkan SC 1.0 core (inherited from Vulkan 1.1)"
+            "TODO: Vulkan SC - These tests require the KHR GPDP2 extension to be present",
+            "which is not supported in Vulkan SC (it is part of Vulkan SC 1.0 instead)",
+            "and do not handle corrently when that is not the case (by skipping the test case)."
         ],
         "HostyResetQueryPool": false,
         "HostyResetDevice": false,
@@ -471,7 +447,9 @@
         "FragmentShaderInterlockEnabled": false,
         "DemoteToHelperInvocation": false,
         "DynamicUniformIndex": false,
-        "ConservativeRasterizationPostDepthCoverage": false
+        "ConservativeRasterizationPostDepthCoverage": false,
+        "DeviceMemoryScope": false,
+        "QueueFamilyMemoryScope": false
     },
     "NegativeShaderStorageImage": {
         "@disabled-depends-SPIRV-validation": [

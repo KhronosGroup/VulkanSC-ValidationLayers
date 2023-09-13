@@ -2720,7 +2720,7 @@ TEST_F(VkLayerTest, ValidateVariableSampleLocations) {
     m_commandBuffer->end();
 }
 
-TEST_F(NegativePipeline, DISABLED_RasterizationConservativeStateCreateInfo) {
+TEST_F(NegativePipeline, RasterizationConservativeStateCreateInfo) {
     TEST_DESCRIPTION("Test PipelineRasterizationConservativeStateCreateInfo.");
 
     AddRequiredExtensions(VK_EXT_CONSERVATIVE_RASTERIZATION_EXTENSION_NAME);

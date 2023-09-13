@@ -24,6 +24,12 @@ class VkSCRenderFramework : public VkRenderFramework {
     VkSCRenderFramework();
     virtual ~VkSCRenderFramework() override;
 
+    void DisableVulkanCompatibility() { use_vk_compatibility_ = false; }
+
+    void InitFramework(void * /*unused compatibility parameter*/ = NULL, void *instance_pnext = NULL);
+    void InitState(VkPhysicalDeviceFeatures *features = nullptr, void *create_device_pnext = nullptr,
+                   const VkCommandPoolCreateFlags flags = 0);
+
     VkPipelineCache GetDefaultPipelineCache();
 
     static VkSCRenderFramework& Instance() {
@@ -41,6 +47,8 @@ class VkSCRenderFramework : public VkRenderFramework {
 
   private:
     vksc::TestDispatchHelper dispatch_helper_;
+
+    bool use_vk_compatibility_{true};
 
     VkPipelineCache default_pipeline_cache_{VK_NULL_HANDLE};
 

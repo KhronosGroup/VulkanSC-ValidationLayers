@@ -1,0 +1,74 @@
+{
+    "$schema": "https://schema.khronos.org/vulkansc/profiles-devsim.json#",
+    "profiles": {
+        "MAX_CORE": {
+            "version": 1,
+            "api-version": "1.0.12",
+            "label": "Max Vulkan SC Core",
+            "description": "Max Vulkan SC Core profile",
+            "contributors": {},
+            "history": [
+                {
+                    "revision": 1,
+                    "date": "2023-09-13",
+                    "author": "Daniel Rakos @ RasterGrid",
+                    "comment": "Max Vulkan SC Core profile"
+                }
+            ],
+            "capabilities": [
+                "device"
+            ]
+        }
+    },
+    "capabilities": {
+        "device": {
+            "features": {
+                "VkPhysicalDeviceVulkanSC10Features": {
+                    "shaderAtomicInstructions": true
+                }
+            },
+            "properties": {
+                "VkPhysicalDeviceVulkanSC10Properties": {
+                    "deviceNoDynamicHostAllocations": true,
+                    "deviceDestroyFreesMemory": true,
+                    "commandPoolMultipleCommandBuffersRecording": true,
+                    "commandPoolResetCommandBuffer": true,
+                    "commandBufferSimultaneousUse": true,
+                    "secondaryCommandBufferNullOrImagelessFramebuffer": true,
+                    "recycleDescriptorSetMemory": true,
+                    "recyclePipelineMemory": true,
+                    "maxRenderPassSubpasses": 64,
+                    "maxRenderPassDependencies": 256,
+                    "maxSubpassInputAttachments": 8,
+                    "maxSubpassPreserveAttachments": 16,
+                    "maxFramebufferAttachments": 16,
+                    "maxDescriptorSetLayoutBindings": 256,
+                    "maxQueryFaultCount": 256,
+                    "maxCallbackFaultCount": 64,
+                    "maxCommandPoolCommandBuffers": 256,
+                    "maxCommandBufferSize": 1073741824
+                }
+            },
+            "extensions": {},
+            "formats": {},
+            "queueFamiliesProperties": [
+                {
+                    "VkQueueFamilyProperties": {
+                        "queueFlags": [
+                            "VK_QUEUE_GRAPHICS_BIT",
+                            "VK_QUEUE_COMPUTE_BIT",
+                            "VK_QUEUE_TRANSFER_BIT"
+                        ],
+                        "queueCount": 8,
+                        "timestampValidBits": 63,
+                        "minImageTransferGranularity": {
+                            "width": 1,
+                            "height": 1,
+                            "depth": 1
+                        }
+                    }
+                }
+            ]
+        }
+    }
+}
