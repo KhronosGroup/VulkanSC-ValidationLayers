@@ -28,8 +28,8 @@
             "build_dir": "Vulkan-Headers/build",
             "install_dir": "Vulkan-Headers/build/install",
             "cmake_options": [
-                "-DVULKANSC=TRUE",
-                "-DGEN_VULKANSC_COMBINED=TRUE"
+                "-DVULKANSC=ON",
+                "-DGEN_VULKANSC_COMBINED=ON"
             ],
             "commit": "e8febd2664a72d0e4d029585822ea3fa127f916e"
         },

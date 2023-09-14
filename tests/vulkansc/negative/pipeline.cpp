@@ -338,7 +338,7 @@ TEST_F(VkSCLayerTest, CreatePipelinePoolSize) {
 
 TEST_F(VkSCLayerTest, CreatePipelineCacheInvalidFlags) {
     TEST_DESCRIPTION("vkCreatePipelineCache - missing required flags");
-    // NOTE: This test case implicitly tests the removed VUIDs: 00768, 007689
+    // NOTE: This test case implicitly tests the removed VUIDs: 00768, 00769
 
     ASSERT_NO_FATAL_FAILURE(Init());
 
