@@ -332,8 +332,18 @@ TEST_F(VkSCLayerTest, SecondaryCommandBufferNullOrImagelessFramebuffer) {
 
         // Check with framebuffer created with VK_FRAMEBUFFER_CREATE_IMAGELESS_BIT
         if (imageless_fb_features.imagelessFramebuffer) {
-            auto attachment_info = LvlInitStruct<VkFramebufferAttachmentsCreateInfo>();
-            framebuffer_ci.pNext = &attachment_info;
+            VkFormat attachment_format = VK_FORMAT_R8G8B8A8_UNORM;
+            auto attachment_info = LvlInitStruct<VkFramebufferAttachmentImageInfoKHR>();
+            attachment_info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+            attachment_info.width = 128;
+            attachment_info.height = 128;
+            attachment_info.layerCount = 1;
+            attachment_info.viewFormatCount = 1;
+            attachment_info.pViewFormats = &attachment_format;
+            auto attachments_info = LvlInitStruct<VkFramebufferAttachmentsCreateInfo>();
+            attachments_info.attachmentImageInfoCount = 1;
+            attachments_info.pAttachmentImageInfos = &attachment_info;
+            framebuffer_ci.pNext = &attachments_info;
             framebuffer_ci.flags = VK_FRAMEBUFFER_CREATE_IMAGELESS_BIT;
             vk_testing::Framebuffer imageless_framebuffer(*m_device, framebuffer_ci);
             inherit_info.framebuffer = imageless_framebuffer;

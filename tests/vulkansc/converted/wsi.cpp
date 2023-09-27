@@ -502,7 +502,7 @@ TEST_F(NegativeWsi, SwapchainImageParams) {
     m_swapchain = VK_NULL_HANDLE;
 }
 
-TEST_F(NegativeWsi, DISABLED_SwapchainAcquireImageNoSync) {
+TEST_F(NegativeWsi, SwapchainAcquireImageNoSync) {
     TEST_DESCRIPTION("Test vkAcquireNextImageKHR with VK_NULL_HANDLE semaphore and fence");
 
     AddSurfaceExtension();
@@ -524,7 +524,7 @@ TEST_F(NegativeWsi, DISABLED_SwapchainAcquireImageNoSync) {
     }
 }
 
-TEST_F(NegativeWsi, DISABLED_SwapchainAcquireImageNoSync2KHR) {
+TEST_F(NegativeWsi, SwapchainAcquireImageNoSync2KHR) {
     TEST_DESCRIPTION("Test vkAcquireNextImage2KHR with VK_NULL_HANDLE semaphore and fence");
     SetTargetApiVersion(VK_API_VERSION_1_1);
 
@@ -652,7 +652,7 @@ TEST_F(NegativeWsi, SwapchainAcquireImageNoBinarySemaphore2KHR) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeWsi, DISABLED_SwapchainAcquireTooManyImages) {
+TEST_F(NegativeWsi, SwapchainAcquireTooManyImages) {
     TEST_DESCRIPTION("Acquiring invalid amount of images from the swapchain.");
 
     AddSurfaceExtension();
@@ -688,7 +688,7 @@ TEST_F(NegativeWsi, DISABLED_SwapchainAcquireTooManyImages) {
     vk::WaitForFences(device(), fences.size(), MakeVkHandles<VkFence>(fences).data(), VK_TRUE, kWaitTimeout);
 }
 
-TEST_F(NegativeWsi, DISABLED_GetSwapchainImageAndTryDestroy) {
+TEST_F(NegativeWsi, GetSwapchainImageAndTryDestroy) {
     TEST_DESCRIPTION("Try destroying a swapchain presentable image with vkDestroyImage");
 
     AddSurfaceExtension();
@@ -793,7 +793,7 @@ TEST_F(NegativeWsi, SwapchainNotSupported) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeWsi, DISABLED_SwapchainAcquireTooManyImages2KHR) {
+TEST_F(NegativeWsi, SwapchainAcquireTooManyImages2KHR) {
     TEST_DESCRIPTION("Acquiring invalid amount of images from the swapchain via vkAcquireNextImage2KHR.");
     SetTargetApiVersion(VK_API_VERSION_1_1);
 
@@ -1567,7 +1567,7 @@ TEST_F(NegativeWsi, DisplayPlaneSurface) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeWsi, DISABLED_WarningSwapchainCreateInfoPreTransform) {
+TEST_F(NegativeWsi, WarningSwapchainCreateInfoPreTransform) {
     TEST_DESCRIPTION("Print warning when preTransform doesn't match curretTransform");
 
     AddSurfaceExtension();
@@ -1756,7 +1756,7 @@ TEST_F(NegativeWsi, DisplayPresentInfoSrcRect) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeWsi, DISABLED_LeakASwapchain) {
+TEST_F(NegativeWsi, LeakASwapchain) {
     TEST_DESCRIPTION("Leak a VkSwapchainKHR.");
     // Because this test intentionally leaks swapchains & surfaces, we need to disable leak checking because drivers may leak memory
     // that cannot be cleaned up from this test.
@@ -1940,7 +1940,7 @@ TEST_F(NegativeWsi, PresentIdWaitFeatures) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeWsi, DISABLED_GetSwapchainImagesCountButNotImages) {
+TEST_F(NegativeWsi, GetSwapchainImagesCountButNotImages) {
     TEST_DESCRIPTION("Test for getting swapchain images count and presenting before getting swapchain images.");
     AddSurfaceExtension();
     ASSERT_NO_FATAL_FAILURE(InitFramework());
@@ -1994,7 +1994,7 @@ TEST_F(NegativeWsi, DISABLED_GetSwapchainImagesCountButNotImages) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeWsi, DISABLED_SurfaceSupportByPhysicalDevice) {
+TEST_F(NegativeWsi, SurfaceSupportByPhysicalDevice) {
     TEST_DESCRIPTION("Test if physical device supports surface.");
     AddOptionalExtensions(VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME);
     AddOptionalExtensions(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
@@ -3273,7 +3273,7 @@ TEST_F(NegativeWsi, PhysicalDeviceSurfaceCapabilities) {
 }
 #endif  // VK_USE_PLATFORM_WIN32_KHR
         //
-TEST_F(NegativeWsi, DISABLED_QueuePresentWaitingSameSemaphore) {
+TEST_F(NegativeWsi, QueuePresentWaitingSameSemaphore) {
     TEST_DESCRIPTION("Submit to queue with waitSemaphore that another queue is already waiting on.");
     AddSurfaceExtension();
     AddRequiredExtensions(VK_KHR_DISPLAY_SWAPCHAIN_EXTENSION_NAME);
@@ -3325,7 +3325,7 @@ TEST_F(NegativeWsi, DISABLED_QueuePresentWaitingSameSemaphore) {
     vk::QueueWaitIdle(other);
 }
 
-TEST_F(NegativeWsi, DISABLED_QueuePresentBinarySemaphoreNotSignaled) {
+TEST_F(NegativeWsi, QueuePresentBinarySemaphoreNotSignaled) {
     TEST_DESCRIPTION("Submit a present operation with a waiting binary semaphore not previously signaled.");
     AddSurfaceExtension();
     AddRequiredExtensions(VK_KHR_DISPLAY_SWAPCHAIN_EXTENSION_NAME);

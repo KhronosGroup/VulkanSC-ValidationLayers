@@ -2968,7 +2968,7 @@ TEST_F(NegativeRenderPass, DepthStencilResolveMode) {
     }
 }
 
-TEST_F(NegativeRenderPass, DISABLED_RenderArea) {
+TEST_F(NegativeRenderPass, RenderArea) {
     TEST_DESCRIPTION("Begin render pass with render area that is not within the framebuffer.");
 
     AddOptionalExtensions(VK_KHR_DEVICE_GROUP_EXTENSION_NAME);

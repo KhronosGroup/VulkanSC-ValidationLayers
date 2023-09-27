@@ -3749,7 +3749,7 @@ TEST_F(NegativeDynamicState, CmdSetDiscardRectangleEXTRectangleCount) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeDynamicState, DISABLED_DiscardRectanglesVersion) {
+TEST_F(NegativeDynamicState, DiscardRectanglesVersion) {
     TEST_DESCRIPTION("check version of VK_EXT_discard_rectangles");
 
     AddRequiredExtensions(VK_EXT_DISCARD_RECTANGLES_EXTENSION_NAME);
@@ -3757,7 +3757,7 @@ TEST_F(NegativeDynamicState, DISABLED_DiscardRectanglesVersion) {
     if (!AreRequiredExtensionsEnabled()) {
         GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
     }
-    if (InstanceExtensionSupported(VK_EXT_DISCARD_RECTANGLES_EXTENSION_NAME, 2)) {
+    if (DeviceExtensionSupported(VK_EXT_DISCARD_RECTANGLES_EXTENSION_NAME, 2)) {
         GTEST_SKIP() << "need VK_EXT_discard_rectangles version 1";
     }
 

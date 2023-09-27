@@ -755,7 +755,7 @@ TEST_F(PositiveWsi, SwapchainPresentShared) {
     }
 }
 
-TEST_F(PositiveWsi, DISABLED_CreateSurface) {
+TEST_F(PositiveWsi, CreateSurface) {
     TEST_DESCRIPTION("Create and destroy a surface without ever creating a swapchain");
 
     AddSurfaceExtension();

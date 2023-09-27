@@ -12,18 +12,10 @@
 #include "vksc_render_framework.h"
 #include "vksc_test_pipeline_cache_helper.h"
 
-VkSCRenderFramework::VkSCRenderFramework() : VkRenderFramework(), dispatch_helper_(this) {
-    assert(s_instance == nullptr);
-    s_instance = this;
-}
-
 VkSCRenderFramework::~VkSCRenderFramework() {
     if (m_device != nullptr && m_device->handle() != VK_NULL_HANDLE) {
         vksc::DestroyPipelineCache(m_device->handle(), default_pipeline_cache_, nullptr);
     }
-
-    assert(s_instance == this);
-    s_instance = nullptr;
 }
 
 void VkSCRenderFramework::InitFramework(void * /*unused compatibility parameter*/, void *instance_pnext) {
@@ -32,21 +24,6 @@ void VkSCRenderFramework::InitFramework(void * /*unused compatibility parameter*
     }
 
     VkRenderFramework::InitFramework(NULL, instance_pnext);
-
-    if (use_vk_compatibility_) {
-        // Make KHR entry points of core functions available if running a Vulkan test
-        vksc::TestDispatchHelper::InitCompatibilityInstanceExtensionEntryPoints(instance_);
-    }
-}
-
-void VkSCRenderFramework::InitState(VkPhysicalDeviceFeatures *features, void *create_device_pnext,
-                                    const VkCommandPoolCreateFlags flags) {
-    VkRenderFramework::InitState(features, create_device_pnext, flags);
-
-    if (use_vk_compatibility_) {
-        // Make KHR entry points of core functions available if running a Vulkan test
-        vksc::TestDispatchHelper::InitCompatibilityDeviceExtensionEntryPoints(instance_, *m_device);
-    }
 }
 
 VkPipelineCache VkSCRenderFramework::GetDefaultPipelineCache() {
@@ -59,6 +36,46 @@ VkPipelineCache VkSCRenderFramework::GetDefaultPipelineCache() {
 
 bool VkSCRenderFramework::GLSLtoSPV(VkPhysicalDeviceLimits const *const device_limits, const VkShaderStageFlagBits shader_type,
                                         const char *pshader, std::vector<uint32_t> &spv, bool debug, const spv_target_env spv_env) {
+    // Vulkan SC tests should never call this
+    assert(false);
+    return false;
+}
+
+bool VkSCRenderFramework::ASMtoSPV(const spv_target_env target_env, const uint32_t options, const char *pasm,
+                                   std::vector<uint32_t> &spv) {
+    // Vulkan SC tests should never call this
+    assert(false);
+    return false;
+}
+
+VkSCCompatibilityRenderFramework::VkSCCompatibilityRenderFramework() : VkSCRenderFramework(), dispatch_helper_(this) {
+    assert(s_instance == nullptr);
+    s_instance = this;
+}
+
+VkSCCompatibilityRenderFramework::~VkSCCompatibilityRenderFramework() {
+    assert(s_instance == this);
+    s_instance = nullptr;
+}
+
+void VkSCCompatibilityRenderFramework::InitFramework(void * /*unused compatibility parameter*/, void *instance_pnext) {
+    VkSCRenderFramework::InitFramework(NULL, instance_pnext);
+
+    // Make KHR entry points of core functions available if running a Vulkan test
+    vksc::TestDispatchHelper::InitCompatibilityInstanceExtensionEntryPoints(instance_);
+}
+
+void VkSCCompatibilityRenderFramework::InitState(VkPhysicalDeviceFeatures *features, void *create_device_pnext,
+                                                 const VkCommandPoolCreateFlags flags) {
+    VkSCRenderFramework::InitState(features, create_device_pnext, flags);
+
+    // Make KHR entry points of core functions available if running a Vulkan test
+    vksc::TestDispatchHelper::InitCompatibilityDeviceExtensionEntryPoints(instance_, *m_device);
+}
+
+bool VkSCCompatibilityRenderFramework::GLSLtoSPV(VkPhysicalDeviceLimits const *const device_limits,
+                                                 const VkShaderStageFlagBits shader_type, const char *pshader,
+                                                 std::vector<uint32_t> &spv, bool debug, const spv_target_env spv_env) {
     if (IsPlatform(kMockICD)) {
         // For mock ICD runs we simply skip shader compilation as it won't affect test execution
         return true;
@@ -69,8 +86,8 @@ bool VkSCRenderFramework::GLSLtoSPV(VkPhysicalDeviceLimits const *const device_l
     }
 }
 
-bool VkSCRenderFramework::ASMtoSPV(const spv_target_env target_env, const uint32_t options, const char *pasm,
-                                       std::vector<uint32_t> &spv) {
+bool VkSCCompatibilityRenderFramework::ASMtoSPV(const spv_target_env target_env, const uint32_t options, const char *pasm,
+                                                std::vector<uint32_t> &spv) {
     if (IsPlatform(kMockICD)) {
         // For mock ICD runs we simply skip shader compilation as it won't affect test execution
         return true;

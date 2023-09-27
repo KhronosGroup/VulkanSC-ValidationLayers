@@ -2,60 +2,39 @@
     "VkLayerTest": {
         "*": "VkLayerTest",
 
-        "@disabled-depends-AllocationCallbacks": [
-            "The test cases below are disabled as they test allocator callbacks which aren't supported in Vulkan SC"
-        ],
+        "@disabled-depends-AllocationCallbacks": "Not supported in Vulkan SC: allocation callbacks",
         "InvalidAllocationCallbacks": false,
 
-        "@disabled-depends-splitInstanceBindRegions": [
-            "Test cases depend on split-instance bind regions image create flag which isn't supported in Vulkan SC"
-        ],
+        "@disabled-depends-splitInstanceBindRegions": "Not supported in Vulkan SC: split-instance bind regions",
         "InvalidImageCreateFlagWithPhysicalDeviceCount": false,
 
-        "@disabled-replaced": "These test cases are replaced with Vulkan SC specific ones",
+        "@disabled-replaced": "Replaced by Vulkan SC specific test",
         "LeakAnObject": false,
         "SpecLinks": false,
 
-        "@disabled-assumes-preVulkan12": [
-            "These tests assume support for a pre-Vulkan 1.2 version, but that's not possible",
-            "in Vulkan SC where version 1.0 inherits Vulkan 1.2 support, including e.g. GPDP2 support"
-        ],
+        "@disabled-assumes-preVulkan12": "Not supported in Vulkan SC: assumes availability of pre-Vulkan 1.2 functionality",
         "UnsupportedPnextApiVersion": false,
         "DeviceFeature2AndVertexAttributeDivisorExtensionUnenabled": false,
         "UsePnextOnlyStructWithoutExtensionEnabled": false,
 
-        "@disabled-depends-deprecated-debug-markers": [
-            "Test case depends on the deprecated VK_EXT_debug_marker extension that is not supported in Vulkan SC"
-        ],
+        "@disabled-depends-VK_EXT_debug_marker": "Not supported in Vulkan SC: VK_EXT_debug_marker",
         "DebugMarkerNameTest": false,
 
-        "@disabled-depends-VK_EXT_validation_cache": "Test cases use unsupported extension in Vulkan SC",
+        "@disabled-depends-VK_EXT_validation_cache": "Not supported in Vulkan SC: VK_EXT_validation_cache",
         "ValidationCacheTestBadMerge": false,
 
-        "@disabled-depends-VK_KHR_portability_enumeration": [
-            "Test case depends on support for VK_KHR_portability_enumeration without actually checking support for it",
-            "or enabling it in the first place, and this extension is not supported in Vulkan SC"
-        ],
+        "@disabled-depends-VK_KHR_portability_enumeration": "Not supported in Vulkan SC: VK_KHR_portability_enumeration",
         "InstanceCreateEnumeratePortability": false
     },
     "VkPositiveLayerTest": {
         "*": "VkPositiveLayerTest",
 
-        "@disabled-depends-vkTrimCommandBuffer": "Test case looks for removed entry point",
+        "@disabled-depends-vkTrimCommandBuffer": "Not supported in Vulkan SC: vkTrimCommandBuffer",
         "GetDevProcAddrExtensions": false,
 
-        "@disabled-temporary-instance-extensions": [
-            "TODO: Vulkan SC - This test relies on the generated instance extension list which",
-            "contains a combined set currently, so this may need some test framework tweaks to",
-            "get it working"
-        ],
-        "ExtensionsInCreateInstance": false,
-
-        "@disabled-depends-WSI": [
-            "The test cases below are disabled because they depend on WSI functionalities",
-            "without actually verifying support for them"
-        ],
-        "TestPhysicalDeviceSurfaceSupport": false
+        "@disabled-not-relevant": "Not relevant for Vulkan SC",
+        "Vulkan12Features": false,
+        "ExtensionsInCreateInstance": false
     },
     "RenderPassCreatePotentialFormatFeaturesTest": {
         "*": "RenderPassCreatePotentialFormatFeaturesTest"
@@ -64,10 +43,7 @@
         "*": "DynamicRenderingCommandBufferInheritanceRenderingInfoTest"
     },
     "NegativeAtomic": {
-        "@disabled-depends-SPIRV-validation": [
-            "TODO: Vulkan SC - These tests rely on being able to validate against SPIR-V contents",
-            "which is not possible on Vulkan SC without actual SPIR-V data as debug information"
-        ],
+        "@disabled-depends-SPIRV-validation": "Depends on availabilty of SPIR-V data to validate",
         "ImageInt64": false,
         "ImageInt64Drawtime32": false,
         "ImageInt64Drawtime64": false,
@@ -77,51 +53,26 @@
         "InvalidStorageOperation": false
     },
     "NegativeBuffer": {
-        "@disabled-depends-vkFreeMemory": "Test cases test the removed vkFreeMemory command's effects",
+        "@disabled-depends-vkFreeMemory": "Not supported in Vulkan SC: vkFreeMemory",
         "@VertexBuffer-comment": "TODO: Vulkan SC - only a small subset of the subtests rely on vkFreeMemory",
         "VertexBuffer": false
     },
     "NegativeCommand": {
-        "@disabled-assumes-preVulkan12": [
-            "These tests assume support for a pre-Vulkan 1.2 version, but that's not possible",
-            "in Vulkan SC where version 1.0 inherits Vulkan 1.2 support, including e.g. GPDP2 support"
-        ],
-        "CopyImageDepthStencilFormatMismatch": false,
-
-        "@disabled-depends-maintenance1": [
-            "TODO: Vulkan SC - These tests depend on the VK_KHR_maintenance1 extension string itself",
-            "which is not present in Vulkan SC as it is part of Vulkan SC 1.0 core (inherited from Vulkan 1.1)"
-        ],
-        "CopyImageLayerCountMismatch": false,
-
-        "@disabled-may-depend-SPIRV-validation": [
-            "TODO: Vulkan SC - These tests also likely rely on SPIR-V validation",
-            "Needs further investigation"
-        ],
+        "@disabled-depends-SPIRV-validation": "Depends on availabilty of SPIR-V data to validate",
         "DrawTimeImageViewTypeMismatchWithPipeline": false,
         "DrawTimeImageMultisampleMismatchWithPipeline": false,
         "DrawTimeImageComponentTypeMismatchWithPipeline": false
     },
     "NegativeDescriptorIndexing": {
-        "@disabled-alreadyPromoted": [
-            "The test cases below depend on pre-Vulkan 1.2 support, hence do not apply to Vulkan SC"
-        ],
+        "@disabled-assumes-preVulkan12": "Not supported in Vulkan SC: assumes availability of pre-Vulkan 1.2 functionality",
         "SetLayoutWithoutExtension": false
     },
     "NegativeDescriptors": {
-        "@disabled-depends-vkFreeMemory": "Test cases test the removed vkFreeMemory command's effects",
+        "@disabled-depends-vkFreeMemory": "Not supported in Vulkan SC: vkFreeMemory",
         "DescriptorImageUpdateNoMemoryBound": false,
 
-        "@disabled-depends-SPIRV-validation": [
-            "TODO: Vulkan SC - These tests rely on being able to validate against SPIR-V contents",
-            "which is not possible on Vulkan SC without actual SPIR-V data as debug information"
-        ],
+        "@disabled-depends-SPIRV-validation": "Depends on availabilty of SPIR-V data to validate",
         "DispatchWithUnboundSet": false,
-
-        "@disabled-may-depend-SPIRV-validation": [
-            "TODO: Vulkan SC - These tests also likely rely on SPIR-V validation",
-            "Needs further investigation"
-        ],
         "DynamicOffsetWithNullBuffer": false,
         "@DescriptorSetCompatibility": "TODO: Vulkan SC - only a small subset of the subtests are SPIR-V dependent",
         "DescriptorSetCompatibility": false,
@@ -137,21 +88,11 @@
         "DescriptorSetSamplerDestroyed": false,
         "DescriptorPoolInUseResetSignaled": false,
 
-        "@disabled-depends-VK_KHR_push_descriptors": [
-            "Test case depends on support for VK_KHR_push_descriptors without actually checking support for it",
-            "or enabling it in the first place, and this extension is not supported in Vulkan SC"
-        ],
+        "@disabled-depends-VK_KHR_push_descriptors": "Not supported in Vulkan SC: VK_KHR_push_descriptors",
         "PushDescriptorSetLayoutWithoutExtension": false
     },
-    "NegativeDynamicState": {
-        "@disabled-dependency-incorrect": "This test case has incorrect dependency handling",
-        "DiscardRectanglesVersion": false
-    },
     "NegativeGeometryTessellation": {
-        "@disabled-depends-SPIRV-validation": [
-            "TODO: Vulkan SC - These tests rely on being able to validate against SPIR-V contents",
-            "which is not possible on Vulkan SC without actual SPIR-V data as debug information"
-        ],
+        "@disabled-depends-SPIRV-validation": "Depends on availabilty of SPIR-V data to validate",
         "PointSizeGeomShaderDontWrite": false,
         "PointSizeGeomShaderWrite": false,
         "BuiltinBlockOrderMismatchVsGs": false,
@@ -165,37 +106,21 @@
         "TessellationShaderEnabled": false
     },
     "NegativeFragmentShadingRate": {
-        "@disabled-depends-SPIRV-validation": [
-            "TODO: Vulkan SC - These tests rely on being able to validate against SPIR-V contents",
-            "which is not possible on Vulkan SC without actual SPIR-V data as debug information"
-        ],
+        "@disabled-depends-SPIRV-validation": "Depends on availabilty of SPIR-V data to validate",
         "PrimitiveFragmentShadingRateWriteMultiViewportLimitDynamic": false,
         "PrimitiveWriteMultiViewportLimit": false
     },
     "NegativeImage": {
-        "@disabled-assumes-preVulkan12": [
-            "These tests assume support for a pre-Vulkan 1.2 version, but that's not possible",
-            "in Vulkan SC where version 1.0 inherits Vulkan 1.2 support, including e.g. GPDP2 support"
-        ],
-        "CreateImageSharingModeConcurrentQueueFamilies": false,
-        "ImageViewLayerCount": false,
-        "ImageViewBreaksParameterCompatibilityRequirements": false,
-        "ImageViewInvalidSubresourceRange": false,
-
         "@disabled-replaced": "These test cases are replaced with Vulkan SC specific ones",
         "ImageMisc": false,
-        "@disabled-depends-SPIRV-validation": [
-            "TODO: Vulkan SC - These tests rely on being able to validate against SPIR-V contents",
-            "which is not possible on Vulkan SC without actual SPIR-V data as debug information"
-        ],
+
+        "@disabled-depends-SPIRV-validation": "Depends on availabilty of SPIR-V data to validate",
         "ComputeImageLayout11": false,
 
-        "@disabled-temporary-expects-unsupported-cap": [
-            "TODO: Vulkan SC - This test expects some capabilities that are not actually reported by MockICD"
-        ],
+        "@disabled-not-relevant": "Relies on a Vulkan MockICD specific hack",
         "GetPhysicalDeviceImageFormatProperties": false,
 
-        "@disabled-depends-VK_EXT_image_view_min_lod": "Test cases use unsupported extension in Vulkan SC",
+        "@disabled-depends-VK_EXT_image_view_min_lod": "Not supported in Vulkan SC: VK_EXT_image_view_min_lod",
         "ImageViewMinLodFeature": false
     },
     "PositiveInstance": {
@@ -203,9 +128,7 @@
         "ValidationInstanceExtensions": false
     },
     "NegativeInstanceless": {
-        "@disabled-depends-AllocationCallbacks": [
-            "The test cases below are disabled as they test allocator callbacks which aren't supported in Vulkan SC"
-        ],
+        "@disabled-depends-AllocationCallbacks": "Not supported in Vulkan SC: allocation callbacks",
         "DestroyInstanceAllocationCallbacksCompatibility": false
     },
     "NegativeMemory": {
@@ -213,31 +136,18 @@
         "BindMemory": false
     },
     "PositiveMemory": {
-        "@disabled-temporary-other": [
-            "TODO: Vulkan SC - These tests fail for some reason",
-            "Needs further investigation"
-        ],
+        "@disabled-temporary-other": "TODO: Vulkan SC - This test needs further investigation",
         "BindImageMemoryMultiThreaded": false
     },
-    "NegativeMultiview": {
-        "@disabled-assumes-preVulkan12": [
-            "These tests assume support for a pre-Vulkan 1.2 version, but that's not possible",
-            "in Vulkan SC where version 1.0 inherits Vulkan 1.2 support, including e.g. GPDP2 support"
-        ],
-        "FeaturesDisabled": false
-    },
     "NegativeObjectLifetime": {
-        "@disabled-depends-vkFreeMemory": "Test cases test the removed vkFreeMemory command's effects",
+        "@disabled-depends-vkFreeMemory": "Not supported in Vulkan SC: vkFreeMemory",
         "CmdBarrierBufferDestroyed": false,
         "CmdBarrierImageDestroyed": false,
         "Sync2CmdBarrierBufferDestroyed": false,
         "Sync2CmdBarrierImageDestroyed": false,
         "FramebufferAttachmentMemoryFreed": false,
 
-        "@disabled-may-depend-SPIRV-validation": [
-            "TODO: Vulkan SC - These tests also likely rely on SPIR-V validation",
-            "Needs further investigation"
-        ],
+        "@disabled-depends-SPIRV-validation": "Depends on availabilty of SPIR-V data to validate",
         "CmdBufferBufferViewDestroyed": false,
         "DescriptorPoolInUseDestroyedSignaled": false,
         "ImageViewInUseDestroyedSignaled": false,
@@ -245,44 +155,31 @@
         "SamplerInUseDestroyedSignaled": false
     },
     "NegativePipeline": {
-        "@disabled-depends-vkMergePipelineCaches": "Test cases test the removed vkMergePipelineCaches command's effects",
+        "@disabled-depends-vkMergePipelineCaches": "Not supported in Vulkan SC: vkMergePipelineCaches",
         "MergePipelineCachesInvalidDst": false,
 
-        "@disabled-depends-derivativePipelines": [
-            "Test cases depend on derivative pipelines which aren't supported in Vulkan SC"
-        ],
+        "@disabled-depends-derivativePipelines": "Not supported in Vulkan SC: derivative pipelines",
         "CreateComputesPipelineWithBadBasePointer": false,
         "CreateGraphicsPipelineWithBadBasePointer": false,
 
-        "@disabled-depends-Vulkan-behavior": "Test cases depend on Vulkan behavior that is changed in Vulkan SC",
+        "@disabled-depends-Vulkan-behavior": "Depends on Vulkan behavior that is changed for Vulkan SC",
         "NullStagepName": false,
 
-        "@disabled-depends-SPIRV-validation": [
-            "TODO: Vulkan SC - These tests rely on being able to validate against SPIR-V contents",
-            "which is not possible on Vulkan SC without actual SPIR-V data as debug information"
-        ],
+        "@disabled-depends-SPIRV-validation": "Depends on availabilty of SPIR-V data to validate",
         "MissingEntrypoint": false,
         "ShaderDrawParametersNotEnabled10": false,
         "ShaderDrawParametersNotEnabled11": false,
         "NotCompatibleForSet": false,
 
-        "@disabled-depends-VK_QCOM_render_pass_shader_resolve": [
-            "Test case depends on support for VK_QCOM_render_pass_shader_resolve without actually checking support for it",
-            "or enabling it in the first place, and this extension is not supported in Vulkan SC"
-        ],
+        "@disabled-depends-VK_QCOM_render_pass_shader_resolve": "Not supported in Vulkan SC: VK_QCOM_render_pass_shader_resolve",
         "SubpassRasterizationSamples": false,
 
-        "@disabled-depends-on-misc-unsupported-extensions": [
-            "Test cases depends on miscellaneous extensions not supported in Vulkan SC"
-        ],
+        "@disabled-depends-on-misc-unsupported-extensions": "Not supported in Vulkan SC: miscellaneous Vulkan-only features",
         "CreateFlags": false,
         "CreateFlagsCompute": false
     },
     "NegativePipelineLayout": {
-        "@disabled-depends-SPIRV-validation": [
-            "TODO: Vulkan SC - These tests rely on being able to validate against SPIR-V contents",
-            "which is not possible on Vulkan SC without actual SPIR-V data as debug information"
-        ],
+        "@disabled-depends-SPIRV-validation": "Depends on availabilty of SPIR-V data to validate",
         "DescriptorTypeMismatch": false,
         "DescriptorTypeMismatchCompute": false,
         "DescriptorTypeMismatchNonCombinedImageSampler": false,
@@ -291,60 +188,32 @@
         "UniformBlockNotProvided": false
     },
     "NegativePipelineTopology": {
-        "@disabled-depends-SPIRV-validation": [
-            "TODO: Vulkan SC - These tests rely on being able to validate against SPIR-V contents",
-            "which is not possible on Vulkan SC without actual SPIR-V data as debug information"
-        ],
+        "@disabled-depends-SPIRV-validation": "Depends on availabilty of SPIR-V data to validate",
         "PointSize": false
     },
     "NegativeQuery": {
-        "@disabled-depends-vkDestroyQueryPool": "Test cases test the removed vkDestroyQueryPool command's effects",
+        "@disabled-depends-vkDestroyQueryPool": "Not supported in Vulkan SC: vkDestroyQueryPool",
         "CmdBufferQueryPoolDestroyed": false,
         "PoolInUseDestroyedSignaled": false,
         "DestroyActiveQueryPool": false,
-        "DestroyWithoutQueryPool": false,
-
-        "@disabled-depends-GPDP2-KHR": [
-            "TODO: Vulkan SC - These tests require the KHR GPDP2 extension to be present",
-            "which is not supported in Vulkan SC (it is part of Vulkan SC 1.0 instead)",
-            "and do not handle corrently when that is not the case (by skipping the test case)."
-        ],
-        "HostyResetQueryPool": false,
-        "HostyResetDevice": false,
-        "HostyResetBadRange": false
-    },
-    "NegativeRenderPass": {
-        "@disabled-assumes-preVulkan12": [
-            "These tests assume support for a pre-Vulkan 1.2 version, but that's not possible",
-            "in Vulkan SC where version 1.0 inherits Vulkan 1.2 support, including e.g. GPDP2 support"
-        ],
-        "RenderArea": false
+        "DestroyWithoutQueryPool": false
     },
     "PositiveRenderPass": {
-        "@disabled-temporary-other": [
-            "TODO: Vulkan SC - These tests fail for some reason",
-            "Needs further investigation"
-        ],
+        "@disabled-temporary-other": "TODO: Vulkan SC - This test needs further investigation",
         "SingleMipTransition": false
     },
     "NegativeSampler": {
-        "@disabled-depends-SPIRV-validation": [
-            "TODO: Vulkan SC - These tests rely on being able to validate against SPIR-V contents",
-            "which is not possible on Vulkan SC without actual SPIR-V data as debug information"
-        ],
+        "@disabled-depends-SPIRV-validation": "Depends on availabilty of SPIR-V data to validate",
         "UnnormalizedCoordinatesCombinedSampler": false,
         "UnnormalizedCoordinatesSeparateSampler": false,
         "UnnormalizedCoordinatesSeparateSamplerSharedImage": false,
         "UnnormalizedCoordinatesSeparateSamplerSharedSampler": false,
         "UnnormalizedCoordinatesInBoundsAccess": false,
 
-        "@disabled-depends-VK_KHR_sampler_mirror_clamp_to_edge": [
-            "Test cases use unsupported extension in Vulkan SC which is part of core",
-            "but could be ported to work against a Vulkan SC implementation with appropriate test changes"
-        ],
+        "@disabled-depends-VK_KHR_sampler_mirror_clamp_to_edge": "Not supported in Vulkan SC: VK_KHR_sampler_mirror_clamp_to_edge",
         "MirrorClampToEdgeNotEnabled": false,
 
-        "@disabled-depends-VK_EXT_border_color_swizzle": "Test cases use unsupported extension in Vulkan SC",
+        "@disabled-depends-VK_EXT_border_color_swizzle": "Not supported in Vulkan SC: VK_EXT_border_color_swizzle",
         "BorderColorSwizzle": false,
 
         "@disabled-temporary-QNX-stack-size": [
@@ -354,10 +223,7 @@
         "CustomBorderColor": false
     },
     "NegativeShaderCompute": {
-        "@disabled-depends-SPIRV-validation": [
-            "TODO: Vulkan SC - These tests rely on being able to validate against SPIR-V contents",
-            "which is not possible on Vulkan SC without actual SPIR-V data as debug information"
-        ],
+        "@disabled-depends-SPIRV-validation": "Depends on availabilty of SPIR-V data to validate",
         "WorkgroupMemoryExplicitLayout": false,
         "SharedMemoryOverLimit": false,
         "SharedMemoryBooleanOverLimit": false,
@@ -369,10 +235,7 @@
         "ZeroInitializeWorkgroupMemory": false
     },
     "NegativeShaderInterface": {
-        "@disabled-depends-SPIRV-validation": [
-            "TODO: Vulkan SC - These tests rely on being able to validate against SPIR-V contents",
-            "which is not possible on Vulkan SC without actual SPIR-V data as debug information"
-        ],
+        "@disabled-depends-SPIRV-validation": "Depends on availabilty of SPIR-V data to validate",
         "VsFsTypeMismatchVectorSize": false,
         "VertexOutputNotConsumed": false,
         "FragmentInputNotProvided": false,
@@ -402,36 +265,24 @@
         "PackingInsideArray": false
     },
     "PositiveShaderInterface": {
-        "@disabled-depends-SPIRV-validation": [
-            "TODO: Vulkan SC - These tests rely on being able to validate against SPIR-V contents",
-            "which is not possible on Vulkan SC without actual SPIR-V data as debug information"
-        ],
+        "@disabled-depends-SPIRV-validation": "Depends on availabilty of SPIR-V data to validate",
         "AlphaToCoverageArrayIndex": false,
         "AlphaToCoverageArrayVec3": false
     },
     "NegativeShaderLimits": {
-        "@disabled-depends-SPIRV-validation": [
-            "TODO: Vulkan SC - These tests rely on being able to validate against SPIR-V contents",
-            "which is not possible on Vulkan SC without actual SPIR-V data as debug information"
-        ],
+        "@disabled-depends-SPIRV-validation": "Depends on availabilty of SPIR-V data to validate",
         "MinAndMaxTexelGatherOffset": false,
         "MinAndMaxTexelOffset": false
     },
     "NegativeShaderPushConstants": {
-        "@disabled-depends-SPIRV-validation": [
-            "TODO: Vulkan SC - These tests rely on being able to validate against SPIR-V contents",
-            "which is not possible on Vulkan SC without actual SPIR-V data as debug information"
-        ],
+        "@disabled-depends-SPIRV-validation": "Depends on availabilty of SPIR-V data to validate",
         "DrawWithoutUpdate": false,
         "MultipleEntryPoint": false,
         "NotInLayout": false,
         "NotDeclared": false
     },
     "NegativeShaderSpirv": {
-        "@disabled-depends-SPIRV-validation": [
-            "TODO: Vulkan SC - These tests rely on being able to validate against SPIR-V contents",
-            "which is not possible on Vulkan SC without actual SPIR-V data as debug information"
-        ],
+        "@disabled-depends-SPIRV-validation": "Depends on availabilty of SPIR-V data to validate",
         "CodeSize": false,
         "Magic": false,
         "SpecializationSizeZero": false,
@@ -452,10 +303,7 @@
         "QueueFamilyMemoryScope": false
     },
     "NegativeShaderStorageImage": {
-        "@disabled-depends-SPIRV-validation": [
-            "TODO: Vulkan SC - These tests rely on being able to validate against SPIR-V contents",
-            "which is not possible on Vulkan SC without actual SPIR-V data as debug information"
-        ],
+        "@disabled-depends-SPIRV-validation": "Depends on availabilty of SPIR-V data to validate",
         "MissingFormatRead": false,
         "MissingFormatWrite": false,
         "MissingNonReadableDecorationFormatRead": false,
@@ -465,55 +313,30 @@
         "UnknownWriteLessComponent": false
     },
     "NegativeShaderStorageTexel": {
-        "@disabled-depends-SPIRV-validation": [
-            "TODO: Vulkan SC - These tests rely on being able to validate against SPIR-V contents",
-            "which is not possible on Vulkan SC without actual SPIR-V data as debug information"
-        ],
+        "@disabled-depends-SPIRV-validation": "Depends on availabilty of SPIR-V data to validate",
         "WriteLessComponent": false
     },
     "NegativeSparse": {
-        "@disabled": [
-            "Test cases depend on sparse binding which isn't supported in Vulkan SC"
-        ],
+        "@disabled": "Not supported in Vulkan SC: space resources",
         "*": false
     },
     "PositiveSparse": {
-        "@disabled": [
-            "Test cases depend on sparse binding which isn't supported in Vulkan SC"
-        ],
+        "@disabled": "Not supported in Vulkan SC: space resources",
         "*": false
     },
     "NegativeSubgroup": {
-        "@disabled-depends-SPIRV-validation": [
-            "TODO: Vulkan SC - These tests rely on being able to validate against SPIR-V contents",
-            "which is not possible on Vulkan SC without actual SPIR-V data as debug information"
-        ],
+        "@disabled-depends-SPIRV-validation": "Depends on availabilty of SPIR-V data to validate",
         "Properties": false
     },
     "NegativeSubpass": {
-        "@disabled-depends-SPIRV-validation": [
-            "TODO: Vulkan SC - These tests rely on being able to validate against SPIR-V contents",
-            "which is not possible on Vulkan SC without actual SPIR-V data as debug information"
-        ],
+        "@disabled-depends-SPIRV-validation": "Depends on availabilty of SPIR-V data to validate",
         "SubpassInputNotBoundDescriptorSet": false,
         "SubpassInputWithoutFormat": false,
         "InputAttachmentMissing": false,
         "InputAttachmentMissingArray": false,
         "InputAttachmentSharingVariable": false
     },
-    "NegativeSyncObject": {
-        "@disabled-assumes-preVulkan12": [
-            "These tests assume support for a pre-Vulkan 1.2 version, but that's not possible",
-            "in Vulkan SC where version 1.0 inherits Vulkan 1.2 support, including e.g. GPDP2 support"
-        ],
-        "QueueSubmitBinarySemaphoreNotSignaled": false
-    },
     "NegativeSyncVal": {
-        "@disabled-depends-WSI": [
-            "The test cases below are disabled because they depend on various WSI functionalities"
-        ],
-        "QSPresentAcquire": false,
-
         "@StageAccessExpansion-comment": [
             "TODO: Vulkan SC - This test fails to generate the appropriate sync hazard error",
             "or report additional hazards than expected",
@@ -524,10 +347,7 @@
         "RenderPassAsyncHazard": false
     },
     "NegativeVertexInput": {
-        "@disabled-depends-SPIRV-validation": [
-            "TODO: Vulkan SC - These tests rely on being able to validate against SPIR-V contents",
-            "which is not possible on Vulkan SC without actual SPIR-V data as debug information"
-        ],
+        "@disabled-depends-SPIRV-validation": "Depends on availabilty of SPIR-V data to validate",
         "AttributeNotConsumed": false,
         "AttributeLocationMismatch": false,
         "AttributeNotProvided": false,
@@ -542,15 +362,11 @@
         "AttributeStructTypeBlockLocation64bit": false
     },
     "PositiveVertexInput": {
-        "@disabled-depends-SPIRV-validation": [
-            "TODO: Vulkan SC - These tests rely on being able to validate against SPIR-V contents",
-            "which is not possible on Vulkan SC without actual SPIR-V data as debug information"
-        ],
-
+        "@disabled-depends-SPIRV-validation": "Depends on availabilty of SPIR-V data to validate",
         "AttributeStructTypeBlockLocation": false
     },
     "NegativeViewportInheritance": {
-        "@disabled-depends-VK_NV_inherited_viewport_scissor": "Test cases use unsupported extension in Vulkan SC",
+        "@disabled-depends-VK_NV_inherited_viewport_scissor": "Not supported in Vulkan SC: VK_NV_inherited_viewport_scissor",
         "BasicUsage": false,
         "MissingFeature": false,
         "MultiViewport": false,
@@ -561,30 +377,11 @@
             "The test cases below are disabled because they depend on WSI functionalities",
             "without actually verifying support for them"
         ],
-        "SurfaceSupportByPhysicalDevice": false,
-        "CreatingWin32Surface": false,
-        "QueuePresentWaitingSameSemaphore": false,
-        "QueuePresentBinarySemaphoreNotSignaled": false,
-        "SwapchainAcquireImageNoSync": false,
-        "SwapchainAcquireImageNoSync2KHR": false,
-        "SwapchainAcquireTooManyImages": false,
-        "GetSwapchainImageAndTryDestroy": false,
-        "SwapchainAcquireTooManyImages2KHR": false,
-        "WarningSwapchainCreateInfoPreTransform": false,
-        "LeakASwapchain": false,
-        "GetSwapchainImagesCountButNotImages": false
+        "CreatingWin32Surface": false
     },
     "PositiveWsi": {
-        "@rename-dead-code": [
-            "These tests need renaming due to the limitations of gtest_add_tests"
-        ],
-        "ProtectedSwapchainImageColorAttachment": "InvalidTestGroup",
-
-        "@disabled-depends-WSI": [
-            "The test cases below are disabled because they depend on WSI functionalities",
-            "without actually verifying support for them"
-        ],
-        "CreateSurface": false
+        "@rename-dead-code": "This test need renaming due to the limitations of gtest_add_tests",
+        "ProtectedSwapchainImageColorAttachment": "InvalidTestGroup"
     },
     "MultiDeviceTest": {
         "*": "MultiDeviceTest"

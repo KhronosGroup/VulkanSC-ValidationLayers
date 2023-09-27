@@ -12,4 +12,4 @@
 
 #include "vksc_render_framework.h"
 
-using VkLayerTestBase = VkSCRenderFramework;
+using VkLayerTestBase = VkSCCompatibilityRenderFramework;

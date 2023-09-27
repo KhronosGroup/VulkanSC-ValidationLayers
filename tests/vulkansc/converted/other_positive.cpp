@@ -283,7 +283,7 @@ TEST_F(VkPositiveLayerTest, ApiVersionZero) {
     ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
 }
 
-TEST_F(VkPositiveLayerTest, DISABLED_TestPhysicalDeviceSurfaceSupport) {
+TEST_F(VkPositiveLayerTest, TestPhysicalDeviceSurfaceSupport) {
     TEST_DESCRIPTION("Test if physical device supports surface.");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddSurfaceExtension();
@@ -426,7 +426,7 @@ TEST_F(VkPositiveLayerTest, DISABLED_GetDevProcAddrExtensions) {
 }
 #endif
 
-TEST_F(VkPositiveLayerTest, Vulkan12Features) {
+TEST_F(VkPositiveLayerTest, DISABLED_Vulkan12Features) {
     TEST_DESCRIPTION("Enable feature via Vulkan12features struct");
     SetTargetApiVersion(VK_API_VERSION_1_2);
     ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));

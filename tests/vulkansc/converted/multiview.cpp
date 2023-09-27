@@ -1272,7 +1272,7 @@ TEST_F(NegativeMultiview, RenderPassViewMasksLimit) {
     TestRenderPassCreate(m_errorMonitor, *m_device, rpci, false, "VUID-VkRenderPassMultiviewCreateInfo-pViewMasks-06697", nullptr);
 }
 
-TEST_F(NegativeMultiview, DISABLED_FeaturesDisabled) {
+TEST_F(NegativeMultiview, FeaturesDisabled) {
     TEST_DESCRIPTION("Create graphics pipeline using multiview features which are not enabled.");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -1283,6 +1283,11 @@ TEST_F(NegativeMultiview, DISABLED_FeaturesDisabled) {
 
     VkPhysicalDeviceMultiviewFeatures multiview_features = LvlInitStruct<VkPhysicalDeviceMultiviewFeatures>();
     auto features2 = GetPhysicalDeviceFeatures2(multiview_features);
+
+    if (!multiview_features.multiview) {
+        GTEST_SKIP() << "Multiview support is required";
+    }
+
     multiview_features.multiviewTessellationShader = VK_FALSE;
     multiview_features.multiviewGeometryShader = VK_FALSE;
     ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features2));

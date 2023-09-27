@@ -1188,12 +1188,14 @@ TEST_F(NegativeCommand, DISABLED_DrawTimeImageComponentTypeMismatchWithPipeline)
     m_commandBuffer->end();
 }
 
-TEST_F(NegativeCommand, DISABLED_CopyImageLayerCountMismatch) {
+TEST_F(NegativeCommand, CopyImageLayerCountMismatch) {
     TEST_DESCRIPTION(
         "Try to copy between images with the source subresource having a different layerCount than the destination subresource");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
     AddOptionalExtensions(VK_KHR_MAINTENANCE_1_EXTENSION_NAME);
     ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
-    const bool maintenance1 = IsExtensionsEnabled(VK_KHR_MAINTENANCE_1_EXTENSION_NAME);
+    const bool maintenance1 =
+        IsExtensionsEnabled(VK_KHR_MAINTENANCE_1_EXTENSION_NAME) || DeviceValidationVersion() >= VK_API_VERSION_1_1;
     ASSERT_NO_FATAL_FAILURE(InitState());
 
     VkFormat image_format = VK_FORMAT_B8G8R8A8_UNORM;
@@ -3316,7 +3318,7 @@ TEST_F(NegativeCommand, CopyImageFormatSizeMismatch) {
     }
 }
 
-TEST_F(NegativeCommand, DISABLED_CopyImageDepthStencilFormatMismatch) {
+TEST_F(NegativeCommand, CopyImageDepthStencilFormatMismatch) {
     ASSERT_NO_FATAL_FAILURE(Init());
     auto depth_format = FindSupportedDepthStencilFormat(gpu());
 

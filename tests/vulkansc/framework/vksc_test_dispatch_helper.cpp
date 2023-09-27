@@ -108,6 +108,8 @@ namespace vk {
 
 namespace compatibility {
 
+static vksc::TestDispatchHelper* DispatchHelper() { return VkSCCompatibilityRenderFramework::DispatchHelper(); }
+
 static const char* GetCompatibilityProcName(const char* pName) {
     // Make KHR Vulkan entry points for Vulkan SC core features available, as many test
     // cases do not actually check for the right pre-conditions to decide whether to use
@@ -256,15 +258,15 @@ static VKAPI_ATTR VkResult VKAPI_CALL CreateInstance(const VkInstanceCreateInfo*
         app_info.apiVersion = VKSC_API_VERSION_1_0;
     }
     VkResult result = vksc::CreateInstance(&create_info, pAllocator, pInstance);
-    if (result == VK_SUCCESS && VkSCRenderFramework::DispatchHelper() != nullptr) {
-        VkSCRenderFramework::DispatchHelper()->RegisterInstance(*pInstance);
+    if (result == VK_SUCCESS && DispatchHelper() != nullptr) {
+        DispatchHelper()->RegisterInstance(*pInstance);
     }
     return result;
 }
 
 static VKAPI_ATTR void VKAPI_CALL DestroyInstance(VkInstance instance, const VkAllocationCallbacks* pAllocator) {
-    if (VkSCRenderFramework::DispatchHelper() != nullptr) {
-        VkSCRenderFramework::DispatchHelper()->UnregisterInstance(instance);
+    if (DispatchHelper() != nullptr) {
+        DispatchHelper()->UnregisterInstance(instance);
     }
     vksc::DestroyInstance(instance, pAllocator);
 }
@@ -314,7 +316,7 @@ static VkResult CreatePipelines(VkDevice device, VkPipelineCache pipeline_cache,
                                 const CREATE_INFO* create_infos, VkPipeline* pipelines, CREATE_FUNC create_func) {
     // If the application did not provide a pipeline cache, let's use a default one
     if (pipeline_cache == VK_NULL_HANDLE) {
-        pipeline_cache = VkSCRenderFramework::Instance().GetDefaultPipelineCache();
+        pipeline_cache = VkSCCompatibilityRenderFramework::Instance().GetDefaultPipelineCache();
     }
 
     // When running Vulkan validation layer tests against the Vulkan SC validation layers
@@ -391,7 +393,7 @@ static VKAPI_ATTR VkResult VKAPI_CALL CreateCommandPool(VkDevice device, const V
 static VKAPI_ATTR VkResult VKAPI_CALL BeginCommandBuffer(VkCommandBuffer commandBuffer,
                                                          const VkCommandBufferBeginInfo* pBeginInfo) {
     static auto policy =
-        VkSCRenderFramework::DispatchHelper()
+        DispatchHelper()
             ->CreateDispatchPolicy()
             .SkipOnMessage("VUID-vkBeginCommandBuffer-commandPoolResetCommandBuffer-05136",
                            "Test requires VkPhysicalDeviceVulkanSC10Properties::commandPoolResetCommandBuffer")
@@ -401,26 +403,26 @@ static VKAPI_ATTR VkResult VKAPI_CALL BeginCommandBuffer(VkCommandBuffer command
                            "Test requires VkPhysicalDeviceVulkanSC10Properties::commandBufferSimultaneousUse")
             .SkipOnMessage("VUID-VkCommandBufferBeginInfo-flags-05010",
                            "Test requires VkPhysicalDeviceVulkanSC10Properties::secondaryCommandBufferNullOrImagelessFramebuffer");
-    VkSCRenderFramework::DispatchHelper()->BeginDispatchPolicy(policy);
+    DispatchHelper()->BeginDispatchPolicy(policy);
     VkResult result = vksc::BeginCommandBuffer(commandBuffer, pBeginInfo);
-    VkSCRenderFramework::DispatchHelper()->EndDispatchPolicy(policy);
+    DispatchHelper()->EndDispatchPolicy(policy);
     return result;
 }
 
 static VKAPI_ATTR VkResult VKAPI_CALL ResetCommandBuffer(VkCommandBuffer commandBuffer, VkCommandBufferResetFlags flags) {
-    static auto policy = VkSCRenderFramework::DispatchHelper()->CreateDispatchPolicy().SkipOnMessage(
+    static auto policy = DispatchHelper()->CreateDispatchPolicy().SkipOnMessage(
         "VUID-vkResetCommandBuffer-commandPoolResetCommandBuffer-05135",
         "Test requires VkPhysicalDeviceVulkanSC10Properties::commandPoolResetCommandBuffer");
-    VkSCRenderFramework::DispatchHelper()->BeginDispatchPolicy(policy);
+    DispatchHelper()->BeginDispatchPolicy(policy);
     VkResult result = vksc::ResetCommandBuffer(commandBuffer, flags);
-    VkSCRenderFramework::DispatchHelper()->EndDispatchPolicy(policy);
+    DispatchHelper()->EndDispatchPolicy(policy);
     return result;
 }
 
 static VKAPI_ATTR VkResult VKAPI_CALL CreateRenderPass(VkDevice device, const VkRenderPassCreateInfo* pCreateInfo,
                                                        const VkAllocationCallbacks* pAllocator, VkRenderPass* pRenderPass) {
     static auto policy =
-        VkSCRenderFramework::DispatchHelper()
+        DispatchHelper()
             ->CreateDispatchPolicy()
             .SkipOnMessage("VUID-VkRenderPassCreateInfo-subpassCount-05050",
                            "Test requires higher limit for VkPhysicalDeviceVulkanSC10Properties::maxRenderPassSubpasses")
@@ -432,16 +434,16 @@ static VKAPI_ATTR VkResult VKAPI_CALL CreateRenderPass(VkDevice device, const Vk
                            "Test requires higher limit for VkPhysicalDeviceVulkanSC10Properties::maxSubpassInputAttachments")
             .SkipOnMessage("VUID-VkSubpassDescription-preserveAttachmentCount-05054",
                            "Test requires higher limit for VkPhysicalDeviceVulkanSC10Properties::maxSubpassPreserveAttachments");
-    VkSCRenderFramework::DispatchHelper()->BeginDispatchPolicy(policy);
+    DispatchHelper()->BeginDispatchPolicy(policy);
     VkResult result = vksc::CreateRenderPass(device, pCreateInfo, pAllocator, pRenderPass);
-    VkSCRenderFramework::DispatchHelper()->EndDispatchPolicy(policy);
+    DispatchHelper()->EndDispatchPolicy(policy);
     return result;
 }
 
 static VKAPI_ATTR VkResult VKAPI_CALL CreateRenderPass2(VkDevice device, const VkRenderPassCreateInfo2* pCreateInfo,
                                                         const VkAllocationCallbacks* pAllocator, VkRenderPass* pRenderPass) {
     static auto policy =
-        VkSCRenderFramework::DispatchHelper()
+        DispatchHelper()
             ->CreateDispatchPolicy()
             .SkipOnMessage("VUID-VkRenderPassCreateInfo2-subpassCount-05055",
                            "Test requires higher limit for VkPhysicalDeviceVulkanSC10Properties::maxRenderPassSubpasses")
@@ -453,10 +455,23 @@ static VKAPI_ATTR VkResult VKAPI_CALL CreateRenderPass2(VkDevice device, const V
                            "Test requires higher limit for VkPhysicalDeviceVulkanSC10Properties::maxSubpassInputAttachments")
             .SkipOnMessage("VUID-VkSubpassDescription2-preserveAttachmentCount-05059",
                            "Test requires higher limit for VkPhysicalDeviceVulkanSC10Properties::maxSubpassPreserveAttachments");
-    VkSCRenderFramework::DispatchHelper()->BeginDispatchPolicy(policy);
+    DispatchHelper()->BeginDispatchPolicy(policy);
     VkResult result = vksc::CreateRenderPass2(device, pCreateInfo, pAllocator, pRenderPass);
-    VkSCRenderFramework::DispatchHelper()->EndDispatchPolicy(policy);
+    DispatchHelper()->EndDispatchPolicy(policy);
     return result;
+}
+
+static VKAPI_ATTR VkResult VKAPI_CALL CreateFramebuffer(VkDevice device, const VkFramebufferCreateInfo* pCreateInfo,
+                                                        const VkAllocationCallbacks* pAllocator, VkFramebuffer* pFramebuffer) {
+    // Vulkan SC allows maxFramebufferLayers = 1 in certain cases while Vulkan requires 256
+    // so we have to skip test cases that rely on higher capabilities
+    const uint32_t max_framebuffer_layers =
+        DispatchHelper()->TestCase()->DeviceObj()->phy().properties().limits.maxFramebufferLayers;
+    if (max_framebuffer_layers < 256 && pCreateInfo->layers > max_framebuffer_layers) {
+        DispatchHelper()->SkipUnsupportedTest(
+            "Test case relies on Vulkan minimum for maxFramebufferLayers but Vulkan SC allows for lower values");
+    }
+    return vksc::CreateFramebuffer(device, pCreateInfo, pAllocator, pFramebuffer);
 }
 
 }  // namespace compatibility
@@ -478,6 +493,7 @@ PFN_vkBeginCommandBuffer BeginCommandBuffer = nullptr;
 PFN_vkResetCommandBuffer ResetCommandBuffer = nullptr;
 PFN_vkCreateRenderPass CreateRenderPass = nullptr;
 PFN_vkCreateRenderPass2 CreateRenderPass2 = nullptr;
+PFN_vkCreateFramebuffer CreateFramebuffer = nullptr;
 
 void TestDispatchHelper::PatchDispatchTable() {
     // Add compatibility implementations for entry points that are not supported in Vulkan SC
@@ -512,6 +528,7 @@ void TestDispatchHelper::PatchDispatchTable() {
     VKSC__SWAP_COMPAT_EP(ResetCommandBuffer);
     VKSC__SWAP_COMPAT_EP(CreateRenderPass);
     VKSC__SWAP_COMPAT_EP(CreateRenderPass2);
+    VKSC__SWAP_COMPAT_EP(CreateFramebuffer);
 
     InitDefaultPipelineCacheData();
     InitDefaultObjectReservationInfo();
@@ -544,7 +561,7 @@ void TestDispatchHelper::InitCompatibilityDeviceExtensionEntryPoints(VkInstance 
     vk::InitDeviceExtension(instance, device, VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
 }
 
-TestDispatchHelper::TestDispatchHelper(VkSCRenderFramework* test_case) : test_case_(test_case) {}
+TestDispatchHelper::TestDispatchHelper(VkSCCompatibilityRenderFramework* test_case) : test_case_(test_case) {}
 
 TestDispatchHelper::~TestDispatchHelper() {
     // Destroy all debug messengers

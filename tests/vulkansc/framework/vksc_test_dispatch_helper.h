@@ -21,7 +21,7 @@
 
 #include <vector>
 
-class VkSCRenderFramework;
+class VkSCCompatibilityRenderFramework;
 
 namespace vksc {
 
@@ -40,6 +40,7 @@ extern PFN_vkBeginCommandBuffer BeginCommandBuffer;
 extern PFN_vkResetCommandBuffer ResetCommandBuffer;
 extern PFN_vkCreateRenderPass CreateRenderPass;
 extern PFN_vkCreateRenderPass2 CreateRenderPass2;
+extern PFN_vkCreateFramebuffer CreateFramebuffer;
 
 const VkDeviceObjectReservationCreateInfo& GetDefaultObjectReservationCreateInfo();
 
@@ -65,11 +66,15 @@ class TestDispatchHelper {
     static void InitCompatibilityInstanceExtensionEntryPoints(VkInstance instance);
     static void InitCompatibilityDeviceExtensionEntryPoints(VkInstance instance, VkDevice device);
 
-    TestDispatchHelper(VkSCRenderFramework* test_case);
+    TestDispatchHelper(VkSCCompatibilityRenderFramework* test_case);
     virtual ~TestDispatchHelper();
 
     void RegisterInstance(VkInstance instance);
     void UnregisterInstance(VkInstance instance);
+
+    VkSCCompatibilityRenderFramework* TestCase() const { return test_case_; }
+
+    void SkipUnsupportedTest(const char* message);
 
     DispatchPolicy CreateDispatchPolicy() { return DispatchPolicy(); }
 
@@ -83,12 +88,10 @@ class TestDispatchHelper {
                                                         VkDebugUtilsMessageTypeFlagsEXT message_types,
                                                         const VkDebugUtilsMessengerCallbackDataEXT* callback_data, void* user_data);
 
-    void SkipUnsupportedTest(const char* message);
-
     inline static thread_local const char* tls_skip_message_{nullptr};
     inline static thread_local DispatchPolicy* tls_dispatch_policy_{nullptr};
 
-    VkSCRenderFramework* test_case_{nullptr};
+    VkSCCompatibilityRenderFramework* test_case_{nullptr};
     bool messengers_valid_{true};
     vvl::unordered_map<VkInstance, VkDebugUtilsMessengerEXT> messengers_{};
 };

@@ -2755,7 +2755,7 @@ TEST_F(NegativeSyncObject, Sync2QueueSubmitTimelineSemaphoreValue) {
     vk::QueueWaitIdle(m_device->m_queue);
 }
 
-TEST_F(NegativeSyncObject, DISABLED_QueueSubmitBinarySemaphoreNotSignaled) {
+TEST_F(NegativeSyncObject, QueueSubmitBinarySemaphoreNotSignaled) {
     TEST_DESCRIPTION("Submit a queue with a waiting binary semaphore not previously signaled.");
 
     AddOptionalExtensions(VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);

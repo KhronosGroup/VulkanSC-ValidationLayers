@@ -5116,7 +5116,7 @@ TEST_F(NegativeSyncVal, QSRenderPass) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeSyncVal, DISABLED_QSPresentAcquire) {
+TEST_F(NegativeSyncVal, QSPresentAcquire) {
     TEST_DESCRIPTION("Try destroying a swapchain presentable image with vkDestroyImage");
 
     AddSurfaceExtension();

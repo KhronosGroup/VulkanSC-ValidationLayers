@@ -1375,10 +1375,6 @@ bool SCCoreChecks::PreCallValidateBeginCommandBuffer(VkCommandBuffer commandBuff
                 const char* vuid = phys_dev_props_sc_10_.secondaryCommandBufferNullOrImagelessFramebuffer
                                        ? "VUID-VkCommandBufferBeginInfo-flags-05009"
                                        : "VUID-VkCommandBufferBeginInfo-flags-05010";
-                auto render_pass = Get<RENDER_PASS_STATE>(pBeginInfo->pInheritanceInfo->renderPass);
-                // renderPass that framebuffer was created with must be compatible with local renderPass
-                skip |= ValidateRenderPassCompatibility("framebuffer", *framebuffer->rp_state.get(), "command buffer",
-                                                        *render_pass.get(), "vkBeginCommandBuffer()", vuid);
 
                 if ((framebuffer->createInfo.flags & VK_FRAMEBUFFER_CREATE_IMAGELESS_BIT) != 0 &&
                     !phys_dev_props_sc_10_.secondaryCommandBufferNullOrImagelessFramebuffer) {
@@ -1389,6 +1385,11 @@ bool SCCoreChecks::PreCallValidateBeginCommandBuffer(VkCommandBuffer commandBuff
                                      "VkPhysicalDeviceVulkanSC10Properties::secondaryCommandBufferNullOrImagelessFramebuffer "
                                      "is not supported.",
                                      report_data->FormatHandle(framebuffer->Handle()).c_str());
+                } else {
+                    auto render_pass = Get<RENDER_PASS_STATE>(pBeginInfo->pInheritanceInfo->renderPass);
+                    // renderPass that framebuffer was created with must be compatible with local renderPass
+                    skip |= ValidateRenderPassCompatibility("framebuffer", *framebuffer->rp_state.get(), "command buffer",
+                                                            *render_pass.get(), "vkBeginCommandBuffer()", vuid);
                 }
             }
         } else if (!phys_dev_props_sc_10_.secondaryCommandBufferNullOrImagelessFramebuffer) {
