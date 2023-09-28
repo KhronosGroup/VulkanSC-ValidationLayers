@@ -1,5 +1,5 @@
 /* THIS FILE IS GENERATED - DO NOT EDIT (scripts/vk_validation_stats.py) */
-/* Vulkan specification version: 1.0.12 */
+/* Vulkan specification version: 1.0.13 */
 /*
  * Vulkan
  *
