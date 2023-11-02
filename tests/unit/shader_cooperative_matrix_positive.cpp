@@ -14,6 +14,36 @@
 
 #include "utils/cast_utils.h"
 #include "../framework/layer_validation_tests.h"
+#include "../framework/pipeline_helper.h"
+
+const char *vkComponentTypeToGLSL(VkComponentTypeKHR type) {
+    switch (type) {
+        case VK_COMPONENT_TYPE_FLOAT16_KHR:
+            return "float16_t";
+        case VK_COMPONENT_TYPE_FLOAT32_KHR:
+            return "float32_t";
+        case VK_COMPONENT_TYPE_FLOAT64_KHR:
+            return "float64_t";
+        case VK_COMPONENT_TYPE_SINT8_KHR:
+            return "int8_t";
+        case VK_COMPONENT_TYPE_SINT16_KHR:
+            return "int16_t";
+        case VK_COMPONENT_TYPE_SINT32_KHR:
+            return "int32_t";
+        case VK_COMPONENT_TYPE_SINT64_KHR:
+            return "int64_t";
+        case VK_COMPONENT_TYPE_UINT8_KHR:
+            return "uint8_t";
+        case VK_COMPONENT_TYPE_UINT16_KHR:
+            return "uint16_t";
+        case VK_COMPONENT_TYPE_UINT32_KHR:
+            return "uint32_t";
+        case VK_COMPONENT_TYPE_UINT64_KHR:
+            return "uint64_t";
+        default:
+            return "unknown";
+    }
+}
 
 TEST_F(PositiveShaderCooperativeMatrix, CooperativeMatrixNV) {
     TEST_DESCRIPTION("Test VK_NV_cooperative_matrix.");
@@ -23,24 +53,17 @@ TEST_F(PositiveShaderCooperativeMatrix, CooperativeMatrixNV) {
     AddRequiredExtensions(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME);
     // glslang will generate OpCapability VulkanMemoryModel and need entension enabled
     AddRequiredExtensions(VK_KHR_VULKAN_MEMORY_MODEL_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    auto float16_features = LvlInitStruct<VkPhysicalDeviceFloat16Int8FeaturesKHR>();
-    auto cooperative_matrix_features = LvlInitStruct<VkPhysicalDeviceCooperativeMatrixFeaturesNV>(&float16_features);
-    auto memory_model_features = LvlInitStruct<VkPhysicalDeviceVulkanMemoryModelFeaturesKHR>(&cooperative_matrix_features);
-    auto features2 = GetPhysicalDeviceFeatures2(memory_model_features);
-    if (memory_model_features.vulkanMemoryModel == VK_FALSE) {
-        GTEST_SKIP() << "vulkanMemoryModel feature not supported";
-    }
-
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features2));
+    VkPhysicalDeviceFloat16Int8FeaturesKHR float16_features = vku::InitStructHelper();
+    VkPhysicalDeviceCooperativeMatrixFeaturesNV cooperative_matrix_features = vku::InitStructHelper(&float16_features);
+    VkPhysicalDeviceVulkanMemoryModelFeaturesKHR memory_model_features = vku::InitStructHelper(&cooperative_matrix_features);
+    GetPhysicalDeviceFeatures2(memory_model_features);
+    RETURN_IF_SKIP(InitState(nullptr, &memory_model_features));
 
     std::vector<VkDescriptorSetLayoutBinding> bindings(0);
-    const VkDescriptorSetLayoutObj dsl(m_device, bindings);
-    const VkPipelineLayoutObj pl(m_device, {&dsl});
+    const vkt::DescriptorSetLayout dsl(*m_device, bindings);
+    const vkt::PipelineLayout pl(*m_device, {&dsl});
 
     char const *csSource = R"glsl(
         #version 450
@@ -79,11 +102,9 @@ TEST_F(PositiveShaderCooperativeMatrix, CooperativeMatrixNV) {
     };
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.InitInfo();
     pipe.cs_ =
         std::make_unique<VkShaderObj>(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL, &specInfo);
     pipe.InitState();
-    pipe.pipeline_layout_ = VkPipelineLayoutObj(m_device, {});
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPipelineShaderStageCreateInfo-pSpecializationInfo-06849");
     pipe.CreateComputePipeline();
     m_errorMonitor->VerifyFound();
@@ -100,31 +121,34 @@ TEST_F(PositiveShaderCooperativeMatrix, CooperativeMatrixKHR) {
     AddRequiredExtensions(VK_KHR_16BIT_STORAGE_EXTENSION_NAME);
     // glslang will generate OpCapability VulkanMemoryModel and need entension enabled
     AddRequiredExtensions(VK_KHR_VULKAN_MEMORY_MODEL_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
+    RETURN_IF_SKIP(InitFramework())
+
+    VkPhysicalDeviceFloat16Int8FeaturesKHR float16_features = vku::InitStructHelper();
+    VkPhysicalDevice16BitStorageFeatures storage16_features = vku::InitStructHelper(&float16_features);
+    VkPhysicalDeviceCooperativeMatrixFeaturesKHR cooperative_matrix_features = vku::InitStructHelper(&storage16_features);
+    VkPhysicalDeviceVulkanMemoryModelFeaturesKHR memory_model_features = vku::InitStructHelper(&cooperative_matrix_features);
+    GetPhysicalDeviceFeatures2(memory_model_features);
+    RETURN_IF_SKIP(InitState(nullptr, &memory_model_features));
+
+    std::vector<VkCooperativeMatrixPropertiesKHR> props;
+    uint32_t props_count = 0;
+    vk::GetPhysicalDeviceCooperativeMatrixPropertiesKHR(gpu(), &props_count, nullptr);
+    for (uint32_t i = 0; i < props_count; i++) {
+        props.emplace_back(vku::InitStruct<VkCooperativeMatrixPropertiesKHR>());
     }
+    vk::GetPhysicalDeviceCooperativeMatrixPropertiesKHR(gpu(), &props_count, props.data());
 
-    auto float16_features = LvlInitStruct<VkPhysicalDeviceFloat16Int8FeaturesKHR>();
-    auto storage16_features = LvlInitStruct<VkPhysicalDevice16BitStorageFeatures>(&float16_features);
-    auto cooperative_matrix_features = LvlInitStruct<VkPhysicalDeviceCooperativeMatrixFeaturesKHR>(&storage16_features);
-    auto memory_model_features = LvlInitStruct<VkPhysicalDeviceVulkanMemoryModelFeaturesKHR>(&cooperative_matrix_features);
-    auto features2 = GetPhysicalDeviceFeatures2(memory_model_features);
-    if (memory_model_features.vulkanMemoryModel == VK_FALSE) {
-        GTEST_SKIP() << "vulkanMemoryModel feature not supported";
+    VkCooperativeMatrixPropertiesKHR subgroup_prop = vku::InitStructHelper();
+    bool found_scope_subgroup = false;
+    for (const auto &prop : props) {
+        if (prop.scope == VK_SCOPE_SUBGROUP_KHR) {
+            found_scope_subgroup = true;
+            subgroup_prop = prop;
+            break;
+        }
     }
-    if (!cooperative_matrix_features.cooperativeMatrix) {
-        GTEST_SKIP() << "cooperativeMatrix feature not supported";
-    }
-
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features2));
-
-    VkCooperativeMatrixPropertiesKHR props = LvlInitStruct<VkCooperativeMatrixPropertiesKHR>();
-    uint32_t props_count = 1;
-    VkResult props_result = vk::GetPhysicalDeviceCooperativeMatrixPropertiesKHR(gpu(), &props_count, &props);
-
-    if (props_result != VK_SUCCESS && props_result != VK_INCOMPLETE && props_count != 1) {
-        GTEST_SKIP() << "GetPhysicalDeviceCooperativeMatrixPropertiesKHR does not report any matrices supported";
+    if (!found_scope_subgroup) {
+        GTEST_SKIP() << "VK_SCOPE_SUBGROUP_KHR not Found";
     }
 
     const VkSampler *ptr = nullptr;
@@ -134,8 +158,8 @@ TEST_F(PositiveShaderCooperativeMatrix, CooperativeMatrixKHR) {
         {2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1, VK_SHADER_STAGE_COMPUTE_BIT, ptr},
         {3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1, VK_SHADER_STAGE_COMPUTE_BIT, ptr},
     };
-    const VkDescriptorSetLayoutObj dsl(m_device, bindings);
-    const VkPipelineLayoutObj pl(m_device, {&dsl});
+    const vkt::DescriptorSetLayout dsl(*m_device, bindings);
+    const vkt::PipelineLayout pl(*m_device, {&dsl});
 
     std::string css = R"glsl(
          #version 450 core
@@ -168,41 +192,18 @@ TEST_F(PositiveShaderCooperativeMatrix, CooperativeMatrixKHR) {
         size_t pos;
         while ((pos = str.find(from)) != std::string::npos) str.replace(pos, from.length(), to);
     };
-    const auto get_type_name = [](const VkComponentTypeKHR &type) {
-        const struct {
-            VkComponentTypeKHR type;
-            const char *name;
-        } cvt[] = {
-            {VK_COMPONENT_TYPE_FLOAT16_KHR, "float16_t"},
-            {VK_COMPONENT_TYPE_FLOAT32_KHR, "float32_t"},
-            {VK_COMPONENT_TYPE_FLOAT64_KHR, "float64_t"},
-            {VK_COMPONENT_TYPE_SINT8_KHR,   "int8_t"   },
-            {VK_COMPONENT_TYPE_SINT16_KHR,  "int16_t"  },
-            {VK_COMPONENT_TYPE_SINT32_KHR,  "int32_t"  },
-            {VK_COMPONENT_TYPE_SINT64_KHR,  "int64_t"  },
-            {VK_COMPONENT_TYPE_UINT8_KHR,   "uint8_t"  },
-            {VK_COMPONENT_TYPE_UINT16_KHR,  "uint16_t" },
-            {VK_COMPONENT_TYPE_UINT32_KHR,  "uint32_t" },
-            {VK_COMPONENT_TYPE_UINT64_KHR,  "uint64_t" },
-        };
-        for (const auto &x: cvt)
-            if (x.type == type) return x.name;
-        return "";
-    };
-    replace(css, "%M%", std::to_string(props.MSize));
-    replace(css, "%N%", std::to_string(props.NSize));
-    replace(css, "%K%", std::to_string(props.KSize));
-    replace(css, "%type_A%", get_type_name(props.AType));
-    replace(css, "%type_B%", get_type_name(props.BType));
-    replace(css, "%type_C%", get_type_name(props.CType));
-    replace(css, "%type_R%", get_type_name(props.ResultType));
+    replace(css, "%M%", std::to_string(subgroup_prop.MSize));
+    replace(css, "%N%", std::to_string(subgroup_prop.NSize));
+    replace(css, "%K%", std::to_string(subgroup_prop.KSize));
+    replace(css, "%type_A%", vkComponentTypeToGLSL(subgroup_prop.AType));
+    replace(css, "%type_B%", vkComponentTypeToGLSL(subgroup_prop.BType));
+    replace(css, "%type_C%", vkComponentTypeToGLSL(subgroup_prop.CType));
+    replace(css, "%type_R%", vkComponentTypeToGLSL(subgroup_prop.ResultType));
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.InitInfo();
-    pipe.cs_ =
-        std::make_unique<VkShaderObj>(this, css.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL, nullptr);
+    pipe.cs_ = std::make_unique<VkShaderObj>(this, css.c_str(), VK_SHADER_STAGE_COMPUTE_BIT);
     pipe.InitState();
-    pipe.pipeline_layout_ = VkPipelineLayoutObj(m_device, {&dsl});
+    pipe.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&dsl});
     pipe.CreateComputePipeline();
     m_errorMonitor->VerifyFound();
 }

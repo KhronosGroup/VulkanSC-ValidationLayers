@@ -13,6 +13,7 @@
  */
 
 #include "../framework/layer_validation_tests.h"
+#include "../framework/pipeline_helper.h"
 
 #ifdef VK_USE_PLATFORM_WAYLAND_KHR
 #include "wayland-client.h"
@@ -26,23 +27,17 @@ TEST_F(NegativeWsi, InitSwapchainPotentiallyIncompatibleFlag) {
     AddRequiredExtensions(VK_KHR_SURFACE_PROTECTED_CAPABILITIES_EXTENSION_NAME);
     AddSurfaceExtension();
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
-    if (DeviceValidationVersion() < VK_API_VERSION_1_1) {
-        GTEST_SKIP() << "At least Vulkan version 1.1 is required";
-    }
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitState())
 
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    InitRenderTarget();
     if (!InitSurface()) {
         GTEST_SKIP() << "Cannot create surface, skipping test";
     }
     InitSwapchainInfo();
 
-    auto swapchain_ci = LvlInitStruct<VkSwapchainCreateInfoKHR>();
+    VkSwapchainCreateInfoKHR swapchain_ci = vku::InitStructHelper();
     swapchain_ci.surface = m_surface;
     swapchain_ci.minImageCount = m_surface_capabilities.minImageCount;
     swapchain_ci.imageFormat = m_surface_formats[0].format;
@@ -62,10 +57,10 @@ TEST_F(NegativeWsi, InitSwapchainPotentiallyIncompatibleFlag) {
         swapchain_ci.flags = VK_SWAPCHAIN_CREATE_PROTECTED_BIT_KHR;
 
         // Get surface protected capabilities
-        auto surface_info = LvlInitStruct<VkPhysicalDeviceSurfaceInfo2KHR>();
+        VkPhysicalDeviceSurfaceInfo2KHR surface_info = vku::InitStructHelper();
         surface_info.surface = swapchain_ci.surface;
-        auto surface_protected_capabilities = LvlInitStruct<VkSurfaceProtectedCapabilitiesKHR>();
-        auto surface_capabilities = LvlInitStruct<VkSurfaceCapabilities2KHR>();
+        VkSurfaceProtectedCapabilitiesKHR surface_protected_capabilities = vku::InitStructHelper();
+        VkSurfaceCapabilities2KHR surface_capabilities = vku::InitStructHelper();
         surface_capabilities.pNext = &surface_protected_capabilities;
         vk::GetPhysicalDeviceSurfaceCapabilities2KHR(gpu(), &surface_info, &surface_capabilities);
 
@@ -86,7 +81,10 @@ TEST_F(NegativeWsi, InitSwapchainPotentiallyIncompatibleFlag) {
     }
 
     // "split instance bind regions" not supported when there is only one device
-    {
+    VkImageFormatProperties image_format_props{};
+    if (vk::GetPhysicalDeviceImageFormatProperties(
+            gpu(), VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+            VK_IMAGE_CREATE_SPLIT_INSTANCE_BIND_REGIONS_BIT, &image_format_props) == VK_SUCCESS) {
         swapchain_ci.flags = VK_SWAPCHAIN_CREATE_SPLIT_INSTANCE_BIND_REGIONS_BIT_KHR;
 
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSwapchainCreateInfoKHR-physicalDeviceCount-01429");
@@ -101,31 +99,19 @@ TEST_F(NegativeWsi, BindImageMemorySwapchain) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
 
     AddSurfaceExtension();
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
-
-    if (IsPlatform(kGalaxyS10)) {
-        GTEST_SKIP() << "This test should not run on Galaxy S10";
-    }
-    if (IsPlatform(kMockICD)) {
+    RETURN_IF_SKIP(InitFramework())
+    if (IsPlatformMockICD()) {
         GTEST_SKIP() << "This test appears to leave the image created a swapchain in a weird state that leads to 00378 when it "
                         "shouldn't. Requires further investigation.";
     }
 
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
-
-    if (DeviceValidationVersion() < VK_API_VERSION_1_1) {
-        GTEST_SKIP() << "At least Vulkan version 1.1 is required";
-    }
-
-    ASSERT_NO_FATAL_FAILURE(InitState());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitState())
+    InitRenderTarget();
     if (!InitSwapchain(VK_IMAGE_USAGE_TRANSFER_SRC_BIT)) {
         GTEST_SKIP() << "Cannot create surface or swapchain, skipping BindSwapchainImageMemory test";
     }
 
-    auto image_create_info = LvlInitStruct<VkImageCreateInfo>();
+    VkImageCreateInfo image_create_info = vku::InitStructHelper();
     image_create_info.imageType = VK_IMAGE_TYPE_2D;
     image_create_info.format = m_surface_formats[0].format;
     image_create_info.extent.width = m_surface_capabilities.minImageExtent.width;
@@ -139,23 +125,23 @@ TEST_F(NegativeWsi, BindImageMemorySwapchain) {
     image_create_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     image_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    auto image_swapchain_create_info = LvlInitStruct<VkImageSwapchainCreateInfoKHR>();
+    VkImageSwapchainCreateInfoKHR image_swapchain_create_info = vku::InitStructHelper();
     image_swapchain_create_info.swapchain = m_swapchain;
     image_create_info.pNext = &image_swapchain_create_info;
 
-    vk_testing::Image image_from_swapchain(*m_device, image_create_info, vk_testing::no_mem);
+    vkt::Image image_from_swapchain(*m_device, image_create_info, vkt::no_mem);
 
     VkMemoryRequirements mem_reqs = {};
     vk::GetImageMemoryRequirements(device(), image_from_swapchain.handle(), &mem_reqs);
 
-    auto alloc_info = LvlInitStruct<VkMemoryAllocateInfo>();
+    VkMemoryAllocateInfo alloc_info = vku::InitStructHelper();
     alloc_info.memoryTypeIndex = 0;
     alloc_info.allocationSize = mem_reqs.size;
     if (alloc_info.allocationSize == 0) {
         GTEST_SKIP() << "Driver seems to not be returning an valid allocation size and need to end test";
     }
 
-    vk_testing::DeviceMemory mem;
+    vkt::DeviceMemory mem;
     bool pass = m_device->phy().set_memory_type(mem_reqs.memoryTypeBits, &alloc_info, 0);
     // some devices don't give us good memory requirements for the swapchain image
     if (pass) {
@@ -163,7 +149,7 @@ TEST_F(NegativeWsi, BindImageMemorySwapchain) {
         ASSERT_TRUE(mem.initialized());
     }
 
-    auto bind_info = LvlInitStruct<VkBindImageMemoryInfo>();
+    VkBindImageMemoryInfo bind_info = vku::InitStructHelper();
     bind_info.image = image_from_swapchain.handle();
     bind_info.memory = VK_NULL_HANDLE;
     bind_info.memoryOffset = 0;
@@ -173,7 +159,7 @@ TEST_F(NegativeWsi, BindImageMemorySwapchain) {
     vk::BindImageMemory2(m_device->device(), 1, &bind_info);
     m_errorMonitor->VerifyFound();
 
-    auto bind_swapchain_info = LvlInitStruct<VkBindImageMemorySwapchainInfoKHR>();
+    VkBindImageMemorySwapchainInfoKHR bind_swapchain_info = vku::InitStructHelper();
     bind_swapchain_info.swapchain = VK_NULL_HANDLE;
     bind_swapchain_info.imageIndex = 0;
     bind_info.pNext = &bind_swapchain_info;
@@ -204,26 +190,18 @@ TEST_F(NegativeWsi, SwapchainImage) {
 
     AddSurfaceExtension();
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
+    RETURN_IF_SKIP(InitFramework())
 
-    if (IsPlatform(kGalaxyS10)) {
-        GTEST_SKIP() << "This test should not run on Galaxy S10";
-    }
-
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
-
-    ASSERT_NO_FATAL_FAILURE(InitState());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitState())
+    InitRenderTarget();
     if (!InitSwapchain()) {
         GTEST_SKIP() << "Cannot create surface or swapchain";
     }
 
-    auto image_swapchain_create_info = LvlInitStruct<VkImageSwapchainCreateInfoKHR>();
+    VkImageSwapchainCreateInfoKHR image_swapchain_create_info = vku::InitStructHelper();
     image_swapchain_create_info.swapchain = m_swapchain;
 
-    auto image_create_info = LvlInitStruct<VkImageCreateInfo>(&image_swapchain_create_info);
+    VkImageCreateInfo image_create_info = vku::InitStructHelper(&image_swapchain_create_info);
     image_create_info.flags = 0;
     image_create_info.imageType = VK_IMAGE_TYPE_2D;
     image_create_info.format = VK_FORMAT_R8G8B8A8_UNORM;
@@ -283,14 +261,7 @@ TEST_F(NegativeWsi, TransferImageToSwapchainLayoutDeviceGroup) {
     SetTargetApiVersion(VK_API_VERSION_1_2);
 
     AddSurfaceExtension();
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
-
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
-    if (DeviceValidationVersion() < VK_API_VERSION_1_2) {
-        GTEST_SKIP() << "At least Vulkan version 1.2 is required";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
     if (IsDriver(VK_DRIVER_ID_MESA_RADV)) {
         // Seeing the same crash as the Android comment above
@@ -307,11 +278,11 @@ TEST_F(NegativeWsi, TransferImageToSwapchainLayoutDeviceGroup) {
     std::vector<VkPhysicalDeviceGroupProperties> physical_device_group(physical_device_group_count,
                                                                        {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_GROUP_PROPERTIES});
     vk::EnumeratePhysicalDeviceGroups(instance(), &physical_device_group_count, physical_device_group.data());
-    auto create_device_pnext = LvlInitStruct<VkDeviceGroupDeviceCreateInfo>();
+    VkDeviceGroupDeviceCreateInfo create_device_pnext = vku::InitStructHelper();
     create_device_pnext.physicalDeviceCount = physical_device_group[0].physicalDeviceCount;
     create_device_pnext.pPhysicalDevices = physical_device_group[0].physicalDevices;
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &create_device_pnext));
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitState(nullptr, &create_device_pnext));
+    InitRenderTarget();
     if (!InitSwapchain(VK_IMAGE_USAGE_TRANSFER_DST_BIT)) {
         GTEST_SKIP() << "Cannot create surface or swapchain";
     }
@@ -322,7 +293,7 @@ TEST_F(NegativeWsi, TransferImageToSwapchainLayoutDeviceGroup) {
         GTEST_SKIP() << "minImageExtent is not large enough";
     }
 
-    auto image_create_info = LvlInitStruct<VkImageCreateInfo>();
+    VkImageCreateInfo image_create_info = vku::InitStructHelper();
     image_create_info.imageType = VK_IMAGE_TYPE_2D;
     image_create_info.format = m_surface_formats[0].format;
     image_create_info.extent.width = m_surface_capabilities.minImageExtent.width;
@@ -341,24 +312,24 @@ TEST_F(NegativeWsi, TransferImageToSwapchainLayoutDeviceGroup) {
 
     image_create_info.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
-    auto image_swapchain_create_info = LvlInitStruct<VkImageSwapchainCreateInfoKHR>();
+    VkImageSwapchainCreateInfoKHR image_swapchain_create_info = vku::InitStructHelper();
     image_swapchain_create_info.swapchain = m_swapchain;
     image_create_info.pNext = &image_swapchain_create_info;
 
-    vk_testing::Image peer_image(*m_device, image_create_info, vk_testing::no_mem);
+    vkt::Image peer_image(*m_device, image_create_info, vkt::no_mem);
 
-    auto bind_devicegroup_info = LvlInitStruct<VkBindImageMemoryDeviceGroupInfo>();
+    VkBindImageMemoryDeviceGroupInfo bind_devicegroup_info = vku::InitStructHelper();
     bind_devicegroup_info.deviceIndexCount = 1;
     std::array<uint32_t, 1> deviceIndices = {{0}};
     bind_devicegroup_info.pDeviceIndices = deviceIndices.data();
     bind_devicegroup_info.splitInstanceBindRegionCount = 0;
     bind_devicegroup_info.pSplitInstanceBindRegions = nullptr;
 
-    auto bind_swapchain_info = LvlInitStruct<VkBindImageMemorySwapchainInfoKHR>(&bind_devicegroup_info);
+    VkBindImageMemorySwapchainInfoKHR bind_swapchain_info = vku::InitStructHelper(&bind_devicegroup_info);
     bind_swapchain_info.swapchain = m_swapchain;
     bind_swapchain_info.imageIndex = 0;
 
-    auto bind_info = LvlInitStruct<VkBindImageMemoryInfo>(&bind_swapchain_info);
+    VkBindImageMemoryInfo bind_info = vku::InitStructHelper(&bind_swapchain_info);
     bind_info.image = peer_image.handle();
     bind_info.memory = VK_NULL_HANDLE;
     bind_info.memoryOffset = 0;
@@ -370,13 +341,10 @@ TEST_F(NegativeWsi, TransferImageToSwapchainLayoutDeviceGroup) {
 
     VkImageCopy copy_region = {};
     copy_region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    copy_region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     copy_region.srcSubresource.mipLevel = 0;
-    copy_region.dstSubresource.mipLevel = 0;
     copy_region.srcSubresource.baseArrayLayer = 0;
-    copy_region.dstSubresource.baseArrayLayer = 0;
     copy_region.srcSubresource.layerCount = 1;
-    copy_region.dstSubresource.layerCount = 1;
+    copy_region.dstSubresource = copy_region.srcSubresource;
     copy_region.srcOffset = {0, 0, 0};
     copy_region.dstOffset = {0, 0, 0};
     copy_region.extent = {test_extent_value, test_extent_value, 1};
@@ -385,14 +353,14 @@ TEST_F(NegativeWsi, TransferImageToSwapchainLayoutDeviceGroup) {
 
     m_commandBuffer->end();
 
-    auto submit_info = LvlInitStruct<VkSubmitInfo>();
+    VkSubmitInfo submit_info = vku::InitStructHelper();
     submit_info.commandBufferCount = 1;
     submit_info.pCommandBuffers = &m_commandBuffer->handle();
 
     // Even though both peer_image and swapchain_images[0] use the same memory and are in an invalid layout,
     // only peer_image is referenced by the command buffer so there should only be one error reported.
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-CoreValidation-DrawState-InvalidImageLayout");
-    vk::QueueSubmit(m_device->m_queue, 1, &submit_info, VK_NULL_HANDLE);
+    vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
     m_errorMonitor->VerifyFound();
 
     // peer_image is a presentable image and controlled by the implementation
@@ -405,23 +373,20 @@ TEST_F(NegativeWsi, SwapchainImageParams) {
     AddSurfaceExtension();
 
     AddRequiredExtensions(VK_KHR_DEVICE_GROUP_CREATION_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    auto device_group_ci = LvlInitStruct<VkDeviceGroupDeviceCreateInfo>();
+    VkDeviceGroupDeviceCreateInfo device_group_ci = vku::InitStructHelper();
     device_group_ci.physicalDeviceCount = 1;
     VkPhysicalDevice pdev = gpu();
     device_group_ci.pPhysicalDevices = &pdev;
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &device_group_ci));
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitState(nullptr, &device_group_ci));
+    InitRenderTarget();
     if (!InitSurface()) {
         GTEST_SKIP() << "Cannot create surface, skipping test";
     }
     InitSwapchainInfo();
 
-    auto good_create_info = LvlInitStruct<VkSwapchainCreateInfoKHR>();
+    VkSwapchainCreateInfoKHR good_create_info = vku::InitStructHelper();
     good_create_info.surface = m_surface;
     good_create_info.minImageCount = m_surface_capabilities.minImageCount;
     good_create_info.imageFormat = m_surface_formats[0].format;
@@ -504,13 +469,9 @@ TEST_F(NegativeWsi, SwapchainAcquireImageNoSync) {
 
     AddSurfaceExtension();
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
+    RETURN_IF_SKIP(InitFramework())
 
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
-
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitState())
     ASSERT_TRUE(InitSwapchain());
 
     {
@@ -527,22 +488,14 @@ TEST_F(NegativeWsi, SwapchainAcquireImageNoSync2KHR) {
 
     AddSurfaceExtension();
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
+    RETURN_IF_SKIP(InitFramework())
 
-    if (DeviceValidationVersion() < VK_API_VERSION_1_1) {
-        GTEST_SKIP() << "At least Vulkan version 1.1 is required";
-    }
-
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
-
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitState())
     ASSERT_TRUE(InitSwapchain());
 
     {
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkAcquireNextImageInfoKHR-semaphore-01782");
-        auto acquire_info = LvlInitStruct<VkAcquireNextImageInfoKHR>();
+        VkAcquireNextImageInfoKHR acquire_info = vku::InitStructHelper();
         acquire_info.swapchain = m_swapchain;
         acquire_info.timeout = kWaitTimeout;
         acquire_info.semaphore = VK_NULL_HANDLE;
@@ -561,32 +514,25 @@ TEST_F(NegativeWsi, SwapchainAcquireImageNoBinarySemaphore) {
     AddSurfaceExtension();
     AddRequiredExtensions(VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    auto timeline_semaphore_features = LvlInitStruct<VkPhysicalDeviceTimelineSemaphoreFeatures>();
-    auto features2 = GetPhysicalDeviceFeatures2(timeline_semaphore_features);
-    if (!timeline_semaphore_features.timelineSemaphore) {
-        GTEST_SKIP() << "timelineSemaphore feature not supported.";
-    }
-
-    auto timeline_semaphore_props = LvlInitStruct<VkPhysicalDeviceTimelineSemaphoreProperties>();
+    VkPhysicalDeviceTimelineSemaphoreFeatures timeline_semaphore_features = vku::InitStructHelper();
+    GetPhysicalDeviceFeatures2(timeline_semaphore_features);
+    VkPhysicalDeviceTimelineSemaphoreProperties timeline_semaphore_props = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(timeline_semaphore_props);
     if (timeline_semaphore_props.maxTimelineSemaphoreValueDifference == 0) {
         // If using MockICD and profiles the value might be zero'ed and cause false errors
         GTEST_SKIP() << "maxTimelineSemaphoreValueDifference is 0";
     }
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features2));
+    RETURN_IF_SKIP(InitState(nullptr, &timeline_semaphore_features));
     ASSERT_TRUE(InitSwapchain());
 
-    auto semaphore_type_create_info = LvlInitStruct<VkSemaphoreTypeCreateInfoKHR>();
+    VkSemaphoreTypeCreateInfoKHR semaphore_type_create_info = vku::InitStructHelper();
     semaphore_type_create_info.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE_KHR;
 
-    auto semaphore_create_info = LvlInitStruct<VkSemaphoreCreateInfo>(&semaphore_type_create_info);
+    VkSemaphoreCreateInfo semaphore_create_info = vku::InitStructHelper(&semaphore_type_create_info);
 
-    vk_testing::Semaphore semaphore(*m_device, semaphore_create_info);
+    vkt::Semaphore semaphore(*m_device, semaphore_create_info);
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkAcquireNextImageKHR-semaphore-03265");
     uint32_t image_i;
@@ -604,40 +550,29 @@ TEST_F(NegativeWsi, SwapchainAcquireImageNoBinarySemaphore2KHR) {
     AddRequiredExtensions(VK_KHR_DEVICE_GROUP_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    if (DeviceValidationVersion() < VK_API_VERSION_1_1) {
-        GTEST_SKIP() << "At least Vulkan version 1.1 is required";
-    }
-
-    auto timeline_semaphore_features = LvlInitStruct<VkPhysicalDeviceTimelineSemaphoreFeatures>();
-    auto features2 = GetPhysicalDeviceFeatures2(timeline_semaphore_features);
-    if (!timeline_semaphore_features.timelineSemaphore) {
-        GTEST_SKIP() << "timelineSemaphore not supported.";
-    }
-
-    auto timeline_semaphore_props = LvlInitStruct<VkPhysicalDeviceTimelineSemaphoreProperties>();
+    VkPhysicalDeviceTimelineSemaphoreFeatures timeline_semaphore_features = vku::InitStructHelper();
+    GetPhysicalDeviceFeatures2(timeline_semaphore_features);
+    VkPhysicalDeviceTimelineSemaphoreProperties timeline_semaphore_props = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(timeline_semaphore_props);
     if (timeline_semaphore_props.maxTimelineSemaphoreValueDifference == 0) {
         // If using MockICD and profiles the value might be zero'ed and cause false errors
         GTEST_SKIP() << "maxTimelineSemaphoreValueDifference is 0";
     }
 
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features2));
+    RETURN_IF_SKIP(InitState(nullptr, &timeline_semaphore_features));
 
     ASSERT_TRUE(InitSwapchain());
 
-    auto semaphore_type_create_info = LvlInitStruct<VkSemaphoreTypeCreateInfoKHR>();
+    VkSemaphoreTypeCreateInfoKHR semaphore_type_create_info = vku::InitStructHelper();
     semaphore_type_create_info.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE_KHR;
 
-    auto semaphore_create_info = LvlInitStruct<VkSemaphoreCreateInfo>(&semaphore_type_create_info);
+    VkSemaphoreCreateInfo semaphore_create_info = vku::InitStructHelper(&semaphore_type_create_info);
 
-    vk_testing::Semaphore semaphore(*m_device, semaphore_create_info);
+    vkt::Semaphore semaphore(*m_device, semaphore_create_info);
 
-    auto acquire_info = LvlInitStruct<VkAcquireNextImageInfoKHR>();
+    VkAcquireNextImageInfoKHR acquire_info = vku::InitStructHelper();
     acquire_info.swapchain = m_swapchain;
     acquire_info.timeout = kWaitTimeout;
     acquire_info.semaphore = semaphore.handle();
@@ -653,27 +588,24 @@ TEST_F(NegativeWsi, SwapchainAcquireTooManyImages) {
     TEST_DESCRIPTION("Acquiring invalid amount of images from the swapchain.");
 
     AddSurfaceExtension();
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitState())
     ASSERT_TRUE(InitSwapchain());
     uint32_t image_count;
-    ASSERT_VK_SUCCESS(vk::GetSwapchainImagesKHR(device(), m_swapchain, &image_count, nullptr));
+    ASSERT_EQ(VK_SUCCESS, vk::GetSwapchainImagesKHR(device(), m_swapchain, &image_count, nullptr));
     VkSurfaceCapabilitiesKHR caps;
-    ASSERT_VK_SUCCESS(vk::GetPhysicalDeviceSurfaceCapabilitiesKHR(gpu(), m_surface, &caps));
+    ASSERT_EQ(VK_SUCCESS, vk::GetPhysicalDeviceSurfaceCapabilitiesKHR(gpu(), m_surface, &caps));
 
     const uint32_t acquirable_count = image_count - caps.minImageCount + 1;
-    std::vector<VkFenceObj> fences(acquirable_count);
+    std::vector<vkt::Fence> fences(acquirable_count);
     for (uint32_t i = 0; i < acquirable_count; ++i) {
-        fences[i].init(*m_device, VkFenceObj::create_info());
+        fences[i].init(*m_device, vkt::Fence::create_info());
         uint32_t image_i;
         const auto res = vk::AcquireNextImageKHR(device(), m_swapchain, kWaitTimeout, VK_NULL_HANDLE, fences[i].handle(), &image_i);
         ASSERT_TRUE(res == VK_SUCCESS || res == VK_SUBOPTIMAL_KHR);
     }
-    VkFenceObj error_fence;
-    error_fence.init(*m_device, VkFenceObj::create_info());
+    vkt::Fence error_fence;
+    error_fence.init(*m_device, vkt::Fence::create_info());
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkAcquireNextImageKHR-surface-07783");
     uint32_t image_i;
@@ -689,11 +621,8 @@ TEST_F(NegativeWsi, GetSwapchainImageAndTryDestroy) {
     TEST_DESCRIPTION("Try destroying a swapchain presentable image with vkDestroyImage");
 
     AddSurfaceExtension();
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitState())
     ASSERT_TRUE(InitSwapchain());
     const auto images = GetSwapchainImages(m_swapchain);
 
@@ -716,11 +645,7 @@ TEST_F(NegativeWsi, SwapchainNotSupported) {
     }
 #endif
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
-
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
     if (!InitSurface()) {
         GTEST_SKIP() << "Cannot create surface";
@@ -749,19 +674,18 @@ TEST_F(NegativeWsi, SwapchainNotSupported) {
         GTEST_SKIP() << "All queues support surface present";
     }
     float queue_priority = 1.0f;
-    auto queue_create_info = LvlInitStruct<VkDeviceQueueCreateInfo>();
+    VkDeviceQueueCreateInfo queue_create_info = vku::InitStructHelper();
     queue_create_info.queueFamilyIndex = qfi;
     queue_create_info.queueCount = 1;
     queue_create_info.pQueuePriorities = &queue_priority;
 
-    auto device_create_info = LvlInitStruct<VkDeviceCreateInfo>();
+    VkDeviceCreateInfo device_create_info = vku::InitStructHelper();
     device_create_info.queueCreateInfoCount = 1;
     device_create_info.pQueueCreateInfos = &queue_create_info;
     device_create_info.enabledExtensionCount = m_device_extension_names.size();
     device_create_info.ppEnabledExtensionNames = m_device_extension_names.data();
 
-    vk_testing::Device test_device(gpu());
-    test_device.init(device_create_info);
+    vkt::Device test_device(gpu(), device_create_info);
 
     // Initialize extensions manually because we don't use InitState() in this test
     for (const char *device_ext_name : m_device_extension_names) {
@@ -769,7 +693,7 @@ TEST_F(NegativeWsi, SwapchainNotSupported) {
     }
 
     // try creating a swapchain, using surface info queried from the default device
-    auto swapchain_create_info = LvlInitStruct<VkSwapchainCreateInfoKHR>();
+    VkSwapchainCreateInfoKHR swapchain_create_info = vku::InitStructHelper();
     swapchain_create_info.flags = 0;
     swapchain_create_info.surface = m_surface;
     swapchain_create_info.minImageCount = m_surface_capabilities.minImageCount;
@@ -795,36 +719,29 @@ TEST_F(NegativeWsi, SwapchainAcquireTooManyImages2KHR) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
 
     AddSurfaceExtension();
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
+    RETURN_IF_SKIP(InitFramework())
 
-    if (DeviceValidationVersion() < VK_API_VERSION_1_1) {
-        GTEST_SKIP() << "At least Vulkan version 1.1 is required";
-    }
-
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitState())
 
     ASSERT_TRUE(InitSwapchain());
     uint32_t image_count;
-    ASSERT_VK_SUCCESS(vk::GetSwapchainImagesKHR(device(), m_swapchain, &image_count, nullptr));
+    ASSERT_EQ(VK_SUCCESS, vk::GetSwapchainImagesKHR(device(), m_swapchain, &image_count, nullptr));
     VkSurfaceCapabilitiesKHR caps;
-    ASSERT_VK_SUCCESS(vk::GetPhysicalDeviceSurfaceCapabilitiesKHR(gpu(), m_surface, &caps));
+    ASSERT_EQ(VK_SUCCESS, vk::GetPhysicalDeviceSurfaceCapabilitiesKHR(gpu(), m_surface, &caps));
 
     const uint32_t acquirable_count = image_count - caps.minImageCount + 1;
-    std::vector<VkFenceObj> fences(acquirable_count);
+    std::vector<vkt::Fence> fences(acquirable_count);
     for (uint32_t i = 0; i < acquirable_count; ++i) {
-        fences[i].init(*m_device, VkFenceObj::create_info());
+        fences[i].init(*m_device, vkt::Fence::create_info());
         uint32_t image_i;
         const auto res = vk::AcquireNextImageKHR(device(), m_swapchain, kWaitTimeout, VK_NULL_HANDLE, fences[i].handle(), &image_i);
         ASSERT_TRUE(res == VK_SUCCESS || res == VK_SUBOPTIMAL_KHR);
     }
-    VkFenceObj error_fence;
-    error_fence.init(*m_device, VkFenceObj::create_info());
+    vkt::Fence error_fence;
+    error_fence.init(*m_device, vkt::Fence::create_info());
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkAcquireNextImage2KHR-surface-07784");
-    auto acquire_info = LvlInitStruct<VkAcquireNextImageInfoKHR>();
+    VkAcquireNextImageInfoKHR acquire_info = vku::InitStructHelper();
 
     acquire_info.swapchain = m_swapchain;
     acquire_info.timeout = vvl::kU64Max;  // NOTE: timeout MUST be UINT64_MAX to trigger the VUID
@@ -845,16 +762,9 @@ TEST_F(NegativeWsi, SwapchainImageFormatList) {
     AddSurfaceExtension();
     AddRequiredExtensions(VK_KHR_SWAPCHAIN_MUTABLE_FORMAT_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_IMAGE_FORMAT_LIST_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
+    RETURN_IF_SKIP(InitFramework())
 
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitState())
     if (!InitSurface()) {
         GTEST_SKIP() << "Cannot create surface";
     }
@@ -884,11 +794,11 @@ TEST_F(NegativeWsi, SwapchainImageFormatList) {
     // Use sampled formats that will always be supported
     // Last format is not compatible with the rest
     const VkFormat formats[4] = {VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_R8G8B8A8_SNORM, VK_FORMAT_R8G8B8A8_UINT, VK_FORMAT_R8_UNORM};
-    auto format_list = LvlInitStruct<VkImageFormatListCreateInfo>();
+    VkImageFormatListCreateInfo format_list = vku::InitStructHelper();
     format_list.viewFormatCount = 3;  // first 3 are compatible
     format_list.pViewFormats = formats;
 
-    auto swapchain_create_info = LvlInitStruct<VkSwapchainCreateInfoKHR>(&format_list);
+    VkSwapchainCreateInfoKHR swapchain_create_info = vku::InitStructHelper(&format_list);
     swapchain_create_info.flags = 0;
     swapchain_create_info.surface = m_surface;
     swapchain_create_info.minImageCount = m_surface_capabilities.minImageCount;
@@ -948,13 +858,9 @@ TEST_F(NegativeWsi, SwapchainMinImageCountNonShared) {
     TEST_DESCRIPTION("Use invalid minImageCount for non shared swapchain creation");
     AddSurfaceExtension();
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
+    RETURN_IF_SKIP(InitFramework())
 
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
-
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitState())
     if (!InitSurface()) {
         GTEST_SKIP() << "Cannot create surface";
     }
@@ -969,7 +875,7 @@ TEST_F(NegativeWsi, SwapchainMinImageCountNonShared) {
         GTEST_SKIP() << "Graphics queue does not support present";
     }
 
-    auto swapchain_create_info = LvlInitStruct<VkSwapchainCreateInfoKHR>();
+    VkSwapchainCreateInfoKHR swapchain_create_info = vku::InitStructHelper();
     swapchain_create_info.surface = m_surface;
     swapchain_create_info.minImageCount = 1;  // invalid
     swapchain_create_info.imageFormat = m_surface_formats[0].format;
@@ -1000,12 +906,9 @@ TEST_F(NegativeWsi, SwapchainMinImageCountShared) {
     AddRequiredExtensions(VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_SHARED_PRESENTABLE_IMAGE_EXTENSION_NAME);
     AddSurfaceExtension();
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitState())
     if (!InitSurface()) {
         GTEST_SKIP() << "Cannot create surface";
     }
@@ -1030,9 +933,9 @@ TEST_F(NegativeWsi, SwapchainMinImageCountShared) {
         GTEST_SKIP() << "Cannot find supported shared present mode";
     }
 
-    auto shared_present_capabilities = LvlInitStruct<VkSharedPresentSurfaceCapabilitiesKHR>();
-    auto capabilities = LvlInitStruct<VkSurfaceCapabilities2KHR>(&shared_present_capabilities);
-    auto surface_info = LvlInitStruct<VkPhysicalDeviceSurfaceInfo2KHR>();
+    VkSharedPresentSurfaceCapabilitiesKHR shared_present_capabilities = vku::InitStructHelper();
+    VkSurfaceCapabilities2KHR capabilities = vku::InitStructHelper(&shared_present_capabilities);
+    VkPhysicalDeviceSurfaceInfo2KHR surface_info = vku::InitStructHelper();
     surface_info.surface = m_surface;
     vk::GetPhysicalDeviceSurfaceCapabilities2KHR(gpu(), &surface_info, &capabilities);
 
@@ -1041,7 +944,7 @@ TEST_F(NegativeWsi, SwapchainMinImageCountShared) {
         GTEST_SKIP() << "Driver was suppose to support VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT";
     }
 
-    auto swapchain_create_info = LvlInitStruct<VkSwapchainCreateInfoKHR>();
+    VkSwapchainCreateInfoKHR swapchain_create_info = vku::InitStructHelper();
     swapchain_create_info.surface = m_surface;
     swapchain_create_info.minImageCount = 2;  // invalid
     swapchain_create_info.imageFormat = m_surface_formats[0].format;
@@ -1069,13 +972,9 @@ TEST_F(NegativeWsi, SwapchainUsageNonShared) {
     TEST_DESCRIPTION("Use invalid imageUsage for non-shared swapchain creation");
     AddSurfaceExtension();
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
+    RETURN_IF_SKIP(InitFramework())
 
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
-
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitState())
     if (!InitSurface()) {
         GTEST_SKIP() << "Cannot create surface";
     }
@@ -1092,7 +991,7 @@ TEST_F(NegativeWsi, SwapchainUsageNonShared) {
         GTEST_SKIP() << "Test has supported usage already the test is using";
     }
 
-    auto swapchain_create_info = LvlInitStruct<VkSwapchainCreateInfoKHR>();
+    VkSwapchainCreateInfoKHR swapchain_create_info = vku::InitStructHelper();
     swapchain_create_info.surface = m_surface;
     swapchain_create_info.minImageCount = m_surface_capabilities.minImageCount;
     swapchain_create_info.imageFormat = m_surface_formats[0].format;
@@ -1120,12 +1019,9 @@ TEST_F(NegativeWsi, SwapchainUsageShared) {
     AddRequiredExtensions(VK_KHR_SHARED_PRESENTABLE_IMAGE_EXTENSION_NAME);
     AddSurfaceExtension();
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitState())
     if (!InitSurface()) {
         GTEST_SKIP() << "Cannot create surface";
     }
@@ -1150,9 +1046,9 @@ TEST_F(NegativeWsi, SwapchainUsageShared) {
         GTEST_SKIP() << "Cannot find supported shared present mode";
     }
 
-    auto shared_present_capabilities = LvlInitStruct<VkSharedPresentSurfaceCapabilitiesKHR>();
-    auto capabilities = LvlInitStruct<VkSurfaceCapabilities2KHR>(&shared_present_capabilities);
-    auto surface_info = LvlInitStruct<VkPhysicalDeviceSurfaceInfo2KHR>();
+    VkSharedPresentSurfaceCapabilitiesKHR shared_present_capabilities = vku::InitStructHelper();
+    VkSurfaceCapabilities2KHR capabilities = vku::InitStructHelper(&shared_present_capabilities);
+    VkPhysicalDeviceSurfaceInfo2KHR surface_info = vku::InitStructHelper();
     surface_info.surface = m_surface;
     vk::GetPhysicalDeviceSurfaceCapabilities2KHR(gpu(), &surface_info, &capabilities);
 
@@ -1161,7 +1057,7 @@ TEST_F(NegativeWsi, SwapchainUsageShared) {
         GTEST_SKIP() << "Test has supported usage already the test is using";
     }
 
-    auto swapchain_create_info = LvlInitStruct<VkSwapchainCreateInfoKHR>();
+    VkSwapchainCreateInfoKHR swapchain_create_info = vku::InitStructHelper();
     swapchain_create_info.surface = m_surface;
     swapchain_create_info.minImageCount = 1;
     swapchain_create_info.imageFormat = m_surface_formats[0].format;
@@ -1189,12 +1085,9 @@ TEST_F(NegativeWsi, SwapchainPresentShared) {
     AddRequiredExtensions(VK_KHR_SHARED_PRESENTABLE_IMAGE_EXTENSION_NAME);
     AddSurfaceExtension();
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitState())
     if (!InitSurface()) {
         GTEST_SKIP() << "Cannot create surface";
     }
@@ -1219,9 +1112,9 @@ TEST_F(NegativeWsi, SwapchainPresentShared) {
         GTEST_SKIP() << "Cannot find supported shared present mode";
     }
 
-    auto shared_present_capabilities = LvlInitStruct<VkSharedPresentSurfaceCapabilitiesKHR>();
-    auto capabilities = LvlInitStruct<VkSurfaceCapabilities2KHR>(&shared_present_capabilities);
-    auto surface_info = LvlInitStruct<VkPhysicalDeviceSurfaceInfo2KHR>();
+    VkSharedPresentSurfaceCapabilitiesKHR shared_present_capabilities = vku::InitStructHelper();
+    VkSurfaceCapabilities2KHR capabilities = vku::InitStructHelper(&shared_present_capabilities);
+    VkPhysicalDeviceSurfaceInfo2KHR surface_info = vku::InitStructHelper();
     surface_info.surface = m_surface;
     vk::GetPhysicalDeviceSurfaceCapabilities2KHR(gpu(), &surface_info, &capabilities);
 
@@ -1230,7 +1123,7 @@ TEST_F(NegativeWsi, SwapchainPresentShared) {
         GTEST_SKIP() << "Driver was suppose to support VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT";
     }
 
-    auto swapchain_create_info = LvlInitStruct<VkSwapchainCreateInfoKHR>();
+    VkSwapchainCreateInfoKHR swapchain_create_info = vku::InitStructHelper();
     swapchain_create_info.surface = m_surface;
     swapchain_create_info.minImageCount = 1;
     swapchain_create_info.imageFormat = m_surface_formats[0].format;
@@ -1252,12 +1145,12 @@ TEST_F(NegativeWsi, SwapchainPresentShared) {
 
     // Try to Present without Acquire...
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPresentInfoKHR-pImageIndices-01430");
-    auto present = LvlInitStruct<VkPresentInfoKHR>();
+    VkPresentInfoKHR present = vku::InitStructHelper();
     present.waitSemaphoreCount = 0;
     present.swapchainCount = 1;
     present.pSwapchains = &m_swapchain;
     present.pImageIndices = &image_index;
-    vk::QueuePresentKHR(m_device->m_queue, &present);
+    vk::QueuePresentKHR(m_default_queue, &present);
     m_errorMonitor->VerifyFound();
 }
 
@@ -1267,15 +1160,8 @@ TEST_F(NegativeWsi, DeviceMask) {
 
     AddSurfaceExtension();
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
+    RETURN_IF_SKIP(InitFramework())
 
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
-
-    if (DeviceValidationVersion() < VK_API_VERSION_1_1) {
-        GTEST_SKIP() << "At least Vulkan version 1.1 is required";
-    }
     uint32_t physical_device_group_count = 0;
     vk::EnumeratePhysicalDeviceGroups(instance(), &physical_device_group_count, nullptr);
 
@@ -1286,21 +1172,21 @@ TEST_F(NegativeWsi, DeviceMask) {
     std::vector<VkPhysicalDeviceGroupProperties> physical_device_group(physical_device_group_count,
                                                                        {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_GROUP_PROPERTIES});
     vk::EnumeratePhysicalDeviceGroups(instance(), &physical_device_group_count, physical_device_group.data());
-    auto create_device_pnext = LvlInitStruct<VkDeviceGroupDeviceCreateInfo>();
+    VkDeviceGroupDeviceCreateInfo create_device_pnext = vku::InitStructHelper();
     create_device_pnext.physicalDeviceCount = physical_device_group[0].physicalDeviceCount;
     create_device_pnext.pPhysicalDevices = physical_device_group[0].physicalDevices;
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &create_device_pnext, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitState(nullptr, &create_device_pnext, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    InitRenderTarget();
 
     if (!InitSwapchain()) {
         GTEST_SKIP() << "Cannot create surface or swapchain";
     }
 
     // Test VkMemoryAllocateFlagsInfo
-    auto alloc_flags_info = LvlInitStruct<VkMemoryAllocateFlagsInfo>();
+    VkMemoryAllocateFlagsInfo alloc_flags_info = vku::InitStructHelper();
     alloc_flags_info.flags = VK_MEMORY_ALLOCATE_DEVICE_MASK_BIT;
     alloc_flags_info.deviceMask = 0xFFFFFFFF;
-    auto alloc_info = LvlInitStruct<VkMemoryAllocateInfo>(&alloc_flags_info);
+    VkMemoryAllocateInfo alloc_info = vku::InitStructHelper(&alloc_flags_info);
     alloc_info.memoryTypeIndex = 0;
     alloc_info.allocationSize = 1024;
 
@@ -1345,9 +1231,9 @@ TEST_F(NegativeWsi, DeviceMask) {
     }
 
     // Test VkDeviceGroupCommandBufferBeginInfo
-    auto dev_grp_cmd_buf_info = LvlInitStruct<VkDeviceGroupCommandBufferBeginInfo>();
+    VkDeviceGroupCommandBufferBeginInfo dev_grp_cmd_buf_info = vku::InitStructHelper();
     dev_grp_cmd_buf_info.deviceMask = 0xFFFFFFFF;
-    auto cmd_buf_info = LvlInitStruct<VkCommandBufferBeginInfo>(&dev_grp_cmd_buf_info);
+    VkCommandBufferBeginInfo cmd_buf_info = vku::InitStructHelper(&dev_grp_cmd_buf_info);
 
     m_commandBuffer->reset();
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDeviceGroupCommandBufferBeginInfo-deviceMask-00106");
@@ -1365,7 +1251,7 @@ TEST_F(NegativeWsi, DeviceMask) {
     m_commandBuffer->reset();
     vk::BeginCommandBuffer(m_commandBuffer->handle(), &cmd_buf_info);
 
-    auto dev_grp_rp_info = LvlInitStruct<VkDeviceGroupRenderPassBeginInfo>();
+    VkDeviceGroupRenderPassBeginInfo dev_grp_rp_info = vku::InitStructHelper();
     dev_grp_rp_info.deviceMask = 0xFFFFFFFF;
     m_renderPassBeginInfo.pNext = &dev_grp_rp_info;
 
@@ -1403,12 +1289,12 @@ TEST_F(NegativeWsi, DeviceMask) {
     vk::CmdSetDeviceMask(m_commandBuffer->handle(), 0);
     m_errorMonitor->VerifyFound();
 
-    vk_testing::Semaphore semaphore(*m_device), semaphore2(*m_device);
-    vk_testing::Fence fence(*m_device);
+    vkt::Semaphore semaphore(*m_device), semaphore2(*m_device);
+    vkt::Fence fence(*m_device);
 
     // Test VkAcquireNextImageInfoKHR
     uint32_t imageIndex;
-    auto acquire_next_image_info = LvlInitStruct<VkAcquireNextImageInfoKHR>();
+    VkAcquireNextImageInfoKHR acquire_next_image_info = vku::InitStructHelper();
     acquire_next_image_info.semaphore = semaphore.handle();
     acquire_next_image_info.swapchain = m_swapchain;
     acquire_next_image_info.fence = fence.handle();
@@ -1428,12 +1314,12 @@ TEST_F(NegativeWsi, DeviceMask) {
     m_errorMonitor->VerifyFound();
 
     // Test VkDeviceGroupSubmitInfo
-    auto device_group_submit_info = LvlInitStruct<VkDeviceGroupSubmitInfo>();
+    VkDeviceGroupSubmitInfo device_group_submit_info = vku::InitStructHelper();
     device_group_submit_info.commandBufferCount = 1;
     std::array<uint32_t, 1> command_buffer_device_masks = {{0xFFFFFFFF}};
     device_group_submit_info.pCommandBufferDeviceMasks = command_buffer_device_masks.data();
 
-    auto submit_info = LvlInitStruct<VkSubmitInfo>(&device_group_submit_info);
+    VkSubmitInfo submit_info = vku::InitStructHelper(&device_group_submit_info);
     submit_info.commandBufferCount = 1;
     submit_info.pCommandBuffers = &m_commandBuffer->handle();
 
@@ -1441,9 +1327,9 @@ TEST_F(NegativeWsi, DeviceMask) {
     vk::BeginCommandBuffer(m_commandBuffer->handle(), &cmd_buf_info);
     vk::EndCommandBuffer(m_commandBuffer->handle());
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDeviceGroupSubmitInfo-pCommandBufferDeviceMasks-00086");
-    vk::QueueSubmit(m_device->m_queue, 1, &submit_info, VK_NULL_HANDLE);
+    vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
     m_errorMonitor->VerifyFound();
-    vk::QueueWaitIdle(m_device->m_queue);
+    vk::QueueWaitIdle(m_default_queue);
 }
 
 TEST_F(NegativeWsi, DisplayPlaneSurface) {
@@ -1451,10 +1337,7 @@ TEST_F(NegativeWsi, DisplayPlaneSurface) {
 
     AddSurfaceExtension();
     AddRequiredExtensions(VK_KHR_DISPLAY_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(Init());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
+    RETURN_IF_SKIP(Init())
 
     if (!InitSurface()) {
         GTEST_SKIP() << "Failed to create surface.  Skipping.";
@@ -1485,13 +1368,13 @@ TEST_F(NegativeWsi, DisplayPlaneSurface) {
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetDisplayPlaneSupportedDisplaysKHR-planeIndex-01249");
     vk::GetDisplayPlaneSupportedDisplaysKHR(gpu(), plane_prop_count, &plane_count, nullptr);
     m_errorMonitor->VerifyFound();
-    ASSERT_VK_SUCCESS(vk::GetDisplayPlaneSupportedDisplaysKHR(gpu(), 0, &plane_count, nullptr));
+    ASSERT_EQ(VK_SUCCESS, vk::GetDisplayPlaneSupportedDisplaysKHR(gpu(), 0, &plane_count, nullptr));
     if (plane_count == 0) {
         GTEST_SKIP() << "test requires at least 1 supported display plane";
     }
     std::vector<VkDisplayKHR> supported_displays(plane_count);
     plane_count = 1;
-    ASSERT_VK_SUCCESS(vk::GetDisplayPlaneSupportedDisplaysKHR(gpu(), 0, &plane_count, supported_displays.data()));
+    ASSERT_EQ(VK_SUCCESS, vk::GetDisplayPlaneSupportedDisplaysKHR(gpu(), 0, &plane_count, supported_displays.data()));
     if (supported_displays[0] != current_display) {
         GTEST_SKIP() << "Current VkDisplayKHR used is not supported";
     }
@@ -1513,10 +1396,10 @@ TEST_F(NegativeWsi, DisplayPlaneSurface) {
     }
 
     VkDisplayPlaneCapabilitiesKHR plane_capabilities;
-    ASSERT_VK_SUCCESS(vk::GetDisplayPlaneCapabilitiesKHR(gpu(), display_mode, 0, &plane_capabilities));
+    ASSERT_EQ(VK_SUCCESS, vk::GetDisplayPlaneCapabilitiesKHR(gpu(), display_mode, 0, &plane_capabilities));
 
     VkSurfaceKHR surface;
-    auto display_surface_info = LvlInitStruct<VkDisplaySurfaceCreateInfoKHR>();
+    VkDisplaySurfaceCreateInfoKHR display_surface_info = vku::InitStructHelper();
     display_surface_info.flags = 0;
     display_surface_info.displayMode = display_mode;
     display_surface_info.planeIndex = 0;
@@ -1555,7 +1438,7 @@ TEST_F(NegativeWsi, DisplayPlaneSurface) {
     m_errorMonitor->VerifyFound();
     display_surface_info.planeIndex = 0;  // restore to good value
 
-    uint32_t bad_size = m_device->phy().properties().limits.maxImageDimension2D + 1;
+    uint32_t bad_size = m_device->phy().limits_.maxImageDimension2D + 1;
     display_surface_info.imageExtent = {bad_size, bad_size};
     // one for height and width
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDisplaySurfaceCreateInfoKHR-width-01256");
@@ -1569,14 +1452,10 @@ TEST_F(NegativeWsi, WarningSwapchainCreateInfoPreTransform) {
 
     AddSurfaceExtension();
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
+    RETURN_IF_SKIP(InitFramework())
 
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
-
-    ASSERT_NO_FATAL_FAILURE(InitState());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitState())
+    InitRenderTarget();
 
     m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "UNASSIGNED-CoreValidation-SwapchainPreTransform");
     m_errorMonitor->SetUnexpectedError("VUID-VkSwapchainCreateInfoKHR-preTransform-01279");
@@ -1589,13 +1468,7 @@ TEST_F(NegativeWsi, DeviceGroupSubmitInfoSemaphoreCount) {
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_DEVICE_GROUP_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (DeviceValidationVersion() < VK_API_VERSION_1_1) {
-        GTEST_SKIP() << "Vulkan >= 1.1 required";
-    }
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
     uint32_t physical_device_group_count = 0;
     vk::EnumeratePhysicalDeviceGroups(instance(), &physical_device_group_count, nullptr);
@@ -1607,25 +1480,23 @@ TEST_F(NegativeWsi, DeviceGroupSubmitInfoSemaphoreCount) {
     std::vector<VkPhysicalDeviceGroupProperties> physical_device_group(physical_device_group_count,
                                                                        {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_GROUP_PROPERTIES});
     vk::EnumeratePhysicalDeviceGroups(instance(), &physical_device_group_count, physical_device_group.data());
-    auto create_device_pnext = LvlInitStruct<VkDeviceGroupDeviceCreateInfo>();
+    VkDeviceGroupDeviceCreateInfo create_device_pnext = vku::InitStructHelper();
     create_device_pnext.physicalDeviceCount = physical_device_group[0].physicalDeviceCount;
     create_device_pnext.pPhysicalDevices = physical_device_group[0].physicalDevices;
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &create_device_pnext, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    RETURN_IF_SKIP(InitState(nullptr, &create_device_pnext, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
 
-    auto dev_grp_cmd_buf_info = LvlInitStruct<VkDeviceGroupCommandBufferBeginInfo>();
+    VkDeviceGroupCommandBufferBeginInfo dev_grp_cmd_buf_info = vku::InitStructHelper();
     dev_grp_cmd_buf_info.deviceMask = 0x1;
-    auto cmd_buf_info = LvlInitStruct<VkCommandBufferBeginInfo>(&dev_grp_cmd_buf_info);
+    VkCommandBufferBeginInfo cmd_buf_info = vku::InitStructHelper(&dev_grp_cmd_buf_info);
 
-    auto semaphore_create_info = LvlInitStruct<VkSemaphoreCreateInfo>();
-    vk_testing::Semaphore semaphore(*m_device, semaphore_create_info);
-    ASSERT_TRUE(semaphore.initialized());
+    vkt::Semaphore semaphore(*m_device);
 
-    auto device_group_submit_info = LvlInitStruct<VkDeviceGroupSubmitInfo>();
+    VkDeviceGroupSubmitInfo device_group_submit_info = vku::InitStructHelper();
     device_group_submit_info.commandBufferCount = 1;
     uint32_t command_buffer_device_masks = 0;
     device_group_submit_info.pCommandBufferDeviceMasks = &command_buffer_device_masks;
 
-    auto submit_info = LvlInitStruct<VkSubmitInfo>(&device_group_submit_info);
+    VkSubmitInfo submit_info = vku::InitStructHelper(&device_group_submit_info);
     submit_info.commandBufferCount = 1;
     submit_info.pCommandBuffers = &m_commandBuffer->handle();
     submit_info.signalSemaphoreCount = 1;
@@ -1635,14 +1506,14 @@ TEST_F(NegativeWsi, DeviceGroupSubmitInfoSemaphoreCount) {
     vk::BeginCommandBuffer(m_commandBuffer->handle(), &cmd_buf_info);
     vk::EndCommandBuffer(m_commandBuffer->handle());
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDeviceGroupSubmitInfo-signalSemaphoreCount-00084");
-    vk::QueueSubmit(m_device->m_queue, 1, &submit_info, VK_NULL_HANDLE);
+    vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
     m_errorMonitor->VerifyFound();
-    vk::QueueWaitIdle(m_device->m_queue);
+    vk::QueueWaitIdle(m_default_queue);
 
-    auto signal_submit_info = LvlInitStruct<VkSubmitInfo>();
+    VkSubmitInfo signal_submit_info = vku::InitStructHelper();
     signal_submit_info.signalSemaphoreCount = 1;
     signal_submit_info.pSignalSemaphores = &semaphore.handle();
-    vk::QueueSubmit(m_device->m_queue, 1, &signal_submit_info, VK_NULL_HANDLE);
+    vk::QueueSubmit(m_default_queue, 1, &signal_submit_info, VK_NULL_HANDLE);
 
     VkPipelineStageFlags waitMask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
     submit_info.pWaitDstStageMask = &waitMask;
@@ -1651,17 +1522,17 @@ TEST_F(NegativeWsi, DeviceGroupSubmitInfoSemaphoreCount) {
     submit_info.signalSemaphoreCount = 0;
     submit_info.pSignalSemaphores = nullptr;
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDeviceGroupSubmitInfo-waitSemaphoreCount-00082");
-    vk::QueueSubmit(m_device->m_queue, 1, &submit_info, VK_NULL_HANDLE);
+    vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
     m_errorMonitor->VerifyFound();
 
     submit_info.waitSemaphoreCount = 0;
     submit_info.commandBufferCount = 0;
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDeviceGroupSubmitInfo-commandBufferCount-00083");
-    vk::QueueSubmit(m_device->m_queue, 1, &submit_info, VK_NULL_HANDLE);
+    vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
     m_errorMonitor->VerifyFound();
 
     // Need to wait for semaphore to not be in use before destroying it
-    vk::QueueWaitIdle(m_device->m_queue);
+    vk::QueueWaitIdle(m_default_queue);
 }
 
 TEST_F(NegativeWsi, SwapchainAcquireImageWithSignaledSemaphore) {
@@ -1670,28 +1541,20 @@ TEST_F(NegativeWsi, SwapchainAcquireImageWithSignaledSemaphore) {
     AddRequiredExtensions(VK_KHR_DEVICE_GROUP_EXTENSION_NAME);
     AddSurfaceExtension();
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
+    RETURN_IF_SKIP(InitFramework())
 
-    if (DeviceValidationVersion() < VK_API_VERSION_1_1) {
-        GTEST_SKIP() << "At least Vulkan version 1.1 is required";
-    }
-
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
-
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitState())
     ASSERT_TRUE(InitSwapchain());
 
-    vk_testing::Semaphore semaphore(*m_device);
+    vkt::Semaphore semaphore(*m_device);
 
-    auto submit_info = LvlInitStruct<VkSubmitInfo>();
+    VkSubmitInfo submit_info = vku::InitStructHelper();
     submit_info.signalSemaphoreCount = 1;
     submit_info.pSignalSemaphores = &semaphore.handle();
-    vk::QueueSubmit(m_device->m_queue, 1, &submit_info, VK_NULL_HANDLE);
-    vk::QueueWaitIdle(m_device->m_queue);
+    vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
+    vk::QueueWaitIdle(m_default_queue);
 
-    auto acquire_info = LvlInitStruct<VkAcquireNextImageInfoKHR>();
+    VkAcquireNextImageInfoKHR acquire_info = vku::InitStructHelper();
     acquire_info.swapchain = m_swapchain;
     acquire_info.timeout = kWaitTimeout;
     acquire_info.semaphore = semaphore.handle();
@@ -1711,19 +1574,16 @@ TEST_F(NegativeWsi, DisplayPresentInfoSrcRect) {
     TEST_DESCRIPTION("Test layout tracking on imageless framebuffers");
     AddSurfaceExtension();
     AddRequiredExtensions(VK_KHR_DISPLAY_SWAPCHAIN_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitState())
     if (!InitSwapchain(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)) {
         GTEST_SKIP() << "Cannot create surface or swapchain, skipping test";
     }
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    InitRenderTarget();
 
     uint32_t current_buffer;
-    auto semaphore_create_info = LvlInitStruct<VkSemaphoreCreateInfo>();
-    vk_testing::Semaphore image_acquired(*m_device, semaphore_create_info);
+    VkSemaphoreCreateInfo semaphore_create_info = vku::InitStructHelper();
+    vkt::Semaphore image_acquired(*m_device, semaphore_create_info);
     ASSERT_TRUE(image_acquired.initialized());
     vk::AcquireNextImageKHR(device(), m_swapchain, kWaitTimeout, image_acquired.handle(), VK_NULL_HANDLE, &current_buffer);
 
@@ -1735,13 +1595,13 @@ TEST_F(NegativeWsi, DisplayPresentInfoSrcRect) {
     uint32_t swapchain_width = m_surface_capabilities.minImageExtent.width;
     uint32_t swapchain_height = m_surface_capabilities.minImageExtent.height;
 
-    auto display_present_info = LvlInitStruct<VkDisplayPresentInfoKHR>();
+    VkDisplayPresentInfoKHR display_present_info = vku::InitStructHelper();
     display_present_info.srcRect.extent.width = swapchain_width + 1;  // Invalid
     display_present_info.srcRect.extent.height = swapchain_height;
     display_present_info.dstRect.extent.width = swapchain_width;
     display_present_info.dstRect.extent.height = swapchain_height;
 
-    auto present = LvlInitStruct<VkPresentInfoKHR>(&display_present_info);
+    VkPresentInfoKHR present = vku::InitStructHelper(&display_present_info);
     present.waitSemaphoreCount = 1;
     present.pWaitSemaphores = &image_acquired.handle();
     present.pSwapchains = &m_swapchain;
@@ -1749,7 +1609,7 @@ TEST_F(NegativeWsi, DisplayPresentInfoSrcRect) {
     present.swapchainCount = 1;
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDisplayPresentInfoKHR-srcRect-01257");
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPresentInfoKHR-pImageIndices-01430");
-    vk::QueuePresentKHR(m_device->m_queue, &present);
+    vk::QueuePresentKHR(m_default_queue, &present);
     m_errorMonitor->VerifyFound();
 }
 
@@ -1762,15 +1622,12 @@ TEST_F(NegativeWsi, LeakASwapchain) {
 #endif
 
     AddSurfaceExtension();
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!IsPlatform(kMockICD)) {
+    RETURN_IF_SKIP(InitFramework())
+    if (!IsPlatformMockICD()) {
         // This test leaks a swapchain (on purpose) and should not be run on a real driver
         GTEST_SKIP() << "This test only runs on the mock ICD";
     }
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitState())
 
     SurfaceContext surface_context{};
     VkSurfaceKHR surface{};
@@ -1780,7 +1637,7 @@ TEST_F(NegativeWsi, LeakASwapchain) {
 
     // Warn about the surface/swapchain not being destroyed
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkDestroyInstance-instance-00629");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkDestroyDevice-device-00378");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkDestroyDevice-device-05137");
     ShutdownFramework();  // Destroy Instance/Device
     DestroySurfaceContext(surface_context);
     m_errorMonitor->VerifyFound();
@@ -1792,21 +1649,17 @@ TEST_F(NegativeWsi, PresentIdWait) {
     AddRequiredExtensions(VK_KHR_PRESENT_WAIT_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_PRESENT_ID_EXTENSION_NAME);
     AddSurfaceExtension();
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
+    RETURN_IF_SKIP(InitFramework())
 
-    if (DeviceValidationVersion() < VK_API_VERSION_1_1) {
-        GTEST_SKIP() << "At least Vulkan version 1.1 is required, skipping test.";
-    }
-
-    auto present_id_features = LvlInitStruct<VkPhysicalDevicePresentIdFeaturesKHR>();
-    auto present_wait_features = LvlInitStruct<VkPhysicalDevicePresentWaitFeaturesKHR>(&present_id_features);
+    VkPhysicalDevicePresentIdFeaturesKHR present_id_features = vku::InitStructHelper();
+    VkPhysicalDevicePresentWaitFeaturesKHR present_wait_features = vku::InitStructHelper(&present_id_features);
     GetPhysicalDeviceFeatures2(present_wait_features);
 
     if (!present_id_features.presentId || !present_wait_features.presentWait) {
         GTEST_SKIP() << "presentWait feature is not available, skipping test.";
     }
 
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &present_wait_features, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    RETURN_IF_SKIP(InitState(nullptr, &present_wait_features, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
 
     if (!InitSwapchain()) {
         GTEST_SKIP() << "Cannot create swapchain, skipping test";
@@ -1822,9 +1675,9 @@ TEST_F(NegativeWsi, PresentIdWait) {
     auto images2 = GetSwapchainImages(swapchain2);
 
     uint32_t image_indices[2];
-    VkFenceObj fence, fence2;
-    fence.init(*m_device, VkFenceObj::create_info());
-    fence2.init(*m_device, VkFenceObj::create_info());
+    vkt::Fence fence, fence2;
+    fence.init(*m_device, vkt::Fence::create_info());
+    fence2.init(*m_device, vkt::Fence::create_info());
     VkFence fence_handles[2];
     fence_handles[0] = fence.handle();
     fence_handles[1] = fence2.handle();
@@ -1838,16 +1691,16 @@ TEST_F(NegativeWsi, PresentIdWait) {
     VkSwapchainKHR swap_chains[2] = {m_swapchain, swapchain2};
     uint64_t present_ids[2] = {};
     present_ids[0] = 4;  // Try setting 3 later
-    auto present_id = LvlInitStruct<VkPresentIdKHR>();
+    VkPresentIdKHR present_id = vku::InitStructHelper();
     present_id.swapchainCount = 2;
     present_id.pPresentIds = present_ids;
-    auto present = LvlInitStruct<VkPresentInfoKHR>(&present_id);
+    VkPresentInfoKHR present = vku::InitStructHelper(&present_id);
     present.pSwapchains = swap_chains;
     present.pImageIndices = image_indices;
     present.swapchainCount = 2;
 
     // Submit a clean present to establish presentIds
-    vk::QueuePresentKHR(m_device->m_queue, &present);
+    vk::QueuePresentKHR(m_default_queue, &present);
 
     vk::ResetFences(device(), 2, fence_handles);
     vk::AcquireNextImageKHR(device(), m_swapchain, kWaitTimeout, VK_NULL_HANDLE, fence_handles[0], &image_indices[0]);
@@ -1860,19 +1713,19 @@ TEST_F(NegativeWsi, PresentIdWait) {
     present_ids[0] = 3;
     present_ids[1] = 5;
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPresentIdKHR-presentIds-04999");
-    vk::QueuePresentKHR(m_device->m_queue, &present);
+    vk::QueuePresentKHR(m_default_queue, &present);
     m_errorMonitor->VerifyFound();
 
     // Errors should prevent previous and future vkQueuePresents from actually happening so ok to re-use images
     present_id.swapchainCount = 0;
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPresentIdKHR-swapchainCount-arraylength");
-    vk::QueuePresentKHR(m_device->m_queue, &present);
+    vk::QueuePresentKHR(m_default_queue, &present);
     m_errorMonitor->VerifyFound();
 
     present_id.swapchainCount = 1;
     present_ids[0] = 5;
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPresentIdKHR-swapchainCount-04998");
-    vk::QueuePresentKHR(m_device->m_queue, &present);
+    vk::QueuePresentKHR(m_default_queue, &present);
     m_errorMonitor->VerifyFound();
 
     VkSwapchainKHR swapchain3 = {};
@@ -1896,14 +1749,8 @@ TEST_F(NegativeWsi, PresentIdWaitFeatures) {
     AddRequiredExtensions(VK_KHR_PRESENT_WAIT_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_PRESENT_ID_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, nullptr, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
-    if (DeviceValidationVersion() < VK_API_VERSION_1_1) {
-        GTEST_SKIP() << "At least Vulkan version 1.1 is required, skipping test.";
-    }
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
+    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitState(nullptr, nullptr, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
     if (!InitSwapchain()) {
         GTEST_SKIP() << "Cannot create swapchain, skipping test";
     }
@@ -1911,25 +1758,25 @@ TEST_F(NegativeWsi, PresentIdWaitFeatures) {
     const auto images = GetSwapchainImages(m_swapchain);
 
     uint32_t image_index;
-    VkFenceObj fence;
-    fence.init(*m_device, VkFenceObj::create_info());
+    vkt::Fence fence;
+    fence.init(*m_device, vkt::Fence::create_info());
     vk::AcquireNextImageKHR(device(), m_swapchain, kWaitTimeout, VK_NULL_HANDLE, fence.handle(), &image_index);
     vk::WaitForFences(device(), 1, &fence.handle(), true, kWaitTimeout);
 
     SetImageLayout(m_device, VK_IMAGE_ASPECT_COLOR_BIT, images[image_index], VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
     uint64_t present_id_index = 1;
-    auto present_id = LvlInitStruct<VkPresentIdKHR>();
+    VkPresentIdKHR present_id = vku::InitStructHelper();
     present_id.swapchainCount = 1;
     present_id.pPresentIds = &present_id_index;
 
-    auto present = LvlInitStruct<VkPresentInfoKHR>(&present_id);
+    VkPresentInfoKHR present = vku::InitStructHelper(&present_id);
     present.pSwapchains = &m_swapchain;
     present.pImageIndices = &image_index;
     present.swapchainCount = 1;
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPresentInfoKHR-pNext-06235");
-    vk::QueuePresentKHR(m_device->m_queue, &present);
+    vk::QueuePresentKHR(m_default_queue, &present);
     m_errorMonitor->VerifyFound();
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkWaitForPresentKHR-presentWait-06234");
@@ -1940,11 +1787,8 @@ TEST_F(NegativeWsi, PresentIdWaitFeatures) {
 TEST_F(NegativeWsi, GetSwapchainImagesCountButNotImages) {
     TEST_DESCRIPTION("Test for getting swapchain images count and presenting before getting swapchain images.");
     AddSurfaceExtension();
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitState())
     ASSERT_TRUE(InitSurface());
 
     VkBool32 supported;
@@ -1960,7 +1804,7 @@ TEST_F(NegativeWsi, GetSwapchainImagesCountButNotImages) {
     VkExtent2D img_ext = {std::min(m_surface_capabilities.maxImageExtent.width, img_format_props.maxExtent.width),
                           std::min(m_surface_capabilities.maxImageExtent.height, img_format_props.maxExtent.height)};
 
-    auto swapchain_info = LvlInitStruct<VkSwapchainCreateInfoKHR>();
+    VkSwapchainCreateInfoKHR swapchain_info = vku::InitStructHelper();
     swapchain_info.surface = m_surface;
     swapchain_info.minImageCount = m_surface_capabilities.minImageCount;
     swapchain_info.imageFormat = m_surface_formats[0].format;
@@ -1982,12 +1826,12 @@ TEST_F(NegativeWsi, GetSwapchainImagesCountButNotImages) {
     vk::GetSwapchainImagesKHR(device(), m_swapchain, &imageCount, nullptr);
 
     const uint32_t image_index = 0;
-    auto present_info = LvlInitStruct<VkPresentInfoKHR>();
+    VkPresentInfoKHR present_info = vku::InitStructHelper();
     present_info.pImageIndices = &image_index;
     present_info.pSwapchains = &m_swapchain;
     present_info.swapchainCount = 1;
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPresentInfoKHR-pImageIndices-01430");
-    vk::QueuePresentKHR(m_device->m_queue, &present_info);
+    vk::QueuePresentKHR(m_default_queue, &present_info);
     m_errorMonitor->VerifyFound();
 }
 
@@ -2006,11 +1850,8 @@ TEST_F(NegativeWsi, SurfaceSupportByPhysicalDevice) {
     AddOptionalExtensions(VK_EXT_DISPLAY_SURFACE_COUNTER_EXTENSION_NAME);
     AddSurfaceExtension();
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
-    if (DeviceValidationVersion() < VK_API_VERSION_1_1) {
-        GTEST_SKIP() << "At least Vulkan version 1.1 is required";
-    }
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitState())
     const bool swapchain = IsExtensionsEnabled(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
     const bool get_surface_capabilities2 = IsExtensionsEnabled(VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME);
     const bool display_surface_counter = IsExtensionsEnabled(VK_EXT_DISPLAY_SURFACE_COUNTER_EXTENSION_NAME);
@@ -2037,7 +1878,7 @@ TEST_F(NegativeWsi, SurfaceSupportByPhysicalDevice) {
 
 #ifdef VK_USE_PLATFORM_WIN32_KHR
     if (full_screen_exclusive) {
-        auto surface_info = LvlInitStruct<VkPhysicalDeviceSurfaceInfo2KHR>();
+        VkPhysicalDeviceSurfaceInfo2KHR surface_info = vku::InitStructHelper();
         surface_info.surface = m_surface;
         VkDeviceGroupPresentModeFlagsKHR flags = VK_DEVICE_GROUP_PRESENT_MODE_LOCAL_BIT_KHR;
 
@@ -2063,7 +1904,7 @@ TEST_F(NegativeWsi, SurfaceSupportByPhysicalDevice) {
     }
 
     if (display_surface_counter) {
-        auto capabilities = LvlInitStruct<VkSurfaceCapabilities2EXT>();
+        VkSurfaceCapabilities2EXT capabilities = vku::InitStructHelper();
 
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetPhysicalDeviceSurfaceCapabilities2EXT-surface-06211");
         vk::GetPhysicalDeviceSurfaceCapabilities2EXT(gpu(), m_surface, &capabilities);
@@ -2071,9 +1912,9 @@ TEST_F(NegativeWsi, SurfaceSupportByPhysicalDevice) {
     }
 
     if (get_surface_capabilities2) {
-        auto surface_info = LvlInitStruct<VkPhysicalDeviceSurfaceInfo2KHR>();
+        VkPhysicalDeviceSurfaceInfo2KHR surface_info = vku::InitStructHelper();
         surface_info.surface = m_surface;
-        auto capabilities = LvlInitStruct<VkSurfaceCapabilities2KHR>();
+        VkSurfaceCapabilities2KHR capabilities = vku::InitStructHelper();
 
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetPhysicalDeviceSurfaceCapabilities2KHR-pSurfaceInfo-06522");
         vk::GetPhysicalDeviceSurfaceCapabilities2KHR(gpu(), &surface_info, &capabilities);
@@ -2088,7 +1929,7 @@ TEST_F(NegativeWsi, SurfaceSupportByPhysicalDevice) {
     }
 
     if (get_surface_capabilities2) {
-        auto surface_info = LvlInitStruct<VkPhysicalDeviceSurfaceInfo2KHR>();
+        VkPhysicalDeviceSurfaceInfo2KHR surface_info = vku::InitStructHelper();
         surface_info.surface = m_surface;
         uint32_t count;
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetPhysicalDeviceSurfaceFormats2KHR-pSurfaceInfo-06522");
@@ -2119,20 +1960,13 @@ TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionAcquire) {
     AddRequiredExtensions(VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME);
     AddSurfaceExtension();
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
-    if (DeviceValidationVersion() < VK_API_VERSION_1_1) {
-        GTEST_SKIP() << "At least Vulkan version 1.1 is required";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
-
-    if (IsPlatform(kMockICD)) {
+    if (IsPlatformMockICD()) {
         GTEST_SKIP() << "Test not supported by MockICD";
     }
 
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitState())
     if (!InitSurface()) {
         GTEST_SKIP() << "Cannot create surface or swapchain";
     }
@@ -2144,7 +1978,7 @@ TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionAcquire) {
     VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     VkSurfaceTransformFlagBitsKHR preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
 
-    auto swapchain_create_info = LvlInitStruct<VkSwapchainCreateInfoKHR>();
+    VkSwapchainCreateInfoKHR swapchain_create_info = vku::InitStructHelper();
     swapchain_create_info.surface = surface;
     swapchain_create_info.minImageCount = m_surface_capabilities.minImageCount;
     swapchain_create_info.imageFormat = m_surface_formats[0].format;
@@ -2173,8 +2007,8 @@ TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionAcquire) {
     std::vector<VkPresentModeKHR> pdev_surface_present_modes(count);
     vk::GetPhysicalDeviceSurfacePresentModesKHR(gpu(), m_surface, &count, pdev_surface_present_modes.data());
 
-    auto surface_info = LvlInitStruct<VkPhysicalDeviceSurfaceInfo2KHR>();
-    auto surface_caps = LvlInitStruct<VkSurfaceCapabilities2KHR>();
+    VkPhysicalDeviceSurfaceInfo2KHR surface_info = vku::InitStructHelper();
+    VkSurfaceCapabilities2KHR surface_caps = vku::InitStructHelper();
     surface_info.surface = m_surface;
 
     // Set a present_mode in VkSurfacePresentModeEXT that's NOT returned by GetPhsyicalDeviceSurfaceCapabilities2KHR
@@ -2187,15 +2021,16 @@ TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionAcquire) {
         }
     }
 
-    auto present_mode = LvlInitStruct<VkSurfacePresentModeEXT>();
+    VkSurfacePresentModeEXT present_mode = vku::InitStructHelper();
     present_mode.presentMode = mismatched_present_mode;
 
     surface_info.pNext = &present_mode;
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSurfacePresentModeEXT-presentMode-07780");
+    m_errorMonitor->SetAllowedFailureMsg("VUID-VkSurfacePresentModeEXT-presentMode-parameter");
     vk::GetPhysicalDeviceSurfaceCapabilities2KHR(gpu(), &surface_info, &surface_caps);
     m_errorMonitor->VerifyFound();
 
-    auto present_mode_compatibility = LvlInitStruct<VkSurfacePresentModeCompatibilityEXT>();
+    VkSurfacePresentModeCompatibilityEXT present_mode_compatibility = vku::InitStructHelper();
     present_mode.presentMode = pdev_surface_present_modes[0];
     surface_caps.pNext = &present_mode_compatibility;
     vk::GetPhysicalDeviceSurfaceCapabilities2KHR(gpu(), &surface_info, &surface_caps);
@@ -2204,13 +2039,13 @@ TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionAcquire) {
     present_mode_compatibility.pPresentModes = compatible_present_modes.data();
     vk::GetPhysicalDeviceSurfaceCapabilities2KHR(gpu(), &surface_info, &surface_caps);
 
-    auto scaling_capabilities = LvlInitStruct<VkSurfacePresentScalingCapabilitiesEXT>();
+    VkSurfacePresentScalingCapabilitiesEXT scaling_capabilities = vku::InitStructHelper();
     surface_caps.pNext = &scaling_capabilities;
     vk::GetPhysicalDeviceSurfaceCapabilities2KHR(gpu(), &surface_info, &surface_caps);
 
     mismatched_present_mode = VK_PRESENT_MODE_MAX_ENUM_KHR;
 
-    auto present_modes_ci = LvlInitStruct<VkSwapchainPresentModesCreateInfoEXT>();
+    VkSwapchainPresentModesCreateInfoEXT present_modes_ci = vku::InitStructHelper();
     swapchain_create_info.pNext = &present_modes_ci;
     present_modes_ci.presentModeCount = 1;
     present_modes_ci.pPresentModes = &mismatched_present_mode;
@@ -2229,6 +2064,7 @@ TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionAcquire) {
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSwapchainPresentModesCreateInfoEXT-None-07762");
         m_errorMonitor->SetAllowedFailureMsg("VUID-VkSwapchainPresentModesCreateInfoEXT-pPresentModes-07763");
         m_errorMonitor->SetAllowedFailureMsg("VUID-VkSwapchainPresentModesCreateInfoEXT-presentMode-07764");
+        m_errorMonitor->SetAllowedFailureMsg("UNASSIGNED-GeneralParameterError-UnrecognizedValue");
         vk::CreateSwapchainKHR(device(), &swapchain_create_info, nullptr, &m_swapchain);
         m_errorMonitor->VerifyFound();
     }
@@ -2262,7 +2098,7 @@ TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionAcquire) {
     }
 
     swapchain_create_info.presentMode = compatible_present_modes[0];
-    auto present_scaling_info = LvlInitStruct<VkSwapchainPresentScalingCreateInfoEXT>();
+    VkSwapchainPresentScalingCreateInfoEXT present_scaling_info = vku::InitStructHelper();
     present_scaling_info.pNext = swapchain_create_info.pNext;
     swapchain_create_info.pNext = &present_scaling_info;
 
@@ -2405,17 +2241,17 @@ TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionAcquire) {
     vk::CreateSwapchainKHR(device(), &swapchain_create_info, nullptr, &m_swapchain);
 
     const auto swapchain_images = GetSwapchainImages(m_swapchain);
-    const vk_testing::Semaphore acquire_semaphore(*m_device);
+    const vkt::Semaphore acquire_semaphore(*m_device);
 
     uint32_t image_index = 0;
     vk::AcquireNextImageKHR(device(), m_swapchain, kWaitTimeout, acquire_semaphore.handle(), VK_NULL_HANDLE, &image_index);
 
-    vk::QueueWaitIdle(m_device->m_queue);
+    vk::QueueWaitIdle(m_default_queue);
 
     uint32_t release_index = static_cast<uint32_t>(swapchain_images.size()) + 2;
-    auto release_info = LvlInitStruct<VkReleaseSwapchainImagesInfoEXT>();
+    VkReleaseSwapchainImagesInfoEXT release_info = vku::InitStructHelper();
     release_info.swapchain = m_swapchain;
-    release_info.imageIndexCount = static_cast<uint32_t>(swapchain_images.size());
+    release_info.imageIndexCount = 1;
     release_info.pImageIndices = &release_index;
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkReleaseSwapchainImagesInfoEXT-pImageIndices-07785");
     vk::ReleaseSwapchainImagesEXT(m_device->device(), &release_info);
@@ -2432,23 +2268,16 @@ TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionCaps) {
     AddRequiredExtensions(VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME);
     AddSurfaceExtension();
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
-    if (DeviceValidationVersion() < VK_API_VERSION_1_1) {
-        GTEST_SKIP() << "At least Vulkan version 1.1 is required";
-    }
-
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
     // Add this after check, surfacless checks are done conditionally
     AddOptionalExtensions(VK_GOOGLE_SURFACELESS_QUERY_EXTENSION_NAME);
 
-    if (IsPlatform(kMockICD)) {
+    if (IsPlatformMockICD()) {
         GTEST_SKIP() << "Test not supported by MockICD";
     }
 
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitState())
     if (!InitSurface()) {
         GTEST_SKIP() << "Cannot create surface or swapchain";
     }
@@ -2461,7 +2290,7 @@ TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionCaps) {
     VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     VkSurfaceTransformFlagBitsKHR preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
 
-    auto swapchain_create_info = LvlInitStruct<VkSwapchainCreateInfoKHR>();
+    VkSwapchainCreateInfoKHR swapchain_create_info = vku::InitStructHelper();
     swapchain_create_info.surface = surface;
     swapchain_create_info.minImageCount = m_surface_capabilities.minImageCount;
     swapchain_create_info.imageFormat = m_surface_formats[0].format;
@@ -2478,7 +2307,7 @@ TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionCaps) {
     swapchain_create_info.flags = VK_SWAPCHAIN_CREATE_DEFERRED_MEMORY_ALLOCATION_BIT_EXT;
 
     VkPresentModeKHR old_present_mode = m_surface_non_shared_present_mode;
-    auto present_modes_ci = LvlInitStruct<VkSwapchainPresentModesCreateInfoEXT>();
+    VkSwapchainPresentModesCreateInfoEXT present_modes_ci = vku::InitStructHelper();
     swapchain_create_info.pNext = &present_modes_ci;
     present_modes_ci.presentModeCount = 1;
     present_modes_ci.pPresentModes = &old_present_mode;
@@ -2487,7 +2316,7 @@ TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionCaps) {
 
     const auto swapchain_images = GetSwapchainImages(m_swapchain);
 
-    auto image_create_info = LvlInitStruct<VkImageCreateInfo>();
+    VkImageCreateInfo image_create_info = vku::InitStructHelper();
     image_create_info.imageType = VK_IMAGE_TYPE_2D;
     image_create_info.format = m_surface_formats[0].format;
     image_create_info.extent.width = m_surface_capabilities.minImageExtent.width;
@@ -2501,18 +2330,18 @@ TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionCaps) {
     image_create_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     image_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    auto image_swapchain_create_info = LvlInitStruct<VkImageSwapchainCreateInfoKHR>();
+    VkImageSwapchainCreateInfoKHR image_swapchain_create_info = vku::InitStructHelper();
     image_swapchain_create_info.swapchain = m_swapchain;
     image_create_info.pNext = &image_swapchain_create_info;
 
-    vk_testing::Image image_from_swapchain(*m_device, image_create_info, vk_testing::no_mem);
+    vkt::Image image_from_swapchain(*m_device, image_create_info, vkt::no_mem);
 
-    auto bind_info = LvlInitStruct<VkBindImageMemoryInfo>();
+    VkBindImageMemoryInfo bind_info = vku::InitStructHelper();
     bind_info.image = image_from_swapchain.handle();
     bind_info.memory = VK_NULL_HANDLE;
     bind_info.memoryOffset = 0;
 
-    auto bind_swapchain_info = LvlInitStruct<VkBindImageMemorySwapchainInfoKHR>();
+    VkBindImageMemorySwapchainInfoKHR bind_swapchain_info = vku::InitStructHelper();
     bind_swapchain_info.imageIndex = 0;
     bind_info.pNext = &bind_swapchain_info;
     bind_swapchain_info.swapchain = m_swapchain;
@@ -2526,12 +2355,12 @@ TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionCaps) {
     std::vector<VkPresentModeKHR> present_modes(count);
     vk::GetPhysicalDeviceSurfacePresentModesKHR(gpu(), m_surface, &count, present_modes.data());
 
-    auto surface_info = LvlInitStruct<VkPhysicalDeviceSurfaceInfo2KHR>();
-    auto surface_caps = LvlInitStruct<VkSurfaceCapabilities2KHR>();
+    VkPhysicalDeviceSurfaceInfo2KHR surface_info = vku::InitStructHelper();
+    VkSurfaceCapabilities2KHR surface_caps = vku::InitStructHelper();
     surface_info.surface = m_surface;
 
-    auto present_mode = LvlInitStruct<VkSurfacePresentModeEXT>();
-    auto present_mode_compatibility = LvlInitStruct<VkSurfacePresentModeCompatibilityEXT>();
+    VkSurfacePresentModeEXT present_mode = vku::InitStructHelper();
+    VkSurfacePresentModeCompatibilityEXT present_mode_compatibility = vku::InitStructHelper();
     present_mode.presentMode = present_modes[0];
     surface_caps.pNext = &present_mode_compatibility;
 
@@ -2547,7 +2376,7 @@ TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionCaps) {
     present_mode_compatibility.pPresentModes = compatible_present_modes.data();
     vk::GetPhysicalDeviceSurfaceCapabilities2KHR(gpu(), &surface_info, &surface_caps);
 
-    auto scaling_capabilities = LvlInitStruct<VkSurfacePresentScalingCapabilitiesEXT>();
+    VkSurfacePresentScalingCapabilitiesEXT scaling_capabilities = vku::InitStructHelper();
     surface_caps.pNext = &scaling_capabilities;
     surface_info.pNext = nullptr;
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetPhysicalDeviceSurfaceCapabilities2KHR-pNext-07777");
@@ -2576,17 +2405,13 @@ TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionRelease) {
     AddRequiredExtensions(VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME);
     AddSurfaceExtension();
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
+    RETURN_IF_SKIP(InitFramework())
 
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
-
-    if (IsPlatform(kMockICD)) {
+    if (IsPlatformMockICD()) {
         GTEST_SKIP() << "Test not supported by MockICD";
     }
 
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, nullptr, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    RETURN_IF_SKIP(InitState(nullptr, nullptr, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
     if (!InitSurface()) {
         GTEST_SKIP() << "Cannot create surface";
     }
@@ -2596,7 +2421,7 @@ TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionRelease) {
     VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     VkSurfaceTransformFlagBitsKHR preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
 
-    VkSwapchainCreateInfoKHR swapchain_create_info = LvlInitStruct<VkSwapchainCreateInfoKHR>();
+    VkSwapchainCreateInfoKHR swapchain_create_info = vku::InitStructHelper();
     swapchain_create_info.surface = surface;
     swapchain_create_info.minImageCount = m_surface_capabilities.minImageCount;
     swapchain_create_info.imageFormat = m_surface_formats[0].format;
@@ -2613,16 +2438,15 @@ TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionRelease) {
     swapchain_create_info.flags = VK_SWAPCHAIN_CREATE_DEFERRED_MEMORY_ALLOCATION_BIT_EXT;
 
     VkPresentModeKHR old_present_mode = m_surface_non_shared_present_mode;
-    VkSwapchainPresentModesCreateInfoEXT present_modes_ci = LvlInitStruct<VkSwapchainPresentModesCreateInfoEXT>();
+    VkSwapchainPresentModesCreateInfoEXT present_modes_ci = vku::InitStructHelper();
     swapchain_create_info.pNext = &present_modes_ci;
     present_modes_ci.presentModeCount = 1;
     present_modes_ci.pPresentModes = &old_present_mode;
 
     vk::CreateSwapchainKHR(device(), &swapchain_create_info, nullptr, &m_swapchain);
 
-    VkSemaphoreCreateInfo semaphore_create_info = LvlInitStruct<VkSemaphoreCreateInfo>();
-    vk_testing::Semaphore acquire_semaphore(*m_device, semaphore_create_info);
-    vk_testing::Semaphore submit_semaphore(*m_device, semaphore_create_info);
+    vkt::Semaphore acquire_semaphore(*m_device);
+    vkt::Semaphore submit_semaphore(*m_device);
 
     const auto swapchain_images = GetSwapchainImages(m_swapchain);
     uint32_t image_index = 0;
@@ -2630,7 +2454,7 @@ TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionRelease) {
 
     m_commandBuffer->begin();
 
-    VkImageMemoryBarrier img_barrier = LvlInitStruct<VkImageMemoryBarrier>();
+    VkImageMemoryBarrier img_barrier = vku::InitStructHelper();
     img_barrier.srcAccessMask = 0;
     img_barrier.dstAccessMask = 0;
     img_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -2650,7 +2474,7 @@ TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionRelease) {
 
     VkPipelineStageFlags stage_mask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
 
-    VkSubmitInfo submit_info = LvlInitStruct<VkSubmitInfo>();
+    VkSubmitInfo submit_info = vku::InitStructHelper();
     submit_info.commandBufferCount = 1;
     submit_info.pCommandBuffers = &m_commandBuffer->handle();
     submit_info.waitSemaphoreCount = 1;
@@ -2659,26 +2483,26 @@ TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionRelease) {
     submit_info.signalSemaphoreCount = 1;
     submit_info.pSignalSemaphores = &submit_semaphore.handle();
 
-    vk::QueueSubmit(m_device->m_queue, 1, &submit_info, VK_NULL_HANDLE);
+    vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
 
-    VkPresentInfoKHR present = LvlInitStruct<VkPresentInfoKHR>();
+    VkPresentInfoKHR present = vku::InitStructHelper();
     present.waitSemaphoreCount = 1;
     present.pWaitSemaphores = &submit_semaphore.handle();
     present.swapchainCount = 1;
     present.pSwapchains = &m_swapchain;
     present.pImageIndices = &image_index;
 
-    VkFenceObj present_fence;
-    present_fence.init(*m_device, VkFenceObj::create_info());
+    vkt::Fence present_fence;
+    present_fence.init(*m_device, vkt::Fence::create_info());
 
     // PresentFenceInfo swapchaincount not equal to PresentInfo swapchaincount
-    VkSwapchainPresentFenceInfoEXT fence_info = LvlInitStruct<VkSwapchainPresentFenceInfoEXT>();
+    VkSwapchainPresentFenceInfoEXT fence_info = vku::InitStructHelper();
     fence_info.swapchainCount = present.swapchainCount + 1;
     fence_info.pFences = &present_fence.handle();
     present.pNext = &fence_info;
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSwapchainPresentFenceInfoEXT-swapchainCount-07757");
-    vk::QueuePresentKHR(m_device->m_queue, &present);
+    vk::QueuePresentKHR(m_default_queue, &present);
     m_errorMonitor->VerifyFound();
 
     const std::vector<VkPresentModeKHR> defined_present_modes{
@@ -2700,21 +2524,21 @@ TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionRelease) {
 
     // Each entry in pPresentModes must be a presentation mode specified in VkSwapchainPresentModesCreateInfoEXT::pPresentModes
     // when creating the entry's corresponding swapchain
-    VkSwapchainPresentModeInfoEXT present_mode_info = LvlInitStruct<VkSwapchainPresentModeInfoEXT>();
+    VkSwapchainPresentModeInfoEXT present_mode_info = vku::InitStructHelper();
     present_mode_info.swapchainCount = 1;
     present_mode_info.pPresentModes = &mismatched_present_mode;
     present.pNext = &present_mode_info;
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSwapchainPresentModeInfoEXT-pPresentModes-07761");
-    vk::QueuePresentKHR(m_device->m_queue, &present);
+    vk::QueuePresentKHR(m_default_queue, &present);
     m_errorMonitor->VerifyFound();
 
     // QueuePresent resets image[index].acquired to false
     VkPresentModeKHR good_present_mode = m_surface_non_shared_present_mode;
     present_mode_info.pPresentModes = &good_present_mode;
-    vk::QueuePresentKHR(m_device->m_queue, &present);
+    vk::QueuePresentKHR(m_default_queue, &present);
 
     uint32_t release_index = 0;
-    VkReleaseSwapchainImagesInfoEXT release_info = LvlInitStruct<VkReleaseSwapchainImagesInfoEXT>();
+    VkReleaseSwapchainImagesInfoEXT release_info = vku::InitStructHelper();
     release_info.swapchain = m_swapchain;
     release_info.imageIndexCount = static_cast<uint32_t>(swapchain_images.size());
     release_info.pImageIndices = &release_index;
@@ -2723,7 +2547,7 @@ TEST_F(NegativeWsi, SwapchainMaintenance1ExtensionRelease) {
     vk::ReleaseSwapchainImagesEXT(m_device->device(), &release_info);
     m_errorMonitor->VerifyFound();
 
-    vk::QueueWaitIdle(m_device->m_queue);
+    vk::QueueWaitIdle(m_default_queue);
 }
 
 #if defined(VK_USE_PLATFORM_WIN32_KHR)
@@ -2736,17 +2560,14 @@ TEST_F(NegativeWsi, AcquireFullScreenExclusiveModeEXT) {
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_FULL_SCREEN_EXCLUSIVE_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    if (!IsPlatform(kMockICD)) {
+    if (!IsPlatformMockICD()) {
         GTEST_SKIP() << "Only run test MockICD due to CI stability";
     }
 
-    ASSERT_NO_FATAL_FAILURE(InitState());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitState())
+    InitRenderTarget();
     if (!InitSwapchain()) {
         GTEST_SKIP() << "Cannot create surface or swapchain";
     }
@@ -2761,14 +2582,14 @@ TEST_F(NegativeWsi, AcquireFullScreenExclusiveModeEXT) {
 
     const POINT pt_zero = {0, 0};
 
-    auto surface_full_screen_exlusive_info_win32 = LvlInitStruct<VkSurfaceFullScreenExclusiveWin32InfoEXT>();
+    VkSurfaceFullScreenExclusiveWin32InfoEXT surface_full_screen_exlusive_info_win32 = vku::InitStructHelper();
     surface_full_screen_exlusive_info_win32.hmonitor = MonitorFromPoint(pt_zero, MONITOR_DEFAULTTOPRIMARY);
 
-    auto surface_full_screen_exlusive_info =
-        LvlInitStruct<VkSurfaceFullScreenExclusiveInfoEXT>(&surface_full_screen_exlusive_info_win32);
+    VkSurfaceFullScreenExclusiveInfoEXT surface_full_screen_exlusive_info =
+        vku::InitStructHelper(&surface_full_screen_exlusive_info_win32);
     surface_full_screen_exlusive_info.fullScreenExclusive = VK_FULL_SCREEN_EXCLUSIVE_APPLICATION_CONTROLLED_EXT;
 
-    auto swapchain_create_info = LvlInitStruct<VkSwapchainCreateInfoKHR>(&surface_full_screen_exlusive_info);
+    VkSwapchainCreateInfoKHR swapchain_create_info = vku::InitStructHelper(&surface_full_screen_exlusive_info);
     swapchain_create_info.flags = 0;
     swapchain_create_info.surface = m_surface;
     swapchain_create_info.minImageCount = m_surface_capabilities.minImageCount;
@@ -2818,24 +2639,21 @@ TEST_F(NegativeWsi, CreateSwapchainFullscreenExclusive) {
     AddSurfaceExtension();
     AddRequiredExtensions(VK_EXT_FULL_SCREEN_EXCLUSIVE_EXTENSION_NAME);
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    if (!IsPlatform(kMockICD)) {
+    if (!IsPlatformMockICD()) {
         GTEST_SKIP() << "Only run test MockICD due to CI stability";
     }
 
-    ASSERT_NO_FATAL_FAILURE(InitState());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitState())
+    InitRenderTarget();
     if (!InitSwapchain()) {
         GTEST_SKIP() << "Cannot create surface or swapchain";
     }
 
-    auto surface_full_screen_exlusive_info = LvlInitStruct<VkSurfaceFullScreenExclusiveInfoEXT>();
+    VkSurfaceFullScreenExclusiveInfoEXT surface_full_screen_exlusive_info = vku::InitStructHelper();
 
-    auto swapchain_create_info = LvlInitStruct<VkSwapchainCreateInfoKHR>(&surface_full_screen_exlusive_info);
+    VkSwapchainCreateInfoKHR swapchain_create_info = vku::InitStructHelper(&surface_full_screen_exlusive_info);
     swapchain_create_info.flags = 0;
     swapchain_create_info.surface = m_surface;
     swapchain_create_info.minImageCount = m_surface_capabilities.minImageCount;
@@ -2869,28 +2687,25 @@ TEST_F(NegativeWsi, GetPhysicalDeviceSurfaceCapabilities2KHRWithFullScreenEXT) {
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_FULL_SCREEN_EXCLUSIVE_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    if (!IsPlatform(kMockICD)) {
+    if (!IsPlatformMockICD()) {
         GTEST_SKIP() << "Only run test MockICD due to CI stability";
     }
 
-    ASSERT_NO_FATAL_FAILURE(InitState());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitState())
+    InitRenderTarget();
     if (!InitSwapchain()) {
         GTEST_SKIP() << "Cannot create surface or swapchain";
     }
 
-    auto fullscreen_exclusive_info = LvlInitStruct<VkSurfaceFullScreenExclusiveInfoEXT>();
+    VkSurfaceFullScreenExclusiveInfoEXT fullscreen_exclusive_info = vku::InitStructHelper();
     fullscreen_exclusive_info.fullScreenExclusive = VK_FULL_SCREEN_EXCLUSIVE_APPLICATION_CONTROLLED_EXT;
     // no VkSurfaceFullScreenExclusiveWin32InfoEXT in pNext chain
-    auto surface_info = LvlInitStruct<VkPhysicalDeviceSurfaceInfo2KHR>(&fullscreen_exclusive_info);
+    VkPhysicalDeviceSurfaceInfo2KHR surface_info = vku::InitStructHelper(&fullscreen_exclusive_info);
     surface_info.surface = m_surface;
 
-    auto surface_caps = LvlInitStruct<VkSurfaceCapabilities2KHR>();
+    VkSurfaceCapabilities2KHR surface_caps = vku::InitStructHelper();
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPhysicalDeviceSurfaceInfo2KHR-pNext-02672");
     vk::GetPhysicalDeviceSurfaceCapabilities2KHR(m_device->phy(), &surface_info, &surface_caps);
     m_errorMonitor->VerifyFound();
@@ -2904,9 +2719,9 @@ TEST_F(NegativeWsi, CreatingWin32Surface) {
     GTEST_SKIP() << "test not supported on platform";
 #else
     AddSurfaceExtension();
-    ASSERT_NO_FATAL_FAILURE(Init());
+    RETURN_IF_SKIP(Init())
 
-    auto surface_create_info = LvlInitStruct<VkWin32SurfaceCreateInfoKHR>();
+    VkWin32SurfaceCreateInfoKHR surface_create_info = vku::InitStructHelper();
     surface_create_info.hinstance = GetModuleHandle(0);
     surface_create_info.hwnd = NULL;  // Invalid
 
@@ -2925,11 +2740,7 @@ TEST_F(NegativeWsi, CreatingWaylandSurface) {
 #else
     AddSurfaceExtension();
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
+    RETURN_IF_SKIP(Init())
 
     if (!IsExtensionsEnabled(VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME)) {
         GTEST_SKIP() << VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME << " extension not supported.";
@@ -2979,7 +2790,7 @@ TEST_F(NegativeWsi, CreatingWaylandSurface) {
 
     // Invalid display
     {
-        auto surface_create_info = LvlInitStruct<VkWaylandSurfaceCreateInfoKHR>();
+        VkWaylandSurfaceCreateInfoKHR surface_create_info = vku::InitStructHelper();
         surface_create_info.display = nullptr;
         surface_create_info.surface = surface;
 
@@ -2991,7 +2802,7 @@ TEST_F(NegativeWsi, CreatingWaylandSurface) {
 
     // Invalid surface
     {
-        auto surface_create_info = LvlInitStruct<VkWaylandSurfaceCreateInfoKHR>();
+        VkWaylandSurfaceCreateInfoKHR surface_create_info = vku::InitStructHelper();
         surface_create_info.display = display;
         surface_create_info.surface = nullptr;
 
@@ -3017,11 +2828,7 @@ TEST_F(NegativeWsi, CreatingXcbSurface) {
 #else
     AddSurfaceExtension();
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
+    RETURN_IF_SKIP(Init())
 
     if (!IsExtensionsEnabled(VK_KHR_XCB_SURFACE_EXTENSION_NAME)) {
         GTEST_SKIP() << VK_KHR_XCB_SURFACE_EXTENSION_NAME << " not supported.";
@@ -3037,7 +2844,7 @@ TEST_F(NegativeWsi, CreatingXcbSurface) {
 
     // Invalid connection
     {
-        auto surface_create_info = LvlInitStruct<VkXcbSurfaceCreateInfoKHR>();
+        VkXcbSurfaceCreateInfoKHR surface_create_info = vku::InitStructHelper();
         surface_create_info.connection = nullptr;
         surface_create_info.window = xcb_window;
 
@@ -3049,7 +2856,7 @@ TEST_F(NegativeWsi, CreatingXcbSurface) {
 
     // Invalid window
     {
-        auto surface_create_info = LvlInitStruct<VkXcbSurfaceCreateInfoKHR>();
+        VkXcbSurfaceCreateInfoKHR surface_create_info = vku::InitStructHelper();
         surface_create_info.connection = xcb_connection;
         surface_create_info.window = 0;
 
@@ -3073,11 +2880,7 @@ TEST_F(NegativeWsi, CreatingX11Surface) {
 #else
     AddSurfaceExtension();
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
+    RETURN_IF_SKIP(Init())
 
     if (!IsExtensionsEnabled(VK_KHR_XLIB_SURFACE_EXTENSION_NAME)) {
         GTEST_SKIP() << VK_KHR_XLIB_SURFACE_EXTENSION_NAME << " not supported.";
@@ -3098,7 +2901,7 @@ TEST_F(NegativeWsi, CreatingX11Surface) {
     // Invalid display
     {
         VkSurfaceKHR vulkan_surface;
-        auto surface_create_info = LvlInitStruct<VkXlibSurfaceCreateInfoKHR>();
+        VkXlibSurfaceCreateInfoKHR surface_create_info = vku::InitStructHelper();
         surface_create_info.dpy = nullptr;
         surface_create_info.window = x11_window;
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkXlibSurfaceCreateInfoKHR-dpy-01313");
@@ -3109,7 +2912,7 @@ TEST_F(NegativeWsi, CreatingX11Surface) {
     // Invalid window
     {
         VkSurfaceKHR vulkan_surface;
-        auto surface_create_info = LvlInitStruct<VkXlibSurfaceCreateInfoKHR>();
+        VkXlibSurfaceCreateInfoKHR surface_create_info = vku::InitStructHelper();
         surface_create_info.dpy = x11_display;
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkXlibSurfaceCreateInfoKHR-window-01314");
         vk::CreateXlibSurfaceKHR(instance(), &surface_create_info, nullptr, &vulkan_surface);
@@ -3126,33 +2929,29 @@ TEST_F(NegativeWsi, UseSwapchainImageBeforeWait) {
 
     AddSurfaceExtension();
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
+    RETURN_IF_SKIP(InitFramework())
 
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
-
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, nullptr, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    RETURN_IF_SKIP(InitState(nullptr, nullptr, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
     if (!InitSwapchain()) {
         GTEST_SKIP() << "Cannot create surface or swapchain";
     }
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPresentInfoKHR-pImageIndices-01430");
 
-    vk_testing::Semaphore acquire_semaphore(*m_device);
+    vkt::Semaphore acquire_semaphore(*m_device);
 
     const auto swapchain_images = GetSwapchainImages(m_swapchain);
     uint32_t image_index = 0;
     vk::AcquireNextImageKHR(device(), m_swapchain, kWaitTimeout, acquire_semaphore.handle(), VK_NULL_HANDLE, &image_index);
 
-    auto present = LvlInitStruct<VkPresentInfoKHR>();
+    VkPresentInfoKHR present = vku::InitStructHelper();
     present.waitSemaphoreCount = 0;  // Invalid, acquire_semaphore should be waited on
     present.swapchainCount = 1;
     present.pSwapchains = &m_swapchain;
     present.pImageIndices = &image_index;
-    vk::QueuePresentKHR(m_device->m_queue, &present);
+    vk::QueuePresentKHR(m_default_queue, &present);
 
-    vk::QueueWaitIdle(m_device->m_queue);
+    vk::QueueWaitIdle(m_default_queue);
     m_errorMonitor->VerifyFound();
 }
 
@@ -3161,15 +2960,12 @@ TEST_F(NegativeWsi, CreatingSwapchainWithExtent) {
 
     AddSurfaceExtension();
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
+    RETURN_IF_SKIP(InitFramework())
 
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
     if (!InitSurface()) {
         GTEST_SKIP() << "Cannot create surface";
     }
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitState())
     InitSwapchainInfo();
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSwapchainCreateInfoKHR-pNext-07781");
@@ -3178,7 +2974,7 @@ TEST_F(NegativeWsi, CreatingSwapchainWithExtent) {
     VkSurfaceCapabilitiesKHR surface_capabilities;
     vk::GetPhysicalDeviceSurfaceCapabilitiesKHR(gpu(), m_surface, &surface_capabilities);
 
-    auto swapchain_ci = LvlInitStruct<VkSwapchainCreateInfoKHR>();
+    VkSwapchainCreateInfoKHR swapchain_ci = vku::InitStructHelper();
     swapchain_ci.surface = m_surface;
     swapchain_ci.minImageCount = m_surface_capabilities.minImageCount;
     swapchain_ci.imageFormat = m_surface_formats[0].format;
@@ -3207,29 +3003,25 @@ TEST_F(NegativeWsi, SurfaceQueryImageCompressionControlWithoutExtension) {
 
     AddRequiredExtensions(VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_IMAGE_COMPRESSION_CONTROL_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
+    RETURN_IF_SKIP(InitFramework())
 
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-
-    auto image_compression_control = LvlInitStruct<VkPhysicalDeviceImageCompressionControlFeaturesEXT>();
+    VkPhysicalDeviceImageCompressionControlFeaturesEXT image_compression_control = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(image_compression_control);
 
     if (image_compression_control.imageCompressionControl) {
         // disable imageCompressionControl feature;
         image_compression_control.imageCompressionControl = VK_FALSE;
-        ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &image_compression_control));
+        RETURN_IF_SKIP(InitState(nullptr, &image_compression_control));
     } else {
-        ASSERT_NO_FATAL_FAILURE(InitState());
+        RETURN_IF_SKIP(InitState())
     }
 
     if (!InitSurface()) {
         GTEST_SKIP() << "Cannot create surface";
     }
 
-    auto compression_properties = LvlInitStruct<VkImageCompressionPropertiesEXT>();
-    auto surface_info = LvlInitStruct<VkPhysicalDeviceSurfaceInfo2KHR>(&compression_properties);
+    VkImageCompressionPropertiesEXT compression_properties = vku::InitStructHelper();
+    VkPhysicalDeviceSurfaceInfo2KHR surface_info = vku::InitStructHelper(&compression_properties);
     surface_info.surface = m_surface;
     uint32_t count;
 
@@ -3247,21 +3039,17 @@ TEST_F(NegativeWsi, PhysicalDeviceSurfaceCapabilities) {
     AddRequiredExtensions(VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_FULL_SCREEN_EXCLUSIVE_EXTENSION_NAME);
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
+    RETURN_IF_SKIP(InitFramework())
 
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
-
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitState())
     ASSERT_TRUE(InitSwapchain());
 
-    auto surface_info = LvlInitStruct<VkPhysicalDeviceSurfaceInfo2KHR>();
+    VkPhysicalDeviceSurfaceInfo2KHR surface_info = vku::InitStructHelper();
     surface_info.surface = m_surface;
 
-    auto capabilities_full_screen_exclusive = LvlInitStruct<VkSurfaceCapabilitiesFullScreenExclusiveEXT>();
+    VkSurfaceCapabilitiesFullScreenExclusiveEXT capabilities_full_screen_exclusive = vku::InitStructHelper();
 
-    auto surface_capabilities = LvlInitStruct<VkSurfaceCapabilities2KHR>(&capabilities_full_screen_exclusive);
+    VkSurfaceCapabilities2KHR surface_capabilities = vku::InitStructHelper(&capabilities_full_screen_exclusive);
     surface_capabilities.surfaceCapabilities = m_surface_capabilities;
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetPhysicalDeviceSurfaceCapabilities2KHR-pNext-02671");
@@ -3274,8 +3062,8 @@ TEST_F(NegativeWsi, QueuePresentWaitingSameSemaphore) {
     TEST_DESCRIPTION("Submit to queue with waitSemaphore that another queue is already waiting on.");
     AddSurfaceExtension();
     AddRequiredExtensions(VK_KHR_DISPLAY_SWAPCHAIN_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitState())
     if (!InitSwapchain(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)) {
         GTEST_SKIP() << "Cannot create surface or swapchain, skipping test";
     }
@@ -3287,27 +3075,25 @@ TEST_F(NegativeWsi, QueuePresentWaitingSameSemaphore) {
     uint32_t image_index{0};
     const auto images = GetSwapchainImages(m_swapchain);
 
-    vk_testing::Fence fence(*m_device);
-    vk_testing::Semaphore semaphore(*m_device);
+    vkt::Fence fence(*m_device);
+    vkt::Semaphore semaphore(*m_device);
 
-    auto err = vk::AcquireNextImageKHR(device(), m_swapchain, kWaitTimeout, semaphore.handle(), fence.handle(), &image_index);
-    ASSERT_VK_SUCCESS(err);
+    vk::AcquireNextImageKHR(device(), m_swapchain, kWaitTimeout, semaphore.handle(), fence.handle(), &image_index);
 
-    err = fence.wait(kWaitTimeout);
-    ASSERT_VK_SUCCESS(err);
+    fence.wait(kWaitTimeout);
     SetImageLayout(m_device, VK_IMAGE_ASPECT_COLOR_BIT, images[image_index], VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
     VkQueue other = m_device->graphics_queues()[1]->handle();
 
     VkPipelineStageFlags stage_flags = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-    auto wait_submit = LvlInitStruct<VkSubmitInfo>();
+    VkSubmitInfo wait_submit = vku::InitStructHelper();
     wait_submit.waitSemaphoreCount = 1;
     wait_submit.pWaitSemaphores = &semaphore.handle();
     wait_submit.pWaitDstStageMask = &stage_flags;
 
-    vk::QueueSubmit(m_device->m_queue, 1, &wait_submit, VK_NULL_HANDLE);
+    vk::QueueSubmit(m_default_queue, 1, &wait_submit, VK_NULL_HANDLE);
 
-    auto present = LvlInitStruct<VkPresentInfoKHR>();
+    VkPresentInfoKHR present = vku::InitStructHelper();
     present.pSwapchains = &m_swapchain;
     present.pImageIndices = &image_index;
     present.swapchainCount = 1;
@@ -3318,7 +3104,7 @@ TEST_F(NegativeWsi, QueuePresentWaitingSameSemaphore) {
     vk::QueuePresentKHR(other, &present);
     m_errorMonitor->VerifyFound();
 
-    vk::QueueWaitIdle(m_device->m_queue);
+    vk::QueueWaitIdle(m_default_queue);
     vk::QueueWaitIdle(other);
 }
 
@@ -3329,37 +3115,34 @@ TEST_F(NegativeWsi, QueuePresentBinarySemaphoreNotSignaled) {
     // timeline semaphore determines which VUID used, even though it isn't needed for the test
     AddOptionalExtensions(VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
+    RETURN_IF_SKIP(InitFramework())
 
-    auto timeline_features = LvlInitStruct<VkPhysicalDeviceTimelineSemaphoreFeaturesKHR>();
+    VkPhysicalDeviceTimelineSemaphoreFeaturesKHR timeline_features = vku::InitStructHelper();
     auto features2 = GetPhysicalDeviceFeatures2(timeline_features);
 
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features2));
+    RETURN_IF_SKIP(InitState(nullptr, &features2))
     if (!InitSwapchain(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)) {
         GTEST_SKIP() << "Cannot create surface or swapchain, skipping test";
     }
     uint32_t image_index{0};
     const auto images = GetSwapchainImages(m_swapchain);
 
-    vk_testing::Fence fence(*m_device);
-    vk_testing::Semaphore semaphore(*m_device);
+    vkt::Fence fence(*m_device);
+    vkt::Semaphore semaphore(*m_device);
 
-    auto err = vk::AcquireNextImageKHR(device(), m_swapchain, kWaitTimeout, semaphore.handle(), fence.handle(), &image_index);
-    ASSERT_VK_SUCCESS(err);
+    vk::AcquireNextImageKHR(device(), m_swapchain, kWaitTimeout, semaphore.handle(), fence.handle(), &image_index);
 
-    err = fence.wait(kWaitTimeout);
-    ASSERT_VK_SUCCESS(err);
+    fence.wait(kWaitTimeout);
     SetImageLayout(m_device, VK_IMAGE_ASPECT_COLOR_BIT, images[image_index], VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
     VkPipelineStageFlags stage_flags = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-    auto submit_info = LvlInitStruct<VkSubmitInfo>();
+    VkSubmitInfo submit_info = vku::InitStructHelper();
     submit_info.waitSemaphoreCount = 1;
     submit_info.pWaitSemaphores = &semaphore.handle();
     submit_info.pWaitDstStageMask = &stage_flags;
-    err = vk::QueueSubmit(m_device->m_queue, 1, &submit_info, VK_NULL_HANDLE);
-    ASSERT_VK_SUCCESS(err);
+    vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
 
-    auto present = LvlInitStruct<VkPresentInfoKHR>();
+    VkPresentInfoKHR present = vku::InitStructHelper();
     present.pSwapchains = &m_swapchain;
     present.pImageIndices = &image_index;
     present.swapchainCount = 1;
@@ -3368,10 +3151,10 @@ TEST_F(NegativeWsi, QueuePresentBinarySemaphoreNotSignaled) {
     present.pWaitSemaphores = &semaphore.handle();
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkQueuePresentKHR-pWaitSemaphores-03268");
-    vk::QueuePresentKHR(m_device->m_queue, &present);
+    vk::QueuePresentKHR(m_default_queue, &present);
     m_errorMonitor->VerifyFound();
 
-    ASSERT_VK_SUCCESS(vk::QueueWaitIdle(m_device->m_queue));
+    vk::QueueWaitIdle(m_default_queue);
 }
 
 TEST_F(NegativeWsi, SwapchainAcquireImageRetired) {
@@ -3380,20 +3163,12 @@ TEST_F(NegativeWsi, SwapchainAcquireImageRetired) {
 
     AddSurfaceExtension();
     AddRequiredExtensions(VK_KHR_DEVICE_GROUP_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
+    RETURN_IF_SKIP(InitFramework())
 
-    if (DeviceValidationVersion() < VK_API_VERSION_1_1) {
-        GTEST_SKIP() << "At least Vulkan version 1.1 is required";
-    }
-
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
-
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitState())
     ASSERT_TRUE(InitSwapchain());
 
-    auto swapchain_create_info = LvlInitStruct<VkSwapchainCreateInfoKHR>();
+    VkSwapchainCreateInfoKHR swapchain_create_info = vku::InitStructHelper();
     swapchain_create_info.surface = m_surface;
     swapchain_create_info.minImageCount = m_surface_capabilities.minImageCount;
     swapchain_create_info.imageFormat = m_surface_formats[0].format;
@@ -3411,11 +3186,9 @@ TEST_F(NegativeWsi, SwapchainAcquireImageRetired) {
     VkSwapchainKHR swapchain;
     vk::CreateSwapchainKHR(device(), &swapchain_create_info, nullptr, &swapchain);
 
-    auto semaphore_create_info = LvlInitStruct<VkSemaphoreCreateInfo>();
-    vk_testing::Semaphore semaphore(*m_device, semaphore_create_info);
-    ASSERT_TRUE(semaphore.initialized());
+    vkt::Semaphore semaphore(*m_device);
 
-    auto acquire_info = LvlInitStruct<VkAcquireNextImageInfoKHR>();
+    VkAcquireNextImageInfoKHR acquire_info = vku::InitStructHelper();
     acquire_info.swapchain = m_swapchain;
     acquire_info.timeout = kWaitTimeout;
     acquire_info.semaphore = semaphore.handle();
@@ -3437,23 +3210,20 @@ TEST_F(NegativeWsi, PresentInfoParameters) {
     TEST_DESCRIPTION("Validate VkPresentInfoKHR implicit VUs");
 
     AddSurfaceExtension();
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitState())
     if (!InitSwapchain()) {
         GTEST_SKIP() << "Cannot create surface or swapchain";
     }
 
     uint32_t image_index;
-    VkFenceObj fence;
-    fence.init(*m_device, VkFenceObj::create_info());
+    vkt::Fence fence;
+    fence.init(*m_device, vkt::Fence::create_info());
     vk::AcquireNextImageKHR(device(), m_swapchain, kWaitTimeout, VK_NULL_HANDLE, fence.handle(), &image_index);
     vk::WaitForFences(device(), 1, &fence.handle(), true, kWaitTimeout);
 
-    auto present = LvlInitStruct<VkPresentInfoKHR>();
+    VkPresentInfoKHR present = vku::InitStructHelper();
     present.waitSemaphoreCount = 0;
     present.swapchainCount = 0;
     present.pSwapchains = &m_swapchain;
@@ -3462,7 +3232,7 @@ TEST_F(NegativeWsi, PresentInfoParameters) {
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID_Undefined");                                    // pSwapchains
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPresentInfoKHR-swapchainCount-arraylength");  // pImageIndices
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPresentInfoKHR-swapchainCount-arraylength");  // pResults
-    vk::QueuePresentKHR(m_device->m_queue, &present);
+    vk::QueuePresentKHR(m_default_queue, &present);
     m_errorMonitor->VerifyFound();
 }
 
@@ -3471,27 +3241,24 @@ TEST_F(NegativeWsi, PresentRegionsKHR) {
 
     AddRequiredExtensions(VK_KHR_INCREMENTAL_PRESENT_EXTENSION_NAME);
     AddSurfaceExtension();
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitState())
     if (!InitSwapchain()) {
         GTEST_SKIP() << "Cannot create surface or swapchain";
     }
 
     uint32_t image_index;
-    VkFenceObj fence;
-    fence.init(*m_device, VkFenceObj::create_info());
+    vkt::Fence fence;
+    fence.init(*m_device, vkt::Fence::create_info());
     vk::AcquireNextImageKHR(device(), m_swapchain, kWaitTimeout, VK_NULL_HANDLE, fence.handle(), &image_index);
     vk::WaitForFences(device(), 1, &fence.handle(), true, kWaitTimeout);
 
     // Allowed to have zero rectangleCount
     VkPresentRegionKHR region[2] = {{0, nullptr}, {0, nullptr}};
 
-    auto regions = LvlInitStruct<VkPresentRegionsKHR>();
-    auto present = LvlInitStruct<VkPresentInfoKHR>(&regions);
+    VkPresentRegionsKHR regions = vku::InitStructHelper();
+    VkPresentInfoKHR present = vku::InitStructHelper(&regions);
     present.waitSemaphoreCount = 0;
     present.swapchainCount = 1;
     present.pSwapchains = &m_swapchain;
@@ -3501,7 +3268,7 @@ TEST_F(NegativeWsi, PresentRegionsKHR) {
         regions.swapchainCount = 2;  // swapchainCount doesn't match VkPresentInfoKHR::swapchainCount
         regions.pRegions = region;
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPresentRegionsKHR-swapchainCount-01260");
-        vk::QueuePresentKHR(m_device->m_queue, &present);
+        vk::QueuePresentKHR(m_default_queue, &present);
         m_errorMonitor->VerifyFound();
     }
 
@@ -3509,7 +3276,113 @@ TEST_F(NegativeWsi, PresentRegionsKHR) {
         regions.swapchainCount = 0;  // can't be zero
         regions.pRegions = region;
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPresentRegionsKHR-swapchainCount-arraylength");
-        vk::QueuePresentKHR(m_device->m_queue, &present);
+        vk::QueuePresentKHR(m_default_queue, &present);
         m_errorMonitor->VerifyFound();
     }
+}
+
+TEST_F(PositiveWsi, UseDestroyedSwapchain) {
+    TEST_DESCRIPTION("Draw to images of a destroyed swapchain");
+    AddSurfaceExtension();
+
+    RETURN_IF_SKIP(InitFramework())
+
+    RETURN_IF_SKIP(InitState())
+    if (!InitSurface()) {
+        GTEST_SKIP() << "Cannot create surface";
+    }
+    InitSwapchainInfo();
+
+    VkBool32 supported;
+    vk::GetPhysicalDeviceSurfaceSupportKHR(gpu(), m_device->graphics_queue_node_index_, m_surface, &supported);
+    if (!supported) {
+        GTEST_SKIP() << "Graphics queue does not support present";
+    }
+
+    VkSwapchainCreateInfoKHR swapchain_create_info = vku::InitStructHelper();
+    swapchain_create_info.surface = m_surface;
+    swapchain_create_info.minImageCount = m_surface_capabilities.minImageCount;
+    swapchain_create_info.imageFormat = m_surface_formats[0].format;
+    swapchain_create_info.imageColorSpace = m_surface_formats[0].colorSpace;
+    swapchain_create_info.imageExtent = {m_surface_capabilities.minImageExtent.width, m_surface_capabilities.minImageExtent.height};
+    swapchain_create_info.imageArrayLayers = 1;
+    swapchain_create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    swapchain_create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    swapchain_create_info.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+    swapchain_create_info.compositeAlpha = m_surface_composite_alpha;
+    swapchain_create_info.presentMode = m_surface_non_shared_present_mode;
+    swapchain_create_info.clipped = VK_FALSE;
+    swapchain_create_info.oldSwapchain = 0;
+    vk::CreateSwapchainKHR(device(), &swapchain_create_info, nullptr, &m_swapchain);
+
+    uint32_t swapchain_images_count = 0;
+    vk::GetSwapchainImagesKHR(device(), m_swapchain, &swapchain_images_count, nullptr);
+    std::vector<VkImage> swapchain_images;
+    swapchain_images.resize(swapchain_images_count);
+    vk::GetSwapchainImagesKHR(device(), m_swapchain, &swapchain_images_count, swapchain_images.data());
+
+    vkt::Fence fence;
+    fence.init(*m_device, vkt::Fence::create_info());
+    VkFence fence_handle = fence.handle();
+    uint32_t index;
+    vk::ResetFences(device(), 1, &fence_handle);
+    vk::AcquireNextImageKHR(device(), m_swapchain, kWaitTimeout, VK_NULL_HANDLE, fence_handle, &index);
+    vk::WaitForFences(device(), 1, &fence_handle, VK_TRUE, kWaitTimeout);
+
+    VkImageViewCreateInfo ivci = vku::InitStructHelper();
+    ivci.image = swapchain_images[index];
+    ivci.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    ivci.format = swapchain_create_info.imageFormat;
+    ivci.subresourceRange.layerCount = 1;
+    ivci.subresourceRange.baseMipLevel = 0;
+    ivci.subresourceRange.levelCount = 1;
+    ivci.subresourceRange.baseArrayLayer = 0;
+    ivci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+
+    vkt::ImageView image_view(*m_device, ivci);
+    VkImageView image_view_handle = image_view.handle();
+
+    VkAttachmentDescription attach[] = {
+        {0, swapchain_create_info.imageFormat, VK_SAMPLE_COUNT_1_BIT, VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+         VK_ATTACHMENT_STORE_OP_DONT_CARE, VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE,
+         VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL},
+    };
+    VkAttachmentReference ref = {0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
+    VkSubpassDescription subpasses[] = {
+        {0, VK_PIPELINE_BIND_POINT_GRAPHICS, 0, nullptr, 1, &ref, nullptr, nullptr, 0, nullptr},
+    };
+
+    VkRenderPassCreateInfo rpci = {VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO, nullptr, 0, 1, attach, 1, subpasses, 0, nullptr};
+    vkt::RenderPass rp(*m_device, rpci);
+
+    VkFramebufferCreateInfo fbci = vku::InitStructHelper();
+    fbci.renderPass = rp.handle();
+    fbci.attachmentCount = 1;
+    fbci.pAttachments = &image_view_handle;
+    fbci.width = 1u;
+    fbci.height = 1u;
+    fbci.layers = 1u;
+    vkt::Framebuffer fb(*m_device, fbci);
+
+    CreatePipelineHelper pipe(*this);
+    pipe.InitState();
+    pipe.gp_ci_.renderPass = rp.handle();
+    pipe.CreateGraphicsPipeline();
+
+    VkRenderPassBeginInfo rpbinfo = vku::InitStructHelper();
+    rpbinfo.renderPass = rp.handle();
+    rpbinfo.framebuffer = fb.handle();
+    rpbinfo.renderArea.extent.width = fbci.width;
+    rpbinfo.renderArea.extent.height = fbci.height;
+
+    VkSwapchainKHR oldSwapchain = m_swapchain;
+    swapchain_create_info.oldSwapchain = m_swapchain;
+    vk::CreateSwapchainKHR(device(), &swapchain_create_info, nullptr, &m_swapchain);
+    vk::DestroySwapchainKHR(device(), oldSwapchain, nullptr);
+
+    m_commandBuffer->begin();
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkRenderPassBeginInfo-framebuffer-parameter");
+    m_commandBuffer->BeginRenderPass(rpbinfo);
+    m_errorMonitor->VerifyFound();
+    m_commandBuffer->end();
 }

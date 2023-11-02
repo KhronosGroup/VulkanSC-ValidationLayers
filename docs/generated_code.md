@@ -27,6 +27,8 @@ cmd /C "python3 scripts/generate_source.py external/Vulkan-Headers/registry/ ext
 When making change to the `scripts/` folder, make sure to run `generate_source.py` and check in both the changes to
 `scripts/` and `layers/vulkan/generated/` in any PR. (Code generation does **not** happen automatically at build time.)
 
+> Note: All generated code is formatted with `clang-format` after it generates (see PR #6480 for details)
+
 To generate source for Vulkan SC, the `--api vulkansc` option must be passed to the `generate_source.py` command and the generated files are located at `layers/vulkansc/generated/`.
 
 ## CMake helper

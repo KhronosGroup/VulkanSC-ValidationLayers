@@ -23,11 +23,11 @@ class VkSCDeviceCreateLayerTest : public VkSCLayerTest {
 
     void TestCreateDevice(void* pNext) {
         float queue_priority = 1.f;
-        auto queue_info = LvlInitStruct<VkDeviceQueueCreateInfo>();
+        auto queue_info = vku::InitStruct<VkDeviceQueueCreateInfo>();
         queue_info.queueCount = 1;
         queue_info.pQueuePriorities = &queue_priority;
 
-        auto create_info = LvlInitStruct<VkDeviceCreateInfo>(pNext);
+        auto create_info = vku::InitStruct<VkDeviceCreateInfo>(pNext);
         create_info.queueCreateInfoCount = 1;
         create_info.pQueueCreateInfos = &queue_info;
 
@@ -43,9 +43,9 @@ class VkSCDeviceCreateLayerTest : public VkSCLayerTest {
 TEST_F(VkSCDeviceCreateLayerTest, MissingVulkanSC10Features) {
     TEST_DESCRIPTION("vkCreateDevice with missing VkPhysicalDeviceVulkanSC10Features.");
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
+    RETURN_IF_SKIP(InitFramework());
 
-    auto object_reservation_info = LvlInitStruct<VkDeviceObjectReservationCreateInfo>();
+    auto object_reservation_info = vku::InitStruct<VkDeviceObjectReservationCreateInfo>();
 
     m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "UNASSIGNED-VkDeviceCreateInfo-pNext-VkPhysicalDeviceVulkanSC10Features");
     TestCreateDevice(&object_reservation_info);
@@ -54,9 +54,9 @@ TEST_F(VkSCDeviceCreateLayerTest, MissingVulkanSC10Features) {
 TEST_F(VkSCDeviceCreateLayerTest, MissingObjectReservationInfo) {
     TEST_DESCRIPTION("vkCreateDevice with missing VkDeviceObjectReservationCreateInfo.");
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
+    RETURN_IF_SKIP(InitFramework());
 
-    auto sc_10_features = LvlInitStruct<VkPhysicalDeviceVulkanSC10Features>();
+    auto sc_10_features = vku::InitStruct<VkPhysicalDeviceVulkanSC10Features>();
 
     m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "UNASSIGNED-VkDeviceCreateInfo-pNext-VkDeviceObjectReservationCreateInfo");
     TestCreateDevice(&sc_10_features);
@@ -65,13 +65,13 @@ TEST_F(VkSCDeviceCreateLayerTest, MissingObjectReservationInfo) {
 TEST_F(VkSCDeviceCreateLayerTest, MaxMemoryAllocationCountExceeded) {
     TEST_DESCRIPTION("vkCreateDevice - requested memory count exceeds maximum");
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
+    RETURN_IF_SKIP(InitFramework());
 
-    auto sc_10_features = LvlInitStruct<VkPhysicalDeviceVulkanSC10Features>();
+    auto sc_10_features = vku::InitStruct<VkPhysicalDeviceVulkanSC10Features>();
 
     const uint32_t max_count = 10;
-    std::vector<VkDeviceObjectReservationCreateInfo> object_reservation_info(max_count,
-                                                                             LvlInitStruct<VkDeviceObjectReservationCreateInfo>());
+    std::vector<VkDeviceObjectReservationCreateInfo> object_reservation_info(
+        max_count, vku::InitStruct<VkDeviceObjectReservationCreateInfo>());
     object_reservation_info[0].pNext = &sc_10_features;
     for (uint32_t i = 1; i < max_count; ++i) {
         object_reservation_info[i].pNext = &object_reservation_info[i - 1];
@@ -99,13 +99,13 @@ TEST_F(VkSCDeviceCreateLayerTest, MaxMemoryAllocationCountExceeded) {
 TEST_F(VkSCDeviceCreateLayerTest, MaxSamplerAllocationCountExceeded) {
     TEST_DESCRIPTION("vkCreateDevice - requested memory count exceeds maximum");
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
+    RETURN_IF_SKIP(InitFramework());
 
-    auto sc_10_features = LvlInitStruct<VkPhysicalDeviceVulkanSC10Features>();
+    auto sc_10_features = vku::InitStruct<VkPhysicalDeviceVulkanSC10Features>();
 
     const uint32_t max_count = 10;
-    std::vector<VkDeviceObjectReservationCreateInfo> object_reservation_info(max_count,
-                                                                             LvlInitStruct<VkDeviceObjectReservationCreateInfo>());
+    std::vector<VkDeviceObjectReservationCreateInfo> object_reservation_info(
+        max_count, vku::InitStruct<VkDeviceObjectReservationCreateInfo>());
     object_reservation_info[0].pNext = &sc_10_features;
     for (uint32_t i = 1; i < max_count; ++i) {
         object_reservation_info[i].pNext = &object_reservation_info[i - 1];
@@ -133,13 +133,13 @@ TEST_F(VkSCDeviceCreateLayerTest, MaxSamplerAllocationCountExceeded) {
 TEST_F(VkSCDeviceCreateLayerTest, MaxImageArrayLayersExceeded) {
     TEST_DESCRIPTION("vkCreateDevice - requested max image view array layers exceeds maximum");
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceProperties pd_props;
     GetPhysicalDeviceProperties(&pd_props);
 
-    auto sc_10_features = LvlInitStruct<VkPhysicalDeviceVulkanSC10Features>();
-    auto object_reservation_info = LvlInitStruct<VkDeviceObjectReservationCreateInfo>(&sc_10_features);
+    auto sc_10_features = vku::InitStruct<VkPhysicalDeviceVulkanSC10Features>();
+    auto object_reservation_info = vku::InitStruct<VkDeviceObjectReservationCreateInfo>(&sc_10_features);
 
     object_reservation_info.maxImageViewArrayLayers = pd_props.limits.maxImageArrayLayers + 1;
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDeviceObjectReservationCreateInfo-maxImageViewArrayLayers-05014");
@@ -149,7 +149,7 @@ TEST_F(VkSCDeviceCreateLayerTest, MaxImageArrayLayersExceeded) {
 TEST_F(VkSCDeviceCreateLayerTest, MaxMipLevelsExceeded) {
     TEST_DESCRIPTION("vkCreateDevice - requested max image view mip levels exceeds maximum");
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceProperties pd_props;
     GetPhysicalDeviceProperties(&pd_props);
@@ -158,8 +158,8 @@ TEST_F(VkSCDeviceCreateLayerTest, MaxMipLevelsExceeded) {
         1u + static_cast<uint32_t>(log2(std::max({pd_props.limits.maxImageDimension1D, pd_props.limits.maxImageDimension2D,
                                                   pd_props.limits.maxImageDimension3D, pd_props.limits.maxImageDimensionCube})));
 
-    auto sc_10_features = LvlInitStruct<VkPhysicalDeviceVulkanSC10Features>();
-    auto object_reservation_info = LvlInitStruct<VkDeviceObjectReservationCreateInfo>(&sc_10_features);
+    auto sc_10_features = vku::InitStruct<VkPhysicalDeviceVulkanSC10Features>();
+    auto object_reservation_info = vku::InitStruct<VkDeviceObjectReservationCreateInfo>(&sc_10_features);
 
     object_reservation_info.maxImageViewMipLevels = max_mip_levels + 1;
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDeviceObjectReservationCreateInfo-maxImageViewMipLevels-05015");
@@ -174,11 +174,11 @@ TEST_F(VkSCDeviceCreateLayerTest, MaxMipLevelsExceeded) {
 TEST_F(VkSCDeviceCreateLayerTest, MaxTotalSubpassDescriptions) {
     TEST_DESCRIPTION("vkCreateDevice - requested subpass description count exceeds maximum possible");
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
+    RETURN_IF_SKIP(InitFramework());
 
     auto sc_10_props = GetVulkanSC10Properties(gpu());
-    auto sc_10_features = LvlInitStruct<VkPhysicalDeviceVulkanSC10Features>();
-    auto object_reservation_info = LvlInitStruct<VkDeviceObjectReservationCreateInfo>(&sc_10_features);
+    auto sc_10_features = vku::InitStruct<VkPhysicalDeviceVulkanSC10Features>();
+    auto object_reservation_info = vku::InitStruct<VkDeviceObjectReservationCreateInfo>(&sc_10_features);
 
     object_reservation_info.renderPassRequestCount = 42;
     object_reservation_info.subpassDescriptionRequestCount =
@@ -203,11 +203,11 @@ TEST_F(VkSCDeviceCreateLayerTest, MaxTotalSubpassDescriptions) {
 TEST_F(VkSCDeviceCreateLayerTest, PipelineCacheCreateMissingRequiredFlags) {
     TEST_DESCRIPTION("vkCreateDevice - VkPipelineCacheCreateInfo is missing required flags");
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
+    RETURN_IF_SKIP(InitFramework());
 
     VkPipelineCacheCreateInfo create_info{};
-    auto sc_10_features = LvlInitStruct<VkPhysicalDeviceVulkanSC10Features>();
-    auto object_reservation_info = LvlInitStruct<VkDeviceObjectReservationCreateInfo>(&sc_10_features);
+    auto sc_10_features = vku::InitStruct<VkPhysicalDeviceVulkanSC10Features>();
+    auto object_reservation_info = vku::InitStruct<VkDeviceObjectReservationCreateInfo>(&sc_10_features);
     object_reservation_info.pipelineCacheCreateInfoCount = 1;
     object_reservation_info.pPipelineCacheCreateInfos = &create_info;
 
@@ -229,8 +229,8 @@ class VkSCPipelineCacheDataLayerTest : public VkSCDeviceCreateLayerTest {
     VkPipelineCacheCreateInfo create_info{};
 
     void TestPipelineCacheData(const std::vector<VkPipelineCacheCreateInfo> create_infos) {
-        auto sc_10_features = LvlInitStruct<VkPhysicalDeviceVulkanSC10Features>();
-        auto object_reservation_info = LvlInitStruct<VkDeviceObjectReservationCreateInfo>(&sc_10_features);
+        auto sc_10_features = vku::InitStruct<VkPhysicalDeviceVulkanSC10Features>();
+        auto object_reservation_info = vku::InitStruct<VkDeviceObjectReservationCreateInfo>(&sc_10_features);
         object_reservation_info.pipelineCacheCreateInfoCount = static_cast<uint32_t>(create_infos.size());
         object_reservation_info.pPipelineCacheCreateInfos = create_infos.data();
 
@@ -243,7 +243,7 @@ class VkSCPipelineCacheDataLayerTest : public VkSCDeviceCreateLayerTest {
 TEST_F(VkSCPipelineCacheDataLayerTest, HeaderTooSmall) {
     TEST_DESCRIPTION("Test when pipeline cache data smaller than expected");
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
+    RETURN_IF_SKIP(InitFramework());
 
     builder.AddBlob(4);
 
@@ -262,7 +262,7 @@ TEST_F(VkSCPipelineCacheDataLayerTest, HeaderTooSmall) {
 TEST_F(VkSCPipelineCacheDataLayerTest, InvalidHeaderSize) {
     TEST_DESCRIPTION("Pipeline cache data - headerSize is not 56");
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
+    RETURN_IF_SKIP(InitFramework());
 
     auto header = builder.AddDefaultHeaderVersionSCOne();
     builder.AddPipelineEntry(header, "1265a236-e369-11ed-b5ea-0242ac120002", 4000);
@@ -281,7 +281,7 @@ TEST_F(VkSCPipelineCacheDataLayerTest, InvalidHeaderSize) {
 TEST_F(VkSCPipelineCacheDataLayerTest, InvalidHeaderVersion) {
     TEST_DESCRIPTION("Pipeline cache data - headerVersion is not VK_PIPELINE_CACHE_HEADER_VERSION_SAFETY_CRITICAL_ONE");
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
+    RETURN_IF_SKIP(InitFramework());
 
     auto header = builder.AddDefaultHeaderVersionSCOne();
     builder.AddPipelineEntry(header, "1265a236-e369-11ed-b5ea-0242ac120002", 4000);
@@ -296,7 +296,7 @@ TEST_F(VkSCPipelineCacheDataLayerTest, InvalidHeaderVersion) {
 TEST_F(VkSCPipelineCacheDataLayerTest, InvalidValidationVersion) {
     TEST_DESCRIPTION("Pipeline cache data - validationVersion is not VK_PIPELINE_CACHE_VALIDATION_VERSION_SAFETY_CRITICAL_ONE");
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
+    RETURN_IF_SKIP(InitFramework());
 
     auto header = builder.AddDefaultHeaderVersionSCOne();
     builder.AddPipelineEntry(header, "1265a236-e369-11ed-b5ea-0242ac120002", 4000);
@@ -311,7 +311,7 @@ TEST_F(VkSCPipelineCacheDataLayerTest, InvalidValidationVersion) {
 TEST_F(VkSCPipelineCacheDataLayerTest, InvalidPipelineIndexStride) {
     TEST_DESCRIPTION("Pipeline cache data - pipelineIndexStride must be at least 56");
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
+    RETURN_IF_SKIP(InitFramework());
 
     auto header = builder.AddDefaultHeaderVersionSCOne();
     using PrivData = uint64_t;
@@ -331,7 +331,7 @@ TEST_F(VkSCPipelineCacheDataLayerTest, InvalidPipelineIndexStride) {
 TEST_F(VkSCPipelineCacheDataLayerTest, PipelineIndexOutOfBounds) {
     TEST_DESCRIPTION("Pipeline cache data - pipeline index entry out of bounds");
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
+    RETURN_IF_SKIP(InitFramework());
 
     auto header = builder.AddDefaultHeaderVersionSCOne();
     builder.AddPipelineEntry(header, "1265a236-e369-11ed-b5ea-0242ac120002", 4000);
@@ -347,7 +347,7 @@ TEST_F(VkSCPipelineCacheDataLayerTest, PipelineIndexOutOfBounds) {
 TEST_F(VkSCPipelineCacheDataLayerTest, DuplicatePipelineIdentifier) {
     TEST_DESCRIPTION("Pipeline cache data - duplicate pipeline identifier");
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
+    RETURN_IF_SKIP(InitFramework());
 
     auto header = builder.AddDefaultHeaderVersionSCOne();
     builder.AddPipelineEntry(header, "3ddda923-b6fc-433e-803c-822c1bccbc05", 4000);
@@ -364,7 +364,7 @@ TEST_F(VkSCPipelineCacheDataLayerTest, DuplicatePipelineIdentifier) {
 TEST_F(VkSCPipelineCacheDataLayerTest, InvalidPipelineIndexEntryValues) {
     TEST_DESCRIPTION("Pipeline cache data - test invalid cases for pipeline index entry values");
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
+    RETURN_IF_SKIP(InitFramework());
 
     auto header = builder.AddDefaultHeaderVersionSCOne();
     std::vector<vksc::PipelineCacheDataBuilder::SCIndexEntry<>> entries = {
@@ -405,7 +405,7 @@ TEST_F(VkSCPipelineCacheDataLayerTest, InvalidPipelineIndexEntryValues) {
 TEST_F(VkSCPipelineCacheDataLayerTest, JsonDataOutOfBounds) {
     TEST_DESCRIPTION("Pipeline cache data - JSON data for pipeline out of bounds");
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
+    RETURN_IF_SKIP(InitFramework());
 
     auto header = builder.AddDefaultHeaderVersionSCOne();
     builder.AddPipelineEntry(header, "1de725b8-e36d-11ed-b5ea-0242ac120002", 4000);
@@ -423,7 +423,7 @@ TEST_F(VkSCPipelineCacheDataLayerTest, JsonDataOutOfBounds) {
 TEST_F(VkSCPipelineCacheDataLayerTest, InvalidStageIndexStride) {
     TEST_DESCRIPTION("Pipeline cache data - stageIndexStride must be at least 16");
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
+    RETURN_IF_SKIP(InitFramework());
 
     auto header = builder.AddDefaultHeaderVersionSCOne();
     builder.AddPipelineEntry(header, "1de725b8-e36d-11ed-b5ea-0242ac120002", 4000);
@@ -446,7 +446,7 @@ TEST_F(VkSCPipelineCacheDataLayerTest, InvalidStageIndexStride) {
 TEST_F(VkSCPipelineCacheDataLayerTest, StageIndexOutOfBounds) {
     TEST_DESCRIPTION("Pipeline cache data - stage index entry out of bounds");
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
+    RETURN_IF_SKIP(InitFramework());
 
     auto header = builder.AddDefaultHeaderVersionSCOne();
     builder.AddPipelineEntry(header, "1de725b8-e36d-11ed-b5ea-0242ac120002", 4000);
@@ -464,7 +464,7 @@ TEST_F(VkSCPipelineCacheDataLayerTest, StageIndexOutOfBounds) {
 TEST_F(VkSCPipelineCacheDataLayerTest, InvalidStageIndexEntryValues) {
     TEST_DESCRIPTION("Pipeline cache data - test invalid cases for stage index entry values");
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
+    RETURN_IF_SKIP(InitFramework());
 
     auto header = builder.AddDefaultHeaderVersionSCOne();
     std::vector<vksc::PipelineCacheDataBuilder::SCIndexEntry<>> entries = {
@@ -497,7 +497,7 @@ TEST_F(VkSCPipelineCacheDataLayerTest, InvalidStageIndexEntryValues) {
 TEST_F(VkSCPipelineCacheDataLayerTest, StageCodeDataOutOfBounds) {
     TEST_DESCRIPTION("Pipeline cache data - stage code data out of bounds");
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
+    RETURN_IF_SKIP(InitFramework());
 
     auto header = builder.AddDefaultHeaderVersionSCOne();
     builder.AddPipelineEntry(header, "1de725b8-e36d-11ed-b5ea-0242ac120002", 4000);
@@ -515,7 +515,7 @@ TEST_F(VkSCPipelineCacheDataLayerTest, StageCodeDataOutOfBounds) {
 TEST_F(VkSCPipelineCacheDataLayerTest, MultipleProblems) {
     TEST_DESCRIPTION("Pipeline cache data - test multiple problems with the pipeline cache data");
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
+    RETURN_IF_SKIP(InitFramework());
 
     std::vector<std::vector<uint8_t>> pipeline_caches{};
 
@@ -585,7 +585,7 @@ TEST_F(VkSCPipelineCacheDataLayerTest, MultipleProblems) {
         builder.Clear();
     }
 
-    std::vector<VkPipelineCacheCreateInfo> create_infos(pipeline_caches.size(), LvlInitStruct<VkPipelineCacheCreateInfo>());
+    std::vector<VkPipelineCacheCreateInfo> create_infos(pipeline_caches.size(), vku::InitStruct<VkPipelineCacheCreateInfo>());
     for (size_t i = 0; i < pipeline_caches.size(); ++i) {
         create_infos[i].flags = VK_PIPELINE_CACHE_CREATE_READ_ONLY_BIT | VK_PIPELINE_CACHE_CREATE_USE_APPLICATION_STORAGE_BIT;
         create_infos[i].initialDataSize = pipeline_caches[i].size();

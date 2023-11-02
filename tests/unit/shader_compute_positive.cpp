@@ -12,17 +12,18 @@
  */
 
 #include "../framework/layer_validation_tests.h"
+#include "../framework/pipeline_helper.h"
 
 TEST_F(PositiveShaderCompute, WorkGroupSizePrecedenceOverLocalSize) {
     // "If an object is decorated with the WorkgroupSize decoration, this takes precedence over any LocalSize or LocalSizeId
     // execution mode."
     TEST_DESCRIPTION("Make sure work WorkgroupSize decoration is used over LocalSize");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
+    RETURN_IF_SKIP(Init())
 
-    uint32_t x_size_limit = m_device->props.limits.maxComputeWorkGroupSize[0];
-    uint32_t y_size_limit = m_device->props.limits.maxComputeWorkGroupSize[1];
-    uint32_t z_size_limit = m_device->props.limits.maxComputeWorkGroupSize[2];
+    uint32_t x_size_limit = m_device->phy().limits_.maxComputeWorkGroupSize[0];
+    uint32_t y_size_limit = m_device->phy().limits_.maxComputeWorkGroupSize[1];
+    uint32_t z_size_limit = m_device->phy().limits_.maxComputeWorkGroupSize[2];
 
     std::stringstream spv_source;
     spv_source << R"(
@@ -59,9 +60,9 @@ TEST_F(PositiveShaderCompute, WorkGroupSizePrecedenceOverLocalSize) {
 TEST_F(PositiveShaderCompute, WorkGroupSizeSpecConstantUnder) {
     TEST_DESCRIPTION("Make sure spec constants get applied to to be under maxComputeWorkGroupSize");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
+    RETURN_IF_SKIP(Init())
 
-    uint32_t x_size_limit = m_device->props.limits.maxComputeWorkGroupSize[0];
+    uint32_t x_size_limit = m_device->phy().limits_.maxComputeWorkGroupSize[0];
 
     std::stringstream spv_source;
     spv_source << R"(
@@ -112,14 +113,11 @@ TEST_F(PositiveShaderCompute, WorkGroupSizeLocalSizeId) {
     TEST_DESCRIPTION("Validate LocalSizeId doesn't triggers maxComputeWorkGroupSize limit");
 
     SetTargetApiVersion(VK_API_VERSION_1_3);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (DeviceValidationVersion() < VK_API_VERSION_1_3) {
-        GTEST_SKIP() << "At least Vulkan version 1.3 is required";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    auto features13 = LvlInitStruct<VkPhysicalDeviceVulkan13Features>();
+    VkPhysicalDeviceVulkan13Features features13 = vku::InitStructHelper();
     features13.maintenance4 = VK_TRUE;  // required to be supported in 1.3
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features13));
+    RETURN_IF_SKIP(InitState(nullptr, &features13));
 
     std::stringstream spv_source;
     spv_source << R"(
@@ -151,16 +149,13 @@ TEST_F(PositiveShaderCompute, WorkGroupSizeLocalSizeIdSpecConstant) {
     TEST_DESCRIPTION("Validate LocalSizeId doesn't triggers maxComputeWorkGroupSize limit with spec constants");
 
     SetTargetApiVersion(VK_API_VERSION_1_3);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (DeviceValidationVersion() < VK_API_VERSION_1_3) {
-        GTEST_SKIP() << "At least Vulkan version 1.3 is required";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    auto features13 = LvlInitStruct<VkPhysicalDeviceVulkan13Features>();
+    VkPhysicalDeviceVulkan13Features features13 = vku::InitStructHelper();
     features13.maintenance4 = VK_TRUE;  // required to be supported in 1.3
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features13));
+    RETURN_IF_SKIP(InitState(nullptr, &features13));
 
-    uint32_t x_size_limit = m_device->props.limits.maxComputeWorkGroupSize[0];
+    uint32_t x_size_limit = m_device->phy().limits_.maxComputeWorkGroupSize[0];
 
     // layout(local_size_x_id = 18, local_size_z_id = 19) in;
     // layout(local_size_x = 32) in;
@@ -212,16 +207,13 @@ TEST_F(PositiveShaderCompute, WorkGroupSizePrecedenceOverLocalSizeId) {
     TEST_DESCRIPTION("Make sure work WorkgroupSize decoration is used over LocalSizeId");
 
     SetTargetApiVersion(VK_API_VERSION_1_3);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (DeviceValidationVersion() < VK_API_VERSION_1_3) {
-        GTEST_SKIP() << "At least Vulkan version 1.3 is required";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    auto features13 = LvlInitStruct<VkPhysicalDeviceVulkan13Features>();
+    VkPhysicalDeviceVulkan13Features features13 = vku::InitStructHelper();
     features13.maintenance4 = VK_TRUE;  // required to be supported in 1.3
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features13));
+    RETURN_IF_SKIP(InitState(nullptr, &features13));
 
-    uint32_t x_size_limit = m_device->props.limits.maxComputeWorkGroupSize[0];
+    uint32_t x_size_limit = m_device->phy().limits_.maxComputeWorkGroupSize[0];
 
     std::stringstream spv_source;
     spv_source << R"(
@@ -258,9 +250,9 @@ TEST_F(PositiveShaderCompute, WorkGroupSizePrecedenceOverLocalSizeId) {
 TEST_F(PositiveShaderCompute, SharedMemorySpecConstantOp) {
     TEST_DESCRIPTION("Validate compute shader shared memory");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
+    RETURN_IF_SKIP(Init())
 
-    const uint32_t max_shared_memory_size = m_device->phy().properties().limits.maxComputeSharedMemorySize;
+    const uint32_t max_shared_memory_size = m_device->phy().limits_.maxComputeSharedMemorySize;
     const uint32_t max_shared_ints = max_shared_memory_size / 4;
 
     if (max_shared_ints < 16 * 7) {
@@ -289,7 +281,7 @@ TEST_F(PositiveShaderCompute, SharedMemorySpecConstantOp) {
 TEST_F(PositiveShaderCompute, SharedMemory) {
     TEST_DESCRIPTION("Validate compute shader shared memory does not exceed maxComputeSharedMemorySize");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
+    RETURN_IF_SKIP(Init())
 
     // Make sure compute pipeline has a compute shader stage set
     char const *csSource = R"glsl(
@@ -310,7 +302,6 @@ TEST_F(PositiveShaderCompute, SharedMemory) {
     )glsl";
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.InitInfo();
     pipe.cs_ = std::make_unique<VkShaderObj>(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
     pipe.InitState();
     pipe.CreateComputePipeline();
@@ -320,19 +311,12 @@ TEST_F(PositiveShaderCompute, ZeroInitializeWorkgroupMemoryFeature) {
     TEST_DESCRIPTION("Enable and use shaderZeroInitializeWorkgroupMemory feature");
 
     AddRequiredExtensions(VK_KHR_ZERO_INITIALIZE_WORKGROUP_MEMORY_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
+    RETURN_IF_SKIP(InitFramework())
 
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " required but not supported";
-    }
+    VkPhysicalDeviceZeroInitializeWorkgroupMemoryFeaturesKHR zero_initialize_work_group_memory_features = vku::InitStructHelper();
+    GetPhysicalDeviceFeatures2(zero_initialize_work_group_memory_features);
 
-    auto zero_initialize_work_group_memory_features = LvlInitStruct<VkPhysicalDeviceZeroInitializeWorkgroupMemoryFeaturesKHR>();
-    auto features2 = GetPhysicalDeviceFeatures2(zero_initialize_work_group_memory_features);
-    if (!zero_initialize_work_group_memory_features.shaderZeroInitializeWorkgroupMemory) {
-        GTEST_SKIP() << "VkPhysicalDeviceZeroInitializeWorkgroupMemoryFeaturesKHR::shaderZeroInitializeWorkgroupMemory is required but not enabled.";
-    }
-
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features2));
+    RETURN_IF_SKIP(InitState(nullptr, &zero_initialize_work_group_memory_features));
 
     const char *spv_source = R"(
                OpCapability Shader
@@ -355,7 +339,7 @@ TEST_F(PositiveShaderCompute, ZeroInitializeWorkgroupMemoryFeature) {
                OpFunctionEnd
         )";
 
-    auto cs = VkShaderObj::CreateFromASM(*this, VK_SHADER_STAGE_COMPUTE_BIT, spv_source, "main", nullptr);
+    auto cs = VkShaderObj::CreateFromASM(this, spv_source, VK_SHADER_STAGE_COMPUTE_BIT);
     const auto set_info = [&cs](CreateComputePipelineHelper &helper) { helper.cs_ = std::move(cs); };
     CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
 }

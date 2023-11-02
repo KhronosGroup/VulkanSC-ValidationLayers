@@ -32,6 +32,8 @@
 class PIPELINE_STATE;
 struct EntryPoint;
 
+static constexpr uint32_t kInvalidSpirvValue = std::numeric_limits<uint32_t>::max();
+
 // This is the common info for both OpDecorate and OpMemberDecorate
 // Used to keep track of all decorations applied to any instruction
 struct DecorationBase {
@@ -48,20 +50,19 @@ struct DecorationBase {
         per_task_nv = 1 << 9,
         per_primitive_ext = 1 << 10,
     };
-    static constexpr uint32_t kInvalidValue = std::numeric_limits<uint32_t>::max();
 
     // bits to know if things have been set or not by a Decoration
     uint32_t flags = 0;
 
     // When being used as an User-defined Variable (input, output, rtx)
-    uint32_t location = kInvalidValue;
+    uint32_t location = kInvalidSpirvValue;
     // Component is optional and spec says it is 0 if not defined
     uint32_t component = 0;
 
     uint32_t offset = 0;
 
     // A given object can only have a single BuiltIn OpDecoration
-    uint32_t builtin = kInvalidValue;
+    uint32_t builtin = kInvalidSpirvValue;
 
     void Add(uint32_t decoration, uint32_t value);
     bool Has(FlagBit flag_bit) const { return (flags & flag_bit) != 0; }
@@ -75,7 +76,7 @@ struct DecorationSet : public DecorationBase {
     uint32_t binding = 0;
 
     // Value of InputAttachmentIndex the variable starts
-    uint32_t input_attachment_index_start = kInvalidValue;
+    uint32_t input_attachment_index_start = kInvalidSpirvValue;
 
     // <index into struct, DecorationBase>
     vvl::unordered_map<uint32_t, DecorationBase> member_decorations;
@@ -115,21 +116,25 @@ struct ExecutionModeSet {
         rounding_mode_rtz_width_32 = 1 << 22,
         rounding_mode_rtz_width_64 = 1 << 23,
     };
-    static constexpr uint32_t kInvalidValue = std::numeric_limits<uint32_t>::max();
 
     // bits to know if things have been set or not by a Decoration
     uint32_t flags = 0;
 
+    VkPrimitiveTopology input_primitive_topology = VK_PRIMITIVE_TOPOLOGY_MAX_ENUM;
     VkPrimitiveTopology primitive_topology = VK_PRIMITIVE_TOPOLOGY_MAX_ENUM;
 
     // SPIR-V spec says only LocalSize or LocalSizeId can be used, so can share
-    uint32_t local_size_x = kInvalidValue;
-    uint32_t local_size_y = kInvalidValue;
-    uint32_t local_size_z = kInvalidValue;
+    uint32_t local_size_x = kInvalidSpirvValue;
+    uint32_t local_size_y = kInvalidSpirvValue;
+    uint32_t local_size_z = kInvalidSpirvValue;
 
     uint32_t output_vertices = 0;
     uint32_t output_primitives = 0;
     uint32_t invocations = 0;
+
+    uint32_t tessellation_subdivision = 0;
+    uint32_t tessellation_orientation = 0;
+    uint32_t tessellation_spacing = 0;
 
     void Add(const Instruction &insn);
     bool Has(FlagBit flag_bit) const { return (flags & flag_bit) != 0; }
@@ -169,10 +174,9 @@ struct ImageAccess {
     bool is_written_to = false;
     bool is_read_from = false;
 
-    static constexpr uint32_t kInvalidValue = std::numeric_limits<uint32_t>::max();
-    uint32_t image_access_chain_index = kInvalidValue;    // Index 0
-    uint32_t sampler_access_chain_index = kInvalidValue;  // Index 0
-    uint32_t texel_component_count = kInvalidValue;
+    uint32_t image_access_chain_index = kInvalidSpirvValue;    // OpAccessChain's Index 0
+    uint32_t sampler_access_chain_index = kInvalidSpirvValue;  // OpAccessChain's Index 0
+    uint32_t texel_component_count = kInvalidSpirvValue;
 
     ImageAccess(const SPIRV_MODULE_STATE &module_state, const Instruction &image_insn);
 };
@@ -439,6 +443,9 @@ struct SPIRV_MODULE_STATE {
 
         // <Specialization constant ID -> target ID> mapping
         vvl::unordered_map<uint32_t, uint32_t> spec_const_map;
+        // <target ID - > Specialization constant ID> mapping
+        // TODO - Remove having a second copy for the map in reverse
+        vvl::unordered_map<uint32_t, uint32_t> id_to_spec_id;
         // Find all decoration instructions to prevent relooping module later - many checks need this info
         std::vector<const Instruction *> decoration_inst;
         std::vector<const Instruction *> member_decoration_inst;
@@ -448,6 +455,8 @@ struct SPIRV_MODULE_STATE {
         std::vector<const Instruction *> builtin_decoration_inst;
         // OpEmitStreamVertex/OpEndStreamPrimitive - only allowed in Geometry shader
         std::vector<const Instruction *> transform_feedback_stream_inst;
+        // OpString - used to find debug information
+        std::vector<const Instruction *> debug_string_inst;
         // For shader tile image - OpDepthAttachmentReadEXT/OpStencilAttachmentReadEXT/OpColorAttachmentReadEXT
         bool has_shader_tile_image_depth_read{false};
         bool has_shader_tile_image_stencil_read{false};
@@ -461,6 +470,7 @@ struct SPIRV_MODULE_STATE {
         std::vector<const Instruction *> atomic_inst;
         std::vector<const Instruction *> group_inst;
         std::vector<const Instruction *> read_clock_inst;
+        std::vector<const Instruction *> cooperative_matrix_inst;
         std::vector<spv::Capability> capability_list;
 
         bool has_specialization_constants{false};
@@ -492,14 +502,14 @@ struct SPIRV_MODULE_STATE {
     const StaticData static_data_;
 
     // Hold a handle so error message can know where the SPIR-V was from (VkShaderModule or VkShaderEXT)
-    const VulkanTypedHandle handle_;
-    VulkanTypedHandle handle() const { return handle_; }
+    VulkanTypedHandle handle_;                            // Will be updated once its known its valid SPIR-V
+    VulkanTypedHandle handle() const { return handle_; }  // matches normal convention to get handle
 
     // Used for when modifying the SPIR-V (spirv-opt, GPU-AV instrumentation, etc) and need reparse it for VVL validaiton
     SPIRV_MODULE_STATE(vvl::span<const uint32_t> code) : words_(code.begin(), code.end()), static_data_(*this) {}
 
-    SPIRV_MODULE_STATE(size_t codeSize, const uint32_t *pCode, VulkanTypedHandle handle)
-        : words_(pCode, pCode + codeSize / sizeof(uint32_t)), static_data_(*this), handle_(handle) {}
+    SPIRV_MODULE_STATE(size_t codeSize, const uint32_t *pCode)
+        : words_(pCode, pCode + codeSize / sizeof(uint32_t)), static_data_(*this) {}
 
     const Instruction *FindDef(uint32_t id) const {
         auto it = static_data_.definitions.find(id);
@@ -583,31 +593,21 @@ struct SPIRV_MODULE_STATE {
 
 // Represents a VkShaderModule handle
 struct SHADER_MODULE_STATE : public BASE_NODE {
-    SHADER_MODULE_STATE(const VkShaderModuleCreateInfo &create_info, VkShaderModule shader_module, uint32_t unique_shader_id = 0)
-        : BASE_NODE(shader_module, kVulkanObjectTypeShaderModule), gpu_validation_shader_id(unique_shader_id) {
-        // Sometime an empty SHADER_MODULE_STATE is needed with no actual SPIR-V backing it for GPL
-        if (create_info.pCode[0] == spv::MagicNumber) {
-            spirv = std::make_unique<SPIRV_MODULE_STATE>(create_info.codeSize, create_info.pCode, handle_);
-        }
+    SHADER_MODULE_STATE(VkShaderModule shader_module, std::shared_ptr<SPIRV_MODULE_STATE> &spirv_module, uint32_t unique_shader_id)
+        : BASE_NODE(shader_module, kVulkanObjectTypeShaderModule), spirv(spirv_module), gpu_validation_shader_id(unique_shader_id) {
+        spirv->handle_ = handle_;
     }
 
-    // If null, means this is a empty object and no shader backing it
-    std::unique_ptr<SPIRV_MODULE_STATE> spirv;
-
-    // Used as way to match instrumented GPU-AV shader to a VkShaderModule handle
-    uint32_t gpu_validation_shader_id = 0;
-};
-
-// Represents a VkShaderEXT (VK_EXT_shader_object) handle
-struct SHADER_OBJECT_STATE : public BASE_NODE {
-    SHADER_OBJECT_STATE(const VkShaderCreateInfoEXT &create_info, VkShaderEXT shader_object, uint32_t unique_shader_id = 0)
-        : BASE_NODE(shader_object, kVulkanObjectTypeShaderEXT),
-          spirv(std::make_unique<SPIRV_MODULE_STATE>(create_info.codeSize, static_cast<const uint32_t *>(create_info.pCode),
-                                                     handle_)),
+    // For when we need to create a module with no SPIR-V backing it
+    SHADER_MODULE_STATE(uint32_t unique_shader_id)
+        : BASE_NODE(static_cast<VkShaderModule>(VK_NULL_HANDLE), kVulkanObjectTypeShaderModule),
           gpu_validation_shader_id(unique_shader_id) {}
 
-    std::unique_ptr<SPIRV_MODULE_STATE> spirv;
+    // If null, means this is a empty object and no shader backing it
+    // TODO - This (and SHADER_OBJECT_STATE) could be unique, but need handle multiple ValidationObjects
+    // https://github.com/KhronosGroup/Vulkan-ValidationLayers/pull/6265/files
+    std::shared_ptr<SPIRV_MODULE_STATE> spirv;
 
-    // Used as way to match instrumented GPU-AV shader to a VkShaderEXT handle
+    // Used as way to match instrumented GPU-AV shader to a VkShaderModule handle
     uint32_t gpu_validation_shader_id = 0;
 };

@@ -122,7 +122,7 @@ bool BestPractices::ClearAttachmentsIsFullClear(const bp_state::CommandBuffer& c
 }
 
 bool BestPractices::ValidateClearAttachment(const bp_state::CommandBuffer& cmd, uint32_t fb_attachment, uint32_t color_attachment,
-                                            VkImageAspectFlags aspects, bool secondary) const {
+                                            VkImageAspectFlags aspects, const Location& loc) const {
     const RENDER_PASS_STATE* rp = cmd.activeRenderPass.get();
     bool skip = false;
 
@@ -144,47 +144,46 @@ bool BestPractices::ValidateClearAttachment(const bp_state::CommandBuffer& cmd, 
 
     // Warn if this is issued prior to Draw Cmd and clearing the entire attachment
     if (!cmd.has_draw_cmd) {
-        skip |= LogPerformanceWarning(
-            cmd.Handle(), kVUID_BestPractices_DrawState_ClearCmdBeforeDraw,
-            "vkCmdClearAttachments() issued on %s prior to any Draw Cmds in current render pass. It is recommended you "
-            "use RenderPass LOAD_OP_CLEAR on attachments instead.",
-            report_data->FormatHandle(cmd.Handle()).c_str());
+        skip |= LogPerformanceWarning(kVUID_BestPractices_DrawState_ClearCmdBeforeDraw, cmd.Handle(), loc,
+                                      "issued on %s prior to any Draw Cmds in current render pass. It is recommended you "
+                                      "use RenderPass LOAD_OP_CLEAR on attachments instead.",
+                                      FormatHandle(cmd).c_str());
     }
 
     if ((new_aspects & VK_IMAGE_ASPECT_COLOR_BIT) &&
         rp->createInfo.pAttachments[fb_attachment].loadOp == VK_ATTACHMENT_LOAD_OP_LOAD) {
-        skip |= LogPerformanceWarning(
-            device, kVUID_BestPractices_ClearAttachments_ClearAfterLoad,
-            "%svkCmdClearAttachments() issued on %s for color attachment #%u in this subpass, "
-            "but LOAD_OP_LOAD was used. If you need to clear the framebuffer, always use LOAD_OP_CLEAR as "
-            "it is more efficient.",
-            secondary ? "vkCmdExecuteCommands(): " : "", report_data->FormatHandle(cmd.Handle()).c_str(), color_attachment);
+        skip |=
+            LogPerformanceWarning(kVUID_BestPractices_ClearAttachments_ClearAfterLoad, device, loc,
+                                  "issued on %s for color attachment #%u in this subpass, "
+                                  "but LOAD_OP_LOAD was used. If you need to clear the framebuffer, always use LOAD_OP_CLEAR as "
+                                  "it is more efficient.",
+                                  FormatHandle(cmd).c_str(), color_attachment);
     }
 
     if ((new_aspects & VK_IMAGE_ASPECT_DEPTH_BIT) &&
         rp->createInfo.pAttachments[fb_attachment].loadOp == VK_ATTACHMENT_LOAD_OP_LOAD) {
         skip |=
-            LogPerformanceWarning(device, kVUID_BestPractices_ClearAttachments_ClearAfterLoad,
-                                  "%svkCmdClearAttachments() issued on %s for the depth attachment in this subpass, "
+            LogPerformanceWarning(kVUID_BestPractices_ClearAttachments_ClearAfterLoad, device, loc,
+                                  "issued on %s for the depth attachment in this subpass, "
                                   "but LOAD_OP_LOAD was used. If you need to clear the framebuffer, always use LOAD_OP_CLEAR as "
                                   "it is more efficient.",
-                                  secondary ? "vkCmdExecuteCommands(): " : "", report_data->FormatHandle(cmd.Handle()).c_str());
+                                  FormatHandle(cmd).c_str());
 
         if (VendorCheckEnabled(kBPVendorNVIDIA)) {
             const auto cmd_state = GetRead<bp_state::CommandBuffer>(cmd.commandBuffer());
             assert(cmd_state);
-            skip |= ValidateZcullScope(*cmd_state);
+            skip |= ValidateZcullScope(*cmd_state, loc);
         }
     }
 
     if ((new_aspects & VK_IMAGE_ASPECT_STENCIL_BIT) &&
         rp->createInfo.pAttachments[fb_attachment].stencilLoadOp == VK_ATTACHMENT_LOAD_OP_LOAD) {
         skip |=
-            LogPerformanceWarning(device, kVUID_BestPractices_ClearAttachments_ClearAfterLoad,
-                                  "%svkCmdClearAttachments() issued on %s for the stencil attachment in this subpass, "
+            LogPerformanceWarning(kVUID_BestPractices_ClearAttachments_ClearAfterLoad, device, loc,
+                                  "issued on %s for the stencil attachment in this subpass, "
                                   "but LOAD_OP_LOAD was used. If you need to clear the framebuffer, always use LOAD_OP_CLEAR as "
                                   "it is more efficient.",
-                                  secondary ? "vkCmdExecuteCommands(): " : "", report_data->FormatHandle(cmd.Handle()).c_str());
+                                  FormatHandle(cmd).c_str());
     }
 
     return skip;
@@ -192,7 +191,7 @@ bool BestPractices::ValidateClearAttachment(const bp_state::CommandBuffer& cmd, 
 
 bool BestPractices::PreCallValidateCmdClearAttachments(VkCommandBuffer commandBuffer, uint32_t attachmentCount,
                                                        const VkClearAttachment* pAttachments, uint32_t rectCount,
-                                                       const VkClearRect* pRects) const {
+                                                       const VkClearRect* pRects, const ErrorObject& error_obj) const {
     bool skip = false;
     const auto cb_node = GetRead<bp_state::CommandBuffer>(commandBuffer);
     if (!cb_node) return skip;
@@ -216,14 +215,14 @@ bool BestPractices::PreCallValidateCmdClearAttachments(VkCommandBuffer commandBu
                 for (uint32_t i = 0; i < attachmentCount; i++) {
                     const auto& attachment = pAttachments[i];
                     if (attachment.aspectMask & VK_IMAGE_ASPECT_DEPTH_BIT) {
-                        skip |= ValidateZcullScope(*cb_node);
+                        skip |= ValidateZcullScope(*cb_node, error_obj.location);
                     }
                     if ((attachment.aspectMask & VK_IMAGE_ASPECT_COLOR_BIT) && attachment.colorAttachment != VK_ATTACHMENT_UNUSED) {
                         const auto& color_attachment = pColorAttachments[attachment.colorAttachment];
                         if (color_attachment.imageView) {
                             auto image_view_state = Get<IMAGE_VIEW_STATE>(color_attachment.imageView);
                             const VkFormat format = image_view_state->create_info.format;
-                            skip |= ValidateClearColor(commandBuffer, format, attachment.clearValue.color);
+                            skip |= ValidateClearColor(commandBuffer, format, attachment.clearValue.color, error_obj.location);
                         }
                     }
                 }
@@ -243,14 +242,15 @@ bool BestPractices::PreCallValidateCmdClearAttachments(VkCommandBuffer commandBu
                     if (attachment.aspectMask & VK_IMAGE_ASPECT_COLOR_BIT) {
                         uint32_t color_attachment = attachment.colorAttachment;
                         uint32_t fb_attachment = subpass.pColorAttachments[color_attachment].attachment;
-                        skip |= ValidateClearAttachment(*cb_node, fb_attachment, color_attachment, attachment.aspectMask, false);
+                        skip |= ValidateClearAttachment(*cb_node, fb_attachment, color_attachment, attachment.aspectMask,
+                                                        error_obj.location);
                     }
 
                     if (subpass.pDepthStencilAttachment &&
                         (attachment.aspectMask & (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT))) {
                         uint32_t fb_attachment = subpass.pDepthStencilAttachment->attachment;
-                        skip |=
-                            ValidateClearAttachment(*cb_node, fb_attachment, VK_ATTACHMENT_UNUSED, attachment.aspectMask, false);
+                        skip |= ValidateClearAttachment(*cb_node, fb_attachment, VK_ATTACHMENT_UNUSED, attachment.aspectMask,
+                                                        error_obj.location);
                     }
                 }
             }
@@ -262,7 +262,7 @@ bool BestPractices::PreCallValidateCmdClearAttachments(VkCommandBuffer commandBu
                         const uint32_t fb_attachment = subpass.pColorAttachments[attachment.colorAttachment].attachment;
                         if (fb_attachment != VK_ATTACHMENT_UNUSED) {
                             const VkFormat format = rp->createInfo.pAttachments[fb_attachment].format;
-                            skip |= ValidateClearColor(commandBuffer, format, attachment.clearValue.color);
+                            skip |= ValidateClearColor(commandBuffer, format, attachment.clearValue.color, error_obj.location);
                         }
                     }
                 }
@@ -289,7 +289,7 @@ bool BestPractices::PreCallValidateCmdClearAttachments(VkCommandBuffer commandBu
 
                 if (black_check && white_check) {
                     skip |= LogPerformanceWarning(
-                        device, kVUID_BestPractices_ClearAttachment_FastClearValues,
+                        kVUID_BestPractices_ClearAttachment_FastClearValues, device, error_obj.location,
                         "%s Performance warning: vkCmdClearAttachments() clear value for color attachment %" PRId32
                         " is not a fast clear value."
                         "Consider changing to one of the following:"
@@ -303,7 +303,7 @@ bool BestPractices::PreCallValidateCmdClearAttachments(VkCommandBuffer commandBu
                 if ((pAttachments[attachment_idx].clearValue.depthStencil.depth != 0 &&
                      pAttachments[attachment_idx].clearValue.depthStencil.depth != 1) &&
                     pAttachments[attachment_idx].clearValue.depthStencil.stencil != 0) {
-                    skip |= LogPerformanceWarning(device, kVUID_BestPractices_ClearAttachment_FastClearValues,
+                    skip |= LogPerformanceWarning(kVUID_BestPractices_ClearAttachment_FastClearValues, device, error_obj.location,
                                                   "%s Performance warning: vkCmdClearAttachments() clear value for depth/stencil "
                                                   "attachment %" PRId32
                                                   " is not a fast clear value."
@@ -320,46 +320,45 @@ bool BestPractices::PreCallValidateCmdClearAttachments(VkCommandBuffer commandBu
 }
 
 bool BestPractices::ValidateCmdResolveImage(VkCommandBuffer command_buffer, VkImage src_image, VkImage dst_image,
-                                            CMD_TYPE cmd_type) const {
+                                            const Location& loc) const {
     bool skip = false;
-    const char* func_name = CommandTypeString(cmd_type);
     auto src_image_type = Get<IMAGE_STATE>(src_image)->createInfo.imageType;
     auto dst_image_type = Get<IMAGE_STATE>(dst_image)->createInfo.imageType;
 
     if (src_image_type != dst_image_type) {
-        skip |= LogPerformanceWarning(command_buffer, kVUID_BestPractices_DrawState_MismatchedImageType,
-                                      "%s: srcImage type (%s) and dstImage type (%s) are not the same.", func_name,
+        skip |= LogPerformanceWarning(kVUID_BestPractices_DrawState_MismatchedImageType, command_buffer, loc,
+                                      "srcImage type (%s) and dstImage type (%s) are not the same.",
                                       string_VkImageType(src_image_type), string_VkImageType(dst_image_type));
     }
 
     skip |= VendorCheckEnabled(kBPVendorArm) &&
-            LogPerformanceWarning(command_buffer, kVUID_BestPractices_CmdResolveImage_ResolvingImage,
-                                  "%s Attempting to use %s to resolve a multisampled image. "
+            LogPerformanceWarning(kVUID_BestPractices_CmdResolveImage_ResolvingImage, command_buffer, loc,
+                                  "%s Attempting to resolve a multisampled image. "
                                   "This is a very slow and extremely bandwidth intensive path. "
                                   "You should always resolve multisampled images on-tile with pResolveAttachments in VkRenderPass.",
-                                  VendorSpecificTag(kBPVendorArm), func_name);
+                                  VendorSpecificTag(kBPVendorArm));
     return skip;
 }
 
 bool BestPractices::PreCallValidateCmdResolveImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout,
                                                    VkImage dstImage, VkImageLayout dstImageLayout, uint32_t regionCount,
-                                                   const VkImageResolve* pRegions) const {
+                                                   const VkImageResolve* pRegions, const ErrorObject& error_obj) const {
     bool skip = false;
-    skip |= ValidateCmdResolveImage(commandBuffer, srcImage, dstImage, CMD_RESOLVEIMAGE);
+    skip |= ValidateCmdResolveImage(commandBuffer, srcImage, dstImage, error_obj.location);
     return skip;
 }
 
 bool BestPractices::PreCallValidateCmdResolveImage2KHR(VkCommandBuffer commandBuffer,
-                                                       const VkResolveImageInfo2KHR* pResolveImageInfo) const {
-    bool skip = false;
-    skip |= ValidateCmdResolveImage(commandBuffer, pResolveImageInfo->srcImage, pResolveImageInfo->dstImage, CMD_RESOLVEIMAGE2KHR);
-    return skip;
+                                                       const VkResolveImageInfo2KHR* pResolveImageInfo,
+                                                       const ErrorObject& error_obj) const {
+    return PreCallValidateCmdResolveImage2(commandBuffer, pResolveImageInfo, error_obj);
 }
 
-bool BestPractices::PreCallValidateCmdResolveImage2(VkCommandBuffer commandBuffer,
-                                                    const VkResolveImageInfo2* pResolveImageInfo) const {
+bool BestPractices::PreCallValidateCmdResolveImage2(VkCommandBuffer commandBuffer, const VkResolveImageInfo2* pResolveImageInfo,
+                                                    const ErrorObject& error_obj) const {
     bool skip = false;
-    skip |= ValidateCmdResolveImage(commandBuffer, pResolveImageInfo->srcImage, pResolveImageInfo->dstImage, CMD_RESOLVEIMAGE2);
+    skip |= ValidateCmdResolveImage(commandBuffer, pResolveImageInfo->srcImage, pResolveImageInfo->dstImage,
+                                    error_obj.location.dot(Field::pResolveImageInfo));
     return skip;
 }
 
@@ -372,26 +371,16 @@ void BestPractices::PreCallRecordCmdResolveImage(VkCommandBuffer commandBuffer, 
     auto dst = Get<bp_state::Image>(dstImage);
 
     for (uint32_t i = 0; i < regionCount; i++) {
-        QueueValidateImage(funcs, "vkCmdResolveImage()", src, IMAGE_SUBRESOURCE_USAGE_BP::RESOLVE_READ, pRegions[i].srcSubresource);
-        QueueValidateImage(funcs, "vkCmdResolveImage()", dst, IMAGE_SUBRESOURCE_USAGE_BP::RESOLVE_WRITE,
+        QueueValidateImage(funcs, Func::vkCmdResolveImage, src, IMAGE_SUBRESOURCE_USAGE_BP::RESOLVE_READ,
+                           pRegions[i].srcSubresource);
+        QueueValidateImage(funcs, Func::vkCmdResolveImage, dst, IMAGE_SUBRESOURCE_USAGE_BP::RESOLVE_WRITE,
                            pRegions[i].dstSubresource);
     }
 }
 
 void BestPractices::PreCallRecordCmdResolveImage2KHR(VkCommandBuffer commandBuffer,
                                                      const VkResolveImageInfo2KHR* pResolveImageInfo) {
-    auto cb = GetWrite<bp_state::CommandBuffer>(commandBuffer);
-    auto& funcs = cb->queue_submit_functions;
-    auto src = Get<bp_state::Image>(pResolveImageInfo->srcImage);
-    auto dst = Get<bp_state::Image>(pResolveImageInfo->dstImage);
-    uint32_t regionCount = pResolveImageInfo->regionCount;
-
-    for (uint32_t i = 0; i < regionCount; i++) {
-        QueueValidateImage(funcs, "vkCmdResolveImage2KHR()", src, IMAGE_SUBRESOURCE_USAGE_BP::RESOLVE_READ,
-                           pResolveImageInfo->pRegions[i].srcSubresource);
-        QueueValidateImage(funcs, "vkCmdResolveImage2KHR()", dst, IMAGE_SUBRESOURCE_USAGE_BP::RESOLVE_WRITE,
-                           pResolveImageInfo->pRegions[i].dstSubresource);
-    }
+    PreCallRecordCmdResolveImage2(commandBuffer, pResolveImageInfo);
 }
 
 void BestPractices::PreCallRecordCmdResolveImage2(VkCommandBuffer commandBuffer, const VkResolveImageInfo2* pResolveImageInfo) {
@@ -402,9 +391,9 @@ void BestPractices::PreCallRecordCmdResolveImage2(VkCommandBuffer commandBuffer,
     uint32_t regionCount = pResolveImageInfo->regionCount;
 
     for (uint32_t i = 0; i < regionCount; i++) {
-        QueueValidateImage(funcs, "vkCmdResolveImage2()", src, IMAGE_SUBRESOURCE_USAGE_BP::RESOLVE_READ,
+        QueueValidateImage(funcs, Func::vkCmdResolveImage2, src, IMAGE_SUBRESOURCE_USAGE_BP::RESOLVE_READ,
                            pResolveImageInfo->pRegions[i].srcSubresource);
-        QueueValidateImage(funcs, "vkCmdResolveImage2()", dst, IMAGE_SUBRESOURCE_USAGE_BP::RESOLVE_WRITE,
+        QueueValidateImage(funcs, Func::vkCmdResolveImage2, dst, IMAGE_SUBRESOURCE_USAGE_BP::RESOLVE_WRITE,
                            pResolveImageInfo->pRegions[i].dstSubresource);
     }
 }
@@ -417,7 +406,7 @@ void BestPractices::PreCallRecordCmdClearColorImage(VkCommandBuffer commandBuffe
     auto dst = Get<bp_state::Image>(image);
 
     for (uint32_t i = 0; i < rangeCount; i++) {
-        QueueValidateImage(funcs, "vkCmdClearColorImage()", dst, IMAGE_SUBRESOURCE_USAGE_BP::CLEARED, pRanges[i]);
+        QueueValidateImage(funcs, Func::vkCmdClearColorImage, dst, IMAGE_SUBRESOURCE_USAGE_BP::CLEARED, pRanges[i]);
     }
 
     if (VendorCheckEnabled(kBPVendorNVIDIA)) {
@@ -436,7 +425,7 @@ void BestPractices::PreCallRecordCmdClearDepthStencilImage(VkCommandBuffer comma
     auto dst = Get<bp_state::Image>(image);
 
     for (uint32_t i = 0; i < rangeCount; i++) {
-        QueueValidateImage(funcs, "vkCmdClearDepthStencilImage()", dst, IMAGE_SUBRESOURCE_USAGE_BP::CLEARED, pRanges[i]);
+        QueueValidateImage(funcs, Func::vkCmdClearDepthStencilImage, dst, IMAGE_SUBRESOURCE_USAGE_BP::CLEARED, pRanges[i]);
     }
     if (VendorCheckEnabled(kBPVendorNVIDIA)) {
         for (uint32_t i = 0; i < rangeCount; i++) {
@@ -457,8 +446,8 @@ void BestPractices::PreCallRecordCmdCopyImage(VkCommandBuffer commandBuffer, VkI
     auto dst = Get<bp_state::Image>(dstImage);
 
     for (uint32_t i = 0; i < regionCount; i++) {
-        QueueValidateImage(funcs, "vkCmdCopyImage()", src, IMAGE_SUBRESOURCE_USAGE_BP::COPY_READ, pRegions[i].srcSubresource);
-        QueueValidateImage(funcs, "vkCmdCopyImage()", dst, IMAGE_SUBRESOURCE_USAGE_BP::COPY_WRITE, pRegions[i].dstSubresource);
+        QueueValidateImage(funcs, Func::vkCmdCopyImage, src, IMAGE_SUBRESOURCE_USAGE_BP::COPY_READ, pRegions[i].srcSubresource);
+        QueueValidateImage(funcs, Func::vkCmdCopyImage, dst, IMAGE_SUBRESOURCE_USAGE_BP::COPY_WRITE, pRegions[i].dstSubresource);
     }
 }
 
@@ -470,7 +459,7 @@ void BestPractices::PreCallRecordCmdCopyBufferToImage(VkCommandBuffer commandBuf
     auto dst = Get<bp_state::Image>(dstImage);
 
     for (uint32_t i = 0; i < regionCount; i++) {
-        QueueValidateImage(funcs, "vkCmdCopyBufferToImage()", dst, IMAGE_SUBRESOURCE_USAGE_BP::COPY_WRITE,
+        QueueValidateImage(funcs, Func::vkCmdCopyBufferToImage, dst, IMAGE_SUBRESOURCE_USAGE_BP::COPY_WRITE,
                            pRegions[i].imageSubresource);
     }
 }
@@ -482,7 +471,7 @@ void BestPractices::PreCallRecordCmdCopyImageToBuffer(VkCommandBuffer commandBuf
     auto src = Get<bp_state::Image>(srcImage);
 
     for (uint32_t i = 0; i < regionCount; i++) {
-        QueueValidateImage(funcs, "vkCmdCopyImageToBuffer()", src, IMAGE_SUBRESOURCE_USAGE_BP::COPY_READ,
+        QueueValidateImage(funcs, Func::vkCmdCopyImageToBuffer, src, IMAGE_SUBRESOURCE_USAGE_BP::COPY_READ,
                            pRegions[i].imageSubresource);
     }
 }
@@ -496,27 +485,26 @@ void BestPractices::PreCallRecordCmdBlitImage(VkCommandBuffer commandBuffer, VkI
     auto dst = Get<bp_state::Image>(dstImage);
 
     for (uint32_t i = 0; i < regionCount; i++) {
-        QueueValidateImage(funcs, "vkCmdBlitImage()", src, IMAGE_SUBRESOURCE_USAGE_BP::BLIT_READ, pRegions[i].srcSubresource);
-        QueueValidateImage(funcs, "vkCmdBlitImage()", dst, IMAGE_SUBRESOURCE_USAGE_BP::BLIT_WRITE, pRegions[i].dstSubresource);
+        QueueValidateImage(funcs, Func::vkCmdBlitImage, src, IMAGE_SUBRESOURCE_USAGE_BP::BLIT_READ, pRegions[i].srcSubresource);
+        QueueValidateImage(funcs, Func::vkCmdBlitImage, dst, IMAGE_SUBRESOURCE_USAGE_BP::BLIT_WRITE, pRegions[i].dstSubresource);
     }
 }
 
 template <typename RegionType>
 bool BestPractices::ValidateCmdBlitImage(VkCommandBuffer command_buffer, uint32_t region_count, const RegionType* regions,
-                                         CMD_TYPE cmd_type) const {
+                                         const Location& loc) const {
     bool skip = false;
-    const char* func_name = CommandTypeString(cmd_type);
     for (uint32_t i = 0; i < region_count; i++) {
         const RegionType region = regions[i];
         if ((region.srcOffsets[0].x == region.srcOffsets[1].x) || (region.srcOffsets[0].y == region.srcOffsets[1].y) ||
             (region.srcOffsets[0].z == region.srcOffsets[1].z)) {
-            skip |= LogWarning(command_buffer, kVUID_BestPractices_DrawState_InvalidExtents,
-                               "%s: pRegions[%" PRIu32 "].srcOffsets specify a zero-volume area", func_name, i);
+            skip |= LogWarning(kVUID_BestPractices_DrawState_InvalidExtents, command_buffer, loc,
+                               "pRegions[%" PRIu32 "].srcOffsets specify a zero-volume area", i);
         }
         if ((region.dstOffsets[0].x == region.dstOffsets[1].x) || (region.dstOffsets[0].y == region.dstOffsets[1].y) ||
             (region.dstOffsets[0].z == region.dstOffsets[1].z)) {
-            skip |= LogWarning(command_buffer, kVUID_BestPractices_DrawState_InvalidExtents,
-                               "%s: pRegions[%" PRIu32 "].dstOffsets specify a zero-volume area", func_name, i);
+            skip |= LogWarning(kVUID_BestPractices_DrawState_InvalidExtents, command_buffer, loc,
+                               "pRegions[%" PRIu32 "].dstOffsets specify a zero-volume area", i);
         }
     }
     return skip;
@@ -524,35 +512,37 @@ bool BestPractices::ValidateCmdBlitImage(VkCommandBuffer command_buffer, uint32_
 
 bool BestPractices::PreCallValidateCmdBlitImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout,
                                                 VkImage dstImage, VkImageLayout dstImageLayout, uint32_t regionCount,
-                                                const VkImageBlit* pRegions, VkFilter filter) const {
-    return ValidateCmdBlitImage(commandBuffer, regionCount, pRegions, CMD_BLITIMAGE);
+                                                const VkImageBlit* pRegions, VkFilter filter, const ErrorObject& error_obj) const {
+    return ValidateCmdBlitImage(commandBuffer, regionCount, pRegions, error_obj.location);
 }
 
-bool BestPractices::PreCallValidateCmdBlitImage2KHR(VkCommandBuffer commandBuffer,
-                                                    const VkBlitImageInfo2KHR* pBlitImageInfo) const {
-    return ValidateCmdBlitImage(commandBuffer, pBlitImageInfo->regionCount, pBlitImageInfo->pRegions, CMD_BLITIMAGE2KHR);
+bool BestPractices::PreCallValidateCmdBlitImage2KHR(VkCommandBuffer commandBuffer, const VkBlitImageInfo2KHR* pBlitImageInfo,
+                                                    const ErrorObject& error_obj) const {
+    return PreCallValidateCmdBlitImage2(commandBuffer, pBlitImageInfo, error_obj);
 }
 
-bool BestPractices::PreCallValidateCmdBlitImage2(VkCommandBuffer commandBuffer, const VkBlitImageInfo2* pBlitImageInfo) const {
-    return ValidateCmdBlitImage(commandBuffer, pBlitImageInfo->regionCount, pBlitImageInfo->pRegions, CMD_BLITIMAGE2);
+bool BestPractices::PreCallValidateCmdBlitImage2(VkCommandBuffer commandBuffer, const VkBlitImageInfo2* pBlitImageInfo,
+                                                 const ErrorObject& error_obj) const {
+    return ValidateCmdBlitImage(commandBuffer, pBlitImageInfo->regionCount, pBlitImageInfo->pRegions,
+                                error_obj.location.dot(Field::pBlitImageInfo));
 }
 
 bool BestPractices::PreCallValidateCmdClearColorImage(VkCommandBuffer commandBuffer, VkImage image, VkImageLayout imageLayout,
                                                       const VkClearColorValue* pColor, uint32_t rangeCount,
-                                                      const VkImageSubresourceRange* pRanges) const {
+                                                      const VkImageSubresourceRange* pRanges, const ErrorObject& error_obj) const {
     bool skip = false;
 
     auto dst = Get<bp_state::Image>(image);
 
     if (VendorCheckEnabled(kBPVendorAMD)) {
         skip |= LogPerformanceWarning(
-            device, kVUID_BestPractices_ClearAttachment_ClearImage,
+            kVUID_BestPractices_ClearAttachment_ClearImage, device, error_obj.location,
             "%s Performance warning: using vkCmdClearColorImage is not recommended. Prefer using LOAD_OP_CLEAR or "
             "vkCmdClearAttachments instead",
             VendorSpecificTag(kBPVendorAMD));
     }
     if (VendorCheckEnabled(kBPVendorNVIDIA)) {
-        skip |= ValidateClearColor(commandBuffer, dst->createInfo.format, *pColor);
+        skip |= ValidateClearColor(commandBuffer, dst->createInfo.format, *pColor, error_obj.location);
     }
 
     return skip;
@@ -561,11 +551,12 @@ bool BestPractices::PreCallValidateCmdClearColorImage(VkCommandBuffer commandBuf
 bool BestPractices::PreCallValidateCmdClearDepthStencilImage(VkCommandBuffer commandBuffer, VkImage image,
                                                              VkImageLayout imageLayout,
                                                              const VkClearDepthStencilValue* pDepthStencil, uint32_t rangeCount,
-                                                             const VkImageSubresourceRange* pRanges) const {
+                                                             const VkImageSubresourceRange* pRanges,
+                                                             const ErrorObject& error_obj) const {
     bool skip = false;
     if (VendorCheckEnabled(kBPVendorAMD)) {
         skip |= LogPerformanceWarning(
-            device, kVUID_BestPractices_ClearAttachment_ClearImage,
+            kVUID_BestPractices_ClearAttachment_ClearImage, device, error_obj.location,
             "%s Performance warning: using vkCmdClearDepthStencilImage is not recommended. Prefer using LOAD_OP_CLEAR or "
             "vkCmdClearAttachments instead",
             VendorSpecificTag(kBPVendorAMD));
@@ -574,7 +565,7 @@ bool BestPractices::PreCallValidateCmdClearDepthStencilImage(VkCommandBuffer com
     assert(cmd_state);
     if (VendorCheckEnabled(kBPVendorNVIDIA)) {
         for (uint32_t i = 0; i < rangeCount; i++) {
-            skip |= ValidateZcull(*cmd_state, image, pRanges[i]);
+            skip |= ValidateZcull(*cmd_state, image, pRanges[i], error_obj.location);
         }
     }
 
@@ -583,7 +574,7 @@ bool BestPractices::PreCallValidateCmdClearDepthStencilImage(VkCommandBuffer com
 
 bool BestPractices::PreCallValidateCmdCopyImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout,
                                                 VkImage dstImage, VkImageLayout dstImageLayout, uint32_t regionCount,
-                                                const VkImageCopy* pRegions) const {
+                                                const VkImageCopy* pRegions, const ErrorObject& error_obj) const {
     bool skip = false;
     std::stringstream src_image_hex;
     std::stringstream dst_image_hex;
@@ -598,7 +589,7 @@ bool BestPractices::PreCallValidateCmdCopyImage(VkCommandBuffer commandBuffer, V
             VkImageTiling src_Tiling = src_state->createInfo.tiling;
             VkImageTiling dst_Tiling = dst_state->createInfo.tiling;
             if (src_Tiling != dst_Tiling && (src_Tiling == VK_IMAGE_TILING_LINEAR || dst_Tiling == VK_IMAGE_TILING_LINEAR)) {
-                skip |= LogPerformanceWarning(device, kVUID_BestPractices_vkImage_AvoidImageToImageCopy,
+                skip |= LogPerformanceWarning(kVUID_BestPractices_vkImage_AvoidImageToImageCopy, device, error_obj.location,
                                               "%s Performance warning: image %s and image %s have differing tilings. Use buffer to "
                                               "image (vkCmdCopyImageToBuffer) "
                                               "and image to buffer (vkCmdCopyBufferToImage) copies instead of image to image "

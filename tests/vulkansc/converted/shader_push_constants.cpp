@@ -16,14 +16,15 @@
  */
 
 #include "../framework/layer_validation_tests.h"
+#include "../framework/pipeline_helper.h"
 
 TEST_F(NegativeShaderPushConstants, DISABLED_NotDeclared) {
     TEST_DESCRIPTION(
         "Create a graphics pipeline in which a push constant range containing a push constant block member is not declared in the "
         "layout.");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
 
     char const *vsSource = R"glsl(
         #version 450
@@ -41,13 +42,12 @@ TEST_F(NegativeShaderPushConstants, DISABLED_NotDeclared) {
     push_constant_range.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
     push_constant_range.size = 4;
 
-    const VkPipelineLayoutObj pipeline_layout(m_device, {}, {push_constant_range});
+    const vkt::PipelineLayout pipeline_layout(*m_device, {}, {push_constant_range});
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitInfo();
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
     pipe.InitState();
-    pipe.pipeline_layout_ = VkPipelineLayoutObj(m_device, {}, {push_constant_range});
+    pipe.pipeline_layout_ = vkt::PipelineLayout(*m_device, {}, {push_constant_range});
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-layout-07987");
     pipe.CreateGraphicsPipeline();
@@ -57,7 +57,7 @@ TEST_F(NegativeShaderPushConstants, DISABLED_NotDeclared) {
 TEST_F(NegativeShaderPushConstants, PipelineRange) {
     TEST_DESCRIPTION("Invalid use of VkPushConstantRange structs.");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
+    RETURN_IF_SKIP(Init())
 
     VkPhysicalDeviceProperties device_props = {};
     vk::GetPhysicalDeviceProperties(gpu(), &device_props);
@@ -113,7 +113,7 @@ TEST_F(NegativeShaderPushConstants, PipelineRange) {
 
     // Sanity check its a valid range before making duplicate
     push_constant_range = {VK_SHADER_STAGE_VERTEX_BIT, 0, maxPushConstantsSize};
-    ASSERT_VK_SUCCESS(vk::CreatePipelineLayout(m_device->device(), &pipeline_layout_info, NULL, &pipeline_layout));
+    ASSERT_EQ(VK_SUCCESS, vk::CreatePipelineLayout(m_device->device(), &pipeline_layout_info, NULL, &pipeline_layout));
     vk::DestroyPipelineLayout(m_device->device(), pipeline_layout, nullptr);
 
     // Duplicate ranges
@@ -129,8 +129,8 @@ TEST_F(NegativeShaderPushConstants, DISABLED_NotInLayout) {
     TEST_DESCRIPTION(
         "Test that an error is produced for a shader consuming push constants which are not provided in the pipeline layout");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
 
     char const *vsSource = R"glsl(
         #version 450
@@ -143,10 +143,9 @@ TEST_F(NegativeShaderPushConstants, DISABLED_NotInLayout) {
     VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitInfo();
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
     pipe.InitState();
-    pipe.pipeline_layout_ = VkPipelineLayoutObj(m_device, {});
+    pipe.pipeline_layout_ = vkt::PipelineLayout(*m_device, {});
     /* should have generated an error -- no push constant ranges provided! */
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-layout-07987");
     pipe.CreateGraphicsPipeline();
@@ -156,7 +155,7 @@ TEST_F(NegativeShaderPushConstants, DISABLED_NotInLayout) {
 TEST_F(NegativeShaderPushConstants, Range) {
     TEST_DESCRIPTION("Invalid use of VkPushConstantRange values in vkCmdPushConstants.");
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
+    RETURN_IF_SKIP(InitFramework())
 
     PFN_vkSetPhysicalDeviceLimitsEXT fpvkSetPhysicalDeviceLimitsEXT = nullptr;
     PFN_vkGetOriginalPhysicalDeviceLimitsEXT fpvkGetOriginalPhysicalDeviceLimitsEXT = nullptr;
@@ -171,9 +170,8 @@ TEST_F(NegativeShaderPushConstants, Range) {
     props.limits.maxPushConstantsSize = maxPushConstantsSize;
     fpvkSetPhysicalDeviceLimitsEXT(gpu(), &props.limits);
 
-    ASSERT_NO_FATAL_FAILURE(InitState());
-    ASSERT_NO_FATAL_FAILURE(InitViewport());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitState())
+    InitRenderTarget();
 
     char const *const vsSource = R"glsl(
         #version 450
@@ -188,13 +186,12 @@ TEST_F(NegativeShaderPushConstants, Range) {
 
     // Set up a push constant range
     VkPushConstantRange push_constant_range = {VK_SHADER_STAGE_VERTEX_BIT, 0, maxPushConstantsSize};
-    const VkPipelineLayoutObj pipeline_layout(m_device, {}, {push_constant_range});
+    const vkt::PipelineLayout pipeline_layout(*m_device, {}, {push_constant_range});
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitInfo();
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
     pipe.InitState();
-    pipe.pipeline_layout_ = VkPipelineLayoutObj(m_device, {}, {push_constant_range});
+    pipe.pipeline_layout_ = vkt::PipelineLayout(*m_device, {}, {push_constant_range});
     pipe.CreateGraphicsPipeline();
 
     const float data[16] = {};  // dummy data to match shader size
@@ -239,8 +236,8 @@ TEST_F(NegativeShaderPushConstants, Range) {
 TEST_F(NegativeShaderPushConstants, DISABLED_DrawWithoutUpdate) {
     TEST_DESCRIPTION("Not every bytes in used push constant ranges has been set before Draw ");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
 
     // push constant range: 0-99
     char const *const vsSource = R"glsl(
@@ -293,23 +290,21 @@ TEST_F(NegativeShaderPushConstants, DISABLED_DrawWithoutUpdate) {
     VkPushConstantRange push_constant_range = {VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, 128};
     VkPushConstantRange push_constant_range_small = {VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 4, 4};
 
-    auto pipeline_layout_info = LvlInitStruct<VkPipelineLayoutCreateInfo>();
+    VkPipelineLayoutCreateInfo pipeline_layout_info = vku::InitStructHelper();
     pipeline_layout_info.pushConstantRangeCount = 1;
     pipeline_layout_info.pPushConstantRanges = &push_constant_range;
-    vk_testing::PipelineLayout pipeline_layout(*m_device, pipeline_layout_info);
+    vkt::PipelineLayout pipeline_layout(*m_device, pipeline_layout_info);
 
     CreatePipelineHelper g_pipe(*this);
-    g_pipe.InitInfo();
     g_pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
     g_pipe.pipeline_layout_ci_ = pipeline_layout_info;
     g_pipe.InitState();
-    ASSERT_VK_SUCCESS(g_pipe.CreateGraphicsPipeline());
+    ASSERT_EQ(VK_SUCCESS, g_pipe.CreateGraphicsPipeline());
 
     pipeline_layout_info.pPushConstantRanges = &push_constant_range_small;
-    vk_testing::PipelineLayout pipeline_layout_small(*m_device, pipeline_layout_info);
+    vkt::PipelineLayout pipeline_layout_small(*m_device, pipeline_layout_info);
 
     CreatePipelineHelper g_pipe_small_range(*this);
-    g_pipe_small_range.InitInfo();
     g_pipe_small_range.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
     g_pipe_small_range.pipeline_layout_ci_ = pipeline_layout_info;
     g_pipe_small_range.InitState();
@@ -358,12 +353,8 @@ TEST_F(NegativeShaderPushConstants, DISABLED_DrawWithoutUpdate) {
 TEST_F(NegativeShaderPushConstants, DISABLED_MultipleEntryPoint) {
     TEST_DESCRIPTION("Test push-constant detect the write entrypoint with the push constants.");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
-
-    if (IsPlatform(kPixel3)) {
-        GTEST_SKIP() << "Pixel 3 compilers can't compile this valid SPIR-V";
-    }
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
 
     // #version 460
     // layout(push_constant) uniform Material {
@@ -434,19 +425,17 @@ TEST_F(NegativeShaderPushConstants, DISABLED_MultipleEntryPoint) {
 
     // Push constant are in the vertex Entrypoint
     VkPushConstantRange push_constant_range = {VK_SHADER_STAGE_FRAGMENT_BIT, 0, 16};
-    auto pipeline_layout_info = LvlInitStruct<VkPipelineLayoutCreateInfo>();
+    VkPipelineLayoutCreateInfo pipeline_layout_info = vku::InitStructHelper();
     pipeline_layout_info.pushConstantRangeCount = 1;
     pipeline_layout_info.pPushConstantRanges = &push_constant_range;
-    vk_testing::PipelineLayout pipeline_layout(*m_device, pipeline_layout_info);
+    vkt::PipelineLayout pipeline_layout(*m_device, pipeline_layout_info);
 
     VkShaderObj const vs(this, source, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
     VkShaderObj const fs(this, source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitInfo();
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
-    pipe.pipeline_layout_ci_ = pipeline_layout_info;
-    pipe.InitState();
+    pipe.gp_ci_.layout = pipeline_layout.handle();
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-layout-07987");
     pipe.CreateGraphicsPipeline();
@@ -454,7 +443,8 @@ TEST_F(NegativeShaderPushConstants, DISABLED_MultipleEntryPoint) {
 
     // Make sure Vertex is ok when used
     push_constant_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-    pipe.InitState();
+    vkt::PipelineLayout pipeline_layout_good(*m_device, pipeline_layout_info);
+    pipe.gp_ci_.layout = pipeline_layout_good.handle();
     pipe.CreateGraphicsPipeline();
 }
 
@@ -462,7 +452,7 @@ TEST_F(NegativeShaderPushConstants, DISABLED_MultipleEntryPoint) {
 // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/5911
 TEST_F(NegativeShaderPushConstants, DISABLED_SpecConstantSize) {
     TEST_DESCRIPTION("Use SpecConstant to adjust size of Push Constant Block");
-    ASSERT_NO_FATAL_FAILURE(Init());
+    RETURN_IF_SKIP(Init())
 
     const char *cs_source = R"glsl(
         #version 460
@@ -491,14 +481,13 @@ TEST_F(NegativeShaderPushConstants, DISABLED_SpecConstantSize) {
 
     // With spec constant set, this should be 32, not 16
     VkPushConstantRange push_constant_range = {VK_SHADER_STAGE_COMPUTE_BIT, 0, 16};
-    const VkPipelineLayoutObj pipeline_layout(m_device, {}, {push_constant_range});
+    const vkt::PipelineLayout pipeline_layout(*m_device, {}, {push_constant_range});
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.InitInfo();
     pipe.cs_ = std::make_unique<VkShaderObj>(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL,
                                              &specialization_info);
     pipe.InitState();
-    pipe.pipeline_layout_ = VkPipelineLayoutObj(m_device, {}, {push_constant_range});
+    pipe.pipeline_layout_ = vkt::PipelineLayout(*m_device, {}, {push_constant_range});
     m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_ERROR_BIT_EXT, "VUID-VkComputePipelineCreateInfo-layout-07987");
     pipe.CreateComputePipeline();
     m_errorMonitor->VerifyFound();

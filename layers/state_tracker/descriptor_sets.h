@@ -30,7 +30,6 @@
 #include "generated/vk_safe_struct.h"
 #include "vulkan/vk_layer.h"
 #include "generated/vk_object_types.h"
-#include "generated/command_validation.h"
 #include <map>
 #include <memory>
 #include <set>
@@ -60,7 +59,7 @@ class DESCRIPTOR_POOL_STATE : public BASE_NODE {
     void Reset();
     void Destroy() override;
 
-    bool InUse() const override;
+    const VulkanTypedHandle *InUse() const override;
     uint32_t GetAvailableCount(uint32_t type) const {
         auto guard = ReadLock();
         auto iter = available_counts_.find(type);
@@ -340,6 +339,10 @@ class DescriptorSet;
 
 class Descriptor {
   public:
+    static bool SupportsNotifyInvalidate() { return false; }
+    static bool IsNotifyInvalidateType(VulkanObjectType) { return false; }
+    virtual void InvalidateNode(const std::shared_ptr<BASE_NODE> &, bool) {}  // Most descriptor types will not call
+
     Descriptor() {}
     virtual ~Descriptor() {}
     virtual void WriteUpdate(DescriptorSet &set_state, const ValidationStateTracker &dev_data, const VkWriteDescriptorSet &,
@@ -408,6 +411,10 @@ class SamplerDescriptor : public Descriptor {
 
 class ImageDescriptor : public Descriptor {
   public:
+    static bool SupportsNotifyInvalidate() { return true; }
+    static bool IsNotifyInvalidateType(const VulkanObjectType node_type) {
+        return node_type == VulkanObjectType::kVulkanObjectTypeImageView;
+    }
     ImageDescriptor() = default;
     DescriptorClass GetClass() const override { return Image; }
     void WriteUpdate(DescriptorSet &set_state, const ValidationStateTracker &dev_data, const VkWriteDescriptorSet &, const uint32_t,
@@ -433,12 +440,24 @@ class ImageDescriptor : public Descriptor {
             image_view_state_->RemoveParent(base_node);
         }
     }
+    void InvalidateNode(const std::shared_ptr<BASE_NODE> &invalid_node, bool unlink) override {
+        if (invalid_node == image_view_state_) {
+            known_valid_view_ = false;
+            if (unlink) {
+                image_view_state_.reset();
+            }
+        }
+    }
 
-    bool Invalid() const override { return !image_view_state_ || image_view_state_->Invalid(); }
+    bool Invalid() const override { return !known_valid_view_ && ComputeInvalid(); }
 
   protected:
+    bool ComputeInvalid() const { return !image_view_state_ || image_view_state_->Invalid(); }
+    void UpdateKnownValidView(bool is_bindless) { known_valid_view_ = !is_bindless && !ComputeInvalid(); }
+
     std::shared_ptr<IMAGE_VIEW_STATE> image_view_state_;
     VkImageLayout image_layout_{VK_IMAGE_LAYOUT_UNDEFINED};
+    bool known_valid_view_ = false;
 };
 
 class ImageSamplerDescriptor : public ImageDescriptor {
@@ -570,8 +589,8 @@ class AccelerationStructureDescriptor : public Descriptor {
     const ACCELERATION_STRUCTURE_STATE_KHR *GetAccelerationStructureStateKHR() const { return acc_state_.get(); }
     ACCELERATION_STRUCTURE_STATE_KHR *GetAccelerationStructureStateKHR() { return acc_state_.get(); }
     VkAccelerationStructureNV GetAccelerationStructureNV() const { return acc_nv_; }
-    const ACCELERATION_STRUCTURE_STATE *GetAccelerationStructureStateNV() const { return acc_state_nv_.get(); }
-    ACCELERATION_STRUCTURE_STATE *GetAccelerationStructureStateNV() { return acc_state_nv_.get(); }
+    const ACCELERATION_STRUCTURE_STATE_NV *GetAccelerationStructureStateNV() const { return acc_state_nv_.get(); }
+    ACCELERATION_STRUCTURE_STATE_NV *GetAccelerationStructureStateNV() { return acc_state_nv_.get(); }
     void CopyUpdate(DescriptorSet &set_state, const ValidationStateTracker &dev_data, const Descriptor &, bool is_bindless,
                     VkDescriptorType type) override;
     bool is_khr() const { return is_khr_; }
@@ -607,7 +626,7 @@ class AccelerationStructureDescriptor : public Descriptor {
     VkAccelerationStructureKHR acc_{VK_NULL_HANDLE};
     std::shared_ptr<ACCELERATION_STRUCTURE_STATE_KHR> acc_state_;
     VkAccelerationStructureNV acc_nv_{VK_NULL_HANDLE};
-    std::shared_ptr<ACCELERATION_STRUCTURE_STATE> acc_state_nv_;
+    std::shared_ptr<ACCELERATION_STRUCTURE_STATE_NV> acc_state_nv_;
 };
 
 class MutableDescriptor : public Descriptor {
@@ -661,8 +680,8 @@ class MutableDescriptor : public Descriptor {
     const ACCELERATION_STRUCTURE_STATE_KHR *GetAccelerationStructureStateKHR() const { return acc_state_.get(); }
     ACCELERATION_STRUCTURE_STATE_KHR *GetAccelerationStructureStateKHR() { return acc_state_.get(); }
     VkAccelerationStructureNV GetAccelerationStructureNV() const { return acc_nv_; }
-    const ACCELERATION_STRUCTURE_STATE *GetAccelerationStructureStateNV() const { return acc_state_nv_.get(); }
-    ACCELERATION_STRUCTURE_STATE *GetAccelerationStructureStateNV() { return acc_state_nv_.get(); }
+    const ACCELERATION_STRUCTURE_STATE_NV *GetAccelerationStructureStateNV() const { return acc_state_nv_.get(); }
+    ACCELERATION_STRUCTURE_STATE_NV *GetAccelerationStructureStateNV() { return acc_state_nv_.get(); }
     // Returns true if there is a stored KHR acceleration structure and false if there is a stored NV acceleration structure.
     // Asserts that there is only one of the two.
     bool IsAccelerationStructureKHR() const {
@@ -702,7 +721,7 @@ class MutableDescriptor : public Descriptor {
     VkAccelerationStructureKHR acc_{VK_NULL_HANDLE};
     std::shared_ptr<ACCELERATION_STRUCTURE_STATE_KHR> acc_state_;
     VkAccelerationStructureNV acc_nv_{VK_NULL_HANDLE};
-    std::shared_ptr<ACCELERATION_STRUCTURE_STATE> acc_state_nv_;
+    std::shared_ptr<ACCELERATION_STRUCTURE_STATE_NV> acc_state_nv_;
 };
 
 // Structs to contain common elements that need to be shared between Validate* and Perform* calls below
@@ -718,6 +737,7 @@ void PerformUpdateDescriptorSets(ValidationStateTracker *, uint32_t, const VkWri
 
 class DescriptorBinding {
   public:
+    using NodeList = BASE_NODE::NodeList;
     DescriptorBinding(const VkDescriptorSetLayoutBinding &create_info, uint32_t count_, VkDescriptorBindingFlags binding_flags_)
         : binding(create_info.binding),
           type(create_info.descriptorType),
@@ -731,6 +751,7 @@ class DescriptorBinding {
 
     virtual void AddParent(DescriptorSet *ds) = 0;
     virtual void RemoveParent(DescriptorSet *ds) = 0;
+    virtual void NotifyInvalidate(const NodeList &invalid_nodes, bool unlink) = 0;
 
     virtual const Descriptor *GetDescriptor(const uint32_t index) const = 0;
     virtual Descriptor *GetDescriptor(const uint32_t index) = 0;
@@ -771,22 +792,37 @@ class DescriptorBindingImpl : public DescriptorBinding {
 
     Descriptor *GetDescriptor(const uint32_t index) override { return index < count ? &descriptors[index] : nullptr; }
 
+    template <typename Fn>
+    void ForAllUpdated(Fn &&op) {
+        auto size = updated.size();
+        for (uint32_t i = 0; i < size; i++) {
+            if (updated[i] != 0) {
+                op(descriptors[i]);
+            }
+        }
+    }
+
     void AddParent(DescriptorSet *ds) override {
-        auto size = updated.size();
-        for (uint32_t i = 0; i < size; i++) {
-            if (updated[i] != 0) {
-                descriptors[i].AddParent(ds);
-            }
-        }
+        auto add_parent = [ds](T &descriptor) { descriptor.AddParent(ds); };
+        ForAllUpdated(add_parent);
     }
+
     void RemoveParent(DescriptorSet *ds) override {
-        auto size = updated.size();
-        for (uint32_t i = 0; i < size; i++) {
-            if (updated[i] != 0) {
-                descriptors[i].RemoveParent(ds);
+        auto remove_parent = [ds](T &descriptor) { descriptor.RemoveParent(ds); };
+        ForAllUpdated(remove_parent);
+    }
+
+    void NotifyInvalidate(const NodeList &invalid_nodes, bool unlink) override {
+        if (!T::SupportsNotifyInvalidate()) return;
+
+        for (const auto &node : invalid_nodes) {
+            if (T::IsNotifyInvalidateType(node->Type())) {
+                auto notify_invalidate = [&node, unlink](T &descriptor) { descriptor.InvalidateNode(node, unlink); };
+                ForAllUpdated(notify_invalidate);
             }
         }
     }
+
     small_vector<T, 1, uint32_t> descriptors;
 };
 
@@ -830,6 +866,7 @@ struct DecodedTemplateUpdate {
  */
 class DescriptorSet : public BASE_NODE {
   public:
+    using BaseClass = BASE_NODE;
     // Given that we are providing placement new allocation for bindings, the deleter needs to *only* call the destructor
     struct BindingDeleter {
         void operator()(DescriptorBinding *binding) { binding->~DescriptorBinding(); }
@@ -843,6 +880,7 @@ class DescriptorSet : public BASE_NODE {
     DescriptorSet(const VkDescriptorSet, DESCRIPTOR_POOL_STATE *, const std::shared_ptr<DescriptorSetLayout const> &,
                   uint32_t variable_count, StateTracker *state_data);
     void LinkChildNodes() override;
+    void NotifyInvalidate(const NodeList &invalid_nodes, bool unlink) override;
     ~DescriptorSet() { Destroy(); }
 
     // A number of common Get* functions that return data based on layout from which this set was created
@@ -869,7 +907,7 @@ class DescriptorSet : public BASE_NODE {
     VkDescriptorSet GetSet() const { return handle_.Cast<VkDescriptorSet>(); };
     // Bind given cmd_buffer to this descriptor set and
     // update CB image layout map with image/imagesampler descriptor image layouts
-    void UpdateDrawState(ValidationStateTracker *, CMD_BUFFER_STATE *cb_state, CMD_TYPE cmd_type, const PIPELINE_STATE *,
+    void UpdateDrawState(ValidationStateTracker *, CMD_BUFFER_STATE *cb_state, vvl::Func command, const PIPELINE_STATE *,
                          const BindingVariableMap &);
 
     // Track work that has been bound or validated to avoid duplicate work, important when large descriptor arrays
@@ -877,7 +915,7 @@ class DescriptorSet : public BASE_NODE {
     typedef vvl::unordered_set<uint32_t> TrackedBindings;
     static void FilterOneBindingReq(const BindingVariableMap::value_type &binding_req_pair, BindingVariableMap *out_req,
                                     const TrackedBindings &set, uint32_t limit);
-    void FilterBindingReqs(const CMD_BUFFER_STATE &cb_state, const PIPELINE_STATE &, const BindingVariableMap &in_req,
+    void FilterBindingReqs(const CMD_BUFFER_STATE &cb_state, const PIPELINE_STATE *, const BindingVariableMap &in_req,
                            BindingVariableMap *out_req) const;
     void UpdateValidationCache(CMD_BUFFER_STATE &cb_state, const PIPELINE_STATE &pipeline,
                                const BindingVariableMap &updated_bindings);
@@ -952,11 +990,10 @@ class DescriptorSet : public BASE_NODE {
     typedef vvl::unordered_map<uint32_t, uint64_t> VersionedBindings;
     // this structure is stored in a map in CMD_BUFFER_STATE, with an entry for every descriptor set.
     struct CachedValidation {
-        TrackedBindings command_binding_and_usage;  // Persistent for the life of the recording
-        TrackedBindings non_dynamic_buffers;        // Persistent for the life of the recording
-        TrackedBindings dynamic_buffers;            // Dirtied (flushed) each BindDescriptorSet
-        vvl::unordered_map<const PIPELINE_STATE *, VersionedBindings>
-            image_samplers;  // Tested vs. changes to CB's ImageLayout
+        TrackedBindings command_binding_and_usage;                                     // Persistent for the life of the recording
+        TrackedBindings non_dynamic_buffers;                                           // Persistent for the life of the recording
+        TrackedBindings dynamic_buffers;                                               // Dirtied (flushed) each BindDescriptorSet
+        vvl::unordered_map<const PIPELINE_STATE *, VersionedBindings> image_samplers;  // Tested vs. changes to CB's ImageLayout
     };
     const DescriptorSetLayout &Layout() const { return *layout_; }
 
@@ -1005,6 +1042,9 @@ class DescriptorSet : public BASE_NODE {
         DescriptorBinding &CurrentBinding() {
             assert(iter_ != end_);
             return **iter_;
+        }
+        uint32_t CurrentIndex() const {
+            return index_;
         }
 
         const Descriptor *operator->() const {
@@ -1090,7 +1130,7 @@ class PrefilterBindRequestMap {
 
     PrefilterBindRequestMap(const DescriptorSet &ds, const BindingVariableMap &in_map)
         : filtered_map_(), orig_map_(in_map), descriptor_set_(ds) {}
-    const BindingVariableMap &FilteredMap(const CMD_BUFFER_STATE &cb_state, const PIPELINE_STATE &);
+    const BindingVariableMap &FilteredMap(const CMD_BUFFER_STATE &cb_state, const PIPELINE_STATE *);
     bool IsManyDescriptors() const { return descriptor_set_.GetTotalDescriptorCount() > kManyDescriptors_; }
 };
 }  // namespace cvdescriptorset

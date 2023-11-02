@@ -34,7 +34,7 @@
 #include <string>
 #include <valarray>
 
-#include "generated/vk_enum_string_helper.h"
+#include "vulkan/vk_enum_string_helper.h"
 #include "generated/chassis.h"
 #include "vulkansc/sc_vuid_enums.h"
 #include "vulkansc/core_checks/sc_core_validation.h"
@@ -156,7 +156,7 @@ bool SCCoreChecks::ValidatePipelinePoolMemory(VkDevice device, const char* cmd, 
 
     vvl::unordered_map<VkDeviceSize, uint32_t> reserved_pipeline_pool_entries{};
     for (uint32_t i = 0; i < create_info_count; ++i) {
-        auto offline_info = LvlFindInChain<VkPipelineOfflineCreateInfo>(create_info[i].pNext);
+        auto offline_info = vku::FindStructInPNextChain<VkPipelineOfflineCreateInfo>(create_info[i].pNext);
         if (offline_info) {
             reserved_pipeline_pool_entries[offline_info->poolEntrySize]++;
         }
@@ -215,7 +215,7 @@ bool SCCoreChecks::ValidatePipelineCacheCreateInfo(VkHandle handle, const char* 
 }
 
 bool SCCoreChecks::ValidatePipelineCacheData(VkPhysicalDevice physicalDevice, const VkPipelineCacheCreateInfo& create_info,
-                                             uint32_t index) const {
+                                             const Location& loc) const {
     bool skip = false;
     bool header_valid = true;
 
@@ -225,11 +225,8 @@ bool SCCoreChecks::ValidatePipelineCacheData(VkPhysicalDevice physicalDevice, co
     }
 
     if (create_info.initialDataSize < sizeof(uint32_t) + sizeof(VkPipelineCacheHeaderVersion)) {
-        skip |= LogWarning(physicalDevice, kVUID_SC_PipelineCacheData_TooSmall,
-                           "vkCreateDevice(): the pipeline cache data size specified in "
-                           "VkDeviceObjectReservationCreateInfo::pPipelineCacheCreateInfos[%u].initialDataSize "
-                           "is too small (%zu bytes) to verify header.",
-                           index, create_info.initialDataSize);
+        skip |= LogWarning(kVUID_SC_PipelineCacheData_TooSmall, physicalDevice, loc.dot(Field::initialDataSize),
+                           "(%zu) is too small to verify pipeline cache header.", create_info.initialDataSize);
         // Return early here as we cannot validate anything else if the header is too small.
         return skip;
     }
@@ -237,65 +234,53 @@ bool SCCoreChecks::ValidatePipelineCacheData(VkPhysicalDevice physicalDevice, co
     const uint32_t sc_header_size = sizeof(VkPipelineCacheHeaderVersionSafetyCriticalOne);
     auto header = reinterpret_cast<const VkPipelineCacheHeaderVersionSafetyCriticalOne*>(create_info.pInitialData);
     if (header->headerVersionOne.headerSize != sc_header_size) {
-        skip |= LogWarning(physicalDevice, kVUID_SC_PipelineCacheData_InvalidHeaderSize,
-                           "vkCreateDevice(): the pipeline cache data specified in "
-                           "VkDeviceObjectReservationCreateInfo::pPipelineCacheCreateInfos[%u].pInitialData "
+        skip |= LogWarning(kVUID_SC_PipelineCacheData_InvalidHeaderSize, physicalDevice, loc.dot(Field::pInitialData),
                            "has an invalid headerSize (%u) that does not match the header size of a Vulkan "
                            "SC pipeline cache VkPipelineCacheHeaderVersionSafetyCriticalOne (%u bytes).",
-                           index, header->headerVersionOne.headerSize, sc_header_size);
+                           header->headerVersionOne.headerSize, sc_header_size);
         header_valid = false;
     }
 
     if (header->headerVersionOne.headerVersion != VK_PIPELINE_CACHE_HEADER_VERSION_SAFETY_CRITICAL_ONE) {
-        skip |= LogWarning(physicalDevice, kVUID_SC_PipelineCacheData_UnrecognizedHeaderVersion,
-                           "vkCreateDevice(): the pipeline cache data specified in "
-                           "VkDeviceObjectReservationCreateInfo::pPipelineCacheCreateInfos[%u].pInitialData "
+        skip |= LogWarning(kVUID_SC_PipelineCacheData_UnrecognizedHeaderVersion, physicalDevice, loc.dot(Field::pInitialData),
                            "has an invalid headerVersion %s (%u) that does not match the header version of "
                            "a Vulkan SC pipeline cache (VK_PIPELINE_CACHE_HEADER_VERSION_SAFETY_CRITICAL_ONE).",
-                           index, string_VkPipelineCacheHeaderVersion(header->headerVersionOne.headerVersion),
+                           string_VkPipelineCacheHeaderVersion(header->headerVersionOne.headerVersion),
                            header->headerVersionOne.headerVersion);
         header_valid = false;
     }
 
     if (create_info.initialDataSize < sc_header_size) {
-        skip |= LogWarning(physicalDevice, kVUID_SC_PipelineCacheData_TooSmall,
-                           "vkCreateDevice(): the pipeline cache data size specified in "
-                           "VkDeviceObjectReservationCreateInfo::pPipelineCacheCreateInfos[%u].initialDataSize "
+        skip |= LogWarning(kVUID_SC_PipelineCacheData_TooSmall, physicalDevice, loc.dot(Field::initialDataSize),
                            "is too small (%zu bytes) to contain a VkPipelineCacheHeaderVersionSafetyCriticalOne "
                            "(%u bytes) header.",
-                           index, create_info.initialDataSize, sc_header_size);
+                           create_info.initialDataSize, sc_header_size);
         // Return early here as we cannot validate anything else if the header is too small.
         return skip;
     }
 
     if (header->validationVersion != VK_PIPELINE_CACHE_VALIDATION_VERSION_SAFETY_CRITICAL_ONE) {
-        skip |= LogWarning(physicalDevice, kVUID_SC_PipelineCacheData_UnrecognizedValidationVersion,
-                           "vkCreateDevice(): the pipeline cache data specified in "
-                           "VkDeviceObjectReservationCreateInfo::pPipelineCacheCreateInfos[%u].pInitialData "
+        skip |= LogWarning(kVUID_SC_PipelineCacheData_UnrecognizedValidationVersion, physicalDevice, loc.dot(Field::pInitialData),
                            "has an invalid validationVersion %s (%u) that does not match the validation version of "
                            "a Vulkan SC pipeline cache (VK_PIPELINE_CACHE_VALIDATION_VERSION_SAFETY_CRITICAL_ONE).",
-                           index, string_VkPipelineCacheValidationVersion(header->validationVersion), header->validationVersion);
+                           string_VkPipelineCacheValidationVersion(header->validationVersion), header->validationVersion);
         header_valid = false;
     }
 
     const uint32_t sc_index_entry_size = sizeof(VkPipelineCacheSafetyCriticalIndexEntry);
     assert(sc_index_entry_size == 56);
     if (header->pipelineIndexStride < sc_index_entry_size) {
-        skip |= LogWarning(physicalDevice, kVUID_SC_PipelineCacheData_PipelineIndexStrideTooSmall,
-                           "vkCreateDevice(): the pipeline cache data specified in "
-                           "VkDeviceObjectReservationCreateInfo::pPipelineCacheCreateInfos[%u].pInitialData "
-                           "has an invalid pipelineIndexStride (%u) which needs to be at least %u.",
-                           index, header->pipelineIndexStride, sc_index_entry_size);
+        skip |= LogWarning(kVUID_SC_PipelineCacheData_PipelineIndexStrideTooSmall, physicalDevice, loc.dot(Field::pInitialData),
+                           "has an invalid pipelineIndexStride (%u) which needs to be at least %u.", header->pipelineIndexStride,
+                           sc_index_entry_size);
         header_valid = false;
     }
 
     if (header->pipelineIndexOffset + header->pipelineIndexCount * header->pipelineIndexStride > create_info.initialDataSize) {
-        skip |= LogWarning(physicalDevice, kVUID_SC_PipelineCacheData_PipelineIndexOutOfBounds,
-                           "vkCreateDevice(): the pipeline cache data specified in "
-                           "VkDeviceObjectReservationCreateInfo::pPipelineCacheCreateInfos[%u].pInitialData "
+        skip |= LogWarning(kVUID_SC_PipelineCacheData_PipelineIndexOutOfBounds, physicalDevice, loc.dot(Field::initialDataSize),
                            "is too small (%zu bytes) to fit pipelineIndexCount (%u) pipelines stored with "
                            "pipelineIndexStride (%u) starting from pipelineIndexOffset (%" PRIu64 ").",
-                           index, create_info.initialDataSize, header->pipelineIndexCount, header->pipelineIndexStride,
+                           create_info.initialDataSize, header->pipelineIndexCount, header->pipelineIndexStride,
                            header->pipelineIndexOffset);
         header_valid = false;
     }
@@ -314,76 +299,68 @@ bool SCCoreChecks::ValidatePipelineCacheData(VkPhysicalDevice physicalDevice, co
 
         auto id = entry.PipelineID();
         if (!pipeline_ids.emplace(id).second) {
-            skip |= LogError(physicalDevice, "VUID-VkPipelineCacheCreateInfo-pInitialData-05139",
-                             "vkCreateDevice(): the pipeline cache data specified in "
-                             "VkDeviceObjectReservationCreateInfo::pPipelineCacheCreateInfos[%u].pInitialData "
-                             "contains duplicate pipeline identifier {%s}.",
-                             index, id.toString().c_str());
+            skip |= LogError("VUID-VkPipelineCacheCreateInfo-pInitialData-05139", physicalDevice, loc.dot(Field::pInitialData),
+                             "contains duplicate pipeline identifier {%s}.", id.toString().c_str());
         }
 
         if (entry->jsonSize == 0 && entry->jsonOffset != 0) {
-            skip |= LogWarning(physicalDevice, kVUID_SC_PipelineCacheData_JsonOffsetAndSizeInconsistent,
-                               "vkCreateDevice(): jsonSize for pipeline identifier {%s} in the pipeline cache data specified "
-                               "in VkDeviceObjectReservationCreateInfo::pPipelineCacheCreateInfos[%u].pInitialData is zero, "
-                               "but jsonOffset is not zero (%" PRIu64 ").",
-                               id.toString().c_str(), index, entry->jsonOffset);
+            skip |=
+                LogWarning(kVUID_SC_PipelineCacheData_JsonOffsetAndSizeInconsistent, physicalDevice, loc.dot(Field::pInitialData),
+                           "contains pipeline identifier {%s} for which jsonSize is zero "
+                           "but jsonOffset is not zero (%" PRIu64 ").",
+                           id.toString().c_str(), entry->jsonOffset);
         }
 
         if (entry->jsonSize != 0 && entry->jsonOffset + entry->jsonSize > create_info.initialDataSize) {
-            skip |= LogWarning(physicalDevice, kVUID_SC_PipelineCacheData_JsonDataOutOfBounds,
-                               "vkCreateDevice(): the pipeline cache data specified in "
-                               "VkDeviceObjectReservationCreateInfo::pPipelineCacheCreateInfos[%u].pInitialData "
+            skip |= LogWarning(kVUID_SC_PipelineCacheData_JsonDataOutOfBounds, physicalDevice, loc.dot(Field::initialDataSize),
                                "is too small (%zu bytes) to fit the JSON data for pipeline identifier {%s} stored with "
                                "jsonSize (%" PRIu64 ") starting from jsonOffset (%" PRIu64 ").",
-                               index, create_info.initialDataSize, id.toString().c_str(), entry->jsonSize, entry->jsonOffset);
+                               create_info.initialDataSize, id.toString().c_str(), entry->jsonSize, entry->jsonOffset);
         }
 
         if (entry->jsonSize == 0 && entry->stageIndexCount != 0) {
-            skip |= LogWarning(physicalDevice, kVUID_SC_PipelineCacheData_JsonSizeStageIndexCountInconsistent,
-                               "vkCreateDevice(): jsonSize for pipeline identifier {%s} in the pipeline cache data specified "
-                               "in VkDeviceObjectReservationCreateInfo::pPipelineCacheCreateInfos[%u].pInitialData is zero, "
+            skip |= LogWarning(kVUID_SC_PipelineCacheData_JsonSizeStageIndexCountInconsistent, physicalDevice,
+                               loc.dot(Field::pInitialData),
+                               "contains pipeline identifier {%s} for which jsonSize is zero "
                                "but stageIndexCount is not zero (%u).",
-                               id.toString().c_str(), index, entry->stageIndexCount);
+                               id.toString().c_str(), entry->stageIndexCount);
         }
 
         if (entry->stageIndexCount == 0 && entry->stageIndexOffset != 0) {
-            skip |= LogWarning(physicalDevice, kVUID_SC_PipelineCacheData_StageIndexOffsetStrideCountInconsistent,
-                               "vkCreateDevice(): stageIndexCount for pipeline identifier {%s} in the pipeline cache data "
-                               "specified in VkDeviceObjectReservationCreateInfo::pPipelineCacheCreateInfos[%u].pInitialData "
-                               "is zero, but stageIndexOffset is not zero (%" PRIu64 ").",
-                               id.toString().c_str(), index, entry->stageIndexOffset);
+            skip |= LogWarning(kVUID_SC_PipelineCacheData_StageIndexOffsetStrideCountInconsistent, physicalDevice,
+                               loc.dot(Field::pInitialData),
+                               "contains pipeline identifier {%s} for which stageIndexCount is zero "
+                               "but stageIndexOffset is not zero (%" PRIu64 ").",
+                               id.toString().c_str(), entry->stageIndexOffset);
         }
 
         if (entry->stageIndexCount == 0 && entry->stageIndexStride != 0) {
-            skip |= LogWarning(physicalDevice, kVUID_SC_PipelineCacheData_StageIndexOffsetStrideCountInconsistent,
-                               "vkCreateDevice(): stageIndexCount for pipeline identifier {%s} in the pipeline cache data "
-                               "specified in VkDeviceObjectReservationCreateInfo::pPipelineCacheCreateInfos[%u].pInitialData "
-                               "is zero, but stageIndexStride is not zero (%u).",
-                               id.toString().c_str(), index, entry->stageIndexStride);
+            skip |= LogWarning(kVUID_SC_PipelineCacheData_StageIndexOffsetStrideCountInconsistent, physicalDevice,
+                               loc.dot(Field::pInitialData),
+                               "contains pipeline identifier {%s} for which stageIndexCount is zero "
+                               "but stageIndexStride is not zero (%u).",
+                               id.toString().c_str(), entry->stageIndexStride);
         }
 
         const uint32_t sc_stage_val_entry_size = sizeof(VkPipelineCacheStageValidationIndexEntry);
         assert(sc_stage_val_entry_size == 16);
         if (entry->stageIndexCount != 0 && entry->stageIndexStride < sc_stage_val_entry_size) {
-            skip |= LogWarning(physicalDevice, kVUID_SC_PipelineCacheData_StageIndexStrideTooSmall,
-                               "vkCreateDevice(): stageIndexCount for pipeline identifier {%s} in the pipeline cache data "
-                               "specified in VkDeviceObjectReservationCreateInfo::pPipelineCacheCreateInfos[%u].pInitialData "
-                               "is not zero, but stageIndexStride is too small (%u bytes) for the stage entries to contain a "
+            skip |= LogWarning(kVUID_SC_PipelineCacheData_StageIndexStrideTooSmall, physicalDevice, loc.dot(Field::pInitialData),
+                               "contains pipeline identifier {%s} for which stageIndexCount is not zero "
+                               "but stageIndexStride is too small (%u bytes) for the stage entries to contain a "
                                "VkPipelineCacheStageValidationIndexEntry structure (%u bytes).",
-                               id.toString().c_str(), index, entry->stageIndexStride, sc_stage_val_entry_size);
+                               id.toString().c_str(), entry->stageIndexStride, sc_stage_val_entry_size);
             stage_info_valid = false;
         }
 
         if (entry->stageIndexCount != 0 &&
             entry->stageIndexOffset + entry->stageIndexCount * entry->stageIndexStride > create_info.initialDataSize) {
-            skip |= LogWarning(physicalDevice, kVUID_SC_PipelineCacheData_StageIndexOutOfBounds,
-                               "vkCreateDevice(): the pipeline cache data specified in "
-                               "VkDeviceObjectReservationCreateInfo::pPipelineCacheCreateInfos[%u].pInitialData "
+            skip |= LogWarning(kVUID_SC_PipelineCacheData_StageIndexOutOfBounds, physicalDevice, loc.dot(Field::initialDataSize),
                                "is too small (%zu bytes) to fit stageIndexCount (%u) stage validation entries for "
                                "pipeline identifier {%s} stored with stageIndexStride (%u) starting from "
                                "stageIndexOffset (%" PRIu64 ").",
-                               index, create_info.initialDataSize, entry->stageIndexCount, id.toString().c_str(),
-                               entry->stageIndexStride, entry->stageIndexOffset);
+                               create_info.initialDataSize, entry->stageIndexCount, id.toString().c_str(), entry->stageIndexStride,
+                               entry->stageIndexOffset);
             stage_info_valid = false;
         }
 
@@ -393,30 +370,27 @@ bool SCCoreChecks::ValidatePipelineCacheData(VkPhysicalDevice physicalDevice, co
                 if (!stage_info) continue;
 
                 if (stage_info->codeSize == 0) {
-                    skip |= LogWarning(physicalDevice, kVUID_SC_PipelineCacheData_CodeSizeZero,
-                                       "vkCreateDevice(): codeSize for stage index entry #%u for pipeline identifier {%s} "
-                                       "in the pipeline cache data specified in VkDeviceObjectReservationCreateInfo::"
-                                       "pPipelineCacheCreateInfos[%u].pInitialData is zero.",
-                                       stage_index, id.toString().c_str(), index);
+                    skip |= LogWarning(kVUID_SC_PipelineCacheData_CodeSizeZero, physicalDevice, loc.dot(Field::pInitialData),
+                                       "contains pipeline identifier {%s} for which codeSize "
+                                       "for stage index entry #%u is zero.",
+                                       id.toString().c_str(), stage_index);
                 }
 
                 if (stage_info->codeSize % 4 != 0) {
-                    skip |= LogWarning(physicalDevice, kVUID_SC_PipelineCacheData_CodeSizeNotMultipleOfFour,
-                                       "vkCreateDevice(): codeSize (%" PRIu64
-                                       ") for stage index entry #%u for pipeline identifier {%s} in the pipeline "
-                                       "cache data specified in VkDeviceObjectReservationCreateInfo::"
-                                       "pPipelineCacheCreateInfos[%u].pInitialData is not a multiple of 4.",
-                                       stage_info->codeSize, stage_index, id.toString().c_str(), index);
+                    skip |= LogWarning(kVUID_SC_PipelineCacheData_CodeSizeNotMultipleOfFour, physicalDevice,
+                                       loc.dot(Field::pInitialData),
+                                       "contains pipeline identifier {%s} for which codeSize (%" PRIu64
+                                       ") for stage index entry #%u is not a multiple of 4.",
+                                       id.toString().c_str(), stage_info->codeSize, stage_index);
                 }
 
                 if (stage_info->codeOffset + stage_info->codeSize > create_info.initialDataSize) {
                     skip |=
-                        LogWarning(physicalDevice, kVUID_SC_PipelineCacheData_CodeDataOutOfBounds,
-                                   "vkCreateDevice(): the pipeline cache data specified in "
-                                   "VkDeviceObjectReservationCreateInfo::pPipelineCacheCreateInfos[%u].pInitialData "
-                                   "is too small (%zu bytes) to fit the SPIR-V module data for stage index entry #%u "
-                                   "for pipeline identifier {%s} stored at codeOffset (%" PRIu64 ") with codeSize (%" PRIu64 ").",
-                                   index, create_info.initialDataSize, stage_index, id.toString().c_str(), stage_info->codeOffset,
+                        LogWarning(kVUID_SC_PipelineCacheData_CodeDataOutOfBounds, physicalDevice, loc.dot(Field::initialDataSize),
+                                   "is too small (%zu bytes) to fit the SPIR-V module data for "
+                                   "stage index entry #%u for pipeline identifier {%s} stored at "
+                                   "codeOffset (%" PRIu64 ") with codeSize (%" PRIu64 ").",
+                                   create_info.initialDataSize, stage_index, id.toString().c_str(), stage_info->codeOffset,
                                    stage_info->codeSize);
                 }
             }
@@ -445,7 +419,7 @@ bool SCCoreChecks::ValidateSwapchainCreateInfo(VkDevice device, const VkSwapchai
     return skip;
 }
 
-bool SCCoreChecks::ValidateShaderModuleId(const PIPELINE_STATE& pipeline) const {
+bool SCCoreChecks::ValidateShaderModuleId(const PIPELINE_STATE& pipeline, const Location& loc) const {
     bool skip = false;
 
     for (const auto& stage_ci : pipeline.shader_stages_ci) {
@@ -459,88 +433,9 @@ bool SCCoreChecks::ValidateShaderModuleId(const PIPELINE_STATE& pipeline) const 
     return skip;
 }
 
-bool SCCoreChecks::ValidatePipelineShaderStage(const PIPELINE_STATE& pipeline, const PipelineStageState& stage_state) const {
-    bool skip = false;
-    const auto* create_info = stage_state.create_info;
-    const SHADER_MODULE_STATE& module_state = *stage_state.module_state.get();
-
-    // TODO: Vulkan SC - Recent refactoring upstream caused validation that does not depend on SPIR-V data
-    // to now require SPIR-V data for being executed. This is a regression that makes us lose some
-    // coverage of non-SPIR-V depended VUs, so for now we simply replicate the checks done by
-    // ValidateSpecialization and ValidateShaderSubgroupSizeControl until the regression is fixed upstream.
-
-    // skip |= ValidateSpecializations(module_state, create_info->pSpecializationInfo, pipeline);
-    {
-        auto spec = create_info->pSpecializationInfo;
-        if (spec) {
-            for (auto i = 0u; i < spec->mapEntryCount; i++) {
-                if (spec->pMapEntries[i].offset >= spec->dataSize) {
-                    skip |=
-                        LogError(module_state.Handle(), "VUID-VkSpecializationInfo-offset-00773",
-                                 "%s(): pCreateInfos[%" PRIu32
-                                 "] Specialization entry %u (for constant id %u) references memory outside provided specialization "
-                                 "data (bytes %u..%zu; %zu bytes provided).",
-                                 pipeline.GetCreateFunctionName(), pipeline.create_index, i, spec->pMapEntries[i].constantID,
-                                 spec->pMapEntries[i].offset, spec->pMapEntries[i].offset + spec->dataSize - 1, spec->dataSize);
-
-                    continue;
-                }
-                if (spec->pMapEntries[i].offset + spec->pMapEntries[i].size > spec->dataSize) {
-                    skip |= LogError(
-                        module_state.Handle(), "VUID-VkSpecializationInfo-pMapEntries-00774",
-                        "%s(): pCreateInfos[%" PRIu32
-                        "] Specialization entry %u (for constant id %u) references memory outside provided specialization "
-                        "data (bytes %u..%zu; %zu bytes provided).",
-                        pipeline.GetCreateFunctionName(), pipeline.create_index, i, spec->pMapEntries[i].constantID,
-                        spec->pMapEntries[i].offset, spec->pMapEntries[i].offset + spec->pMapEntries[i].size - 1, spec->dataSize);
-                }
-                for (uint32_t j = i + 1; j < spec->mapEntryCount; ++j) {
-                    if (spec->pMapEntries[i].constantID == spec->pMapEntries[j].constantID) {
-                        skip |= LogError(module_state.Handle(), "VUID-VkSpecializationInfo-constantID-04911",
-                                         "%s(): pCreateInfos[%" PRIu32 "] Specialization entry %" PRIu32 " and %" PRIu32
-                                         " have the same constantID (%" PRIu32 ").",
-                                         pipeline.GetCreateFunctionName(), pipeline.create_index, i, j,
-                                         spec->pMapEntries[i].constantID);
-                    }
-                }
-            }
-        }
-    }
-
-    if (IsExtEnabled(device_extensions.vk_ext_subgroup_size_control)) {
-        // skip |= ValidateShaderSubgroupSizeControl(module_state, create_info->stage, create_info->flags);
-        auto stage = create_info->stage;
-        auto flags = create_info->flags;
-
-        if ((flags & VK_PIPELINE_SHADER_STAGE_CREATE_ALLOW_VARYING_SUBGROUP_SIZE_BIT_EXT) != 0 &&
-            !enabled_features.core13.subgroupSizeControl) {
-            skip |= LogError(module_state.Handle(), "VUID-VkPipelineShaderStageCreateInfo-flags-02784",
-                             "VkPipelineShaderStageCreateInfo flags contain "
-                             "VK_PIPELINE_SHADER_STAGE_CREATE_ALLOW_VARYING_SUBGROUP_SIZE_BIT_EXT, "
-                             "but the VkPhysicalDeviceSubgroupSizeControlFeaturesEXT::subgroupSizeControl feature is not enabled.");
-        }
-
-        if ((flags & VK_PIPELINE_SHADER_STAGE_CREATE_REQUIRE_FULL_SUBGROUPS_BIT_EXT) != 0) {
-            if (!enabled_features.core13.computeFullSubgroups) {
-                skip |= LogError(module_state.Handle(), "VUID-VkPipelineShaderStageCreateInfo-flags-02785",
-                                 "VkPipelineShaderStageCreateInfo flags contain "
-                                 "VK_PIPELINE_SHADER_STAGE_CREATE_REQUIRE_FULL_SUBGROUPS_BIT_EXT, but the "
-                                 "VkPhysicalDeviceSubgroupSizeControlFeaturesEXT::computeFullSubgroups feature is not enabled");
-            } else if ((stage & (VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_COMPUTE_BIT)) == 0) {
-                skip |= LogError(module_state.Handle(), "VUID-VkPipelineShaderStageCreateInfo-flags-08988",
-                                 "VkPipelineShaderStageCreateInfo flags contain "
-                                 "VK_PIPELINE_SHADER_STAGE_CREATE_REQUIRE_FULL_SUBGROUPS_BIT_EXT, but the stage is %s.",
-                                 string_VkShaderStageFlagBits(stage));
-            }
-        }
-    }
-
-    return skip;
-}
-
 bool SCCoreChecks::PreCallValidateCreateInstance(const VkInstanceCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator,
-                                                 VkInstance* pInstance) const {
-    bool skip = BASE::PreCallValidateCreateInstance(pCreateInfo, pAllocator, pInstance);
+                                                 VkInstance* pInstance, const ErrorObject& error_obj) const {
+    bool skip = BASE::PreCallValidateCreateInstance(pCreateInfo, pAllocator, pInstance, error_obj);
 
     if (pCreateInfo && pCreateInfo->pApplicationInfo) {
         uint32_t api_version = pCreateInfo->pApplicationInfo->apiVersion;
@@ -555,15 +450,16 @@ bool SCCoreChecks::PreCallValidateCreateInstance(const VkInstanceCreateInfo* pCr
 }
 
 bool SCCoreChecks::PreCallValidateCreateDevice(VkPhysicalDevice physicalDevice, const VkDeviceCreateInfo* pCreateInfo,
-                                               const VkAllocationCallbacks* pAllocator, VkDevice* pDevice) const {
-    bool skip = BASE::PreCallValidateCreateDevice(physicalDevice, pCreateInfo, pAllocator, pDevice);
+                                               const VkAllocationCallbacks* pAllocator, VkDevice* pDevice,
+                                               const ErrorObject& error_obj) const {
+    bool skip = BASE::PreCallValidateCreateDevice(physicalDevice, pCreateInfo, pAllocator, pDevice, error_obj);
     auto pd_state = Get<PHYSICAL_DEVICE_STATE>(physicalDevice);
 
     if (pd_state) {
-        const char* missing_pnext_msg = "vkCreateDevice(): missing %s from the pNext chain of pCreateInfo";
+        const char* missing_pnext_msg = "does not contain a %s structure.";
 
-        auto sc_10_props = LvlInitStruct<VkPhysicalDeviceVulkanSC10Properties>();
-        auto pd_props = LvlInitStruct<VkPhysicalDeviceProperties2>(&sc_10_props);
+        auto sc_10_props = vku::InitStruct<VkPhysicalDeviceVulkanSC10Properties>();
+        auto pd_props = vku::InitStruct<VkPhysicalDeviceProperties2>(&sc_10_props);
         const auto& device_limits = pd_props.properties.limits;
         DispatchGetPhysicalDeviceProperties2(physicalDevice, &pd_props);
 
@@ -571,15 +467,17 @@ bool SCCoreChecks::PreCallValidateCreateDevice(VkPhysicalDevice physicalDevice, 
             1u + static_cast<uint32_t>(log2(std::max({device_limits.maxImageDimension1D, device_limits.maxImageDimension2D,
                                                       device_limits.maxImageDimension3D, device_limits.maxImageDimensionCube})));
 
-        const auto* sc_10_features = LvlFindInChain<VkPhysicalDeviceVulkanSC10Features>(pCreateInfo->pNext);
+        const auto* sc_10_features = vku::FindStructInPNextChain<VkPhysicalDeviceVulkanSC10Features>(pCreateInfo->pNext);
         if (sc_10_features == nullptr) {
-            skip |= LogWarning(physicalDevice, kVUID_SC_CreateDevice_MissingVulkanSC10Features, missing_pnext_msg,
+            skip |= LogWarning(kVUID_SC_CreateDevice_MissingVulkanSC10Features, physicalDevice,
+                               error_obj.location.dot(Field::pCreateInfo).dot(Field::pNext), missing_pnext_msg,
                                "VkPhysicalDeviceVulkanSC10Features");
         }
 
-        const auto* object_reservation_info = LvlFindInChain<VkDeviceObjectReservationCreateInfo>(pCreateInfo->pNext);
+        const auto* object_reservation_info = vku::FindStructInPNextChain<VkDeviceObjectReservationCreateInfo>(pCreateInfo->pNext);
         if (object_reservation_info == nullptr) {
-            skip |= LogWarning(physicalDevice, kVUID_SC_CreateDevice_MissingObjectReservationInfo, missing_pnext_msg,
+            skip |= LogWarning(kVUID_SC_CreateDevice_MissingObjectReservationInfo, physicalDevice,
+                               error_obj.location.dot(Field::pCreateInfo).dot(Field::pNext), missing_pnext_msg,
                                "VkDeviceObjectReservationCreateInfo");
         }
 
@@ -590,7 +488,10 @@ bool SCCoreChecks::PreCallValidateCreateDevice(VkPhysicalDevice physicalDevice, 
             for (uint32_t i = 0; i < object_reservation_info->pipelineCacheCreateInfoCount; ++i) {
                 const auto& create_info = object_reservation_info->pPipelineCacheCreateInfos[i];
                 skip |= ValidatePipelineCacheCreateInfo(physicalDevice, "vkCreateDevice", create_info);
-                skip |= ValidatePipelineCacheData(physicalDevice, create_info, i);
+                skip |= ValidatePipelineCacheData(physicalDevice, create_info,
+                                                  error_obj.location.dot(Field::pCreateInfo)
+                                                      .pNext(Struct::VkDeviceObjectReservationCreateInfo)
+                                                      .dot(Field::pPipelineCacheCreateInfos, i));
             }
 
             if (object_reservation_info->maxImageViewArrayLayers > device_limits.maxImageArrayLayers) {
@@ -648,7 +549,8 @@ bool SCCoreChecks::PreCallValidateCreateDevice(VkPhysicalDevice physicalDevice, 
 
             total_device_memory_request_count += object_reservation_info->deviceMemoryRequestCount;
             total_sampler_request_count += object_reservation_info->samplerRequestCount;
-            object_reservation_info = LvlFindInChain<VkDeviceObjectReservationCreateInfo>(object_reservation_info->pNext);
+            object_reservation_info =
+                vku::FindStructInPNextChain<VkDeviceObjectReservationCreateInfo>(object_reservation_info->pNext);
         }
 
         if (total_device_memory_request_count > device_limits.maxMemoryAllocationCount) {
@@ -677,14 +579,15 @@ void SCCoreChecks::CreateDevice(const VkDeviceCreateInfo* pCreateInfo) {
 }
 
 bool SCCoreChecks::PreCallValidateCreateCommandPool(VkDevice device, const VkCommandPoolCreateInfo* pCreateInfo,
-                                                    const VkAllocationCallbacks* pAllocator, VkCommandPool* pCommandPool) const {
-    bool skip = BASE::PreCallValidateCreateCommandPool(device, pCreateInfo, pAllocator, pCommandPool);
+                                                    const VkAllocationCallbacks* pAllocator, VkCommandPool* pCommandPool,
+                                                    const ErrorObject& error_obj) const {
+    bool skip = BASE::PreCallValidateCreateCommandPool(device, pCreateInfo, pAllocator, pCommandPool, error_obj);
 
     skip |= ValidateObjectRequestCount(device, "vkCreateCommandPool", "VUID-vkCreateCommandPool-device-05068", "command pools",
                                        Count<COMMAND_POOL_STATE>(), "commandPoolRequestCount",
                                        sc_object_limits_.commandPoolRequestCount, 1);
 
-    const auto* mem_reservation_info = LvlFindInChain<VkCommandPoolMemoryReservationCreateInfo>(pCreateInfo->pNext);
+    const auto* mem_reservation_info = vku::FindStructInPNextChain<VkCommandPoolMemoryReservationCreateInfo>(pCreateInfo->pNext);
     if (mem_reservation_info) {
         if (mem_reservation_info->commandPoolReservedSize == 0) {
             skip |= LogError(device, "VUID-VkCommandPoolMemoryReservationCreateInfo-commandPoolReservedSize-05003",
@@ -722,8 +625,8 @@ bool SCCoreChecks::PreCallValidateCreateCommandPool(VkDevice device, const VkCom
 
 bool SCCoreChecks::PreCallValidateCreateDescriptorSetLayout(VkDevice device, const VkDescriptorSetLayoutCreateInfo* pCreateInfo,
                                                             const VkAllocationCallbacks* pAllocator,
-                                                            VkDescriptorSetLayout* pSetLayout) const {
-    bool skip = BASE::PreCallValidateCreateDescriptorSetLayout(device, pCreateInfo, pAllocator, pSetLayout);
+                                                            VkDescriptorSetLayout* pSetLayout, const ErrorObject& error_obj) const {
+    bool skip = BASE::PreCallValidateCreateDescriptorSetLayout(device, pCreateInfo, pAllocator, pSetLayout, error_obj);
 
     skip |= ValidateObjectRequestCount(device, "vkCreateDescriptorSetLayout", "VUID-vkCreateDescriptorSetLayout-device-05068",
                                        "descriptor set layouts", Count<cvdescriptorset::DescriptorSetLayout>(),
@@ -773,9 +676,9 @@ bool SCCoreChecks::PreCallValidateCreateDescriptorSetLayout(VkDevice device, con
 }
 
 bool SCCoreChecks::PreCallValidateCreatePipelineLayout(VkDevice device, const VkPipelineLayoutCreateInfo* pCreateInfo,
-                                                       const VkAllocationCallbacks* pAllocator,
-                                                       VkPipelineLayout* pPipelineLayout) const {
-    bool skip = BASE::PreCallValidateCreatePipelineLayout(device, pCreateInfo, pAllocator, pPipelineLayout);
+                                                       const VkAllocationCallbacks* pAllocator, VkPipelineLayout* pPipelineLayout,
+                                                       const ErrorObject& error_obj) const {
+    bool skip = BASE::PreCallValidateCreatePipelineLayout(device, pCreateInfo, pAllocator, pPipelineLayout, error_obj);
 
     skip |= ValidateObjectRequestCount(device, "vkCreatePipelineLayout", "VUID-vkCreatePipelineLayout-device-05068",
                                        "pipeline layouts", Count<PIPELINE_LAYOUT_STATE>(), "pipelineLayout",
@@ -785,9 +688,9 @@ bool SCCoreChecks::PreCallValidateCreatePipelineLayout(VkDevice device, const Vk
 }
 
 bool SCCoreChecks::PreCallValidateCreateDescriptorPool(VkDevice device, const VkDescriptorPoolCreateInfo* pCreateInfo,
-                                                       const VkAllocationCallbacks* pAllocator,
-                                                       VkDescriptorPool* pDescriptorPool) const {
-    bool skip = BASE::PreCallValidateCreateDescriptorPool(device, pCreateInfo, pAllocator, pDescriptorPool);
+                                                       const VkAllocationCallbacks* pAllocator, VkDescriptorPool* pDescriptorPool,
+                                                       const ErrorObject& error_obj) const {
+    bool skip = BASE::PreCallValidateCreateDescriptorPool(device, pCreateInfo, pAllocator, pDescriptorPool, error_obj);
 
     skip |= ValidateObjectRequestCount(device, "vkCreateDescriptorPool", "VUID-vkCreateDescriptorPool-device-05068",
                                        "descriptor pool", Count<DESCRIPTOR_POOL_STATE>(), "descriptorPool",
@@ -797,8 +700,8 @@ bool SCCoreChecks::PreCallValidateCreateDescriptorPool(VkDevice device, const Vk
 }
 
 bool SCCoreChecks::PreCallValidateAllocateCommandBuffers(VkDevice device, const VkCommandBufferAllocateInfo* pAllocateInfo,
-                                                         VkCommandBuffer* pCommandBuffers) const {
-    bool skip = false;
+                                                         VkCommandBuffer* pCommandBuffers, const ErrorObject& error_obj) const {
+    bool skip = BASE::PreCallValidateAllocateCommandBuffers(device, pAllocateInfo, pCommandBuffers, error_obj);
 
     auto cp_state = Get<SC_COMMAND_POOL_STATE>(pAllocateInfo->commandPool);
     if (!cp_state) return false;
@@ -817,8 +720,9 @@ bool SCCoreChecks::PreCallValidateAllocateCommandBuffers(VkDevice device, const 
 }
 
 bool SCCoreChecks::PreCallValidateAllocateDescriptorSets(VkDevice device, const VkDescriptorSetAllocateInfo* pAllocateInfo,
-                                                         VkDescriptorSet* pDescriptorSets, void* ads_state_data) const {
-    bool skip = BASE::PreCallValidateAllocateDescriptorSets(device, pAllocateInfo, pDescriptorSets, ads_state_data);
+                                                         VkDescriptorSet* pDescriptorSets, const ErrorObject& error_obj,
+                                                         void* ads_state_data) const {
+    bool skip = BASE::PreCallValidateAllocateDescriptorSets(device, pAllocateInfo, pDescriptorSets, error_obj, ads_state_data);
 
     if (pAllocateInfo) {
         skip |= ValidateObjectRequestCount(device, "vkAllocateDescriptorSets", "VUID-vkAllocateDescriptorSets-device-05068",
@@ -831,8 +735,9 @@ bool SCCoreChecks::PreCallValidateAllocateDescriptorSets(VkDevice device, const 
 }
 
 bool SCCoreChecks::PreCallValidateAllocateMemory(VkDevice device, const VkMemoryAllocateInfo* pAllocateInfo,
-                                                 const VkAllocationCallbacks* pAllocator, VkDeviceMemory* pMemory) const {
-    bool skip = BASE::PreCallValidateAllocateMemory(device, pAllocateInfo, pAllocator, pMemory);
+                                                 const VkAllocationCallbacks* pAllocator, VkDeviceMemory* pMemory,
+                                                 const ErrorObject& error_obj) const {
+    bool skip = BASE::PreCallValidateAllocateMemory(device, pAllocateInfo, pAllocator, pMemory, error_obj);
 
     skip |= ValidateObjectRequestCount(device, "vkAllocateMemory", "VUID-vkAllocateMemory-device-05068", "device memory objects",
                                        Count<DEVICE_MEMORY_STATE>(), "deviceMemory", sc_object_limits_.deviceMemoryRequestCount, 1);
@@ -843,9 +748,9 @@ bool SCCoreChecks::PreCallValidateAllocateMemory(VkDevice device, const VkMemory
 bool SCCoreChecks::PreCallValidateCreateComputePipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t count,
                                                          const VkComputePipelineCreateInfo* pCreateInfos,
                                                          const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,
-                                                         void* ccpl_state_data) const {
+                                                         const ErrorObject& error_obj, void* ccpl_state_data) const {
     bool skip = BASE::PreCallValidateCreateComputePipelines(device, pipelineCache, count, pCreateInfos, pAllocator, pPipelines,
-                                                            ccpl_state_data);
+                                                            error_obj, ccpl_state_data);
 
     skip |= ValidateObjectRequestCount(device, "vkCreateComputePipelines", "VUID-vkCreateComputePipelines-device-05068",
                                        "compute pipelines", sc_reserved_objects_.compute_pipelines.load(), "computePipeline",
@@ -873,9 +778,9 @@ bool SCCoreChecks::PreCallValidateCreateComputePipelines(VkDevice device, VkPipe
 bool SCCoreChecks::PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t count,
                                                           const VkGraphicsPipelineCreateInfo* pCreateInfos,
                                                           const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,
-                                                          void* cgpl_state_data) const {
+                                                          const ErrorObject& error_obj, void* cgpl_state_data) const {
     bool skip = BASE::PreCallValidateCreateGraphicsPipelines(device, pipelineCache, count, pCreateInfos, pAllocator, pPipelines,
-                                                             cgpl_state_data);
+                                                             error_obj, cgpl_state_data);
 
     skip |= ValidateObjectRequestCount(device, "vkCreateGraphicsPipelines", "VUID-vkCreateGraphicsPipelines-device-05068",
                                        "graphics pipelines", sc_reserved_objects_.graphics_pipelines.load(), "graphicsPipeline",
@@ -901,9 +806,9 @@ bool SCCoreChecks::PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPip
 }
 
 bool SCCoreChecks::PreCallValidateCreatePipelineCache(VkDevice device, const VkPipelineCacheCreateInfo* pCreateInfo,
-                                                      const VkAllocationCallbacks* pAllocator,
-                                                      VkPipelineCache* pPipelineCache) const {
-    bool skip = BASE::PreCallValidateCreatePipelineCache(device, pCreateInfo, pAllocator, pPipelineCache);
+                                                      const VkAllocationCallbacks* pAllocator, VkPipelineCache* pPipelineCache,
+                                                      const ErrorObject& error_obj) const {
+    bool skip = BASE::PreCallValidateCreatePipelineCache(device, pCreateInfo, pAllocator, pPipelineCache, error_obj);
 
     skip |= ValidateObjectRequestCount(device, "vkCreatePipelineCache", "VUID-vkCreatePipelineCache-device-05068",
                                        "pipeline caches", Count<SC_PIPELINE_CACHE_STATE>(), "pipelineCache",
@@ -931,8 +836,9 @@ bool SCCoreChecks::PreCallValidateCreatePipelineCache(VkDevice device, const VkP
 }
 
 bool SCCoreChecks::PreCallValidateCreateQueryPool(VkDevice device, const VkQueryPoolCreateInfo* pCreateInfo,
-                                                  const VkAllocationCallbacks* pAllocator, VkQueryPool* pQueryPool) const {
-    bool skip = BASE::PreCallValidateCreateQueryPool(device, pCreateInfo, pAllocator, pQueryPool);
+                                                  const VkAllocationCallbacks* pAllocator, VkQueryPool* pQueryPool,
+                                                  const ErrorObject& error_obj) const {
+    bool skip = BASE::PreCallValidateCreateQueryPool(device, pCreateInfo, pAllocator, pQueryPool, error_obj);
 
     skip |= ValidateObjectRequestCount(device, "vkCreateQueryPool", "VUID-vkCreateQueryPool-device-05068", "query pools",
                                        Count<QUERY_POOL_STATE>(), "queryPool", sc_object_limits_.queryPoolRequestCount, 1);
@@ -975,8 +881,9 @@ bool SCCoreChecks::PreCallValidateCreateQueryPool(VkDevice device, const VkQuery
 }
 
 bool SCCoreChecks::PreCallValidateCreateRenderPass(VkDevice device, const VkRenderPassCreateInfo* pCreateInfo,
-                                                   const VkAllocationCallbacks* pAllocator, VkRenderPass* pRenderPass) const {
-    bool skip = BASE::PreCallValidateCreateRenderPass(device, pCreateInfo, pAllocator, pRenderPass);
+                                                   const VkAllocationCallbacks* pAllocator, VkRenderPass* pRenderPass,
+                                                   const ErrorObject& error_obj) const {
+    bool skip = BASE::PreCallValidateCreateRenderPass(device, pCreateInfo, pAllocator, pRenderPass, error_obj);
 
     skip |= ValidateObjectRequestCount(device, "vkCreateRenderPass", "VUID-vkCreateRenderPass-device-05068", "render passes",
                                        Count<RENDER_PASS_STATE>(), "renderPass", sc_object_limits_.renderPassRequestCount, 1);
@@ -1031,8 +938,9 @@ bool SCCoreChecks::PreCallValidateCreateRenderPass(VkDevice device, const VkRend
 }
 
 bool SCCoreChecks::PreCallValidateCreateRenderPass2(VkDevice device, const VkRenderPassCreateInfo2* pCreateInfo,
-                                                    const VkAllocationCallbacks* pAllocator, VkRenderPass* pRenderPass) const {
-    bool skip = BASE::PreCallValidateCreateRenderPass2(device, pCreateInfo, pAllocator, pRenderPass);
+                                                    const VkAllocationCallbacks* pAllocator, VkRenderPass* pRenderPass,
+                                                    const ErrorObject& error_obj) const {
+    bool skip = BASE::PreCallValidateCreateRenderPass2(device, pCreateInfo, pAllocator, pRenderPass, error_obj);
 
     skip |= ValidateObjectRequestCount(device, "vkCreateRenderPass2", "VUID-vkCreateRenderPass2-device-05068", "render passes",
                                        Count<RENDER_PASS_STATE>(), "renderPass", sc_object_limits_.renderPassRequestCount, 1);
@@ -1087,8 +995,9 @@ bool SCCoreChecks::PreCallValidateCreateRenderPass2(VkDevice device, const VkRen
 }
 
 bool SCCoreChecks::PreCallValidateCreateFramebuffer(VkDevice device, const VkFramebufferCreateInfo* pCreateInfo,
-                                                    const VkAllocationCallbacks* pAllocator, VkFramebuffer* pFramebuffer) const {
-    bool skip = BASE::PreCallValidateCreateFramebuffer(device, pCreateInfo, pAllocator, pFramebuffer);
+                                                    const VkAllocationCallbacks* pAllocator, VkFramebuffer* pFramebuffer,
+                                                    const ErrorObject& error_obj) const {
+    bool skip = BASE::PreCallValidateCreateFramebuffer(device, pCreateInfo, pAllocator, pFramebuffer, error_obj);
 
     skip |= ValidateObjectRequestCount(device, "vkCreateFramebuffer", "VUID-vkCreateFramebuffer-device-05068", "framebuffers",
                                        Count<FRAMEBUFFER_STATE>(), "framebuffer", sc_object_limits_.framebufferRequestCount, 1);
@@ -1106,8 +1015,9 @@ bool SCCoreChecks::PreCallValidateCreateFramebuffer(VkDevice device, const VkFra
 }
 
 bool SCCoreChecks::PreCallValidateCreateBuffer(VkDevice device, const VkBufferCreateInfo* pCreateInfo,
-                                               const VkAllocationCallbacks* pAllocator, VkBuffer* pBuffer) const {
-    bool skip = BASE::PreCallValidateCreateBuffer(device, pCreateInfo, pAllocator, pBuffer);
+                                               const VkAllocationCallbacks* pAllocator, VkBuffer* pBuffer,
+                                               const ErrorObject& error_obj) const {
+    bool skip = BASE::PreCallValidateCreateBuffer(device, pCreateInfo, pAllocator, pBuffer, error_obj);
 
     skip |= ValidateObjectRequestCount(device, "vkCreateBuffer", "VUID-vkCreateBuffer-device-05068", "buffers",
                                        Count<BUFFER_STATE>(), "buffer", sc_object_limits_.bufferRequestCount, 1);
@@ -1127,8 +1037,9 @@ bool SCCoreChecks::PreCallValidateCreateBuffer(VkDevice device, const VkBufferCr
 }
 
 bool SCCoreChecks::PreCallValidateCreateBufferView(VkDevice device, const VkBufferViewCreateInfo* pCreateInfo,
-                                                   const VkAllocationCallbacks* pAllocator, VkBufferView* pView) const {
-    bool skip = BASE::PreCallValidateCreateBufferView(device, pCreateInfo, pAllocator, pView);
+                                                   const VkAllocationCallbacks* pAllocator, VkBufferView* pView,
+                                                   const ErrorObject& error_obj) const {
+    bool skip = BASE::PreCallValidateCreateBufferView(device, pCreateInfo, pAllocator, pView, error_obj);
 
     skip |= ValidateObjectRequestCount(device, "vkCreateBufferView", "VUID-vkCreateBufferView-device-05068", "buffer views",
                                        Count<BUFFER_VIEW_STATE>(), "bufferView", sc_object_limits_.bufferViewRequestCount, 1);
@@ -1137,8 +1048,9 @@ bool SCCoreChecks::PreCallValidateCreateBufferView(VkDevice device, const VkBuff
 }
 
 bool SCCoreChecks::PreCallValidateCreateImage(VkDevice device, const VkImageCreateInfo* pCreateInfo,
-                                              const VkAllocationCallbacks* pAllocator, VkImage* pImage) const {
-    bool skip = BASE::PreCallValidateCreateImage(device, pCreateInfo, pAllocator, pImage);
+                                              const VkAllocationCallbacks* pAllocator, VkImage* pImage,
+                                              const ErrorObject& error_obj) const {
+    bool skip = BASE::PreCallValidateCreateImage(device, pCreateInfo, pAllocator, pImage, error_obj);
 
     skip |= ValidateObjectRequestCount(device, "vkCreateImage", "VUID-vkCreateImage-device-05068", "images", Count<IMAGE_STATE>(),
                                        "image", sc_object_limits_.imageRequestCount, 1);
@@ -1158,8 +1070,9 @@ bool SCCoreChecks::PreCallValidateCreateImage(VkDevice device, const VkImageCrea
 }
 
 bool SCCoreChecks::PreCallValidateCreateImageView(VkDevice device, const VkImageViewCreateInfo* pCreateInfo,
-                                                  const VkAllocationCallbacks* pAllocator, VkImageView* pView) const {
-    bool skip = BASE::PreCallValidateCreateImageView(device, pCreateInfo, pAllocator, pView);
+                                                  const VkAllocationCallbacks* pAllocator, VkImageView* pView,
+                                                  const ErrorObject& error_obj) const {
+    bool skip = BASE::PreCallValidateCreateImageView(device, pCreateInfo, pAllocator, pView, error_obj);
     auto image_state = Get<IMAGE_STATE>(pCreateInfo->image);
     if (!image_state) {
         return skip;
@@ -1219,8 +1132,9 @@ bool SCCoreChecks::PreCallValidateCreateImageView(VkDevice device, const VkImage
 }
 
 bool SCCoreChecks::PreCallValidateCreateSampler(VkDevice device, const VkSamplerCreateInfo* pCreateInfo,
-                                                const VkAllocationCallbacks* pAllocator, VkSampler* pSampler) const {
-    bool skip = BASE::PreCallValidateCreateSampler(device, pCreateInfo, pAllocator, pSampler);
+                                                const VkAllocationCallbacks* pAllocator, VkSampler* pSampler,
+                                                const ErrorObject& error_obj) const {
+    bool skip = BASE::PreCallValidateCreateSampler(device, pCreateInfo, pAllocator, pSampler, error_obj);
 
     skip |= ValidateObjectRequestCount(device, "vkCreateSampler", "VUID-vkCreateSampler-device-05068", "samplers",
                                        Count<SAMPLER_STATE>(), "sampler", sc_object_limits_.samplerRequestCount, 1);
@@ -1231,8 +1145,9 @@ bool SCCoreChecks::PreCallValidateCreateSampler(VkDevice device, const VkSampler
 bool SCCoreChecks::PreCallValidateCreateSamplerYcbcrConversion(VkDevice device,
                                                                const VkSamplerYcbcrConversionCreateInfo* pCreateInfo,
                                                                const VkAllocationCallbacks* pAllocator,
-                                                               VkSamplerYcbcrConversion* pYcbcrConversion) const {
-    bool skip = BASE::PreCallValidateCreateSamplerYcbcrConversion(device, pCreateInfo, pAllocator, pYcbcrConversion);
+                                                               VkSamplerYcbcrConversion* pYcbcrConversion,
+                                                               const ErrorObject& error_obj) const {
+    bool skip = BASE::PreCallValidateCreateSamplerYcbcrConversion(device, pCreateInfo, pAllocator, pYcbcrConversion, error_obj);
 
     skip |= ValidateObjectRequestCount(device, "vkCreateSamplerYcbcrConversion", "VUID-vkCreateSamplerYcbcrConversion-device-05068",
                                        "sampler conversions", Count<SAMPLER_YCBCR_CONVERSION_STATE>(), "samplerYcbcrConversion",
@@ -1242,8 +1157,9 @@ bool SCCoreChecks::PreCallValidateCreateSamplerYcbcrConversion(VkDevice device,
 }
 
 bool SCCoreChecks::PreCallValidateCreateFence(VkDevice device, const VkFenceCreateInfo* pCreateInfo,
-                                              const VkAllocationCallbacks* pAllocator, VkFence* pFence) const {
-    bool skip = BASE::PreCallValidateCreateFence(device, pCreateInfo, pAllocator, pFence);
+                                              const VkAllocationCallbacks* pAllocator, VkFence* pFence,
+                                              const ErrorObject& error_obj) const {
+    bool skip = BASE::PreCallValidateCreateFence(device, pCreateInfo, pAllocator, pFence, error_obj);
 
     skip |= ValidateObjectRequestCount(device, "vkCreateFence", "VUID-vkCreateFence-device-05068", "fences", Count<FENCE_STATE>(),
                                        "fence", sc_object_limits_.fenceRequestCount, 1);
@@ -1252,8 +1168,9 @@ bool SCCoreChecks::PreCallValidateCreateFence(VkDevice device, const VkFenceCrea
 }
 
 bool SCCoreChecks::PreCallValidateCreateSemaphore(VkDevice device, const VkSemaphoreCreateInfo* pCreateInfo,
-                                                  const VkAllocationCallbacks* pAllocator, VkSemaphore* pSemaphore) const {
-    bool skip = BASE::PreCallValidateCreateSemaphore(device, pCreateInfo, pAllocator, pSemaphore);
+                                                  const VkAllocationCallbacks* pAllocator, VkSemaphore* pSemaphore,
+                                                  const ErrorObject& error_obj) const {
+    bool skip = BASE::PreCallValidateCreateSemaphore(device, pCreateInfo, pAllocator, pSemaphore, error_obj);
 
     skip |= ValidateObjectRequestCount(device, "vkCreateSemaphore", "VUID-vkCreateSemaphore-device-05068", "semaphores",
                                        Count<SEMAPHORE_STATE>(), "semaphore", sc_object_limits_.semaphoreRequestCount, 1);
@@ -1262,8 +1179,9 @@ bool SCCoreChecks::PreCallValidateCreateSemaphore(VkDevice device, const VkSemap
 }
 
 bool SCCoreChecks::PreCallValidateCreateEvent(VkDevice device, const VkEventCreateInfo* pCreateInfo,
-                                              const VkAllocationCallbacks* pAllocator, VkEvent* pEvent) const {
-    bool skip = BASE::PreCallValidateCreateEvent(device, pCreateInfo, pAllocator, pEvent);
+                                              const VkAllocationCallbacks* pAllocator, VkEvent* pEvent,
+                                              const ErrorObject& error_obj) const {
+    bool skip = BASE::PreCallValidateCreateEvent(device, pCreateInfo, pAllocator, pEvent, error_obj);
 
     skip |= ValidateObjectRequestCount(device, "vkCreateEvent", "VUID-vkCreateEvent-device-05068", "events", Count<EVENT_STATE>(),
                                        "event", sc_object_limits_.eventRequestCount, 1);
@@ -1272,8 +1190,9 @@ bool SCCoreChecks::PreCallValidateCreateEvent(VkDevice device, const VkEventCrea
 }
 
 bool SCCoreChecks::PreCallValidateCreateSwapchainKHR(VkDevice device, const VkSwapchainCreateInfoKHR* pCreateInfo,
-                                                     const VkAllocationCallbacks* pAllocator, VkSwapchainKHR* pSwapchain) const {
-    bool skip = BASE::PreCallValidateCreateSwapchainKHR(device, pCreateInfo, pAllocator, pSwapchain);
+                                                     const VkAllocationCallbacks* pAllocator, VkSwapchainKHR* pSwapchain,
+                                                     const ErrorObject& error_obj) const {
+    bool skip = BASE::PreCallValidateCreateSwapchainKHR(device, pCreateInfo, pAllocator, pSwapchain, error_obj);
 
     skip |= ValidateObjectRequestCount(device, "vkCreateSwapchainKHR", "VUID-vkCreateSwapchainKHR-device-05068", "swapchains",
                                        Count<SWAPCHAIN_NODE>(), "swapchain", sc_object_limits_.swapchainRequestCount, 1);
@@ -1285,9 +1204,10 @@ bool SCCoreChecks::PreCallValidateCreateSwapchainKHR(VkDevice device, const VkSw
 
 bool SCCoreChecks::PreCallValidateCreateSharedSwapchainsKHR(VkDevice device, uint32_t swapchainCount,
                                                             const VkSwapchainCreateInfoKHR* pCreateInfos,
-                                                            const VkAllocationCallbacks* pAllocator,
-                                                            VkSwapchainKHR* pSwapchains) const {
-    bool skip = BASE::PreCallValidateCreateSharedSwapchainsKHR(device, swapchainCount, pCreateInfos, pAllocator, pSwapchains);
+                                                            const VkAllocationCallbacks* pAllocator, VkSwapchainKHR* pSwapchains,
+                                                            const ErrorObject& error_obj) const {
+    bool skip =
+        BASE::PreCallValidateCreateSharedSwapchainsKHR(device, swapchainCount, pCreateInfos, pAllocator, pSwapchains, error_obj);
 
     skip |= ValidateObjectRequestCount(device, "vkCreateSharedSwapchainsKHR", "VUID-vkCreateSharedSwapchainsKHR-device-05068",
                                        "swapchains", Count<SWAPCHAIN_NODE>(), "swapchain", sc_object_limits_.swapchainRequestCount,
@@ -1304,8 +1224,9 @@ bool SCCoreChecks::PreCallValidateCreateSharedSwapchainsKHR(VkDevice device, uin
 
 bool SCCoreChecks::PreCallValidateCreatePrivateDataSlotEXT(VkDevice device, const VkPrivateDataSlotCreateInfoEXT* pCreateInfo,
                                                            const VkAllocationCallbacks* pAllocator,
-                                                           VkPrivateDataSlotEXT* pPrivateDataSlot) const {
-    bool skip = BASE::PreCallValidateCreatePrivateDataSlotEXT(device, pCreateInfo, pAllocator, pPrivateDataSlot);
+                                                           VkPrivateDataSlotEXT* pPrivateDataSlot,
+                                                           const ErrorObject& error_obj) const {
+    bool skip = BASE::PreCallValidateCreatePrivateDataSlotEXT(device, pCreateInfo, pAllocator, pPrivateDataSlot, error_obj);
 
     uint32_t reserved_private_data_slots = sc_reserved_objects_.private_data_slots.load();
     if (reserved_private_data_slots >= sc_private_data_slot_limits_.privateDataSlotRequestCount) {
@@ -1319,12 +1240,12 @@ bool SCCoreChecks::PreCallValidateCreatePrivateDataSlotEXT(VkDevice device, cons
     return skip;
 }
 
-bool SCCoreChecks::PreCallValidateBindImageMemory2(VkDevice device, uint32_t bindInfoCount,
-                                                   const VkBindImageMemoryInfo* pBindInfos) const {
-    bool skip = BASE::PreCallValidateBindImageMemory2(device, bindInfoCount, pBindInfos);
+bool SCCoreChecks::PreCallValidateBindImageMemory2(VkDevice device, uint32_t bindInfoCount, const VkBindImageMemoryInfo* pBindInfos,
+                                                   const ErrorObject& error_obj) const {
+    bool skip = BASE::PreCallValidateBindImageMemory2(device, bindInfoCount, pBindInfos, error_obj);
 
     for (uint32_t i = 0; i < bindInfoCount; ++i) {
-        auto device_group_info = LvlFindInChain<VkBindImageMemoryDeviceGroupInfo>(pBindInfos[i].pNext);
+        auto device_group_info = vku::FindStructInPNextChain<VkBindImageMemoryDeviceGroupInfo>(pBindInfos[i].pNext);
         if (device_group_info && device_group_info->splitInstanceBindRegionCount != 0) {
             skip |= LogError(device, "VUID-VkBindImageMemoryDeviceGroupInfo-splitInstanceBindRegionCount-05067",
                              "vkBindImageMemory2(): VkBindImageMemoryDeviceGroupInfo::splitInstanceBindRegionCount "
@@ -1336,9 +1257,9 @@ bool SCCoreChecks::PreCallValidateBindImageMemory2(VkDevice device, uint32_t bin
     return skip;
 }
 
-bool SCCoreChecks::PreCallValidateBeginCommandBuffer(VkCommandBuffer commandBuffer,
-                                                     const VkCommandBufferBeginInfo* pBeginInfo) const {
-    bool skip = BASE::PreCallValidateBeginCommandBuffer(commandBuffer, pBeginInfo);
+bool SCCoreChecks::PreCallValidateBeginCommandBuffer(VkCommandBuffer commandBuffer, const VkCommandBufferBeginInfo* pBeginInfo,
+                                                     const ErrorObject& error_obj) const {
+    bool skip = BASE::PreCallValidateBeginCommandBuffer(commandBuffer, pBeginInfo, error_obj);
 
     auto cb_state = GetRead<CMD_BUFFER_STATE>(commandBuffer);
     if (!cb_state) return false;
@@ -1388,8 +1309,9 @@ bool SCCoreChecks::PreCallValidateBeginCommandBuffer(VkCommandBuffer commandBuff
                 } else {
                     auto render_pass = Get<RENDER_PASS_STATE>(pBeginInfo->pInheritanceInfo->renderPass);
                     // renderPass that framebuffer was created with must be compatible with local renderPass
-                    skip |= ValidateRenderPassCompatibility("framebuffer", *framebuffer->rp_state.get(), "command buffer",
-                                                            *render_pass.get(), "vkBeginCommandBuffer()", vuid);
+                    skip |= ValidateRenderPassCompatibility(
+                        "framebuffer", *framebuffer->rp_state.get(), "command buffer", *render_pass.get(),
+                        error_obj.location.dot(Field::pBeginInfo).dot(Field::pInheritanceInfo), vuid);
                 }
             }
         } else if (!phys_dev_props_sc_10_.secondaryCommandBufferNullOrImagelessFramebuffer) {
@@ -1404,8 +1326,9 @@ bool SCCoreChecks::PreCallValidateBeginCommandBuffer(VkCommandBuffer commandBuff
     return skip;
 }
 
-bool SCCoreChecks::PreCallValidateResetCommandBuffer(VkCommandBuffer commandBuffer, VkCommandBufferResetFlags flags) const {
-    bool skip = BASE::PreCallValidateResetCommandBuffer(commandBuffer, flags);
+bool SCCoreChecks::PreCallValidateResetCommandBuffer(VkCommandBuffer commandBuffer, VkCommandBufferResetFlags flags,
+                                                     const ErrorObject& error_obj) const {
+    bool skip = BASE::PreCallValidateResetCommandBuffer(commandBuffer, flags, error_obj);
 
     if (!phys_dev_props_sc_10_.commandPoolResetCommandBuffer) {
         skip |= LogError(commandBuffer, "VUID-vkResetCommandBuffer-commandPoolResetCommandBuffer-05135",

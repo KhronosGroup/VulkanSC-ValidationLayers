@@ -28,7 +28,7 @@
 #include "generated/vk_extension_helper.h"
 #include "test_common.h"
 
-namespace vk_testing {
+namespace vkt {
 
 template <class Dst, class Src>
 std::vector<Dst> MakeVkHandles(const std::vector<Src> &v) {
@@ -46,9 +46,6 @@ std::vector<Dst> MakeVkHandles(const std::vector<Src *> &v) {
                    [](const Src *o) { return (o) ? o->handle() : VK_NULL_HANDLE; });
     return handles;
 }
-
-typedef void (*ErrorCallback)(const char *expr, const char *file, unsigned int line, const char *function);
-void set_error_callback(ErrorCallback callback);
 
 class PhysicalDevice;
 class Device;
@@ -140,6 +137,8 @@ class NonDispHandle : public Handle<T> {
         dev_handle_ = dev;
     }
 
+    void destroy() noexcept { dev_handle_ = VK_NULL_HANDLE; }
+
   private:
     VkDevice dev_handle_;
 };
@@ -148,14 +147,13 @@ class NonDispHandle : public Handle<T> {
 
 class PhysicalDevice : public internal::Handle<VkPhysicalDevice> {
   public:
-    explicit PhysicalDevice(VkPhysicalDevice phy) : Handle(phy) {
-        memory_properties_ = memory_properties();
-        device_properties_ = properties();
-    }
+    explicit PhysicalDevice(VkPhysicalDevice phy)
+        : Handle(phy),
+          properties_(properties()),
+          limits_(properties_.limits),
+          memory_properties_(memory_properties()),
+          queue_properties_(queue_properties()) {}
 
-    VkPhysicalDeviceProperties properties() const;
-    VkPhysicalDeviceMemoryProperties memory_properties() const;
-    std::vector<VkQueueFamilyProperties> queue_properties() const;
     VkPhysicalDeviceFeatures features() const;
 
     bool set_memory_type(const uint32_t type_bits, VkMemoryAllocateInfo *info, const VkMemoryPropertyFlags properties,
@@ -167,13 +165,17 @@ class PhysicalDevice : public internal::Handle<VkPhysicalDevice> {
     // vkEnumerateLayers()
     std::vector<VkLayerProperties> layers() const;
 
+    const VkPhysicalDeviceProperties properties_;
+    const VkPhysicalDeviceLimits limits_;
+    const VkPhysicalDeviceMemoryProperties memory_properties_;
+    const std::vector<VkQueueFamilyProperties> queue_properties_;
+
   private:
     void add_extension_dependencies(uint32_t dependency_count, VkExtensionProperties *depencency_props,
                                     std::vector<VkExtensionProperties> &ext_list);
-
-    VkPhysicalDeviceMemoryProperties memory_properties_;
-
-    VkPhysicalDeviceProperties device_properties_;
+    VkPhysicalDeviceProperties properties() const;
+    std::vector<VkQueueFamilyProperties> queue_properties() const;
+    VkPhysicalDeviceMemoryProperties memory_properties() const;
 };
 
 class QueueCreateInfoArray {
@@ -189,7 +191,14 @@ class QueueCreateInfoArray {
 
 class Device : public internal::Handle<VkDevice> {
   public:
-    explicit Device(VkPhysicalDevice phy) : phy_(phy) {}
+    explicit Device(VkPhysicalDevice phy) : phy_(phy) { init(); }
+    explicit Device(VkPhysicalDevice phy, const VkDeviceCreateInfo &info) : phy_(phy) { init(info); }
+    explicit Device(VkPhysicalDevice phy, std::vector<const char *> &extension_names, VkPhysicalDeviceFeatures *features = nullptr,
+                    void *create_device_pnext = nullptr)
+        : phy_(phy) {
+        init(extension_names, features, create_device_pnext);
+    }
+
     ~Device() noexcept;
     void destroy() noexcept;
 
@@ -202,6 +211,7 @@ class Device : public internal::Handle<VkDevice> {
         init(extensions);
     };
 
+    VkDevice device() { return handle(); }
     const PhysicalDevice &phy() const { return phy_; }
 
     std::vector<const char *> GetEnabledExtensions() { return enabled_extensions_; }
@@ -219,7 +229,16 @@ class Device : public internal::Handle<VkDevice> {
     typedef std::vector<QueueFamilyQueues> QueueFamilies;
     const QueueFamilyQueues &queue_family_queues(uint32_t queue_family) const;
 
+    // Find a queue family with and without desired capabilities
+    std::optional<uint32_t> QueueFamilyMatching(VkQueueFlags with, VkQueueFlags without, bool all_bits = true);
+    std::optional<uint32_t> QueueFamilyWithoutCapabilities(VkQueueFlags capabilities) {
+        // an all_bits match with 0 matches all
+        return QueueFamilyMatching(VkQueueFlags(0), capabilities, true /* all_bits with */);
+    }
+
     uint32_t graphics_queue_node_index_;
+
+    const PhysicalDevice phy_;
 
     struct Format {
         VkFormat format;
@@ -273,8 +292,6 @@ class Device : public internal::Handle<VkDevice> {
     void init_queues(const VkDeviceCreateInfo &info);
     void init_formats();
 
-    PhysicalDevice phy_;
-
     std::vector<const char *> enabled_extensions_;
 
     QueueFamilies queue_families_;
@@ -327,7 +344,7 @@ class DeviceMemory : public internal::NonDispHandle<VkDeviceMemory> {
     void unmap() const;
 	const auto &get_memory_allocate_info() { return memory_allocate_info_; }
 
-        static VkMemoryAllocateInfo get_resource_alloc_info(const vk_testing::Device &dev, const VkMemoryRequirements &reqs,
+        static VkMemoryAllocateInfo get_resource_alloc_info(const vkt::Device &dev, const VkMemoryRequirements &reqs,
                                                             VkMemoryPropertyFlags mem_props, void *alloc_info_pnext = nullptr);
 
       private:
@@ -365,7 +382,7 @@ class Fence : public internal::NonDispHandle<VkFence> {
 class Semaphore : public internal::NonDispHandle<VkSemaphore> {
   public:
     Semaphore() = default;
-    Semaphore(const Device &dev) { init(dev, LvlInitStruct<VkSemaphoreCreateInfo>()); }
+    Semaphore(const Device &dev) { init(dev, vku::InitStruct<VkSemaphoreCreateInfo>()); }
     Semaphore(const Device &dev, const VkSemaphoreCreateInfo &info) { init(dev, info); }
     ~Semaphore() noexcept;
     void destroy() noexcept;
@@ -387,7 +404,7 @@ class Semaphore : public internal::NonDispHandle<VkSemaphore> {
 class Event : public internal::NonDispHandle<VkEvent> {
   public:
     Event() = default;
-    Event(const Device &dev) { init(dev, LvlInitStruct<VkEventCreateInfo>()); }
+    Event(const Device &dev) { init(dev, vku::InitStruct<VkEventCreateInfo>()); }
     Event(const Device &dev, const VkEventCreateInfo &info) { init(dev, info); }
     ~Event() noexcept;
     void destroy() noexcept;
@@ -431,26 +448,16 @@ static constexpr NoMemT no_mem{};
 
 class Buffer : public internal::NonDispHandle<VkBuffer> {
   public:
-    explicit Buffer() : NonDispHandle(), create_info_(LvlInitStruct<decltype(create_info_)>()) {}
-    explicit Buffer(const Device &dev, const VkBufferCreateInfo &info) { init(dev, info); }
-    explicit Buffer(const Device &dev, const VkBufferCreateInfo &info, VkMemoryPropertyFlags mem_props) {
-        init(dev, info, mem_props);
-    }
-    explicit Buffer(const Device &dev, const VkBufferCreateInfo &info, VkMemoryPropertyFlags mem_props, void *alloc_info_pnext) {
+    explicit Buffer() : NonDispHandle(), create_info_(vku::InitStruct<decltype(create_info_)>()) {}
+    explicit Buffer(const Device &dev, const VkBufferCreateInfo &info, VkMemoryPropertyFlags mem_props = 0,
+                    void *alloc_info_pnext = nullptr) {
         init(dev, info, mem_props, alloc_info_pnext);
     }
-    explicit Buffer(const Device &dev, const VkBufferCreateInfo &info, VkMemoryPropertyFlags mem_props,
-                    VkMemoryAllocateFlags alloc_flags) {
-        auto memflagsinfo = LvlInitStruct<VkMemoryAllocateFlagsInfo>();
-        memflagsinfo.flags = alloc_flags;
-        init(dev, info, mem_props, &memflagsinfo);
-    }
-    explicit Buffer(const Device &dev, VkDeviceSize size, VkMemoryPropertyFlags mem_props, VkBufferUsageFlags usage,
-                    void *alloc_info_pnext) {
-        init(dev, size, mem_props, usage, alloc_info_pnext);
+    explicit Buffer(const Device &dev, VkDeviceSize size, VkBufferUsageFlags usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VkMemoryPropertyFlags mem_props = 0,
+                    void *alloc_info_pnext = nullptr) {
+        init(dev, size, usage, mem_props, alloc_info_pnext);
     }
     explicit Buffer(const Device &dev, const VkBufferCreateInfo &info, NoMemT) { init_no_mem(dev, info); }
-    explicit Buffer(const Device &dev, VkDeviceSize size) { init(dev, size); }
     Buffer(Buffer &&rhs) noexcept : NonDispHandle(std::move(rhs)) {
         create_info_ = std::move(rhs.create_info_);
         internal_mem_ = std::move(rhs.internal_mem_);
@@ -470,38 +477,13 @@ class Buffer : public internal::NonDispHandle<VkBuffer> {
     void destroy() noexcept;
 
     // vkCreateBuffer()
-    void init(const Device &dev, const VkBufferCreateInfo &info, VkMemoryPropertyFlags mem_props, void *alloc_info_pnext = nullptr);
-    void init(const Device &dev, const VkBufferCreateInfo &info) { init(dev, info, 0); }
-    void init(const Device &dev, VkDeviceSize size, VkMemoryPropertyFlags mem_props,
-              VkBufferUsageFlags usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, const std::vector<uint32_t> &queue_families = {}) {
-        init(dev, create_info(size, usage, &queue_families), mem_props);
+    void init(const Device &dev, const VkBufferCreateInfo &info, VkMemoryPropertyFlags mem_props = 0,
+              void *alloc_info_pnext = nullptr);
+    void init(const Device &dev, VkDeviceSize size, VkBufferUsageFlags usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+              VkMemoryPropertyFlags mem_props = 0, void *alloc_info_pnext = nullptr,
+              const std::vector<uint32_t> &queue_families = {}) {
+        init(dev, create_info(size, usage, &queue_families), mem_props, alloc_info_pnext);
     }
-    void init(const Device &dev, VkDeviceSize size, VkMemoryPropertyFlags mem_props, VkBufferUsageFlags usage,
-              void *alloc_info_pnext) {
-        init(dev, create_info(size, usage), mem_props, alloc_info_pnext);
-    }
-    void init(const Device &dev, VkDeviceSize size) { init(dev, size, 0); }
-    void init_as_src(const Device &dev, VkDeviceSize size, VkMemoryPropertyFlags &reqs,
-                     const std::vector<uint32_t> *queue_families = nullptr) {
-        init(dev, create_info(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, queue_families), reqs);
-    }
-    void init_as_dst(const Device &dev, VkDeviceSize size, VkMemoryPropertyFlags &reqs,
-                     const std::vector<uint32_t> *queue_families = nullptr) {
-        init(dev, create_info(size, VK_BUFFER_USAGE_TRANSFER_DST_BIT, queue_families), reqs);
-    }
-    void init_as_src_and_dst(const Device &dev, VkDeviceSize size, VkMemoryPropertyFlags &reqs,
-                             const std::vector<uint32_t> *queue_families = nullptr, bool memory = true) {
-        if (memory)
-            init(dev, create_info(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, queue_families), reqs);
-        else
-            init_no_mem(dev,
-                        create_info(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, queue_families));
-    }
-    void init_as_storage(const Device &dev, VkDeviceSize size, VkMemoryPropertyFlags &reqs,
-        const std::vector<uint32_t> *queue_families = nullptr) {
-        init(dev, create_info(size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, queue_families), reqs);
-    }
-
     void init_no_mem(const Device &dev, const VkBufferCreateInfo &info);
 
     // get the internal memory
@@ -524,7 +506,7 @@ class Buffer : public internal::NonDispHandle<VkBuffer> {
 
     VkBufferMemoryBarrier buffer_memory_barrier(VkFlags output_mask, VkFlags input_mask, VkDeviceSize offset,
                                                 VkDeviceSize size) const {
-        VkBufferMemoryBarrier barrier = LvlInitStruct<VkBufferMemoryBarrier>();
+        VkBufferMemoryBarrier barrier = vku::InitStructHelper();
         barrier.buffer = handle();
         barrier.srcAccessMask = output_mask;
         barrier.dstAccessMask = input_mask;
@@ -540,7 +522,7 @@ class Buffer : public internal::NonDispHandle<VkBuffer> {
     VkBufferMemoryBarrier2KHR buffer_memory_barrier(VkPipelineStageFlags2KHR src_stage, VkPipelineStageFlags2KHR dst_stage,
                                                     VkAccessFlags2KHR src_access, VkAccessFlags2KHR dst_access, VkDeviceSize offset,
                                                     VkDeviceSize size) const {
-        VkBufferMemoryBarrier2KHR barrier = LvlInitStruct<VkBufferMemoryBarrier2KHR>();
+        VkBufferMemoryBarrier2KHR barrier = vku::InitStructHelper();
         barrier.buffer = handle();
         barrier.srcStageMask = src_stage;
         barrier.dstStageMask = dst_stage;
@@ -555,7 +537,7 @@ class Buffer : public internal::NonDispHandle<VkBuffer> {
         return barrier;
     }
 
-    [[nodiscard]] VkDeviceAddress address(APIVersion vk_api_version = VK_API_VERSION_1_2) const;
+    [[nodiscard]] VkDeviceAddress address() const;
 
   private:
     VkBufferCreateInfo create_info_;
@@ -576,7 +558,7 @@ class BufferView : public internal::NonDispHandle<VkBufferView> {
 };
 
 inline VkBufferViewCreateInfo BufferView::createInfo(VkBuffer buffer, VkFormat format, VkDeviceSize offset, VkDeviceSize range) {
-    VkBufferViewCreateInfo info = LvlInitStruct<VkBufferViewCreateInfo>();
+    VkBufferViewCreateInfo info = vku::InitStructHelper();
     info.flags = VkFlags(0);
     info.buffer = buffer;
     info.format = format;
@@ -635,7 +617,7 @@ class Image : public internal::NonDispHandle<VkImage> {
                                               VkImageLayout new_layout, const VkImageSubresourceRange &range,
                                               uint32_t srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
                                               uint32_t dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED) const {
-        VkImageMemoryBarrier barrier = LvlInitStruct<VkImageMemoryBarrier>();
+        VkImageMemoryBarrier barrier = vku::InitStructHelper();
         barrier.srcAccessMask = output_mask;
         barrier.dstAccessMask = input_mask;
         barrier.oldLayout = old_layout;
@@ -653,7 +635,7 @@ class Image : public internal::NonDispHandle<VkImage> {
                                                   const VkImageSubresourceRange &range,
                                                   uint32_t srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
                                                   uint32_t dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED) const {
-        VkImageMemoryBarrier2KHR barrier = LvlInitStruct<VkImageMemoryBarrier2KHR>();
+        VkImageMemoryBarrier2KHR barrier = vku::InitStructHelper();
         barrier.srcStageMask = src_stage;
         barrier.dstStageMask = dst_stage;
         barrier.srcAccessMask = src_access;
@@ -726,8 +708,8 @@ class AccelerationStructure : public internal::NonDispHandle<VkAccelerationStruc
 
     const VkDevice &dev() const { return device(); }
 
-    [[nodiscard]] vk_testing::Buffer create_scratch_buffer(const Device &device, VkBufferCreateInfo *pCreateInfo = nullptr,
-                                                           bool buffer_device_address = false) const;
+    [[nodiscard]] vkt::Buffer create_scratch_buffer(const Device &device, VkBufferCreateInfo *pCreateInfo = nullptr,
+                                                    bool buffer_device_address = false) const;
 
   private:
     VkAccelerationStructureInfoNV info_;
@@ -750,6 +732,12 @@ class ShaderModule : public internal::NonDispHandle<VkShaderModule> {
 class Shader : public internal::NonDispHandle<VkShaderEXT> {
   public:
     Shader(const Device &dev, const VkShaderCreateInfoEXT &info) { init(dev, info); }
+    Shader(const Device &dev, const VkShaderStageFlagBits stage, const std::vector<uint32_t> &spv,
+           const VkDescriptorSetLayout *descriptorSetLayout = nullptr, const VkPushConstantRange* pushConstRange = nullptr);
+    Shader(const Device &dev, const VkShaderStageFlagBits stage, const std::vector<uint8_t> &binary,
+           const VkDescriptorSetLayout *descriptorSetLayout = nullptr, const VkPushConstantRange *pushConstRange = nullptr);
+    Shader(const Device &dev, const VkShaderStageFlagBits stage, const std::vector<uint32_t> &spv,
+           VkShaderCreateFlagsEXT flags);
     ~Shader() noexcept;
     void destroy() noexcept;
 
@@ -797,6 +785,16 @@ class PipelineLayout : public internal::NonDispHandle<VkPipelineLayout> {
     PipelineLayout(const Device &dev, VkPipelineLayoutCreateInfo &info) {
         init(dev, info);
     }
+    PipelineLayout(const Device &dev, const std::vector<const DescriptorSetLayout *> &layouts = {},
+                   const std::vector<VkPushConstantRange> &push_constant_ranges = {},
+                   VkPipelineLayoutCreateFlags flags = static_cast<VkPipelineLayoutCreateFlags>(0)) {
+        VkPipelineLayoutCreateInfo info = vku::InitStructHelper();
+        info.flags = flags;
+        info.pushConstantRangeCount = static_cast<uint32_t>(push_constant_ranges.size());
+        info.pPushConstantRanges = push_constant_ranges.data();
+
+        init(dev, info, layouts);
+    }
     ~PipelineLayout() noexcept;
     void destroy() noexcept;
 
@@ -829,6 +827,15 @@ class DescriptorSetLayout : public internal::NonDispHandle<VkDescriptorSetLayout
   public:
     DescriptorSetLayout() noexcept : NonDispHandle(){};
     DescriptorSetLayout(const Device &dev, const VkDescriptorSetLayoutCreateInfo &info) { init(dev, info); }
+    DescriptorSetLayout(const Device &dev, const std::vector<VkDescriptorSetLayoutBinding> &descriptor_set_bindings = {},
+                        VkDescriptorSetLayoutCreateFlags flags = 0, void *pNext = nullptr) {
+        VkDescriptorSetLayoutCreateInfo info = vku::InitStructHelper(pNext);
+        info.flags = flags;
+        info.bindingCount = static_cast<uint32_t>(descriptor_set_bindings.size());
+        info.pBindings = descriptor_set_bindings.data();
+        init(dev, info);
+    }
+
     ~DescriptorSetLayout() noexcept;
     void destroy() noexcept;
 
@@ -879,7 +886,7 @@ class DescriptorPool : public internal::NonDispHandle<VkDescriptorPool> {
 template <typename PoolSizes>
 inline VkDescriptorPoolCreateInfo DescriptorPool::create_info(VkDescriptorPoolCreateFlags flags, uint32_t max_sets,
                                                               const PoolSizes &pool_sizes) {
-    VkDescriptorPoolCreateInfo info = LvlInitStruct<VkDescriptorPoolCreateInfo>();
+    VkDescriptorPoolCreateInfo info = vku::InitStructHelper();
     info.flags = flags;
     info.maxSets = max_sets;
     info.poolSizeCount = pool_sizes.size();
@@ -908,6 +915,9 @@ class CommandPool : public internal::NonDispHandle<VkCommandPool> {
 
     explicit CommandPool() : NonDispHandle() {}
     explicit CommandPool(const Device &dev, const VkCommandPoolCreateInfo &info) { init(dev, info); }
+    explicit CommandPool(const Device &dev, uint32_t queue_family_index, VkCommandPoolCreateFlags flags = 0) {
+        init(dev, vkt::CommandPool::create_info(queue_family_index, flags));
+    }
 
     void init(const Device &dev, const VkCommandPoolCreateInfo &info);
 
@@ -915,7 +925,7 @@ class CommandPool : public internal::NonDispHandle<VkCommandPool> {
 };
 
 inline VkCommandPoolCreateInfo CommandPool::create_info(uint32_t queue_family_index, VkCommandPoolCreateFlags flags) {
-    VkCommandPoolCreateInfo info = LvlInitStruct<VkCommandPoolCreateInfo>();
+    VkCommandPoolCreateInfo info = vku::InitStructHelper();
     info.queueFamilyIndex = queue_family_index;
     info.flags = flags;
     return info;
@@ -928,9 +938,15 @@ class CommandBuffer : public internal::Handle<VkCommandBuffer> {
 
     explicit CommandBuffer() : Handle() {}
     explicit CommandBuffer(const Device &dev, const VkCommandBufferAllocateInfo &info) { init(dev, info); }
+    explicit CommandBuffer(Device *device, const CommandPool *pool, VkCommandBufferLevel level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+                           Queue *queue = nullptr) {
+        Init(device, pool, level, queue);
+    }
 
     // vkAllocateCommandBuffers()
     void init(const Device &dev, const VkCommandBufferAllocateInfo &info);
+    void Init(Device *device, const CommandPool *pool, VkCommandBufferLevel level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+              Queue *queue = nullptr);
 
     // vkBeginCommandBuffer()
     void begin(const VkCommandBufferBeginInfo *info);
@@ -944,9 +960,35 @@ class CommandBuffer : public internal::Handle<VkCommandBuffer> {
 
     static VkCommandBufferAllocateInfo create_info(VkCommandPool const &pool);
 
+    void BeginRenderPass(const VkRenderPassBeginInfo &info, VkSubpassContents contents = VK_SUBPASS_CONTENTS_INLINE);
+    void NextSubpass(VkSubpassContents contents = VK_SUBPASS_CONTENTS_INLINE);
+    void EndRenderPass();
+    void BeginRendering(const VkRenderingInfoKHR &renderingInfo);
+    void BeginRenderingColor(const VkImageView imageView);
+    void EndRendering();
+
+    void BeginVideoCoding(const VkVideoBeginCodingInfoKHR &beginInfo);
+    void ControlVideoCoding(const VkVideoCodingControlInfoKHR &controlInfo);
+    void DecodeVideo(const VkVideoDecodeInfoKHR &decodeInfo);
+    void EndVideoCoding(const VkVideoEndCodingInfoKHR &endInfo);
+
+    void QueueCommandBuffer(bool check_success = true);
+    void QueueCommandBuffer(const Fence &fence, bool check_success = true, bool submit_2 = false);
+
+    void SetEvent(Event &event, VkPipelineStageFlags stageMask) { event.cmd_set(*this, stageMask); }
+    void ResetEvent(Event &event, VkPipelineStageFlags stageMask) { event.cmd_reset(*this, stageMask); }
+    void WaitEvents(uint32_t eventCount, const VkEvent *pEvents, VkPipelineStageFlags srcStageMask,
+                    VkPipelineStageFlags dstStageMask, uint32_t memoryBarrierCount, const VkMemoryBarrier *pMemoryBarriers,
+                    uint32_t bufferMemoryBarrierCount, const VkBufferMemoryBarrier *pBufferMemoryBarriers,
+                    uint32_t imageMemoryBarrierCount, const VkImageMemoryBarrier *pImageMemoryBarriers) {
+        vk::CmdWaitEvents(handle(), eventCount, pEvents, srcStageMask, dstStageMask, memoryBarrierCount, pMemoryBarriers,
+                          bufferMemoryBarrierCount, pBufferMemoryBarriers, imageMemoryBarrierCount, pImageMemoryBarriers);
+    }
+
   private:
     VkDevice dev_handle_;
     VkCommandPool cmd_pool_;
+    Queue *m_queue;
 };
 
 class RenderPass : public internal::NonDispHandle<VkRenderPass> {
@@ -999,7 +1041,7 @@ class SamplerYcbcrConversion : public internal::NonDispHandle<VkSamplerYcbcrConv
 
 inline VkBufferCreateInfo Buffer::create_info(VkDeviceSize size, VkFlags usage, const std::vector<uint32_t> *queue_families,
                                               void *create_info_pnext) {
-    VkBufferCreateInfo info = LvlInitStruct<VkBufferCreateInfo>(create_info_pnext);
+    VkBufferCreateInfo info = vku::InitStructHelper(create_info_pnext);
     info.size = size;
     info.usage = usage;
 
@@ -1013,37 +1055,37 @@ inline VkBufferCreateInfo Buffer::create_info(VkDeviceSize size, VkFlags usage, 
 }
 
 inline VkFenceCreateInfo Fence::create_info(VkFenceCreateFlags flags) {
-    VkFenceCreateInfo info = LvlInitStruct<VkFenceCreateInfo>();
+    VkFenceCreateInfo info = vku::InitStructHelper();
     info.flags = flags;
     return info;
 }
 
 inline VkFenceCreateInfo Fence::create_info() {
-    VkFenceCreateInfo info = LvlInitStruct<VkFenceCreateInfo>();
+    VkFenceCreateInfo info = vku::InitStructHelper();
     return info;
 }
 
 inline VkSemaphoreCreateInfo Semaphore::create_info(VkFlags flags) {
-    VkSemaphoreCreateInfo info = LvlInitStruct<VkSemaphoreCreateInfo>();
+    VkSemaphoreCreateInfo info = vku::InitStructHelper();
     info.flags = flags;
     return info;
 }
 
 inline VkEventCreateInfo Event::create_info(VkFlags flags) {
-    VkEventCreateInfo info = LvlInitStruct<VkEventCreateInfo>();
+    VkEventCreateInfo info = vku::InitStructHelper();
     info.flags = flags;
     return info;
 }
 
 inline VkQueryPoolCreateInfo QueryPool::create_info(VkQueryType type, uint32_t slot_count) {
-    VkQueryPoolCreateInfo info = LvlInitStruct<VkQueryPoolCreateInfo>();
+    VkQueryPoolCreateInfo info = vku::InitStructHelper();
     info.queryType = type;
     info.queryCount = slot_count;
     return info;
 }
 
 inline VkImageCreateInfo Image::create_info() {
-    VkImageCreateInfo info = LvlInitStruct<VkImageCreateInfo>();
+    VkImageCreateInfo info = vku::InitStructHelper();
     info.extent.width = 1;
     info.extent.height = 1;
     info.extent.depth = 1;
@@ -1133,7 +1175,7 @@ inline VkExtent3D Image::extent(int32_t width, int32_t height, int32_t depth) {
 }
 
 inline VkShaderModuleCreateInfo ShaderModule::create_info(size_t code_size, const uint32_t *code, VkFlags flags) {
-    VkShaderModuleCreateInfo info = LvlInitStruct<VkShaderModuleCreateInfo>();
+    VkShaderModuleCreateInfo info = vku::InitStructHelper();
     info.codeSize = code_size;
     info.pCode = code;
     info.flags = flags;
@@ -1143,7 +1185,7 @@ inline VkShaderModuleCreateInfo ShaderModule::create_info(size_t code_size, cons
 inline VkWriteDescriptorSet Device::write_descriptor_set(const DescriptorSet &set, uint32_t binding, uint32_t array_element,
                                                          VkDescriptorType type, uint32_t count,
                                                          const VkDescriptorImageInfo *image_info) {
-    VkWriteDescriptorSet write = LvlInitStruct<VkWriteDescriptorSet>();
+    VkWriteDescriptorSet write = vku::InitStructHelper();
     write.dstSet = set.handle();
     write.dstBinding = binding;
     write.dstArrayElement = array_element;
@@ -1156,7 +1198,7 @@ inline VkWriteDescriptorSet Device::write_descriptor_set(const DescriptorSet &se
 inline VkWriteDescriptorSet Device::write_descriptor_set(const DescriptorSet &set, uint32_t binding, uint32_t array_element,
                                                          VkDescriptorType type, uint32_t count,
                                                          const VkDescriptorBufferInfo *buffer_info) {
-    VkWriteDescriptorSet write = LvlInitStruct<VkWriteDescriptorSet>();
+    VkWriteDescriptorSet write = vku::InitStructHelper();
     write.dstSet = set.handle();
     write.dstBinding = binding;
     write.dstArrayElement = array_element;
@@ -1168,7 +1210,7 @@ inline VkWriteDescriptorSet Device::write_descriptor_set(const DescriptorSet &se
 
 inline VkWriteDescriptorSet Device::write_descriptor_set(const DescriptorSet &set, uint32_t binding, uint32_t array_element,
                                                          VkDescriptorType type, uint32_t count, const VkBufferView *buffer_views) {
-    VkWriteDescriptorSet write = LvlInitStruct<VkWriteDescriptorSet>();
+    VkWriteDescriptorSet write = vku::InitStructHelper();
     write.dstSet = set.handle();
     write.dstBinding = binding;
     write.dstArrayElement = array_element;
@@ -1198,7 +1240,7 @@ inline VkWriteDescriptorSet Device::write_descriptor_set(const DescriptorSet &se
 inline VkCopyDescriptorSet Device::copy_descriptor_set(const DescriptorSet &src_set, uint32_t src_binding,
                                                        uint32_t src_array_element, const DescriptorSet &dst_set,
                                                        uint32_t dst_binding, uint32_t dst_array_element, uint32_t count) {
-    VkCopyDescriptorSet copy = LvlInitStruct<VkCopyDescriptorSet>();
+    VkCopyDescriptorSet copy = vku::InitStructHelper();
     copy.srcSet = src_set.handle();
     copy.srcBinding = src_binding;
     copy.srcArrayElement = src_array_element;
@@ -1210,26 +1252,17 @@ inline VkCopyDescriptorSet Device::copy_descriptor_set(const DescriptorSet &src_
     return copy;
 }
 
-inline VkCommandBufferAllocateInfo CommandBuffer::create_info(VkCommandPool const &pool) {
-    VkCommandBufferAllocateInfo info = LvlInitStruct<VkCommandBufferAllocateInfo>();
-    info.commandPool = pool;
-    info.commandBufferCount = 1;
-    return info;
-}
-
 struct GraphicsPipelineLibraryStage {
     vvl::span<const uint32_t> spv;
     VkShaderModuleCreateInfo shader_ci;
     VkPipelineShaderStageCreateInfo stage_ci;
 
-    GraphicsPipelineLibraryStage(vvl::span<const uint32_t> spv, VkShaderStageFlagBits stage = VK_SHADER_STAGE_VERTEX_BIT,
-                                 const char *name = "main")
-        : spv(spv) {
-        shader_ci = LvlInitStruct<VkShaderModuleCreateInfo>();
+    GraphicsPipelineLibraryStage(vvl::span<const uint32_t> spv, VkShaderStageFlagBits stage, const char *name = "main") : spv(spv) {
+        shader_ci = vku::InitStructHelper();
         shader_ci.codeSize = spv.size() * sizeof(uint32_t);
         shader_ci.pCode = spv.data();
 
-        stage_ci = LvlInitStruct<VkPipelineShaderStageCreateInfo>(&shader_ci);
+        stage_ci = vku::InitStructHelper(&shader_ci);
         stage_ci.stage = stage;
         stage_ci.module = VK_NULL_HANDLE;
         stage_ci.pName = name;
@@ -1239,11 +1272,11 @@ struct GraphicsPipelineLibraryStage {
 struct GraphicsPipelineFromLibraries {
     vvl::span<VkPipeline> libs;
     VkPipelineLibraryCreateInfoKHR link_info;
-    vk_testing::Pipeline pipe;
+    vkt::Pipeline pipe;
 
     GraphicsPipelineFromLibraries(const Device &dev, vvl::span<VkPipeline> libs, VkPipelineLayout layout)
         : GraphicsPipelineFromLibraries(libs) {
-        auto exe_pipe_ci = LvlInitStruct<VkGraphicsPipelineCreateInfo>(&link_info);
+        VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
         exe_pipe_ci.layout = layout;
         pipe.init(dev, exe_pipe_ci);
         pipe.initialized();
@@ -1262,11 +1295,10 @@ struct GraphicsPipelineFromLibraries {
 
   private:
     GraphicsPipelineFromLibraries(vvl::span<VkPipeline> libs) : libs(libs) {
-        link_info = LvlInitStruct<VkPipelineLibraryCreateInfoKHR>();
+        link_info = vku::InitStructHelper();
         link_info.libraryCount = static_cast<uint32_t>(libs.size());
         link_info.pLibraries = libs.data();
     }
 };
 
-}  // namespace vk_testing
-
+}  // namespace vkt

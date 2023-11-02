@@ -2,25 +2,25 @@
 // See layer_chassis_generator.py for modifications
 
 /***************************************************************************
-*
-* Copyright (c) 2015-2023 The Khronos Group Inc.
-* Copyright (c) 2015-2023 Valve Corporation
-* Copyright (c) 2015-2023 LunarG, Inc.
-* Copyright (c) 2015-2023 Google Inc.
-* Copyright (c) 2023-2023 RasterGrid Kft.
-*
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
-*
-*     http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-****************************************************************************/
+ *
+ * Copyright (c) 2015-2023 The Khronos Group Inc.
+ * Copyright (c) 2015-2023 Valve Corporation
+ * Copyright (c) 2015-2023 LunarG, Inc.
+ * Copyright (c) 2015-2023 Google Inc.
+ * Copyright (c) 2023-2023 RasterGrid Kft.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ ****************************************************************************/
 
 // NOLINTBEGIN
 
@@ -32,7 +32,7 @@
 // class virtual function. Preventing non-overridden calls from reaching the default
 // functions saved about 5% in multithreaded applications.
 
-typedef enum InterceptId{
+typedef enum InterceptId {
     InterceptIdPreCallValidateGetDeviceQueue,
     InterceptIdPreCallRecordGetDeviceQueue,
     InterceptIdPostCallRecordGetDeviceQueue,
@@ -870,6 +870,18 @@ typedef enum InterceptId{
     InterceptIdPreCallValidateGetDeviceImageSparseMemoryRequirementsKHR,
     InterceptIdPreCallRecordGetDeviceImageSparseMemoryRequirementsKHR,
     InterceptIdPostCallRecordGetDeviceImageSparseMemoryRequirementsKHR,
+    InterceptIdPreCallValidateCmdBindIndexBuffer2KHR,
+    InterceptIdPreCallRecordCmdBindIndexBuffer2KHR,
+    InterceptIdPostCallRecordCmdBindIndexBuffer2KHR,
+    InterceptIdPreCallValidateGetRenderingAreaGranularityKHR,
+    InterceptIdPreCallRecordGetRenderingAreaGranularityKHR,
+    InterceptIdPostCallRecordGetRenderingAreaGranularityKHR,
+    InterceptIdPreCallValidateGetDeviceImageSubresourceLayoutKHR,
+    InterceptIdPreCallRecordGetDeviceImageSubresourceLayoutKHR,
+    InterceptIdPostCallRecordGetDeviceImageSubresourceLayoutKHR,
+    InterceptIdPreCallValidateGetImageSubresourceLayout2KHR,
+    InterceptIdPreCallRecordGetImageSubresourceLayout2KHR,
+    InterceptIdPostCallRecordGetImageSubresourceLayout2KHR,
     InterceptIdPreCallValidateDebugMarkerSetObjectTagEXT,
     InterceptIdPreCallRecordDebugMarkerSetObjectTagEXT,
     InterceptIdPostCallRecordDebugMarkerSetObjectTagEXT,
@@ -1005,6 +1017,27 @@ typedef enum InterceptId{
     InterceptIdPreCallValidateGetMemoryAndroidHardwareBufferANDROID,
     InterceptIdPreCallRecordGetMemoryAndroidHardwareBufferANDROID,
     InterceptIdPostCallRecordGetMemoryAndroidHardwareBufferANDROID,
+    InterceptIdPreCallValidateCreateExecutionGraphPipelinesAMDX,
+    InterceptIdPreCallRecordCreateExecutionGraphPipelinesAMDX,
+    InterceptIdPostCallRecordCreateExecutionGraphPipelinesAMDX,
+    InterceptIdPreCallValidateGetExecutionGraphPipelineScratchSizeAMDX,
+    InterceptIdPreCallRecordGetExecutionGraphPipelineScratchSizeAMDX,
+    InterceptIdPostCallRecordGetExecutionGraphPipelineScratchSizeAMDX,
+    InterceptIdPreCallValidateGetExecutionGraphPipelineNodeIndexAMDX,
+    InterceptIdPreCallRecordGetExecutionGraphPipelineNodeIndexAMDX,
+    InterceptIdPostCallRecordGetExecutionGraphPipelineNodeIndexAMDX,
+    InterceptIdPreCallValidateCmdInitializeGraphScratchMemoryAMDX,
+    InterceptIdPreCallRecordCmdInitializeGraphScratchMemoryAMDX,
+    InterceptIdPostCallRecordCmdInitializeGraphScratchMemoryAMDX,
+    InterceptIdPreCallValidateCmdDispatchGraphAMDX,
+    InterceptIdPreCallRecordCmdDispatchGraphAMDX,
+    InterceptIdPostCallRecordCmdDispatchGraphAMDX,
+    InterceptIdPreCallValidateCmdDispatchGraphIndirectAMDX,
+    InterceptIdPreCallRecordCmdDispatchGraphIndirectAMDX,
+    InterceptIdPostCallRecordCmdDispatchGraphIndirectAMDX,
+    InterceptIdPreCallValidateCmdDispatchGraphIndirectCountAMDX,
+    InterceptIdPreCallRecordCmdDispatchGraphIndirectCountAMDX,
+    InterceptIdPostCallRecordCmdDispatchGraphIndirectCountAMDX,
     InterceptIdPreCallValidateCmdSetSampleLocationsEXT,
     InterceptIdPreCallRecordCmdSetSampleLocationsEXT,
     InterceptIdPostCallRecordCmdSetSampleLocationsEXT,
@@ -1170,6 +1203,21 @@ typedef enum InterceptId{
     InterceptIdPreCallValidateCmdSetStencilOpEXT,
     InterceptIdPreCallRecordCmdSetStencilOpEXT,
     InterceptIdPostCallRecordCmdSetStencilOpEXT,
+    InterceptIdPreCallValidateCopyMemoryToImageEXT,
+    InterceptIdPreCallRecordCopyMemoryToImageEXT,
+    InterceptIdPostCallRecordCopyMemoryToImageEXT,
+    InterceptIdPreCallValidateCopyImageToMemoryEXT,
+    InterceptIdPreCallRecordCopyImageToMemoryEXT,
+    InterceptIdPostCallRecordCopyImageToMemoryEXT,
+    InterceptIdPreCallValidateCopyImageToImageEXT,
+    InterceptIdPreCallRecordCopyImageToImageEXT,
+    InterceptIdPostCallRecordCopyImageToImageEXT,
+    InterceptIdPreCallValidateTransitionImageLayoutEXT,
+    InterceptIdPreCallRecordTransitionImageLayoutEXT,
+    InterceptIdPostCallRecordTransitionImageLayoutEXT,
+    InterceptIdPreCallValidateGetImageSubresourceLayout2EXT,
+    InterceptIdPreCallRecordGetImageSubresourceLayout2EXT,
+    InterceptIdPostCallRecordGetImageSubresourceLayout2EXT,
     InterceptIdPreCallValidateReleaseSwapchainImagesEXT,
     InterceptIdPreCallRecordReleaseSwapchainImagesEXT,
     InterceptIdPostCallRecordReleaseSwapchainImagesEXT,
@@ -1245,9 +1293,6 @@ typedef enum InterceptId{
     InterceptIdPreCallValidateCmdSetFragmentShadingRateEnumNV,
     InterceptIdPreCallRecordCmdSetFragmentShadingRateEnumNV,
     InterceptIdPostCallRecordCmdSetFragmentShadingRateEnumNV,
-    InterceptIdPreCallValidateGetImageSubresourceLayout2EXT,
-    InterceptIdPreCallRecordGetImageSubresourceLayout2EXT,
-    InterceptIdPostCallRecordGetImageSubresourceLayout2EXT,
     InterceptIdPreCallValidateGetDeviceFaultInfoEXT,
     InterceptIdPreCallRecordGetDeviceFaultInfoEXT,
     InterceptIdPostCallRecordGetDeviceFaultInfoEXT,
@@ -1410,6 +1455,15 @@ typedef enum InterceptId{
     InterceptIdPreCallValidateCmdDecompressMemoryIndirectCountNV,
     InterceptIdPreCallRecordCmdDecompressMemoryIndirectCountNV,
     InterceptIdPostCallRecordCmdDecompressMemoryIndirectCountNV,
+    InterceptIdPreCallValidateGetPipelineIndirectMemoryRequirementsNV,
+    InterceptIdPreCallRecordGetPipelineIndirectMemoryRequirementsNV,
+    InterceptIdPostCallRecordGetPipelineIndirectMemoryRequirementsNV,
+    InterceptIdPreCallValidateCmdUpdatePipelineIndirectBufferNV,
+    InterceptIdPreCallRecordCmdUpdatePipelineIndirectBufferNV,
+    InterceptIdPostCallRecordCmdUpdatePipelineIndirectBufferNV,
+    InterceptIdPreCallValidateGetPipelineIndirectDeviceAddressNV,
+    InterceptIdPreCallRecordGetPipelineIndirectDeviceAddressNV,
+    InterceptIdPostCallRecordGetPipelineIndirectDeviceAddressNV,
     InterceptIdPreCallValidateCmdSetTessellationDomainOriginEXT,
     InterceptIdPreCallRecordCmdSetTessellationDomainOriginEXT,
     InterceptIdPostCallRecordCmdSetTessellationDomainOriginEXT,
@@ -1521,9 +1575,6 @@ typedef enum InterceptId{
     InterceptIdPreCallValidateCmdOpticalFlowExecuteNV,
     InterceptIdPreCallRecordCmdOpticalFlowExecuteNV,
     InterceptIdPostCallRecordCmdOpticalFlowExecuteNV,
-    InterceptIdPreCallValidateCreateShadersEXT,
-    InterceptIdPreCallRecordCreateShadersEXT,
-    InterceptIdPostCallRecordCreateShadersEXT,
     InterceptIdPreCallValidateDestroyShaderEXT,
     InterceptIdPreCallRecordDestroyShaderEXT,
     InterceptIdPostCallRecordDestroyShaderEXT,
@@ -1545,6 +1596,21 @@ typedef enum InterceptId{
     InterceptIdPreCallValidateDestroySemaphoreSciSyncPoolNV,
     InterceptIdPreCallRecordDestroySemaphoreSciSyncPoolNV,
     InterceptIdPostCallRecordDestroySemaphoreSciSyncPoolNV,
+    InterceptIdPreCallValidateSetLatencySleepModeNV,
+    InterceptIdPreCallRecordSetLatencySleepModeNV,
+    InterceptIdPostCallRecordSetLatencySleepModeNV,
+    InterceptIdPreCallValidateLatencySleepNV,
+    InterceptIdPreCallRecordLatencySleepNV,
+    InterceptIdPostCallRecordLatencySleepNV,
+    InterceptIdPreCallValidateSetLatencyMarkerNV,
+    InterceptIdPreCallRecordSetLatencyMarkerNV,
+    InterceptIdPostCallRecordSetLatencyMarkerNV,
+    InterceptIdPreCallValidateGetLatencyTimingsNV,
+    InterceptIdPreCallRecordGetLatencyTimingsNV,
+    InterceptIdPostCallRecordGetLatencyTimingsNV,
+    InterceptIdPreCallValidateQueueNotifyOutOfBandNV,
+    InterceptIdPreCallRecordQueueNotifyOutOfBandNV,
+    InterceptIdPostCallRecordQueueNotifyOutOfBandNV,
     InterceptIdPreCallValidateCmdSetAttachmentFeedbackLoopEnableEXT,
     InterceptIdPreCallRecordCmdSetAttachmentFeedbackLoopEnableEXT,
     InterceptIdPostCallRecordCmdSetAttachmentFeedbackLoopEnableEXT,
@@ -1627,47 +1693,38 @@ typedef enum InterceptId{
 } InterceptId;
 
 void ValidationObject::InitObjectDispatchVectors() {
-
-#define BUILD_DISPATCH_VECTOR(name) \
-    init_object_dispatch_vector(InterceptId ## name, \
-                                typeid(&ValidationObject::name), \
-                                typeid(&ThreadSafety::name), \
-                                typeid(&StatelessValidation::name), \
-                                typeid(&ObjectLifetimes::name), \
-                                typeid(&SCCoreChecks::name), \
+#define BUILD_DISPATCH_VECTOR(name)                                                                                              \
+    init_object_dispatch_vector(InterceptId##name, typeid(&ValidationObject::name), typeid(&ThreadSafety::name),                 \
+                                typeid(&StatelessValidation::name), typeid(&ObjectLifetimes::name), typeid(&SCCoreChecks::name), \
                                 typeid(&SyncValidator::name));
 
-    auto init_object_dispatch_vector = [this](InterceptId id,
-                                              const std::type_info& vo_typeid,
-                                              const std::type_info& tt_typeid,
-                                              const std::type_info& tpv_typeid,
-                                              const std::type_info& tot_typeid,
-                                              const std::type_info& tcv_typeid,
-                                              const std::type_info& tsv_typeid) {
+    auto init_object_dispatch_vector = [this](InterceptId id, const std::type_info& vo_typeid, const std::type_info& tt_typeid,
+                                              const std::type_info& tpv_typeid, const std::type_info& tot_typeid,
+                                              const std::type_info& tcv_typeid, const std::type_info& tsv_typeid) {
         for (auto item : this->object_dispatch) {
             auto intercept_vector = &this->intercept_vectors[id];
             switch (item->container_type) {
-            case LayerObjectTypeThreading:
-                if (tt_typeid != vo_typeid) intercept_vector->push_back(item);
-                break;
-            case LayerObjectTypeParameterValidation:
-                if (tpv_typeid != vo_typeid) intercept_vector->push_back(item);
-                break;
-            case LayerObjectTypeObjectTracker:
-                if (tot_typeid != vo_typeid) intercept_vector->push_back(item);
-                break;
-            case LayerObjectTypeCoreValidation:
-                if (tcv_typeid != vo_typeid) intercept_vector->push_back(item);
-                break;
-            case LayerObjectTypeSyncValidation:
-                if (tsv_typeid != vo_typeid) intercept_vector->push_back(item);
-                break;
-            case LayerObjectTypeInstance:
-            case LayerObjectTypeDevice:
-                break;
-            default:
-                /* Chassis codegen needs to be updated for unknown validation object type */
-                assert(0);
+                case LayerObjectTypeThreading:
+                    if (tt_typeid != vo_typeid) intercept_vector->push_back(item);
+                    break;
+                case LayerObjectTypeParameterValidation:
+                    if (tpv_typeid != vo_typeid) intercept_vector->push_back(item);
+                    break;
+                case LayerObjectTypeObjectTracker:
+                    if (tot_typeid != vo_typeid) intercept_vector->push_back(item);
+                    break;
+                case LayerObjectTypeCoreValidation:
+                    if (tcv_typeid != vo_typeid) intercept_vector->push_back(item);
+                    break;
+                case LayerObjectTypeSyncValidation:
+                    if (tsv_typeid != vo_typeid) intercept_vector->push_back(item);
+                    break;
+                case LayerObjectTypeInstance:
+                case LayerObjectTypeDevice:
+                    break;
+                default:
+                    /* Chassis codegen needs to be updated for unknown validation object type */
+                    assert(0);
             }
         }
     };
@@ -2526,6 +2583,18 @@ void ValidationObject::InitObjectDispatchVectors() {
     BUILD_DISPATCH_VECTOR(PreCallValidateGetDeviceImageSparseMemoryRequirementsKHR);
     BUILD_DISPATCH_VECTOR(PreCallRecordGetDeviceImageSparseMemoryRequirementsKHR);
     BUILD_DISPATCH_VECTOR(PostCallRecordGetDeviceImageSparseMemoryRequirementsKHR);
+    BUILD_DISPATCH_VECTOR(PreCallValidateCmdBindIndexBuffer2KHR);
+    BUILD_DISPATCH_VECTOR(PreCallRecordCmdBindIndexBuffer2KHR);
+    BUILD_DISPATCH_VECTOR(PostCallRecordCmdBindIndexBuffer2KHR);
+    BUILD_DISPATCH_VECTOR(PreCallValidateGetRenderingAreaGranularityKHR);
+    BUILD_DISPATCH_VECTOR(PreCallRecordGetRenderingAreaGranularityKHR);
+    BUILD_DISPATCH_VECTOR(PostCallRecordGetRenderingAreaGranularityKHR);
+    BUILD_DISPATCH_VECTOR(PreCallValidateGetDeviceImageSubresourceLayoutKHR);
+    BUILD_DISPATCH_VECTOR(PreCallRecordGetDeviceImageSubresourceLayoutKHR);
+    BUILD_DISPATCH_VECTOR(PostCallRecordGetDeviceImageSubresourceLayoutKHR);
+    BUILD_DISPATCH_VECTOR(PreCallValidateGetImageSubresourceLayout2KHR);
+    BUILD_DISPATCH_VECTOR(PreCallRecordGetImageSubresourceLayout2KHR);
+    BUILD_DISPATCH_VECTOR(PostCallRecordGetImageSubresourceLayout2KHR);
     BUILD_DISPATCH_VECTOR(PreCallValidateDebugMarkerSetObjectTagEXT);
     BUILD_DISPATCH_VECTOR(PreCallRecordDebugMarkerSetObjectTagEXT);
     BUILD_DISPATCH_VECTOR(PostCallRecordDebugMarkerSetObjectTagEXT);
@@ -2666,6 +2735,41 @@ void ValidationObject::InitObjectDispatchVectors() {
     BUILD_DISPATCH_VECTOR(PreCallValidateGetMemoryAndroidHardwareBufferANDROID);
     BUILD_DISPATCH_VECTOR(PreCallRecordGetMemoryAndroidHardwareBufferANDROID);
     BUILD_DISPATCH_VECTOR(PostCallRecordGetMemoryAndroidHardwareBufferANDROID);
+#endif
+#ifdef VK_ENABLE_BETA_EXTENSIONS
+    BUILD_DISPATCH_VECTOR(PreCallValidateCreateExecutionGraphPipelinesAMDX);
+    BUILD_DISPATCH_VECTOR(PreCallRecordCreateExecutionGraphPipelinesAMDX);
+    BUILD_DISPATCH_VECTOR(PostCallRecordCreateExecutionGraphPipelinesAMDX);
+#endif
+#ifdef VK_ENABLE_BETA_EXTENSIONS
+    BUILD_DISPATCH_VECTOR(PreCallValidateGetExecutionGraphPipelineScratchSizeAMDX);
+    BUILD_DISPATCH_VECTOR(PreCallRecordGetExecutionGraphPipelineScratchSizeAMDX);
+    BUILD_DISPATCH_VECTOR(PostCallRecordGetExecutionGraphPipelineScratchSizeAMDX);
+#endif
+#ifdef VK_ENABLE_BETA_EXTENSIONS
+    BUILD_DISPATCH_VECTOR(PreCallValidateGetExecutionGraphPipelineNodeIndexAMDX);
+    BUILD_DISPATCH_VECTOR(PreCallRecordGetExecutionGraphPipelineNodeIndexAMDX);
+    BUILD_DISPATCH_VECTOR(PostCallRecordGetExecutionGraphPipelineNodeIndexAMDX);
+#endif
+#ifdef VK_ENABLE_BETA_EXTENSIONS
+    BUILD_DISPATCH_VECTOR(PreCallValidateCmdInitializeGraphScratchMemoryAMDX);
+    BUILD_DISPATCH_VECTOR(PreCallRecordCmdInitializeGraphScratchMemoryAMDX);
+    BUILD_DISPATCH_VECTOR(PostCallRecordCmdInitializeGraphScratchMemoryAMDX);
+#endif
+#ifdef VK_ENABLE_BETA_EXTENSIONS
+    BUILD_DISPATCH_VECTOR(PreCallValidateCmdDispatchGraphAMDX);
+    BUILD_DISPATCH_VECTOR(PreCallRecordCmdDispatchGraphAMDX);
+    BUILD_DISPATCH_VECTOR(PostCallRecordCmdDispatchGraphAMDX);
+#endif
+#ifdef VK_ENABLE_BETA_EXTENSIONS
+    BUILD_DISPATCH_VECTOR(PreCallValidateCmdDispatchGraphIndirectAMDX);
+    BUILD_DISPATCH_VECTOR(PreCallRecordCmdDispatchGraphIndirectAMDX);
+    BUILD_DISPATCH_VECTOR(PostCallRecordCmdDispatchGraphIndirectAMDX);
+#endif
+#ifdef VK_ENABLE_BETA_EXTENSIONS
+    BUILD_DISPATCH_VECTOR(PreCallValidateCmdDispatchGraphIndirectCountAMDX);
+    BUILD_DISPATCH_VECTOR(PreCallRecordCmdDispatchGraphIndirectCountAMDX);
+    BUILD_DISPATCH_VECTOR(PostCallRecordCmdDispatchGraphIndirectCountAMDX);
 #endif
     BUILD_DISPATCH_VECTOR(PreCallValidateCmdSetSampleLocationsEXT);
     BUILD_DISPATCH_VECTOR(PreCallRecordCmdSetSampleLocationsEXT);
@@ -2838,6 +2942,21 @@ void ValidationObject::InitObjectDispatchVectors() {
     BUILD_DISPATCH_VECTOR(PreCallValidateCmdSetStencilOpEXT);
     BUILD_DISPATCH_VECTOR(PreCallRecordCmdSetStencilOpEXT);
     BUILD_DISPATCH_VECTOR(PostCallRecordCmdSetStencilOpEXT);
+    BUILD_DISPATCH_VECTOR(PreCallValidateCopyMemoryToImageEXT);
+    BUILD_DISPATCH_VECTOR(PreCallRecordCopyMemoryToImageEXT);
+    BUILD_DISPATCH_VECTOR(PostCallRecordCopyMemoryToImageEXT);
+    BUILD_DISPATCH_VECTOR(PreCallValidateCopyImageToMemoryEXT);
+    BUILD_DISPATCH_VECTOR(PreCallRecordCopyImageToMemoryEXT);
+    BUILD_DISPATCH_VECTOR(PostCallRecordCopyImageToMemoryEXT);
+    BUILD_DISPATCH_VECTOR(PreCallValidateCopyImageToImageEXT);
+    BUILD_DISPATCH_VECTOR(PreCallRecordCopyImageToImageEXT);
+    BUILD_DISPATCH_VECTOR(PostCallRecordCopyImageToImageEXT);
+    BUILD_DISPATCH_VECTOR(PreCallValidateTransitionImageLayoutEXT);
+    BUILD_DISPATCH_VECTOR(PreCallRecordTransitionImageLayoutEXT);
+    BUILD_DISPATCH_VECTOR(PostCallRecordTransitionImageLayoutEXT);
+    BUILD_DISPATCH_VECTOR(PreCallValidateGetImageSubresourceLayout2EXT);
+    BUILD_DISPATCH_VECTOR(PreCallRecordGetImageSubresourceLayout2EXT);
+    BUILD_DISPATCH_VECTOR(PostCallRecordGetImageSubresourceLayout2EXT);
     BUILD_DISPATCH_VECTOR(PreCallValidateReleaseSwapchainImagesEXT);
     BUILD_DISPATCH_VECTOR(PreCallRecordReleaseSwapchainImagesEXT);
     BUILD_DISPATCH_VECTOR(PostCallRecordReleaseSwapchainImagesEXT);
@@ -2915,9 +3034,6 @@ void ValidationObject::InitObjectDispatchVectors() {
     BUILD_DISPATCH_VECTOR(PreCallValidateCmdSetFragmentShadingRateEnumNV);
     BUILD_DISPATCH_VECTOR(PreCallRecordCmdSetFragmentShadingRateEnumNV);
     BUILD_DISPATCH_VECTOR(PostCallRecordCmdSetFragmentShadingRateEnumNV);
-    BUILD_DISPATCH_VECTOR(PreCallValidateGetImageSubresourceLayout2EXT);
-    BUILD_DISPATCH_VECTOR(PreCallRecordGetImageSubresourceLayout2EXT);
-    BUILD_DISPATCH_VECTOR(PostCallRecordGetImageSubresourceLayout2EXT);
     BUILD_DISPATCH_VECTOR(PreCallValidateGetDeviceFaultInfoEXT);
     BUILD_DISPATCH_VECTOR(PreCallRecordGetDeviceFaultInfoEXT);
     BUILD_DISPATCH_VECTOR(PostCallRecordGetDeviceFaultInfoEXT);
@@ -3112,6 +3228,15 @@ void ValidationObject::InitObjectDispatchVectors() {
     BUILD_DISPATCH_VECTOR(PreCallValidateCmdDecompressMemoryIndirectCountNV);
     BUILD_DISPATCH_VECTOR(PreCallRecordCmdDecompressMemoryIndirectCountNV);
     BUILD_DISPATCH_VECTOR(PostCallRecordCmdDecompressMemoryIndirectCountNV);
+    BUILD_DISPATCH_VECTOR(PreCallValidateGetPipelineIndirectMemoryRequirementsNV);
+    BUILD_DISPATCH_VECTOR(PreCallRecordGetPipelineIndirectMemoryRequirementsNV);
+    BUILD_DISPATCH_VECTOR(PostCallRecordGetPipelineIndirectMemoryRequirementsNV);
+    BUILD_DISPATCH_VECTOR(PreCallValidateCmdUpdatePipelineIndirectBufferNV);
+    BUILD_DISPATCH_VECTOR(PreCallRecordCmdUpdatePipelineIndirectBufferNV);
+    BUILD_DISPATCH_VECTOR(PostCallRecordCmdUpdatePipelineIndirectBufferNV);
+    BUILD_DISPATCH_VECTOR(PreCallValidateGetPipelineIndirectDeviceAddressNV);
+    BUILD_DISPATCH_VECTOR(PreCallRecordGetPipelineIndirectDeviceAddressNV);
+    BUILD_DISPATCH_VECTOR(PostCallRecordGetPipelineIndirectDeviceAddressNV);
     BUILD_DISPATCH_VECTOR(PreCallValidateCmdSetTessellationDomainOriginEXT);
     BUILD_DISPATCH_VECTOR(PreCallRecordCmdSetTessellationDomainOriginEXT);
     BUILD_DISPATCH_VECTOR(PostCallRecordCmdSetTessellationDomainOriginEXT);
@@ -3223,9 +3348,6 @@ void ValidationObject::InitObjectDispatchVectors() {
     BUILD_DISPATCH_VECTOR(PreCallValidateCmdOpticalFlowExecuteNV);
     BUILD_DISPATCH_VECTOR(PreCallRecordCmdOpticalFlowExecuteNV);
     BUILD_DISPATCH_VECTOR(PostCallRecordCmdOpticalFlowExecuteNV);
-    BUILD_DISPATCH_VECTOR(PreCallValidateCreateShadersEXT);
-    BUILD_DISPATCH_VECTOR(PreCallRecordCreateShadersEXT);
-    BUILD_DISPATCH_VECTOR(PostCallRecordCreateShadersEXT);
     BUILD_DISPATCH_VECTOR(PreCallValidateDestroyShaderEXT);
     BUILD_DISPATCH_VECTOR(PreCallRecordDestroyShaderEXT);
     BUILD_DISPATCH_VECTOR(PostCallRecordDestroyShaderEXT);
@@ -3251,6 +3373,21 @@ void ValidationObject::InitObjectDispatchVectors() {
     BUILD_DISPATCH_VECTOR(PreCallRecordDestroySemaphoreSciSyncPoolNV);
     BUILD_DISPATCH_VECTOR(PostCallRecordDestroySemaphoreSciSyncPoolNV);
 #endif
+    BUILD_DISPATCH_VECTOR(PreCallValidateSetLatencySleepModeNV);
+    BUILD_DISPATCH_VECTOR(PreCallRecordSetLatencySleepModeNV);
+    BUILD_DISPATCH_VECTOR(PostCallRecordSetLatencySleepModeNV);
+    BUILD_DISPATCH_VECTOR(PreCallValidateLatencySleepNV);
+    BUILD_DISPATCH_VECTOR(PreCallRecordLatencySleepNV);
+    BUILD_DISPATCH_VECTOR(PostCallRecordLatencySleepNV);
+    BUILD_DISPATCH_VECTOR(PreCallValidateSetLatencyMarkerNV);
+    BUILD_DISPATCH_VECTOR(PreCallRecordSetLatencyMarkerNV);
+    BUILD_DISPATCH_VECTOR(PostCallRecordSetLatencyMarkerNV);
+    BUILD_DISPATCH_VECTOR(PreCallValidateGetLatencyTimingsNV);
+    BUILD_DISPATCH_VECTOR(PreCallRecordGetLatencyTimingsNV);
+    BUILD_DISPATCH_VECTOR(PostCallRecordGetLatencyTimingsNV);
+    BUILD_DISPATCH_VECTOR(PreCallValidateQueueNotifyOutOfBandNV);
+    BUILD_DISPATCH_VECTOR(PreCallRecordQueueNotifyOutOfBandNV);
+    BUILD_DISPATCH_VECTOR(PostCallRecordQueueNotifyOutOfBandNV);
     BUILD_DISPATCH_VECTOR(PreCallValidateCmdSetAttachmentFeedbackLoopEnableEXT);
     BUILD_DISPATCH_VECTOR(PreCallRecordCmdSetAttachmentFeedbackLoopEnableEXT);
     BUILD_DISPATCH_VECTOR(PostCallRecordCmdSetAttachmentFeedbackLoopEnableEXT);

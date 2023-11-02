@@ -15,6 +15,7 @@
  */
 
 #include "../framework/layer_validation_tests.h"
+#include "../framework/pipeline_helper.h"
 
 class VkPositiveBestPracticesLayerTest : public VkBestPracticesLayerTest {};
 
@@ -23,10 +24,11 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_TestDestroyFreeNullHandles) {
 
     TEST_DESCRIPTION("Call all applicable destroy and free routines with NULL handles, expecting no validation errors");
 
-    ASSERT_NO_FATAL_FAILURE(InitBestPracticesFramework());
-    ASSERT_NO_FATAL_FAILURE(InitState());
-    ASSERT_NO_FATAL_FAILURE(InitViewport());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitBestPracticesFramework());
+    RETURN_IF_SKIP(InitState())
+    InitRenderTarget();
+
+    m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit);
 
     vk::DestroyBuffer(m_device->device(), VK_NULL_HANDLE, NULL);
     vk::DestroyBufferView(m_device->device(), VK_NULL_HANDLE, NULL);
@@ -76,7 +78,7 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_TestDestroyFreeNullHandles) {
     ds_pool_ci.poolSizeCount = 1;
     ds_pool_ci.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
     ds_pool_ci.pPoolSizes = &ds_type_count;
-    vk_testing::DescriptorPool ds_pool(*m_device, ds_pool_ci);
+    vkt::DescriptorPool ds_pool(*m_device, ds_pool_ci);
 
     VkDescriptorSetLayoutBinding dsl_binding = {};
     dsl_binding.binding = 2;
@@ -85,7 +87,7 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_TestDestroyFreeNullHandles) {
     dsl_binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
     dsl_binding.pImmutableSamplers = NULL;
 
-    const VkDescriptorSetLayoutObj ds_layout(m_device, {dsl_binding});
+    const vkt::DescriptorSetLayout ds_layout(*m_device, {dsl_binding});
 
     VkDescriptorSet descriptor_sets[3] = {};
     VkDescriptorSetAllocateInfo alloc_info = {};
@@ -94,7 +96,7 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_TestDestroyFreeNullHandles) {
     alloc_info.descriptorPool = ds_pool.handle();
     alloc_info.pSetLayouts = &ds_layout.handle();
     err = vk::AllocateDescriptorSets(m_device->device(), &alloc_info, &descriptor_sets[1]);
-    ASSERT_VK_SUCCESS(err);
+    ASSERT_EQ(VK_SUCCESS, err);
     vk::FreeDescriptorSets(m_device->device(), ds_pool.handle(), 3, descriptor_sets);
 
     vk::FreeMemory(m_device->device(), VK_NULL_HANDLE, NULL);
@@ -106,17 +108,18 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_DrawingWithUnboundUnusedSet) {
         "unbound. Its purpose is to catch regression of this bug: "
         "https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/4597.");
 
-    ASSERT_NO_FATAL_FAILURE(InitBestPracticesFramework());
-    ASSERT_NO_FATAL_FAILURE(InitState());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitBestPracticesFramework());
+    RETURN_IF_SKIP(InitState())
+    InitRenderTarget();
+
+    m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit);
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitInfo();
     pipe.InitState();
     pipe.CreateGraphicsPipeline();
 
     OneOffDescriptorSet empty_ds(m_device, {});
-    const VkPipelineLayoutObj pipeline_layout(m_device, {&empty_ds.layout_, &empty_ds.layout_});
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&empty_ds.layout_, &empty_ds.layout_});
 
     m_commandBuffer->begin();
 
@@ -125,12 +128,11 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_DrawingWithUnboundUnusedSet) {
 
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
     vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_);
-    const float vbo_data[3] = {1.f, 0.f, 1.f};
-    VkConstantBufferObj vbo(m_device, sizeof(vbo_data), (const void *)&vbo_data, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-    m_commandBuffer->BindVertexBuffer(&vbo, (VkDeviceSize)0, 1);
+    vkt::Buffer vbo(*m_device, sizeof(float) * 3, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+    vk::CmdBindVertexBuffers(m_commandBuffer->handle(), 1, 1, &vbo.handle(), &kZeroDeviceSize);
 
     // The draw command will most likely produce a crash in case of a regression.
-    m_commandBuffer->Draw(1, 0, 0, 0);
+    vk::CmdDraw(m_commandBuffer->handle(), 1, 1, 0, 0);
 
     m_commandBuffer->EndRenderPass();
     m_commandBuffer->end();
@@ -140,38 +142,61 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_DynStateIgnoreAttachments) {
     TEST_DESCRIPTION("Make sure pAttachments is ignored if dynamic state is enabled");
 
     AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitBestPracticesFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-    if (!IsPlatform(kMockICD)) {
+    RETURN_IF_SKIP(InitBestPracticesFramework())
+    if (!IsPlatformMockICD()) {
         // Several drivers have been observed to crash on the legal null pAttachments - restrict to MockICD for now
         GTEST_SKIP() << "This test only runs on MockICD";
     }
-    auto extended_dynamic_state3_features = LvlInitStruct<VkPhysicalDeviceExtendedDynamicState3FeaturesEXT>();
+    VkPhysicalDeviceExtendedDynamicState3FeaturesEXT extended_dynamic_state3_features = vku::InitStructHelper();
     auto features2 = GetPhysicalDeviceFeatures2(extended_dynamic_state3_features);
     if (!extended_dynamic_state3_features.extendedDynamicState3ColorBlendEnable ||
         !extended_dynamic_state3_features.extendedDynamicState3ColorBlendEquation ||
         !extended_dynamic_state3_features.extendedDynamicState3ColorWriteMask) {
         GTEST_SKIP() << "DynamicState3 features not supported";
     }
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features2));
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitState(nullptr, &features2))
+    InitRenderTarget();
+
+    m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit);
 
     // pAttachments should be ignored with these four states set
     VkDynamicState dynamic_states[4] = {VK_DYNAMIC_STATE_COLOR_BLEND_ENABLE_EXT, VK_DYNAMIC_STATE_COLOR_BLEND_ADVANCED_EXT,
                                         VK_DYNAMIC_STATE_COLOR_BLEND_EQUATION_EXT, VK_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT};
-    VkPipelineDynamicStateCreateInfo dynamic_create_info = LvlInitStruct<VkPipelineDynamicStateCreateInfo>();
+    VkPipelineDynamicStateCreateInfo dynamic_create_info = vku::InitStructHelper();
     dynamic_create_info.pDynamicStates = dynamic_states;
     dynamic_create_info.dynamicStateCount = 4;
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitInfo();
     pipe.cb_ci_.pAttachments = nullptr;
     pipe.gp_ci_.pDynamicState = &dynamic_create_info;
     pipe.InitState();
     pipe.CreateGraphicsPipeline();
     m_commandBuffer->begin();
     vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_);
+    m_commandBuffer->end();
+}
+
+TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_ImageInputAttachmentLayout) {
+    TEST_DESCRIPTION("Test transitioning image layout to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL for input attachment");
+
+    RETURN_IF_SKIP(InitBestPracticesFramework());
+    RETURN_IF_SKIP(InitState())
+
+    m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit);
+
+    VkImageObj image(m_device);
+    image.Init(32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT, VK_IMAGE_TILING_OPTIMAL, 0);
+
+    VkImageMemoryBarrier image_memory_barrier = vku::InitStructHelper();
+    image_memory_barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    image_memory_barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
+    image_memory_barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    image_memory_barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    image_memory_barrier.image = image.handle();
+    image_memory_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0u, 1u, 0u, 1u};
+
+    m_commandBuffer->begin();
+    vk::CmdPipelineBarrier(m_commandBuffer->handle(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0u, 0u,
+                           nullptr, 0u, nullptr, 1u, &image_memory_barrier);
     m_commandBuffer->end();
 }

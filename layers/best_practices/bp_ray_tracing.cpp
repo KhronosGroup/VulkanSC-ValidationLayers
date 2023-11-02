@@ -25,31 +25,31 @@ bool BestPractices::PreCallValidateCmdBuildAccelerationStructureNV(VkCommandBuff
                                                                    VkBuffer instanceData, VkDeviceSize instanceOffset,
                                                                    VkBool32 update, VkAccelerationStructureNV dst,
                                                                    VkAccelerationStructureNV src, VkBuffer scratch,
-                                                                   VkDeviceSize scratchOffset) const {
-    return ValidateBuildAccelerationStructure(commandBuffer);
+                                                                   VkDeviceSize scratchOffset, const ErrorObject& error_obj) const {
+    return ValidateBuildAccelerationStructure(commandBuffer, error_obj.location);
 }
 
 bool BestPractices::PreCallValidateCmdBuildAccelerationStructuresIndirectKHR(
     VkCommandBuffer commandBuffer, uint32_t infoCount, const VkAccelerationStructureBuildGeometryInfoKHR* pInfos,
-    const VkDeviceAddress* pIndirectDeviceAddresses, const uint32_t* pIndirectStrides,
-    const uint32_t* const* ppMaxPrimitiveCounts) const {
-    return ValidateBuildAccelerationStructure(commandBuffer);
+    const VkDeviceAddress* pIndirectDeviceAddresses, const uint32_t* pIndirectStrides, const uint32_t* const* ppMaxPrimitiveCounts,
+    const ErrorObject& error_obj) const {
+    return ValidateBuildAccelerationStructure(commandBuffer, error_obj.location);
 }
 
 bool BestPractices::PreCallValidateCmdBuildAccelerationStructuresKHR(
     VkCommandBuffer commandBuffer, uint32_t infoCount, const VkAccelerationStructureBuildGeometryInfoKHR* pInfos,
-    const VkAccelerationStructureBuildRangeInfoKHR* const* ppBuildRangeInfos) const {
-    return ValidateBuildAccelerationStructure(commandBuffer);
+    const VkAccelerationStructureBuildRangeInfoKHR* const* ppBuildRangeInfos, const ErrorObject& error_obj) const {
+    return ValidateBuildAccelerationStructure(commandBuffer, error_obj.location);
 }
 
-bool BestPractices::ValidateBuildAccelerationStructure(VkCommandBuffer commandBuffer) const {
+bool BestPractices::ValidateBuildAccelerationStructure(VkCommandBuffer commandBuffer, const Location& loc) const {
     bool skip = false;
     auto cb_node = GetRead<bp_state::CommandBuffer>(commandBuffer);
     assert(cb_node);
 
     if (VendorCheckEnabled(kBPVendorNVIDIA)) {
         if ((cb_node->GetQueueFlags() & VK_QUEUE_GRAPHICS_BIT) != 0) {
-            skip |= LogPerformanceWarning(commandBuffer, kVUID_BestPractices_AccelerationStructure_NotAsync,
+            skip |= LogPerformanceWarning(kVUID_BestPractices_AccelerationStructure_NotAsync, commandBuffer, loc,
                                           "%s Performance warning: Prefer building acceleration structures on an asynchronous "
                                           "compute queue, instead of using the universal graphics queue.",
                                           VendorSpecificTag(kBPVendorNVIDIA));
@@ -59,21 +59,21 @@ bool BestPractices::ValidateBuildAccelerationStructure(VkCommandBuffer commandBu
     return skip;
 }
 
-bool BestPractices::PreCallValidateBindAccelerationStructureMemoryNV(
-    VkDevice device, uint32_t bindInfoCount, const VkBindAccelerationStructureMemoryInfoNV* pBindInfos) const {
+bool BestPractices::PreCallValidateBindAccelerationStructureMemoryNV(VkDevice device, uint32_t bindInfoCount,
+                                                                     const VkBindAccelerationStructureMemoryInfoNV* pBindInfos,
+                                                                     const ErrorObject& error_obj) const {
     bool skip = false;
 
     for (uint32_t i = 0; i < bindInfoCount; i++) {
-        auto as_state = Get<ACCELERATION_STRUCTURE_STATE>(pBindInfos[i].accelerationStructure);
+        auto as_state = Get<ACCELERATION_STRUCTURE_STATE_NV>(pBindInfos[i].accelerationStructure);
         if (!as_state->memory_requirements_checked) {
             // There's not an explicit requirement in the spec to call vkGetImageMemoryRequirements() prior to calling
             // BindAccelerationStructureMemoryNV but it's implied in that memory being bound must conform with
             // VkAccelerationStructureMemoryRequirementsInfoNV from vkGetAccelerationStructureMemoryRequirementsNV
             skip |= LogWarning(
-                device, kVUID_BestPractices_BindAccelNV_NoMemReqQuery,
-                "vkBindAccelerationStructureMemoryNV(): "
+                kVUID_BestPractices_BindAccelNV_NoMemReqQuery, device, error_obj.location,
                 "Binding memory to %s but vkGetAccelerationStructureMemoryRequirementsNV() has not been called on that structure.",
-                report_data->FormatHandle(pBindInfos[i].accelerationStructure).c_str());
+                FormatHandle(pBindInfos[i].accelerationStructure).c_str());
         }
     }
 

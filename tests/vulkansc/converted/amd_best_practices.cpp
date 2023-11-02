@@ -16,6 +16,7 @@
 
 #include "utils/cast_utils.h"
 #include "../framework/layer_validation_tests.h"
+#include "../framework/pipeline_helper.h"
 
 // Tests for AMD-specific best practices
 const char *kEnableAMDValidation = "VALIDATION_CHECK_ENABLE_VENDOR_SPECIFIC_AMD";
@@ -25,11 +26,10 @@ const char *kEnableAMDValidation = "VALIDATION_CHECK_ENABLE_VENDOR_SPECIFIC_AMD"
 // disabled for now
 #ifdef AMD_LONG_RUNNING_TEST
 TEST_F(VkAmdBestPracticesLayerTest, DISABLED_TooManyPipelines) {
-    InitBestPracticesFramework(kEnableAMDValidation);
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableAMDValidation))
     InitState();
 
-    ASSERT_NO_FATAL_FAILURE(InitViewport());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    InitRenderTarget();
 
     // create 1 more than the warning limit for pipeline objects
     const uint32_t warn_limit = 5001;
@@ -44,7 +44,6 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_TooManyPipelines) {
                                                  "UNASSIGNED-BestPractices-vkCreatePipelines-multiple-pipelines-caches");
         }
         CreatePipelineHelper pipe(*this);
-        pipe.InitInfo();
         pipe.InitState();
         pipe.CreateGraphicsPipeline();
         pipeline_Array[i] = pipe.pipeline_;
@@ -61,11 +60,10 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_TooManyPipelines) {
 #endif
 
 TEST_F(VkAmdBestPracticesLayerTest, DISABLED_UseMutableRT) {
-    InitBestPracticesFramework(kEnableAMDValidation);
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableAMDValidation))
     InitState();
 
-    ASSERT_NO_FATAL_FAILURE(InitViewport());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    InitRenderTarget();
 
     m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit,
                                          "UNASSIGNED-BestPractices-vkImage-DontUseMutableRenderTargets");
@@ -136,18 +134,17 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_UseMutableRT) {
 }
 
 TEST_F(VkAmdBestPracticesLayerTest, DISABLED_UsageConcurentRT) {
-    InitBestPracticesFramework(kEnableAMDValidation);
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableAMDValidation))
     InitState();
 
-    ASSERT_NO_FATAL_FAILURE(InitViewport());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    InitRenderTarget();
 
-    if (m_device->queue_props.size() < 2) {
+    if (m_device->phy().queue_properties_.size() < 2) {
         GTEST_SKIP() << "Test not supported by a single queue family device";
     }
 
-    std::vector<uint32_t> queueFamilies(m_device->queue_props.size());
-    for (size_t i = 0; i < m_device->queue_props.size(); i++) {
+    std::vector<uint32_t> queueFamilies(m_device->phy().queue_properties_.size());
+    for (size_t i = 0; i < m_device->phy().queue_properties_.size(); i++) {
         queueFamilies[i] = i;
     }
 
@@ -196,11 +193,10 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_UsageConcurentRT) {
 }
 
 TEST_F(VkAmdBestPracticesLayerTest, DISABLED_UsageStorageRT) {
-    InitBestPracticesFramework(kEnableAMDValidation);
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableAMDValidation))
     InitState();
 
-    ASSERT_NO_FATAL_FAILURE(InitViewport());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    InitRenderTarget();
 
     m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit,
                                          "UNASSIGNED-BestPractices-vkImage-DontUseStorageRenderTargets");
@@ -227,17 +223,15 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_UsageStorageRT) {
 }
 
 TEST_F(VkAmdBestPracticesLayerTest, DISABLED_PrimitiveRestart) {
-    InitBestPracticesFramework(kEnableAMDValidation);
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableAMDValidation))
     InitState();
 
-    ASSERT_NO_FATAL_FAILURE(InitViewport());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    InitRenderTarget();
 
     m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit,
                                          "UNASSIGNED-BestPractices-CreatePipelines-AvoidPrimitiveRestart");
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitInfo();
     pipe.InitState();
     pipe.ia_ci_.primitiveRestartEnable = true;
     pipe.CreateGraphicsPipeline();
@@ -246,11 +240,10 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_PrimitiveRestart) {
 }
 
 TEST_F(VkAmdBestPracticesLayerTest, DISABLED_NumDynamicStates) {
-    InitBestPracticesFramework(kEnableAMDValidation);
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableAMDValidation))
     InitState();
 
-    ASSERT_NO_FATAL_FAILURE(InitViewport());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    InitRenderTarget();
 
     m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit,
                                          "UNASSIGNED-BestPractices-CreatePipelines-MinimizeNumDynamicStates");
@@ -268,7 +261,6 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_NumDynamicStates) {
     dynamic_state_info.pDynamicStates = dynamic_states_array;
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitInfo();
     pipe.InitState();
     pipe.dyn_state_ci_ = dynamic_state_info;
     pipe.CreateGraphicsPipeline();
@@ -278,11 +270,10 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_NumDynamicStates) {
 
 TEST_F(VkAmdBestPracticesLayerTest, DISABLED_KeepLayoutSmall) {
     // TODO: add dynamic buffer check as well
-    InitBestPracticesFramework(kEnableAMDValidation);
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableAMDValidation))
     InitState();
 
-    ASSERT_NO_FATAL_FAILURE(InitViewport());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    InitRenderTarget();
 
     m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit,
                                          "UNASSIGNED-BestPractices-CreatePipelinesLayout-KeepLayoutSmall");
@@ -307,7 +298,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_KeepLayoutSmall) {
     ds_layout_info.bindingCount = 1;
     ds_layout_info.pBindings = &binding;
 
-    vk_testing::DescriptorSetLayout ds_layout(*m_device, ds_layout_info);
+    vkt::DescriptorSetLayout ds_layout(*m_device, ds_layout_info);
 
     VkPipelineLayoutCreateInfo pipeline_layout_info = {};
     pipeline_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -324,11 +315,10 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_KeepLayoutSmall) {
 
 TEST_F(VkAmdBestPracticesLayerTest, DISABLED_CopyingDescriptors) {
     // TODO: add dynamic buffer check as well
-    InitBestPracticesFramework(kEnableAMDValidation);
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableAMDValidation))
     InitState();
 
-    ASSERT_NO_FATAL_FAILURE(InitViewport());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    InitRenderTarget();
 
     m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit,
                                          "UNASSIGNED-BestPractices-UpdateDescriptors-AvoidCopyingDescriptors");
@@ -345,7 +335,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_CopyingDescriptors) {
     ds_pool_ci.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
     ds_pool_ci.pPoolSizes = &ds_type_count;
 
-    vk_testing::DescriptorPool ds_pool(*m_device, ds_pool_ci);
+    vkt::DescriptorPool ds_pool(*m_device, ds_pool_ci);
 
     VkDescriptorSetLayoutBinding dsl_binding = {};
     dsl_binding.binding = 2;
@@ -354,7 +344,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_CopyingDescriptors) {
     dsl_binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
     dsl_binding.pImmutableSamplers = NULL;
 
-    const VkDescriptorSetLayoutObj ds_layout(m_device, {dsl_binding});
+    const vkt::DescriptorSetLayout ds_layout(*m_device, {dsl_binding});
 
     VkDescriptorSet descriptor_sets[2] = {};
     VkDescriptorSetAllocateInfo alloc_info = {};
@@ -383,9 +373,9 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_CopyingDescriptors) {
 TEST_F(VkAmdBestPracticesLayerTest, DISABLED_ClearImage) {
     TEST_DESCRIPTION("Test for validating usage of vkCmdClearAttachments");
 
-    InitBestPracticesFramework(kEnableAMDValidation);
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableAMDValidation))
     InitState();
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    InitRenderTarget();
 
     {
         VkImageCreateInfo img_info = {VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
@@ -470,9 +460,9 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_ClearImage) {
 }
 
 TEST_F(VkAmdBestPracticesLayerTest, DISABLED_ImageToImageCopy) {
-    InitBestPracticesFramework(kEnableAMDValidation);
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableAMDValidation))
     InitState();
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    InitRenderTarget();
 
     VkImageCreateInfo img_info = {VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
                                   nullptr,
@@ -520,9 +510,9 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_ImageToImageCopy) {
 }
 
 TEST_F(VkAmdBestPracticesLayerTest, DISABLED_GeneralLayout) {
-    InitBestPracticesFramework(kEnableAMDValidation);
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableAMDValidation))
     InitState();
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    InitRenderTarget();
 
     VkImageCreateInfo img_info = {VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
                                  nullptr,
@@ -552,7 +542,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_GeneralLayout) {
 }
 
 TEST_F(VkAmdBestPracticesLayerTest, DISABLED_RobustAccessOn) {
-    InitBestPracticesFramework(kEnableAMDValidation);
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableAMDValidation))
     InitState();
     m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit,
                                          "UNASSIGNED-BestPractices-vkCreateDevice-RobustBufferAccess");
@@ -580,9 +570,9 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_RobustAccessOn) {
 }
 
 TEST_F(VkAmdBestPracticesLayerTest, DISABLED_Barriers) {
-    InitBestPracticesFramework(kEnableAMDValidation);
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableAMDValidation))
     InitState();
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    InitRenderTarget();
 
     VkImageCreateInfo img_info = {
         VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
@@ -635,15 +625,11 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_Barriers) {
 TEST_F(VkAmdBestPracticesLayerTest, DISABLED_NumberOfSubmissions) {
     AddSurfaceExtension();
 
-    InitBestPracticesFramework(kEnableAMDValidation);
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableAMDValidation))
 
     InitState();
-    ASSERT_NO_FATAL_FAILURE(InitViewport());
     InitSwapchain();
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    InitRenderTarget();
 
     VkImageCreateInfo img_info = {VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
                                  nullptr,
@@ -672,8 +658,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_NumberOfSubmissions) {
     }
 
     uint32_t current_buffer;
-    VkSemaphoreCreateInfo semaphore_create_info = LvlInitStruct<VkSemaphoreCreateInfo>();
-    vk_testing::Semaphore image_acquired(*m_device, semaphore_create_info);
+    vkt::Semaphore image_acquired(*m_device);
     ASSERT_TRUE(image_acquired.initialized());
     vk::AcquireNextImageKHR(device(), m_swapchain, kWaitTimeout, image_acquired.handle(), VK_NULL_HANDLE, &current_buffer);
 
@@ -690,19 +675,19 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_NumberOfSubmissions) {
                                          "UNASSIGNED-BestPractices-Submission-ReduceNumberOfSubmissions");
     m_errorMonitor->SetUnexpectedError("VUID-VkPresentInfoKHR-pImageIndices-01430");
 
-    vk::QueuePresentKHR(m_device->GetDefaultQueue()->handle(), &present_info);
+    vk::QueuePresentKHR(m_default_queue, &present_info);
 
     m_errorMonitor->VerifyFound();
 }
 
 TEST_F(VkAmdBestPracticesLayerTest, DISABLED_NumSyncPrimitives) {
-    InitBestPracticesFramework(kEnableAMDValidation);
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableAMDValidation))
     InitState();
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    InitRenderTarget();
 
     constexpr int fence_warn_limit = 5;
-    const auto fence_ci = vk_testing::Fence::create_info();
-    std::vector<vk_testing::Fence> test_fences(fence_warn_limit);
+    const auto fence_ci = vkt::Fence::create_info();
+    std::vector<vkt::Fence> test_fences(fence_warn_limit);
     for (int i = 0; i < fence_warn_limit - 1; ++i) {
         test_fences[i].init(*m_device, fence_ci);
     }
@@ -712,8 +697,8 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_NumSyncPrimitives) {
     m_errorMonitor->VerifyFound();
 
     constexpr int semaphore_warn_limit = 12;
-    const auto semaphore_ci = LvlInitStruct<VkSemaphoreCreateInfo>();
-    std::vector<vk_testing::Semaphore> test_semaphores(semaphore_warn_limit);
+    const VkSemaphoreCreateInfo semaphore_ci = vku::InitStructHelper();
+    std::vector<vkt::Semaphore> test_semaphores(semaphore_warn_limit);
     for (int i = 0; i < semaphore_warn_limit - 1; ++i) {
         test_semaphores[i].init(*m_device, semaphore_ci);
     }
@@ -724,11 +709,10 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_NumSyncPrimitives) {
 }
 
 TEST_F(VkAmdBestPracticesLayerTest, DISABLED_SecondaryCmdBuffer) {
-    InitBestPracticesFramework(kEnableAMDValidation);
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableAMDValidation))
     InitState();
 
-    ASSERT_NO_FATAL_FAILURE(InitViewport());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    InitRenderTarget();
 
     VkPipelineMultisampleStateCreateInfo pipe_ms_state_ci = {};
     pipe_ms_state_ci.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
@@ -738,23 +722,20 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_SecondaryCmdBuffer) {
     pipe_ms_state_ci.minSampleShading = 1.0;
     pipe_ms_state_ci.pSampleMask = NULL;
 
-    VkBufferObj vertex_buffer;
-    auto info = vertex_buffer.create_info(64, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-    vertex_buffer.init(*m_device, info);
+    vkt::Buffer vertex_buffer(*m_device, 64, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitInfo();
     pipe.pipe_ms_state_ci_ = pipe_ms_state_ci;
     pipe.InitState();
     pipe.CreateGraphicsPipeline();
 
-    VkCommandPoolObj pool(m_device, m_device->graphics_queue_node_index_);
-    VkCommandBufferObj secondary_cmd_buf(m_device, &pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+    vkt::CommandPool pool(*m_device, m_device->graphics_queue_node_index_);
+    vkt::CommandBuffer secondary_cmd_buf(m_device, &pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
 
-    VkCommandBufferInheritanceInfo iinfo = LvlInitStruct<VkCommandBufferInheritanceInfo>();
+    VkCommandBufferInheritanceInfo iinfo = vku::InitStructHelper();
     iinfo.renderPass = m_renderPassBeginInfo.renderPass;
 
-    VkCommandBufferBeginInfo binfo = LvlInitStruct<VkCommandBufferBeginInfo>();
+    VkCommandBufferBeginInfo binfo = vku::InitStructHelper();
     binfo.pInheritanceInfo = &iinfo;
     binfo.flags = VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
     // record a secondary command buffer
@@ -763,10 +744,10 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_SecondaryCmdBuffer) {
     vk::CmdBindPipeline(secondary_cmd_buf.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_);
     VkDeviceSize offset = 0;
     vk::CmdBindVertexBuffers(secondary_cmd_buf.handle(), 0, 1, &vertex_buffer.handle(), &offset);
-    secondary_cmd_buf.Draw(1, 0, 0, 0);
-    secondary_cmd_buf.Draw(1, 0, 0, 0);
-    secondary_cmd_buf.Draw(1, 0, 0, 0);
-    secondary_cmd_buf.Draw(1, 0, 0, 0);
+    vk::CmdDraw(secondary_cmd_buf.handle(), 1, 0, 0, 0);
+    vk::CmdDraw(secondary_cmd_buf.handle(), 1, 0, 0, 0);
+    vk::CmdDraw(secondary_cmd_buf.handle(), 1, 0, 0, 0);
+    vk::CmdDraw(secondary_cmd_buf.handle(), 1, 0, 0, 0);
 
     VkClearAttachment color_attachment;
     color_attachment.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -795,18 +776,17 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_SecondaryCmdBuffer) {
 TEST_F(VkAmdBestPracticesLayerTest, DISABLED_ComputeWorkgroupSize) {
     TEST_DESCRIPTION("On AMD make the workgroup size a multiple of 64 to obtain best performance across all GPU generations.");
 
-    InitBestPracticesFramework(kEnableAMDValidation);
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableAMDValidation))
     InitState();
 
     CreateComputePipelineHelper pipe(*this);
 
     auto make_pipeline_with_shader = [=](CreateComputePipelineHelper& pipe, const VkPipelineShaderStageCreateInfo& stage) {
-        pipe.InitInfo();
         pipe.InitState();
         pipe.cp_ci_.stage = stage;
         pipe.dsl_bindings_ = {};
         pipe.cp_ci_.layout = pipe.pipeline_layout_.handle();
-        pipe.CreateComputePipeline(true, false);
+        pipe.CreateComputePipeline(false);
     };
 
     // workgroup size = 4

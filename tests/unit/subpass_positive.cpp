@@ -20,16 +20,10 @@
 TEST_F(PositiveSubpass, SubpassImageBarrier) {
     TEST_DESCRIPTION("Subpass with image barrier (self-dependency)");
     SetTargetApiVersion(VK_API_VERSION_1_3);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (DeviceValidationVersion() < VK_API_VERSION_1_3) {
-        GTEST_SKIP() << "At least Vulkan version 1.3 is required";
-    }
-    auto sync2_features = LvlInitStruct<VkPhysicalDeviceSynchronization2Features>();
+    RETURN_IF_SKIP(InitFramework())
+    VkPhysicalDeviceSynchronization2Features sync2_features = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(sync2_features);
-    if (!sync2_features.synchronization2) {
-        GTEST_SKIP() << "Test requires (unsupported) synchronization2";
-    }
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &sync2_features, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    RETURN_IF_SKIP(InitState(nullptr, &sync2_features, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
 
     const VkAttachmentDescription attachment = {0,
                                                 VK_FORMAT_R8G8B8A8_UNORM,
@@ -50,36 +44,36 @@ TEST_F(PositiveSubpass, SubpassImageBarrier) {
     const VkAttachmentReference ref = {0, VK_IMAGE_LAYOUT_GENERAL};
     const VkSubpassDescription subpass = {0, VK_PIPELINE_BIND_POINT_GRAPHICS, 1, &ref, 1, &ref, nullptr, nullptr, 0, nullptr};
 
-    auto rpci = LvlInitStruct<VkRenderPassCreateInfo>();
+    VkRenderPassCreateInfo rpci = vku::InitStructHelper();
     rpci.attachmentCount = 1;
     rpci.pAttachments = &attachment;
     rpci.subpassCount = 1;
     rpci.pSubpasses = &subpass;
     rpci.dependencyCount = 1;
     rpci.pDependencies = &dependency;
-    vk_testing::RenderPass render_pass(*m_device, rpci);
+    vkt::RenderPass render_pass(*m_device, rpci);
 
     VkImageObj image(m_device);
     image.InitNoLayout(32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM,
                        VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_IMAGE_TILING_OPTIMAL);
     VkImageView image_view = image.targetView(VK_FORMAT_R8G8B8A8_UNORM);
 
-    auto fbci = LvlInitStruct<VkFramebufferCreateInfo>();
+    VkFramebufferCreateInfo fbci = vku::InitStructHelper();
     fbci.renderPass = render_pass;
     fbci.attachmentCount = 1;
     fbci.pAttachments = &image_view;
     fbci.width = 32;
     fbci.height = 32;
     fbci.layers = 1;
-    vk_testing::Framebuffer framebuffer(*m_device, fbci);
+    vkt::Framebuffer framebuffer(*m_device, fbci);
 
-    auto render_pass_begin = LvlInitStruct<VkRenderPassBeginInfo>();
+    VkRenderPassBeginInfo render_pass_begin = vku::InitStructHelper();
     render_pass_begin.renderPass = render_pass;
     render_pass_begin.framebuffer = framebuffer;
     render_pass_begin.renderArea = VkRect2D{{0, 0}, {32, 32}};
 
     // VkImageMemoryBarrier
-    auto barrier = LvlInitStruct<VkImageMemoryBarrier>();
+    VkImageMemoryBarrier barrier = vku::InitStructHelper();
     barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
     barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
     barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
@@ -96,7 +90,7 @@ TEST_F(PositiveSubpass, SubpassImageBarrier) {
     // VkDependencyInfo with VkImageMemoryBarrier2
     const safe_VkImageMemoryBarrier2 safe_barrier2 = ConvertVkImageMemoryBarrierToV2(
         barrier, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
-    auto dependency_info = LvlInitStruct<VkDependencyInfo>();
+    VkDependencyInfo dependency_info = vku::InitStructHelper();
     dependency_info.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
     dependency_info.imageMemoryBarrierCount = 1;
     dependency_info.pImageMemoryBarriers = safe_barrier2.ptr();
@@ -121,16 +115,10 @@ TEST_F(PositiveSubpass, SubpassImageBarrier) {
 TEST_F(PositiveSubpass, SubpassWithEventWait) {
     TEST_DESCRIPTION("Subpass waits for the event set outside of this subpass");
     SetTargetApiVersion(VK_API_VERSION_1_3);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (DeviceValidationVersion() < VK_API_VERSION_1_3) {
-        GTEST_SKIP() << "At least Vulkan version 1.3 is required";
-    }
-    auto sync2_features = LvlInitStruct<VkPhysicalDeviceSynchronization2Features>();
+    RETURN_IF_SKIP(InitFramework())
+    VkPhysicalDeviceSynchronization2Features sync2_features = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(sync2_features);
-    if (!sync2_features.synchronization2) {
-        GTEST_SKIP() << "Test requires (unsupported) synchronization2";
-    }
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &sync2_features, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    RETURN_IF_SKIP(InitState(nullptr, &sync2_features, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
 
     const VkAttachmentDescription attachment = {0,
                                                 VK_FORMAT_R8G8B8A8_UNORM,
@@ -151,36 +139,36 @@ TEST_F(PositiveSubpass, SubpassWithEventWait) {
     const VkAttachmentReference ref = {0, VK_IMAGE_LAYOUT_GENERAL};
     const VkSubpassDescription subpass = {0, VK_PIPELINE_BIND_POINT_GRAPHICS, 1, &ref, 1, &ref, nullptr, nullptr, 0, nullptr};
 
-    auto rpci = LvlInitStruct<VkRenderPassCreateInfo>();
+    VkRenderPassCreateInfo rpci = vku::InitStructHelper();
     rpci.attachmentCount = 1;
     rpci.pAttachments = &attachment;
     rpci.subpassCount = 1;
     rpci.pSubpasses = &subpass;
     rpci.dependencyCount = 1;
     rpci.pDependencies = &dependency;
-    vk_testing::RenderPass render_pass(*m_device, rpci);
+    vkt::RenderPass render_pass(*m_device, rpci);
 
     VkImageObj image(m_device);
     image.InitNoLayout(32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM,
                        VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_IMAGE_TILING_OPTIMAL);
     VkImageView image_view = image.targetView(VK_FORMAT_R8G8B8A8_UNORM);
 
-    auto fbci = LvlInitStruct<VkFramebufferCreateInfo>();
+    VkFramebufferCreateInfo fbci = vku::InitStructHelper();
     fbci.renderPass = render_pass;
     fbci.attachmentCount = 1;
     fbci.pAttachments = &image_view;
     fbci.width = 32;
     fbci.height = 32;
     fbci.layers = 1;
-    vk_testing::Framebuffer framebuffer(*m_device, fbci);
+    vkt::Framebuffer framebuffer(*m_device, fbci);
 
-    auto render_pass_begin = LvlInitStruct<VkRenderPassBeginInfo>();
+    VkRenderPassBeginInfo render_pass_begin = vku::InitStructHelper();
     render_pass_begin.renderPass = render_pass;
     render_pass_begin.framebuffer = framebuffer;
     render_pass_begin.renderArea = VkRect2D{{0, 0}, {32, 32}};
 
     // VkImageMemoryBarrier
-    auto barrier = LvlInitStruct<VkImageMemoryBarrier>();
+    VkImageMemoryBarrier barrier = vku::InitStructHelper();
     barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
     barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
     barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
@@ -197,14 +185,14 @@ TEST_F(PositiveSubpass, SubpassWithEventWait) {
     // VkDependencyInfo with VkImageMemoryBarrier2
     const safe_VkImageMemoryBarrier2 safe_barrier2 = ConvertVkImageMemoryBarrierToV2(
         barrier, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
-    auto dependency_info = LvlInitStruct<VkDependencyInfo>();
+    VkDependencyInfo dependency_info = vku::InitStructHelper();
     dependency_info.dependencyFlags = 0;
     dependency_info.imageMemoryBarrierCount = 1;
     dependency_info.pImageMemoryBarriers = safe_barrier2.ptr();
 
     // vkCmdWaitEvents inside render pass
     {
-        VkEventObj event(*m_device);
+        vkt::Event event(*m_device);
         m_commandBuffer->begin();
         vk::CmdSetEvent(*m_commandBuffer, event, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
         vk::CmdBeginRenderPass(*m_commandBuffer, &render_pass_begin, VK_SUBPASS_CONTENTS_INLINE);
@@ -217,7 +205,7 @@ TEST_F(PositiveSubpass, SubpassWithEventWait) {
     // vkCmdWaitEvents2 inside render pass.
     // It's also a regression test for https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/4258
     {
-        VkEventObj event2(*m_device);
+        vkt::Event event2(*m_device);
         m_commandBuffer->begin();
         vk::CmdSetEvent2(*m_commandBuffer, event2, &dependency_info);
         vk::CmdBeginRenderPass(*m_commandBuffer, &render_pass_begin, VK_SUBPASS_CONTENTS_INLINE);

@@ -24,7 +24,7 @@ class VkSCRenderFramework : public VkRenderFramework {
 
     virtual ~VkSCRenderFramework() override;
 
-    void InitFramework(void * /*unused compatibility parameter*/ = NULL, void *instance_pnext = NULL);
+    void InitFramework(void *instance_pnext = NULL);
 
     VkPipelineCache GetDefaultPipelineCache();
 
@@ -44,11 +44,11 @@ class VkSCCompatibilityRenderFramework : public VkSCRenderFramework {
     VkSCCompatibilityRenderFramework();
     virtual ~VkSCCompatibilityRenderFramework() override;
 
-    void InitFramework(void * /*unused compatibility parameter*/ = NULL, void *instance_pnext = NULL);
+    void InitFramework(void *instance_pnext = NULL);
     void InitState(VkPhysicalDeviceFeatures *features = nullptr, void *create_device_pnext = nullptr,
                    const VkCommandPoolCreateFlags flags = 0);
 
-    static VkSCCompatibilityRenderFramework &Instance() {
+    static VkSCCompatibilityRenderFramework &RenderFrameworkInstance() {
         assert(s_instance != nullptr);
         return *s_instance;
     }

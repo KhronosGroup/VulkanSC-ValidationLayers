@@ -21,7 +21,6 @@
 # https://github.com/actions/runner-images/blob/main/images/linux/Ubuntu2204-Readme.md#environment-variables-2
 
 import argparse
-import json
 import os
 import sys
 import shutil
@@ -29,28 +28,23 @@ import common_ci
 
 # Manifest file describing out test application
 def get_android_manifest() -> str:
-    manifest = common_ci.RepoRelative('build-android/AndroidManifest.xml')
+    manifest = common_ci.RepoRelative('tests/android/AndroidManifest.xml')
     if not os.path.isfile(manifest):
         print(f"Unable to find manifest for APK! {manifest}")
         sys.exit(-1)
     return manifest
 
-# Resources for our test application.
-def get_android_resources() -> str:
-    res = common_ci.RepoRelative('build-android/res')
-    if not os.path.isdir(res):
-        print(f"Unable to find android resources for APK! {res}")
-        sys.exit(-1)
-    return res
-
 # Generate the APK from the CMake binaries
 def generate_apk(SDK_ROOT : str, CMAKE_INSTALL_DIR : str) -> str:
-    apk_dir = common_ci.RepoRelative(f'build-android/bin')
+    apk_dir = common_ci.RepoRelative('build-android/bin')
 
-    common_ci.RunShellCmd(f'cmake -E copy_directory {CMAKE_INSTALL_DIR} {apk_dir}')
+    # Delete APK directory since it could contain files from old runs
+    if os.path.isdir(apk_dir):
+        shutil.rmtree(apk_dir)
+
+    shutil.copytree(CMAKE_INSTALL_DIR, apk_dir)
 
     android_manifest = get_android_manifest()
-    android_resources = get_android_resources()
 
     android_jar = f"{SDK_ROOT}/platforms/android-26/android.jar"
     if not os.path.isfile(android_jar):
@@ -63,7 +57,7 @@ def generate_apk(SDK_ROOT : str, CMAKE_INSTALL_DIR : str) -> str:
     test_apk = f'{apk_dir}/{apk_name}.apk'
 
     # Create APK
-    common_ci.RunShellCmd(f'aapt package -f -M {android_manifest} -I {android_jar} -S {android_resources} -F {unaligned_apk} {CMAKE_INSTALL_DIR}')
+    common_ci.RunShellCmd(f'aapt package -f -M {android_manifest} -I {android_jar} -F {unaligned_apk} {CMAKE_INSTALL_DIR}')
 
     # Align APK
     common_ci.RunShellCmd(f'zipalign -f 4 {unaligned_apk} {test_apk}')
@@ -136,10 +130,15 @@ def main():
 
         print(f"Using {tool} : {path}")
 
-    cmake_install_dir = common_ci.RepoRelative(f'build-android/libs')
+    cmake_install_dir = common_ci.RepoRelative('build-android/libs')
+
+    # Delete install directory since it could contain files from old runs
+    if os.path.isdir(cmake_install_dir):
+        print("Cleaning CMake install")
+        shutil.rmtree(cmake_install_dir)
 
     for abi in android_abis:
-        build_dir = common_ci.RepoRelative(f'build-android/obj/{abi}')
+        build_dir = common_ci.RepoRelative(f'build-android/cmake/{abi}')
         lib_dir = f'lib/{abi}'
 
         if clean:

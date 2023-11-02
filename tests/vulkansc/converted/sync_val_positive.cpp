@@ -15,6 +15,7 @@
  */
 
 #include "../framework/layer_validation_tests.h"
+#include "../framework/pipeline_helper.h"
 
 class PositiveSyncVal : public VkSyncValTest {};
 
@@ -27,11 +28,8 @@ TEST_F(PositiveSyncVal, CmdClearAttachmentLayer) {
     // attachment inside a render pass can create hazards with the copy operations outside render pass.
     AddRequiredExtensions(VK_EXT_LOAD_STORE_OP_NONE_EXTENSION_NAME);
 
-    ASSERT_NO_FATAL_FAILURE(InitSyncValFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, nullptr, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    RETURN_IF_SKIP(InitSyncValFramework());
+    RETURN_IF_SKIP(InitState(nullptr, nullptr, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
 
     const uint32_t width = 256;
     const uint32_t height = 128;
@@ -68,14 +66,14 @@ TEST_F(PositiveSyncVal, CmdClearAttachmentLayer) {
     subpass.colorAttachmentCount = 1;
     subpass.pColorAttachments = &color_ref;
 
-    auto rpci = LvlInitStruct<VkRenderPassCreateInfo>();
+    VkRenderPassCreateInfo rpci = vku::InitStructHelper();
     rpci.subpassCount = 1;
     rpci.pSubpasses = &subpass;
     rpci.attachmentCount = 1;
     rpci.pAttachments = &attachment;
-    vk_testing::RenderPass render_pass(*m_device, rpci);
+    vkt::RenderPass render_pass(*m_device, rpci);
 
-    auto fbci = LvlInitStruct<VkFramebufferCreateInfo>();
+    VkFramebufferCreateInfo fbci = vku::InitStructHelper();
     fbci.flags = 0;
     fbci.renderPass = render_pass;
     fbci.attachmentCount = 1;
@@ -83,19 +81,18 @@ TEST_F(PositiveSyncVal, CmdClearAttachmentLayer) {
     fbci.width = width;
     fbci.height = height;
     fbci.layers = layers;
-    vk_testing::Framebuffer framebuffer(*m_device, fbci);
+    vkt::Framebuffer framebuffer(*m_device, fbci);
 
-    auto rpbi = LvlInitStruct<VkRenderPassBeginInfo>();
+    VkRenderPassBeginInfo rpbi = vku::InitStructHelper();
     rpbi.framebuffer = framebuffer;
     rpbi.renderPass = render_pass;
     rpbi.renderArea.extent.width = width;
     rpbi.renderArea.extent.height = height;
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitInfo();
     pipe.gp_ci_.renderPass = render_pass;
     pipe.InitState();
-    ASSERT_VK_SUCCESS(pipe.CreateGraphicsPipeline());
+    ASSERT_EQ(VK_SUCCESS, pipe.CreateGraphicsPipeline());
 
     VkImageCopy copy_region = {};
     copy_region.srcSubresource = {VkImageAspectFlags(VK_IMAGE_ASPECT_COLOR_BIT), 0, 0, 1};
@@ -121,7 +118,7 @@ TEST_F(PositiveSyncVal, CmdClearAttachmentLayer) {
     vk::CmdEndRenderPass(*m_commandBuffer);
     m_commandBuffer->end();
     m_commandBuffer->QueueCommandBuffer();
-    vk::QueueWaitIdle(m_device->m_queue);
+    vk::QueueWaitIdle(m_default_queue);
 }
 
 // Image transition ensures that image data is made visible and available when necessary.
@@ -130,18 +127,18 @@ TEST_F(PositiveSyncVal, CmdClearAttachmentLayer) {
 // the writes performed by the transition.
 TEST_F(PositiveSyncVal, WriteToImageAfterTransition) {
     TEST_DESCRIPTION("Perform image transition then copy to image from buffer");
-    ASSERT_NO_FATAL_FAILURE(InitSyncValFramework());
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitSyncValFramework());
+    RETURN_IF_SKIP(InitState())
 
     constexpr uint32_t width = 256;
     constexpr uint32_t height = 128;
     constexpr VkFormat format = VK_FORMAT_B8G8R8A8_UNORM;
 
-    VkBufferObj buffer(*m_device, width * height * 4, 0, VK_BUFFER_USAGE_TRANSFER_DST_BIT, nullptr);
+    vkt::Buffer buffer(*m_device, width * height * 4, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
     VkImageObj image(m_device);
     image.InitNoLayout(width, height, 1, format, VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_TILING_OPTIMAL);
 
-    auto barrier = LvlInitStruct<VkImageMemoryBarrier>();
+    VkImageMemoryBarrier barrier = vku::InitStructHelper();
     barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
     barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
@@ -172,27 +169,21 @@ TEST_F(PositiveSyncVal, WriteToImageAfterTransition) {
 TEST_F(PositiveSyncVal, SignalAndWaitSemaphoreOnHost) {
     TEST_DESCRIPTION("Signal semaphore on the host and wait on the host");
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    ASSERT_NO_FATAL_FAILURE(InitSyncValFramework());
-    if (IsPlatform(kMockICD)) {
+    RETURN_IF_SKIP(InitSyncValFramework());
+    if (IsPlatformMockICD()) {
         // Mock does not support proper ordering of events, e.g. wait can return before signal
         GTEST_SKIP() << "Test not supported by MockICD";
     }
-    if (DeviceValidationVersion() < VK_API_VERSION_1_2) {
-        GTEST_SKIP() << "At least Vulkan version 1.2 is required";
-    }
-    auto timeline_semaphore_features = LvlInitStruct<VkPhysicalDeviceTimelineSemaphoreFeatures>();
+    VkPhysicalDeviceTimelineSemaphoreFeatures timeline_semaphore_features = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(timeline_semaphore_features);
-    if (!timeline_semaphore_features.timelineSemaphore) {
-        GTEST_SKIP() << "timelineSemaphore not supported";
-    }
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &timeline_semaphore_features));
+    RETURN_IF_SKIP(InitState(nullptr, &timeline_semaphore_features));
 
     constexpr uint64_t max_signal_value = 10'000;
 
-    auto semaphore_type_info = LvlInitStruct<VkSemaphoreTypeCreateInfo>();
+    VkSemaphoreTypeCreateInfo semaphore_type_info = vku::InitStructHelper();
     semaphore_type_info.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
-    const auto create_info = LvlInitStruct<VkSemaphoreCreateInfo>(&semaphore_type_info);
-    vk_testing::Semaphore semaphore(*m_device, create_info);
+    const VkSemaphoreCreateInfo create_info = vku::InitStructHelper(&semaphore_type_info);
+    vkt::Semaphore semaphore(*m_device, create_info);
 
     std::atomic<bool> bailout{false};
     m_errorMonitor->SetBailout(&bailout);
@@ -201,10 +192,10 @@ TEST_F(PositiveSyncVal, SignalAndWaitSemaphoreOnHost) {
     auto signaling_thread = std::thread{[&] {
         uint64_t last_signalled_value = 0;
         while (last_signalled_value != max_signal_value) {
-            auto signal_info = LvlInitStruct<VkSemaphoreSignalInfo>();
+            VkSemaphoreSignalInfo signal_info = vku::InitStructHelper();
             signal_info.semaphore = semaphore;
             signal_info.value = ++last_signalled_value;
-            ASSERT_VK_SUCCESS(vk::SignalSemaphore(*m_device, &signal_info));
+            ASSERT_EQ(VK_SUCCESS, vk::SignalSemaphore(*m_device, &signal_info));
             if (bailout.load()) {
                 break;
             }
@@ -213,12 +204,12 @@ TEST_F(PositiveSyncVal, SignalAndWaitSemaphoreOnHost) {
     // Wait for each signal
     uint64_t wait_value = 1;
     while (wait_value <= max_signal_value) {
-        auto wait_info = LvlInitStruct<VkSemaphoreWaitInfo>();
+        VkSemaphoreWaitInfo wait_info = vku::InitStructHelper();
         wait_info.flags = VK_SEMAPHORE_WAIT_ANY_BIT;
         wait_info.semaphoreCount = 1;
         wait_info.pSemaphores = &semaphore.handle();
         wait_info.pValues = &wait_value;
-        ASSERT_VK_SUCCESS(vk::WaitSemaphores(*m_device, &wait_info, vvl::kU64Max));
+        ASSERT_EQ(VK_SUCCESS, vk::WaitSemaphores(*m_device, &wait_info, vvl::kU64Max));
         ++wait_value;
         if (bailout.load()) {
             break;
@@ -233,27 +224,21 @@ TEST_F(PositiveSyncVal, SignalAndWaitSemaphoreOnHost) {
 TEST_F(PositiveSyncVal, SignalAndGetSemaphoreCounter) {
     TEST_DESCRIPTION("Singal semaphore on the host and regularly read semaphore payload value");
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    ASSERT_NO_FATAL_FAILURE(InitSyncValFramework());
-    if (IsPlatform(kMockICD)) {
+    RETURN_IF_SKIP(InitSyncValFramework());
+    if (IsPlatformMockICD()) {
         // Mock does not support precise semaphore counter reporting
         GTEST_SKIP() << "Test not supported by MockICD";
     }
-    if (DeviceValidationVersion() < VK_API_VERSION_1_2) {
-        GTEST_SKIP() << "At least Vulkan version 1.2 is required";
-    }
-    auto timeline_semaphore_features = LvlInitStruct<VkPhysicalDeviceTimelineSemaphoreFeatures>();
+    VkPhysicalDeviceTimelineSemaphoreFeatures timeline_semaphore_features = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(timeline_semaphore_features);
-    if (!timeline_semaphore_features.timelineSemaphore) {
-        GTEST_SKIP() << "timelineSemaphore not supported";
-    }
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &timeline_semaphore_features));
+    RETURN_IF_SKIP(InitState(nullptr, &timeline_semaphore_features));
 
     constexpr uint64_t max_signal_value = 1'000;
 
-    auto semaphore_type_info = LvlInitStruct<VkSemaphoreTypeCreateInfo>();
+    VkSemaphoreTypeCreateInfo semaphore_type_info = vku::InitStructHelper();
     semaphore_type_info.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
-    const auto create_info = LvlInitStruct<VkSemaphoreCreateInfo>(&semaphore_type_info);
-    vk_testing::Semaphore semaphore(*m_device, create_info);
+    const VkSemaphoreCreateInfo create_info = vku::InitStructHelper(&semaphore_type_info);
+    vkt::Semaphore semaphore(*m_device, create_info);
 
     std::atomic<bool> bailout{false};
     m_errorMonitor->SetBailout(&bailout);
@@ -262,10 +247,10 @@ TEST_F(PositiveSyncVal, SignalAndGetSemaphoreCounter) {
     auto signaling_thread = std::thread{[&] {
         uint64_t last_signalled_value = 0;
         while (last_signalled_value != max_signal_value) {
-            auto signal_info = LvlInitStruct<VkSemaphoreSignalInfo>();
+            VkSemaphoreSignalInfo signal_info = vku::InitStructHelper();
             signal_info.semaphore = semaphore;
             signal_info.value = ++last_signalled_value;
-            ASSERT_VK_SUCCESS(vk::SignalSemaphore(*m_device, &signal_info));
+            ASSERT_EQ(VK_SUCCESS, vk::SignalSemaphore(*m_device, &signal_info));
             if (bailout.load()) {
                 break;
             }
@@ -274,7 +259,7 @@ TEST_F(PositiveSyncVal, SignalAndGetSemaphoreCounter) {
     // Spin until semaphore payload value equals maximum signaled value
     uint64_t counter = 0;
     while (counter != max_signal_value) {
-        ASSERT_VK_SUCCESS(vk::GetSemaphoreCounterValue(*m_device, semaphore, &counter));
+        ASSERT_EQ(VK_SUCCESS, vk::GetSemaphoreCounterValue(*m_device, semaphore, &counter));
         if (bailout.load()) {
             break;
         }
@@ -285,27 +270,21 @@ TEST_F(PositiveSyncVal, SignalAndGetSemaphoreCounter) {
 TEST_F(PositiveSyncVal, GetSemaphoreCounterFromMultipleThreads) {
     TEST_DESCRIPTION("Read semaphore counter value from multiple threads");
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    ASSERT_NO_FATAL_FAILURE(InitSyncValFramework());
-    if (IsPlatform(kMockICD)) {
+    RETURN_IF_SKIP(InitSyncValFramework());
+    if (IsPlatformMockICD()) {
         // Mock does not support precise semaphore counter reporting
         GTEST_SKIP() << "Test not supported by MockICD";
     }
-    if (DeviceValidationVersion() < VK_API_VERSION_1_2) {
-        GTEST_SKIP() << "At least Vulkan version 1.2 is required";
-    }
-    auto timeline_semaphore_features = LvlInitStruct<VkPhysicalDeviceTimelineSemaphoreFeatures>();
+    VkPhysicalDeviceTimelineSemaphoreFeatures timeline_semaphore_features = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(timeline_semaphore_features);
-    if (!timeline_semaphore_features.timelineSemaphore) {
-        GTEST_SKIP() << "timelineSemaphore not supported";
-    }
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &timeline_semaphore_features));
+    RETURN_IF_SKIP(InitState(nullptr, &timeline_semaphore_features));
 
     constexpr uint64_t max_signal_value = 15'000;
 
-    auto semaphore_type_info = LvlInitStruct<VkSemaphoreTypeCreateInfo>();
+    VkSemaphoreTypeCreateInfo semaphore_type_info = vku::InitStructHelper();
     semaphore_type_info.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
-    const auto create_info = LvlInitStruct<VkSemaphoreCreateInfo>(&semaphore_type_info);
-    vk_testing::Semaphore semaphore(*m_device, create_info);
+    const VkSemaphoreCreateInfo create_info = vku::InitStructHelper(&semaphore_type_info);
+    vkt::Semaphore semaphore(*m_device, create_info);
 
     std::atomic<bool> bailout{false};
     m_errorMonitor->SetBailout(&bailout);
@@ -318,7 +297,7 @@ TEST_F(PositiveSyncVal, GetSemaphoreCounterFromMultipleThreads) {
         auto timeout_guard = timeout_helper.ThreadGuard();
         uint64_t counter = 0;
         while (counter != max_signal_value) {
-            ASSERT_VK_SUCCESS(vk::GetSemaphoreCounterValue(*m_device, semaphore, &counter));
+            ASSERT_EQ(VK_SUCCESS, vk::GetSemaphoreCounterValue(*m_device, semaphore, &counter));
             if (bailout.load()) {
                 break;
             }
@@ -333,10 +312,10 @@ TEST_F(PositiveSyncVal, GetSemaphoreCounterFromMultipleThreads) {
         auto timeout_guard = timeout_helper.ThreadGuard();
         uint64_t last_signalled_value = 0;
         while (last_signalled_value != max_signal_value) {
-            auto signal_info = LvlInitStruct<VkSemaphoreSignalInfo>();
+            VkSemaphoreSignalInfo signal_info = vku::InitStructHelper();
             signal_info.semaphore = semaphore;
             signal_info.value = ++last_signalled_value;
-            ASSERT_VK_SUCCESS(vk::SignalSemaphore(*m_device, &signal_info));
+            ASSERT_EQ(VK_SUCCESS, vk::SignalSemaphore(*m_device, &signal_info));
             if (bailout.load()) {
                 break;
             }
@@ -368,9 +347,9 @@ TEST_F(PositiveSyncVal, GetSemaphoreCounterFromMultipleThreads) {
 
 TEST_F(PositiveSyncVal, ShaderReferencesNotBoundSet) {
     TEST_DESCRIPTION("Shader references a descriptor set that was not bound. SyncVal should not crash if core checks are disabled");
-    ASSERT_NO_FATAL_FAILURE(InitSyncValFramework());
-    ASSERT_NO_FATAL_FAILURE(InitState());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitSyncValFramework());
+    RETURN_IF_SKIP(InitState())
+    InitRenderTarget();
 
     const char vs_source[] = R"glsl(
         #version 460
@@ -383,28 +362,21 @@ TEST_F(PositiveSyncVal, ShaderReferencesNotBoundSet) {
     VkShaderObj fs(this, kFragmentColorOutputGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     const VkDescriptorSetLayoutBinding binding = {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT, nullptr};
-    const VkDescriptorSetLayoutObj set_layout(m_device, {binding});
-    const VkPipelineLayoutObj pipeline_layout(m_device, {&set_layout, &set_layout});
+    const vkt::DescriptorSetLayout set_layout(*m_device, {binding});
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&set_layout, &set_layout});
     OneOffDescriptorSet set(m_device, {binding});
 
-    VkPipelineObj pipe(m_device);
-    pipe.AddShader(&vs);
-    pipe.AddShader(&fs);
-    pipe.AddDefaultColorAttachment();
-    VkViewport viewport = {0.0f, 0.0f, 64.0f, 64.0f, 0.0f, 1.0f};
-    m_viewports.push_back(viewport);
-    pipe.SetViewport(m_viewports);
-    VkRect2D rect = {{0, 0}, {64, 64}};
-    m_scissors.push_back(rect);
-    pipe.SetScissor(m_scissors);
-    pipe.CreateVKPipeline(pipeline_layout, m_renderPass);
+    CreatePipelineHelper pipe(*this);
+    pipe.InitState();
+    pipe.gp_ci_.layout = pipeline_layout.handle();
+    pipe.CreateGraphicsPipeline();
 
     m_commandBuffer->begin();
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
 
     // Bind set 0.
     vk::CmdBindDescriptorSets(*m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &set.set_, 0, nullptr);
-    vk::CmdBindPipeline(*m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdBindPipeline(*m_commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
 
     // Core checks prevent SyncVal from running when error is found. This test has core checks disabled and also invalid
     // setup where a shader uses not bound set 1.
@@ -413,4 +385,146 @@ TEST_F(PositiveSyncVal, ShaderReferencesNotBoundSet) {
 
     vk::CmdEndRenderPass(*m_commandBuffer);
     m_commandBuffer->end();
+}
+
+TEST_F(PositiveSyncVal, PresentAfterSubmit2AutomaticVisibility) {
+    TEST_DESCRIPTION("Waiting on the semaphore makes available image accesses visible to the presentation engine.");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddSurfaceExtension();
+    RETURN_IF_SKIP(InitSyncValFramework(true));
+    VkPhysicalDeviceSynchronization2FeaturesKHR sync2_features = vku::InitStructHelper();
+    sync2_features.synchronization2 = VK_TRUE;
+    RETURN_IF_SKIP(InitState(nullptr, &sync2_features));
+    if (!InitSwapchain()) {
+        GTEST_SKIP() << "Cannot create surface or swapchain";
+    }
+    const vkt::Semaphore acquire_semaphore(*m_device);
+    const vkt::Semaphore submit_semaphore(*m_device);
+    const auto swapchain_images = GetSwapchainImages(m_swapchain);
+
+    uint32_t image_index = 0;
+    ASSERT_EQ(VK_SUCCESS,
+        vk::AcquireNextImageKHR(device(), m_swapchain, kWaitTimeout, acquire_semaphore, VK_NULL_HANDLE, &image_index));
+
+    VkImageMemoryBarrier2 layout_transition = vku::InitStructHelper();
+    // this creates execution dependency with submit's wait semaphore, so layout
+    // transition does not start before image is acquired.
+    layout_transition.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+    layout_transition.srcAccessMask = 0;
+
+    // this creates execution dependency with submit's signal operation, so layout
+    // transition finishes before presentation starts.
+    layout_transition.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+
+    // dstAccessMask makes accesses visible only to the device.
+    // Also, any writes to swapchain images that are made available, are
+    // automatically made visible to the presentation engine reads.
+    // This test checks that presentation engine accesses are not reported as hazards.
+    layout_transition.dstAccessMask = 0;
+
+    layout_transition.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    layout_transition.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    layout_transition.image = swapchain_images[image_index];
+    layout_transition.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    layout_transition.subresourceRange.baseMipLevel = 0;
+    layout_transition.subresourceRange.levelCount = 1;
+    layout_transition.subresourceRange.baseArrayLayer = 0;
+    layout_transition.subresourceRange.layerCount = 1;
+
+    VkDependencyInfoKHR dep_info = vku::InitStructHelper();
+    dep_info.imageMemoryBarrierCount = 1;
+    dep_info.pImageMemoryBarriers = &layout_transition;
+
+    m_commandBuffer->begin();
+    vk::CmdPipelineBarrier2(*m_commandBuffer, &dep_info);
+    m_commandBuffer->end();
+
+    VkSemaphoreSubmitInfo wait_info = vku::InitStructHelper();
+    wait_info.semaphore = acquire_semaphore;
+    wait_info.stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+
+    VkCommandBufferSubmitInfo command_buffer_info = vku::InitStructHelper();
+    command_buffer_info.commandBuffer = *m_commandBuffer;
+
+    VkSemaphoreSubmitInfo signal_info = vku::InitStructHelper();
+    signal_info.semaphore = submit_semaphore;
+    signal_info.stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+
+    VkSubmitInfo2 submit = vku::InitStructHelper();
+    submit.waitSemaphoreInfoCount = 1;
+    submit.pWaitSemaphoreInfos = &wait_info;
+    submit.commandBufferInfoCount = 1;
+    submit.pCommandBufferInfos = &command_buffer_info;
+    submit.signalSemaphoreInfoCount = 1;
+    submit.pSignalSemaphoreInfos = &signal_info;
+    ASSERT_EQ(VK_SUCCESS, vk::QueueSubmit2(m_default_queue, 1, &submit, VK_NULL_HANDLE));
+
+    VkPresentInfoKHR present = vku::InitStructHelper();
+    present.waitSemaphoreCount = 1;
+    present.pWaitSemaphores = &submit_semaphore.handle();
+    present.swapchainCount = 1;
+    present.pSwapchains = &m_swapchain;
+    present.pImageIndices = &image_index;
+    ASSERT_EQ(VK_SUCCESS, vk::QueuePresentKHR(m_default_queue, &present));
+    ASSERT_EQ(VK_SUCCESS, vk::QueueWaitIdle(m_default_queue));
+}
+
+TEST_F(PositiveSyncVal, PresentAfterSubmitAutomaticVisibility) {
+    TEST_DESCRIPTION("Waiting on the semaphore makes available image accesses visible to the presentation engine.");
+    AddSurfaceExtension();
+    RETURN_IF_SKIP(InitSyncValFramework(true));
+    RETURN_IF_SKIP(InitState())
+    if (!InitSwapchain()) {
+        GTEST_SKIP() << "Cannot create surface or swapchain";
+    }
+    const vkt::Semaphore acquire_semaphore(*m_device);
+    const vkt::Semaphore submit_semaphore(*m_device);
+    const auto swapchain_images = GetSwapchainImages(m_swapchain);
+
+    uint32_t image_index = 0;
+    ASSERT_EQ(VK_SUCCESS,
+        vk::AcquireNextImageKHR(device(), m_swapchain, kWaitTimeout, acquire_semaphore, VK_NULL_HANDLE, &image_index));
+
+    VkImageMemoryBarrier layout_transition = vku::InitStructHelper();
+    layout_transition.srcAccessMask = 0;
+
+    // dstAccessMask makes accesses visible only to the device.
+    // Also, any writes to swapchain images that are made available, are
+    // automatically made visible to the presentation engine reads.
+    // This test checks that presentation engine accesses are not reported as hazards.
+    layout_transition.dstAccessMask = 0;
+
+    layout_transition.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    layout_transition.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    layout_transition.image = swapchain_images[image_index];
+    layout_transition.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    layout_transition.subresourceRange.baseMipLevel = 0;
+    layout_transition.subresourceRange.levelCount = 1;
+    layout_transition.subresourceRange.baseArrayLayer = 0;
+    layout_transition.subresourceRange.layerCount = 1;
+
+    m_commandBuffer->begin();
+    vk::CmdPipelineBarrier(*m_commandBuffer, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                           VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, nullptr, 0, nullptr, 1, &layout_transition);
+    m_commandBuffer->end();
+
+    constexpr VkPipelineStageFlags semaphore_wait_stage = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+    VkSubmitInfo submit = vku::InitStructHelper();
+    submit.waitSemaphoreCount = 1;
+    submit.pWaitSemaphores = &acquire_semaphore.handle();
+    submit.pWaitDstStageMask = &semaphore_wait_stage;
+    submit.commandBufferCount = 1;
+    submit.pCommandBuffers = &m_commandBuffer->handle();
+    submit.signalSemaphoreCount = 1;
+    submit.pSignalSemaphores = &submit_semaphore.handle();
+    ASSERT_EQ(VK_SUCCESS, vk::QueueSubmit(m_default_queue, 1, &submit, VK_NULL_HANDLE));
+
+    VkPresentInfoKHR present = vku::InitStructHelper();
+    present.waitSemaphoreCount = 1;
+    present.pWaitSemaphores = &submit_semaphore.handle();
+    present.swapchainCount = 1;
+    present.pSwapchains = &m_swapchain;
+    present.pImageIndices = &image_index;
+    ASSERT_EQ(VK_SUCCESS, vk::QueuePresentKHR(m_default_queue, &present));
+    ASSERT_EQ(VK_SUCCESS, vk::QueueWaitIdle(m_default_queue));
 }

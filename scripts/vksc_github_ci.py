@@ -69,7 +69,7 @@ def BuildVVL(config, cmake_args, build_tests):
     RunShellCmd(cmake_ver_cmd)
 
     print("Run CMake for Validation Layers")
-    cmake_cmd = f'cmake -S . -B {VVL_BUILD_DIR} -DUPDATE_DEPS=ON -DCMAKE_BUILD_TYPE={config}'
+    cmake_cmd = f'cmake -S . -B {VVL_BUILD_DIR} -DUPDATE_DEPS=ON -DUPDATE_DEPS_DIR={externalDir(config)} -DCMAKE_BUILD_TYPE={config}'
     # By default BUILD_WERROR is OFF, CI should always enable it.
     cmake_cmd += ' -DBUILD_WERROR=ON'
     cmake_cmd += f' -DBUILD_TESTS={build_tests}'
@@ -93,7 +93,7 @@ def BuildVVL(config, cmake_args, build_tests):
     stats_script = RepoRelative('scripts/vk_validation_stats.py')
     validusage = os.path.join(ext_dir, 'Vulkan-Headers', 'registry', 'validusage.json')
     outfile = os.path.join('layers', 'vuid_coverage_database.txt')
-    RunShellCmd(f'{sys.executable} {stats_script} {validusage} -text {outfile}', VVL_BUILD_DIR)
+    RunShellCmd(f'{sys.executable} {stats_script} {validusage} -text {outfile} -api vulkansc', VVL_BUILD_DIR)
 
 #
 # Prepare Loader for executing Layer Validation Tests

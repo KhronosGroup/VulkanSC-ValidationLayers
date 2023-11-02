@@ -21,16 +21,15 @@
 #include "best_practices/best_practices_error_enums.h"
 
 bool BestPractices::ValidateGetPhysicalDeviceDisplayPlanePropertiesKHRQuery(VkPhysicalDevice physicalDevice,
-                                                                            const char* api_name) const {
+                                                                            const Location& loc) const {
     bool skip = false;
     const auto bp_pd_state = Get<bp_state::PhysicalDevice>(physicalDevice);
 
     if (bp_pd_state) {
         if (bp_pd_state->vkGetPhysicalDeviceDisplayPlanePropertiesKHRState == UNCALLED) {
-            skip |= LogWarning(physicalDevice, kVUID_BestPractices_DisplayPlane_PropertiesNotCalled,
-                               "Potential problem with calling %s() without first retrieving properties from "
-                               "vkGetPhysicalDeviceDisplayPlanePropertiesKHR or vkGetPhysicalDeviceDisplayPlaneProperties2KHR.",
-                               api_name);
+            skip |= LogWarning(kVUID_BestPractices_DisplayPlane_PropertiesNotCalled, physicalDevice, loc,
+                               "was called without first retrieving properties from "
+                               "vkGetPhysicalDeviceDisplayPlanePropertiesKHR or vkGetPhysicalDeviceDisplayPlaneProperties2KHR.");
         }
     }
 
@@ -38,36 +37,38 @@ bool BestPractices::ValidateGetPhysicalDeviceDisplayPlanePropertiesKHRQuery(VkPh
 }
 
 bool BestPractices::PreCallValidateGetDisplayPlaneSupportedDisplaysKHR(VkPhysicalDevice physicalDevice, uint32_t planeIndex,
-                                                                       uint32_t* pDisplayCount, VkDisplayKHR* pDisplays) const {
+                                                                       uint32_t* pDisplayCount, VkDisplayKHR* pDisplays,
+                                                                       const ErrorObject& error_obj) const {
     bool skip = false;
 
-    skip |= ValidateGetPhysicalDeviceDisplayPlanePropertiesKHRQuery(physicalDevice, "vkGetDisplayPlaneSupportedDisplaysKHR");
+    skip |= ValidateGetPhysicalDeviceDisplayPlanePropertiesKHRQuery(physicalDevice, error_obj.location);
 
     return skip;
 }
 
 bool BestPractices::PreCallValidateGetDisplayPlaneCapabilitiesKHR(VkPhysicalDevice physicalDevice, VkDisplayModeKHR mode,
-                                                                  uint32_t planeIndex,
-                                                                  VkDisplayPlaneCapabilitiesKHR* pCapabilities) const {
+                                                                  uint32_t planeIndex, VkDisplayPlaneCapabilitiesKHR* pCapabilities,
+                                                                  const ErrorObject& error_obj) const {
     bool skip = false;
 
-    skip |= ValidateGetPhysicalDeviceDisplayPlanePropertiesKHRQuery(physicalDevice, "vkGetDisplayPlaneCapabilitiesKHR");
+    skip |= ValidateGetPhysicalDeviceDisplayPlanePropertiesKHRQuery(physicalDevice, error_obj.location);
 
     return skip;
 }
 
 bool BestPractices::PreCallValidateGetDisplayPlaneCapabilities2KHR(VkPhysicalDevice physicalDevice,
                                                                    const VkDisplayPlaneInfo2KHR* pDisplayPlaneInfo,
-                                                                   VkDisplayPlaneCapabilities2KHR* pCapabilities) const {
+                                                                   VkDisplayPlaneCapabilities2KHR* pCapabilities,
+                                                                   const ErrorObject& error_obj) const {
     bool skip = false;
 
-    skip |= ValidateGetPhysicalDeviceDisplayPlanePropertiesKHRQuery(physicalDevice, "vkGetDisplayPlaneCapabilities2KHR");
+    skip |= ValidateGetPhysicalDeviceDisplayPlanePropertiesKHRQuery(physicalDevice, error_obj.location);
 
     return skip;
 }
 
 bool BestPractices::PreCallValidateGetSwapchainImagesKHR(VkDevice device, VkSwapchainKHR swapchain, uint32_t* pSwapchainImageCount,
-                                                         VkImage* pSwapchainImages) const {
+                                                         VkImage* pSwapchainImages, const ErrorObject& error_obj) const {
     bool skip = false;
 
     auto swapchain_state = Get<bp_state::Swapchain>(swapchain);
@@ -75,19 +76,17 @@ bool BestPractices::PreCallValidateGetSwapchainImagesKHR(VkDevice device, VkSwap
     if (swapchain_state && pSwapchainImages) {
         // Compare the preliminary value of *pSwapchainImageCount with the value this time:
         if (swapchain_state->vkGetSwapchainImagesKHRState == UNCALLED) {
-            skip |=
-                LogWarning(device, kVUID_Core_Swapchain_PriorCount,
-                           "vkGetSwapchainImagesKHR() called with non-NULL pSwapchainImageCount; but no prior positive value has "
-                           "been seen for pSwapchainImages.");
+            skip |= LogWarning(kVUID_Core_Swapchain_PriorCount, device, error_obj.location,
+                               "called with non-NULL pSwapchainImageCount; but no prior positive value has "
+                               "been seen for pSwapchainImages.");
         }
 
         if (*pSwapchainImageCount > swapchain_state->get_swapchain_image_count) {
-            skip |= LogWarning(
-                device, kVUID_BestPractices_Swapchain_InvalidCount,
-                "vkGetSwapchainImagesKHR() called with non-NULL pSwapchainImages, and with pSwapchainImageCount set to a "
-                "value (%" PRId32 ") that is greater than the value (%" PRId32
-                ") that was returned when pSwapchainImages was NULL.",
-                *pSwapchainImageCount, swapchain_state->get_swapchain_image_count);
+            skip |= LogWarning(kVUID_BestPractices_Swapchain_InvalidCount, device, error_obj.location,
+                               "called with non-NULL pSwapchainImages, and with pSwapchainImageCount set to a "
+                               "value (%" PRId32 ") that is greater than the value (%" PRId32
+                               ") that was returned when pSwapchainImages was NULL.",
+                               *pSwapchainImageCount, swapchain_state->get_swapchain_image_count);
         }
     }
 
@@ -95,34 +94,34 @@ bool BestPractices::PreCallValidateGetSwapchainImagesKHR(VkDevice device, VkSwap
 }
 
 bool BestPractices::PreCallValidateCreateSwapchainKHR(VkDevice device, const VkSwapchainCreateInfoKHR* pCreateInfo,
-                                                      const VkAllocationCallbacks* pAllocator, VkSwapchainKHR* pSwapchain) const {
+                                                      const VkAllocationCallbacks* pAllocator, VkSwapchainKHR* pSwapchain,
+                                                      const ErrorObject& error_obj) const {
     bool skip = false;
 
     const auto* bp_pd_state = GetPhysicalDeviceState();
     if (bp_pd_state) {
         if (bp_pd_state->vkGetPhysicalDeviceSurfaceCapabilitiesKHRState == UNCALLED) {
-            skip |= LogWarning(device, kVUID_BestPractices_Swapchain_GetSurfaceNotCalled,
-                               "vkCreateSwapchainKHR() called before getting surface capabilities from "
+            skip |= LogWarning(kVUID_BestPractices_Swapchain_GetSurfaceNotCalled, device, error_obj.location,
+                               "called before getting surface capabilities from "
                                "vkGetPhysicalDeviceSurfaceCapabilitiesKHR().");
         }
 
         if ((pCreateInfo->presentMode != VK_PRESENT_MODE_FIFO_KHR) &&
             (bp_pd_state->vkGetPhysicalDeviceSurfacePresentModesKHRState != QUERY_DETAILS)) {
-            skip |= LogWarning(device, kVUID_BestPractices_Swapchain_GetSurfaceNotCalled,
-                               "vkCreateSwapchainKHR() called before getting surface present mode(s) from "
+            skip |= LogWarning(kVUID_BestPractices_Swapchain_GetSurfaceNotCalled, device, error_obj.location,
+                               "called before getting surface present mode(s) from "
                                "vkGetPhysicalDeviceSurfacePresentModesKHR().");
         }
 
         if (bp_pd_state->vkGetPhysicalDeviceSurfaceFormatsKHRState != QUERY_DETAILS) {
-            skip |= LogWarning(
-                device, kVUID_BestPractices_Swapchain_GetSurfaceNotCalled,
-                "vkCreateSwapchainKHR() called before getting surface format(s) from vkGetPhysicalDeviceSurfaceFormatsKHR().");
+            skip |= LogWarning(kVUID_BestPractices_Swapchain_GetSurfaceNotCalled, device, error_obj.location,
+                               "called before getting surface format(s) from vkGetPhysicalDeviceSurfaceFormatsKHR().");
         }
     }
 
     if ((pCreateInfo->queueFamilyIndexCount > 1) && (pCreateInfo->imageSharingMode == VK_SHARING_MODE_EXCLUSIVE)) {
         skip |=
-            LogWarning(device, kVUID_BestPractices_SharingModeExclusive,
+            LogWarning(kVUID_BestPractices_SharingModeExclusive, device, error_obj.location,
                        "Warning: A Swapchain is being created which specifies a sharing mode of VK_SHARING_MODE_EXCLUSIVE while "
                        "specifying multiple queues (queueFamilyIndexCount of %" PRIu32 ").",
                        pCreateInfo->queueFamilyIndexCount);
@@ -132,7 +131,7 @@ bool BestPractices::PreCallValidateCreateSwapchainKHR(VkDevice device, const VkS
     if (((present_mode == VK_PRESENT_MODE_MAILBOX_KHR) || (present_mode == VK_PRESENT_MODE_FIFO_KHR)) &&
         (pCreateInfo->minImageCount == 2)) {
         skip |= LogPerformanceWarning(
-            device, kVUID_BestPractices_SuboptimalSwapchainImageCount,
+            kVUID_BestPractices_SuboptimalSwapchainImageCount, device, error_obj.location,
             "Warning: A Swapchain is being created with minImageCount set to %" PRIu32
             ", which means double buffering is going "
             "to be used. Using double buffering and vsync locks rendering to an integer fraction of the vsync rate. In turn, "
@@ -141,8 +140,17 @@ bool BestPractices::PreCallValidateCreateSwapchainKHR(VkDevice device, const VkS
             pCreateInfo->minImageCount);
     }
 
+    if (IsExtEnabled(device_extensions.vk_ext_swapchain_maintenance1) &&
+        !vku::FindStructInPNextChain<VkSwapchainPresentModesCreateInfoEXT>(pCreateInfo->pNext)) {
+        skip |= LogWarning(kVUID_BestPractices_NoVkSwapchainPresentModesCreateInfoEXTProvided, device, error_obj.location,
+                           "No VkSwapchainPresentModesCreateInfoEXT was provided to VkCreateSwapchainKHR. "
+                           "When VK_EXT_swapchain_maintenance1 is enabled, a VkSwapchainPresentModesCreateInfoEXT should "
+                           "be provided to inform the implementation that the application is aware of the new features "
+                           "in a backward compatible way.");
+    }
+
     if (VendorCheckEnabled(kBPVendorArm) && (pCreateInfo->presentMode != VK_PRESENT_MODE_FIFO_KHR)) {
-        skip |= LogWarning(device, kVUID_BestPractices_CreateSwapchain_PresentMode,
+        skip |= LogWarning(kVUID_BestPractices_CreateSwapchain_PresentMode, device, error_obj.location,
                            "%s Warning: Swapchain is not being created with presentation mode \"VK_PRESENT_MODE_FIFO_KHR\". "
                            "Prefer using \"VK_PRESENT_MODE_FIFO_KHR\" to avoid unnecessary CPU and GPU load and save power. "
                            "Presentation modes which are not FIFO will present the latest available frame and discard other "
@@ -155,14 +163,14 @@ bool BestPractices::PreCallValidateCreateSwapchainKHR(VkDevice device, const VkS
 
 bool BestPractices::PreCallValidateCreateSharedSwapchainsKHR(VkDevice device, uint32_t swapchainCount,
                                                              const VkSwapchainCreateInfoKHR* pCreateInfos,
-                                                             const VkAllocationCallbacks* pAllocator,
-                                                             VkSwapchainKHR* pSwapchains) const {
+                                                             const VkAllocationCallbacks* pAllocator, VkSwapchainKHR* pSwapchains,
+                                                             const ErrorObject& error_obj) const {
     bool skip = false;
 
     for (uint32_t i = 0; i < swapchainCount; i++) {
         if ((pCreateInfos[i].queueFamilyIndexCount > 1) && (pCreateInfos[i].imageSharingMode == VK_SHARING_MODE_EXCLUSIVE)) {
             skip |= LogWarning(
-                device, kVUID_BestPractices_SharingModeExclusive,
+                kVUID_BestPractices_SharingModeExclusive, device, error_obj.location,
                 "Warning: A shared swapchain (index %" PRIu32
                 ") is being created which specifies a sharing mode of VK_SHARING_MODE_EXCLUSIVE while specifying multiple "
                 "queues (queueFamilyIndexCount of %" PRIu32 ").",
@@ -173,17 +181,19 @@ bool BestPractices::PreCallValidateCreateSharedSwapchainsKHR(VkDevice device, ui
     return skip;
 }
 
-void BestPractices::ManualPostCallRecordQueuePresentKHR(VkQueue queue, const VkPresentInfoKHR* pPresentInfo, VkResult result) {
+void BestPractices::ManualPostCallRecordQueuePresentKHR(VkQueue queue, const VkPresentInfoKHR* pPresentInfo,
+                                                        const RecordObject& record_obj) {
     for (uint32_t i = 0; i < pPresentInfo->swapchainCount; ++i) {
-        auto swapchains_result = pPresentInfo->pResults ? pPresentInfo->pResults[i] : result;
+        auto swapchains_result = pPresentInfo->pResults ? pPresentInfo->pResults[i] : record_obj.result;
         if (swapchains_result == VK_SUBOPTIMAL_KHR) {
             LogPerformanceWarning(
-                pPresentInfo->pSwapchains[i], kVUID_BestPractices_SuboptimalSwapchain,
-                "vkQueuePresentKHR: %s :VK_SUBOPTIMAL_KHR was returned. VK_SUBOPTIMAL_KHR - Presentation will still succeed, "
-                "subject to the window resize behavior, but the swapchain is no longer configured optimally for the surface it "
+                kVUID_BestPractices_SuboptimalSwapchain, pPresentInfo->pSwapchains[i], record_obj.location,
+                "VK_SUBOPTIMAL_KHR was returned. VK_SUBOPTIMAL_KHR - Presentation will still succeed, "
+                "subject to the window resize behavior, but the swapchain (%s) is no longer configured optimally for the surface "
+                "it "
                 "targets. Applications should query updated surface information and recreate their swapchain at the next "
                 "convenient opportunity.",
-                report_data->FormatHandle(pPresentInfo->pSwapchains[i]).c_str());
+                FormatHandle(pPresentInfo->pSwapchains[i]).c_str());
         }
     }
 
@@ -196,7 +206,8 @@ void BestPractices::ManualPostCallRecordQueuePresentKHR(VkQueue queue, const VkP
 
 bool BestPractices::PreCallValidateGetPhysicalDeviceSurfaceFormatsKHR(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface,
                                                                       uint32_t* pSurfaceFormatCount,
-                                                                      VkSurfaceFormatKHR* pSurfaceFormats) const {
+                                                                      VkSurfaceFormatKHR* pSurfaceFormats,
+                                                                      const ErrorObject& error_obj) const {
     if (!pSurfaceFormats) return false;
     const auto bp_pd_state = Get<bp_state::PhysicalDevice>(physicalDevice);
     const auto& call_state = bp_pd_state->vkGetPhysicalDeviceSurfaceFormatsKHRState;
@@ -204,13 +215,13 @@ bool BestPractices::PreCallValidateGetPhysicalDeviceSurfaceFormatsKHR(VkPhysical
     if (call_state == UNCALLED) {
         // Since we haven't recorded a preliminary value of *pSurfaceFormatCount, that likely means that the application didn't
         // previously call this function with a NULL value of pSurfaceFormats:
-        skip |= LogWarning(physicalDevice, kVUID_BestPractices_DevLimit_MustQueryCount,
-                           "vkGetPhysicalDeviceSurfaceFormatsKHR() called with non-NULL pSurfaceFormatCount; but no prior "
+        skip |= LogWarning(kVUID_BestPractices_DevLimit_MustQueryCount, physicalDevice, error_obj.location,
+                           "called with non-NULL pSurfaceFormatCount; but no prior "
                            "positive value has been seen for pSurfaceFormats.");
     } else {
         if (*pSurfaceFormatCount > bp_pd_state->surface_formats_count) {
-            skip |= LogWarning(physicalDevice, kVUID_BestPractices_DevLimit_CountMismatch,
-                               "vkGetPhysicalDeviceSurfaceFormatsKHR() called with non-NULL pSurfaceFormatCount, and with "
+            skip |= LogWarning(kVUID_BestPractices_DevLimit_CountMismatch, physicalDevice, error_obj.location,
+                               "called with non-NULL pSurfaceFormatCount, and with "
                                "pSurfaceFormats set to a value (%u) that is greater than the value (%u) that was returned "
                                "when pSurfaceFormatCount was NULL.",
                                *pSurfaceFormatCount, bp_pd_state->surface_formats_count);
@@ -219,13 +230,14 @@ bool BestPractices::PreCallValidateGetPhysicalDeviceSurfaceFormatsKHR(VkPhysical
     return skip;
 }
 
-bool BestPractices::PreCallValidateQueuePresentKHR(VkQueue queue, const VkPresentInfoKHR* pPresentInfo) const {
+bool BestPractices::PreCallValidateQueuePresentKHR(VkQueue queue, const VkPresentInfoKHR* pPresentInfo,
+                                                   const ErrorObject& error_obj) const {
     bool skip = false;
 
     if (VendorCheckEnabled(kBPVendorAMD) || VendorCheckEnabled(kBPVendorNVIDIA)) {
         auto num = num_queue_submissions_.load();
         if (num > kNumberOfSubmissionWarningLimitAMD) {
-            skip |= LogPerformanceWarning(device, kVUID_BestPractices_Submission_ReduceNumberOfSubmissions,
+            skip |= LogPerformanceWarning(kVUID_BestPractices_Submission_ReduceNumberOfSubmissions, device, error_obj.location,
                                           "%s %s Performance warning: command buffers submitted %" PRId32
                                           " times this frame. Submitting command buffers has a CPU "
                                           "and GPU overhead. Submit fewer times to incur less overhead.",
@@ -237,12 +249,13 @@ bool BestPractices::PreCallValidateQueuePresentKHR(VkQueue queue, const VkPresen
 }
 
 bool BestPractices::PreCallValidateAcquireNextImageKHR(VkDevice device, VkSwapchainKHR swapchain, uint64_t timeout,
-                                                       VkSemaphore semaphore, VkFence fence, uint32_t* pImageIndex) const {
+                                                       VkSemaphore semaphore, VkFence fence, uint32_t* pImageIndex,
+                                                       const ErrorObject& error_obj) const {
     auto swapchain_data = Get<SWAPCHAIN_NODE>(swapchain);
     bool skip = false;
     if (swapchain_data && swapchain_data->images.size() == 0) {
-        skip |= LogWarning(swapchain, kVUID_BestPractices_DrawState_SwapchainImagesNotFound,
-                           "vkAcquireNextImageKHR: No images found to acquire from. Application probably did not call "
+        skip |= LogWarning(kVUID_BestPractices_DrawState_SwapchainImagesNotFound, swapchain, error_obj.location,
+                           "No images found to acquire from. Application probably did not call "
                            "vkGetSwapchainImagesKHR after swapchain creation.");
     }
     return skip;
@@ -251,7 +264,7 @@ bool BestPractices::PreCallValidateAcquireNextImageKHR(VkDevice device, VkSwapch
 void BestPractices::ManualPostCallRecordGetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice physicalDevice,
                                                                                 VkSurfaceKHR surface,
                                                                                 VkSurfaceCapabilitiesKHR* pSurfaceCapabilities,
-                                                                                VkResult result) {
+                                                                                const RecordObject& record_obj) {
     auto bp_pd_state = Get<bp_state::PhysicalDevice>(physicalDevice);
     if (bp_pd_state) {
         bp_pd_state->vkGetPhysicalDeviceSurfaceCapabilitiesKHRState = QUERY_DETAILS;
@@ -260,7 +273,7 @@ void BestPractices::ManualPostCallRecordGetPhysicalDeviceSurfaceCapabilitiesKHR(
 
 void BestPractices::ManualPostCallRecordGetPhysicalDeviceSurfaceCapabilities2KHR(
     VkPhysicalDevice physicalDevice, const VkPhysicalDeviceSurfaceInfo2KHR* pSurfaceInfo,
-    VkSurfaceCapabilities2KHR* pSurfaceCapabilities, VkResult result) {
+    VkSurfaceCapabilities2KHR* pSurfaceCapabilities, const RecordObject& record_obj) {
     auto bp_pd_state = Get<bp_state::PhysicalDevice>(physicalDevice);
     if (bp_pd_state) {
         bp_pd_state->vkGetPhysicalDeviceSurfaceCapabilitiesKHRState = QUERY_DETAILS;
@@ -270,7 +283,7 @@ void BestPractices::ManualPostCallRecordGetPhysicalDeviceSurfaceCapabilities2KHR
 void BestPractices::ManualPostCallRecordGetPhysicalDeviceSurfaceCapabilities2EXT(VkPhysicalDevice physicalDevice,
                                                                                  VkSurfaceKHR surface,
                                                                                  VkSurfaceCapabilities2EXT* pSurfaceCapabilities,
-                                                                                 VkResult result) {
+                                                                                 const RecordObject& record_obj) {
     auto bp_pd_state = Get<bp_state::PhysicalDevice>(physicalDevice);
     if (bp_pd_state) {
         bp_pd_state->vkGetPhysicalDeviceSurfaceCapabilitiesKHRState = QUERY_DETAILS;
@@ -279,7 +292,8 @@ void BestPractices::ManualPostCallRecordGetPhysicalDeviceSurfaceCapabilities2EXT
 
 void BestPractices::ManualPostCallRecordGetPhysicalDeviceSurfacePresentModesKHR(VkPhysicalDevice physicalDevice,
                                                                                 VkSurfaceKHR surface, uint32_t* pPresentModeCount,
-                                                                                VkPresentModeKHR* pPresentModes, VkResult result) {
+                                                                                VkPresentModeKHR* pPresentModes,
+                                                                                const RecordObject& record_obj) {
     auto bp_pd_data = Get<bp_state::PhysicalDevice>(physicalDevice);
     if (bp_pd_data) {
         auto& call_state = bp_pd_data->vkGetPhysicalDeviceSurfacePresentModesKHRState;
@@ -299,7 +313,8 @@ void BestPractices::ManualPostCallRecordGetPhysicalDeviceSurfacePresentModesKHR(
 
 void BestPractices::ManualPostCallRecordGetPhysicalDeviceSurfaceFormatsKHR(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface,
                                                                            uint32_t* pSurfaceFormatCount,
-                                                                           VkSurfaceFormatKHR* pSurfaceFormats, VkResult result) {
+                                                                           VkSurfaceFormatKHR* pSurfaceFormats,
+                                                                           const RecordObject& record_obj) {
     auto bp_pd_data = Get<bp_state::PhysicalDevice>(physicalDevice);
     if (bp_pd_data) {
         auto& call_state = bp_pd_data->vkGetPhysicalDeviceSurfaceFormatsKHRState;
@@ -321,7 +336,8 @@ void BestPractices::ManualPostCallRecordGetPhysicalDeviceSurfaceFormatsKHR(VkPhy
 void BestPractices::ManualPostCallRecordGetPhysicalDeviceSurfaceFormats2KHR(VkPhysicalDevice physicalDevice,
                                                                             const VkPhysicalDeviceSurfaceInfo2KHR* pSurfaceInfo,
                                                                             uint32_t* pSurfaceFormatCount,
-                                                                            VkSurfaceFormat2KHR* pSurfaceFormats, VkResult result) {
+                                                                            VkSurfaceFormat2KHR* pSurfaceFormats,
+                                                                            const RecordObject& record_obj) {
     auto bp_pd_data = Get<bp_state::PhysicalDevice>(physicalDevice);
     if (bp_pd_data) {
         if (*pSurfaceFormatCount) {
@@ -341,7 +357,7 @@ void BestPractices::ManualPostCallRecordGetPhysicalDeviceSurfaceFormats2KHR(VkPh
 void BestPractices::ManualPostCallRecordGetPhysicalDeviceDisplayPlanePropertiesKHR(VkPhysicalDevice physicalDevice,
                                                                                    uint32_t* pPropertyCount,
                                                                                    VkDisplayPlanePropertiesKHR* pProperties,
-                                                                                   VkResult result) {
+                                                                                   const RecordObject& record_obj) {
     auto bp_pd_data = Get<bp_state::PhysicalDevice>(physicalDevice);
     if (bp_pd_data) {
         if (*pPropertyCount) {
@@ -359,7 +375,7 @@ void BestPractices::ManualPostCallRecordGetPhysicalDeviceDisplayPlanePropertiesK
 
 void BestPractices::ManualPostCallRecordGetSwapchainImagesKHR(VkDevice device, VkSwapchainKHR swapchain,
                                                               uint32_t* pSwapchainImageCount, VkImage* pSwapchainImages,
-                                                              VkResult result) {
+                                                              const RecordObject& record_obj) {
     auto swapchain_state = Get<bp_state::Swapchain>(swapchain);
     if (swapchain_state && (pSwapchainImages || *pSwapchainImageCount)) {
         if (swapchain_state->vkGetSwapchainImagesKHRState < QUERY_DETAILS) {

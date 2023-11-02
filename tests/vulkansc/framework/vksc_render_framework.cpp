@@ -18,12 +18,12 @@ VkSCRenderFramework::~VkSCRenderFramework() {
     }
 }
 
-void VkSCRenderFramework::InitFramework(void * /*unused compatibility parameter*/, void *instance_pnext) {
+void VkSCRenderFramework::InitFramework(void *instance_pnext) {
     if (InstanceLayerSupported("VK_LAYER_KHRONOS_device_simulation") && getenv("VKSC_DEVSIM_PROFILE_FILE")) {
         instance_layers_.push_back("VK_LAYER_KHRONOS_device_simulation");
     }
 
-    VkRenderFramework::InitFramework(NULL, instance_pnext);
+    VkRenderFramework::InitFramework(instance_pnext);
 }
 
 VkPipelineCache VkSCRenderFramework::GetDefaultPipelineCache() {
@@ -58,8 +58,8 @@ VkSCCompatibilityRenderFramework::~VkSCCompatibilityRenderFramework() {
     s_instance = nullptr;
 }
 
-void VkSCCompatibilityRenderFramework::InitFramework(void * /*unused compatibility parameter*/, void *instance_pnext) {
-    VkSCRenderFramework::InitFramework(NULL, instance_pnext);
+void VkSCCompatibilityRenderFramework::InitFramework(void *instance_pnext) {
+    VkSCRenderFramework::InitFramework(instance_pnext);
 
     // Make KHR entry points of core functions available if running a Vulkan test
     vksc::TestDispatchHelper::InitCompatibilityInstanceExtensionEntryPoints(instance_);
@@ -76,7 +76,7 @@ void VkSCCompatibilityRenderFramework::InitState(VkPhysicalDeviceFeatures *featu
 bool VkSCCompatibilityRenderFramework::GLSLtoSPV(VkPhysicalDeviceLimits const *const device_limits,
                                                  const VkShaderStageFlagBits shader_type, const char *pshader,
                                                  std::vector<uint32_t> &spv, bool debug, const spv_target_env spv_env) {
-    if (IsPlatform(kMockICD)) {
+    if (IsPlatformMockICD()) {
         // For mock ICD runs we simply skip shader compilation as it won't affect test execution
         return true;
     } else {
@@ -88,7 +88,7 @@ bool VkSCCompatibilityRenderFramework::GLSLtoSPV(VkPhysicalDeviceLimits const *c
 
 bool VkSCCompatibilityRenderFramework::ASMtoSPV(const spv_target_env target_env, const uint32_t options, const char *pasm,
                                                 std::vector<uint32_t> &spv) {
-    if (IsPlatform(kMockICD)) {
+    if (IsPlatformMockICD()) {
         // For mock ICD runs we simply skip shader compilation as it won't affect test execution
         return true;
     } else {

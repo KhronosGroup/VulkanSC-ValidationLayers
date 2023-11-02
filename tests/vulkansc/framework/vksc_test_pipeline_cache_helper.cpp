@@ -37,17 +37,17 @@ void InitDefaultPipelineCacheData() {
 
     default_pipeline_cache_data = builder.GetData();
 
-    default_pipeline_pool_size = LvlInitStruct<VkPipelinePoolSize>();
+    default_pipeline_pool_size = vku::InitStruct<VkPipelinePoolSize>();
     default_pipeline_pool_size.poolEntrySize = 65536;
     default_pipeline_pool_size.poolEntryCount = 256;
 
-    default_pipeline_cache_create_info = LvlInitStruct<VkPipelineCacheCreateInfo>();
+    default_pipeline_cache_create_info = vku::InitStruct<VkPipelineCacheCreateInfo>();
     default_pipeline_cache_create_info.flags |=
         VK_PIPELINE_CACHE_CREATE_READ_ONLY_BIT | VK_PIPELINE_CACHE_CREATE_USE_APPLICATION_STORAGE_BIT;
     default_pipeline_cache_create_info.initialDataSize = default_pipeline_cache_data.size();
     default_pipeline_cache_create_info.pInitialData = default_pipeline_cache_data.data();
 
-    default_pipeline_offline_create_info = LvlInitStruct<VkPipelineOfflineCreateInfo>();
+    default_pipeline_offline_create_info = vku::InitStruct<VkPipelineOfflineCreateInfo>();
     ParseUUID(default_pipeline_identifier, &default_pipeline_offline_create_info.pipelineIdentifier[0]);
     default_pipeline_offline_create_info.poolEntrySize = default_pipeline_pool_size.poolEntrySize;
 }

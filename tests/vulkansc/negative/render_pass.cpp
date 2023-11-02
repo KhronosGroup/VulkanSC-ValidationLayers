@@ -14,10 +14,10 @@
 TEST_F(VkSCLayerTest, CreateRenderPassMaxRenderPassSubpassesExceeded) {
     TEST_DESCRIPTION("vkCreateRenderPass - subpassCount exceeds maxRenderPassSubpasses");
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
+    RETURN_IF_SKIP(InitFramework());
 
     const auto subpass_count = GetVulkanSC10Properties(gpu()).maxRenderPassSubpasses + 1;
-    auto sc_10_features = LvlInitStruct<VkPhysicalDeviceVulkanSC10Features>();
+    auto sc_10_features = vku::InitStruct<VkPhysicalDeviceVulkanSC10Features>();
     auto object_reservation_info = vksc::GetDefaultObjectReservationCreateInfo();
     object_reservation_info.pNext = &sc_10_features;
     object_reservation_info.subpassDescriptionRequestCount = subpass_count;
@@ -32,7 +32,7 @@ TEST_F(VkSCLayerTest, CreateRenderPassMaxRenderPassSubpassesExceeded) {
             subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
         }
 
-        auto create_info = LvlInitStruct<VkRenderPassCreateInfo>();
+        auto create_info = vku::InitStruct<VkRenderPassCreateInfo>();
         create_info.pSubpasses = subpasses.data();
         create_info.subpassCount = subpasses.size();
 
@@ -41,12 +41,12 @@ TEST_F(VkSCLayerTest, CreateRenderPassMaxRenderPassSubpassesExceeded) {
         m_errorMonitor->VerifyFound();
     }
     {
-        std::vector<VkSubpassDescription2> subpasses(subpass_count, LvlInitStruct<VkSubpassDescription2>());
+        std::vector<VkSubpassDescription2> subpasses(subpass_count, vku::InitStruct<VkSubpassDescription2>());
         for (auto& subpass : subpasses) {
             subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
         }
 
-        auto create_info = LvlInitStruct<VkRenderPassCreateInfo2>();
+        auto create_info = vku::InitStruct<VkRenderPassCreateInfo2>();
         create_info.pSubpasses = subpasses.data();
         create_info.subpassCount = subpasses.size();
 
@@ -58,10 +58,10 @@ TEST_F(VkSCLayerTest, CreateRenderPassMaxRenderPassSubpassesExceeded) {
 
 TEST_F(VkSCLayerTest, CreateRenderPassMaxRenderPassDependenciesExceeded) {
     TEST_DESCRIPTION("vkCreateRenderPass - dependencyCount exceeds maxRenderPassDependencies");
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
+    RETURN_IF_SKIP(InitFramework());
 
     const auto dependency_count = GetVulkanSC10Properties(gpu()).maxRenderPassDependencies + 1;
-    auto sc_10_features = LvlInitStruct<VkPhysicalDeviceVulkanSC10Features>();
+    auto sc_10_features = vku::InitStruct<VkPhysicalDeviceVulkanSC10Features>();
     auto object_reservation_info = vksc::GetDefaultObjectReservationCreateInfo();
     object_reservation_info.pNext = &sc_10_features;
     ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &object_reservation_info));
@@ -83,7 +83,7 @@ TEST_F(VkSCLayerTest, CreateRenderPassMaxRenderPassDependenciesExceeded) {
             dependency.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
         }
 
-        auto create_info = LvlInitStruct<VkRenderPassCreateInfo>();
+        auto create_info = vku::InitStruct<VkRenderPassCreateInfo>();
         create_info.pDependencies = dependencies.data();
         create_info.dependencyCount = dependencies.size();
         create_info.pSubpasses = &subpass;
@@ -94,10 +94,10 @@ TEST_F(VkSCLayerTest, CreateRenderPassMaxRenderPassDependenciesExceeded) {
         m_errorMonitor->VerifyFound();
     }
     {
-        auto subpass = LvlInitStruct<VkSubpassDescription2>();
+        auto subpass = vku::InitStruct<VkSubpassDescription2>();
         subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 
-        std::vector<VkSubpassDependency2> dependencies{dependency_count, LvlInitStruct<VkSubpassDependency2>()};
+        std::vector<VkSubpassDependency2> dependencies{dependency_count, vku::InitStruct<VkSubpassDependency2>()};
         for (auto& dependency : dependencies) {
             dependency.srcSubpass = 0;
             dependency.dstSubpass = 0;
@@ -108,7 +108,7 @@ TEST_F(VkSCLayerTest, CreateRenderPassMaxRenderPassDependenciesExceeded) {
             dependency.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
         }
 
-        auto create_info = LvlInitStruct<VkRenderPassCreateInfo2>();
+        auto create_info = vku::InitStruct<VkRenderPassCreateInfo2>();
         create_info.pDependencies = dependencies.data();
         create_info.dependencyCount = dependencies.size();
         create_info.pSubpasses = &subpass;
@@ -123,10 +123,10 @@ TEST_F(VkSCLayerTest, CreateRenderPassMaxRenderPassDependenciesExceeded) {
 TEST_F(VkSCLayerTest, CreateRenderPassMaxFramebufferAttachmentsExceeded) {
     TEST_DESCRIPTION("vkCreateRenderPass - attachmentCount exceeds maxFramebufferAttachments");
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
+    RETURN_IF_SKIP(InitFramework());
 
     const auto attachments_count = GetVulkanSC10Properties(gpu()).maxFramebufferAttachments + 1;
-    auto sc_10_features = LvlInitStruct<VkPhysicalDeviceVulkanSC10Features>();
+    auto sc_10_features = vku::InitStruct<VkPhysicalDeviceVulkanSC10Features>();
     auto object_reservation_info = vksc::GetDefaultObjectReservationCreateInfo();
     object_reservation_info.pNext = &sc_10_features;
     object_reservation_info.attachmentDescriptionRequestCount = attachments_count;
@@ -148,7 +148,7 @@ TEST_F(VkSCLayerTest, CreateRenderPassMaxFramebufferAttachmentsExceeded) {
             attachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         }
 
-        auto create_info = LvlInitStruct<VkRenderPassCreateInfo>();
+        auto create_info = vku::InitStruct<VkRenderPassCreateInfo>();
         create_info.pAttachments = attachments.data();
         create_info.attachmentCount = attachments.size();
         create_info.pSubpasses = &subpass;
@@ -159,10 +159,10 @@ TEST_F(VkSCLayerTest, CreateRenderPassMaxFramebufferAttachmentsExceeded) {
         m_errorMonitor->VerifyFound();
     }
     {
-        auto subpass = LvlInitStruct<VkSubpassDescription2>();
+        auto subpass = vku::InitStruct<VkSubpassDescription2>();
         subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 
-        std::vector<VkAttachmentDescription2> attachments(attachments_count, LvlInitStruct<VkAttachmentDescription2>());
+        std::vector<VkAttachmentDescription2> attachments(attachments_count, vku::InitStruct<VkAttachmentDescription2>());
         for (auto& attachment : attachments) {
             attachment.format = VK_FORMAT_R8G8B8A8_UNORM;
             attachment.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -172,7 +172,7 @@ TEST_F(VkSCLayerTest, CreateRenderPassMaxFramebufferAttachmentsExceeded) {
             attachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         }
 
-        auto create_info = LvlInitStruct<VkRenderPassCreateInfo2>();
+        auto create_info = vku::InitStruct<VkRenderPassCreateInfo2>();
         create_info.pAttachments = attachments.data();
         create_info.attachmentCount = attachments.size();
         create_info.pSubpasses = &subpass;
@@ -187,7 +187,7 @@ TEST_F(VkSCLayerTest, CreateRenderPassMaxFramebufferAttachmentsExceeded) {
 TEST_F(VkSCLayerTest, CreateRenderPassMaxSubpassInputAttachmentsExceeded) {
     TEST_DESCRIPTION("vkCreateRenderPass - inputAttachmentCount exceeds maxSubpassInputAttachments");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
+    RETURN_IF_SKIP(Init())
 
     const auto subpass_count = std::min(GetVulkanSC10Properties(gpu()).maxRenderPassSubpasses, 2u);
     const auto input_attachment_count = GetVulkanSC10Properties(gpu()).maxSubpassInputAttachments + 1;
@@ -215,7 +215,7 @@ TEST_F(VkSCLayerTest, CreateRenderPassMaxSubpassInputAttachmentsExceeded) {
             subpass.inputAttachmentCount = input_attachments.size();
         }
 
-        auto create_info = LvlInitStruct<VkRenderPassCreateInfo>();
+        auto create_info = vku::InitStruct<VkRenderPassCreateInfo>();
         create_info.pAttachments = attachments.data();
         create_info.attachmentCount = attachments.size();
         create_info.pSubpasses = subpasses.data();
@@ -229,7 +229,7 @@ TEST_F(VkSCLayerTest, CreateRenderPassMaxSubpassInputAttachmentsExceeded) {
         m_errorMonitor->VerifyFound();
     }
     {
-        std::vector<VkAttachmentDescription2> attachments(input_attachment_count, LvlInitStruct<VkAttachmentDescription2>());
+        std::vector<VkAttachmentDescription2> attachments(input_attachment_count, vku::InitStruct<VkAttachmentDescription2>());
         for (auto& attachment : attachments) {
             attachment.format = VK_FORMAT_R8G8B8A8_UNORM;
             attachment.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -238,20 +238,20 @@ TEST_F(VkSCLayerTest, CreateRenderPassMaxSubpassInputAttachmentsExceeded) {
             attachment.initialLayout = VK_IMAGE_LAYOUT_GENERAL;
             attachment.finalLayout = VK_IMAGE_LAYOUT_GENERAL;
         }
-        std::vector<VkAttachmentReference2> input_attachments(input_attachment_count, LvlInitStruct<VkAttachmentReference2>());
+        std::vector<VkAttachmentReference2> input_attachments(input_attachment_count, vku::InitStruct<VkAttachmentReference2>());
         for (uint32_t i = 0; i < input_attachments.size(); ++i) {
             input_attachments[i].layout = VK_IMAGE_LAYOUT_GENERAL;
             input_attachments[i].attachment = i;
             input_attachments[i].aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         }
-        std::vector<VkSubpassDescription2> subpasses(subpass_count, LvlInitStruct<VkSubpassDescription2>());
+        std::vector<VkSubpassDescription2> subpasses(subpass_count, vku::InitStruct<VkSubpassDescription2>());
         for (auto& subpass : subpasses) {
             subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
             subpass.pInputAttachments = input_attachments.data();
             subpass.inputAttachmentCount = input_attachments.size();
         }
 
-        auto create_info = LvlInitStruct<VkRenderPassCreateInfo2>();
+        auto create_info = vku::InitStruct<VkRenderPassCreateInfo2>();
         create_info.pAttachments = attachments.data();
         create_info.attachmentCount = attachments.size();
         create_info.pSubpasses = subpasses.data();
@@ -269,7 +269,7 @@ TEST_F(VkSCLayerTest, CreateRenderPassMaxSubpassInputAttachmentsExceeded) {
 TEST_F(VkSCLayerTest, CreateRenderPassMaxSubpassPreserveAttachmentsExceeded) {
     TEST_DESCRIPTION("vkCreateRenderPass - preserveAttachmentCount exceeds maxSubpassPreserveAttachments");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
+    RETURN_IF_SKIP(Init())
 
     const auto subpass_count = std::min(GetVulkanSC10Properties(gpu()).maxRenderPassSubpasses, 2u);
     const auto preserve_attachment_count = GetVulkanSC10Properties(gpu()).maxSubpassPreserveAttachments + 1;
@@ -294,7 +294,7 @@ TEST_F(VkSCLayerTest, CreateRenderPassMaxSubpassPreserveAttachmentsExceeded) {
             subpass.preserveAttachmentCount = preserve_attachments.size();
         }
 
-        auto create_info = LvlInitStruct<VkRenderPassCreateInfo>();
+        auto create_info = vku::InitStruct<VkRenderPassCreateInfo>();
         create_info.pAttachments = attachments.data();
         create_info.attachmentCount = attachments.size();
         create_info.pSubpasses = subpasses.data();
@@ -308,7 +308,7 @@ TEST_F(VkSCLayerTest, CreateRenderPassMaxSubpassPreserveAttachmentsExceeded) {
         m_errorMonitor->VerifyFound();
     }
     {
-        std::vector<VkAttachmentDescription2> attachments(preserve_attachment_count, LvlInitStruct<VkAttachmentDescription2>());
+        std::vector<VkAttachmentDescription2> attachments(preserve_attachment_count, vku::InitStruct<VkAttachmentDescription2>());
         for (auto& attachment : attachments) {
             attachment.format = VK_FORMAT_R8G8B8A8_UNORM;
             attachment.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -318,14 +318,14 @@ TEST_F(VkSCLayerTest, CreateRenderPassMaxSubpassPreserveAttachmentsExceeded) {
             attachment.finalLayout = VK_IMAGE_LAYOUT_GENERAL;
         }
         std::vector<uint32_t> preserve_attachments(preserve_attachment_count, 0u);
-        std::vector<VkSubpassDescription2> subpasses(subpass_count, LvlInitStruct<VkSubpassDescription2>());
+        std::vector<VkSubpassDescription2> subpasses(subpass_count, vku::InitStruct<VkSubpassDescription2>());
         for (auto& subpass : subpasses) {
             subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
             subpass.pPreserveAttachments = preserve_attachments.data();
             subpass.preserveAttachmentCount = preserve_attachments.size();
         }
 
-        auto create_info = LvlInitStruct<VkRenderPassCreateInfo2>();
+        auto create_info = vku::InitStruct<VkRenderPassCreateInfo2>();
         create_info.pAttachments = attachments.data();
         create_info.attachmentCount = attachments.size();
         create_info.pSubpasses = subpasses.data();

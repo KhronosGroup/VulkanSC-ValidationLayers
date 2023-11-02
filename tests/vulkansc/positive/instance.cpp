@@ -12,7 +12,7 @@
 #include "../framework/vksc_layer_validation_tests.h"
 
 TEST_F(VkSCPositiveLayerTest, ValidationInstanceExtensions) {
-    ASSERT_NO_FATAL_FAILURE(Init());
+    RETURN_IF_SKIP(Init())
 
     std::string layer_name = "VK_LAYER_KHRONOS_validation";
     std::vector<std::string> extensions = {VK_EXT_DEBUG_UTILS_EXTENSION_NAME,

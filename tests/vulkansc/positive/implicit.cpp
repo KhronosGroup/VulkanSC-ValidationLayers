@@ -18,10 +18,10 @@
 TEST_F(VkSCPositiveLayerTest, ResetCommandPoolAllowed) {
     TEST_DESCRIPTION("vkResetCommandPool - allowed if VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT is not specified");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
+    RETURN_IF_SKIP(Init())
 
-    auto create_info = LvlInitStruct<VkCommandPoolCreateInfo>();
-    vk_testing::CommandPool cmd_pool(*m_device, create_info);
+    auto create_info = vku::InitStruct<VkCommandPoolCreateInfo>();
+    vkt::CommandPool cmd_pool(*m_device, create_info);
 
     vksc::ResetCommandPool(m_device->handle(), cmd_pool.handle(), 0);
 }
@@ -29,15 +29,15 @@ TEST_F(VkSCPositiveLayerTest, ResetCommandPoolAllowed) {
 TEST_F(VkSCPositiveLayerTest, CreatePipelinesAllowNullStageName) {
     TEST_DESCRIPTION("vkCreate*Pipelines - VkPipelineShaderStageCreateInfo::pName can be NULL in Vulkan SC");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
+    RETURN_IF_SKIP(Init())
 
-    VkPipelineLayoutObj pipeline_layout(m_device);
+    const vkt::PipelineLayout pipeline_layout(*m_device);
     VkPipeline pipeline = VK_NULL_HANDLE;
     auto offline_info = vksc::GetDefaultPipelineOfflineCreateInfo();
 
     {
-        auto create_info = LvlInitStruct<VkComputePipelineCreateInfo>(&offline_info);
-        create_info.stage = LvlInitStruct<VkPipelineShaderStageCreateInfo>();
+        auto create_info = vku::InitStruct<VkComputePipelineCreateInfo>(&offline_info);
+        create_info.stage = vku::InitStruct<VkPipelineShaderStageCreateInfo>();
         create_info.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
         create_info.stage.pName = NULL;
         create_info.layout = pipeline_layout.handle();
@@ -46,19 +46,40 @@ TEST_F(VkSCPositiveLayerTest, CreatePipelinesAllowNullStageName) {
         vksc::DestroyPipeline(m_device->handle(), pipeline, nullptr);
     }
     {
-        VkRenderpassObj render_pass(m_device);
+        VkAttachmentReference attach = {};
+        attach.layout = VK_IMAGE_LAYOUT_GENERAL;
 
-        auto stage_info = LvlInitStruct<VkPipelineShaderStageCreateInfo>();
+        VkSubpassDescription subpass = {};
+        subpass.pColorAttachments = &attach;
+        subpass.colorAttachmentCount = 1;
+
+        VkAttachmentDescription attach_desc = {};
+        attach_desc.format = VK_FORMAT_B8G8R8A8_UNORM;
+        attach_desc.samples = VK_SAMPLE_COUNT_1_BIT;
+        attach_desc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        attach_desc.finalLayout = VK_IMAGE_LAYOUT_GENERAL;
+        attach_desc.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        attach_desc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+
+        VkRenderPassCreateInfo rpci = vku::InitStructHelper();
+        rpci.subpassCount = 1;
+        rpci.pSubpasses = &subpass;
+        rpci.attachmentCount = 1;
+        rpci.pAttachments = &attach_desc;
+
+        const vkt::RenderPass render_pass(*m_device, rpci);
+
+        auto stage_info = vku::InitStruct<VkPipelineShaderStageCreateInfo>();
         stage_info.stage = VK_SHADER_STAGE_VERTEX_BIT;
         stage_info.pName = NULL;
 
-        auto vi_state = LvlInitStruct<VkPipelineVertexInputStateCreateInfo>();
-        auto ia_state = LvlInitStruct<VkPipelineInputAssemblyStateCreateInfo>();
-        auto rs_state = LvlInitStruct<VkPipelineRasterizationStateCreateInfo>();
+        auto vi_state = vku::InitStruct<VkPipelineVertexInputStateCreateInfo>();
+        auto ia_state = vku::InitStruct<VkPipelineInputAssemblyStateCreateInfo>();
+        auto rs_state = vku::InitStruct<VkPipelineRasterizationStateCreateInfo>();
         rs_state.rasterizerDiscardEnable = VK_TRUE;
         rs_state.lineWidth = 1.f;
 
-        auto create_info = LvlInitStruct<VkGraphicsPipelineCreateInfo>(&offline_info);
+        auto create_info = vku::InitStruct<VkGraphicsPipelineCreateInfo>(&offline_info);
         create_info.stageCount = 1;
         create_info.pStages = &stage_info;
         create_info.pVertexInputState = &vi_state;

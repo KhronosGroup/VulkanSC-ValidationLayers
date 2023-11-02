@@ -49,7 +49,7 @@ class SCCoreChecks : public SCValidationStateTracker<CoreChecks> {
     template <typename VkHandle>
     bool ValidatePipelineCacheCreateInfo(VkHandle handle, const char* cmd, const VkPipelineCacheCreateInfo& create_info) const;
     bool ValidatePipelineCacheData(VkPhysicalDevice physicalDevice, const VkPipelineCacheCreateInfo& create_info,
-                                   uint32_t index) const;
+                                   const Location& loc) const;
 
     bool ValidateSwapchainCreateInfo(VkDevice device, const VkSwapchainCreateInfoKHR& create_info, const char* api_name,
                                      const char* where) const;
@@ -58,66 +58,80 @@ class SCCoreChecks : public SCValidationStateTracker<CoreChecks> {
     template <typename VkHandle>
     bool ValidateRemovedCommand(VkHandle handle, const char* cmd) const;
     bool PreCallValidateCreateShaderModule(VkDevice device, const VkShaderModuleCreateInfo* pCreateInfo,
-                                           const VkAllocationCallbacks* pAllocator, VkShaderModule* pShaderModule) const override;
-    bool PreCallValidateDestroyShaderModule(VkDevice device, VkShaderModule shaderModule,
-                                            const VkAllocationCallbacks* pAllocator) const override;
+                                           const VkAllocationCallbacks* pAllocator, VkShaderModule* pShaderModule,
+                                           const ErrorObject& error_obj) const override;
+    bool PreCallValidateDestroyShaderModule(VkDevice device, VkShaderModule shaderModule, const VkAllocationCallbacks* pAllocator,
+                                            const ErrorObject& error_obj) const override;
     bool PreCallValidateMergePipelineCaches(VkDevice device, VkPipelineCache dstCache, uint32_t srcCacheCount,
-                                            const VkPipelineCache* pSrcCaches) const override;
-    bool PreCallValidateGetPipelineCacheData(VkDevice device, VkPipelineCache pipelineCache, size_t* pDataSize,
-                                             void* pData) const override;
-    bool PreCallValidateTrimCommandPool(VkDevice device, VkCommandPool commandPool, VkCommandPoolTrimFlags flags) const override;
-    bool PreCallValidateTrimCommandPoolKHR(VkDevice device, VkCommandPool commandPool, VkCommandPoolTrimFlags flags) const override;
-    bool PreCallValidateDestroyCommandPool(VkDevice device, VkCommandPool commandPool,
-                                           const VkAllocationCallbacks* pAllocator) const override;
+                                            const VkPipelineCache* pSrcCaches, const ErrorObject& error_obj) const override;
+    bool PreCallValidateGetPipelineCacheData(VkDevice device, VkPipelineCache pipelineCache, size_t* pDataSize, void* pData,
+                                             const ErrorObject& error_obj) const override;
+    bool PreCallValidateTrimCommandPool(VkDevice device, VkCommandPool commandPool, VkCommandPoolTrimFlags flags,
+                                        const ErrorObject& error_obj) const override;
+    bool PreCallValidateTrimCommandPoolKHR(VkDevice device, VkCommandPool commandPool, VkCommandPoolTrimFlags flags,
+                                           const ErrorObject& error_obj) const override;
+    bool PreCallValidateDestroyCommandPool(VkDevice device, VkCommandPool commandPool, const VkAllocationCallbacks* pAllocator,
+                                           const ErrorObject& error_obj) const override;
     bool PreCallValidateDestroyDescriptorPool(VkDevice device, VkDescriptorPool descriptorPool,
-                                              const VkAllocationCallbacks* pAllocator) const override;
-    bool PreCallValidateDestroyQueryPool(VkDevice device, VkQueryPool queryPool,
-                                         const VkAllocationCallbacks* pAllocator) const override;
-    bool PreCallValidateDestroySwapchainKHR(VkDevice device, VkSwapchainKHR swapchain,
-                                            const VkAllocationCallbacks* pAllocator) const override;
-    bool PreCallValidateFreeMemory(VkDevice device, VkDeviceMemory mem, const VkAllocationCallbacks* pAllocator) const override;
+                                              const VkAllocationCallbacks* pAllocator, const ErrorObject& error_obj) const override;
+    bool PreCallValidateDestroyQueryPool(VkDevice device, VkQueryPool queryPool, const VkAllocationCallbacks* pAllocator,
+                                         const ErrorObject& error_obj) const override;
+    bool PreCallValidateDestroySwapchainKHR(VkDevice device, VkSwapchainKHR swapchain, const VkAllocationCallbacks* pAllocator,
+                                            const ErrorObject& error_obj) const override;
+    bool PreCallValidateFreeMemory(VkDevice device, VkDeviceMemory mem, const VkAllocationCallbacks* pAllocator,
+                                   const ErrorObject& error_obj) const override;
     bool PreCallValidateCreateDescriptorUpdateTemplate(VkDevice device, const VkDescriptorUpdateTemplateCreateInfo* pCreateInfo,
                                                        const VkAllocationCallbacks* pAllocator,
-                                                       VkDescriptorUpdateTemplate* pDescriptorUpdateTemplate) const override;
+                                                       VkDescriptorUpdateTemplate* pDescriptorUpdateTemplate,
+                                                       const ErrorObject& error_obj) const override;
     bool PreCallValidateCreateDescriptorUpdateTemplateKHR(VkDevice device, const VkDescriptorUpdateTemplateCreateInfo* pCreateInfo,
                                                           const VkAllocationCallbacks* pAllocator,
-                                                          VkDescriptorUpdateTemplate* pDescriptorUpdateTemplate) const override;
+                                                          VkDescriptorUpdateTemplate* pDescriptorUpdateTemplate,
+                                                          const ErrorObject& error_obj) const override;
     bool PreCallValidateDestroyDescriptorUpdateTemplate(VkDevice device, VkDescriptorUpdateTemplate descriptorUpdateTemplate,
-                                                        const VkAllocationCallbacks* pAllocator) const override;
+                                                        const VkAllocationCallbacks* pAllocator,
+                                                        const ErrorObject& error_obj) const override;
     bool PreCallValidateDestroyDescriptorUpdateTemplateKHR(VkDevice device, VkDescriptorUpdateTemplate descriptorUpdateTemplate,
-                                                           const VkAllocationCallbacks* pAllocator) const override;
+                                                           const VkAllocationCallbacks* pAllocator,
+                                                           const ErrorObject& error_obj) const override;
     bool PreCallValidateUpdateDescriptorSetWithTemplate(VkDevice device, VkDescriptorSet descriptorSet,
-                                                        VkDescriptorUpdateTemplate descriptorUpdateTemplate,
-                                                        const void* pData) const override;
+                                                        VkDescriptorUpdateTemplate descriptorUpdateTemplate, const void* pData,
+                                                        const ErrorObject& error_obj) const override;
     bool PreCallValidateUpdateDescriptorSetWithTemplateKHR(VkDevice device, VkDescriptorSet descriptorSet,
-                                                           VkDescriptorUpdateTemplate descriptorUpdateTemplate,
-                                                           const void* pData) const override;
+                                                           VkDescriptorUpdateTemplate descriptorUpdateTemplate, const void* pData,
+                                                           const ErrorObject& error_obj) const override;
     bool PreCallValidateGetPhysicalDeviceSparseImageFormatProperties(VkPhysicalDevice physicalDevice, VkFormat format,
                                                                      VkImageType type, VkSampleCountFlagBits samples,
                                                                      VkImageUsageFlags usage, VkImageTiling tiling,
                                                                      uint32_t* pPropertyCount,
-                                                                     VkSparseImageFormatProperties* pProperties) const override;
+                                                                     VkSparseImageFormatProperties* pProperties,
+                                                                     const ErrorObject& error_obj) const override;
     bool PreCallValidateGetPhysicalDeviceSparseImageFormatProperties2(VkPhysicalDevice physicalDevice,
                                                                       const VkPhysicalDeviceSparseImageFormatInfo2* pFormatInfo,
                                                                       uint32_t* pPropertyCount,
-                                                                      VkSparseImageFormatProperties2* pProperties) const override;
-    bool PreCallValidateGetPhysicalDeviceSparseImageFormatProperties2KHR(
-        VkPhysicalDevice physicalDevice, const VkPhysicalDeviceSparseImageFormatInfo2* pFormatInfo, uint32_t* pPropertyCount,
-        VkSparseImageFormatProperties2* pProperties) const override;
+                                                                      VkSparseImageFormatProperties2* pProperties,
+                                                                      const ErrorObject& error_obj) const override;
+    bool PreCallValidateGetPhysicalDeviceSparseImageFormatProperties2KHR(VkPhysicalDevice physicalDevice,
+                                                                         const VkPhysicalDeviceSparseImageFormatInfo2* pFormatInfo,
+                                                                         uint32_t* pPropertyCount,
+                                                                         VkSparseImageFormatProperties2* pProperties,
+                                                                         const ErrorObject& error_obj) const override;
     bool PreCallValidateGetImageSparseMemoryRequirements(VkDevice device, VkImage image, uint32_t* pSparseMemoryRequirementCount,
-                                                         VkSparseImageMemoryRequirements* pSparseMemoryRequirements) const override;
-    bool PreCallValidateGetImageSparseMemoryRequirements2(
-        VkDevice device, const VkImageSparseMemoryRequirementsInfo2* pInfo, uint32_t* pSparseMemoryRequirementCount,
-        VkSparseImageMemoryRequirements2* pSparseMemoryRequirements) const override;
-    bool PreCallValidateGetImageSparseMemoryRequirements2KHR(
-        VkDevice device, const VkImageSparseMemoryRequirementsInfo2* pInfo, uint32_t* pSparseMemoryRequirementCount,
-        VkSparseImageMemoryRequirements2* pSparseMemoryRequirements) const override;
-    bool PreCallValidateQueueBindSparse(VkQueue queue, uint32_t bindInfoCount, const VkBindSparseInfo* pBindInfo,
-                                        VkFence fence) const override;
+                                                         VkSparseImageMemoryRequirements* pSparseMemoryRequirements,
+                                                         const ErrorObject& error_obj) const override;
+    bool PreCallValidateGetImageSparseMemoryRequirements2(VkDevice device, const VkImageSparseMemoryRequirementsInfo2* pInfo,
+                                                          uint32_t* pSparseMemoryRequirementCount,
+                                                          VkSparseImageMemoryRequirements2* pSparseMemoryRequirements,
+                                                          const ErrorObject& error_obj) const override;
+    bool PreCallValidateGetImageSparseMemoryRequirements2KHR(VkDevice device, const VkImageSparseMemoryRequirementsInfo2* pInfo,
+                                                             uint32_t* pSparseMemoryRequirementCount,
+                                                             VkSparseImageMemoryRequirements2* pSparseMemoryRequirements,
+                                                             const ErrorObject& error_obj) const override;
+    bool PreCallValidateQueueBindSparse(VkQueue queue, uint32_t bindInfoCount, const VkBindSparseInfo* pBindInfo, VkFence fence,
+                                        const ErrorObject& error_obj) const override;
 
     // Validation utility functions overridden for Vulkan SC
-    bool ValidateShaderModuleId(const PIPELINE_STATE& pipeline) const override;
-    bool ValidatePipelineShaderStage(const PIPELINE_STATE& pipeline, const PipelineStageState& stage_state) const override;
+    bool ValidateShaderModuleId(const PIPELINE_STATE& pipeline, const Location& loc) const override;
 
     // Intercept instance creation to set up VUID filters
     void PreCallRecordCreateInstance(const VkInstanceCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator,
@@ -125,79 +139,95 @@ class SCCoreChecks : public SCValidationStateTracker<CoreChecks> {
 
     // Functions requiring additional/modified validation for Vulkan SC
     bool PreCallValidateCreateInstance(const VkInstanceCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator,
-                                       VkInstance* pInstance) const override;
+                                       VkInstance* pInstance, const ErrorObject& error_obj) const override;
     bool PreCallValidateCreateDevice(VkPhysicalDevice physicalDevice, const VkDeviceCreateInfo* pCreateInfo,
-                                     const VkAllocationCallbacks* pAllocator, VkDevice* pDevice) const override;
+                                     const VkAllocationCallbacks* pAllocator, VkDevice* pDevice,
+                                     const ErrorObject& error_obj) const override;
     void CreateDevice(const VkDeviceCreateInfo* pCreateInfo) override;
 
     bool PreCallValidateCreateCommandPool(VkDevice device, const VkCommandPoolCreateInfo* pCreateInfo,
-                                          const VkAllocationCallbacks* pAllocator, VkCommandPool* pCommandPool) const override;
+                                          const VkAllocationCallbacks* pAllocator, VkCommandPool* pCommandPool,
+                                          const ErrorObject& error_obj) const override;
     bool PreCallValidateAllocateCommandBuffers(VkDevice device, const VkCommandBufferAllocateInfo* pAllocateInfo,
-                                               VkCommandBuffer* pCommandBuffers) const override;
+                                               VkCommandBuffer* pCommandBuffers, const ErrorObject& error_obj) const override;
     bool PreCallValidateCreateDescriptorSetLayout(VkDevice device, const VkDescriptorSetLayoutCreateInfo* pCreateInfo,
-                                                  const VkAllocationCallbacks* pAllocator,
-                                                  VkDescriptorSetLayout* pSetLayout) const override;
+                                                  const VkAllocationCallbacks* pAllocator, VkDescriptorSetLayout* pSetLayout,
+                                                  const ErrorObject& error_obj) const override;
     bool PreCallValidateCreatePipelineLayout(VkDevice device, const VkPipelineLayoutCreateInfo* pCreateInfo,
-                                             const VkAllocationCallbacks* pAllocator,
-                                             VkPipelineLayout* pPipelineLayout) const override;
+                                             const VkAllocationCallbacks* pAllocator, VkPipelineLayout* pPipelineLayout,
+                                             const ErrorObject& error_obj) const override;
     bool PreCallValidateCreateDescriptorPool(VkDevice device, const VkDescriptorPoolCreateInfo* pCreateInfo,
-                                             const VkAllocationCallbacks* pAllocator,
-                                             VkDescriptorPool* pDescriptorPool) const override;
+                                             const VkAllocationCallbacks* pAllocator, VkDescriptorPool* pDescriptorPool,
+                                             const ErrorObject& error_obj) const override;
     bool PreCallValidateAllocateDescriptorSets(VkDevice device, const VkDescriptorSetAllocateInfo* pAllocateInfo,
-                                               VkDescriptorSet* pDescriptorSets, void* ads_state) const override;
+                                               VkDescriptorSet* pDescriptorSets, const ErrorObject& error_obj,
+                                               void* ads_state) const override;
     bool PreCallValidateAllocateMemory(VkDevice device, const VkMemoryAllocateInfo* pAllocateInfo,
-                                       const VkAllocationCallbacks* pAllocator, VkDeviceMemory* pMemory) const override;
+                                       const VkAllocationCallbacks* pAllocator, VkDeviceMemory* pMemory,
+                                       const ErrorObject& error_obj) const override;
     bool PreCallValidateCreateComputePipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t count,
                                                const VkComputePipelineCreateInfo* pCreateInfos,
                                                const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,
-                                               void* pipe_state) const override;
+                                               const ErrorObject& error_obj, void* pipe_state) const override;
     bool PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t count,
                                                 const VkGraphicsPipelineCreateInfo* pCreateInfos,
                                                 const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,
-                                                void* cgpl_state) const override;
+                                                const ErrorObject& error_obj, void* cgpl_state) const override;
     bool PreCallValidateCreatePipelineCache(VkDevice device, const VkPipelineCacheCreateInfo* pCreateInfo,
-                                            const VkAllocationCallbacks* pAllocator,
-                                            VkPipelineCache* pPipelineCache) const override;
+                                            const VkAllocationCallbacks* pAllocator, VkPipelineCache* pPipelineCache,
+                                            const ErrorObject& error_obj) const override;
     bool PreCallValidateCreateQueryPool(VkDevice device, const VkQueryPoolCreateInfo* pCreateInfo,
-                                        const VkAllocationCallbacks* pAllocator, VkQueryPool* pQueryPool) const override;
+                                        const VkAllocationCallbacks* pAllocator, VkQueryPool* pQueryPool,
+                                        const ErrorObject& error_obj) const override;
     bool PreCallValidateCreateRenderPass(VkDevice device, const VkRenderPassCreateInfo* pCreateInfo,
-                                         const VkAllocationCallbacks* pAllocator, VkRenderPass* pRenderPass) const override;
+                                         const VkAllocationCallbacks* pAllocator, VkRenderPass* pRenderPass,
+                                         const ErrorObject& error_obj) const override;
     bool PreCallValidateCreateRenderPass2(VkDevice device, const VkRenderPassCreateInfo2* pCreateInfo,
-                                          const VkAllocationCallbacks* pAllocator, VkRenderPass* pRenderPass) const override;
+                                          const VkAllocationCallbacks* pAllocator, VkRenderPass* pRenderPass,
+                                          const ErrorObject& error_obj) const override;
     bool PreCallValidateCreateFramebuffer(VkDevice device, const VkFramebufferCreateInfo* pCreateInfo,
-                                          const VkAllocationCallbacks* pAllocator, VkFramebuffer* pFramebuffer) const override;
+                                          const VkAllocationCallbacks* pAllocator, VkFramebuffer* pFramebuffer,
+                                          const ErrorObject& error_obj) const override;
     bool PreCallValidateCreateBuffer(VkDevice device, const VkBufferCreateInfo* pCreateInfo,
-                                     const VkAllocationCallbacks* pAllocator, VkBuffer* pBuffer) const override;
+                                     const VkAllocationCallbacks* pAllocator, VkBuffer* pBuffer,
+                                     const ErrorObject& error_obj) const override;
     bool PreCallValidateCreateBufferView(VkDevice device, const VkBufferViewCreateInfo* pCreateInfo,
-                                         const VkAllocationCallbacks* pAllocator, VkBufferView* pView) const override;
+                                         const VkAllocationCallbacks* pAllocator, VkBufferView* pView,
+                                         const ErrorObject& error_obj) const override;
     bool PreCallValidateCreateImage(VkDevice device, const VkImageCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator,
-                                    VkImage* pImage) const override;
+                                    VkImage* pImage, const ErrorObject& error_obj) const override;
     bool PreCallValidateCreateImageView(VkDevice device, const VkImageViewCreateInfo* pCreateInfo,
-                                        const VkAllocationCallbacks* pAllocator, VkImageView* pView) const override;
+                                        const VkAllocationCallbacks* pAllocator, VkImageView* pView,
+                                        const ErrorObject& error_obj) const override;
     bool PreCallValidateCreateSampler(VkDevice device, const VkSamplerCreateInfo* pCreateInfo,
-                                      const VkAllocationCallbacks* pAllocator, VkSampler* pSampler) const override;
+                                      const VkAllocationCallbacks* pAllocator, VkSampler* pSampler,
+                                      const ErrorObject& error_obj) const override;
     bool PreCallValidateCreateSamplerYcbcrConversion(VkDevice device, const VkSamplerYcbcrConversionCreateInfo* pCreateInfo,
                                                      const VkAllocationCallbacks* pAllocator,
-                                                     VkSamplerYcbcrConversion* pYcbcrConversion) const override;
+                                                     VkSamplerYcbcrConversion* pYcbcrConversion,
+                                                     const ErrorObject& error_obj) const override;
     bool PreCallValidateCreateFence(VkDevice device, const VkFenceCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator,
-                                    VkFence* pFence) const override;
+                                    VkFence* pFence, const ErrorObject& error_obj) const override;
     bool PreCallValidateCreateSemaphore(VkDevice device, const VkSemaphoreCreateInfo* pCreateInfo,
-                                        const VkAllocationCallbacks* pAllocator, VkSemaphore* pSemaphore) const override;
+                                        const VkAllocationCallbacks* pAllocator, VkSemaphore* pSemaphore,
+                                        const ErrorObject& error_obj) const override;
     bool PreCallValidateCreateEvent(VkDevice device, const VkEventCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator,
-                                    VkEvent* pEvent) const override;
+                                    VkEvent* pEvent, const ErrorObject& error_obj) const override;
     bool PreCallValidateCreateSwapchainKHR(VkDevice device, const VkSwapchainCreateInfoKHR* pCreateInfo,
-                                           const VkAllocationCallbacks* pAllocator, VkSwapchainKHR* pSwapchain) const override;
+                                           const VkAllocationCallbacks* pAllocator, VkSwapchainKHR* pSwapchain,
+                                           const ErrorObject& error_obj) const override;
     bool PreCallValidateCreateSharedSwapchainsKHR(VkDevice device, uint32_t swapchainCount,
                                                   const VkSwapchainCreateInfoKHR* pCreateInfos,
-                                                  const VkAllocationCallbacks* pAllocator,
-                                                  VkSwapchainKHR* pSwapchains) const override;
+                                                  const VkAllocationCallbacks* pAllocator, VkSwapchainKHR* pSwapchains,
+                                                  const ErrorObject& error_obj) const override;
     bool PreCallValidateCreatePrivateDataSlotEXT(VkDevice device, const VkPrivateDataSlotCreateInfoEXT* pCreateInfo,
-                                                 const VkAllocationCallbacks* pAllocator,
-                                                 VkPrivateDataSlotEXT* pPrivateDataSlot) const override;
-    bool PreCallValidateBindImageMemory2(VkDevice device, uint32_t bindInfoCount,
-                                         const VkBindImageMemoryInfo* pBindInfos) const override;
-    bool PreCallValidateBeginCommandBuffer(VkCommandBuffer commandBuffer,
-                                           const VkCommandBufferBeginInfo* pBeginInfo) const override;
-    bool PreCallValidateResetCommandBuffer(VkCommandBuffer commandBuffer, VkCommandBufferResetFlags flags) const override;
+                                                 const VkAllocationCallbacks* pAllocator, VkPrivateDataSlotEXT* pPrivateDataSlot,
+                                                 const ErrorObject& error_obj) const override;
+    bool PreCallValidateBindImageMemory2(VkDevice device, uint32_t bindInfoCount, const VkBindImageMemoryInfo* pBindInfos,
+                                         const ErrorObject& error_obj) const override;
+    bool PreCallValidateBeginCommandBuffer(VkCommandBuffer commandBuffer, const VkCommandBufferBeginInfo* pBeginInfo,
+                                           const ErrorObject& error_obj) const override;
+    bool PreCallValidateResetCommandBuffer(VkCommandBuffer commandBuffer, VkCommandBufferResetFlags flags,
+                                           const ErrorObject& error_obj) const override;
 
 };  // Class SCCoreChecks

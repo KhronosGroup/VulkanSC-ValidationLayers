@@ -14,9 +14,9 @@
 TEST_F(VkSCLayerTest, CreateCommandPoolMissingMemoryReservationInfo) {
     TEST_DESCRIPTION("vkCreateCommandPool - missing VkCommandPoolMemoryReservationCreateInfo");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
+    RETURN_IF_SKIP(Init())
 
-    auto create_info = LvlInitStruct<VkCommandPoolCreateInfo>();
+    auto create_info = vku::InitStruct<VkCommandPoolCreateInfo>();
     VkCommandPool cmd_pool = VK_NULL_HANDLE;
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkCommandPoolCreateInfo-pNext-05002");
@@ -27,13 +27,13 @@ TEST_F(VkSCLayerTest, CreateCommandPoolMissingMemoryReservationInfo) {
 TEST_F(VkSCLayerTest, CreateCommandPoolInvalidReservedSize) {
     TEST_DESCRIPTION("vkCreateCommandPool - commandPoolReservedSize is zero");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
+    RETURN_IF_SKIP(Init())
 
-    auto mem_reservation_info = LvlInitStruct<VkCommandPoolMemoryReservationCreateInfo>();
+    auto mem_reservation_info = vku::InitStruct<VkCommandPoolMemoryReservationCreateInfo>();
     mem_reservation_info.commandPoolReservedSize = 0;
     mem_reservation_info.commandPoolMaxCommandBuffers = 1;
 
-    auto create_info = LvlInitStruct<VkCommandPoolCreateInfo>(&mem_reservation_info);
+    auto create_info = vku::InitStruct<VkCommandPoolCreateInfo>(&mem_reservation_info);
     VkCommandPool cmd_pool = VK_NULL_HANDLE;
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkCommandPoolMemoryReservationCreateInfo-commandPoolReservedSize-05003");
@@ -44,13 +44,13 @@ TEST_F(VkSCLayerTest, CreateCommandPoolInvalidReservedSize) {
 TEST_F(VkSCLayerTest, CreateCommandPoolInvalidMaxCommandBuffers) {
     TEST_DESCRIPTION("vkCreateCommandPool - commandPoolMaxCommandBuffers is zero or greater than maxCommandPoolCommandBuffers");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
+    RETURN_IF_SKIP(Init())
 
-    auto mem_reservation_info = LvlInitStruct<VkCommandPoolMemoryReservationCreateInfo>();
+    auto mem_reservation_info = vku::InitStruct<VkCommandPoolMemoryReservationCreateInfo>();
     mem_reservation_info.commandPoolReservedSize = 16 * 1024 * 1024;
     mem_reservation_info.commandPoolMaxCommandBuffers = 1;
 
-    auto create_info = LvlInitStruct<VkCommandPoolCreateInfo>(&mem_reservation_info);
+    auto create_info = vku::InitStruct<VkCommandPoolCreateInfo>(&mem_reservation_info);
     VkCommandPool cmd_pool = VK_NULL_HANDLE;
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit,
@@ -70,23 +70,23 @@ TEST_F(VkSCLayerTest, CreateCommandPoolInvalidMaxCommandBuffers) {
 TEST_F(VkSCLayerTest, AllocateCommandBuffersExceededMaxCommandBuffers) {
     TEST_DESCRIPTION("vkAllocateCommandBuffers - cannot allocate more command buffers from pool than commandPoolMaxCommandBuffers");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
+    RETURN_IF_SKIP(Init())
 
     const uint32_t max_cmd_buffers = 13;
 
-    auto mem_reservation_info = LvlInitStruct<VkCommandPoolMemoryReservationCreateInfo>();
+    auto mem_reservation_info = vku::InitStruct<VkCommandPoolMemoryReservationCreateInfo>();
     mem_reservation_info.commandPoolReservedSize = 16 * 1024 * 1024;
     mem_reservation_info.commandPoolMaxCommandBuffers = max_cmd_buffers;
 
-    auto create_info = LvlInitStruct<VkCommandPoolCreateInfo>(&mem_reservation_info);
+    auto create_info = vku::InitStruct<VkCommandPoolCreateInfo>(&mem_reservation_info);
 
-    vk_testing::CommandPool cmd_pool(*m_device, create_info);
+    vkt::CommandPool cmd_pool(*m_device, create_info);
 
-    auto alloc_info = LvlInitStruct<VkCommandBufferAllocateInfo>();
+    auto alloc_info = vku::InitStruct<VkCommandBufferAllocateInfo>();
     alloc_info.commandPool = cmd_pool.handle();
 
     VkCommandBuffer cmd_buffers[max_cmd_buffers + 1];
-    vk_testing::CommandBuffer tmp_cmd_buffers[max_cmd_buffers];
+    vkt::CommandBuffer tmp_cmd_buffers[max_cmd_buffers];
     uint32_t avail_cmd_buffers = max_cmd_buffers;
 
     // Cannot allocate more than reserved
@@ -131,29 +131,29 @@ TEST_F(VkSCLayerTest, AllocateCommandBuffersExceededMaxCommandBuffers) {
 TEST_F(VkSCLayerTest, ResetCommandBufferNotSupported) {
     TEST_DESCRIPTION("vkReset/BeginCommandBuffer - commandPoolResetCommandBuffer not supported");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
+    RETURN_IF_SKIP(Init())
 
     if (GetVulkanSC10Properties(gpu()).commandPoolResetCommandBuffer) {
         GTEST_SKIP() << "Only applicable if commandPoolResetCommandBuffer is not supported";
     }
 
-    auto mem_reservation_info = LvlInitStruct<VkCommandPoolMemoryReservationCreateInfo>();
+    auto mem_reservation_info = vku::InitStruct<VkCommandPoolMemoryReservationCreateInfo>();
     mem_reservation_info.commandPoolReservedSize = 1024 * 1024;
     mem_reservation_info.commandPoolMaxCommandBuffers = 1;
-    auto create_info = LvlInitStruct<VkCommandPoolCreateInfo>(&mem_reservation_info);
+    auto create_info = vku::InitStruct<VkCommandPoolCreateInfo>(&mem_reservation_info);
     create_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    vk_testing::CommandPool cmd_pool(*m_device, create_info);
+    vkt::CommandPool cmd_pool(*m_device, create_info);
 
-    auto alloc_info = LvlInitStruct<VkCommandBufferAllocateInfo>();
+    auto alloc_info = vku::InitStruct<VkCommandBufferAllocateInfo>();
     alloc_info.commandPool = cmd_pool.handle();
     alloc_info.commandBufferCount = 1;
-    vk_testing::CommandBuffer cmd_buffer(*m_device, alloc_info);
+    vkt::CommandBuffer cmd_buffer(*m_device, alloc_info);
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkResetCommandBuffer-commandPoolResetCommandBuffer-05135");
     vksc::ResetCommandBuffer(cmd_buffer.handle(), 0);
     m_errorMonitor->VerifyFound();
 
-    auto begin_info = LvlInitStruct<VkCommandBufferBeginInfo>();
+    auto begin_info = vku::InitStruct<VkCommandBufferBeginInfo>();
     vksc::BeginCommandBuffer(cmd_buffer.handle(), &begin_info);
     vksc::EndCommandBuffer(cmd_buffer.handle());
 
@@ -165,30 +165,30 @@ TEST_F(VkSCLayerTest, ResetCommandBufferNotSupported) {
 TEST_F(VkSCLayerTest, CommandPoolMultipleRecordingNotSupported) {
     TEST_DESCRIPTION("vkBeginCommandBuffer - commandPoolMultipleCommandBuffersRecording not supported");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
+    RETURN_IF_SKIP(Init())
 
     if (GetVulkanSC10Properties(gpu()).commandPoolMultipleCommandBuffersRecording) {
         GTEST_SKIP() << "Only applicable if commandPoolMultipleCommandBuffersRecording is not supported";
     }
 
-    auto mem_reservation_info = LvlInitStruct<VkCommandPoolMemoryReservationCreateInfo>();
+    auto mem_reservation_info = vku::InitStruct<VkCommandPoolMemoryReservationCreateInfo>();
     mem_reservation_info.commandPoolReservedSize = 1024 * 1024;
     mem_reservation_info.commandPoolMaxCommandBuffers = 2;
-    auto create_info = LvlInitStruct<VkCommandPoolCreateInfo>(&mem_reservation_info);
+    auto create_info = vku::InitStruct<VkCommandPoolCreateInfo>(&mem_reservation_info);
     create_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    vk_testing::CommandPool cmd_pool1(*m_device, create_info);
-    vk_testing::CommandPool cmd_pool2(*m_device, create_info);
+    vkt::CommandPool cmd_pool1(*m_device, create_info);
+    vkt::CommandPool cmd_pool2(*m_device, create_info);
 
-    auto alloc_info = LvlInitStruct<VkCommandBufferAllocateInfo>();
+    auto alloc_info = vku::InitStruct<VkCommandBufferAllocateInfo>();
     alloc_info.commandPool = cmd_pool1.handle();
     alloc_info.commandBufferCount = 1;
-    vk_testing::CommandBuffer cb1(*m_device, alloc_info);
-    vk_testing::CommandBuffer cb2(*m_device, alloc_info);
+    vkt::CommandBuffer cb1(*m_device, alloc_info);
+    vkt::CommandBuffer cb2(*m_device, alloc_info);
 
     alloc_info.commandPool = cmd_pool2.handle();
-    vk_testing::CommandBuffer cb_other_pool(*m_device, alloc_info);
+    vkt::CommandBuffer cb_other_pool(*m_device, alloc_info);
 
-    auto begin_info = LvlInitStruct<VkCommandBufferBeginInfo>();
+    auto begin_info = vku::InitStruct<VkCommandBufferBeginInfo>();
 
     cb1.begin();
     cb_other_pool.begin();
@@ -204,25 +204,25 @@ TEST_F(VkSCLayerTest, CommandPoolMultipleRecordingNotSupported) {
 TEST_F(VkSCLayerTest, SimulatenousUseNotSupported) {
     TEST_DESCRIPTION("vkBeginCommandBuffer - commandBufferSimultaneousUse not supported");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
+    RETURN_IF_SKIP(Init())
 
     if (GetVulkanSC10Properties(gpu()).commandBufferSimultaneousUse) {
         GTEST_SKIP() << "Only applicable if commandBufferSimultaneousUse is not supported";
     }
 
-    auto mem_reservation_info = LvlInitStruct<VkCommandPoolMemoryReservationCreateInfo>();
+    auto mem_reservation_info = vku::InitStruct<VkCommandPoolMemoryReservationCreateInfo>();
     mem_reservation_info.commandPoolReservedSize = 1024 * 1024;
     mem_reservation_info.commandPoolMaxCommandBuffers = 1;
-    auto create_info = LvlInitStruct<VkCommandPoolCreateInfo>(&mem_reservation_info);
+    auto create_info = vku::InitStruct<VkCommandPoolCreateInfo>(&mem_reservation_info);
     create_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    vk_testing::CommandPool cmd_pool(*m_device, create_info);
+    vkt::CommandPool cmd_pool(*m_device, create_info);
 
-    auto alloc_info = LvlInitStruct<VkCommandBufferAllocateInfo>();
+    auto alloc_info = vku::InitStruct<VkCommandBufferAllocateInfo>();
     alloc_info.commandPool = cmd_pool.handle();
     alloc_info.commandBufferCount = 1;
-    vk_testing::CommandBuffer cmd_buffer(*m_device, alloc_info);
+    vkt::CommandBuffer cmd_buffer(*m_device, alloc_info);
 
-    auto begin_info = LvlInitStruct<VkCommandBufferBeginInfo>();
+    auto begin_info = vku::InitStruct<VkCommandBufferBeginInfo>();
     begin_info.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkBeginCommandBuffer-commandBufferSimultaneousUse-05008");
@@ -233,25 +233,25 @@ TEST_F(VkSCLayerTest, SimulatenousUseNotSupported) {
 TEST_F(VkSCLayerTest, SecondaryCommandBufferNullOrImagelessFramebuffer) {
     TEST_DESCRIPTION("vkBeginCommandBuffer - test effects of secondaryCommandBufferNullOrImagelessFramebuffer");
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
+    RETURN_IF_SKIP(InitFramework());
 
-    auto imageless_fb_features = LvlInitStruct<VkPhysicalDeviceImagelessFramebufferFeaturesKHR>();
+    auto imageless_fb_features = vku::InitStruct<VkPhysicalDeviceImagelessFramebufferFeaturesKHR>();
     auto features2 = GetPhysicalDeviceFeatures2(imageless_fb_features);
 
     ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features2));
 
-    auto mem_reservation_info = LvlInitStruct<VkCommandPoolMemoryReservationCreateInfo>();
+    auto mem_reservation_info = vku::InitStruct<VkCommandPoolMemoryReservationCreateInfo>();
     mem_reservation_info.commandPoolReservedSize = 1024 * 1024;
     mem_reservation_info.commandPoolMaxCommandBuffers = 1;
-    auto create_info = LvlInitStruct<VkCommandPoolCreateInfo>(&mem_reservation_info);
+    auto create_info = vku::InitStruct<VkCommandPoolCreateInfo>(&mem_reservation_info);
     create_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    vk_testing::CommandPool cmd_pool(*m_device, create_info);
+    vkt::CommandPool cmd_pool(*m_device, create_info);
 
-    auto alloc_info = LvlInitStruct<VkCommandBufferAllocateInfo>();
+    auto alloc_info = vku::InitStruct<VkCommandBufferAllocateInfo>();
     alloc_info.commandPool = cmd_pool.handle();
     alloc_info.level = VK_COMMAND_BUFFER_LEVEL_SECONDARY;
     alloc_info.commandBufferCount = 1;
-    vk_testing::CommandBuffer cmd_buffer(*m_device, alloc_info);
+    vkt::CommandBuffer cmd_buffer(*m_device, alloc_info);
 
     VkAttachmentDescription attachment{0,
                                        VK_FORMAT_R8G8B8A8_UNORM,
@@ -265,18 +265,18 @@ TEST_F(VkSCLayerTest, SecondaryCommandBufferNullOrImagelessFramebuffer) {
     VkSubpassDescription subpass = {};
     VkAttachmentReference attachment_ref = {0, VK_IMAGE_LAYOUT_GENERAL};
 
-    auto renderpass_ci = LvlInitStruct<VkRenderPassCreateInfo>();
+    auto renderpass_ci = vku::InitStruct<VkRenderPassCreateInfo>();
     renderpass_ci.subpassCount = 1;
     renderpass_ci.pSubpasses = &subpass;
     renderpass_ci.attachmentCount = 1;
     renderpass_ci.pAttachments = &attachment;
-    vk_testing::RenderPass renderpass1(*m_device, renderpass_ci);
+    vkt::RenderPass renderpass1(*m_device, renderpass_ci);
 
     subpass.colorAttachmentCount = 1;
     subpass.pColorAttachments = &attachment_ref;
-    vk_testing::RenderPass renderpass2(*m_device, renderpass_ci);
+    vkt::RenderPass renderpass2(*m_device, renderpass_ci);
 
-    auto image_ci = LvlInitStruct<VkImageCreateInfo>();
+    auto image_ci = vku::InitStruct<VkImageCreateInfo>();
     image_ci.imageType = VK_IMAGE_TYPE_2D;
     image_ci.format = VK_FORMAT_R8G8B8A8_UNORM;
     image_ci.extent = {128, 128, 1};
@@ -286,30 +286,30 @@ TEST_F(VkSCLayerTest, SecondaryCommandBufferNullOrImagelessFramebuffer) {
     image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_ci.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     image_ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    vk_testing::Image image(*m_device, image_ci);
+    vkt::Image image(*m_device, image_ci);
 
-    auto image_view_ci = LvlInitStruct<VkImageViewCreateInfo>();
+    auto image_view_ci = vku::InitStruct<VkImageViewCreateInfo>();
     image_view_ci.image = image.handle();
     image_view_ci.viewType = VK_IMAGE_VIEW_TYPE_2D;
     image_view_ci.format = VK_FORMAT_R8G8B8A8_UNORM;
     image_view_ci.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-    vk_testing::ImageView image_view(*m_device, image_view_ci);
+    vkt::ImageView image_view(*m_device, image_view_ci);
 
     VkImageView fb_attachment = image_view.handle();
-    auto framebuffer_ci = LvlInitStruct<VkFramebufferCreateInfo>();
+    auto framebuffer_ci = vku::InitStruct<VkFramebufferCreateInfo>();
     framebuffer_ci.renderPass = renderpass1;
     framebuffer_ci.attachmentCount = 1;
     framebuffer_ci.pAttachments = &fb_attachment;
     framebuffer_ci.width = 128;
     framebuffer_ci.height = 128;
     framebuffer_ci.layers = 1;
-    vk_testing::Framebuffer framebuffer(*m_device, framebuffer_ci);
+    vkt::Framebuffer framebuffer(*m_device, framebuffer_ci);
 
-    auto inherit_info = LvlInitStruct<VkCommandBufferInheritanceInfo>();
+    auto inherit_info = vku::InitStruct<VkCommandBufferInheritanceInfo>();
     inherit_info.framebuffer = framebuffer;
     inherit_info.renderPass = renderpass2;
 
-    auto begin_info = LvlInitStruct<VkCommandBufferBeginInfo>();
+    auto begin_info = vku::InitStruct<VkCommandBufferBeginInfo>();
     begin_info.flags = VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
     begin_info.pInheritanceInfo = &inherit_info;
 
@@ -333,19 +333,19 @@ TEST_F(VkSCLayerTest, SecondaryCommandBufferNullOrImagelessFramebuffer) {
         // Check with framebuffer created with VK_FRAMEBUFFER_CREATE_IMAGELESS_BIT
         if (imageless_fb_features.imagelessFramebuffer) {
             VkFormat attachment_format = VK_FORMAT_R8G8B8A8_UNORM;
-            auto attachment_info = LvlInitStruct<VkFramebufferAttachmentImageInfoKHR>();
+            auto attachment_info = vku::InitStruct<VkFramebufferAttachmentImageInfoKHR>();
             attachment_info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
             attachment_info.width = 128;
             attachment_info.height = 128;
             attachment_info.layerCount = 1;
             attachment_info.viewFormatCount = 1;
             attachment_info.pViewFormats = &attachment_format;
-            auto attachments_info = LvlInitStruct<VkFramebufferAttachmentsCreateInfo>();
+            auto attachments_info = vku::InitStruct<VkFramebufferAttachmentsCreateInfo>();
             attachments_info.attachmentImageInfoCount = 1;
             attachments_info.pAttachmentImageInfos = &attachment_info;
             framebuffer_ci.pNext = &attachments_info;
             framebuffer_ci.flags = VK_FRAMEBUFFER_CREATE_IMAGELESS_BIT;
-            vk_testing::Framebuffer imageless_framebuffer(*m_device, framebuffer_ci);
+            vkt::Framebuffer imageless_framebuffer(*m_device, framebuffer_ci);
             inherit_info.framebuffer = imageless_framebuffer;
 
             m_errorMonitor->SetDesiredFailureMsg(kErrorBit, expected_vuid);

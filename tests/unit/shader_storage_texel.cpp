@@ -13,17 +13,15 @@
  */
 
 #include "../framework/layer_validation_tests.h"
+#include "../framework/pipeline_helper.h"
 
 TEST_F(NegativeShaderStorageTexel, WriteLessComponent) {
     TEST_DESCRIPTION("Test writing to texel buffer with less components.");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
-    if (DeviceValidationVersion() < VK_API_VERSION_1_2) {
-        GTEST_SKIP() << "At least Vulkan version 1.2 is required";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitState())
 
     // not valid GLSL, but would look like:
     // layout(set = 0, binding = 0, Rgba8ui) uniform uimageBuffer storageTexelBuffer;
@@ -75,14 +73,8 @@ TEST_F(NegativeShaderStorageTexel, UnknownWriteLessComponent) {
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-    if (DeviceValidationVersion() < VK_API_VERSION_1_2) {
-        GTEST_SKIP() << "At least Vulkan version 1.2 is required";
-    }
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitState())
 
     // not valid GLSL, but would look like:
     // layout(set = 0, binding = 0, Unknown) uniform uimageBuffer storageTexelBuffer;
@@ -132,26 +124,25 @@ TEST_F(NegativeShaderStorageTexel, UnknownWriteLessComponent) {
         GTEST_SKIP() << "Format doesn't support storage texel buffer";
     }
 
-    auto fmt_props_3 = LvlInitStruct<VkFormatProperties3KHR>();
-    auto fmt_props = LvlInitStruct<VkFormatProperties2>(&fmt_props_3);
+    VkFormatProperties3KHR fmt_props_3 = vku::InitStructHelper();
+    VkFormatProperties2 fmt_props = vku::InitStructHelper(&fmt_props_3);
     vk::GetPhysicalDeviceFormatProperties2(gpu(), VK_FORMAT_R8G8B8A8_UINT, &fmt_props);
     if ((fmt_props_3.bufferFeatures & VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT_KHR) == 0) {
         GTEST_SKIP() << "Format doesn't support storage write without format";
     }
 
-    VkBufferCreateInfo buffer_create_info = LvlInitStruct<VkBufferCreateInfo>();
+    VkBufferCreateInfo buffer_create_info = vku::InitStructHelper();
     buffer_create_info.size = 1024;
     buffer_create_info.usage = VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT;
-    VkBufferObj buffer;
-    buffer.init(*m_device, buffer_create_info);
+    vkt::Buffer buffer(*m_device, buffer_create_info);
 
-    VkBufferViewCreateInfo buff_view_ci = LvlInitStruct<VkBufferViewCreateInfo>();
+    VkBufferViewCreateInfo buff_view_ci = vku::InitStructHelper();
     buff_view_ci.buffer = buffer.handle();
     buff_view_ci.format = format;
     buff_view_ci.range = VK_WHOLE_SIZE;
-    vk_testing::BufferView buffer_view(*m_device, buff_view_ci);
+    vkt::BufferView buffer_view(*m_device, buff_view_ci);
 
-    VkWriteDescriptorSet descriptor_write = LvlInitStruct<VkWriteDescriptorSet>();
+    VkWriteDescriptorSet descriptor_write = vku::InitStructHelper();
     descriptor_write.dstSet = ds.set_;
     descriptor_write.dstBinding = 0;
     descriptor_write.descriptorCount = 1;
@@ -160,10 +151,9 @@ TEST_F(NegativeShaderStorageTexel, UnknownWriteLessComponent) {
     vk::UpdateDescriptorSets(m_device->device(), 1, &descriptor_write, 0, nullptr);
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.InitInfo();
     pipe.cs_ = std::make_unique<VkShaderObj>(this, source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
     pipe.InitState();
-    pipe.pipeline_layout_ = VkPipelineLayoutObj(m_device, {&ds.layout_});
+    pipe.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&ds.layout_});
     pipe.CreateComputePipeline();
 
     m_commandBuffer->begin();
@@ -178,15 +168,10 @@ TEST_F(NegativeShaderStorageTexel, UnknownWriteLessComponent) {
 
 TEST_F(NegativeShaderStorageTexel, MissingFormatWriteForFormat) {
     TEST_DESCRIPTION("Create a shader writing a storage texel buffer without an image format");
-
-    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+    SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, nullptr, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
-
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
+    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitState(nullptr, nullptr, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
 
     PFN_vkSetPhysicalDeviceFormatProperties2EXT fpvkSetPhysicalDeviceFormatProperties2EXT = nullptr;
     PFN_vkGetOriginalPhysicalDeviceFormatProperties2EXT fpvkGetOriginalPhysicalDeviceFormatProperties2EXT = nullptr;
@@ -195,8 +180,8 @@ TEST_F(NegativeShaderStorageTexel, MissingFormatWriteForFormat) {
     }
 
     const VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
-    auto fmt_props_3 = LvlInitStruct<VkFormatProperties3>();
-    auto fmt_props = LvlInitStruct<VkFormatProperties2>(&fmt_props_3);
+    VkFormatProperties3 fmt_props_3 = vku::InitStructHelper();
+    VkFormatProperties2 fmt_props = vku::InitStructHelper(&fmt_props_3);
 
     // set so format can be used as a storage texel buffer, but no WITHOUT_FORMAT support
     fpvkGetOriginalPhysicalDeviceFormatProperties2EXT(gpu(), format, &fmt_props);
@@ -247,32 +232,30 @@ TEST_F(NegativeShaderStorageTexel, MissingFormatWriteForFormat) {
                                      });
 
     CreateComputePipelineHelper cs_pipeline(*this);
-    cs_pipeline.InitInfo();
     cs_pipeline.cs_ =
         std::make_unique<VkShaderObj>(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
     cs_pipeline.InitState();
-    cs_pipeline.pipeline_layout_ = VkPipelineLayoutObj(m_device, {&ds.layout_});
+    cs_pipeline.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&ds.layout_});
     cs_pipeline.LateBindPipelineInfo();
     cs_pipeline.cp_ci_.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;  // override with wrong value
-    cs_pipeline.CreateComputePipeline(true, false);                // need false to prevent late binding
+    cs_pipeline.CreateComputePipeline(false);                      // need false to prevent late binding
 
-    VkBufferCreateInfo buffer_create_info = LvlInitStruct<VkBufferCreateInfo>();
+    VkBufferCreateInfo buffer_create_info = vku::InitStructHelper();
     buffer_create_info.size = 1024;
     buffer_create_info.usage = VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT;
-    VkBufferObj buffer;
-    buffer.init(*m_device, buffer_create_info);
+    vkt::Buffer buffer(*m_device, buffer_create_info);
 
-    VkBufferViewCreateInfo buff_view_ci = LvlInitStruct<VkBufferViewCreateInfo>();
+    VkBufferViewCreateInfo buff_view_ci = vku::InitStructHelper();
     buff_view_ci.buffer = buffer.handle();
     buff_view_ci.format = format;
     buff_view_ci.range = VK_WHOLE_SIZE;
-    vk_testing::BufferView buffer_view(*m_device, buff_view_ci);
+    vkt::BufferView buffer_view(*m_device, buff_view_ci);
     if (!buffer_view.initialized()) {
         // device profile layer might hide fact this is not a supported buffer view format
         GTEST_SKIP() << "Device will not be able to initialize buffer view skipped";
     }
 
-    VkWriteDescriptorSet descriptor_write = LvlInitStruct<VkWriteDescriptorSet>();
+    VkWriteDescriptorSet descriptor_write = vku::InitStructHelper();
     descriptor_write.dstSet = ds.set_;
     descriptor_write.dstBinding = 0;
     descriptor_write.descriptorCount = 1;

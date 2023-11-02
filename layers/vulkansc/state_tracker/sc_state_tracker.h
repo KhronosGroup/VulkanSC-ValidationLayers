@@ -26,7 +26,6 @@
 #include "generated/layer_chassis_dispatch.h"
 #include "error_message/logging.h"
 #include "vulkan/vk_layer.h"
-#include "generated/vk_typemap_helper.h"
 
 #include <atomic>
 
@@ -79,48 +78,48 @@ class SCValidationStateTracker : public BASE {
                                                                        const VkCommandPoolCreateInfo* pCreateInfo) override;
     void PostCallRecordCreateCommandPool(VkDevice device, const VkCommandPoolCreateInfo* pCreateInfo,
                                          const VkAllocationCallbacks* pAllocator, VkCommandPool* pCommandPool,
-                                         VkResult result) override;
+                                         const RecordObject& record_obj) override;
     std::shared_ptr<PIPELINE_CACHE_STATE> CreatePipelineCacheState(VkPipelineCache pipeline_cache,
                                                                    const VkPipelineCacheCreateInfo* pCreateInfo) const override;
+
     std::shared_ptr<PIPELINE_STATE> CreateGraphicsPipelineState(const VkGraphicsPipelineCreateInfo* pCreateInfo,
-                                                                uint32_t create_index,
                                                                 std::shared_ptr<const RENDER_PASS_STATE>&& render_pass,
                                                                 std::shared_ptr<const PIPELINE_LAYOUT_STATE>&& layout,
                                                                 CreateShaderModuleStates* csm_states) const override;
     std::shared_ptr<PIPELINE_STATE> CreateComputePipelineState(
-        const VkComputePipelineCreateInfo* pCreateInfo, uint32_t create_index,
-        std::shared_ptr<const PIPELINE_LAYOUT_STATE>&& layout) const override;
+        const VkComputePipelineCreateInfo* pCreateInfo, std::shared_ptr<const PIPELINE_LAYOUT_STATE>&& layout) const override;
     void PostCallRecordCreateGraphicsPipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t count,
                                                const VkGraphicsPipelineCreateInfo* pCreateInfos,
-                                               const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines, VkResult result,
-                                               void* cgpl_state) override;
+                                               const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,
+                                               const RecordObject& record_obj, void* cgpl_state) override;
     void PostCallRecordCreateComputePipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t count,
                                               const VkComputePipelineCreateInfo* pCreateInfos,
-                                              const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines, VkResult result,
-                                              void* pipe_state) override;
+                                              const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,
+                                              const RecordObject& record_obj, void* pipe_state) override;
     void PreCallRecordDestroyPipeline(VkDevice device, VkPipeline pipeline, const VkAllocationCallbacks* pAllocator) override;
     void PostCallRecordCreateImageView(VkDevice device, const VkImageViewCreateInfo* pCreateInfo,
-                                       const VkAllocationCallbacks* pAllocator, VkImageView* pView, VkResult result) override;
+                                       const VkAllocationCallbacks* pAllocator, VkImageView* pView,
+                                       const RecordObject& record_obj) override;
     void PreCallRecordDestroyImageView(VkDevice device, VkImageView imageView, const VkAllocationCallbacks* pAllocator) override;
     void PostCallRecordCreateDescriptorSetLayout(VkDevice device, const VkDescriptorSetLayoutCreateInfo* pCreateInfo,
                                                  const VkAllocationCallbacks* pAllocator, VkDescriptorSetLayout* pSetLayout,
-                                                 VkResult result) override;
+                                                 const RecordObject& record_obj) override;
     void PreCallRecordDestroyDescriptorSetLayout(VkDevice device, VkDescriptorSetLayout descriptorSetLayout,
                                                  const VkAllocationCallbacks* pAllocator) override;
     void PostCallRecordCreateRenderPass(VkDevice device, const VkRenderPassCreateInfo* pCreateInfo,
                                         const VkAllocationCallbacks* pAllocator, VkRenderPass* pRenderPass,
-                                        VkResult result) override;
+                                        const RecordObject& record_obj) override;
     void PostCallRecordCreateRenderPass2(VkDevice device, const VkRenderPassCreateInfo2* pCreateInfo,
                                          const VkAllocationCallbacks* pAllocator, VkRenderPass* pRenderPass,
-                                         VkResult result) override;
+                                         const RecordObject& record_obj) override;
     void PreCallRecordDestroyRenderPass(VkDevice device, VkRenderPass renderPass, const VkAllocationCallbacks* pAllocator) override;
     void PostCallRecordCreatePrivateDataSlotEXT(VkDevice device, const VkPrivateDataSlotCreateInfo* pCreateInfo,
                                                 const VkAllocationCallbacks* pAllocator, VkPrivateDataSlot* pPrivateDataSlot,
-                                                VkResult result) override;
+                                                const RecordObject& record_obj) override;
     void PreCallRecordDestroyPrivateDataSlotEXT(VkDevice device, VkPrivateDataSlot privateDataSlot,
                                                 const VkAllocationCallbacks* pAllocator) override;
     void PostCallRecordBeginCommandBuffer(VkCommandBuffer commandBuffer, const VkCommandBufferBeginInfo* pBeginInfo,
-                                          VkResult result) override;
+                                          const RecordObject& record_obj) override;
     void PreCallRecordEndCommandBuffer(VkCommandBuffer commandBuffer) override;
 
   protected:

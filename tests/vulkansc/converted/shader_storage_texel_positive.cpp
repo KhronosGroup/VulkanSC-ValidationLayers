@@ -15,22 +15,20 @@
  */
 
 #include "../framework/layer_validation_tests.h"
+#include "../framework/pipeline_helper.h"
 
 TEST_F(PositiveShaderStorageTexel, BufferWriteMoreComponent) {
     TEST_DESCRIPTION("Test writing to image with less components.");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
-    if (DeviceValidationVersion() < VK_API_VERSION_1_2) {
-        GTEST_SKIP() << "At least Vulkan version 1.2 is required";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
     VkPhysicalDeviceFeatures available_features = {};
-    ASSERT_NO_FATAL_FAILURE(GetPhysicalDeviceFeatures(&available_features));
+    GetPhysicalDeviceFeatures(&available_features);
     if (!available_features.shaderStorageImageExtendedFormats) {
         GTEST_SKIP() << "shaderStorageImageExtendedFormats is not supported";
     }
-    ASSERT_NO_FATAL_FAILURE(InitState(&available_features));
+    RETURN_IF_SKIP(InitState(&available_features));
 
     // not valid GLSL, but would look like:
     // layout(set = 0, binding = 0, Rg32ui) uniform uimageBuffer storageTexelBuffer;
@@ -74,19 +72,18 @@ TEST_F(PositiveShaderStorageTexel, BufferWriteMoreComponent) {
         GTEST_SKIP() << "Format doesn't support storage texel buffer";
     }
 
-    VkBufferCreateInfo buffer_create_info = LvlInitStruct<VkBufferCreateInfo>();
+    VkBufferCreateInfo buffer_create_info = vku::InitStructHelper();
     buffer_create_info.size = 1024;
     buffer_create_info.usage = VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT;
-    VkBufferObj buffer;
-    buffer.init(*m_device, buffer_create_info);
+    vkt::Buffer buffer(*m_device, buffer_create_info);
 
-    VkBufferViewCreateInfo buff_view_ci = LvlInitStruct<VkBufferViewCreateInfo>();
+    VkBufferViewCreateInfo buff_view_ci = vku::InitStructHelper();
     buff_view_ci.buffer = buffer.handle();
     buff_view_ci.format = format;
     buff_view_ci.range = VK_WHOLE_SIZE;
-    vk_testing::BufferView buffer_view(*m_device, buff_view_ci);
+    vkt::BufferView buffer_view(*m_device, buff_view_ci);
 
-    VkWriteDescriptorSet descriptor_write = LvlInitStruct<VkWriteDescriptorSet>();
+    VkWriteDescriptorSet descriptor_write = vku::InitStructHelper();
     descriptor_write.dstSet = ds.set_;
     descriptor_write.dstBinding = 0;
     descriptor_write.descriptorCount = 1;
@@ -95,10 +92,9 @@ TEST_F(PositiveShaderStorageTexel, BufferWriteMoreComponent) {
     vk::UpdateDescriptorSets(m_device->device(), 1, &descriptor_write, 0, nullptr);
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.InitInfo();
     pipe.cs_ = std::make_unique<VkShaderObj>(this, source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
     pipe.InitState();
-    pipe.pipeline_layout_ = VkPipelineLayoutObj(m_device, {&ds.layout_});
+    pipe.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&ds.layout_});
     pipe.CreateComputePipeline();
 
     m_commandBuffer->begin();

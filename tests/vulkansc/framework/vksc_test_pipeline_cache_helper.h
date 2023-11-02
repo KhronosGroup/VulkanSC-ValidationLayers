@@ -16,7 +16,7 @@
  */
 #pragma once
 
-#include "generated/vk_typemap_helper.h"
+#include <vulkan/utility/vk_struct_helper.hpp>
 #include "spirv-tools/libspirv.h"
 
 #include <assert.h>
@@ -189,7 +189,7 @@ class PipelineCacheDataBuilder {
     VkPipelineCacheCreateInfo MakeCreateInfo(
         VkPipelineCacheCreateFlags create_flags = VK_PIPELINE_CACHE_CREATE_READ_ONLY_BIT |
                                                   VK_PIPELINE_CACHE_CREATE_USE_APPLICATION_STORAGE_BIT) const {
-        auto create_info = LvlInitStruct<VkPipelineCacheCreateInfo>();
+        auto create_info = vku::InitStruct<VkPipelineCacheCreateInfo>();
         create_info.flags = create_flags;
         create_info.initialDataSize = data_.size();
         create_info.pInitialData = data_.data();

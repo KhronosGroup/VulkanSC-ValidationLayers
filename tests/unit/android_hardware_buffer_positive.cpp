@@ -21,96 +21,54 @@ TEST_F(PositiveAndroidHardwareBuffer, MemoryRequirements) {
     TEST_DESCRIPTION("Verify AndroidHardwareBuffer doesn't conflict with memory requirements.");
 
     AddRequiredExtensions(VK_ANDROID_EXTERNAL_MEMORY_ANDROID_HARDWARE_BUFFER_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
+    RETURN_IF_SKIP(Init())
 
-    if (IsPlatform(kGalaxyS10)) {
-        GTEST_SKIP() << "This test should not run on Galaxy S10";
-    }
+    vkt::AHB ahb(AHARDWAREBUFFER_FORMAT_BLOB, AHARDWAREBUFFER_USAGE_GPU_DATA_BUFFER, 64);
 
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-
-    ASSERT_NO_FATAL_FAILURE(InitState());
-
-    // Allocate an AHardwareBuffer
-    AHardwareBuffer *ahb;
-    AHardwareBuffer_Desc ahb_desc = {};
-    ahb_desc.format = AHARDWAREBUFFER_FORMAT_BLOB;
-    ahb_desc.usage = AHARDWAREBUFFER_USAGE_GPU_DATA_BUFFER;
-    ahb_desc.width = 64;
-    ahb_desc.height = 1;
-    ahb_desc.layers = 1;
-    ahb_desc.stride = 1;
-    AHardwareBuffer_allocate(&ahb_desc, &ahb);
-
-    VkExternalMemoryBufferCreateInfo ext_buf_info = LvlInitStruct<VkExternalMemoryBufferCreateInfo>();
+    VkExternalMemoryBufferCreateInfo ext_buf_info = vku::InitStructHelper();
     ext_buf_info.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID;
 
-    VkBufferCreateInfo buffer_create_info = LvlInitStruct<VkBufferCreateInfo>(&ext_buf_info);
-    buffer_create_info.size = 512;
-    buffer_create_info.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+    VkImportAndroidHardwareBufferInfoANDROID import_ahb_Info = vku::InitStructHelper();
+    import_ahb_Info.buffer = ahb.handle();
 
-    VkBufferObj buffer;
-    buffer.init_no_mem(*m_device, buffer_create_info);
+    VkAndroidHardwareBufferPropertiesANDROID ahb_props = vku::InitStructHelper();
+    vk::GetAndroidHardwareBufferPropertiesANDROID(m_device->device(), ahb.handle(), &ahb_props);
 
-    VkImportAndroidHardwareBufferInfoANDROID import_ahb_Info = LvlInitStruct<VkImportAndroidHardwareBufferInfoANDROID>();
-    import_ahb_Info.buffer = ahb;
-
-    VkAndroidHardwareBufferPropertiesANDROID ahb_props = LvlInitStruct<VkAndroidHardwareBufferPropertiesANDROID>();
-    vk::GetAndroidHardwareBufferPropertiesANDROID(m_device->device(), ahb, &ahb_props);
-
-    VkMemoryAllocateInfo memory_allocate_info = LvlInitStruct<VkMemoryAllocateInfo>(&import_ahb_Info);
+    VkMemoryAllocateInfo memory_allocate_info = vku::InitStructHelper(&import_ahb_Info);
     if (!SetAllocationInfoImportAHB(m_device, ahb_props, memory_allocate_info)) {
-        AHardwareBuffer_release(ahb);
         GTEST_SKIP() << "No valid memory type index could be found";
     }
 
-    // Should be able to bind memory with no error
-    vk_testing::DeviceMemory memory(*m_device, memory_allocate_info);
-    vk::BindBufferMemory(m_device->device(), buffer.handle(), memory, 0);
+    vkt::Buffer buffer;
+    VkBufferCreateInfo buffer_create_info = vku::InitStructHelper(&ext_buf_info);
+    buffer_create_info.size = memory_allocate_info.allocationSize;
+    buffer_create_info.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+    buffer.init_no_mem(*m_device, buffer_create_info);
 
-    AHardwareBuffer_release(ahb);
+    // Should be able to bind memory with no error
+    vkt::DeviceMemory memory(*m_device, memory_allocate_info);
+    vk::BindBufferMemory(m_device->device(), buffer.handle(), memory, 0);
 }
 
 TEST_F(PositiveAndroidHardwareBuffer, DepthStencil) {
     TEST_DESCRIPTION("Verify AndroidHardwareBuffer can import Depth/Stencil");
 
     AddRequiredExtensions(VK_ANDROID_EXTERNAL_MEMORY_ANDROID_HARDWARE_BUFFER_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
+    RETURN_IF_SKIP(Init())
 
-    if (IsPlatform(kGalaxyS10) || IsPlatform(kShieldTVb)) {
-        GTEST_SKIP() << "This test should not run on Galaxy S10";
-    }
-
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-
-    ASSERT_NO_FATAL_FAILURE(InitState());
-
-    // Allocate an AHardwareBuffer
-    AHardwareBuffer *ahb;
-    AHardwareBuffer_Desc ahb_desc = {};
-    ahb_desc.format = AHARDWAREBUFFER_FORMAT_D16_UNORM;
-    ahb_desc.usage = AHARDWAREBUFFER_USAGE_GPU_FRAMEBUFFER;
-    ahb_desc.width = 64;
-    ahb_desc.height = 1;
-    ahb_desc.layers = 1;
-    ahb_desc.stride = 1;
-    AHardwareBuffer_allocate(&ahb_desc, &ahb);
-    if (!ahb) {
+    vkt::AHB ahb(AHARDWAREBUFFER_FORMAT_D16_UNORM, AHARDWAREBUFFER_USAGE_GPU_FRAMEBUFFER, 64);
+    if (!ahb.handle()) {
         GTEST_SKIP() << "Failed to Allocate AHB";
     }
 
     // Incase it hits the below driver bug, catch the false VUID error thrown from driver not creating valid AHB
     m_errorMonitor->SetUnexpectedError("VUID-vkGetAndroidHardwareBufferPropertiesANDROID-buffer-01884");
 
-    VkAndroidHardwareBufferFormatPropertiesANDROID ahb_fmt_props = LvlInitStruct<VkAndroidHardwareBufferFormatPropertiesANDROID>();
-    VkAndroidHardwareBufferPropertiesANDROID ahb_props = LvlInitStruct<VkAndroidHardwareBufferPropertiesANDROID>(&ahb_fmt_props);
-    vk::GetAndroidHardwareBufferPropertiesANDROID(m_device->device(), ahb, &ahb_props);
+    VkAndroidHardwareBufferFormatPropertiesANDROID ahb_fmt_props = vku::InitStructHelper();
+    VkAndroidHardwareBufferPropertiesANDROID ahb_props = vku::InitStructHelper(&ahb_fmt_props);
+    vk::GetAndroidHardwareBufferPropertiesANDROID(m_device->device(), ahb.handle(), &ahb_props);
 
-    VkExternalMemoryImageCreateInfo ext_image_info = LvlInitStruct<VkExternalMemoryImageCreateInfo>();
+    VkExternalMemoryImageCreateInfo ext_image_info = vku::InitStructHelper();
     ext_image_info.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID;
 
     if (ahb_fmt_props.format != VK_FORMAT_D16_UNORM) {
@@ -119,7 +77,7 @@ TEST_F(PositiveAndroidHardwareBuffer, DepthStencil) {
 
     // Create a Depth/Stencil image
     VkImageObj ds_image(m_device);
-    VkImageCreateInfo image_create_info = LvlInitStruct<VkImageCreateInfo>(&ext_image_info);
+    VkImageCreateInfo image_create_info = vku::InitStructHelper(&ext_image_info);
     image_create_info.flags = 0;
     image_create_info.imageType = VK_IMAGE_TYPE_2D;
     image_create_info.format = ahb_fmt_props.format;
@@ -136,24 +94,21 @@ TEST_F(PositiveAndroidHardwareBuffer, DepthStencil) {
         GTEST_SKIP() << "Was not able to create a D16 AHB framebuffer";
     }
 
-    VkMemoryDedicatedAllocateInfo memory_dedicated_info = LvlInitStruct<VkMemoryDedicatedAllocateInfo>();
+    VkMemoryDedicatedAllocateInfo memory_dedicated_info = vku::InitStructHelper();
     memory_dedicated_info.image = ds_image.handle();
     memory_dedicated_info.buffer = VK_NULL_HANDLE;
 
     VkImportAndroidHardwareBufferInfoANDROID import_ahb_Info =
-        LvlInitStruct<VkImportAndroidHardwareBufferInfoANDROID>(&memory_dedicated_info);
-    import_ahb_Info.buffer = ahb;
+        vku::InitStructHelper(&memory_dedicated_info);
+    import_ahb_Info.buffer = ahb.handle();
 
-    VkMemoryAllocateInfo memory_allocate_info = LvlInitStruct<VkMemoryAllocateInfo>(&import_ahb_Info);
+    VkMemoryAllocateInfo memory_allocate_info = vku::InitStructHelper(&import_ahb_Info);
     if (!SetAllocationInfoImportAHB(m_device, ahb_props, memory_allocate_info)) {
-        AHardwareBuffer_release(ahb);
         GTEST_SKIP() << "No valid memory type index could be found";
     }
 
-    vk_testing::DeviceMemory memory(*m_device, memory_allocate_info);
+    vkt::DeviceMemory memory(*m_device, memory_allocate_info);
     vk::BindImageMemory(m_device->device(), ds_image.handle(), memory, 0);
-
-    AHardwareBuffer_release(ahb);
 }
 
 TEST_F(PositiveAndroidHardwareBuffer, BindBufferMemory) {
@@ -161,22 +116,18 @@ TEST_F(PositiveAndroidHardwareBuffer, BindBufferMemory) {
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_ANDROID_EXTERNAL_MEMORY_ANDROID_HARDWARE_BUFFER_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
+    RETURN_IF_SKIP(InitFramework())
 
-    if (IsPlatform(kGalaxyS10)) {
-        GTEST_SKIP() << "This test should not run on Galaxy S10";
-    }
+    RETURN_IF_SKIP(InitState())
 
-    ASSERT_NO_FATAL_FAILURE(InitState());
-
-    VkExternalMemoryBufferCreateInfo ext_buf_info = LvlInitStruct<VkExternalMemoryBufferCreateInfo>();
+    VkExternalMemoryBufferCreateInfo ext_buf_info = vku::InitStructHelper();
     ext_buf_info.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID;
 
-    VkBufferCreateInfo buffer_create_info = LvlInitStruct<VkBufferCreateInfo>(&ext_buf_info);
+    VkBufferCreateInfo buffer_create_info = vku::InitStructHelper(&ext_buf_info);
     buffer_create_info.size = 8192;  // greater than the 4k AHB usually are
     buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 
-    VkBufferObj buffer;
+    vkt::Buffer buffer;
     buffer.init_no_mem(*m_device, buffer_create_info);
 
     // Try to get memory requirements prior to binding memory
@@ -184,39 +135,28 @@ TEST_F(PositiveAndroidHardwareBuffer, BindBufferMemory) {
     vk::GetBufferMemoryRequirements(m_device->device(), buffer.handle(), &mem_reqs);
 
     // Test bind memory 2 extension
-    VkBufferMemoryRequirementsInfo2 buffer_mem_reqs2 = LvlInitStruct<VkBufferMemoryRequirementsInfo2>();
+    VkBufferMemoryRequirementsInfo2 buffer_mem_reqs2 = vku::InitStructHelper();
     buffer_mem_reqs2.buffer = buffer.handle();
-    VkMemoryRequirements2 mem_reqs2 = LvlInitStruct<VkMemoryRequirements2>();
+    VkMemoryRequirements2 mem_reqs2 = vku::InitStructHelper();
     vk::GetBufferMemoryRequirements2(m_device->device(), &buffer_mem_reqs2, &mem_reqs2);
 
     // Allocate an AHardwareBuffer to match the size
-    AHardwareBuffer *ahb;
-    AHardwareBuffer_Desc ahb_desc = {};
-    ahb_desc.format = AHARDWAREBUFFER_FORMAT_BLOB;
-    ahb_desc.usage = AHARDWAREBUFFER_USAGE_GPU_DATA_BUFFER;
-    ahb_desc.width = mem_reqs.size;
-    ahb_desc.height = 1;
-    ahb_desc.layers = 1;
-    ahb_desc.stride = 1;
-    AHardwareBuffer_allocate(&ahb_desc, &ahb);
+    vkt::AHB ahb(AHARDWAREBUFFER_FORMAT_BLOB, AHARDWAREBUFFER_USAGE_GPU_DATA_BUFFER, mem_reqs.size);
 
     // Get real values
-    VkAndroidHardwareBufferPropertiesANDROID ahb_props = LvlInitStruct<VkAndroidHardwareBufferPropertiesANDROID>();
-    vk::GetAndroidHardwareBufferPropertiesANDROID(m_device->device(), ahb, &ahb_props);
+    VkAndroidHardwareBufferPropertiesANDROID ahb_props = vku::InitStructHelper();
+    vk::GetAndroidHardwareBufferPropertiesANDROID(m_device->device(), ahb.handle(), &ahb_props);
 
-    VkImportAndroidHardwareBufferInfoANDROID import_ahb_Info = LvlInitStruct<VkImportAndroidHardwareBufferInfoANDROID>();
-    import_ahb_Info.buffer = ahb;
+    VkImportAndroidHardwareBufferInfoANDROID import_ahb_Info = vku::InitStructHelper();
+    import_ahb_Info.buffer = ahb.handle();
 
-    VkMemoryAllocateInfo memory_allocate_info = LvlInitStruct<VkMemoryAllocateInfo>(&import_ahb_Info);
+    VkMemoryAllocateInfo memory_allocate_info = vku::InitStructHelper(&import_ahb_Info);
     if (!SetAllocationInfoImportAHB(m_device, ahb_props, memory_allocate_info)) {
-        AHardwareBuffer_release(ahb);
         GTEST_SKIP() << "No valid memory type index could be found";
     }
 
-    vk_testing::DeviceMemory memory(*m_device, memory_allocate_info);
+    vkt::DeviceMemory memory(*m_device, memory_allocate_info);
     vk::BindBufferMemory(m_device->device(), buffer.handle(), memory, 0);
-
-    AHardwareBuffer_release(ahb);
 }
 
 TEST_F(PositiveAndroidHardwareBuffer, ExportBuffer) {
@@ -224,32 +164,26 @@ TEST_F(PositiveAndroidHardwareBuffer, ExportBuffer) {
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_ANDROID_EXTERNAL_MEMORY_ANDROID_HARDWARE_BUFFER_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
-
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(Init())
 
     // Create VkBuffer to be exported to an AHB
-    VkExternalMemoryBufferCreateInfo ext_buf_info = LvlInitStruct<VkExternalMemoryBufferCreateInfo>();
+    VkExternalMemoryBufferCreateInfo ext_buf_info = vku::InitStructHelper();
     ext_buf_info.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID;
 
-    VkBufferCreateInfo buffer_create_info = LvlInitStruct<VkBufferCreateInfo>(&ext_buf_info);
+    VkBufferCreateInfo buffer_create_info = vku::InitStructHelper(&ext_buf_info);
     buffer_create_info.size = 4096;
     buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 
-    VkBufferObj buffer;
+    vkt::Buffer buffer;
     buffer.init_no_mem(*m_device, buffer_create_info);
 
     VkMemoryRequirements mem_reqs;
     vk::GetBufferMemoryRequirements(device(), buffer.handle(), &mem_reqs);
 
-    VkExportMemoryAllocateInfo export_memory_info = LvlInitStruct<VkExportMemoryAllocateInfo>();
+    VkExportMemoryAllocateInfo export_memory_info = vku::InitStructHelper();
     export_memory_info.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID;
 
-    VkMemoryAllocateInfo memory_info = LvlInitStruct<VkMemoryAllocateInfo>(&export_memory_info);
+    VkMemoryAllocateInfo memory_info = vku::InitStructHelper(&export_memory_info);
     memory_info.allocationSize = mem_reqs.size;
 
     bool has_memtype = m_device->phy().set_memory_type(mem_reqs.memoryTypeBits, &memory_info, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
@@ -257,13 +191,13 @@ TEST_F(PositiveAndroidHardwareBuffer, ExportBuffer) {
         GTEST_SKIP() << "No valid memory type index could be found";
     }
 
-    vk_testing::DeviceMemory memory(*m_device, memory_info);
+    vkt::DeviceMemory memory(*m_device, memory_info);
     vk::BindBufferMemory(device(), buffer.handle(), memory, 0);
 
     // Export memory to AHB
     AHardwareBuffer *ahb = nullptr;
 
-    VkMemoryGetAndroidHardwareBufferInfoANDROID get_ahb_info = LvlInitStruct<VkMemoryGetAndroidHardwareBufferInfoANDROID>();
+    VkMemoryGetAndroidHardwareBufferInfoANDROID get_ahb_info = vku::InitStructHelper();
     get_ahb_info.memory = memory;
     vk::GetMemoryAndroidHardwareBufferANDROID(device(), &get_ahb_info, &ahb);
 
@@ -276,20 +210,14 @@ TEST_F(PositiveAndroidHardwareBuffer, ExportImage) {
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_ANDROID_EXTERNAL_MEMORY_ANDROID_HARDWARE_BUFFER_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
-
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(Init())
 
     // Create VkImage to be exported to an AHB
-    VkExternalMemoryImageCreateInfo ext_image_info = LvlInitStruct<VkExternalMemoryImageCreateInfo>();
+    VkExternalMemoryImageCreateInfo ext_image_info = vku::InitStructHelper();
     ext_image_info.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID;
 
     VkImageObj image(m_device);
-    VkImageCreateInfo image_create_info = LvlInitStruct<VkImageCreateInfo>(&ext_image_info);
+    VkImageCreateInfo image_create_info = vku::InitStructHelper(&ext_image_info);
     image_create_info.flags = 0;
     image_create_info.imageType = VK_IMAGE_TYPE_2D;
     image_create_info.format = VK_FORMAT_R8G8B8A8_UNORM;
@@ -303,14 +231,14 @@ TEST_F(PositiveAndroidHardwareBuffer, ExportImage) {
     image_create_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
     image.init_no_mem(*m_device, image_create_info);
 
-    VkMemoryDedicatedAllocateInfo memory_dedicated_info = LvlInitStruct<VkMemoryDedicatedAllocateInfo>();
+    VkMemoryDedicatedAllocateInfo memory_dedicated_info = vku::InitStructHelper();
     memory_dedicated_info.image = image.handle();
     memory_dedicated_info.buffer = VK_NULL_HANDLE;
 
-    VkExportMemoryAllocateInfo export_memory_info = LvlInitStruct<VkExportMemoryAllocateInfo>(&memory_dedicated_info);
+    VkExportMemoryAllocateInfo export_memory_info = vku::InitStructHelper(&memory_dedicated_info);
     export_memory_info.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID;
 
-    VkMemoryAllocateInfo memory_info = LvlInitStruct<VkMemoryAllocateInfo>(&export_memory_info);
+    VkMemoryAllocateInfo memory_info = vku::InitStructHelper(&export_memory_info);
 
     // "When allocating new memory for an image that can be exported to an Android hardware buffer, the memory’s allocationSize must
     // be zero":
@@ -322,13 +250,13 @@ TEST_F(PositiveAndroidHardwareBuffer, ExportImage) {
         GTEST_SKIP() << "No valid memory type index could be found";
     }
 
-    vk_testing::DeviceMemory memory(*m_device, memory_info);
+    vkt::DeviceMemory memory(*m_device, memory_info);
     vk::BindImageMemory(device(), image.handle(), memory, 0);
 
     // Export memory to AHB
     AHardwareBuffer *ahb = nullptr;
 
-    VkMemoryGetAndroidHardwareBufferInfoANDROID get_ahb_info = LvlInitStruct<VkMemoryGetAndroidHardwareBufferInfoANDROID>();
+    VkMemoryGetAndroidHardwareBufferInfoANDROID get_ahb_info = vku::InitStructHelper();
     get_ahb_info.memory = memory;
     vk::GetMemoryAndroidHardwareBufferANDROID(device(), &get_ahb_info, &ahb);
 
@@ -341,39 +269,19 @@ TEST_F(PositiveAndroidHardwareBuffer, ExternalImage) {
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_ANDROID_EXTERNAL_MEMORY_ANDROID_HARDWARE_BUFFER_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-
-    if (IsPlatform(kGalaxyS10)) {
-        GTEST_SKIP() << "This test should not run on Galaxy S10 - fails in gralloc";
-    }
-
-    ASSERT_NO_FATAL_FAILURE(InitState());
-    if (DeviceValidationVersion() < VK_API_VERSION_1_1) {
-        GTEST_SKIP() << "At least Vulkan version 1.1 is required.";
-    }
+    RETURN_IF_SKIP(Init())
 
     // FORMAT_Y8Cb8Cr8_420 is a known/public valid AHB Format but does not have a Vulkan mapping to it
     // Will use the external image feature to get access to it
-    AHardwareBuffer *ahb;
-    AHardwareBuffer_Desc ahb_desc = {};
-    ahb_desc.format = AHARDWAREBUFFER_FORMAT_Y8Cb8Cr8_420;
-    ahb_desc.usage = AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE;
-    ahb_desc.width = 64;
-    ahb_desc.height = 64;
-    ahb_desc.layers = 1;
-    ahb_desc.stride = 1;
-    int result = AHardwareBuffer_allocate(&ahb_desc, &ahb);
-    if (result != 0) {
+    vkt::AHB ahb(AHARDWAREBUFFER_FORMAT_Y8Cb8Cr8_420, AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE, 64, 64);
+    if (!ahb.handle()) {
         GTEST_SKIP() << "could not allocate AHARDWAREBUFFER_FORMAT_Y8Cb8Cr8_420";
     }
 
-    VkAndroidHardwareBufferFormatPropertiesANDROID ahb_fmt_props = LvlInitStruct<VkAndroidHardwareBufferFormatPropertiesANDROID>();
+    VkAndroidHardwareBufferFormatPropertiesANDROID ahb_fmt_props = vku::InitStructHelper();
 
-    VkAndroidHardwareBufferPropertiesANDROID ahb_props = LvlInitStruct<VkAndroidHardwareBufferPropertiesANDROID>(&ahb_fmt_props);
-    vk::GetAndroidHardwareBufferPropertiesANDROID(m_device->device(), ahb, &ahb_props);
+    VkAndroidHardwareBufferPropertiesANDROID ahb_props = vku::InitStructHelper(&ahb_fmt_props);
+    vk::GetAndroidHardwareBufferPropertiesANDROID(m_device->device(), ahb.handle(), &ahb_props);
 
     // The spec says the driver must not return zero, even if a VkFormat is returned with it, some older drivers do as a driver bug
     if (ahb_fmt_props.externalFormat == 0) {
@@ -381,14 +289,14 @@ TEST_F(PositiveAndroidHardwareBuffer, ExternalImage) {
     }
 
     // Create an image w/ external format
-    VkExternalFormatANDROID ext_format = LvlInitStruct<VkExternalFormatANDROID>();
+    VkExternalFormatANDROID ext_format = vku::InitStructHelper();
     ext_format.externalFormat = ahb_fmt_props.externalFormat;
 
-    VkExternalMemoryImageCreateInfo ext_image_info = LvlInitStruct<VkExternalMemoryImageCreateInfo>(&ext_format);
+    VkExternalMemoryImageCreateInfo ext_image_info = vku::InitStructHelper(&ext_format);
     ext_image_info.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID;
 
     VkImageObj image(m_device);
-    VkImageCreateInfo image_create_info = LvlInitStruct<VkImageCreateInfo>(&ext_image_info);
+    VkImageCreateInfo image_create_info = vku::InitStructHelper(&ext_image_info);
     image_create_info.flags = 0;
     image_create_info.imageType = VK_IMAGE_TYPE_2D;
     image_create_info.format = VK_FORMAT_UNDEFINED;
@@ -402,45 +310,41 @@ TEST_F(PositiveAndroidHardwareBuffer, ExternalImage) {
     image_create_info.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
 
     {
-        auto external_image_info = LvlInitStruct<VkPhysicalDeviceExternalImageFormatInfo>();
+        VkPhysicalDeviceExternalImageFormatInfo external_image_info = vku::InitStructHelper();
         external_image_info.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID;
-        auto image_info = LvlInitStruct<VkPhysicalDeviceImageFormatInfo2>(&external_image_info);
+        VkPhysicalDeviceImageFormatInfo2 image_info = vku::InitStructHelper(&external_image_info);
         image_info.format = image_create_info.format;
         image_info.type = image_create_info.imageType;
         image_info.tiling = image_create_info.tiling;
         image_info.usage = image_create_info.usage;
         image_info.flags = image_create_info.flags;
 
-        auto ahb_usage = LvlInitStruct<VkAndroidHardwareBufferUsageANDROID>();
-        auto external_image_properties = LvlInitStruct<VkExternalImageFormatProperties>(&ahb_usage);
-        auto image_properties = LvlInitStruct<VkImageFormatProperties2>(&external_image_properties);
+        VkAndroidHardwareBufferUsageANDROID ahb_usage = vku::InitStructHelper();
+        VkExternalImageFormatProperties external_image_properties = vku::InitStructHelper(&ahb_usage);
+        VkImageFormatProperties2 image_properties = vku::InitStructHelper(&external_image_properties);
 
         if (vk::GetPhysicalDeviceImageFormatProperties2(gpu(), &image_info, &image_properties) != VK_SUCCESS) {
-            AHardwareBuffer_release(ahb);
             GTEST_SKIP() << "could not create image with external format";
         }
     }
 
     image.init_no_mem(*m_device, image_create_info);
 
-    VkMemoryDedicatedAllocateInfo memory_dedicated_info = LvlInitStruct<VkMemoryDedicatedAllocateInfo>();
+    VkMemoryDedicatedAllocateInfo memory_dedicated_info = vku::InitStructHelper();
     memory_dedicated_info.image = image.handle();
     memory_dedicated_info.buffer = VK_NULL_HANDLE;
 
     VkImportAndroidHardwareBufferInfoANDROID import_ahb_Info =
-        LvlInitStruct<VkImportAndroidHardwareBufferInfoANDROID>(&memory_dedicated_info);
-    import_ahb_Info.buffer = ahb;
+        vku::InitStructHelper(&memory_dedicated_info);
+    import_ahb_Info.buffer = ahb.handle();
 
-    VkMemoryAllocateInfo memory_allocate_info = LvlInitStruct<VkMemoryAllocateInfo>(&import_ahb_Info);
+    VkMemoryAllocateInfo memory_allocate_info = vku::InitStructHelper(&import_ahb_Info);
     if (!SetAllocationInfoImportAHB(m_device, ahb_props, memory_allocate_info)) {
-        AHardwareBuffer_release(ahb);
         GTEST_SKIP() << "No valid memory type index could be found";
     }
 
-    vk_testing::DeviceMemory memory(*m_device, memory_allocate_info);
+    vkt::DeviceMemory memory(*m_device, memory_allocate_info);
     vk::BindImageMemory(m_device->device(), image.handle(), memory, 0);
-
-    AHardwareBuffer_release(ahb);
 }
 
 TEST_F(PositiveAndroidHardwareBuffer, ExternalCameraFormat) {
@@ -448,22 +352,9 @@ TEST_F(PositiveAndroidHardwareBuffer, ExternalCameraFormat) {
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_ANDROID_EXTERNAL_MEMORY_ANDROID_HARDWARE_BUFFER_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-
-    if (IsPlatform(kGalaxyS10)) {
-        GTEST_SKIP() << "This test should not run on Galaxy S10 - fails in gralloc";
-    }
-
-    ASSERT_NO_FATAL_FAILURE(InitState());
-    if (DeviceValidationVersion() < VK_API_VERSION_1_1) {
-        GTEST_SKIP() << "At least Vulkan version 1.1 is required.";
-    }
+    RETURN_IF_SKIP(Init())
 
     // Simulate camera usage of AHB
-    AHardwareBuffer *ahb;
     AHardwareBuffer_Desc ahb_desc = {};
     ahb_desc.format = AHARDWAREBUFFER_FORMAT_IMPLEMENTATION_DEFINED;
     ahb_desc.usage =
@@ -472,15 +363,15 @@ TEST_F(PositiveAndroidHardwareBuffer, ExternalCameraFormat) {
     ahb_desc.height = 64;
     ahb_desc.layers = 1;
     ahb_desc.stride = 1;
-    int result = AHardwareBuffer_allocate(&ahb_desc, &ahb);
-    if (result != 0) {
+    vkt::AHB ahb(&ahb_desc);
+    if (!ahb.handle()) {
         GTEST_SKIP() << "could not allocate AHARDWAREBUFFER_FORMAT_IMPLEMENTATION_DEFINED";
     }
 
-    VkAndroidHardwareBufferFormatPropertiesANDROID ahb_fmt_props = LvlInitStruct<VkAndroidHardwareBufferFormatPropertiesANDROID>();
+    VkAndroidHardwareBufferFormatPropertiesANDROID ahb_fmt_props = vku::InitStructHelper();
 
-    VkAndroidHardwareBufferPropertiesANDROID ahb_props = LvlInitStruct<VkAndroidHardwareBufferPropertiesANDROID>(&ahb_fmt_props);
-    vk::GetAndroidHardwareBufferPropertiesANDROID(m_device->device(), ahb, &ahb_props);
+    VkAndroidHardwareBufferPropertiesANDROID ahb_props = vku::InitStructHelper(&ahb_fmt_props);
+    vk::GetAndroidHardwareBufferPropertiesANDROID(m_device->device(), ahb.handle(), &ahb_props);
 
     // The spec says the driver must not return zero, even if a VkFormat is returned with it, some older drivers do as a driver bug
     if (ahb_fmt_props.externalFormat == 0) {
@@ -488,14 +379,14 @@ TEST_F(PositiveAndroidHardwareBuffer, ExternalCameraFormat) {
     }
 
     // Create an image w/ external format
-    VkExternalFormatANDROID ext_format = LvlInitStruct<VkExternalFormatANDROID>();
+    VkExternalFormatANDROID ext_format = vku::InitStructHelper();
     ext_format.externalFormat = ahb_fmt_props.externalFormat;
 
-    VkExternalMemoryImageCreateInfo ext_image_info = LvlInitStruct<VkExternalMemoryImageCreateInfo>(&ext_format);
+    VkExternalMemoryImageCreateInfo ext_image_info = vku::InitStructHelper(&ext_format);
     ext_image_info.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID;
 
     VkImageObj image(m_device);
-    VkImageCreateInfo image_create_info = LvlInitStruct<VkImageCreateInfo>(&ext_image_info);
+    VkImageCreateInfo image_create_info = vku::InitStructHelper(&ext_image_info);
     image_create_info.flags = 0;
     image_create_info.imageType = VK_IMAGE_TYPE_2D;
     image_create_info.format = VK_FORMAT_UNDEFINED;
@@ -508,45 +399,70 @@ TEST_F(PositiveAndroidHardwareBuffer, ExternalCameraFormat) {
     image_create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     image_create_info.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
     {
-        auto external_image_info = LvlInitStruct<VkPhysicalDeviceExternalImageFormatInfo>();
+        VkPhysicalDeviceExternalImageFormatInfo external_image_info = vku::InitStructHelper();
         external_image_info.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID;
-        auto image_info = LvlInitStruct<VkPhysicalDeviceImageFormatInfo2>(&external_image_info);
+        VkPhysicalDeviceImageFormatInfo2 image_info = vku::InitStructHelper(&external_image_info);
         image_info.format = image_create_info.format;
         image_info.type = image_create_info.imageType;
         image_info.tiling = image_create_info.tiling;
         image_info.usage = image_create_info.usage;
         image_info.flags = image_create_info.flags;
 
-        auto ahb_usage = LvlInitStruct<VkAndroidHardwareBufferUsageANDROID>();
-        auto external_image_properties = LvlInitStruct<VkExternalImageFormatProperties>(&ahb_usage);
-        auto image_properties = LvlInitStruct<VkImageFormatProperties2>(&external_image_properties);
+        VkAndroidHardwareBufferUsageANDROID ahb_usage = vku::InitStructHelper();
+        VkExternalImageFormatProperties external_image_properties = vku::InitStructHelper(&ahb_usage);
+        VkImageFormatProperties2 image_properties = vku::InitStructHelper(&external_image_properties);
 
         if (vk::GetPhysicalDeviceImageFormatProperties2(gpu(), &image_info, &image_properties) != VK_SUCCESS) {
-            AHardwareBuffer_release(ahb);
             GTEST_SKIP() << "could not create image with external format";
         }
     }
 
     image.init_no_mem(*m_device, image_create_info);
 
-    VkMemoryDedicatedAllocateInfo memory_dedicated_info = LvlInitStruct<VkMemoryDedicatedAllocateInfo>();
+    VkMemoryDedicatedAllocateInfo memory_dedicated_info = vku::InitStructHelper();
     memory_dedicated_info.image = image.handle();
     memory_dedicated_info.buffer = VK_NULL_HANDLE;
 
     VkImportAndroidHardwareBufferInfoANDROID import_ahb_Info =
-        LvlInitStruct<VkImportAndroidHardwareBufferInfoANDROID>(&memory_dedicated_info);
-    import_ahb_Info.buffer = ahb;
+        vku::InitStructHelper(&memory_dedicated_info);
+    import_ahb_Info.buffer = ahb.handle();
 
-    VkMemoryAllocateInfo memory_allocate_info = LvlInitStruct<VkMemoryAllocateInfo>(&import_ahb_Info);
+    VkMemoryAllocateInfo memory_allocate_info = vku::InitStructHelper(&import_ahb_Info);
     if (!SetAllocationInfoImportAHB(m_device, ahb_props, memory_allocate_info)) {
-        AHardwareBuffer_release(ahb);
         GTEST_SKIP() << "No valid memory type index could be found";
     }
 
-    vk_testing::DeviceMemory memory(*m_device, memory_allocate_info);
+    vkt::DeviceMemory memory(*m_device, memory_allocate_info);
     vk::BindImageMemory(m_device->device(), image.handle(), memory, 0);
+}
 
-    AHardwareBuffer_release(ahb);
+TEST_F(PositiveAndroidHardwareBuffer, DeviceImageMemoryReq) {
+    TEST_DESCRIPTION("Call vkGetDeviceImageMemoryRequirementsKHR with externalFormat of zero.");
+
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_ANDROID_EXTERNAL_MEMORY_ANDROID_HARDWARE_BUFFER_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
+    RETURN_IF_SKIP(Init())
+
+    VkExternalFormatANDROID external_format = vku::InitStructHelper();
+    external_format.externalFormat = 0;
+
+    VkImageCreateInfo image_create_info = vku::InitStructHelper(&external_format);
+    image_create_info.imageType = VK_IMAGE_TYPE_2D;
+    image_create_info.arrayLayers = 1;
+    image_create_info.extent = {64, 64, 1};
+    image_create_info.format = VK_FORMAT_UNDEFINED;
+    image_create_info.mipLevels = 1;
+    image_create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_create_info.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
+
+    VkDeviceImageMemoryRequirements image_memory_req = vku::InitStructHelper();
+    image_memory_req.pCreateInfo = &image_create_info;
+    image_memory_req.planeAspect = VK_IMAGE_ASPECT_COLOR_BIT;
+    VkMemoryRequirements2 out_memory_req = vku::InitStructHelper();
+    vk::GetDeviceImageMemoryRequirementsKHR(device(), &image_memory_req, &out_memory_req);
 }
 
 #endif  // VK_USE_PLATFORM_ANDROID_KHR

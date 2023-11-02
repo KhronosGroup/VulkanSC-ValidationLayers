@@ -19,8 +19,8 @@
 # limitations under the License.
 
 import os
-from generators.generator_utils import (buildListVUID, incIndent, decIndent)
-from generators.vulkan_object import (Handle, Command, Struct, Member, Param)
+from generators.generator_utils import buildListVUID, getVUID
+from generators.vulkan_object import Handle, Command, Struct, Member, Param
 from generators.base_generator import BaseGenerator
 
 # This class is a container for any source code, data, or other behavior that is necessary to
@@ -46,7 +46,7 @@ class APISpecific:
             case 'vulkan':
                 per_scope = {
                     'instance': 'VUID-vkDestroyInstance-instance-00629',
-                    'device': 'VUID-vkDestroyDevice-device-00378'
+                    'device': 'VUID-vkDestroyDevice-device-05137'
                 }
 
         return per_scope[scope]
@@ -198,26 +198,136 @@ class ObjectTrackerOutputGenerator(BaseGenerator):
             "VkAccelerationStructureKHR-accelerationStructure-nullalloc": "\"VUID-vkDestroyAccelerationStructureKHR-accelerationStructure-02444\"",
             "VkAccelerationStructureNV-accelerationStructure-compatalloc": "\"VUID-vkDestroyAccelerationStructureNV-accelerationStructure-03753\"",
             "VkAccelerationStructureNV-accelerationStructure-nullalloc": "\"VUID-vkDestroyAccelerationStructureNV-accelerationStructure-03754\"",
+            "shader-compatalloc": "\"VUID-vkDestroyShaderEXT-pAllocator-08483\"",
+            "shader-nullalloc": "\"VUID-vkDestroyShaderEXT-pAllocator-08484\"",
            }
 
-    #
-    # Get VUID identifier from implicit VUID tag
-    def GetVuid(self, parent: str, suffix: str) -> str:
-        vuid_string = 'VUID-%s-%s' % (parent, suffix)
-        vuid = "kVUIDUndefined"
-        if '->' in vuid_string:
-           return vuid
-        if vuid_string in self.valid_vuids:
-            vuid = "\"%s\"" % vuid_string
-        else:
-            alias =  self.vk.commands[parent].alias if parent in self.vk.commands else None
-            if alias:
-                alias_string = 'VUID-%s-%s' % (alias, suffix)
-                if alias_string in self.valid_vuids:
-                    vuid = "\"%s\"" % alias_string
-        return vuid
-    def isNonDispatchable(self, name: str) -> bool:
-        return name in self.vk.handles and not self.vk.handles[name].dispatchable
+        # Structures that do not define parent/commonparent VUIDs for vulkan handles.
+        # This overlaps with https://gitlab.khronos.org/vulkan/vulkan/-/issues/3553#note_424431
+        self.structs_that_forgot_about_parent_vuids = [
+            'VkMappedMemoryRange',
+            'VkSparseMemoryBind',
+            'VkSparseImageMemoryBind',
+            'VkBufferViewCreateInfo',
+            'VkPipelineShaderStageCreateInfo',
+            'VkPipelineLayoutCreateInfo',
+            'VkBufferMemoryBarrier',
+            'VkImageMemoryBarrier',
+            'VkImageMemoryRequirementsInfo2',
+            'VkBufferMemoryRequirementsInfo2',
+            'VkImageSparseMemoryRequirementsInfo2',
+            'VkSemaphoreWaitInfo',
+            'VkSemaphoreSignalInfo',
+            'VkBufferMemoryBarrier2',
+            'VkImageMemoryBarrier2',
+            'VkSemaphoreSubmitInfo',
+            'VkCommandBufferSubmitInfo',
+            'VkBindVideoSessionMemoryInfoKHR',
+            'VkVideoPictureResourceInfoKHR',
+            'VkVideoDecodeInfoKHR',
+            'VkMemoryGetWin32HandleInfoKHR',
+            'VkMemoryGetFdInfoKHR',
+            'VkImportSemaphoreWin32HandleInfoKHR',
+            'VkSemaphoreGetWin32HandleInfoKHR',
+            'VkImportSemaphoreFdInfoKHR',
+            'VkSemaphoreGetFdInfoKHR',
+            'VkImportFenceWin32HandleInfoKHR',
+            'VkFenceGetWin32HandleInfoKHR',
+            'VkImportFenceFdInfoKHR',
+            'VkFenceGetFdInfoKHR',
+            'VkPhysicalDeviceSurfaceInfo2KHR',
+            'VkPipelineInfoKHR',
+            'VkPipelineExecutableInfoKHR',
+            'VkMemoryMapInfoKHR',
+            'VkMemoryUnmapInfoKHR',
+            'VkVideoEncodeSessionParametersGetInfoKHR',
+            'VkVideoEncodeInfoKHR',
+            'VkCuFunctionCreateInfoNVX',
+            'VkCuLaunchInfoNVX',
+            'VkConditionalRenderingBeginInfoEXT',
+            'VkMemoryGetAndroidHardwareBufferInfoANDROID',
+            'VkPipelineLibraryCreateInfoKHR',
+            'VkGeometryAABBNV',
+            'VkAccelerationStructureMemoryRequirementsInfoNV',
+            'VkCopyMemoryToImageInfoEXT',
+            'VkCopyImageToMemoryInfoEXT',
+            'VkHostImageLayoutTransitionInfoEXT',
+            'VkReleaseSwapchainImagesInfoEXT',
+            'VkIndirectCommandsLayoutTokenNV',
+            'VkBufferCaptureDescriptorDataInfoEXT',
+            'VkImageCaptureDescriptorDataInfoEXT',
+            'VkImageViewCaptureDescriptorDataInfoEXT',
+            'VkSamplerCaptureDescriptorDataInfoEXT',
+            'VkMemoryGetZirconHandleInfoFUCHSIA',
+            'VkImportSemaphoreZirconHandleInfoFUCHSIA',
+            'VkSemaphoreGetZirconHandleInfoFUCHSIA',
+            'VkMemoryGetRemoteAddressInfoNV',
+            'VkMicromapCreateInfoEXT',
+            'VkMicromapBuildInfoEXT',
+            'VkCopyMicromapToMemoryInfoEXT',
+            'VkCopyMemoryToMicromapInfoEXT',
+            'VkDescriptorSetBindingReferenceVALVE',
+            'VkShaderCreateInfoEXT',
+            'VkAccelerationStructureCreateInfoKHR',
+            'VkCopyAccelerationStructureToMemoryInfoKHR',
+            'VkCopyMemoryToAccelerationStructureInfoKHR',
+            'VkDisplaySurfaceCreateInfoKHR',
+            'VkDisplayPlaneInfo2KHR',
+            'VkSparseBufferMemoryBindInfo',
+            'VkSparseImageOpaqueMemoryBindInfo',
+            'VkSparseImageMemoryBindInfo',
+            'VkImportMemoryBufferCollectionFUCHSIA',
+            'VkBufferCollectionBufferCreateInfoFUCHSIA',
+            'VkBufferCollectionImageCreateInfoFUCHSIA',
+            'VkImageSwapchainCreateInfoKHR',
+            'VkSamplerYcbcrConversionInfo',
+            'VkShaderModuleValidationCacheCreateInfoEXT',
+            'VkGraphicsPipelineShaderGroupsCreateInfoNV',
+            'VkSubpassShadingPipelineCreateInfoHUAWEI',
+            'VkRenderPassAttachmentBeginInfo',
+            'VkBindImageMemorySwapchainInfoKHR',
+            'VkRenderingFragmentDensityMapAttachmentInfoEXT',
+            'VkRenderingFragmentShadingRateAttachmentInfoKHR',
+            'VkSwapchainPresentFenceInfoEXT',
+            'VkIndirectCommandsStreamNV',
+            'VkDescriptorBufferBindingPushDescriptorBufferHandleEXT',
+            'VkBufferDeviceAddressInfo',
+            'VkDeviceMemoryOpaqueCaptureAddressInfo',
+            'VkPipelineIndirectDeviceAddressInfoNV',
+            'VkAccelerationStructureDeviceAddressInfoKHR',
+            ]
+
+        # Commands that define parent requirements using "-parent" instead of "-commonparent" VUID
+        # for the cases when multiple objects share the same parent.
+        self.use_parent_instead_of_commonparent_commands = [
+            'vkBindBufferMemory',
+            'vkBindImageMemory',
+            'vkMergePipelineCaches',
+            'vkCreateGraphicsPipelines',
+            'vkCreateComputePipelines',
+            'vkUpdateDescriptorSetWithTemplate',
+            'vkUpdateDescriptorSetWithTemplateKHR',
+            'vkAcquireNextImageKHR',
+            'vkMergeValidationCachesEXT',
+            'vkBindOpticalFlowSessionImageNV',
+            ]
+
+        # Commands that include the dispatchable parameter in the "-commonparent" list of handles.
+        # For example, if the dispatchable parameter is VkDevice, but commonparent VUID defines
+        # VkInstance as a parent then such VUID will also ask to validate VkDevice againt VkInstance.
+        # In other cases, the dispatchable parameter is considered to be a parent and it is not
+        # included in the VUID's list of handles.
+        self.dispatchable_has_parent_vuid_commands = [
+            'vkGetDeviceGroupSurfacePresentModesKHR',
+            'vkDisplayPowerControlEXT',
+            'vkRegisterDisplayEventEXT',
+            'vkGetPhysicalDeviceSurfaceSupportKHR',
+            'vkGetPhysicalDeviceSurfaceCapabilitiesKHR',
+            'vkGetPhysicalDeviceSurfaceFormatsKHR',
+            'vkGetPhysicalDeviceSurfacePresentModesKHR',
+            'vkGetPhysicalDevicePresentRectanglesKHR',
+            'vkGetPhysicalDeviceSurfaceCapabilities2EXT'
+        ]
 
     # Work up Handle's parents to see if it VkDevice
     def isParentDevice(self, handle: Handle) -> bool:
@@ -227,30 +337,34 @@ class ObjectTrackerOutputGenerator(BaseGenerator):
             handle = handle.parent
         return False
 
+    def allComments(self, lines: list[str]) -> bool:
+        not_empty_lines = [line for line in lines.splitlines() if line.strip()]
+        return all(line.startswith('//') for line in not_empty_lines)
+
     def generate(self):
         self.write(f'''// *** THIS FILE IS GENERATED - DO NOT EDIT ***
-// See {os.path.basename(__file__)} for modifications
+            // See {os.path.basename(__file__)} for modifications
 
-/***************************************************************************
-*
-* Copyright (c) 2015-2023 The Khronos Group Inc.
-* Copyright (c) 2015-2023 Valve Corporation
-* Copyright (c) 2015-2023 LunarG, Inc.
-* Copyright (c) 2015-2023 Google Inc.
-* Copyright (c) 2015-2023 RasterGrid Kft.
-*
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
-*
-*     http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-****************************************************************************/\n''')
+            /***************************************************************************
+            *
+            * Copyright (c) 2015-2023 The Khronos Group Inc.
+            * Copyright (c) 2015-2023 Valve Corporation
+            * Copyright (c) 2015-2023 LunarG, Inc.
+            * Copyright (c) 2015-2023 Google Inc.
+            * Copyright (c) 2015-2023 RasterGrid Kft.
+            *
+            * Licensed under the Apache License, Version 2.0 (the "License");
+            * you may not use this file except in compliance with the License.
+            * You may obtain a copy of the License at
+            *
+            *     http://www.apache.org/licenses/LICENSE-2.0
+            *
+            * Unless required by applicable law or agreed to in writing, software
+            * distributed under the License is distributed on an "AS IS" BASIS,
+            * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+            * See the License for the specific language governing permissions and
+            * limitations under the License.
+            ****************************************************************************/\n''')
         self.write('// NOLINTBEGIN') # Wrap for clang-tidy to ignore
 
         if self.filename == 'object_tracker.h':
@@ -272,41 +386,45 @@ class ObjectTrackerOutputGenerator(BaseGenerator):
             prototype = (command.cPrototype.split('VKAPI_CALL ')[1])[2:-1]
             terminator = ';\n' if 'ValidationCache' in command.name else ' override;\n'
 
-            if pre_call_validate:
-                out.append(f'bool PreCallValidate{prototype} const{terminator}')
+            # If a function has manual implementation we still need to generate its signature in the header file
+            function_signature_for_no_autogen = command.name in self.no_autogen_list and not command.name == 'vkCreateInstance'
+
+            generate_pre_call_validate = (pre_call_validate and not self.allComments(pre_call_validate)) or function_signature_for_no_autogen
+
+            if generate_pre_call_validate:
+                prePrototype = prototype.replace(')', ', const ErrorObject& error_obj)')
+                out.append(f'bool PreCallValidate{prePrototype} const{terminator}')
 
             if pre_call_record:
                 out.append(f'void PreCallRecord{prototype}{terminator}')
 
             if post_call_record:
-                if command.returnType == 'VkResult':
-                    prototype = prototype.replace(')', ',\n    VkResult                                    result)')
-                elif command.returnType == 'VkDeviceAddress':
-                    prototype = prototype.replace(')', ',\n    VkDeviceAddress                             result)')
+                prototype = prototype.replace(')', ', const RecordObject& record_obj)')
                 out.append(f'void PostCallRecord{prototype}{terminator}')
 
             out.extend([f'#endif // {command.protect}\n'] if command.protect else [])
 
         out.append('''
 
-void PostCallRecordDestroyInstance(VkInstance instance, const VkAllocationCallbacks *pAllocator) override;
-void PreCallRecordResetDescriptorPool(VkDevice device, VkDescriptorPool descriptorPool, VkDescriptorPoolResetFlags flags) override;
-void PostCallRecordGetPhysicalDeviceQueueFamilyProperties(VkPhysicalDevice physicalDevice, uint32_t *pQueueFamilyPropertyCount, VkQueueFamilyProperties *pQueueFamilyProperties) override;
-void PreCallRecordFreeCommandBuffers(VkDevice device, VkCommandPool commandPool, uint32_t commandBufferCount, const VkCommandBuffer *pCommandBuffers) override;
-void PreCallRecordFreeDescriptorSets(VkDevice device, VkDescriptorPool descriptorPool, uint32_t descriptorSetCount, const VkDescriptorSet *pDescriptorSets) override;
-void PostCallRecordGetPhysicalDeviceQueueFamilyProperties2(VkPhysicalDevice physicalDevice, uint32_t *pQueueFamilyPropertyCount, VkQueueFamilyProperties2 *pQueueFamilyProperties) override;
-void PostCallRecordGetPhysicalDeviceQueueFamilyProperties2KHR(VkPhysicalDevice physicalDevice, uint32_t *pQueueFamilyPropertyCount, VkQueueFamilyProperties2 *pQueueFamilyProperties) override;
-void PostCallRecordGetPhysicalDeviceDisplayPropertiesKHR(VkPhysicalDevice physicalDevice, uint32_t *pPropertyCount, VkDisplayPropertiesKHR *pProperties, VkResult result) override;
-void PostCallRecordGetDisplayModePropertiesKHR(VkPhysicalDevice physicalDevice, VkDisplayKHR display, uint32_t *pPropertyCount, VkDisplayModePropertiesKHR *pProperties, VkResult result) override;
-void PostCallRecordGetPhysicalDeviceDisplayProperties2KHR(VkPhysicalDevice physicalDevice, uint32_t *pPropertyCount, VkDisplayProperties2KHR *pProperties, VkResult result) override;
-void PostCallRecordGetDisplayModeProperties2KHR(VkPhysicalDevice physicalDevice, VkDisplayKHR display, uint32_t *pPropertyCount, VkDisplayModeProperties2KHR *pProperties, VkResult result) override;
-void PostCallRecordGetPhysicalDeviceDisplayPlanePropertiesKHR(VkPhysicalDevice physicalDevice, uint32_t* pPropertyCount, VkDisplayPlanePropertiesKHR* pProperties, VkResult result) override;
-void PostCallRecordGetPhysicalDeviceDisplayPlaneProperties2KHR(VkPhysicalDevice physicalDevice, uint32_t* pPropertyCount, VkDisplayPlaneProperties2KHR* pProperties, VkResult result) override;
-''')
+            void PostCallRecordDestroyInstance(VkInstance instance, const VkAllocationCallbacks *pAllocator, const RecordObject& record_obj) override;
+            void PreCallRecordResetDescriptorPool(VkDevice device, VkDescriptorPool descriptorPool, VkDescriptorPoolResetFlags flags) override;
+            void PostCallRecordGetPhysicalDeviceQueueFamilyProperties(VkPhysicalDevice physicalDevice, uint32_t *pQueueFamilyPropertyCount, VkQueueFamilyProperties *pQueueFamilyProperties, const RecordObject& record_obj) override;
+            void PreCallRecordFreeCommandBuffers(VkDevice device, VkCommandPool commandPool, uint32_t commandBufferCount, const VkCommandBuffer *pCommandBuffers) override;
+            void PreCallRecordFreeDescriptorSets(VkDevice device, VkDescriptorPool descriptorPool, uint32_t descriptorSetCount, const VkDescriptorSet *pDescriptorSets) override;
+            void PostCallRecordGetPhysicalDeviceQueueFamilyProperties2(VkPhysicalDevice physicalDevice, uint32_t *pQueueFamilyPropertyCount, VkQueueFamilyProperties2 *pQueueFamilyProperties, const RecordObject& record_obj) override;
+            void PostCallRecordGetPhysicalDeviceQueueFamilyProperties2KHR(VkPhysicalDevice physicalDevice, uint32_t *pQueueFamilyPropertyCount, VkQueueFamilyProperties2 *pQueueFamilyProperties, const RecordObject& record_obj) override;
+            void PostCallRecordGetPhysicalDeviceDisplayPropertiesKHR(VkPhysicalDevice physicalDevice, uint32_t *pPropertyCount, VkDisplayPropertiesKHR *pProperties, const RecordObject& record_obj) override;
+            void PostCallRecordGetDisplayModePropertiesKHR(VkPhysicalDevice physicalDevice, VkDisplayKHR display, uint32_t *pPropertyCount, VkDisplayModePropertiesKHR *pProperties, const RecordObject& record_obj) override;
+            void PostCallRecordGetPhysicalDeviceDisplayProperties2KHR(VkPhysicalDevice physicalDevice, uint32_t *pPropertyCount, VkDisplayProperties2KHR *pProperties, const RecordObject& record_obj) override;
+            void PostCallRecordGetDisplayModeProperties2KHR(VkPhysicalDevice physicalDevice, VkDisplayKHR display, uint32_t *pPropertyCount, VkDisplayModeProperties2KHR *pProperties, const RecordObject& record_obj) override;
+            void PostCallRecordGetPhysicalDeviceDisplayPlanePropertiesKHR(VkPhysicalDevice physicalDevice, uint32_t* pPropertyCount, VkDisplayPlanePropertiesKHR* pProperties, const RecordObject& record_obj) override;
+            void PostCallRecordGetPhysicalDeviceDisplayPlaneProperties2KHR(VkPhysicalDevice physicalDevice, uint32_t* pPropertyCount, VkDisplayPlaneProperties2KHR* pProperties, const RecordObject& record_obj) override;
+            ''')
         self.write("".join(out))
 
     def generateSource(self):
         out = []
+        out.append('// clang-format off')
         out.append('''
 #include "chassis.h"
 #include "object_tracker/object_lifetime_validation.h"
@@ -314,7 +432,7 @@ ReadLockGuard ObjectLifetimes::ReadLock() const { return ReadLockGuard(validatio
 WriteLockGuard ObjectLifetimes::WriteLock() { return WriteLockGuard(validation_object_mutex, std::defer_lock); }
 
 // ObjectTracker undestroyed objects validation function
-bool ObjectLifetimes::ReportUndestroyedInstanceObjects(VkInstance instance) const {
+bool ObjectLifetimes::ReportUndestroyedInstanceObjects(VkInstance instance, const Location& loc) const {
     bool skip = false;
     const std::string error_code = "%s";
 ''' % APISpecific.getUndestroyedObjectVUID(self.targetApiName, 'instance'))
@@ -322,12 +440,12 @@ bool ObjectLifetimes::ReportUndestroyedInstanceObjects(VkInstance instance) cons
             comment_prefix = ''
             if APISpecific.IsImplicitlyDestroyed(self.targetApiName, handle.name):
                 comment_prefix = '// No destroy API or implicitly freed/destroyed -- do not report: '
-            out.append(f'    {comment_prefix}skip |= ReportLeakedInstanceObjects(instance, kVulkanObjectType{handle.name[2:]}, error_code);\n')
+            out.append(f'    {comment_prefix}skip |= ReportLeakedInstanceObjects(instance, kVulkanObjectType{handle.name[2:]}, error_code, loc);\n')
         out.append('    return skip;\n')
         out.append('}\n')
 
         out.append('''
-bool ObjectLifetimes::ReportUndestroyedDeviceObjects(VkDevice device) const {
+bool ObjectLifetimes::ReportUndestroyedDeviceObjects(VkDevice device, const Location& loc) const {
     bool skip = false;
     const std::string error_code = "%s";
 ''' % APISpecific.getUndestroyedObjectVUID(self.targetApiName, 'device'))
@@ -335,13 +453,13 @@ bool ObjectLifetimes::ReportUndestroyedDeviceObjects(VkDevice device) const {
         comment_prefix = ''
         if APISpecific.IsImplicitlyDestroyed(self.targetApiName, 'VkCommandBuffer'):
             comment_prefix = '// No destroy API or implicitly freed/destroyed -- do not report: '
-        out.append(f'    {comment_prefix}skip |= ReportLeakedDeviceObjects(device, kVulkanObjectTypeCommandBuffer, error_code);\n')
+        out.append(f'    {comment_prefix}skip |= ReportLeakedDeviceObjects(device, kVulkanObjectTypeCommandBuffer, error_code, loc);\n')
 
         for handle in [x for x in self.vk.handles.values() if not x.dispatchable and self.isParentDevice(x)]:
             comment_prefix = ''
             if APISpecific.IsImplicitlyDestroyed(self.targetApiName, handle.name):
                 comment_prefix = '// No destroy API or implicitly freed/destroyed -- do not report: '
-            out.append(f'    {comment_prefix}skip |= ReportLeakedDeviceObjects(device, kVulkanObjectType{handle.name[2:]}, error_code);\n')
+            out.append(f'    {comment_prefix}skip |= ReportLeakedDeviceObjects(device, kVulkanObjectType{handle.name[2:]}, error_code, loc);\n')
         out.append('    return skip;\n')
         out.append('}\n')
 
@@ -356,6 +474,8 @@ bool ObjectLifetimes::ReportUndestroyedDeviceObjects(VkDevice device) const {
             out.append(f'    DestroyUndestroyedObjects(kVulkanObjectType{handle.name[2:]});\n')
         out.append('}\n')
 
+        out.append('// clang-format on')
+
         for command in [x for x in self.vk.commands.values() if x.name not in self.no_autogen_list]:
             out.extend([f'#ifdef {command.protect}\n'] if command.protect else [])
 
@@ -366,35 +486,44 @@ bool ObjectLifetimes::ReportUndestroyedDeviceObjects(VkDevice device) const {
 
             # Output PreCallValidateAPI function if necessary
             if pre_call_validate:
-                out.append('\n')
-                out.append(f'bool ObjectLifetimes::PreCallValidate{prototype} const {{\n')
-                out.append('    bool skip = false;\n')
-                out.append(f'{pre_call_validate}\n')
-                out.append('    return skip;\n')
-                out.append('}\n')
+                prePrototype = prototype.replace(')', ', const ErrorObject& error_obj)')
+                if self.allComments(pre_call_validate):
+                     out.append(f'''
+                        // {command.name}:
+                        {pre_call_validate}
+                        ''')
+                else:
+                    out.append(f'''
+                        bool ObjectLifetimes::PreCallValidate{prePrototype} const {{
+                            bool skip = false;
+                            {pre_call_validate}
+                            return skip;
+                        }}
+                        ''')
 
             # Output PreCallRecordAPI function if necessary
             if pre_call_record:
-                out.append('\n')
-                out.append(f'void ObjectLifetimes::PreCallRecord{prototype} {{\n')
-                out.append(f'{pre_call_record}\n')
-                out.append('}\n')
+                out.append(f'''
+                    void ObjectLifetimes::PreCallRecord{prototype} {{
+                        {pre_call_record}
+                    }}
+                    ''')
 
             # Output PosCallRecordAPI function if necessary
             if post_call_record:
                 out.append('\n')
                 postPrototype = f'void ObjectLifetimes::PostCallRecord{prototype} {{\n'
+                postPrototype = postPrototype.replace(')', ', const RecordObject& record_obj)')
                 if command.returnType == 'VkResult':
-                    postPrototype = postPrototype.replace(')', ',\n    VkResult                                    result)')
-                    failureCondition = 'result != VK_SUCCESS'
+                    failureCondition = 'record_obj.result != VK_SUCCESS'
                     # VK_INCOMPLETE is considered a success
                     if 'EnumeratePhysicalDeviceGroups' in command.name:
-                        failureCondition += ' && result != VK_INCOMPLETE'
+                        failureCondition += ' && record_obj.result != VK_INCOMPLETE'
+                    if 'CreateShadersEXT' in command.name:
+                        failureCondition += ' && record_obj.result != VK_ERROR_INCOMPATIBLE_SHADER_BINARY_EXT'
                     # The two createpipelines APIs may create on failure -- skip the success result check
                     if 'CreateGraphicsPipelines' not in command.name and 'CreateComputePipelines' not in command.name and 'CreateRayTracingPipelines' not in command.name:
                         postPrototype = postPrototype.replace('{', f'{{\n    if ({failureCondition}) return;')
-                elif command.returnType == 'VkDeviceAddress':
-                    postPrototype = postPrototype.replace(')', ',\n    VkDeviceAddress                             result)')
                 out.append(postPrototype)
 
                 out.append(f'{post_call_record}\n')
@@ -429,121 +558,268 @@ bool ObjectLifetimes::ReportUndestroyedDeviceObjects(VkDevice device) const {
             return vuid
         return "kVUIDUndefined"
 
+
+    def getParamVUID(self, member: Member, parentName: str) -> str:
+        # Replace with alias if one
+        alias = self.vk.commands[parentName].alias if parentName in self.vk.commands else None
+        parent = alias if alias else parentName
+        vuid_string = f'VUID-{parent}-{member.name}-parameter'
+
+        # TODO: Currently just brute force check all VUs, but should be smarter what makes these `-parameter` VUs
+        param_vuid = f'"{vuid_string}"' if vuid_string in self.valid_vuids else "kVUIDUndefined"
+        return param_vuid
+
+    def hasFieldParentVUID(self, member: Member, structName: str) -> bool:
+        # Not a vulkan handle. Parent VUIDs are only for vulkan handles 
+        if member.type not in self.vk.handles:
+            return False
+
+        # All struct members that are vulkan handles should have parent VUID.
+        # There is a bunch of structs though, for which the specification does not do this.
+        return structName not in self.structs_that_forgot_about_parent_vuids
+
+
+    def hasParameterParentVUID(self, parameter: Member, commandName: str) -> bool:
+        # Check for commands that, except the first dispatchable parameter,
+        # do not have other parameters that are Vulkan handles. 
+        # Such commands can't have parent VUIDs (e.g. vkQueueWaitIdle)
+        params = self.vk.commands[commandName].params
+        only_dispatchable_parameter = len([x for x in params if x.type in self.vk.handles and (not x.pointer or x.const)]) == 1
+        if only_dispatchable_parameter:
+            return False
+        
+        # Special case: vkReleaseFullScreenExclusiveModeEXT.
+        # The specification does not define a parent VUID for the swapchain parameter.
+        # It mentions in a free form that device should be associated with a swapchain.
+        if commandName == 'vkReleaseFullScreenExclusiveModeEXT':
+            return False
+
+        # Not a vulkan handle. Parent VUIDs are only for vulkan handles 
+        if parameter.type not in self.vk.handles:
+            return False
+
+        # Skip output parameter
+        if parameter.pointer and not parameter.const:
+            return False
+
+        # Non-dispatchable handles need parent
+        if not self.vk.handles[parameter.type].dispatchable:
+            return True
+
+        # Queue/command buffer handles have parent vuids
+        if parameter.type == 'VkQueue' or parameter.type == 'VkCommandBuffer':
+            return True
+
+        # For other dispatchable handles it depends on the API function
+        return commandName in self.dispatchable_has_parent_vuid_commands
+
+
+    def getFieldParentVUID(self, member: Member, structName: str, commandName: str, singleParentVuid: bool) -> str:
+        if not self.hasFieldParentVUID(member, structName):
+            return 'kVUIDUndefined'
+
+        # Special case
+        if commandName == 'vkCreateImageView' and member.name == 'image':
+            return "\"VUID-vkCreateImageView-image-09179\""
+
+        if singleParentVuid:
+            return getVUID(self.valid_vuids, f'VUID-{structName}-{member.name}-parent')
+        else:
+            return getVUID(self.valid_vuids, f'VUID-{structName}-commonparent')
+
+
+    def getParameterParentVUID(self, parameter: Member, commandName: str, singleParentVuid: bool) -> str:
+        if not self.hasParameterParentVUID(parameter, commandName):
+            return 'kVUIDUndefined'
+
+        # Replace with alias if one
+        alias = self.vk.commands[commandName].alias
+        parent = alias if alias else commandName
+
+        if singleParentVuid or (commandName in self.use_parent_instead_of_commonparent_commands):
+            return getVUID(self.valid_vuids, f'VUID-{parent}-{parameter.name}-parent')
+        else:
+            return getVUID(self.valid_vuids, f'VUID-{parent}-commonparent')
+
+
     # recursively walks struct members (and command params)
-    def validateObjects(self, members: list[Member], indent: str, prefix: str, arrayIndex: int, parentName, isTopLevelCreate: bool) -> str:
+    # parentName == Struct or Command calling into this
+    # topCommand == The command called from (when in a struct)
+    def validateObjects(self, members: list[Member], prefix: str, arrayIndex: int, parentName: str, topCommand: str, errorLoc: str) -> str:
         pre_call_validate = ''
         index = f'index{str(arrayIndex)}'
         arrayIndex += 1
+        is_struct = (parentName != topCommand)
+
+        if is_struct:
+            handle_types = [x.type for x in members if self.hasFieldParentVUID(x, parentName)]
+        else:
+            handle_types = [x.type for x in members if self.hasParameterParentVUID(x, parentName)]
+
+        single_parent_vuid = (len(handle_types) == 1)
+
+        # Parent type in parent/commonparent VUIDs: Device, PhysicalDevice or Instance
+        parent_type = 'Device'
+        for type in handle_types:
+            current_type = self.vk.handles[type].parent.type
+            if current_type in ['VK_OBJECT_TYPE_PHYSICAL_DEVICE', 'VK_OBJECT_TYPE_DISPLAY_KHR', 'VK_OBJECT_TYPE_DISPLAY_MODE_KHR']:
+                parent_type = 'PhysicalDevice'
+                # continue search in case instance parent exists
+            elif current_type == 'VK_OBJECT_TYPE_INSTANCE':
+                parent_type = 'Instance'
+                # end search
+                break
+
         # Process any objects in this structure and recurse for any sub-structs in this struct
         for member in members:
-            if isTopLevelCreate and member == members[-1]:
-                continue # ignore last param of creation commands
+            if member.pointer and not member.const:
+                continue # ignore output parameters
 
             if member.type in self.vk.handles:
+                if member.noAutoValidity:
+                    nullAllowed = 'true'
+                elif member.length:
+                    nullAllowed = str(member.optionalPointer).lower()
+                else:
+                    nullAllowed = str(member.optional).lower()
+
+                param_vuid = self.getParamVUID(member, parentName)
+
+                if is_struct:
+                    parent_vuid = self.getFieldParentVUID(member, parentName, topCommand, single_parent_vuid)
+                else:
+                    parent_vuid = self.getParameterParentVUID(member, parentName, single_parent_vuid)
+
+                # Do not generate validation code for the function's dispatchable parameter (the first one).
+                # Validation of such parameters is always successful based on the model of how the chassis
+                # dispactches the calls to ValidationObject. If invalid handle is used it will cause
+                # crash/corruption on the chassis level (in get_dispatch_key or later). And if correct handle
+                # is passed, then due to the mapping done by get_dispatch_key() the handle will belong to the
+                # retrieved validation object, which guarantees positive result of the parenting test.
+                function_dispatchable_parameter = not is_struct and member == members[0]
+                if function_dispatchable_parameter:
+                    chassis_parent_vuid = parent_vuid # keep parent vuid for "Checked by chassis" comment
+                    parent_vuid = 'kVUIDUndefined'
+
+                parent_object_type = '' # empty value corresponds to C++ default parameter value (kVulkanObjectTypeDevice)
+                if parent_type != 'Device':
+                    parent_object_type = f', kVulkanObjectType{parent_type}'
+
+                # Special case: VUID-VkSwapchainCreateInfoKHR-commonparent
+                # This is a problematic VUID in the form it's defined in the spec 1.3.265. Details (internal link):
+                # https://gitlab.khronos.org/vulkan/vulkan/-/issues/2983
+                # Ideally such VUID should be split into two since there are two different parents:
+                # VkInstance for surface and VkDevice for oldSwapchain
+                if parentName == 'VkSwapchainCreateInfoKHR' and member.name == 'oldSwapchain':
+                    parent_object_type = ", kVulkanObjectTypeDevice"
+
                 if member.length:
+                    location = f'{errorLoc}.dot(Field::{member.name}, {index})'
                     countName = f'{prefix}{member.length}'
-                    nullAllowed = 'true' if member.noAutoValidity else str(member.optionalPointer).lower()
+                    pre_call_validate += f'''
+                        if (({countName} > 0) && ({prefix}{member.name})) {{
+                            for (uint32_t {index} = 0; {index} < {countName}; ++{index}) {{
+                                skip |= ValidateObject({prefix}{member.name}[{index}], kVulkanObjectType{member.type[2:]}, {nullAllowed}, {param_vuid}, {parent_vuid}, {location}{parent_object_type});
+                            }}
+                        }}\n'''
+                elif 'basePipelineHandle' in member.name:
+                    pre_call_validate += f'if (({prefix}flags & VK_PIPELINE_CREATE_DERIVATIVE_BIT) && ({prefix}basePipelineIndex == -1))\n'
+                    manual_vuid_index = parentName + '-' + member.name
+                    param_vuid = self.manual_vuids.get(manual_vuid_index, "kVUIDUndefined")
+                    pre_call_validate += f'skip |= ValidateObject({prefix}{member.name}, kVulkanObjectType{member.type[2:]}, false, {param_vuid}, {parent_vuid}, error_obj.location{parent_object_type});\n'
+                elif function_dispatchable_parameter:
+                    pre_call_validate += f'// Checked by chassis: {member.name}: {param_vuid}\n'
+                    if chassis_parent_vuid != 'kVUIDUndefined':
+                        pre_call_validate += f'// Checked by chassis: {member.name}: {chassis_parent_vuid}\n'
                 else:
-                    countName = None
-                    nullAllowed = 'true' if member.noAutoValidity else str(member.optional).lower()
-
-                paramVUID = self.GetVuid(parentName, f'{member.name}-parameter')
-                parentVUID = self.GetVuid(parentName, f'{member.name}-parent')
-
-                # TODO: Revise object 'parent' handling.  Each object definition in the XML specifies a parent, this should
-                #       all be handled in codegen (or at least called out)
-                # These objects do not have a VkDevice as their (ultimate) parent objecs, so skip the current code-gen'd parent checks
-                parent_exception_list = [
-                    'VkPhysicalDevice',
-                    'VkSwapchainKHR',
-                    'VkDisplayKHR',
-                    'VkSurfaceKHR',
-                    'VkDisplayModeKHR',
-                    'VkDebugReportCallbackEXT',
-                    'VkDebugUtilsMessengerEXT']
-                if member.type in parent_exception_list:
-                    parentVUID = 'kVUIDUndefined'
-                else:
-                    # If no parent VUID for this member, look for a commonparent VUID
-                    if parentVUID == 'kVUIDUndefined':
-                        parentVUID = self.GetVuid(parentName, 'commonparent')
-
-                if countName is not None:
-                    pre_call_validate += f'{indent}if (({countName} > 0) && ({prefix}{member.name})) {{\n'
-                    indent = incIndent(indent)
-                    pre_call_validate += f'{indent}for (uint32_t {index} = 0; {index} < {countName}; ++{index}) {{\n'
-                    indent = incIndent(indent)
-                    pre_call_validate += f'{indent}skip |= ValidateObject({prefix}{member.name}[{index}], kVulkanObjectType{member.type[2:]}, {nullAllowed}, {paramVUID}, {parentVUID}, "{parentName}");\n'
-                    indent = decIndent(indent)
-                    pre_call_validate += f'{indent}}}\n'
-                    indent = decIndent(indent)
-                    pre_call_validate += f'{indent}}}\n'
-                else:
-                    bonus_indent = ''
-                    if 'basePipelineHandle' in member.name:
-                        pre_call_validate += f'{indent}if (({prefix}flags & VK_PIPELINE_CREATE_DERIVATIVE_BIT) && ({prefix}basePipelineIndex == -1))\n'
-                        bonus_indent = '    '
-                        nullAllowed = 'false'
-                        manual_vuid_index = parentName + '-' + member.name
-                        paramVUID = self.manual_vuids.get(manual_vuid_index, "kVUIDUndefined")
-                    pre_call_validate += f'{bonus_indent}{indent}skip |= ValidateObject({prefix}{member.name}, kVulkanObjectType{member.type[2:]}, {nullAllowed}, {paramVUID}, {parentVUID}, "{parentName}");\n'
-                    if 'pSampler' in member.name:
-                        pre_call_validate = ''
+                    location = f'{errorLoc}.dot(Field::{member.name})'
+                    if self.vk.commands[topCommand].device and self.vk.handles[member.type].instance:
+                        # Use case when for device-level API call we should use instance-level validation object
+                        pre_call_validate += 'auto instance_data = GetLayerDataPtr(get_dispatch_key(instance), layer_data_map);\n'
+                        pre_call_validate += 'auto instance_object_lifetimes = instance_data->GetValidationObject<ObjectLifetimes>();\n'
+                        pre_call_validate += f'skip |= instance_object_lifetimes->ValidateObject({prefix}{member.name}, kVulkanObjectType{member.type[2:]}, {nullAllowed}, {param_vuid}, {parent_vuid}, {location}{parent_object_type});\n'
+                    else:
+                        pre_call_validate += f'skip |= ValidateObject({prefix}{member.name}, kVulkanObjectType{member.type[2:]}, {nullAllowed}, {param_vuid}, {parent_vuid}, {location}{parent_object_type});\n'
 
             # Handle Structs that contain objects at some level
             elif member.type in self.vk.structs:
+                nested_struct = []
                 struct = self.vk.structs[member.type]
+
                 # Structs at first level will have an object
-                if self.structContainsObject(struct):
-                    # Struct Array
-                    if member.length is not None:
-                        # Update struct prefix
-                        pre_call_validate += f'{indent}if ({prefix}{member.name}) {{\n'
-                        indent = incIndent(indent)
-                        pre_call_validate += f'{indent}for (uint32_t {index} = 0; {index} < {prefix}{member.length}; ++{index}) {{\n'
-                        indent = incIndent(indent)
-                        local_prefix = f'{prefix}{member.name}[{index}].'
-                        # Process sub-structs in this struct
-                        pre_call_validate += self.validateObjects(struct.members, indent, local_prefix, arrayIndex, member.type, False)
-                        indent = decIndent(indent)
-                        pre_call_validate += f'{indent}}}\n'
-                        indent = decIndent(indent)
-                        pre_call_validate += f'{indent}}}\n'
-                    # Single Struct Pointer
-                    elif member.pointer:
-                        # Update struct prefix
-                        new_prefix = f'{prefix}{member.name}->'
-                        # Declare safe_VarType for struct
-                        pre_call_validate += f'{indent}if ({prefix}{member.name}) {{\n'
-                        indent = incIndent(indent)
-                        # Process sub-structs in this struct
-                        pre_call_validate += self.validateObjects(struct.members, indent, new_prefix, arrayIndex, member.type, False)
-                        indent = decIndent(indent)
-                        pre_call_validate += '%s}\n' % indent
-                    # Single Nested Struct
-                    else:
-                        # Update struct prefix
-                        new_prefix = f'{prefix}{member.name}.'
-                        # Process sub-structs
-                        pre_call_validate += self.validateObjects(struct.members, indent, new_prefix, arrayIndex, member.type, False)
+                contains_object = self.structContainsObject(struct)
+
+                # Struct Array
+                if member.length is not None:
+                    # Update struct prefix
+                    nested_struct.append(f'if ({prefix}{member.name}) {{\n')
+                    nested_struct.append(f'    for (uint32_t {index} = 0; {index} < {prefix}{member.length}; ++{index}) {{\n')
+                    new_error_loc = f'{index}_loc'
+                    nested_struct.append(f'[[maybe_unused]] const Location {new_error_loc} = {errorLoc}.dot(Field::{member.name}, {index});\n')
+                    new_prefix = f'{prefix}{member.name}[{index}].'
+                # Single Struct Pointer
+                elif member.pointer:
+                    # Update struct prefix
+                    new_prefix = f'{prefix}{member.name}->'
+                    # Declare safe_VarType for struct
+                    nested_struct.append(f'if ({prefix}{member.name}) {{\n')
+                    new_error_loc = f'{member.name}_loc'
+                    nested_struct.append(f'    [[maybe_unused]] const Location {new_error_loc} = {errorLoc}.dot(Field::{member.name});\n')
+                # Single Nested Struct
+                else:
+                    # Update struct prefix
+                    new_prefix = f'{prefix}{member.name}.'
+                    new_error_loc = f'{member.name}_loc'
+                    nested_struct.append(f'[[maybe_unused]] const Location {new_error_loc} = {errorLoc}.dot(Field::{member.name});\n')
+                    # Process sub-structs
+
+                if contains_object:
+                    nested_struct.append(self.validateObjects(struct.members, new_prefix, arrayIndex, member.type, topCommand, new_error_loc))
+
+                contains_pNext = False
+                if struct.extendedBy:
+                    for extendedBy in struct.extendedBy:
+                        extended_struct = self.vk.structs[extendedBy]
+                        extended_members = [x for x in extended_struct.members if x.type in self.vk.handles]
+                        if not extended_members:
+                            continue
+                        contains_pNext = True
+                        nested_struct.extend([f'#ifdef {extended_struct.protect}\n'] if extended_struct.protect else [])
+                        nested_struct.append(f'if (auto pNext = vku::FindStructInPNextChain<{extendedBy}>({new_prefix}pNext)) {{\n')
+                        nested_struct.append(f'    const Location pNext_loc = {new_error_loc}.pNext(Struct::{extendedBy});\n')
+                        nested_struct.append(self.validateObjects(extended_members, 'pNext->', arrayIndex + 1, extendedBy, topCommand, 'pNext_loc'))
+                        nested_struct.append('}\n')
+                        nested_struct.extend([f'#endif // {extended_struct.protect}\n'] if extended_struct.protect else [])
+
+                # Close indentation
+                if member.length is not None:
+                    nested_struct.append('}\n')
+                    nested_struct.append('}\n')
+                elif member.pointer:
+                    nested_struct.append('}\n')
+
+                # Only print if called into validateObjects
+                if contains_object or contains_pNext:
+                    pre_call_validate += "".join(nested_struct)
+
         return pre_call_validate
     #
     # For a particular API, generate the object handling code
     def generateFunctionBody(self, command: Command):
-        indent = '    '
         pre_call_validate = ''
         pre_call_record = ''
         post_call_record = ''
-
-        isCreate = any(x in command.name for x in ['Create', 'Allocate', 'Enumerate', 'RegisterDeviceEvent', 'RegisterDisplayEvent', 'AcquirePerformanceConfigurationINTEL']) or ('vkGet' in command.name and command.params[-1].pointer)
+        isGetCreate = 'vkGet' in command.name and command.params[-1].pointer and not command.params[-1].const
+        isCreate = any(x in command.name for x in ['Create', 'Allocate', 'Enumerate', 'RegisterDeviceEvent', 'RegisterDisplayEvent', 'AcquirePerformanceConfigurationINTEL']) or isGetCreate
         isDestroy = any(x in command.name for x in ['Destroy', 'Free', 'ReleasePerformanceConfigurationINTEL'])
 
-        pre_call_validate += self.validateObjects(command.params, indent, '', 0, command.name, isCreate)
+        pre_call_validate += self.validateObjects(command.params, '', 0, command.name, command.name, 'error_obj.location')
 
         # Handle object create operations if last parameter is created by this call
         if isCreate:
             handle_type = command.params[-1].type
             isCreatePipelines = 'CreateGraphicsPipelines' in command.name or 'CreateComputePipelines' in command.name or 'CreateRayTracingPipelines' in command.name
+            isCreateShaders = 'CreateShaders' in command.name
 
             if handle_type in self.vk.handles:
                 # Check for special case where multiple handles are returned
@@ -551,32 +827,32 @@ bool ObjectLifetimes::ReportUndestroyedDeviceObjects(VkDevice device) const {
 
                 if objectArray:
                     if isCreatePipelines:
-                        post_call_record += f'{indent}if (VK_ERROR_VALIDATION_FAILED_EXT == result) return;\n'
+                        post_call_record += 'if (VK_ERROR_VALIDATION_FAILED_EXT == record_obj.result) return;\n'
 
-                    post_call_record += f'{indent}if ({command.params[-1].name}) {{\n'
-                    indent = incIndent(indent)
+                    post_call_record += f'if ({command.params[-1].name}) {{\n'
                     countIsPointer = '*' if command.params[-2].type == 'uint32_t' and command.params[-2].pointer else ''
-                    post_call_record += f'{indent}for (uint32_t index = 0; index < {countIsPointer}{command.params[-1].length}; index++) {{\n'
-                    indent = incIndent(indent)
+                    post_call_record += f'for (uint32_t index = 0; index < {countIsPointer}{command.params[-1].length}; index++) {{\n'
 
                 if isCreatePipelines:
-                    post_call_record += f'{indent}if (!pPipelines[index]) continue;\n'
+                    post_call_record += 'if (!pPipelines[index]) continue;\n'
+                elif isCreateShaders:
+                    post_call_record += 'if (!pShaders[index]) break;\n'
 
                 allocator = command.params[-2].name if command.params[-2].type == 'VkAllocationCallbacks' else 'nullptr'
                 objectDest = f'{command.params[-1].name}[index]' if objectArray else f'*{command.params[-1].name}'
-                post_call_record += f'{indent}CreateObject({objectDest}, kVulkanObjectType{handle_type[2:]}, {allocator});\n'
+                post_call_record += f'CreateObject({objectDest}, kVulkanObjectType{handle_type[2:]}, {allocator});\n'
                 if objectArray:
-                    indent = decIndent(indent)
-                    post_call_record += f'{indent}}}\n'
-                    indent = decIndent(indent)
-                    post_call_record += f'{indent}}}\n'
+                    post_call_record += '}\n'
+                    post_call_record += '}\n'
             # Physical device groups are not handles, but a set of handles, they need to be tracked as well
             elif handle_type == 'VkPhysicalDeviceGroupProperties':
-                post_call_record += f'''{indent}if ({command.params[-1].name}) {{
-{indent}{indent}for (uint32_t device_group_index = 0; device_group_index < *{command.params[-2].name}; device_group_index++) {{
-{indent}{indent}{indent}PostCallRecordEnumeratePhysicalDevices({command.params[0].name}, &{command.params[-1].name}[device_group_index].physicalDeviceCount, {command.params[-1].name}[device_group_index].physicalDevices, VK_SUCCESS);
-{indent}{indent}}}
-{indent}}}\n'''
+                post_call_record += f'''
+                    if ({command.params[-1].name}) {{
+                        const RecordObject record_obj(vvl::Func::vkEnumeratePhysicalDevices, VK_SUCCESS);
+                        for (uint32_t device_group_index = 0; device_group_index < *{command.params[-2].name}; device_group_index++) {{
+                            PostCallRecordEnumeratePhysicalDevices({command.params[0].name}, &{command.params[-1].name}[device_group_index].physicalDeviceCount, {command.params[-1].name}[device_group_index].physicalDevices, record_obj);
+                        }}
+                    }}\n'''
         # Handle object destroy operations
         if isDestroy:
             # Check for special case where multiple handles are returned
@@ -587,8 +863,8 @@ bool ObjectLifetimes::ReportUndestroyedDeviceObjects(VkDevice device) const {
             nullallocVUID = self.getAllocVUID(handle_param, "nullalloc")
             if handle_param.type in self.vk.handles:
                 # Call Destroy a single time
-                pre_call_validate += f'{indent}skip |= ValidateDestroyObject({handle_param.name}, kVulkanObjectType{handle_param.type[2:]}, {allocator}, {compatallocVUID}, {nullallocVUID});\n'
-                pre_call_record += f'{indent}RecordDestroyObject({handle_param.name}, kVulkanObjectType{handle_param.type[2:]});\n'
+                pre_call_validate += f'skip |= ValidateDestroyObject({handle_param.name}, kVulkanObjectType{handle_param.type[2:]}, {allocator}, {compatallocVUID}, {nullallocVUID}, error_obj.location);\n'
+                pre_call_record += f'RecordDestroyObject({handle_param.name}, kVulkanObjectType{handle_param.type[2:]});\n'
 
         return pre_call_validate, pre_call_record, post_call_record
 

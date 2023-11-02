@@ -15,6 +15,7 @@
  */
 
 #include "../framework/layer_validation_tests.h"
+#include "../framework/pipeline_helper.h"
 
 static std::array gpu_av_enables = {VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT};
 static std::array gpu_av_disables = {VK_VALIDATION_FEATURE_DISABLE_THREAD_SAFETY_EXT,
@@ -24,7 +25,7 @@ static std::array gpu_av_disables = {VK_VALIDATION_FEATURE_DISABLE_THREAD_SAFETY
 // enabled/disabled
 VkValidationFeaturesEXT VkGpuAssistedLayerTest::GetValidationFeatures() {
     AddRequiredExtensions(VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME);
-    VkValidationFeaturesEXT features = LvlInitStruct<VkValidationFeaturesEXT>();
+    VkValidationFeaturesEXT features = vku::InitStructHelper();
     features.enabledValidationFeatureCount = size32(gpu_av_enables);
     // TODO - Add command line flag or env var or another system for setting this to 'zero' to allow for someone writting a new
     // GPU-AV test to easily check the test is valid
@@ -35,18 +36,33 @@ VkValidationFeaturesEXT VkGpuAssistedLayerTest::GetValidationFeatures() {
 }
 
 // This checks any requirements needed for GPU-AV are met otherwise devices not meeting them will "fail" the tests
+void VkGpuAssistedLayerTest::InitGpuAvFramework() {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    VkValidationFeaturesEXT validation_features = GetValidationFeatures();
+    RETURN_IF_SKIP(InitFramework(&validation_features));
+
+    VkPhysicalDeviceFeatures2 features2 = vku::InitStructHelper();
+    GetPhysicalDeviceFeatures2(features2);
+    if (!features2.features.fragmentStoresAndAtomics || !features2.features.vertexPipelineStoresAndAtomics) {
+        GTEST_SKIP() << "fragmentStoresAndAtomics and vertexPipelineStoresAndAtomics are required for GPU-AV";
+    } else if (IsPlatformMockICD()) {
+        GTEST_SKIP() << "Test not supported by MockICD, GPU-Assisted validation test requires a driver that can draw";
+    }
+}
+
+// This checks any requirements needed for GPU-AV are met otherwise devices not meeting them will "fail" the tests
 bool VkGpuAssistedLayerTest::CanEnableGpuAV() {
     // Check version first before trying to call GetPhysicalDeviceFeatures2
     if (DeviceValidationVersion() < VK_API_VERSION_1_1) {
         printf("At least Vulkan version 1.1 is required for GPU-AV\n");
         return false;
     }
-    auto features2 = LvlInitStruct<VkPhysicalDeviceFeatures2>();
+    VkPhysicalDeviceFeatures2 features2 = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(features2);
     if (!features2.features.fragmentStoresAndAtomics || !features2.features.vertexPipelineStoresAndAtomics) {
         printf("fragmentStoresAndAtomics and vertexPipelineStoresAndAtomics are required for GPU-AV\n");
         return false;
-    } else if (IsPlatform(kMockICD)) {
+    } else if (IsPlatformMockICD()) {
         printf("Test not supported by MockICD, GPU-Assisted validation test requires a driver that can draw\n");
         return false;
     }
@@ -57,27 +73,15 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuValidationArrayOOBGraphicsShaders) {
     TEST_DESCRIPTION(
         "GPU validation: Verify detection of out-of-bounds descriptor array indexing and use of uninitialized descriptors.");
 
-    SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
     AddOptionalExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
-    VkValidationFeaturesEXT validation_features = GetValidationFeatures();
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor, &validation_features));
+    RETURN_IF_SKIP(InitGpuAvFramework())
     bool descriptor_indexing = IsExtensionsEnabled(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-    if (!CanEnableGpuAV()) {
-        GTEST_SKIP() << "Requirements for GPU-AV are not met";
-    }
 
-    if (IsPlatform(kGalaxyS10)) {
-        GTEST_SKIP() << "This test should not run on Galaxy S10";
-    }
-
-    auto maintenance4_features = LvlInitStruct<VkPhysicalDeviceMaintenance4Features>();
+    VkPhysicalDeviceMaintenance4Features maintenance4_features = vku::InitStructHelper();
     maintenance4_features.maintenance4 = true;
-    auto features2 = LvlInitStruct<VkPhysicalDeviceFeatures2KHR>(&maintenance4_features);
-    auto indexing_features = LvlInitStruct<VkPhysicalDeviceDescriptorIndexingFeaturesEXT>();
+    VkPhysicalDeviceFeatures2KHR features2 = vku::InitStructHelper(&maintenance4_features);
+    VkPhysicalDeviceDescriptorIndexingFeaturesEXT indexing_features = vku::InitStructHelper();
     if (descriptor_indexing) {
         maintenance4_features.pNext = &indexing_features;
         GetPhysicalDeviceFeatures2(features2);
@@ -91,24 +95,23 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuValidationArrayOOBGraphicsShaders) {
     }
 
     VkCommandPoolCreateFlags pool_flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features2, pool_flags));
-    ASSERT_NO_FATAL_FAILURE(InitViewport());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitState(nullptr, &features2, pool_flags));
+    InitRenderTarget();
 
     // Make a uniform buffer to be passed to the shader that contains the invalid array index.
     uint32_t qfi = 0;
-    VkBufferCreateInfo bci = LvlInitStruct<VkBufferCreateInfo>();
+    VkBufferCreateInfo bci = vku::InitStructHelper();
     bci.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
     bci.size = 1024;
     bci.queueFamilyIndexCount = 1;
     bci.pQueueFamilyIndices = &qfi;
-    VkBufferObj buffer0;
+    vkt::Buffer buffer0;
     VkMemoryPropertyFlags mem_props = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
     buffer0.init(*m_device, bci, mem_props);
 
     bci.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
     // Make another buffer to populate the buffer array to be indexed
-    VkBufferObj buffer1;
+    vkt::Buffer buffer1;
     buffer1.init(*m_device, bci, mem_props);
 
     void *layout_pnext = nullptr;
@@ -121,7 +124,7 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuValidationArrayOOBGraphicsShaders) {
         ds_binding_flags[0] = 0;
         ds_binding_flags[1] = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT_EXT;
 
-        layout_createinfo_binding_flags[0] = LvlInitStruct<VkDescriptorSetLayoutBindingFlagsCreateInfo>();
+        layout_createinfo_binding_flags[0] = vku::InitStructHelper();
         layout_createinfo_binding_flags[0].bindingCount = 2;
         layout_createinfo_binding_flags[0].pBindingFlags = ds_binding_flags;
         layout_create_flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT_EXT;
@@ -145,7 +148,7 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuValidationArrayOOBGraphicsShaders) {
         ds_binding_flags[1] =
             VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT | VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT_EXT;
         desc_counts = 6;  // We'll reserve 8 spaces in the layout, but the descriptor will only use 6
-        variable_count = LvlInitStruct<VkDescriptorSetVariableDescriptorCountAllocateInfo>();
+        variable_count = vku::InitStructHelper();
         variable_count.descriptorSetCount = 1;
         variable_count.pDescriptorCounts = &desc_counts;
         allocate_pnext = &variable_count;
@@ -158,10 +161,13 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuValidationArrayOOBGraphicsShaders) {
                                                 },
                                                 layout_create_flags, layout_pnext, pool_create_flags, allocate_pnext);
 
-    const VkPipelineLayoutObj pipeline_layout(m_device, {&descriptor_set.layout_});
-    const VkPipelineLayoutObj pipeline_layout_variable(m_device, {&descriptor_set_variable.layout_});
-    VkTextureObj texture(m_device, nullptr);
-    VkSamplerObj sampler(m_device);
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
+    const vkt::PipelineLayout pipeline_layout_variable(*m_device, {&descriptor_set_variable.layout_});
+
+    VkImageObj image(m_device);
+    image.Init(16, 16, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    VkImageView imageView = image.targetView(VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
+    vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
 
     VkDescriptorBufferInfo buffer_info[1] = {};
     buffer_info[0].buffer = buffer0.handle();
@@ -170,19 +176,17 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuValidationArrayOOBGraphicsShaders) {
 
     VkDescriptorImageInfo image_info[6] = {};
     for (int i = 0; i < 6; i++) {
-        image_info[i] = texture.DescriptorImageInfo();
-        image_info[i].sampler = sampler.handle();
-        image_info[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        image_info[i] = {sampler.handle(), imageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
     }
 
     VkWriteDescriptorSet descriptor_writes[2] = {};
-    descriptor_writes[0] = LvlInitStruct<VkWriteDescriptorSet>();
+    descriptor_writes[0] = vku::InitStructHelper();
     descriptor_writes[0].dstSet = descriptor_set.set_;  // descriptor_set;
     descriptor_writes[0].dstBinding = 0;
     descriptor_writes[0].descriptorCount = 1;
     descriptor_writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     descriptor_writes[0].pBufferInfo = buffer_info;
-    descriptor_writes[1] = LvlInitStruct<VkWriteDescriptorSet>();
+    descriptor_writes[1] = vku::InitStructHelper();
     descriptor_writes[1].dstSet = descriptor_set.set_;  // descriptor_set;
     descriptor_writes[1].dstBinding = 1;
     if (descriptor_indexing)
@@ -209,7 +213,7 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuValidationArrayOOBGraphicsShaders) {
                                               },
                                               0, layout_pnext, 0);
 
-    const VkPipelineLayoutObj pipeline_layout_buffer(m_device, {&descriptor_set_buffer.layout_});
+    const vkt::PipelineLayout pipeline_layout_buffer(*m_device, {&descriptor_set_buffer.layout_});
 
     VkDescriptorBufferInfo buffer_test_buffer_info[7] = {};
     buffer_test_buffer_info[0].buffer = buffer0.handle();
@@ -224,13 +228,13 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuValidationArrayOOBGraphicsShaders) {
 
     if (descriptor_indexing) {
         VkWriteDescriptorSet buffer_descriptor_writes[2] = {};
-        buffer_descriptor_writes[0] = LvlInitStruct<VkWriteDescriptorSet>();
+        buffer_descriptor_writes[0] = vku::InitStructHelper();
         buffer_descriptor_writes[0].dstSet = descriptor_set_buffer.set_;  // descriptor_set;
         buffer_descriptor_writes[0].dstBinding = 0;
         buffer_descriptor_writes[0].descriptorCount = 1;
         buffer_descriptor_writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         buffer_descriptor_writes[0].pBufferInfo = buffer_test_buffer_info;
-        buffer_descriptor_writes[1] = LvlInitStruct<VkWriteDescriptorSet>();
+        buffer_descriptor_writes[1] = vku::InitStructHelper();
         buffer_descriptor_writes[1].dstSet = descriptor_set_buffer.set_;  // descriptor_set;
         buffer_descriptor_writes[1].dstBinding = 1;
         buffer_descriptor_writes[1].descriptorCount = 5;  // Intentionally don't write index 5
@@ -345,7 +349,7 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuValidationArrayOOBGraphicsShaders) {
         char const *tess_ctrl_source;
         char const *tess_eval_source;
         bool debug;
-        const VkPipelineLayoutObj *pipeline_layout;
+        const vkt::PipelineLayout *pipeline_layout;
         const OneOffDescriptorSet *descriptor_set;
         uint32_t index;
         char const *expected_error;
@@ -356,15 +360,11 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuValidationArrayOOBGraphicsShaders) {
                      "(set = 0, binding = 1) Index of 25 used to index descriptor array of length 6."});
     tests.push_back({vsSource_frag, fsSource_frag, nullptr, nullptr, nullptr, false, &pipeline_layout, &descriptor_set, 25,
                      "(set = 0, binding = 1) Index of 25 used to index descriptor array of length 6."});
-#if !defined(VK_USE_PLATFORM_ANDROID_KHR)
-    // The Android test framework uses shaderc for online compilations.  Even when configured to compile with debug info,
-    // shaderc seems to drop the OpLine instructions from the shader binary.  This causes the following two tests to fail
-    // on Android platforms.  Skip these tests until the shaderc issue is understood/resolved.
     tests.push_back({vsSource_vert, fsSource_vert, nullptr, nullptr, nullptr, true, &pipeline_layout, &descriptor_set, 25,
                      "gl_Position += 1e-30 * texture(tex[uniform_index_buffer.tex_index[0]], vec2(0, 0));"});
     tests.push_back({vsSource_frag, fsSource_frag, nullptr, nullptr, nullptr, true, &pipeline_layout, &descriptor_set, 25,
                      "uFragColor = texture(tex[index], vec2(0, 0));"});
-#endif
+
     if (descriptor_indexing) {
         tests.push_back({vsSource_frag, fsSource_frag_runtime, nullptr, nullptr, nullptr, false, &pipeline_layout, &descriptor_set,
                          25, "(set = 0, binding = 1) Index of 25 used to index descriptor array of length 6."});
@@ -395,15 +395,11 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuValidationArrayOOBGraphicsShaders) {
         }
     }
 
-    VkViewport viewport = m_viewports[0];
-    VkRect2D scissors = m_scissors[0];
-
-    VkSubmitInfo submit_info = LvlInitStruct<VkSubmitInfo>();
+    VkSubmitInfo submit_info = vku::InitStructHelper();
     submit_info.commandBufferCount = 1;
     submit_info.pCommandBuffers = &m_commandBuffer->handle();
 
     for (const auto &iter : tests) {
-        VkResult err;
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, iter.expected_error);
         VkShaderObj vs(this, iter.vertex_source, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL, nullptr, "main",
                        iter.debug);
@@ -412,13 +408,15 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuValidationArrayOOBGraphicsShaders) {
         VkShaderObj *gs = nullptr;
         VkShaderObj *tcs = nullptr;
         VkShaderObj *tes = nullptr;
-        VkPipelineObj pipe(m_device);
-        pipe.AddShader(&vs);
-        pipe.AddShader(&fs);
+
+        CreatePipelineHelper pipe(*this);
+        pipe.InitState();
+        pipe.shader_stages_.clear();
+        pipe.shader_stages_.push_back(vs.GetStageCreateInfo());
         if (iter.geometry_source) {
             gs = new VkShaderObj(this, iter.geometry_source, VK_SHADER_STAGE_GEOMETRY_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL,
                                  nullptr, "main", iter.debug);
-            pipe.AddShader(gs);
+            pipe.shader_stages_.push_back(gs->GetStageCreateInfo());
         }
         VkPipelineInputAssemblyStateCreateInfo iasci{VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO, nullptr, 0,
                                                          VK_PRIMITIVE_TOPOLOGY_PATCH_LIST, VK_FALSE};
@@ -433,37 +431,40 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuValidationArrayOOBGraphicsShaders) {
                                   SPV_SOURCE_GLSL, nullptr, "main", iter.debug);
             tes = new VkShaderObj(this, iter.tess_eval_source, VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT, SPV_ENV_VULKAN_1_0,
                                   SPV_SOURCE_GLSL, nullptr, "main", iter.debug);
-            pipe.AddShader(tcs);
-            pipe.AddShader(tes);
-            pipe.SetTessellation(&tsci);
-            pipe.SetInputAssembly(&iasci);
+            pipe.shader_stages_.push_back(tcs->GetStageCreateInfo());
+            pipe.shader_stages_.push_back(tes->GetStageCreateInfo());
+            pipe.gp_ci_.pTessellationState = &tsci;
+            pipe.gp_ci_.pInputAssemblyState = &iasci;
         }
-        pipe.AddDefaultColorAttachment();
-        err = pipe.CreateVKPipeline(iter.pipeline_layout->handle(), renderPass());
-        ASSERT_VK_SUCCESS(err);
+
+        pipe.shader_stages_.push_back(fs.GetStageCreateInfo());
+        pipe.gp_ci_.layout = iter.pipeline_layout->handle();
+        pipe.CreateGraphicsPipeline();
+
         m_commandBuffer->begin();
         m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-        vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.handle());
+        vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
         vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, iter.pipeline_layout->handle(), 0, 1,
                                   &iter.descriptor_set->set_, 0, nullptr);
-        vk::CmdSetViewport(m_commandBuffer->handle(), 0, 1, &viewport);
-        vk::CmdSetScissor(m_commandBuffer->handle(), 0, 1, &scissors);
         vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
-        vk::CmdEndRenderPass(m_commandBuffer->handle());
+        m_commandBuffer->EndRenderPass();
         m_commandBuffer->end();
         uint32_t *data = (uint32_t *)buffer0.memory().map();
         data[0] = iter.index;
         buffer0.memory().unmap();
 
-        vk::QueueSubmit(m_device->m_queue, 1, &submit_info, VK_NULL_HANDLE);
-        vk::QueueWaitIdle(m_device->m_queue);
+        vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
+        vk::QueueWaitIdle(m_default_queue);
         m_errorMonitor->VerifyFound();
         delete gs;
         delete tcs;
         delete tes;
     }
-    auto c_queue = m_device->GetDefaultComputeQueue();
-    if (c_queue && descriptor_indexing) {
+
+    if (m_device->compute_queues().empty()) {
+        return;
+    }
+    if (descriptor_indexing) {
         char const *csSource =
             "#version 450\n"
             "#extension GL_EXT_nonuniform_qualifier : enable\n "
@@ -477,7 +478,7 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuValidationArrayOOBGraphicsShaders) {
 
         VkShaderObj shader_module(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
 
-        VkPipelineShaderStageCreateInfo stage = LvlInitStruct<VkPipelineShaderStageCreateInfo>();
+        VkPipelineShaderStageCreateInfo stage = vku::InitStructHelper();
         stage.flags = 0;
         stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
         stage.module = shader_module.handle();
@@ -485,7 +486,7 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuValidationArrayOOBGraphicsShaders) {
         stage.pSpecializationInfo = nullptr;
 
         // CreateComputePipelines
-        VkComputePipelineCreateInfo pipeline_info = LvlInitStruct<VkComputePipelineCreateInfo>();
+        VkComputePipelineCreateInfo pipeline_info = vku::InitStructHelper();
         pipeline_info.flags = 0;
         pipeline_info.layout = pipeline_layout_buffer.handle();
         pipeline_info.basePipelineHandle = VK_NULL_HANDLE;
@@ -494,8 +495,8 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuValidationArrayOOBGraphicsShaders) {
 
         VkPipeline c_pipeline;
         vk::CreateComputePipelines(device(), VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &c_pipeline);
-        VkCommandBufferBeginInfo begin_info = LvlInitStruct<VkCommandBufferBeginInfo>();
-        VkCommandBufferInheritanceInfo hinfo = LvlInitStruct<VkCommandBufferInheritanceInfo>();
+        VkCommandBufferBeginInfo begin_info = vku::InitStructHelper();
+        VkCommandBufferInheritanceInfo hinfo = vku::InitStructHelper();
         begin_info.pInheritanceInfo = &hinfo;
 
         m_commandBuffer->begin(&begin_info);
@@ -510,18 +511,404 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuValidationArrayOOBGraphicsShaders) {
         data[0] = 5;
         buffer0.memory().unmap();
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "Stage = Compute");
-        vk::QueueSubmit(c_queue->handle(), 1, &submit_info, VK_NULL_HANDLE);
-        vk::QueueWaitIdle(m_device->m_queue);
+        vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
+        vk::QueueWaitIdle(m_default_queue);
         m_errorMonitor->VerifyFound();
         // Out of Bounds
         data = (uint32_t *)buffer0.memory().map();
         data[0] = 25;
         buffer0.memory().unmap();
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "Stage = Compute");
-        vk::QueueSubmit(c_queue->handle(), 1, &submit_info, VK_NULL_HANDLE);
-        vk::QueueWaitIdle(m_device->m_queue);
+        vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
+        vk::QueueWaitIdle(m_default_queue);
         m_errorMonitor->VerifyFound();
         vk::DestroyPipeline(m_device->handle(), c_pipeline, NULL);
+    }
+    return;
+}
+
+TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuValidationArrayEarlyDelete) {
+    TEST_DESCRIPTION(
+        "GPU validation: Verify detection descriptors where resources have been deleted while in use.");
+
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitGpuAvFramework())
+
+    auto maintenance4_features = vku::InitStruct<VkPhysicalDeviceMaintenance4Features>();
+    maintenance4_features.maintenance4 = true;
+    auto features2 = vku::InitStruct<VkPhysicalDeviceFeatures2KHR>(&maintenance4_features);
+    auto indexing_features = vku::InitStruct<VkPhysicalDeviceDescriptorIndexingFeaturesEXT>();
+    maintenance4_features.pNext = &indexing_features;
+    GetPhysicalDeviceFeatures2(features2);
+
+    if (!indexing_features.runtimeDescriptorArray || !indexing_features.descriptorBindingSampledImageUpdateAfterBind ||
+        !indexing_features.descriptorBindingPartiallyBound || !indexing_features.descriptorBindingVariableDescriptorCount ||
+        !indexing_features.shaderSampledImageArrayNonUniformIndexing ||
+        !indexing_features.shaderStorageBufferArrayNonUniformIndexing) {
+        GTEST_SKIP() << "Not all descriptor indexing features supported, skipping descriptor indexing tests";
+    }
+
+    VkCommandPoolCreateFlags pool_flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    RETURN_IF_SKIP(InitState(nullptr, &features2, pool_flags));
+    InitRenderTarget();
+
+    // Make a uniform buffer to be passed to the shader that contains the invalid array index.
+    uint32_t qfi = 0;
+    VkBufferCreateInfo bci = vku::InitStruct<VkBufferCreateInfo>();
+    bci.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+    bci.size = 1024;
+    bci.queueFamilyIndexCount = 1;
+    bci.pQueueFamilyIndices = &qfi;
+    vkt::Buffer buffer0;
+    VkMemoryPropertyFlags mem_props = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+    buffer0.init(*m_device, bci, mem_props);
+
+    bci.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+    // Make another buffer to populate the buffer array to be indexed
+    vkt::Buffer buffer1;
+    buffer1.init(*m_device, bci, mem_props);
+
+    void *layout_pnext = nullptr;
+    void *allocate_pnext = nullptr;
+    auto pool_create_flags = 0;
+    auto layout_create_flags = 0;
+    VkDescriptorBindingFlagsEXT ds_binding_flags[2] = {};
+    VkDescriptorSetLayoutBindingFlagsCreateInfoEXT layout_createinfo_binding_flags[1] = {};
+    ds_binding_flags[0] = 0;
+    ds_binding_flags[1] = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT_EXT;
+
+    layout_createinfo_binding_flags[0] = vku::InitStruct<VkDescriptorSetLayoutBindingFlagsCreateInfo>();
+    layout_createinfo_binding_flags[0].bindingCount = 2;
+    layout_createinfo_binding_flags[0].pBindingFlags = ds_binding_flags;
+    layout_create_flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT_EXT;
+    pool_create_flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT_EXT;
+    layout_pnext = layout_createinfo_binding_flags;
+
+    VkDescriptorSetVariableDescriptorCountAllocateInfoEXT variable_count = {};
+    layout_create_flags = 0;
+    pool_create_flags = 0;
+    ds_binding_flags[1] =
+        VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT | VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT_EXT;
+    const uint32_t kDescCount = 2;  // We'll reserve 8 spaces in the layout, but the descriptor will only use 2
+    variable_count = vku::InitStruct<VkDescriptorSetVariableDescriptorCountAllocateInfo>();
+    variable_count.descriptorSetCount = 1;
+    variable_count.pDescriptorCounts = &kDescCount;
+    allocate_pnext = &variable_count;
+
+    OneOffDescriptorSet descriptor_set_variable(m_device,
+                                                {
+                                                {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
+                                                {1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 8, VK_SHADER_STAGE_ALL, nullptr},
+                                                },
+                                                layout_create_flags, layout_pnext, pool_create_flags, allocate_pnext);
+
+    const vkt::PipelineLayout pipeline_layout_variable(*m_device, {&descriptor_set_variable.layout_});
+    VkImageObj image(m_device);
+    image.Init(16, 16, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    VkImageView image_view = image.targetView(VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
+    vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
+
+    VkDescriptorBufferInfo buffer_info[kDescCount] = {};
+    buffer_info[0].buffer = buffer0.handle();
+    buffer_info[0].offset = 0;
+    buffer_info[0].range = sizeof(uint32_t);
+
+    VkDescriptorImageInfo image_info[kDescCount] = {};
+    for (int i = 0; i < kDescCount; i++) {
+        image_info[i] = {sampler.handle(), image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+    }
+
+    VkWriteDescriptorSet descriptor_writes[2] = {};
+    descriptor_writes[0] = vku::InitStruct<VkWriteDescriptorSet>();
+    descriptor_writes[0].dstSet = descriptor_set_variable.set_;
+    descriptor_writes[0].dstBinding = 0;
+    descriptor_writes[0].descriptorCount = 1;
+    descriptor_writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descriptor_writes[0].pBufferInfo = buffer_info;
+    descriptor_writes[1] = vku::InitStruct<VkWriteDescriptorSet>();
+    descriptor_writes[1].dstSet = descriptor_set_variable.set_;
+    descriptor_writes[1].dstBinding = 1;
+    descriptor_writes[1].descriptorCount = 2;
+    descriptor_writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    descriptor_writes[1].pImageInfo = image_info;
+    vk::UpdateDescriptorSets(m_device->device(), 2, descriptor_writes, 0, NULL);
+
+    ds_binding_flags[0] = 0;
+    ds_binding_flags[1] = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT;
+
+    // - The vertex shader fetches the invalid index from the uniform buffer and passes it to the fragment shader.
+    // - The fragment shader makes the invalid array access.
+    char const *vsSource_frag =
+        "#version 450\n"
+        "\n"
+        "layout(std140, binding = 0) uniform foo { uint tex_index[1]; } uniform_index_buffer;\n"
+        "layout(location = 0) out flat uint index;\n"
+        "vec2 vertices[3];\n"
+        "void main(){\n"
+        "      vertices[0] = vec2(-1.0, -1.0);\n"
+        "      vertices[1] = vec2( 1.0, -1.0);\n"
+        "      vertices[2] = vec2( 0.0,  1.0);\n"
+        "   gl_Position = vec4(vertices[gl_VertexIndex % 3], 0.0, 1.0);\n"
+        "   index = uniform_index_buffer.tex_index[0];\n"
+        "}\n";
+    char const *fsSource_frag_runtime =
+        "#version 450\n"
+        "#extension GL_EXT_nonuniform_qualifier : enable\n"
+        "\n"
+        "layout(set = 0, binding = 1) uniform sampler2D tex[];\n"
+        "layout(location = 0) out vec4 uFragColor;\n"
+        "layout(location = 0) in flat uint index;\n"
+        "void main(){\n"
+        "   uFragColor = texture(tex[index], vec2(0, 0));\n"
+        "}\n";
+    struct TestCase {
+        char const *vertex_source;
+        char const *fragment_source;
+        bool debug;
+        const vkt::PipelineLayout *pipeline_layout;
+        const OneOffDescriptorSet *descriptor_set;
+        uint32_t index;
+        char const *expected_error;
+    };
+
+    std::vector<TestCase> tests;
+
+    tests.push_back({vsSource_frag, fsSource_frag_runtime, false, &pipeline_layout_variable,
+                    &descriptor_set_variable, 1, "(set = 0, binding = 1) Descriptor index 1 references a resource that was destroyed."});
+
+    VkSubmitInfo submit_info = vku::InitStruct<VkSubmitInfo>();
+    submit_info.commandBufferCount = 1;
+    submit_info.pCommandBuffers = &m_commandBuffer->handle();
+
+    for (const auto &iter : tests) {
+        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, iter.expected_error);
+        VkShaderObj vs(this, iter.vertex_source, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL, nullptr, "main",
+                       iter.debug);
+        VkShaderObj fs(this, iter.fragment_source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL, nullptr,
+                       "main", iter.debug);
+        CreatePipelineHelper pipe(*this);
+        pipe.InitState();
+        pipe.shader_stages_.clear();
+        pipe.shader_stages_.push_back(vs.GetStageCreateInfo());
+        pipe.shader_stages_.push_back(fs.GetStageCreateInfo());
+        pipe.gp_ci_.layout = iter.pipeline_layout->handle();
+        pipe.CreateGraphicsPipeline();
+        m_commandBuffer->begin();
+        m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
+        vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+        vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, iter.pipeline_layout->handle(), 0, 1,
+                                  &iter.descriptor_set->set_, 0, nullptr);
+        vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
+        m_commandBuffer->EndRenderPass();
+        m_commandBuffer->end();
+        uint32_t *data = (uint32_t *)buffer0.memory().map();
+        data[0] = iter.index;
+        buffer0.memory().unmap();
+
+        // NOTE: object in use checking is entirely disabled for bindless descriptor sets so
+        // destroying before submit still needs to be caught by GPU-AV. Once GPU-AV no
+        // longer does QueueWaitIdle() in each submit call, we should also be able to detect
+        // resource destruction while a submission is blocked on a semaphore as well.
+        image.destroy();
+
+        vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
+        vk::QueueWaitIdle(m_default_queue);
+        m_errorMonitor->VerifyFound();
+    }
+    return;
+}
+
+TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuValidationArrayEarlySamplerDelete) {
+    TEST_DESCRIPTION(
+        "GPU validation: Verify detection descriptors where resources have been deleted while in use.");
+
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitGpuAvFramework())
+
+    auto maintenance4_features = vku::InitStruct<VkPhysicalDeviceMaintenance4Features>();
+    maintenance4_features.maintenance4 = true;
+    auto features2 = vku::InitStruct<VkPhysicalDeviceFeatures2KHR>(&maintenance4_features);
+    auto indexing_features = vku::InitStruct<VkPhysicalDeviceDescriptorIndexingFeaturesEXT>();
+    maintenance4_features.pNext = &indexing_features;
+    GetPhysicalDeviceFeatures2(features2);
+
+    if (!indexing_features.runtimeDescriptorArray || !indexing_features.descriptorBindingSampledImageUpdateAfterBind ||
+        !indexing_features.descriptorBindingPartiallyBound || !indexing_features.descriptorBindingVariableDescriptorCount ||
+        !indexing_features.shaderSampledImageArrayNonUniformIndexing ||
+        !indexing_features.shaderStorageBufferArrayNonUniformIndexing) {
+        GTEST_SKIP() << "Not all descriptor indexing features supported, skipping descriptor indexing tests";
+    }
+
+    VkCommandPoolCreateFlags pool_flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    RETURN_IF_SKIP(InitState(nullptr, &features2, pool_flags));
+    InitRenderTarget();
+
+    // Make a uniform buffer to be passed to the shader that contains the invalid array index.
+    uint32_t qfi = 0;
+    VkBufferCreateInfo bci = vku::InitStruct<VkBufferCreateInfo>();
+    bci.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+    bci.size = 1024;
+    bci.queueFamilyIndexCount = 1;
+    bci.pQueueFamilyIndices = &qfi;
+    vkt::Buffer buffer0;
+    VkMemoryPropertyFlags mem_props = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+    buffer0.init(*m_device, bci, mem_props);
+
+    bci.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+    // Make another buffer to populate the buffer array to be indexed
+    vkt::Buffer buffer1;
+    buffer1.init(*m_device, bci, mem_props);
+
+    void *layout_pnext = nullptr;
+    void *allocate_pnext = nullptr;
+    auto pool_create_flags = 0;
+    auto layout_create_flags = 0;
+    VkDescriptorBindingFlagsEXT ds_binding_flags[2] = {};
+    VkDescriptorSetLayoutBindingFlagsCreateInfoEXT layout_createinfo_binding_flags[1] = {};
+    ds_binding_flags[0] = 0;
+    ds_binding_flags[1] = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT_EXT;
+
+    layout_createinfo_binding_flags[0] = vku::InitStruct<VkDescriptorSetLayoutBindingFlagsCreateInfo>();
+    layout_createinfo_binding_flags[0].bindingCount = 2;
+    layout_createinfo_binding_flags[0].pBindingFlags = ds_binding_flags;
+    layout_create_flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT_EXT;
+    pool_create_flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT_EXT;
+    layout_pnext = layout_createinfo_binding_flags;
+
+    VkDescriptorSetVariableDescriptorCountAllocateInfoEXT variable_count = {};
+    layout_create_flags = 0;
+    pool_create_flags = 0;
+    ds_binding_flags[1] =
+        VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT | VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT_EXT;
+    const uint32_t kDescCount = 2;  // We'll reserve 8 spaces in the layout, but the descriptor will only use 2
+    variable_count = vku::InitStruct<VkDescriptorSetVariableDescriptorCountAllocateInfo>();
+    variable_count.descriptorSetCount = 1;
+    variable_count.pDescriptorCounts = &kDescCount;
+    allocate_pnext = &variable_count;
+
+    OneOffDescriptorSet descriptor_set_variable(m_device,
+                                                {
+                                                {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
+                                                {1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 8, VK_SHADER_STAGE_ALL, nullptr},
+                                                },
+                                                layout_create_flags, layout_pnext, pool_create_flags, allocate_pnext);
+
+    const vkt::PipelineLayout pipeline_layout_variable(*m_device, {&descriptor_set_variable.layout_});
+    VkImageObj image(m_device);
+    image.Init(16, 16, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    VkImageView image_view = image.targetView(VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
+    vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
+
+    VkDescriptorBufferInfo buffer_info[kDescCount] = {};
+    buffer_info[0].buffer = buffer0.handle();
+    buffer_info[0].offset = 0;
+    buffer_info[0].range = sizeof(uint32_t);
+
+    VkDescriptorImageInfo image_info[kDescCount] = {};
+    for (int i = 0; i < kDescCount; i++) {
+        image_info[i] = {sampler.handle(), image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+    }
+
+    VkWriteDescriptorSet descriptor_writes[2] = {};
+    descriptor_writes[0] = vku::InitStruct<VkWriteDescriptorSet>();
+    descriptor_writes[0].dstSet = descriptor_set_variable.set_;
+    descriptor_writes[0].dstBinding = 0;
+    descriptor_writes[0].descriptorCount = 1;
+    descriptor_writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descriptor_writes[0].pBufferInfo = buffer_info;
+    descriptor_writes[1] = vku::InitStruct<VkWriteDescriptorSet>();
+    descriptor_writes[1].dstSet = descriptor_set_variable.set_;
+    descriptor_writes[1].dstBinding = 1;
+    descriptor_writes[1].descriptorCount = 2;
+    descriptor_writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    descriptor_writes[1].pImageInfo = image_info;
+    vk::UpdateDescriptorSets(m_device->device(), 2, descriptor_writes, 0, NULL);
+
+    ds_binding_flags[0] = 0;
+    ds_binding_flags[1] = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT;
+
+    // - The vertex shader fetches the invalid index from the uniform buffer and passes it to the fragment shader.
+    // - The fragment shader makes the invalid array access.
+    char const *vsSource_frag =
+        "#version 450\n"
+        "\n"
+        "layout(std140, binding = 0) uniform foo { uint tex_index[1]; } uniform_index_buffer;\n"
+        "layout(location = 0) out flat uint index;\n"
+        "vec2 vertices[3];\n"
+        "void main(){\n"
+        "      vertices[0] = vec2(-1.0, -1.0);\n"
+        "      vertices[1] = vec2( 1.0, -1.0);\n"
+        "      vertices[2] = vec2( 0.0,  1.0);\n"
+        "   gl_Position = vec4(vertices[gl_VertexIndex % 3], 0.0, 1.0);\n"
+        "   index = uniform_index_buffer.tex_index[0];\n"
+        "}\n";
+    char const *fsSource_frag_runtime =
+        "#version 450\n"
+        "#extension GL_EXT_nonuniform_qualifier : enable\n"
+        "\n"
+        "layout(set = 0, binding = 1) uniform sampler2D tex[];\n"
+        "layout(location = 0) out vec4 uFragColor;\n"
+        "layout(location = 0) in flat uint index;\n"
+        "void main(){\n"
+        "   uFragColor = texture(tex[index], vec2(0, 0));\n"
+        "}\n";
+    struct TestCase {
+        char const *vertex_source;
+        char const *fragment_source;
+        bool debug;
+        const vkt::PipelineLayout *pipeline_layout;
+        const OneOffDescriptorSet *descriptor_set;
+        uint32_t index;
+        char const *expected_error;
+    };
+
+    std::vector<TestCase> tests;
+
+    tests.push_back({vsSource_frag, fsSource_frag_runtime, false, &pipeline_layout_variable,
+                    &descriptor_set_variable, 1, "(set = 0, binding = 1) Descriptor index 1 references a resource that was destroyed."});
+
+    VkSubmitInfo submit_info = vku::InitStruct<VkSubmitInfo>();
+    submit_info.commandBufferCount = 1;
+    submit_info.pCommandBuffers = &m_commandBuffer->handle();
+
+    for (const auto &iter : tests) {
+        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, iter.expected_error);
+        VkShaderObj vs(this, iter.vertex_source, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL, nullptr, "main",
+                       iter.debug);
+        VkShaderObj fs(this, iter.fragment_source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL, nullptr,
+                       "main", iter.debug);
+        CreatePipelineHelper pipe(*this);
+        pipe.InitState();
+        pipe.shader_stages_.clear();
+        pipe.shader_stages_.push_back(vs.GetStageCreateInfo());
+        pipe.shader_stages_.push_back(fs.GetStageCreateInfo());
+        pipe.gp_ci_.layout = iter.pipeline_layout->handle();
+        pipe.CreateGraphicsPipeline();
+        m_commandBuffer->begin();
+        m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
+        vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+        vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, iter.pipeline_layout->handle(), 0, 1,
+                                  &iter.descriptor_set->set_, 0, nullptr);
+        vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
+        m_commandBuffer->EndRenderPass();
+        m_commandBuffer->end();
+        uint32_t *data = (uint32_t *)buffer0.memory().map();
+        data[0] = iter.index;
+        buffer0.memory().unmap();
+
+        // NOTE: object in use checking is entirely disabled for bindless descriptor sets so
+        // destroying before submit still needs to be caught by GPU-AV. Once GPU-AV no
+        // longer does QueueWaitIdle() in each submit call, we should also be able to detect
+        // resource destruction while a submission is blocked on a semaphore as well.
+        sampler.destroy();
+
+        vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
+        vk::QueueWaitIdle(m_default_queue);
+        m_errorMonitor->VerifyFound();
     }
     return;
 }
@@ -529,36 +916,25 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuValidationArrayOOBGraphicsShaders) {
 TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuRobustBufferOOB) {
     TEST_DESCRIPTION("Check buffer oob validation when per pipeline robustness is enabled");
 
-    SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_PIPELINE_ROBUSTNESS_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitGpuAvFramework())
 
-    VkValidationFeaturesEXT validation_features = GetValidationFeatures();
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor, &validation_features));
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-    if (!CanEnableGpuAV()) {
-        GTEST_SKIP() << "Requirements for GPU-AV are not met";
-    }
-    auto pipeline_robustness_features = LvlInitStruct<VkPhysicalDevicePipelineRobustnessFeaturesEXT>();
+    VkPhysicalDevicePipelineRobustnessFeaturesEXT pipeline_robustness_features = vku::InitStructHelper();
     auto features2 = GetPhysicalDeviceFeatures2(pipeline_robustness_features);
     features2.features.robustBufferAccess = VK_FALSE;
     if (!pipeline_robustness_features.pipelineRobustness) {
         GTEST_SKIP() << "pipelineRobustness feature not supported";
     }
-    pipeline_robustness_features.pipelineRobustness = VK_FALSE;
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features2));
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
-    VkBufferObj uniform_buffer;
-    VkBufferObj storage_buffer;
+    RETURN_IF_SKIP(InitState(nullptr, &features2))
+    InitRenderTarget();
     VkMemoryPropertyFlags reqs = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-    uniform_buffer.init(*m_device, 4, reqs);
-    storage_buffer.init_as_storage(*m_device, 16, reqs);
+    vkt::Buffer uniform_buffer(*m_device, 4, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, reqs);
+    vkt::Buffer storage_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, reqs);
     OneOffDescriptorSet descriptor_set(m_device, {
         {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
         {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}});
-    const VkPipelineLayoutObj pipeline_layout(m_device, {&descriptor_set.layout_});
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
     descriptor_set.WriteDescriptorBufferInfo(0, uniform_buffer.handle(), 0, 4);
     descriptor_set.WriteDescriptorBufferInfo(1, storage_buffer.handle(), 0, 16, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     descriptor_set.UpdateDescriptorSets();
@@ -578,29 +954,26 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuRobustBufferOOB) {
     )glsl";
 
     VkShaderObj vs(this, vertshader, VK_SHADER_STAGE_VERTEX_BIT);
-    auto pipeline_robustness_ci = LvlInitStruct<VkPipelineRobustnessCreateInfoEXT>();
-    VkPipelineObj robust_pipe(m_device);
-    robust_pipe.AddShader(&vs);
-    robust_pipe.AddDefaultColorAttachment();
-    robust_pipe.DisableRasterization();
-    VkGraphicsPipelineCreateInfo gp_ci;
-    robust_pipe.InitGraphicsPipelineCreateInfo(&gp_ci);
-    gp_ci.pNext = &pipeline_robustness_ci;
+
+    VkPipelineRobustnessCreateInfoEXT pipeline_robustness_ci = vku::InitStructHelper();
     pipeline_robustness_ci.uniformBuffers = VK_PIPELINE_ROBUSTNESS_BUFFER_BEHAVIOR_ROBUST_BUFFER_ACCESS_EXT;
     pipeline_robustness_ci.storageBuffers = VK_PIPELINE_ROBUSTNESS_BUFFER_BEHAVIOR_ROBUST_BUFFER_ACCESS_EXT;
-    robust_pipe.CreateVKPipeline(pipeline_layout.handle(), m_renderPass, &gp_ci);
-    VkCommandBufferBeginInfo begin_info = LvlInitStruct<VkCommandBufferBeginInfo>();
+
+    CreatePipelineHelper robust_pipe(*this);
+    robust_pipe.InitState();
+    robust_pipe.shader_stages_[0] = vs.GetStageCreateInfo();
+    robust_pipe.gp_ci_.layout = pipeline_layout.handle();
+    robust_pipe.gp_ci_.pNext = &pipeline_robustness_ci;
+    robust_pipe.CreateGraphicsPipeline();
+
+    VkCommandBufferBeginInfo begin_info = vku::InitStructHelper();
     m_commandBuffer->begin(&begin_info);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, robust_pipe.handle());
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, robust_pipe.Handle());
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
     vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1,
                               &descriptor_set.set_, 0, nullptr);
-    VkViewport viewport = {0, 0, 16, 16, 0, 1};
-    vk::CmdSetViewport(m_commandBuffer->handle(), 0, 1, &viewport);
-    VkRect2D scissor = {{0, 0}, {16, 16}};
-    vk::CmdSetScissor(m_commandBuffer->handle(), 0, 1, &scissor);
     vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
-    vk::CmdEndRenderPass(m_commandBuffer->handle());
+    m_commandBuffer->EndRenderPass();
     m_commandBuffer->end();
 
     uint32_t *data = (uint32_t *)uniform_buffer.memory().map();
@@ -618,23 +991,14 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuRobustBufferOOB) {
 }
 
 TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuBufferOOB) {
-    SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
     AddOptionalExtensions(VK_EXT_MULTI_DRAW_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitGpuAvFramework())
 
-    VkValidationFeaturesEXT validation_features = GetValidationFeatures();
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor, &validation_features));
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-    if (!CanEnableGpuAV()) {
-        GTEST_SKIP() << "Requirements for GPU-AV are not met";
-    }
-
-    auto multi_draw_features = LvlInitStruct<VkPhysicalDeviceMultiDrawFeaturesEXT>();
+    VkPhysicalDeviceMultiDrawFeaturesEXT multi_draw_features = vku::InitStructHelper();
     const bool multi_draw = IsExtensionsEnabled(VK_EXT_MULTI_DRAW_EXTENSION_NAME);
-    auto robustness2_features = LvlInitStruct<VkPhysicalDeviceRobustness2FeaturesEXT>(multi_draw ? &multi_draw_features : nullptr);
+    auto robustness2_features = vku::InitStruct<VkPhysicalDeviceRobustness2FeaturesEXT>(multi_draw ? &multi_draw_features : nullptr);
     auto features2 = GetPhysicalDeviceFeatures2(robustness2_features);
     if (!robustness2_features.nullDescriptor) {
         GTEST_SKIP() << "nullDescriptor feature not supported";
@@ -642,33 +1006,29 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuBufferOOB) {
     features2.features.robustBufferAccess = VK_FALSE;
     robustness2_features.robustBufferAccess2 = VK_FALSE;
     VkCommandPoolCreateFlags pool_flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features2, pool_flags));
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitState(nullptr, &features2, pool_flags));
+    InitRenderTarget();
 
-    VkBufferObj offset_buffer;
-    VkBufferObj write_buffer;
-    VkBufferObj uniform_texel_buffer;
-    VkBufferObj storage_texel_buffer;
     VkMemoryPropertyFlags reqs = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-    offset_buffer.init(*m_device, 4, reqs);
-    write_buffer.init_as_storage(*m_device, 16, reqs);
+    vkt::Buffer offset_buffer(*m_device, 4, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, reqs);
+    vkt::Buffer write_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, reqs);
 
-    VkBufferCreateInfo buffer_create_info = LvlInitStruct<VkBufferCreateInfo>();
+    VkBufferCreateInfo buffer_create_info = vku::InitStructHelper();
     uint32_t queue_family_index = 0;
     buffer_create_info.size = 16;
     buffer_create_info.usage = VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT;
     buffer_create_info.queueFamilyIndexCount = 1;
     buffer_create_info.pQueueFamilyIndices = &queue_family_index;
-    uniform_texel_buffer.init(*m_device, buffer_create_info, reqs);
+    vkt::Buffer uniform_texel_buffer(*m_device, buffer_create_info, reqs);
     buffer_create_info.usage = VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT;
-    storage_texel_buffer.init(*m_device, buffer_create_info, reqs);
-    VkBufferViewCreateInfo bvci = LvlInitStruct<VkBufferViewCreateInfo>();
+    vkt::Buffer storage_texel_buffer(*m_device, buffer_create_info, reqs);
+    VkBufferViewCreateInfo bvci = vku::InitStructHelper();
     bvci.buffer = uniform_texel_buffer.handle();
     bvci.format = VK_FORMAT_R32_SFLOAT;
     bvci.range = VK_WHOLE_SIZE;
-    vk_testing::BufferView uniform_buffer_view(*m_device, bvci);
+    vkt::BufferView uniform_buffer_view(*m_device, bvci);
     bvci.buffer = storage_texel_buffer.handle();
-    vk_testing::BufferView storage_buffer_view(*m_device, bvci);
+    vkt::BufferView storage_buffer_view(*m_device, bvci);
 
     OneOffDescriptorSet descriptor_set(m_device, {{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
                                                   {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
@@ -676,7 +1036,7 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuBufferOOB) {
                                                   {3, VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
                                                   {4, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}});
 
-    const VkPipelineLayoutObj pipeline_layout(m_device, {&descriptor_set.layout_});
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
     descriptor_set.WriteDescriptorBufferInfo(0, offset_buffer.handle(), 0, 4);
     descriptor_set.WriteDescriptorBufferInfo(1, write_buffer.handle(), 0, 16, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     descriptor_set.WriteDescriptorBufferInfo(2, VK_NULL_HANDLE, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
@@ -711,23 +1071,20 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuBufferOOB) {
         "}\n";
 
     VkShaderObj vs(this, vertshader, VK_SHADER_STAGE_VERTEX_BIT);
-    VkPipelineObj pipe(m_device);
-    pipe.AddShader(&vs);
-    pipe.AddDefaultColorAttachment();
-    pipe.DisableRasterization();
-    pipe.CreateVKPipeline(pipeline_layout.handle(), m_renderPass);
-    VkCommandBufferBeginInfo begin_info = LvlInitStruct<VkCommandBufferBeginInfo>();
+    CreatePipelineHelper pipe(*this);
+    pipe.InitState();
+    pipe.shader_stages_[0] = vs.GetStageCreateInfo();
+    pipe.gp_ci_.layout = pipeline_layout.handle();
+    pipe.CreateGraphicsPipeline();
+
+    VkCommandBufferBeginInfo begin_info = vku::InitStructHelper();
     m_commandBuffer->begin(&begin_info);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.handle());
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
     vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1,
                               &descriptor_set.set_, 0, nullptr);
-    VkViewport viewport = {0, 0, 16, 16, 0, 1};
-    vk::CmdSetViewport(m_commandBuffer->handle(), 0, 1, &viewport);
-    VkRect2D scissor = {{0, 0}, {16, 16}};
-    vk::CmdSetScissor(m_commandBuffer->handle(), 0, 1, &scissor);
     vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
-    vk::CmdEndRenderPass(m_commandBuffer->handle());
+    m_commandBuffer->EndRenderPass();
     m_commandBuffer->end();
     struct TestCase {
         bool positive;
@@ -762,7 +1119,7 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuBufferOOB) {
         } else {
             m_errorMonitor->VerifyFound();
         }
-        vk::QueueWaitIdle(m_device->m_queue);
+        vk::QueueWaitIdle(m_default_queue);
     }
 
     if (multi_draw && multi_draw_features.multiDraw) {
@@ -771,18 +1128,15 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuBufferOOB) {
         VkMultiDrawIndexedInfoEXT multi_draw_indices[3] = {};
         multi_draw_indices[0].indexCount = multi_draw_indices[1].indexCount = multi_draw_indices[2].indexCount = 3;
 
-        VkBufferObj buffer;
-        buffer.init(*m_device, 1024, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+        vkt::Buffer buffer(*m_device, 1024, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
         m_commandBuffer->begin(&begin_info);
-        vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.handle());
+        vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
         m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
         vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1,
-            &descriptor_set.set_, 0, nullptr);
-        vk::CmdSetViewport(m_commandBuffer->handle(), 0, 1, &viewport);
-        vk::CmdSetScissor(m_commandBuffer->handle(), 0, 1, &scissor);
-        m_commandBuffer->BindIndexBuffer(&buffer, 0, VK_INDEX_TYPE_UINT16);
+                                  &descriptor_set.set_, 0, nullptr);
+        vk::CmdBindIndexBuffer(m_commandBuffer->handle(), buffer.handle(), 0, VK_INDEX_TYPE_UINT16);
         vk::CmdDrawMultiIndexedEXT(m_commandBuffer->handle(), 3, multi_draw_indices, 1, 0, sizeof(VkMultiDrawIndexedInfoEXT), 0);
-        vk::CmdEndRenderPass(m_commandBuffer->handle());
+        m_commandBuffer->EndRenderPass();
         m_commandBuffer->end();
 
         uint32_t *data = (uint32_t *)offset_buffer.memory().map();
@@ -793,14 +1147,12 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuBufferOOB) {
         m_errorMonitor->VerifyFound();
 
         m_commandBuffer->begin(&begin_info);
-        vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.handle());
+        vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
         m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
         vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1,
-            &descriptor_set.set_, 0, nullptr);
-        vk::CmdSetViewport(m_commandBuffer->handle(), 0, 1, &viewport);
-        vk::CmdSetScissor(m_commandBuffer->handle(), 0, 1, &scissor);
+                                  &descriptor_set.set_, 0, nullptr);
         vk::CmdDrawMultiEXT(m_commandBuffer->handle(), 3, multi_draws, 1, 0, sizeof(VkMultiDrawInfoEXT));
-        vk::CmdEndRenderPass(m_commandBuffer->handle());
+        m_commandBuffer->EndRenderPass();
         m_commandBuffer->end();
 
         data = (uint32_t *)offset_buffer.memory().map();
@@ -814,49 +1166,49 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuBufferOOB) {
 
 void VkGpuAssistedLayerTest::ShaderBufferSizeTest(VkDeviceSize buffer_size, VkDeviceSize binding_offset, VkDeviceSize binding_range,
                                                   VkDescriptorType descriptor_type, const char *fragment_shader,
-                                                  const char *expected_error) {
-    SetTargetApiVersion(VK_API_VERSION_1_1);
+                                                  const char *expected_error, bool shader_objects) {
+    if (shader_objects) {
+        AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+        AddRequiredExtensions(VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
+    }
+    RETURN_IF_SKIP(InitGpuAvFramework())
 
-    VkValidationFeaturesEXT validation_features = GetValidationFeatures();
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor, &validation_features));
-    if (!CanEnableGpuAV()) {
-        GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    VkPhysicalDeviceDynamicRenderingFeatures dynamic_rendering_features = vku::InitStructHelper();
+    dynamic_rendering_features.dynamicRendering = VK_TRUE;
+    VkPhysicalDeviceShaderObjectFeaturesEXT shader_object_features = vku::InitStructHelper(&dynamic_rendering_features);
+    shader_object_features.shaderObject = VK_TRUE;
+    VkPhysicalDeviceFeatures2 features = vku::InitStructHelper();  // Make sure robust buffer access is not enabled
+    if (shader_objects) {
+        features.pNext = &shader_object_features;
     }
-    if (IsPlatform(kGalaxyS10)) {
-        GTEST_SKIP() << "This test should not run on Galaxy S10";
+    RETURN_IF_SKIP(InitState(nullptr, &features));
+    if (shader_objects) {
+        InitDynamicRenderTarget();
+    } else {
+        InitRenderTarget();
     }
-    if (IsPlatform(kShieldTVb)) {
-        GTEST_SKIP() << "This test should not run on Shield TV";
-    }
-
-    VkPhysicalDeviceFeatures features = {};  // Make sure robust buffer access is not enabled
-    ASSERT_NO_FATAL_FAILURE(InitState(&features));
-    ASSERT_NO_FATAL_FAILURE(InitViewport());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
 
     m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_ERROR_BIT_EXT, expected_error);
 
     OneOffDescriptorSet ds(m_device, {{0, descriptor_type, 1, VK_SHADER_STAGE_ALL, nullptr}});
 
-    const VkPipelineLayoutObj pipeline_layout(m_device, {&ds.layout_});
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&ds.layout_});
 
     uint32_t qfi = 0;
-    VkBufferCreateInfo bci = LvlInitStruct<VkBufferCreateInfo>();
+    VkBufferCreateInfo bci = vku::InitStructHelper();
     bci.usage = descriptor_type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ? VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT
                                                                      : VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
     bci.size = buffer_size;
     bci.queueFamilyIndexCount = 1;
     bci.pQueueFamilyIndices = &qfi;
-    VkBufferObj buffer;
-    buffer.init(*m_device, bci);
-    VkPipelineObj pipe(m_device);
+    vkt::Buffer buffer(*m_device, bci);
 
     VkDescriptorBufferInfo buffer_info;
     buffer_info.buffer = buffer.handle();
     buffer_info.offset = binding_offset;
     buffer_info.range = binding_range;
 
-    VkWriteDescriptorSet descriptor_write = LvlInitStruct<VkWriteDescriptorSet>();
+    VkWriteDescriptorSet descriptor_write = vku::InitStructHelper();
     descriptor_write.dstSet = ds.set_;
     descriptor_write.dstBinding = 0;
     descriptor_write.descriptorCount = 1;
@@ -875,33 +1227,58 @@ void VkGpuAssistedLayerTest::ShaderBufferSizeTest(VkDeviceSize buffer_size, VkDe
         "      gl_Position = vec4(vertices[gl_VertexIndex % 3], 0.0, 1.0);\n"
         "}\n";
 
+    vkt::Shader *vso = nullptr;
+    vkt::Shader *fso = nullptr;
+    if (shader_objects) {
+        vso = new vkt::Shader(*m_device, VK_SHADER_STAGE_VERTEX_BIT, GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, vsSource),
+                              &ds.layout_.handle());
+        fso = new vkt::Shader(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT, GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, fragment_shader),
+                              &ds.layout_.handle());
+    }
+
     VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
     VkShaderObj fs(this, fragment_shader, VK_SHADER_STAGE_FRAGMENT_BIT);
 
-    pipe.AddShader(&vs);
-    pipe.AddShader(&fs);
-    pipe.AddDefaultColorAttachment();
-
-    VkResult err = pipe.CreateVKPipeline(pipeline_layout.handle(), renderPass());
-    ASSERT_VK_SUCCESS(err);
+    CreatePipelineHelper pipe(*this);
+    pipe.InitState();
+    pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
+    pipe.gp_ci_.layout = pipeline_layout.handle();
+    pipe.CreateGraphicsPipeline();
 
     m_commandBuffer->begin();
-    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
+    if (shader_objects) {
+        m_commandBuffer->BeginRenderingColor(GetDynamicRenderTarget());
+    } else {
+        m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
+    }
 
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.handle());
+    if (shader_objects) {
+        const VkShaderStageFlagBits stages[] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT,
+                                                VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT, VK_SHADER_STAGE_GEOMETRY_BIT,
+                                                VK_SHADER_STAGE_FRAGMENT_BIT};
+        const VkShaderEXT shaders[] = {vso->handle(), VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE, fso->handle()};
+        vk::CmdBindShadersEXT(m_commandBuffer->handle(), 5u, stages, shaders);
+        SetDefaultDynamicStates(m_commandBuffer->handle());
+    } else {
+        vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    }
     vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1, &ds.set_,
                               0, nullptr);
 
-    VkViewport viewport = {0, 0, 16, 16, 0, 1};
-    vk::CmdSetViewport(m_commandBuffer->handle(), 0, 1, &viewport);
-    VkRect2D scissor = {{0, 0}, {16, 16}};
-    vk::CmdSetScissor(m_commandBuffer->handle(), 0, 1, &scissor);
     vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
-    m_commandBuffer->EndRenderPass();
+    if (shader_objects) {
+        m_commandBuffer->EndRendering();
+    } else {
+        m_commandBuffer->EndRenderPass();
+    }
     m_commandBuffer->end();
     m_commandBuffer->QueueCommandBuffer(true);
     m_errorMonitor->VerifyFound();
     DestroyRenderTarget();
+    if (shader_objects) {
+        delete vso;
+        delete fso;
+    }
 }
 
 TEST_F(VkGpuAssistedLayerTest, DISABLED_DrawTimeShaderUniformBufferTooSmall) {
@@ -921,6 +1298,7 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_DrawTimeShaderUniformBufferTooSmall) {
                          VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, fsSource,
                          "Descriptor size is 4 and highest byte accessed was 7");
 }
+
 TEST_F(VkGpuAssistedLayerTest, DISABLED_DrawTimeShaderStorageBufferTooSmall) {
     TEST_DESCRIPTION("Test that an error is produced when trying to access storage buffer outside the bound region.");
 
@@ -993,69 +1371,57 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuBufferDeviceAddressOOB) {
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
     AddOptionalExtensions(VK_NV_MESH_SHADER_EXTENSION_NAME);
-    VkValidationFeaturesEXT validation_features = GetValidationFeatures();
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor, &validation_features));
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-    if (!CanEnableGpuAV()) {
-        GTEST_SKIP() << "Requirements for GPU-AV are not met";
-    }
-    if (DeviceValidationVersion() < VK_API_VERSION_1_2) {
-        GTEST_SKIP() << "At least Vulkan version 1.2 is required";
-    }
+    RETURN_IF_SKIP(InitGpuAvFramework())
+
     if (IsDriver(VK_DRIVER_ID_MESA_RADV)) {
         GTEST_SKIP() << "This test should not be run on the RADV driver.";
     }
     if (IsDriver(VK_DRIVER_ID_AMD_PROPRIETARY)) {
         GTEST_SKIP() << "This test should not be run on the AMD proprietary driver.";
     }
-    VkResult err;
     const bool mesh_shader_supported = IsExtensionsEnabled(VK_NV_MESH_SHADER_EXTENSION_NAME);
 
-    auto mesh_shader_features = LvlInitStruct<VkPhysicalDeviceMeshShaderFeaturesNV>();
+    VkPhysicalDeviceMeshShaderFeaturesNV mesh_shader_features = vku::InitStructHelper();
     auto bda_features =
-        LvlInitStruct<VkPhysicalDeviceBufferDeviceAddressFeaturesKHR>(mesh_shader_supported ? &mesh_shader_features : nullptr);
+        vku::InitStruct<VkPhysicalDeviceBufferDeviceAddressFeaturesKHR>(mesh_shader_supported ? &mesh_shader_features : nullptr);
 
     VkPhysicalDeviceFeatures2KHR features2 = GetPhysicalDeviceFeatures2(bda_features);
-    if (!bda_features.bufferDeviceAddress) {
-        GTEST_SKIP() << "Buffer Device Address feature not supported";
+    if (!features2.features.shaderInt64) {
+        GTEST_SKIP() << "shaderInt64 is not supported";
     }
     features2.features.robustBufferAccess = VK_FALSE;
 
     VkCommandPoolCreateFlags pool_flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features2, pool_flags));
-    ASSERT_NO_FATAL_FAILURE(InitViewport());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitState(nullptr, &features2, pool_flags));
+    InitRenderTarget();
 
     // Make a uniform buffer to be passed to the shader that contains the pointer and write count
     uint32_t qfi = 0;
-    auto bci = LvlInitStruct<VkBufferCreateInfo>();
+    VkBufferCreateInfo bci = vku::InitStructHelper();
     bci.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
     bci.size = 12;  // 64 bit pointer + int
     bci.queueFamilyIndexCount = 1;
     bci.pQueueFamilyIndices = &qfi;
-    vk_testing::Buffer buffer0;
+    vkt::Buffer buffer0;
     VkMemoryPropertyFlags mem_props = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
     buffer0.init(*m_device, bci, mem_props);
 
     // Make another buffer to write to
     bci.usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT_KHR;
     bci.size = 64;  // Buffer should be 16*4 = 64 bytes
-    vk_testing::Buffer buffer1(*m_device, bci, mem_props, VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT);
+    VkMemoryAllocateFlagsInfo allocate_flag_info = vku::InitStructHelper();
+    allocate_flag_info.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
+    vkt::Buffer buffer1(*m_device, bci, mem_props, &allocate_flag_info);
 
     // Get device address of buffer to write to
     auto pBuffer = buffer1.address();
 
-    VkViewport viewport = m_viewports[0];
-    VkRect2D scissors = m_scissors[0];
-
-    auto submit_info = LvlInitStruct<VkSubmitInfo>();
+    VkSubmitInfo submit_info = vku::InitStructHelper();
     submit_info.commandBufferCount = 1;
     submit_info.pCommandBuffers = &m_commandBuffer->handle();
 
-    auto begin_info = LvlInitStruct<VkCommandBufferBeginInfo>();
-    auto hinfo = LvlInitStruct<VkCommandBufferInheritanceInfo>();
+    VkCommandBufferBeginInfo begin_info = vku::InitStructHelper();
+    VkCommandBufferInheritanceInfo hinfo = vku::InitStructHelper();
     begin_info.pInheritanceInfo = &hinfo;
 
     struct TestCase {
@@ -1074,14 +1440,14 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuBufferDeviceAddressOOB) {
         push_constant_ranges.offset = 0;
         push_constant_ranges.size = 2 * sizeof(VkDeviceAddress);
 
-        auto plci = LvlInitStruct<VkPipelineLayoutCreateInfo>();
-        plci = LvlInitStruct<VkPipelineLayoutCreateInfo>();
+        VkPipelineLayoutCreateInfo plci = vku::InitStructHelper();
+        plci = vku::InitStructHelper();
         plci.pushConstantRangeCount = 1;
         plci.pPushConstantRanges = &push_constant_ranges;
         plci.setLayoutCount = 0;
         plci.pSetLayouts = nullptr;
 
-        vk_testing::PipelineLayout pipeline_layout(*m_device, plci);
+        vkt::PipelineLayout pipeline_layout(*m_device, plci);
 
         char const *shader_source = R"glsl(
             #version 450
@@ -1102,32 +1468,27 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuBufferDeviceAddressOOB) {
         )glsl";
         VkShaderObj vs(this, shader_source, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL, nullptr, "main", true);
 
-        VkPipelineObj pipe(m_device);
-        pipe.AddShader(&vs);
-        pipe.AddDefaultColorAttachment();
-        pipe.DisableRasterization();
-        err = pipe.CreateVKPipeline(pipeline_layout.handle(), renderPass());
-        ASSERT_VK_SUCCESS(err);
+        CreatePipelineHelper pipe(*this);
+        pipe.InitState();
+        pipe.shader_stages_[0] = vs.GetStageCreateInfo();
+        pipe.gp_ci_.layout = pipeline_layout.handle();
+        pipe.CreateGraphicsPipeline();
 
         for (const auto &test : testcases) {
             m_commandBuffer->begin(&begin_info);
             m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-            vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.handle());
+            vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
             vk::CmdPushConstants(m_commandBuffer->handle(), pipeline_layout.handle(), VK_SHADER_STAGE_VERTEX_BIT, 0,
                                  sizeof(test.push_constants), test.push_constants);
-            vk::CmdSetViewport(m_commandBuffer->handle(), 0, 1, &viewport);
-            vk::CmdSetScissor(m_commandBuffer->handle(), 0, 1, &scissors);
             vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
-            vk::CmdEndRenderPass(m_commandBuffer->handle());
+            m_commandBuffer->EndRenderPass();
             m_commandBuffer->end();
 
             if (!test.error.empty()) {
                 m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "access out of bounds");
             }
-            err = vk::QueueSubmit(m_device->m_queue, 1, &submit_info, VK_NULL_HANDLE);
-            ASSERT_VK_SUCCESS(err);
-            err = vk::QueueWaitIdle(m_device->m_queue);
-            ASSERT_VK_SUCCESS(err);
+            vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
+            vk::QueueWaitIdle(m_default_queue);
             if (!test.error.empty()) {
                 m_errorMonitor->VerifyFound();
             }
@@ -1138,13 +1499,13 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuBufferDeviceAddressOOB) {
     {
         OneOffDescriptorSet descriptor_set(m_device, {{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}});
 
-        const VkPipelineLayoutObj pipeline_layout(m_device, {&descriptor_set.layout_});
+        const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
         VkDescriptorBufferInfo buffer_test_buffer_info = {};
         buffer_test_buffer_info.buffer = buffer0.handle();
         buffer_test_buffer_info.offset = 0;
         buffer_test_buffer_info.range = sizeof(uint32_t);
 
-        auto descriptor_write = LvlInitStruct<VkWriteDescriptorSet>();
+        VkWriteDescriptorSet descriptor_write = vku::InitStructHelper();
         descriptor_write.dstSet = descriptor_set.set_;
         descriptor_write.dstBinding = 0;
         descriptor_write.descriptorCount = 1;
@@ -1171,22 +1532,19 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuBufferDeviceAddressOOB) {
         )glsl";
         VkShaderObj vs(this, shader_source, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL, nullptr, "main", true);
 
-        VkPipelineObj pipe(m_device);
-        pipe.AddShader(&vs);
-        pipe.AddDefaultColorAttachment();
-        pipe.DisableRasterization();
-        auto subcase_err = pipe.CreateVKPipeline(pipeline_layout.handle(), renderPass());
-        ASSERT_VK_SUCCESS(subcase_err);
+        CreatePipelineHelper pipe(*this);
+        pipe.InitState();
+        pipe.shader_stages_[0] = vs.GetStageCreateInfo();
+        pipe.gp_ci_.layout = pipeline_layout.handle();
+        pipe.CreateGraphicsPipeline();
 
         m_commandBuffer->begin(&begin_info);
         m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-        vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.handle());
+        vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
         vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1,
                                   &descriptor_set.set_, 0, nullptr);
-        vk::CmdSetViewport(m_commandBuffer->handle(), 0, 1, &viewport);
-        vk::CmdSetScissor(m_commandBuffer->handle(), 0, 1, &scissors);
         vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
-        vk::CmdEndRenderPass(m_commandBuffer->handle());
+        m_commandBuffer->EndRenderPass();
         m_commandBuffer->end();
 
         for (const auto &test : testcases) {
@@ -1198,10 +1556,8 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuBufferDeviceAddressOOB) {
             if (!test.error.empty()) {
                 m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "access out of bounds");
             }
-            subcase_err = vk::QueueSubmit(m_device->m_queue, 1, &submit_info, VK_NULL_HANDLE);
-            ASSERT_VK_SUCCESS(subcase_err);
-            subcase_err = vk::QueueWaitIdle(m_device->m_queue);
-            ASSERT_VK_SUCCESS(subcase_err);
+            vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
+            vk::QueueWaitIdle(m_default_queue);
             if (!test.error.empty()) {
                 m_errorMonitor->VerifyFound();
             }
@@ -1215,12 +1571,12 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuBufferDeviceAddressOOB) {
         push_constant_ranges[0].offset = 0;
         push_constant_ranges[0].size = 2 * sizeof(VkDeviceAddress);
 
-        auto plci = LvlInitStruct<VkPipelineLayoutCreateInfo>();
+        VkPipelineLayoutCreateInfo plci = vku::InitStructHelper();
         plci.pushConstantRangeCount = push_constant_range_count;
         plci.pPushConstantRanges = push_constant_ranges;
         plci.setLayoutCount = 0;
         plci.pSetLayouts = nullptr;
-        vk_testing::PipelineLayout mesh_pipeline_layout(*m_device, plci);
+        vkt::PipelineLayout mesh_pipeline_layout(*m_device, plci);
 
         char const *mesh_shader_source = R"glsl(
             #version 460
@@ -1250,29 +1606,26 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuBufferDeviceAddressOOB) {
         )glsl";
         VkShaderObj ms(this, mesh_shader_source, VK_SHADER_STAGE_MESH_BIT_NV, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL, nullptr, "main",
                        true);
-        VkPipelineObj mesh_pipe(m_device);
-        mesh_pipe.AddShader(&ms);
-        mesh_pipe.AddDefaultColorAttachment();
-        mesh_pipe.DisableRasterization();
-        err = mesh_pipe.CreateVKPipeline(mesh_pipeline_layout.handle(), renderPass());
-        ASSERT_VK_SUCCESS(err);
+
+        CreatePipelineHelper mesh_pipe(*this);
+        mesh_pipe.InitState();
+        mesh_pipe.shader_stages_ = {ms.GetStageCreateInfo()};
+        mesh_pipe.gp_ci_.layout = mesh_pipeline_layout.handle();
+        mesh_pipe.CreateGraphicsPipeline();
+
         m_commandBuffer->begin(&begin_info);
         m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-        vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, mesh_pipe.handle());
+        vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, mesh_pipe.Handle());
         VkDeviceAddress push_constants[2] = {pBuffer, 5};
         vk::CmdPushConstants(m_commandBuffer->handle(), mesh_pipeline_layout.handle(), VK_SHADER_STAGE_MESH_BIT_NV, 0,
                              sizeof(push_constants), push_constants);
-        vk::CmdSetViewport(m_commandBuffer->handle(), 0, 1, &viewport);
-        vk::CmdSetScissor(m_commandBuffer->handle(), 0, 1, &scissors);
         vk::CmdDrawMeshTasksNV(m_commandBuffer->handle(), 1, 0);
-        vk::CmdEndRenderPass(m_commandBuffer->handle());
+        m_commandBuffer->EndRenderPass();
         m_commandBuffer->end();
 
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "access out of bounds");
-        err = vk::QueueSubmit(m_device->m_queue, 1, &submit_info, VK_NULL_HANDLE);
-        ASSERT_VK_SUCCESS(err);
-        err = vk::QueueWaitIdle(m_device->m_queue);
-        ASSERT_VK_SUCCESS(err);
+        vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
+        vk::QueueWaitIdle(m_default_queue);
         m_errorMonitor->VerifyFound();
     }
 }
@@ -1281,17 +1634,9 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuDrawIndirectCountDeviceLimit) {
     TEST_DESCRIPTION("GPU validation: Validate maxDrawIndirectCount limit");
     SetTargetApiVersion(VK_API_VERSION_1_3);
     AddRequiredExtensions(VK_KHR_DRAW_INDIRECT_COUNT_EXTENSION_NAME);  // instead of enabling feature
-    VkValidationFeaturesEXT validation_features = GetValidationFeatures();
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor, &validation_features));
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
+    RETURN_IF_SKIP(InitGpuAvFramework())
 
-    if (!CanEnableGpuAV()) {
-        GTEST_SKIP() << "Requirements for GPU-AV are not met";
-    }
-
-    VkPhysicalDeviceVulkan13Features features13 = LvlInitStruct<VkPhysicalDeviceVulkan13Features>();
+    VkPhysicalDeviceVulkan13Features features13 = vku::InitStructHelper();
     if (DeviceValidationVersion() >= VK_API_VERSION_1_3) {
         GetPhysicalDeviceFeatures2(features13);
     }
@@ -1308,47 +1653,40 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuDrawIndirectCountDeviceLimit) {
     fpvkSetPhysicalDeviceLimitsEXT(gpu(), &props.limits);
 
     VkCommandPoolCreateFlags pool_flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, features13.dynamicRendering ? (void *)&features13 : nullptr, pool_flags));
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitState(nullptr, features13.dynamicRendering ? (void *)&features13 : nullptr, pool_flags));
+    InitRenderTarget();
 
-    VkBufferCreateInfo buffer_create_info = LvlInitStruct<VkBufferCreateInfo>();
+    VkBufferCreateInfo buffer_create_info = vku::InitStructHelper();
     buffer_create_info.size = 2 * sizeof(VkDrawIndirectCommand);
     buffer_create_info.usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
-    VkBufferObj draw_buffer;
-    draw_buffer.init(*m_device, buffer_create_info, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    vkt::Buffer draw_buffer(*m_device, buffer_create_info,
+                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
     VkDrawIndirectCommand *draw_ptr = static_cast<VkDrawIndirectCommand *>(draw_buffer.memory().map());
     memset(draw_ptr, 0, 2 * sizeof(VkDrawIndirectCommand));
     draw_buffer.memory().unmap();
 
-    VkBufferCreateInfo count_buffer_create_info = LvlInitStruct<VkBufferCreateInfo>();
+    VkBufferCreateInfo count_buffer_create_info = vku::InitStructHelper();
     count_buffer_create_info.size = sizeof(uint32_t);
     count_buffer_create_info.usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
-    VkBufferObj count_buffer;
-    count_buffer.init(*m_device, count_buffer_create_info,
-                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    vkt::Buffer count_buffer(*m_device, count_buffer_create_info,
+                             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
     uint32_t *count_ptr = static_cast<uint32_t *>(count_buffer.memory().map());
     *count_ptr = 2;  // Fits in buffer but exceeds (fake) limit
     count_buffer.memory().unmap();
 
-    VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = LvlInitStruct<VkPipelineLayoutCreateInfo>();
-    vk_testing::PipelineLayout pipeline_layout(*m_device, pipelineLayoutCreateInfo);
+    VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vku::InitStructHelper();
+    vkt::PipelineLayout pipeline_layout(*m_device, pipelineLayoutCreateInfo);
     ASSERT_TRUE(pipeline_layout.initialized());
 
-    VkShaderObj vs(this, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
-    VkPipelineObj pipe(m_device);
-    pipe.AddShader(&vs);
-    pipe.AddDefaultColorAttachment();
-    pipe.DisableRasterization();
-    ASSERT_VK_SUCCESS(pipe.CreateVKPipeline(pipeline_layout.handle(), renderPass()));
+    CreatePipelineHelper pipe(*this);
+    pipe.InitState();
+    pipe.gp_ci_.layout = pipeline_layout.handle();
+    pipe.CreateGraphicsPipeline();
 
-    VkCommandBufferBeginInfo begin_info = LvlInitStruct<VkCommandBufferBeginInfo>();
+    VkCommandBufferBeginInfo begin_info = vku::InitStructHelper();
     m_commandBuffer->begin(&begin_info);
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.handle());
-    VkViewport viewport = {0, 0, 16, 16, 0, 1};
-    vk::CmdSetViewport(m_commandBuffer->handle(), 0, 1, &viewport);
-    VkRect2D scissor = {{0, 0}, {16, 16}};
-    vk::CmdSetScissor(m_commandBuffer->handle(), 0, 1, &scissor);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDrawIndirectCount-countBuffer-02717");
     vk::CmdDrawIndirectCountKHR(m_commandBuffer->handle(), draw_buffer.handle(), 0, count_buffer.handle(), 0, 2,
@@ -1357,21 +1695,13 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuDrawIndirectCountDeviceLimit) {
     m_commandBuffer->EndRenderPass();
     m_commandBuffer->end();
     m_commandBuffer->QueueCommandBuffer();
-    ASSERT_VK_SUCCESS(vk::QueueWaitIdle(m_device->m_queue));
+    ASSERT_EQ(VK_SUCCESS, vk::QueueWaitIdle(m_default_queue));
     m_errorMonitor->VerifyFound();
 
     if (!IsDriver(VK_DRIVER_ID_MESA_RADV) && features13.dynamicRendering) {
-        VkPipelineObj dr_pipe(m_device);
-        dr_pipe.AddShader(&vs);
-        dr_pipe.AddDefaultColorAttachment();
-        dr_pipe.DisableRasterization();
-        ASSERT_VK_SUCCESS(dr_pipe.CreateVKPipeline(pipeline_layout.handle(), VK_NULL_HANDLE));
-
         m_commandBuffer->begin();
         m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-        vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.handle());
-        vk::CmdSetViewport(m_commandBuffer->handle(), 0, 1, &viewport);
-        vk::CmdSetScissor(m_commandBuffer->handle(), 0, 1, &scissor);
+        vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
 
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDrawIndirectCount-countBuffer-02717");
         vk::CmdDrawIndirectCountKHR(m_commandBuffer->handle(), draw_buffer.handle(), 0, count_buffer.handle(), 0, 2,
@@ -1380,7 +1710,7 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuDrawIndirectCountDeviceLimit) {
         m_commandBuffer->EndRenderPass();
         m_commandBuffer->end();
         m_commandBuffer->QueueCommandBuffer();
-        ASSERT_VK_SUCCESS(vk::QueueWaitIdle(m_device->m_queue));
+        ASSERT_EQ(VK_SUCCESS, vk::QueueWaitIdle(m_default_queue));
         m_errorMonitor->VerifyFound();
     }
 }
@@ -1388,14 +1718,7 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuDrawIndirectCountDeviceLimit) {
 TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuDrawIndexedIndirectCountDeviceLimitSubmit2) {
     TEST_DESCRIPTION("GPU validation: Validate maxDrawIndirectCount limit using vkQueueSubmit2");
     SetTargetApiVersion(VK_API_VERSION_1_3);
-    VkValidationFeaturesEXT validation_features = GetValidationFeatures();
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor, &validation_features));
-    if (!CanEnableGpuAV()) {
-        GTEST_SKIP() << "Requirements for GPU-AV are not met";
-    }
-    if (DeviceValidationVersion() < VK_API_VERSION_1_3) {
-        GTEST_SKIP() << "At least Vulkan version 1.3 is required";
-    }
+    RETURN_IF_SKIP(InitGpuAvFramework())
 
     PFN_vkSetPhysicalDeviceLimitsEXT fpvkSetPhysicalDeviceLimitsEXT = nullptr;
     PFN_vkGetOriginalPhysicalDeviceLimitsEXT fpvkGetOriginalPhysicalDeviceLimitsEXT = nullptr;
@@ -1408,57 +1731,49 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuDrawIndexedIndirectCountDeviceLimitSu
     props.limits.maxDrawIndirectCount = 1;
     fpvkSetPhysicalDeviceLimitsEXT(gpu(), &props.limits);
 
-    auto features_13 = LvlInitStruct<VkPhysicalDeviceVulkan13Features>();
-    auto features_12 = LvlInitStruct<VkPhysicalDeviceVulkan12Features>(&features_13);
-    auto features2 = LvlInitStruct<VkPhysicalDeviceFeatures2>(&features_12);
+    VkPhysicalDeviceVulkan13Features features_13 = vku::InitStructHelper();
+    VkPhysicalDeviceVulkan12Features features_12 = vku::InitStructHelper(&features_13);
+    VkPhysicalDeviceFeatures2 features2 = vku::InitStructHelper(&features_12);
     GetPhysicalDeviceFeatures2(features2);
-    if (!features_12.drawIndirectCount || !features_13.synchronization2) {
-        GTEST_SKIP() << "drawIndirectCount and synchronization2 both not supported";
+    if (!features_12.drawIndirectCount) {
+        GTEST_SKIP() << "drawIndirectCount not supported";
     }
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features2));
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitState(nullptr, &features2))
+    InitRenderTarget();
 
-    VkBufferCreateInfo buffer_create_info = LvlInitStruct<VkBufferCreateInfo>();
+    VkBufferCreateInfo buffer_create_info = vku::InitStructHelper();
     buffer_create_info.size = 2 * sizeof(VkDrawIndexedIndirectCommand);
     buffer_create_info.usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
-    VkBufferObj draw_buffer;
-    draw_buffer.init(*m_device, buffer_create_info, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    vkt::Buffer draw_buffer(*m_device, buffer_create_info,
+                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
     VkDrawIndexedIndirectCommand *draw_ptr = static_cast<VkDrawIndexedIndirectCommand *>(draw_buffer.memory().map());
     memset(draw_ptr, 0, 2 * sizeof(VkDrawIndexedIndirectCommand));
     draw_buffer.memory().unmap();
 
-    VkBufferCreateInfo count_buffer_create_info = LvlInitStruct<VkBufferCreateInfo>();
+    VkBufferCreateInfo count_buffer_create_info = vku::InitStructHelper();
     count_buffer_create_info.size = sizeof(uint32_t);
     count_buffer_create_info.usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
-    VkBufferObj count_buffer;
-    count_buffer.init(*m_device, count_buffer_create_info,
-                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    vkt::Buffer count_buffer(*m_device, count_buffer_create_info,
+                             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
     uint32_t *count_ptr = static_cast<uint32_t *>(count_buffer.memory().map());
     *count_ptr = 2;  // Fits in buffer but exceeds (fake) limit
     count_buffer.memory().unmap();
 
-    VkBufferObj index_buffer;
-    index_buffer.init(*m_device, sizeof(uint32_t), VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+    vkt::Buffer index_buffer(*m_device, sizeof(uint32_t), VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-    VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = LvlInitStruct<VkPipelineLayoutCreateInfo>();
-    vk_testing::PipelineLayout pipeline_layout(*m_device, pipelineLayoutCreateInfo);
+    VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vku::InitStructHelper();
+    vkt::PipelineLayout pipeline_layout(*m_device, pipelineLayoutCreateInfo);
     ASSERT_TRUE(pipeline_layout.initialized());
 
-    VkShaderObj vs(this, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
-    VkPipelineObj pipe(m_device);
-    pipe.AddShader(&vs);
-    pipe.AddDefaultColorAttachment();
-    pipe.DisableRasterization();
-    ASSERT_VK_SUCCESS(pipe.CreateVKPipeline(pipeline_layout.handle(), renderPass()));
+    CreatePipelineHelper pipe(*this);
+    pipe.InitState();
+    pipe.gp_ci_.layout = pipeline_layout.handle();
+    pipe.CreateGraphicsPipeline();
 
-    VkCommandBufferBeginInfo begin_info = LvlInitStruct<VkCommandBufferBeginInfo>();
+    VkCommandBufferBeginInfo begin_info = vku::InitStructHelper();
     m_commandBuffer->begin(&begin_info);
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.handle());
-    VkViewport viewport = {0, 0, 16, 16, 0, 1};
-    vk::CmdSetViewport(m_commandBuffer->handle(), 0, 1, &viewport);
-    VkRect2D scissor = {{0, 0}, {16, 16}};
-    vk::CmdSetScissor(m_commandBuffer->handle(), 0, 1, &scissor);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
     vk::CmdBindIndexBuffer(m_commandBuffer->handle(), index_buffer.handle(), 0, VK_INDEX_TYPE_UINT32);
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDrawIndexedIndirectCount-countBuffer-02717");
@@ -1467,35 +1782,27 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuDrawIndexedIndirectCountDeviceLimitSu
 
     m_commandBuffer->EndRenderPass();
     m_commandBuffer->end();
-    VkFenceObj null_fence;
+    vkt::Fence null_fence;
     // use vkQueueSumit2
     m_commandBuffer->QueueCommandBuffer(null_fence, true, true);
-    ASSERT_VK_SUCCESS(vk::QueueWaitIdle(m_device->m_queue));
+    ASSERT_EQ(VK_SUCCESS, vk::QueueWaitIdle(m_default_queue));
     m_errorMonitor->VerifyFound();
 }
 
 TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuDrawIndirectCount) {
     TEST_DESCRIPTION("GPU validation: Validate Draw*IndirectCount countBuffer contents");
-    SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_DRAW_INDIRECT_COUNT_EXTENSION_NAME);
-    VkValidationFeaturesEXT validation_features = GetValidationFeatures();
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor, &validation_features));
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-    if (!CanEnableGpuAV()) {
-        GTEST_SKIP() << "Requirements for GPU-AV are not met";
-    }
+    RETURN_IF_SKIP(InitGpuAvFramework())
 
     VkCommandPoolCreateFlags pool_flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, nullptr, pool_flags));
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitState(nullptr, nullptr, pool_flags));
+    InitRenderTarget();
 
-    VkBufferCreateInfo buffer_create_info = LvlInitStruct<VkBufferCreateInfo>();
+    VkBufferCreateInfo buffer_create_info = vku::InitStructHelper();
     buffer_create_info.size = sizeof(VkDrawIndirectCommand);
     buffer_create_info.usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
-    VkBufferObj draw_buffer;
-    draw_buffer.init(*m_device, buffer_create_info, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    vkt::Buffer draw_buffer(*m_device, buffer_create_info,
+                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
     VkDrawIndirectCommand *draw_ptr = static_cast<VkDrawIndirectCommand *>(draw_buffer.memory().map());
     draw_ptr->firstInstance = 0;
     draw_ptr->firstVertex = 0;
@@ -1503,44 +1810,35 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuDrawIndirectCount) {
     draw_ptr->vertexCount = 3;
     draw_buffer.memory().unmap();
 
-    VkBufferCreateInfo count_buffer_create_info = LvlInitStruct<VkBufferCreateInfo>();
+    VkBufferCreateInfo count_buffer_create_info = vku::InitStructHelper();
     count_buffer_create_info.size = sizeof(uint32_t);
     count_buffer_create_info.usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
-    VkBufferObj count_buffer;
-    count_buffer.init(*m_device, count_buffer_create_info,
-                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    vkt::Buffer count_buffer(*m_device, count_buffer_create_info,
+                             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-    VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = LvlInitStruct<VkPipelineLayoutCreateInfo>();
-    vk_testing::PipelineLayout pipeline_layout(*m_device, pipelineLayoutCreateInfo);
+    VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vku::InitStructHelper();
+    vkt::PipelineLayout pipeline_layout(*m_device, pipelineLayoutCreateInfo);
 
-    VkShaderObj vs(this, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
-    VkPipelineObj pipe(m_device);
-    pipe.AddShader(&vs);
-    pipe.AddDefaultColorAttachment();
-    pipe.DisableRasterization();
-    VkResult err = pipe.CreateVKPipeline(pipeline_layout.handle(), renderPass());
-    ASSERT_VK_SUCCESS(err);
+    CreatePipelineHelper pipe(*this);
+    pipe.InitState();
+    pipe.gp_ci_.layout = pipeline_layout.handle();
+    pipe.CreateGraphicsPipeline();
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDrawIndirectCount-countBuffer-03122");
     uint32_t *count_ptr = static_cast<uint32_t *>(count_buffer.memory().map());
     *count_ptr = 2;
     count_buffer.memory().unmap();
-    VkCommandBufferBeginInfo begin_info = LvlInitStruct<VkCommandBufferBeginInfo>();
+    VkCommandBufferBeginInfo begin_info = vku::InitStructHelper();
     m_commandBuffer->begin(&begin_info);
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.handle());
-    VkViewport viewport = {0, 0, 16, 16, 0, 1};
-    vk::CmdSetViewport(m_commandBuffer->handle(), 0, 1, &viewport);
-    VkRect2D scissor = {{0, 0}, {16, 16}};
-    vk::CmdSetScissor(m_commandBuffer->handle(), 0, 1, &scissor);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
 
     vk::CmdDrawIndirectCountKHR(m_commandBuffer->handle(), draw_buffer.handle(), 0, count_buffer.handle(), 0, 1,
                                 sizeof(VkDrawIndirectCommand));
     m_commandBuffer->EndRenderPass();
     m_commandBuffer->end();
     m_commandBuffer->QueueCommandBuffer();
-    err = vk::QueueWaitIdle(m_device->m_queue);
-    ASSERT_VK_SUCCESS(err);
+    vk::QueueWaitIdle(m_default_queue);
     m_errorMonitor->VerifyFound();
     count_ptr = static_cast<uint32_t *>(count_buffer.memory().map());
     *count_ptr = 1;
@@ -1549,24 +1847,20 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuDrawIndirectCount) {
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDrawIndirectCount-countBuffer-03121");
     m_commandBuffer->begin();
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.handle());
-    vk::CmdSetViewport(m_commandBuffer->handle(), 0, 1, &viewport);
-    vk::CmdSetScissor(m_commandBuffer->handle(), 0, 1, &scissor);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
     // Offset of 4 should error
     vk::CmdDrawIndirectCountKHR(m_commandBuffer->handle(), draw_buffer.handle(), 4, count_buffer.handle(), 0, 1,
                                 sizeof(VkDrawIndirectCommand));
     m_commandBuffer->EndRenderPass();
     m_commandBuffer->end();
     m_commandBuffer->QueueCommandBuffer();
-    err = vk::QueueWaitIdle(m_device->m_queue);
-    ASSERT_VK_SUCCESS(err);
+    vk::QueueWaitIdle(m_default_queue);
     m_errorMonitor->VerifyFound();
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDrawIndexedIndirectCount-countBuffer-03154");
-    VkBufferObj indexed_draw_buffer;
     buffer_create_info.size = sizeof(VkDrawIndexedIndirectCommand);
-    indexed_draw_buffer.init(*m_device, buffer_create_info,
-                             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    vkt::Buffer indexed_draw_buffer(*m_device, buffer_create_info,
+                                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
     VkDrawIndexedIndirectCommand *indexed_draw_ptr = (VkDrawIndexedIndirectCommand *)indexed_draw_buffer.memory().map();
     indexed_draw_ptr->indexCount = 3;
     indexed_draw_ptr->firstIndex = 0;
@@ -1580,22 +1874,18 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuDrawIndirectCount) {
     count_buffer.memory().unmap();
     m_commandBuffer->begin(&begin_info);
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.handle());
-    vk::CmdSetViewport(m_commandBuffer->handle(), 0, 1, &viewport);
-    vk::CmdSetScissor(m_commandBuffer->handle(), 0, 1, &scissor);
-    VkBufferCreateInfo index_buffer_create_info = LvlInitStruct<VkBufferCreateInfo>();
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    VkBufferCreateInfo index_buffer_create_info = vku::InitStructHelper();
     index_buffer_create_info.size = 3 * sizeof(uint32_t);
     index_buffer_create_info.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-    VkBufferObj index_buffer;
-    index_buffer.init(*m_device, index_buffer_create_info);
+    vkt::Buffer index_buffer(*m_device, index_buffer_create_info);
     vk::CmdBindIndexBuffer(m_commandBuffer->handle(), index_buffer.handle(), 0, VK_INDEX_TYPE_UINT32);
     vk::CmdDrawIndexedIndirectCountKHR(m_commandBuffer->handle(), indexed_draw_buffer.handle(), 0, count_buffer.handle(), 0, 1,
                                        sizeof(VkDrawIndexedIndirectCommand));
     m_commandBuffer->EndRenderPass();
     m_commandBuffer->end();
     m_commandBuffer->QueueCommandBuffer();
-    err = vk::QueueWaitIdle(m_device->m_queue);
-    ASSERT_VK_SUCCESS(err);
+    vk::QueueWaitIdle(m_default_queue);
     m_errorMonitor->VerifyFound();
     count_ptr = static_cast<uint32_t *>(count_buffer.memory().map());
     *count_ptr = 1;
@@ -1604,9 +1894,7 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuDrawIndirectCount) {
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDrawIndexedIndirectCount-countBuffer-03153");
     m_commandBuffer->begin(&begin_info);
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.handle());
-    vk::CmdSetViewport(m_commandBuffer->handle(), 0, 1, &viewport);
-    vk::CmdSetScissor(m_commandBuffer->handle(), 0, 1, &scissor);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
     vk::CmdBindIndexBuffer(m_commandBuffer->handle(), index_buffer.handle(), 0, VK_INDEX_TYPE_UINT32);
     // Offset of 4 should error
     vk::CmdDrawIndexedIndirectCountKHR(m_commandBuffer->handle(), indexed_draw_buffer.handle(), 4, count_buffer.handle(), 0, 1,
@@ -1614,39 +1902,28 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuDrawIndirectCount) {
     m_commandBuffer->EndRenderPass();
     m_commandBuffer->end();
     m_commandBuffer->QueueCommandBuffer();
-    err = vk::QueueWaitIdle(m_device->m_queue);
-    ASSERT_VK_SUCCESS(err);
+    vk::QueueWaitIdle(m_default_queue);
     m_errorMonitor->VerifyFound();
 }
 
 TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuDrawIndirectFirstInstance) {
     TEST_DESCRIPTION("Validate illegal firstInstance values");
-    SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-    VkValidationFeaturesEXT validation_features = GetValidationFeatures();
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor, &validation_features));
-    if (IsPlatform(kGalaxyS10)) {
-        GTEST_SKIP() << "This test should not run on Galaxy S10";
-    }
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-    if (!CanEnableGpuAV()) {
-        GTEST_SKIP() << "Requirements for GPU-AV are not met";
-    }
-    auto features2 = LvlInitStruct<VkPhysicalDeviceFeatures2>();
+    RETURN_IF_SKIP(InitGpuAvFramework())
+
+    VkPhysicalDeviceFeatures2 features2 = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(features2);
     features2.features.drawIndirectFirstInstance = VK_FALSE;
 
     VkCommandPoolCreateFlags pool_flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features2, pool_flags));
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitState(nullptr, &features2, pool_flags));
+    InitRenderTarget();
 
-    VkBufferCreateInfo buffer_create_info = LvlInitStruct<VkBufferCreateInfo>();
+    VkBufferCreateInfo buffer_create_info = vku::InitStructHelper();
     buffer_create_info.size = 4 * sizeof(VkDrawIndirectCommand);
     buffer_create_info.usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
-    VkBufferObj draw_buffer;
-    draw_buffer.init(*m_device, buffer_create_info, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    vkt::Buffer draw_buffer(*m_device, buffer_create_info,
+                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
     VkDrawIndirectCommand *draw_ptr = static_cast<VkDrawIndirectCommand *>(draw_buffer.memory().map());
     for (uint32_t i = 0; i < 4; i++) {
         draw_ptr->vertexCount = 3;
@@ -1657,40 +1934,31 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuDrawIndirectFirstInstance) {
     }
     draw_buffer.memory().unmap();
 
-    VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = LvlInitStruct<VkPipelineLayoutCreateInfo>();
-    vk_testing::PipelineLayout pipeline_layout(*m_device, pipelineLayoutCreateInfo);
+    VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = vku::InitStructHelper();
+    vkt::PipelineLayout pipeline_layout(*m_device, pipelineLayoutCreateInfo);
 
-    VkShaderObj vs(this, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
-    VkPipelineObj pipe(m_device);
-    pipe.AddShader(&vs);
-    pipe.AddDefaultColorAttachment();
-    pipe.DisableRasterization();
-    VkResult err = pipe.CreateVKPipeline(pipeline_layout.handle(), renderPass());
-    ASSERT_VK_SUCCESS(err);
+    CreatePipelineHelper pipe(*this);
+    pipe.InitState();
+    pipe.gp_ci_.layout = pipeline_layout.handle();
+    pipe.CreateGraphicsPipeline();
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDrawIndirectCommand-firstInstance-00501");
-    VkCommandBufferBeginInfo begin_info = LvlInitStruct<VkCommandBufferBeginInfo>();
+    VkCommandBufferBeginInfo begin_info = vku::InitStructHelper();
     m_commandBuffer->begin(&begin_info);
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.handle());
-    VkViewport viewport = {0, 0, 16, 16, 0, 1};
-    vk::CmdSetViewport(m_commandBuffer->handle(), 0, 1, &viewport);
-    VkRect2D scissor = {{0, 0}, {16, 16}};
-    vk::CmdSetScissor(m_commandBuffer->handle(), 0, 1, &scissor);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
     vk::CmdDrawIndirect(m_commandBuffer->handle(), draw_buffer.handle(), 0, 4, sizeof(VkDrawIndirectCommand));
     m_commandBuffer->EndRenderPass();
     m_commandBuffer->end();
     m_commandBuffer->QueueCommandBuffer();
-    err = vk::QueueWaitIdle(m_device->m_queue);
-    ASSERT_VK_SUCCESS(err);
+    vk::QueueWaitIdle(m_default_queue);
     m_errorMonitor->VerifyFound();
 
     // Now with an offset and indexed draw
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDrawIndexedIndirectCommand-firstInstance-00554");
-    VkBufferObj indexed_draw_buffer;
     buffer_create_info.size = 4 * sizeof(VkDrawIndexedIndirectCommand);
-    indexed_draw_buffer.init(*m_device, buffer_create_info,
-                             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    vkt::Buffer indexed_draw_buffer(*m_device, buffer_create_info,
+                                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
     VkDrawIndexedIndirectCommand *indexed_draw_ptr = (VkDrawIndexedIndirectCommand *)indexed_draw_buffer.memory().map();
     for (uint32_t i = 0; i < 4; i++) {
         indexed_draw_ptr->indexCount = 3;
@@ -1704,22 +1972,18 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuDrawIndirectFirstInstance) {
 
     m_commandBuffer->begin(&begin_info);
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.handle());
-    vk::CmdSetViewport(m_commandBuffer->handle(), 0, 1, &viewport);
-    vk::CmdSetScissor(m_commandBuffer->handle(), 0, 1, &scissor);
-    VkBufferCreateInfo index_buffer_create_info = LvlInitStruct<VkBufferCreateInfo>();
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    VkBufferCreateInfo index_buffer_create_info = vku::InitStructHelper();
     index_buffer_create_info.size = 3 * sizeof(uint32_t);
     index_buffer_create_info.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-    VkBufferObj index_buffer;
-    index_buffer.init(*m_device, index_buffer_create_info);
+    vkt::Buffer index_buffer(*m_device, index_buffer_create_info);
     vk::CmdBindIndexBuffer(m_commandBuffer->handle(), index_buffer.handle(), 0, VK_INDEX_TYPE_UINT32);
     vk::CmdDrawIndexedIndirect(m_commandBuffer->handle(), indexed_draw_buffer.handle(), sizeof(VkDrawIndexedIndirectCommand), 3,
                                sizeof(VkDrawIndexedIndirectCommand));
     m_commandBuffer->EndRenderPass();
     m_commandBuffer->end();
     m_commandBuffer->QueueCommandBuffer();
-    err = vk::QueueWaitIdle(m_device->m_queue);
-    ASSERT_VK_SUCCESS(err);
+    vk::QueueWaitIdle(m_default_queue);
     m_errorMonitor->VerifyFound();
 }
 
@@ -1736,47 +2000,40 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuValidationInlineUniformBlockAndMiscGp
                                               VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_RESERVE_BINDING_SLOT_EXT};
     validation_features.pEnabledValidationFeatures = enables;
     validation_features.enabledValidationFeatureCount = 2;
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor, &validation_features));
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
+    RETURN_IF_SKIP(InitFramework(&validation_features));
     if (!CanEnableGpuAV()) {
         GTEST_SKIP() << "Requirements for GPU-AV are not met";
     }
-    if (IsPlatform(kShieldTVb)) {
-        GTEST_SKIP() << "This test should not run on Shield TV";
-    }
-    auto indexing_features = LvlInitStruct<VkPhysicalDeviceDescriptorIndexingFeaturesEXT>();
-    auto inline_uniform_block_features = LvlInitStruct<VkPhysicalDeviceInlineUniformBlockFeaturesEXT>(&indexing_features);
+    VkPhysicalDeviceDescriptorIndexingFeaturesEXT indexing_features = vku::InitStructHelper();
+    VkPhysicalDeviceInlineUniformBlockFeaturesEXT inline_uniform_block_features = vku::InitStructHelper(&indexing_features);
     auto features2 = GetPhysicalDeviceFeatures2(inline_uniform_block_features);
     if (!indexing_features.descriptorBindingPartiallyBound || !inline_uniform_block_features.inlineUniformBlock) {
         GTEST_SKIP() << "Not all features supported";
     }
-    auto inline_uniform_props = LvlInitStruct<VkPhysicalDeviceInlineUniformBlockPropertiesEXT>();
+    VkPhysicalDeviceInlineUniformBlockPropertiesEXT inline_uniform_props = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(inline_uniform_props);
 
     VkCommandPoolCreateFlags pool_flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features2, pool_flags));
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
-    auto c_queue = m_device->GetDefaultComputeQueue();
-    if (nullptr == c_queue) {
+    RETURN_IF_SKIP(InitState(nullptr, &features2, pool_flags));
+    InitRenderTarget();
+    if (m_device->compute_queues().empty()) {
         GTEST_SKIP() << "Compute not supported";
     }
 
     uint32_t qfi = 0;
-    VkBufferCreateInfo bci = LvlInitStruct<VkBufferCreateInfo>();
+    VkBufferCreateInfo bci = vku::InitStructHelper();
     bci.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
     bci.size = 4;
     bci.queueFamilyIndexCount = 1;
     bci.pQueueFamilyIndices = &qfi;
-    VkBufferObj buffer0;
+    vkt::Buffer buffer0;
     VkMemoryPropertyFlags mem_props = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
     buffer0.init(*m_device, bci, mem_props);
 
     VkDescriptorBindingFlagsEXT ds_binding_flags[2] = {};
     ds_binding_flags[1] = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT;
     VkDescriptorSetLayoutBindingFlagsCreateInfoEXT layout_createinfo_binding_flags[1] = {};
-    layout_createinfo_binding_flags[0] = LvlInitStruct<VkDescriptorSetLayoutBindingFlagsCreateInfo>();
+    layout_createinfo_binding_flags[0] = vku::InitStructHelper();
     layout_createinfo_binding_flags[0].bindingCount = 2;
     layout_createinfo_binding_flags[0].pBindingFlags = ds_binding_flags;
 
@@ -1787,7 +2044,7 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuValidationInlineUniformBlockAndMiscGp
                                             nullptr},
                                        },
                                        0, layout_createinfo_binding_flags, 0);
-    const VkPipelineLayoutObj pipeline_layout(m_device, {&descriptor_set.layout_});
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
 
     VkDescriptorBufferInfo buffer_info[1] = {};
     buffer_info[0].buffer = buffer0.handle();
@@ -1795,19 +2052,19 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuValidationInlineUniformBlockAndMiscGp
     buffer_info[0].range = sizeof(uint32_t);
 
     const uint32_t test_data = 0xdeadca7;
-    VkWriteDescriptorSetInlineUniformBlockEXT write_inline_uniform = LvlInitStruct<VkWriteDescriptorSetInlineUniformBlockEXT>();
+    VkWriteDescriptorSetInlineUniformBlockEXT write_inline_uniform = vku::InitStructHelper();
     write_inline_uniform.dataSize = 4;
     write_inline_uniform.pData = &test_data;
 
     VkWriteDescriptorSet descriptor_writes[2] = {};
-    descriptor_writes[0] = LvlInitStruct<VkWriteDescriptorSet>();
+    descriptor_writes[0] = vku::InitStructHelper();
     descriptor_writes[0].dstSet = descriptor_set.set_;
     descriptor_writes[0].dstBinding = 0;
     descriptor_writes[0].descriptorCount = 1;
     descriptor_writes[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     descriptor_writes[0].pBufferInfo = buffer_info;
 
-    descriptor_writes[1] = LvlInitStruct<VkWriteDescriptorSet>(&write_inline_uniform);
+    descriptor_writes[1] = vku::InitStructHelper(&write_inline_uniform);
     descriptor_writes[1].dstSet = descriptor_set.set_;
     descriptor_writes[1].dstBinding = 1;
     descriptor_writes[1].dstArrayElement = 16;  // Skip first 16 bytes (dummy)
@@ -1827,7 +2084,7 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuValidationInlineUniformBlockAndMiscGp
 
     VkShaderObj shader_module(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
 
-    VkPipelineShaderStageCreateInfo stage = LvlInitStruct<VkPipelineShaderStageCreateInfo>();
+    VkPipelineShaderStageCreateInfo stage = vku::InitStructHelper();
     stage.flags = 0;
     stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
     stage.module = shader_module.handle();
@@ -1835,7 +2092,7 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuValidationInlineUniformBlockAndMiscGp
     stage.pSpecializationInfo = nullptr;
 
     // CreateComputePipelines
-    VkComputePipelineCreateInfo pipeline_info = LvlInitStruct<VkComputePipelineCreateInfo>();
+    VkComputePipelineCreateInfo pipeline_info = vku::InitStructHelper();
     pipeline_info.flags = 0;
     pipeline_info.layout = pipeline_layout.handle();
     pipeline_info.basePipelineHandle = VK_NULL_HANDLE;
@@ -1852,11 +2109,11 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuValidationInlineUniformBlockAndMiscGp
     vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
     m_commandBuffer->end();
 
-    VkSubmitInfo submit_info = LvlInitStruct<VkSubmitInfo>();
+    VkSubmitInfo submit_info = vku::InitStructHelper();
     submit_info.commandBufferCount = 1;
     submit_info.pCommandBuffers = &m_commandBuffer->handle();
-    vk::QueueSubmit(c_queue->handle(), 1, &submit_info, VK_NULL_HANDLE);
-    vk::QueueWaitIdle(m_device->m_queue);
+    vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
+    vk::QueueWaitIdle(m_default_queue);
     vk::DestroyPipeline(m_device->handle(), c_pipeline, NULL);
 
     uint32_t *data = (uint32_t *)buffer0.memory().map();
@@ -1875,7 +2132,7 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuValidationInlineUniformBlockAndMiscGp
 
     VkPhysicalDeviceProperties properties;
     vk::GetPhysicalDeviceProperties(phys_devices[m_gpu_index], &properties);
-    if (m_device->props.limits.maxBoundDescriptorSets != properties.limits.maxBoundDescriptorSets - 1)
+    if (m_device->phy().limits_.maxBoundDescriptorSets != properties.limits.maxBoundDescriptorSets - 1)
         m_errorMonitor->SetError("VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_RESERVE_BINDING_SLOT_EXT not functioning as expected");
     vk::DestroyInstance(test_inst, NULL);
 
@@ -1896,13 +2153,13 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuValidationInlineUniformBlockAndMiscGp
     dsl_binding[1].stageFlags = VK_SHADER_STAGE_ALL;
     VkDescriptorSetLayout *layouts{new VkDescriptorSetLayout[set_count]{}};
     VkDescriptorSetLayoutCreateInfo dsl_create_info =
-        LvlInitStruct<VkDescriptorSetLayoutCreateInfo>(layout_createinfo_binding_flags);
+        vku::InitStructHelper(layout_createinfo_binding_flags);
     dsl_create_info.pBindings = dsl_binding;
     dsl_create_info.bindingCount = 2;
     for (uint32_t i = 0; i < set_count; i++) {
         vk::CreateDescriptorSetLayout(m_device->handle(), &dsl_create_info, NULL, &layouts[i]);
     }
-    VkPipelineLayoutCreateInfo pl_create_info = LvlInitStruct<VkPipelineLayoutCreateInfo>();
+    VkPipelineLayoutCreateInfo pl_create_info = vku::InitStructHelper();
     VkPipelineLayout pl_layout;
     pl_create_info.setLayoutCount = set_count;
     pl_create_info.pSetLayouts = layouts;
@@ -1920,8 +2177,8 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuValidationInlineUniformBlockAndMiscGp
                               nullptr);
     vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
     m_commandBuffer->end();
-    vk::QueueSubmit(c_queue->handle(), 1, &submit_info, VK_NULL_HANDLE);
-    vk::QueueWaitIdle(m_device->m_queue);
+    vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
+    vk::QueueWaitIdle(m_default_queue);
     vk::DestroyPipelineLayout(m_device->handle(), pl_layout, NULL);
     vk::DestroyPipeline(m_device->handle(), c_pipeline, NULL);
     for (uint32_t i = 0; i < set_count; i++) {
@@ -1944,8 +2201,8 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuValidationInlineUniformBlockAndMiscGp
                               &descriptor_set.set_, 0, nullptr);
     vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
     m_commandBuffer->end();
-    vk::QueueSubmit(c_queue->handle(), 1, &submit_info, VK_NULL_HANDLE);
-    vk::QueueWaitIdle(m_device->m_queue);
+    vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
+    vk::QueueWaitIdle(m_default_queue);
     vk::DestroyPipeline(m_device->handle(), c_pipeline2, nullptr);
     data = (uint32_t *)buffer0.memory().map();
     if (*data != test_data) m_errorMonitor->SetError("Using shader after pipeline recovery not functioning as expected");
@@ -1953,38 +2210,27 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuValidationInlineUniformBlockAndMiscGp
     buffer0.memory().unmap();
 
     // Destroy pipeline layout after creating pipeline
-    VkShaderObj vs(this, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
-    VkPipelineObj pipe(m_device);
-    pipe.AddShader(&vs);
-    pipe.AddDefaultColorAttachment();
-    pipe.DisableRasterization();
+    CreatePipelineHelper pipe(*this);
+    pipe.InitState();
     {
-        const VkPipelineLayoutObj doomed_pipeline_layout(m_device);
-        pipe.CreateVKPipeline(doomed_pipeline_layout.handle(), m_renderPass);
+        const vkt::PipelineLayout doomed_pipeline_layout(*m_device);
+        pipe.gp_ci_.layout = doomed_pipeline_layout.handle();
+        pipe.CreateGraphicsPipeline();
     }
+
     m_commandBuffer->begin();
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.handle());
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-    VkViewport viewport = {0, 0, 16, 16, 0, 1};
-    vk::CmdSetViewport(m_commandBuffer->handle(), 0, 1, &viewport);
-    VkRect2D scissor = {{0, 0}, {16, 16}};
-    vk::CmdSetScissor(m_commandBuffer->handle(), 0, 1, &scissor);
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "Unable to find pipeline layout to bind debug descriptor set");
     vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
     m_errorMonitor->VerifyFound();
-    vk::CmdEndRenderPass(m_commandBuffer->handle());
+    m_commandBuffer->EndRenderPass();
     m_commandBuffer->end();
 }
 
 TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuValidationAbort) {
     TEST_DESCRIPTION("GPU validation: Verify that aborting GPU-AV is safe.");
-
-    SetTargetApiVersion(VK_API_VERSION_1_1);
-    VkValidationFeaturesEXT validation_features = GetValidationFeatures();
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor, &validation_features));
-    if (!CanEnableGpuAV()) {
-        GTEST_SKIP() << "Requirements for GPU-AV are not met";
-    }
+    RETURN_IF_SKIP(InitGpuAvFramework())
 
     PFN_vkSetPhysicalDeviceFeaturesEXT fpvkSetPhysicalDeviceFeaturesEXT = nullptr;
     PFN_vkGetOriginalPhysicalDeviceFeaturesEXT fpvkGetOriginalPhysicalDeviceFeaturesEXT = nullptr;
@@ -2000,7 +2246,7 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuValidationAbort) {
     features.fragmentStoresAndAtomics = false;
     fpvkSetPhysicalDeviceFeaturesEXT(gpu(), features);
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "GPU-Assisted Validation disabled");
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitState())
     m_errorMonitor->VerifyFound();
 }
 
@@ -2008,7 +2254,7 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_ValidationFeatures) {
     TEST_DESCRIPTION("Validate Validation Features");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     VkValidationFeatureEnableEXT enables[] = {VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_RESERVE_BINDING_SLOT_EXT};
-    VkValidationFeaturesEXT features = LvlInitStruct<VkValidationFeaturesEXT>();
+    VkValidationFeaturesEXT features = vku::InitStructHelper();
     features.enabledValidationFeatureCount = 1;
     features.pEnabledValidationFeatures = enables;
 
@@ -2033,19 +2279,11 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_DrawingWithUnboundUnusedSet) {
     TEST_DESCRIPTION(
         "Test issuing draw command with pipeline layout that has 2 descriptor sets with first descriptor set begin unused and "
         "unbound.");
-
-    SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_DRAW_INDIRECT_COUNT_EXTENSION_NAME);
-    VkValidationFeaturesEXT validation_features = GetValidationFeatures();
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor, &validation_features));
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-    if (IsPlatform(kShieldTVb)) {
-        GTEST_SKIP() << "This test should not run on Shield TV";
-    }
-    ASSERT_NO_FATAL_FAILURE(InitState());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitGpuAvFramework())
+
+    RETURN_IF_SKIP(InitState())
+    InitRenderTarget();
     if (DeviceValidationVersion() != VK_API_VERSION_1_1) {
         GTEST_SKIP() << "Tests requires Vulkan 1.1 exactly";
     }
@@ -2065,7 +2303,7 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_DrawingWithUnboundUnusedSet) {
     image.Init(32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_TILING_OPTIMAL, 0);
     VkImageView imageView = image.targetView(VK_FORMAT_R8G8B8A8_UNORM);
 
-    vk_testing::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
+    vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
 
     OneOffDescriptorSet descriptor_set(m_device,
                                        {
@@ -2074,25 +2312,20 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_DrawingWithUnboundUnusedSet) {
     descriptor_set.WriteDescriptorImageInfo(0, imageView, sampler.handle());
     descriptor_set.UpdateDescriptorSets();
 
-    VkBufferObj indirect_buffer;
-    indirect_buffer.init(*m_device, sizeof(VkDrawIndirectCommand), VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                         VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT);
+    vkt::Buffer indirect_buffer(*m_device, sizeof(VkDrawIndirectCommand), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+                                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-    VkBufferObj indexed_indirect_buffer;
-    indexed_indirect_buffer.init(*m_device, sizeof(VkDrawIndexedIndirectCommand), VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                                 VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT);
+    vkt::Buffer indexed_indirect_buffer(*m_device, sizeof(VkDrawIndexedIndirectCommand), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+                                        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-    VkBufferObj count_buffer;
-    count_buffer.init(*m_device, sizeof(uint32_t), VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT);
+    vkt::Buffer count_buffer(*m_device, sizeof(uint32_t), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-    VkBufferObj index_buffer;
-    index_buffer.init(*m_device, sizeof(uint32_t), VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+    vkt::Buffer index_buffer(*m_device, sizeof(uint32_t), VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitInfo();
     pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
     pipe.InitState();
-    pipe.pipeline_layout_ = VkPipelineLayoutObj(m_device, {&descriptor_set.layout_, &descriptor_set.layout_});
+    pipe.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&descriptor_set.layout_, &descriptor_set.layout_});
     pipe.CreateGraphicsPipeline();
 
     m_commandBuffer->begin();
@@ -2111,12 +2344,9 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_DispatchIndirectWorkgroupSize) {
     TEST_DESCRIPTION("GPU validation: Validate VkDispatchIndirectCommand");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     VkValidationFeaturesEXT validation_features = GetValidationFeatures();
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor, &validation_features));
-    if (IsPlatform(kMockICD)) {
+    RETURN_IF_SKIP(InitFramework(&validation_features));
+    if (IsPlatformMockICD()) {
         GTEST_SKIP() << "GPU-Assisted validation test requires a driver that can draw.";
-    }
-    if (IsPlatform(kShieldTVb)) {
-        GTEST_SKIP() << "This test should not run on Shield TV";
     }
 
     PFN_vkSetPhysicalDeviceLimitsEXT fpvkSetPhysicalDeviceLimitsEXT = nullptr;
@@ -2132,14 +2362,14 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_DispatchIndirectWorkgroupSize) {
     props.limits.maxComputeWorkGroupCount[2] = 2;
     fpvkSetPhysicalDeviceLimitsEXT(gpu(), &props.limits);
 
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, nullptr, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    RETURN_IF_SKIP(InitState(nullptr, nullptr, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
 
-    VkBufferCreateInfo buffer_create_info = LvlInitStruct<VkBufferCreateInfo>();
+    VkBufferCreateInfo buffer_create_info = vku::InitStructHelper();
     buffer_create_info.size = 5 * sizeof(VkDispatchIndirectCommand);
     buffer_create_info.usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
 
-    VkBufferObj indirect_buffer;
-    indirect_buffer.init(*m_device, buffer_create_info, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    vkt::Buffer indirect_buffer(*m_device, buffer_create_info,
+                                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
     VkDispatchIndirectCommand *ptr = static_cast<VkDispatchIndirectCommand *>(indirect_buffer.memory().map());
     // VkDispatchIndirectCommand[0]
     ptr->x = 4;  // over
@@ -2168,7 +2398,6 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_DispatchIndirectWorkgroupSize) {
     indirect_buffer.memory().unmap();
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.InitInfo();
     pipe.InitState();
     pipe.CreateComputePipeline();
 
@@ -2193,7 +2422,7 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_DispatchIndirectWorkgroupSize) {
 
     m_commandBuffer->end();
     m_commandBuffer->QueueCommandBuffer();
-    ASSERT_VK_SUCCESS(vk::QueueWaitIdle(m_device->m_queue));
+    ASSERT_EQ(VK_SUCCESS, vk::QueueWaitIdle(m_default_queue));
 
     // Check again in a 2nd submitted command buffer
     m_commandBuffer->reset();
@@ -2210,7 +2439,7 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_DispatchIndirectWorkgroupSize) {
 
     m_commandBuffer->end();
     m_commandBuffer->QueueCommandBuffer();
-    ASSERT_VK_SUCCESS(vk::QueueWaitIdle(m_device->m_queue));
+    ASSERT_EQ(VK_SUCCESS, vk::QueueWaitIdle(m_default_queue));
     m_errorMonitor->VerifyFound();
 }
 
@@ -2221,19 +2450,13 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuBufferOOBGPL) {
     AddRequiredExtensions(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME);
 
     auto validation_features = GetValidationFeatures();
-    ASSERT_NO_FATAL_FAILURE(InitFramework(nullptr, &validation_features));
-    if (IsPlatform(kMockICD)) {
+    RETURN_IF_SKIP(InitFramework(&validation_features));
+    if (IsPlatformMockICD()) {
         GTEST_SKIP() << "Test not supported by MockICD, GPU-Assisted validation test requires a driver that can draw";
     }
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-    if (IsPlatform(kShieldTVb)) {
-        GTEST_SKIP() << "This test should not run on Shield TV";
-    }
 
-    auto robustness2_features = LvlInitStruct<VkPhysicalDeviceRobustness2FeaturesEXT>();
-    auto gpl_features = LvlInitStruct<VkPhysicalDeviceGraphicsPipelineLibraryFeaturesEXT>(&robustness2_features);
+    VkPhysicalDeviceRobustness2FeaturesEXT robustness2_features = vku::InitStructHelper();
+    VkPhysicalDeviceGraphicsPipelineLibraryFeaturesEXT gpl_features = vku::InitStructHelper(&robustness2_features);
     auto features2 = GetPhysicalDeviceFeatures2(gpl_features);
     if (!robustness2_features.nullDescriptor) {
         GTEST_SKIP() << "nullDescriptor feature not supported";
@@ -2244,33 +2467,29 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuBufferOOBGPL) {
     features2.features.robustBufferAccess = VK_FALSE;
     robustness2_features.robustBufferAccess2 = VK_FALSE;
     VkCommandPoolCreateFlags pool_flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features2, pool_flags));
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitState(nullptr, &features2, pool_flags));
+    InitRenderTarget();
 
-    VkBufferObj offset_buffer;
-    VkBufferObj write_buffer;
-    VkBufferObj uniform_texel_buffer;
-    VkBufferObj storage_texel_buffer;
     VkMemoryPropertyFlags reqs = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-    offset_buffer.init(*m_device, 4, reqs);
-    write_buffer.init_as_storage(*m_device, 16, reqs);
+    vkt::Buffer offset_buffer(*m_device, 4, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, reqs);
+    vkt::Buffer write_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, reqs);
 
-    VkBufferCreateInfo buffer_create_info = LvlInitStruct<VkBufferCreateInfo>();
+    VkBufferCreateInfo buffer_create_info = vku::InitStructHelper();
     uint32_t queue_family_index = 0;
     buffer_create_info.size = 16;
     buffer_create_info.usage = VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT;
     buffer_create_info.queueFamilyIndexCount = 1;
     buffer_create_info.pQueueFamilyIndices = &queue_family_index;
-    uniform_texel_buffer.init(*m_device, buffer_create_info, reqs);
+    vkt::Buffer uniform_texel_buffer(*m_device, buffer_create_info, reqs);
     buffer_create_info.usage = VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT;
-    storage_texel_buffer.init(*m_device, buffer_create_info, reqs);
-    VkBufferViewCreateInfo bvci = LvlInitStruct<VkBufferViewCreateInfo>();
+    vkt::Buffer storage_texel_buffer(*m_device, buffer_create_info, reqs);
+    VkBufferViewCreateInfo bvci = vku::InitStructHelper();
     bvci.buffer = uniform_texel_buffer.handle();
     bvci.format = VK_FORMAT_R32_SFLOAT;
     bvci.range = VK_WHOLE_SIZE;
-    vk_testing::BufferView uniform_buffer_view(*m_device, bvci);
+    vkt::BufferView uniform_buffer_view(*m_device, bvci);
     bvci.buffer = storage_texel_buffer.handle();
-    vk_testing::BufferView storage_buffer_view(*m_device, bvci);
+    vkt::BufferView storage_buffer_view(*m_device, bvci);
 
     OneOffDescriptorSet descriptor_set(m_device, {{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
                                                   {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
@@ -2278,7 +2497,7 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuBufferOOBGPL) {
                                                   {3, VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
                                                   {4, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}});
 
-    const VkPipelineLayoutObj pipeline_layout(m_device, {&descriptor_set.layout_});
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
     descriptor_set.WriteDescriptorBufferInfo(0, offset_buffer.handle(), 0, 4);
     descriptor_set.WriteDescriptorBufferInfo(1, write_buffer.handle(), 0, 16, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     descriptor_set.WriteDescriptorBufferInfo(2, VK_NULL_HANDLE, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
@@ -2313,34 +2532,36 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuBufferOOBGPL) {
         }
     )glsl";
     const auto vs_spv = GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, vertshader);
-    vk_testing::GraphicsPipelineLibraryStage pre_raster_stage(vs_spv);
+    vkt::GraphicsPipelineLibraryStage pre_raster_stage(vs_spv, VK_SHADER_STAGE_VERTEX_BIT);
 
     CreatePipelineHelper vi(*this);
     vi.InitVertexInputLibInfo();
     vi.InitState();
-    ASSERT_VK_SUCCESS(vi.CreateGraphicsPipeline(true, false));
+    ASSERT_EQ(VK_SUCCESS, vi.CreateGraphicsPipeline(false));
 
     CreatePipelineHelper pre_raster(*this);
-    pre_raster.InitPreRasterLibInfo(1, &pre_raster_stage.stage_ci);
+    pre_raster.InitPreRasterLibInfo(&pre_raster_stage.stage_ci);
     pre_raster.InitState();
     pre_raster.gp_ci_.layout = pipeline_layout.handle();
-    pre_raster.CreateGraphicsPipeline(true, false);
+    pre_raster.CreateGraphicsPipeline(false);
 
     const auto render_pass = pre_raster.gp_ci_.renderPass;
     const auto subpass = pre_raster.gp_ci_.subpass;
 
     CreatePipelineHelper fragment(*this);
-    fragment.InitFragmentLibInfo(0, nullptr);
+    fragment.InitFragmentLibInfo(nullptr);
+    fragment.gp_ci_.stageCount = 0;
+    fragment.shader_stages_.clear();
     fragment.gp_ci_.layout = pipeline_layout.handle();
     fragment.gp_ci_.renderPass = render_pass;
     fragment.gp_ci_.subpass = subpass;
-    fragment.CreateGraphicsPipeline(true, false);
+    fragment.CreateGraphicsPipeline(false);
 
     CreatePipelineHelper frag_out(*this);
     frag_out.InitFragmentOutputLibInfo();
     frag_out.gp_ci_.renderPass = render_pass;
     frag_out.gp_ci_.subpass = subpass;
-    ASSERT_VK_SUCCESS(frag_out.CreateGraphicsPipeline(true, false));
+    ASSERT_EQ(VK_SUCCESS, frag_out.CreateGraphicsPipeline(false));
 
     std::array<VkPipeline, 4> libraries = {
         vi.pipeline_,
@@ -2348,17 +2569,17 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuBufferOOBGPL) {
         fragment.pipeline_,
         frag_out.pipeline_,
     };
-    vk_testing::GraphicsPipelineFromLibraries pipe(*m_device, libraries, pipeline_layout.handle());
+    vkt::GraphicsPipelineFromLibraries pipe(*m_device, libraries, pipeline_layout.handle());
     ASSERT_TRUE(pipe);
 
-    VkCommandBufferBeginInfo begin_info = LvlInitStruct<VkCommandBufferBeginInfo>();
+    VkCommandBufferBeginInfo begin_info = vku::InitStructHelper();
     m_commandBuffer->begin(&begin_info);
     vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
     vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1,
                               &descriptor_set.set_, 0, nullptr);
     vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
-    vk::CmdEndRenderPass(m_commandBuffer->handle());
+    m_commandBuffer->EndRenderPass();
     m_commandBuffer->end();
     struct TestCase {
         bool positive;
@@ -2393,7 +2614,7 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuBufferOOBGPL) {
         } else {
             m_errorMonitor->VerifyFound();
         }
-        vk::QueueWaitIdle(m_device->m_queue);
+        vk::QueueWaitIdle(m_default_queue);
     }
 }
 
@@ -2404,19 +2625,13 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuBufferOOBGPLIndependentSets) {
     AddRequiredExtensions(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME);
 
     auto validation_features = GetValidationFeatures();
-    ASSERT_NO_FATAL_FAILURE(InitFramework(nullptr, &validation_features));
-    if (IsPlatform(kMockICD)) {
+    RETURN_IF_SKIP(InitFramework(&validation_features));
+    if (IsPlatformMockICD()) {
         GTEST_SKIP() << "Test not supported by MockICD, GPU-Assisted validation test requires a driver that can draw";
     }
-    if (IsPlatform(kShieldTVb)) {
-        GTEST_SKIP() << "This test should not run on Shield TV";
-    }
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
 
-    auto robustness2_features = LvlInitStruct<VkPhysicalDeviceRobustness2FeaturesEXT>();
-    auto gpl_features = LvlInitStruct<VkPhysicalDeviceGraphicsPipelineLibraryFeaturesEXT>(&robustness2_features);
+    VkPhysicalDeviceRobustness2FeaturesEXT robustness2_features = vku::InitStructHelper();
+    VkPhysicalDeviceGraphicsPipelineLibraryFeaturesEXT gpl_features = vku::InitStructHelper(&robustness2_features);
     auto features2 = GetPhysicalDeviceFeatures2(gpl_features);
     if (!robustness2_features.nullDescriptor) {
         GTEST_SKIP() << "nullDescriptor feature not supported";
@@ -2427,33 +2642,29 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuBufferOOBGPLIndependentSets) {
     features2.features.robustBufferAccess = VK_FALSE;
     robustness2_features.robustBufferAccess2 = VK_FALSE;
     VkCommandPoolCreateFlags pool_flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features2, pool_flags));
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitState(nullptr, &features2, pool_flags));
+    InitRenderTarget();
 
-    VkBufferObj offset_buffer;
-    VkBufferObj write_buffer;
-    VkBufferObj uniform_texel_buffer;
-    VkBufferObj storage_texel_buffer;
     VkMemoryPropertyFlags reqs = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-    offset_buffer.init(*m_device, 4, reqs);
-    write_buffer.init_as_storage(*m_device, 16, reqs);
+    vkt::Buffer offset_buffer(*m_device, 4, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, reqs);
+    vkt::Buffer write_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, reqs);
 
-    VkBufferCreateInfo buffer_create_info = LvlInitStruct<VkBufferCreateInfo>();
+    VkBufferCreateInfo buffer_create_info = vku::InitStructHelper();
     uint32_t queue_family_index = 0;
     buffer_create_info.size = 16;
     buffer_create_info.usage = VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT;
     buffer_create_info.queueFamilyIndexCount = 1;
     buffer_create_info.pQueueFamilyIndices = &queue_family_index;
-    uniform_texel_buffer.init(*m_device, buffer_create_info, reqs);
+    vkt::Buffer uniform_texel_buffer(*m_device, buffer_create_info, reqs);
     buffer_create_info.usage = VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT;
-    storage_texel_buffer.init(*m_device, buffer_create_info, reqs);
-    VkBufferViewCreateInfo bvci = LvlInitStruct<VkBufferViewCreateInfo>();
+    vkt::Buffer storage_texel_buffer(*m_device, buffer_create_info, reqs);
+    VkBufferViewCreateInfo bvci = vku::InitStructHelper();
     bvci.buffer = uniform_texel_buffer.handle();
     bvci.format = VK_FORMAT_R32_SFLOAT;
     bvci.range = VK_WHOLE_SIZE;
-    vk_testing::BufferView uniform_buffer_view(*m_device, bvci);
+    vkt::BufferView uniform_buffer_view(*m_device, bvci);
     bvci.buffer = storage_texel_buffer.handle();
-    vk_testing::BufferView storage_buffer_view(*m_device, bvci);
+    vkt::BufferView storage_buffer_view(*m_device, bvci);
 
     OneOffDescriptorSet vertex_set(m_device, {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT, nullptr}});
     OneOffDescriptorSet common_set(m_device, {{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}});
@@ -2462,11 +2673,11 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuBufferOOBGPLIndependentSets) {
                                       {1, VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
                                       {2, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}});
 
-    const VkPipelineLayoutObj pipeline_layout_vs(m_device, {&vertex_set.layout_, &common_set.layout_, nullptr}, {},
+    const vkt::PipelineLayout pipeline_layout_vs(*m_device, {&vertex_set.layout_, &common_set.layout_, nullptr}, {},
                                                  VK_PIPELINE_LAYOUT_CREATE_INDEPENDENT_SETS_BIT_EXT);
-    const VkPipelineLayoutObj pipeline_layout_fs(m_device, {nullptr, &common_set.layout_, &fragment_set.layout_}, {},
+    const vkt::PipelineLayout pipeline_layout_fs(*m_device, {nullptr, &common_set.layout_, &fragment_set.layout_}, {},
                                                  VK_PIPELINE_LAYOUT_CREATE_INDEPENDENT_SETS_BIT_EXT);
-    const VkPipelineLayoutObj pipeline_layout(m_device, {&vertex_set.layout_, &common_set.layout_, &fragment_set.layout_}, {},
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&vertex_set.layout_, &common_set.layout_, &fragment_set.layout_}, {},
                                               VK_PIPELINE_LAYOUT_CREATE_INDEPENDENT_SETS_BIT_EXT);
     vertex_set.WriteDescriptorBufferInfo(0, write_buffer.handle(), 0, 16, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     vertex_set.UpdateDescriptorSets();
@@ -2498,23 +2709,18 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuBufferOOBGPLIndependentSets) {
         }
     )glsl";
     const auto vs_spv = GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, vertshader);
-    vk_testing::GraphicsPipelineLibraryStage pre_raster_stage(vs_spv);
+    vkt::GraphicsPipelineLibraryStage pre_raster_stage(vs_spv, VK_SHADER_STAGE_VERTEX_BIT);
 
     CreatePipelineHelper vi(*this);
     vi.InitVertexInputLibInfo();
     vi.InitState();
-    ASSERT_VK_SUCCESS(vi.CreateGraphicsPipeline(true, false));
+    ASSERT_EQ(VK_SUCCESS, vi.CreateGraphicsPipeline(false));
 
-    VkDynamicState dyn_states[2] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
-    auto dyn_state = LvlInitStruct<VkPipelineDynamicStateCreateInfo>();
-    dyn_state.dynamicStateCount = size(dyn_states);
-    dyn_state.pDynamicStates = dyn_states;
     CreatePipelineHelper pre_raster(*this);
-    pre_raster.InitPreRasterLibInfo(1, &pre_raster_stage.stage_ci);
+    pre_raster.InitPreRasterLibInfo(&pre_raster_stage.stage_ci);
     pre_raster.InitState();
     pre_raster.gp_ci_.layout = pipeline_layout_vs.handle();
-    pre_raster.gp_ci_.pDynamicState = &dyn_state;
-    pre_raster.CreateGraphicsPipeline(true, false);
+    pre_raster.CreateGraphicsPipeline(false);
 
     static const char frag_shader[] = R"glsl(
         #version 450
@@ -2540,16 +2746,16 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuBufferOOBGPLIndependentSets) {
         }
     )glsl";
     const auto fs_spv = GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, frag_shader);
-    vk_testing::GraphicsPipelineLibraryStage fragment_stage(fs_spv, VK_SHADER_STAGE_FRAGMENT_BIT);
+    vkt::GraphicsPipelineLibraryStage fragment_stage(fs_spv, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     CreatePipelineHelper fragment(*this);
-    fragment.InitFragmentLibInfo(1, &fragment_stage.stage_ci);
+    fragment.InitFragmentLibInfo(&fragment_stage.stage_ci);
     fragment.gp_ci_.layout = pipeline_layout_fs.handle();
-    fragment.CreateGraphicsPipeline(true, false);
+    fragment.CreateGraphicsPipeline(false);
 
     CreatePipelineHelper frag_out(*this);
     frag_out.InitFragmentOutputLibInfo();
-    ASSERT_VK_SUCCESS(frag_out.CreateGraphicsPipeline(true, false));
+    ASSERT_EQ(VK_SUCCESS, frag_out.CreateGraphicsPipeline(false));
 
     std::array<VkPipeline, 4> libraries = {
         vi.pipeline_,
@@ -2557,21 +2763,17 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuBufferOOBGPLIndependentSets) {
         fragment.pipeline_,
         frag_out.pipeline_,
     };
-    vk_testing::GraphicsPipelineFromLibraries pipe(*m_device, libraries, pipeline_layout.handle());
+    vkt::GraphicsPipelineFromLibraries pipe(*m_device, libraries, pipeline_layout.handle());
     ASSERT_TRUE(pipe);
 
-    VkCommandBufferBeginInfo begin_info = LvlInitStruct<VkCommandBufferBeginInfo>();
+    VkCommandBufferBeginInfo begin_info = vku::InitStructHelper();
     m_commandBuffer->begin(&begin_info);
     vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
     vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0,
                               static_cast<uint32_t>(desc_sets.size()), desc_sets.data(), 0, nullptr);
-    VkViewport viewport = {0, 0, 1, 1, 0, 1};
-    vk::CmdSetViewport(m_commandBuffer->handle(), 0, 1, &viewport);
-    VkRect2D scissor = {{0, 0}, {1, 1}};
-    vk::CmdSetScissor(m_commandBuffer->handle(), 0, 1, &scissor);
     vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
-    vk::CmdEndRenderPass(m_commandBuffer->handle());
+    m_commandBuffer->EndRenderPass();
     m_commandBuffer->end();
     struct TestCase {
         bool positive;
@@ -2606,6 +2808,212 @@ TEST_F(VkGpuAssistedLayerTest, DISABLED_GpuBufferOOBGPLIndependentSets) {
         } else {
             m_errorMonitor->VerifyFound();
         }
-        vk::QueueWaitIdle(m_device->m_queue);
+        vk::QueueWaitIdle(m_default_queue);
     }
+}
+
+TEST_F(VkGpuAssistedLayerTest, DISABLED_DrawTimeShaderObjectUniformBufferTooSmall) {
+    TEST_DESCRIPTION("Test that an error is produced when trying to access uniform buffer outside the bound region.");
+    char const *fsSource =
+        "#version 450\n"
+        "\n"
+        "layout(location=0) out vec4 x;\n"
+        "layout(set=0, binding=0) uniform readonly foo { int x; int y; } bar;\n"
+        "void main(){\n"
+        "   x = vec4(bar.x, bar.y, 0, 1);\n"
+        "}\n";
+
+    ShaderBufferSizeTest(4,  // buffer size
+                         0,  // binding offset
+                         4,  // binding range
+                         VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, fsSource, "Descriptor size is 4 and highest byte accessed was 7",
+                         true);
+}
+
+TEST_F(VkGpuAssistedLayerTest, DISABLED_DispatchIndirectWorkgroupSizeShaderObjects) {
+    TEST_DESCRIPTION("GPU validation: Validate VkDispatchIndirectCommand");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
+    VkValidationFeaturesEXT validation_features = GetValidationFeatures();
+    RETURN_IF_SKIP(InitFramework(&validation_features));
+    if (IsPlatformMockICD()) {
+        GTEST_SKIP() << "GPU-Assisted validation test requires a driver that can draw.";
+    }
+
+    PFN_vkSetPhysicalDeviceLimitsEXT fpvkSetPhysicalDeviceLimitsEXT = nullptr;
+    PFN_vkGetOriginalPhysicalDeviceLimitsEXT fpvkGetOriginalPhysicalDeviceLimitsEXT = nullptr;
+    if (!LoadDeviceProfileLayer(fpvkSetPhysicalDeviceLimitsEXT, fpvkGetOriginalPhysicalDeviceLimitsEXT)) {
+        GTEST_SKIP() << "Failed to load device profile layer.";
+    }
+
+    VkPhysicalDeviceProperties props;
+    fpvkGetOriginalPhysicalDeviceLimitsEXT(gpu(), &props.limits);
+    props.limits.maxComputeWorkGroupCount[0] = 2;
+    props.limits.maxComputeWorkGroupCount[1] = 2;
+    props.limits.maxComputeWorkGroupCount[2] = 2;
+    fpvkSetPhysicalDeviceLimitsEXT(gpu(), &props.limits);
+
+    RETURN_IF_SKIP(InitState(nullptr, nullptr, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+
+    VkBufferCreateInfo buffer_create_info = vku::InitStructHelper();
+    buffer_create_info.size = 5 * sizeof(VkDispatchIndirectCommand);
+    buffer_create_info.usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
+
+    vkt::Buffer indirect_buffer(*m_device, buffer_create_info,
+                                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    VkDispatchIndirectCommand *ptr = static_cast<VkDispatchIndirectCommand *>(indirect_buffer.memory().map());
+    // VkDispatchIndirectCommand[0]
+    ptr->x = 4;  // over
+    ptr->y = 2;
+    ptr->z = 1;
+    // VkDispatchIndirectCommand[1]
+    ptr++;
+    ptr->x = 2;
+    ptr->y = 3;  // over
+    ptr->z = 1;
+    // VkDispatchIndirectCommand[2] - valid inbetween
+    ptr++;
+    ptr->x = 1;
+    ptr->y = 1;
+    ptr->z = 1;
+    // VkDispatchIndirectCommand[3]
+    ptr++;
+    ptr->x = 0;  // allowed
+    ptr->y = 2;
+    ptr->z = 3;  // over
+    // VkDispatchIndirectCommand[4]
+    ptr++;
+    ptr->x = 3;  // over
+    ptr->y = 2;
+    ptr->z = 3;  // over
+    indirect_buffer.memory().unmap();
+
+    VkShaderStageFlagBits stage = VK_SHADER_STAGE_COMPUTE_BIT;
+    vkt::Shader shader(*m_device, stage, GLSLToSPV(stage, kMinimalShaderGlsl));
+
+    m_commandBuffer->begin();
+    vk::CmdBindShadersEXT(m_commandBuffer->handle(), 1u, &stage, &shader.handle());
+
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDispatchIndirectCommand-x-00417");
+    vk::CmdDispatchIndirect(m_commandBuffer->handle(), indirect_buffer.handle(), 0);
+
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDispatchIndirectCommand-y-00418");
+    vk::CmdDispatchIndirect(m_commandBuffer->handle(), indirect_buffer.handle(), sizeof(VkDispatchIndirectCommand));
+
+    // valid
+    vk::CmdDispatchIndirect(m_commandBuffer->handle(), indirect_buffer.handle(), 2 * sizeof(VkDispatchIndirectCommand));
+
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDispatchIndirectCommand-z-00419");
+    vk::CmdDispatchIndirect(m_commandBuffer->handle(), indirect_buffer.handle(), 3 * sizeof(VkDispatchIndirectCommand));
+
+    // Only expect to have the first error return
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDispatchIndirectCommand-x-00417");
+    vk::CmdDispatchIndirect(m_commandBuffer->handle(), indirect_buffer.handle(), 4 * sizeof(VkDispatchIndirectCommand));
+
+    m_commandBuffer->end();
+    m_commandBuffer->QueueCommandBuffer();
+    ASSERT_EQ(VK_SUCCESS, vk::QueueWaitIdle(m_default_queue));
+
+    // Check again in a 2nd submitted command buffer
+    m_commandBuffer->reset();
+    m_commandBuffer->begin();
+    vk::CmdBindShadersEXT(m_commandBuffer->handle(), 1u, &stage, &shader.handle());
+
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDispatchIndirectCommand-x-00417");
+    vk::CmdDispatchIndirect(m_commandBuffer->handle(), indirect_buffer.handle(), 0);
+
+    vk::CmdDispatchIndirect(m_commandBuffer->handle(), indirect_buffer.handle(), 2 * sizeof(VkDispatchIndirectCommand));
+
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDispatchIndirectCommand-x-00417");
+    vk::CmdDispatchIndirect(m_commandBuffer->handle(), indirect_buffer.handle(), 0);
+
+    m_commandBuffer->end();
+    m_commandBuffer->QueueCommandBuffer();
+    ASSERT_EQ(VK_SUCCESS, vk::QueueWaitIdle(m_default_queue));
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(VkGpuAssistedLayerTest, DISABLED_SelectInstrumentedShaders) {
+    TEST_DESCRIPTION("GPU validation: Validate selection of which shaders get instrumented for GPU-AV");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    const VkBool32 value = true;
+    const VkLayerSettingEXT setting = {OBJECT_LAYER_NAME, "select_instrumented_shaders", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1,
+                                       &value};
+    VkLayerSettingsCreateInfoEXT layer_settings_create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1,
+                                                               &setting};
+    VkValidationFeaturesEXT validation_features = GetValidationFeatures();
+    validation_features.pNext = &layer_settings_create_info;
+    RETURN_IF_SKIP(InitFramework(&validation_features));
+    if (!CanEnableGpuAV()) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    }
+    VkPhysicalDeviceFeatures2 features2 = vku::InitStructHelper();
+    GetPhysicalDeviceFeatures2(features2);
+    if (!features2.features.robustBufferAccess) {
+        GTEST_SKIP() << "Not safe to write outside of buffer memory";
+    }
+    // Robust buffer access will be on by default
+    VkCommandPoolCreateFlags pool_flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    InitState(nullptr, nullptr, pool_flags);
+    InitRenderTarget();
+
+    VkMemoryPropertyFlags reqs = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+    vkt::Buffer write_buffer(*m_device, 4, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, reqs);
+    OneOffDescriptorSet descriptor_set(m_device, {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}});
+
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
+    descriptor_set.WriteDescriptorBufferInfo(0, write_buffer.handle(), 0, 4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    descriptor_set.UpdateDescriptorSets();
+    static const char vertshader[] =
+        "#version 450\n"
+        "layout(set = 0, binding = 0) buffer StorageBuffer { uint data[]; } Data;\n"
+        "void main() {\n"
+        "        Data.data[4] = 0xdeadca71;\n"
+        "}\n";
+
+    VkShaderObj vs(this, vertshader, VK_SHADER_STAGE_VERTEX_BIT);
+    CreatePipelineHelper pipe(*this);
+    pipe.InitState();
+    pipe.shader_stages_[0] = vs.GetStageCreateInfo();
+    pipe.gp_ci_.layout = pipeline_layout.handle();
+    pipe.CreateGraphicsPipeline();
+
+    VkCommandBufferBeginInfo begin_info = vku::InitStructHelper();
+    m_commandBuffer->begin(&begin_info);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1,
+                              &descriptor_set.set_, 0, nullptr);
+    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
+    m_commandBuffer->EndRenderPass();
+    m_commandBuffer->end();
+    // Should not get a warning since shader wasn't instrumented
+    m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit);
+    m_commandBuffer->QueueCommandBuffer();
+    vk::QueueWaitIdle(m_default_queue);
+    VkValidationFeatureEnableEXT enabled[] = {VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT};
+    VkValidationFeaturesEXT features = vku::InitStructHelper();
+    features.enabledValidationFeatureCount = 1;
+    features.pEnabledValidationFeatures = enabled;
+    VkShaderObj instrumented_vs(this, vertshader, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL, nullptr, "main",
+                                false, &features);
+    CreatePipelineHelper pipe2(*this);
+    pipe2.InitState();
+    pipe2.shader_stages_[0] = instrumented_vs.GetStageCreateInfo();
+    pipe2.gp_ci_.layout = pipeline_layout.handle();
+    pipe2.CreateGraphicsPipeline();
+
+    m_commandBuffer->begin(&begin_info);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe2.Handle());
+    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1,
+                              &descriptor_set.set_, 0, nullptr);
+    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
+    m_commandBuffer->EndRenderPass();
+    m_commandBuffer->end();
+    // Should get a warning since shader was instrumented
+    m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "VUID-vkCmdDraw-None-08613");
+    m_commandBuffer->QueueCommandBuffer();
+    vk::QueueWaitIdle(m_default_queue);
+    m_errorMonitor->VerifyFound();
 }

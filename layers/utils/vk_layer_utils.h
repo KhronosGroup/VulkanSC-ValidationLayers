@@ -25,10 +25,12 @@
 #include <string>
 #include <vector>
 #include <bitset>
-#include <iomanip>
+#include <shared_mutex>
+
+#include <vulkan/utility/vk_format_utils.h>
+
 #include "cast_utils.h"
 #include "generated/vk_extension_helper.h"
-#include "generated/vk_format_utils.h"
 #include "error_message/logging.h"
 
 #ifndef WIN32
@@ -51,8 +53,6 @@
 #endif
 #endif
 
-#ifdef __cplusplus
-
 static inline VkExtent3D CastTo3D(const VkExtent2D &d2) {
     VkExtent3D d3 = {d2.width, d2.height, 1};
     return d3;
@@ -61,17 +61,6 @@ static inline VkExtent3D CastTo3D(const VkExtent2D &d2) {
 static inline VkOffset3D CastTo3D(const VkOffset2D &d2) {
     VkOffset3D d3 = {d2.x, d2.y, 0};
     return d3;
-}
-
-// Convert integer API version to a string
-static inline std::string StringAPIVersion(APIVersion version) {
-    std::stringstream version_name;
-    if (!version.Valid()) {
-        return "<unrecognized>";
-    }
-    version_name << version.Major() << "." << version.Minor() << "." << version.Patch() << " (0x" << std::setfill('0')
-                 << std::setw(8) << std::hex << version.Value() << ")";
-    return version_name.str();
 }
 
 // Traits objects to allow string_join to operate on collections of const char *
@@ -369,28 +358,9 @@ static inline uint32_t GetIndexAlignment(VkIndexType indexType) {
     }
 }
 
-static inline uint32_t GetPlaneIndex(VkImageAspectFlags aspect) {
-    // Returns an out of bounds index on error
-    switch (aspect) {
-        case VK_IMAGE_ASPECT_PLANE_0_BIT:
-            return 0;
-            break;
-        case VK_IMAGE_ASPECT_PLANE_1_BIT:
-            return 1;
-            break;
-        case VK_IMAGE_ASPECT_PLANE_2_BIT:
-            return 2;
-            break;
-        default:
-            // If more than one plane bit is set, return error condition
-            return FORMAT_MAX_PLANES;
-            break;
-    }
-}
-
 // vkspec.html#formats-planes-image-aspect
 static inline bool IsValidPlaneAspect(VkFormat format, VkImageAspectFlags aspect_mask) {
-    const uint32_t planes = FormatPlaneCount(format);
+    const uint32_t planes = vkuFormatPlaneCount(format);
     constexpr VkImageAspectFlags valid_planes =
         VK_IMAGE_ASPECT_PLANE_0_BIT | VK_IMAGE_ASPECT_PLANE_1_BIT | VK_IMAGE_ASPECT_PLANE_2_BIT;
 
@@ -502,8 +472,8 @@ static inline uint32_t FullMipChainLevels(VkExtent3D extent) {
 
     // If multi-plane, adjust per-plane extent
     const VkFormat format = ci.format;
-    if (FormatIsMultiplane(format)) {
-        VkExtent2D divisors = FindMultiplaneExtentDivisors(format, aspect_mask);
+    if (vkuFormatIsMultiplane(format)) {
+        VkExtent2D divisors = vkuFindMultiplaneExtentDivisors(format, static_cast<VkImageAspectFlagBits>(aspect_mask));
         extent.width /= divisors.width;
         extent.height /= divisors.height;
     }
@@ -561,9 +531,6 @@ bool IsValueIn(const T &v, const std::initializer_list<T> &list) {
     return IsValueIn<T, decltype(list)>(v, list);
 }
 
-extern "C" {
-#endif
-
 #define VK_LAYER_API_VERSION VK_HEADER_VERSION_COMPLETE
 
 typedef enum VkStringErrorFlagBits {
@@ -577,13 +544,7 @@ void layer_debug_messenger_actions(debug_report_data *report_data, const char *l
 
 VkStringErrorFlags vk_string_validate(const int max_length, const char *char_array);
 bool white_list(const char *item, const std::set<std::string> &whitelist);
-
-#ifdef __cplusplus
-}
-#endif
-
-#ifdef __cplusplus
-#include <shared_mutex>
+std::string GetTempFilePath();
 
 // Aliases to avoid excessive typing. We can't easily auto these away because
 // there are virtual methods in ValidationObject which return lock guards
@@ -810,6 +771,23 @@ static inline void ToUpper(std::string &str) {
               [](char c) { return static_cast<char>(std::toupper(c)); });
 }
 
-}  // namespace vvl
+// The standard does not specify the value of data() for zero-sized contatiners as being null or non-null,
+// only that it is not dereferenceable.
+//
+// Vulkan VUID's OTOH frequently require NULLs for zero-sized entries, or for option entries with non-zero counts
+template <typename T>
+const typename T::value_type *DataOrNull(const T &container) {
+    if (!container.empty()) {
+        return container.data();
+    }
+    return nullptr;
+}
 
-#endif
+
+// Workaround for static_assert(false) before C++ 23 arrives
+// https://en.cppreference.com/w/cpp/language/static_assert
+// https://cplusplus.github.io/CWG/issues/2518.html
+template <typename>
+inline constexpr bool dependent_false_v = false;
+
+}  // namespace vvl

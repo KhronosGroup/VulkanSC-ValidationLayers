@@ -116,6 +116,11 @@
 [[maybe_unused]] static const char *kVUID_BestPractices_SuboptimalSwapchain = "UNASSIGNED-BestPractices-SuboptimalSwapchain";
 [[maybe_unused]] static const char *kVUID_BestPractices_SuboptimalSwapchainImageCount =
     "UNASSIGNED-BestPractices-vkCreateSwapchainKHR-suboptimal-swapchain-image-count";
+[[maybe_unused]] static const char *kVUID_BestPractices_NoVkSwapchainPresentModesCreateInfoEXTProvided =
+    "UNASSIGNED-BestPractices-vkCreateSwapchainKHR-no-VkSwapchainPresentModesCreateInfoEXT-provided";
+[[maybe_unused]] static const char *kVUID_BestPractices_SubpassResolve_NonOptimalFormat =
+    "UNASSIGNED-BestPractices-vkCreateRenderPass-SubpassResolve-NonOptimalFormat";
+
 [[maybe_unused]] static const char *kVUID_BestPractices_Swapchain_InvalidCount = "UNASSIGNED-BestPractices-SwapchainInvalidCount";
 [[maybe_unused]] static const char *kVUID_BestPractices_DepthBiasNoAttachment = "UNASSIGNED-BestPractices-DepthBiasNoAttachment";
 [[maybe_unused]] static const char *kVUID_BestPractices_SpirvDeprecated_WorkgroupSize =
@@ -136,9 +141,12 @@
 [[maybe_unused]] static const char *kVUID_BestPractices_DrawState_SwapchainImagesNotFound = "UNASSIGNED-BestPractices-DrawState-SwapchainImagesNotFound";
 [[maybe_unused]] static const char *kVUID_BestPractices_DrawState_MismatchedImageType = "UNASSIGNED-BestPractices-DrawState-MismatchedImageType";
 [[maybe_unused]] static const char *kVUID_BestPractices_DrawState_InvalidExtents = "UNASSIGNED-BestPractices-DrawState-InvalidExtents";
+[[maybe_unused]] static const char *kVUID_BestPractices_DrawState_InvalidCommandBufferSimultaneousUse = "UNASSIGNED-BestPractices-DrawState-InvalidCommandBufferSimultaneousUse";
 [[maybe_unused]] static const char *kVUID_BestPractices_Shader_InputNotProduced = "UNASSIGNED-BestPractices-Shader-InputNotProduced";
 [[maybe_unused]] static const char *kVUID_BestPractices_Shader_OutputNotConsumed = "UNASSIGNED-BestPractices-Shader-OutputNotConsumed";
 [[maybe_unused]] static const char *kVUID_BestPractices_Shader_FragmentOutputMismatch = "UNASSIGNED-BestPractices-Shader-FragmentOutputMismatch";
+[[maybe_unused]] static const char *kVUID_BestPractices_Pipeline_NoRendering = "UNASSIGNED-BestPractices-Pipeline-NoRendering";
+[[maybe_unused]] static const char *kVUID_BestPractices_QueryPool_Unavailable = "UNASSIGNED-BestPractices-QueryPool-Unavailable";
 
 // Arm-specific best practice
 [[maybe_unused]] static const char *kVUID_BestPractices_AllocateDescriptorSets_SuboptimalReuse =

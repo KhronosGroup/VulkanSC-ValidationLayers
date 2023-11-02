@@ -12,12 +12,13 @@
  */
 
 #include "../framework/layer_validation_tests.h"
+#include "../framework/pipeline_helper.h"
 
 TEST_F(VkPositiveLayerTest, TestShaderInputAndOutputComponents) {
     TEST_DESCRIPTION("Test shader layout in and out with different components.");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
 
     char const *vsSource = R"glsl(
                 #version 450
@@ -123,14 +124,8 @@ TEST_F(VkPositiveLayerTest, TestShaderInputAndOutputComponents) {
 TEST_F(VkPositiveLayerTest, TestShaderInputAndOutputStructComponents) {
     TEST_DESCRIPTION("Test shader interface with structs.");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-
-    // There is a crash inside the driver on S10
-    if (IsPlatform(kGalaxyS10)) {
-        GTEST_SKIP() << "This test should not run on Galaxy S10";
-    }
-
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
 
     char const *vsSource = R"glsl(
                 #version 450
@@ -178,12 +173,9 @@ TEST_F(PositiveShaderInterface, RelaxedBlockLayout) {
     TEST_DESCRIPTION("Create a shader that requires relaxed block layout.");
 
     AddRequiredExtensions(VK_KHR_RELAXED_BLOCK_LAYOUT_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-    ASSERT_NO_FATAL_FAILURE(InitState());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitState())
+    InitRenderTarget();
 
     // Vertex shader requiring relaxed layout.
     // Without relaxed layout, we would expect a message like:
@@ -221,19 +213,16 @@ TEST_F(PositiveShaderInterface, UboStd430Layout) {
     TEST_DESCRIPTION("Create a shader that requires UBO std430 layout.");
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_UNIFORM_BUFFER_STANDARD_LAYOUT_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    auto uniform_buffer_standard_layout_features = LvlInitStruct<VkPhysicalDeviceUniformBufferStandardLayoutFeaturesKHR>(NULL);
+    VkPhysicalDeviceUniformBufferStandardLayoutFeaturesKHR uniform_buffer_standard_layout_features = vku::InitStructHelper(NULL);
     uniform_buffer_standard_layout_features.uniformBufferStandardLayout = VK_TRUE;
     GetPhysicalDeviceFeatures2(uniform_buffer_standard_layout_features);
 
-    auto set_features2 = LvlInitStruct<VkPhysicalDeviceFeatures2>(&uniform_buffer_standard_layout_features);
+    VkPhysicalDeviceFeatures2 set_features2 = vku::InitStructHelper(&uniform_buffer_standard_layout_features);
 
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &set_features2));
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitState(nullptr, &set_features2));
+    InitRenderTarget();
 
     // Vertex shader requiring std430 in a uniform buffer.
     // Without uniform buffer standard layout, we would expect a message like:
@@ -266,7 +255,7 @@ TEST_F(PositiveShaderInterface, UboStd430Layout) {
                OpFunctionEnd
         )";
 
-    VkShaderObj::CreateFromASM(*this, VK_SHADER_STAGE_VERTEX_BIT, spv_source, "main", nullptr, SPV_ENV_VULKAN_1_0);
+    VkShaderObj::CreateFromASM(this, spv_source, VK_SHADER_STAGE_VERTEX_BIT);
 }
 
 TEST_F(PositiveShaderInterface, ScalarBlockLayout) {
@@ -275,22 +264,14 @@ TEST_F(PositiveShaderInterface, ScalarBlockLayout) {
     TEST_DESCRIPTION("Create a shader that requires scalar block layout.");
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    auto scalar_block_features = LvlInitStruct<VkPhysicalDeviceScalarBlockLayoutFeaturesEXT>(NULL);
+    VkPhysicalDeviceScalarBlockLayoutFeaturesEXT scalar_block_features = vku::InitStructHelper(NULL);
     GetPhysicalDeviceFeatures2(scalar_block_features);
+    VkPhysicalDeviceFeatures2 set_features2 = vku::InitStructHelper(&scalar_block_features);
 
-    if (scalar_block_features.scalarBlockLayout != VK_TRUE) {
-        GTEST_SKIP() << "scalarBlockLayout feature not supported";
-    }
-
-    auto set_features2 = LvlInitStruct<VkPhysicalDeviceFeatures2>(&scalar_block_features);
-
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &set_features2));
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitState(nullptr, &set_features2));
+    InitRenderTarget();
 
     // Vertex shader requiring scalar layout.
     // Without scalar layout, we would expect a message like:
@@ -329,29 +310,24 @@ TEST_F(PositiveShaderInterface, FragmentOutputNotWrittenButMasked) {
         "Test that no error is produced when the fragment shader fails to declare an output, but the corresponding attachment's "
         "write mask is 0.");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
 
     char const *fsSource = R"glsl(
         #version 450
         void main() {}
     )glsl";
-
-    VkShaderObj vs(this, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
     VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
-
-    VkPipelineObj pipe(m_device);
-    pipe.AddShader(&vs);
-    pipe.AddShader(&fs);
-
-    /* set up CB 0, not written, but also masked */
-    pipe.AddDefaultColorAttachment(0);
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
 
     VkDescriptorSetObj descriptorSet(m_device);
     descriptorSet.AppendDummy();
     descriptorSet.CreateVKDescriptorSet(m_commandBuffer);
 
-    pipe.CreateVKPipeline(descriptorSet.GetPipelineLayout(), renderPass());
+    CreatePipelineHelper pipe(*this);
+    pipe.InitState();
+    pipe.shader_stages_[1] = fs.GetStageCreateInfo();
+    pipe.gp_ci_.layout = descriptorSet.GetPipelineLayout();
+    pipe.CreateGraphicsPipeline();
 }
 
 TEST_F(PositiveShaderInterface, RelaxedTypeMatch) {
@@ -362,20 +338,11 @@ TEST_F(PositiveShaderInterface, RelaxedTypeMatch) {
 
     SetTargetApiVersion(VK_API_VERSION_1_1); // At least 1.1 is required for maintenance4
     AddRequiredExtensions(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (DeviceValidationVersion() < VK_API_VERSION_1_1) {
-        GTEST_SKIP() << "At least Vulkan 1.1 is required";
-    }
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " required but not supported";
-    }
-    auto maintenance_4_features = LvlInitStruct<VkPhysicalDeviceMaintenance4FeaturesKHR>();
+    RETURN_IF_SKIP(InitFramework())
+    VkPhysicalDeviceMaintenance4FeaturesKHR maintenance_4_features = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(maintenance_4_features);
-    if (!maintenance_4_features.maintenance4) {
-        GTEST_SKIP() << "maintenance4 is required but not enabled.";
-    }
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &maintenance_4_features));
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitState(nullptr, &maintenance_4_features));
+    InitRenderTarget();
 
     char const *vsSource = R"glsl(
         #version 450
@@ -402,7 +369,6 @@ TEST_F(PositiveShaderInterface, RelaxedTypeMatch) {
     VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitInfo();
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
     pipe.InitState();
     pipe.CreateGraphicsPipeline();
@@ -411,8 +377,8 @@ TEST_F(PositiveShaderInterface, RelaxedTypeMatch) {
 TEST_F(PositiveShaderInterface, TessPerVertex) {
     TEST_DESCRIPTION("Test that pipeline validation accepts per-vertex variables passed between the TCS and TES stages");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
 
     if (!m_device->phy().features().tessellationShader) {
         GTEST_SKIP() << "Device does not support tessellation shaders";
@@ -449,7 +415,6 @@ TEST_F(PositiveShaderInterface, TessPerVertex) {
     VkPipelineTessellationStateCreateInfo tsci{VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO, nullptr, 0, 3};
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitInfo();
     pipe.gp_ci_.pTessellationState = &tsci;
     pipe.gp_ci_.pInputAssemblyState = &iasci;
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), tcs.GetStageCreateInfo(), tes.GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -462,8 +427,8 @@ TEST_F(PositiveShaderInterface, GeometryInputBlockPositive) {
         "Test that pipeline validation accepts a user-defined interface block passed into the geometry shader. This is interesting "
         "because the 'extra' array level is not present on the member type, but on the block instance.");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
 
     if (!m_device->phy().features().geometryShader) {
         GTEST_SKIP() << "Device does not support geometry shaders";
@@ -495,7 +460,6 @@ TEST_F(PositiveShaderInterface, GeometryInputBlockPositive) {
     VkShaderObj fs(this, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitInfo();
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), gs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
     pipe.InitState();
     pipe.CreateGraphicsPipeline();
@@ -504,7 +468,8 @@ TEST_F(PositiveShaderInterface, GeometryInputBlockPositive) {
 TEST_F(PositiveShaderInterface, InputAttachment) {
     TEST_DESCRIPTION("Positive test for a correctly matched input attachment");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
 
     char const *fsSource = R"glsl(
         #version 450
@@ -514,19 +479,11 @@ TEST_F(PositiveShaderInterface, InputAttachment) {
            color = subpassLoad(x);
         }
     )glsl";
-
-    VkShaderObj vs(this, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
     VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
-    VkPipelineObj pipe(m_device);
-    pipe.AddShader(&vs);
-    pipe.AddShader(&fs);
-    pipe.AddDefaultColorAttachment();
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
-
     VkDescriptorSetLayoutBinding dslb = {0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
-    const VkDescriptorSetLayoutObj dsl(m_device, {dslb});
-    const VkPipelineLayoutObj pl(m_device, {&dsl});
+    const vkt::DescriptorSetLayout dsl(*m_device, {dslb});
+    const vkt::PipelineLayout pl(*m_device, {&dsl});
 
     VkAttachmentDescription descs[2] = {
         {0, VK_FORMAT_R8G8B8A8_UNORM, VK_SAMPLE_COUNT_1_BIT, VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_STORE,
@@ -547,17 +504,21 @@ TEST_F(PositiveShaderInterface, InputAttachment) {
     VkSubpassDescription sd = {0, VK_PIPELINE_BIND_POINT_GRAPHICS, 1, &input, 1, &color, nullptr, nullptr, 0, nullptr};
 
     VkRenderPassCreateInfo rpci = {VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO, nullptr, 0, 2, descs, 1, &sd, 0, nullptr};
-    vk_testing::RenderPass rp(*m_device, rpci);
+    vkt::RenderPass rp(*m_device, rpci);
 
-    // should be OK. would go wrong here if it's going to...
-    pipe.CreateVKPipeline(pl.handle(), rp.handle());
+    CreatePipelineHelper pipe(*this);
+    pipe.InitState();
+    pipe.shader_stages_[1] = fs.GetStageCreateInfo();
+    pipe.gp_ci_.layout = pl.handle();
+    pipe.gp_ci_.renderPass = rp.handle();
+    pipe.CreateGraphicsPipeline();
 }
 
 TEST_F(PositiveShaderInterface, InputAttachmentMissingNotRead) {
     TEST_DESCRIPTION("Input Attachment would be missing, but it is not read from in shader");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
 
     // layout(input_attachment_index=0, set=0, binding=0) uniform subpassInput xs[1];
     // layout(location=0) out vec4 color;
@@ -609,13 +570,10 @@ TEST_F(PositiveShaderInterface, InputAttachmentArray) {
     TEST_DESCRIPTION("Input Attachment array where need to follow the index into the array");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (DeviceValidationVersion() < VK_API_VERSION_1_2) {
-        GTEST_SKIP() << "At least Vulkan version 1.2 is required";
-    }
-    auto features12 = LvlInitStruct<VkPhysicalDeviceVulkan12Features>();
+    RETURN_IF_SKIP(InitFramework())
+    VkPhysicalDeviceVulkan12Features features12 = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(features12);
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features12));
+    RETURN_IF_SKIP(InitState(nullptr, &features12));
 
     const VkAttachmentDescription inputAttachmentDescription = {0,
                                                                 m_render_target_fmt,
@@ -646,13 +604,13 @@ TEST_F(PositiveShaderInterface, InputAttachmentArray) {
                                                      0,
                                                      nullptr};
 
-    auto renderPassInfo = LvlInitStruct<VkRenderPassCreateInfo>();
+    VkRenderPassCreateInfo renderPassInfo = vku::InitStructHelper();
     renderPassInfo.attachmentCount = 1;
     renderPassInfo.pAttachments = &inputAttachmentDescription;
     renderPassInfo.subpassCount = 1;
     renderPassInfo.pSubpasses = &subpassDescription;
 
-    vk_testing::RenderPass renderPass(*m_device, renderPassInfo);
+    vkt::RenderPass renderPass(*m_device, renderPassInfo);
 
     // use static array of 2 and index into element 1 to read
     {
@@ -764,13 +722,10 @@ TEST_F(PositiveShaderInterface, InputAttachmentDepthStencil) {
     TEST_DESCRIPTION("Input Attachment sharing same variable, but different aspect");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (DeviceValidationVersion() < VK_API_VERSION_1_2) {
-        GTEST_SKIP() << "At least Vulkan version 1.2 is required";
-    }
-    auto features12 = LvlInitStruct<VkPhysicalDeviceVulkan12Features>();
+    RETURN_IF_SKIP(InitFramework())
+    VkPhysicalDeviceVulkan12Features features12 = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(features12);
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features12));
+    RETURN_IF_SKIP(InitState(nullptr, &features12));
 
     const VkFormat ds_format = FindSupportedDepthStencilFormat(gpu());
 
@@ -795,13 +750,13 @@ TEST_F(PositiveShaderInterface, InputAttachmentDepthStencil) {
                                                      0,
                                                      nullptr};
 
-    auto renderPassInfo = LvlInitStruct<VkRenderPassCreateInfo>();
+    VkRenderPassCreateInfo renderPassInfo = vku::InitStructHelper();
     renderPassInfo.attachmentCount = 2;
     renderPassInfo.pAttachments = inputAttachmentDescriptions;
     renderPassInfo.subpassCount = 1;
     renderPassInfo.pSubpasses = &subpassDescription;
 
-    vk_testing::RenderPass renderPass(*m_device, renderPassInfo);
+    vkt::RenderPass renderPass(*m_device, renderPassInfo);
 
     // Depth and Stencil use same index, but valid because differnet image aspect masks
     const char *fs_source = R"(
@@ -834,10 +789,10 @@ TEST_F(VkPositiveLayerTest, FragmentOutputNotConsumedButAlphaToCoverageEnabled) 
     TEST_DESCRIPTION(
         "Test that no warning is produced when writing to non-existing color attachment if alpha to coverage is enabled.");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget(0u));
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget(0u);
 
-    VkPipelineMultisampleStateCreateInfo ms_state_ci = LvlInitStruct<VkPipelineMultisampleStateCreateInfo>();
+    VkPipelineMultisampleStateCreateInfo ms_state_ci = vku::InitStructHelper();
     ms_state_ci.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
     ms_state_ci.alphaToCoverageEnable = VK_TRUE;
 
@@ -853,8 +808,8 @@ TEST_F(VkPositiveLayerTest, FragmentOutputNotConsumedButAlphaToCoverageEnabled) 
 TEST_F(PositiveShaderInterface, DISABLED_InputOutputMatch2) {
     TEST_DESCRIPTION("Test matching vertex shader output with fragment shader input.");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
 
     const char vsSource[] = R"glsl(#version 450
         layout(location = 0) out vec2 v1;
@@ -880,7 +835,6 @@ TEST_F(PositiveShaderInterface, DISABLED_InputOutputMatch2) {
     VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitInfo();
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
     pipe.InitState();
     pipe.CreateGraphicsPipeline();
@@ -889,8 +843,8 @@ TEST_F(PositiveShaderInterface, DISABLED_InputOutputMatch2) {
 TEST_F(VkPositiveLayerTest, TestShaderInputOutputMatch) {
     TEST_DESCRIPTION("Test matching vertex shader output with fragment shader input.");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
 
     const char vsSource[] = R"glsl(#version 450
 
@@ -958,29 +912,26 @@ TEST_F(VkPositiveLayerTest, TestShaderInputOutputMatch) {
                   });
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitInfo();
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
     pipe.vi_ci_.vertexBindingDescriptionCount = 1;
     pipe.vi_ci_.pVertexBindingDescriptions = &vertex_input_binding_description;
     pipe.vi_ci_.vertexAttributeDescriptionCount = 4;
     pipe.vi_ci_.pVertexAttributeDescriptions = vertex_input_attribute_descriptions;
     pipe.InitState();
-    pipe.pipeline_layout_ = VkPipelineLayoutObj(m_device, {&ds.layout_});
+    pipe.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&ds.layout_});
     pipe.CreateGraphicsPipeline();
 
-    VkBufferObj uniform_buffer;
-    auto ub_ci = LvlInitStruct<VkBufferCreateInfo>();
+    VkBufferCreateInfo ub_ci = vku::InitStructHelper();
     ub_ci.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
     ub_ci.size = 1024;
-    uniform_buffer.init(*m_device, ub_ci);
+    vkt::Buffer uniform_buffer(*m_device, ub_ci);
     ds.WriteDescriptorBufferInfo(0, uniform_buffer.handle(), 0, 1024);
     ds.UpdateDescriptorSets();
 
-    VkBufferObj buffer;
-    VkBufferCreateInfo vb_ci = LvlInitStruct<VkBufferCreateInfo>();
+    VkBufferCreateInfo vb_ci = vku::InitStructHelper();
     vb_ci.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
     vb_ci.size = 1024;
-    buffer.init(*m_device, vb_ci);
+    vkt::Buffer buffer(*m_device, vb_ci);
     VkBuffer buffer_handle = buffer.handle();
     VkDeviceSize offset = 0;
 
@@ -999,8 +950,8 @@ TEST_F(VkPositiveLayerTest, TestShaderInputOutputMatch) {
 
 TEST_F(PositiveShaderInterface, NestedStructs) {
     TEST_DESCRIPTION("Use nested structs between shaders.");
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
 
     const char vsSource[] = R"glsl(
         #version 450
@@ -1032,7 +983,6 @@ TEST_F(PositiveShaderInterface, NestedStructs) {
     VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitInfo();
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
     pipe.InitState();
     pipe.CreateGraphicsPipeline();
@@ -1041,8 +991,8 @@ TEST_F(PositiveShaderInterface, NestedStructs) {
 TEST_F(PositiveShaderInterface, AlphaToCoverageOffsetToAlpha) {
     TEST_DESCRIPTION("Only set the needed component and nothing else.");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget(0u));
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget(0u);
 
     char const *fsSource = R"glsl(
         #version 450
@@ -1053,7 +1003,7 @@ TEST_F(PositiveShaderInterface, AlphaToCoverageOffsetToAlpha) {
     )glsl";
     VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
-    VkPipelineMultisampleStateCreateInfo ms_state_ci = LvlInitStruct<VkPipelineMultisampleStateCreateInfo>();
+    VkPipelineMultisampleStateCreateInfo ms_state_ci = vku::InitStructHelper();
     ms_state_ci.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
     ms_state_ci.alphaToCoverageEnable = VK_TRUE;
 
@@ -1067,8 +1017,8 @@ TEST_F(PositiveShaderInterface, AlphaToCoverageOffsetToAlpha) {
 TEST_F(PositiveShaderInterface, AlphaToCoverageArray) {
     TEST_DESCRIPTION("Have array out outputs");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget(0u));
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget(0u);
 
     char const *fsSource = R"glsl(
         #version 450
@@ -1079,7 +1029,7 @@ TEST_F(PositiveShaderInterface, AlphaToCoverageArray) {
     )glsl";
     VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
-    VkPipelineMultisampleStateCreateInfo ms_state_ci = LvlInitStruct<VkPipelineMultisampleStateCreateInfo>();
+    VkPipelineMultisampleStateCreateInfo ms_state_ci = vku::InitStructHelper();
     ms_state_ci.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
     ms_state_ci.alphaToCoverageEnable = VK_TRUE;
 
@@ -1093,8 +1043,11 @@ TEST_F(PositiveShaderInterface, AlphaToCoverageArray) {
 TEST_F(PositiveShaderInterface, VsFsTypeMismatchBlockStructArray) {
     TEST_DESCRIPTION("Have an struct inside a block between shaders");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
+    if (m_device->phy().limits_.maxVertexOutputComponents <= 64) {
+        GTEST_SKIP() << "maxVertexOutputComponents is too low";
+    }
 
     char const *vsSource = R"glsl(
         #version 450
@@ -1138,11 +1091,11 @@ TEST_F(PositiveShaderInterface, VsFsTypeMismatchBlockStructArray) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
 }
 
-TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockNestedStructLastElementArray) {
+TEST_F(PositiveShaderInterface, VsFsTypeMismatchBlockNestedStructLastElementArray) {
     TEST_DESCRIPTION("Have nested struct inside a block between shaders");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
 
     char const *vsSource = R"glsl(
         #version 450
@@ -1203,8 +1156,8 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockNestedStructLastElementArra
 TEST_F(PositiveShaderInterface, VsFsTypeMismatchBlockNestedStructArray) {
     TEST_DESCRIPTION("Have nested struct inside a block between shaders");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
 
     char const *vsSource = R"glsl(
         #version 450
@@ -1265,8 +1218,8 @@ TEST_F(PositiveShaderInterface, VsFsTypeMismatchBlockNestedStructArray) {
 TEST_F(PositiveShaderInterface, MultidimensionalArray) {
     TEST_DESCRIPTION("Make sure multidimensional arrays are handled");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
 
     char const *vsSource = R"glsl(
         #version 450
@@ -1293,8 +1246,11 @@ TEST_F(PositiveShaderInterface, MultidimensionalArray) {
 TEST_F(PositiveShaderInterface, MultidimensionalArrayVertex) {
     TEST_DESCRIPTION("multidimensional arrays but have lingering vertex output");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
+    if (m_device->phy().limits_.maxVertexOutputComponents <= 64) {
+        GTEST_SKIP() << "maxVertexOutputComponents is too low";
+    }
 
     char const *vsSource = R"glsl(
         #version 450
@@ -1321,8 +1277,11 @@ TEST_F(PositiveShaderInterface, MultidimensionalArrayVertex) {
 TEST_F(PositiveShaderInterface, MultidimensionalArrayDims) {
     TEST_DESCRIPTION("multidimensional arrays but have lingering vertex output");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
+    if (m_device->phy().limits_.maxVertexOutputComponents <= 64) {
+        GTEST_SKIP() << "maxVertexOutputComponents is too low";
+    }
 
     char const *vsSource = R"glsl(
         #version 450
@@ -1349,8 +1308,11 @@ TEST_F(PositiveShaderInterface, MultidimensionalArrayDims) {
 TEST_F(PositiveShaderInterface, MultidimensionalArrayDims2) {
     TEST_DESCRIPTION("multidimensional arrays but have lingering vertex output");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
+    if (m_device->phy().limits_.maxVertexOutputComponents <= 64) {
+        GTEST_SKIP() << "maxVertexOutputComponents is too low";
+    }
 
     char const *vsSource = R"glsl(
         #version 450
@@ -1377,8 +1339,8 @@ TEST_F(PositiveShaderInterface, MultidimensionalArrayDims2) {
 TEST_F(PositiveShaderInterface, MultidimensionalArray64bit) {
     TEST_DESCRIPTION("Make sure multidimensional arrays are handled for 64bits");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
     if (!m_device->phy().features().shaderFloat64) {
         GTEST_SKIP() << "Device does not support 64bit floats";
     }
@@ -1411,8 +1373,8 @@ TEST_F(PositiveShaderInterface, MultidimensionalArray64bit) {
 TEST_F(PositiveShaderInterface, PackingInsideArray) {
     TEST_DESCRIPTION("From https://gitlab.khronos.org/vulkan/vulkan/-/issues/3558");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
 
     char const *vsSource = R"glsl(
         #version 450
@@ -1445,21 +1407,15 @@ TEST_F(PositiveShaderInterface, PhysicalStorageBufferGlslang3) {
     TEST_DESCRIPTION("Taken from glslang spv.bufferhandle3.frag test");
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
-    if (DeviceValidationVersion() < VK_API_VERSION_1_2) {
-        GTEST_SKIP() << "At least Vulkan version 1.2 is required";
-    }
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    auto features12 = LvlInitStruct<VkPhysicalDeviceVulkan12Features>();
+    VkPhysicalDeviceVulkan12Features features12 = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(features12);
     if (VK_TRUE != features12.bufferDeviceAddress) {
         GTEST_SKIP() << "bufferDeviceAddress not supported and is required";
     }
 
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features12));
+    RETURN_IF_SKIP(InitState(nullptr, &features12));
 
     char const *fsSource = R"glsl(
         #version 450
@@ -1491,21 +1447,15 @@ TEST_F(PositiveShaderInterface, PhysicalStorageBufferGlslang6) {
     TEST_DESCRIPTION("Taken from glslang spv.bufferhandle6.frag test");
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
-    if (DeviceValidationVersion() < VK_API_VERSION_1_2) {
-        GTEST_SKIP() << "At least Vulkan version 1.2 is required";
-    }
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    auto features12 = LvlInitStruct<VkPhysicalDeviceVulkan12Features>();
+    VkPhysicalDeviceVulkan12Features features12 = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(features12);
     if (VK_TRUE != features12.bufferDeviceAddress) {
         GTEST_SKIP() << "bufferDeviceAddress not supported and is required";
     }
 
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features12));
+    RETURN_IF_SKIP(InitState(nullptr, &features12));
 
     char const *fsSource = R"glsl(
         #version 450 core
@@ -1529,23 +1479,17 @@ TEST_F(PositiveShaderInterface, PhysicalStorageBuffer) {
     TEST_DESCRIPTION("Regression shaders from https://github.com/KhronosGroup/Vulkan-ValidationLayers/pull/5349");
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
-    if (DeviceValidationVersion() < VK_API_VERSION_1_2) {
-        GTEST_SKIP() << "At least Vulkan version 1.2 is required";
-    }
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    auto features12 = LvlInitStruct<VkPhysicalDeviceVulkan12Features>();
+    VkPhysicalDeviceVulkan12Features features12 = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(features12);
     if (VK_TRUE != features12.bufferDeviceAddress) {
         GTEST_SKIP() << "bufferDeviceAddress not supported and is required";
     }
 
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features12));
+    RETURN_IF_SKIP(InitState(nullptr, &features12));
 
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    InitRenderTarget();
 
     char const *vsSource = R"glsl(
         #version 450

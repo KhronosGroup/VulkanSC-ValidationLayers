@@ -14,6 +14,7 @@
 
 #include "utils/cast_utils.h"
 #include "../framework/layer_validation_tests.h"
+#include "../framework/pipeline_helper.h"
 #include "best_practices/best_practices_error_enums.h"
 
 void VkBestPracticesLayerTest::InitBestPracticesFramework() {
@@ -21,33 +22,31 @@ void VkBestPracticesLayerTest::InitBestPracticesFramework() {
     InitBestPracticesFramework("");
 }
 
-void VkBestPracticesLayerTest::InitBestPracticesFramework(const char* vendor_checks_to_enable) {
+void VkBestPracticesLayerTest::InitBestPracticesFramework(const char *vendor_checks_to_enable) {
     // Enable the vendor-specific checks spcified by vendor_checks_to_enable
-    VkLayerSettingValueDataEXT bp_setting_string_value{};
-    bp_setting_string_value.arrayString.pCharArray = vendor_checks_to_enable;
-    bp_setting_string_value.arrayString.count = sizeof(bp_setting_string_value.arrayString.pCharArray);
-    VkLayerSettingValueEXT bp_vendor_all_setting_val = {"enables", VK_LAYER_SETTING_VALUE_TYPE_STRING_ARRAY_EXT,
-                                                        bp_setting_string_value};
-    VkLayerSettingsEXT bp_settings{VK_STRUCTURE_TYPE_INSTANCE_LAYER_SETTINGS_EXT, nullptr, 1, &bp_vendor_all_setting_val};
-    features_.pNext = &bp_settings;
+    const char * input_values[] = {vendor_checks_to_enable};
+    const VkLayerSettingEXT settings[] = {
+        {
+            OBJECT_LAYER_NAME, "enables",
+            VK_LAYER_SETTING_TYPE_STRING_EXT, static_cast<uint32_t>(std::size(input_values)), input_values
+        }
+    };
 
-    InitFramework(m_errorMonitor, &features_);
+    const VkLayerSettingsCreateInfoEXT layer_settings_create_info{
+        VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr,
+        static_cast<uint32_t>(std::size(settings)), settings};
+
+    features_.pNext = &layer_settings_create_info;
+
+    InitFramework(&features_);
 }
 
 TEST_F(VkBestPracticesLayerTest, ReturnCodes) {
     SetTargetApiVersion(VK_API_VERSION_1_2);
 
     AddSurfaceExtension();
-    ASSERT_NO_FATAL_FAILURE(InitBestPracticesFramework());
-
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
-
-    ASSERT_NO_FATAL_FAILURE(InitState());
-    if (DeviceValidationVersion() < VK_API_VERSION_1_2) {
-        GTEST_SKIP() << "At least Vulkan version 1.2 is required, skipping test.";
-    }
+    RETURN_IF_SKIP(InitBestPracticesFramework())
+    RETURN_IF_SKIP(InitState())
 
     if (!InitSwapchain()) {
         GTEST_SKIP() << "Cannot create surface or swapchain, skipping CmdCopySwapchainImage test";
@@ -71,7 +70,7 @@ TEST_F(VkBestPracticesLayerTest, ReturnCodes) {
         m_errorMonitor->VerifyFound();
     }
 
-    if (IsPlatform(kMockICD)) {
+    if (IsPlatformMockICD()) {
         GTEST_SKIP() << "Test not supported by MockICD because will always return VK_SUCCESS";
     }
 
@@ -95,24 +94,17 @@ TEST_F(VkBestPracticesLayerTest, UseDeprecatedInstanceExtensions) {
     TEST_DESCRIPTION("Create an instance with a deprecated extension.");
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
-
-    ASSERT_NO_FATAL_FAILURE(InitBestPracticesFramework());
-
-    if (DeviceValidationVersion() < VK_API_VERSION_1_1) {
-        GTEST_SKIP() << "At least Vulkan version 1.1 is required";
-    }
-
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-
-    if (IsPlatform(kMockICD)) {
+    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitBestPracticesFramework())
+    if (IsPlatformMockICD()) {
         GTEST_SKIP() << "Test not supported by MockICD - currently can't create 2 concurrent instances";
     }
 
-    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-
     // Create a 1.1 vulkan instance and request an extension promoted to core in 1.1
+    if (IsExtensionsEnabled(VK_EXT_DEBUG_REPORT_EXTENSION_NAME)) {
+        // Extra error if VK_EXT_debug_report is used on Android still
+        m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "UNASSIGNED-BestPractices-vkCreateInstance-deprecated-extension");
+    }
     m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "UNASSIGNED-BestPractices-vkCreateInstance-deprecated-extension");
     m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "UNASSIGNED-BestPractices-vkCreateInstance-specialuse-extension-debugging");
     VkInstance dummy;
@@ -142,16 +134,7 @@ TEST_F(VkBestPracticesLayerTest, UseDeprecatedDeviceExtensions) {
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
-
-    ASSERT_NO_FATAL_FAILURE(InitBestPracticesFramework());
-
-    if (DeviceValidationVersion() < VK_API_VERSION_1_2) {
-        GTEST_SKIP() << "At least Vulkan version 1.2 is required";
-    }
-
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
+    RETURN_IF_SKIP(InitBestPracticesFramework())
 
     VkDevice local_device;
     VkDeviceCreateInfo dev_info = {};
@@ -183,10 +166,7 @@ TEST_F(VkBestPracticesLayerTest, SpecialUseExtensions) {
     TEST_DESCRIPTION("Create a device with a 'specialuse' extension.");
 
     AddRequiredExtensions(VK_EXT_DEPTH_CLIP_ENABLE_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitBestPracticesFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
+    RETURN_IF_SKIP(InitBestPracticesFramework())
 
     VkDevice local_device;
     VkDeviceCreateInfo dev_info = {};
@@ -214,9 +194,9 @@ TEST_F(VkBestPracticesLayerTest, SpecialUseExtensions) {
 TEST_F(VkBestPracticesLayerTest, CmdClearAttachmentTest) {
     TEST_DESCRIPTION("Test for validating usage of vkCmdClearAttachments");
 
-    InitBestPracticesFramework();
+    RETURN_IF_SKIP(InitBestPracticesFramework())
     InitState();
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    InitRenderTarget();
 
     m_commandBuffer->begin();
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
@@ -243,23 +223,17 @@ TEST_F(VkBestPracticesLayerTest, CmdClearAttachmentTest) {
 TEST_F(VkBestPracticesLayerTest, CmdClearAttachmentTestSecondary) {
     TEST_DESCRIPTION("Test for validating usage of vkCmdClearAttachments with secondary command buffers");
 
-    InitBestPracticesFramework();
+    RETURN_IF_SKIP(InitBestPracticesFramework())
     InitState();
-
-    if (IsPlatform(PlatformType::kShieldTVb)) {
-        GTEST_SKIP() << "Test CmdClearAttachmentTestSecondary is unstable on ShieldTV";
-    }
-
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    InitRenderTarget();
 
     m_commandBuffer->begin();
 
-    VkCommandBufferObj secondary_full_clear(m_device, m_commandPool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
-    VkCommandBufferObj secondary_small_clear(m_device, m_commandPool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
-    VkCommandBufferBeginInfo begin_info = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
-    begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT |
-                       VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
-    VkCommandBufferInheritanceInfo inherit_info = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO };
+    vkt::CommandBuffer secondary_full_clear(m_device, m_commandPool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+    vkt::CommandBuffer secondary_small_clear(m_device, m_commandPool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+    VkCommandBufferBeginInfo begin_info = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
+    begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT | VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
+    VkCommandBufferInheritanceInfo inherit_info = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO};
     begin_info.pInheritanceInfo = &inherit_info;
     inherit_info.subpass = 0;
     inherit_info.renderPass = m_renderPassBeginInfo.renderPass;
@@ -317,14 +291,14 @@ TEST_F(VkBestPracticesLayerTest, CmdClearAttachmentTestSecondary) {
 }
 
 TEST_F(VkBestPracticesLayerTest, CmdResolveImageTypeMismatch) {
-    InitBestPracticesFramework();
+    RETURN_IF_SKIP(InitBestPracticesFramework())
     InitState();
 
     // Create two images of different types and try to copy between them
     VkImageObj srcImage(m_device);
     VkImageObj dstImage(m_device);
 
-    VkImageCreateInfo image_create_info = LvlInitStruct<VkImageCreateInfo>();
+    VkImageCreateInfo image_create_info = vku::InitStructHelper();
     image_create_info.imageType = VK_IMAGE_TYPE_2D;
     image_create_info.format = VK_FORMAT_B8G8R8A8_UNORM;
     image_create_info.extent.width = 32;
@@ -371,8 +345,8 @@ TEST_F(VkBestPracticesLayerTest, CmdResolveImageTypeMismatch) {
     resolveRegion.extent.depth = 1;
 
     m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "UNASSIGNED-BestPractices-DrawState-MismatchedImageType");
-    m_commandBuffer->ResolveImage(srcImage.handle(), VK_IMAGE_LAYOUT_GENERAL, dstImage.handle(), VK_IMAGE_LAYOUT_GENERAL, 1,
-                                  &resolveRegion);
+    vk::CmdResolveImage(m_commandBuffer->handle(), srcImage.handle(), VK_IMAGE_LAYOUT_GENERAL, dstImage.handle(),
+                        VK_IMAGE_LAYOUT_GENERAL, 1, &resolveRegion);
     m_errorMonitor->VerifyFound();
     m_commandBuffer->end();
 }
@@ -380,7 +354,7 @@ TEST_F(VkBestPracticesLayerTest, CmdResolveImageTypeMismatch) {
 TEST_F(VkBestPracticesLayerTest, ZeroSizeBlitRegion) {
     TEST_DESCRIPTION("vkCmdBlitImage with a zero area region");
 
-    InitBestPracticesFramework();
+    RETURN_IF_SKIP(InitBestPracticesFramework())
     InitState();
 
     VkImageObj image_src(m_device);
@@ -410,9 +384,9 @@ TEST_F(VkBestPracticesLayerTest, ZeroSizeBlitRegion) {
 TEST_F(VkBestPracticesLayerTest, CmdBeginRenderPassZeroSizeRenderArea) {
     TEST_DESCRIPTION("Test for getting warned when render area is 0 in VkRenderPassBeginInfo during vkCmdBeginRenderPass");
 
-    InitBestPracticesFramework();
+    RETURN_IF_SKIP(InitBestPracticesFramework())
     InitState();
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    InitRenderTarget();
 
     m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "UNASSIGNED-BestPractices-vkCmdBeginRenderPass-zero-size-render-area");
 
@@ -424,7 +398,7 @@ TEST_F(VkBestPracticesLayerTest, CmdBeginRenderPassZeroSizeRenderArea) {
 }
 
 TEST_F(VkBestPracticesLayerTest, VtxBufferBadIndex) {
-    InitBestPracticesFramework();
+    RETURN_IF_SKIP(InitBestPracticesFramework())
     InitState();
 
     m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "UNASSIGNED-BestPractices-DrawState-VtxIndexOutOfBounds");
@@ -434,8 +408,7 @@ TEST_F(VkBestPracticesLayerTest, VtxBufferBadIndex) {
     m_errorMonitor->SetAllowedFailureMsg("UNASSIGNED-BestPractices-vkBindMemory-small-dedicated-allocation");
     m_errorMonitor->SetAllowedFailureMsg("UNASSIGNED-BestPractices-VkCommandBuffer-AvoidTinyCmdBuffers");
 
-    ASSERT_NO_FATAL_FAILURE(InitViewport());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    InitRenderTarget();
 
     VkPipelineMultisampleStateCreateInfo pipe_ms_state_ci = {};
     pipe_ms_state_ci.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
@@ -446,7 +419,6 @@ TEST_F(VkBestPracticesLayerTest, VtxBufferBadIndex) {
     pipe_ms_state_ci.pSampleMask = NULL;
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitInfo();
     pipe.pipe_ms_state_ci_ = pipe_ms_state_ci;
     pipe.InitState();
     pipe.CreateGraphicsPipeline();
@@ -455,10 +427,10 @@ TEST_F(VkBestPracticesLayerTest, VtxBufferBadIndex) {
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
     vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_);
     // Don't care about actual data, just need to get to draw to flag error
-    const float vbo_data[3] = {1.f, 0.f, 1.f};
-    VkConstantBufferObj vbo(m_device, sizeof(vbo_data), (const void*)&vbo_data, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-    m_commandBuffer->BindVertexBuffer(&vbo, (VkDeviceSize)0, 1);  // VBO idx 1, but no VBO in PSO
-    m_commandBuffer->Draw(1, 0, 0, 0);
+    vkt::Buffer vbo(*m_device, sizeof(float) * 3, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+    // VBO idx 1, but no VBO in PSO
+    vk::CmdBindVertexBuffers(m_commandBuffer->handle(), 1, 1, &vbo.handle(), &kZeroDeviceSize);
+    vk::CmdDraw(m_commandBuffer->handle(), 1, 0, 0, 0);
 
     m_errorMonitor->VerifyFound();
 
@@ -469,7 +441,7 @@ TEST_F(VkBestPracticesLayerTest, VtxBufferBadIndex) {
 TEST_F(VkBestPracticesLayerTest, CommandBufferReset) {
     TEST_DESCRIPTION("Test for validating usage of vkCreateCommandPool with COMMAND_BUFFER_RESET_BIT");
 
-    InitBestPracticesFramework();
+    RETURN_IF_SKIP(InitBestPracticesFramework())
     InitState();
 
     m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit,
@@ -488,7 +460,7 @@ TEST_F(VkBestPracticesLayerTest, CommandBufferReset) {
 TEST_F(VkBestPracticesLayerTest, SecondaryCommandBuffer) {
     TEST_DESCRIPTION("Test for validating usage of vkCreateCommandPool with VK_COMMAND_BUFFER_LEVEL_SECONDARY");
 
-    InitBestPracticesFramework();
+    RETURN_IF_SKIP(InitBestPracticesFramework())
     InitState();
 
     uint32_t queue_family_count;
@@ -511,12 +483,12 @@ TEST_F(VkBestPracticesLayerTest, SecondaryCommandBuffer) {
         GTEST_SKIP() << "No queue family found without support for secondary command buffers";
     }
 
-    VkCommandPoolCreateInfo pool_create_info = LvlInitStruct<VkCommandPoolCreateInfo>();
+    VkCommandPoolCreateInfo pool_create_info = vku::InitStructHelper();
     pool_create_info.queueFamilyIndex = queue_family_index;
-    vk_testing::CommandPool command_pool(*m_device, pool_create_info);
+    vkt::CommandPool command_pool(*m_device, pool_create_info);
 
     VkCommandBuffer command_buffer = VK_NULL_HANDLE;
-    VkCommandBufferAllocateInfo alloc_info = LvlInitStruct<VkCommandBufferAllocateInfo>();
+    VkCommandBufferAllocateInfo alloc_info = vku::InitStructHelper();
     alloc_info.commandPool = command_pool.handle();
     alloc_info.level = VK_COMMAND_BUFFER_LEVEL_SECONDARY;
     alloc_info.commandBufferCount = 1;
@@ -531,7 +503,7 @@ TEST_F(VkBestPracticesLayerTest, SecondaryCommandBuffer) {
 TEST_F(VkBestPracticesLayerTest, SimultaneousUse) {
     TEST_DESCRIPTION("Test for validating usage of vkBeginCommandBuffer with SIMULTANEOUS_USE");
 
-    InitBestPracticesFramework();
+    RETURN_IF_SKIP(InitBestPracticesFramework())
     InitState();
 
     m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "UNASSIGNED-BestPractices-vkBeginCommandBuffer-simultaneous-use");
@@ -549,14 +521,14 @@ TEST_F(VkBestPracticesLayerTest, SimultaneousUse) {
 TEST_F(VkBestPracticesLayerTest, SmallAllocation) {
     TEST_DESCRIPTION("Test for small memory allocations");
 
-    InitBestPracticesFramework();
+    RETURN_IF_SKIP(InitBestPracticesFramework())
     InitState();
 
     m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "UNASSIGNED-BestPractices-vkAllocateMemory-small-allocation");
 
     // Find appropriate memory type for given reqs
     VkMemoryPropertyFlags mem_props = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-    VkPhysicalDeviceMemoryProperties dev_mem_props = m_device->phy().memory_properties();
+    VkPhysicalDeviceMemoryProperties dev_mem_props = m_device->phy().memory_properties_;
 
     uint32_t mem_type_index = 0;
     for (mem_type_index = 0; mem_type_index < dev_mem_props.memoryTypeCount; ++mem_type_index) {
@@ -580,7 +552,7 @@ TEST_F(VkBestPracticesLayerTest, SmallAllocation) {
 TEST_F(VkBestPracticesLayerTest, SmallDedicatedAllocation) {
     TEST_DESCRIPTION("Test for small dedicated memory allocations");
 
-    InitBestPracticesFramework();
+    RETURN_IF_SKIP(InitBestPracticesFramework())
     InitState();
 
     m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit,
@@ -603,9 +575,9 @@ TEST_F(VkBestPracticesLayerTest, SmallDedicatedAllocation) {
     VkImageObj image(m_device);
     image.init_no_mem(*m_device, image_info);
 
-    vk_testing::DeviceMemory mem;
-    mem.init(*m_device, vk_testing::DeviceMemory::get_resource_alloc_info(*m_device, image.memory_requirements(),
-                                                                          VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT));
+    vkt::DeviceMemory mem;
+    mem.init(*m_device, vkt::DeviceMemory::get_resource_alloc_info(*m_device, image.memory_requirements(),
+                                                                   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT));
     vk::BindImageMemory(device(), image.handle(), mem.handle(), 0);
 
     m_errorMonitor->VerifyFound();
@@ -614,7 +586,7 @@ TEST_F(VkBestPracticesLayerTest, SmallDedicatedAllocation) {
 TEST_F(VkBestPracticesLayerTest, MSImageRequiresMemory) {
     TEST_DESCRIPTION("Test for MS image that requires memory");
 
-    InitBestPracticesFramework();
+    RETURN_IF_SKIP(InitBestPracticesFramework())
     InitState();
 
     m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit,
@@ -646,12 +618,8 @@ TEST_F(VkBestPracticesLayerTest, MSImageRequiresMemory) {
 TEST_F(VkBestPracticesLayerTest, AttachmentShouldNotBeTransient) {
     TEST_DESCRIPTION("Test for non-lazy multisampled images");
 
-    InitBestPracticesFramework();
+    RETURN_IF_SKIP(InitBestPracticesFramework())
     InitState();
-
-    if (IsPlatform(kPixel3) || IsPlatform(kShieldTVb)) {
-        GTEST_SKIP() << "This test seems super-picky on Android platforms";
-    }
 
     m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit,
                                          "UNASSIGNED-BestPractices-vkCreateFramebuffer-attachment-should-not-be-transient");
@@ -672,12 +640,12 @@ TEST_F(VkBestPracticesLayerTest, AttachmentShouldNotBeTransient) {
 
     VkSubpassDescription sd{};
 
-    VkRenderPassCreateInfo rp_info = LvlInitStruct<VkRenderPassCreateInfo>();
+    VkRenderPassCreateInfo rp_info = vku::InitStructHelper();
     rp_info.attachmentCount = 1;
     rp_info.pAttachments = &attachment;
     rp_info.subpassCount = 1;
     rp_info.pSubpasses = &sd;
-    vk_testing::RenderPass rp(*m_device, rp_info);
+    vkt::RenderPass rp(*m_device, rp_info);
 
     VkImageCreateInfo image_info{};
     image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -701,7 +669,7 @@ TEST_F(VkBestPracticesLayerTest, AttachmentShouldNotBeTransient) {
     iv_info.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
     iv_info.components = {VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A};
 
-    vk_testing::ImageView image_view(*m_device, iv_info);
+    vkt::ImageView image_view(*m_device, iv_info);
 
     VkFramebufferCreateInfo fb_info{};
     fb_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
@@ -711,7 +679,7 @@ TEST_F(VkBestPracticesLayerTest, AttachmentShouldNotBeTransient) {
     fb_info.height = 1080;
     fb_info.attachmentCount = 1;
     fb_info.pAttachments = &image_view.handle();
-    vk_testing::Framebuffer fb(*m_device, fb_info);
+    vkt::Framebuffer fb(*m_device, fb_info);
 
     m_errorMonitor->VerifyFound();
 }
@@ -719,7 +687,7 @@ TEST_F(VkBestPracticesLayerTest, AttachmentShouldNotBeTransient) {
 TEST_F(VkBestPracticesLayerTest, TooManyInstancedVertexBuffers) {
     TEST_DESCRIPTION("Test for too many instanced vertex buffers");
 
-    InitBestPracticesFramework();
+    RETURN_IF_SKIP(InitBestPracticesFramework())
     InitState();
 
     m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit,
@@ -733,8 +701,7 @@ TEST_F(VkBestPracticesLayerTest, TooManyInstancedVertexBuffers) {
     // This test does not need for the shader to consume the vertex input
     m_errorMonitor->SetAllowedFailureMsg("UNASSIGNED-BestPractices-Shader-OutputNotConsumed");
 
-    ASSERT_NO_FATAL_FAILURE(InitViewport());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    InitRenderTarget();
 
     std::vector<VkVertexInputBindingDescription> bindings(2, VkVertexInputBindingDescription{});
     std::vector<VkVertexInputAttributeDescription> attributes(2, VkVertexInputAttributeDescription{});
@@ -763,7 +730,6 @@ TEST_F(VkBestPracticesLayerTest, TooManyInstancedVertexBuffers) {
     vi_state_ci.pVertexAttributeDescriptions = attributes.data();
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitInfo();
     pipe.vi_ci_ = vi_state_ci;
     pipe.InitState();
     pipe.CreateGraphicsPipeline();
@@ -776,9 +742,9 @@ TEST_F(VkBestPracticesLayerTest, CreatePipelineFragmentOutputNotWritten) {
         "Test that an error is produced for a fragment shader which does not provide an output for one of the pipeline's color "
         "attachments");
 
-    ASSERT_NO_FATAL_FAILURE(InitBestPracticesFramework());
-    ASSERT_NO_FATAL_FAILURE(InitState());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitBestPracticesFramework());
+    RETURN_IF_SKIP(InitState())
+    InitRenderTarget();
 
     VkShaderObj fs(this, kMinimalShaderGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
@@ -794,9 +760,9 @@ TEST_F(VkBestPracticesLayerTest, CreatePipelineFragmentOutputTypeMismatch) {
         "Test that an error is produced for a mismatch between the fundamental type of an fragment shader output variable, and the "
         "format of the corresponding attachment");
 
-    ASSERT_NO_FATAL_FAILURE(InitBestPracticesFramework());
-    ASSERT_NO_FATAL_FAILURE(InitState());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitBestPracticesFramework());
+    RETURN_IF_SKIP(InitState())
+    InitRenderTarget();
 
     char const *fsSource = R"glsl(
         #version 450
@@ -818,9 +784,9 @@ TEST_F(VkBestPracticesLayerTest, CreatePipelineFragmentOutputNotConsumed) {
     TEST_DESCRIPTION(
         "Test that a warning is produced for a fragment shader which provides a spurious output with no matching attachment");
 
-    ASSERT_NO_FATAL_FAILURE(InitBestPracticesFramework());
-    ASSERT_NO_FATAL_FAILURE(InitState());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitBestPracticesFramework());
+    RETURN_IF_SKIP(InitState())
+    InitRenderTarget();
 
     char const *fsSource = R"glsl(
         #version 450
@@ -842,11 +808,11 @@ TEST_F(VkBestPracticesLayerTest, CreatePipelineFragmentOutputNotConsumed) {
 TEST_F(VkBestPracticesLayerTest, ClearAttachmentsAfterLoad) {
     TEST_DESCRIPTION("Test for clearing attachments after load");
 
-    InitBestPracticesFramework();
+    RETURN_IF_SKIP(InitBestPracticesFramework())
     InitState();
 
     m_clear_via_load_op = false;  // Force LOAD_OP_LOAD
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    InitRenderTarget();
 
     m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "UNASSIGNED-BestPractices-vkCmdClearAttachments-clear-after-load");
 
@@ -877,15 +843,11 @@ TEST_F(VkBestPracticesLayerTest, ClearAttachmentsAfterLoad) {
 TEST_F(VkBestPracticesLayerTest, ClearAttachmentsAfterLoadSecondary) {
     TEST_DESCRIPTION("Test for clearing attachments after load with secondary command buffers");
 
-    InitBestPracticesFramework();
+    RETURN_IF_SKIP(InitBestPracticesFramework())
     InitState();
 
-    if (IsPlatform(PlatformType::kShieldTVb)) {
-        GTEST_SKIP() << "Test CmdClearAttachmentAfterLoadSecondary is unstable on ShieldTV";
-    }
-
     m_clear_via_load_op = false;  // Force LOAD_OP_LOAD
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    InitRenderTarget();
 
     // On tiled renderers, this can also trigger a warning about LOAD_OP_LOAD causing a readback
     m_errorMonitor->SetAllowedFailureMsg("UNASSIGNED-BestPractices-vkCmdBeginRenderPass-attachment-needs-readback");
@@ -894,13 +856,11 @@ TEST_F(VkBestPracticesLayerTest, ClearAttachmentsAfterLoadSecondary) {
     m_errorMonitor->SetAllowedFailureMsg("UNASSIGNED-BestPractices-RenderPass-inefficient-clear");
 
     CreatePipelineHelper pipe_masked(*this);
-    pipe_masked.InitInfo();
     pipe_masked.InitState();
     pipe_masked.cb_attachments_[0].colorWriteMask = 0;
     pipe_masked.CreateGraphicsPipeline();
 
     CreatePipelineHelper pipe_writes(*this);
-    pipe_writes.InitInfo();
     pipe_writes.InitState();
     pipe_writes.cb_attachments_[0].colorWriteMask = 0xf;
     pipe_writes.CreateGraphicsPipeline();
@@ -931,7 +891,7 @@ TEST_F(VkBestPracticesLayerTest, ClearAttachmentsAfterLoadSecondary) {
     m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "UNASSIGNED-BestPractices-vkCmdClearAttachments-clear-after-load");
     {
         vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe_masked.pipeline_);
-        m_commandBuffer->Draw(1, 0, 0, 0);
+        vk::CmdDraw(m_commandBuffer->handle(), 1, 0, 0, 0);
         vk::CmdClearAttachments(m_commandBuffer->handle(), 1, &color_attachment, 1, &clear_rect);
         m_errorMonitor->VerifyFound();
     }
@@ -941,23 +901,22 @@ TEST_F(VkBestPracticesLayerTest, ClearAttachmentsAfterLoadSecondary) {
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
     {
         vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe_writes.pipeline_);
-        m_commandBuffer->Draw(1, 0, 0, 0);
+        vk::CmdDraw(m_commandBuffer->handle(), 1, 0, 0, 0);
         vk::CmdClearAttachments(m_commandBuffer->handle(), 1, &color_attachment, 1, &clear_rect);
     }
     m_commandBuffer->EndRenderPass();
 
     // Try the same thing, but now with secondary command buffers.
-    VkCommandBufferBeginInfo begin_info = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
-    begin_info.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT |
-                       VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
-    VkCommandBufferInheritanceInfo inherit_info = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO };
+    VkCommandBufferBeginInfo begin_info = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
+    begin_info.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT | VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
+    VkCommandBufferInheritanceInfo inherit_info = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO};
     begin_info.pInheritanceInfo = &inherit_info;
     inherit_info.subpass = 0;
     inherit_info.renderPass = m_renderPassBeginInfo.renderPass;
 
-    VkCommandBufferObj secondary_clear(m_device, m_commandPool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
-    VkCommandBufferObj secondary_draw_masked(m_device, m_commandPool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
-    VkCommandBufferObj secondary_draw_write(m_device, m_commandPool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+    vkt::CommandBuffer secondary_clear(m_device, m_commandPool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+    vkt::CommandBuffer secondary_draw_masked(m_device, m_commandPool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+    vkt::CommandBuffer secondary_draw_write(m_device, m_commandPool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
 
     secondary_clear.begin(&begin_info);
     secondary_draw_masked.begin(&begin_info);
@@ -966,10 +925,10 @@ TEST_F(VkBestPracticesLayerTest, ClearAttachmentsAfterLoadSecondary) {
     vk::CmdClearAttachments(secondary_clear.handle(), 1, &color_attachment, 1, &clear_rect);
 
     vk::CmdBindPipeline(secondary_draw_masked.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe_masked.pipeline_);
-    secondary_draw_masked.Draw(1, 0, 0, 0);
+    vk::CmdDraw(secondary_draw_masked.handle(), 1, 0, 0, 0);
 
     vk::CmdBindPipeline(secondary_draw_write.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe_writes.pipeline_);
-    secondary_draw_write.Draw(1, 0, 0, 0);
+    vk::CmdDraw(secondary_draw_write.handle(), 1, 0, 0, 0);
 
     secondary_clear.end();
     secondary_draw_masked.end();
@@ -1008,10 +967,7 @@ TEST_F(VkBestPracticesLayerTest, TripleBufferingTest) {
     TEST_DESCRIPTION("Test for usage of triple buffering");
 
     AddSurfaceExtension();
-    InitBestPracticesFramework();
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
+    RETURN_IF_SKIP(InitBestPracticesFramework())
     InitState();
     m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT,
                                          "UNASSIGNED-BestPractices-vkCreateSwapchainKHR-suboptimal-swapchain-image-count");
@@ -1068,10 +1024,7 @@ TEST_F(VkBestPracticesLayerTest, SwapchainCreationTest) {
     TEST_DESCRIPTION("Test for correct swapchain creation");
 
     AddSurfaceExtension();
-    InitBestPracticesFramework();
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
+    RETURN_IF_SKIP(InitBestPracticesFramework())
     InitState();
     if (!InitSurface()) {
         GTEST_SKIP() << "Cannot create surface";
@@ -1137,8 +1090,8 @@ TEST_F(VkBestPracticesLayerTest, ExpectedQueryDetails) {
     app_info_.apiVersion = VK_API_VERSION_1_1;
     // VK_KHR_get_physical_device_properties2 required to test vkGetPhysicalDeviceQueueFamilyProperties2KHR
     m_instance_extension_names.emplace_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitBestPracticesFramework());
-    const vk_testing::PhysicalDevice phys_device_obj(gpu_);
+    RETURN_IF_SKIP(InitBestPracticesFramework());
+    const vkt::PhysicalDevice phys_device_obj(gpu_);
 
     std::vector<VkQueueFamilyProperties> queue_family_props;
 
@@ -1165,25 +1118,31 @@ TEST_F(VkBestPracticesLayerTest, ExpectedQueryDetails) {
     queue_family_props2.resize(queue_count);
     vk::GetPhysicalDeviceQueueFamilyProperties2KHR(phys_device_obj.handle(), &queue_count, queue_family_props2.data());
 
-    vk_testing::Device device(phys_device_obj.handle());
-    device.init();
+    vkt::Device device(phys_device_obj.handle());
 }
 
 TEST_F(VkBestPracticesLayerTest, MissingQueryDetails) {
     TEST_DESCRIPTION("Check that GetPhysicalDeviceQueueFamilyProperties generates appropriate query warning");
 
-    ASSERT_NO_FATAL_FAILURE(InitBestPracticesFramework());
-    const vk_testing::PhysicalDevice phys_device_obj(gpu_);
+    RETURN_IF_SKIP(InitBestPracticesFramework());
+    const vkt::PhysicalDevice phys_device_obj(gpu_);
 
     std::vector<VkQueueFamilyProperties> queue_family_props(1);
     uint32_t queue_count = static_cast<uint32_t>(queue_family_props.size());
 
-    m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "UNASSIGNED-BestPractices-DevLimit-MissingQueryCount");
+    // might only be a queue_count of 1, so check and then do "real" test to make sure error is detected
+    m_errorMonitor->SetUnexpectedError("UNASSIGNED-BestPractices-DevLimit-CountMismatch");
     vk::GetPhysicalDeviceQueueFamilyProperties(phys_device_obj.handle(), &queue_count, queue_family_props.data());
     m_errorMonitor->VerifyFound();
 
+    if (queue_count > 1) {
+        m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "UNASSIGNED-BestPractices-DevLimit-CountMismatch");
+        vk::GetPhysicalDeviceQueueFamilyProperties(phys_device_obj.handle(), &queue_count, queue_family_props.data());
+        m_errorMonitor->VerifyFound();
+    }
+
     // Now get information correctly
-    vk_testing::QueueCreateInfoArray queue_info(phys_device_obj.queue_properties());
+    vkt::QueueCreateInfoArray queue_info(phys_device_obj.queue_properties_);
     // Only request creation with queuefamilies that have at least one queue
     std::vector<VkDeviceQueueCreateInfo> create_queue_infos;
     auto qci = queue_info.data();
@@ -1217,13 +1176,9 @@ TEST_F(VkBestPracticesLayerTest, GetSwapchainImagesInvalidCount) {
     TEST_DESCRIPTION("Pass an 'incorrect' count to the second GetSwapchainImagesKHR call");
 
     AddSurfaceExtension();
-    ASSERT_NO_FATAL_FAILURE(InitBestPracticesFramework());
-
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
-    ASSERT_NO_FATAL_FAILURE(InitState());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitBestPracticesFramework())
+    RETURN_IF_SKIP(InitState())
+    InitRenderTarget();
     if (!InitSwapchain()) {
         GTEST_SKIP() << "Cannot create surface or swapchain";
     }
@@ -1241,12 +1196,11 @@ TEST_F(VkBestPracticesLayerTest, GetSwapchainImagesInvalidCount) {
 TEST_F(VkBestPracticesLayerTest, DepthBiasNoAttachment) {
     TEST_DESCRIPTION("Enable depthBias without a depth attachment");
 
-    InitBestPracticesFramework();
+    RETURN_IF_SKIP(InitBestPracticesFramework())
     InitState();
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    InitRenderTarget();
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitInfo();
     pipe.rs_state_ci_.depthBiasEnable = VK_TRUE;
     pipe.rs_state_ci_.depthBiasConstantFactor = 1.0f;
     pipe.InitState();
@@ -1267,8 +1221,8 @@ TEST_F(VkBestPracticesLayerTest, DepthBiasNoAttachment) {
 TEST_F(VkBestPracticesLayerTest, CreatePipelineVsFsTypeMismatchArraySize) {
     TEST_DESCRIPTION("Test that an error is produced for mismatched array sizes across the vertex->fragment shader interface");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
 
     char const *vsSource = R"glsl(
         #version 450
@@ -1302,11 +1256,8 @@ TEST_F(VkBestPracticesLayerTest, WorkgroupSizeDeprecated) {
 
     SetTargetApiVersion(VK_API_VERSION_1_3);
     AddRequiredExtensions(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitBestPracticesFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitBestPracticesFramework())
+    RETURN_IF_SKIP(InitState())
 
     const char *spv_source = R"(
                OpCapability Shader
@@ -1340,8 +1291,8 @@ TEST_F(VkBestPracticesLayerTest, WorkgroupSizeDeprecated) {
 TEST_F(VkBestPracticesLayerTest, CreatePipelineWithoutRenderPass) {
     TEST_DESCRIPTION("Test creating a graphics pipeline with no render pass");
 
-    ASSERT_NO_FATAL_FAILURE(InitBestPracticesFramework());
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitBestPracticesFramework());
+    RETURN_IF_SKIP(InitState())
 
     // This test checks that no BP messages are incorrectly triggered, but triggers core errors
     m_errorMonitor->SetUnexpectedError("VUID-VkGraphicsPipelineCreateInfo-renderPass-06603");
@@ -1351,7 +1302,6 @@ TEST_F(VkBestPracticesLayerTest, CreatePipelineWithoutRenderPass) {
     VkShaderObj fs(this, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitInfo();
     pipe.InitState();
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
     pipe.CreateGraphicsPipeline();
@@ -1360,10 +1310,10 @@ TEST_F(VkBestPracticesLayerTest, CreatePipelineWithoutRenderPass) {
 TEST_F(VkBestPracticesLayerTest, ImageExtendedUsageWithoutMutableFormat) {
     TEST_DESCRIPTION("Create image with extended usage bit but not mutable format bit.");
 
-    ASSERT_NO_FATAL_FAILURE(InitBestPracticesFramework());
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitBestPracticesFramework());
+    RETURN_IF_SKIP(InitState())
 
-    VkImageCreateInfo image_ci = LvlInitStruct<VkImageCreateInfo>();
+    VkImageCreateInfo image_ci = vku::InitStructHelper();
     image_ci.flags = VK_IMAGE_CREATE_EXTENDED_USAGE_BIT;
     image_ci.imageType = VK_IMAGE_TYPE_2D;
     image_ci.format = VK_FORMAT_B8G8R8A8_UNORM;
@@ -1389,27 +1339,22 @@ TEST_F(VkBestPracticesLayerTest, ThreadUpdateDescriptorUpdateAfterBindNoCollisio
 
     AddRequiredExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_MAINTENANCE_3_EXTENSION_NAME);
-
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
     // Create a device that enables descriptorBindingStorageBufferUpdateAfterBind
-    auto indexing_features = LvlInitStruct<VkPhysicalDeviceDescriptorIndexingFeaturesEXT>();
+    VkPhysicalDeviceDescriptorIndexingFeaturesEXT indexing_features = vku::InitStructHelper();
     auto features2 = GetPhysicalDeviceFeatures2(indexing_features);
 
     if (VK_FALSE == indexing_features.descriptorBindingStorageBufferUpdateAfterBind) {
         GTEST_SKIP() << "Test requires (unsupported) descriptorBindingStorageBufferUpdateAfterBind";
     }
 
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features2, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
-    ASSERT_NO_FATAL_FAILURE(InitViewport());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitState(nullptr, &features2, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    InitRenderTarget();
 
     std::array<VkDescriptorBindingFlagsEXT, 2> flags = {
         {VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT_EXT, VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT_EXT}};
-    auto flags_create_info = LvlInitStruct<VkDescriptorSetLayoutBindingFlagsCreateInfoEXT>();
+    VkDescriptorSetLayoutBindingFlagsCreateInfoEXT flags_create_info = vku::InitStructHelper();
     flags_create_info.bindingCount = (uint32_t)flags.size();
     flags_create_info.pBindingFlags = flags.data();
 
@@ -1421,8 +1366,7 @@ TEST_F(VkBestPracticesLayerTest, ThreadUpdateDescriptorUpdateAfterBindNoCollisio
                                               VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT_EXT, &flags_create_info,
                                               VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT_EXT);
 
-    VkBufferObj buffer;
-    buffer.init(*m_device, 256, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    vkt::Buffer buffer(*m_device, 256, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
     ThreadTestData data;
     data.device = device();
@@ -1455,11 +1399,12 @@ TEST_F(VkBestPracticesLayerTest, ThreadUpdateDescriptorUpdateAfterBindNoCollisio
 TEST_F(VkBestPracticesLayerTest, TransitionFromUndefinedToReadOnly) {
     TEST_DESCRIPTION("Transition image layout from undefined to read only");
 
-    ASSERT_NO_FATAL_FAILURE(InitBestPracticesFramework());
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitBestPracticesFramework());
+    RETURN_IF_SKIP(InitState())
 
     VkImageObj image(m_device);
-    image.Init(128, 128, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_TILING_OPTIMAL, 0);
+    image.Init(128, 128, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+               VK_IMAGE_TILING_OPTIMAL, 0);
 
     VkClearColorValue color_clear_value = {};
     color_clear_value.uint32[0] = 255;
@@ -1470,7 +1415,7 @@ TEST_F(VkBestPracticesLayerTest, TransitionFromUndefinedToReadOnly) {
     clear_range.layerCount = 1;
     clear_range.levelCount = 1;
 
-    VkImageMemoryBarrier img_barrier = LvlInitStruct<VkImageMemoryBarrier>();
+    VkImageMemoryBarrier img_barrier = vku::InitStructHelper();
     img_barrier.srcAccessMask = 0;
     img_barrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
     img_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -1484,7 +1429,7 @@ TEST_F(VkBestPracticesLayerTest, TransitionFromUndefinedToReadOnly) {
 
     m_commandBuffer->begin();
 
-    m_commandBuffer->ClearColorImage(image.handle(), VK_IMAGE_LAYOUT_GENERAL, &color_clear_value, 1, &clear_range);
+    vk::CmdClearColorImage(m_commandBuffer->handle(), image.handle(), VK_IMAGE_LAYOUT_GENERAL, &color_clear_value, 1, &clear_range);
 
     m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "UNASSIGNED-BestPractices-TransitionUndefinedToReadOnly");
     vk::CmdPipelineBarrier(m_commandBuffer->handle(), VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0,
@@ -1498,10 +1443,7 @@ TEST_F(VkBestPracticesLayerTest, CreateFifoRelaxedSwapchain) {
     TEST_DESCRIPTION("Test creating fifo relaxed swapchain");
 
     AddSurfaceExtension();
-    InitBestPracticesFramework();
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported.";
-    }
+    RETURN_IF_SKIP(InitBestPracticesFramework())
     InitState();
     if (!InitSurface()) {
         GTEST_SKIP() << "Cannot create surface";
@@ -1515,7 +1457,7 @@ TEST_F(VkBestPracticesLayerTest, CreateFifoRelaxedSwapchain) {
     }
 
     bool fifo_relaxed = false;
-    for (const auto& present_mode : m_surface_present_modes) {
+    for (const auto &present_mode : m_surface_present_modes) {
         if (present_mode == VK_PRESENT_MODE_FIFO_RELAXED_KHR) {
             fifo_relaxed = true;
             break;
@@ -1551,61 +1493,53 @@ TEST_F(VkBestPracticesLayerTest, CreateFifoRelaxedSwapchain) {
 TEST_F(VkBestPracticesLayerTest, SemaphoreSetWhenCountIsZero) {
     TEST_DESCRIPTION("Set semaphore in SubmitInfo but count is 0");
 
-    ASSERT_NO_FATAL_FAILURE(InitBestPracticesFramework());
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitBestPracticesFramework());
+    RETURN_IF_SKIP(InitState())
 
-
-    auto semaphore_ci = LvlInitStruct<VkSemaphoreCreateInfo>();
-    vk_testing::Semaphore semaphore;
-    semaphore.init(*m_device, semaphore_ci);
+    vkt::Semaphore semaphore(*m_device);
     VkSemaphore semaphore_handle = semaphore.handle();
 
-    VkSubmitInfo signal_submit_info = LvlInitStruct<VkSubmitInfo>();
+    VkSubmitInfo signal_submit_info = vku::InitStructHelper();
     signal_submit_info.signalSemaphoreCount = 0;
     signal_submit_info.pSignalSemaphores = &semaphore_handle;
 
     m_errorMonitor->SetDesiredFailureMsg(kInformationBit, "UNASSIGNED-BestPractices-SemaphoreCount");
-    vk::QueueSubmit(m_device->m_queue, 1, &signal_submit_info, VK_NULL_HANDLE);
+    vk::QueueSubmit(m_default_queue, 1, &signal_submit_info, VK_NULL_HANDLE);
     m_errorMonitor->VerifyFound();
 
     signal_submit_info.signalSemaphoreCount = 1;
-    vk::QueueSubmit(m_device->m_queue, 1, &signal_submit_info, VK_NULL_HANDLE);
+    vk::QueueSubmit(m_default_queue, 1, &signal_submit_info, VK_NULL_HANDLE);
 
-    VkSubmitInfo wait_submit_info = LvlInitStruct<VkSubmitInfo>();
+    VkSubmitInfo wait_submit_info = vku::InitStructHelper();
     wait_submit_info.waitSemaphoreCount = 0;
     wait_submit_info.pWaitSemaphores = &semaphore_handle;
 
     m_errorMonitor->SetDesiredFailureMsg(kInformationBit, "UNASSIGNED-BestPractices-SemaphoreCount");
-    vk::QueueSubmit(m_device->m_queue, 1, &wait_submit_info, VK_NULL_HANDLE);
+    vk::QueueSubmit(m_default_queue, 1, &wait_submit_info, VK_NULL_HANDLE);
     m_errorMonitor->VerifyFound();
 
-    vk::QueueWaitIdle(m_device->m_queue);
+    vk::QueueWaitIdle(m_default_queue);
 }
 
 TEST_F(VkBestPracticesLayerTest, OverAllocateFromDescriptorPool) {
     TEST_DESCRIPTION("Attempt to allocate more sets and descriptors than descriptor pool has available.");
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
-
-    ASSERT_NO_FATAL_FAILURE(InitBestPracticesFramework());
-    ASSERT_NO_FATAL_FAILURE(InitState());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
-
-    if (DeviceValidationVersion() < VK_API_VERSION_1_1) {
-        GTEST_SKIP() << "At least Vulkan version 1.1 is required";
-    }
+    RETURN_IF_SKIP(InitBestPracticesFramework())
+    RETURN_IF_SKIP(InitState())
+    InitRenderTarget();
 
     VkDescriptorPoolSize ds_type_count = {};
     ds_type_count.type = VK_DESCRIPTOR_TYPE_SAMPLER;
     ds_type_count.descriptorCount = 2;
 
-    VkDescriptorPoolCreateInfo ds_pool_ci = LvlInitStruct<VkDescriptorPoolCreateInfo>();
+    VkDescriptorPoolCreateInfo ds_pool_ci = vku::InitStructHelper();
     ds_pool_ci.flags = 0;
     ds_pool_ci.maxSets = 1;
     ds_pool_ci.poolSizeCount = 1;
     ds_pool_ci.pPoolSizes = &ds_type_count;
 
-    vk_testing::DescriptorPool ds_pool(*m_device, ds_pool_ci);
+    vkt::DescriptorPool ds_pool(*m_device, ds_pool_ci);
 
     VkDescriptorSetLayoutBinding dsl_binding_samp = {};
     dsl_binding_samp.binding = 0;
@@ -1614,12 +1548,12 @@ TEST_F(VkBestPracticesLayerTest, OverAllocateFromDescriptorPool) {
     dsl_binding_samp.stageFlags = VK_SHADER_STAGE_ALL;
     dsl_binding_samp.pImmutableSamplers = NULL;
 
-    const VkDescriptorSetLayoutObj ds_layout_samp(m_device, {dsl_binding_samp});
+    const vkt::DescriptorSetLayout ds_layout_samp(*m_device, {dsl_binding_samp});
 
     // Try to allocate 2 sets when pool only has 1 set
     VkDescriptorSet descriptor_sets[2];
     VkDescriptorSetLayout set_layouts[2] = {ds_layout_samp.handle(), ds_layout_samp.handle()};
-    VkDescriptorSetAllocateInfo alloc_info = LvlInitStruct<VkDescriptorSetAllocateInfo>();
+    VkDescriptorSetAllocateInfo alloc_info = vku::InitStructHelper();
     alloc_info.descriptorSetCount = 2;
     alloc_info.descriptorPool = ds_pool.handle();
     alloc_info.pSetLayouts = set_layouts;
@@ -1631,9 +1565,8 @@ TEST_F(VkBestPracticesLayerTest, OverAllocateFromDescriptorPool) {
 TEST_F(VkBestPracticesLayerTest, RenderPassClearWithoutLoadOpClear) {
     TEST_DESCRIPTION("Test for clearing a RenderPass with non-zero clearValueCount without any VK_ATTACHMENT_LOAD_OP_CLEAR");
 
-
-    ASSERT_NO_FATAL_FAILURE(InitBestPracticesFramework());
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitBestPracticesFramework());
+    RETURN_IF_SKIP(InitState())
 
     // Setup necessary objects correctly
 
@@ -1642,7 +1575,7 @@ TEST_F(VkBestPracticesLayerTest, RenderPassClearWithoutLoadOpClear) {
     const unsigned int h = 1080;
 
     // Setup Image
-    VkImageCreateInfo image_info = LvlInitStruct<VkImageCreateInfo>();
+    VkImageCreateInfo image_info = vku::InitStructHelper();
     image_info.extent = {w, h, 1};
     image_info.format = VK_FORMAT_R8G8B8A8_UNORM;
     image_info.imageType = VK_IMAGE_TYPE_2D;
@@ -1675,16 +1608,16 @@ TEST_F(VkBestPracticesLayerTest, RenderPassClearWithoutLoadOpClear) {
     spd.colorAttachmentCount = 1;
     spd.pColorAttachments = &ar;
 
-    VkRenderPassCreateInfo rp_info = LvlInitStruct<VkRenderPassCreateInfo>();
+    VkRenderPassCreateInfo rp_info = vku::InitStructHelper();
     rp_info.attachmentCount = 1;
     rp_info.pAttachments = &attachment;
     rp_info.subpassCount = 1;
     rp_info.pSubpasses = &spd;
 
-    vk_testing::RenderPass rp(*m_device, rp_info);
+    vkt::RenderPass rp(*m_device, rp_info);
 
     // Setup Framebuffer
-    VkFramebufferCreateInfo fb_info = LvlInitStruct<VkFramebufferCreateInfo>();
+    VkFramebufferCreateInfo fb_info = vku::InitStructHelper();
     fb_info.width = w;
     fb_info.height = h;
     fb_info.layers = 1;
@@ -1692,7 +1625,7 @@ TEST_F(VkBestPracticesLayerTest, RenderPassClearWithoutLoadOpClear) {
     fb_info.attachmentCount = 1;
     fb_info.pAttachments = &image_view;
 
-    vk_testing::Framebuffer fb(*m_device, fb_info);
+    vkt::Framebuffer fb(*m_device, fb_info);
 
     m_commandBuffer->begin();
 
@@ -1701,7 +1634,7 @@ TEST_F(VkBestPracticesLayerTest, RenderPassClearWithoutLoadOpClear) {
     cv.color = VkClearColorValue{};
     std::fill(std::begin(cv.color.float32), std::begin(cv.color.float32) + 4, 0.0f);
 
-    VkRenderPassBeginInfo begin_info = LvlInitStruct<VkRenderPassBeginInfo>();
+    VkRenderPassBeginInfo begin_info = vku::InitStructHelper();
     begin_info.clearValueCount = 1;  // Pass one clearValue, in conflict with attachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE
     begin_info.pClearValues = &cv;
     begin_info.renderPass = rp.handle();
@@ -1723,12 +1656,12 @@ TEST_F(VkBestPracticesLayerTest, RenderPassClearWithoutLoadOpClear) {
     m_commandBuffer->end();
 }
 
-
 TEST_F(VkBestPracticesLayerTest, RenderPassClearValueCountHigherThanAttachmentCount) {
-    TEST_DESCRIPTION("Test for beginning a RenderPass with VkRenderPassBeginInfo.clearValueCount > VkRenderPassCreateInfo.attachmentCount");
+    TEST_DESCRIPTION(
+        "Test for beginning a RenderPass with VkRenderPassBeginInfo.clearValueCount > VkRenderPassCreateInfo.attachmentCount");
 
-    ASSERT_NO_FATAL_FAILURE(InitBestPracticesFramework());
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitBestPracticesFramework());
+    RETURN_IF_SKIP(InitState())
 
     // Setup necessary objects correctly
 
@@ -1737,7 +1670,7 @@ TEST_F(VkBestPracticesLayerTest, RenderPassClearValueCountHigherThanAttachmentCo
     const unsigned int h = 1080;
 
     // Setup Image
-    VkImageCreateInfo image_info = LvlInitStruct<VkImageCreateInfo>();
+    VkImageCreateInfo image_info = vku::InitStructHelper();
     image_info.extent = {w, h, 1};
     image_info.format = VK_FORMAT_R8G8B8A8_UNORM;
     image_info.imageType = VK_IMAGE_TYPE_2D;
@@ -1770,16 +1703,16 @@ TEST_F(VkBestPracticesLayerTest, RenderPassClearValueCountHigherThanAttachmentCo
     spd.colorAttachmentCount = 1;
     spd.pColorAttachments = &ar;
 
-    VkRenderPassCreateInfo rp_info = LvlInitStruct<VkRenderPassCreateInfo>();
-    rp_info.attachmentCount = 1; // There is only one attachment
+    VkRenderPassCreateInfo rp_info = vku::InitStructHelper();
+    rp_info.attachmentCount = 1;  // There is only one attachment
     rp_info.pAttachments = &attachment;
     rp_info.subpassCount = 1;
     rp_info.pSubpasses = &spd;
 
-    vk_testing::RenderPass rp(*m_device, rp_info);
+    vkt::RenderPass rp(*m_device, rp_info);
 
     // Setup Framebuffer
-    VkFramebufferCreateInfo fb_info = LvlInitStruct<VkFramebufferCreateInfo>();
+    VkFramebufferCreateInfo fb_info = vku::InitStructHelper();
     fb_info.width = w;
     fb_info.height = h;
     fb_info.layers = 1;
@@ -1787,7 +1720,7 @@ TEST_F(VkBestPracticesLayerTest, RenderPassClearValueCountHigherThanAttachmentCo
     fb_info.attachmentCount = 1;
     fb_info.pAttachments = &image_view;
 
-    vk_testing::Framebuffer fb(*m_device, fb_info);
+    vkt::Framebuffer fb(*m_device, fb_info);
 
     m_commandBuffer->begin();
 
@@ -1802,7 +1735,7 @@ TEST_F(VkBestPracticesLayerTest, RenderPassClearValueCountHigherThanAttachmentCo
     cv[1].color = VkClearColorValue{};
     std::fill(std::begin(cv[1].color.float32), std::begin(cv[1].color.float32) + 4, 0.0f);
 
-    VkRenderPassBeginInfo begin_info = LvlInitStruct<VkRenderPassBeginInfo>();
+    VkRenderPassBeginInfo begin_info = vku::InitStructHelper();
     begin_info.clearValueCount = 2;  // Pass 2 clearValues, in conflict with VkRenderPassCreateInfo.attachmentCount == 1 meaning the
                                      // second clearValue will be ignored
     begin_info.pClearValues = cv;
@@ -1828,8 +1761,8 @@ TEST_F(VkBestPracticesLayerTest, RenderPassClearValueCountHigherThanAttachmentCo
 TEST_F(VkBestPracticesLayerTest, DontCareThenLoad) {
     TEST_DESCRIPTION("Test for storing an attachment with STORE_OP_DONT_CARE then loading with LOAD_OP_LOAD");
 
-    ASSERT_NO_FATAL_FAILURE(InitBestPracticesFramework());
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitBestPracticesFramework());
+    RETURN_IF_SKIP(InitState())
 
     // Setup necessary objects correctly
 
@@ -1837,7 +1770,7 @@ TEST_F(VkBestPracticesLayerTest, DontCareThenLoad) {
     const unsigned int h = 100;
 
     // Setup Image
-    VkImageCreateInfo image_info = LvlInitStruct<VkImageCreateInfo>();
+    VkImageCreateInfo image_info = vku::InitStructHelper();
     image_info.extent = {w, h, 1};
     image_info.format = VK_FORMAT_R8G8B8A8_UNORM;
     image_info.imageType = VK_IMAGE_TYPE_2D;
@@ -1870,13 +1803,13 @@ TEST_F(VkBestPracticesLayerTest, DontCareThenLoad) {
     spd.colorAttachmentCount = 1;
     spd.pColorAttachments = &ar;
 
-    VkRenderPassCreateInfo rp_info = LvlInitStruct<VkRenderPassCreateInfo>();
+    VkRenderPassCreateInfo rp_info = vku::InitStructHelper();
     rp_info.attachmentCount = 1;
     rp_info.pAttachments = &attachment;
     rp_info.subpassCount = 1;
     rp_info.pSubpasses = &spd;
 
-    vk_testing::RenderPass rp1(*m_device, rp_info);
+    vkt::RenderPass rp1(*m_device, rp_info);
 
     // Setup second RenderPass
     attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;  // Loading even though was stored with dont care
@@ -1884,10 +1817,10 @@ TEST_F(VkBestPracticesLayerTest, DontCareThenLoad) {
     attachment.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     attachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-    vk_testing::RenderPass rp2(*m_device, rp_info);
+    vkt::RenderPass rp2(*m_device, rp_info);
 
     // Setup Framebuffer
-    VkFramebufferCreateInfo fb_info = LvlInitStruct<VkFramebufferCreateInfo>();
+    VkFramebufferCreateInfo fb_info = vku::InitStructHelper();
     fb_info.width = w;
     fb_info.height = h;
     fb_info.layers = 1;
@@ -1895,7 +1828,7 @@ TEST_F(VkBestPracticesLayerTest, DontCareThenLoad) {
     fb_info.attachmentCount = 1;
     fb_info.pAttachments = &image_view;
 
-    vk_testing::Framebuffer fb(*m_device, fb_info);
+    vkt::Framebuffer fb(*m_device, fb_info);
 
     m_commandBuffer->begin();
 
@@ -1905,7 +1838,7 @@ TEST_F(VkBestPracticesLayerTest, DontCareThenLoad) {
     std::fill(std::begin(cv.color.float32), std::begin(cv.color.float32) + 4, 1.0f);
 
     // Begin first renderpass
-    VkRenderPassBeginInfo begin_info = LvlInitStruct<VkRenderPassBeginInfo>();
+    VkRenderPassBeginInfo begin_info = vku::InitStructHelper();
     begin_info.clearValueCount = 1;
     begin_info.pClearValues = &cv;
     begin_info.renderPass = rp1.handle();
@@ -1928,7 +1861,7 @@ TEST_F(VkBestPracticesLayerTest, DontCareThenLoad) {
 
     m_commandBuffer->end();
 
-    VkSubmitInfo submit_info = LvlInitStruct<VkSubmitInfo>();
+    VkSubmitInfo submit_info = vku::InitStructHelper();
     submit_info.commandBufferCount = 1;
     submit_info.pCommandBuffers = &m_commandBuffer->handle();
 
@@ -1938,11 +1871,11 @@ TEST_F(VkBestPracticesLayerTest, DontCareThenLoad) {
     m_errorMonitor->SetDesiredFailureMsg(kWarningBit, kVUID_BestPractices_StoreOpDontCareThenLoadOpLoad);
 
     // This should give a warning
-    vk::QueueSubmit(m_device->m_queue, 1, &submit_info, VK_NULL_HANDLE);
+    vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
 
     m_errorMonitor->VerifyFound();
 
-    vk::QueueWaitIdle(m_device->m_queue);
+    vk::QueueWaitIdle(m_default_queue);
 }
 
 TEST_F(VkBestPracticesLayerTest, LoadDeprecatedExtension) {
@@ -1950,7 +1883,7 @@ TEST_F(VkBestPracticesLayerTest, LoadDeprecatedExtension) {
 
     SetTargetApiVersion(VK_API_VERSION_1_3);
 
-    ASSERT_NO_FATAL_FAILURE(InitBestPracticesFramework());
+    RETURN_IF_SKIP(InitBestPracticesFramework());
 
     const char *extension = VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME;
 
@@ -1958,13 +1891,13 @@ TEST_F(VkBestPracticesLayerTest, LoadDeprecatedExtension) {
         GTEST_SKIP() << extension << " not supported.";
     }
 
-    VkDeviceQueueCreateInfo qci = LvlInitStruct<VkDeviceQueueCreateInfo>();
+    VkDeviceQueueCreateInfo qci = vku::InitStructHelper();
     qci.queueFamilyIndex = 0;
     float priority = 1;
     qci.pQueuePriorities = &priority;
     qci.queueCount = 1;
 
-    VkDeviceCreateInfo dev_info = LvlInitStruct<VkDeviceCreateInfo>();
+    VkDeviceCreateInfo dev_info = vku::InitStructHelper();
     dev_info.queueCreateInfoCount = 1;
     dev_info.pQueueCreateInfos = &qci;
     dev_info.enabledExtensionCount = 1;
@@ -1987,12 +1920,12 @@ TEST_F(VkBestPracticesLayerTest, LoadDeprecatedExtension) {
 TEST_F(VkBestPracticesLayerTest, ExclusiveImageMultiQueueUsage) {
     TEST_DESCRIPTION("Test for using a queue exclusive image on multiple queues");
 
-    ASSERT_NO_FATAL_FAILURE(InitBestPracticesFramework());
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitBestPracticesFramework());
+    RETURN_IF_SKIP(InitState())
 
-    VkQueueObj *graphics_queue = m_device->GetDefaultQueue();
+    vkt::Queue *graphics_queue = m_device->graphics_queues()[0];
 
-    VkQueueObj *compute_queue = nullptr;
+    vkt::Queue *compute_queue = nullptr;
     for (uint32_t i = 0; i < m_device->compute_queues().size(); ++i) {
         auto cqi = m_device->compute_queues()[i];
         if (cqi->get_family_index() != graphics_queue->get_family_index()) {
@@ -2011,7 +1944,7 @@ TEST_F(VkBestPracticesLayerTest, ExclusiveImageMultiQueueUsage) {
     const unsigned int h = 100;
 
     // Setup Image
-    VkImageCreateInfo image_info = LvlInitStruct<VkImageCreateInfo>();
+    VkImageCreateInfo image_info = vku::InitStructHelper();
     image_info.extent = {w, h, 1};
     image_info.format = VK_FORMAT_R8G8B8A8_UNORM;
     image_info.imageType = VK_IMAGE_TYPE_2D;
@@ -2046,16 +1979,16 @@ TEST_F(VkBestPracticesLayerTest, ExclusiveImageMultiQueueUsage) {
     spd.colorAttachmentCount = 1;
     spd.pColorAttachments = &ar;
 
-    VkRenderPassCreateInfo rp_info = LvlInitStruct<VkRenderPassCreateInfo>();
+    VkRenderPassCreateInfo rp_info = vku::InitStructHelper();
     rp_info.attachmentCount = 1;
     rp_info.pAttachments = &attachment;
     rp_info.subpassCount = 1;
     rp_info.pSubpasses = &spd;
 
-    vk_testing::RenderPass rp(*m_device, rp_info);
+    vkt::RenderPass rp(*m_device, rp_info);
 
     // Setup Framebuffer
-    VkFramebufferCreateInfo fb_info = LvlInitStruct<VkFramebufferCreateInfo>();
+    VkFramebufferCreateInfo fb_info = vku::InitStructHelper();
     fb_info.width = w;
     fb_info.height = h;
     fb_info.layers = 1;
@@ -2063,17 +1996,17 @@ TEST_F(VkBestPracticesLayerTest, ExclusiveImageMultiQueueUsage) {
     fb_info.attachmentCount = 1;
     fb_info.pAttachments = &image_view;
 
-    vk_testing::Framebuffer fb(*m_device, fb_info);
+    vkt::Framebuffer fb(*m_device, fb_info);
 
-    VkCommandPoolObj graphics_pool(m_device, graphics_queue->get_family_index());
+    vkt::CommandPool graphics_pool(*m_device, graphics_queue->get_family_index());
 
-    VkCommandBufferObj graphics_buffer(m_device, &graphics_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, graphics_queue);
+    vkt::CommandBuffer graphics_buffer(m_device, &graphics_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, graphics_queue);
 
     VkClearValue cv;
     cv.color = VkClearColorValue{};
     std::fill(std::begin(cv.color.float32), std::begin(cv.color.float32) + 4, 1.0f);
 
-    VkRenderPassBeginInfo begin_info = LvlInitStruct<VkRenderPassBeginInfo>();
+    VkRenderPassBeginInfo begin_info = vku::InitStructHelper();
     begin_info.clearValueCount = 1;
     begin_info.pClearValues = &cv;
     begin_info.renderPass = rp.handle();
@@ -2092,23 +2025,21 @@ TEST_F(VkBestPracticesLayerTest, ExclusiveImageMultiQueueUsage) {
     )glsl";
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.InitInfo();
     pipe.cs_ = std::make_unique<VkShaderObj>(this, cs, VK_SHADER_STAGE_COMPUTE_BIT);
-    pipe.InitDescriptorSetInfo();
     pipe.dsl_bindings_[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
     pipe.dsl_bindings_[0].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
     pipe.InitState();
     pipe.CreateComputePipeline();
 
-    VkSamplerObj sampler(m_device);
+    vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
 
     pipe.descriptor_set_->WriteDescriptorImageInfo(0, image_view, sampler.handle(), VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
                                                    VK_IMAGE_LAYOUT_GENERAL);
     pipe.descriptor_set_->UpdateDescriptorSets();
 
-    VkCommandPoolObj compute_pool(m_device, compute_queue->get_family_index());
+    vkt::CommandPool compute_pool(*m_device, compute_queue->get_family_index());
 
-    VkCommandBufferObj compute_buffer(m_device, &compute_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, compute_queue);
+    vkt::CommandBuffer compute_buffer(m_device, &compute_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, compute_queue);
 
     // Record command buffers without queue transition
 
@@ -2146,7 +2077,7 @@ TEST_F(VkBestPracticesLayerTest, ExclusiveImageMultiQueueUsage) {
     // Record command buffers with queue transition
 
     // Queue transition barrier, same for release and acquire
-    VkImageMemoryBarrier barrier = LvlInitStruct<VkImageMemoryBarrier>();
+    VkImageMemoryBarrier barrier = vku::InitStructHelper();
     barrier.image = image.handle();
     barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;  // only matters for release
     barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;             // only matters for acquire
@@ -2198,10 +2129,8 @@ TEST_F(VkBestPracticesLayerTest, ImageMemoryBarrierAccessLayoutCombinations) {
 
     AddRequiredExtensions(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitBestPracticesFramework());
-    ASSERT_NO_FATAL_FAILURE(InitState());
-
-    bool sync2 = AreRequiredExtensionsEnabled();
+    RETURN_IF_SKIP(InitBestPracticesFramework());
+    RETURN_IF_SKIP(InitState())
 
     VkImageObj image(m_device);
     image.Init(128, 128, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
@@ -2216,7 +2145,7 @@ TEST_F(VkBestPracticesLayerTest, ImageMemoryBarrierAccessLayoutCombinations) {
     clear_range.layerCount = 1;
     clear_range.levelCount = 1;
 
-    auto img_barrier = LvlInitStruct<VkImageMemoryBarrier>();
+    VkImageMemoryBarrier img_barrier = vku::InitStructHelper();
     img_barrier.srcAccessMask = 0;
     img_barrier.dstAccessMask = 0;
     img_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -2230,7 +2159,7 @@ TEST_F(VkBestPracticesLayerTest, ImageMemoryBarrierAccessLayoutCombinations) {
 
     m_commandBuffer->begin();
 
-    m_commandBuffer->ClearColorImage(image.handle(), VK_IMAGE_LAYOUT_GENERAL, &color_clear_value, 1, &clear_range);
+    vk::CmdClearColorImage(m_commandBuffer->handle(), image.handle(), VK_IMAGE_LAYOUT_GENERAL, &color_clear_value, 1, &clear_range);
 
     // GENERAL - Any
     // note: the table in PR 2918 originally said that 0 was not allowed, but this was incorrect. See Issue #4735
@@ -2268,8 +2197,8 @@ TEST_F(VkBestPracticesLayerTest, ImageMemoryBarrierAccessLayoutCombinations) {
     vk::CmdPipelineBarrier(m_commandBuffer->handle(), VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, 0,
                            nullptr, 0, nullptr, 1, &img_barrier);
 
-    if (sync2) {
-        auto img_barrier2 = LvlInitStruct<VkImageMemoryBarrier2KHR>();
+    {
+        VkImageMemoryBarrier2KHR img_barrier2 = vku::InitStructHelper();
         img_barrier2.srcAccessMask = 0;
         img_barrier2.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         img_barrier2.image = image.handle();
@@ -2279,9 +2208,13 @@ TEST_F(VkBestPracticesLayerTest, ImageMemoryBarrierAccessLayoutCombinations) {
         img_barrier2.subresourceRange.layerCount = 1;
         img_barrier2.subresourceRange.levelCount = 1;
 
-        auto dependency_info = LvlInitStruct<VkDependencyInfoKHR>();
+        VkDependencyInfoKHR dependency_info = vku::InitStructHelper();
         dependency_info.imageMemoryBarrierCount = 1;
         dependency_info.pImageMemoryBarriers = &img_barrier2;
+
+        img_barrier2.dstAccessMask = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
+        img_barrier2.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        vk::CmdPipelineBarrier2KHR(m_commandBuffer->handle(), &dependency_info);
 
         img_barrier2.dstAccessMask = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
         img_barrier2.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
@@ -2313,12 +2246,9 @@ TEST_F(VkBestPracticesLayerTest, DescriptorTypeNotInPool) {
     TEST_DESCRIPTION("With maintenance1, allocate descriptor with type not in pool");
 
     SetTargetApiVersion(VK_API_VERSION_1_1);  // Need VK_KHR_maintenance1
-    ASSERT_NO_FATAL_FAILURE(InitBestPracticesFramework());
-    ASSERT_NO_FATAL_FAILURE(InitState());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
-    if (DeviceValidationVersion() < VK_API_VERSION_1_1) {
-        GTEST_SKIP() << "At least Vulkan version 1.1 is required";
-    }
+    RETURN_IF_SKIP(InitBestPracticesFramework())
+    RETURN_IF_SKIP(InitState())
+    InitRenderTarget();
 
     // Create Pool with 2 Sampler descriptors, but try to alloc
     // - 1 Sampler
@@ -2327,13 +2257,13 @@ TEST_F(VkBestPracticesLayerTest, DescriptorTypeNotInPool) {
     ds_type_count.type = VK_DESCRIPTOR_TYPE_SAMPLER;
     ds_type_count.descriptorCount = 2;
 
-    VkDescriptorPoolCreateInfo ds_pool_ci = LvlInitStruct<VkDescriptorPoolCreateInfo>();
+    VkDescriptorPoolCreateInfo ds_pool_ci = vku::InitStructHelper();
     ds_pool_ci.flags = 0;
     ds_pool_ci.maxSets = 2;
     ds_pool_ci.poolSizeCount = 1;
     ds_pool_ci.pPoolSizes = &ds_type_count;
 
-    vk_testing::DescriptorPool ds_pool(*m_device, ds_pool_ci);
+    vkt::DescriptorPool ds_pool(*m_device, ds_pool_ci);
 
     VkDescriptorSetLayoutBinding dsl_binding_sampler = {};
     dsl_binding_sampler.binding = 0;
@@ -2349,14 +2279,168 @@ TEST_F(VkBestPracticesLayerTest, DescriptorTypeNotInPool) {
     dsl_binding_uniform.stageFlags = VK_SHADER_STAGE_ALL;
     dsl_binding_uniform.pImmutableSamplers = nullptr;
 
-    const VkDescriptorSetLayoutObj ds_layout(m_device, {dsl_binding_sampler, dsl_binding_uniform});
+    const vkt::DescriptorSetLayout ds_layout(*m_device, {dsl_binding_sampler, dsl_binding_uniform});
 
     VkDescriptorSet descriptor_set;
-    VkDescriptorSetAllocateInfo alloc_info = LvlInitStruct<VkDescriptorSetAllocateInfo>();
+    VkDescriptorSetAllocateInfo alloc_info = vku::InitStructHelper();
     alloc_info.descriptorSetCount = 1;
     alloc_info.descriptorPool = ds_pool.handle();
     alloc_info.pSetLayouts = &ds_layout.handle();
     m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "UNASSIGNED-BestPractices-DescriptorTypeNotInPool");
     vk::AllocateDescriptorSets(m_device->device(), &alloc_info, &descriptor_set);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(VkBestPracticesLayerTest, NonSimultaneousSecondaryMarksPrimary) {
+    RETURN_IF_SKIP(InitBestPracticesFramework());
+    RETURN_IF_SKIP(InitState())
+
+    vkt::CommandBuffer secondary(m_device, m_commandPool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+
+    secondary.begin();
+    secondary.end();
+
+    VkCommandBufferBeginInfo cbbi = {
+        VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+        nullptr,
+        VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT,
+        nullptr,
+    };
+
+    m_commandBuffer->begin(&cbbi);
+    m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "UNASSIGNED-BestPractices-DrawState-InvalidCommandBufferSimultaneousUse");
+    vk::CmdExecuteCommands(m_commandBuffer->handle(), 1, &secondary.handle());
+    m_errorMonitor->VerifyFound();
+    m_commandBuffer->end();
+}
+
+TEST_F(VkBestPracticesLayerTest, NoCreateSwapchainPresentModes) {
+    TEST_DESCRIPTION("With swapchain maintenance 1, CreateSwapchain with VkPresentModesCreateInfoEXT");
+
+    AddSurfaceExtension();
+    AddRequiredExtensions(VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitBestPracticesFramework())
+
+    RETURN_IF_SKIP(InitState())
+    if (!InitSurface()) {
+        GTEST_SKIP() << "Cannot create surface";
+    }
+    m_errorMonitor->SetDesiredFailureMsg(
+        kWarningBit, "UNASSIGNED-BestPractices-vkCreateSwapchainKHR-no-VkSwapchainPresentModesCreateInfoEXT-provided");
+    CreateSwapchain(m_surface, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR, m_swapchain);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(VkBestPracticesLayerTest, PipelineWithoutRenderPassOrRenderingInfo) {
+    TEST_DESCRIPTION("Create pipeline with VK_NULL_HANDLE render pass and no VkPipelineRenderingCreateInfo in pNext chain");
+
+    AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitBestPracticesFramework())
+    VkPhysicalDeviceDynamicRenderingFeatures dynamic_rendering_features = vku::InitStructHelper();
+    GetPhysicalDeviceFeatures2(dynamic_rendering_features);
+
+    if (!dynamic_rendering_features.dynamicRendering) {
+        GTEST_SKIP() << "Test requires (unsupported) dynamicRendering";
+    }
+    RETURN_IF_SKIP(InitState(nullptr, &dynamic_rendering_features));
+
+    if (IsDriver(VK_DRIVER_ID_MESA_RADV) || IsDriver(VK_DRIVER_ID_ARM_PROPRIETARY)) {
+        GTEST_SKIP() << "Temporarily disabling on Pixel 7 and RADV due to driver crash";
+    }
+
+    CreatePipelineHelper pipe(*this);
+    pipe.InitState();
+    pipe.gp_ci_.renderPass = VK_NULL_HANDLE;
+    pipe.CreateGraphicsPipeline();
+
+    m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "UNASSIGNED-BestPractices-Pipeline-NoRendering");
+    pipe.CreateGraphicsPipeline();
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(VkBestPracticesLayerTest, GetQueryPoolResultsWithoutBegin) {
+    TEST_DESCRIPTION("Get query pool results without ever beginning the query");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    RETURN_IF_SKIP(InitBestPracticesFramework())
+    RETURN_IF_SKIP(InitState())
+
+    VkQueryPoolCreateInfo query_pool_create_info = vku::InitStructHelper();
+    query_pool_create_info.queryType = VK_QUERY_TYPE_OCCLUSION;
+    query_pool_create_info.queryCount = 1;
+    vkt::QueryPool query_pool(*m_device, query_pool_create_info);
+
+    m_commandBuffer->begin();
+    vk::CmdResetQueryPool(m_commandBuffer->handle(), query_pool.handle(), 0u, 1u);
+    m_commandBuffer->end();
+
+    VkSubmitInfo submit_info = vku::InitStructHelper();
+    submit_info.commandBufferCount = 1u;
+    submit_info.pCommandBuffers = &m_commandBuffer->handle();
+
+    vk::QueueSubmit(m_default_queue, 1u, &submit_info, VK_NULL_HANDLE);
+    vk::QueueWaitIdle(m_default_queue);
+
+    uint32_t data = 0u;
+    m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "UNASSIGNED-BestPractices-QueryPool-Unavailable");
+    vk::GetQueryPoolResults(*m_device, query_pool.handle(), 0u, 1u, sizeof(uint32_t), &data, sizeof(uint32_t), 0u);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(VkBestPracticesLayerTest, NonOptimalResolveFormat) {
+    TEST_DESCRIPTION("Create a render pass with a resolve attachment that is not optimal");
+
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_EXT_MULTISAMPLED_RENDER_TO_SINGLE_SAMPLED_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitBestPracticesFramework())
+    RETURN_IF_SKIP(InitState())
+
+    VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
+
+    VkSubpassResolvePerformanceQueryEXT performance_query = vku::InitStructHelper();
+    VkFormatProperties2 format_properties2 = vku::InitStructHelper(&performance_query);
+    vk::GetPhysicalDeviceFormatProperties2(gpu(), format, &format_properties2);
+    if (performance_query.optimal == VK_TRUE) {
+        GTEST_SKIP() << "VkSubpassResolvePerformanceQueryEXT::optimal required to be VK_FALSE.";
+    }
+
+    VkAttachmentReference color_attachment;
+    color_attachment.attachment = 0u;
+    color_attachment.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    VkAttachmentReference resolve_attachment;
+    resolve_attachment.attachment = 1u;
+    resolve_attachment.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkAttachmentDescription attachments[2];
+    attachments[0] = {};
+    attachments[0].format = format;
+    attachments[0].samples = VK_SAMPLE_COUNT_2_BIT;
+    attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    attachments[0].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    attachments[0].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    attachments[1] = {};
+    attachments[1].format = format;
+    attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
+    attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    attachments[1].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    attachments[1].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkSubpassDescription subpass = {};
+    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass.colorAttachmentCount = 1u;
+    subpass.pColorAttachments = &color_attachment;
+    subpass.pResolveAttachments = &resolve_attachment;
+
+    VkRenderPassCreateInfo render_pass_ci = vku::InitStructHelper();
+    render_pass_ci.attachmentCount = 2u;
+    render_pass_ci.pAttachments = attachments;
+    render_pass_ci.subpassCount = 1u;
+    render_pass_ci.pSubpasses = &subpass;
+
+    VkRenderPass render_pass;
+    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit,
+                                         "UNASSIGNED-BestPractices-vkCreateRenderPass-SubpassResolve-NonOptimalFormat");
+    vk::CreateRenderPass(*m_device, &render_pass_ci, nullptr, &render_pass);
     m_errorMonitor->VerifyFound();
 }

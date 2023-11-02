@@ -22,8 +22,9 @@
 // NOLINTBEGIN
 
 #include "sync_validation_types.h"
-const std::array<SyncStageAccessInfoType, 86>& syncStageAccessInfoByStageAccessIndex() {
-static const std::array<SyncStageAccessInfoType, 86> variable = { {
+// clang-format off
+const std::array<SyncStageAccessInfoType, 87>& syncStageAccessInfoByStageAccessIndex() {
+static const std::array<SyncStageAccessInfoType, 87> variable = { {
     {
         "SYNC_ACCESS_INDEX_NONE",
         VK_PIPELINE_STAGE_2_NONE_KHR,
@@ -522,6 +523,13 @@ static const std::array<SyncStageAccessInfoType, 86> variable = { {
         SYNC_ACCELERATION_STRUCTURE_BUILD_INDIRECT_COMMAND_READ_BIT
     },
     {
+        "SYNC_ACCELERATION_STRUCTURE_BUILD_SHADER_STORAGE_READ",
+        VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+        VK_ACCESS_2_SHADER_STORAGE_READ_BIT,
+        SYNC_ACCELERATION_STRUCTURE_BUILD_SHADER_STORAGE_READ,
+        SYNC_ACCELERATION_STRUCTURE_BUILD_SHADER_STORAGE_READ_BIT
+    },
+    {
         "SYNC_ACCELERATION_STRUCTURE_BUILD_TRANSFER_READ",
         VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
         VK_ACCESS_2_TRANSFER_READ_BIT,
@@ -740,6 +748,7 @@ const std::map<VkPipelineStageFlags2, SyncStageAccessFlags>& syncStageAccessMask
         SYNC_ACCELERATION_STRUCTURE_BUILD_ACCELERATION_STRUCTURE_READ_BIT |
         SYNC_ACCELERATION_STRUCTURE_BUILD_ACCELERATION_STRUCTURE_WRITE_BIT |
         SYNC_ACCELERATION_STRUCTURE_BUILD_INDIRECT_COMMAND_READ_BIT |
+        SYNC_ACCELERATION_STRUCTURE_BUILD_SHADER_STORAGE_READ_BIT |
         SYNC_ACCELERATION_STRUCTURE_BUILD_TRANSFER_READ_BIT |
         SYNC_ACCELERATION_STRUCTURE_BUILD_TRANSFER_WRITE_BIT
     )},
@@ -896,7 +905,8 @@ const std::map<VkAccessFlags2, SyncStageAccessFlags>& syncStageAccessMaskByAcces
         SYNC_COMPUTE_SHADER_SHADER_STORAGE_READ_BIT |
         SYNC_TASK_SHADER_EXT_SHADER_STORAGE_READ_BIT |
         SYNC_MESH_SHADER_EXT_SHADER_STORAGE_READ_BIT |
-        SYNC_RAY_TRACING_SHADER_SHADER_STORAGE_READ_BIT
+        SYNC_RAY_TRACING_SHADER_SHADER_STORAGE_READ_BIT |
+        SYNC_ACCELERATION_STRUCTURE_BUILD_SHADER_STORAGE_READ_BIT
     )},
     { VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT, (
         SYNC_VERTEX_SHADER_SHADER_STORAGE_WRITE_BIT |
@@ -1036,6 +1046,7 @@ const std::map<VkPipelineStageFlags2, VkAccessFlags2>& syncDirectStageToAccessMa
         VK_ACCESS_2_ACCELERATION_STRUCTURE_READ_BIT_KHR |
         VK_ACCESS_2_ACCELERATION_STRUCTURE_WRITE_BIT_KHR |
         VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT |
+        VK_ACCESS_2_SHADER_STORAGE_READ_BIT |
         VK_ACCESS_2_TRANSFER_READ_BIT |
         VK_ACCESS_2_TRANSFER_WRITE_BIT
     )},
@@ -1578,5 +1589,6 @@ const std::map<VkPipelineStageFlags2, VkPipelineStageFlags2>& syncLogicallyLater
     return variable;
 }
 
+// clang-format on
 
 // NOLINTEND

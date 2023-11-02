@@ -20,19 +20,20 @@
 #include "best_practices/best_practices_validation.h"
 #include "best_practices/best_practices_error_enums.h"
 
-bool BestPractices::PreCallValidateGetVideoSessionMemoryRequirementsKHR(
-    VkDevice device, VkVideoSessionKHR videoSession, uint32_t* pMemoryRequirementsCount,
-    VkVideoSessionMemoryRequirementsKHR* pMemoryRequirements) const {
+bool BestPractices::PreCallValidateGetVideoSessionMemoryRequirementsKHR(VkDevice device, VkVideoSessionKHR videoSession,
+                                                                        uint32_t* pMemoryRequirementsCount,
+                                                                        VkVideoSessionMemoryRequirementsKHR* pMemoryRequirements,
+                                                                        const ErrorObject& error_obj) const {
     bool skip = false;
 
     auto vs_state = Get<VIDEO_SESSION_STATE>(videoSession);
     if (vs_state) {
         if (pMemoryRequirements != nullptr && !vs_state->memory_binding_count_queried) {
-            skip |= LogWarning(videoSession, kVUID_BestPractices_GetVideoSessionMemReqCountNotRetrieved,
-                               "vkGetVideoSessionMemoryRequirementsKHR(): querying list of memory requirements of %s "
+            skip |= LogWarning(kVUID_BestPractices_GetVideoSessionMemReqCountNotRetrieved, videoSession, error_obj.location,
+                               "querying list of memory requirements of %s "
                                "but the number of memory requirements has not been queried before by calling this "
                                "command with pMemoryRequirements set to NULL.",
-                               report_data->FormatHandle(videoSession).c_str());
+                               FormatHandle(videoSession).c_str());
         }
     }
 
@@ -41,23 +42,24 @@ bool BestPractices::PreCallValidateGetVideoSessionMemoryRequirementsKHR(
 
 bool BestPractices::PreCallValidateBindVideoSessionMemoryKHR(VkDevice device, VkVideoSessionKHR videoSession,
                                                              uint32_t bindSessionMemoryInfoCount,
-                                                             const VkBindVideoSessionMemoryInfoKHR* pBindSessionMemoryInfos) const {
+                                                             const VkBindVideoSessionMemoryInfoKHR* pBindSessionMemoryInfos,
+                                                             const ErrorObject& error_obj) const {
     bool skip = false;
 
     auto vs_state = Get<VIDEO_SESSION_STATE>(videoSession);
     if (vs_state) {
         if (!vs_state->memory_binding_count_queried) {
-            skip |= LogWarning(videoSession, kVUID_BestPractices_BindVideoSessionMemReqCountNotRetrieved,
-                               "vkBindVideoSessionMemoryKHR(): binding memory to %s but "
+            skip |= LogWarning(kVUID_BestPractices_BindVideoSessionMemReqCountNotRetrieved, videoSession, error_obj.location,
+                               "binding memory to %s but "
                                "vkGetVideoSessionMemoryRequirementsKHR() has not been called to retrieve the "
                                "number of memory requirements for the video session.",
-                               report_data->FormatHandle(videoSession).c_str());
+                               FormatHandle(videoSession).c_str());
         } else if (vs_state->memory_bindings_queried < vs_state->GetMemoryBindingCount()) {
-            skip |= LogWarning(videoSession, kVUID_BestPractices_BindVideoSessionMemReqNotAllBindingsRetrieved,
-                               "vkBindVideoSessionMemoryKHR(): binding memory to %s but "
+            skip |= LogWarning(kVUID_BestPractices_BindVideoSessionMemReqNotAllBindingsRetrieved, videoSession, error_obj.location,
+                               "binding memory to %s but "
                                "not all memory requirements for the video session have been queried using "
                                "vkGetVideoSessionMemoryRequirementsKHR().",
-                               report_data->FormatHandle(videoSession).c_str());
+                               FormatHandle(videoSession).c_str());
         }
     }
 

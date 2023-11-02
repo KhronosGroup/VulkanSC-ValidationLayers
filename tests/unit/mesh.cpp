@@ -14,6 +14,7 @@
 
 #include "utils/cast_utils.h"
 #include "../framework/layer_validation_tests.h"
+#include "../framework/pipeline_helper.h"
 
 TEST_F(NegativeMesh, BasicUsage) {
     TEST_DESCRIPTION("Test VK_EXT_mesh_shader.");
@@ -24,24 +25,21 @@ TEST_F(NegativeMesh, BasicUsage) {
     AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_MULTIVIEW_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_MESH_SHADER_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
     // Create a device that enables mesh_shader
-    auto vertex_input_dynamic_state = LvlInitStruct<VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT>();
-    auto extended_dynamic_state2 = LvlInitStruct<VkPhysicalDeviceExtendedDynamicState2FeaturesEXT>(&vertex_input_dynamic_state);
-    auto maintenance4 = LvlInitStruct<VkPhysicalDeviceMaintenance4Features>(&extended_dynamic_state2);
-    auto multiview_feature = LvlInitStruct<VkPhysicalDeviceMultiviewFeatures>(&maintenance4);
-    auto xfb_feature = LvlInitStruct<VkPhysicalDeviceTransformFeedbackFeaturesEXT>(&multiview_feature);
-    auto mesh_shader_features = LvlInitStruct<VkPhysicalDeviceMeshShaderFeaturesEXT>(&xfb_feature);
+    VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT vertex_input_dynamic_state = vku::InitStructHelper();
+    VkPhysicalDeviceExtendedDynamicState2FeaturesEXT extended_dynamic_state2 = vku::InitStructHelper(&vertex_input_dynamic_state);
+    VkPhysicalDeviceMaintenance4Features maintenance4 = vku::InitStructHelper(&extended_dynamic_state2);
+    VkPhysicalDeviceMultiviewFeatures multiview_feature = vku::InitStructHelper(&maintenance4);
+    VkPhysicalDeviceTransformFeedbackFeaturesEXT xfb_feature = vku::InitStructHelper(&multiview_feature);
+    VkPhysicalDeviceMeshShaderFeaturesEXT mesh_shader_features = vku::InitStructHelper(&xfb_feature);
     auto features2 = GetPhysicalDeviceFeatures2(mesh_shader_features);
     mesh_shader_features.multiviewMeshShader = VK_FALSE;
     features2.features.multiDrawIndirect = VK_FALSE;
 
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features2));
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitState(nullptr, &features2))
+    InitRenderTarget();
 
     static const char vert_shader_text[] = R"glsl(
         #version 460
@@ -190,9 +188,10 @@ TEST_F(NegativeMesh, BasicUsage) {
             helper.gp_ci_.pVertexInputState = nullptr;
             helper.gp_ci_.pInputAssemblyState = nullptr;
         };
-        CreatePipelineHelper::OneshotTest(*this, break_vp3, kErrorBit,
-                                          vector<std::string>({"VUID-VkGraphicsPipelineCreateInfo-pStages-02097",
-                                                               "VUID-VkGraphicsPipelineCreateInfo-pStages-02098"}));
+        CreatePipelineHelper::OneshotTest(
+            *this, break_vp3, kErrorBit,
+            vector<std::string>({"VUID-VkGraphicsPipelineCreateInfo-pStages-02097",
+                                 "VUID-VkGraphicsPipelineCreateInfo-dynamicPrimitiveTopologyUnrestricted-09031"}));
 
         // xfb with mesh shader
         const auto break_vp4 = [&](CreatePipelineHelper &helper) {
@@ -213,7 +212,7 @@ TEST_F(NegativeMesh, BasicUsage) {
             "VUID-VkGraphicsPipelineCreateInfo-pDynamicStates-07065", "VUID-VkGraphicsPipelineCreateInfo-pDynamicStates-07065",
             "VUID-VkGraphicsPipelineCreateInfo-pDynamicStates-07066", "VUID-VkGraphicsPipelineCreateInfo-pDynamicStates-07066",
             "VUID-VkGraphicsPipelineCreateInfo-pDynamicStates-07067"};
-        VkPipelineDynamicStateCreateInfo dyn_state = LvlInitStruct<VkPipelineDynamicStateCreateInfo>();
+        VkPipelineDynamicStateCreateInfo dyn_state = vku::InitStructHelper();
         for (int i = 0; i < 5; i++) {
             dyn_state.dynamicStateCount = dyn_states[i].size();
             dyn_state.pDynamicStates = dyn_states[i].data();
@@ -228,8 +227,11 @@ TEST_F(NegativeMesh, BasicUsage) {
         }
 
         // viewMask without enabling multiviewMeshShader feature
-        auto pipeline_rendering_info = LvlInitStruct<VkPipelineRenderingCreateInfoKHR>();
+        VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
         pipeline_rendering_info.viewMask = 0x2;
+        VkFormat color_formats[] = {VK_FORMAT_UNDEFINED};
+        pipeline_rendering_info.colorAttachmentCount = 1;
+        pipeline_rendering_info.pColorAttachmentFormats = color_formats;
 
         const auto break_vp5 = [&](CreatePipelineHelper &helper) {
             helper.shader_stages_ = {ms.GetStageCreateInfo(), fs.GetStageCreateInfo()};
@@ -245,13 +247,10 @@ TEST_F(NegativeMesh, ExtensionDisabled) {
 
     SetTargetApiVersion(VK_API_VERSION_1_3);
     AddRequiredExtensions(VK_EXT_MESH_SHADER_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    auto maintenance4 = LvlInitStruct<VkPhysicalDeviceMaintenance4Features>();
-    auto mesh_shader_features = LvlInitStruct<VkPhysicalDeviceMeshShaderFeaturesEXT>(&maintenance4);
+    VkPhysicalDeviceMaintenance4Features maintenance4 = vku::InitStructHelper();
+    VkPhysicalDeviceMeshShaderFeaturesEXT mesh_shader_features = vku::InitStructHelper(&maintenance4);
     GetPhysicalDeviceFeatures2(mesh_shader_features);
     if (mesh_shader_features.meshShader != VK_TRUE) {
         GTEST_SKIP() << "Mesh shader feature not supported";
@@ -259,8 +258,8 @@ TEST_F(NegativeMesh, ExtensionDisabled) {
 
     mesh_shader_features.meshShader = VK_FALSE;
     mesh_shader_features.taskShader = VK_FALSE;
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &mesh_shader_features));
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitState(nullptr, &mesh_shader_features));
+    InitRenderTarget();
 
     VkShaderObj vs(this, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
 
@@ -358,22 +357,19 @@ TEST_F(NegativeMesh, RuntimeSpirv) {
 
     SetTargetApiVersion(VK_API_VERSION_1_3);
     AddRequiredExtensions(VK_EXT_MESH_SHADER_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    auto maintenance4 = LvlInitStruct<VkPhysicalDeviceMaintenance4Features>();
-    auto mesh_shader_features = LvlInitStruct<VkPhysicalDeviceMeshShaderFeaturesEXT>(&maintenance4);
+    VkPhysicalDeviceMaintenance4Features maintenance4 = vku::InitStructHelper();
+    VkPhysicalDeviceMeshShaderFeaturesEXT mesh_shader_features = vku::InitStructHelper(&maintenance4);
     GetPhysicalDeviceFeatures2(mesh_shader_features);
     if (mesh_shader_features.meshShader != VK_TRUE) {
         GTEST_SKIP() << "Mesh shader feature not supported";
     }
 
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &mesh_shader_features));
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitState(nullptr, &mesh_shader_features));
+    InitRenderTarget();
 
-    VkPhysicalDeviceMeshShaderPropertiesEXT mesh_shader_properties = LvlInitStruct<VkPhysicalDeviceMeshShaderPropertiesEXT>();
+    VkPhysicalDeviceMeshShaderPropertiesEXT mesh_shader_properties = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(mesh_shader_properties);
 
     vector<std::string> error_vuids, error_vuids_1;
@@ -537,21 +533,18 @@ TEST_F(NegativeMesh, RuntimeSpirvNV) {
     TEST_DESCRIPTION("Test VK_NV_mesh_shader spirv related VUIDs");
 
     AddRequiredExtensions(VK_NV_MESH_SHADER_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    auto mesh_shader_features = LvlInitStruct<VkPhysicalDeviceMeshShaderFeaturesNV>();
+    VkPhysicalDeviceMeshShaderFeaturesNV mesh_shader_features = vku::InitStructHelper();
     auto features2 = GetPhysicalDeviceFeatures2(mesh_shader_features);
     if (mesh_shader_features.meshShader != VK_TRUE) {
         GTEST_SKIP() << "Mesh shader feature not supported";
     }
 
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features2));
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitState(nullptr, &features2))
+    InitRenderTarget();
 
-    VkPhysicalDeviceMeshShaderPropertiesNV mesh_shader_properties = LvlInitStruct<VkPhysicalDeviceMeshShaderPropertiesNV>();
+    VkPhysicalDeviceMeshShaderPropertiesNV mesh_shader_properties = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(mesh_shader_properties);
 
     std::string mesh_src = R"(
@@ -599,18 +592,15 @@ TEST_F(NegativeMesh, BasicUsageNV) {
 
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_NV_MESH_SHADER_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
     // Create a device that enables mesh_shader
-    auto mesh_shader_features = LvlInitStruct<VkPhysicalDeviceMeshShaderFeaturesNV>();
+    VkPhysicalDeviceMeshShaderFeaturesNV mesh_shader_features = vku::InitStructHelper();
     auto features2 = GetPhysicalDeviceFeatures2(mesh_shader_features);
     features2.features.multiDrawIndirect = VK_FALSE;
 
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features2));
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitState(nullptr, &features2))
+    InitRenderTarget();
 
     static const char vertShaderText[] = R"glsl(
         #version 450
@@ -668,25 +658,31 @@ TEST_F(NegativeMesh, BasicUsageNV) {
             helper.gp_ci_.pVertexInputState = nullptr;
             helper.gp_ci_.pInputAssemblyState = nullptr;
         };
-        CreatePipelineHelper::OneshotTest(*this, break_vp3, kErrorBit,
-                                          vector<std::string>({"VUID-VkGraphicsPipelineCreateInfo-pStages-02097",
-                                                               "VUID-VkGraphicsPipelineCreateInfo-pStages-02098"}));
+        CreatePipelineHelper::OneshotTest(
+            *this, break_vp3, kErrorBit,
+            vector<std::string>({"VUID-VkGraphicsPipelineCreateInfo-pStages-02097",
+                                 "VUID-VkGraphicsPipelineCreateInfo-dynamicPrimitiveTopologyUnrestricted-09031"}));
     }
 
-    VkBufferCreateInfo buffer_create_info = LvlInitStruct<VkBufferCreateInfo>();
+    VkBufferCreateInfo buffer_create_info = vku::InitStructHelper();
     buffer_create_info.size = sizeof(uint32_t);
     buffer_create_info.usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
     VkBuffer buffer;
     VkResult result = vk::CreateBuffer(m_device->device(), &buffer_create_info, nullptr, &buffer);
-    ASSERT_VK_SUCCESS(result);
+    ASSERT_EQ(VK_SUCCESS, result);
 
     m_commandBuffer->begin();
+    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
 
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDrawMeshTasksIndirectNV-None-08606");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDrawMeshTasksIndirectNV-buffer-02708");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDrawMeshTasksIndirectNV-drawCount-02157");
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDrawMeshTasksIndirectNV-drawCount-02146");
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDrawMeshTasksIndirectNV-drawCount-02718");
     vk::CmdDrawMeshTasksIndirectNV(m_commandBuffer->handle(), buffer, 0, 2, 0);
     m_errorMonitor->VerifyFound();
 
+    m_commandBuffer->EndRenderPass();
     m_commandBuffer->end();
 
     vk::DestroyBuffer(m_device->device(), buffer, 0);
@@ -696,12 +692,9 @@ TEST_F(NegativeMesh, ExtensionDisabledNV) {
     TEST_DESCRIPTION("Test VK_NV_mesh_shader VUs with NV_mesh_shader disabled.");
 
     AddRequiredExtensions(VK_NV_MESH_SHADER_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    auto mesh_shader_features = LvlInitStruct<VkPhysicalDeviceMeshShaderFeaturesNV>();
+    VkPhysicalDeviceMeshShaderFeaturesNV mesh_shader_features = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(mesh_shader_features);
     if (mesh_shader_features.meshShader != VK_TRUE) {
         GTEST_SKIP() << "Mesh shader feature not supported";
@@ -709,10 +702,10 @@ TEST_F(NegativeMesh, ExtensionDisabledNV) {
 
     mesh_shader_features.meshShader = VK_FALSE;
     mesh_shader_features.taskShader = VK_FALSE;
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &mesh_shader_features));
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitState(nullptr, &mesh_shader_features));
+    InitRenderTarget();
 
-    vk_testing::Event event_obj(*m_device);
+    vkt::Event event_obj(*m_device);
     const auto event = event_obj.handle();
     ASSERT_TRUE(event_obj.initialized());
 
@@ -760,17 +753,17 @@ TEST_F(NegativeMesh, ExtensionDisabledNV) {
 
     m_commandBuffer->end();
 
-    vk_testing::Semaphore semaphore_obj(*m_device);
+    vkt::Semaphore semaphore_obj(*m_device);
     const auto semaphore = semaphore_obj.handle();
     ASSERT_TRUE(semaphore_obj.initialized());
 
     VkPipelineStageFlags stage_flags = VK_PIPELINE_STAGE_MESH_SHADER_BIT_NV | VK_PIPELINE_STAGE_TASK_SHADER_BIT_NV;
-    VkSubmitInfo submit_info = LvlInitStruct<VkSubmitInfo>();
+    VkSubmitInfo submit_info = vku::InitStructHelper();
 
     // Signal the semaphore so the next test can wait on it.
     submit_info.signalSemaphoreCount = 1;
     submit_info.pSignalSemaphores = &semaphore;
-    vk::QueueSubmit(m_device->m_queue, 1, &submit_info, VK_NULL_HANDLE);
+    vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
 
     submit_info.signalSemaphoreCount = 0;
     submit_info.pSignalSemaphores = nullptr;
@@ -780,10 +773,10 @@ TEST_F(NegativeMesh, ExtensionDisabledNV) {
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSubmitInfo-pWaitDstStageMask-04095");
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSubmitInfo-pWaitDstStageMask-04096");
-    vk::QueueSubmit(m_device->m_queue, 1, &submit_info, VK_NULL_HANDLE);
+    vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
     m_errorMonitor->VerifyFound();
 
-    vk::QueueWaitIdle(m_device->m_queue);
+    vk::QueueWaitIdle(m_default_queue);
 
     VkShaderObj vs(this, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
     // #version 450
@@ -863,25 +856,20 @@ TEST_F(NegativeMesh, DrawCmds) {
 
     SetTargetApiVersion(VK_API_VERSION_1_3);
     AddRequiredExtensions(VK_EXT_MESH_SHADER_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    auto maintenance4 = LvlInitStruct<VkPhysicalDeviceMaintenance4Features>();
-    auto mesh_shader_features = LvlInitStruct<VkPhysicalDeviceMeshShaderFeaturesEXT>(&maintenance4);
+    VkPhysicalDeviceMaintenance4Features maintenance4 = vku::InitStructHelper();
+    VkPhysicalDeviceMeshShaderFeaturesEXT mesh_shader_features = vku::InitStructHelper(&maintenance4);
     auto features2 = GetPhysicalDeviceFeatures2(mesh_shader_features);
     if (mesh_shader_features.meshShader != VK_TRUE) {
         GTEST_SKIP() << "Mesh shader feature not supported";
     }
     features2.features.multiDrawIndirect = VK_FALSE;
 
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features2));
+    RETURN_IF_SKIP(InitState(nullptr, &features2))
+    InitRenderTarget();
 
-    ASSERT_NO_FATAL_FAILURE(InitViewport());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
-
-    VkPhysicalDeviceMeshShaderPropertiesEXT mesh_shader_properties = LvlInitStruct<VkPhysicalDeviceMeshShaderPropertiesEXT>();
+    VkPhysicalDeviceMeshShaderPropertiesEXT mesh_shader_properties = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(mesh_shader_properties);
 
     // #version 450
@@ -922,39 +910,27 @@ TEST_F(NegativeMesh, DrawCmds) {
     )";
 
     VkShaderObj mesh_shader(this, mesh_src, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_3, SPV_SOURCE_ASM);
-    VkShaderObj vs(this, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj fs(this, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
-    VkBufferCreateInfo buffer_create_info = LvlInitStruct<VkBufferCreateInfo>();
+    VkBufferCreateInfo buffer_create_info = vku::InitStructHelper();
     buffer_create_info.usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
     buffer_create_info.size = 2 * sizeof(VkDrawMeshTasksIndirectCommandEXT);
-    VkBufferObj buffer;
-    buffer.init(*m_device, buffer_create_info);
+    vkt::Buffer buffer(*m_device, buffer_create_info);
 
-    VkBufferObj count_buffer;
     buffer_create_info.size = 64;
-    count_buffer.init(*m_device, buffer_create_info);
+    vkt::Buffer count_buffer(*m_device, buffer_create_info);
 
-    VkPipelineLayoutObj pipeline_layout(m_device);
-    VkPipelineObj pipe(m_device);
-    pipe.AddDefaultColorAttachment();
-    pipe.AddShader(&mesh_shader);
-    pipe.AddShader(&fs);
-    pipe.SetViewport(m_viewports);
-    pipe.SetScissor(m_scissors);
-    pipe.CreateVKPipeline(pipeline_layout.handle(), renderPass());
+    CreatePipelineHelper pipe(*this);
+    pipe.InitState();
+    pipe.shader_stages_[0] = mesh_shader.GetStageCreateInfo();
+    pipe.CreateGraphicsPipeline();
 
-    VkPipelineObj pipe1(m_device);
-    pipe1.AddDefaultColorAttachment();
-    pipe1.AddShader(&vs);
-    pipe1.AddShader(&fs);
-    pipe1.SetViewport(m_viewports);
-    pipe1.SetScissor(m_scissors);
-    pipe1.CreateVKPipeline(pipeline_layout.handle(), renderPass());
+    CreatePipelineHelper pipe1(*this);
+    pipe1.InitState();
+    pipe1.CreateGraphicsPipeline();
 
     m_commandBuffer->begin();
     m_commandBuffer->BeginRenderPass(renderPassBeginInfo());
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.handle());
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
 
     uint32_t max_group_count_X = mesh_shader_properties.maxTaskWorkGroupCount[0];
     uint32_t max_group_count_Y = mesh_shader_properties.maxTaskWorkGroupCount[1];
@@ -983,11 +959,13 @@ TEST_F(NegativeMesh, DrawCmds) {
     vk::CmdDrawMeshTasksIndirectEXT(m_commandBuffer->handle(), buffer.handle(), 0, 2, sizeof(VkDrawMeshTasksIndirectCommandEXT));
     m_errorMonitor->VerifyFound();
 
-    if (m_device->props.limits.maxDrawIndirectCount < vvl::MaxTypeValue(m_device->props.limits.maxDrawIndirectCount)) {
+    if (m_device->phy().limits_.maxDrawIndirectCount < vvl::MaxTypeValue(m_device->phy().limits_.maxDrawIndirectCount)) {
         m_errorMonitor->SetUnexpectedError("VUID-vkCmdDrawMeshTasksIndirectEXT-drawCount-02718");
+        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDrawMeshTasksIndirectEXT-drawCount-07090");
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDrawMeshTasksIndirectEXT-drawCount-02719");
         vk::CmdDrawMeshTasksIndirectEXT(m_commandBuffer->handle(), buffer.handle(), 0,
-                                        m_device->props.limits.maxDrawIndirectCount + 1, sizeof(VkDrawMeshTasksIndirectCommandEXT));
+                                        m_device->phy().limits_.maxDrawIndirectCount + 1,
+                                        sizeof(VkDrawMeshTasksIndirectCommandEXT));
         m_errorMonitor->VerifyFound();
     }
 
@@ -997,10 +975,10 @@ TEST_F(NegativeMesh, DrawCmds) {
     m_errorMonitor->VerifyFound();
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDraw-stage-06481");
-    m_commandBuffer->Draw(3, 1, 0, 0);
+    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
     m_errorMonitor->VerifyFound();
 
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe1.handle());
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe1.Handle());
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDrawMeshTasksEXT-stage-06480");
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDrawMeshTasksEXT-MeshEXT-07087");
     vk::CmdDrawMeshTasksEXT(m_commandBuffer->handle(), 1, 1, 1);
@@ -1026,24 +1004,19 @@ TEST_F(NegativeMesh, MultiDrawIndirect) {
 
     SetTargetApiVersion(VK_API_VERSION_1_3);
     AddRequiredExtensions(VK_EXT_MESH_SHADER_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    auto maintenance4 = LvlInitStruct<VkPhysicalDeviceMaintenance4Features>();
-    auto mesh_shader_features = LvlInitStruct<VkPhysicalDeviceMeshShaderFeaturesEXT>(&maintenance4);
+    VkPhysicalDeviceMaintenance4Features maintenance4 = vku::InitStructHelper();
+    VkPhysicalDeviceMeshShaderFeaturesEXT mesh_shader_features = vku::InitStructHelper(&maintenance4);
     auto features2 = GetPhysicalDeviceFeatures2(mesh_shader_features);
     if (mesh_shader_features.meshShader != VK_TRUE) {
         GTEST_SKIP() << "Mesh shader feature not supported";
     }
 
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features2));
+    RETURN_IF_SKIP(InitState(nullptr, &features2))
+    InitRenderTarget();
 
-    ASSERT_NO_FATAL_FAILURE(InitViewport());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
-
-    VkPhysicalDeviceMeshShaderPropertiesEXT mesh_shader_properties = LvlInitStruct<VkPhysicalDeviceMeshShaderPropertiesEXT>();
+    VkPhysicalDeviceMeshShaderPropertiesEXT mesh_shader_properties = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(mesh_shader_properties);
 
     // #version 450
@@ -1088,26 +1061,20 @@ TEST_F(NegativeMesh, MultiDrawIndirect) {
     )";
 
     VkShaderObj mesh_shader(this, mesh_src, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_3, SPV_SOURCE_ASM);
-    VkShaderObj fs(this, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
-    VkBufferCreateInfo buffer_create_info = LvlInitStruct<VkBufferCreateInfo>();
+    VkBufferCreateInfo buffer_create_info = vku::InitStructHelper();
     buffer_create_info.usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
     buffer_create_info.size = 2 * sizeof(VkDrawMeshTasksIndirectCommandEXT);
-    VkBufferObj buffer;
-    buffer.init(*m_device, buffer_create_info);
+    vkt::Buffer buffer(*m_device, buffer_create_info);
 
-    VkPipelineLayoutObj pipeline_layout(m_device);
-    VkPipelineObj pipe(m_device);
-    pipe.AddDefaultColorAttachment();
-    pipe.AddShader(&mesh_shader);
-    pipe.AddShader(&fs);
-    pipe.SetViewport(m_viewports);
-    pipe.SetScissor(m_scissors);
-    pipe.CreateVKPipeline(pipeline_layout.handle(), renderPass());
+    CreatePipelineHelper pipe(*this);
+    pipe.InitState();
+    pipe.shader_stages_[0] = mesh_shader.GetStageCreateInfo();
+    pipe.CreateGraphicsPipeline();
 
     m_commandBuffer->begin();
     m_commandBuffer->BeginRenderPass(renderPassBeginInfo());
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.handle());
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDrawMeshTasksIndirectEXT-drawCount-07088");
     vk::CmdDrawMeshTasksIndirectEXT(m_commandBuffer->handle(), buffer.handle(), 0, 2,
@@ -1118,24 +1085,23 @@ TEST_F(NegativeMesh, MultiDrawIndirect) {
     vk::CmdDrawMeshTasksIndirectEXT(m_commandBuffer->handle(), buffer.handle(), 0, 4, sizeof(VkDrawMeshTasksIndirectCommandEXT));
     m_errorMonitor->VerifyFound();
 
-    VkBufferObj draw_buffer;
+    vkt::Buffer draw_buffer;
     draw_buffer.init_no_mem(*m_device, buffer_create_info);
     ASSERT_TRUE(draw_buffer.initialized());
     draw_buffer.allocate_and_bind_memory(*m_device);
 
-    VkBufferCreateInfo count_buffer_create_info = LvlInitStruct<VkBufferCreateInfo>();
+    VkBufferCreateInfo count_buffer_create_info = vku::InitStructHelper();
     count_buffer_create_info.size = 64;
     count_buffer_create_info.usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
 
-    VkBufferObj count_buffer;
-    count_buffer.init(*m_device, count_buffer_create_info);
+    vkt::Buffer count_buffer(*m_device, count_buffer_create_info);
     ASSERT_TRUE(count_buffer.initialized());
 
-    VkBufferObj count_buffer_unbound;
+    vkt::Buffer count_buffer_unbound;
     count_buffer_unbound.init_no_mem(*m_device, count_buffer_create_info);
     ASSERT_TRUE(count_buffer_unbound.initialized());
 
-    VkBufferObj count_buffer_wrong_usage;
+    vkt::Buffer count_buffer_wrong_usage;
     count_buffer_create_info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
     count_buffer_wrong_usage.init(*m_device, count_buffer_create_info);
 
@@ -1168,22 +1134,18 @@ TEST_F(NegativeMesh, DrawCmdsNV) {
     TEST_DESCRIPTION("Test VK_NV_mesh_shader draw commands.");
 
     AddRequiredExtensions(VK_NV_MESH_SHADER_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    auto mesh_shader_features = LvlInitStruct<VkPhysicalDeviceMeshShaderFeaturesNV>();
+    VkPhysicalDeviceMeshShaderFeaturesNV mesh_shader_features = vku::InitStructHelper();
     auto features2 = GetPhysicalDeviceFeatures2(mesh_shader_features);
     if (mesh_shader_features.meshShader != VK_TRUE) {
         GTEST_SKIP() << "Mesh shader feature not supported";
     }
     features2.features.multiDrawIndirect = VK_FALSE;
 
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features2));
+    RETURN_IF_SKIP(InitState(nullptr, &features2))
 
-    ASSERT_NO_FATAL_FAILURE(InitViewport());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    InitRenderTarget();
 
     static const char mesh_src[] = R"glsl(
         #version 450
@@ -1204,46 +1166,34 @@ TEST_F(NegativeMesh, DrawCmdsNV) {
     )glsl";
 
     VkShaderObj mesh_shader(this, mesh_src, VK_SHADER_STAGE_MESH_BIT_NV);
-    VkShaderObj vs(this, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj fs(this, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
-    VkBufferCreateInfo buffer_create_info = LvlInitStruct<VkBufferCreateInfo>();
+    VkBufferCreateInfo buffer_create_info = vku::InitStructHelper();
     buffer_create_info.usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
     buffer_create_info.size = 2 * sizeof(VkDrawMeshTasksIndirectCommandNV);
-    VkBufferObj buffer;
-    buffer.init(*m_device, buffer_create_info);
+    vkt::Buffer buffer(*m_device, buffer_create_info);
 
-    VkBufferObj count_buffer;
     buffer_create_info.size = 64;
-    count_buffer.init(*m_device, buffer_create_info);
+    vkt::Buffer count_buffer(*m_device, buffer_create_info);
 
-    VkPipelineLayoutObj pipeline_layout(m_device);
-    VkPipelineObj pipe(m_device);
-    pipe.AddDefaultColorAttachment();
-    pipe.AddShader(&mesh_shader);
-    pipe.AddShader(&fs);
-    pipe.SetViewport(m_viewports);
-    pipe.SetScissor(m_scissors);
-    pipe.CreateVKPipeline(pipeline_layout.handle(), renderPass());
+    CreatePipelineHelper pipe(*this);
+    pipe.InitState();
+    pipe.shader_stages_[0] = mesh_shader.GetStageCreateInfo();
+    pipe.CreateGraphicsPipeline();
 
-    VkPipelineObj pipe1(m_device);
-    pipe1.AddDefaultColorAttachment();
-    pipe1.AddShader(&vs);
-    pipe1.AddShader(&fs);
-    pipe1.SetViewport(m_viewports);
-    pipe1.SetScissor(m_scissors);
-    pipe1.CreateVKPipeline(pipeline_layout.handle(), renderPass());
+    CreatePipelineHelper pipe1(*this);
+    pipe1.InitState();
+    pipe1.CreateGraphicsPipeline();
 
     m_commandBuffer->begin();
     m_commandBuffer->BeginRenderPass(renderPassBeginInfo());
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.handle());
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDrawMeshTasksIndirectNV-drawCount-02156");
     vk::CmdDrawMeshTasksIndirectNV(m_commandBuffer->handle(), buffer.handle(), sizeof(VkDrawMeshTasksIndirectCommandNV) * 2, 1,
                                    sizeof(VkDrawMeshTasksIndirectCommandNV));
     m_errorMonitor->VerifyFound();
 
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe1.handle());
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe1.Handle());
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDrawMeshTasksNV-MeshNV-07080");
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDrawMeshTasksNV-stage-06480");
     vk::CmdDrawMeshTasksNV(m_commandBuffer->handle(), 1, 0);
@@ -1262,4 +1212,115 @@ TEST_F(NegativeMesh, DrawCmdsNV) {
 
     m_commandBuffer->EndRenderPass();
     m_commandBuffer->end();
+}
+
+TEST_F(NegativeMesh, MeshTasksWorkgroupCount) {
+    TEST_DESCRIPTION("Test mesh tasks emitted from task shader.");
+
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_KHR_SPIRV_1_4_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_MESH_SHADER_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitFramework())
+
+    VkPhysicalDeviceMaintenance4Features maintenance_4_features = vku::InitStructHelper();
+    VkPhysicalDeviceMeshShaderFeaturesEXT mesh_shader_features = vku::InitStructHelper(&maintenance_4_features);
+    GetPhysicalDeviceFeatures2(mesh_shader_features);
+
+    if (!maintenance_4_features.maintenance4) {
+        GTEST_SKIP() << "maintenance4 feature not supported";
+    }
+    if (!mesh_shader_features.taskShader || !mesh_shader_features.meshShader) {
+        GTEST_SKIP() << "Task or mesh shader feature not supported";
+    }
+
+    RETURN_IF_SKIP(InitState(nullptr, &mesh_shader_features));
+    InitRenderTarget();
+
+    VkPhysicalDeviceMeshShaderPropertiesEXT mesh_shader_properties = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(mesh_shader_properties);
+
+    std::string task_src_x = R"glsl(
+        #version 450
+        #extension GL_EXT_mesh_shader : require
+        layout (local_size_x=1, local_size_y=1, local_size_z=1) in;
+        void main () {
+            EmitMeshTasksEXT()glsl";
+    task_src_x += std::to_string(mesh_shader_properties.maxMeshWorkGroupCount[0] + 1);
+    task_src_x += R"glsl(u, 1u, 1u);
+        }
+    )glsl";
+
+    std::string task_src_y = R"glsl(
+        #version 450
+        #extension GL_EXT_mesh_shader : require
+        layout (local_size_x=1, local_size_y=1, local_size_z=1) in;
+        void main () {
+            EmitMeshTasksEXT(1u, )glsl";
+    task_src_y += std::to_string(mesh_shader_properties.maxMeshWorkGroupCount[1] + 1);
+    task_src_y += R"glsl(u, 1u);
+        }
+    )glsl";
+
+    std::string task_src_z = R"glsl(
+        #version 450
+        #extension GL_EXT_mesh_shader : require
+        layout (local_size_x=1, local_size_y=1, local_size_z=1) in;
+        void main () {
+            EmitMeshTasksEXT(1u, 1u, )glsl";
+    task_src_z += std::to_string(mesh_shader_properties.maxMeshWorkGroupCount[2] + 1);
+    task_src_z += R"glsl(u);
+        }
+    )glsl";
+
+    static const char mesh_src[] = R"glsl(
+        #version 460
+        #extension GL_EXT_mesh_shader : require
+        layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+        layout(max_vertices = 3) out;
+        layout(max_primitives = 1) out;
+        layout(triangles) out;
+        void main() {
+            SetMeshOutputsEXT(3, 1);
+            gl_MeshVerticesEXT[0].gl_Position = vec4(-1.0, -1.0, 0.0f, 1.0f);
+            gl_MeshVerticesEXT[1].gl_Position = vec4( 3.0, -1.0, 0.0f, 1.0f);
+            gl_MeshVerticesEXT[2].gl_Position = vec4(-1.0,  3.0, 0.0f, 1.0f);
+            gl_PrimitiveTriangleIndicesEXT[0] = uvec3(0, 1, 2);
+        }
+    )glsl";
+
+    static const char frag_src[] = R"glsl(
+        #version 460
+        layout(location = 0) out vec4 uFragColor;
+        void main(){
+           uFragColor = vec4(0.2f, 0.4f, 0.6f, 0.8f);
+        }
+    )glsl";
+
+    VkShaderObj task_shader_x(this, task_src_x.c_str(), VK_SHADER_STAGE_TASK_BIT_EXT, SPV_ENV_VULKAN_1_3);
+    VkShaderObj task_shader_y(this, task_src_y.c_str(), VK_SHADER_STAGE_TASK_BIT_EXT, SPV_ENV_VULKAN_1_3);
+    VkShaderObj task_shader_z(this, task_src_z.c_str(), VK_SHADER_STAGE_TASK_BIT_EXT, SPV_ENV_VULKAN_1_3);
+    VkShaderObj mesh_shader(this, mesh_src, VK_SHADER_STAGE_MESH_BIT_EXT, SPV_ENV_VULKAN_1_3);
+    VkShaderObj frag_shader(this, frag_src, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_3);
+
+    // mesh and task shaders not supported
+    const auto mesh_tasks_x = [&](CreatePipelineHelper &helper) {
+        helper.shader_stages_ = {task_shader_x.GetStageCreateInfo(), mesh_shader.GetStageCreateInfo(),
+                                 frag_shader.GetStageCreateInfo()};
+    };
+    const auto mesh_tasks_y = [&](CreatePipelineHelper &helper) {
+        helper.shader_stages_ = {task_shader_y.GetStageCreateInfo(), mesh_shader.GetStageCreateInfo(),
+                                 frag_shader.GetStageCreateInfo()};
+    };
+    const auto mesh_tasks_z = [&](CreatePipelineHelper &helper) {
+        helper.shader_stages_ = {task_shader_z.GetStageCreateInfo(), mesh_shader.GetStageCreateInfo(),
+                                 frag_shader.GetStageCreateInfo()};
+    };
+    std::vector<std::string> vuids = {"VUID-RuntimeSpirv-TaskEXT-07299"};
+    if (mesh_shader_properties.maxMeshWorkGroupCount[0] == mesh_shader_properties.maxMeshWorkGroupTotalCount) {
+        vuids.push_back("VUID-RuntimeSpirv-TaskEXT-07302");
+    }
+    CreatePipelineHelper::OneshotTest(*this, mesh_tasks_x, kErrorBit, vuids);
+    CreatePipelineHelper::OneshotTest(*this, mesh_tasks_y, kErrorBit, "VUID-RuntimeSpirv-TaskEXT-07300");
+    CreatePipelineHelper::OneshotTest(*this, mesh_tasks_z, kErrorBit, "VUID-RuntimeSpirv-TaskEXT-07301");
 }

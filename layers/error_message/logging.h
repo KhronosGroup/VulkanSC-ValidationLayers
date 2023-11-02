@@ -26,11 +26,12 @@
 #include <vector>
 #include <unordered_set>
 
+#include <vulkan/utility/vk_struct_helper.hpp>
+
 #include "vk_layer_config.h"
 #include "containers/custom_containers.h"
 #include "generated/vk_layer_dispatch_table.h"
 #include "generated/vk_object_types.h"
-#include "generated/vk_typemap_helper.h"
 
 #if defined __ANDROID__
 #include <android/log.h>
@@ -38,7 +39,7 @@
 [[maybe_unused]] static const char *kForceDefaultCallbackKey = "debug.vvl.forcelayerlog";
 #endif
 
-[[maybe_unused]] static const char *kVUIDUndefined = "VUID_Undefined";
+extern const char *kVUIDUndefined;
 
 typedef enum DebugCallbackStatusBits {
     DEBUG_CALLBACK_UTILS = 0x00000001,     // This struct describes a VK_EXT_debug_utils callback
@@ -113,7 +114,7 @@ struct LoggingLabel {
     bool Empty() const { return name.empty(); }
 
     VkDebugUtilsLabelEXT Export() const {
-        auto out = LvlInitStruct<VkDebugUtilsLabelEXT>();
+        VkDebugUtilsLabelEXT out = vku::InitStructHelper();
         out.pLabelName = name.c_str();
         std::copy(color.cbegin(), color.cend(), out.color);
         return out;
@@ -160,6 +161,18 @@ struct LoggingLabelState {
     }
 };
 
+class TypedHandleWrapper {
+  public:
+    template <typename Handle>
+    TypedHandleWrapper(Handle h, VulkanObjectType t) : handle_(h, t) {}
+
+    const VulkanTypedHandle &Handle() const { return handle_; }
+    VulkanObjectType Type() const { return handle_.type; }
+
+  protected:
+    VulkanTypedHandle handle_;
+};
+
 typedef struct _debug_report_data {
     std::vector<VkLayerDbgFunctionState> debug_callback_list;
     VkDebugUtilsMessageSeverityFlagsEXT active_severities{0};
@@ -173,10 +186,11 @@ typedef struct _debug_report_data {
     // This mutex is defined as mutable since the normal usage for a debug report object is as 'const'. The mutable keyword allows
     // the layers to continue this pattern, but also allows them to use/change this specific member for synchronization purposes.
     mutable std::mutex debug_output_mutex;
-    int32_t duplicate_message_limit = 0;
-    mutable vvl::unordered_map<uint32_t, int32_t> duplicate_message_count_map{};
+    uint32_t duplicate_message_limit = 0;
+    mutable vvl::unordered_map<uint32_t, uint32_t> duplicate_message_count_map{};
     const void *instance_pnext_chain{};
     bool forceDefaultLogCallback{false};
+    uint32_t device_created = 0;
 
     void DebugReportSetUtilsObjectName(const VkDebugUtilsObjectNameInfoEXT *pNameInfo) {
         std::unique_lock<std::mutex> lock(debug_output_mutex);
@@ -229,9 +243,11 @@ typedef struct _debug_report_data {
         return FormatHandle(object_string[handle.type], handle.handle);
     }
 
-    template <typename HANDLE_T>
-    std::string FormatHandle(HANDLE_T handle) const {
-        return FormatHandle(VkHandleInfo<HANDLE_T>::Typename(), HandleToUint64(handle));
+    std::string FormatHandle(const TypedHandleWrapper &wrapper) const { return FormatHandle(wrapper.Handle()); }
+
+    template <typename T, typename std::enable_if_t<!std::is_base_of<TypedHandleWrapper, T>::value, void *> = nullptr>
+    std::string FormatHandle(T handle) const {
+        return FormatHandle(VkHandleInfo<T>::Typename(), HandleToUint64(handle));
     }
 
 } debug_report_data;
@@ -286,7 +302,8 @@ static inline LogMessageTypeFlags DebugAnnotFlagsToMsgTypeFlags(VkDebugUtilsMess
     return msg_type_flags;
 }
 
-VKAPI_ATTR bool LogMsg(const debug_report_data *debug_data, VkFlags msg_flags, const LogObjectList &objects,
+struct Location;
+VKAPI_ATTR bool LogMsg(const debug_report_data *debug_data, VkFlags msg_flags, const LogObjectList &objects, const Location *loc,
                        std::string_view vuid_text, const char *format, va_list argptr);
 
 VKAPI_ATTR VkResult LayerCreateMessengerCallback(debug_report_data *debug_data, bool default_callback,

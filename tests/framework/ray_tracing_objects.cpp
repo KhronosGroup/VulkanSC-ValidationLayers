@@ -13,11 +13,10 @@
 
 #include "utils/vk_layer_utils.h"
 
-namespace rt {
+namespace vkt {
 namespace as {
 
-GeometryKHR::GeometryKHR(APIVersion vk_api_version)
-    : vk_api_version_(vk_api_version), vk_obj_(LvlInitStruct<decltype(vk_obj_)>()) {}
+GeometryKHR::GeometryKHR() : vk_obj_(vku::InitStructHelper()) {}
 
 GeometryKHR &GeometryKHR::SetType(Type type) {
     type_ = type;
@@ -73,12 +72,12 @@ GeometryKHR &GeometryKHR::SetStride(VkDeviceSize stride) {
     return *this;
 }
 
-GeometryKHR &GeometryKHR::SetTrianglesDeviceVertexBuffer(vk_testing::Buffer &&vertex_buffer, uint32_t max_vertex,
+GeometryKHR &GeometryKHR::SetTrianglesDeviceVertexBuffer(vkt::Buffer &&vertex_buffer, uint32_t max_vertex,
                                                          VkFormat vertex_format /*= VK_FORMAT_R32G32B32_SFLOAT*/,
                                                          VkDeviceSize stride /*= 3 * sizeof(float)*/) {
     triangles_.device_vertex_buffer = std::move(vertex_buffer);
     vk_obj_.geometry.triangles.vertexFormat = vertex_format;
-    vk_obj_.geometry.triangles.vertexData.deviceAddress = triangles_.device_vertex_buffer.address(vk_api_version_);
+    vk_obj_.geometry.triangles.vertexData.deviceAddress = triangles_.device_vertex_buffer.address();
     vk_obj_.geometry.triangles.maxVertex = max_vertex;
     vk_obj_.geometry.triangles.vertexStride = stride;
     return *this;
@@ -94,11 +93,11 @@ GeometryKHR &GeometryKHR::SetTrianglesHostVertexBuffer(std::unique_ptr<float[]> 
     return *this;
 }
 
-GeometryKHR &GeometryKHR::SetTrianglesDeviceIndexBuffer(vk_testing::Buffer &&index_buffer,
+GeometryKHR &GeometryKHR::SetTrianglesDeviceIndexBuffer(vkt::Buffer &&index_buffer,
                                                         VkIndexType index_type /*= VK_INDEX_TYPE_UINT32*/) {
     triangles_.device_index_buffer = std::move(index_buffer);
     vk_obj_.geometry.triangles.indexType = index_type;
-    vk_obj_.geometry.triangles.indexData.deviceAddress = triangles_.device_index_buffer.address(vk_api_version_);
+    vk_obj_.geometry.triangles.indexData.deviceAddress = triangles_.device_index_buffer.address();
     return *this;
 }
 
@@ -114,9 +113,9 @@ GeometryKHR &GeometryKHR::SetTrianglesIndexType(VkIndexType index_type) {
     return *this;
 }
 
-GeometryKHR &GeometryKHR::SetAABBsDeviceBuffer(vk_testing::Buffer &&buffer, VkDeviceSize stride /*= sizeof(VkAabbPositionsKHR)*/) {
+GeometryKHR &GeometryKHR::SetAABBsDeviceBuffer(vkt::Buffer &&buffer, VkDeviceSize stride /*= sizeof(VkAabbPositionsKHR)*/) {
     aabbs_.device_buffer = std::move(buffer);
-    vk_obj_.geometry.aabbs.data.deviceAddress = aabbs_.device_buffer.address(vk_api_version_);
+    vk_obj_.geometry.aabbs.data.deviceAddress = aabbs_.device_buffer.address();
     vk_obj_.geometry.aabbs.stride = stride;
     return *this;
 }
@@ -129,12 +128,11 @@ GeometryKHR &GeometryKHR::SetAABBsHostBuffer(std::unique_ptr<VkAabbPositionsKHR[
     return *this;
 }
 
-GeometryKHR &GeometryKHR::SetInstanceDeviceAccelStructRef(const vk_testing::Device &device,
-                                                          VkAccelerationStructureKHR bottom_level_as) {
+GeometryKHR &GeometryKHR::SetInstanceDeviceAccelStructRef(const vkt::Device &device, VkAccelerationStructureKHR bottom_level_as) {
     auto vkGetAccelerationStructureDeviceAddressKHR = reinterpret_cast<PFN_vkGetAccelerationStructureDeviceAddressKHR>(
         vk::GetDeviceProcAddr(device.handle(), "vkGetAccelerationStructureDeviceAddressKHR"));
     assert(vkGetAccelerationStructureDeviceAddressKHR);
-    auto as_address_info = LvlInitStruct<VkAccelerationStructureDeviceAddressInfoKHR>();
+    VkAccelerationStructureDeviceAddressInfoKHR as_address_info = vku::InitStructHelper();
     as_address_info.accelerationStructure = bottom_level_as;
     VkDeviceAddress as_address = vkGetAccelerationStructureDeviceAddressKHR(device.handle(), &as_address_info);
     instance_.vk_instance = std::make_unique<VkAccelerationStructureInstanceKHR>();
@@ -143,15 +141,15 @@ GeometryKHR &GeometryKHR::SetInstanceDeviceAccelStructRef(const vk_testing::Devi
 
     // Create instance buffer. Do not copy instance_.vk_instance into it, for now no point in doing it for the test framework
     assert(!instance_.buffer.initialized());  // for now, do not handle already initialized buffer
-    auto alloc_flags = LvlInitStruct<VkMemoryAllocateFlagsInfo>();
+    VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
     alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR;
     instance_.buffer.init(
-        device, sizeof(VkAccelerationStructureInstanceKHR), VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        device, sizeof(VkAccelerationStructureInstanceKHR),
         VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
-        &alloc_flags);
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &alloc_flags);
 
     vk_obj_.geometry.instances.arrayOfPointers = VK_FALSE;
-    vk_obj_.geometry.instances.data.deviceAddress = instance_.buffer.address(vk_api_version_);
+    vk_obj_.geometry.instances.data.deviceAddress = instance_.buffer.address();
     return *this;
 }
 
@@ -177,8 +175,7 @@ VkAccelerationStructureBuildRangeInfoKHR GeometryKHR::GetFullBuildRange() const 
     return range_info;
 }
 
-AccelerationStructureKHR::AccelerationStructureKHR(APIVersion vk_api_version)
-    : vk_api_version_(vk_api_version), vk_info_(LvlInitStruct<decltype(vk_info_)>()), device_buffer_() {}
+AccelerationStructureKHR::AccelerationStructureKHR() : vk_info_(vku::InitStructHelper()), device_buffer_() {}
 
 AccelerationStructureKHR &AccelerationStructureKHR::SetSize(VkDeviceSize size) {
     vk_info_.size = size;
@@ -200,7 +197,7 @@ AccelerationStructureKHR &AccelerationStructureKHR::SetFlags(VkAccelerationStruc
     return *this;
 }
 
-AccelerationStructureKHR &AccelerationStructureKHR::SetDeviceBuffer(vk_testing::Buffer &&buffer) {
+AccelerationStructureKHR &AccelerationStructureKHR::SetDeviceBuffer(vkt::Buffer &&buffer) {
     device_buffer_ = std::move(buffer);
     return *this;
 }
@@ -231,23 +228,23 @@ VkDeviceAddress AccelerationStructureKHR::GetBufferDeviceAddress() const {
     assert(initialized());
     assert(device_buffer_.initialized());
     assert(device_buffer_.create_info().size > 0);
-    return device_buffer_.address(vk_api_version_);
+    return device_buffer_.address();
 }
 
-void AccelerationStructureKHR::Build(const vk_testing::Device &device) {
+void AccelerationStructureKHR::Build(const vkt::Device &device) {
     assert(handle() == VK_NULL_HANDLE);
 
     // Create a buffer to store acceleration structure
     if (!device_buffer_.initialized() && (buffer_usage_flags_ != 0)) {
-        auto alloc_flags = LvlInitStruct<VkMemoryAllocateFlagsInfo>();
+        VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
         alloc_flags.flags = buffer_memory_allocate_flags_;
+        VkBufferCreateInfo ci = vku::InitStructHelper();
+        ci.size = vk_info_.size;
+        ci.usage = buffer_usage_flags_;
         if (buffer_init_no_mem_) {
-            auto ci = LvlInitStruct<VkBufferCreateInfo>();
-            ci.size = vk_info_.size;
-            ci.usage = buffer_usage_flags_;
             device_buffer_.init_no_mem(device, ci);
         } else {
-            device_buffer_.init(device, vk_info_.size, buffer_memory_property_flags_, buffer_usage_flags_, &alloc_flags);
+            device_buffer_.init(device, ci, buffer_memory_property_flags_, &alloc_flags);
         }
     }
     vk_info_.buffer = device_buffer_.handle();
@@ -272,13 +269,12 @@ void AccelerationStructureKHR::Destroy() {
     device_buffer_.destroy();
 }
 
-BuildGeometryInfoKHR::BuildGeometryInfoKHR(APIVersion vk_api_version)
-    : vk_api_version_(vk_api_version),
-      vk_info_(LvlInitStruct<decltype(vk_info_)>()),
+BuildGeometryInfoKHR::BuildGeometryInfoKHR()
+    : vk_info_(vku::InitStructHelper()),
       geometries_(),
-      src_as_(std::make_shared<AccelerationStructureKHR>(vk_api_version)),
-      dst_as_(std::make_shared<AccelerationStructureKHR>(vk_api_version)),
-      device_scratch_() {}
+      src_as_(std::make_shared<AccelerationStructureKHR>()),
+      dst_as_(std::make_shared<AccelerationStructureKHR>()),
+      device_scratch_(std::make_shared<vkt::Buffer>()) {}
 
 BuildGeometryInfoKHR &BuildGeometryInfoKHR::SetGeometries(std::vector<GeometryKHR> &&geometries) {
     geometries_ = std::move(geometries);
@@ -319,7 +315,7 @@ BuildGeometryInfoKHR &BuildGeometryInfoKHR::SetDstAS(std::shared_ptr<Acceleratio
     return *this;
 }
 
-BuildGeometryInfoKHR &BuildGeometryInfoKHR::SetScratchBuffer(vk_testing::Buffer &&scratch_buffer) {
+BuildGeometryInfoKHR &BuildGeometryInfoKHR::SetScratchBuffer(std::shared_ptr<vkt::Buffer> scratch_buffer) {
     device_scratch_ = std::move(scratch_buffer);
     return *this;
 }
@@ -350,8 +346,7 @@ BuildGeometryInfoKHR &BuildGeometryInfoKHR::SetNullBuildRangeInfos(bool use_null
     return *this;
 }
 
-void BuildGeometryInfoKHR::BuildCmdBuffer(const vk_testing::Device &device, VkCommandBuffer cmd_buffer,
-                                          bool use_ppGeometries /*= true*/) {
+void BuildGeometryInfoKHR::BuildCmdBuffer(const vkt::Device &device, VkCommandBuffer cmd_buffer, bool use_ppGeometries /*= true*/) {
     if (blas_) {
         blas_->BuildCmdBuffer(device, cmd_buffer, use_ppGeometries);
     }
@@ -359,7 +354,7 @@ void BuildGeometryInfoKHR::BuildCmdBuffer(const vk_testing::Device &device, VkCo
     VkCmdBuildAccelerationStructuresKHR(device, cmd_buffer, true);
 }
 
-void BuildGeometryInfoKHR::BuildCmdBufferIndirect(const vk_testing::Device &device, VkCommandBuffer cmd_buffer) {
+void BuildGeometryInfoKHR::BuildCmdBufferIndirect(const vkt::Device &device, VkCommandBuffer cmd_buffer) {
     if (blas_) {
         blas_->BuildCmdBufferIndirect(device, cmd_buffer);
     }
@@ -367,7 +362,7 @@ void BuildGeometryInfoKHR::BuildCmdBufferIndirect(const vk_testing::Device &devi
     VkCmdBuildAccelerationStructuresIndirectKHR(device, cmd_buffer);
 }
 
-void BuildGeometryInfoKHR::BuildHost(VkInstance instance, const vk_testing::Device &device) {
+void BuildGeometryInfoKHR::BuildHost(VkInstance instance, const vkt::Device &device) {
     if (blas_) {
         blas_->BuildHost(instance, device);
     }
@@ -375,7 +370,7 @@ void BuildGeometryInfoKHR::BuildHost(VkInstance instance, const vk_testing::Devi
     VkBuildAccelerationStructuresKHR(instance, device);
 }
 
-void BuildGeometryInfoKHR::VkCmdBuildAccelerationStructuresKHR(const vk_testing::Device &device, VkCommandBuffer cmd_buffer,
+void BuildGeometryInfoKHR::VkCmdBuildAccelerationStructuresKHR(const vkt::Device &device, VkCommandBuffer cmd_buffer,
                                                                bool use_ppGeometries /*= true*/) {
     // fill vk_info_ with geometry data, and get build ranges
     std::vector<const VkAccelerationStructureGeometryKHR *> pGeometries;
@@ -416,8 +411,7 @@ void BuildGeometryInfoKHR::VkCmdBuildAccelerationStructuresKHR(const vk_testing:
     vk_info_.pGeometries = nullptr;
 }
 
-void BuildGeometryInfoKHR::VkCmdBuildAccelerationStructuresIndirectKHR(const vk_testing::Device &device,
-                                                                       VkCommandBuffer cmd_buffer) {
+void BuildGeometryInfoKHR::VkCmdBuildAccelerationStructuresIndirectKHR(const vkt::Device &device, VkCommandBuffer cmd_buffer) {
     // fill vk_info_ with geometry data, and get build ranges
     std::vector<const VkAccelerationStructureGeometryKHR *> pGeometries(geometries_.size());
 
@@ -442,7 +436,7 @@ void BuildGeometryInfoKHR::VkCmdBuildAccelerationStructuresIndirectKHR(const vk_
     vk_info_.pGeometries = nullptr;
 }
 
-void BuildGeometryInfoKHR::VkBuildAccelerationStructuresKHR(VkInstance instance, const vk_testing::Device &device) {
+void BuildGeometryInfoKHR::VkBuildAccelerationStructuresKHR(VkInstance instance, const vkt::Device &device) {
     // fill vk_info_ with geometry data, and get build ranges
     std::vector<const VkAccelerationStructureGeometryKHR *> pGeometries(geometries_.size());
     std::vector<VkAccelerationStructureBuildRangeInfoKHR> range_infos(geometries_.size());
@@ -494,7 +488,7 @@ VkAccelerationStructureBuildSizesInfoKHR BuildGeometryInfoKHR::GetSizeInfo(VkDev
     }
 
     // Get VkAccelerationStructureBuildSizesInfoKHR using this->vk_info_
-    auto size_info = LvlInitStruct<VkAccelerationStructureBuildSizesInfoKHR>();
+    VkAccelerationStructureBuildSizesInfoKHR size_info = vku::InitStructHelper();
     vk::GetAccelerationStructureBuildSizesKHR(device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR, &vk_info_, &primitives_count,
                                               &size_info);
 
@@ -506,8 +500,7 @@ VkAccelerationStructureBuildSizesInfoKHR BuildGeometryInfoKHR::GetSizeInfo(VkDev
     return size_info;
 }
 
-void BuildGeometryInfoKHR::BuildCommon(const vk_testing::Device &device, bool is_on_device_build,
-                                       bool use_ppGeometries /*= true*/) {
+void BuildGeometryInfoKHR::BuildCommon(const vkt::Device &device, bool is_on_device_build, bool use_ppGeometries /*= true*/) {
     assert(vk_info_.mode == VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR ||
            vk_info_.mode == VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR);
 
@@ -533,23 +526,24 @@ void BuildGeometryInfoKHR::BuildCommon(const vk_testing::Device &device, bool is
         // Allocate device local scratch buffer
 
         // Get minAccelerationStructureScratchOffsetAlignment
-        auto as_props = LvlInitStruct<VkPhysicalDeviceAccelerationStructurePropertiesKHR>();
-        auto phys_dev_props = LvlInitStruct<VkPhysicalDeviceProperties2>(&as_props);
+        VkPhysicalDeviceAccelerationStructurePropertiesKHR as_props = vku::InitStructHelper();
+        VkPhysicalDeviceProperties2 phys_dev_props = vku::InitStructHelper(&as_props);
         vk::GetPhysicalDeviceProperties2(device.phy(), &phys_dev_props);
 
-        if (!device_scratch_.initialized()) {
-            auto alloc_flags = LvlInitStruct<VkMemoryAllocateFlagsInfo>();
+        assert(device_scratch_);  // So far null pointers are not supported
+        if (!device_scratch_->initialized()) {
+            VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
             alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR;
 
             if (scratch_size > 0) {
-                device_scratch_.init(device, scratch_size + as_props.minAccelerationStructureScratchOffsetAlignment,
-                                     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                                     VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, &alloc_flags);
+                device_scratch_->init(device, scratch_size + as_props.minAccelerationStructureScratchOffsetAlignment,
+                                      VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                                      VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &alloc_flags);
             }
         }
-        if (device_scratch_.create_info().size != 0 &&
-            device_scratch_.create_info().usage & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT) {
-            const VkDeviceAddress scratch_address = device_scratch_.address(vk_api_version_);
+        if (device_scratch_->create_info().size != 0 &&
+            device_scratch_->create_info().usage & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT) {
+            const VkDeviceAddress scratch_address = device_scratch_->address();
             const auto aligned_scratch_address =
                 Align<VkDeviceAddress>(scratch_address, as_props.minAccelerationStructureScratchOffsetAlignment);
             assert(aligned_scratch_address >= scratch_address);
@@ -557,7 +551,7 @@ void BuildGeometryInfoKHR::BuildCommon(const vk_testing::Device &device, bool is
             vk_info_.scratchData.deviceAddress = aligned_scratch_address + device_scratch_offset_;
             assert(vk_info_.scratchData.deviceAddress <
                    (scratch_address +
-                    device_scratch_.create_info().size));  // Note: This assert may prove overly conservative in the future
+                    device_scratch_->create_info().size));  // Note: This assert may prove overly conservative in the future
         } else {
             vk_info_.scratchData.deviceAddress = 0;
         }
@@ -572,10 +566,10 @@ void BuildGeometryInfoKHR::BuildCommon(const vk_testing::Device &device, bool is
     }
 }
 
-void BuildAccelerationStructuresKHR(const vk_testing::Device &device, VkCommandBuffer cmd_buffer,
+void BuildAccelerationStructuresKHR(const vkt::Device &device, VkCommandBuffer cmd_buffer,
                                     std::vector<BuildGeometryInfoKHR> &infos) {
     size_t total_geomertry_count = 0;
-    
+
     for (auto &build_info : infos) {
         total_geomertry_count += build_info.geometries_.size();
     }
@@ -629,22 +623,22 @@ void BuildAccelerationStructuresKHR(const vk_testing::Device &device, VkCommandB
 }
 
 namespace blueprint {
-GeometryKHR GeometrySimpleOnDeviceTriangleInfo(APIVersion vk_api_version, const vk_testing::Device &device) {
-    GeometryKHR triangle_geometry(vk_api_version);
+GeometryKHR GeometrySimpleOnDeviceTriangleInfo(const vkt::Device &device) {
+    GeometryKHR triangle_geometry;
 
     triangle_geometry.SetType(GeometryKHR::Type::Triangle);
 
     // Allocate vertex and index buffers
-    auto alloc_flags = LvlInitStruct<VkMemoryAllocateFlagsInfo>();
+    VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
     alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR;
     const VkBufferUsageFlags buffer_usage = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR |
                                             VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR |
                                             VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
 
-    vk_testing::Buffer vertex_buffer(device, 1024, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                                     buffer_usage, &alloc_flags);
-    vk_testing::Buffer index_buffer(device, 1024, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                                    buffer_usage, &alloc_flags);
+    vkt::Buffer vertex_buffer(device, 1024, buffer_usage,
+                              VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &alloc_flags);
+    vkt::Buffer index_buffer(device, 1024, buffer_usage, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                             &alloc_flags);
 
     // Fill vertex and index buffers with one triangle
     triangle_geometry.SetPrimitiveCount(1);
@@ -666,8 +660,8 @@ GeometryKHR GeometrySimpleOnDeviceTriangleInfo(APIVersion vk_api_version, const 
     return triangle_geometry;
 }
 
-GeometryKHR GeometrySimpleOnHostTriangleInfo(APIVersion vk_api_version) {
-    GeometryKHR triangle_geometry(vk_api_version);
+GeometryKHR GeometrySimpleOnHostTriangleInfo() {
+    GeometryKHR triangle_geometry;
 
     triangle_geometry.SetType(GeometryKHR::Type::Triangle);
 
@@ -689,8 +683,8 @@ GeometryKHR GeometrySimpleOnHostTriangleInfo(APIVersion vk_api_version) {
     return triangle_geometry;
 }
 
-GeometryKHR GeometrySimpleOnDeviceAABBInfo(APIVersion vk_api_version, const vk_testing::Device &device) {
-    GeometryKHR aabb_geometry(vk_api_version);
+GeometryKHR GeometrySimpleOnDeviceAABBInfo(const vkt::Device &device) {
+    GeometryKHR aabb_geometry;
 
     aabb_geometry.SetType(GeometryKHR::Type::AABB);
 
@@ -698,15 +692,15 @@ GeometryKHR GeometrySimpleOnDeviceAABBInfo(APIVersion vk_api_version, const vk_t
     const std::array<VkAabbPositionsKHR, 1> aabbs = {{{-1.0f, -1.0f, -1.0f, +1.0f, +1.0f, +1.0f}}};
 
     const VkDeviceSize aabb_buffer_size = sizeof(aabbs[0]) * aabbs.size();
-    vk_testing::Buffer aabb_buffer;
-    auto alloc_flags = LvlInitStruct<VkMemoryAllocateFlagsInfo>();
+    vkt::Buffer aabb_buffer;
+    VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
     alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR;
     const VkBufferUsageFlags buffer_usage = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR |
                                             VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR |
                                             VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
 
-    aabb_buffer.init(device, aabb_buffer_size, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                     buffer_usage, &alloc_flags);
+    aabb_buffer.init(device, aabb_buffer_size, buffer_usage,
+                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &alloc_flags);
 
     // Fill buffer with one AABB
     aabb_geometry.SetPrimitiveCount(static_cast<uint32_t>(aabbs.size()));
@@ -719,8 +713,8 @@ GeometryKHR GeometrySimpleOnDeviceAABBInfo(APIVersion vk_api_version, const vk_t
     return aabb_geometry;
 }
 
-GeometryKHR GeometrySimpleOnHostAABBInfo(APIVersion vk_api_version) {
-    GeometryKHR aabb_geometry(vk_api_version);
+GeometryKHR GeometrySimpleOnHostAABBInfo() {
+    GeometryKHR aabb_geometry;
 
     aabb_geometry.SetType(GeometryKHR::Type::AABB);
 
@@ -736,9 +730,8 @@ GeometryKHR GeometrySimpleOnHostAABBInfo(APIVersion vk_api_version) {
     return aabb_geometry;
 }
 
-GeometryKHR GeometrySimpleDeviceInstance(APIVersion vk_api_version, const vk_testing::Device &device,
-                                         VkAccelerationStructureKHR device_instance) {
-    GeometryKHR instance_geometry(vk_api_version);
+GeometryKHR GeometrySimpleDeviceInstance(const vkt::Device &device, VkAccelerationStructureKHR device_instance) {
+    GeometryKHR instance_geometry;
 
     instance_geometry.SetType(GeometryKHR::Type::Instance);
     instance_geometry.SetPrimitiveCount(1);
@@ -747,8 +740,8 @@ GeometryKHR GeometrySimpleDeviceInstance(APIVersion vk_api_version, const vk_tes
     return instance_geometry;
 }
 
-GeometryKHR GeometrySimpleHostInstance(APIVersion vk_api_version, VkAccelerationStructureKHR host_instance) {
-    GeometryKHR instance_geometry(vk_api_version);
+GeometryKHR GeometrySimpleHostInstance(VkAccelerationStructureKHR host_instance) {
+    GeometryKHR instance_geometry;
 
     instance_geometry.SetType(GeometryKHR::Type::Instance);
     instance_geometry.SetPrimitiveCount(1);
@@ -757,14 +750,14 @@ GeometryKHR GeometrySimpleHostInstance(APIVersion vk_api_version, VkAcceleration
     return instance_geometry;
 }
 
-std::shared_ptr<AccelerationStructureKHR> AccelStructNull(APIVersion vk_api_version) {
-    auto as = std::make_shared<AccelerationStructureKHR>(vk_api_version);
+std::shared_ptr<AccelerationStructureKHR> AccelStructNull() {
+    auto as = std::make_shared<AccelerationStructureKHR>();
     as->SetNull(true);
     return as;
 }
 
-std::shared_ptr<AccelerationStructureKHR> AccelStructSimpleOnDeviceBottomLevel(APIVersion vk_api_version, VkDeviceSize size) {
-    auto as = std::make_shared<AccelerationStructureKHR>(vk_api_version);
+std::shared_ptr<AccelerationStructureKHR> AccelStructSimpleOnDeviceBottomLevel(VkDeviceSize size) {
+    auto as = std::make_shared<AccelerationStructureKHR>();
     as->SetSize(size);
     as->SetType(VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR);
     as->SetDeviceBufferMemoryAllocateFlags(VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR);
@@ -775,8 +768,8 @@ std::shared_ptr<AccelerationStructureKHR> AccelStructSimpleOnDeviceBottomLevel(A
     return as;
 }
 
-std::shared_ptr<rt::as::AccelerationStructureKHR> AccelStructSimpleOnHostBottomLevel(APIVersion vk_api_version, VkDeviceSize size) {
-    auto as = std::make_shared<AccelerationStructureKHR>(vk_api_version);
+std::shared_ptr<vkt::as::AccelerationStructureKHR> AccelStructSimpleOnHostBottomLevel(VkDeviceSize size) {
+    auto as = std::make_shared<AccelerationStructureKHR>();
     as->SetSize(size);
     as->SetType(VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR);
     as->SetDeviceBufferMemoryAllocateFlags(0);
@@ -786,8 +779,8 @@ std::shared_ptr<rt::as::AccelerationStructureKHR> AccelStructSimpleOnHostBottomL
     return as;
 }
 
-std::shared_ptr<AccelerationStructureKHR> AccelStructSimpleOnDeviceTopLevel(APIVersion vk_api_version, VkDeviceSize size) {
-    auto as = std::make_shared<AccelerationStructureKHR>(vk_api_version);
+std::shared_ptr<AccelerationStructureKHR> AccelStructSimpleOnDeviceTopLevel(VkDeviceSize size) {
+    auto as = std::make_shared<AccelerationStructureKHR>();
     as->SetSize(size);
     as->SetType(VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR);
     as->SetDeviceBufferMemoryAllocateFlags(VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR);
@@ -798,9 +791,9 @@ std::shared_ptr<AccelerationStructureKHR> AccelStructSimpleOnDeviceTopLevel(APIV
     return as;
 }
 
-BuildGeometryInfoKHR BuildGeometryInfoSimpleOnDeviceBottomLevel(APIVersion vk_api_version, const vk_testing::Device &device,
+BuildGeometryInfoKHR BuildGeometryInfoSimpleOnDeviceBottomLevel(const vkt::Device &device,
                                                                 GeometryKHR::Type geometry_type /*= GeometryKHR::Type::Triangle*/) {
-    BuildGeometryInfoKHR out_build_info(vk_api_version);
+    BuildGeometryInfoKHR out_build_info;
 
     out_build_info.SetType(VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR);
     out_build_info.SetMode(VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR);
@@ -809,10 +802,10 @@ BuildGeometryInfoKHR BuildGeometryInfoSimpleOnDeviceBottomLevel(APIVersion vk_ap
     std::vector<GeometryKHR> geometries;
     switch (geometry_type) {
         case GeometryKHR::Type::Triangle:
-            geometries.emplace_back(GeometrySimpleOnDeviceTriangleInfo(vk_api_version, device));
+            geometries.emplace_back(GeometrySimpleOnDeviceTriangleInfo(device));
             break;
         case GeometryKHR::Type::AABB:
-            geometries.emplace_back(GeometrySimpleOnDeviceAABBInfo(vk_api_version, device));
+            geometries.emplace_back(GeometrySimpleOnDeviceAABBInfo(device));
             break;
         case GeometryKHR::Type::Instance:
             [[fallthrough]];
@@ -823,9 +816,9 @@ BuildGeometryInfoKHR BuildGeometryInfoSimpleOnDeviceBottomLevel(APIVersion vk_ap
     out_build_info.SetGeometries(std::move(geometries));
 
     // Set source and destination acceleration structures info. Does not create handles, it is done in Build()
-    out_build_info.SetSrcAS(AccelStructNull(vk_api_version));
+    out_build_info.SetSrcAS(AccelStructNull());
     auto dstAsSize = out_build_info.GetSizeInfo(device.handle()).accelerationStructureSize;
-    out_build_info.SetDstAS(AccelStructSimpleOnDeviceBottomLevel(vk_api_version, dstAsSize));
+    out_build_info.SetDstAS(AccelStructSimpleOnDeviceBottomLevel(dstAsSize));
 
     out_build_info.SetInfoCount(1);
     out_build_info.SetNullInfos(false);
@@ -834,9 +827,9 @@ BuildGeometryInfoKHR BuildGeometryInfoSimpleOnDeviceBottomLevel(APIVersion vk_ap
     return out_build_info;
 }
 
-BuildGeometryInfoKHR BuildGeometryInfoSimpleOnHostBottomLevel(APIVersion vk_api_version, const vk_testing::Device &device,
+BuildGeometryInfoKHR BuildGeometryInfoSimpleOnHostBottomLevel(const vkt::Device &device,
                                                               GeometryKHR::Type geometry_type /*= GeometryKHR::Type::Triangle*/) {
-    BuildGeometryInfoKHR out_build_info(vk_api_version);
+    BuildGeometryInfoKHR out_build_info;
 
     out_build_info.SetType(VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR);
     out_build_info.SetMode(VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR);
@@ -845,10 +838,10 @@ BuildGeometryInfoKHR BuildGeometryInfoSimpleOnHostBottomLevel(APIVersion vk_api_
     std::vector<GeometryKHR> geometries;
     switch (geometry_type) {
         case GeometryKHR::Type::Triangle:
-            geometries.emplace_back(GeometrySimpleOnHostTriangleInfo(vk_api_version));
+            geometries.emplace_back(GeometrySimpleOnHostTriangleInfo());
             break;
         case GeometryKHR::Type::AABB:
-            geometries.emplace_back(GeometrySimpleOnHostAABBInfo(vk_api_version));
+            geometries.emplace_back(GeometrySimpleOnHostAABBInfo());
             break;
         case GeometryKHR::Type::Instance:
             [[fallthrough]];
@@ -859,9 +852,9 @@ BuildGeometryInfoKHR BuildGeometryInfoSimpleOnHostBottomLevel(APIVersion vk_api_
     out_build_info.SetGeometries(std::move(geometries));
 
     // Set source and destination acceleration structures info. Does not create handles, it is done in Build()
-    out_build_info.SetSrcAS(AccelStructNull(vk_api_version));
+    out_build_info.SetSrcAS(AccelStructNull());
     auto dstAsSize = out_build_info.GetSizeInfo(device.handle()).accelerationStructureSize;
-    out_build_info.SetDstAS(AccelStructSimpleOnHostBottomLevel(vk_api_version, dstAsSize));
+    out_build_info.SetDstAS(AccelStructSimpleOnHostBottomLevel(dstAsSize));
 
     out_build_info.SetInfoCount(1);
     out_build_info.SetNullInfos(false);
@@ -871,9 +864,8 @@ BuildGeometryInfoKHR BuildGeometryInfoSimpleOnHostBottomLevel(APIVersion vk_api_
 }
 
 BuildGeometryInfoKHR BuildGeometryInfoSimpleOnDeviceTopLevel(
-    APIVersion vk_api_version, const vk_testing::Device &device,
-    std::shared_ptr<BuildGeometryInfoKHR> on_device_bottom_level_geometry) {
-    BuildGeometryInfoKHR out_build_info(vk_api_version);
+    const vkt::Device &device, std::shared_ptr<BuildGeometryInfoKHR> on_device_bottom_level_geometry) {
+    BuildGeometryInfoKHR out_build_info;
 
     out_build_info.SetType(VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR);
     out_build_info.SetMode(VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR);
@@ -884,14 +876,13 @@ BuildGeometryInfoKHR BuildGeometryInfoSimpleOnDeviceTopLevel(
 
     // Set geometry to one instance pointing to bottom level acceleration structure
     std::vector<GeometryKHR> geometries;
-    geometries.emplace_back(
-        GeometrySimpleDeviceInstance(vk_api_version, device, out_build_info.GetBottomLevelAS()->GetDstAS()->handle()));
+    geometries.emplace_back(GeometrySimpleDeviceInstance(device, out_build_info.GetBottomLevelAS()->GetDstAS()->handle()));
     out_build_info.SetGeometries(std::move(geometries));
 
     // Set source and destination acceleration structures info. Does not create handles, it is done in Build()
-    out_build_info.SetSrcAS(AccelStructNull(vk_api_version));
+    out_build_info.SetSrcAS(AccelStructNull());
     auto dstAsSize = out_build_info.GetSizeInfo(device.handle()).accelerationStructureSize;
-    auto dst_as = AccelStructSimpleOnDeviceBottomLevel(vk_api_version, dstAsSize);
+    auto dst_as = AccelStructSimpleOnDeviceBottomLevel(dstAsSize);
     dst_as->SetType(VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR);
     out_build_info.SetDstAS(std::move(dst_as));
 
@@ -902,9 +893,9 @@ BuildGeometryInfoKHR BuildGeometryInfoSimpleOnDeviceTopLevel(
     return out_build_info;
 }
 
-BuildGeometryInfoKHR BuildGeometryInfoSimpleOnHostTopLevel(APIVersion vk_api_version, const vk_testing::Device &device,
+BuildGeometryInfoKHR BuildGeometryInfoSimpleOnHostTopLevel(const vkt::Device &device,
                                                            std::shared_ptr<BuildGeometryInfoKHR> on_host_bottom_level_geometry) {
-    BuildGeometryInfoKHR out_build_info(vk_api_version);
+    BuildGeometryInfoKHR out_build_info;
 
     out_build_info.SetType(VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR);
     out_build_info.SetMode(VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR);
@@ -915,13 +906,13 @@ BuildGeometryInfoKHR BuildGeometryInfoSimpleOnHostTopLevel(APIVersion vk_api_ver
 
     // Set geometry to one instance pointing to bottom level acceleration structure
     std::vector<GeometryKHR> geometries;
-    geometries.emplace_back(GeometrySimpleHostInstance(vk_api_version, out_build_info.GetBottomLevelAS()->GetDstAS()->handle()));
+    geometries.emplace_back(GeometrySimpleHostInstance(out_build_info.GetBottomLevelAS()->GetDstAS()->handle()));
     out_build_info.SetGeometries(std::move(geometries));
 
     // Set source and destination acceleration structures info. Does not create handles, it is done in Build()
-    out_build_info.SetSrcAS(AccelStructNull(vk_api_version));
+    out_build_info.SetSrcAS(AccelStructNull());
     auto dstAsSize = out_build_info.GetSizeInfo(device.handle()).accelerationStructureSize;
-    auto dst_as = AccelStructSimpleOnHostBottomLevel(vk_api_version, dstAsSize);
+    auto dst_as = AccelStructSimpleOnHostBottomLevel(dstAsSize);
     dst_as->SetType(VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR);
     out_build_info.SetDstAS(std::move(dst_as));
 
@@ -936,4 +927,4 @@ BuildGeometryInfoKHR BuildGeometryInfoSimpleOnHostTopLevel(APIVersion vk_api_ver
 
 }  // namespace as
 
-}  // namespace rt
+}  // namespace vkt

@@ -43,7 +43,7 @@ The choice of Vulkan or Vulkan SC support is determined at build time.
 
 ## Info
 * [BUILD.md](BUILD.md) - Instructions for building the Validation Layers
-* [LAYER_CONFIGURATION.md](LAYER_CONFIGURATION.md) - Instructions for configuring the Validation Layers at runtime.
+* [KHRONOS_VALIDATION_LAYER.md](docs/khronos_validation_layer.md) - Instructions for configuring the Validation Layers
 * [CONTRIBUTING.md](CONTRIBUTING.md) - Information needed to make a contribution.
     * [./docs](./docs/) - Details of the Validation Layer source code. **For those wanting to make contributions**
     * [./tests](./tests) - Information about testing the Validation Layers.
@@ -51,11 +51,11 @@ The choice of Vulkan or Vulkan SC support is determined at build time.
 
 ## Version Tagging Scheme
 
-Updates to the `VulkanSC-ValidationLayers` repository which correspond to a new Vulkan specification release are tagged using the following format: `v<`_`version`_`>` (e.g., `v1.1.96`).
+Updates to this repository which correspond to a new Vulkan specification release are tagged using the following format: `v<`_`version`_`>` (e.g., `v1.3.266`).
 
-**Note**: Marked version releases have undergone thorough testing but do not imply the same quality level as SDK tags. SDK tags follow the `sdk-<`_`version`_`>.<`_`patch`_`>` format (e.g., `sdk-1.1.92.0`).
+**Note**: Marked version releases have undergone thorough testing but do not imply the same quality level as SDK tags. SDK tags follow the `vulkan-sdk-<`_`version`_`>.<`_`patch`_`>` format (e.g., `vulkan-sdk-1.3.266.0`).
 
-This scheme was adopted following the `1.1.96` Vulkan specification release.
+This scheme was adopted following the `1.3.266` Vulkan specification release.
 
 For Vulkan SC, updates to a new API version will be tagged using the following format `vksc<`_`version`_`>.<`_`patch`_`>` (e.g., `vksc1.0.12`).
 

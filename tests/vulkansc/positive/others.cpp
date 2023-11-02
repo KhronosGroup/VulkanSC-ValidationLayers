@@ -14,7 +14,7 @@
 TEST_F(VkSCPositiveLayerTest, SetNegativeViewport) {
     TEST_DESCRIPTION("vkCmdSetViewport - test that the removed VUID 07917 is not triggered in Vulkan SC");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
+    RETURN_IF_SKIP(Init())
 
     m_commandBuffer->begin();
 
@@ -36,9 +36,9 @@ TEST_F(VkSCPositiveLayerTest, SetNegativeViewport) {
 TEST_F(VkSCPositiveLayerTest, CopyBetween2DAnd3DImage) {
     TEST_DESCRIPTION("vkCmdCopyImage - test that the removed VUIDs 07922, 07923, and 07941 are not triggered in Vulkan SC");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
+    RETURN_IF_SKIP(Init())
 
-    auto create_info = LvlInitStruct<VkImageCreateInfo>();
+    auto create_info = vku::InitStruct<VkImageCreateInfo>();
     create_info.format = VK_FORMAT_R8G8B8A8_UNORM;
     create_info.mipLevels = 3;
     create_info.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -85,13 +85,13 @@ TEST_F(VkSCPositiveLayerTest, CopyBetween2DAnd3DImage) {
 TEST_F(VkSCPositiveLayerTest, CopyImagePlane) {
     TEST_DESCRIPTION("vkCmdCopyImage - test that the removed VUID 07940 is not triggered in Vulkan SC");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
+    RETURN_IF_SKIP(Init())
 
     if (!ImageFormatIsSupported(gpu(), VK_FORMAT_G8_B8R8_2PLANE_420_UNORM)) {
         GTEST_SKIP() << "VK_FORMAT_G8_B8R8_2PLANE_420_UNORM is unsupported";
     }
 
-    auto create_info = LvlInitStruct<VkImageCreateInfo>();
+    auto create_info = vku::InitStruct<VkImageCreateInfo>();
     create_info.imageType = VK_IMAGE_TYPE_2D;
     create_info.extent = {64, 64, 1};
     create_info.mipLevels = 1;
@@ -151,34 +151,34 @@ TEST_F(VkSCPositiveLayerTest, CopyImagePlane) {
 TEST_F(VkSCPositiveLayerTest, AllocateDescriptorSetsExceedsCapacity) {
     TEST_DESCRIPTION("vkAllocateDescriptorSets - test that the removed VUIDs 07895 and 07896 are not triggered in Vulkan SC");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
+    RETURN_IF_SKIP(Init())
 
     VkDescriptorPoolSize pool_size = {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 8};
-    auto desc_pool_ci = LvlInitStruct<VkDescriptorPoolCreateInfo>();
+    auto desc_pool_ci = vku::InitStruct<VkDescriptorPoolCreateInfo>();
     desc_pool_ci.maxSets = 4;
     desc_pool_ci.poolSizeCount = 1;
     desc_pool_ci.pPoolSizes = &pool_size;
-    vk_testing::DescriptorPool desc_pool(*m_device, desc_pool_ci);
+    vkt::DescriptorPool desc_pool(*m_device, desc_pool_ci);
 
     VkDescriptorSetLayoutBinding bindings[] = {
         {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1},
         {1, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1},
         {2, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1},
     };
-    auto set_layout_ci = LvlInitStruct<VkDescriptorSetLayoutCreateInfo>();
+    auto set_layout_ci = vku::InitStruct<VkDescriptorSetLayoutCreateInfo>();
     set_layout_ci.bindingCount = sizeof(bindings) / sizeof(bindings[0]);
     set_layout_ci.pBindings = &bindings[0];
-    vk_testing::DescriptorSetLayout set_layout(*m_device, set_layout_ci);
+    vkt::DescriptorSetLayout set_layout(*m_device, set_layout_ci);
 
     constexpr size_t desc_set_count = 4;
     std::vector<VkDescriptorSet> desc_sets(desc_set_count, VK_NULL_HANDLE);
     std::vector<VkDescriptorSetLayout> set_layouts(desc_set_count, set_layout.handle());
-    auto alloc_info = LvlInitStruct<VkDescriptorSetAllocateInfo>();
+    auto alloc_info = vku::InitStruct<VkDescriptorSetAllocateInfo>();
     alloc_info.descriptorPool = desc_pool.handle();
     alloc_info.descriptorSetCount = static_cast<uint32_t>(set_layouts.size());
     alloc_info.pSetLayouts = set_layouts.data();
     VkResult result = vksc::AllocateDescriptorSets(m_device->handle(), &alloc_info, &desc_sets[0]);
-    if (!IsPlatform(kMockICD)) {
+    if (!IsPlatformMockICD()) {
         // The descriptor set allocation should fail on a real driver implementation
         EXPECT_LT(result, VK_SUCCESS);
     }

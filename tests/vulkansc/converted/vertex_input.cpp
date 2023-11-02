@@ -17,12 +17,13 @@
 
 #include "utils/cast_utils.h"
 #include "../framework/layer_validation_tests.h"
+#include "../framework/pipeline_helper.h"
 
 TEST_F(NegativeVertexInput, AttributeFormat) {
     TEST_DESCRIPTION("Test that pipeline validation catches invalid vertex attribute formats");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
 
     VkVertexInputBindingDescription input_binding = {0, 4, VK_VERTEX_INPUT_RATE_VERTEX};
 
@@ -52,25 +53,22 @@ TEST_F(NegativeVertexInput, DivisorExtension) {
 
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_VERTEX_ATTRIBUTE_DIVISOR_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    VkPhysicalDeviceVertexAttributeDivisorFeaturesEXT vadf = LvlInitStruct<VkPhysicalDeviceVertexAttributeDivisorFeaturesEXT>();
+    VkPhysicalDeviceVertexAttributeDivisorFeaturesEXT vadf = vku::InitStructHelper();
     vadf.vertexAttributeInstanceRateDivisor = VK_TRUE;
     vadf.vertexAttributeInstanceRateZeroDivisor = VK_TRUE;
 
-    VkPhysicalDeviceFeatures2 pd_features2 = LvlInitStruct<VkPhysicalDeviceFeatures2>(&vadf);
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &pd_features2));
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    VkPhysicalDeviceFeatures2 pd_features2 = vku::InitStructHelper(&vadf);
+    RETURN_IF_SKIP(InitState(nullptr, &pd_features2));
+    InitRenderTarget();
 
-    const VkPhysicalDeviceLimits &dev_limits = m_device->props.limits;
-    auto pdvad_props = LvlInitStruct<VkPhysicalDeviceVertexAttributeDivisorPropertiesEXT>();
+    const VkPhysicalDeviceLimits &dev_limits = m_device->phy().limits_;
+    VkPhysicalDeviceVertexAttributeDivisorPropertiesEXT pdvad_props = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(pdvad_props);
 
     VkVertexInputBindingDivisorDescriptionEXT vibdd = {};
-    VkPipelineVertexInputDivisorStateCreateInfoEXT pvids_ci = LvlInitStruct<VkPipelineVertexInputDivisorStateCreateInfoEXT>();
+    VkPipelineVertexInputDivisorStateCreateInfoEXT pvids_ci = vku::InitStructHelper();
     pvids_ci.vertexBindingDivisorCount = 1;
     pvids_ci.pVertexBindingDivisors = &vibdd;
     VkVertexInputBindingDescription vibd = {};
@@ -137,25 +135,22 @@ TEST_F(NegativeVertexInput, DivisorDisabled) {
 
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_VERTEX_ATTRIBUTE_DIVISOR_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    VkPhysicalDeviceVertexAttributeDivisorFeaturesEXT vadf = LvlInitStruct<VkPhysicalDeviceVertexAttributeDivisorFeaturesEXT>();
+    VkPhysicalDeviceVertexAttributeDivisorFeaturesEXT vadf = vku::InitStructHelper();
     vadf.vertexAttributeInstanceRateDivisor = VK_FALSE;
     vadf.vertexAttributeInstanceRateZeroDivisor = VK_FALSE;
-    VkPhysicalDeviceFeatures2 pd_features2 = LvlInitStruct<VkPhysicalDeviceFeatures2>(&vadf);
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &pd_features2));
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    VkPhysicalDeviceFeatures2 pd_features2 = vku::InitStructHelper(&vadf);
+    RETURN_IF_SKIP(InitState(nullptr, &pd_features2));
+    InitRenderTarget();
 
-    auto pdvad_props = LvlInitStruct<VkPhysicalDeviceVertexAttributeDivisorPropertiesEXT>();
+    VkPhysicalDeviceVertexAttributeDivisorPropertiesEXT pdvad_props = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(pdvad_props);
 
     VkVertexInputBindingDivisorDescriptionEXT vibdd = {};
     vibdd.binding = 0;
     vibdd.divisor = 2;
-    VkPipelineVertexInputDivisorStateCreateInfoEXT pvids_ci = LvlInitStruct<VkPipelineVertexInputDivisorStateCreateInfoEXT>();
+    VkPipelineVertexInputDivisorStateCreateInfoEXT pvids_ci = vku::InitStructHelper();
     pvids_ci.vertexBindingDivisorCount = 1;
     pvids_ci.pVertexBindingDivisors = &vibdd;
     VkVertexInputBindingDescription vibd = {};
@@ -181,22 +176,19 @@ TEST_F(NegativeVertexInput, DivisorInstanceRateZero) {
 
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_VERTEX_ATTRIBUTE_DIVISOR_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    VkPhysicalDeviceVertexAttributeDivisorFeaturesEXT vadf = LvlInitStruct<VkPhysicalDeviceVertexAttributeDivisorFeaturesEXT>();
+    VkPhysicalDeviceVertexAttributeDivisorFeaturesEXT vadf = vku::InitStructHelper();
     vadf.vertexAttributeInstanceRateDivisor = VK_TRUE;
     vadf.vertexAttributeInstanceRateZeroDivisor = VK_FALSE;
-    VkPhysicalDeviceFeatures2 pd_features2 = LvlInitStruct<VkPhysicalDeviceFeatures2>(&vadf);
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &pd_features2));
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    VkPhysicalDeviceFeatures2 pd_features2 = vku::InitStructHelper(&vadf);
+    RETURN_IF_SKIP(InitState(nullptr, &pd_features2));
+    InitRenderTarget();
 
     VkVertexInputBindingDivisorDescriptionEXT vibdd = {};
     vibdd.binding = 0;
     vibdd.divisor = 0;
-    VkPipelineVertexInputDivisorStateCreateInfoEXT pvids_ci = LvlInitStruct<VkPipelineVertexInputDivisorStateCreateInfoEXT>();
+    VkPipelineVertexInputDivisorStateCreateInfoEXT pvids_ci = vku::InitStructHelper();
     pvids_ci.vertexBindingDivisorCount = 1;
     pvids_ci.pVertexBindingDivisors = &vibdd;
     VkVertexInputBindingDescription vibd = {};
@@ -219,12 +211,12 @@ TEST_F(NegativeVertexInput, InputBindingMaxVertexInputBindings) {
         "Test VUID-VkVertexInputBindingDescription-binding-00618: binding must be less than "
         "VkPhysicalDeviceLimits::maxVertexInputBindings");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
 
     // Test when binding is greater than or equal to VkPhysicalDeviceLimits::maxVertexInputBindings.
     VkVertexInputBindingDescription vertex_input_binding_description{};
-    vertex_input_binding_description.binding = m_device->props.limits.maxVertexInputBindings;
+    vertex_input_binding_description.binding = m_device->phy().limits_.maxVertexInputBindings;
 
     const auto set_binding = [&](CreatePipelineHelper &helper) {
         helper.vi_ci_.pVertexBindingDescriptions = &vertex_input_binding_description;
@@ -238,12 +230,12 @@ TEST_F(NegativeVertexInput, InputBindingMaxVertexInputBindingStride) {
         "Test VUID-VkVertexInputBindingDescription-stride-00619: stride must be less than or equal to "
         "VkPhysicalDeviceLimits::maxVertexInputBindingStride");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
 
     // Test when stride is greater than VkPhysicalDeviceLimits::maxVertexInputBindingStride.
     VkVertexInputBindingDescription vertex_input_binding_description{};
-    vertex_input_binding_description.stride = m_device->props.limits.maxVertexInputBindingStride + 1;
+    vertex_input_binding_description.stride = m_device->phy().limits_.maxVertexInputBindingStride + 1;
 
     const auto set_binding = [&](CreatePipelineHelper &helper) {
         helper.vi_ci_.pVertexBindingDescriptions = &vertex_input_binding_description;
@@ -257,12 +249,12 @@ TEST_F(NegativeVertexInput, InputAttributeMaxVertexInputAttributes) {
         "Test VUID-VkVertexInputAttributeDescription-location-00620: location must be less than "
         "VkPhysicalDeviceLimits::maxVertexInputAttributes");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
 
     // Test when location is greater than or equal to VkPhysicalDeviceLimits::maxVertexInputAttributes.
     VkVertexInputAttributeDescription vertex_input_attribute_description{};
-    vertex_input_attribute_description.location = m_device->props.limits.maxVertexInputAttributes;
+    vertex_input_attribute_description.location = m_device->phy().limits_.maxVertexInputAttributes;
 
     const auto set_attribute = [&](CreatePipelineHelper &helper) {
         helper.vi_ci_.pVertexAttributeDescriptions = &vertex_input_attribute_description;
@@ -279,12 +271,12 @@ TEST_F(NegativeVertexInput, InputAttributeMaxVertexInputBindings) {
         "Test VUID-VkVertexInputAttributeDescription-binding-00621: binding must be less than "
         "VkPhysicalDeviceLimits::maxVertexInputBindings");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
 
     // Test when binding is greater than or equal to VkPhysicalDeviceLimits::maxVertexInputBindings.
     VkVertexInputAttributeDescription vertex_input_attribute_description{};
-    vertex_input_attribute_description.binding = m_device->props.limits.maxVertexInputBindings;
+    vertex_input_attribute_description.binding = m_device->phy().limits_.maxVertexInputBindings;
 
     const auto set_attribute = [&](CreatePipelineHelper &helper) {
         helper.vi_ci_.pVertexAttributeDescriptions = &vertex_input_attribute_description;
@@ -301,7 +293,7 @@ TEST_F(NegativeVertexInput, AttributeDescriptionOffset) {
         "Test VUID-VkVertexInputAttributeDescription-offset-00622: offset must be less than or equal to "
         "VkPhysicalDeviceLimits::maxVertexInputAttributeOffset");
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
+    RETURN_IF_SKIP(InitFramework())
 
     VkPhysicalDeviceProperties device_props = {};
     vk::GetPhysicalDeviceProperties(gpu(), &device_props);
@@ -309,12 +301,12 @@ TEST_F(NegativeVertexInput, AttributeDescriptionOffset) {
     if (maxVertexInputAttributeOffset == 0xFFFFFFFF) {
         GTEST_SKIP() << "maxVertexInputAttributeOffset is max<uint32_t> already";
     }
-    ASSERT_NO_FATAL_FAILURE(InitState());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitState())
+    InitRenderTarget();
 
     VkVertexInputBindingDescription vertex_input_binding_description{};
     vertex_input_binding_description.binding = 0;
-    vertex_input_binding_description.stride = m_device->props.limits.maxVertexInputBindingStride;
+    vertex_input_binding_description.stride = m_device->phy().limits_.maxVertexInputBindingStride;
     vertex_input_binding_description.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
     // Test when offset is greater than maximum.
     VkVertexInputAttributeDescription vertex_input_attribute_description{};
@@ -335,10 +327,10 @@ TEST_F(NegativeVertexInput, BindingDescriptions) {
         "1) count of vertex bindings exceeds device's maxVertexInputBindings limit"
         "2) requested bindings include a duplicate binding value");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
 
-    const uint32_t binding_count = m_device->props.limits.maxVertexInputBindings + 1;
+    const uint32_t binding_count = m_device->phy().limits_.maxVertexInputBindings + 1;
 
     std::vector<VkVertexInputBindingDescription> input_bindings(binding_count);
     for (uint32_t i = 0; i < binding_count; ++i) {
@@ -373,15 +365,15 @@ TEST_F(NegativeVertexInput, AttributeDescriptions) {
         "2) requested location include a duplicate location value"
         "3) binding used by one attribute is not defined by a binding description");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
 
     VkVertexInputBindingDescription input_binding;
     input_binding.binding = 0;
     input_binding.stride = 4;
     input_binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-    const uint32_t attribute_count = m_device->props.limits.maxVertexInputAttributes + 1;
+    const uint32_t attribute_count = m_device->phy().limits_.maxVertexInputAttributes + 1;
     std::vector<VkVertexInputAttributeDescription> input_attribs(attribute_count);
     for (uint32_t i = 0; i < attribute_count; ++i) {
         input_attribs[i].binding = 0;
@@ -409,12 +401,11 @@ TEST_F(NegativeVertexInput, AttributeDescriptions) {
 TEST_F(NegativeVertexInput, UsingProvokingVertexModeLastVertexExtDisabled) {
     TEST_DESCRIPTION("Test using VK_PROVOKING_VERTEX_MODE_LAST_VERTEX_EXT but it doesn't enable provokingVertexLast.");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitInfo();
-    auto provoking_vertex_state_ci = LvlInitStruct<VkPipelineRasterizationProvokingVertexStateCreateInfoEXT>();
+    VkPipelineRasterizationProvokingVertexStateCreateInfoEXT provoking_vertex_state_ci = vku::InitStructHelper();
     provoking_vertex_state_ci.provokingVertexMode = VK_PROVOKING_VERTEX_MODE_LAST_VERTEX_EXT;
     pipe.rs_state_ci_.pNext = &provoking_vertex_state_ci;
     pipe.InitState();
@@ -431,45 +422,35 @@ TEST_F(NegativeVertexInput, ProvokingVertexModePerPipeline) {
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_EXT_PROVOKING_VERTEX_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
+    RETURN_IF_SKIP(InitFramework())
 
-    if (DeviceValidationVersion() < VK_API_VERSION_1_1) {
-        GTEST_SKIP() << "At least Vulkan version 1.1 is required";
-    }
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-
-    auto provoking_vertex_properties = LvlInitStruct<VkPhysicalDeviceProvokingVertexPropertiesEXT>();
+    VkPhysicalDeviceProvokingVertexPropertiesEXT provoking_vertex_properties = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(provoking_vertex_properties);
     if (provoking_vertex_properties.provokingVertexModePerPipeline == VK_TRUE) {
         GTEST_SKIP() << "provokingVertexModePerPipeline is VK_TRUE";
     }
 
-    auto provoking_vertex_features = LvlInitStruct<VkPhysicalDeviceProvokingVertexFeaturesEXT>();
+    VkPhysicalDeviceProvokingVertexFeaturesEXT provoking_vertex_features = vku::InitStructHelper();
     provoking_vertex_features.provokingVertexLast = VK_TRUE;
-    auto features2 = LvlInitStruct<VkPhysicalDeviceFeatures2>(&provoking_vertex_features);
+    VkPhysicalDeviceFeatures2 features2 = vku::InitStructHelper(&provoking_vertex_features);
 
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features2));
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitState(nullptr, &features2))
+    InitRenderTarget();
 
     CreatePipelineHelper pipe1(*this);
-    pipe1.InitInfo();
-    auto provoking_vertex_state_ci = LvlInitStruct<VkPipelineRasterizationProvokingVertexStateCreateInfoEXT>();
+    VkPipelineRasterizationProvokingVertexStateCreateInfoEXT provoking_vertex_state_ci = vku::InitStructHelper();
     provoking_vertex_state_ci.provokingVertexMode = VK_PROVOKING_VERTEX_MODE_FIRST_VERTEX_EXT;
     pipe1.rs_state_ci_.pNext = &provoking_vertex_state_ci;
     pipe1.InitState();
     pipe1.CreateGraphicsPipeline();
 
     CreatePipelineHelper pipe2(*this);
-    pipe2.InitInfo();
     provoking_vertex_state_ci.provokingVertexMode = VK_PROVOKING_VERTEX_MODE_LAST_VERTEX_EXT;
     pipe2.rs_state_ci_.pNext = &provoking_vertex_state_ci;
     pipe2.InitState();
     pipe2.CreateGraphicsPipeline();
 
     CreatePipelineHelper pipe3(*this);
-    pipe3.InitInfo();
     pipe3.InitState();
     pipe3.CreateGraphicsPipeline();
 
@@ -496,15 +477,12 @@ TEST_F(NegativeVertexInput, ProvokingVertexModePerPipeline) {
 TEST_F(NegativeVertexInput, VertextBinding) {
     TEST_DESCRIPTION("Verify if VkPipelineVertexInputStateCreateInfo matches vkCmdBindVertexBuffers");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
 
-    VkBufferObj vtx_buf;
-    auto info = vtx_buf.create_info(32, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-    vtx_buf.init(*m_device, info);
+    vkt::Buffer vtx_buf(*m_device, 32, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitInfo();
     // CmdBindVertexBuffers only has binding:1. It causes 04007 & 04008 desired fail.
     VkVertexInputBindingDescription vtx_binding_des[3] = {
         {0, 64, VK_VERTEX_INPUT_RATE_VERTEX}, {1, 64, VK_VERTEX_INPUT_RATE_VERTEX}, {2, 64, VK_VERTEX_INPUT_RATE_VERTEX}};
@@ -542,11 +520,10 @@ TEST_F(NegativeVertexInput, VertextBinding) {
 TEST_F(NegativeVertexInput, AttributeAlignment) {
     TEST_DESCRIPTION("Check for proper aligment of attribAddress which depends on a bound pipeline and on a bound vertex buffer");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitViewport());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
 
-    const VkPipelineLayoutObj pipeline_layout(m_device);
+    const vkt::PipelineLayout pipeline_layout(*m_device);
 
     struct VboEntry {
         uint16_t input0[2];
@@ -555,10 +532,7 @@ TEST_F(NegativeVertexInput, AttributeAlignment) {
     };
 
     const unsigned vbo_entry_count = 3;
-    const VboEntry vbo_data[vbo_entry_count] = {};
-
-    VkConstantBufferObj vbo(m_device, static_cast<int>(sizeof(VboEntry) * vbo_entry_count),
-                            reinterpret_cast<const void *>(vbo_data), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+    vkt::Buffer vbo(*m_device, sizeof(VboEntry) * vbo_entry_count, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
     VkVertexInputBindingDescription input_binding;
     input_binding.binding = 0;
@@ -595,51 +569,49 @@ TEST_F(NegativeVertexInput, AttributeAlignment) {
     )glsl";
 
     VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj fs(this, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
-    VkPipelineObj pipe1(m_device);
-    pipe1.AddDefaultColorAttachment();
-    pipe1.AddShader(&vs);
-    pipe1.AddShader(&fs);
-    pipe1.AddVertexInputBindings(&input_binding, 1);
-    pipe1.AddVertexInputAttribs(&input_attribs[0], 3);
-    pipe1.SetViewport(m_viewports);
-    pipe1.SetScissor(m_scissors);
-    pipe1.CreateVKPipeline(pipeline_layout.handle(), renderPass());
+    VkPipelineVertexInputStateCreateInfo vi_state = vku::InitStructHelper();
+    vi_state.flags = 0;
+    vi_state.vertexBindingDescriptionCount = 1;
+    vi_state.pVertexBindingDescriptions = &input_binding;
+    vi_state.vertexAttributeDescriptionCount = 3;
+    vi_state.pVertexAttributeDescriptions = &input_attribs[0];
+
+    CreatePipelineHelper pipe1(*this);
+    pipe1.InitState();
+    pipe1.shader_stages_[0] = vs.GetStageCreateInfo();
+    pipe1.vi_ci_ = vi_state;
+    pipe1.CreateGraphicsPipeline();
 
     input_binding.stride = 6;
 
-    VkPipelineObj pipe2(m_device);
-    pipe2.AddDefaultColorAttachment();
-    pipe2.AddShader(&vs);
-    pipe2.AddShader(&fs);
-    pipe2.AddVertexInputBindings(&input_binding, 1);
-    pipe2.AddVertexInputAttribs(&input_attribs[0], 3);
-    pipe2.SetViewport(m_viewports);
-    pipe2.SetScissor(m_scissors);
-    pipe2.CreateVKPipeline(pipeline_layout.handle(), renderPass());
+    CreatePipelineHelper pipe2(*this);
+    pipe2.InitState();
+    pipe2.shader_stages_[0] = vs.GetStageCreateInfo();
+    pipe2.vi_ci_ = vi_state;
+    pipe2.CreateGraphicsPipeline();
 
     m_commandBuffer->begin();
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
 
     // Test with invalid buffer offset
     VkDeviceSize offset = 1;
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe1.handle());
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe1.Handle());
     vk::CmdBindVertexBuffers(m_commandBuffer->handle(), 0, 1, &vbo.handle(), &offset);
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDraw-None-02721");  // attribute 0
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDraw-None-02721");  // attribute 1
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDraw-None-02721");  // attribute 2
-    m_commandBuffer->Draw(1, 0, 0, 0);
+    vk::CmdDraw(m_commandBuffer->handle(), 1, 0, 0, 0);
     m_errorMonitor->VerifyFound();
 
     // Test with invalid buffer stride
     offset = 0;
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe2.handle());
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe2.Handle());
     vk::CmdBindVertexBuffers(m_commandBuffer->handle(), 0, 1, &vbo.handle(), &offset);
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDraw-None-02721");  // attribute 0
     // Attribute[1] is aligned properly even with a wrong stride
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDraw-None-02721");  // attribute 2
-    m_commandBuffer->Draw(1, 0, 0, 0);
+    vk::CmdDraw(m_commandBuffer->handle(), 1, 0, 0, 0);
     m_errorMonitor->VerifyFound();
 
     m_commandBuffer->EndRenderPass();
@@ -649,15 +621,12 @@ TEST_F(NegativeVertexInput, AttributeAlignment) {
 TEST_F(NegativeVertexInput, BindVertexOffset) {
     TEST_DESCRIPTION("set the pOffset in vkCmdBindVertexBuffers to 3 and use R16");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
 
-    VkBufferObj vtx_buf;
-    auto info = vtx_buf.create_info(1024, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-    vtx_buf.init(*m_device, info);
+    vkt::Buffer vtx_buf(*m_device, 1024, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitInfo();
     VkVertexInputBindingDescription input_binding = {0, 4, VK_VERTEX_INPUT_RATE_VERTEX};
     VkVertexInputAttributeDescription input_attribs = {0, 0, VK_FORMAT_R16_UNORM, 0};
 
@@ -685,8 +654,8 @@ TEST_F(NegativeVertexInput, BindVertexOffset) {
 TEST_F(NegativeVertexInput, DISABLED_AttributeNotConsumed) {
     TEST_DESCRIPTION("Test that a warning is produced for a vertex attribute which is not consumed by the vertex shader");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
 
     VkVertexInputBindingDescription input_binding = {0, 4, VK_VERTEX_INPUT_RATE_VERTEX};
 
@@ -709,8 +678,8 @@ TEST_F(NegativeVertexInput, DISABLED_AttributeLocationMismatch) {
         "Test that a warning is produced for a location mismatch on vertex attributes. This flushes out bad behavior in the "
         "interface walker");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
 
     VkVertexInputBindingDescription input_binding = {0, 4, VK_VERTEX_INPUT_RATE_VERTEX};
 
@@ -732,8 +701,8 @@ TEST_F(NegativeVertexInput, DISABLED_AttributeLocationMismatch) {
 TEST_F(NegativeVertexInput, DISABLED_AttributeNotProvided) {
     TEST_DESCRIPTION("Test that an error is produced for a vertex shader input which is not provided by a vertex attribute");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
 
     char const *vsSource = R"glsl(
         #version 450
@@ -755,8 +724,8 @@ TEST_F(NegativeVertexInput, DISABLED_AttributeTypeMismatch) {
         "Test that an error is produced for a mismatch between the fundamental type (float/int/uint) of an attribute and the "
         "vertex shader input that consumes it");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
 
     VkVertexInputBindingDescription input_binding = {0, 4, VK_VERTEX_INPUT_RATE_VERTEX};
 
@@ -786,8 +755,8 @@ TEST_F(NegativeVertexInput, DISABLED_AttributeTypeMismatch) {
 TEST_F(NegativeVertexInput, DISABLED_AttributeStructTypeFirstLocation) {
     TEST_DESCRIPTION("Input is OpTypeStruct but doesn't match");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
 
     VkVertexInputBindingDescription input_binding = {0, 24, VK_VERTEX_INPUT_RATE_VERTEX};
 
@@ -827,7 +796,6 @@ TEST_F(NegativeVertexInput, DISABLED_AttributeStructTypeFirstLocation) {
     VkShaderObj fs(this, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitInfo();
     pipe.vi_ci_.pVertexBindingDescriptions = &input_binding;
     pipe.vi_ci_.vertexBindingDescriptionCount = 1;
     pipe.vi_ci_.pVertexAttributeDescriptions = input_attribs;
@@ -842,8 +810,8 @@ TEST_F(NegativeVertexInput, DISABLED_AttributeStructTypeFirstLocation) {
 TEST_F(NegativeVertexInput, DISABLED_AttributeStructTypeSecondLocation) {
     TEST_DESCRIPTION("Input is OpTypeStruct but doesn't match for location given");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
 
     VkVertexInputBindingDescription input_binding = {0, 24, VK_VERTEX_INPUT_RATE_VERTEX};
 
@@ -883,7 +851,6 @@ TEST_F(NegativeVertexInput, DISABLED_AttributeStructTypeSecondLocation) {
     VkShaderObj fs(this, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitInfo();
     pipe.vi_ci_.pVertexBindingDescriptions = &input_binding;
     pipe.vi_ci_.vertexBindingDescriptionCount = 1;
     pipe.vi_ci_.pVertexAttributeDescriptions = input_attribs;
@@ -898,8 +865,8 @@ TEST_F(NegativeVertexInput, DISABLED_AttributeStructTypeSecondLocation) {
 TEST_F(NegativeVertexInput, DISABLED_AttributeStructTypeBlockLocation) {
     TEST_DESCRIPTION("Input is OpTypeStruct where the Block has the Location");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
 
     VkVertexInputBindingDescription input_binding = {0, 24, VK_VERTEX_INPUT_RATE_VERTEX};
 
@@ -909,7 +876,7 @@ TEST_F(NegativeVertexInput, DISABLED_AttributeStructTypeBlockLocation) {
 
     // This is not valid GLSL (but is valid SPIR-V) - would look like:
     //     layout(location = 4) in VertexIn {
-    //         ivec4 x;
+    //         vec4 x;
     //         uvec4 y;
     //     } x_struct;
     char const *vsSource = R"(
@@ -937,7 +904,6 @@ TEST_F(NegativeVertexInput, DISABLED_AttributeStructTypeBlockLocation) {
     VkShaderObj fs(this, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitInfo();
     pipe.vi_ci_.pVertexBindingDescriptions = &input_binding;
     pipe.vi_ci_.vertexBindingDescriptionCount = 1;
     pipe.vi_ci_.pVertexAttributeDescriptions = input_attribs;
@@ -953,8 +919,8 @@ TEST_F(NegativeVertexInput, AttributeBindingConflict) {
     TEST_DESCRIPTION(
         "Test that an error is produced for a vertex attribute setup where multiple bindings provide the same location");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
 
     /* Two binding descriptions for binding 0 */
     VkVertexInputBindingDescription input_bindings[2] = {{0, 4, VK_VERTEX_INPUT_RATE_VERTEX}, {0, 4, VK_VERTEX_INPUT_RATE_VERTEX}};
@@ -987,8 +953,8 @@ TEST_F(NegativeVertexInput, AttributeBindingConflict) {
 TEST_F(NegativeVertexInput, DISABLED_Attribute64bitInputAttribute) {
     TEST_DESCRIPTION("InputAttribute has 64-bit, but shader reads 32-bit");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
 
     if (!m_device->phy().features().shaderFloat64) {
         GTEST_SKIP() << "Device does not support 64bit vertex attributes";
@@ -1008,7 +974,6 @@ TEST_F(NegativeVertexInput, DISABLED_Attribute64bitInputAttribute) {
     VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitInfo();
     VkVertexInputBindingDescription input_binding = {0, 8, VK_VERTEX_INPUT_RATE_VERTEX};
     VkVertexInputAttributeDescription input_attribs = {0, 0, format, 0};
 
@@ -1027,8 +992,8 @@ TEST_F(NegativeVertexInput, DISABLED_Attribute64bitInputAttribute) {
 TEST_F(NegativeVertexInput, DISABLED_Attribute64bitShaderInput) {
     TEST_DESCRIPTION("InputAttribute has 32-bit, but shader reads 64-bit");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
 
     if (!m_device->phy().features().shaderFloat64) {
         GTEST_SKIP() << "Device does not support 64bit vertex attributes";
@@ -1049,7 +1014,6 @@ TEST_F(NegativeVertexInput, DISABLED_Attribute64bitShaderInput) {
     VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitInfo();
     VkVertexInputBindingDescription input_binding = {0, 4, VK_VERTEX_INPUT_RATE_VERTEX};
     VkVertexInputAttributeDescription input_attribs = {0, 0, format, 0};
 
@@ -1068,8 +1032,8 @@ TEST_F(NegativeVertexInput, DISABLED_Attribute64bitShaderInput) {
 TEST_F(NegativeVertexInput, DISABLED_Attribute64bitUnusedComponent) {
     TEST_DESCRIPTION("Shader uses f64vec2, but only provides first component with R64");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
 
     if (!m_device->phy().features().shaderFloat64) {
         GTEST_SKIP() << "Device does not support 64bit vertex attributes";
@@ -1090,7 +1054,6 @@ TEST_F(NegativeVertexInput, DISABLED_Attribute64bitUnusedComponent) {
     VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitInfo();
     VkVertexInputBindingDescription input_binding = {0, 8, VK_VERTEX_INPUT_RATE_VERTEX};
     VkVertexInputAttributeDescription input_attribs = {0, 0, format, 0};
 
@@ -1101,48 +1064,7 @@ TEST_F(NegativeVertexInput, DISABLED_Attribute64bitUnusedComponent) {
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
     pipe.InitState();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-VkGraphicsPipelineCreateInfo-Component-64bit");
-    pipe.CreateGraphicsPipeline();
-    m_errorMonitor->VerifyFound();
-}
-
-TEST_F(NegativeVertexInput, DISABLED_Attribute64bitMissingComponent) {
-    TEST_DESCRIPTION("Shader uses f64vec2, but provides too many component with R64G64B64A64");
-
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
-
-    if (!m_device->phy().features().shaderFloat64) {
-        GTEST_SKIP() << "Device does not support 64bit vertex attributes";
-    }
-
-    const VkFormat format = VK_FORMAT_R64G64B64A64_SFLOAT;
-    VkFormatProperties format_props = m_device->format_properties(format);
-    if ((format_props.bufferFeatures & VK_FORMAT_FEATURE_VERTEX_BUFFER_BIT) == 0) {
-        GTEST_SKIP() << "Format not supported for Vertex Buffer";
-    }
-
-    char const *vsSource = R"glsl(
-        #version 450 core
-        #extension GL_EXT_shader_explicit_arithmetic_types_float64 : enable
-        layout(location = 0) in f64vec2 pos;
-        void main() {}
-    )glsl";
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
-
-    CreatePipelineHelper pipe(*this);
-    pipe.InitInfo();
-    VkVertexInputBindingDescription input_binding = {0, 32, VK_VERTEX_INPUT_RATE_VERTEX};
-    VkVertexInputAttributeDescription input_attribs = {0, 0, format, 0};
-
-    pipe.vi_ci_.vertexBindingDescriptionCount = 1;
-    pipe.vi_ci_.pVertexBindingDescriptions = &input_binding;
-    pipe.vi_ci_.vertexAttributeDescriptionCount = 1;
-    pipe.vi_ci_.pVertexAttributeDescriptions = &input_attribs;
-    pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
-    pipe.InitState();
-
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-VkGraphicsPipelineCreateInfo-Component-64bit");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-pVertexInputState-09198");
     pipe.CreateGraphicsPipeline();
     m_errorMonitor->VerifyFound();
 }
@@ -1150,8 +1072,8 @@ TEST_F(NegativeVertexInput, DISABLED_Attribute64bitMissingComponent) {
 TEST_F(NegativeVertexInput, DISABLED_AttributeStructTypeBlockLocation64bit) {
     TEST_DESCRIPTION("Input is OpTypeStruct where the Block has the Location with 64-bit Vertex format");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
 
     if (!m_device->phy().features().shaderFloat64) {
         GTEST_SKIP() << "Device does not support 64bit vertex attributes";
@@ -1203,7 +1125,6 @@ TEST_F(NegativeVertexInput, DISABLED_AttributeStructTypeBlockLocation64bit) {
     VkShaderObj fs(this, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitInfo();
     pipe.vi_ci_.pVertexBindingDescriptions = &input_binding;
     pipe.vi_ci_.vertexBindingDescriptionCount = 1;
     pipe.vi_ci_.pVertexAttributeDescriptions = input_attribs;

@@ -81,6 +81,12 @@ class ValidationJSON:
             '\u2026' : '...',# HORIZONTAL ELLIPSIS
             '\u2032' : "'",  # PRIME
             '\u2192' : '->', # RIGHTWARDS ARROW
+            '\u2308' : '⌈', # LEFT CEILING
+            '\u2309' : '⌉', # RIGHT CEILING
+            '\u230a' : '⌊', # LEFT FLOOR
+            '\u230b' : '⌋', # RIGHT FLOOR
+            '\u00d7' : '×', # MULTIPLICATION SIGN
+            '\u2264' : '≤', # LESS-THAN OR EQUAL TO
         }
 
     def sanitize(self, text, location):
@@ -146,7 +152,7 @@ def buildKvuidDict(unassigned_vuid_files):
 
     for uf in unassigned_vuid_files:
         line_num = 0
-        with open(uf) as f:
+        with open(uf, encoding='utf-8') as f:
             for line in f:
                 line_num = line_num + 1
                 if True in [line.strip().startswith(comment) for comment in ['//', '/*']]:
@@ -158,6 +164,11 @@ def buildKvuidDict(unassigned_vuid_files):
                     if eq_pos >= 0:
                         kvuid = line[kvuid_pos:eq_pos].strip(' \t\n;"')
                         unassigned_str = line[eq_pos+1:].strip(' \t\n;"')
+                        # Handle the case when the value of the constant is on a new line due to formatting
+                        if unassigned_str == '':
+                            line = f.readline()
+                            pos = line.find('"')
+                            unassigned_str = line[pos+1:].strip(' \t\n;"')
                         kvuid_dict[kvuid] = unassigned_str
     return kvuid_dict
 
@@ -269,10 +280,12 @@ class ValidationTests:
         prepend = None
         for test_file in self.test_files:
             spirv_file = True if spirv_val.enabled and test_file.startswith(spirv_val.repo_path) else False
-            with open(test_file) as tf:
+            with open(test_file, encoding='utf-8') as tf:
                 for line in tf:
                     if True in [line.strip().startswith(comment) for comment in ['//', '/*']]:
                         continue
+                    elif True in [x in line for x in ['TEST_DESCRIPTION', 'vvl_vuid_hash']]:
+                        continue # Tests have extra place it might not want to report VUIDs
 
                     # if line ends in a broken VUID string, fix that before proceeding
                     if prepend is not None:
@@ -436,7 +449,7 @@ static const vuid_spec_text_pair vuid_spec_text[] = {
 """
     def dump_txt(self, filename, only_unimplemented=False):
         print(f'\nDumping database to text file: {filename}')
-        with open (filename, 'w') as txt:
+        with open(filename, 'w', encoding='utf-8') as txt:
             txt.write("## VUID Database\n")
             txt.write("## Format: VUID_NAME | CHECKED | SPIRV-TOOL | TEST | TYPE | API/STRUCT | EXTENSION | VUID_TEXT\n##\n")
             vuid_list = list(self.vj.all_vuids)
@@ -465,7 +478,7 @@ static const vuid_spec_text_pair vuid_spec_text[] = {
 
     def dump_csv(self, filename, only_unimplemented=False):
         print(f'\nDumping database to csv file: {filename}')
-        with open (filename, 'w', newline='') as csvfile:
+        with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
             cw = csv.writer(csvfile)
             cw.writerow(['VUID_NAME','CHECKED','SPIRV-TOOL', 'TEST','TYPE','API/STRUCT','EXTENSION','VUID_TEXT'])
             vuid_list = list(self.vj.all_vuids)
@@ -489,7 +502,7 @@ static const vuid_spec_text_pair vuid_spec_text[] = {
                     test = 'None'
                     if vuid in self.vt.vuid_to_tests:
                         sep = ', '
-                        test = sep.join(self.vt.vuid_to_tests[vuid])
+                        test = sep.join(sorted(self.vt.vuid_to_tests[vuid]))
                     row.append(test)
                     row.append(db_entry['type'])
                     row.append(db_entry['api'])
@@ -501,7 +514,7 @@ static const vuid_spec_text_pair vuid_spec_text[] = {
         print(f'\nDumping database to html file: {filename}')
         preamble = '<!DOCTYPE html>\n<html>\n<head>\n<style>\ntable, th, td {\n border: 1px solid black;\n border-collapse: collapse; \n}\n</style>\n<body>\n<h2>Valid Usage Database</h2>\n<font size="2" face="Arial">\n<table style="width:100%">\n'
         headers = '<tr><th>VUID NAME</th><th>CHECKED</th><th>SPIRV-TOOL</th><th>TEST</th><th>TYPE</th><th>API/STRUCT</th><th>EXTENSION</th><th>VUID TEXT</th></tr>\n'
-        with open(filename, 'w') as hfile:
+        with open(filename, 'w', encoding='utf-8') as hfile:
             hfile.write(preamble)
             hfile.write(headers)
             vuid_list = list(self.vj.all_vuids)
@@ -523,7 +536,7 @@ static const vuid_spec_text_pair vuid_spec_text[] = {
                     test = 'None'
                     if vuid in self.vt.vuid_to_tests:
                         sep = ', '
-                        test = sep.join(self.vt.vuid_to_tests[vuid])
+                        test = sep.join(sorted(self.vt.vuid_to_tests[vuid]))
                     hfile.write('<th>%s</th>' % test)
                     hfile.write('<th>%s</th>' % db_entry['type'])
                     hfile.write('<th>%s</th>' % db_entry['api'])
@@ -546,7 +559,7 @@ static const vuid_spec_text_pair vuid_spec_text[] = {
                     if vuid in self.vs.all_vuids:
                         ext_db[ext_name].checked += 1
 
-        with open (filename, 'w', newline='') as csvfile:
+        with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
             cw = csv.writer(csvfile)
             cw.writerow(['EXTENSION','CHECKED','TOTAL','COVERAGE'])
             for ext_name in sorted(ext_db):
@@ -626,7 +639,7 @@ static const vuid_spec_text_pair vuid_spec_text[] = {
     def export_header(self, filename):
         if verbose_mode:
             print("\n Exporting header file to: %s" % filename)
-        with open (filename, 'w', newline='\n') as hfile:
+        with open(filename, 'w', newline='\n', encoding='utf-8') as hfile:
             hfile.write(self.header_version)
             hfile.write(self.header_preamble)
             vuid_list = list(self.vj.all_vuids)
@@ -649,6 +662,8 @@ static const vuid_spec_text_pair vuid_spec_text[] = {
                 db_text = re.sub(html_remove_tags, '', db_text)
                 # In future we could use the `/n` to add new lines to a pretty print in the console
                 db_text = db_text.replace('\n', ' ')
+                # Remove multiple whitespaces
+                db_text = re.sub(' +', ' ', db_text)
                 hfile.write('    {"%s", "%s", "%s"},\n' % (vuid, db_text, spec_url_id))
                 # For multiply-defined VUIDs, include versions with extension appended
                 if len(self.vj.vuid_db[vuid]) > 1:
@@ -703,7 +718,7 @@ def main(argv):
     parser.add_argument('json_file', help="registry file 'validusage.json'")
     parser.add_argument('-api',
                         default='vulkan',
-                        choices=['vulkan'],
+                        choices=['vulkan','vulkansc'],
                         help='Specify API name to use')
     parser.add_argument('-c', action='store_true',
                         help='report consistency warnings')
@@ -763,6 +778,7 @@ def main(argv):
         test_source_files.extend(glob.glob(os.path.join(repo_relative('tests/vulkansc/positive'), '*.cpp')))
 
     unassigned_vuid_files = [repo_relative(path) for path in [
+        'layers/vulkansc/sc_vuid_enums.h',
         'layers/best_practices/best_practices_error_enums.h',
         'layers/stateless/stateless_validation.h',
         'layers/error_message/validation_error_enums.h',

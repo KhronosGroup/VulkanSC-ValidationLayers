@@ -15,20 +15,18 @@
 
 #include "utils/cast_utils.h"
 #include "../framework/layer_validation_tests.h"
+#include "../framework/pipeline_helper.h"
 
 TEST_F(NegativePortabilitySubset, Device) {
     TEST_DESCRIPTION("Portability: CreateDevice called and VK_KHR_portability_subset not enabled");
     AddRequiredExtensions(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    vk_testing::PhysicalDevice phys_device(gpu());
+    vkt::PhysicalDevice phys_device(gpu());
 
     // request all queues
-    const std::vector<VkQueueFamilyProperties> queue_props = phys_device.queue_properties();
-    vk_testing::QueueCreateInfoArray queue_info(phys_device.queue_properties());
+    const std::vector<VkQueueFamilyProperties> queue_props = phys_device.queue_properties_;
+    vkt::QueueCreateInfoArray queue_info(phys_device.queue_properties_);
 
     // Only request creation with queuefamilies that have at least one queue
     std::vector<VkDeviceQueueCreateInfo> create_queue_infos;
@@ -39,7 +37,7 @@ TEST_F(NegativePortabilitySubset, Device) {
         }
     }
 
-    VkDeviceCreateInfo dev_info = LvlInitStruct<VkDeviceCreateInfo>();
+    VkDeviceCreateInfo dev_info = vku::InitStructHelper();
     dev_info.queueCreateInfoCount = create_queue_infos.size();
     dev_info.pQueueCreateInfos = create_queue_infos.data();
     dev_info.enabledLayerCount = 0;
@@ -57,19 +55,16 @@ TEST_F(NegativePortabilitySubset, Device) {
 TEST_F(NegativePortabilitySubset, Event) {
     TEST_DESCRIPTION("Portability: CreateEvent when not supported");
     AddRequiredExtensions(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    auto portability_feature = LvlInitStruct<VkPhysicalDevicePortabilitySubsetFeaturesKHR>();
+    VkPhysicalDevicePortabilitySubsetFeaturesKHR portability_feature = vku::InitStructHelper();
     auto features2 = GetPhysicalDeviceFeatures2(portability_feature);
     portability_feature.events = VK_FALSE;  // Make sure events are disabled
 
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features2));
+    RETURN_IF_SKIP(InitState(nullptr, &features2))
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateEvent-events-04468");
-    VkEventCreateInfo eci = LvlInitStruct<VkEventCreateInfo>();
+    VkEventCreateInfo eci = vku::InitStructHelper();
     VkEvent event;
     vk::CreateEvent(m_device->device(), &eci, nullptr, &event);
     m_errorMonitor->VerifyFound();
@@ -78,20 +73,17 @@ TEST_F(NegativePortabilitySubset, Event) {
 TEST_F(NegativePortabilitySubset, Image) {
     TEST_DESCRIPTION("Portability: CreateImage - VUIDs 04459, 04460");
     AddRequiredExtensions(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    auto portability_feature = LvlInitStruct<VkPhysicalDevicePortabilitySubsetFeaturesKHR>();
+    VkPhysicalDevicePortabilitySubsetFeaturesKHR portability_feature = vku::InitStructHelper();
     auto features2 = GetPhysicalDeviceFeatures2(portability_feature);
     // Make sure image features are disabled via portability extension
     portability_feature.imageView2DOn3DImage = VK_FALSE;
     portability_feature.multisampleArrayImage = VK_FALSE;
 
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features2));
+    RETURN_IF_SKIP(InitState(nullptr, &features2))
 
-    VkImageCreateInfo ci = LvlInitStruct<VkImageCreateInfo>();
+    VkImageCreateInfo ci = vku::InitStructHelper();
     ci.flags = VK_IMAGE_CREATE_2D_ARRAY_COMPATIBLE_BIT;
     ci.imageType = VK_IMAGE_TYPE_3D;
     ci.format = VK_FORMAT_R8G8B8A8_UNORM;
@@ -119,18 +111,15 @@ TEST_F(NegativePortabilitySubset, Image) {
 TEST_F(NegativePortabilitySubset, ImageViewFormatSwizzle) {
     TEST_DESCRIPTION("Portability: If imageViewFormatSwizzle is not enabled");
     AddRequiredExtensions(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    auto portability_feature = LvlInitStruct<VkPhysicalDevicePortabilitySubsetFeaturesKHR>();
+    VkPhysicalDevicePortabilitySubsetFeaturesKHR portability_feature = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(portability_feature);
     portability_feature.imageViewFormatSwizzle = VK_FALSE;
 
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &portability_feature));
+    RETURN_IF_SKIP(InitState(nullptr, &portability_feature));
 
-    VkImageCreateInfo imageCI = LvlInitStruct<VkImageCreateInfo>();
+    VkImageCreateInfo imageCI = vku::InitStructHelper();
     imageCI.flags = VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
     imageCI.imageType = VK_IMAGE_TYPE_2D;
     imageCI.format = VK_FORMAT_R8G8B8A8_UNORM;
@@ -149,7 +138,7 @@ TEST_F(NegativePortabilitySubset, ImageViewFormatSwizzle) {
     VkImageObj image(m_device);
     image.init(&imageCI);
 
-    VkImageViewCreateInfo ci = LvlInitStruct<VkImageViewCreateInfo>();
+    VkImageViewCreateInfo ci = vku::InitStructHelper();
     ci.flags = 0;
     ci.image = image.image();
     ci.viewType = VK_IMAGE_VIEW_TYPE_2D;
@@ -173,17 +162,14 @@ TEST_F(NegativePortabilitySubset, ImageViewFormatSwizzle) {
 TEST_F(NegativePortabilitySubset, ImageViewFormatReinterpretationComponentCount) {
     TEST_DESCRIPTION("Portability: If ImageViewFormatReinterpretation is not enabled");
     AddRequiredExtensions(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    auto portability_feature = LvlInitStruct<VkPhysicalDevicePortabilitySubsetFeaturesKHR>();
+    VkPhysicalDevicePortabilitySubsetFeaturesKHR portability_feature = vku::InitStructHelper();
     portability_feature.imageViewFormatReinterpretation = VK_FALSE;
 
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &portability_feature));
+    RETURN_IF_SKIP(InitState(nullptr, &portability_feature));
 
-    VkImageCreateInfo imageCI = LvlInitStruct<VkImageCreateInfo>();
+    VkImageCreateInfo imageCI = vku::InitStructHelper();
     imageCI.flags = VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
     imageCI.imageType = VK_IMAGE_TYPE_2D;
     imageCI.format = VK_FORMAT_R8G8B8A8_UNORM;
@@ -200,7 +186,7 @@ TEST_F(NegativePortabilitySubset, ImageViewFormatReinterpretationComponentCount)
     VkImageObj image(m_device);
     image.init(&imageCI);
 
-    VkImageViewCreateInfo ci = LvlInitStruct<VkImageViewCreateInfo>();
+    VkImageViewCreateInfo ci = vku::InitStructHelper();
     ci.flags = 0;
     ci.image = image.image();
     ci.viewType = VK_IMAGE_VIEW_TYPE_2D;
@@ -220,17 +206,14 @@ TEST_F(NegativePortabilitySubset, ImageViewFormatReinterpretationComponentCount)
 TEST_F(NegativePortabilitySubset, Sampler) {
     TEST_DESCRIPTION("Portability: CreateSampler - VUID 04467");
     AddRequiredExtensions(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    auto portability_feature = LvlInitStruct<VkPhysicalDevicePortabilitySubsetFeaturesKHR>();
+    VkPhysicalDevicePortabilitySubsetFeaturesKHR portability_feature = vku::InitStructHelper();
     auto features2 = GetPhysicalDeviceFeatures2(portability_feature);
     // Make sure image features are disabled via portability extension
     portability_feature.samplerMipLodBias = VK_FALSE;
 
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features2));
+    RETURN_IF_SKIP(InitState(nullptr, &features2))
 
     VkSamplerCreateInfo sampler_info = SafeSaneSamplerCreateInfo();
     sampler_info.mipLodBias = 1.0f;
@@ -240,23 +223,22 @@ TEST_F(NegativePortabilitySubset, Sampler) {
 TEST_F(NegativePortabilitySubset, TriangleFans) {
     TEST_DESCRIPTION("Portability: CreateGraphicsPipelines - VUID 04452");
     AddRequiredExtensions(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    auto portability_feature = LvlInitStruct<VkPhysicalDevicePortabilitySubsetFeaturesKHR>();
+    VkPhysicalDevicePortabilitySubsetFeaturesKHR portability_feature = vku::InitStructHelper();
     auto features2 = GetPhysicalDeviceFeatures2(portability_feature);
     // Make sure image features are disabled via portability extension
     portability_feature.triangleFans = VK_FALSE;
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features2));
+    RETURN_IF_SKIP(InitState(nullptr, &features2))
 
     m_depth_stencil_fmt = FindSupportedDepthStencilFormat(gpu());
-    m_depthStencil->Init(m_device, m_width, m_height, m_depth_stencil_fmt);
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget(m_depthStencil->BindInfo()));
+    m_depthStencil->Init(m_width, m_height, 1, m_depth_stencil_fmt, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+                         VK_IMAGE_TILING_OPTIMAL);
+    VkImageView depth_image_view =
+        m_depthStencil->targetView(m_depth_stencil_fmt, VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
+    InitRenderTarget(&depth_image_view);
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitInfo();
     pipe.ia_ci_ = VkPipelineInputAssemblyStateCreateInfo{VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO, nullptr, 0,
                                                          VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN, VK_FALSE};
     pipe.rs_state_ci_.rasterizerDiscardEnable = VK_TRUE;
@@ -271,28 +253,27 @@ TEST_F(NegativePortabilitySubset, TriangleFans) {
 TEST_F(NegativePortabilitySubset, VertexInputStride) {
     TEST_DESCRIPTION("Portability: CreateGraphicsPipelines - VUID 04456");
     AddRequiredExtensions(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    auto portability_feature = LvlInitStruct<VkPhysicalDevicePortabilitySubsetFeaturesKHR>();
+    VkPhysicalDevicePortabilitySubsetFeaturesKHR portability_feature = vku::InitStructHelper();
     auto features2 = GetPhysicalDeviceFeatures2(portability_feature);
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features2));
+    RETURN_IF_SKIP(InitState(nullptr, &features2))
 
     // Get the current vertex stride to ensure we pass an incorrect value when creating the graphics pipeline
-    auto portability_properties = LvlInitStruct<VkPhysicalDevicePortabilitySubsetPropertiesKHR>();
+    VkPhysicalDevicePortabilitySubsetPropertiesKHR portability_properties = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(portability_properties);
 
     ASSERT_TRUE(portability_properties.minVertexInputBindingStrideAlignment > 0);
     auto vertex_stride = portability_properties.minVertexInputBindingStrideAlignment - 1;
 
     m_depth_stencil_fmt = FindSupportedDepthStencilFormat(gpu());
-    m_depthStencil->Init(m_device, m_width, m_height, m_depth_stencil_fmt);
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget(m_depthStencil->BindInfo()));
+    m_depthStencil->Init(m_width, m_height, 1, m_depth_stencil_fmt, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+                         VK_IMAGE_TILING_OPTIMAL);
+    VkImageView depth_image_view =
+        m_depthStencil->targetView(m_depth_stencil_fmt, VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
+    InitRenderTarget(&depth_image_view);
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitInfo();
     VkVertexInputBindingDescription vertex_desc{
         0,                            // binding
         vertex_stride,                // stride
@@ -314,22 +295,21 @@ TEST_F(NegativePortabilitySubset, VertexInputStride) {
 TEST_F(NegativePortabilitySubset, VertexAttributes) {
     TEST_DESCRIPTION("Portability: CreateGraphicsPipelines - VUID 04457");
     AddRequiredExtensions(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-    auto portability_feature = LvlInitStruct<VkPhysicalDevicePortabilitySubsetFeaturesKHR>();
+    RETURN_IF_SKIP(InitFramework())
+    VkPhysicalDevicePortabilitySubsetFeaturesKHR portability_feature = vku::InitStructHelper();
     auto features2 = GetPhysicalDeviceFeatures2(portability_feature);
     // Make sure image features are disabled via portability extension
     portability_feature.vertexAttributeAccessBeyondStride = VK_FALSE;
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features2));
+    RETURN_IF_SKIP(InitState(nullptr, &features2))
 
     m_depth_stencil_fmt = FindSupportedDepthStencilFormat(gpu());
-    m_depthStencil->Init(m_device, m_width, m_height, m_depth_stencil_fmt);
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget(m_depthStencil->BindInfo()));
+    m_depthStencil->Init(m_width, m_height, 1, m_depth_stencil_fmt, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+                         VK_IMAGE_TILING_OPTIMAL);
+    VkImageView depth_image_view =
+        m_depthStencil->targetView(m_depth_stencil_fmt, VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
+    InitRenderTarget(&depth_image_view);
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitInfo();
     VkVertexInputBindingDescription vertex_desc{
         0,                            // binding
         4,                            // stride
@@ -356,16 +336,13 @@ TEST_F(NegativePortabilitySubset, VertexAttributes) {
 TEST_F(NegativePortabilitySubset, RasterizationState) {
     TEST_DESCRIPTION("Portability: CreateGraphicsPipelines - VUID 04458");
     AddRequiredExtensions(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    auto portability_feature = LvlInitStruct<VkPhysicalDevicePortabilitySubsetFeaturesKHR>();
+    VkPhysicalDevicePortabilitySubsetFeaturesKHR portability_feature = vku::InitStructHelper();
     auto features2 = GetPhysicalDeviceFeatures2(portability_feature);
     // Make sure point polygons are disabled
     portability_feature.pointPolygons = VK_FALSE;
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features2));
+    RETURN_IF_SKIP(InitState(nullptr, &features2))
 
     VkAttachmentDescription attachment{};
     attachment.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -383,7 +360,7 @@ TEST_F(NegativePortabilitySubset, RasterizationState) {
     subpass.pColorAttachments = &color_ref;
     subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 
-    VkRenderPassCreateInfo rp_info = LvlInitStruct<VkRenderPassCreateInfo>();
+    VkRenderPassCreateInfo rp_info = vku::InitStructHelper();
     rp_info.attachmentCount = 1;
     rp_info.pAttachments = &attachment;
     rp_info.subpassCount = 1;
@@ -393,7 +370,6 @@ TEST_F(NegativePortabilitySubset, RasterizationState) {
     m_renderPass_info = rp_info;
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitInfo();
     pipe.rs_state_ci_.polygonMode = VK_POLYGON_MODE_POINT;
     pipe.InitState();
 
@@ -405,28 +381,27 @@ TEST_F(NegativePortabilitySubset, RasterizationState) {
 TEST_F(NegativePortabilitySubset, DepthStencilState) {
     TEST_DESCRIPTION("Portability: CreateGraphicsPipelines - VUID 04453");
     AddRequiredExtensions(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    auto portability_feature = LvlInitStruct<VkPhysicalDevicePortabilitySubsetFeaturesKHR>();
+    VkPhysicalDevicePortabilitySubsetFeaturesKHR portability_feature = vku::InitStructHelper();
     auto features2 = GetPhysicalDeviceFeatures2(portability_feature);
     portability_feature.separateStencilMaskRef = VK_FALSE;
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features2));
+    RETURN_IF_SKIP(InitState(nullptr, &features2))
 
     m_depth_stencil_fmt = FindSupportedDepthStencilFormat(gpu());
-    m_depthStencil->Init(m_device, m_width, m_height, m_depth_stencil_fmt);
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget(m_depthStencil->BindInfo()));
+    m_depthStencil->Init(m_width, m_height, 1, m_depth_stencil_fmt, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+                         VK_IMAGE_TILING_OPTIMAL);
+    VkImageView depth_image_view =
+        m_depthStencil->targetView(m_depth_stencil_fmt, VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
+    InitRenderTarget(&depth_image_view);
 
-    auto depth_stencil_ci = LvlInitStruct<VkPipelineDepthStencilStateCreateInfo>();
+    VkPipelineDepthStencilStateCreateInfo depth_stencil_ci = vku::InitStructHelper();
     depth_stencil_ci.stencilTestEnable = VK_TRUE;
     depth_stencil_ci.front.reference = 1;
     depth_stencil_ci.back.reference = depth_stencil_ci.front.reference + 1;
     //  front.reference != back.reference should trigger 04453
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitInfo();
     pipe.gp_ci_.pDepthStencilState = &depth_stencil_ci;
     pipe.rs_state_ci_.cullMode = VK_CULL_MODE_NONE;
     pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo()};
@@ -447,19 +422,15 @@ TEST_F(NegativePortabilitySubset, DepthStencilState) {
 TEST_F(NegativePortabilitySubset, ColorBlendAttachmentState) {
     TEST_DESCRIPTION("Portability: CreateGraphicsPipelines - VUIDs 04454, 04455");
     AddRequiredExtensions(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    auto portability_feature = LvlInitStruct<VkPhysicalDevicePortabilitySubsetFeaturesKHR>();
+    VkPhysicalDevicePortabilitySubsetFeaturesKHR portability_feature = vku::InitStructHelper();
     auto features2 = GetPhysicalDeviceFeatures2(portability_feature);
     portability_feature.constantAlphaColorBlendFactors = VK_FALSE;
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features2));
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitState(nullptr, &features2))
+    InitRenderTarget();
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitInfo();
     pipe.cb_attachments_[0].srcColorBlendFactor = VK_BLEND_FACTOR_CONSTANT_ALPHA;
     pipe.InitState();
 
@@ -492,20 +463,16 @@ class VkPortabilitySubsetTest : public VkLayerTest {};
 TEST_F(VkPortabilitySubsetTest, UpdateDescriptorSets) {
     TEST_DESCRIPTION("Portability: UpdateDescriptorSets - VUID 04450");
     AddRequiredExtensions(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-    auto portability_feature = LvlInitStruct<VkPhysicalDevicePortabilitySubsetFeaturesKHR>();
+    RETURN_IF_SKIP(InitFramework())
+    VkPhysicalDevicePortabilitySubsetFeaturesKHR portability_feature = vku::InitStructHelper();
     auto features2 = GetPhysicalDeviceFeatures2(portability_feature);
     // Make sure image features are disabled via portability extension
     portability_feature.mutableComparisonSamplers = VK_FALSE;
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features2));
-    ASSERT_NO_FATAL_FAILURE(InitViewport());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitState(nullptr, &features2))
+    InitRenderTarget();
     VkSamplerCreateInfo sampler_info = SafeSaneSamplerCreateInfo();
     sampler_info.compareEnable = VK_TRUE;  // Incompatible with portability setting
-    vk_testing::Sampler sampler(*m_device, sampler_info);
+    vkt::Sampler sampler(*m_device, sampler_info);
 
     constexpr VkFormat img_format = VK_FORMAT_R8G8B8A8_UNORM;
     VkImageObj image(m_device);
@@ -515,10 +482,9 @@ TEST_F(VkPortabilitySubsetTest, UpdateDescriptorSets) {
                                        {
                                            {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_ALL, nullptr},
                                        });
-    const VkPipelineLayoutObj pipeline_layout(m_device, {&descriptor_set.layout_});
-    vk_testing::ImageView view;
-    auto image_view_create_info = SafeSaneImageViewCreateInfo(image, img_format, VK_IMAGE_ASPECT_COLOR_BIT);
-    view.init(*m_device, image_view_create_info);
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
+    auto image_view_create_info = image.BasicViewCreatInfo();
+    vkt::ImageView view(*m_device, image_view_create_info);
 
     VkDescriptorImageInfo img_info = {};
     img_info.sampler = sampler.handle();
@@ -526,7 +492,7 @@ TEST_F(VkPortabilitySubsetTest, UpdateDescriptorSets) {
     img_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
     VkWriteDescriptorSet descriptor_writes[2] = {};
-    descriptor_writes[0] = LvlInitStruct<VkWriteDescriptorSet>();
+    descriptor_writes[0] = vku::InitStructHelper();
     descriptor_writes[0].dstSet = descriptor_set.set_;
     descriptor_writes[0].dstBinding = 0;
     descriptor_writes[0].descriptorCount = 1;
@@ -541,20 +507,16 @@ TEST_F(VkPortabilitySubsetTest, UpdateDescriptorSets) {
 TEST_F(VkPortabilitySubsetTest, ShaderValidation) {
     TEST_DESCRIPTION("Attempt to use shader features that are not supported via portability");
     AddRequiredExtensions(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    auto portability_feature = LvlInitStruct<VkPhysicalDevicePortabilitySubsetFeaturesKHR>();
+    VkPhysicalDevicePortabilitySubsetFeaturesKHR portability_feature = vku::InitStructHelper();
     auto features2 = GetPhysicalDeviceFeatures2(portability_feature);
     portability_feature.tessellationIsolines = VK_FALSE;                    // Make sure IsoLines are disabled
     portability_feature.tessellationPointMode = VK_FALSE;                   // Make sure PointMode is disabled
     portability_feature.shaderSampleRateInterpolationFunctions = VK_FALSE;  // Make sure interpolation functions are disabled
 
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features2));
-    ASSERT_NO_FATAL_FAILURE(InitViewport());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitState(nullptr, &features2))
+    InitRenderTarget();
 
     VkShaderObj tsc_obj(this, kTessellationControlMinimalGlsl, VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT);
 
@@ -565,7 +527,6 @@ TEST_F(VkPortabilitySubsetTest, ShaderValidation) {
     VkShaderObj vs(this, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitInfo();
     pipe.ia_ci_ = iasci;
     pipe.rs_state_ci_.rasterizerDiscardEnable = VK_TRUE;
     pipe.tess_ci_ = tsci;
@@ -632,7 +593,6 @@ TEST_F(VkPortabilitySubsetTest, ShaderValidation) {
         VkShaderObj fs_obj(this, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
 
         CreatePipelineHelper raster_pipe(*this);
-        raster_pipe.InitInfo();
         iasci.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
         raster_pipe.ia_ci_ = iasci;
         raster_pipe.ia_ci_ = iasci;
@@ -644,4 +604,39 @@ TEST_F(VkPortabilitySubsetTest, ShaderValidation) {
         raster_pipe.CreateGraphicsPipeline();
         m_errorMonitor->VerifyFound();
     }
+}
+
+TEST_F(VkPortabilitySubsetTest, PortabilitySubsetColorBlendFactor) {
+    TEST_DESCRIPTION("Test invalid color blend factor with portability subset");
+
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitFramework())
+    VkPhysicalDeviceExtendedDynamicState3FeaturesEXT extended_dynamic_state3_features = vku::InitStructHelper();
+    GetPhysicalDeviceFeatures2(extended_dynamic_state3_features);
+    if (!extended_dynamic_state3_features.extendedDynamicState3ColorBlendEquation) {
+        GTEST_SKIP() << "extendedDynamicState3ColorBlendEquation not supported";
+    }
+
+    RETURN_IF_SKIP(InitState(nullptr, &extended_dynamic_state3_features, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+
+    VkColorBlendEquationEXT color_blend_equation = {
+        VK_BLEND_FACTOR_CONSTANT_ALPHA, VK_BLEND_FACTOR_ZERO, VK_BLEND_OP_ADD, VK_BLEND_FACTOR_ONE,
+        VK_BLEND_FACTOR_ZERO,           VK_BLEND_OP_ADD,
+    };
+
+    m_commandBuffer->begin();
+
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkColorBlendEquationEXT-constantAlphaColorBlendFactors-07362");
+    vk::CmdSetColorBlendEquationEXT(m_commandBuffer->handle(), 0u, 1u, &color_blend_equation);
+    m_errorMonitor->VerifyFound();
+
+    color_blend_equation.srcColorBlendFactor = VK_BLEND_FACTOR_ZERO;
+    color_blend_equation.dstColorBlendFactor = VK_BLEND_FACTOR_CONSTANT_ALPHA;
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkColorBlendEquationEXT-constantAlphaColorBlendFactors-07363");
+    vk::CmdSetColorBlendEquationEXT(m_commandBuffer->handle(), 0u, 1u, &color_blend_equation);
+    m_errorMonitor->VerifyFound();
+
+    m_commandBuffer->end();
 }

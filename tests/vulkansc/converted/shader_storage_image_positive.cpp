@@ -15,22 +15,20 @@
  */
 
 #include "../framework/layer_validation_tests.h"
+#include "../framework/pipeline_helper.h"
 
 TEST_F(PositiveShaderStorageImage, WriteMoreComponent) {
     TEST_DESCRIPTION("Test writing to image with less components.");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
-    if (DeviceValidationVersion() < VK_API_VERSION_1_2) {
-        GTEST_SKIP() << "At least Vulkan version 1.2 is required";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
     VkPhysicalDeviceFeatures available_features = {};
-    ASSERT_NO_FATAL_FAILURE(GetPhysicalDeviceFeatures(&available_features));
+    GetPhysicalDeviceFeatures(&available_features);
     if (!available_features.shaderStorageImageExtendedFormats) {
         GTEST_SKIP() << "shaderStorageImageExtendedFormats is not supported";
     }
-    ASSERT_NO_FATAL_FAILURE(InitState(&available_features));
+    RETURN_IF_SKIP(InitState(&available_features));
 
     // not valid GLSL, but would look like:
     // layout(set = 0, binding = 0, Rg32ui) uniform uimage2D storageImage;
@@ -82,7 +80,7 @@ TEST_F(PositiveShaderStorageImage, WriteMoreComponent) {
     image_info.imageView = image.targetView(format);
     image_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
-    VkWriteDescriptorSet descriptor_write = LvlInitStruct<VkWriteDescriptorSet>();
+    VkWriteDescriptorSet descriptor_write = vku::InitStructHelper();
     descriptor_write.dstSet = ds.set_;
     descriptor_write.dstBinding = 0;
     descriptor_write.descriptorCount = 1;
@@ -91,10 +89,9 @@ TEST_F(PositiveShaderStorageImage, WriteMoreComponent) {
     vk::UpdateDescriptorSets(m_device->device(), 1, &descriptor_write, 0, nullptr);
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.InitInfo();
     pipe.cs_ = std::make_unique<VkShaderObj>(this, source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
     pipe.InitState();
-    pipe.pipeline_layout_ = VkPipelineLayoutObj(m_device, {&ds.layout_});
+    pipe.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&ds.layout_});
     pipe.CreateComputePipeline();
 
     m_commandBuffer->begin();
@@ -105,23 +102,20 @@ TEST_F(PositiveShaderStorageImage, WriteMoreComponent) {
     m_commandBuffer->end();
 }
 
-TEST_F(PositiveShaderStorageImage, UnknownWriteMoreComponent) {
+TEST_F(PositiveShaderStorageImage, DISABLED_UnknownWriteMoreComponent) {
     TEST_DESCRIPTION("Test writing to image with less components for Unknown for OpTypeImage.");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
-    if (DeviceValidationVersion() < VK_API_VERSION_1_2) {
-        GTEST_SKIP() << "At least Vulkan version 1.2 is required";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
     VkPhysicalDeviceFeatures available_features = {};
-    ASSERT_NO_FATAL_FAILURE(GetPhysicalDeviceFeatures(&available_features));
+    GetPhysicalDeviceFeatures(&available_features);
     if (!available_features.shaderStorageImageExtendedFormats) {
         GTEST_SKIP() << "shaderStorageImageExtendedFormats is not supported";
     } else if (!available_features.shaderStorageImageWriteWithoutFormat) {
         GTEST_SKIP() << "shaderStorageImageWriteWithoutFormat is not supported";
     }
-    ASSERT_NO_FATAL_FAILURE(InitState(&available_features));
+    RETURN_IF_SKIP(InitState(&available_features));
 
     // not valid GLSL, but would look like:
     // layout(set = 0, binding = 0, Unknown) readonly uniform uimage2D storageImage;
@@ -168,6 +162,13 @@ TEST_F(PositiveShaderStorageImage, UnknownWriteMoreComponent) {
         GTEST_SKIP() << "Format doesn't support storage image";
     }
 
+    VkFormatProperties3KHR fmt_props_3 = vku::InitStructHelper();
+    VkFormatProperties2 fmt_props = vku::InitStructHelper(&fmt_props_3);
+    vk::GetPhysicalDeviceFormatProperties2(gpu(), format, &fmt_props);
+    if ((fmt_props_3.optimalTilingFeatures & VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT_KHR) == 0) {
+        GTEST_SKIP() << "Format doesn't support storage write without format";
+    }
+
     VkImageObj image(m_device);
     image.Init(32, 32, 1, format, VK_IMAGE_USAGE_STORAGE_BIT, VK_IMAGE_TILING_OPTIMAL);
 
@@ -175,7 +176,7 @@ TEST_F(PositiveShaderStorageImage, UnknownWriteMoreComponent) {
     image_info.imageView = image.targetView(format);
     image_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
-    VkWriteDescriptorSet descriptor_write = LvlInitStruct<VkWriteDescriptorSet>();
+    VkWriteDescriptorSet descriptor_write = vku::InitStructHelper();
     descriptor_write.dstSet = ds.set_;
     descriptor_write.dstBinding = 0;
     descriptor_write.descriptorCount = 1;
@@ -184,10 +185,9 @@ TEST_F(PositiveShaderStorageImage, UnknownWriteMoreComponent) {
     vk::UpdateDescriptorSets(m_device->device(), 1, &descriptor_write, 0, nullptr);
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.InitInfo();
     pipe.cs_ = std::make_unique<VkShaderObj>(this, source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
     pipe.InitState();
-    pipe.pipeline_layout_ = VkPipelineLayoutObj(m_device, {&ds.layout_});
+    pipe.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&ds.layout_});
     pipe.CreateComputePipeline();
 
     m_commandBuffer->begin();
@@ -202,17 +202,14 @@ TEST_F(PositiveShaderStorageImage, WriteSpecConstantMoreComponent) {
     TEST_DESCRIPTION("Test writing to image with less components with Texel being a spec constant.");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
-    if (DeviceValidationVersion() < VK_API_VERSION_1_2) {
-        GTEST_SKIP() << "At least Vulkan version 1.2 is required";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
     VkPhysicalDeviceFeatures available_features = {};
-    ASSERT_NO_FATAL_FAILURE(GetPhysicalDeviceFeatures(&available_features));
+    GetPhysicalDeviceFeatures(&available_features);
     if (!available_features.shaderStorageImageExtendedFormats) {
         GTEST_SKIP() << "shaderStorageImageExtendedFormats is not supported";
     }
-    ASSERT_NO_FATAL_FAILURE(InitState(&available_features));
+    RETURN_IF_SKIP(InitState(&available_features));
 
     // not valid GLSL, but would look like:
     // layout (constant_id = 0) const uint sc = 1;
@@ -267,7 +264,7 @@ TEST_F(PositiveShaderStorageImage, WriteSpecConstantMoreComponent) {
     image_info.imageView = image.targetView(format);
     image_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
-    VkWriteDescriptorSet descriptor_write = LvlInitStruct<VkWriteDescriptorSet>();
+    VkWriteDescriptorSet descriptor_write = vku::InitStructHelper();
     descriptor_write.dstSet = ds.set_;
     descriptor_write.dstBinding = 0;
     descriptor_write.descriptorCount = 1;
@@ -287,11 +284,10 @@ TEST_F(PositiveShaderStorageImage, WriteSpecConstantMoreComponent) {
     specialization_info.pData = &data;
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.InitInfo();
     pipe.cs_ = std::make_unique<VkShaderObj>(this, source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM,
                                              &specialization_info);
     pipe.InitState();
-    pipe.pipeline_layout_ = VkPipelineLayoutObj(m_device, {&ds.layout_});
+    pipe.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&ds.layout_});
     pipe.CreateComputePipeline();
 
     m_commandBuffer->begin();
@@ -306,16 +302,9 @@ TEST_F(PositiveShaderStorageImage, UnknownWriteLessComponentMultiEntrypoint) {
     TEST_DESCRIPTION("Test writing to image unknown format with less components, but in unused Entrypoint.");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
-    if (DeviceValidationVersion() < VK_API_VERSION_1_2) {
-        GTEST_SKIP() << "At least Vulkan version 1.2 is required";
-    }
-    ASSERT_NO_FATAL_FAILURE(InitState());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
-
-    if (IsPlatform(kPixel3)) {
-        GTEST_SKIP() << "Pixel 3 compilers can't compile this valid SPIR-V";
-    }
+    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitState())
+    InitRenderTarget();
 
     // The vertex and fragment shader are just a passthrough
     // The compute shader has the invalid OpImageWrite
@@ -403,7 +392,7 @@ TEST_F(PositiveShaderStorageImage, UnknownWriteLessComponentMultiEntrypoint) {
     image_info.imageView = image.targetView(format);
     image_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
-    VkWriteDescriptorSet descriptor_write = LvlInitStruct<VkWriteDescriptorSet>();
+    VkWriteDescriptorSet descriptor_write = vku::InitStructHelper();
     descriptor_write.dstSet = ds.set_;
     descriptor_write.dstBinding = 0;
     descriptor_write.descriptorCount = 1;
@@ -415,10 +404,9 @@ TEST_F(PositiveShaderStorageImage, UnknownWriteLessComponentMultiEntrypoint) {
     VkShaderObj const fs(this, source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitInfo();
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
     pipe.InitState();
-    pipe.pipeline_layout_ = VkPipelineLayoutObj(m_device, {&ds.layout_});
+    pipe.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&ds.layout_});
     pipe.CreateGraphicsPipeline();
 
     m_commandBuffer->begin();

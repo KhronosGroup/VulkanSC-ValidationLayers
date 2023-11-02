@@ -44,15 +44,19 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/dynamic_state_positive.cpp
     converted/external_memory_sync.cpp
     converted/external_memory_sync_positive.cpp
-    converted/format_utils_positive.cpp
     converted/fragment_shading_rate.cpp
     converted/fragment_shading_rate_positive.cpp
     converted/geometry_tessellation.cpp
+    converted/geometry_tessellation_positive.cpp
     converted/gpu_av.cpp
     converted/gpu_av_positive.cpp
     converted/graphics_library.cpp
     converted/graphics_library_positive.cpp
+    converted/host_image_copy.cpp
+    converted/host_image_copy_positive.cpp
     converted/image.cpp
+    converted/image_drm.cpp
+    converted/image_drm_positive.cpp
     converted/image_positive.cpp
     converted/imageless_framebuffer.cpp
     converted/imageless_framebuffer_positive.cpp
@@ -63,12 +67,12 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/memory_positive.cpp
     converted/mesh.cpp
     converted/mesh_positive.cpp
-    converted/multi_device.cpp
     converted/multiview.cpp
     converted/nvidia_best_practices.cpp
     converted/object_lifetime.cpp
     converted/other_positive.cpp
     converted/others.cpp
+    converted/parent.cpp
     converted/pipeline.cpp
     converted/pipeline_advanced_blend.cpp
     converted/pipeline_layout.cpp
@@ -79,6 +83,8 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/portability_subset.cpp
     converted/protected_memory.cpp
     converted/protected_memory_positive.cpp
+    converted/push_descriptor.cpp
+    converted/push_descriptor_positive.cpp
     converted/query.cpp
     converted/query_positive.cpp
     converted/ray_tracing.cpp
@@ -112,8 +118,10 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/shader_storage_image_positive.cpp
     converted/shader_storage_texel.cpp
     converted/shader_storage_texel_positive.cpp
-    converted/sparse.cpp
-    converted/sparse_positive.cpp
+    converted/sparse_buffer.cpp
+    converted/sparse_buffer_positive.cpp
+    converted/sparse_image.cpp
+    converted/sparse_image_positive.cpp
     converted/subgroups.cpp
     converted/subpass.cpp
     converted/subpass_positive.cpp
@@ -121,6 +129,8 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/sync_object_positive.cpp
     converted/sync_val.cpp
     converted/sync_val_positive.cpp
+    converted/threading.cpp
+    converted/threading_positive.cpp
     converted/tooling_positive.cpp
     converted/transform_feedback.cpp
     converted/vertex_input.cpp

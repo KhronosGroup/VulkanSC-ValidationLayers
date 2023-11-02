@@ -27,17 +27,7 @@
 
 #include <vulkan/vulkan.h>
 
-#ifdef _MSC_VER
-#pragma warning(push)
-/*
-    warnings 4251 and 4275 have to do with potential dll-interface mismatch
-    between library (gtest) and users. Since we build the gtest library
-    as part of the test build we know that the dll-interface will match and
-    can disable these warnings.
- */
-#pragma warning(disable : 4251)
-#pragma warning(disable : 4275)
-#endif
+#include <vulkan/vk_enum_string_helper.h>
 
 // GTest and Xlib collide due to redefinitions of "None" and "Bool"
 #ifdef VK_USE_PLATFORM_XLIB_KHR
@@ -47,12 +37,7 @@
 #undef Bool
 #endif
 
-// Use the NDK's header on Android
-#ifndef __ANDROID__
-#include "gtest/gtest.h"
-#else
-#include "gtest/gtest.h"
-#endif
+#include <gtest/gtest.h>
 
 // Redefine Xlib definitions
 #ifdef VK_USE_PLATFORM_XLIB_KHR
@@ -60,81 +45,13 @@
 #pragma pop_macro("None")
 #endif
 
-#ifdef _MSC_VER
-#pragma warning(pop)
-#endif
+// GTest has a GTEST_SKIP macro, but the test can't be actually "skipped" unless you are at the top function in the test.
+// The macro will call the function and then call 'return' if a skip has been called inside
+#define RETURN_IF_SKIP(function) \
+    function;                    \
+    if (::testing::Test::IsSkipped()) return;
+
 #include "binding.h"
 
-#define ASSERT_VK_SUCCESS(err)                                                 \
-    {                                                                          \
-        const VkResult resolved_err = err;                                     \
-        ASSERT_EQ(VK_SUCCESS, resolved_err) << vk_result_string(resolved_err); \
-    }
-
-static inline const char *vk_result_string(VkResult err) {
-    switch (err) {
-#define STR(r) \
-    case r:    \
-        return #r
-        STR(VK_SUCCESS);
-        STR(VK_NOT_READY);
-        STR(VK_TIMEOUT);
-        STR(VK_EVENT_SET);
-        STR(VK_EVENT_RESET);
-        STR(VK_INCOMPLETE);
-        STR(VK_ERROR_OUT_OF_HOST_MEMORY);
-        STR(VK_ERROR_OUT_OF_DEVICE_MEMORY);
-        STR(VK_ERROR_INITIALIZATION_FAILED);
-        STR(VK_ERROR_DEVICE_LOST);
-        STR(VK_ERROR_MEMORY_MAP_FAILED);
-        STR(VK_ERROR_LAYER_NOT_PRESENT);
-        STR(VK_ERROR_EXTENSION_NOT_PRESENT);
-        STR(VK_ERROR_FEATURE_NOT_PRESENT);
-        STR(VK_ERROR_INCOMPATIBLE_DRIVER);
-        STR(VK_ERROR_TOO_MANY_OBJECTS);
-        STR(VK_ERROR_FORMAT_NOT_SUPPORTED);
-        STR(VK_ERROR_FRAGMENTED_POOL);
-        STR(VK_ERROR_UNKNOWN);
-        STR(VK_ERROR_OUT_OF_POOL_MEMORY);
-        STR(VK_ERROR_INVALID_EXTERNAL_HANDLE);
-        STR(VK_ERROR_FRAGMENTATION);
-        STR(VK_ERROR_INVALID_OPAQUE_CAPTURE_ADDRESS);
-        STR(VK_ERROR_SURFACE_LOST_KHR);
-        STR(VK_ERROR_NATIVE_WINDOW_IN_USE_KHR);
-        STR(VK_SUBOPTIMAL_KHR);
-        STR(VK_ERROR_OUT_OF_DATE_KHR);
-        STR(VK_ERROR_INCOMPATIBLE_DISPLAY_KHR);
-        STR(VK_ERROR_VALIDATION_FAILED_EXT);
-        STR(VK_ERROR_INVALID_SHADER_NV);
-        STR(VK_ERROR_INVALID_DRM_FORMAT_MODIFIER_PLANE_LAYOUT_EXT);
-        STR(VK_ERROR_NOT_PERMITTED_EXT);
-        STR(VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT);
-#undef STR
-        default:
-            return "UNKNOWN_RESULT";
-    }
-}
-
-static inline void test_error_callback(const char *expr, const char *file, unsigned int line, const char *function) {
-    ADD_FAILURE_AT(file, line) << "Assertion: `" << expr << "'";
-}
-
-// Wrap FAIL:
-//  * DRY for common messages
-//  * for test stability reasons sometimes cleanup code is required *prior* to the return hidden in FAIL
-//  * result_arg_ *can* (should) have side-effect, but is referenced exactly once
-//  * label_ must be converitble to bool, and *should* *not* have side-effects
-//  * clean_ *can* (should) have side-effects
-//    * "{}" or ";" are valid clean_ values for noop
-#define REQUIRE_SUCCESS(result_arg_, label_, clean_)                    \
-    {                                                                   \
-        const VkResult result_ = (result_arg_);                         \
-        if (result_ != VK_SUCCESS) {                                    \
-            { clean_; }                                                 \
-            if (bool(label_)) {                                         \
-                FAIL() << string_VkResult(result_) << ": " << (label_); \
-            } else {                                                    \
-                FAIL() << string_VkResult(result_);                     \
-            }                                                           \
-        }                                                               \
-    }
+// Stream operator for VkResult so GTEST will print out error codes as strings (automatically)
+inline std::ostream& operator<<(std::ostream& os, const VkResult& result) { return os << string_VkResult(result); }

@@ -44,8 +44,14 @@ target_sources(vksc_layer_validation_tests PRIVATE
     ../framework/binding.cpp
     ../framework/test_framework.h
     ../framework/test_framework.cpp
+    ../framework/pipeline_helper.h
+    ../framework/pipeline_helper.cpp
+    ../framework/ray_tracing_nv.h
+    ../framework/ray_tracing_nv.cpp
     ../framework/ray_tracing_objects.h
     ../framework/ray_tracing_objects.cpp
+    ../framework/external_memory_sync.h
+    ../framework/external_memory_sync.cpp
     negative/command.cpp
     negative/device_create.cpp
     negative/implicit.cpp
@@ -95,8 +101,8 @@ elseif(MSVC)
     endif()
 endif()
 
-find_package(GTest REQUIRED CONFIG QUIET)
-find_package(glslang REQUIRED CONFIG QUIET)
+find_package(GTest CONFIG)
+find_package(glslang CONFIG)
 
 target_link_libraries(vksc_layer_validation_tests PRIVATE
     VkLayer_utils
@@ -108,13 +114,28 @@ target_link_libraries(vksc_layer_validation_tests PRIVATE
     glslang::HLSL
     glslang::SPIRV
     glslang::SPVRemapper
-    VVL-SPIRV-LIBS
+    SPIRV-Headers::SPIRV-Headers
     GTest::gtest
     GTest::gtest_main
     $<TARGET_NAME_IF_EXISTS:PkgConfig::XCB>
     $<TARGET_NAME_IF_EXISTS:PkgConfig::X11>
     $<TARGET_NAME_IF_EXISTS:PkgConfig::WAYlAND_CLIENT>
 )
+
+find_package(SPIRV-Tools CONFIG QUIET)
+
+# See https://github.com/KhronosGroup/SPIRV-Tools/issues/3909 for background on this.
+# The targets available from SPIRV-Tools change depending on how SPIRV_TOOLS_BUILD_STATIC is set.
+# Try to handle all possible combinations so that we work with externally built packages.
+if (TARGET SPIRV-Tools)
+    target_link_libraries(vksc_layer_validation_tests PRIVATE SPIRV-Tools)
+elseif(TARGET SPIRV-Tools-static)
+    target_link_libraries(vksc_layer_validation_tests PRIVATE SPIRV-Tools-static)
+elseif(TARGET SPIRV-Tools-shared)
+    target_link_libraries(vksc_layer_validation_tests PRIVATE SPIRV-Tools-shared)
+else()
+    message(FATAL_ERROR "Cannot determine SPIRV-Tools target name")
+endif()
 
 install(TARGETS vksc_layer_validation_tests)
 

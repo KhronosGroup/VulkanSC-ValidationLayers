@@ -16,19 +16,17 @@
  */
 
 #include "../framework/layer_validation_tests.h"
+#include "../framework/pipeline_helper.h"
 
 TEST_F(NegativeShaderStorageImage, DISABLED_MissingFormatRead) {
     TEST_DESCRIPTION("Create a shader reading a storage image without an image format");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (DeviceValidationVersion() < VK_API_VERSION_1_2) {
-        GTEST_SKIP() << "At least Vulkan version 1.2 is required";
-    }
+    RETURN_IF_SKIP(InitFramework())
     VkPhysicalDeviceFeatures features;
     vk::GetPhysicalDeviceFeatures(gpu(), &features);
     features.shaderStorageImageReadWithoutFormat = VK_FALSE;
-    ASSERT_NO_FATAL_FAILURE(InitState(&features));
+    RETURN_IF_SKIP(InitState(&features));
 
     // Checks based off shaderStorageImage(Read|Write)WithoutFormat are
     // disabled if VK_KHR_format_feature_flags2 is supported.
@@ -86,15 +84,14 @@ TEST_F(NegativeShaderStorageImage, DISABLED_MissingFormatRead) {
                                      });
 
     CreateComputePipelineHelper cs_pipeline(*this);
-    cs_pipeline.InitInfo();
     cs_pipeline.cs_ =
         std::make_unique<VkShaderObj>(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
     cs_pipeline.InitState();
-    cs_pipeline.pipeline_layout_ = VkPipelineLayoutObj(m_device, {&ds.layout_});
+    cs_pipeline.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&ds.layout_});
     cs_pipeline.LateBindPipelineInfo();
     cs_pipeline.cp_ci_.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;  // override with wrong value
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkShaderModuleCreateInfo-pCode-08740");
-    cs_pipeline.CreateComputePipeline(true, false);  // need false to prevent late binding
+    cs_pipeline.CreateComputePipeline(false);  // need false to prevent late binding
     m_errorMonitor->VerifyFound();
 }
 
@@ -102,14 +99,11 @@ TEST_F(NegativeShaderStorageImage, DISABLED_MissingFormatWrite) {
     TEST_DESCRIPTION("Create a shader writing a storage image without an image format");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (DeviceValidationVersion() < VK_API_VERSION_1_2) {
-        GTEST_SKIP() << "At least Vulkan version 1.2 is required";
-    }
+    RETURN_IF_SKIP(InitFramework())
     VkPhysicalDeviceFeatures features;
     vk::GetPhysicalDeviceFeatures(gpu(), &features);
     features.shaderStorageImageWriteWithoutFormat = VK_FALSE;
-    ASSERT_NO_FATAL_FAILURE(InitState(&features));
+    RETURN_IF_SKIP(InitState(&features));
 
     // Checks based off shaderStorageImage(Read|Write)WithoutFormat are
     // disabled if VK_KHR_format_feature_flags2 is supported.
@@ -162,29 +156,23 @@ TEST_F(NegativeShaderStorageImage, DISABLED_MissingFormatWrite) {
                                      });
 
     CreateComputePipelineHelper cs_pipeline(*this);
-    cs_pipeline.InitInfo();
     cs_pipeline.cs_ =
         std::make_unique<VkShaderObj>(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
     cs_pipeline.InitState();
-    cs_pipeline.pipeline_layout_ = VkPipelineLayoutObj(m_device, {&ds.layout_});
+    cs_pipeline.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&ds.layout_});
     cs_pipeline.LateBindPipelineInfo();
     cs_pipeline.cp_ci_.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;  // override with wrong value
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkShaderModuleCreateInfo-pCode-08740");
-    cs_pipeline.CreateComputePipeline(true, false);  // need false to prevent late binding
+    cs_pipeline.CreateComputePipeline(false);  // need false to prevent late binding
     m_errorMonitor->VerifyFound();
 }
 
 TEST_F(NegativeShaderStorageImage, MissingFormatReadForFormat) {
     TEST_DESCRIPTION("Create a shader reading a storage image without an image format");
-
-    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+    SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, nullptr, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
-
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
+    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitState(nullptr, nullptr, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
 
     struct {
         VkFormat format;
@@ -197,8 +185,8 @@ TEST_F(NegativeShaderStorageImage, MissingFormatReadForFormat) {
     for (uint32_t fmt = VK_FORMAT_R4G4_UNORM_PACK8; fmt < VK_FORMAT_D16_UNORM; fmt++) {
         if (has_without_format_test && has_with_format_test) break;
 
-        auto fmt_props_3 = LvlInitStruct<VkFormatProperties3KHR>();
-        auto fmt_props = LvlInitStruct<VkFormatProperties2>(&fmt_props_3);
+        VkFormatProperties3KHR fmt_props_3 = vku::InitStructHelper();
+        VkFormatProperties2 fmt_props = vku::InitStructHelper(&fmt_props_3);
 
         vk::GetPhysicalDeviceFormatProperties2KHR(gpu(), (VkFormat)fmt, &fmt_props);
 
@@ -276,14 +264,13 @@ TEST_F(NegativeShaderStorageImage, MissingFormatReadForFormat) {
                                      });
 
     CreateComputePipelineHelper cs_pipeline(*this);
-    cs_pipeline.InitInfo();
     cs_pipeline.cs_ =
         std::make_unique<VkShaderObj>(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
     cs_pipeline.InitState();
-    cs_pipeline.pipeline_layout_ = VkPipelineLayoutObj(m_device, {&ds.layout_});
+    cs_pipeline.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&ds.layout_});
     cs_pipeline.LateBindPipelineInfo();
     cs_pipeline.cp_ci_.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;  // override with wrong value
-    cs_pipeline.CreateComputePipeline(true, false);                // need false to prevent late binding
+    cs_pipeline.CreateComputePipeline(false);                      // need false to prevent late binding
 
     for (int t = 0; t < n_tests; t++) {
         VkFormat format = tests[t].format;
@@ -295,7 +282,7 @@ TEST_F(NegativeShaderStorageImage, MissingFormatReadForFormat) {
         image_info.imageView = image.targetView(format);
         image_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
-        VkWriteDescriptorSet descriptor_write = LvlInitStruct<VkWriteDescriptorSet>();
+        VkWriteDescriptorSet descriptor_write = vku::InitStructHelper();
         descriptor_write.dstSet = ds.set_;
         descriptor_write.dstBinding = 0;
         descriptor_write.descriptorCount = 1;
@@ -307,7 +294,7 @@ TEST_F(NegativeShaderStorageImage, MissingFormatReadForFormat) {
         m_commandBuffer->begin();
 
         {
-            VkImageMemoryBarrier img_barrier = LvlInitStruct<VkImageMemoryBarrier>();
+            VkImageMemoryBarrier img_barrier = vku::InitStructHelper();
             img_barrier.srcAccessMask = VK_ACCESS_HOST_READ_BIT;
             img_barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
             img_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -340,15 +327,10 @@ TEST_F(NegativeShaderStorageImage, MissingFormatReadForFormat) {
 
 TEST_F(NegativeShaderStorageImage, MissingFormatWriteForFormat) {
     TEST_DESCRIPTION("Create a shader writing a storage image without an image format");
-
-    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+    SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, nullptr, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
-
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
+    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitState(nullptr, nullptr, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
 
     struct {
         VkFormat format;
@@ -361,8 +343,8 @@ TEST_F(NegativeShaderStorageImage, MissingFormatWriteForFormat) {
     for (uint32_t fmt = VK_FORMAT_R4G4_UNORM_PACK8; fmt < VK_FORMAT_D16_UNORM; fmt++) {
         if (has_without_format_test && has_with_format_test) break;
 
-        auto fmt_props_3 = LvlInitStruct<VkFormatProperties3KHR>();
-        auto fmt_props = LvlInitStruct<VkFormatProperties2>(&fmt_props_3);
+        VkFormatProperties3KHR fmt_props_3 = vku::InitStructHelper();
+        VkFormatProperties2 fmt_props = vku::InitStructHelper(&fmt_props_3);
 
         vk::GetPhysicalDeviceFormatProperties2KHR(gpu(), (VkFormat)fmt, &fmt_props);
 
@@ -436,14 +418,13 @@ TEST_F(NegativeShaderStorageImage, MissingFormatWriteForFormat) {
                                      });
 
     CreateComputePipelineHelper cs_pipeline(*this);
-    cs_pipeline.InitInfo();
     cs_pipeline.cs_ =
         std::make_unique<VkShaderObj>(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
     cs_pipeline.InitState();
-    cs_pipeline.pipeline_layout_ = VkPipelineLayoutObj(m_device, {&ds.layout_});
+    cs_pipeline.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&ds.layout_});
     cs_pipeline.LateBindPipelineInfo();
     cs_pipeline.cp_ci_.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;  // override with wrong value
-    cs_pipeline.CreateComputePipeline(true, false);                // need false to prevent late binding
+    cs_pipeline.CreateComputePipeline(false);                      // need false to prevent late binding
 
     for (int t = 0; t < n_tests; t++) {
         VkFormat format = tests[t].format;
@@ -455,7 +436,7 @@ TEST_F(NegativeShaderStorageImage, MissingFormatWriteForFormat) {
         image_info.imageView = image.targetView(format);
         image_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
-        VkWriteDescriptorSet descriptor_write = LvlInitStruct<VkWriteDescriptorSet>();
+        VkWriteDescriptorSet descriptor_write = vku::InitStructHelper();
         descriptor_write.dstSet = ds.set_;
         descriptor_write.dstBinding = 0;
         descriptor_write.descriptorCount = 1;
@@ -467,7 +448,7 @@ TEST_F(NegativeShaderStorageImage, MissingFormatWriteForFormat) {
         m_commandBuffer->begin();
 
         {
-            VkImageMemoryBarrier img_barrier = LvlInitStruct<VkImageMemoryBarrier>();
+            VkImageMemoryBarrier img_barrier = vku::InitStructHelper();
             img_barrier.srcAccessMask = VK_ACCESS_HOST_READ_BIT;
             img_barrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
             img_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -506,14 +487,11 @@ TEST_F(NegativeShaderStorageImage, DISABLED_MissingNonReadableDecorationFormatRe
     // rather than as a device feature. The code we test here only looks at
     // the shader.
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (DeviceValidationVersion() < VK_API_VERSION_1_2) {
-        GTEST_SKIP() << "At least Vulkan version 1.2 is required";
-    }
+    RETURN_IF_SKIP(InitFramework())
     VkPhysicalDeviceFeatures features;
     vk::GetPhysicalDeviceFeatures(gpu(), &features);
     features.shaderStorageImageReadWithoutFormat = VK_FALSE;
-    ASSERT_NO_FATAL_FAILURE(InitState(&features));
+    RETURN_IF_SKIP(InitState(&features));
 
     if (DeviceExtensionSupported(gpu(), nullptr, VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME)) {
         GTEST_SKIP() << "VK_KHR_format_feature_flags2 is supported";
@@ -561,15 +539,14 @@ TEST_F(NegativeShaderStorageImage, DISABLED_MissingNonReadableDecorationFormatRe
                                      });
 
     CreateComputePipelineHelper cs_pipeline(*this);
-    cs_pipeline.InitInfo();
     cs_pipeline.cs_ =
         std::make_unique<VkShaderObj>(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
     cs_pipeline.InitState();
-    cs_pipeline.pipeline_layout_ = VkPipelineLayoutObj(m_device, {&ds.layout_});
+    cs_pipeline.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&ds.layout_});
     cs_pipeline.LateBindPipelineInfo();
     cs_pipeline.cp_ci_.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;  // override with wrong value
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-RuntimeSpirv-apiVersion-07955");
-    cs_pipeline.CreateComputePipeline(true, false);  // need false to prevent late binding
+    cs_pipeline.CreateComputePipeline(false);  // need false to prevent late binding
     m_errorMonitor->VerifyFound();
 }
 
@@ -581,14 +558,11 @@ TEST_F(NegativeShaderStorageImage, DISABLED_MissingNonWritableDecorationFormatWr
     // rather than as a device feature. The code we test here only looks at
     // the shader.
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (DeviceValidationVersion() < VK_API_VERSION_1_2) {
-        GTEST_SKIP() << "At least Vulkan version 1.2 is required";
-    }
+    RETURN_IF_SKIP(InitFramework())
     VkPhysicalDeviceFeatures features;
     vk::GetPhysicalDeviceFeatures(gpu(), &features);
     features.shaderStorageImageWriteWithoutFormat = VK_FALSE;
-    ASSERT_NO_FATAL_FAILURE(InitState(&features));
+    RETURN_IF_SKIP(InitState(&features));
 
     if (DeviceExtensionSupported(gpu(), nullptr, VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME)) {
         GTEST_SKIP() << "VK_KHR_format_feature_flags2 is supported";
@@ -631,15 +605,14 @@ TEST_F(NegativeShaderStorageImage, DISABLED_MissingNonWritableDecorationFormatWr
                                      });
 
     CreateComputePipelineHelper cs_pipeline(*this);
-    cs_pipeline.InitInfo();
     cs_pipeline.cs_ =
         std::make_unique<VkShaderObj>(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
     cs_pipeline.InitState();
-    cs_pipeline.pipeline_layout_ = VkPipelineLayoutObj(m_device, {&ds.layout_});
+    cs_pipeline.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&ds.layout_});
     cs_pipeline.LateBindPipelineInfo();
     cs_pipeline.cp_ci_.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;  // override with wrong value
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-RuntimeSpirv-apiVersion-07954");
-    cs_pipeline.CreateComputePipeline(true, false);  // need false to prevent late binding
+    cs_pipeline.CreateComputePipeline(false);  // need false to prevent late binding
     m_errorMonitor->VerifyFound();
 }
 
@@ -647,12 +620,9 @@ TEST_F(NegativeShaderStorageImage, DISABLED_WriteLessComponent) {
     TEST_DESCRIPTION("Test writing to image with less components.");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
-    if (DeviceValidationVersion() < VK_API_VERSION_1_2) {
-        GTEST_SKIP() << "At least Vulkan version 1.2 is required";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitState())
 
     // not valid GLSL, but would look like:
     // layout(set = 0, binding = 0, Rgba8ui) uniform uimage2D storageImage;
@@ -702,12 +672,9 @@ TEST_F(NegativeShaderStorageImage, DISABLED_WriteSpecConstantLessComponent) {
     TEST_DESCRIPTION("Test writing to image with less components with Texel being a spec constant.");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
-    if (DeviceValidationVersion() < VK_API_VERSION_1_2) {
-        GTEST_SKIP() << "At least Vulkan version 1.2 is required";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitState())
 
     // not valid GLSL, but would look like:
     // layout (constant_id = 0) const uint sc = 1;
@@ -773,11 +740,8 @@ TEST_F(NegativeShaderStorageImage, DISABLED_UnknownWriteLessComponent) {
     TEST_DESCRIPTION("Test writing to image unknown format with less components.");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
-    if (DeviceValidationVersion() < VK_API_VERSION_1_2) {
-        GTEST_SKIP() << "At least Vulkan version 1.2 is required";
-    }
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitState())
 
     // not valid GLSL, but would look like:
     // layout(set = 0, binding = 0, Unknown) readonly uniform uimage2D storageImage;
@@ -822,6 +786,13 @@ TEST_F(NegativeShaderStorageImage, DISABLED_UnknownWriteLessComponent) {
         GTEST_SKIP() << "Format doesn't support storage image";
     }
 
+    VkFormatProperties3KHR fmt_props_3 = vku::InitStructHelper();
+    VkFormatProperties2 fmt_props = vku::InitStructHelper(&fmt_props_3);
+    vk::GetPhysicalDeviceFormatProperties2(gpu(), format, &fmt_props);
+    if ((fmt_props_3.optimalTilingFeatures & VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT_KHR) == 0) {
+        GTEST_SKIP() << "Format doesn't support storage write without format";
+    }
+
     VkImageObj image(m_device);
     image.Init(32, 32, 1, format, VK_IMAGE_USAGE_STORAGE_BIT, VK_IMAGE_TILING_OPTIMAL);
 
@@ -829,7 +800,7 @@ TEST_F(NegativeShaderStorageImage, DISABLED_UnknownWriteLessComponent) {
     image_info.imageView = image.targetView(format);
     image_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
-    VkWriteDescriptorSet descriptor_write = LvlInitStruct<VkWriteDescriptorSet>();
+    VkWriteDescriptorSet descriptor_write = vku::InitStructHelper();
     descriptor_write.dstSet = ds.set_;
     descriptor_write.dstBinding = 0;
     descriptor_write.descriptorCount = 1;
@@ -838,17 +809,98 @@ TEST_F(NegativeShaderStorageImage, DISABLED_UnknownWriteLessComponent) {
     vk::UpdateDescriptorSets(m_device->device(), 1, &descriptor_write, 0, nullptr);
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.InitInfo();
     pipe.cs_ = std::make_unique<VkShaderObj>(this, source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
     pipe.InitState();
-    pipe.pipeline_layout_ = VkPipelineLayoutObj(m_device, {&ds.layout_});
+    pipe.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&ds.layout_});
     pipe.CreateComputePipeline();
 
     m_commandBuffer->begin();
     vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_);
     vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0, 1,
                               &ds.set_, 0, nullptr);
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDispatch-None-04115");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDispatch-OpImageWrite-08795");
+    vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
+    m_errorMonitor->VerifyFound();
+    m_commandBuffer->end();
+}
+
+TEST_F(NegativeShaderStorageImage, UnknownWriteComponentA8Unorm) {
+    TEST_DESCRIPTION("Test writing to image unknown format with VK_FORMAT_A8_UNORM_KHR.");
+
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitState())
+
+    // not valid GLSL, but would look like:
+    // layout(set = 0, binding = 0, Unknown) readonly uniform image2D storageImage;
+    // imageStore(storageImage, ivec2(1, 1), vec3(1, 1, 1));
+    //
+    // only have 3 components
+    const char *source = R"(
+               OpCapability Shader
+               OpCapability StorageImageWriteWithoutFormat
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %main "main" %var
+               OpExecutionMode %main LocalSize 1 1 1
+               OpDecorate %var DescriptorSet 0
+               OpDecorate %var Binding 0
+               OpDecorate %var NonReadable
+       %void = OpTypeVoid
+       %func = OpTypeFunction %void
+        %int = OpTypeInt 32 1
+      %float = OpTypeFloat 32
+      %image = OpTypeImage %float 2D 0 0 0 2 Unknown
+        %ptr = OpTypePointer UniformConstant %image
+        %var = OpVariable %ptr UniformConstant
+      %v2int = OpTypeVector %int 2
+      %int_1 = OpConstant %int 1
+      %coord = OpConstantComposite %v2int %int_1 %int_1
+     %v3float = OpTypeVector %float 3
+     %float_1 = OpConstant %float 1
+    %texelU3 = OpConstantComposite %v3float %float_1 %float_1 %float_1
+       %main = OpFunction %void None %func
+      %label = OpLabel
+       %load = OpLoad %image %var
+               OpImageWrite %load %coord %texelU3 ZeroExtend
+               OpReturn
+               OpFunctionEnd
+        )";
+    OneOffDescriptorSet ds(m_device, {
+                                         {0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+                                     });
+
+    const VkFormat format = VK_FORMAT_A8_UNORM_KHR;
+    if (!ImageFormatAndFeaturesSupported(gpu(), format, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT)) {
+        GTEST_SKIP() << "Format doesn't support storage image";
+    }
+
+    VkImageObj image(m_device);
+    image.Init(32, 32, 1, format, VK_IMAGE_USAGE_STORAGE_BIT, VK_IMAGE_TILING_OPTIMAL);
+
+    VkDescriptorImageInfo image_info = {};
+    image_info.imageView = image.targetView(format);
+    image_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+    VkWriteDescriptorSet descriptor_write = vku::InitStructHelper();
+    descriptor_write.dstSet = ds.set_;
+    descriptor_write.dstBinding = 0;
+    descriptor_write.descriptorCount = 1;
+    descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    descriptor_write.pImageInfo = &image_info;
+    vk::UpdateDescriptorSets(m_device->device(), 1, &descriptor_write, 0, nullptr);
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cs_ = std::make_unique<VkShaderObj>(this, source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
+    pipe.InitState();
+    pipe.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&ds.layout_});
+    pipe.CreateComputePipeline();
+
+    m_commandBuffer->begin();
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_);
+    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0, 1,
+                              &ds.set_, 0, nullptr);
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDispatch-OpImageWrite-08796");
     vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
     m_errorMonitor->VerifyFound();
     m_commandBuffer->end();

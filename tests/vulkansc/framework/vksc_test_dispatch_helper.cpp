@@ -18,7 +18,6 @@
 #include "vksc_test_dispatch_helper.h"
 #include "vksc_test_pipeline_cache_helper.h"
 #include "vksc_render_framework.h"
-#include "generated/vk_typemap_helper.h"
 
 #include "gtest/gtest.h"
 
@@ -36,7 +35,7 @@ static VkPerformanceQueryReservationInfoKHR default_perf_query_reservation_info{
 
 static void InitDefaultObjectReservationInfo() {
     // Initialize default object reservation info
-    default_object_reservation_info = LvlInitStruct<VkDeviceObjectReservationCreateInfo>();
+    default_object_reservation_info = vku::InitStruct<VkDeviceObjectReservationCreateInfo>();
 
     default_object_reservation_info.pipelineCacheCreateInfoCount = 1;
     default_object_reservation_info.pPipelineCacheCreateInfos = &GetDefaultPipelineCacheCreateInfo();
@@ -87,17 +86,13 @@ static void InitDefaultObjectReservationInfo() {
     // TODO: Vulkan SC - Enable this once private data support actually arrives to Vulkan SC
 #if 0
     // Private data reservation info
-    default_private_data_reservation_info = LvlInitStruct<VkDevicePrivateDataCreateInfoEXT>();
+    default_private_data_reservation_info = vku::InitStruct<VkDevicePrivateDataCreateInfoEXT>();
     default_private_data_reservation_info.privateDataSlotRequestCount = 16;
-    default_private_data_reservation_info.pNext = default_object_reservation_info.pNext;
-    default_object_reservation_info.pNext = &default_private_data_reservation_info;
 #endif
 
     // Performance query reservation info
-    default_perf_query_reservation_info = LvlInitStruct<VkPerformanceQueryReservationInfoKHR>();
+    default_perf_query_reservation_info = vku::InitStruct<VkPerformanceQueryReservationInfoKHR>();
     default_perf_query_reservation_info.maxPerformanceQueriesPerPool = 8;
-    default_perf_query_reservation_info.pNext = default_object_reservation_info.pNext;
-    default_object_reservation_info.pNext = &default_perf_query_reservation_info;
 }
 
 const VkDeviceObjectReservationCreateInfo& GetDefaultObjectReservationCreateInfo() { return default_object_reservation_info; }
@@ -248,14 +243,17 @@ static VKAPI_ATTR VkResult VKAPI_CALL CreateInstance(const VkInstanceCreateInfo*
                                                      const VkAllocationCallbacks* pAllocator, VkInstance* pInstance) {
     // Override requested Vulkan API version with corresponding Vulkan SC API version
     auto create_info = *pCreateInfo;
-    auto app_info = LvlInitStruct<VkApplicationInfo>();
+    auto app_info = vku::InitStruct<VkApplicationInfo>();
     if (create_info.pApplicationInfo != nullptr) {
         app_info = *create_info.pApplicationInfo;
     }
     create_info.pApplicationInfo = &app_info;
     if (VK_API_VERSION_VARIANT(app_info.apiVersion) != VKSC_API_VARIANT) {
-        assert(app_info.apiVersion <= VK_API_VERSION_1_2);
-        app_info.apiVersion = VKSC_API_VERSION_1_0;
+        if (app_info.apiVersion <= VK_API_VERSION_1_2) {
+            app_info.apiVersion = VKSC_API_VERSION_1_0;
+        } else {
+            DispatchHelper()->SkipUnsupportedTest("Test case was written against Vulkan 1.3");
+        }
     }
     VkResult result = vksc::CreateInstance(&create_info, pAllocator, pInstance);
     if (result == VK_SUCCESS && DispatchHelper() != nullptr) {
@@ -279,15 +277,22 @@ static VKAPI_ATTR VkResult VKAPI_CALL CreateDevice(VkPhysicalDevice physicalDevi
     VkDeviceCreateInfo create_info = *pCreateInfo;
 
     VkDeviceObjectReservationCreateInfo object_reservation_info;
-    if (!LvlFindInChain<VkDeviceObjectReservationCreateInfo>(create_info.pNext)) {
+    if (!vku::FindStructInPNextChain<VkDeviceObjectReservationCreateInfo>(create_info.pNext)) {
         object_reservation_info = vksc::default_object_reservation_info;
         object_reservation_info.pNext = create_info.pNext;
         create_info.pNext = &object_reservation_info;
     }
 
+    VkPerformanceQueryReservationInfoKHR perf_query_reservation_info;
+    if (!vku::FindStructInPNextChain<VkPerformanceQueryReservationInfoKHR>(create_info.pNext)) {
+        perf_query_reservation_info = vksc::default_perf_query_reservation_info;
+        perf_query_reservation_info.pNext = create_info.pNext;
+        create_info.pNext = &perf_query_reservation_info;
+    }
+
     VkPhysicalDeviceVulkanSC10Features sc_10_features;
-    if (!LvlFindInChain<VkPhysicalDeviceVulkanSC10Features>(create_info.pNext)) {
-        sc_10_features = LvlInitStruct<VkPhysicalDeviceVulkanSC10Features>();
+    if (!vku::FindStructInPNextChain<VkPhysicalDeviceVulkanSC10Features>(create_info.pNext)) {
+        sc_10_features = vku::InitStruct<VkPhysicalDeviceVulkanSC10Features>();
         sc_10_features.pNext = (void*)create_info.pNext;
         create_info.pNext = &sc_10_features;
     }
@@ -316,14 +321,14 @@ static VkResult CreatePipelines(VkDevice device, VkPipelineCache pipeline_cache,
                                 const CREATE_INFO* create_infos, VkPipeline* pipelines, CREATE_FUNC create_func) {
     // If the application did not provide a pipeline cache, let's use a default one
     if (pipeline_cache == VK_NULL_HANDLE) {
-        pipeline_cache = VkSCCompatibilityRenderFramework::Instance().GetDefaultPipelineCache();
+        pipeline_cache = VkSCCompatibilityRenderFramework::RenderFrameworkInstance().GetDefaultPipelineCache();
     }
 
     // When running Vulkan validation layer tests against the Vulkan SC validation layers
     // we need to manually inject the default offline pipeline creation info, if not present.
     bool need_to_chain_offline_info = false;
     for (uint32_t i = 0; i < create_info_count; ++i) {
-        if (!LvlFindInChain<VkPipelineOfflineCreateInfo>(create_infos[i].pNext)) {
+        if (!vku::FindStructInPNextChain<VkPipelineOfflineCreateInfo>(create_infos[i].pNext)) {
             need_to_chain_offline_info = true;
         }
     }
@@ -379,8 +384,8 @@ static VKAPI_ATTR VkResult VKAPI_CALL CreateCommandPool(VkDevice device, const V
     // pNext chain of pCreateInfo.
     VkCommandPoolCreateInfo create_info = *pCreateInfo;
 
-    auto mem_reservation_info = LvlInitStruct<VkCommandPoolMemoryReservationCreateInfo>();
-    if (!LvlFindInChain<VkCommandPoolMemoryReservationCreateInfo>(create_info.pNext)) {
+    auto mem_reservation_info = vku::InitStruct<VkCommandPoolMemoryReservationCreateInfo>();
+    if (!vku::FindStructInPNextChain<VkCommandPoolMemoryReservationCreateInfo>(create_info.pNext)) {
         mem_reservation_info.commandPoolReservedSize = 1024 * 1024;
         mem_reservation_info.commandPoolMaxCommandBuffers = 64;
         mem_reservation_info.pNext = create_info.pNext;
@@ -466,7 +471,7 @@ static VKAPI_ATTR VkResult VKAPI_CALL CreateFramebuffer(VkDevice device, const V
     // Vulkan SC allows maxFramebufferLayers = 1 in certain cases while Vulkan requires 256
     // so we have to skip test cases that rely on higher capabilities
     const uint32_t max_framebuffer_layers =
-        DispatchHelper()->TestCase()->DeviceObj()->phy().properties().limits.maxFramebufferLayers;
+        DispatchHelper()->TestCase()->DeviceObj()->phy().properties_.limits.maxFramebufferLayers;
     if (max_framebuffer_layers < 256 && pCreateInfo->layers > max_framebuffer_layers) {
         DispatchHelper()->SkipUnsupportedTest(
             "Test case relies on Vulkan minimum for maxFramebufferLayers but Vulkan SC allows for lower values");
@@ -578,7 +583,7 @@ void TestDispatchHelper::RegisterInstance(VkInstance instance) {
     // Create debug messenger for the instance (needed by some of the compatibility utilities)
     VkDebugUtilsMessengerEXT messenger = VK_NULL_HANDLE;
 
-    auto create_info = LvlInitStruct<VkDebugUtilsMessengerCreateInfoEXT>();
+    auto create_info = vku::InitStruct<VkDebugUtilsMessengerCreateInfoEXT>();
     create_info.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
                                   VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT;
     create_info.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;

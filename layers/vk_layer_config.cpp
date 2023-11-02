@@ -112,13 +112,6 @@ std::string GetEnvironment(const char *variable) {
 }
 
 const char *getLayerOption(const char *option) { return layer_config.GetOption(option); }
-const char *GetLayerEnvVar(const char *option) {
-    // NOTE: new code should use GetEnvironment directly. This is a workaround for the problem
-    // described in https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/3048
-    static std::string result;
-    result = GetEnvironment(option);
-    return result.c_str();
-}
 
 const SettingsFileInfo *GetLayerSettingsFileInfo() { return &layer_config.settings_info; }
 
@@ -178,8 +171,6 @@ VkFlags GetLayerOptionFlags(const string &option, vvl::unordered_map<string, VkF
     }
     return flags;
 }
-
-void setLayerOption(const char *option, const char *value) { layer_config.SetOption(option, value); }
 
 // Constructor for ConfigFile. Initialize layers to log error messages to stdout by default. If a vk_layer_settings file is present,
 // its settings will override the defaults.
@@ -428,7 +419,13 @@ void PrintMessageType(VkFlags vk_flags, char *msg_flags) {
 
 // Require at least NDK 20 to build Validation Layers. Makes everything simpler to just have people building the layers to use a
 // recent (over 2 years old) version of the NDK.
-#if __NDK_MAJOR__ < 20
+//
+// This avoids issues with older NDKs which complicate correct CMake builds:
+// Example:
+//
+// The NDK toolchain file in r23 contains a bug which means CMAKE_ANDROID_EXCEPTIONS might not be set correctly in some
+// circumstances, if not set directly by the developer.
+#if __NDK_MAJOR__ < 25
 #error "Validation Layers require at least NDK r20 or greater to build"
 #endif
 

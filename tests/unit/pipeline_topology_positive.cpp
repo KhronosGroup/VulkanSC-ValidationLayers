@@ -12,20 +12,19 @@
  */
 
 #include "../framework/layer_validation_tests.h"
+#include "../framework/pipeline_helper.h"
 
 TEST_F(PositivePipelineTopology, PointSizeWriteInFunction) {
     TEST_DESCRIPTION("Create a pipeline using TOPOLOGY_POINT_LIST and write PointSize in vertex shader function.");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
-    ASSERT_NO_FATAL_FAILURE(InitViewport());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
 
     // Create VS declaring PointSize and write to it in a function call.
     VkShaderObj vs(this, kVertexPointSizeGlsl, VK_SHADER_STAGE_VERTEX_BIT);
     VkShaderObj ps(this, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
     {
         CreatePipelineHelper pipe(*this);
-        pipe.InitInfo();
         pipe.shader_stages_ = {vs.GetStageCreateInfo(), ps.GetStageCreateInfo()};
         pipe.ia_ci_.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
         pipe.InitState();
@@ -37,13 +36,12 @@ TEST_F(PositivePipelineTopology, PointSizeGeomShaderSuccess) {
     TEST_DESCRIPTION(
         "Create a pipeline using TOPOLOGY_POINT_LIST, set PointSize vertex shader, and write in the final geometry stage.");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
+    RETURN_IF_SKIP(Init())
 
     if ((!m_device->phy().features().geometryShader) || (!m_device->phy().features().shaderTessellationAndGeometryPointSize)) {
         GTEST_SKIP() << "Device does not support the required geometry shader features";
     }
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
-    ASSERT_NO_FATAL_FAILURE(InitViewport());
+    InitRenderTarget();
 
     // Create VS declaring PointSize and writing to it
     VkShaderObj vs(this, kVertexPointSizeGlsl, VK_SHADER_STAGE_VERTEX_BIT);
@@ -51,7 +49,6 @@ TEST_F(PositivePipelineTopology, PointSizeGeomShaderSuccess) {
     VkShaderObj ps(this, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitInfo();
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), gs.GetStageCreateInfo(), ps.GetStageCreateInfo()};
     // Set Input Assembly to TOPOLOGY POINT LIST
     pipe.ia_ci_.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
@@ -62,13 +59,12 @@ TEST_F(PositivePipelineTopology, PointSizeGeomShaderSuccess) {
 TEST_F(PositivePipelineTopology, PointSizeGeomShaderDontEmit) {
     TEST_DESCRIPTION("If vertex is not emitted, don't need Point Size in Geometry shader");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
+    RETURN_IF_SKIP(Init())
 
     if ((!m_device->phy().features().geometryShader) || (!m_device->phy().features().shaderTessellationAndGeometryPointSize)) {
         GTEST_SKIP() << "Device does not support the required geometry shader features";
     }
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
-    ASSERT_NO_FATAL_FAILURE(InitViewport());
+    InitRenderTarget();
 
     // Never calls OpEmitVertex
     static char const *gsSource = R"glsl(
@@ -94,9 +90,8 @@ TEST_F(PositivePipelineTopology, PointSizeGeomShaderDontEmit) {
 TEST_F(VkPositiveLayerTest, LoosePointSizeWrite) {
     TEST_DESCRIPTION("Create a pipeline using TOPOLOGY_POINT_LIST and write PointSize outside of a structure.");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
-    ASSERT_NO_FATAL_FAILURE(InitViewport());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
 
     const char *LoosePointSizeWrite = R"(
                                        OpCapability Shader
@@ -170,7 +165,6 @@ TEST_F(VkPositiveLayerTest, LoosePointSizeWrite) {
 
     {
         CreatePipelineHelper pipe(*this);
-        pipe.InitInfo();
         pipe.shader_stages_ = {vs.GetStageCreateInfo(), ps.GetStageCreateInfo()};
         // Set Input Assembly to TOPOLOGY POINT LIST
         pipe.ia_ci_.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
@@ -184,20 +178,11 @@ TEST_F(PositivePipelineTopology, PointSizeStructMemeberWritten) {
 
     SetTargetApiVersion(VK_API_VERSION_1_1); // At least 1.1 is required for maintenance4
     AddRequiredExtensions(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (DeviceValidationVersion() < VK_API_VERSION_1_1) {
-        GTEST_SKIP() << "At least Vulkan 1.1 is required";
-    }
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " required but not supported";
-    }
-    auto maint4features = LvlInitStruct<VkPhysicalDeviceMaintenance4FeaturesKHR>();
-    auto features2 = GetPhysicalDeviceFeatures2(maint4features);
-    if (!maint4features.maintenance4) {
-        GTEST_SKIP() << "VkPhysicalDeviceMaintenance4FeaturesKHR::maintenance4 is required but not enabled.";
-    }
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features2));
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitFramework())
+    VkPhysicalDeviceMaintenance4FeaturesKHR maint4features = vku::InitStructHelper();
+    GetPhysicalDeviceFeatures2(maint4features);
+    RETURN_IF_SKIP(InitState(nullptr, &maint4features));
+    InitRenderTarget();
 
     const std::string vs_src = R"asm(
                OpCapability Shader
@@ -291,7 +276,7 @@ TEST_F(PositivePipelineTopology, PointSizeStructMemeberWritten) {
                OpReturn
                OpFunctionEnd
     )asm";
-    auto vs = VkShaderObj::CreateFromASM(*this, VK_SHADER_STAGE_VERTEX_BIT, vs_src, "main");
+    auto vs = VkShaderObj::CreateFromASM(this, vs_src.c_str(), VK_SHADER_STAGE_VERTEX_BIT);
 
     if (vs) {
         // struct has {
@@ -315,7 +300,6 @@ TEST_F(PositivePipelineTopology, PointSizeStructMemeberWritten) {
         };
 
         CreatePipelineHelper pipe(*this);
-        pipe.InitInfo();
         pipe.shader_stages_ = {vs->GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
         pipe.pipeline_layout_ci_ = pipeline_layout_info;
         pipe.ia_ci_.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
@@ -333,21 +317,42 @@ TEST_F(PositivePipelineTopology, PointSizeStructMemeberWritten) {
 TEST_F(VkPositiveLayerTest, PSOPolygonModeValid) {
     TEST_DESCRIPTION("Verify that using a solid polygon fill mode works correctly.");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(Init())
+    InitRenderTarget();
 
     std::vector<const char *> device_extension_names;
     auto features = m_device->phy().features();
     // Artificially disable support for non-solid fill modes
     features.fillModeNonSolid = false;
     // The sacrificial device object
-    VkDeviceObj test_device(0, gpu(), device_extension_names, &features);
+    vkt::Device test_device(gpu(), device_extension_names, &features);
 
-    VkRenderpassObj render_pass(&test_device);
+    VkAttachmentReference attach = {};
+    attach.layout = VK_IMAGE_LAYOUT_GENERAL;
 
-    const VkPipelineLayoutObj pipeline_layout(&test_device);
+    VkSubpassDescription subpass = {};
+    subpass.pColorAttachments = &attach;
+    subpass.colorAttachmentCount = 1;
 
-    VkPipelineRasterizationStateCreateInfo rs_ci = LvlInitStruct<VkPipelineRasterizationStateCreateInfo>();
+    VkAttachmentDescription attach_desc = {};
+    attach_desc.format = VK_FORMAT_B8G8R8A8_UNORM;
+    attach_desc.samples = VK_SAMPLE_COUNT_1_BIT;
+    attach_desc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    attach_desc.finalLayout = VK_IMAGE_LAYOUT_GENERAL;
+    attach_desc.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    attach_desc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+
+    VkRenderPassCreateInfo rpci = vku::InitStructHelper();
+    rpci.subpassCount = 1;
+    rpci.pSubpasses = &subpass;
+    rpci.attachmentCount = 1;
+    rpci.pAttachments = &attach_desc;
+
+    vkt::RenderPass render_pass(test_device, rpci);
+
+    const vkt::PipelineLayout pipeline_layout(test_device);
+
+    VkPipelineRasterizationStateCreateInfo rs_ci = vku::InitStructHelper();
     rs_ci.lineWidth = 1.0f;
     rs_ci.rasterizerDiscardEnable = false;
 
@@ -358,32 +363,42 @@ TEST_F(VkPositiveLayerTest, PSOPolygonModeValid) {
 
     // Set polygonMode=FILL. No error is expected
     {
-        VkPipelineObj pipe(&test_device);
-        pipe.AddShader(&vs);
-        pipe.AddShader(&fs);
-        pipe.AddDefaultColorAttachment();
+        CreatePipelineHelper pipe(*this);
+        pipe.device_ = &test_device;
+        pipe.InitState();
+        pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
+        pipe.gp_ci_.layout = pipeline_layout.handle();
+        pipe.gp_ci_.renderPass = render_pass.handle();
         // Set polygonMode to a good value
         rs_ci.polygonMode = VK_POLYGON_MODE_FILL;
-        pipe.SetRasterization(&rs_ci);
-        pipe.CreateVKPipeline(pipeline_layout.handle(), render_pass.handle());
+        pipe.gp_ci_.pRasterizationState = &rs_ci;
+        pipe.CreateGraphicsPipeline();
     }
 }
 
 TEST_F(PositivePipelineTopology, NotPointSizeGeometry) {
     TEST_DESCRIPTION("Create a pipeline using TOPOLOGY_POINT_LIST, but geometry shader doesn't include PointSize.");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
+    RETURN_IF_SKIP(Init())
 
     if ((!m_device->phy().features().geometryShader)) {
         GTEST_SKIP() << "Device does not support the required geometry shader features";
     }
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
-    ASSERT_NO_FATAL_FAILURE(InitViewport());
+    InitRenderTarget();
 
-    VkShaderObj gs(this, kGeometryMinimalGlsl, VK_SHADER_STAGE_GEOMETRY_BIT);
+    static char const geom_src[] = R"glsl(
+        #version 460
+        layout(points) in;
+        layout(triangle_strip, max_vertices=3) out;
+        void main() {
+           gl_Position = vec4(1);
+           EmitVertex();
+        }
+    )glsl";
+
+    VkShaderObj gs(this, geom_src, VK_SHADER_STAGE_GEOMETRY_BIT);
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitInfo();
     pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), gs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
     pipe.ia_ci_.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
     pipe.InitState();
@@ -394,9 +409,9 @@ TEST_F(PositivePipelineTopology, NotPointSizeGeometry) {
 TEST_F(VkPositiveLayerTest, TopologyAtRasterizer) {
     TEST_DESCRIPTION("Test topology set when creating a pipeline with tessellation and geometry shader.");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
+    RETURN_IF_SKIP(Init())
 
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    InitRenderTarget();
 
     if (!m_device->phy().features().tessellationShader) {
         GTEST_SKIP() << "Device does not support tessellation shaders";
@@ -412,7 +427,7 @@ TEST_F(VkPositiveLayerTest, TopologyAtRasterizer) {
     )glsl";
     char const *tesSource = R"glsl(
         #version 450
-        layout(isolines, equal_spacing, cw) in;
+        layout(triangles, equal_spacing, cw) in;
         void main(){
            gl_Position.xyz = gl_TessCoord;
            gl_Position.w = 1.0f;
@@ -437,23 +452,17 @@ TEST_F(VkPositiveLayerTest, TopologyAtRasterizer) {
 
     VkPipelineTessellationStateCreateInfo tsci{VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO, nullptr, 0, 3};
 
-    VkDynamicState dyn_state = VK_DYNAMIC_STATE_LINE_WIDTH;
-    VkPipelineDynamicStateCreateInfo dyn_state_ci = LvlInitStruct<VkPipelineDynamicStateCreateInfo>();
-    dyn_state_ci.dynamicStateCount = 1;
-    dyn_state_ci.pDynamicStates = &dyn_state;
-
     CreatePipelineHelper pipe(*this);
-    pipe.InitInfo();
     pipe.gp_ci_.pTessellationState = &tsci;
     pipe.gp_ci_.pInputAssemblyState = &iasci;
     pipe.shader_stages_.emplace_back(gs.GetStageCreateInfo());
     pipe.shader_stages_.emplace_back(tcs.GetStageCreateInfo());
     pipe.shader_stages_.emplace_back(tes.GetStageCreateInfo());
     pipe.InitState();
-    pipe.dyn_state_ci_ = dyn_state_ci;
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_LINE_WIDTH);
     pipe.CreateGraphicsPipeline();
 
-    VkRenderPassBeginInfo rpbi = LvlInitStruct<VkRenderPassBeginInfo>();
+    VkRenderPassBeginInfo rpbi = vku::InitStructHelper();
     rpbi.renderPass = m_renderPass;
     rpbi.framebuffer = m_framebuffer;
     rpbi.renderArea.offset.x = 0;
@@ -467,7 +476,7 @@ TEST_F(VkPositiveLayerTest, TopologyAtRasterizer) {
     vk::CmdBeginRenderPass(m_commandBuffer->handle(), &rpbi, VK_SUBPASS_CONTENTS_INLINE);
     vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_);
     vk::CmdDraw(m_commandBuffer->handle(), 4, 1, 0, 0);
-    vk::CmdEndRenderPass(m_commandBuffer->handle());
+    m_commandBuffer->EndRenderPass();
     m_commandBuffer->end();
 }
 
@@ -477,37 +486,21 @@ TEST_F(PositivePipelineTopology, LineTopologyClasses) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
 
     AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
+    RETURN_IF_SKIP(InitFramework())
 
-    if (DeviceValidationVersion() < VK_API_VERSION_1_1) {
-        GTEST_SKIP() << "At least Vulkan version 1.1 is required";
-    }
-
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-
-    auto extended_dynamic_state_features = LvlInitStruct<VkPhysicalDeviceExtendedDynamicStateFeaturesEXT>();
+    VkPhysicalDeviceExtendedDynamicStateFeaturesEXT extended_dynamic_state_features = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(extended_dynamic_state_features);
 
     if (!extended_dynamic_state_features.extendedDynamicState) {
         GTEST_SKIP() << "Test requires (unsupported) extendedDynamicState";
     }
 
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &extended_dynamic_state_features));
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
-
-    const VkDynamicState dyn_states[1] = {
-        VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY_EXT,
-    };
+    RETURN_IF_SKIP(InitState(nullptr, &extended_dynamic_state_features));
+    InitRenderTarget();
 
     // Verify each vkCmdSet command
     CreatePipelineHelper pipe(*this);
-    pipe.InitInfo();
-    auto dyn_state_ci = LvlInitStruct<VkPipelineDynamicStateCreateInfo>();
-    dyn_state_ci.dynamicStateCount = size(dyn_states);
-    dyn_state_ci.pDynamicStates = dyn_states;
-    pipe.dyn_state_ci_ = dyn_state_ci;
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY_EXT);
     pipe.vi_ci_.vertexBindingDescriptionCount = 1;
     VkVertexInputBindingDescription inputBinding = {0, sizeof(float), VK_VERTEX_INPUT_RATE_VERTEX};
     pipe.vi_ci_.pVertexBindingDescriptions = &inputBinding;
@@ -518,16 +511,14 @@ TEST_F(PositivePipelineTopology, LineTopologyClasses) {
     pipe.InitState();
     pipe.CreateGraphicsPipeline();
 
-    const float vbo_data[3] = {0};
-    VkConstantBufferObj vb(m_device, sizeof(vbo_data), reinterpret_cast<const void *>(&vbo_data),
-                           VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+    vkt::Buffer vbo(*m_device, sizeof(float) * 3, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
-    VkCommandBufferObj cb(m_device, m_commandPool);
+    vkt::CommandBuffer cb(m_device, m_commandPool);
     cb.begin();
     cb.BeginRenderPass(m_renderPassBeginInfo);
 
     vk::CmdBindPipeline(cb.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_);
-    cb.BindVertexBuffer(&vb, 0, 0);
+    vk::CmdBindVertexBuffers(cb.handle(), 0, 1, &vbo.handle(), &kZeroDeviceSize);
     vk::CmdSetPrimitiveTopologyEXT(cb.handle(), VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY);
     vk::CmdDraw(cb.handle(), 1, 1, 0, 0);
 
@@ -543,20 +534,17 @@ TEST_F(PositivePipelineTopology, PointSizeDynamicAndUnestricted) {
 
     AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-    auto extended_dynamic_state_features = LvlInitStruct<VkPhysicalDeviceExtendedDynamicStateFeaturesEXT>();
+    RETURN_IF_SKIP(InitFramework())
+    VkPhysicalDeviceExtendedDynamicStateFeaturesEXT extended_dynamic_state_features = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(extended_dynamic_state_features);
     if (!extended_dynamic_state_features.extendedDynamicState) {
         GTEST_SKIP() << "Test requires (unsupported) extendedDynamicState";
     }
 
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &extended_dynamic_state_features));
-    ASSERT_NO_FATAL_FAILURE(InitRenderTarget());
+    RETURN_IF_SKIP(InitState(nullptr, &extended_dynamic_state_features));
+    InitRenderTarget();
 
-    auto dynamic_state_3_props = LvlInitStruct<VkPhysicalDeviceExtendedDynamicState3PropertiesEXT>();
+    VkPhysicalDeviceExtendedDynamicState3PropertiesEXT dynamic_state_3_props = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(dynamic_state_3_props);
     if (!dynamic_state_3_props.dynamicPrimitiveTopologyUnrestricted) {
         GTEST_SKIP() << "dynamicPrimitiveTopologyUnrestricted is VK_TRUE";
@@ -571,13 +559,52 @@ TEST_F(PositivePipelineTopology, PointSizeDynamicAndUnestricted) {
     VkShaderObj vs(this, vs_source, VK_SHADER_STAGE_VERTEX_BIT);
 
     const VkDynamicState dyn_state = VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY;
-    auto dyn_state_ci = LvlInitStruct<VkPipelineDynamicStateCreateInfo>();
+    VkPipelineDynamicStateCreateInfo dyn_state_ci = vku::InitStructHelper();
     dyn_state_ci.dynamicStateCount = 1;
     dyn_state_ci.pDynamicStates = &dyn_state;
 
     auto set_info = [&](CreatePipelineHelper &helper) {
         helper.ia_ci_.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
         helper.dyn_state_ci_ = dyn_state_ci;
+        helper.shader_stages_ = {vs.GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
+    };
+    CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
+}
+
+TEST_F(PositivePipelineTopology, PointSizeMaintenance5) {
+    TEST_DESCRIPTION(
+        "Create a pipeline using TOPOLOGY_POINT_LIST but do not set PointSize in vertex shader, but have maintenance5.");
+
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitFramework())
+
+    VkPhysicalDeviceMaintenance5FeaturesKHR maintenance5_features = vku::InitStructHelper();
+    GetPhysicalDeviceFeatures2(maintenance5_features);
+    RETURN_IF_SKIP(InitState(nullptr, &maintenance5_features));
+
+    InitRenderTarget();
+
+    const char *source = R"glsl(
+        #version 450
+        vec2 vertices[3];
+        out gl_PerVertex
+        {
+            vec4 gl_Position;
+            float gl_PointSize;
+        };
+        void main() {
+            vertices[0] = vec2(-1.0, -1.0);
+            vertices[1] = vec2( 1.0, -1.0);
+            vertices[2] = vec2( 0.0,  1.0);
+            gl_Position = vec4(vertices[gl_VertexIndex % 3], 0.0, 1.0);
+        }
+    )glsl";
+
+    VkShaderObj vs(this, source, VK_SHADER_STAGE_VERTEX_BIT);
+
+    auto set_info = [&](CreatePipelineHelper &helper) {
+        helper.ia_ci_.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
         helper.shader_stages_ = {vs.GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
     };
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit);

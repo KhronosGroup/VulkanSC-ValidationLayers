@@ -182,10 +182,10 @@ class SC_PIPELINE_STATE : public PIPELINE_STATE {
 
   private:
     const VkPipelineOfflineCreateInfo* FindOfflineCreateInfo(const VkGraphicsPipelineCreateInfo*) const {
-        return LvlFindInChain<VkPipelineOfflineCreateInfo>(create_info.graphics.pNext);
+        return vku::FindStructInPNextChain<VkPipelineOfflineCreateInfo>(create_info.graphics.pNext);
     }
 
     const VkPipelineOfflineCreateInfo* FindOfflineCreateInfo(const VkComputePipelineCreateInfo*) const {
-        return LvlFindInChain<VkPipelineOfflineCreateInfo>(create_info.compute.pNext);
+        return vku::FindStructInPNextChain<VkPipelineOfflineCreateInfo>(create_info.compute.pNext);
     }
 };

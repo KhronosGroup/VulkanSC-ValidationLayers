@@ -50,9 +50,12 @@ def buildListVUID(valid_usage_file: str) -> set:
 
     # List of VUs that should exists, but have a spec bug
     for vuid in [
-        # https://gitlab.khronos.org/vulkan/vulkan/-/issues/3553
-        "VUID-VkImageViewCreateInfo-commonparent",
-        "VUID-VkMicromapBuildInfoEXT-commonparent",
+        # https://gitlab.khronos.org/vulkan/vulkan/-/issues/3582
+        "VUID-VkCopyImageToImageInfoEXT-commonparent",
+        "VUID-vkUpdateDescriptorSetWithTemplate-descriptorSet-parent",
+        "VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-parent",
+        "VUID-vkDestroyVideoSessionParametersKHR-videoSessionParameters-parent",
+        "VUID-vkGetDescriptorSetHostMappingVALVE-descriptorSet-parent",
         ]:
         valid_vuids.add(vuid)
 
@@ -64,11 +67,3 @@ def getVUID(valid_vuids: set, vuid: str, quotes: bool = True) -> str:
         print(f'Warning: Could not find {vuid} in validusage.json')
         vuid = vuid.replace('VUID-', 'UNASSIGNED-')
     return vuid if not quotes else f'"{vuid}"'
-
-INDENT_SPACES = 4
-def incIndent(indent: str) -> str:
-    inc = ' ' * INDENT_SPACES
-    return indent + inc if indent else inc
-
-def decIndent(indent: str) -> str:
-    return indent[:-INDENT_SPACES] if indent and (len(indent) > INDENT_SPACES) else ''

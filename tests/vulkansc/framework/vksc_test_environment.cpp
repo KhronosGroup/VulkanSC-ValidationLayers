@@ -147,8 +147,6 @@ class VkSCTestEnvironment : public ::testing::Environment {
 void VkSCTestEnvironment::SetUp() {
     CheckEnvironmentVariables();
 
-    vk_testing::set_error_callback(test_error_callback);
-
     vk::InitCore("vulkansc");
 
     vksc::TestDispatchHelper::PatchDispatchTable();

@@ -20,16 +20,12 @@
 #include <vulkan/vulkan_core.h>
 #include "containers/custom_containers.h"
 
-namespace core_error {
 struct Location;
-}
-
 struct DeviceExtensions;
 struct SubresourceRangeErrorCodes;
 struct DeviceExtensions;
 
 namespace sync_vuid_maps {
-using core_error::Location;
 
 extern const std::map<VkPipelineStageFlags2KHR, std::string> kFeatureNameMap;
 
@@ -40,11 +36,16 @@ const std::string &GetBadAccessFlagsVUID(const Location &loc, VkAccessFlags2KHR 
 const std::string &GetStageQueueCapVUID(const Location &loc, VkPipelineStageFlags2KHR bit);
 
 enum class QueueError {
-    kSrcOrDstMustBeIgnore = 0,
-    kSpecialOrIgnoreOnly,
-    kSrcAndDstValidOrSpecial,
-    kSrcAndDestMustBeIgnore,
-    kSrcAndDstBothValid,
+    kSrcNoExternalExt = 0,
+    kDstNoExternalExt,
+    kSrcNoForeignExt,
+    kDstNoForeignExt,
+    kSync1ConcurrentNoIgnored,
+    kSync1ConcurrentSrc,
+    kSync1ConcurrentDst,
+    kExclusiveSrc,
+    kExclusiveDst,
+    kHostStage,
 };
 
 extern const std::map<QueueError, std::string> kQueueErrorSummary;
@@ -70,7 +71,8 @@ enum class ImageError {
     kBadAttFeedbackLoopLayout,
     kBadSync2OldLayout,
     kBadSync2NewLayout,
-    kNotColorAspect,
+    kNotColorAspectSinglePlane,
+    kNotColorAspectNonDisjoint,
     kBadMultiplanarAspect,
     kBadPlaneCount,
     kNotDepthOrStencilAspect,
@@ -114,6 +116,6 @@ enum class ShaderTileImageError { kShaderTileImageFeatureError, kShaderTileImage
 
 const std::string &GetShaderTileImageVUID(const Location &loc, ShaderTileImageError error);
 
-const char *GetAccessMaskRayQueryVUIDSelector(const Location &loc, const DeviceExtensions &device_extensions);
+const std::string &GetAccessMaskRayQueryVUIDSelector(const Location &loc, const DeviceExtensions &device_extensions);
 
 }  // namespace sync_vuid_maps

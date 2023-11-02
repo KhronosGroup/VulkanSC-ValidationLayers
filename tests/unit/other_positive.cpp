@@ -26,13 +26,13 @@ TEST_F(VkPositiveLayerTest, StatelessValidationDisable) {
     features.disabledValidationFeatureCount = 1;
     features.pDisabledValidationFeatures = disables;
     VkCommandPoolCreateFlags pool_flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    ASSERT_NO_FATAL_FAILURE(Init(nullptr, nullptr, pool_flags, &features));
+    RETURN_IF_SKIP(Init(nullptr, nullptr, pool_flags, &features));
 
     // Specify 0 for a reserved VkFlags parameter. Normally this is expected to trigger an stateless validation error, but this
     // validation was disabled via the features extension, so no errors should be forthcoming.
-    VkEventCreateInfo event_info = LvlInitStruct<VkEventCreateInfo>();
+    VkEventCreateInfo event_info = vku::InitStructHelper();
     event_info.flags = 1;
-    vk_testing::Event event(*m_device, event_info);
+    vkt::Event event(*m_device, event_info);
 }
 
 TEST_F(VkPositiveLayerTest, TestDestroyFreeNullHandles) {
@@ -40,7 +40,7 @@ TEST_F(VkPositiveLayerTest, TestDestroyFreeNullHandles) {
 
     TEST_DESCRIPTION("Call all applicable destroy and free routines with NULL handles, expecting no validation errors");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
+    RETURN_IF_SKIP(Init())
     vk::DestroyBuffer(m_device->device(), VK_NULL_HANDLE, NULL);
     vk::DestroyBufferView(m_device->device(), VK_NULL_HANDLE, NULL);
     vk::DestroyCommandPool(m_device->device(), VK_NULL_HANDLE, NULL);
@@ -63,12 +63,12 @@ TEST_F(VkPositiveLayerTest, TestDestroyFreeNullHandles) {
     vk::DestroyShaderModule(m_device->device(), VK_NULL_HANDLE, NULL);
 
     VkCommandPool command_pool;
-    VkCommandPoolCreateInfo pool_create_info = LvlInitStruct<VkCommandPoolCreateInfo>();
+    VkCommandPoolCreateInfo pool_create_info = vku::InitStructHelper();
     pool_create_info.queueFamilyIndex = m_device->graphics_queue_node_index_;
     pool_create_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     vk::CreateCommandPool(m_device->device(), &pool_create_info, nullptr, &command_pool);
     VkCommandBuffer command_buffers[3] = {};
-    VkCommandBufferAllocateInfo command_buffer_allocate_info = LvlInitStruct<VkCommandBufferAllocateInfo>();
+    VkCommandBufferAllocateInfo command_buffer_allocate_info = vku::InitStructHelper();
     command_buffer_allocate_info.commandPool = command_pool;
     command_buffer_allocate_info.commandBufferCount = 1;
     command_buffer_allocate_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
@@ -80,12 +80,12 @@ TEST_F(VkPositiveLayerTest, TestDestroyFreeNullHandles) {
     ds_type_count.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
     ds_type_count.descriptorCount = 1;
 
-    VkDescriptorPoolCreateInfo ds_pool_ci = LvlInitStruct<VkDescriptorPoolCreateInfo>();
+    VkDescriptorPoolCreateInfo ds_pool_ci = vku::InitStructHelper();
     ds_pool_ci.maxSets = 1;
     ds_pool_ci.poolSizeCount = 1;
     ds_pool_ci.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
     ds_pool_ci.pPoolSizes = &ds_type_count;
-    vk_testing::DescriptorPool ds_pool(*m_device, ds_pool_ci);
+    vkt::DescriptorPool ds_pool(*m_device, ds_pool_ci);
 
     VkDescriptorSetLayoutBinding dsl_binding = {};
     dsl_binding.binding = 2;
@@ -94,15 +94,15 @@ TEST_F(VkPositiveLayerTest, TestDestroyFreeNullHandles) {
     dsl_binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
     dsl_binding.pImmutableSamplers = NULL;
 
-    const VkDescriptorSetLayoutObj ds_layout(m_device, {dsl_binding});
+    const vkt::DescriptorSetLayout ds_layout(*m_device, {dsl_binding});
 
     VkDescriptorSet descriptor_sets[3] = {};
-    VkDescriptorSetAllocateInfo alloc_info = LvlInitStruct<VkDescriptorSetAllocateInfo>();
+    VkDescriptorSetAllocateInfo alloc_info = vku::InitStructHelper();
     alloc_info.descriptorSetCount = 1;
     alloc_info.descriptorPool = ds_pool.handle();
     alloc_info.pSetLayouts = &ds_layout.handle();
     err = vk::AllocateDescriptorSets(m_device->device(), &alloc_info, &descriptor_sets[1]);
-    ASSERT_VK_SUCCESS(err);
+    ASSERT_EQ(VK_SUCCESS, err);
     vk::FreeDescriptorSets(m_device->device(), ds_pool.handle(), 3, descriptor_sets);
 
     vk::FreeMemory(m_device->device(), VK_NULL_HANDLE, NULL);
@@ -112,13 +112,10 @@ TEST_F(VkPositiveLayerTest, Maintenance1Tests) {
     TEST_DESCRIPTION("Validate various special cases for the Maintenance1_KHR extension");
 
     AddRequiredExtensions(VK_KHR_MAINTENANCE_1_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitState())
 
-    VkCommandBufferObj cmd_buf(m_device, m_commandPool);
+    vkt::CommandBuffer cmd_buf(m_device, m_commandPool);
     cmd_buf.begin();
     // Set Negative height, should give error if Maintenance 1 is not enabled
     VkViewport viewport = {0, 0, 16, -16, 0, 1};
@@ -131,17 +128,14 @@ TEST_F(VkPositiveLayerTest, ValidStructPNext) {
 
     // Positive test to check parameter_validation and unique_objects support for NV_dedicated_allocation
     AddRequiredExtensions(VK_NV_DEDICATED_ALLOCATION_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitState())
 
-    VkDedicatedAllocationBufferCreateInfoNV dedicated_buffer_create_info = LvlInitStruct<VkDedicatedAllocationBufferCreateInfoNV>();
+    VkDedicatedAllocationBufferCreateInfoNV dedicated_buffer_create_info = vku::InitStructHelper();
     dedicated_buffer_create_info.dedicatedAllocation = VK_TRUE;
 
     uint32_t queue_family_index = 0;
-    VkBufferCreateInfo buffer_create_info = LvlInitStruct<VkBufferCreateInfo>(&dedicated_buffer_create_info);
+    VkBufferCreateInfo buffer_create_info = vku::InitStructHelper(&dedicated_buffer_create_info);
     buffer_create_info.size = 1024;
     buffer_create_info.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
     buffer_create_info.queueFamilyIndexCount = 1;
@@ -149,16 +143,16 @@ TEST_F(VkPositiveLayerTest, ValidStructPNext) {
 
     VkBuffer buffer;
     VkResult err = vk::CreateBuffer(m_device->device(), &buffer_create_info, NULL, &buffer);
-    ASSERT_VK_SUCCESS(err);
+    ASSERT_EQ(VK_SUCCESS, err);
 
     VkMemoryRequirements memory_reqs;
     vk::GetBufferMemoryRequirements(m_device->device(), buffer, &memory_reqs);
 
-    VkDedicatedAllocationMemoryAllocateInfoNV dedicated_memory_info = LvlInitStruct<VkDedicatedAllocationMemoryAllocateInfoNV>();
+    VkDedicatedAllocationMemoryAllocateInfoNV dedicated_memory_info = vku::InitStructHelper();
     dedicated_memory_info.buffer = buffer;
     dedicated_memory_info.image = VK_NULL_HANDLE;
 
-    VkMemoryAllocateInfo memory_info = LvlInitStruct<VkMemoryAllocateInfo>(&dedicated_memory_info);
+    VkMemoryAllocateInfo memory_info = vku::InitStructHelper(&dedicated_memory_info);
     memory_info.allocationSize = memory_reqs.size;
 
     bool pass;
@@ -167,10 +161,10 @@ TEST_F(VkPositiveLayerTest, ValidStructPNext) {
 
     VkDeviceMemory buffer_memory;
     err = vk::AllocateMemory(m_device->device(), &memory_info, NULL, &buffer_memory);
-    ASSERT_VK_SUCCESS(err);
+    ASSERT_EQ(VK_SUCCESS, err);
 
     err = vk::BindBufferMemory(m_device->device(), buffer, buffer_memory, 0);
-    ASSERT_VK_SUCCESS(err);
+    ASSERT_EQ(VK_SUCCESS, err);
 
     vk::DestroyBuffer(m_device->device(), buffer, NULL);
     vk::FreeMemory(m_device->device(), buffer_memory, NULL);
@@ -180,13 +174,9 @@ TEST_F(VkPositiveLayerTest, SurfacelessQueryTest) {
     TEST_DESCRIPTION("Ensure affected API calls can be made with surfacless query extension");
 
     AddRequiredExtensions(VK_GOOGLE_SURFACELESS_QUERY_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
+    RETURN_IF_SKIP(InitFramework())
 
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-
-    if (IsPlatform(kMockICD)) {
+    if (IsPlatformMockICD()) {
         GTEST_SKIP() << "VK_GOOGLE_surfaceless_query not supported on desktop";
     }
 
@@ -206,19 +196,16 @@ TEST_F(VkPositiveLayerTest, ParameterLayerFeatures2Capture) {
     TEST_DESCRIPTION("Ensure parameter_validation_layer correctly captures physical device features");
 
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
     VkResult err;
 
-    VkPhysicalDeviceFeatures2 features2 = LvlInitStruct<VkPhysicalDeviceFeatures2>();
+    VkPhysicalDeviceFeatures2 features2 = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(features2);
 
     // We're not creating a valid m_device, but the phy wrapper is useful
-    vk_testing::PhysicalDevice physical_device(gpu());
-    vk_testing::QueueCreateInfoArray queue_info(physical_device.queue_properties());
+    vkt::PhysicalDevice physical_device(gpu());
+    vkt::QueueCreateInfoArray queue_info(physical_device.queue_properties_);
     // Only request creation with queuefamilies that have at least one queue
     std::vector<VkDeviceQueueCreateInfo> create_queue_infos;
     auto qci = queue_info.data();
@@ -228,7 +215,7 @@ TEST_F(VkPositiveLayerTest, ParameterLayerFeatures2Capture) {
         }
     }
 
-    VkDeviceCreateInfo dev_info = LvlInitStruct<VkDeviceCreateInfo>(&features2);
+    VkDeviceCreateInfo dev_info = vku::InitStructHelper(&features2);
     dev_info.flags = 0;
     dev_info.queueCreateInfoCount = create_queue_infos.size();
     dev_info.pQueueCreateInfos = create_queue_infos.data();
@@ -240,18 +227,18 @@ TEST_F(VkPositiveLayerTest, ParameterLayerFeatures2Capture) {
 
     VkDevice device;
     err = vk::CreateDevice(gpu(), &dev_info, nullptr, &device);
-    ASSERT_VK_SUCCESS(err);
+    ASSERT_EQ(VK_SUCCESS, err);
 
     if (features2.features.samplerAnisotropy) {
         // Test that the parameter layer is caching the features correctly using CreateSampler
         VkSamplerCreateInfo sampler_ci = SafeSaneSamplerCreateInfo();
         // If the features were not captured correctly, this should cause an error
         sampler_ci.anisotropyEnable = VK_TRUE;
-        sampler_ci.maxAnisotropy = physical_device.properties().limits.maxSamplerAnisotropy;
+        sampler_ci.maxAnisotropy = physical_device.limits_.maxSamplerAnisotropy;
 
         VkSampler sampler = VK_NULL_HANDLE;
         err = vk::CreateSampler(device, &sampler_ci, nullptr, &sampler);
-        ASSERT_VK_SUCCESS(err);
+        ASSERT_EQ(VK_SUCCESS, err);
         vk::DestroySampler(device, sampler, nullptr);
     } else {
         printf("Feature samplerAnisotropy not enabled;  parameter_layer check skipped.\n");
@@ -260,11 +247,11 @@ TEST_F(VkPositiveLayerTest, ParameterLayerFeatures2Capture) {
     // Verify the core validation layer has captured the physical device features by creating a a query pool.
     if (features2.features.pipelineStatisticsQuery) {
         VkQueryPool query_pool;
-        VkQueryPoolCreateInfo qpci = LvlInitStruct<VkQueryPoolCreateInfo>();
+        VkQueryPoolCreateInfo qpci = vku::InitStructHelper();
         qpci.queryType = VK_QUERY_TYPE_PIPELINE_STATISTICS;
         qpci.queryCount = 1;
         err = vk::CreateQueryPool(device, &qpci, nullptr, &query_pool);
-        ASSERT_VK_SUCCESS(err);
+        ASSERT_EQ(VK_SUCCESS, err);
 
         vk::DestroyQueryPool(device, query_pool, nullptr);
     } else {
@@ -277,7 +264,7 @@ TEST_F(VkPositiveLayerTest, ParameterLayerFeatures2Capture) {
 TEST_F(VkPositiveLayerTest, ApiVersionZero) {
     TEST_DESCRIPTION("Check that apiVersion = 0 is valid.");
     app_info_.apiVersion = 0U;
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
+    RETURN_IF_SKIP(InitFramework())
 }
 
 TEST_F(VkPositiveLayerTest, TestPhysicalDeviceSurfaceSupport) {
@@ -285,12 +272,9 @@ TEST_F(VkPositiveLayerTest, TestPhysicalDeviceSurfaceSupport) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddSurfaceExtension();
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
-    if (DeviceValidationVersion() < VK_API_VERSION_1_1) {
-        GTEST_SKIP() << "At least Vulkan version 1.1 is required";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitState())
     if (!InitSurface()) {
         GTEST_SKIP() << "Cannot create surface";
     }
@@ -310,17 +294,11 @@ TEST_F(VkPositiveLayerTest, ModifyPnext) {
     SetTargetApiVersion(VK_API_VERSION_1_2);
 
     AddRequiredExtensions(VK_NV_FRAGMENT_SHADING_RATE_ENUMS_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-    if (DeviceValidationVersion() < VK_API_VERSION_1_2) {
-        GTEST_SKIP() << "At least Vulkan version 1.2 is required";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    auto shading = LvlInitStruct<VkPhysicalDeviceFragmentShadingRateEnumsPropertiesNV>();
+    VkPhysicalDeviceFragmentShadingRateEnumsPropertiesNV shading = vku::InitStructHelper();
     shading.maxFragmentShadingRateInvocationCount = static_cast<VkSampleCountFlagBits>(0);
-    auto props = LvlInitStruct<VkPhysicalDeviceProperties2>(&shading);
+    VkPhysicalDeviceProperties2 props = vku::InitStructHelper(&shading);
 
     vk::GetPhysicalDeviceProperties2(gpu(), &props);
 }
@@ -330,37 +308,31 @@ TEST_F(VkPositiveLayerTest, HostQueryResetSuccess) {
 
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_HOST_QUERY_RESET_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    VkPhysicalDeviceHostQueryResetFeaturesEXT host_query_reset_features =
-        LvlInitStruct<VkPhysicalDeviceHostQueryResetFeaturesEXT>();
-    host_query_reset_features.hostQueryReset = VK_TRUE;
+    VkPhysicalDeviceHostQueryResetFeaturesEXT host_query_reset_features = vku::InitStructHelper();
+    GetPhysicalDeviceFeatures2(host_query_reset_features);
+    RETURN_IF_SKIP(InitState(nullptr, &host_query_reset_features));
 
-    VkPhysicalDeviceFeatures2 pd_features2 = LvlInitStruct<VkPhysicalDeviceFeatures2>(&host_query_reset_features);
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &pd_features2));
-
-    VkQueryPoolCreateInfo query_pool_create_info = LvlInitStruct<VkQueryPoolCreateInfo>();
+    VkQueryPoolCreateInfo query_pool_create_info = vku::InitStructHelper();
     query_pool_create_info.queryType = VK_QUERY_TYPE_TIMESTAMP;
     query_pool_create_info.queryCount = 1;
-    vk_testing::QueryPool query_pool(*m_device, query_pool_create_info);
+    vkt::QueryPool query_pool(*m_device, query_pool_create_info);
     vk::ResetQueryPoolEXT(m_device->device(), query_pool.handle(), 0, 1);
 }
 
 TEST_F(VkPositiveLayerTest, UseFirstQueueUnqueried) {
     TEST_DESCRIPTION("Use first queue family and one queue without first querying with vkGetPhysicalDeviceQueueFamilyProperties");
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
+    RETURN_IF_SKIP(InitFramework())
 
     const float q_priority[] = {1.0f};
-    VkDeviceQueueCreateInfo queue_ci = LvlInitStruct<VkDeviceQueueCreateInfo>();
+    VkDeviceQueueCreateInfo queue_ci = vku::InitStructHelper();
     queue_ci.queueFamilyIndex = 0;
     queue_ci.queueCount = 1;
     queue_ci.pQueuePriorities = q_priority;
 
-    VkDeviceCreateInfo device_ci = LvlInitStruct<VkDeviceCreateInfo>();
+    VkDeviceCreateInfo device_ci = vku::InitStructHelper();
     device_ci.queueCreateInfoCount = 1;
     device_ci.pQueueCreateInfos = &queue_ci;
 
@@ -375,11 +347,8 @@ TEST_F(VkPositiveLayerTest, UseFirstQueueUnqueried) {
 TEST_F(VkPositiveLayerTest, GetDevProcAddrNullPtr) {
     TEST_DESCRIPTION("Call GetDeviceProcAddr on an enabled instance extension expecting nullptr");
     AddRequiredExtensions(VK_KHR_SURFACE_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitState())
 
     auto fpDestroySurface = (PFN_vkCreateValidationCacheEXT)vk::GetDeviceProcAddr(m_device->device(), "vkDestroySurfaceKHR");
     if (fpDestroySurface) {
@@ -390,11 +359,8 @@ TEST_F(VkPositiveLayerTest, GetDevProcAddrNullPtr) {
 TEST_F(VkPositiveLayerTest, GetDevProcAddrExtensions) {
     TEST_DESCRIPTION("Call GetDeviceProcAddr with and without extension enabled");
     SetTargetApiVersion(VK_API_VERSION_1_1);
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
-    if (DeviceValidationVersion() < VK_API_VERSION_1_1) {
-        GTEST_SKIP() << "At least Vulkan version 1.1 is required";
-    }
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitState())
 
     auto vkTrimCommandPool = vk::GetDeviceProcAddr(m_device->device(), "vkTrimCommandPool");
     auto vkTrimCommandPoolKHR = vk::GetDeviceProcAddr(m_device->device(), "vkTrimCommandPoolKHR");
@@ -403,12 +369,12 @@ TEST_F(VkPositiveLayerTest, GetDevProcAddrExtensions) {
 
     const char *const extension = {VK_KHR_MAINTENANCE_1_EXTENSION_NAME};
     const float q_priority[] = {1.0f};
-    VkDeviceQueueCreateInfo queue_ci = LvlInitStruct<VkDeviceQueueCreateInfo>();
+    VkDeviceQueueCreateInfo queue_ci = vku::InitStructHelper();
     queue_ci.queueFamilyIndex = 0;
     queue_ci.queueCount = 1;
     queue_ci.pQueuePriorities = q_priority;
 
-    VkDeviceCreateInfo device_ci = LvlInitStruct<VkDeviceCreateInfo>();
+    VkDeviceCreateInfo device_ci = vku::InitStructHelper();
     device_ci.enabledExtensionCount = 1;
     device_ci.ppEnabledExtensionNames = &extension;
     device_ci.queueCreateInfoCount = 1;
@@ -426,25 +392,20 @@ TEST_F(VkPositiveLayerTest, GetDevProcAddrExtensions) {
 TEST_F(VkPositiveLayerTest, Vulkan12Features) {
     TEST_DESCRIPTION("Enable feature via Vulkan12features struct");
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
-    if (DeviceValidationVersion() < VK_API_VERSION_1_2) {
-        GTEST_SKIP() << "At least Vulkan version 1.2 is required";
-    }
-
-    auto bda_features = LvlInitStruct<VkPhysicalDeviceBufferDeviceAddressFeatures>();
+    RETURN_IF_SKIP(InitFramework())
+    VkPhysicalDeviceBufferDeviceAddressFeatures bda_features = vku::InitStructHelper();
     VkPhysicalDeviceFeatures2 features2 = GetPhysicalDeviceFeatures2(bda_features);
     if (!bda_features.bufferDeviceAddress) {
-        printf("Buffer Device Address feature not supported, skipping test\n");
-        return;
+        GTEST_SKIP() << "Buffer Device Address feature not supported, skipping test";
     }
 
-    VkPhysicalDeviceVulkan12Features features12 = LvlInitStruct<VkPhysicalDeviceVulkan12Features>();
+    VkPhysicalDeviceVulkan12Features features12 = vku::InitStructHelper();
     features12.bufferDeviceAddress = true;
     features2.pNext = &features12;
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features2));
+    RETURN_IF_SKIP(InitState(nullptr, &features2))
 
     uint32_t qfi = 0;
-    VkBufferCreateInfo bci = LvlInitStruct<VkBufferCreateInfo>();
+    VkBufferCreateInfo bci = vku::InitStructHelper();
     bci.usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
     bci.size = 8;
     bci.queueFamilyIndexCount = 1;
@@ -453,7 +414,7 @@ TEST_F(VkPositiveLayerTest, Vulkan12Features) {
     vk::CreateBuffer(m_device->device(), &bci, NULL, &buffer);
     VkMemoryRequirements buffer_mem_reqs = {};
     vk::GetBufferMemoryRequirements(m_device->device(), buffer, &buffer_mem_reqs);
-    VkMemoryAllocateInfo buffer_alloc_info = LvlInitStruct<VkMemoryAllocateInfo>();
+    VkMemoryAllocateInfo buffer_alloc_info = vku::InitStructHelper();
     buffer_alloc_info.allocationSize = buffer_mem_reqs.size;
     m_device->phy().set_memory_type(buffer_mem_reqs.memoryTypeBits, &buffer_alloc_info, 0);
     VkMemoryAllocateFlagsInfo alloc_flags = {VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO};
@@ -461,10 +422,10 @@ TEST_F(VkPositiveLayerTest, Vulkan12Features) {
     buffer_alloc_info.pNext = &alloc_flags;
     VkDeviceMemory buffer_mem;
     VkResult err = vk::AllocateMemory(m_device->device(), &buffer_alloc_info, NULL, &buffer_mem);
-    ASSERT_VK_SUCCESS(err);
+    ASSERT_EQ(VK_SUCCESS, err);
     vk::BindBufferMemory(m_device->device(), buffer, buffer_mem, 0);
 
-    VkBufferDeviceAddressInfo bda_info = LvlInitStruct<VkBufferDeviceAddressInfo>();
+    VkBufferDeviceAddressInfo bda_info = vku::InitStructHelper();
     bda_info.buffer = buffer;
     auto vkGetBufferDeviceAddress =
         (PFN_vkGetBufferDeviceAddress)vk::GetDeviceProcAddr(m_device->device(), "vkGetBufferDeviceAddress");
@@ -485,28 +446,25 @@ TEST_F(VkPositiveLayerTest, QueueThreading) {
     using namespace std::chrono;
     using std::thread;
     SetTargetApiVersion(VK_API_VERSION_1_1);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (DeviceValidationVersion() < VK_API_VERSION_1_1) {
-        GTEST_SKIP() << "At least Vulkan version 1.1 is required";
-    }
+    RETURN_IF_SKIP(InitFramework())
     // Test randomly fails with VK_TIMEOUT, most likely a driver bug
     if (IsDriver(VK_DRIVER_ID_AMD_PROPRIETARY)) {
         GTEST_SKIP() << "Test does not run on AMD proprietary driver";
     }
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitState())
 
-    const auto queue_family = DeviceObj()->GetDefaultQueue()->get_family_index();
+    const auto queue_family = m_device->graphics_queues()[0]->get_family_index();
     constexpr uint32_t queue_index = 0;
-    VkCommandPoolObj command_pool(DeviceObj(), queue_family);
+    vkt::CommandPool command_pool(*DeviceObj(), queue_family);
 
     const VkDevice device_h = device();
     VkQueue queue_h;
     vk::GetDeviceQueue(device(), queue_family, queue_index, &queue_h);
-    VkQueueObj queue_o(queue_h, queue_family);
+    vkt::Queue queue_o(queue_h, queue_family);
 
     const VkCommandBufferAllocateInfo cbai = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO, nullptr, command_pool.handle(),
                                               VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1};
-    vk_testing::CommandBuffer mock_cmdbuff(*DeviceObj(), cbai);
+    vkt::CommandBuffer mock_cmdbuff(*DeviceObj(), cbai);
     const VkCommandBufferBeginInfo cbbi{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, nullptr,
                                         VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT, nullptr};
     mock_cmdbuff.begin(&cbbi);
@@ -526,11 +484,11 @@ TEST_F(VkPositiveLayerTest, QueueThreading) {
 
     const auto &testing_thread2 = [&]() {
         for (auto timer_now = steady_clock::now(); timer_now - timer_begin < test_duration; timer_now = steady_clock::now()) {
-            VkSubmitInfo si = LvlInitStruct<VkSubmitInfo>();
+            VkSubmitInfo si = vku::InitStructHelper();
             si.commandBufferCount = 1;
             si.pCommandBuffers = &mock_cmdbuff.handle();
             queue_mutex.lock();
-            ASSERT_VK_SUCCESS(vk::QueueSubmit(queue_h, 1, &si, VK_NULL_HANDLE));
+            ASSERT_EQ(VK_SUCCESS, vk::QueueSubmit(queue_h, 1, &si, VK_NULL_HANDLE));
             queue_mutex.unlock();
         }
     };
@@ -538,7 +496,7 @@ TEST_F(VkPositiveLayerTest, QueueThreading) {
     const auto &testing_thread3 = [&]() {
         for (auto timer_now = steady_clock::now(); timer_now - timer_begin < test_duration; timer_now = steady_clock::now()) {
             queue_mutex.lock();
-            ASSERT_VK_SUCCESS(vk::QueueWaitIdle(queue_h));
+            ASSERT_EQ(VK_SUCCESS, vk::QueueWaitIdle(queue_h));
             queue_mutex.unlock();
         }
     };
@@ -573,7 +531,7 @@ TEST_F(VkPositiveLayerTest, EnumeratePhysicalDeviceGroups) {
     auto ici = GetInstanceCreateInfo();
 
     VkInstance test_instance = VK_NULL_HANDLE;
-    ASSERT_VK_SUCCESS(vk::CreateInstance(&ici, nullptr, &test_instance));
+    ASSERT_EQ(VK_SUCCESS, vk::CreateInstance(&ici, nullptr, &test_instance));
     for (const char *instance_ext_name : m_instance_extension_names) {
         vk::InitInstanceExtension(test_instance, instance_ext_name);
     }
@@ -584,7 +542,7 @@ TEST_F(VkPositiveLayerTest, EnumeratePhysicalDeviceGroups) {
     uint32_t physical_device_group_count = 0;
     vk::EnumeratePhysicalDeviceGroups(test_instance, &physical_device_group_count, nullptr);
     std::vector<VkPhysicalDeviceGroupProperties> device_groups(physical_device_group_count,
-                                                               LvlInitStruct<VkPhysicalDeviceGroupProperties>());
+                                                               vku::InitStruct<VkPhysicalDeviceGroupProperties>());
     vk::EnumeratePhysicalDeviceGroups(test_instance, &physical_device_group_count, device_groups.data());
 
     if (physical_device_group_count > 0) {
@@ -607,34 +565,31 @@ TEST_F(VkPositiveLayerTest, ExportMetalObjects) {
 
     // Initialize framework
     {
-        auto queue_info = LvlInitStruct<VkExportMetalObjectCreateInfoEXT>();
+        VkExportMetalObjectCreateInfoEXT queue_info = vku::InitStructHelper();
         queue_info.exportObjectType = VK_EXPORT_METAL_OBJECT_TYPE_METAL_COMMAND_QUEUE_BIT_EXT;
 
-        auto metal_info = LvlInitStruct<VkExportMetalObjectCreateInfoEXT>();
+        VkExportMetalObjectCreateInfoEXT metal_info = vku::InitStructHelper();
         metal_info.exportObjectType = VK_EXPORT_METAL_OBJECT_TYPE_METAL_DEVICE_BIT_EXT;
         metal_info.pNext = &queue_info;
 
-        ASSERT_NO_FATAL_FAILURE(InitFramework(nullptr, &metal_info));
-        if (!AreRequiredExtensionsEnabled()) {
-            GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-        }
+        RETURN_IF_SKIP(InitFramework(&metal_info));
 
-        auto portability_features = LvlInitStruct<VkPhysicalDevicePortabilitySubsetFeaturesKHR>();
+        VkPhysicalDevicePortabilitySubsetFeaturesKHR portability_features = vku::InitStructHelper();
         auto features2 = GetPhysicalDeviceFeatures2(portability_features);
 
-        ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &features2));
+        RETURN_IF_SKIP(InitState(nullptr, &features2))
     }
 
     const VkDevice device = m_device->device();
 
     // Get Metal Device and Metal Command Queue in 1 call
     {
-        const VkQueue queue = m_device->m_queue;
+        const VkQueue queue = m_default_queue;
 
-        auto queueInfo = LvlInitStruct<VkExportMetalCommandQueueInfoEXT>();
+        VkExportMetalCommandQueueInfoEXT queueInfo = vku::InitStructHelper();
         queueInfo.queue = queue;
-        auto deviceInfo = LvlInitStruct<VkExportMetalDeviceInfoEXT>(&queueInfo);
-        auto objectsInfo = LvlInitStruct<VkExportMetalObjectsInfoEXT>(&deviceInfo);
+        VkExportMetalDeviceInfoEXT deviceInfo = vku::InitStructHelper(&queueInfo);
+        VkExportMetalObjectsInfoEXT objectsInfo = vku::InitStructHelper(&deviceInfo);
 
         // This tests both device, queue, and pNext chaining
         vk::ExportMetalObjectsEXT(device, &objectsInfo);
@@ -645,20 +600,20 @@ TEST_F(VkPositiveLayerTest, ExportMetalObjects) {
 
     // Get Metal Buffer
     {
-        auto metalBufferCreateInfo = LvlInitStruct<VkExportMetalObjectCreateInfoEXT>();
+        VkExportMetalObjectCreateInfoEXT metalBufferCreateInfo = vku::InitStructHelper();
         metalBufferCreateInfo.exportObjectType = VK_EXPORT_METAL_OBJECT_TYPE_METAL_BUFFER_BIT_EXT;
 
-        VkMemoryAllocateInfo mem_info = LvlInitStruct<VkMemoryAllocateInfo>();
+        VkMemoryAllocateInfo mem_info = vku::InitStructHelper();
         mem_info.allocationSize = 1024;
         mem_info.pNext = &metalBufferCreateInfo;
 
         VkDeviceMemory memory;
         const VkResult err = vk::AllocateMemory(device, &mem_info, NULL, &memory);
-        ASSERT_VK_SUCCESS(err);
+        ASSERT_EQ(VK_SUCCESS, err);
 
-        auto bufferInfo = LvlInitStruct<VkExportMetalBufferInfoEXT>();
+        VkExportMetalBufferInfoEXT bufferInfo = vku::InitStructHelper();
         bufferInfo.memory = memory;
-        auto objectsInfo = LvlInitStruct<VkExportMetalObjectsInfoEXT>(&bufferInfo);
+        VkExportMetalObjectsInfoEXT objectsInfo = vku::InitStructHelper(&bufferInfo);
 
         vk::ExportMetalObjectsEXT(device, &objectsInfo);
 
@@ -669,13 +624,13 @@ TEST_F(VkPositiveLayerTest, ExportMetalObjects) {
 
     // Get Metal Texture and Metal IOSurfaceRef
     {
-        auto metalSurfaceInfo = LvlInitStruct<VkExportMetalObjectCreateInfoEXT>();
+        VkExportMetalObjectCreateInfoEXT metalSurfaceInfo = vku::InitStructHelper();
         metalSurfaceInfo.exportObjectType = VK_EXPORT_METAL_OBJECT_TYPE_METAL_IOSURFACE_BIT_EXT;
-        auto metalTextureCreateInfo = LvlInitStruct<VkExportMetalObjectCreateInfoEXT>(&metalSurfaceInfo);
+        VkExportMetalObjectCreateInfoEXT metalTextureCreateInfo = vku::InitStructHelper(&metalSurfaceInfo);
         metalTextureCreateInfo.exportObjectType = VK_EXPORT_METAL_OBJECT_TYPE_METAL_TEXTURE_BIT_EXT;
 
         // Image contents don't matter
-        VkImageCreateInfo ici = LvlInitStruct<VkImageCreateInfo>(&metalTextureCreateInfo);
+        VkImageCreateInfo ici = vku::InitStructHelper(&metalTextureCreateInfo);
         ici.imageType = VK_IMAGE_TYPE_2D;
         ici.format = VK_FORMAT_B8G8R8A8_UNORM;
         ici.extent = {32, 32, 1};
@@ -688,12 +643,12 @@ TEST_F(VkPositiveLayerTest, ExportMetalObjects) {
         image.Init(ici);
         ASSERT_TRUE(image.initialized());
 
-        auto surfaceInfo = LvlInitStruct<VkExportMetalIOSurfaceInfoEXT>();
+        VkExportMetalIOSurfaceInfoEXT surfaceInfo = vku::InitStructHelper();
         surfaceInfo.image = image.handle();
-        auto textureInfo = LvlInitStruct<VkExportMetalTextureInfoEXT>(&surfaceInfo);
+        VkExportMetalTextureInfoEXT textureInfo = vku::InitStructHelper(&surfaceInfo);
         textureInfo.image = image.handle();
         textureInfo.plane = VK_IMAGE_ASPECT_PLANE_0_BIT;  // Image is not multi-planar
-        auto objectsInfo = LvlInitStruct<VkExportMetalObjectsInfoEXT>(&textureInfo);
+        VkExportMetalObjectsInfoEXT objectsInfo = vku::InitStructHelper(&textureInfo);
 
         // This tests both texture, surface, and pNext chaining
         vk::ExportMetalObjectsEXT(device, &objectsInfo);
@@ -704,16 +659,16 @@ TEST_F(VkPositiveLayerTest, ExportMetalObjects) {
 
     // Get Metal Shared Event
     {
-        auto metalEventCreateInfo = LvlInitStruct<VkExportMetalObjectCreateInfoEXT>();
+        VkExportMetalObjectCreateInfoEXT metalEventCreateInfo = vku::InitStructHelper();
         metalEventCreateInfo.exportObjectType = VK_EXPORT_METAL_OBJECT_TYPE_METAL_SHARED_EVENT_BIT_EXT;
 
-        auto eventCreateInfo = LvlInitStruct<VkEventCreateInfo>(&metalEventCreateInfo);
-        VkEventObj event(*m_device, eventCreateInfo);
+        VkEventCreateInfo eventCreateInfo = vku::InitStructHelper(&metalEventCreateInfo);
+        vkt::Event event(*m_device, eventCreateInfo);
         ASSERT_TRUE(event.initialized());
 
-        auto eventInfo = LvlInitStruct<VkExportMetalSharedEventInfoEXT>();
+        VkExportMetalSharedEventInfoEXT eventInfo = vku::InitStructHelper();
         eventInfo.event = event.handle();
-        auto objectsInfo = LvlInitStruct<VkExportMetalObjectsInfoEXT>(&eventInfo);
+        VkExportMetalObjectsInfoEXT objectsInfo = vku::InitStructHelper(&eventInfo);
 
         vk::ExportMetalObjectsEXT(device, &objectsInfo);
 
@@ -734,7 +689,7 @@ TEST_F(VkPositiveLayerTest, ExtensionXmlDependsLogic) {
     }
     m_instance_extension_names.push_back(VK_KHR_DEVICE_GROUP_CREATION_EXTENSION_NAME);
     m_instance_extension_names.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
+    RETURN_IF_SKIP(InitFramework())
 
     if (!DeviceExtensionSupported(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME) ||
         !DeviceExtensionSupported(VK_KHR_DEVICE_GROUP_EXTENSION_NAME)) {
@@ -743,7 +698,7 @@ TEST_F(VkPositiveLayerTest, ExtensionXmlDependsLogic) {
 
     m_device_extension_names.push_back(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
     m_device_extension_names.push_back(VK_KHR_DEVICE_GROUP_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitState())
 }
 
 // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/5112
@@ -794,15 +749,13 @@ TEST_F(VkPositiveLayerTest, SafeVoidPointerCopies) {
 TEST_F(VkPositiveLayerTest, FormatProperties3FromProfiles) {
     // https://github.com/KhronosGroup/Vulkan-Profiles/pull/392
     TEST_DESCRIPTION("Make sure VkFormatProperties3KHR is overwritten correctly in Profiles layer");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitState())
 
-    auto fmt_props_3 = LvlInitStruct<VkFormatProperties3KHR>();
-    auto fmt_props = LvlInitStruct<VkFormatProperties2>(&fmt_props_3);
+    VkFormatProperties3KHR fmt_props_3 = vku::InitStructHelper();
+    VkFormatProperties2 fmt_props = vku::InitStructHelper(&fmt_props_3);
     vk::GetPhysicalDeviceFormatProperties2(gpu(), VK_FORMAT_R8_UNORM, &fmt_props);
     vk::GetPhysicalDeviceFormatProperties2(gpu(), VK_FORMAT_R8G8B8A8_UNORM, &fmt_props);
 }
@@ -810,11 +763,8 @@ TEST_F(VkPositiveLayerTest, FormatProperties3FromProfiles) {
 TEST_F(VkPositiveLayerTest, GDPAWithMultiCmdExt) {
     TEST_DESCRIPTION("Use GetDeviceProcAddr on a function which is provided by multiple extensions");
     AddRequiredExtensions(VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitState())
 
     auto vkCmdSetColorBlendAdvancedEXT = GetDeviceProcAddr<PFN_vkCmdSetColorBlendAdvancedEXT>("vkCmdSetColorBlendAdvancedEXT");
     ASSERT_NE(vkCmdSetColorBlendAdvancedEXT, nullptr);
@@ -824,20 +774,14 @@ TEST_F(VkPositiveLayerTest, UseInteractionApi) {
     TEST_DESCRIPTION("Use an API that is provided by multiple extensions");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-    if (DeviceValidationVersion() < VK_API_VERSION_1_1) {
-        GTEST_SKIP() << "Vulkan 1.1 required";
-    }
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitState())
 
     auto vkGetDeviceGroupPresentCapabilitiesKHR =
         GetDeviceProcAddr<PFN_vkGetDeviceGroupPresentCapabilitiesKHR>("vkGetDeviceGroupPresentCapabilitiesKHR");
     ASSERT_NE(vkGetDeviceGroupPresentCapabilitiesKHR, nullptr);
 
-    auto device_group_present_caps = LvlInitStruct<VkDeviceGroupPresentCapabilitiesKHR>();
+    VkDeviceGroupPresentCapabilitiesKHR device_group_present_caps = vku::InitStructHelper();
     vkGetDeviceGroupPresentCapabilitiesKHR(m_device->device(), &device_group_present_caps);
 }
 
@@ -848,21 +792,15 @@ TEST_F(VkPositiveLayerTest, ExtensionExpressions) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-    if (DeviceValidationVersion() < VK_API_VERSION_1_1) {
-        GTEST_SKIP() << "Vulkan 1.1 required";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
-    auto fsr_features = LvlInitStruct<VkPhysicalDeviceFragmentShadingRateFeaturesKHR>();
+    VkPhysicalDeviceFragmentShadingRateFeaturesKHR fsr_features = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(fsr_features);
     if (!fsr_features.pipelineFragmentShadingRate) {
         GTEST_SKIP() << "VkPhysicalDeviceFragmentShadingRateFeaturesKHR::pipelineFragmentShadingRate not supported";
     }
 
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &fsr_features));
+    RETURN_IF_SKIP(InitState(nullptr, &fsr_features));
 
     VkExtent2D fragment_size = {1, 1};
     std::array combiner_ops = {VK_FRAGMENT_SHADING_RATE_COMBINER_OP_KEEP_KHR, VK_FRAGMENT_SHADING_RATE_COMBINER_OP_KEEP_KHR};
@@ -877,15 +815,15 @@ TEST_F(VkPositiveLayerTest, AllowedDuplicateStype) {
 
     VkInstance instance;
 
-    VkInstanceCreateInfo ici = LvlInitStruct<VkInstanceCreateInfo>();
+    VkInstanceCreateInfo ici = vku::InitStructHelper();
     ici.enabledLayerCount = instance_layers_.size();
     ici.ppEnabledLayerNames = instance_layers_.data();
 
-    auto dbgUtils0 = LvlInitStruct<VkDebugUtilsMessengerCreateInfoEXT>();
-    auto dbgUtils1 = LvlInitStruct<VkDebugUtilsMessengerCreateInfoEXT>(&dbgUtils0);
+    VkDebugUtilsMessengerCreateInfoEXT dbgUtils0 = vku::InitStructHelper();
+    VkDebugUtilsMessengerCreateInfoEXT dbgUtils1 = vku::InitStructHelper(&dbgUtils0);
     ici.pNext = &dbgUtils1;
 
-    ASSERT_VK_SUCCESS(vk::CreateInstance(&ici, nullptr, &instance));
+    ASSERT_EQ(VK_SUCCESS, vk::CreateInstance(&ici, nullptr, &instance));
 
     ASSERT_NO_FATAL_FAILURE(vk::DestroyInstance(instance, nullptr));
 }
@@ -918,7 +856,7 @@ TEST_F(VkPositiveLayerTest, ExtensionsInCreateInstance) {
         }
     }
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework(m_errorMonitor));
+    RETURN_IF_SKIP(InitFramework())
 }
 
 TEST_F(VkPositiveLayerTest, CustomSafePNextCopy) {
@@ -929,7 +867,7 @@ TEST_F(VkPositiveLayerTest, CustomSafePNextCopy) {
     // whose members must be partially ignored depending on the graphics sub-state present.
 
     VkFormat format = VK_FORMAT_B8G8R8A8_UNORM;
-    auto pri = LvlInitStruct<VkPipelineRenderingCreateInfo>();
+    VkPipelineRenderingCreateInfo pri = vku::InitStructHelper();
     pri.colorAttachmentCount = 1;
     pri.pColorAttachmentFormats = &format;
 
@@ -947,7 +885,7 @@ TEST_F(VkPositiveLayerTest, CustomSafePNextCopy) {
     };
 
     {
-        auto gpci = LvlInitStruct<VkGraphicsPipelineCreateInfo>(&pri);
+        VkGraphicsPipelineCreateInfo gpci = vku::InitStructHelper(&pri);
         safe_VkGraphicsPipelineCreateInfo safe_gpci(&gpci, false, false, &copy_state);
 
         auto safe_pri = reinterpret_cast<const safe_VkPipelineRenderingCreateInfo *>(safe_gpci.pNext);
@@ -962,8 +900,8 @@ TEST_F(VkPositiveLayerTest, CustomSafePNextCopy) {
 
     // Ensure PNextCopyState::init is also applied when there is more than one element in the pNext chain
     {
-        auto gpl_info = LvlInitStruct<VkGraphicsPipelineLibraryCreateInfoEXT>(&pri);
-        auto gpci = LvlInitStruct<VkGraphicsPipelineCreateInfo>(&gpl_info);
+        VkGraphicsPipelineLibraryCreateInfoEXT gpl_info = vku::InitStructHelper(&pri);
+        VkGraphicsPipelineCreateInfo gpci = vku::InitStructHelper(&gpl_info);
 
         safe_VkGraphicsPipelineCreateInfo safe_gpci(&gpci, false, false, &copy_state);
 
@@ -984,7 +922,7 @@ TEST_F(VkPositiveLayerTest, CustomSafePNextCopy) {
         pri.pColorAttachmentFormats = &format;
 
         ignore_default_construction = false;
-        auto gpci = LvlInitStruct<VkGraphicsPipelineCreateInfo>(&pri);
+        VkGraphicsPipelineCreateInfo gpci = vku::InitStructHelper(&pri);
         safe_VkGraphicsPipelineCreateInfo safe_gpci(&gpci, false, false, &copy_state);
 
         auto safe_pri = reinterpret_cast<const safe_VkPipelineRenderingCreateInfo *>(safe_gpci.pNext);
@@ -1001,10 +939,10 @@ TEST_F(VkPositiveLayerTest, CustomSafePNextCopy) {
 TEST_F(VkPositiveLayerTest, FreeCommandBuffersNull) {
     TEST_DESCRIPTION("Can pass NULL for vkFreeCommandBuffers");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
+    RETURN_IF_SKIP(Init())
 
     VkCommandBuffer command_buffer = VK_NULL_HANDLE;
-    auto command_buffer_allocate_info = LvlInitStruct<VkCommandBufferAllocateInfo>();
+    VkCommandBufferAllocateInfo command_buffer_allocate_info = vku::InitStructHelper();
     command_buffer_allocate_info.commandPool = m_commandPool->handle();
     command_buffer_allocate_info.commandBufferCount = 1;
     command_buffer_allocate_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
@@ -1017,24 +955,24 @@ TEST_F(VkPositiveLayerTest, FreeCommandBuffersNull) {
 TEST_F(VkPositiveLayerTest, FreeDescriptorSetsNull) {
     TEST_DESCRIPTION("Can pass NULL for vkFreeDescriptorSets");
 
-    ASSERT_NO_FATAL_FAILURE(Init());
+    RETURN_IF_SKIP(Init())
 
     VkDescriptorPoolSize ds_type_count = {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1};
 
-    auto ds_pool_ci = LvlInitStruct<VkDescriptorPoolCreateInfo>();
+    VkDescriptorPoolCreateInfo ds_pool_ci = vku::InitStructHelper();
     ds_pool_ci.maxSets = 1;
     ds_pool_ci.poolSizeCount = 1;
     ds_pool_ci.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
     ds_pool_ci.pPoolSizes = &ds_type_count;
-    vk_testing::DescriptorPool ds_pool(*m_device, ds_pool_ci);
+    vkt::DescriptorPool ds_pool(*m_device, ds_pool_ci);
 
     VkDescriptorSetLayoutBinding dsl_binding = {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, VK_SHADER_STAGE_FRAGMENT_BIT,
                                                 nullptr};
 
-    const VkDescriptorSetLayoutObj ds_layout(m_device, {dsl_binding});
+    const vkt::DescriptorSetLayout ds_layout(*m_device, {dsl_binding});
 
     VkDescriptorSet descriptor_sets[2] = {VK_NULL_HANDLE, VK_NULL_HANDLE};
-    auto alloc_info = LvlInitStruct<VkDescriptorSetAllocateInfo>();
+    VkDescriptorSetAllocateInfo alloc_info = vku::InitStructHelper();
     alloc_info.descriptorSetCount = 1;
     alloc_info.descriptorPool = ds_pool.handle();
     alloc_info.pSetLayouts = &ds_layout.handle();
@@ -1047,7 +985,7 @@ TEST_F(VkPositiveLayerTest, ExclusiveScissorVersionCount) {
     TEST_DESCRIPTION("Test using vkCmdSetExclusiveScissorEnableNV.");
 
     AddRequiredExtensions(VK_NV_SCISSOR_EXCLUSIVE_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
+    RETURN_IF_SKIP(InitFramework())
     uint32_t propertyCount = 0u;
     vk::EnumerateDeviceExtensionProperties(gpu_, nullptr, &propertyCount, nullptr);
     std::vector<VkExtensionProperties> properties(propertyCount);
@@ -1064,13 +1002,36 @@ TEST_F(VkPositiveLayerTest, ExclusiveScissorVersionCount) {
     if (!exclusiveScissor2) {
         GTEST_SKIP() << VK_NV_SCISSOR_EXCLUSIVE_EXTENSION_NAME << " version 2 not supported";
     }
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-    ASSERT_NO_FATAL_FAILURE(InitState());
+    RETURN_IF_SKIP(InitState())
 
     m_commandBuffer->begin();
     VkBool32 exclusiveScissorEnable = VK_TRUE;
     vk::CmdSetExclusiveScissorEnableNV(m_commandBuffer->handle(), 0u, 1u, &exclusiveScissorEnable);
     m_commandBuffer->end();
+}
+
+TEST_F(VkPositiveLayerTest, GetCalibratedTimestamps) {
+    TEST_DESCRIPTION("Basic usage of vkGetCalibratedTimestampsEXT.");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_EXT_CALIBRATED_TIMESTAMPS_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitState())
+
+    uint32_t count = 0;
+    vk::GetPhysicalDeviceCalibrateableTimeDomainsEXT(gpu(), &count, nullptr);
+    if (count < 2) {
+        GTEST_SKIP() << "only 1 TimeDomain supported";
+    }
+    std::vector<VkTimeDomainEXT> time_domains(count);
+    vk::GetPhysicalDeviceCalibrateableTimeDomainsEXT(gpu(), &count, time_domains.data());
+
+    VkCalibratedTimestampInfoEXT timestamp_infos[2];
+    timestamp_infos[0] = vku::InitStructHelper();
+    timestamp_infos[0].timeDomain = time_domains[0];
+    timestamp_infos[1] = vku::InitStructHelper();
+    timestamp_infos[1].timeDomain = time_domains[1];
+
+    uint64_t timestamps[2];
+    uint64_t max_deviation;
+    vk::GetCalibratedTimestampsEXT(device(), 2, timestamp_infos, timestamps, &max_deviation);
 }

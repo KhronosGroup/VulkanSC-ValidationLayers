@@ -20,10 +20,12 @@
 #pragma once
 
 #include <utility>
+#include <variant>
+
+#include <vulkan/utility/vk_format_utils.h>
 
 #include "state_tracker/device_memory_state.h"
 #include "state_tracker/image_layout_map.h"
-#include "generated/vk_format_utils.h"
 #include "utils/vk_layer_utils.h"
 
 class ValidationStateTracker;
@@ -62,9 +64,14 @@ static inline VkImageSubresourceRange RangeFromLayers(const VkImageSubresourceLa
 
 class GlobalImageLayoutRangeMap : public subresource_adapter::BothRangeMap<VkImageLayout, 16> {
   public:
+    using RangeGenerator = image_layout_map::RangeGenerator;
+    using RangeType = key_type;
+
     GlobalImageLayoutRangeMap(index_type index) : BothRangeMap<VkImageLayout, 16>(index) {}
     ReadLockGuard ReadLock() const { return ReadLockGuard(lock_); }
     WriteLockGuard WriteLock() { return WriteLockGuard(lock_); }
+
+    bool AnyInRange(RangeGenerator &gen, std::function<bool(const key_type &range, const mapped_type &state)> &&func) const;
 
   private:
     mutable std::shared_mutex lock_;
@@ -106,7 +113,6 @@ class IMAGE_STATE : public BINDABLE {
     static constexpr int MAX_PLANES = 3;
     using MemoryReqs = std::array<VkMemoryRequirements, MAX_PLANES>;
     const MemoryReqs requirements;
-    const VkMemoryRequirements *const memory_requirements_pointer = &requirements[0];
     std::array<bool, MAX_PLANES> memory_requirements_checked = {};
 
     const bool sparse_residency;
@@ -219,6 +225,7 @@ class IMAGE_STATE : public BINDABLE {
     }
 
     void SetInitialLayoutMap();
+    void SetImageLayout(const VkImageSubresourceRange &range, VkImageLayout layout);
 
   protected:
     void NotifyInvalidate(const BASE_NODE::NodeList &invalid_nodes, bool unlink) override;
@@ -250,16 +257,13 @@ class IMAGE_STATE : public BINDABLE {
         }
         return false;
     }
-};
 
-template <typename ImageState>
-struct ImageStateBindingTraits {
-    using NoBinding = MEMORY_TRACKED_RESOURCE_STATE<ImageState, BindableNoMemoryTracker>;
-    using Linear = MEMORY_TRACKED_RESOURCE_STATE<ImageState, BindableLinearMemoryTracker>;
-    template <bool IS_RESIDENT>
-    using Sparse = MEMORY_TRACKED_RESOURCE_STATE<ImageState, BindableSparseMemoryTracker<IS_RESIDENT>>;
-    template <unsigned PLANE_COUNT>
-    using Multiplanar = MEMORY_TRACKED_RESOURCE_STATE<ImageState, BindableMultiplanarMemoryTracker<PLANE_COUNT>>;
+  private:
+    std::variant<std::monostate,
+                 BindableNoMemoryTracker,
+                 BindableLinearMemoryTracker,
+                 BindableSparseMemoryTracker,
+                 BindableMultiplanarMemoryTracker> tracker_;
 };
 
 // State for VkImageView objects.
@@ -282,6 +286,7 @@ class IMAGE_VIEW_STATE : public BASE_NODE {
     const bool metal_imageview_export;
 #endif  // VK_USE_PLATFORM_METAL_EXT
     std::shared_ptr<IMAGE_STATE> image_state;
+    const bool is_depth_sliced;
 
     IMAGE_VIEW_STATE(const std::shared_ptr<IMAGE_STATE> &image_state, VkImageView iv, const VkImageViewCreateInfo *ci,
                      VkFormatFeatureFlags2KHR ff, const VkFilterCubicImageViewImageFormatPropertiesEXT &cubic_props);
@@ -303,10 +308,8 @@ class IMAGE_VIEW_STATE : public BASE_NODE {
 
     void Destroy() override;
 
-    bool IsDepthSliced() const;
+    bool IsDepthSliced() const { return is_depth_sliced; }
 
-    VkOffset3D GetOffset() const;
-    VkExtent3D GetExtent() const;
     uint32_t GetAttachmentLayerCount() const;
 
     bool Invalid() const override { return Destroyed() || !image_state || image_state->Invalid(); }
@@ -402,7 +405,7 @@ class SURFACE_STATE : public BASE_NODE {
 
     VkSurfaceKHR surface() const { return handle_.Cast<VkSurfaceKHR>(); }
     VkPhysicalDeviceSurfaceInfo2KHR GetSurfaceInfo2(const void *surface_info2_pnext = nullptr) const {
-        auto surface_info2 = LvlInitStruct<VkPhysicalDeviceSurfaceInfo2KHR>();
+        VkPhysicalDeviceSurfaceInfo2KHR surface_info2 = vku::InitStructHelper();
         surface_info2.pNext = surface_info2_pnext;
         surface_info2.surface = surface();
         return surface_info2;

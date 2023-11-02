@@ -76,7 +76,7 @@ def convert_test_file(args, filename, data, converted_cases):
     missing_group_rule = set()
     missing_case_rule = set()
 
-    with open(f'{args.testdir}/unit/{filename}', 'r') as input, open(f'{args.testdir}/vulkansc/converted/{filename}.tmp', 'w') as output:
+    with open(f'{args.testdir}/unit/{filename}', 'r', encoding='utf-8-sig') as input, open(f'{args.testdir}/vulkansc/converted/{filename}.tmp', 'w', encoding='utf-8') as output:
         output.write('// *** THIS FILE IS GENERATED - DO NOT EDIT ***\n')
         output.write('// See vksc_convert_tests.py for modifications\n')
         output.write('\n')
@@ -159,7 +159,7 @@ if __name__ == '__main__':
         parser.print_usage()
         exit(2)
 
-    file = open(args.input, 'r')
+    file = open(args.input, 'r', encoding='utf-8')
     data = json.load(file)
     file.close()
 
@@ -185,6 +185,9 @@ if __name__ == '__main__':
                     result = False
 
     if not result:
+        for filename in sorted(os.listdir(f'{args.testdir}/vulkansc/converted')):
+            if filename.endswith('.tmp'):
+                os.remove(f'{args.testdir}/vulkansc/converted/{filename}')
         exit(1)
 
     for filename in sorted(os.listdir(f'{args.testdir}/vulkansc/converted')):
@@ -203,7 +206,7 @@ if __name__ == '__main__':
         else:
             os.remove(temp_filename)
 
-    with open(f'{args.testdir}/vulkansc/convertedTests.cmake', 'w') as cmake:
+    with open(f'{args.testdir}/vulkansc/convertedTests.cmake', 'w', encoding='utf-8') as cmake:
         cmake.write('# *** THIS FILE IS GENERATED - DO NOT EDIT ***\n')
         cmake.write('# See vksc_convert_tests.py for modifications\n')
         cmake.write('\n')

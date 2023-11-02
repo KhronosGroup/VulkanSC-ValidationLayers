@@ -28,7 +28,8 @@ class SC_COMMAND_POOL_STATE : public COMMAND_POOL_STATE {
     SC_COMMAND_POOL_STATE(ValidationStateTracker *dev, VkCommandPool cp, const VkCommandPoolCreateInfo *pCreateInfo,
                           VkQueueFlags flags)
         : COMMAND_POOL_STATE(dev, cp, pCreateInfo, flags), max_command_buffers(0), command_buffers_recording(0) {
-        const auto *mem_reservation_info = LvlFindInChain<VkCommandPoolMemoryReservationCreateInfo>(pCreateInfo->pNext);
+        const auto *mem_reservation_info =
+            vku::FindStructInPNextChain<VkCommandPoolMemoryReservationCreateInfo>(pCreateInfo->pNext);
         if (mem_reservation_info) {
             max_command_buffers = mem_reservation_info->commandPoolMaxCommandBuffers;
         }

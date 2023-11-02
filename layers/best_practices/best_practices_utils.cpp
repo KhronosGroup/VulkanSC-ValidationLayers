@@ -102,25 +102,26 @@ const char* BestPractices::VendorSpecificTag(BPVendorFlags vendors) const {
 }
 
 // Despite the return code being successful this can be a useful utility for some developers in niche debugging situation.
-void BestPractices::LogPositiveSuccessCode(const char* api_name, VkResult result) const {
-    assert(result > VK_SUCCESS);
+void BestPractices::LogPositiveSuccessCode(const RecordObject& record_obj) const {
+    assert(record_obj.result > VK_SUCCESS);
 
-    LogVerbose(instance, kVUID_BestPractices_Verbose_Success_Logging, "%s(): Returned %s.", api_name, string_VkResult(result));
+    LogVerbose(kVUID_BestPractices_Verbose_Success_Logging, instance, record_obj.location, "Returned %s.",
+               string_VkResult(record_obj.result));
 }
 
-void BestPractices::LogErrorCode(const char* api_name, VkResult result) const {
-    assert(result < VK_SUCCESS);  // Anything less than VK_SUCCESS is an error.
+void BestPractices::LogErrorCode(const RecordObject& record_obj) const {
+    assert(record_obj.result < VK_SUCCESS);  // Anything less than VK_SUCCESS is an error.
 
     // Despite being error codes log these results as informational.
     // That is because they are returned frequently during window resizing.
     // They are expected to occur during the normal application lifecycle.
     constexpr std::array common_failure_codes = {VK_ERROR_OUT_OF_DATE_KHR, VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT};
-    const auto result_string = string_VkResult(result);
+    const auto result_string = string_VkResult(record_obj.result);
 
-    if (IsValueIn(result, common_failure_codes)) {
-        LogInfo(instance, kVUID_BestPractices_Failure_Result, "%s(): Returned error %s.", api_name, result_string);
+    if (IsValueIn(record_obj.result, common_failure_codes)) {
+        LogInfo(kVUID_BestPractices_Failure_Result, instance, record_obj.location, "Returned error %s.", result_string);
     } else {
-        LogWarning(instance, kVUID_BestPractices_Error_Result, "%s(): Returned error %s.", api_name, result_string);
+        LogWarning(kVUID_BestPractices_Error_Result, instance, record_obj.location, "Returned error %s.", result_string);
     }
 }
 
@@ -281,21 +282,21 @@ void BestPractices::RecordZcullDraw(bp_state::CommandBuffer& cmd_state) {
     });
 }
 
-bool BestPractices::ValidateZcullScope(const bp_state::CommandBuffer& cmd_state) const {
+bool BestPractices::ValidateZcullScope(const bp_state::CommandBuffer& cmd_state, const Location& loc) const {
     assert(VendorCheckEnabled(kBPVendorNVIDIA));
 
     bool skip = false;
 
     if (cmd_state.nv.depth_test_enable) {
         auto& scope = cmd_state.nv.zcull_scope;
-        skip |= ValidateZcull(cmd_state, scope.image, scope.range);
+        skip |= ValidateZcull(cmd_state, scope.image, scope.range, loc);
     }
 
     return skip;
 }
 
 bool BestPractices::ValidateZcull(const bp_state::CommandBuffer& cmd_state, VkImage image,
-                                  const VkImageSubresourceRange& subresource_range) const {
+                                  const VkImageSubresourceRange& subresource_range, const Location& loc) const {
     bool skip = false;
 
     const char* good_mode = nullptr;
@@ -341,13 +342,12 @@ bool BestPractices::ValidateZcull(const bp_state::CommandBuffer& cmd_state, VkIm
 
     if (is_balanced) {
         skip |= LogPerformanceWarning(
-            cmd_state.commandBuffer(), kVUID_BestPractices_Zcull_LessGreaterRatio,
+            kVUID_BestPractices_Zcull_LessGreaterRatio, cmd_state.commandBuffer(), loc,
             "%s Depth attachment %s is primarily rendered with depth compare op %s, but some draws use %s. "
             "Z-cull is disabled for the least used direction, which harms depth testing performance. "
             "The Z-cull direction can be reset by clearing the depth attachment, transitioning from VK_IMAGE_LAYOUT_UNDEFINED, "
             "using VK_ATTACHMENT_LOAD_OP_DONT_CARE, or using VK_ATTACHMENT_STORE_OP_DONT_CARE.",
-            VendorSpecificTag(kBPVendorNVIDIA), report_data->FormatHandle(cmd_state.nv.zcull_scope.image).c_str(), good_mode,
-            bad_mode);
+            VendorSpecificTag(kBPVendorNVIDIA), FormatHandle(cmd_state.nv.zcull_scope.image).c_str(), good_mode, bad_mode);
     }
 
     return skip;
@@ -358,10 +358,10 @@ static std::array<uint32_t, 4> GetRawClearColor(VkFormat format, const VkClearCo
     std::copy_n(clear_value.uint32, raw_color.size(), raw_color.data());
 
     // Zero out unused components to avoid polluting the cache with garbage
-    if (!FormatHasRed(format)) raw_color[0] = 0;
-    if (!FormatHasGreen(format)) raw_color[1] = 0;
-    if (!FormatHasBlue(format)) raw_color[2] = 0;
-    if (!FormatHasAlpha(format)) raw_color[3] = 0;
+    if (!vkuFormatHasRed(format)) raw_color[0] = 0;
+    if (!vkuFormatHasGreen(format)) raw_color[1] = 0;
+    if (!vkuFormatHasBlue(format)) raw_color[2] = 0;
+    if (!vkuFormatHasAlpha(format)) raw_color[3] = 0;
 
     return raw_color;
 }
@@ -376,11 +376,11 @@ static bool IsClearColorZeroOrOne(VkFormat format, const std::array<uint32_t, 4>
     memcpy(&raw_zero, &zero, sizeof(zero));
 
     const bool is_one =
-        (!FormatHasRed(format) || (clear_color[0] == raw_one)) && (!FormatHasGreen(format) || (clear_color[1] == raw_one)) &&
-        (!FormatHasBlue(format) || (clear_color[2] == raw_one)) && (!FormatHasAlpha(format) || (clear_color[3] == raw_one));
+        (!vkuFormatHasRed(format) || (clear_color[0] == raw_one)) && (!vkuFormatHasGreen(format) || (clear_color[1] == raw_one)) &&
+        (!vkuFormatHasBlue(format) || (clear_color[2] == raw_one)) && (!vkuFormatHasAlpha(format) || (clear_color[3] == raw_one));
     const bool is_zero =
-        (!FormatHasRed(format) || (clear_color[0] == raw_zero)) && (!FormatHasGreen(format) || (clear_color[1] == raw_zero)) &&
-        (!FormatHasBlue(format) || (clear_color[2] == raw_zero)) && (!FormatHasAlpha(format) || (clear_color[3] == raw_zero));
+        (!vkuFormatHasRed(format) || (clear_color[0] == raw_zero)) && (!vkuFormatHasGreen(format) || (clear_color[1] == raw_zero)) &&
+        (!vkuFormatHasBlue(format) || (clear_color[2] == raw_zero)) && (!vkuFormatHasAlpha(format) || (clear_color[3] == raw_zero));
     return is_one || is_zero;
 }
 
@@ -421,7 +421,8 @@ void BestPractices::RecordClearColor(VkFormat format, const VkClearColorValue& c
     }
 }
 
-bool BestPractices::ValidateClearColor(VkCommandBuffer commandBuffer, VkFormat format, const VkClearColorValue& clear_value) const {
+bool BestPractices::ValidateClearColor(VkCommandBuffer commandBuffer, VkFormat format, const VkClearColorValue& clear_value,
+                                       const Location& loc) const {
     assert(VendorCheckEnabled(kBPVendorNVIDIA));
 
     bool skip = false;
@@ -437,7 +438,7 @@ bool BestPractices::ValidateClearColor(VkCommandBuffer commandBuffer, VkFormat f
         // The format is not compressible
         static const std::string format_list = MakeCompressedFormatListNVIDIA();
 
-        skip |= LogPerformanceWarning(commandBuffer, kVUID_BestPractices_ClearColor_NotCompressed,
+        skip |= LogPerformanceWarning(kVUID_BestPractices_ClearColor_NotCompressed, commandBuffer, loc,
                                       "%s Clearing image with format %s without a 1.0f or 0.0f clear color. "
                                       "The clear will not get compressed in the GPU, harming performance. "
                                       "This can be fixed using a clear color of VkClearColorValue{0.0f, 0.0f, 0.0f, 0.0f}, or "
@@ -458,10 +459,10 @@ bool BestPractices::ValidateClearColor(VkCommandBuffer commandBuffer, VkFormat f
         if (!registered) {
             std::string clear_color_str;
 
-            if (FormatIsUINT(format)) {
+            if (vkuFormatIsUINT(format)) {
                 clear_color_str = std::to_string(clear_value.uint32[0]) + ", " + std::to_string(clear_value.uint32[1]) + ", " +
                                   std::to_string(clear_value.uint32[2]) + ", " + std::to_string(clear_value.uint32[3]);
-            } else if (FormatIsSINT(format)) {
+            } else if (vkuFormatIsSINT(format)) {
                 clear_color_str = std::to_string(clear_value.int32[0]) + ", " + std::to_string(clear_value.int32[1]) + ", " +
                                   std::to_string(clear_value.int32[2]) + ", " + std::to_string(clear_value.int32[3]);
             } else {
@@ -470,7 +471,7 @@ bool BestPractices::ValidateClearColor(VkCommandBuffer commandBuffer, VkFormat f
             }
 
             skip |= LogPerformanceWarning(
-                commandBuffer, kVUID_BestPractices_ClearColor_NotCompressed,
+                kVUID_BestPractices_ClearColor_NotCompressed, commandBuffer, loc,
                 "%s Clearing image with unregistered VkClearColorValue{%s}. "
                 "This clear will not get compressed in the GPU, harming performance. "
                 "The clear color is not registered because too many unique colors have been used. "
@@ -483,15 +484,15 @@ bool BestPractices::ValidateClearColor(VkCommandBuffer commandBuffer, VkFormat f
     return skip;
 }
 
-void BestPractices::QueueValidateImageView(QueueCallbacks& funcs, const char* function_name, IMAGE_VIEW_STATE* view,
+void BestPractices::QueueValidateImageView(QueueCallbacks& funcs, Func command, IMAGE_VIEW_STATE* view,
                                            IMAGE_SUBRESOURCE_USAGE_BP usage) {
     if (view) {
         auto image_state = std::static_pointer_cast<bp_state::Image>(view->image_state);
-        QueueValidateImage(funcs, function_name, image_state, usage, view->normalized_subresource_range);
+        QueueValidateImage(funcs, command, image_state, usage, view->normalized_subresource_range);
     }
 }
 
-void BestPractices::QueueValidateImage(QueueCallbacks& funcs, const char* function_name, std::shared_ptr<bp_state::Image>& state,
+void BestPractices::QueueValidateImage(QueueCallbacks& funcs, Func command, std::shared_ptr<bp_state::Image>& state,
                                        IMAGE_SUBRESOURCE_USAGE_BP usage, const VkImageSubresourceRange& subresource_range) {
     // If we're viewing a 3D slice, ignore base array layer.
     // The entire 3D subresource is accessed as one atomic unit.
@@ -504,53 +505,51 @@ void BestPractices::QueueValidateImage(QueueCallbacks& funcs, const char* functi
 
     for (uint32_t layer = 0; layer < array_layers; layer++) {
         for (uint32_t level = 0; level < mip_levels; level++) {
-            QueueValidateImage(funcs, function_name, state, usage, layer + base_array_layer,
-                               level + subresource_range.baseMipLevel);
+            QueueValidateImage(funcs, command, state, usage, layer + base_array_layer, level + subresource_range.baseMipLevel);
         }
     }
 }
 
-void BestPractices::QueueValidateImage(QueueCallbacks& funcs, const char* function_name, std::shared_ptr<bp_state::Image>& state,
+void BestPractices::QueueValidateImage(QueueCallbacks& funcs, Func command, std::shared_ptr<bp_state::Image>& state,
                                        IMAGE_SUBRESOURCE_USAGE_BP usage, const VkImageSubresourceLayers& subresource_layers) {
     const uint32_t max_layers = state->createInfo.arrayLayers - subresource_layers.baseArrayLayer;
     const uint32_t array_layers = std::min(subresource_layers.layerCount, max_layers);
 
     for (uint32_t layer = 0; layer < array_layers; layer++) {
-        QueueValidateImage(funcs, function_name, state, usage, layer + subresource_layers.baseArrayLayer,
-                           subresource_layers.mipLevel);
+        QueueValidateImage(funcs, command, state, usage, layer + subresource_layers.baseArrayLayer, subresource_layers.mipLevel);
     }
 }
 
-void BestPractices::QueueValidateImage(QueueCallbacks& funcs, const char* function_name, std::shared_ptr<bp_state::Image>& state,
+void BestPractices::QueueValidateImage(QueueCallbacks& funcs, Func command, std::shared_ptr<bp_state::Image>& state,
                                        IMAGE_SUBRESOURCE_USAGE_BP usage, uint32_t array_layer, uint32_t mip_level) {
-    funcs.push_back([this, function_name, state, usage, array_layer, mip_level](
-                        const ValidationStateTracker& vst, const QUEUE_STATE& qs, const CMD_BUFFER_STATE& cbs) -> bool {
-        ValidateImageInQueue(qs, cbs, function_name, *state, usage, array_layer, mip_level);
+    funcs.push_back([this, command, state, usage, array_layer, mip_level](const ValidationStateTracker& vst, const QUEUE_STATE& qs,
+                                                                          const CMD_BUFFER_STATE& cbs) -> bool {
+        ValidateImageInQueue(qs, cbs, command, *state, usage, array_layer, mip_level);
         return false;
     });
 }
 
-void BestPractices::ValidateImageInQueueArmImg(const char* function_name, const bp_state::Image& image,
-                                               IMAGE_SUBRESOURCE_USAGE_BP last_usage, IMAGE_SUBRESOURCE_USAGE_BP usage,
-                                               uint32_t array_layer, uint32_t mip_level) {
+void BestPractices::ValidateImageInQueueArmImg(Func command, const bp_state::Image& image, IMAGE_SUBRESOURCE_USAGE_BP last_usage,
+                                               IMAGE_SUBRESOURCE_USAGE_BP usage, uint32_t array_layer, uint32_t mip_level) {
     // Swapchain images are implicitly read so clear after store is expected.
+    const Location loc(command);
     if (usage == IMAGE_SUBRESOURCE_USAGE_BP::RENDER_PASS_CLEARED && last_usage == IMAGE_SUBRESOURCE_USAGE_BP::RENDER_PASS_STORED &&
         !image.IsSwapchainImage()) {
         LogPerformanceWarning(
-            device, kVUID_BestPractices_RenderPass_RedundantStore,
-            "%s %s: %s Subresource (arrayLayer: %u, mipLevel: %u) of image was cleared as part of LOAD_OP_CLEAR, but last time "
+            kVUID_BestPractices_RenderPass_RedundantStore, device, loc,
+            "%s %s Subresource (arrayLayer: %u, mipLevel: %u) of image was cleared as part of LOAD_OP_CLEAR, but last time "
             "image was used, it was written to with STORE_OP_STORE. "
             "Storing to the image is probably redundant in this case, and wastes bandwidth on tile-based "
             "architectures.",
-            function_name, VendorSpecificTag(kBPVendorArm), VendorSpecificTag(kBPVendorIMG), array_layer, mip_level);
+            VendorSpecificTag(kBPVendorArm), VendorSpecificTag(kBPVendorIMG), array_layer, mip_level);
     } else if (usage == IMAGE_SUBRESOURCE_USAGE_BP::RENDER_PASS_CLEARED && last_usage == IMAGE_SUBRESOURCE_USAGE_BP::CLEARED) {
         LogPerformanceWarning(
-            device, kVUID_BestPractices_RenderPass_RedundantClear,
-            "%s %s: %s Subresource (arrayLayer: %u, mipLevel: %u) of image was cleared as part of LOAD_OP_CLEAR, but last time "
+            kVUID_BestPractices_RenderPass_RedundantClear, device, loc,
+            "%s %s Subresource (arrayLayer: %u, mipLevel: %u) of image was cleared as part of LOAD_OP_CLEAR, but last time "
             "image was used, it was written to with vkCmdClear*Image(). "
             "Clearing the image with vkCmdClear*Image() is probably redundant in this case, and wastes bandwidth on "
             "tile-based architectures.",
-            function_name, VendorSpecificTag(kBPVendorArm), VendorSpecificTag(kBPVendorIMG), array_layer, mip_level);
+            VendorSpecificTag(kBPVendorArm), VendorSpecificTag(kBPVendorIMG), array_layer, mip_level);
     } else if (usage == IMAGE_SUBRESOURCE_USAGE_BP::RENDER_PASS_READ_TO_TILE &&
                (last_usage == IMAGE_SUBRESOURCE_USAGE_BP::BLIT_WRITE || last_usage == IMAGE_SUBRESOURCE_USAGE_BP::CLEARED ||
                 last_usage == IMAGE_SUBRESOURCE_USAGE_BP::COPY_WRITE || last_usage == IMAGE_SUBRESOURCE_USAGE_BP::RESOLVE_WRITE)) {
@@ -596,17 +595,15 @@ void BestPractices::ValidateImageInQueueArmImg(const char* function_name, const 
         }
 
         LogPerformanceWarning(
-            device, vuid,
-            "%s %s: %s Subresource (arrayLayer: %u, mipLevel: %u) of image was loaded to tile as part of LOAD_OP_LOAD, but last "
+            vuid, device, loc,
+            "%s %s Subresource (arrayLayer: %u, mipLevel: %u) of image was loaded to tile as part of LOAD_OP_LOAD, but last "
             "time image was used, it was written to with %s. %s",
-            function_name, VendorSpecificTag(kBPVendorArm), VendorSpecificTag(kBPVendorIMG), array_layer, mip_level, last_cmd,
-            suggestion);
+            VendorSpecificTag(kBPVendorArm), VendorSpecificTag(kBPVendorIMG), array_layer, mip_level, last_cmd, suggestion);
     }
 }
 
-void BestPractices::ValidateImageInQueue(const QUEUE_STATE& qs, const CMD_BUFFER_STATE& cbs, const char* function_name,
-                                         bp_state::Image& state, IMAGE_SUBRESOURCE_USAGE_BP usage, uint32_t array_layer,
-                                         uint32_t mip_level) {
+void BestPractices::ValidateImageInQueue(const QUEUE_STATE& qs, const CMD_BUFFER_STATE& cbs, Func command, bp_state::Image& state,
+                                         IMAGE_SUBRESOURCE_USAGE_BP usage, uint32_t array_layer, uint32_t mip_level) {
     auto queue_family = qs.queueFamilyIndex;
     auto last_usage = state.UpdateUsage(array_layer, mip_level, usage, queue_family);
 
@@ -619,15 +616,15 @@ void BestPractices::ValidateImageInQueue(const QUEUE_STATE& qs, const CMD_BUFFER
             if (usage == IMAGE_SUBRESOURCE_USAGE_BP::RENDER_PASS_READ_TO_TILE || usage == IMAGE_SUBRESOURCE_USAGE_BP::BLIT_READ ||
                 usage == IMAGE_SUBRESOURCE_USAGE_BP::COPY_READ || usage == IMAGE_SUBRESOURCE_USAGE_BP::DESCRIPTOR_ACCESS ||
                 usage == IMAGE_SUBRESOURCE_USAGE_BP::RESOLVE_READ) {
+                Location loc(command);
                 LogWarning(
-                    state.image(), kVUID_BestPractices_ConcurrentUsageOfExclusiveImage,
-                    "%s : Subresource (arrayLayer: %" PRIu32 ", mipLevel: %" PRIu32
-                    ") of image is used on queue family index %" PRIu32
+                    kVUID_BestPractices_ConcurrentUsageOfExclusiveImage, state.image(), loc,
+                    "Subresource (arrayLayer: %" PRIu32 ", mipLevel: %" PRIu32 ") of image is used on queue family index %" PRIu32
                     " after being used on "
                     "queue family index %" PRIu32
                     ", "
                     "but has VK_SHARING_MODE_EXCLUSIVE, and has not been acquired and released with a ownership transfer operation",
-                    function_name, array_layer, mip_level, queue_family, last_usage.queue_family_index);
+                    array_layer, mip_level, queue_family, last_usage.queue_family_index);
             }
         }
     }
@@ -635,13 +632,14 @@ void BestPractices::ValidateImageInQueue(const QUEUE_STATE& qs, const CMD_BUFFER
     // When image was discarded with StoreOpDontCare but is now being read with LoadOpLoad
     if (last_usage.type == IMAGE_SUBRESOURCE_USAGE_BP::RENDER_PASS_DISCARDED &&
         usage == IMAGE_SUBRESOURCE_USAGE_BP::RENDER_PASS_READ_TO_TILE) {
-        LogWarning(device, kVUID_BestPractices_StoreOpDontCareThenLoadOpLoad,
+        Location loc(command);
+        LogWarning(kVUID_BestPractices_StoreOpDontCareThenLoadOpLoad, device, loc,
                    "Trying to load an attachment with LOAD_OP_LOAD that was previously stored with STORE_OP_DONT_CARE. This may "
                    "result in undefined behaviour.");
     }
 
     if (VendorCheckEnabled(kBPVendorArm) || VendorCheckEnabled(kBPVendorIMG)) {
-        ValidateImageInQueueArmImg(function_name, state, last_usage.type, usage, array_layer, mip_level);
+        ValidateImageInQueueArmImg(command, state, last_usage.type, usage, array_layer, mip_level);
     }
 }
 

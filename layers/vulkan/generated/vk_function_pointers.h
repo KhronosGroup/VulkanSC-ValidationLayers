@@ -2,25 +2,26 @@
 // See function_pointers_generator.py for modifications
 
 /***************************************************************************
-*
-* Copyright (c) 2015-2023 The Khronos Group Inc.
-* Copyright (c) 2015-2023 Valve Corporation
-* Copyright (c) 2015-2023 LunarG, Inc.
-*
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
-*
-*     http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-****************************************************************************/
+ *
+ * Copyright (c) 2015-2023 The Khronos Group Inc.
+ * Copyright (c) 2015-2023 Valve Corporation
+ * Copyright (c) 2015-2023 LunarG, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ ****************************************************************************/
 
 // NOLINTBEGIN
+// clang-format off
 
 #pragma once
 #include <vulkan/vulkan.h>
@@ -432,6 +433,10 @@ extern PFN_vkCmdTraceRaysIndirect2KHR CmdTraceRaysIndirect2KHR;
 extern PFN_vkGetDeviceBufferMemoryRequirementsKHR GetDeviceBufferMemoryRequirementsKHR;
 extern PFN_vkGetDeviceImageMemoryRequirementsKHR GetDeviceImageMemoryRequirementsKHR;
 extern PFN_vkGetDeviceImageSparseMemoryRequirementsKHR GetDeviceImageSparseMemoryRequirementsKHR;
+extern PFN_vkCmdBindIndexBuffer2KHR CmdBindIndexBuffer2KHR;
+extern PFN_vkGetRenderingAreaGranularityKHR GetRenderingAreaGranularityKHR;
+extern PFN_vkGetDeviceImageSubresourceLayoutKHR GetDeviceImageSubresourceLayoutKHR;
+extern PFN_vkGetImageSubresourceLayout2KHR GetImageSubresourceLayout2KHR;
 extern PFN_vkGetPhysicalDeviceCooperativeMatrixPropertiesKHR GetPhysicalDeviceCooperativeMatrixPropertiesKHR;
 extern PFN_vkCreateDebugReportCallbackEXT CreateDebugReportCallbackEXT;
 extern PFN_vkDestroyDebugReportCallbackEXT DestroyDebugReportCallbackEXT;
@@ -511,6 +516,27 @@ extern PFN_vkGetAndroidHardwareBufferPropertiesANDROID GetAndroidHardwareBufferP
 #ifdef VK_USE_PLATFORM_ANDROID_KHR
 extern PFN_vkGetMemoryAndroidHardwareBufferANDROID GetMemoryAndroidHardwareBufferANDROID;
 #endif //VK_USE_PLATFORM_ANDROID_KHR
+#ifdef VK_ENABLE_BETA_EXTENSIONS
+extern PFN_vkCreateExecutionGraphPipelinesAMDX CreateExecutionGraphPipelinesAMDX;
+#endif //VK_ENABLE_BETA_EXTENSIONS
+#ifdef VK_ENABLE_BETA_EXTENSIONS
+extern PFN_vkGetExecutionGraphPipelineScratchSizeAMDX GetExecutionGraphPipelineScratchSizeAMDX;
+#endif //VK_ENABLE_BETA_EXTENSIONS
+#ifdef VK_ENABLE_BETA_EXTENSIONS
+extern PFN_vkGetExecutionGraphPipelineNodeIndexAMDX GetExecutionGraphPipelineNodeIndexAMDX;
+#endif //VK_ENABLE_BETA_EXTENSIONS
+#ifdef VK_ENABLE_BETA_EXTENSIONS
+extern PFN_vkCmdInitializeGraphScratchMemoryAMDX CmdInitializeGraphScratchMemoryAMDX;
+#endif //VK_ENABLE_BETA_EXTENSIONS
+#ifdef VK_ENABLE_BETA_EXTENSIONS
+extern PFN_vkCmdDispatchGraphAMDX CmdDispatchGraphAMDX;
+#endif //VK_ENABLE_BETA_EXTENSIONS
+#ifdef VK_ENABLE_BETA_EXTENSIONS
+extern PFN_vkCmdDispatchGraphIndirectAMDX CmdDispatchGraphIndirectAMDX;
+#endif //VK_ENABLE_BETA_EXTENSIONS
+#ifdef VK_ENABLE_BETA_EXTENSIONS
+extern PFN_vkCmdDispatchGraphIndirectCountAMDX CmdDispatchGraphIndirectCountAMDX;
+#endif //VK_ENABLE_BETA_EXTENSIONS
 extern PFN_vkCmdSetSampleLocationsEXT CmdSetSampleLocationsEXT;
 extern PFN_vkGetPhysicalDeviceMultisamplePropertiesEXT GetPhysicalDeviceMultisamplePropertiesEXT;
 extern PFN_vkGetImageDrmFormatModifierPropertiesEXT GetImageDrmFormatModifierPropertiesEXT;
@@ -592,6 +618,11 @@ extern PFN_vkCmdSetDepthCompareOpEXT CmdSetDepthCompareOpEXT;
 extern PFN_vkCmdSetDepthBoundsTestEnableEXT CmdSetDepthBoundsTestEnableEXT;
 extern PFN_vkCmdSetStencilTestEnableEXT CmdSetStencilTestEnableEXT;
 extern PFN_vkCmdSetStencilOpEXT CmdSetStencilOpEXT;
+extern PFN_vkCopyMemoryToImageEXT CopyMemoryToImageEXT;
+extern PFN_vkCopyImageToMemoryEXT CopyImageToMemoryEXT;
+extern PFN_vkCopyImageToImageEXT CopyImageToImageEXT;
+extern PFN_vkTransitionImageLayoutEXT TransitionImageLayoutEXT;
+extern PFN_vkGetImageSubresourceLayout2EXT GetImageSubresourceLayout2EXT;
 extern PFN_vkReleaseSwapchainImagesEXT ReleaseSwapchainImagesEXT;
 extern PFN_vkGetGeneratedCommandsMemoryRequirementsNV GetGeneratedCommandsMemoryRequirementsNV;
 extern PFN_vkCmdPreprocessGeneratedCommandsNV CmdPreprocessGeneratedCommandsNV;
@@ -621,7 +652,6 @@ extern PFN_vkGetImageViewOpaqueCaptureDescriptorDataEXT GetImageViewOpaqueCaptur
 extern PFN_vkGetSamplerOpaqueCaptureDescriptorDataEXT GetSamplerOpaqueCaptureDescriptorDataEXT;
 extern PFN_vkGetAccelerationStructureOpaqueCaptureDescriptorDataEXT GetAccelerationStructureOpaqueCaptureDescriptorDataEXT;
 extern PFN_vkCmdSetFragmentShadingRateEnumNV CmdSetFragmentShadingRateEnumNV;
-extern PFN_vkGetImageSubresourceLayout2EXT GetImageSubresourceLayout2EXT;
 extern PFN_vkGetDeviceFaultInfoEXT GetDeviceFaultInfoEXT;
 #ifdef VK_USE_PLATFORM_WIN32_KHR
 extern PFN_vkAcquireWinrtDisplayNV AcquireWinrtDisplayNV;
@@ -705,6 +735,9 @@ extern PFN_vkCmdCopyMemoryIndirectNV CmdCopyMemoryIndirectNV;
 extern PFN_vkCmdCopyMemoryToImageIndirectNV CmdCopyMemoryToImageIndirectNV;
 extern PFN_vkCmdDecompressMemoryNV CmdDecompressMemoryNV;
 extern PFN_vkCmdDecompressMemoryIndirectCountNV CmdDecompressMemoryIndirectCountNV;
+extern PFN_vkGetPipelineIndirectMemoryRequirementsNV GetPipelineIndirectMemoryRequirementsNV;
+extern PFN_vkCmdUpdatePipelineIndirectBufferNV CmdUpdatePipelineIndirectBufferNV;
+extern PFN_vkGetPipelineIndirectDeviceAddressNV GetPipelineIndirectDeviceAddressNV;
 extern PFN_vkCmdSetTessellationDomainOriginEXT CmdSetTessellationDomainOriginEXT;
 extern PFN_vkCmdSetDepthClampEnableEXT CmdSetDepthClampEnableEXT;
 extern PFN_vkCmdSetPolygonModeEXT CmdSetPolygonModeEXT;
@@ -749,6 +782,11 @@ extern PFN_vkGetShaderBinaryDataEXT GetShaderBinaryDataEXT;
 extern PFN_vkCmdBindShadersEXT CmdBindShadersEXT;
 extern PFN_vkGetFramebufferTilePropertiesQCOM GetFramebufferTilePropertiesQCOM;
 extern PFN_vkGetDynamicRenderingTilePropertiesQCOM GetDynamicRenderingTilePropertiesQCOM;
+extern PFN_vkSetLatencySleepModeNV SetLatencySleepModeNV;
+extern PFN_vkLatencySleepNV LatencySleepNV;
+extern PFN_vkSetLatencyMarkerNV SetLatencyMarkerNV;
+extern PFN_vkGetLatencyTimingsNV GetLatencyTimingsNV;
+extern PFN_vkQueueNotifyOutOfBandNV QueueNotifyOutOfBandNV;
 extern PFN_vkCmdSetAttachmentFeedbackLoopEnableEXT CmdSetAttachmentFeedbackLoopEnableEXT;
 #ifdef VK_USE_PLATFORM_SCREEN_QNX
 extern PFN_vkGetScreenBufferPropertiesQNX GetScreenBufferPropertiesQNX;
@@ -785,4 +823,5 @@ void InitDeviceExtension(VkInstance instance, VkDevice device, const char* exten
 void ResetAllExtensions();
 
 } // namespace vk
+// clang-format on
 // NOLINTEND

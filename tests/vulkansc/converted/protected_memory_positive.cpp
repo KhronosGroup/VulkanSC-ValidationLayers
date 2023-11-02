@@ -23,23 +23,11 @@ TEST_F(PositiveProtectedMemory, MixProtectedQueue) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
 
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!AreRequiredExtensionsEnabled()) {
-        GTEST_SKIP() << RequiredExtensionsNotSupported() << " not supported";
-    }
-
-    // NOTE (ncesario): This appears to be failing in the driver on the Shield.
-    //      It's clear what is causing this; more investigation is necessary.
-    if (IsPlatform(kShieldTVb)) {
-        GTEST_SKIP() << "Test not supported by Shield TV";
-    }
+    RETURN_IF_SKIP(InitFramework())
 
     // Needed for both protected memory and vkGetDeviceQueue2
-    if (DeviceValidationVersion() < VK_API_VERSION_1_1) {
-        GTEST_SKIP() << "At least Vulkan version 1.1 is required";
-    }
 
-    auto protected_features = LvlInitStruct<VkPhysicalDeviceProtectedMemoryFeatures>();
+    VkPhysicalDeviceProtectedMemoryFeatures protected_features = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(protected_features);
     if (protected_features.protectedMemory == VK_FALSE) {
         GTEST_SKIP() << "test requires protectedMemory";
@@ -71,32 +59,32 @@ TEST_F(PositiveProtectedMemory, MixProtectedQueue) {
     float queue_priority = 1.0;
 
     VkDeviceQueueCreateInfo queue_create_info[2];
-    queue_create_info[0] = LvlInitStruct<VkDeviceQueueCreateInfo>();
+    queue_create_info[0] = vku::InitStructHelper();
     queue_create_info[0].flags = VK_DEVICE_QUEUE_CREATE_PROTECTED_BIT;
     queue_create_info[0].queueFamilyIndex = queue_family_index;
     queue_create_info[0].queueCount = 1;
     queue_create_info[0].pQueuePriorities = &queue_priority;
 
-    queue_create_info[1] = LvlInitStruct<VkDeviceQueueCreateInfo>();
+    queue_create_info[1] = vku::InitStructHelper();
     queue_create_info[1].flags = 0;  // unprotected because the protected flag is not set
     queue_create_info[1].queueFamilyIndex = queue_family_index;
     queue_create_info[1].queueCount = 1;
     queue_create_info[1].pQueuePriorities = &queue_priority;
 
     VkDevice test_device = VK_NULL_HANDLE;
-    VkDeviceCreateInfo device_create_info = LvlInitStruct<VkDeviceCreateInfo>(&protected_features);
+    VkDeviceCreateInfo device_create_info = vku::InitStructHelper(&protected_features);
     device_create_info.flags = 0;
     device_create_info.pQueueCreateInfos = queue_create_info;
     device_create_info.queueCreateInfoCount = 2;
     device_create_info.pEnabledFeatures = nullptr;
     device_create_info.enabledLayerCount = 0;
     device_create_info.enabledExtensionCount = 0;
-    ASSERT_VK_SUCCESS(vk::CreateDevice(gpu(), &device_create_info, nullptr, &test_device));
+    ASSERT_EQ(VK_SUCCESS, vk::CreateDevice(gpu(), &device_create_info, nullptr, &test_device));
 
     VkQueue test_queue_protected = VK_NULL_HANDLE;
     VkQueue test_queue_unprotected = VK_NULL_HANDLE;
 
-    VkDeviceQueueInfo2 queue_info_2 = LvlInitStruct<VkDeviceQueueInfo2>();
+    VkDeviceQueueInfo2 queue_info_2 = vku::InitStructHelper();
 
     queue_info_2.flags = VK_DEVICE_QUEUE_CREATE_PROTECTED_BIT;
     queue_info_2.queueFamilyIndex = queue_family_index;

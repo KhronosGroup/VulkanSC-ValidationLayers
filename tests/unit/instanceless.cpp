@@ -179,8 +179,9 @@ TEST_F(NegativeInstanceless, InstanceValidationFlags) {
         validation_flags.disabledValidationCheckCount = 0;
         ici.pNext = &validation_flags;
 
+        // TODO - Currently returns VUID_Undefined
         // VUID-VkValidationFlagsEXT-disabledValidationCheckCount-arraylength
-        Monitor().SetDesiredFailureMsg(kErrorBit, "parameter disabledValidationCheckCount must be greater than 0");
+        Monitor().SetDesiredFailureMsg(kErrorBit, "disabledValidationCheckCount must be greater than 0");
         vk::CreateInstance(&ici, nullptr, &dummy_instance);
         Monitor().VerifyFound();
     }
@@ -222,7 +223,7 @@ TEST_F(NegativeInstanceless, DestroyInstanceAllocationCallbacksCompatibility) {
 
     {
         VkInstance instance;
-        ASSERT_VK_SUCCESS(vk::CreateInstance(&ici, nullptr, &instance));
+        ASSERT_EQ(VK_SUCCESS, vk::CreateInstance(&ici, nullptr, &instance));
 
         Monitor().SetDesiredFailureMsg(kErrorBit, "VUID-vkDestroyInstance-instance-00631");
         vk::DestroyInstance(instance, &alloc_callbacks);
@@ -233,33 +234,33 @@ TEST_F(NegativeInstanceless, DestroyInstanceAllocationCallbacksCompatibility) {
 // TODO - Currently can not be ran with Profile layer
 TEST_F(NegativeInstanceless, DISABLED_DestroyInstanceHandleLeak) {
     TEST_DESCRIPTION("Test vkDestroyInstance while leaking a VkDevice object.");
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
-    if (!IsPlatform(kMockICD)) {
+    RETURN_IF_SKIP(InitFramework())
+    if (!IsPlatformMockICD()) {
         // This test leaks a device (on purpose) and should not be run on a real driver
         GTEST_SKIP() << "This test only runs on the mock ICD";
     }
     const auto ici = GetInstanceCreateInfo();
 
     VkInstance instance;
-    ASSERT_VK_SUCCESS(vk::CreateInstance(&ici, nullptr, &instance));
+    ASSERT_EQ(VK_SUCCESS, vk::CreateInstance(&ici, nullptr, &instance));
     uint32_t physical_device_count = 1;
     VkPhysicalDevice physical_device;
     const VkResult err = vk::EnumeratePhysicalDevices(instance, &physical_device_count, &physical_device);
-    ASSERT_TRUE(err == VK_SUCCESS || err == VK_INCOMPLETE) << vk_result_string(err);
+    ASSERT_TRUE(err == VK_SUCCESS || err == VK_INCOMPLETE) << string_VkResult(err);
     ASSERT_EQ(physical_device_count, 1);
 
     float dqci_priorities[] = {1.0};
-    VkDeviceQueueCreateInfo dqci = LvlInitStruct<VkDeviceQueueCreateInfo>();
+    VkDeviceQueueCreateInfo dqci = vku::InitStructHelper();
     dqci.queueFamilyIndex = 0;
     dqci.queueCount = 1;
     dqci.pQueuePriorities = dqci_priorities;
 
-    VkDeviceCreateInfo dci = LvlInitStruct<VkDeviceCreateInfo>();
+    VkDeviceCreateInfo dci = vku::InitStructHelper();
     dci.queueCreateInfoCount = 1;
     dci.pQueueCreateInfos = &dqci;
 
     VkDevice leaked_device;
-    ASSERT_VK_SUCCESS(vk::CreateDevice(physical_device, &dci, nullptr, &leaked_device));
+    ASSERT_EQ(VK_SUCCESS, vk::CreateDevice(physical_device, &dci, nullptr, &leaked_device));
 
     // VUID-vkDestroyInstance-instance-00629
     Monitor().SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-ObjectTracker-ObjectLeak");

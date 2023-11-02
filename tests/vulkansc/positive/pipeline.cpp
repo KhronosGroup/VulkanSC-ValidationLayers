@@ -31,14 +31,14 @@ TEST_F(VkSCPositiveLayerTest, PipelineCacheCreateInfo) {
     }
 
     for (uint32_t i = 0; i < additional_object_reservation_infos; ++i) {
-        auto object_reservation_info = LvlInitStruct<VkDeviceObjectReservationCreateInfo>();
+        auto object_reservation_info = vku::InitStruct<VkDeviceObjectReservationCreateInfo>();
         object_reservation_info.pNext = &object_reservation_infos.back();
         object_reservation_info.pipelineCacheCreateInfoCount = pc_create_infos_per_object_reservation_info;
         object_reservation_info.pPipelineCacheCreateInfos = &pc_create_infos[i * pc_create_infos_per_object_reservation_info];
         object_reservation_infos.push_back(object_reservation_info);
     }
 
-    ASSERT_NO_FATAL_FAILURE(InitFramework());
+    RETURN_IF_SKIP(InitFramework());
     ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &object_reservation_infos.back()));
 
     for (uint32_t i = 0; i < pc_create_info_count; ++i) {
