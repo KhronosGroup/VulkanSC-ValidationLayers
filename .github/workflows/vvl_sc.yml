@@ -111,8 +111,8 @@ jobs:
       - name: Build VulkanSC-ValidationLayers
         run: python3 scripts/vksc_github_ci.py --build --config release --cmake='-DVVL_CPP_STANDARD=20 -DVVL_ENABLE_ASAN=ON'
         env:
-          CC: clang
-          CXX: clang++
+          CC: gcc
+          CXX: g++
 
   windows:
     runs-on: ${{matrix.os}}
