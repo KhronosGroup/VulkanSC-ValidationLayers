@@ -681,3 +681,50 @@ TEST_F(VkSCLayerTest, CreateFramebufferMaxFramebufferAttachmentsExceeded) {
     vksc::CreateFramebuffer(device(), &create_info, nullptr, &framebuffer);
     m_errorMonitor->VerifyFound();
 }
+
+TEST_F(VkSCLayerTest, GetFaultDataExceedsMaxQueryFaultCount) {
+    TEST_DESCRIPTION("vkGetFaultData - pFaultCount exceeds maxQueryFaultCount");
+
+    RETURN_IF_SKIP(Init())
+
+    auto fault_count = GetVulkanSC10Properties(gpu()).maxQueryFaultCount + 1;
+
+    VkBool32 unrecorded_faults = VK_FALSE;
+
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetFaultData-pFaultCount-05020");
+    vksc::GetFaultData(device(), VK_FAULT_QUERY_BEHAVIOR_GET_AND_CLEAR_ALL_FAULTS, &unrecorded_faults, &fault_count, nullptr);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(VkSCLayerTest, FaultCallbackInfoFaultCount) {
+    TEST_DESCRIPTION("VkFaultCallbackInfo - faultCount is not zero and does not equal maxCallbackFaultCount");
+
+    RETURN_IF_SKIP(InitFramework())
+
+    const auto max_callback_fault_count = GetVulkanSC10Properties(gpu()).maxCallbackFaultCount;
+
+    auto fault_callback_info = vku::InitStruct<VkFaultCallbackInfo>();
+    fault_callback_info.faultCount = max_callback_fault_count == 1 ? 2 : 1;
+
+    std::vector<VkFaultData> fault_data(fault_callback_info.faultCount, vku::InitStruct<VkFaultData>());
+    fault_callback_info.pFaults = fault_data.data();
+    fault_callback_info.pfnFaultCallback = (PFN_vkFaultCallbackFunction)0xDEADBEEF;
+
+    auto sc_10_features = vku::InitStruct<VkPhysicalDeviceVulkanSC10Features>(&fault_callback_info);
+    auto object_reservation_info = vku::InitStruct<VkDeviceObjectReservationCreateInfo>(&sc_10_features);
+
+    float queue_priority = 1.f;
+    auto queue_info = vku::InitStruct<VkDeviceQueueCreateInfo>();
+    queue_info.queueCount = 1;
+    queue_info.pQueuePriorities = &queue_priority;
+
+    auto device_ci = vku::InitStruct<VkDeviceCreateInfo>(&object_reservation_info);
+    device_ci.queueCreateInfoCount = 1;
+    device_ci.pQueueCreateInfos = &queue_info;
+
+    VkDevice device = VK_NULL_HANDLE;
+
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkFaultCallbackInfo-faultCount-05138");
+    vksc::CreateDevice(gpu(), &device_ci, nullptr, &device);
+    m_errorMonitor->VerifyFound();
+}

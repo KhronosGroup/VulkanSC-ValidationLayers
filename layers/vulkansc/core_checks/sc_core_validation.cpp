@@ -481,6 +481,14 @@ bool SCCoreChecks::PreCallValidateCreateDevice(VkPhysicalDevice physicalDevice, 
                                "VkDeviceObjectReservationCreateInfo");
         }
 
+        const auto* fault_callback_info = vku::FindStructInPNextChain<VkFaultCallbackInfo>(pCreateInfo->pNext);
+        if (fault_callback_info != nullptr && fault_callback_info->faultCount != 0 &&
+            fault_callback_info->faultCount != phys_dev_props_sc_10_.maxCallbackFaultCount) {
+            skip |= LogError("VUID-VkFaultCallbackInfo-faultCount-05138", device, error_obj.location.dot(Field::faultCount),
+                             "(%u) does not equal zero or VkPhysicalDeviceVulkanSC10Properties::maxCallbackFaultCount (%u).",
+                             fault_callback_info->faultCount, phys_dev_props_sc_10_.maxCallbackFaultCount);
+        }
+
         uint32_t total_device_memory_request_count = 0;
         uint32_t total_sampler_request_count = 0;
 
@@ -1334,6 +1342,20 @@ bool SCCoreChecks::PreCallValidateResetCommandBuffer(VkCommandBuffer commandBuff
         skip |= LogError(commandBuffer, "VUID-vkResetCommandBuffer-commandPoolResetCommandBuffer-05135",
                          "vkResetCommandBuffer(): VkPhysicalDeviceVulkanSC10Properties::commandPoolResetCommandBuffer "
                          "is not supported.");
+    }
+
+    return skip;
+}
+
+bool SCCoreChecks::PreCallValidateGetFaultData(VkDevice device, VkFaultQueryBehavior faultQueryBehavior,
+                                               VkBool32* pUnrecordedFaults, uint32_t* pFaultCount, VkFaultData* pFaults,
+                                               const ErrorObject& error_obj) const {
+    bool skip = BASE::PreCallValidateGetFaultData(device, faultQueryBehavior, pUnrecordedFaults, pFaultCount, pFaults, error_obj);
+
+    if (*pFaultCount > phys_dev_props_sc_10_.maxQueryFaultCount) {
+        skip |= LogError("VUID-vkGetFaultData-pFaultCount-05020", device, error_obj.location.dot(Field::pFaultCount),
+                         "(%u) exceeds the device limit VkPhysicalDeviceVulkanSC10Properties::maxQueryFaultCount (%u).",
+                         *pFaultCount, phys_dev_props_sc_10_.maxQueryFaultCount);
     }
 
     return skip;

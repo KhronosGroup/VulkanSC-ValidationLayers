@@ -229,5 +229,7 @@ class SCCoreChecks : public SCValidationStateTracker<CoreChecks> {
                                            const ErrorObject& error_obj) const override;
     bool PreCallValidateResetCommandBuffer(VkCommandBuffer commandBuffer, VkCommandBufferResetFlags flags,
                                            const ErrorObject& error_obj) const override;
+    bool PreCallValidateGetFaultData(VkDevice device, VkFaultQueryBehavior faultQueryBehavior, VkBool32* pUnrecordedFaults,
+                                     uint32_t* pFaultCount, VkFaultData* pFaults, const ErrorObject& error_obj) const override;
 
 };  // Class SCCoreChecks
