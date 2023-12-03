@@ -33,12 +33,75 @@ class VkConstantBufferObj : public vkt::Buffer {
     }
 };
 
+VkFramebuffer VkArmBestPracticesLayerTest::CreateFramebuffer(const uint32_t width, const uint32_t height, VkImageView image_view,
+                                                             VkRenderPass renderpass) {
+    VkFramebuffer framebuffer{VK_NULL_HANDLE};
+
+    VkFramebufferCreateInfo framebuffer_create_info = vku::InitStructHelper();
+    framebuffer_create_info.renderPass = renderpass;
+    framebuffer_create_info.attachmentCount = 1;
+    framebuffer_create_info.pAttachments = &image_view;
+    framebuffer_create_info.width = width;
+    framebuffer_create_info.height = height;
+    framebuffer_create_info.layers = 1;
+
+    VkResult result = vk::CreateFramebuffer(m_device->handle(), &framebuffer_create_info, nullptr, &framebuffer);
+    assert(result == VK_SUCCESS);
+    (void)result;
+
+    return framebuffer;
+}
+
+std::unique_ptr<VkImageObj> VkArmBestPracticesLayerTest::CreateImage(VkFormat format, const uint32_t width, const uint32_t height,
+                                                                     VkImageUsageFlags attachment_usage) {
+    auto img = std::unique_ptr<VkImageObj>(new VkImageObj(m_device));
+    img->Init(width, height, 1, format,
+              VK_IMAGE_USAGE_SAMPLED_BIT | attachment_usage | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+              VK_IMAGE_TILING_OPTIMAL);
+    return img;
+}
+
+VkRenderPass VkArmBestPracticesLayerTest::CreateRenderPass(VkFormat format, VkAttachmentLoadOp load_op,
+                                                           VkAttachmentStoreOp store_op) {
+    VkRenderPass renderpass{VK_NULL_HANDLE};
+
+    // Create renderpass
+    VkAttachmentDescription attachment = {};
+    attachment.format = format;
+    attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    attachment.loadOp = load_op;
+    attachment.storeOp = store_op;
+    attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    attachment.finalLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+    VkAttachmentReference attachment_reference = {};
+    attachment_reference.attachment = 0;
+    attachment_reference.layout = VK_IMAGE_LAYOUT_GENERAL;
+
+    VkSubpassDescription subpass = {};
+    subpass.colorAttachmentCount = 1;
+    subpass.pColorAttachments = &attachment_reference;
+
+    VkRenderPassCreateInfo rpinf = vku::InitStructHelper();
+    rpinf.attachmentCount = 1;
+    rpinf.pAttachments = &attachment;
+    rpinf.subpassCount = 1;
+    rpinf.pSubpasses = &subpass;
+    rpinf.dependencyCount = 0;
+    rpinf.pDependencies = nullptr;
+
+    VkResult result = vk::CreateRenderPass(m_device->handle(), &rpinf, nullptr, &renderpass);
+    assert(result == VK_SUCCESS);
+    (void)result;
+
+    return renderpass;
+}
 // Tests for Arm-specific best practices
 
 TEST_F(VkArmBestPracticesLayerTest, DISABLED_TooManySamples) {
     TEST_DESCRIPTION("Test for multisampled images with too many samples");
 
-    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableArmValidation))
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableArmValidation));
     InitState();
 
     m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT,
@@ -68,7 +131,7 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_TooManySamples) {
 TEST_F(VkArmBestPracticesLayerTest, DISABLED_NonTransientMSImage) {
     TEST_DESCRIPTION("Test for non-transient multisampled images");
 
-    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableArmValidation))
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableArmValidation));
     InitState();
 
     m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT,
@@ -94,7 +157,7 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_NonTransientMSImage) {
 TEST_F(VkArmBestPracticesLayerTest, DISABLED_SamplerCreation) {
     TEST_DESCRIPTION("Test for various checks during sampler creation");
 
-    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableArmValidation))
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableArmValidation));
     InitState();
 
     m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT,
@@ -128,7 +191,7 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_SamplerCreation) {
 TEST_F(VkArmBestPracticesLayerTest, DISABLED_MultisampledBlending) {
     TEST_DESCRIPTION("Test for multisampled blending");
 
-    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableArmValidation))
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableArmValidation));
     InitState();
 
     m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT,
@@ -186,10 +249,10 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_MultisampledBlending) {
 TEST_F(VkArmBestPracticesLayerTest, DISABLED_AttachmentNeedsReadback) {
     TEST_DESCRIPTION("Test for attachments that need readback");
 
-    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableArmValidation))
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableArmValidation));
     InitState();
 
-    m_clear_via_load_op = false;  // Force LOAD_OP_LOAD
+    m_load_op_clear = false;  // Force LOAD_OP_LOAD
     InitRenderTarget();
 
     m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT,
@@ -202,7 +265,7 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_AttachmentNeedsReadback) {
 }
 
 TEST_F(VkArmBestPracticesLayerTest, DISABLED_ManySmallIndexedDrawcalls) {
-    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableArmValidation))
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableArmValidation));
     InitState();
     m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT,
                                          "UNASSIGNED-BestPractices-vkCmdDrawIndexed-many-small-indexed-drawcalls");
@@ -250,7 +313,7 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_ManySmallIndexedDrawcalls) {
 TEST_F(VkArmBestPracticesLayerTest, DISABLED_SuboptimalDescriptorReuseTest) {
     TEST_DESCRIPTION("Test for validation warnings of potentially suboptimal re-use of descriptor set allocations");
 
-    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableArmValidation))
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableArmValidation));
     InitState();
     InitRenderTarget();
 
@@ -328,7 +391,7 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_SparseIndexBufferTest) {
     TEST_DESCRIPTION(
         "Test for appropriate warnings to be thrown when recording an indexed draw call with sparse/non-sparse index buffers.");
 
-    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableArmValidation))
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableArmValidation));
     InitState();
     InitRenderTarget();
 
@@ -436,7 +499,7 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_PostTransformVertexCacheThrashingIn
         "Test for appropriate warnings to be thrown when recording an indexed draw call where the indices thrash the "
         "post-transform vertex cache.");
 
-    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableArmValidation))
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableArmValidation));
     InitState();
     InitRenderTarget();
 
@@ -499,7 +562,7 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_PresentModeTest) {
     TEST_DESCRIPTION("Test for usage of Presentation Modes");
 
     AddSurfaceExtension();
-    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableArmValidation))
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableArmValidation));
     InitState();
     m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_WARNING_BIT_EXT,
                                          "UNASSIGNED-BestPractices-vkCreateSwapchainKHR-swapchain-presentmode-not-fifo");
@@ -556,7 +619,7 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_PresentModeTest) {
 TEST_F(VkArmBestPracticesLayerTest, DISABLED_PipelineDepthBiasZeroTest) {
     TEST_DESCRIPTION("Test for unnecessary rasterization due to using 0 for depthBiasConstantFactor and depthBiasSlopeFactor");
 
-    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableArmValidation))
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableArmValidation));
     InitState();
     InitRenderTarget();
 
@@ -580,7 +643,7 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_PipelineDepthBiasZeroTest) {
 TEST_F(VkArmBestPracticesLayerTest, DISABLED_RobustBufferAccessTest) {
     TEST_DESCRIPTION("Test for appropriate warnings to be thrown when robustBufferAccess is enabled.");
 
-    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableArmValidation))
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableArmValidation));
 
     VkDevice local_device;
     VkDeviceQueueCreateInfo queue_info = {};
@@ -616,16 +679,15 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_RobustBufferAccessTest) {
 }
 
 TEST_F(VkArmBestPracticesLayerTest, DISABLED_DepthPrePassUsage) {
-    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableArmValidation))
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableArmValidation));
     InitState();
 
     m_depth_stencil_fmt = FindSupportedDepthStencilFormat(gpu());
 
     m_depthStencil->Init(m_width, m_height, 1, m_depth_stencil_fmt, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
                          VK_IMAGE_TILING_OPTIMAL);
-    VkImageView depth_image_view =
-        m_depthStencil->targetView(m_depth_stencil_fmt, VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
-    InitRenderTarget(&depth_image_view);
+    vkt::ImageView depth_image_view = m_depthStencil->CreateView(VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
+    InitRenderTarget(&depth_image_view.handle());
 
     VkPipelineColorBlendAttachmentState color_write_off = {};
     VkPipelineColorBlendAttachmentState color_write_on = {};
@@ -709,7 +771,7 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_ComputeShaderBadWorkGroupThreadAlig
         "Testing for cases where compute shaders will be dispatched in an inefficient way, due to work group dispatch counts on "
         "Arm Mali architectures.");
 
-    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableArmValidation))
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableArmValidation));
     InitState();
 
     VkShaderObj compute_4_1_1(this,
@@ -762,7 +824,7 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_ComputeShaderBadWorkGroupThreadCoun
     TEST_DESCRIPTION(
         "Testing for cases where the number of work groups spawned is greater than advised for Arm Mali architectures.");
 
-    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableArmValidation))
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableArmValidation));
     InitState();
 
     VkShaderObj compute_4_1_1(this,
@@ -816,7 +878,7 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_ComputeShaderBadSpatialLocalityTest
         "Testing for cases where a compute shader's configuration makes poor use of spatial locality, on Arm Mali architectures, "
         "for one or more of its resources.");
 
-    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableArmValidation))
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableArmValidation));
     InitState();
 
     VkShaderObj compute_sampler_2d_8_8_1(this,
@@ -884,7 +946,7 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_ComputeShaderBadSpatialLocalityTest
 TEST_F(VkArmBestPracticesLayerTest, DISABLED_RedundantRenderPassStore) {
     TEST_DESCRIPTION("Test for appropriate warnings to be thrown when a redundant store is used.");
 
-    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableArmValidation))
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableArmValidation));
     InitState();
 
     m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "UNASSIGNED-BestPractices-RenderPass-redundant-store");
@@ -893,21 +955,22 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_RedundantRenderPassStore) {
     const VkFormat FMT = VK_FORMAT_R8G8B8A8_UNORM;
     const uint32_t WIDTH = 512, HEIGHT = 512;
 
-    std::vector<std::unique_ptr<VkImageObj>> images;
     std::vector<VkRenderPass> renderpasses;
     std::vector<VkFramebuffer> framebuffers;
-
-    images.push_back(CreateImage(FMT, WIDTH, HEIGHT));
+    auto image0 = CreateImage(FMT, WIDTH, HEIGHT);
+    vkt::ImageView view0 = image0->CreateView();
     renderpasses.push_back(CreateRenderPass(FMT, VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE));
-    framebuffers.push_back(CreateFramebuffer(WIDTH, HEIGHT, images[0]->targetView(FMT), renderpasses[0]));
+    framebuffers.push_back(CreateFramebuffer(WIDTH, HEIGHT, view0, renderpasses[0]));
 
     m_errorMonitor->SetAllowedFailureMsg("UNASSIGNED-BestPractices-vkBindImageMemory-non-lazy-transient-image");
     auto img = std::unique_ptr<VkImageObj>(new VkImageObj(m_device));
     img->Init(WIDTH, HEIGHT, 1, FMT, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
               VK_IMAGE_TILING_OPTIMAL);
-    images.push_back(std::move(img));
+
+    auto image1 = std::move(img);
+    vkt::ImageView view1 = image1->CreateView();
     renderpasses.push_back(CreateRenderPass(FMT, VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_DONT_CARE));
-    framebuffers.push_back(CreateFramebuffer(WIDTH, HEIGHT, images[1]->targetView(FMT), renderpasses[1]));
+    framebuffers.push_back(CreateFramebuffer(WIDTH, HEIGHT, view1, renderpasses[1]));
 
     CreatePipelineHelper graphics_pipeline(*this);
     graphics_pipeline.dsl_bindings_[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -995,7 +1058,7 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_RedundantRenderPassStore) {
 TEST_F(VkArmBestPracticesLayerTest, DISABLED_RedundantRenderPassClear) {
     TEST_DESCRIPTION("Test for appropriate warnings to be thrown when a redundant clear is used.");
 
-    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableArmValidation))
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableArmValidation));
     InitState();
 
     m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "UNASSIGNED-BestPractices-RenderPass-redundant-clear");
@@ -1003,14 +1066,15 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_RedundantRenderPassClear) {
     const VkFormat FMT = VK_FORMAT_R8G8B8A8_UNORM;
     const uint32_t WIDTH = 512, HEIGHT = 512;
 
-    std::vector<std::unique_ptr<VkImageObj>> images;
-    std::vector<VkRenderPass> renderpasses;
-    std::vector<VkFramebuffer> framebuffers;
+    auto image0 = CreateImage(FMT, WIDTH, HEIGHT);
+    image0->SetLayout(VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL);
+    vkt::ImageView view0 = image0->CreateView();
 
-    images.push_back(CreateImage(FMT, WIDTH, HEIGHT));
-    images[0]->SetLayout(VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL);
+    std::vector<VkRenderPass> renderpasses;
     renderpasses.push_back(CreateRenderPass(FMT, VK_ATTACHMENT_LOAD_OP_CLEAR, VK_ATTACHMENT_STORE_OP_STORE));
-    framebuffers.push_back(CreateFramebuffer(WIDTH, HEIGHT, images[0]->targetView(FMT), renderpasses[0]));
+
+    std::vector<VkFramebuffer> framebuffers;
+    framebuffers.push_back(CreateFramebuffer(WIDTH, HEIGHT, view0, renderpasses[0]));
 
     CreatePipelineHelper graphics_pipeline(*this);
     graphics_pipeline.dsl_bindings_[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -1038,7 +1102,7 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_RedundantRenderPassClear) {
     subresource_range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     subresource_range.layerCount = VK_REMAINING_ARRAY_LAYERS;
     subresource_range.levelCount = VK_REMAINING_MIP_LEVELS;
-    vk::CmdClearColorImage(m_commandBuffer->handle(), images[0]->image(), VK_IMAGE_LAYOUT_GENERAL, &clear_color_value, 1,
+    vk::CmdClearColorImage(m_commandBuffer->handle(), image0->handle(), VK_IMAGE_LAYOUT_GENERAL, &clear_color_value, 1,
                            &subresource_range);
 
     m_commandBuffer->BeginRenderPass(render_pass_begin_info);
@@ -1077,7 +1141,7 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_RedundantRenderPassClear) {
 TEST_F(VkArmBestPracticesLayerTest, DISABLED_InefficientRenderPassClear) {
     TEST_DESCRIPTION("Test for appropriate warnings to be thrown when a redundant clear is used on a LOAD_OP_LOAD attachment.");
 
-    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableArmValidation))
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableArmValidation));
     InitState();
 
     m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "UNASSIGNED-BestPractices-RenderPass-inefficient-clear");
@@ -1114,7 +1178,8 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_InefficientRenderPassClear) {
 
     std::unique_ptr<VkImageObj> image = CreateImage(FMT, WIDTH, HEIGHT);
     image->SetLayout(VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL);
-    VkFramebuffer fb = CreateFramebuffer(WIDTH, HEIGHT, image->targetView(FMT), rp.handle());
+    vkt::ImageView view = image->CreateView();
+    VkFramebuffer fb = CreateFramebuffer(WIDTH, HEIGHT, view, rp.handle());
 
     CreatePipelineHelper graphics_pipeline(*this);
     graphics_pipeline.dsl_bindings_[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -1176,7 +1241,7 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_InefficientRenderPassClear) {
 TEST_F(VkArmBestPracticesLayerTest, DISABLED_DescriptorTracking) {
     TEST_DESCRIPTION("Tests that we track descriptors, which means we should not trigger warnings.");
 
-    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableArmValidation))
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableArmValidation));
     InitState();
 
     m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "UNASSIGNED-BestPractices-RenderPass-inefficient-clear");
@@ -1210,18 +1275,17 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_DescriptorTracking) {
 
     vkt::RenderPass rp(*m_device, rpinf);
 
-    std::vector<std::unique_ptr<VkImageObj>> images;
+    auto image0 = CreateImage(FMT, WIDTH, HEIGHT);
+    image0->SetLayout(VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL);
+    auto view0 = image0->CreateView();
+
+    auto image1 = CreateImage(FMT, WIDTH, HEIGHT);
+    image1->SetLayout(VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL);
+    auto view1 = image1->CreateView();
+
     std::vector<VkFramebuffer> framebuffers;
-
-    images.push_back(CreateImage(FMT, WIDTH, HEIGHT));
-    images.push_back(CreateImage(FMT, WIDTH, HEIGHT));
-
-    for (auto& image : images) {
-        image->SetLayout(VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL);
-    }
-
-    framebuffers.push_back(CreateFramebuffer(WIDTH, HEIGHT, images[0]->targetView(FMT), rp.handle()));
-    framebuffers.push_back(CreateFramebuffer(WIDTH, HEIGHT, images[1]->targetView(FMT), rp.handle()));
+    framebuffers.push_back(CreateFramebuffer(WIDTH, HEIGHT, view0, rp.handle()));
+    framebuffers.push_back(CreateFramebuffer(WIDTH, HEIGHT, view1, rp.handle()));
 
     CreatePipelineHelper graphics_pipeline(*this);
     graphics_pipeline.dsl_bindings_.resize(2);
@@ -1260,7 +1324,7 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_DescriptorTracking) {
     vk::AllocateDescriptorSets(m_device->handle(), &descriptor_set_allocate_info, &descriptor_set);
 
     VkDescriptorImageInfo image_info = {};
-    image_info.imageView = images[1]->targetView(FMT);
+    image_info.imageView = view1;
     image_info.sampler = VK_NULL_HANDLE;
     image_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
@@ -1289,7 +1353,7 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_DescriptorTracking) {
     subresource_range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     subresource_range.layerCount = VK_REMAINING_ARRAY_LAYERS;
     subresource_range.levelCount = VK_REMAINING_MIP_LEVELS;
-    vk::CmdClearColorImage(m_commandBuffer->handle(), images[1]->image(), VK_IMAGE_LAYOUT_GENERAL, &clear_color_value, 1,
+    vk::CmdClearColorImage(m_commandBuffer->handle(), image1->handle(), VK_IMAGE_LAYOUT_GENERAL, &clear_color_value, 1,
                            &subresource_range);
 
     // Trigger a read on the image.
@@ -1347,7 +1411,7 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_BlitImageLoadOpLoad) {
     RETURN_IF_SKIP(InitBestPracticesFramework(kEnableArmValidation));
     InitState();
 
-    m_clear_via_load_op = false;  // Force LOAD_OP_LOAD
+    m_load_op_clear = false;  // Force LOAD_OP_LOAD
     InitRenderTarget();
 
     m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT,
@@ -1441,9 +1505,9 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_BlitImageLoadOpLoad) {
     VkRenderPassCreateInfo rpci = {VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO, nullptr, 0, 1, attach, 1, &subpass, 0, nullptr};
     vkt::RenderPass rp(*m_device, rpci);
 
-    auto imageView = images[1]->targetView(FMT);
+    auto imageView = images[1]->CreateView();
     VkFramebufferCreateInfo fbci = {
-        VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO, nullptr, 0, rp.handle(), 1, &imageView, WIDTH, HEIGHT, 1};
+        VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO, nullptr, 0, rp.handle(), 1, &imageView.handle(), WIDTH, HEIGHT, 1};
     vkt::Framebuffer fb(*m_device, fbci);
 
     VkRenderPassBeginInfo rpbi =
@@ -1481,10 +1545,10 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_RedundantAttachment) {
 
     auto ds = CreateImage(ds_format, m_width, m_height, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
 
-    m_clear_via_load_op = true;
+    m_load_op_clear = true;
     m_depth_stencil_fmt = ds_format;
-    auto ds_view = ds->targetView(ds_format, VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
-    InitRenderTarget(1, &ds_view);
+    auto ds_view = ds->CreateView(VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
+    InitRenderTarget(1, &ds_view.handle());
 
     CreatePipelineHelper pipe_all(*this);
     pipe_all.InitState();

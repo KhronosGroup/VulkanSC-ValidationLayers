@@ -18,11 +18,11 @@ TEST_F(PositiveImagelessFramebuffer, BasicUsage) {
     TEST_DESCRIPTION("Create an imageless framebuffer");
 
     AddRequiredExtensions(VK_KHR_IMAGELESS_FRAMEBUFFER_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceImagelessFramebufferFeaturesKHR imageless_features = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(imageless_features);
-    RETURN_IF_SKIP(InitState(nullptr, &imageless_features, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    RETURN_IF_SKIP(InitState(nullptr, &imageless_features));
     InitRenderTarget();
 
     uint32_t attachment_width = 512;
@@ -68,10 +68,8 @@ TEST_F(PositiveImagelessFramebuffer, BasicUsage) {
     fb_ci.pAttachments  = nullptr;
     vkt::Framebuffer framebuffer_null(*m_device, fb_ci);
 
-    VkImageView image_views[2] = {
-    m_renderTargets[0]->targetView(VK_FORMAT_B8G8R8A8_UNORM),
-    CastToHandle<VkImageView, uintptr_t>(0xbaadbeef)
-    };
+    vkt::ImageView rt_view = m_renderTargets[0]->CreateView();
+    VkImageView image_views[2] = {rt_view, CastToHandle<VkImageView, uintptr_t>(0xbaadbeef)};
     fb_ci.pAttachments = image_views;
     vkt::Framebuffer framebuffer_bad_image_view(*m_device, fb_ci);
 }
@@ -80,7 +78,7 @@ TEST_F(PositiveImagelessFramebuffer, Image3D) {
     TEST_DESCRIPTION("Create imageless framebuffer with image view from 3D image.");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
     VkPhysicalDeviceImagelessFramebufferFeatures imageless_framebuffer = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(imageless_framebuffer);
     RETURN_IF_SKIP(InitState(nullptr, &imageless_framebuffer));
@@ -127,7 +125,7 @@ TEST_F(PositiveImagelessFramebuffer, Image3D) {
 
     VkImageObj image(m_device);
     image.Init(image_ci);
-    VkImageView imageView = image.targetView(format, VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 4, VK_IMAGE_VIEW_TYPE_2D_ARRAY);
+    vkt::ImageView imageView = image.CreateView(VK_IMAGE_VIEW_TYPE_2D_ARRAY, 0, 1, 0, 4);
 
     VkFramebufferAttachmentImageInfo framebuffer_attachment_image_info = vku::InitStructHelper();
     framebuffer_attachment_image_info.flags = VK_IMAGE_CREATE_2D_ARRAY_COMPATIBLE_BIT;
@@ -146,7 +144,7 @@ TEST_F(PositiveImagelessFramebuffer, Image3D) {
     framebuffer_ci.flags = VK_FRAMEBUFFER_CREATE_IMAGELESS_BIT;
     framebuffer_ci.renderPass = render_pass.handle();
     framebuffer_ci.attachmentCount = 1;
-    framebuffer_ci.pAttachments = &imageView;
+    framebuffer_ci.pAttachments = &imageView.handle();
     framebuffer_ci.width = 32;
     framebuffer_ci.height = 32;
     framebuffer_ci.layers = 1;
@@ -158,7 +156,7 @@ TEST_F(PositiveImagelessFramebuffer, Image3D) {
 
     VkRenderPassAttachmentBeginInfo render_pass_attachment_bi = vku::InitStructHelper();
     render_pass_attachment_bi.attachmentCount = 1;
-    render_pass_attachment_bi.pAttachments = &imageView;
+    render_pass_attachment_bi.pAttachments = &imageView.handle();
 
     VkRenderPassBeginInfo render_pass_bi = vku::InitStructHelper(&render_pass_attachment_bi);
     render_pass_bi.renderPass = render_pass.handle();

@@ -1233,6 +1233,13 @@ static const vvl::unordered_map<Func, CommandValidationInfo> kCommandValidationT
     CMD_SCOPE_BOTH, "kVUIDUndefined",
     CMD_SCOPE_OUTSIDE, "VUID-vkCmdSetDepthBias2EXT-videocoding",
 }},
+{Func::vkCmdCudaLaunchKernelNV, {
+    "VUID-vkCmdCudaLaunchKernelNV-commandBuffer-recording",
+    nullptr,
+    VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT, "VUID-vkCmdCudaLaunchKernelNV-commandBuffer-cmdpool",
+    CMD_SCOPE_BOTH, "kVUIDUndefined",
+    CMD_SCOPE_OUTSIDE, "VUID-vkCmdCudaLaunchKernelNV-videocoding",
+}},
 {Func::vkCmdBindDescriptorBuffersEXT, {
     "VUID-vkCmdBindDescriptorBuffersEXT-commandBuffer-recording",
     nullptr,
@@ -1763,12 +1770,12 @@ bool CoreChecks::ValidateCmd(const CMD_BUFFER_STATE& cb_state, const Location& l
     // flagging errors if CB is not in the recording state or if there's an issue with the Cmd ordering
     switch (cb_state.state) {
         case CbState::Recording:
-            skip |= ValidateCmdSubpassState(cb_state, loc);
+            skip |= ValidateCmdSubpassState(cb_state, loc, info.recording_vuid);
             break;
 
         case CbState::InvalidComplete:
         case CbState::InvalidIncomplete:
-            skip |= ReportInvalidCommandBuffer(cb_state, loc);
+            skip |= ReportInvalidCommandBuffer(cb_state, loc, info.recording_vuid);
             break;
 
         default:

@@ -31,6 +31,7 @@
 //      devices over the lifespan of the project (e.g., VLT).
 
 // clang-format off
+
 template<>
 std::vector<VkResult> ValidationObject::ValidParamValues() const {
     constexpr std::array CoreVkResultEnums = {VK_SUCCESS, VK_NOT_READY, VK_TIMEOUT, VK_EVENT_SET, VK_EVENT_RESET, VK_INCOMPLETE, VK_ERROR_OUT_OF_HOST_MEMORY, VK_ERROR_OUT_OF_DEVICE_MEMORY, VK_ERROR_INITIALIZATION_FAILED, VK_ERROR_DEVICE_LOST, VK_ERROR_MEMORY_MAP_FAILED, VK_ERROR_LAYER_NOT_PRESENT, VK_ERROR_EXTENSION_NOT_PRESENT, VK_ERROR_FEATURE_NOT_PRESENT, VK_ERROR_INCOMPATIBLE_DRIVER, VK_ERROR_TOO_MANY_OBJECTS, VK_ERROR_FORMAT_NOT_SUPPORTED, VK_ERROR_FRAGMENTED_POOL, VK_ERROR_UNKNOWN};
@@ -129,6 +130,7 @@ std::vector<VkObjectType> ValidationObject::ValidParamValues() const {
         { &DeviceExtensions::vk_intel_performance_query, { VK_OBJECT_TYPE_PERFORMANCE_CONFIGURATION_INTEL } },
         { &DeviceExtensions::vk_nv_device_generated_commands, { VK_OBJECT_TYPE_INDIRECT_COMMANDS_LAYOUT_NV } },
         { &DeviceExtensions::vk_ext_private_data, { VK_OBJECT_TYPE_PRIVATE_DATA_SLOT } },
+        { &DeviceExtensions::vk_nv_cuda_kernel_launch, { VK_OBJECT_TYPE_CUDA_MODULE_NV, VK_OBJECT_TYPE_CUDA_FUNCTION_NV } },
         { &DeviceExtensions::vk_fuchsia_buffer_collection, { VK_OBJECT_TYPE_BUFFER_COLLECTION_FUCHSIA } },
         { &DeviceExtensions::vk_ext_opacity_micromap, { VK_OBJECT_TYPE_MICROMAP_EXT } },
         { &DeviceExtensions::vk_nv_optical_flow, { VK_OBJECT_TYPE_OPTICAL_FLOW_SESSION_NV } },
@@ -848,7 +850,7 @@ std::vector<VkVideoEncodeTuningModeKHR> ValidationObject::ValidParamValues() con
     std::copy(unique_exts.cbegin(), unique_exts.cend(), std::back_inserter(values));
     return values;
 }
-#endif //VK_ENABLE_BETA_EXTENSIONS
+#endif  // VK_ENABLE_BETA_EXTENSIONS
 
 template<>
 std::vector<VkComponentTypeKHR> ValidationObject::ValidParamValues() const {
@@ -890,6 +892,7 @@ std::vector<VkDebugReportObjectTypeEXT> ValidationObject::ValidParamValues() con
         { &DeviceExtensions::vk_khr_sampler_ycbcr_conversion, { VK_DEBUG_REPORT_OBJECT_TYPE_SAMPLER_YCBCR_CONVERSION_EXT } },
         { &DeviceExtensions::vk_nvx_binary_import, { VK_DEBUG_REPORT_OBJECT_TYPE_CU_MODULE_NVX_EXT, VK_DEBUG_REPORT_OBJECT_TYPE_CU_FUNCTION_NVX_EXT } },
         { &DeviceExtensions::vk_nv_ray_tracing, { VK_DEBUG_REPORT_OBJECT_TYPE_ACCELERATION_STRUCTURE_NV_EXT } },
+        { &DeviceExtensions::vk_nv_cuda_kernel_launch, { VK_DEBUG_REPORT_OBJECT_TYPE_CUDA_MODULE_NV_EXT, VK_DEBUG_REPORT_OBJECT_TYPE_CUDA_FUNCTION_NV_EXT } },
         { &DeviceExtensions::vk_fuchsia_buffer_collection, { VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_COLLECTION_FUCHSIA_EXT } },
         { &DeviceExtensions::vk_khr_acceleration_structure, { VK_DEBUG_REPORT_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR_EXT } },
     };
@@ -1416,7 +1419,7 @@ std::vector<VkFullScreenExclusiveEXT> ValidationObject::ValidParamValues() const
     std::copy(unique_exts.cbegin(), unique_exts.cend(), std::back_inserter(values));
     return values;
 }
-#endif //VK_USE_PLATFORM_WIN32_KHR
+#endif  // VK_USE_PLATFORM_WIN32_KHR
 
 template<>
 std::vector<VkLineRasterizationModeEXT> ValidationObject::ValidParamValues() const {

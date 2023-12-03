@@ -16,6 +16,7 @@
 
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
+#include "../framework/descriptor_helper.h"
 
 class VkPositiveBestPracticesLayerTest : public VkBestPracticesLayerTest {};
 
@@ -25,7 +26,7 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_TestDestroyFreeNullHandles) {
     TEST_DESCRIPTION("Call all applicable destroy and free routines with NULL handles, expecting no validation errors");
 
     RETURN_IF_SKIP(InitBestPracticesFramework());
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
     m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit);
@@ -109,7 +110,7 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_DrawingWithUnboundUnusedSet) {
         "https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/4597.");
 
     RETURN_IF_SKIP(InitBestPracticesFramework());
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
     m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit);
@@ -142,7 +143,7 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_DynStateIgnoreAttachments) {
     TEST_DESCRIPTION("Make sure pAttachments is ignored if dynamic state is enabled");
 
     AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitBestPracticesFramework())
+    RETURN_IF_SKIP(InitBestPracticesFramework());
     if (!IsPlatformMockICD()) {
         // Several drivers have been observed to crash on the legal null pAttachments - restrict to MockICD for now
         GTEST_SKIP() << "This test only runs on MockICD";
@@ -154,7 +155,7 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_DynStateIgnoreAttachments) {
         !extended_dynamic_state3_features.extendedDynamicState3ColorWriteMask) {
         GTEST_SKIP() << "DynamicState3 features not supported";
     }
-    RETURN_IF_SKIP(InitState(nullptr, &features2))
+    RETURN_IF_SKIP(InitState(nullptr, &features2));
     InitRenderTarget();
 
     m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit);
@@ -180,7 +181,7 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_ImageInputAttachmentLayout) {
     TEST_DESCRIPTION("Test transitioning image layout to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL for input attachment");
 
     RETURN_IF_SKIP(InitBestPracticesFramework());
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitState());
 
     m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit);
 
@@ -199,4 +200,24 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_ImageInputAttachmentLayout) {
     vk::CmdPipelineBarrier(m_commandBuffer->handle(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0u, 0u,
                            nullptr, 0u, nullptr, 1u, &image_memory_barrier);
     m_commandBuffer->end();
+}
+
+TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_PipelineLibraryNoRendering) {
+    TEST_DESCRIPTION("Create a pipeline library without a render pass or rendering info");
+
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitBestPracticesFramework());
+    RETURN_IF_SKIP(InitState());
+
+    m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit);
+
+    CreatePipelineHelper pre_raster_lib(*this);
+    const auto vs_spv = GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, kVertexMinimalGlsl);
+    vkt::GraphicsPipelineLibraryStage vs_stage(vs_spv, VK_SHADER_STAGE_VERTEX_BIT);
+    pre_raster_lib.InitPreRasterLibInfo(&vs_stage.stage_ci);
+    pre_raster_lib.InitState();
+    pre_raster_lib.gp_ci_.renderPass = VK_NULL_HANDLE;
+    pre_raster_lib.gp_ci_.flags |= VK_PIPELINE_CREATE_RETAIN_LINK_TIME_OPTIMIZATION_INFO_BIT_EXT;
+    pre_raster_lib.CreateGraphicsPipeline();
 }

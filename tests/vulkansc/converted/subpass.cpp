@@ -24,9 +24,9 @@ TEST_F(NegativeSubpass, NonGraphicsPipeline) {
     TEST_DESCRIPTION("Create a subpass with the compute pipeline bind point");
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddOptionalExtensions(VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
     const bool rp2Supported = IsExtensionsEnabled(VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitState());
 
     VkSubpassDescription subpasses[] = {
         {0, VK_PIPELINE_BIND_POINT_COMPUTE, 0, nullptr, 0, nullptr, nullptr, nullptr, 0, nullptr},
@@ -43,8 +43,8 @@ TEST_F(NegativeSubpass, InputAttachmentParameters) {
 
     // Check for VK_KHR_get_physical_device_properties2
     AddRequiredExtensions(VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitState());
 
     VkAttachmentDescription2 attach_desc = vku::InitStructHelper();
     attach_desc.format = VK_FORMAT_R32_UINT;
@@ -68,23 +68,23 @@ TEST_F(NegativeSubpass, InputAttachmentParameters) {
     // Valid
     PositiveTestRenderPass2KHRCreate(*m_device, rpci2);
 
-    attach_desc.format = VK_FORMAT_UNDEFINED;
+    attach_desc.format = VK_FORMAT_R8G8B8A8_UNORM;
 
     reference.aspectMask = 0;
     // Test for aspect mask of 0
-    m_errorMonitor->SetUnexpectedError("VUID-VkAttachmentDescription2-format-06698");
+    m_errorMonitor->SetUnexpectedError("VUID-VkRenderPassCreateInfo2-attachment-02525");
     m_errorMonitor->SetUnexpectedError("VUID-VkSubpassDescription2-pInputAttachments-02897");
     TestRenderPass2KHRCreate(*m_errorMonitor, *m_device, rpci2, {"VUID-VkSubpassDescription2-attachment-02800"});
 
     // Test for invalid aspect mask bits
     reference.aspectMask = 0x40000000;  // invalid VkImageAspectFlagBits value
-    m_errorMonitor->SetUnexpectedError("VUID-VkAttachmentDescription2-format-06698");
+    m_errorMonitor->SetUnexpectedError("VUID-VkRenderPassCreateInfo2-attachment-02525");
     m_errorMonitor->SetUnexpectedError("VUID-VkSubpassDescription2-pInputAttachments-02897");
     TestRenderPass2KHRCreate(*m_errorMonitor, *m_device, rpci2, {"VUID-VkSubpassDescription2-attachment-02799"});
 
     // Test for invalid use of VK_IMAGE_ASPECT_METADATA_BIT
     reference.aspectMask = VK_IMAGE_ASPECT_METADATA_BIT;
-    m_errorMonitor->SetUnexpectedError("VUID-VkAttachmentDescription2-format-06698");
+    m_errorMonitor->SetUnexpectedError("VUID-VkRenderPassCreateInfo2-attachment-02525");
     m_errorMonitor->SetUnexpectedError("VUID-VkSubpassDescription2-pInputAttachments-02897");
     TestRenderPass2KHRCreate(*m_errorMonitor, *m_device, rpci2, {"VUID-VkSubpassDescription2-attachment-02801"});
 }
@@ -93,7 +93,7 @@ TEST_F(NegativeSubpass, SubpassDependencies) {
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddOptionalExtensions(VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME);
     AddOptionalExtensions(VK_KHR_MULTIVIEW_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
     const bool rp2_supported = IsExtensionsEnabled(VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME);
     const bool multiview_supported =
         IsExtensionsEnabled(VK_KHR_MULTIVIEW_EXTENSION_NAME) || (DeviceValidationVersion() >= VK_API_VERSION_1_1);
@@ -105,7 +105,7 @@ TEST_F(NegativeSubpass, SubpassDependencies) {
     }
     // Add a device features struct enabling NO features
     features2.features = {};
-    RETURN_IF_SKIP(InitState(nullptr, &features2))
+    RETURN_IF_SKIP(InitState(nullptr, &features2));
 
     // Create two dummy subpasses
     VkSubpassDescription subpasses[] = {
@@ -311,9 +311,9 @@ TEST_F(NegativeSubpass, NextSubpassExcessive) {
 
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddOptionalExtensions(VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
     const bool rp2Supported = IsExtensionsEnabled(VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
     m_commandBuffer->begin();
@@ -342,9 +342,8 @@ TEST_F(NegativeSubpass, RenderPassEndBeforeFinalSubpass) {
 
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddOptionalExtensions(VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(Init());
     const bool rp2Supported = IsExtensionsEnabled(VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitState(nullptr, nullptr, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
 
     VkSubpassDescription sd[2] = {{0, VK_PIPELINE_BIND_POINT_GRAPHICS, 0, nullptr, 0, nullptr, nullptr, nullptr, 0, nullptr},
                                   {0, VK_PIPELINE_BIND_POINT_GRAPHICS, 0, nullptr, 0, nullptr, nullptr, nullptr, 0, nullptr}};
@@ -385,9 +384,9 @@ TEST_F(NegativeSubpass, SubpassIndices) {
 
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddOptionalExtensions(VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
     const bool rp2_supported = IsExtensionsEnabled(VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitState());
 
     VkSubpassDescription sci[2] = {};
     sci[0].pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
@@ -432,7 +431,7 @@ TEST_F(NegativeSubpass, SubpassIndices) {
 TEST_F(NegativeSubpass, DrawWithPipelineIncompatibleWithSubpass) {
     TEST_DESCRIPTION("Use a pipeline for the wrong subpass in a render pass instance");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     // A renderpass with two subpasses, both writing the same attachment.
     VkAttachmentDescription attach[] = {
@@ -457,9 +456,9 @@ TEST_F(NegativeSubpass, DrawWithPipelineIncompatibleWithSubpass) {
 
     VkImageObj image(m_device);
     image.InitNoLayout(32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_IMAGE_TILING_OPTIMAL, 0);
-    VkImageView imageView = image.targetView(VK_FORMAT_R8G8B8A8_UNORM);
+    vkt::ImageView imageView = image.CreateView();
 
-    auto fbci = vku::InitStruct<VkFramebufferCreateInfo>(nullptr, 0u, rp.handle(), 1u, &imageView, 32u, 32u, 1u);
+    auto fbci = vku::InitStruct<VkFramebufferCreateInfo>(nullptr, 0u, rp.handle(), 1u, &imageView.handle(), 32u, 32u, 1u);
     vkt::Framebuffer fb(*m_device, fbci);
 
     CreatePipelineHelper pipe(*this);
@@ -496,7 +495,7 @@ TEST_F(NegativeSubpass, DrawWithPipelineIncompatibleWithSubpass) {
 
 TEST_F(NegativeSubpass, ImageBarrierSubpassConflict) {
     TEST_DESCRIPTION("Check case where subpass index references different image from image barrier");
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     // Create RP/FB combo where subpass has incorrect index attachment, this is 2nd half of "VUID-vkCmdPipelineBarrier-image-02635"
     VkAttachmentDescription attach[] = {
@@ -525,10 +524,10 @@ TEST_F(NegativeSubpass, ImageBarrierSubpassConflict) {
 
     VkImageObj image(m_device);
     image.InitNoLayout(32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_IMAGE_TILING_OPTIMAL, 0);
-    VkImageView imageView = image.targetView(VK_FORMAT_R8G8B8A8_UNORM);
+    vkt::ImageView imageView = image.CreateView();
     VkImageObj image2(m_device);
     image2.InitNoLayout(32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_IMAGE_TILING_OPTIMAL, 0);
-    VkImageView imageView2 = image2.targetView(VK_FORMAT_R8G8B8A8_UNORM);
+    vkt::ImageView imageView2 = image2.CreateView();
     // re-use imageView from start of test
     VkImageView iv_array[2] = {imageView, imageView2};
 
@@ -562,7 +561,7 @@ TEST_F(NegativeSubpass, ImageBarrierSubpassConflict) {
 TEST_F(NegativeSubpass, DISABLED_SubpassInputNotBoundDescriptorSet) {
     TEST_DESCRIPTION("Validate subpass input isn't bound to fragment shader or descriptor set");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     VkImageUsageFlags usage_input =
@@ -572,7 +571,7 @@ TEST_F(NegativeSubpass, DISABLED_SubpassInputNotBoundDescriptorSet) {
     auto image_ci = VkImageObj::ImageCreateInfo2D(64, 64, 1, 1, format, usage_input, VK_IMAGE_TILING_OPTIMAL);
     image_input.Init(image_ci);
     image_input.SetLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-    VkImageView view_input = image_input.targetView(format);
+    vkt::ImageView view_input = image_input.CreateView();
 
     const VkAttachmentDescription inputAttachment = {
         0u,
@@ -609,7 +608,7 @@ TEST_F(NegativeSubpass, DISABLED_SubpassInputNotBoundDescriptorSet) {
     VkFramebufferCreateInfo fbci = vku::InitStructHelper();
     fbci.renderPass = rp.handle();
     fbci.attachmentCount = 1u;
-    fbci.pAttachments = &view_input;
+    fbci.pAttachments = &view_input.handle();
     fbci.width = 64;
     fbci.height = 64;
     fbci.layers = 1u;
@@ -648,12 +647,13 @@ TEST_F(NegativeSubpass, DISABLED_SubpassInputNotBoundDescriptorSet) {
     }
 
     {  // Binds input attachment
-        char const *fsSource =
-            "#version 450\n"
-            "layout(input_attachment_index=0, set=0, binding=0) uniform subpassInput x;\n"
-            "void main() {\n"
-            "   vec4 color = subpassLoad(x);\n"
-            "}\n";
+        char const *fsSource = R"glsl(
+            #version 450
+            layout(input_attachment_index=0, set=0, binding=0) uniform subpassInput x;
+            void main() {
+               vec4 color = subpassLoad(x);
+            }
+            )glsl";
         VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
         CreatePipelineHelper g_pipe(*this);
@@ -691,7 +691,7 @@ TEST_F(NegativeSubpass, SubpassDescriptionViewMask) {
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
     VkPhysicalDeviceMultiviewFeatures multiview_features = vku::InitStructHelper();
     auto features2 = GetPhysicalDeviceFeatures2(multiview_features);
     if (multiview_features.multiview == VK_FALSE) {
@@ -705,7 +705,7 @@ TEST_F(NegativeSubpass, SubpassDescriptionViewMask) {
         GTEST_SKIP() << "maxMultiviewViewCount too high";
     }
 
-    RETURN_IF_SKIP(InitState(nullptr, &features2))
+    RETURN_IF_SKIP(InitState(nullptr, &features2));
 
     VkAttachmentDescription2 attach_desc = vku::InitStructHelper();
     attach_desc.format = VK_FORMAT_R8G8B8A8_UNORM;
@@ -739,8 +739,8 @@ TEST_F(NegativeSubpass, PipelineSubpassIndex) {
     TEST_DESCRIPTION("Test using pipeline with incompatible subpass index for current renderpass subpass");
 
     AddRequiredExtensions(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitState());
 
     VkAttachmentDescription attach_desc = {};
     attach_desc.format = VK_FORMAT_R8G8B8A8_UNORM;
@@ -779,12 +779,12 @@ TEST_F(NegativeSubpass, PipelineSubpassIndex) {
 
     VkImageObj image(m_device);
     image.InitNoLayout(32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_IMAGE_TILING_OPTIMAL, 0);
-    VkImageView imageView = image.targetView(VK_FORMAT_R8G8B8A8_UNORM);
+    vkt::ImageView imageView = image.CreateView();
 
     VkFramebufferCreateInfo framebuffer_ci = vku::InitStructHelper();
     framebuffer_ci.renderPass = render_pass.handle();
     framebuffer_ci.attachmentCount = 1;
-    framebuffer_ci.pAttachments = &imageView;
+    framebuffer_ci.pAttachments = &imageView.handle();
     framebuffer_ci.width = 32;
     framebuffer_ci.height = 32;
     framebuffer_ci.layers = 1;
@@ -843,7 +843,7 @@ TEST_F(NegativeSubpass, SubpassDependencyMasksSync2) {
     // The synchronization and access scopes instead are defined by the parameters of VkMemoryBarrier2.
     SetTargetApiVersion(VK_API_VERSION_1_2);  // VK_KHR_create_renderpass2
     AddRequiredExtensions(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
     VkPhysicalDeviceSynchronization2FeaturesKHR sync2_features = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(sync2_features);
     RETURN_IF_SKIP(InitState(nullptr, &sync2_features));
@@ -911,9 +911,9 @@ TEST_F(NegativeSubpass, InputAttachmentReferences) {
     TEST_DESCRIPTION("Create a subpass with the meta data aspect mask set for an input attachment");
 
     AddRequiredExtensions(VK_KHR_MAINTENANCE_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitState());
 
     VkAttachmentDescription attach = {0,
                                       VK_FORMAT_R8G8B8A8_UNORM,
@@ -965,9 +965,9 @@ TEST_F(NegativeSubpass, InputAttachmentLayout) {
 
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddOptionalExtensions(VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
     const bool rp2_supported = IsExtensionsEnabled(VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitState());
 
     const VkAttachmentDescription attach0 = {0,
                                              VK_FORMAT_R8G8B8A8_UNORM,
@@ -1043,7 +1043,7 @@ TEST_F(NegativeSubpass, DISABLED_InputAttachmentMissing) {
         "Test that an error is produced for a shader consuming an input attachment which is not included in the subpass "
         "description");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     char const *fsSource = R"glsl(
@@ -1069,7 +1069,7 @@ TEST_F(NegativeSubpass, DISABLED_InputAttachmentMissingArray) {
         "Test that an error is produced for a shader consuming an input attachment which is not included in the subpass "
         "description -- array case");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     char const *fsSource = R"glsl(
@@ -1090,10 +1090,38 @@ TEST_F(NegativeSubpass, DISABLED_InputAttachmentMissingArray) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-renderPass-06038");
 }
 
+// This is not working because of a bug in the Spec Constant logic
+// https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/5911
+TEST_F(NegativeSubpass, DISABLED_InputAttachmentMissingSpecConstant) {
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    char const *fsSource = R"glsl(
+        #version 450
+        layout (constant_id = 0) const int index = 2;
+        layout(input_attachment_index=0, set=0, binding=0) uniform subpassInput xs[index];
+        layout(location=0) out vec4 color;
+        void main() {
+           color = subpassLoad(xs[0]);
+        }
+    )glsl";
+
+    uint32_t data = 4;  // over VkDescriptorSetLayoutBinding::descriptorCount
+    VkSpecializationMapEntry entry = {0, 0, sizeof(uint32_t)};
+    VkSpecializationInfo specialization_info = {1, &entry, sizeof(uint32_t), &data};
+    const VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL, &specialization_info);
+
+    const auto set_info = [&](CreatePipelineHelper &helper) {
+        helper.shader_stages_ = {helper.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
+        helper.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 2, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}};
+    };
+    CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-layout-07991");
+}
+
 TEST_F(NegativeSubpass, DISABLED_InputAttachmentSharingVariable) {
     TEST_DESCRIPTION("Make sure if 2 loads use same variable, both are tracked");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     const VkAttachmentDescription inputAttachmentDescription = {0,
                                                                 m_render_target_fmt,
@@ -1131,7 +1159,7 @@ TEST_F(NegativeSubpass, DISABLED_InputAttachmentSharingVariable) {
 
     // There are 2 OpLoad/OpAccessChain that point the same OpVariable
     // Make sure we are not just taking the first load and checking all loads on a variable
-    const char *fs_source = R"(
+    const char *fs_source = R"glsl(
         #version 460
         layout(input_attachment_index=0, set=0, binding=0) uniform subpassInput xs[2];
         layout(location=0) out vec4 color;
@@ -1139,7 +1167,7 @@ TEST_F(NegativeSubpass, DISABLED_InputAttachmentSharingVariable) {
             color = subpassLoad(xs[1]); // valid
             color = subpassLoad(xs[0]); // invalid
         }
-    )";
+    )glsl";
     VkShaderObj fs(this, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL);
 
     const auto set_info = [&](CreatePipelineHelper &helper) {
@@ -1154,7 +1182,7 @@ TEST_F(NegativeSubpass, DISABLED_SubpassInputWithoutFormat) {
     TEST_DESCRIPTION("Non-InputAttachment shader input with unknown image format");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
     VkPhysicalDeviceFeatures features;
     vk::GetPhysicalDeviceFeatures(gpu(), &features);
     features.shaderStorageImageReadWithoutFormat = VK_FALSE;
@@ -1254,7 +1282,7 @@ TEST_F(NegativeSubpass, DISABLED_SubpassInputWithoutFormat) {
 
 TEST_F(NegativeSubpass, NextSubpassNoRenderPass) {
     TEST_DESCRIPTION("call next subpass outside a renderpass");
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     m_commandBuffer->begin();

@@ -769,6 +769,52 @@ VkImageAspectFlags Image::aspect_mask(VkFormat format) {
     return image_aspect;
 }
 
+VkImageMemoryBarrier Image::transition_to_present(VkImage swapchain_image, VkImageLayout old_layout,
+                                                  VkAccessFlags src_access_mask) {
+    VkImageMemoryBarrier transition = vku::InitStructHelper();
+    transition.srcAccessMask = src_access_mask;
+
+    // No need to make writes visible. Available writes are automatically become visible to the presentation engine
+    transition.dstAccessMask = 0;
+
+    transition.oldLayout = old_layout;
+    transition.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    transition.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    transition.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    transition.image = swapchain_image;
+    transition.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    transition.subresourceRange.baseMipLevel = 0;
+    transition.subresourceRange.levelCount = 1;
+    transition.subresourceRange.baseArrayLayer = 0;
+    transition.subresourceRange.layerCount = 1;
+    return transition;
+}
+
+VkImageMemoryBarrier2 Image::transition_to_present_2(VkImage swapchain_image, VkImageLayout old_layout,
+                                                     VkPipelineStageFlags2 src_stage_mask, VkAccessFlags2 src_access_mask) {
+    VkImageMemoryBarrier2 transition = vku::InitStructHelper();
+    transition.srcStageMask = src_stage_mask;
+    transition.srcAccessMask = src_access_mask;
+
+    // Spec advice: when transitioning to "present" there is no need to delay subsequent processing
+    transition.dstStageMask = VK_PIPELINE_STAGE_2_NONE;
+
+    // No need to make writes visible. Available writes are automatically become visible to the presentation engine
+    transition.dstAccessMask = 0;
+
+    transition.oldLayout = old_layout;
+    transition.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    transition.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    transition.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    transition.image = swapchain_image;
+    transition.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    transition.subresourceRange.baseMipLevel = 0;
+    transition.subresourceRange.levelCount = 1;
+    transition.subresourceRange.baseArrayLayer = 0;
+    transition.subresourceRange.layerCount = 1;
+    return transition;
+}
+
 NON_DISPATCHABLE_HANDLE_DTOR(ImageView, vk::DestroyImageView)
 
 void ImageView::init(const Device &dev, const VkImageViewCreateInfo &info) {
@@ -1238,14 +1284,11 @@ void RenderPass::init(const Device &dev, const VkRenderPassCreateInfo &info) {
     NON_DISPATCHABLE_HANDLE_INIT(vk::CreateRenderPass, dev, &info);
 }
 
-void RenderPass::init(const Device &dev, const VkRenderPassCreateInfo2 &info, bool khr) {
-    if (!khr) {
-        NON_DISPATCHABLE_HANDLE_INIT(vk::CreateRenderPass2, dev, &info);
+void RenderPass::init(const Device &dev, const VkRenderPassCreateInfo2 &info) {
+    if (vk::CreateRenderPass2KHR) {
+        NON_DISPATCHABLE_HANDLE_INIT(vk::CreateRenderPass2KHR, dev, &info);
     } else {
-        auto vkCreateRenderPass2KHR =
-            reinterpret_cast<PFN_vkCreateRenderPass2KHR>(vk::GetDeviceProcAddr(dev.handle(), "vkCreateRenderPass2KHR"));
-        ASSERT_NE(vkCreateRenderPass2KHR, nullptr);
-        NON_DISPATCHABLE_HANDLE_INIT(vkCreateRenderPass2KHR, dev, &info);
+        NON_DISPATCHABLE_HANDLE_INIT(vk::CreateRenderPass2, dev, &info);
     }
 }
 
@@ -1257,14 +1300,11 @@ void Framebuffer::init(const Device &dev, const VkFramebufferCreateInfo &info) {
 
 NON_DISPATCHABLE_HANDLE_DTOR(Framebuffer, vk::DestroyFramebuffer)
 
-void SamplerYcbcrConversion::init(const Device &dev, const VkSamplerYcbcrConversionCreateInfo &info, bool khr) {
-    if (!khr) {
-        NON_DISPATCHABLE_HANDLE_INIT(vk::CreateSamplerYcbcrConversion, dev, &info);
+void SamplerYcbcrConversion::init(const Device &dev, const VkSamplerYcbcrConversionCreateInfo &info) {
+    if (vk::CreateSamplerYcbcrConversionKHR) {
+        NON_DISPATCHABLE_HANDLE_INIT(vk::CreateSamplerYcbcrConversionKHR, dev, &info);
     } else {
-        auto vkCreateSamplerYcbcrConversionKHR = reinterpret_cast<PFN_vkCreateSamplerYcbcrConversionKHR>(
-            vk::GetDeviceProcAddr(dev.handle(), "vkCreateSamplerYcbcrConversionKHR"));
-        ASSERT_NE(vkCreateSamplerYcbcrConversionKHR, nullptr);
-        NON_DISPATCHABLE_HANDLE_INIT(vkCreateSamplerYcbcrConversionKHR, dev, &info);
+        NON_DISPATCHABLE_HANDLE_INIT(vk::CreateSamplerYcbcrConversion, dev, &info);
     }
 }
 
@@ -1293,15 +1333,13 @@ void SamplerYcbcrConversion::destroy() noexcept {
     if (!initialized()) {
         return;
     }
-    if (!khr_) {
-        vk::DestroySamplerYcbcrConversion(device(), handle(), nullptr);
+    if (vk::DestroySamplerYcbcrConversionKHR) {
+        vk::DestroySamplerYcbcrConversionKHR(device(), handle(), nullptr);
     } else {
-        auto vkDestroySamplerYcbcrConversionKHR = reinterpret_cast<PFN_vkDestroySamplerYcbcrConversionKHR>(
-            vk::GetDeviceProcAddr(device(), "vkDestroySamplerYcbcrConversionKHR"));
-        assert(vkDestroySamplerYcbcrConversionKHR != nullptr);
-        vkDestroySamplerYcbcrConversionKHR(device(), handle(), nullptr);
+        vk::DestroySamplerYcbcrConversion(device(), handle(), nullptr);
     }
     handle_ = VK_NULL_HANDLE;
+    internal::NonDispHandle<decltype(handle_)>::destroy();
 }
 
 SamplerYcbcrConversion::~SamplerYcbcrConversion() noexcept { destroy(); }

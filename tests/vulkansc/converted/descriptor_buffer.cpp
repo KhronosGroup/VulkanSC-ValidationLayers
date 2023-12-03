@@ -23,7 +23,7 @@
 
 TEST_F(NegativeDescriptorBuffer, SetLayout) {
     TEST_DESCRIPTION("Descriptor buffer set layout tests.");
-    RETURN_IF_SKIP(InitBasicDescriptorBuffer())
+    RETURN_IF_SKIP(InitBasicDescriptorBuffer());
 
     vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
 
@@ -143,7 +143,7 @@ TEST_F(NegativeDescriptorBuffer, SetLayoutInlineUniformBlockEXT) {
     TEST_DESCRIPTION("Descriptor buffer set layout tests.");
     AddRequiredExtensions(VK_EXT_INLINE_UNIFORM_BLOCK_EXTENSION_NAME);
     VkPhysicalDeviceInlineUniformBlockFeaturesEXT inline_uniform_features = vku::InitStructHelper();
-    RETURN_IF_SKIP(InitBasicDescriptorBuffer(&inline_uniform_features))
+    RETURN_IF_SKIP(InitBasicDescriptorBuffer(&inline_uniform_features));
 
     vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
 
@@ -165,7 +165,7 @@ TEST_F(NegativeDescriptorBuffer, SetLayoutMutableDescriptorEXT) {
     TEST_DESCRIPTION("Descriptor buffer set layout tests.");
     AddRequiredExtensions(VK_EXT_MUTABLE_DESCRIPTOR_TYPE_EXTENSION_NAME);
     VkPhysicalDeviceMutableDescriptorTypeFeaturesEXT mutable_descriptor_features = vku::InitStructHelper();
-    RETURN_IF_SKIP(InitBasicDescriptorBuffer(&mutable_descriptor_features))
+    RETURN_IF_SKIP(InitBasicDescriptorBuffer(&mutable_descriptor_features));
 
     vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
 
@@ -186,14 +186,14 @@ TEST_F(NegativeDescriptorBuffer, NotEnabled) {
     AddRequiredExtensions(VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
     AddOptionalExtensions(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceBufferDeviceAddressFeatures buffer_device_address_features = vku::InitStructHelper();
     VkPhysicalDeviceAccelerationStructureFeaturesKHR acceleration_structure_features =
         vku::InitStructHelper(&buffer_device_address_features);
     GetPhysicalDeviceFeatures2(acceleration_structure_features);
 
-    RETURN_IF_SKIP(InitState(nullptr, &acceleration_structure_features, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    RETURN_IF_SKIP(InitState(nullptr, &acceleration_structure_features));
 
     VkPhysicalDeviceDescriptorBufferPropertiesEXT descriptor_buffer_properties = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(descriptor_buffer_properties);
@@ -517,12 +517,12 @@ TEST_F(NegativeDescriptorBuffer, BindingAndOffsets) {
 
     AddRequiredExtensions(VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
     VkPhysicalDeviceDescriptorBufferFeaturesEXT descriptor_buffer_features = vku::InitStructHelper();
     VkPhysicalDeviceBufferDeviceAddressFeatures buffer_device_address_features = vku::InitStructHelper(&descriptor_buffer_features);
     GetPhysicalDeviceFeatures2(buffer_device_address_features);
 
-    RETURN_IF_SKIP(InitState(nullptr, &buffer_device_address_features, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    RETURN_IF_SKIP(InitState(nullptr, &buffer_device_address_features));
 
     VkPhysicalDeviceDescriptorBufferPropertiesEXT descriptor_buffer_properties = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(descriptor_buffer_properties);
@@ -562,6 +562,10 @@ TEST_F(NegativeDescriptorBuffer, BindingAndOffsets) {
 
         for (uint32_t i = 0; i < descriptor_buffer_properties.maxDescriptorBufferBindings + 1; i++) {
             binding_infos.push_back(dbbi);
+            if (descriptor_buffer_properties.bufferlessPushDescriptors == VK_FALSE && i > 0) {
+                m_errorMonitor->SetDesiredFailureMsg(kErrorBit,
+                                                     "VUID-VkDescriptorBufferBindingInfoEXT-bufferlessPushDescriptors-08056");
+            }
         }
 
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit,
@@ -596,10 +600,17 @@ TEST_F(NegativeDescriptorBuffer, BindingAndOffsets) {
     vkt::Buffer d_buffer2(*m_device, buffCI, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &allocate_flag_info);
 
     if (descriptor_buffer_properties.descriptorBufferOffsetAlignment != 1) {
+        VkDescriptorBufferBindingPushDescriptorBufferHandleEXT dbbpdbh = vku::InitStructHelper();
+        dbbpdbh.buffer = d_buffer2.handle();
+
         VkDescriptorBufferBindingInfoEXT dbbi2 = vku::InitStructHelper();
         dbbi2.address = d_buffer2.address() + 1;  // make alignment bad
         dbbi2.usage = VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT | VK_BUFFER_USAGE_SAMPLER_DESCRIPTOR_BUFFER_BIT_EXT |
                       VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+        if (descriptor_buffer_properties.bufferlessPushDescriptors == VK_FALSE) {
+            dbbi2.usage |= VK_BUFFER_USAGE_2_PUSH_DESCRIPTORS_DESCRIPTOR_BUFFER_BIT_EXT;
+            dbbi2.pNext = &dbbpdbh;
+        }
 
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDescriptorBufferBindingInfoEXT-address-08057");
         vk::CmdBindDescriptorBuffersEXT(m_commandBuffer->handle(), 1, &dbbi2);
@@ -626,6 +637,10 @@ TEST_F(NegativeDescriptorBuffer, BindingAndOffsets) {
         m_errorMonitor->VerifyFound();
 
         dbbi2.usage = VK_BUFFER_USAGE_PUSH_DESCRIPTORS_DESCRIPTOR_BUFFER_BIT_EXT;
+        if (descriptor_buffer_properties.bufferlessPushDescriptors == VK_FALSE) {
+            m_errorMonitor->SetDesiredFailureMsg(kErrorBit,
+                                                 "VUID-VkDescriptorBufferBindingInfoEXT-bufferlessPushDescriptors-08056");
+        }
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDescriptorBufferBindingInfoEXT-usage-08124");
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBindDescriptorBuffersEXT-pBindingInfos-08055");
         vk::CmdBindDescriptorBuffersEXT(m_commandBuffer->handle(), 1, &dbbi2);
@@ -826,7 +841,7 @@ TEST_F(NegativeDescriptorBuffer, InconsistentBuffer) {
     TEST_DESCRIPTION("Dispatch pipeline with descriptor set bound while descriptor buffer expected");
     AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
     VkPhysicalDeviceBufferDeviceAddressFeatures buffer_device_address_features = vku::InitStructHelper();
-    RETURN_IF_SKIP(InitBasicDescriptorBuffer(&buffer_device_address_features))
+    RETURN_IF_SKIP(InitBasicDescriptorBuffer(&buffer_device_address_features));
 
     const VkDescriptorSetLayoutBinding binding{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr};
 
@@ -884,7 +899,7 @@ TEST_F(NegativeDescriptorBuffer, InconsistentSet) {
     TEST_DESCRIPTION("Dispatch pipeline with descriptor buffer bound while of descriptor set expected");
     AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
     VkPhysicalDeviceBufferDeviceAddressFeatures buffer_device_address_features = vku::InitStructHelper();
-    RETURN_IF_SKIP(InitBasicDescriptorBuffer(&buffer_device_address_features))
+    RETURN_IF_SKIP(InitBasicDescriptorBuffer(&buffer_device_address_features));
 
     const VkDescriptorSetLayoutBinding binding{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr};
     VkDescriptorSetLayoutCreateInfo dslci = vku::InitStructHelper();
@@ -938,7 +953,7 @@ TEST_F(NegativeDescriptorBuffer, BindPoint) {
     TEST_DESCRIPTION("Descriptor buffer invalid bind point.");
     AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
     VkPhysicalDeviceBufferDeviceAddressFeatures buffer_device_address_features = vku::InitStructHelper();
-    RETURN_IF_SKIP(InitBasicDescriptorBuffer(&buffer_device_address_features))
+    RETURN_IF_SKIP(InitBasicDescriptorBuffer(&buffer_device_address_features));
 
     VkPhysicalDeviceDescriptorBufferPropertiesEXT descriptor_buffer_properties = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(descriptor_buffer_properties);
@@ -993,7 +1008,7 @@ TEST_F(NegativeDescriptorBuffer, BindPoint) {
 
 TEST_F(NegativeDescriptorBuffer, DescriptorGetInfoBasic) {
     TEST_DESCRIPTION("Descriptor buffer vkDescriptorGetInfo().");
-    RETURN_IF_SKIP(InitBasicDescriptorBuffer())
+    RETURN_IF_SKIP(InitBasicDescriptorBuffer());
 
     uint8_t buffer[128];
     VkPhysicalDeviceDescriptorBufferPropertiesEXT descriptor_buffer_properties = vku::InitStructHelper();
@@ -1015,7 +1030,7 @@ TEST_F(NegativeDescriptorBuffer, DescriptorGetInfoBasic) {
 
 TEST_F(NegativeDescriptorBuffer, DescriptorGetInfoSampler) {
     TEST_DESCRIPTION("Descriptor buffer vkDescriptorGetInfo() with a sampler backed VkDescriptorImageInfo.");
-    RETURN_IF_SKIP(InitBasicDescriptorBuffer())
+    RETURN_IF_SKIP(InitBasicDescriptorBuffer());
 
     uint8_t buffer[128];
     VkPhysicalDeviceDescriptorBufferPropertiesEXT descriptor_buffer_properties = vku::InitStructHelper();
@@ -1081,7 +1096,7 @@ TEST_F(NegativeDescriptorBuffer, DescriptorGetInfoSampler) {
 TEST_F(NegativeDescriptorBuffer, DescriptorGetInfoAS) {
     TEST_DESCRIPTION("Descriptor buffer vkDescriptorGetInfo() for Acceleration Structure.");
     AddRequiredExtensions(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitBasicDescriptorBuffer())
+    RETURN_IF_SKIP(InitBasicDescriptorBuffer());
 
     uint8_t buffer[128];
     VkPhysicalDeviceDescriptorBufferPropertiesEXT descriptor_buffer_properties = vku::InitStructHelper();
@@ -1098,7 +1113,7 @@ TEST_F(NegativeDescriptorBuffer, DescriptorGetInfoAS) {
 TEST_F(NegativeDescriptorBuffer, DescriptorGetInfoRtxNV) {
     TEST_DESCRIPTION("Descriptor buffer vkDescriptorGetInfo() for NV_ray_tracing.");
     AddRequiredExtensions(VK_NV_RAY_TRACING_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitBasicDescriptorBuffer())
+    RETURN_IF_SKIP(InitBasicDescriptorBuffer());
 
     uint8_t buffer[128];
     VkPhysicalDeviceDescriptorBufferPropertiesEXT descriptor_buffer_properties = vku::InitStructHelper();
@@ -1116,7 +1131,7 @@ TEST_F(NegativeDescriptorBuffer, DescriptorGetInfoAddressRange) {
     TEST_DESCRIPTION("Descriptor buffer vkDescriptorGetInfo() with VkDescriptorAddressInfoEXT.");
     AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
     VkPhysicalDeviceBufferDeviceAddressFeatures buffer_device_address_features = vku::InitStructHelper();
-    RETURN_IF_SKIP(InitBasicDescriptorBuffer(&buffer_device_address_features))
+    RETURN_IF_SKIP(InitBasicDescriptorBuffer(&buffer_device_address_features));
 
     uint8_t buffer[128];
     VkPhysicalDeviceDescriptorBufferPropertiesEXT descriptor_buffer_properties = vku::InitStructHelper();
@@ -1219,7 +1234,7 @@ TEST_F(NegativeDescriptorBuffer, Various) {
     AddOptionalExtensions(VK_EXT_MUTABLE_DESCRIPTOR_TYPE_EXTENSION_NAME);
     AddOptionalExtensions(VK_EXT_INLINE_UNIFORM_BLOCK_EXTENSION_NAME);
     AddOptionalExtensions(VK_NV_RAY_TRACING_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitBasicDescriptorBuffer())
+    RETURN_IF_SKIP(InitBasicDescriptorBuffer());
     const bool nv_ray_tracing = IsExtensionsEnabled(VK_NV_RAY_TRACING_EXTENSION_NAME);
 
     VkPhysicalDeviceDescriptorBufferPropertiesEXT descriptor_buffer_properties = vku::InitStructHelper();
@@ -1386,7 +1401,7 @@ TEST_F(NegativeDescriptorBuffer, ExtensionCombination) {
 
     AddRequiredExtensions(VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME);
     AddRequiredExtensions(VK_AMD_SHADER_FRAGMENT_MASK_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     const auto q_props = vkt::PhysicalDevice(gpu()).queue_properties_;
     ASSERT_TRUE(q_props.size() > 0);
@@ -1420,7 +1435,7 @@ TEST_F(NegativeDescriptorBuffer, ExtensionCombination) {
 
 TEST_F(NegativeDescriptorBuffer, SetBufferAddressSpaceLimits) {
     TEST_DESCRIPTION("Create VkBuffer with extension.");
-    RETURN_IF_SKIP(InitBasicDescriptorBuffer())
+    RETURN_IF_SKIP(InitBasicDescriptorBuffer());
 
     VkPhysicalDeviceDescriptorBufferPropertiesEXT descriptor_buffer_properties = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(descriptor_buffer_properties);
@@ -1449,7 +1464,7 @@ TEST_F(NegativeDescriptorBuffer, SetBufferAddressSpaceLimits) {
 // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/5826
 TEST_F(NegativeDescriptorBuffer, NullHandle) {
     TEST_DESCRIPTION("Descriptor buffer various tests.");
-    RETURN_IF_SKIP(InitBasicDescriptorBuffer())
+    RETURN_IF_SKIP(InitBasicDescriptorBuffer());
 
     VkPhysicalDeviceDescriptorBufferPropertiesEXT descriptor_buffer_properties = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(descriptor_buffer_properties);
@@ -1471,7 +1486,7 @@ TEST_F(NegativeDescriptorBuffer, NullHandle) {
 
 TEST_F(NegativeDescriptorBuffer, BufferUsage) {
     TEST_DESCRIPTION("Wrong Usage for buffer createion.");
-    RETURN_IF_SKIP(InitBasicDescriptorBuffer())
+    RETURN_IF_SKIP(InitBasicDescriptorBuffer());
 
     VkPhysicalDeviceDescriptorBufferPropertiesEXT descriptor_buffer_properties = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(descriptor_buffer_properties);

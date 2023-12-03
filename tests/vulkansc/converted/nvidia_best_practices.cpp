@@ -29,7 +29,7 @@ static constexpr float defaultQueuePriority = 0.0f;
 
 TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_PageableDeviceLocalMemory) {
     AddRequiredExtensions(VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableNVIDIAValidation))
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableNVIDIAValidation));
 
     VkDeviceQueueCreateInfo queue_ci = vku::InitStructHelper();
     queue_ci.queueCount = 1;
@@ -67,7 +67,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_PageableDeviceLocalMemory) {
 }
 
 TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_TilingLinear) {
-    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableNVIDIAValidation))
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableNVIDIAValidation));
     InitState();
 
     VkImageCreateInfo image_ci = vku::InitStructHelper();
@@ -98,7 +98,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_TilingLinear) {
 }
 
 TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_Depth32Format) {
-    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableNVIDIAValidation))
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableNVIDIAValidation));
     InitState();
 
     VkImageCreateInfo image_ci = vku::InitStructHelper();
@@ -132,7 +132,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_Depth32Format) {
 }
 
 TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_QueueBindSparse_NotAsync) {
-    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableNVIDIAValidation))
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableNVIDIAValidation));
     InitState();
 
     if (!m_device->phy().features().sparseBinding) {
@@ -250,11 +250,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_AccelerationStructure_NotAsync) 
     AddRequiredExtensions(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableNVIDIAValidation))
-
-    if (IsDriver(VK_DRIVER_ID_AMD_PROPRIETARY)) {
-        GTEST_SKIP() << "Test is crashing on AMD hardware for unknown reasons.";
-    }
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableNVIDIAValidation));
 
     VkPhysicalDeviceRayTracingPipelineFeaturesKHR rt_pipeline_features = vku::InitStructHelper();
     VkPhysicalDeviceAccelerationStructureFeaturesKHR as_features = vku::InitStructHelper(&rt_pipeline_features);
@@ -307,7 +303,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_AccelerationStructure_NotAsync) 
 }
 
 TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_AllocateMemory_SetPriority) {
-    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableNVIDIAValidation))
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableNVIDIAValidation));
     InitState();
 
     VkMemoryAllocateInfo memory_ai = vku::InitStructHelper();
@@ -334,7 +330,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_AllocateMemory_SetPriority) {
 }
 
 TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_AllocateMemory_ReuseAllocations) {
-    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableNVIDIAValidation))
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableNVIDIAValidation));
     InitState();
 
     VkMemoryAllocateInfo memory_ai = vku::InitStructHelper();
@@ -367,7 +363,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_BindMemory_NoPriority) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableNVIDIAValidation))
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableNVIDIAValidation));
 
     InitState();
 
@@ -447,7 +443,7 @@ static VkDescriptorSetLayoutBinding CreateSingleDescriptorBinding(VkDescriptorTy
 }
 
 TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_CreatePipelineLayout_SeparateSampler) {
-    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableNVIDIAValidation))
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableNVIDIAValidation));
     InitState();
 
     VkDescriptorSetLayoutBinding separate_bindings[] = {
@@ -492,7 +488,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_CreatePipelineLayout_SeparateSam
 }
 
 TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_CreatePipelineLayout_LargePipelineLayout) {
-    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableNVIDIAValidation))
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableNVIDIAValidation));
     InitState();
 
     VkDescriptorSetLayoutBinding large_bindings[] = {
@@ -550,7 +546,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_BindPipeline_SwitchTessGeometryM
         GTEST_SKIP() << "This test requires dynamicRendering";
     }
 
-    RETURN_IF_SKIP(InitState(nullptr, &features2))
+    RETURN_IF_SKIP(InitState(nullptr, &features2));
 
     if (m_device->phy().limits_.maxGeometryOutputVertices <= 3) {
         GTEST_SKIP() << "Device doesn't support requried maxGeometryOutputVertices";
@@ -618,7 +614,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_BindPipeline_ZcullDirection)
     if (!dynamic_rendering_features.dynamicRendering) {
         GTEST_SKIP() << "This test requires dynamicRendering";
     }
-    RETURN_IF_SKIP(InitState(nullptr, &features2))
+    RETURN_IF_SKIP(InitState(nullptr, &features2));
 
     VkFormat depth_format = VK_FORMAT_D32_SFLOAT_S8_UINT;
     VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
@@ -990,7 +986,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_ClearColor_NotCompressed)
         GTEST_SKIP() << "This test requires dynamicRendering";
     }
 
-    RETURN_IF_SKIP(InitState(nullptr, &features2))
+    RETURN_IF_SKIP(InitState(nullptr, &features2));
 
     auto set_desired = [this] {
         m_errorMonitor->Finish();
@@ -1091,7 +1087,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_ClearColor_NotCompressed)
 }
 
 TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_BeginCommandBuffer_OneTimeSubmit) {
-    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableNVIDIAValidation))
+    RETURN_IF_SKIP(InitBestPracticesFramework(kEnableNVIDIAValidation));
     InitState();
 
     VkCommandPoolCreateInfo command_pool_ci = vku::InitStructHelper();

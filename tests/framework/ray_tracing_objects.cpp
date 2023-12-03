@@ -18,6 +18,11 @@ namespace as {
 
 GeometryKHR::GeometryKHR() : vk_obj_(vku::InitStructHelper()) {}
 
+GeometryKHR &GeometryKHR::SetFlags(VkGeometryFlagsKHR flags) {
+    vk_obj_.flags = flags;
+    return *this;
+}
+
 GeometryKHR &GeometryKHR::SetType(Type type) {
     type_ = type;
     vk_obj_.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
@@ -113,6 +118,21 @@ GeometryKHR &GeometryKHR::SetTrianglesIndexType(VkIndexType index_type) {
     return *this;
 }
 
+GeometryKHR &GeometryKHR::SetTrianglesVertexFormat(VkFormat vertex_format) {
+    vk_obj_.geometry.triangles.vertexFormat = vertex_format;
+    return *this;
+}
+
+GeometryKHR &GeometryKHR::SetTrianglesMaxVertex(uint32_t max_vertex) {
+    vk_obj_.geometry.triangles.maxVertex = max_vertex;
+    return *this;
+}
+
+GeometryKHR &GeometryKHR::SetTrianglesTransformatData(VkDeviceAddress address) {
+    vk_obj_.geometry.triangles.transformData.deviceAddress = address;
+    return *this;
+}
+
 GeometryKHR &GeometryKHR::SetAABBsDeviceBuffer(vkt::Buffer &&buffer, VkDeviceSize stride /*= sizeof(VkAabbPositionsKHR)*/) {
     aabbs_.device_buffer = std::move(buffer);
     vk_obj_.geometry.aabbs.data.deviceAddress = aabbs_.device_buffer.address();
@@ -124,6 +144,11 @@ GeometryKHR &GeometryKHR::SetAABBsHostBuffer(std::unique_ptr<VkAabbPositionsKHR[
                                              VkDeviceSize stride /*= sizeof(VkAabbPositionsKHR)*/) {
     aabbs_.host_buffer = std::move(buffer);
     vk_obj_.geometry.aabbs.data.hostAddress = aabbs_.host_buffer.get();
+    vk_obj_.geometry.aabbs.stride = stride;
+    return *this;
+}
+
+GeometryKHR &GeometryKHR::SetAABBsStride(VkDeviceSize stride) {
     vk_obj_.geometry.aabbs.stride = stride;
     return *this;
 }
@@ -501,9 +526,6 @@ VkAccelerationStructureBuildSizesInfoKHR BuildGeometryInfoKHR::GetSizeInfo(VkDev
 }
 
 void BuildGeometryInfoKHR::BuildCommon(const vkt::Device &device, bool is_on_device_build, bool use_ppGeometries /*= true*/) {
-    assert(vk_info_.mode == VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR ||
-           vk_info_.mode == VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR);
-
     // Build geometries
     for (auto &geometry : geometries_) {
         geometry.Build();
@@ -521,7 +543,7 @@ void BuildGeometryInfoKHR::BuildCommon(const vkt::Device &device, bool is_on_dev
 
     const VkAccelerationStructureBuildSizesInfoKHR size_info = GetSizeInfo(device.handle(), use_ppGeometries);
     const VkDeviceSize scratch_size =
-        vk_info_.mode == VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR ? size_info.buildScratchSize : size_info.updateScratchSize;
+        vk_info_.mode == VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR ? size_info.updateScratchSize : size_info.buildScratchSize;
     if (is_on_device_build) {
         // Allocate device local scratch buffer
 

@@ -29,7 +29,7 @@
 
 #include <atomic>
 
-VALSTATETRACK_DERIVED_STATE_OBJECT(VkPipelineCache, SC_PIPELINE_CACHE_STATE, PIPELINE_CACHE_STATE);
+VALSTATETRACK_DERIVED_STATE_OBJECT(VkPipelineCache, vvl::sc::PipelineCache, vvl::PipelineCache);
 VALSTATETRACK_DERIVED_STATE_OBJECT(VkPipeline, SC_PIPELINE_STATE, PIPELINE_STATE);
 VALSTATETRACK_DERIVED_STATE_OBJECT(VkCommandPool, SC_COMMAND_POOL_STATE, COMMAND_POOL_STATE);
 
@@ -79,11 +79,11 @@ class SCValidationStateTracker : public BASE {
     void PostCallRecordCreateCommandPool(VkDevice device, const VkCommandPoolCreateInfo* pCreateInfo,
                                          const VkAllocationCallbacks* pAllocator, VkCommandPool* pCommandPool,
                                          const RecordObject& record_obj) override;
-    std::shared_ptr<PIPELINE_CACHE_STATE> CreatePipelineCacheState(VkPipelineCache pipeline_cache,
-                                                                   const VkPipelineCacheCreateInfo* pCreateInfo) const override;
+    std::shared_ptr<vvl::PipelineCache> CreatePipelineCacheState(VkPipelineCache pipeline_cache,
+                                                                 const VkPipelineCacheCreateInfo* pCreateInfo) const override;
 
     std::shared_ptr<PIPELINE_STATE> CreateGraphicsPipelineState(const VkGraphicsPipelineCreateInfo* pCreateInfo,
-                                                                std::shared_ptr<const RENDER_PASS_STATE>&& render_pass,
+                                                                std::shared_ptr<const vvl::RenderPass>&& render_pass,
                                                                 std::shared_ptr<const PIPELINE_LAYOUT_STATE>&& layout,
                                                                 CreateShaderModuleStates* csm_states) const override;
     std::shared_ptr<PIPELINE_STATE> CreateComputePipelineState(
@@ -96,31 +96,34 @@ class SCValidationStateTracker : public BASE {
                                               const VkComputePipelineCreateInfo* pCreateInfos,
                                               const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,
                                               const RecordObject& record_obj, void* pipe_state) override;
-    void PreCallRecordDestroyPipeline(VkDevice device, VkPipeline pipeline, const VkAllocationCallbacks* pAllocator) override;
+    void PreCallRecordDestroyPipeline(VkDevice device, VkPipeline pipeline, const VkAllocationCallbacks* pAllocator,
+                                      const RecordObject& record_obj) override;
     void PostCallRecordCreateImageView(VkDevice device, const VkImageViewCreateInfo* pCreateInfo,
                                        const VkAllocationCallbacks* pAllocator, VkImageView* pView,
                                        const RecordObject& record_obj) override;
-    void PreCallRecordDestroyImageView(VkDevice device, VkImageView imageView, const VkAllocationCallbacks* pAllocator) override;
+    void PreCallRecordDestroyImageView(VkDevice device, VkImageView imageView, const VkAllocationCallbacks* pAllocator,
+                                       const RecordObject& record_obj) override;
     void PostCallRecordCreateDescriptorSetLayout(VkDevice device, const VkDescriptorSetLayoutCreateInfo* pCreateInfo,
                                                  const VkAllocationCallbacks* pAllocator, VkDescriptorSetLayout* pSetLayout,
                                                  const RecordObject& record_obj) override;
     void PreCallRecordDestroyDescriptorSetLayout(VkDevice device, VkDescriptorSetLayout descriptorSetLayout,
-                                                 const VkAllocationCallbacks* pAllocator) override;
+                                                 const VkAllocationCallbacks* pAllocator, const RecordObject& record_obj) override;
     void PostCallRecordCreateRenderPass(VkDevice device, const VkRenderPassCreateInfo* pCreateInfo,
                                         const VkAllocationCallbacks* pAllocator, VkRenderPass* pRenderPass,
                                         const RecordObject& record_obj) override;
     void PostCallRecordCreateRenderPass2(VkDevice device, const VkRenderPassCreateInfo2* pCreateInfo,
                                          const VkAllocationCallbacks* pAllocator, VkRenderPass* pRenderPass,
                                          const RecordObject& record_obj) override;
-    void PreCallRecordDestroyRenderPass(VkDevice device, VkRenderPass renderPass, const VkAllocationCallbacks* pAllocator) override;
+    void PreCallRecordDestroyRenderPass(VkDevice device, VkRenderPass renderPass, const VkAllocationCallbacks* pAllocator,
+                                        const RecordObject& record_obj) override;
     void PostCallRecordCreatePrivateDataSlotEXT(VkDevice device, const VkPrivateDataSlotCreateInfo* pCreateInfo,
                                                 const VkAllocationCallbacks* pAllocator, VkPrivateDataSlot* pPrivateDataSlot,
                                                 const RecordObject& record_obj) override;
     void PreCallRecordDestroyPrivateDataSlotEXT(VkDevice device, VkPrivateDataSlot privateDataSlot,
-                                                const VkAllocationCallbacks* pAllocator) override;
+                                                const VkAllocationCallbacks* pAllocator, const RecordObject& record_obj) override;
     void PostCallRecordBeginCommandBuffer(VkCommandBuffer commandBuffer, const VkCommandBufferBeginInfo* pBeginInfo,
                                           const RecordObject& record_obj) override;
-    void PreCallRecordEndCommandBuffer(VkCommandBuffer commandBuffer) override;
+    void PreCallRecordEndCommandBuffer(VkCommandBuffer commandBuffer, const RecordObject& record_obj) override;
 
   protected:
     // SC-specific features and properties
@@ -133,7 +136,7 @@ class SCValidationStateTracker : public BASE {
     VkPerformanceQueryReservationInfoKHR sc_perf_query_limits_ = {};
 
     // Pipeline cache and pool related states
-    vvl::unordered_map<const void*, std::unique_ptr<SCPipelineCacheData>> sc_pipeline_cache_map_ = {};
+    vvl::unordered_map<const void*, std::unique_ptr<vvl::sc::PipelineCacheData>> sc_pipeline_cache_map_ = {};
     vvl::unordered_map<VkDeviceSize, uint32_t> sc_pipeline_pool_size_map_ = {};
     mutable std::mutex sc_used_pipeline_pool_size_map_mutex_{};
     vvl::unordered_map<VkDeviceSize, uint32_t> sc_used_pipeline_pool_size_map_ = {};

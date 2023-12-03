@@ -15,13 +15,15 @@
 #include "utils/cast_utils.h"
 #include "generated/enum_flag_bits.h"
 #include "../framework/layer_validation_tests.h"
+#include "../framework/descriptor_helper.h"
+#include "../framework/pipeline_helper.h"
 #include "utils/vk_layer_utils.h"
 
 TEST_F(NegativeYcbcr, Sampler) {
     TEST_DESCRIPTION("Verify YCbCr sampler creation.");
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
-    RETURN_IF_SKIP(InitBasicYcbcr())
+    RETURN_IF_SKIP(InitBasicYcbcr());
 
     PFN_vkSetPhysicalDeviceFormatPropertiesEXT fpvkSetPhysicalDeviceFormatPropertiesEXT = nullptr;
     PFN_vkGetOriginalPhysicalDeviceFormatPropertiesEXT fpvkGetOriginalPhysicalDeviceFormatPropertiesEXT = nullptr;
@@ -128,7 +130,7 @@ TEST_F(NegativeYcbcr, Sampler) {
 TEST_F(NegativeYcbcr, Swizzle) {
     TEST_DESCRIPTION("Verify Invalid use of siwizzle components when dealing with YCbCr.");
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    RETURN_IF_SKIP(InitBasicYcbcr())
+    RETURN_IF_SKIP(InitBasicYcbcr());
 
     const VkFormat mp_format = VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM;
 
@@ -252,7 +254,7 @@ TEST_F(NegativeYcbcr, Swizzle) {
     // Create a valid conversion with guaranteed support
     sycci.format = mp_format;
     sycci.components = identity;
-    vkt::SamplerYcbcrConversion conversion(*m_device, sycci, false);
+    vkt::SamplerYcbcrConversion conversion(*m_device, sycci);
 
     VkImageObj image(m_device);
     image.Init(128, 128, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_TILING_OPTIMAL, 0);
@@ -276,7 +278,7 @@ TEST_F(NegativeYcbcr, Swizzle) {
 
 TEST_F(NegativeYcbcr, Formats) {
     TEST_DESCRIPTION("Creating images with Ycbcr Formats.");
-    RETURN_IF_SKIP(InitBasicYcbcr())
+    RETURN_IF_SKIP(InitBasicYcbcr());
     InitRenderTarget();
 
     PFN_vkSetPhysicalDeviceFormatPropertiesEXT fpvkSetPhysicalDeviceFormatPropertiesEXT = nullptr;
@@ -285,7 +287,7 @@ TEST_F(NegativeYcbcr, Formats) {
         GTEST_SKIP() << "Failed to load device profile layer.";
     }
 
-    if (!ImageFormatIsSupported(gpu(), VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM)) {
+    if (!FormatIsSupported(gpu(), VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM)) {
         GTEST_SKIP() << "VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM is unsupported";
     }
 
@@ -370,7 +372,7 @@ TEST_F(NegativeYcbcr, Formats) {
 
 TEST_F(NegativeYcbcr, CopyImageSinglePlane422Alignment) {
     // Image copy tests on single-plane _422 formats with block alignment errors
-    RETURN_IF_SKIP(InitBasicYcbcr())
+    RETURN_IF_SKIP(InitBasicYcbcr());
 
     // Select a _422 format and verify support
     VkImageCreateInfo ci = vku::InitStructHelper();
@@ -389,7 +391,7 @@ TEST_F(NegativeYcbcr, CopyImageSinglePlane422Alignment) {
 
     // Verify formats
     VkFormatFeatureFlags features = VK_FORMAT_FEATURE_TRANSFER_SRC_BIT | VK_FORMAT_FEATURE_TRANSFER_DST_BIT;
-    bool supported = ImageFormatAndFeaturesSupported(instance(), gpu(), ci, features);
+    bool supported = ImageFormatIsSupported(instance(), gpu(), ci, features);
     if (!supported) {
         // Assume there's low ROI on searching for different mp formats
         GTEST_SKIP() << "Single-plane _422 image format not supported";
@@ -456,7 +458,7 @@ TEST_F(NegativeYcbcr, CopyImageSinglePlane422Alignment) {
 
 TEST_F(NegativeYcbcr, CopyImageMultiplaneAspectBits) {
     // Image copy tests on multiplane images with aspect errors
-    RETURN_IF_SKIP(InitBasicYcbcr())
+    RETURN_IF_SKIP(InitBasicYcbcr());
 
     // Select multi-plane formats and verify support
     VkFormat mp3_format = VK_FORMAT_G8_B8_R8_3PLANE_422_UNORM_KHR;
@@ -479,11 +481,11 @@ TEST_F(NegativeYcbcr, CopyImageMultiplaneAspectBits) {
 
     // Verify formats
     VkFormatFeatureFlags features = VK_FORMAT_FEATURE_TRANSFER_SRC_BIT | VK_FORMAT_FEATURE_TRANSFER_DST_BIT;
-    bool supported = ImageFormatAndFeaturesSupported(instance(), gpu(), ci, features);
+    bool supported = ImageFormatIsSupported(instance(), gpu(), ci, features);
     ci.format = VK_FORMAT_D24_UNORM_S8_UINT;
-    supported = supported && ImageFormatAndFeaturesSupported(instance(), gpu(), ci, features);
+    supported = supported && ImageFormatIsSupported(instance(), gpu(), ci, features);
     ci.format = mp3_format;
-    supported = supported && ImageFormatAndFeaturesSupported(instance(), gpu(), ci, features);
+    supported = supported && ImageFormatIsSupported(instance(), gpu(), ci, features);
     if (!supported) {
         // Assume there's low ROI on searching for different mp formats
         GTEST_SKIP() << "Multiplane image formats or optimally tiled depth-stencil buffers not supported";
@@ -567,7 +569,7 @@ TEST_F(NegativeYcbcr, SamplerYcbcrConversionEnable) {
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
     // Explictly not enable Ycbcr Conversion Features
     VkPhysicalDeviceSamplerYcbcrConversionFeatures ycbcr_features = vku::InitStructHelper();
     ycbcr_features.samplerYcbcrConversion = VK_FALSE;
@@ -594,7 +596,7 @@ TEST_F(NegativeYcbcr, SamplerYcbcrConversionEnable) {
 
 TEST_F(NegativeYcbcr, ClearColorImageFormat) {
     TEST_DESCRIPTION("Record clear color with an invalid image formats");
-    RETURN_IF_SKIP(InitBasicYcbcr())
+    RETURN_IF_SKIP(InitBasicYcbcr());
     InitRenderTarget();
 
     VkImageObj mp_image(m_device);
@@ -612,7 +614,7 @@ TEST_F(NegativeYcbcr, ClearColorImageFormat) {
     image_create_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
     image_create_info.arrayLayers = 1;
 
-    bool supported = ImageFormatAndFeaturesSupported(instance(), gpu(), image_create_info, VK_FORMAT_FEATURE_TRANSFER_SRC_BIT);
+    bool supported = ImageFormatIsSupported(instance(), gpu(), image_create_info, VK_FORMAT_FEATURE_TRANSFER_SRC_BIT);
     if (supported == false) {
         GTEST_SKIP() << "Multiplane image format not supported";
     }
@@ -636,10 +638,10 @@ TEST_F(NegativeYcbcr, ClearColorImageFormat) {
 
 TEST_F(NegativeYcbcr, WriteDescriptorSet) {
     TEST_DESCRIPTION("Attempt to use VkSamplerYcbcrConversion ImageView to update descriptors that are not allowed.");
-    RETURN_IF_SKIP(InitBasicYcbcr())
+    RETURN_IF_SKIP(InitBasicYcbcr());
 
-    if (!ImageFormatAndFeaturesSupported(gpu(), VK_FORMAT_G8_B8R8_2PLANE_420_UNORM, VK_IMAGE_TILING_OPTIMAL,
-                                         VK_FORMAT_FEATURE_COSITED_CHROMA_SAMPLES_BIT)) {
+    if (!FormatFeaturesAreSupported(gpu(), VK_FORMAT_G8_B8R8_2PLANE_420_UNORM, VK_IMAGE_TILING_OPTIMAL,
+                                    VK_FORMAT_FEATURE_COSITED_CHROMA_SAMPLES_BIT)) {
         GTEST_SKIP() << "Required formats/features not supported";
     }
 
@@ -650,7 +652,7 @@ TEST_F(NegativeYcbcr, WriteDescriptorSet) {
         VkComponentMapping{VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
                            VK_COMPONENT_SWIZZLE_IDENTITY},
         VK_CHROMA_LOCATION_COSITED_EVEN, VK_CHROMA_LOCATION_COSITED_EVEN, VK_FILTER_NEAREST, VK_FALSE);
-    vkt::SamplerYcbcrConversion conversion(*m_device, ycbcr_create_info, DeviceValidationVersion() < VK_API_VERSION_1_1);
+    vkt::SamplerYcbcrConversion conversion(*m_device, ycbcr_create_info);
 
     OneOffDescriptorSet descriptor_set(m_device, {
                                                      {0, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr},
@@ -686,7 +688,7 @@ TEST_F(NegativeYcbcr, WriteDescriptorSet) {
 
 TEST_F(NegativeYcbcr, MultiplaneImageLayoutAspectFlags) {
     TEST_DESCRIPTION("Query layout of a multiplane image using illegal aspect flag masks");
-    RETURN_IF_SKIP(InitBasicYcbcr())
+    RETURN_IF_SKIP(InitBasicYcbcr());
 
     VkImageCreateInfo ci = vku::InitStructHelper();
     ci.flags = 0;
@@ -702,9 +704,9 @@ TEST_F(NegativeYcbcr, MultiplaneImageLayoutAspectFlags) {
     ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
     // Verify formats
-    bool supported = ImageFormatAndFeaturesSupported(instance(), gpu(), ci, VK_FORMAT_FEATURE_TRANSFER_SRC_BIT);
+    bool supported = ImageFormatIsSupported(instance(), gpu(), ci, VK_FORMAT_FEATURE_TRANSFER_SRC_BIT);
     ci.format = VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM_KHR;
-    supported = supported && ImageFormatAndFeaturesSupported(instance(), gpu(), ci, VK_FORMAT_FEATURE_TRANSFER_SRC_BIT);
+    supported = supported && ImageFormatIsSupported(instance(), gpu(), ci, VK_FORMAT_FEATURE_TRANSFER_SRC_BIT);
     if (!supported) {
         // Assume there's low ROI on searching for different mp formats
         GTEST_SKIP() << "Multiplane image format not supported";
@@ -742,7 +744,7 @@ TEST_F(NegativeYcbcr, MultiplaneImageLayoutAspectFlags) {
 }
 
 TEST_F(NegativeYcbcr, BindMemory) {
-    RETURN_IF_SKIP(InitBasicYcbcr())
+    RETURN_IF_SKIP(InitBasicYcbcr());
 
     // Try to bind an image created with Disjoint bit
     VkFormatProperties format_properties;
@@ -870,12 +872,13 @@ TEST_F(NegativeYcbcr, BindMemory2Disjoint) {
     TEST_DESCRIPTION("These tests deal with VK_KHR_bind_memory_2 and disjoint memory being bound");
 
     // Enable KHR YCbCr req'd extensions for Disjoint Bit
+    AddRequiredExtensions(VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_BIND_MEMORY_2_EXTENSION_NAME);
     AddOptionalExtensions(VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     const bool mp_supported = IsExtensionsEnabled(VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitState());
 
     const VkFormat mp_format = VK_FORMAT_G8_B8R8_2PLANE_420_UNORM;
     const VkFormat tex_format = VK_FORMAT_R8G8B8A8_UNORM;
@@ -1073,12 +1076,13 @@ TEST_F(NegativeYcbcr, BindMemory2DisjointUnsupported) {
     TEST_DESCRIPTION("These tests deal with VK_KHR_bind_memory_2 and disjoint memory being bound");
 
     // Enable KHR YCbCr req'd extensions for Disjoint Bit
+    AddRequiredExtensions(VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_BIND_MEMORY_2_EXTENSION_NAME);
     AddOptionalExtensions(VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     const bool mp_supported = IsExtensionsEnabled(VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitState());
 
     const VkFormat mp_format = VK_FORMAT_G8_B8R8_2PLANE_420_UNORM;
     const VkFormat tex_format = VK_FORMAT_R8G8B8A8_UNORM;
@@ -1252,7 +1256,7 @@ TEST_F(NegativeYcbcr, BindMemory2DisjointUnsupported) {
 TEST_F(NegativeYcbcr, MismatchedImageViewAndSamplerFormat) {
     TEST_DESCRIPTION("Create image view with a different format that SamplerYcbcr was created with.");
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    RETURN_IF_SKIP(InitBasicYcbcr())
+    RETURN_IF_SKIP(InitBasicYcbcr());
 
     VkImageObj image(m_device);
     image.Init(128, 128, 1, VK_FORMAT_G8_B8R8_2PLANE_420_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_TILING_OPTIMAL, 0);
@@ -1269,7 +1273,7 @@ TEST_F(NegativeYcbcr, MismatchedImageViewAndSamplerFormat) {
     sampler_conversion_ci.chromaFilter = VK_FILTER_NEAREST;
     sampler_conversion_ci.forceExplicitReconstruction = false;
 
-    vkt::SamplerYcbcrConversion sampler_conversion(*m_device, sampler_conversion_ci, false);
+    vkt::SamplerYcbcrConversion sampler_conversion(*m_device, sampler_conversion_ci);
 
     VkSamplerYcbcrConversionInfo sampler_ycbcr_conversion_info = vku::InitStructHelper();
     sampler_ycbcr_conversion_info.conversion = sampler_conversion.handle();
@@ -1292,15 +1296,10 @@ TEST_F(NegativeYcbcr, MultiplaneIncompatibleViewFormat) {
 
     // Use 1.1 to get VK_KHR_sampler_ycbcr_conversion easier
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    RETURN_IF_SKIP(InitBasicYcbcr())
+    RETURN_IF_SKIP(InitBasicYcbcr());
 
-    // This test hits a bug in the driver, CTS was written, but incase using an old driver
-    if (IsDriver(VK_DRIVER_ID_NVIDIA_PROPRIETARY)) {
-        GTEST_SKIP() << "This test should not be run on the NVIDIA proprietary driver.";
-    }
-
-    if (!ImageFormatAndFeaturesSupported(gpu(), VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM, VK_IMAGE_TILING_OPTIMAL,
-                                         VK_FORMAT_FEATURE_COSITED_CHROMA_SAMPLES_BIT)) {
+    if (!FormatFeaturesAreSupported(gpu(), VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM, VK_IMAGE_TILING_OPTIMAL,
+                                    VK_FORMAT_FEATURE_COSITED_CHROMA_SAMPLES_BIT)) {
         GTEST_SKIP() << "Required formats/features not supported";
     }
 
@@ -1334,7 +1333,7 @@ TEST_F(NegativeYcbcr, MultiplaneIncompatibleViewFormat) {
     ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
     const VkFormatFeatureFlags features = VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT;
-    bool supported = ImageFormatAndFeaturesSupported(instance(), gpu(), ci, features);
+    bool supported = ImageFormatIsSupported(instance(), gpu(), ci, features);
     // Verify format 3 Plane format
     if (!supported) {
         printf("Multiplane image format not supported.  Skipping test.\n");
@@ -1374,7 +1373,7 @@ TEST_F(NegativeYcbcr, MultiplaneIncompatibleViewFormat) {
     }
 
     ci.format = VK_FORMAT_G8_B8R8_2PLANE_420_UNORM;
-    supported = ImageFormatAndFeaturesSupported(instance(), gpu(), ci, features);
+    supported = ImageFormatIsSupported(instance(), gpu(), ci, features);
     // Verify format 2 Plane format
     if (!supported) {
         printf("Multiplane image format not supported.  Skipping test.\n");
@@ -1417,7 +1416,7 @@ TEST_F(NegativeYcbcr, MultiplaneImageViewAspectMasks) {
     TEST_DESCRIPTION("Create a VkImageView with multiple planar aspect masks");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    RETURN_IF_SKIP(InitBasicYcbcr())
+    RETURN_IF_SKIP(InitBasicYcbcr());
 
     if (IsExtensionsEnabled(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME)) {
         GTEST_SKIP() << "VK_KHR_portability_subset enabled, can hit issues with imageViewFormatReinterpretation";
@@ -1488,10 +1487,10 @@ TEST_F(NegativeYcbcr, MultiplaneImageViewAspectMasks) {
 TEST_F(NegativeYcbcr, MultiplaneAspectBits) {
     TEST_DESCRIPTION("Attempt to update descriptor sets for images that do not have correct aspect bits sets.");
     SetTargetApiVersion(VK_API_VERSION_1_1);
-    RETURN_IF_SKIP(InitBasicYcbcr())
+    RETURN_IF_SKIP(InitBasicYcbcr());
 
-    if (!ImageFormatAndFeaturesSupported(gpu(), VK_FORMAT_G8_B8R8_2PLANE_420_UNORM, VK_IMAGE_TILING_OPTIMAL,
-                                         VK_FORMAT_FEATURE_COSITED_CHROMA_SAMPLES_BIT)) {
+    if (!FormatFeaturesAreSupported(gpu(), VK_FORMAT_G8_B8R8_2PLANE_420_UNORM, VK_IMAGE_TILING_OPTIMAL,
+                                    VK_FORMAT_FEATURE_COSITED_CHROMA_SAMPLES_BIT)) {
         GTEST_SKIP() << "Required formats/features not supported";
     }
 
@@ -1521,14 +1520,14 @@ TEST_F(NegativeYcbcr, MultiplaneAspectBits) {
     ycbcr_create_info.chromaFilter = VK_FILTER_NEAREST;
     ycbcr_create_info.forceExplicitReconstruction = false;
 
-    vkt::SamplerYcbcrConversion conversion(*m_device, ycbcr_create_info, DeviceValidationVersion() < VK_API_VERSION_1_1);
+    vkt::SamplerYcbcrConversion conversion(*m_device, ycbcr_create_info);
 
     VkSamplerYcbcrConversionInfo ycbcr_info = vku::InitStructHelper();
     ycbcr_info.conversion = conversion.handle();
 
     auto image_view_ci = image_obj.BasicViewCreatInfo();
     image_view_ci.pNext = &ycbcr_info;
-    auto image_view = image_obj.targetView(image_view_ci);
+    const auto image_view = vkt::ImageView(*m_device, image_view_ci);
 
     VkSamplerCreateInfo sampler_ci = SafeSaneSamplerCreateInfo();
     sampler_ci.pNext = &ycbcr_info;
@@ -1559,7 +1558,7 @@ TEST_F(NegativeYcbcr, DisjointImageWithDrmFormatModifier) {
     TEST_DESCRIPTION("Create image with VK_IMAGE_CREATE_DISJOINT_BIT and VK_IMAGE_TILING_DRM_FORMAT_MODIFIER_EXT.");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_EXT_IMAGE_DRM_FORMAT_MODIFIER_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitBasicYcbcr())
+    RETURN_IF_SKIP(InitBasicYcbcr());
 
     VkFormat format = VK_FORMAT_G8_B8R8_2PLANE_420_UNORM;
 
@@ -1615,4 +1614,189 @@ TEST_F(NegativeYcbcr, DisjointImageWithDrmFormatModifier) {
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageMemoryRequirementsInfo2-image-02279");
     vk::GetImageMemoryRequirements2KHR(device(), &mem_req_info2, &mem_req2);
     m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeYcbcr, DrawFetch) {
+    TEST_DESCRIPTION("Do OpImageFetch on a Ycbcr COMBINED_IMAGE_SAMPLER.");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    RETURN_IF_SKIP(InitBasicYcbcr());
+    InitRenderTarget();
+    const VkFormat format = VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM_KHR;
+
+    auto ci = vku::InitStruct<VkImageCreateInfo>();
+    ci.flags = 0;
+    ci.imageType = VK_IMAGE_TYPE_2D;
+    ci.format = format;
+    ci.tiling = VK_IMAGE_TILING_OPTIMAL;
+    ci.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    ci.extent = {256, 256, 1};
+    ci.mipLevels = 1;
+    ci.arrayLayers = 1;
+    ci.samples = VK_SAMPLE_COUNT_1_BIT;
+    if (!ImageFormatIsSupported(instance(), gpu(), ci, VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT)) {
+        // Assume there's low ROI on searching for different mp formats
+        GTEST_SKIP() << "Multiplane image format not supported";
+    }
+
+    VkImageObj image(m_device);
+    image.Init(ci);
+
+    vkt::SamplerYcbcrConversion conversion(*m_device, format);
+    auto conversion_info = conversion.ConversionInfo();
+    auto ivci = vku::InitStruct<VkImageViewCreateInfo>(&conversion_info);
+    ivci.image = image.handle();
+    ivci.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    ivci.format = format;
+    ivci.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    vkt::ImageView view(*m_device, ivci);
+
+    VkSamplerCreateInfo sampler_ci = SafeSaneSamplerCreateInfo();
+    sampler_ci.pNext = &conversion_info;
+    vkt::Sampler sampler(*m_device, sampler_ci);
+
+    OneOffDescriptorSet descriptor_set(
+        m_device, {
+                      {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, &sampler.handle()},
+                  });
+    if (!descriptor_set.set_) {
+        GTEST_SKIP() << "Can't allocate descriptor with immutable sampler";
+    }
+
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
+    descriptor_set.WriteDescriptorImageInfo(0, view.handle(), sampler.handle());
+    descriptor_set.UpdateDescriptorSets();
+
+    const char fsSource[] = R"glsl(
+        #version 450
+        layout (set = 0, binding = 0) uniform sampler2D ycbcr;
+        layout(location=0) out vec4 out_color;
+        void main() {
+            out_color = texelFetch(ycbcr, ivec2(0), 0);
+        }
+    )glsl";
+    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    CreatePipelineHelper pipe(*this);
+    pipe.InitState();
+    pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
+    pipe.gp_ci_.layout = pipeline_layout.handle();
+    pipe.CreateGraphicsPipeline();
+
+    m_commandBuffer->begin();
+    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1,
+                              &descriptor_set.set_, 0, nullptr);
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDraw-None-06550");
+    vk::CmdDraw(m_commandBuffer->handle(), 1, 0, 0, 0);
+    m_errorMonitor->VerifyFound();
+    m_commandBuffer->EndRenderPass();
+    m_commandBuffer->end();
+}
+
+TEST_F(NegativeYcbcr, DrawConstOffset) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    RETURN_IF_SKIP(InitBasicYcbcr());
+    InitRenderTarget();
+    const VkFormat format = VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM_KHR;
+
+    auto ci = vku::InitStruct<VkImageCreateInfo>();
+    ci.flags = 0;
+    ci.imageType = VK_IMAGE_TYPE_2D;
+    ci.format = format;
+    ci.tiling = VK_IMAGE_TILING_OPTIMAL;
+    ci.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    ci.extent = {256, 256, 1};
+    ci.mipLevels = 1;
+    ci.arrayLayers = 1;
+    ci.samples = VK_SAMPLE_COUNT_1_BIT;
+    if (!ImageFormatIsSupported(instance(), gpu(), ci, VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT)) {
+        // Assume there's low ROI on searching for different mp formats
+        GTEST_SKIP() << "Multiplane image format not supported";
+    }
+
+    VkImageObj image(m_device);
+    image.Init(ci);
+
+    vkt::SamplerYcbcrConversion conversion(*m_device, format);
+    auto conversion_info = conversion.ConversionInfo();
+    auto ivci = vku::InitStruct<VkImageViewCreateInfo>(&conversion_info);
+    ivci.image = image.handle();
+    ivci.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    ivci.format = format;
+    ivci.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    vkt::ImageView view(*m_device, ivci);
+
+    VkSamplerCreateInfo sampler_ci = SafeSaneSamplerCreateInfo();
+    sampler_ci.pNext = &conversion_info;
+    vkt::Sampler sampler(*m_device, sampler_ci);
+
+    OneOffDescriptorSet descriptor_set(
+        m_device, {
+                      {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, &sampler.handle()},
+                  });
+    if (!descriptor_set.set_) {
+        GTEST_SKIP() << "Can't allocate descriptor with immutable sampler";
+    }
+
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
+    descriptor_set.WriteDescriptorImageInfo(0, view.handle(), sampler.handle());
+    descriptor_set.UpdateDescriptorSets();
+
+    const char fsSource[] = R"(
+               OpCapability Shader
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %main "main" %out_color
+               OpExecutionMode %main OriginUpperLeft
+               OpSource GLSL 450
+               OpName %main "main"
+               OpName %out_color "out_color"
+               OpName %ycbcr "ycbcr"
+               OpDecorate %out_color Location 0
+               OpDecorate %ycbcr DescriptorSet 0
+               OpDecorate %ycbcr Binding 0
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+        %int = OpTypeInt 32 1
+      %float = OpTypeFloat 32
+    %v4float = OpTypeVector %float 4
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+  %out_color = OpVariable %_ptr_Output_v4float Output
+         %10 = OpTypeImage %float 2D 0 0 0 1 Unknown
+         %11 = OpTypeSampledImage %10
+%_ptr_UniformConstant_11 = OpTypePointer UniformConstant %11
+      %ycbcr = OpVariable %_ptr_UniformConstant_11 UniformConstant
+    %v2float = OpTypeVector %float 2
+    %float_0 = OpConstant %float 0
+         %17 = OpConstantComposite %v2float %float_0 %float_0
+      %v2int = OpTypeVector %int 2
+      %int_0 = OpConstant %int 0
+   %offset_0 = OpConstantComposite %v2int %int_0 %int_0
+       %main = OpFunction %void None %3
+          %5 = OpLabel
+         %14 = OpLoad %11 %ycbcr
+         %18 = OpImageSampleImplicitLod %v4float %14 %17 ConstOffset %offset_0
+               OpStore %out_color %18
+               OpReturn
+               OpFunctionEnd
+    )";
+    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
+
+    CreatePipelineHelper pipe(*this);
+    pipe.InitState();
+    pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
+    pipe.gp_ci_.layout = pipeline_layout.handle();
+    pipe.CreateGraphicsPipeline();
+
+    m_commandBuffer->begin();
+    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1,
+                              &descriptor_set.set_, 0, nullptr);
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDraw-ConstOffset-06551");
+    vk::CmdDraw(m_commandBuffer->handle(), 1, 0, 0, 0);
+    m_errorMonitor->VerifyFound();
+    m_commandBuffer->EndRenderPass();
+    m_commandBuffer->end();
 }

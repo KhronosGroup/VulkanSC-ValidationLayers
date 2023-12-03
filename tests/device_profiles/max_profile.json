@@ -780,6 +780,9 @@
                 "VkPhysicalDeviceDynamicRenderingUnusedAttachmentsFeaturesEXT": {
                     "dynamicRenderingUnusedAttachments": true
                 },
+                "VkPhysicalDeviceExternalFormatResolveFeaturesANDROID": {
+                    "externalFormatResolve": true
+                },
                 "VkPhysicalDeviceDepthBiasControlFeaturesEXT": {
                     "depthBiasControl": true,
                     "leastRepresentableValueForceUnormRepresentation": true,
@@ -1137,7 +1140,9 @@
                     "shaderRoundingModeRTZFloat32": true,
                     "shaderRoundingModeRTZFloat64": true
                 },
-                "VkPhysicalDeviceExternalMemoryHostPropertiesEXT": {},
+                "VkPhysicalDeviceExternalMemoryHostPropertiesEXT": {
+                    "minImportedHostPointerAlignment": 4096
+                },
                 "VkPhysicalDeviceConservativeRasterizationPropertiesEXT": {
                     "primitiveUnderestimation": true,
                     "conservativePointAndLineRasterization": true,
@@ -1664,6 +1669,9 @@
                         "height": 64
                     }
                 },
+                "VkPhysicalDeviceExternalFormatResolvePropertiesANDROID": {
+                    "nullColorAttachmentWithExternalFormatResolve": false
+                },
                 "VkPhysicalDeviceOpticalFlowPropertiesNV": {},
                 "VkPhysicalDeviceShaderCoreBuiltinsPropertiesARM": {
                     "shaderCoreCount": 4294967000,
@@ -1694,6 +1702,7 @@
                 "VK_AMD_shader_trinary_minmax": 1,
                 "VK_AMD_texture_gather_bias_lod": 1,
                 "VK_ANDROID_external_memory_android_hardware_buffer": 1,
+                "VK_ANDROID_external_format_resolve": 1,
                 "VK_ARM_rasterization_order_attachment_access": 1,
                 "VK_ARM_shader_core_builtins": 1,
                 "VK_EXT_4444_formats": 1,

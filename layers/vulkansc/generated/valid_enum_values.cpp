@@ -31,6 +31,7 @@
 //      devices over the lifespan of the project (e.g., VLT).
 
 // clang-format off
+
 template<>
 std::vector<VkResult> ValidationObject::ValidParamValues() const {
     constexpr std::array CoreVkResultEnums = {VK_SUCCESS, VK_NOT_READY, VK_TIMEOUT, VK_EVENT_SET, VK_EVENT_RESET, VK_INCOMPLETE, VK_ERROR_OUT_OF_HOST_MEMORY, VK_ERROR_OUT_OF_DEVICE_MEMORY, VK_ERROR_INITIALIZATION_FAILED, VK_ERROR_DEVICE_LOST, VK_ERROR_MEMORY_MAP_FAILED, VK_ERROR_LAYER_NOT_PRESENT, VK_ERROR_EXTENSION_NOT_PRESENT, VK_ERROR_FEATURE_NOT_PRESENT, VK_ERROR_INCOMPATIBLE_DRIVER, VK_ERROR_TOO_MANY_OBJECTS, VK_ERROR_FORMAT_NOT_SUPPORTED, VK_ERROR_FRAGMENTED_POOL, VK_ERROR_UNKNOWN, VK_ERROR_OUT_OF_POOL_MEMORY, VK_ERROR_INVALID_EXTERNAL_HANDLE, VK_ERROR_FRAGMENTATION, VK_ERROR_INVALID_OPAQUE_CAPTURE_ADDRESS, VK_PIPELINE_COMPILE_REQUIRED, VK_ERROR_VALIDATION_FAILED, VK_ERROR_INVALID_PIPELINE_CACHE_DATA, VK_ERROR_NO_PIPELINE_MATCH};
@@ -959,9 +960,7 @@ std::vector<VkSciSyncClientTypeNV> ValidationObject::ValidParamValues() const {
     std::copy(unique_exts.cbegin(), unique_exts.cend(), std::back_inserter(values));
     return values;
 }
-#endif //VK_USE_PLATFORM_SCI
 
-#ifdef VK_USE_PLATFORM_SCI
 template<>
 std::vector<VkSciSyncPrimitiveTypeNV> ValidationObject::ValidParamValues() const {
     constexpr std::array CoreVkSciSyncPrimitiveTypeNVEnums = {VK_SCI_SYNC_PRIMITIVE_TYPE_FENCE_NV, VK_SCI_SYNC_PRIMITIVE_TYPE_SEMAPHORE_NV};
@@ -977,7 +976,7 @@ std::vector<VkSciSyncPrimitiveTypeNV> ValidationObject::ValidParamValues() const
     std::copy(unique_exts.cbegin(), unique_exts.cend(), std::back_inserter(values));
     return values;
 }
-#endif //VK_USE_PLATFORM_SCI
+#endif  // VK_USE_PLATFORM_SCI
 
 // clang-format on
 

@@ -20,7 +20,7 @@
 TEST_F(PositiveShaderPushConstants, OverlappingPushConstantRange) {
     TEST_DESCRIPTION("Test overlapping push-constant ranges.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     char const *const vsSource = R"glsl(
@@ -60,7 +60,7 @@ TEST_F(PositiveShaderPushConstants, OverlappingPushConstantRange) {
 TEST_F(PositiveShaderPushConstants, MultipleEntryPointVert) {
     TEST_DESCRIPTION("Test push-constant only being used by single entrypoint.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     // #version 450
@@ -169,7 +169,7 @@ TEST_F(PositiveShaderPushConstants, MultipleEntryPointVert) {
 TEST_F(PositiveShaderPushConstants, MultipleEntryPointFrag) {
     TEST_DESCRIPTION("Test push-constant only being used by single entrypoint.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     // #version 450
@@ -277,8 +277,7 @@ TEST_F(PositiveShaderPushConstants, MultipleEntryPointFrag) {
 
 TEST_F(PositiveShaderPushConstants, CompatibilityGraphicsOnly) {
     TEST_DESCRIPTION("Based on verified valid examples from internal Vulkan Spec issue #2168");
-    RETURN_IF_SKIP(InitFramework())
-    RETURN_IF_SKIP(InitState(nullptr, nullptr, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     char const *const vsSource = R"glsl(
@@ -416,8 +415,7 @@ TEST_F(PositiveShaderPushConstants, CompatibilityGraphicsOnly) {
 
 TEST_F(PositiveShaderPushConstants, StaticallyUnused) {
     TEST_DESCRIPTION("Test cases where creating pipeline with no use of push constants but still has ranges in layout");
-    RETURN_IF_SKIP(InitFramework())
-    RETURN_IF_SKIP(InitState(nullptr, nullptr, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     // Create set of Pipeline Layouts that cover variations of ranges
@@ -481,7 +479,7 @@ TEST_F(PositiveShaderPushConstants, StaticallyUnused) {
 TEST_F(PositiveShaderPushConstants, OffsetVector) {
     TEST_DESCRIPTION("Vector uses offset in the shader.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     char const *const vsSource = R"glsl(
@@ -521,7 +519,7 @@ TEST_F(PositiveShaderPushConstants, PhysicalStorageBufferBasic) {
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceVulkan12Features features12 = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(features12);
@@ -578,7 +576,7 @@ TEST_F(PositiveShaderPushConstants, PhysicalStorageBufferVertFrag) {
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceVulkan12Features features12 = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(features12);
@@ -654,7 +652,7 @@ TEST_F(PositiveShaderPushConstants, PhysicalStorageBufferVertFrag) {
 TEST_F(PositiveShaderPushConstants, MultipleStructs) {
     TEST_DESCRIPTION("Test having multiple structs Push Constant structs, but only one is used.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     // Note - it is invalid SPIR-V for an entrypoint to have 2 Push Constant variables used. This is only valid because it is being
@@ -722,7 +720,7 @@ TEST_F(PositiveShaderPushConstants, MultipleStructs) {
 
 TEST_F(PositiveShaderPushConstants, SpecConstantSizeDefault) {
     TEST_DESCRIPTION("Use SpecConstant to adjust size of Push Constant Block, but use default value");
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     const char *cs_source = R"glsl(
         #version 460
@@ -748,7 +746,7 @@ TEST_F(PositiveShaderPushConstants, SpecConstantSizeDefault) {
 
 TEST_F(PositiveShaderPushConstants, SpecConstantSizeSet) {
     TEST_DESCRIPTION("Use SpecConstant to adjust size of Push Constant Block");
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     const char *cs_source = R"glsl(
         #version 460

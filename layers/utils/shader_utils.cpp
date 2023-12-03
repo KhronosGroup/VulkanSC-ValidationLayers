@@ -20,8 +20,10 @@
 #include "shader_utils.h"
 
 #include "state_tracker/device_state.h"
+#include "generated/state_tracker_helper.h"
 #include "generated/vk_extension_helper.h"
 #include "state_tracker/shader_module.h"
+#include "state_tracker/shader_instruction.h"
 
 spv_target_env PickSpirvEnv(const APIVersion &api_version, bool spirv_1_4) {
     if (api_version >= VK_API_VERSION_1_3) {
@@ -51,19 +53,19 @@ void AdjustValidatorOptions(const DeviceExtensions &device_extensions, const Dev
     // The rest of the settings are controlled from a feature bit, which are set correctly in the state tracking. Regardless of
     // Vulkan version used, the feature bit is needed (also described in the spec).
 
-    if (enabled_features.core12.uniformBufferStandardLayout == VK_TRUE) {
+    if (enabled_features.uniformBufferStandardLayout == VK_TRUE) {
         // --uniform-buffer-standard-layout
         options.SetUniformBufferStandardLayout(true);
     }
-    if (enabled_features.core12.scalarBlockLayout == VK_TRUE) {
+    if (enabled_features.scalarBlockLayout == VK_TRUE) {
         // --scalar-block-layout
         options.SetScalarBlockLayout(true);
     }
-    if (enabled_features.workgroup_memory_explicit_layout_features.workgroupMemoryExplicitLayoutScalarBlockLayout) {
+    if (enabled_features.workgroupMemoryExplicitLayoutScalarBlockLayout) {
         // --workgroup-scalar-block-layout
         options.SetWorkgroupScalarBlockLayout(true);
     }
-    if (enabled_features.core13.maintenance4) {
+    if (enabled_features.maintenance4) {
         // --allow-localsizeid
         options.SetAllowLocalSizeId(true);
     }
@@ -81,37 +83,7 @@ void GetActiveSlots(ActiveSlotMap &active_slots, const std::shared_ptr<const Ent
         // While validating shaders capture which slots are used by the pipeline
         auto &entry = active_slots[variable.decorations.set][variable.decorations.binding];
         entry.variable = &variable;
-
-        auto &reqs = entry.reqs;
-        if (variable.is_atomic_operation) reqs |= DESCRIPTOR_REQ_VIEW_ATOMIC_OPERATION;
-        if (variable.is_sampler_sampled) reqs |= DESCRIPTOR_REQ_SAMPLER_SAMPLED;
-        if (variable.is_sampler_implicitLod_dref_proj) reqs |= DESCRIPTOR_REQ_SAMPLER_IMPLICITLOD_DREF_PROJ;
-        if (variable.is_sampler_bias_offset) reqs |= DESCRIPTOR_REQ_SAMPLER_BIAS_OFFSET;
-        if (variable.is_read_without_format) reqs |= DESCRIPTOR_REQ_IMAGE_READ_WITHOUT_FORMAT;
-        if (variable.is_write_without_format) reqs |= DESCRIPTOR_REQ_IMAGE_WRITE_WITHOUT_FORMAT;
-        if (variable.is_dref) reqs |= DESCRIPTOR_REQ_IMAGE_DREF;
-
-        if (variable.image_format_type == NumericTypeFloat) reqs |= DESCRIPTOR_REQ_COMPONENT_TYPE_FLOAT;
-        if (variable.image_format_type == NumericTypeSint) reqs |= DESCRIPTOR_REQ_COMPONENT_TYPE_SINT;
-        if (variable.image_format_type == NumericTypeUint) reqs |= DESCRIPTOR_REQ_COMPONENT_TYPE_UINT;
-
-        if (variable.image_dim == spv::Dim1D) {
-            reqs |= (variable.is_image_array) ? DESCRIPTOR_REQ_VIEW_TYPE_1D_ARRAY : DESCRIPTOR_REQ_VIEW_TYPE_1D;
-        }
-
-        if (variable.image_dim == spv::Dim2D) {
-            reqs |= (variable.is_multisampled) ? DESCRIPTOR_REQ_MULTI_SAMPLE : DESCRIPTOR_REQ_SINGLE_SAMPLE;
-            reqs |= (variable.is_image_array) ? DESCRIPTOR_REQ_VIEW_TYPE_2D_ARRAY : DESCRIPTOR_REQ_VIEW_TYPE_2D;
-        }
-
-        if (variable.image_dim == spv::Dim3D) reqs |= DESCRIPTOR_REQ_VIEW_TYPE_3D;
-
-        if (variable.image_dim == spv::DimCube) {
-            reqs |= (variable.is_image_array) ? DESCRIPTOR_REQ_VIEW_TYPE_CUBE_ARRAY : DESCRIPTOR_REQ_VIEW_TYPE_CUBE;
-        }
-        if (variable.image_dim == spv::DimSubpassData) {
-            reqs |= (variable.is_multisampled) ? DESCRIPTOR_REQ_MULTI_SAMPLE : DESCRIPTOR_REQ_SINGLE_SAMPLE;
-        }
+        entry.revalidate_hash = variable.descriptor_hash;
     }
 }
 
@@ -152,6 +124,30 @@ safe_VkSpecializationInfo *PipelineStageState::GetSpecializationInfo() const {
 
 const void *PipelineStageState::GetPNext() const {
     return (pipeline_create_info) ? pipeline_create_info->pNext : shader_object_create_info->pNext;
+}
+
+bool PipelineStageState::GetInt32ConstantValue(const Instruction &insn, uint32_t *value) const {
+    const Instruction *type_id = spirv_state->FindDef(insn.Word(1));
+    if (type_id->Opcode() != spv::OpTypeInt || type_id->Word(2) != 32) {
+        return false;
+    }
+
+    if (insn.Opcode() == spv::OpConstant) {
+        *value = insn.Word(3);
+        return true;
+    } else if (insn.Opcode() == spv::OpSpecConstant) {
+        *value = insn.Word(3);  // default value
+        const auto *spec_info = GetSpecializationInfo();
+        const uint32_t spec_id = spirv_state->static_data_.id_to_spec_id.at(insn.Word(2));
+        if (spec_info && spec_id < spec_info->mapEntryCount) {
+            memcpy(value, (uint8_t *)spec_info->pData + spec_info->pMapEntries[spec_id].offset,
+                   spec_info->pMapEntries[spec_id].size);
+        }
+        return true;
+    }
+
+    // This means the value is not known until runtime and will need to be checked in GPU-AV
+    return false;
 }
 
 PipelineStageState::PipelineStageState(const safe_VkPipelineShaderStageCreateInfo *pipeline_create_info,

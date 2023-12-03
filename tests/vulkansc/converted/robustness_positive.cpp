@@ -15,6 +15,7 @@
 
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
+#include "../framework/descriptor_helper.h"
 #include "generated/vk_extension_helper.h"
 
 TEST_F(PositiveRobustness, WriteDescriptorSetAccelerationStructureNVNullDescriptor) {
@@ -22,14 +23,14 @@ TEST_F(PositiveRobustness, WriteDescriptorSetAccelerationStructureNVNullDescript
 
     AddRequiredExtensions(VK_NV_RAY_TRACING_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceRobustness2FeaturesEXT robustness2_features = vku::InitStructHelper();
     auto features2 = GetPhysicalDeviceFeatures2(robustness2_features);
     if (robustness2_features.nullDescriptor != VK_TRUE) {
         GTEST_SKIP() << "nullDescriptor feature not supported";
     }
-    RETURN_IF_SKIP(InitState(nullptr, &features2))
+    RETURN_IF_SKIP(InitState(nullptr, &features2));
 
     OneOffDescriptorSet ds(m_device, {
                                          {0, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV, 1, VK_SHADER_STAGE_MISS_BIT_NV, nullptr},
@@ -56,7 +57,7 @@ TEST_F(PositiveRobustness, BindVertexBuffers2EXTNullDescriptors) {
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceRobustness2FeaturesEXT robustness2_features = vku::InitStructHelper();
     auto features2 = GetPhysicalDeviceFeatures2(robustness2_features);
@@ -64,8 +65,7 @@ TEST_F(PositiveRobustness, BindVertexBuffers2EXTNullDescriptors) {
         GTEST_SKIP() << "nullDescriptor feature not supported";
     }
 
-    VkCommandPoolCreateFlags pool_flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    RETURN_IF_SKIP(InitState(nullptr, &features2, pool_flags));
+    RETURN_IF_SKIP(InitState(nullptr, &features2));
     InitRenderTarget();
 
     OneOffDescriptorSet descriptor_set(m_device, {
@@ -94,7 +94,7 @@ TEST_F(PositiveRobustness, PipelineRobustnessRobustImageAccessExposed) {
 
     SetTargetApiVersion(VK_API_VERSION_1_3);
     AddRequiredExtensions(VK_EXT_PIPELINE_ROBUSTNESS_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
     // 1.3 exposes VK_EXT_image_robustness and the feature for us
     VkPhysicalDevicePipelineRobustnessFeaturesEXT pipeline_robustness_features = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(pipeline_robustness_features);

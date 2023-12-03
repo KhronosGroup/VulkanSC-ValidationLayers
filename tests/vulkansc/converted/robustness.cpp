@@ -22,8 +22,8 @@ TEST_F(NegativeRobustness, PipelineRobustnessDisabled) {
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_EXT_PIPELINE_ROBUSTNESS_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitState());
 
     {
         CreateComputePipelineHelper pipe(*this);
@@ -79,8 +79,8 @@ TEST_F(NegativeRobustness, PipelineRobustnessDisabledShaderStage) {
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_EXT_PIPELINE_ROBUSTNESS_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitState());
 
     CreateComputePipelineHelper pipe(*this);
 
@@ -102,7 +102,7 @@ TEST_F(NegativeRobustness, PipelineRobustnessDisabledShaderStageWithIdentifier) 
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_EXT_PIPELINE_ROBUSTNESS_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_SHADER_MODULE_IDENTIFIER_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDevicePipelineCreationCacheControlFeatures shader_cache_control_features = vku::InitStructHelper();
     VkPhysicalDeviceShaderModuleIdentifierFeaturesEXT shader_module_id_features =
@@ -143,7 +143,7 @@ TEST_F(NegativeRobustness, DISABLED_PipelineRobustnessRobustBufferAccess2Unsuppo
     AddRequiredExtensions(VK_EXT_PIPELINE_ROBUSTNESS_EXTENSION_NAME);
     AddOptionalExtensions(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
 
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     if (IsExtensionsEnabled(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME)) {
         VkPhysicalDeviceRobustness2FeaturesEXT robustness2_features = vku::InitStructHelper();
@@ -161,7 +161,7 @@ TEST_F(NegativeRobustness, DISABLED_PipelineRobustnessRobustBufferAccess2Unsuppo
         GTEST_SKIP() << "pipelineRobustness is not supported";
     }
 
-    RETURN_IF_SKIP(InitState(nullptr, &features2))
+    RETURN_IF_SKIP(InitState(nullptr, &features2));
 
     {
         CreateComputePipelineHelper pipe(*this);
@@ -209,7 +209,7 @@ TEST_F(NegativeRobustness, DISABLED_PipelineRobustnessRobustImageAccess2Unsuppor
     AddOptionalExtensions(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     if (IsExtensionsEnabled(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME)) {
         VkPhysicalDeviceRobustness2FeaturesEXT robustness2_features = vku::InitStructHelper();
@@ -227,7 +227,7 @@ TEST_F(NegativeRobustness, DISABLED_PipelineRobustnessRobustImageAccess2Unsuppor
         GTEST_SKIP() << "pipelineRobustness is not supported";
     }
 
-    RETURN_IF_SKIP(InitState(nullptr, &features2))
+    RETURN_IF_SKIP(InitState(nullptr, &features2));
 
     CreateComputePipelineHelper pipe(*this);
     pipe.InitState();
@@ -245,7 +245,7 @@ TEST_F(NegativeRobustness, PipelineRobustnessRobustImageAccessNotExposed) {
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_EXT_PIPELINE_ROBUSTNESS_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
     if (DeviceValidationVersion() > VK_API_VERSION_1_2) {
         GTEST_SKIP() << "version 1.3 enables extensions which we don't want";
     }

@@ -19,7 +19,7 @@
 TEST_F(PositiveSparseBuffer, DISABLED_NonOverlappingBufferCopy) {
     TEST_DESCRIPTION("Test correct non overlapping sparse buffers' copy");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     if (!m_device->phy().features().sparseBinding) {
         GTEST_SKIP() << "Requires unsupported sparseBinding feature.";
@@ -111,7 +111,7 @@ TEST_F(PositiveSparseBuffer, DISABLED_NonOverlappingBufferCopy) {
 TEST_F(PositiveSparseBuffer, DISABLED_NonOverlappingBufferCopy2) {
     TEST_DESCRIPTION("Non overlapping ranges copies should not trigger errors");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     if (!m_device->phy().features().sparseBinding) {
         GTEST_SKIP() << "Requires unsupported sparseBinding feature.";
@@ -196,7 +196,7 @@ TEST_F(PositiveSparseBuffer, DISABLED_NonOverlappingBufferCopy2) {
 TEST_F(PositiveSparseBuffer, DISABLED_NonOverlappingBufferCopy3) {
     TEST_DESCRIPTION("Test that overlaps are computed in buffer space, not memory space");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     if (!m_device->phy().features().sparseBinding) {
         GTEST_SKIP() << "Requires unsupported sparseBinding feature.";
@@ -279,7 +279,7 @@ TEST_F(PositiveSparseBuffer, DISABLED_NonOverlappingBufferCopy3) {
 TEST_F(PositiveSparseBuffer, DISABLED_NonOverlappingBufferCopy4) {
     TEST_DESCRIPTION("Test coyping from a range that spans two different memory chunks");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     if (!m_device->phy().features().sparseBinding) {
         GTEST_SKIP() << "Requires unsupported sparseBinding feature.";

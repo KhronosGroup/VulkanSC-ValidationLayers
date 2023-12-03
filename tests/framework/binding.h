@@ -668,6 +668,12 @@ class Image : public internal::NonDispHandle<VkImage> {
 
     static VkExtent3D extent(int32_t width, int32_t height, int32_t depth);
 
+    static VkImageMemoryBarrier transition_to_present(VkImage swapchain_image, VkImageLayout old_layout = VK_IMAGE_LAYOUT_UNDEFINED,
+                                                      VkAccessFlags src_access_mask = 0);
+    static VkImageMemoryBarrier2 transition_to_present_2(
+        VkImage swapchain_image, VkImageLayout old_layout = VK_IMAGE_LAYOUT_UNDEFINED,
+        VkPipelineStageFlags2 src_stage_mask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, VkAccessFlags2 src_access_mask = 0);
+
   private:
     void init_info(const Device &dev, const VkImageCreateInfo &info);
 
@@ -681,6 +687,12 @@ class ImageView : public internal::NonDispHandle<VkImageView> {
   public:
     explicit ImageView() = default;
     explicit ImageView(const Device &dev, const VkImageViewCreateInfo &info) { init(dev, info); }
+    ImageView(ImageView &&rhs) noexcept : NonDispHandle(std::move(rhs)) {}
+    ImageView &operator=(ImageView &&src) noexcept {
+        this->~ImageView();
+        this->NonDispHandle::operator=(std::move(src));
+        return *this;
+    }
     ~ImageView() noexcept;
     void destroy() noexcept;
 
@@ -997,14 +1009,14 @@ class RenderPass : public internal::NonDispHandle<VkRenderPass> {
     // vkCreateRenderPass()
     RenderPass(const Device &dev, const VkRenderPassCreateInfo &info) { init(dev, info); }
     // vkCreateRenderPass2()
-    RenderPass(const Device &dev, const VkRenderPassCreateInfo2 &info, bool khr = false) { init(dev, info, khr); }
+    RenderPass(const Device &dev, const VkRenderPassCreateInfo2 &info) { init(dev, info); }
     ~RenderPass() noexcept;
     void destroy() noexcept;
 
     // vkCreateRenderPass()
     void init(const Device &dev, const VkRenderPassCreateInfo &info);
     // vkCreateRenderPass2()
-    void init(const Device &dev, const VkRenderPassCreateInfo2 &info, bool khr = false);
+    void init(const Device &dev, const VkRenderPassCreateInfo2 &info);
 };
 
 
@@ -1022,21 +1034,19 @@ class Framebuffer : public internal::NonDispHandle<VkFramebuffer> {
 class SamplerYcbcrConversion : public internal::NonDispHandle<VkSamplerYcbcrConversion> {
   public:
     SamplerYcbcrConversion() = default;
-    SamplerYcbcrConversion(const Device &dev, VkFormat format, bool khr = false) : khr_(khr) {
-        init(dev, DefaultConversionInfo(format), khr);
+    SamplerYcbcrConversion(const Device &dev, VkFormat format) {
+        init(dev, DefaultConversionInfo(format));
     }
-    SamplerYcbcrConversion(const Device &dev, const VkSamplerYcbcrConversionCreateInfo &info, bool khr = false) : khr_(khr) {
-        init(dev, info, khr);
+    SamplerYcbcrConversion(const Device &dev, const VkSamplerYcbcrConversionCreateInfo &info) {
+        init(dev, info);
     }
     ~SamplerYcbcrConversion() noexcept;
     void destroy() noexcept;
 
-    void init(const Device &dev, const VkSamplerYcbcrConversionCreateInfo &info, bool khr);
+    void init(const Device &dev, const VkSamplerYcbcrConversionCreateInfo &info);
     VkSamplerYcbcrConversionInfo ConversionInfo();
 
     static VkSamplerYcbcrConversionCreateInfo DefaultConversionInfo(VkFormat format);
-
-    bool khr_ = false;
 };
 
 inline VkBufferCreateInfo Buffer::create_info(VkDeviceSize size, VkFlags usage, const std::vector<uint32_t> *queue_families,

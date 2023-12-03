@@ -1864,7 +1864,7 @@ TEST_F(VkSCObjectReservationLayerTest, SamplerYcbcrConversionRequestCount) {
                                               VK_FORMAT_G8_B8_R8_3PLANE_422_UNORM, VK_FORMAT_G8_B8R8_2PLANE_422_UNORM,
                                               VK_FORMAT_G8_B8_R8_3PLANE_444_UNORM};
     for (const auto format : ycbcr_formats) {
-        if (ImageFormatAndFeaturesSupported(gpu(), format, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT)) {
+        if (FormatFeaturesAreSupported(gpu(), format, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT)) {
             data.ycbcr_format = format;
             break;
         }

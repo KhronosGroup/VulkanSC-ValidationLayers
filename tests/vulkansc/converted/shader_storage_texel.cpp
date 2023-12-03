@@ -17,14 +17,15 @@
 
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
+#include "../framework/descriptor_helper.h"
 
 TEST_F(NegativeShaderStorageTexel, DISABLED_WriteLessComponent) {
     TEST_DESCRIPTION("Test writing to texel buffer with less components.");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitState());
 
     // not valid GLSL, but would look like:
     // layout(set = 0, binding = 0, Rgba8ui) uniform uimageBuffer storageTexelBuffer;
@@ -76,8 +77,8 @@ TEST_F(NegativeShaderStorageTexel, UnknownWriteLessComponent) {
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitState());
 
     // not valid GLSL, but would look like:
     // layout(set = 0, binding = 0, Unknown) uniform uimageBuffer storageTexelBuffer;
@@ -173,8 +174,7 @@ TEST_F(NegativeShaderStorageTexel, MissingFormatWriteForFormat) {
     TEST_DESCRIPTION("Create a shader writing a storage texel buffer without an image format");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
-    RETURN_IF_SKIP(InitState(nullptr, nullptr, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    RETURN_IF_SKIP(Init());
 
     PFN_vkSetPhysicalDeviceFormatProperties2EXT fpvkSetPhysicalDeviceFormatProperties2EXT = nullptr;
     PFN_vkGetOriginalPhysicalDeviceFormatProperties2EXT fpvkGetOriginalPhysicalDeviceFormatProperties2EXT = nullptr;

@@ -13,35 +13,32 @@
 
 #include "../framework/layer_validation_tests.h"
 #include "../framework/ray_tracing_objects.h"
+#include "../framework/shader_helper.h"
 #include "generated/vk_extension_helper.h"
 #include "../layers/utils/vk_layer_utils.h"
 
-void RayTracingTest::InitFrameworkForRayTracingTest(VkRenderFramework *framework, bool is_khr,
-                                                    VkPhysicalDeviceFeatures2KHR *features2,
-                                                    VkValidationFeaturesEXT *enabled_features) {
-    framework->AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-    framework->AddRequiredExtensions(VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME);
+void RayTracingTest::InitFrameworkForRayTracingTest(bool is_khr, VkPhysicalDeviceFeatures2KHR *features2 /*= nullptr*/,
+                                                    VkValidationFeaturesEXT *enabled_features /*= nullptr*/) {
+    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME);
     if (is_khr) {
-        framework->AddRequiredExtensions(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
-        framework->AddRequiredExtensions(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
-        framework->AddRequiredExtensions(VK_KHR_RAY_QUERY_EXTENSION_NAME);
-        framework->AddRequiredExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
-        framework->AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
-        framework->AddRequiredExtensions(VK_KHR_SPIRV_1_4_EXTENSION_NAME);
-        framework->AddRequiredExtensions(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
-        framework->AddRequiredExtensions(VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME);
+        AddRequiredExtensions(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
+        AddRequiredExtensions(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
+        AddRequiredExtensions(VK_KHR_RAY_QUERY_EXTENSION_NAME);
+        AddRequiredExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
+        AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
+        AddRequiredExtensions(VK_KHR_SPIRV_1_4_EXTENSION_NAME);
+        AddRequiredExtensions(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
+        AddRequiredExtensions(VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME);
     } else {
-        framework->AddRequiredExtensions(VK_NV_RAY_TRACING_EXTENSION_NAME);
+        AddRequiredExtensions(VK_NV_RAY_TRACING_EXTENSION_NAME);
     }
 
-    RETURN_IF_SKIP(framework->InitFramework(enabled_features));
+    RETURN_IF_SKIP(InitFramework(enabled_features));
 
     if (features2) {
         // extension enabled as dependency of RT extension
-        auto vkGetPhysicalDeviceFeatures2KHR = reinterpret_cast<PFN_vkGetPhysicalDeviceFeatures2KHR>(
-            vk::GetInstanceProcAddr(framework->instance(), "vkGetPhysicalDeviceFeatures2KHR"));
-        assert(vkGetPhysicalDeviceFeatures2KHR);
-        vkGetPhysicalDeviceFeatures2KHR(framework->gpu(), features2);
+        vk::GetPhysicalDeviceFeatures2KHR(gpu(), features2);
     }
 }
 
@@ -51,12 +48,7 @@ TEST_F(PositiveRayTracing, GetAccelerationStructureBuildSizes) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
 
-    RETURN_IF_SKIP(InitFramework())
-
-    // Crashes without any warnings
-    if (IsDriver(VK_DRIVER_ID_AMD_PROPRIETARY)) {
-        GTEST_SKIP() << "Test does not run on AMD proprietary driver";
-    }
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceAccelerationStructureFeaturesKHR accel_struct_features = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(accel_struct_features);
@@ -77,7 +69,7 @@ TEST_F(PositiveRayTracing, AccelerationStructureReference) {
     AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_RAY_QUERY_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceBufferDeviceAddressFeatures bda_features = vku::InitStructHelper();
     VkPhysicalDeviceRayQueryFeaturesKHR ray_query_features = vku::InitStructHelper(&bda_features);
@@ -104,7 +96,7 @@ TEST_F(PositiveRayTracing, HostAccelerationStructureReference) {
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceRayQueryFeaturesKHR ray_query_features = vku::InitStructHelper();
     VkPhysicalDeviceAccelerationStructureFeaturesKHR acc_structure_features = vku::InitStructHelper(&ray_query_features);
@@ -136,11 +128,11 @@ TEST_F(PositiveRayTracing, StridedDeviceAddressRegion) {
     bda_features.bufferDeviceAddress = VK_TRUE;
     VkPhysicalDeviceRayTracingPipelineFeaturesKHR ray_tracing_features = vku::InitStructHelper(&bda_features);
     VkPhysicalDeviceFeatures2KHR features2 = vku::InitStructHelper(&ray_tracing_features);
-    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(this, true, &features2))
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(true, &features2));
     if (IsPlatformMockICD()) {
         GTEST_SKIP() << "Test not supported by MockICD";
     }
-    RETURN_IF_SKIP(InitState(nullptr, &features2))
+    RETURN_IF_SKIP(InitState(nullptr, &features2));
 
     // Create ray tracing pipeline
     VkPipeline raytracing_pipeline = VK_NULL_HANDLE;
@@ -222,7 +214,7 @@ TEST_F(PositiveRayTracing, StridedDeviceAddressRegion) {
     {
         VkStridedDeviceAddressRegionKHR valid_region = stridebufregion;
         valid_region.deviceAddress = 0;
-        vk::CmdTraceRaysKHR(m_commandBuffer->handle(), &valid_region, &stridebufregion, &stridebufregion, &stridebufregion, 100,
+        vk::CmdTraceRaysKHR(m_commandBuffer->handle(), &stridebufregion, &valid_region, &stridebufregion, &stridebufregion, 100,
                             100, 1);
     }
 
@@ -232,11 +224,15 @@ TEST_F(PositiveRayTracing, StridedDeviceAddressRegion) {
         empty_region.deviceAddress += buffer.create_info().size + 128;
         empty_region.size = 0;
         empty_region.stride = 0;
-        vk::CmdTraceRaysKHR(m_commandBuffer->handle(), &empty_region, &stridebufregion, &stridebufregion, &stridebufregion, 100,
+        vk::CmdTraceRaysKHR(m_commandBuffer->handle(), &stridebufregion, &empty_region, &stridebufregion, &stridebufregion, 100,
                             100, 1);
     }
 
     m_commandBuffer->end();
+
+    m_commandBuffer->QueueCommandBuffer(true);
+
+    vk::DeviceWaitIdle(m_device->handle());
 
     vk::DestroyPipeline(device(), raytracing_pipeline, nullptr);
 }
@@ -251,11 +247,11 @@ TEST_F(PositiveRayTracing, BarrierAccessMaskAccelerationStructureRayQueryEnabled
     AddRequiredExtensions(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_RAY_QUERY_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
     VkPhysicalDeviceRayQueryFeaturesKHR ray_query_feature = vku::InitStructHelper();
     VkPhysicalDeviceSynchronization2FeaturesKHR sync2_features = vku::InitStructHelper(&ray_query_feature);
     GetPhysicalDeviceFeatures2(sync2_features);
-    RETURN_IF_SKIP(InitState(nullptr, &sync2_features, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    RETURN_IF_SKIP(InitState(nullptr, &sync2_features));
 
     VkMemoryBarrier2 mem_barrier = vku::InitStructHelper();
     mem_barrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
@@ -317,11 +313,15 @@ TEST_F(PositiveRayTracing, BarrierAccessMaskAccelerationStructureRayQueryEnabled
     AddRequiredExtensions(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_RAY_QUERY_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
-    VkPhysicalDeviceRayQueryFeaturesKHR ray_query_feature = vku::InitStructHelper();
-    VkPhysicalDeviceSynchronization2FeaturesKHR sync2_features = vku::InitStructHelper(&ray_query_feature);
+    RETURN_IF_SKIP(InitFramework());
+    VkPhysicalDeviceRayTracingPipelineFeaturesKHR ray_tracing_pipeline_features = vku::InitStructHelper();
+    VkPhysicalDeviceRayQueryFeaturesKHR ray_query_features = vku::InitStructHelper(&ray_tracing_pipeline_features);
+    VkPhysicalDeviceSynchronization2FeaturesKHR sync2_features = vku::InitStructHelper(&ray_query_features);
     GetPhysicalDeviceFeatures2(sync2_features);
-    RETURN_IF_SKIP(InitState(nullptr, &sync2_features, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    if (!ray_tracing_pipeline_features.rayTracingPipeline) {
+        GTEST_SKIP() << "rayTracingPipeline not supported";
+    }
+    RETURN_IF_SKIP(InitState(nullptr, &sync2_features));
 
     VkMemoryBarrier2 mem_barrier = vku::InitStructHelper();
     mem_barrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
@@ -375,7 +375,7 @@ TEST_F(PositiveRayTracing, BarrierAccessMaskAccelerationStructureRayQueryEnabled
 
 TEST_F(PositiveRayTracing, BarrierSync1NoCrash) {
     TEST_DESCRIPTION("Regression test for nullptr crash when Sync1 barrier API is used for acceleration structure accesses");
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     // This stage can not be used with ACCELERATION_STRUCTURE_READ access when ray query is disabled, but VVL also should not crash.
     constexpr VkPipelineStageFlags invalid_src_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
@@ -402,8 +402,8 @@ TEST_F(PositiveRayTracing, BuildAccelerationStructuresList) {
     ray_query_features.rayQuery = VK_TRUE;
 
     VkPhysicalDeviceFeatures2KHR features2 = vku::InitStructHelper(&ray_query_features);
-    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(this, true, &features2))
-    RETURN_IF_SKIP(InitState(nullptr, &features2, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(true, &features2));
+    RETURN_IF_SKIP(InitState(nullptr, &features2));
 
     constexpr size_t build_info_count = 10;
 
@@ -441,7 +441,7 @@ TEST_F(PositiveRayTracing, AccelerationStructuresOverlappingMemory) {
     ray_query_features.rayQuery = VK_TRUE;
 
     VkPhysicalDeviceFeatures2KHR features2 = vku::InitStructHelper(&ray_query_features);
-    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(this, true, &features2))
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(true, &features2));
 
     if (ray_query_features.rayQuery == VK_FALSE) {
         GTEST_SKIP() << "rayQuery feature is not supported";
@@ -453,7 +453,7 @@ TEST_F(PositiveRayTracing, AccelerationStructuresOverlappingMemory) {
         GTEST_SKIP() << "bufferDeviceAddress feature is not supported";
     }
 
-    RETURN_IF_SKIP(InitState(nullptr, &features2, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    RETURN_IF_SKIP(InitState(nullptr, &features2));
 
     constexpr size_t build_info_count = 3;
 
@@ -501,7 +501,7 @@ TEST_F(PositiveRayTracing, AccelerationStructuresReuseScratchMemory) {
     ray_query_features.rayQuery = VK_TRUE;
 
     VkPhysicalDeviceFeatures2KHR features2 = vku::InitStructHelper(&ray_query_features);
-    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(this, true, &features2))
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(true, &features2));
 
     if (ray_query_features.rayQuery == VK_FALSE) {
         GTEST_SKIP() << "rayQuery feature is not supported";
@@ -513,7 +513,7 @@ TEST_F(PositiveRayTracing, AccelerationStructuresReuseScratchMemory) {
         GTEST_SKIP() << "bufferDeviceAddress feature is not supported";
     }
 
-    RETURN_IF_SKIP(InitState(nullptr, &features2, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    RETURN_IF_SKIP(InitState(nullptr, &features2));
 
     // Allocate a memory chunk that will be used as backing memory for scratch buffer
     VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
@@ -691,7 +691,7 @@ TEST_F(PositiveRayTracing, AccelerationStructuresDedicatedScratchMemory) {
     ray_query_features.rayQuery = VK_TRUE;
 
     VkPhysicalDeviceFeatures2KHR features2 = vku::InitStructHelper(&ray_query_features);
-    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(this, true, &features2))
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(true, &features2));
 
     if (ray_query_features.rayQuery == VK_FALSE) {
         GTEST_SKIP() << "rayQuery feature is not supported";
@@ -703,7 +703,7 @@ TEST_F(PositiveRayTracing, AccelerationStructuresDedicatedScratchMemory) {
         GTEST_SKIP() << "bufferDeviceAddress feature is not supported";
     }
 
-    RETURN_IF_SKIP(InitState(nullptr, &features2, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    RETURN_IF_SKIP(InitState(nullptr, &features2));
 
     vkt::CommandBuffer cmd_buffer_frame_0(m_device, m_commandPool);
     vkt::CommandBuffer cmd_buffer_frame_1(m_device, m_commandPool);

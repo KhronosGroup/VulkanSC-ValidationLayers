@@ -44,10 +44,18 @@ target_sources(vksc_layer_validation_tests PRIVATE
     ../framework/binding.cpp
     ../framework/test_framework.h
     ../framework/test_framework.cpp
+    ../framework/descriptor_helper.h
+    ../framework/descriptor_helper.cpp
+    ../framework/shader_helper.h
+    ../framework/shader_helper.cpp
+    ../framework/thread_timeout_helper.h
+    ../framework/thread_timeout_helper.cpp
+    ../framework/barrier_queue_family.h
+    ../framework/barrier_queue_family.cpp
     ../framework/pipeline_helper.h
     ../framework/pipeline_helper.cpp
-    ../framework/ray_tracing_nv.h
-    ../framework/ray_tracing_nv.cpp
+    ../framework/ray_tracing_helper_nv.h
+    ../framework/ray_tracing_helper_nv.cpp
     ../framework/ray_tracing_objects.h
     ../framework/ray_tracing_objects.cpp
     ../framework/external_memory_sync.h
@@ -106,12 +114,6 @@ find_package(glslang CONFIG)
 
 target_link_libraries(vksc_layer_validation_tests PRIVATE
     VkLayer_utils
-    glslang::glslang
-    glslang::OGLCompiler
-    glslang::OSDependent
-    glslang::MachineIndependent
-    glslang::GenericCodeGen
-    glslang::HLSL
     glslang::SPIRV
     glslang::SPVRemapper
     SPIRV-Headers::SPIRV-Headers

@@ -24,13 +24,13 @@
 std::vector<std::pair<uint32_t, uint32_t>> custom_stype_info{};
 
 VkFormat FindSupportedDepthOnlyFormat(VkPhysicalDevice phy) {
-    const VkFormat ds_formats[] = {VK_FORMAT_D16_UNORM, VK_FORMAT_X8_D24_UNORM_PACK32, VK_FORMAT_D32_SFLOAT};
-    for (uint32_t i = 0; i < size(ds_formats); ++i) {
+    constexpr std::array depth_formats = {VK_FORMAT_D16_UNORM, VK_FORMAT_X8_D24_UNORM_PACK32, VK_FORMAT_D32_SFLOAT};
+    for (VkFormat depth_format : depth_formats) {
         VkFormatProperties format_props;
-        vk::GetPhysicalDeviceFormatProperties(phy, ds_formats[i], &format_props);
+        vk::GetPhysicalDeviceFormatProperties(phy, depth_format, &format_props);
 
         if (format_props.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) {
-            return ds_formats[i];
+            return depth_format;
         }
     }
     assert(false);  // Vulkan drivers are guaranteed to have at least one supported format
@@ -38,13 +38,13 @@ VkFormat FindSupportedDepthOnlyFormat(VkPhysicalDevice phy) {
 }
 
 VkFormat FindSupportedStencilOnlyFormat(VkPhysicalDevice phy) {
-    const VkFormat ds_formats[] = {VK_FORMAT_S8_UINT};
-    for (uint32_t i = 0; i < size(ds_formats); ++i) {
+    constexpr std::array stencil_formats = {VK_FORMAT_S8_UINT};
+    for (VkFormat stencil_format : stencil_formats) {
         VkFormatProperties format_props;
-        vk::GetPhysicalDeviceFormatProperties(phy, ds_formats[i], &format_props);
+        vk::GetPhysicalDeviceFormatProperties(phy, stencil_format, &format_props);
 
         if (format_props.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) {
-            return ds_formats[i];
+            return stencil_format;
         }
     }
     return VK_FORMAT_UNDEFINED;
@@ -64,7 +64,7 @@ VkFormat FindSupportedDepthStencilFormat(VkPhysicalDevice phy) {
     return VK_FORMAT_UNDEFINED;
 }
 
-bool ImageFormatIsSupported(VkPhysicalDevice phy, VkFormat format, VkImageTiling tiling, VkFormatFeatureFlags features) {
+bool FormatIsSupported(VkPhysicalDevice phy, VkFormat format, VkImageTiling tiling, VkFormatFeatureFlags features) {
     VkFormatProperties format_props;
     vk::GetPhysicalDeviceFormatProperties(phy, format, &format_props);
     VkFormatFeatureFlags phy_features =
@@ -72,7 +72,7 @@ bool ImageFormatIsSupported(VkPhysicalDevice phy, VkFormat format, VkImageTiling
     return (0 != (phy_features & features));
 }
 
-bool ImageFormatAndFeaturesSupported(VkPhysicalDevice phy, VkFormat format, VkImageTiling tiling, VkFormatFeatureFlags features) {
+bool FormatFeaturesAreSupported(VkPhysicalDevice phy, VkFormat format, VkImageTiling tiling, VkFormatFeatureFlags features) {
     VkFormatProperties format_props;
     vk::GetPhysicalDeviceFormatProperties(phy, format, &format_props);
     VkFormatFeatureFlags phy_features =
@@ -80,10 +80,10 @@ bool ImageFormatAndFeaturesSupported(VkPhysicalDevice phy, VkFormat format, VkIm
     return (features == (phy_features & features));
 }
 
-bool ImageFormatAndFeaturesSupported(const VkInstance inst, const VkPhysicalDevice phy, const VkImageCreateInfo info,
-                                     const VkFormatFeatureFlags features) {
+bool ImageFormatIsSupported(const VkInstance inst, const VkPhysicalDevice phy, const VkImageCreateInfo info,
+                            const VkFormatFeatureFlags features) {
     // Verify physical device support of format features
-    if (!ImageFormatAndFeaturesSupported(phy, info.format, info.tiling, features)) {
+    if (!FormatFeaturesAreSupported(phy, info.format, info.tiling, features)) {
         return false;
     }
 
@@ -183,29 +183,6 @@ void UpdateDescriptor(ThreadTestData *data) {
 
 #endif  // GTEST_IS_THREADSAFE
 
-bool ThreadTimeoutHelper::WaitForThreads(int timeout_in_seconds) {
-    std::unique_lock lock(mutex_);
-    return cv_.wait_for(lock, std::chrono::seconds{timeout_in_seconds}, [this] {
-        std::lock_guard lock_guard(active_thread_mutex_);
-        return active_threads_ == 0;
-    });
-}
-
-void ThreadTimeoutHelper::OnThreadDone() {
-    bool last_worker = false;
-    {
-        std::lock_guard lock(active_thread_mutex_);
-        active_threads_--;
-        assert(active_threads_ >= 0);
-        if (!active_threads_) {
-            last_worker = true;
-        }
-    }
-    if (last_worker) {
-        cv_.notify_one();
-    }
-}
-
 void ReleaseNullFence(ThreadTestData *data) {
     for (int i = 0; i < 40000; i++) {
         vk::DestroyFence(data->device, VK_NULL_HANDLE, NULL);
@@ -232,24 +209,9 @@ void TestRenderPassCreate(ErrorMonitor *error_monitor, const vkt::Device &device
 
     if (rp2_supported && rp2_vuid) {
         safe_VkRenderPassCreateInfo2 create_info2 = ConvertVkRenderPassCreateInfoToV2KHR(create_info);
-
-        const auto vkCreateRenderPass2KHR =
-            reinterpret_cast<PFN_vkCreateRenderPass2KHR>(vk::GetDeviceProcAddr(device, "vkCreateRenderPass2KHR"));
-        // For API version < 1.2 where the extension was not enabled
-        if (vkCreateRenderPass2KHR) {
-            error_monitor->SetDesiredFailureMsg(kErrorBit, rp2_vuid);
-            vkt::RenderPass rp2_khr(device, *create_info2.ptr(), true);
-            error_monitor->VerifyFound();
-        }
-
-        const auto vkCreateRenderPass2 =
-            reinterpret_cast<PFN_vkCreateRenderPass2>(vk::GetDeviceProcAddr(device, "vkCreateRenderPass2"));
-        // For API version >= 1.2, try core entrypoint
-        if (vkCreateRenderPass2) {
-            error_monitor->SetDesiredFailureMsg(kErrorBit, rp2_vuid);
-            vkt::RenderPass rp2_core(device, *create_info2.ptr(), false);
-            error_monitor->VerifyFound();
-        }
+        error_monitor->SetDesiredFailureMsg(kErrorBit, rp2_vuid);
+        vkt::RenderPass rp2(device, *create_info2.ptr());
+        error_monitor->VerifyFound();
     }
 }
 
@@ -257,12 +219,12 @@ void PositiveTestRenderPassCreate(ErrorMonitor *error_monitor, const vkt::Device
                                   bool rp2_supported) {
     vkt::RenderPass rp(device, create_info);
     if (rp2_supported) {
-        vkt::RenderPass rp2(device, *ConvertVkRenderPassCreateInfoToV2KHR(create_info).ptr(), true);
+        vkt::RenderPass rp2(device, *ConvertVkRenderPassCreateInfoToV2KHR(create_info).ptr());
     }
 }
 
 void PositiveTestRenderPass2KHRCreate(const vkt::Device &device, const VkRenderPassCreateInfo2KHR &create_info) {
-    vkt::RenderPass rp(device, create_info, true);
+    vkt::RenderPass rp(device, create_info);
 }
 
 void TestRenderPass2KHRCreate(ErrorMonitor &error_monitor, const vkt::Device &device, const VkRenderPassCreateInfo2KHR &create_info,
@@ -270,7 +232,7 @@ void TestRenderPass2KHRCreate(ErrorMonitor &error_monitor, const vkt::Device &de
     for (auto vuid : vuids) {
         error_monitor.SetDesiredFailureMsg(kErrorBit, vuid);
     }
-    vkt::RenderPass rp(device, create_info, true);
+    vkt::RenderPass rp(device, create_info);
     error_monitor.VerifyFound();
 }
 
@@ -445,7 +407,7 @@ void AllocateDisjointMemory(vkt::Device *device, PFN_vkGetImageMemoryRequirement
 
 void CreateSamplerTest(VkLayerTest &test, const VkSamplerCreateInfo *create_info, const std::string &code) {
     if (code.length()) {
-        test.Monitor().SetDesiredFailureMsg(kErrorBit | kWarningBit, code);
+        test.Monitor().SetDesiredFailureMsg(kErrorBit, code);
     }
 
     vkt::Sampler sampler(*test.DeviceObj(), *create_info);
@@ -516,10 +478,9 @@ VkSamplerCreateInfo SafeSaneSamplerCreateInfo() {
     return sampler_create_info;
 }
 
-void VkLayerTest::Init(VkPhysicalDeviceFeatures *features, VkPhysicalDeviceFeatures2 *features2,
-                       const VkCommandPoolCreateFlags flags, void *instance_pnext) {
+void VkLayerTest::Init(VkPhysicalDeviceFeatures *features, VkPhysicalDeviceFeatures2 *features2, void *instance_pnext) {
     RETURN_IF_SKIP(InitFramework(instance_pnext));
-    RETURN_IF_SKIP(InitState(features, features2, flags));
+    RETURN_IF_SKIP(InitState(features, features2));
 }
 
 vkt::CommandBuffer *VkLayerTest::CommandBuffer() { return m_commandBuffer; }
@@ -622,17 +583,6 @@ VkPhysicalDeviceProperties2 VkLayerTest::GetPhysicalDeviceProperties2(VkPhysical
         vkGetPhysicalDeviceProperties2KHR(gpu(), &props2);
     }
     return props2;
-}
-
-bool VkLayerTest::IsDriver(VkDriverId driver_id) {
-    if (VkRenderFramework::IgnoreDisableChecks()) {
-        return false;
-    } else {
-        VkPhysicalDeviceDriverProperties driver_properties = vku::InitStructHelper();
-        VkPhysicalDeviceProperties2 physical_device_properties2 = vku::InitStructHelper(&driver_properties);
-        GetPhysicalDeviceProperties2(physical_device_properties2);
-        return (driver_properties.driverID == driver_id);
-    }
 }
 
 bool VkLayerTest::LoadDeviceProfileLayer(
@@ -771,388 +721,6 @@ void SetImageLayout(vkt::Device *device, VkImageAspectFlags aspect, VkImage imag
     cmd_buf.end();
 
     cmd_buf.QueueCommandBuffer();
-}
-
-std::unique_ptr<VkImageObj> VkArmBestPracticesLayerTest::CreateImage(VkFormat format, const uint32_t width, const uint32_t height,
-                                                                     VkImageUsageFlags attachment_usage) {
-    auto img = std::unique_ptr<VkImageObj>(new VkImageObj(m_device));
-    img->Init(width, height, 1, format,
-              VK_IMAGE_USAGE_SAMPLED_BIT | attachment_usage | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-              VK_IMAGE_TILING_OPTIMAL);
-    return img;
-}
-
-VkRenderPass VkArmBestPracticesLayerTest::CreateRenderPass(VkFormat format, VkAttachmentLoadOp load_op,
-                                                           VkAttachmentStoreOp store_op) {
-    VkRenderPass renderpass{VK_NULL_HANDLE};
-
-    // Create renderpass
-    VkAttachmentDescription attachment = {};
-    attachment.format = format;
-    attachment.samples = VK_SAMPLE_COUNT_1_BIT;
-    attachment.loadOp = load_op;
-    attachment.storeOp = store_op;
-    attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    attachment.finalLayout = VK_IMAGE_LAYOUT_GENERAL;
-
-    VkAttachmentReference attachment_reference = {};
-    attachment_reference.attachment = 0;
-    attachment_reference.layout = VK_IMAGE_LAYOUT_GENERAL;
-
-    VkSubpassDescription subpass = {};
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &attachment_reference;
-
-    VkRenderPassCreateInfo rpinf = vku::InitStructHelper();
-    rpinf.attachmentCount = 1;
-    rpinf.pAttachments = &attachment;
-    rpinf.subpassCount = 1;
-    rpinf.pSubpasses = &subpass;
-    rpinf.dependencyCount = 0;
-    rpinf.pDependencies = nullptr;
-
-    VkResult result = vk::CreateRenderPass(m_device->handle(), &rpinf, nullptr, &renderpass);
-    assert(result == VK_SUCCESS);
-    (void)result;
-
-    return renderpass;
-}
-
-VkFramebuffer VkArmBestPracticesLayerTest::CreateFramebuffer(const uint32_t width, const uint32_t height, VkImageView image_view,
-                                                             VkRenderPass renderpass) {
-    VkFramebuffer framebuffer{VK_NULL_HANDLE};
-
-    VkFramebufferCreateInfo framebuffer_create_info = vku::InitStructHelper();
-    framebuffer_create_info.renderPass = renderpass;
-    framebuffer_create_info.attachmentCount = 1;
-    framebuffer_create_info.pAttachments = &image_view;
-    framebuffer_create_info.width = width;
-    framebuffer_create_info.height = height;
-    framebuffer_create_info.layers = 1;
-
-    VkResult result = vk::CreateFramebuffer(m_device->handle(), &framebuffer_create_info, nullptr, &framebuffer);
-    assert(result == VK_SUCCESS);
-    (void)result;
-
-    return framebuffer;
-}
-
-VkSampler VkArmBestPracticesLayerTest::CreateDefaultSampler() {
-    VkSampler sampler{VK_NULL_HANDLE};
-
-    VkSamplerCreateInfo sampler_create_info = vku::InitStructHelper();
-    sampler_create_info.magFilter = VK_FILTER_NEAREST;
-    sampler_create_info.minFilter = VK_FILTER_NEAREST;
-    sampler_create_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
-    sampler_create_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    sampler_create_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    sampler_create_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    sampler_create_info.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-    sampler_create_info.maxLod = VK_LOD_CLAMP_NONE;
-
-    VkResult result = vk::CreateSampler(m_device->handle(), &sampler_create_info, nullptr, &sampler);
-    assert(result == VK_SUCCESS);
-    (void)result;
-
-    return sampler;
-}
-
-OneOffDescriptorSet::OneOffDescriptorSet(vkt::Device *device, const Bindings &bindings,
-                                         VkDescriptorSetLayoutCreateFlags layout_flags, void *layout_pnext,
-                                         VkDescriptorPoolCreateFlags poolFlags, void *allocate_pnext)
-    : device_{device}, pool_{}, layout_(*device, bindings, layout_flags, layout_pnext), set_(VK_NULL_HANDLE) {
-    VkResult err;
-    std::vector<VkDescriptorPoolSize> sizes;
-    for (const auto &b : bindings) sizes.push_back({b.descriptorType, std::max(1u, b.descriptorCount)});
-
-    VkDescriptorPoolCreateInfo dspci = {
-        VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO, nullptr, poolFlags, 1, uint32_t(sizes.size()), sizes.data()};
-    err = vk::CreateDescriptorPool(device_->handle(), &dspci, nullptr, &pool_);
-    if (err != VK_SUCCESS) return;
-
-    if ((layout_flags & VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR) == 0) {
-        VkDescriptorSetAllocateInfo alloc_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO, allocate_pnext, pool_, 1,
-                                                  &layout_.handle()};
-        err = vk::AllocateDescriptorSets(device_->handle(), &alloc_info, &set_);
-    }
-}
-
-OneOffDescriptorSet::~OneOffDescriptorSet() {
-    // No need to destroy set-- it's going away with the pool.
-    vk::DestroyDescriptorPool(device_->handle(), pool_, nullptr);
-}
-
-bool OneOffDescriptorSet::Initialized() { return pool_ != VK_NULL_HANDLE && layout_.initialized() && set_ != VK_NULL_HANDLE; }
-
-void OneOffDescriptorSet::Clear() {
-    resource_infos.clear();
-    descriptor_writes.clear();
-}
-
-void OneOffDescriptorSet::AddDescriptorWrite(uint32_t binding, uint32_t array_element, VkDescriptorType descriptor_type) {
-    VkWriteDescriptorSet descriptor_write = vku::InitStructHelper();
-    descriptor_write.dstSet = set_;
-    descriptor_write.dstBinding = binding;
-    descriptor_write.dstArrayElement = array_element;
-    descriptor_write.descriptorCount = 1;
-    descriptor_write.descriptorType = descriptor_type;
-    descriptor_writes.emplace_back(descriptor_write);
-}
-
-void OneOffDescriptorSet::WriteDescriptorBufferInfo(int binding, VkBuffer buffer, VkDeviceSize offset, VkDeviceSize range,
-                                                    VkDescriptorType descriptorType, uint32_t arrayElement) {
-    VkDescriptorBufferInfo buffer_info = {};
-    buffer_info.buffer = buffer;
-    buffer_info.offset = offset;
-    buffer_info.range = range;
-
-    ResourceInfo resource_info;
-    resource_info.buffer_info = buffer_info;
-    resource_infos.emplace_back(resource_info);
-    AddDescriptorWrite(binding, arrayElement, descriptorType);
-}
-
-void OneOffDescriptorSet::WriteDescriptorBufferView(int binding, VkBufferView buffer_view, VkDescriptorType descriptorType,
-                                                    uint32_t arrayElement) {
-    ResourceInfo resource_info;
-    resource_info.buffer_view = buffer_view;
-    resource_infos.emplace_back(resource_info);
-    AddDescriptorWrite(binding, arrayElement, descriptorType);
-}
-
-void OneOffDescriptorSet::WriteDescriptorImageInfo(int binding, VkImageView image_view, VkSampler sampler,
-                                                   VkDescriptorType descriptorType, VkImageLayout imageLayout,
-                                                   uint32_t arrayElement) {
-    VkDescriptorImageInfo image_info = {};
-    image_info.imageView = image_view;
-    image_info.sampler = sampler;
-    image_info.imageLayout = imageLayout;
-
-    ResourceInfo resource_info;
-    resource_info.image_info = image_info;
-    resource_infos.emplace_back(resource_info);
-    AddDescriptorWrite(binding, arrayElement, descriptorType);
-}
-
-void OneOffDescriptorSet::UpdateDescriptorSets() {
-    assert(resource_infos.size() == descriptor_writes.size());
-    for (size_t i = 0; i < resource_infos.size(); i++) {
-        const auto &info = resource_infos[i];
-        if (info.image_info.has_value()) {
-            descriptor_writes[i].pImageInfo = &info.image_info.value();
-        } else if (info.buffer_info.has_value()) {
-            descriptor_writes[i].pBufferInfo = &info.buffer_info.value();
-        } else {
-            assert(info.buffer_view.has_value());
-            descriptor_writes[i].pTexelBufferView = &info.buffer_view.value();
-        }
-    }
-    vk::UpdateDescriptorSets(device_->handle(), descriptor_writes.size(), descriptor_writes.data(), 0, NULL);
-}
-
-BarrierQueueFamilyBase::QueueFamilyObjs::~QueueFamilyObjs() {
-    delete command_buffer2;
-    delete command_buffer;
-    delete command_pool;
-    delete queue;
-}
-
-void BarrierQueueFamilyBase::QueueFamilyObjs::Init(vkt::Device *device, uint32_t qf_index, VkQueue qf_queue,
-                                                   VkCommandPoolCreateFlags cp_flags) {
-    index = qf_index;
-    queue = new vkt::Queue(qf_queue, qf_index);
-    command_pool = new vkt::CommandPool(*device, qf_index, cp_flags);
-    command_buffer = new vkt::CommandBuffer(device, command_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, queue);
-    command_buffer2 = new vkt::CommandBuffer(device, command_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, queue);
-}
-
-BarrierQueueFamilyBase::Context::Context(VkLayerTest *test, const std::vector<uint32_t> &queue_family_indices) : layer_test(test) {
-    if (0 == queue_family_indices.size()) {
-        return;  // This is invalid
-    }
-    vkt::Device *device_obj = layer_test->DeviceObj();
-    queue_families.reserve(queue_family_indices.size());
-    default_index = queue_family_indices[0];
-    for (auto qfi : queue_family_indices) {
-        VkQueue queue = device_obj->queue_family_queues(qfi)[0]->handle();
-        queue_families.emplace(std::make_pair(qfi, QueueFamilyObjs()));
-        queue_families[qfi].Init(device_obj, qfi, queue, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
-    }
-    Reset();
-}
-
-void BarrierQueueFamilyBase::Context::Reset() {
-    layer_test->DeviceObj()->wait();
-    for (auto &qf : queue_families) {
-        vk::ResetCommandPool(layer_test->device(), qf.second.command_pool->handle(), 0);
-    }
-}
-
-void BarrierQueueFamilyTestHelper::Init(std::vector<uint32_t> *families, bool image_memory, bool buffer_memory) {
-    vkt::Device *device_obj = context_->layer_test->DeviceObj();
-
-    image_.Init(32, 32, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_IMAGE_TILING_OPTIMAL, 0, families,
-                image_memory);
-
-    ASSERT_TRUE(image_.initialized());
-
-    image_barrier_ = image_.image_memory_barrier(VK_ACCESS_TRANSFER_READ_BIT, VK_ACCESS_TRANSFER_READ_BIT, image_.Layout(),
-                                                 image_.Layout(), image_.subresource_range(VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1));
-
-    VkMemoryPropertyFlags mem_prop = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-    auto buffer_ci = vkt::Buffer::create_info(256, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, families);
-    if (buffer_memory) {
-        buffer_.init(*device_obj, buffer_ci, mem_prop);
-    } else {
-        buffer_.init_no_mem(*device_obj, buffer_ci);
-    }
-    ASSERT_TRUE(buffer_.initialized());
-    buffer_barrier_ = buffer_.buffer_memory_barrier(VK_ACCESS_TRANSFER_READ_BIT, VK_ACCESS_TRANSFER_READ_BIT, 0, VK_WHOLE_SIZE);
-}
-
-void Barrier2QueueFamilyTestHelper::Init(std::vector<uint32_t> *families, bool image_memory, bool buffer_memory) {
-    vkt::Device *device_obj = context_->layer_test->DeviceObj();
-
-    image_.Init(32, 32, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_IMAGE_TILING_OPTIMAL, 0, families,
-                image_memory);
-
-    ASSERT_TRUE(image_.initialized());
-
-    image_barrier_ = image_.image_memory_barrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                                                 VK_ACCESS_TRANSFER_READ_BIT, VK_ACCESS_TRANSFER_READ_BIT, image_.Layout(),
-                                                 image_.Layout(), image_.subresource_range(VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1));
-
-    VkMemoryPropertyFlags mem_prop = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-    auto buffer_ci = vkt::Buffer::create_info(256, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, families);
-    if (buffer_memory) {
-        buffer_.init(*device_obj, buffer_ci, mem_prop);
-    } else {
-        buffer_.init_no_mem(*device_obj, buffer_ci);
-    }
-    ASSERT_TRUE(buffer_.initialized());
-    buffer_barrier_ = buffer_.buffer_memory_barrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                                                    VK_ACCESS_TRANSFER_READ_BIT, VK_ACCESS_TRANSFER_READ_BIT, 0, VK_WHOLE_SIZE);
-}
-
-BarrierQueueFamilyBase::QueueFamilyObjs *BarrierQueueFamilyBase::GetQueueFamilyInfo(Context *context, uint32_t qfi) {
-    QueueFamilyObjs *qf;
-
-    auto qf_it = context->queue_families.find(qfi);
-    if (qf_it != context->queue_families.end()) {
-        qf = &(qf_it->second);
-    } else {
-        qf = &(context->queue_families[context->default_index]);
-    }
-    return qf;
-}
-
-void BarrierQueueFamilyTestHelper::operator()(const std::string &img_err, const std::string &buf_err, uint32_t src, uint32_t dst,
-                                              uint32_t queue_family_index, Modifier mod) {
-    auto &monitor = context_->layer_test->Monitor();
-    const bool has_img_err = img_err.size() > 0;
-    const bool has_buf_err = buf_err.size() > 0;
-    bool positive = !has_img_err && !has_buf_err;
-    if (has_img_err) monitor.SetDesiredFailureMsg(kErrorBit | kWarningBit, img_err);
-    if (has_buf_err) monitor.SetDesiredFailureMsg(kErrorBit | kWarningBit, buf_err);
-
-    image_barrier_.srcQueueFamilyIndex = src;
-    image_barrier_.dstQueueFamilyIndex = dst;
-    buffer_barrier_.srcQueueFamilyIndex = src;
-    buffer_barrier_.dstQueueFamilyIndex = dst;
-
-    QueueFamilyObjs *qf = GetQueueFamilyInfo(context_, queue_family_index);
-
-    vkt::CommandBuffer *command_buffer = qf->command_buffer;
-    for (int cb_repeat = 0; cb_repeat < (mod == Modifier::DOUBLE_COMMAND_BUFFER ? 2 : 1); cb_repeat++) {
-        command_buffer->begin();
-        for (int repeat = 0; repeat < (mod == Modifier::DOUBLE_RECORD ? 2 : 1); repeat++) {
-            vk::CmdPipelineBarrier(command_buffer->handle(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                                   VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 1, &buffer_barrier_, 1, &image_barrier_);
-        }
-        command_buffer->end();
-        command_buffer = qf->command_buffer2;  // Second pass (if any) goes to the secondary command_buffer.
-    }
-
-    if (queue_family_index != kInvalidQueueFamily) {
-        if (mod == Modifier::DOUBLE_COMMAND_BUFFER) {
-            // the Fence resolves to VK_NULL_HANLE... i.e. no fence
-            qf->queue->submit({{qf->command_buffer, qf->command_buffer2}}, vkt::Fence(), positive);
-        } else {
-            qf->command_buffer->QueueCommandBuffer(positive);  // Check for success on positive tests only
-        }
-    }
-
-    if (!positive) {
-        monitor.VerifyFound();
-    }
-    context_->Reset();
-}
-
-void Barrier2QueueFamilyTestHelper::operator()(const std::string &img_err, const std::string &buf_err, uint32_t src, uint32_t dst,
-                                               uint32_t queue_family_index, Modifier mod) {
-    auto &monitor = context_->layer_test->Monitor();
-    bool positive = true;
-    if (img_err.length()) {
-        monitor.SetDesiredFailureMsg(kErrorBit | kWarningBit, img_err);
-        positive = false;
-    }
-    if (buf_err.length()) {
-        monitor.SetDesiredFailureMsg(kErrorBit | kWarningBit, buf_err);
-        positive = false;
-    }
-
-    image_barrier_.srcQueueFamilyIndex = src;
-    image_barrier_.dstQueueFamilyIndex = dst;
-    buffer_barrier_.srcQueueFamilyIndex = src;
-    buffer_barrier_.dstQueueFamilyIndex = dst;
-
-    VkDependencyInfoKHR dep_info = vku::InitStructHelper();
-    dep_info.bufferMemoryBarrierCount = 1;
-    dep_info.pBufferMemoryBarriers = &buffer_barrier_;
-    dep_info.imageMemoryBarrierCount = 1;
-    dep_info.pImageMemoryBarriers = &image_barrier_;
-
-    QueueFamilyObjs *qf = GetQueueFamilyInfo(context_, queue_family_index);
-
-    vkt::CommandBuffer *command_buffer = qf->command_buffer;
-    for (int cb_repeat = 0; cb_repeat < (mod == Modifier::DOUBLE_COMMAND_BUFFER ? 2 : 1); cb_repeat++) {
-        command_buffer->begin();
-        for (int repeat = 0; repeat < (mod == Modifier::DOUBLE_RECORD ? 2 : 1); repeat++) {
-            vk::CmdPipelineBarrier2KHR(command_buffer->handle(), &dep_info);
-        }
-        command_buffer->end();
-        command_buffer = qf->command_buffer2;  // Second pass (if any) goes to the secondary command_buffer.
-    }
-
-    if (queue_family_index != kInvalidQueueFamily) {
-        if (mod == Modifier::DOUBLE_COMMAND_BUFFER) {
-            // the Fence resolves to VK_NULL_HANLE... i.e. no fence
-            qf->queue->submit({{qf->command_buffer, qf->command_buffer2}}, vkt::Fence(), positive);
-        } else {
-            qf->command_buffer->QueueCommandBuffer(positive);  // Check for success on positive tests only
-        }
-    }
-
-    if (!positive) {
-        monitor.VerifyFound();
-    }
-    context_->Reset();
-}
-
-void VkSyncValTest::InitSyncValFramework(bool enable_queue_submit_validation) {
-    // Enable synchronization validation
-
-    // Optional feature definition, add if requested (but they can't be defined at the conditional scope)
-    const char *kEnableQueuSubmitSyncValidation[] = {"VALIDATION_CHECK_ENABLE_SYNCHRONIZATION_VALIDATION_QUEUE_SUBMIT"};
-    const VkLayerSettingEXT settings[] = {
-        {OBJECT_LAYER_NAME, "enables", VK_LAYER_SETTING_TYPE_STRING_EXT, 1, kEnableQueuSubmitSyncValidation}};
-    const VkLayerSettingsCreateInfoEXT qs_settings{VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr,
-                                                   static_cast<uint32_t>(std::size(settings)), settings};
-
-    if (enable_queue_submit_validation) {
-        features_.pNext = &qs_settings;
-    }
-    InitFramework(&features_);
 }
 
 void print_android(const char *c) {
@@ -1397,18 +965,22 @@ int main(int argc, char **argv) {
     int result;
 
 #if defined(_WIN32)
-#if !defined(NDEBUG)
-    _CrtSetReportMode(_CRT_WARN, _CRTDBG_MODE_FILE);
-    _CrtSetReportFile(_CRT_WARN, _CRTDBG_FILE_STDERR);
-    _CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_FILE);
-    _CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDERR);
-#endif
-    // Avoid "Abort, Retry, Ignore" dialog boxes
-    _set_error_mode(_OUT_TO_STDERR);
-    _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
-    SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);
-    _CrtSetReportMode(_CRT_ERROR, _CRTDBG_MODE_FILE);
-    _CrtSetReportFile(_CRT_ERROR, _CRTDBG_FILE_STDERR);
+    // --gtest_break_on_failure disables gtest suppression of debug message boxes.
+    // If this flag is set, then limit the VVL test framework in how it configures CRT
+    // in order not to change expected gtest behavior (with regard to --gtest_break_on_failure).
+    bool break_on_failure = false;
+    for (int i = 1; i < argc; i++) {
+        if (std::string_view(argv[i]) == "--gtest_break_on_failure") {
+            break_on_failure = true;
+            break;
+        }
+    }
+    if (!break_on_failure) {
+        // Disable message box for: "Errors, unrecoverable problems, and issues that require immediate attention."
+        // This does not include asserts. GTest does similar configuration for asserts.
+        _CrtSetReportMode(_CRT_ERROR, _CRTDBG_MODE_FILE);
+        _CrtSetReportFile(_CRT_ERROR, _CRTDBG_FILE_STDERR);
+    }
 #endif
 
     ::testing::InitGoogleTest(&argc, argv);

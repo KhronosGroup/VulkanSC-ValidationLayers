@@ -51,7 +51,10 @@ bool BestPractices::ValidateMultisampledBlendingArm(uint32_t createInfoCount, co
             return skip;
         }
 
-        auto rp_state = Get<RENDER_PASS_STATE>(create_info->renderPass);
+        auto rp_state = Get<vvl::RenderPass>(create_info->renderPass);
+        if (!rp_state) {
+            continue;
+        }
         const auto& subpass = rp_state->createInfo.pSubpasses[create_info->subpass];
 
         // According to spec, pColorBlendState must be ignored if subpass does not have color attachments.
@@ -137,31 +140,14 @@ bool BestPractices::PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPi
                 VendorSpecificTag(kBPVendorArm));
         }
 
-        const PipelineStageState* fragment_stage = nullptr;
-        for (auto& stage_state : pipeline.stage_states) {
-            if (stage_state.GetStage() == VK_SHADER_STAGE_FRAGMENT_BIT) {
-                fragment_stage = &stage_state;
-                break;
-            }
-        }
-
-        // Only validate pipelines that contain shader stages
-        if (pipeline.pre_raster_state && pipeline.fragment_shader_state) {
-            if (fragment_stage && fragment_stage->entrypoint && fragment_stage->spirv_state) {
-                const auto& rp_state = pipeline.RenderPassState();
-                if (rp_state && rp_state->UsesDynamicRendering()) {
-                    skip |= ValidateFsOutputsAgainstDynamicRenderingRenderPass(
-                        *fragment_stage->spirv_state.get(), *fragment_stage->entrypoint, pipeline, create_info_loc);
-                } else {
-                    skip |= ValidateFsOutputsAgainstRenderPass(*fragment_stage->spirv_state.get(), *fragment_stage->entrypoint,
-                                                               pipeline, pipeline.Subpass(), create_info_loc);
-                }
-            }
-        }
         skip |= VendorCheckEnabled(kBPVendorArm) && ValidateMultisampledBlendingArm(createInfoCount, pCreateInfos, create_info_loc);
 
+        const auto* graphics_lib_info = vku::FindStructInPNextChain<VkGraphicsPipelineLibraryCreateInfoEXT>(create_info.pNext);
         if (pCreateInfos[i].renderPass == VK_NULL_HANDLE &&
-            !vku::FindStructInPNextChain<VkPipelineRenderingCreateInfoKHR>(pCreateInfos[i].pNext)) {
+            !vku::FindStructInPNextChain<VkPipelineRenderingCreateInfoKHR>(pCreateInfos[i].pNext) &&
+            (!graphics_lib_info ||
+             (graphics_lib_info->flags & (VK_GRAPHICS_PIPELINE_LIBRARY_FRAGMENT_SHADER_BIT_EXT |
+                                          VK_GRAPHICS_PIPELINE_LIBRARY_FRAGMENT_OUTPUT_INTERFACE_BIT_EXT)) != 0)) {
             skip |= LogWarning(kVUID_BestPractices_Pipeline_NoRendering, device, create_info_loc,
                                "renderPass is VK_NULL_HANDLE and pNext chain does not contain VkPipelineRenderingCreateInfoKHR.");
         }
@@ -179,6 +165,28 @@ bool BestPractices::PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPi
                     kVUID_BestPractices_CreatePipelines_MinimizeNumDynamicStates, device, create_info_loc,
                     "%s Performance warning: Dynamic States usage incurs a performance cost. Ensure that they are truly needed",
                     VendorSpecificTag(kBPVendorAMD));
+            }
+        }
+
+        for (const auto& stage : pipeline.stage_states) {
+            if (stage.GetStage() != VK_SHADER_STAGE_FRAGMENT_BIT) {
+                continue;
+            }
+            const auto& rp_state = pipeline.RenderPassState();
+            if (rp_state && !rp_state->UsesDynamicRendering() && stage.entrypoint) {
+                auto rpci = rp_state->createInfo.ptr();
+                auto subpass = pipeline.Subpass();
+                for (const auto& variable : stage.entrypoint->resource_interface_variables) {
+                    if (!variable.decorations.Has(DecorationSet::input_attachment_bit)) {
+                        continue;
+                    }
+                    auto slot = variable.decorations.input_attachment_index_start;
+                    if (!rpci->pSubpasses[subpass].pInputAttachments || slot >= rpci->pSubpasses[subpass].inputAttachmentCount) {
+                        const LogObjectList objlist(stage.module_state->Handle(), pipeline.PipelineLayoutState()->layout());
+                        skip |= LogWarning(kVUID_BestPractices_Shader_MissingInputAttachment, device, error_obj.location,
+                                           "Shader consumes input attachment index %" PRIu32 " but not provided in subpass", slot);
+                    }
+                }
             }
         }
     }
@@ -245,13 +253,13 @@ static std::vector<bp_state::AttachmentInfo> GetAttachmentAccess(bp_state::Pipel
 }
 
 bp_state::Pipeline::Pipeline(const ValidationStateTracker* state_data, const VkGraphicsPipelineCreateInfo* pCreateInfo,
-                             std::shared_ptr<const RENDER_PASS_STATE>&& rpstate,
+                             std::shared_ptr<const vvl::RenderPass>&& rpstate,
                              std::shared_ptr<const PIPELINE_LAYOUT_STATE>&& layout, CreateShaderModuleStates* csm_states)
     : PIPELINE_STATE(state_data, pCreateInfo, std::move(rpstate), std::move(layout), csm_states),
       access_framebuffer_attachments(GetAttachmentAccess(*this)) {}
 
 std::shared_ptr<PIPELINE_STATE> BestPractices::CreateGraphicsPipelineState(const VkGraphicsPipelineCreateInfo* pCreateInfo,
-                                                                           std::shared_ptr<const RENDER_PASS_STATE>&& render_pass,
+                                                                           std::shared_ptr<const vvl::RenderPass>&& render_pass,
                                                                            std::shared_ptr<const PIPELINE_LAYOUT_STATE>&& layout,
                                                                            CreateShaderModuleStates* csm_states) const {
     return std::static_pointer_cast<PIPELINE_STATE>(
@@ -370,7 +378,7 @@ bool BestPractices::ValidateCreateComputePipelineArm(const VkComputePipelineCrea
     // or we may have a linearly tiled image, but these cases are quite unlikely in practice.
     bool accesses_2d = false;
     for (const auto& variable : entrypoint->resource_interface_variables) {
-        if (variable.image_dim != spv::Dim1D && variable.image_dim != spv::DimBuffer) {
+        if (variable.info.image_dim != spv::Dim1D && variable.info.image_dim != spv::DimBuffer) {
             accesses_2d = true;
             break;
         }
@@ -421,8 +429,8 @@ bool BestPractices::ValidateCreateComputePipelineAmd(const VkComputePipelineCrea
 }
 
 void BestPractices::PreCallRecordCmdBindPipeline(VkCommandBuffer commandBuffer, VkPipelineBindPoint pipelineBindPoint,
-                                                 VkPipeline pipeline) {
-    StateTracker::PreCallRecordCmdBindPipeline(commandBuffer, pipelineBindPoint, pipeline);
+                                                 VkPipeline pipeline, const RecordObject& record_obj) {
+    StateTracker::PreCallRecordCmdBindPipeline(commandBuffer, pipelineBindPoint, pipeline, record_obj);
 
     auto pipeline_info = Get<PIPELINE_STATE>(pipeline);
     auto cb = GetWrite<bp_state::CommandBuffer>(commandBuffer);
@@ -522,9 +530,9 @@ void BestPractices::PostCallRecordCmdBindPipeline(VkCommandBuffer commandBuffer,
 void BestPractices::PreCallRecordCreateGraphicsPipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t createInfoCount,
                                                          const VkGraphicsPipelineCreateInfo* pCreateInfos,
                                                          const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,
-                                                         void* cgpl_state) {
+                                                         const RecordObject& record_obj, void* cgpl_state) {
     ValidationStateTracker::PreCallRecordCreateGraphicsPipelines(device, pipelineCache, createInfoCount, pCreateInfos, pAllocator,
-                                                                 pPipelines);
+                                                                 pPipelines, record_obj);
     // AMD best practice
     num_pso_ += createInfoCount;
 }
@@ -534,14 +542,14 @@ bool BestPractices::PreCallValidateCreatePipelineLayout(VkDevice device, const V
                                                         const ErrorObject& error_obj) const {
     bool skip = false;
     if (VendorCheckEnabled(kBPVendorAMD)) {
-        uint32_t descriptor_size = enabled_features.core.robustBufferAccess ? 4 : 2;
+        uint32_t descriptor_size = enabled_features.robustBufferAccess ? 4 : 2;
         // Descriptor sets cost 1 DWORD each.
         // Dynamic buffers cost 2 DWORDs each when robust buffer access is OFF.
         // Dynamic buffers cost 4 DWORDs each when robust buffer access is ON.
         // Push constants cost 1 DWORD per 4 bytes in the Push constant range.
         uint32_t pipeline_size = pCreateInfo->setLayoutCount;  // in DWORDS
         for (uint32_t i = 0; i < pCreateInfo->setLayoutCount; i++) {
-            auto descriptor_set_layout_state = Get<cvdescriptorset::DescriptorSetLayout>(pCreateInfo->pSetLayouts[i]);
+            auto descriptor_set_layout_state = Get<vvl::DescriptorSetLayout>(pCreateInfo->pSetLayouts[i]);
             pipeline_size += descriptor_set_layout_state->GetDynamicDescriptorCount() * descriptor_size;
         }
 
@@ -566,7 +574,7 @@ bool BestPractices::PreCallValidateCreatePipelineLayout(VkDevice device, const V
         size_t fast_space_usage = 0;
 
         for (uint32_t i = 0; i < pCreateInfo->setLayoutCount; ++i) {
-            auto descriptor_set_layout_state = Get<cvdescriptorset::DescriptorSetLayout>(pCreateInfo->pSetLayouts[i]);
+            auto descriptor_set_layout_state = Get<vvl::DescriptorSetLayout>(pCreateInfo->pSetLayouts[i]);
             for (const auto& binding : descriptor_set_layout_state->GetBindings()) {
                 if (binding.descriptorType == VK_DESCRIPTOR_TYPE_SAMPLER) {
                     has_separate_sampler = true;
@@ -658,141 +666,6 @@ bool BestPractices::PreCallValidateCmdBindPipeline(VkCommandBuffer commandBuffer
                                   "and/or mesh shaders. Group draw calls using these shader stages together.",
                                   VendorSpecificTag(kBPVendorNVIDIA));
             // Do not set 'skip' so the number of switches gets properly counted after the message.
-        }
-    }
-
-    return skip;
-}
-
-bool BestPractices::ValidateFsOutputsAgainstRenderPass(const SPIRV_MODULE_STATE& module_state, const EntryPoint& entrypoint,
-                                                       const PIPELINE_STATE& pipeline, uint32_t subpass_index,
-                                                       const Location& create_info_loc) const {
-    bool skip = false;
-
-    struct Attachment {
-        const VkAttachmentReference2* reference = nullptr;
-        const VkAttachmentDescription2* attachment = nullptr;
-        const StageInteraceVariable* output = nullptr;
-    };
-    std::map<uint32_t, Attachment> location_map;
-
-    const auto& rp_state = pipeline.RenderPassState();
-    if (rp_state && !rp_state->UsesDynamicRendering()) {
-        const auto rpci = rp_state->createInfo.ptr();
-        const auto subpass = rpci->pSubpasses[subpass_index];
-        for (uint32_t i = 0; i < subpass.colorAttachmentCount; ++i) {
-            auto const& reference = subpass.pColorAttachments[i];
-            location_map[i].reference = &reference;
-            if (reference.attachment != VK_ATTACHMENT_UNUSED &&
-                rpci->pAttachments[reference.attachment].format != VK_FORMAT_UNDEFINED) {
-                location_map[i].attachment = &rpci->pAttachments[reference.attachment];
-            }
-        }
-    }
-
-    // TODO: dual source blend index (spv::DecIndex, zero if not provided)
-    for (const auto* variable : entrypoint.user_defined_interface_variables) {
-        if ((variable->storage_class != spv::StorageClassOutput) || variable->interface_slots.empty()) {
-            continue;  // not an output interface
-        }
-        // It is not allowed to have Block Fragment or 64-bit vectors output in Frag shader
-        // This means all Locations in slots will be the same
-        location_map[variable->interface_slots[0].Location()].output = variable;
-    }
-
-    const auto* ms_state = pipeline.MultisampleState();
-    const bool alpha_to_coverage_enabled = ms_state && (ms_state->alphaToCoverageEnable == VK_TRUE);
-
-    // Don't check any color attachments if rasterization is disabled
-    const auto raster_state = pipeline.RasterizationState();
-    if (raster_state && !raster_state->rasterizerDiscardEnable) {
-        for (const auto& location_it : location_map) {
-            const auto reference = location_it.second.reference;
-            if (reference != nullptr && reference->attachment == VK_ATTACHMENT_UNUSED) {
-                continue;
-            }
-
-            const auto location = location_it.first;
-            const auto attachment = location_it.second.attachment;
-            const auto output = location_it.second.output;
-            if (attachment && !output) {
-                const auto& attachments = pipeline.Attachments();
-                if (location < attachments.size() && attachments[location].colorWriteMask != 0) {
-                    skip |= LogWarning(kVUID_BestPractices_Shader_InputNotProduced, module_state.handle(), create_info_loc,
-                                       "Attachment %" PRIu32
-                                       " not written by fragment shader; undefined values will be written to attachment",
-                                       location);
-                }
-            } else if (!attachment && output) {
-                if (!(alpha_to_coverage_enabled && location == 0)) {
-                    skip |=
-                        LogWarning(kVUID_BestPractices_Shader_OutputNotConsumed, module_state.handle(), create_info_loc,
-                                   "fragment shader writes to output location %" PRIu32 " with no matching attachment", location);
-                }
-            } else if (attachment && output) {
-                const auto attachment_type = GetFormatType(attachment->format);
-                const auto output_type = module_state.GetNumericType(output->type_id);
-
-                // Type checking
-                if (!(output_type & attachment_type)) {
-                    skip |= LogWarning(
-                        kVUID_BestPractices_Shader_FragmentOutputMismatch, module_state.handle(), create_info_loc,
-                        "Attachment %" PRIu32
-                        " of type `%s` does not match fragment shader output type of `%s`; resulting values are undefined",
-                        location, string_VkFormat(attachment->format), module_state.DescribeType(output->type_id).c_str());
-                }
-            } else {            // !attachment && !output
-                assert(false);  // at least one exists in the map
-            }
-        }
-    }
-
-    return skip;
-}
-
-bool BestPractices::ValidateFsOutputsAgainstDynamicRenderingRenderPass(const SPIRV_MODULE_STATE& module_state,
-                                                                       const EntryPoint& entrypoint, const PIPELINE_STATE& pipeline,
-                                                                       const Location& create_info_loc) const {
-    bool skip = false;
-
-    struct Attachment {
-        const StageInteraceVariable* output = nullptr;
-    };
-    std::map<uint32_t, Attachment> location_map;
-
-    // TODO: dual source blend index (spv::DecIndex, zero if not provided)
-    for (const auto* variable : entrypoint.user_defined_interface_variables) {
-        if ((variable->storage_class != spv::StorageClassOutput) || variable->interface_slots.empty()) {
-            continue;  // not an output interface
-        }
-        // It is not allowed to have Block Fragment or 64-bit vectors output in Frag shader
-        // This means all Locations in slots will be the same
-        location_map[variable->interface_slots[0].Location()].output = variable;
-    }
-
-    for (uint32_t location = 0; location < location_map.size(); ++location) {
-        const auto output = location_map[location].output;
-
-        const auto& rp_state = pipeline.RenderPassState();
-        const auto& attachments = pipeline.Attachments();
-        if (!output && location < attachments.size() && attachments[location].colorWriteMask != 0) {
-            skip |= LogWarning(
-                kVUID_BestPractices_Shader_InputNotProduced, module_state.handle(), create_info_loc,
-                "Attachment %" PRIu32 " not written by fragment shader; undefined values will be written to attachment", location);
-        } else if (pipeline.fragment_output_state && output &&
-                   (location < rp_state->dynamic_rendering_pipeline_create_info.colorAttachmentCount)) {
-            auto format = rp_state->dynamic_rendering_pipeline_create_info.pColorAttachmentFormats[location];
-            const auto attachment_type = GetFormatType(format);
-            const auto output_type = module_state.GetNumericType(output->type_id);
-
-            // Type checking
-            if (!(output_type & attachment_type)) {
-                skip |=
-                    LogWarning(kVUID_BestPractices_Shader_FragmentOutputMismatch, module_state.handle(), create_info_loc,
-                               "Attachment %" PRIu32
-                               " of type `%s` does not match fragment shader output type of `%s`; resulting values are undefined",
-                               location, string_VkFormat(format), module_state.DescribeType(output->type_id).c_str());
-            }
         }
     }
 

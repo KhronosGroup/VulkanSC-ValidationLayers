@@ -26,12 +26,31 @@ void VkSCRenderFramework::InitFramework(void *instance_pnext) {
     VkRenderFramework::InitFramework(instance_pnext);
 }
 
+void VkSCRenderFramework::InitState(VkPhysicalDeviceFeatures *features, void *create_device_pnext,
+                                    const VkCommandPoolCreateFlags flags) {
+    VkRenderFramework::InitState(features, create_device_pnext, flags);
+}
+
 VkPipelineCache VkSCRenderFramework::GetDefaultPipelineCache() {
     if (default_pipeline_cache_ == VK_NULL_HANDLE) {
         vksc::CreatePipelineCache(m_device->handle(), &vksc::GetDefaultPipelineCacheCreateInfo(), nullptr,
                                   &default_pipeline_cache_);
     }
     return default_pipeline_cache_;
+}
+
+VkPhysicalDeviceVulkanSC10Features VkSCRenderFramework::GetVulkanSC10Features(VkPhysicalDevice phys_dev) {
+    auto sc_10_features = vku::InitStruct<VkPhysicalDeviceVulkanSC10Features>();
+    auto features2 = vku::InitStruct<VkPhysicalDeviceFeatures2>(&sc_10_features);
+    vksc::GetPhysicalDeviceFeatures2(phys_dev, &features2);
+    return sc_10_features;
+}
+
+VkPhysicalDeviceVulkanSC10Properties VkSCRenderFramework::GetVulkanSC10Properties(VkPhysicalDevice phys_dev) {
+    auto sc_10_props = vku::InitStruct<VkPhysicalDeviceVulkanSC10Properties>();
+    auto props2 = vku::InitStruct<VkPhysicalDeviceProperties2>(&sc_10_props);
+    vksc::GetPhysicalDeviceProperties2(phys_dev, &props2);
+    return sc_10_props;
 }
 
 bool VkSCRenderFramework::GLSLtoSPV(VkPhysicalDeviceLimits const *const device_limits, const VkShaderStageFlagBits shader_type,
@@ -58,19 +77,11 @@ VkSCCompatibilityRenderFramework::~VkSCCompatibilityRenderFramework() {
     s_instance = nullptr;
 }
 
-void VkSCCompatibilityRenderFramework::InitFramework(void *instance_pnext) {
-    VkSCRenderFramework::InitFramework(instance_pnext);
-
-    // Make KHR entry points of core functions available if running a Vulkan test
-    vksc::TestDispatchHelper::InitCompatibilityInstanceExtensionEntryPoints(instance_);
-}
+void VkSCCompatibilityRenderFramework::InitFramework(void *instance_pnext) { VkSCRenderFramework::InitFramework(instance_pnext); }
 
 void VkSCCompatibilityRenderFramework::InitState(VkPhysicalDeviceFeatures *features, void *create_device_pnext,
                                                  const VkCommandPoolCreateFlags flags) {
     VkSCRenderFramework::InitState(features, create_device_pnext, flags);
-
-    // Make KHR entry points of core functions available if running a Vulkan test
-    vksc::TestDispatchHelper::InitCompatibilityDeviceExtensionEntryPoints(instance_, *m_device);
 }
 
 bool VkSCCompatibilityRenderFramework::GLSLtoSPV(VkPhysicalDeviceLimits const *const device_limits,

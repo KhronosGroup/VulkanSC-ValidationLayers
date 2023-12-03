@@ -54,13 +54,15 @@ struct hash<SamplerUsedByImage> {
 };
 }  // namespace std
 
-class SAMPLER_STATE : public BASE_NODE {
+namespace vvl {
+
+class Sampler : public BASE_NODE {
   public:
     const VkSamplerCreateInfo createInfo;
     const VkSamplerYcbcrConversion samplerConversion;
     const VkSamplerCustomBorderColorCreateInfoEXT customCreateInfo;
 
-    SAMPLER_STATE(const VkSampler s, const VkSamplerCreateInfo *pci)
+    Sampler(const VkSampler s, const VkSamplerCreateInfo *pci)
         : BASE_NODE(s, kVulkanObjectTypeSampler),
           createInfo(*pci),
           samplerConversion(GetConversion(pci)),
@@ -81,30 +83,22 @@ class SAMPLER_STATE : public BASE_NODE {
     }
 };
 
-class SAMPLER_YCBCR_CONVERSION_STATE : public BASE_NODE {
+class SamplerYcbcrConversion : public BASE_NODE {
   public:
     const VkFormatFeatureFlags2KHR format_features;
     const VkFormat format;
     const VkFilter chromaFilter;
     const uint64_t external_format;
 
-    SAMPLER_YCBCR_CONVERSION_STATE(VkSamplerYcbcrConversion ycbcr, const VkSamplerYcbcrConversionCreateInfo *info,
-                                   VkFormatFeatureFlags2KHR features)
+    SamplerYcbcrConversion(VkSamplerYcbcrConversion ycbcr, const VkSamplerYcbcrConversionCreateInfo *info,
+                           VkFormatFeatureFlags2KHR features)
         : BASE_NODE(ycbcr, kVulkanObjectTypeSamplerYcbcrConversion),
           format_features(features),
           format(info->format),
           chromaFilter(info->chromaFilter),
-          external_format(GetExternalFormat(info)) {}
+          external_format(GetExternalFormat(info->pNext)) {}
 
     VkSamplerYcbcrConversion ycbcr_conversion() const { return handle_.Cast<VkSamplerYcbcrConversion>(); }
-
-  private:
-#ifdef VK_USE_PLATFORM_ANDROID_KHR
-    uint64_t GetExternalFormat(const VkSamplerYcbcrConversionCreateInfo *info) {
-        const VkExternalFormatANDROID *ext_format_android = vku::FindStructInPNextChain<VkExternalFormatANDROID>(info->pNext);
-        return ext_format_android ? ext_format_android->externalFormat : 0;
-    }
-#else
-    uint64_t GetExternalFormat(const VkSamplerYcbcrConversionCreateInfo *info) { return 0; }
-#endif  // VK_USE_PLATFORM_ANDROID_KHR
 };
+
+}  // namespace vvl

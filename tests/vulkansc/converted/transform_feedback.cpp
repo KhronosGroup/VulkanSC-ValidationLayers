@@ -56,7 +56,7 @@ static const char *kXfbVsSource = R"asm(
 
 void NegativeTransformFeedback::InitBasicTransformFeedback(void *pNextFeatures) {
     AddRequiredExtensions(VK_EXT_TRANSFORM_FEEDBACK_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceTransformFeedbackFeaturesEXT tf_features = vku::InitStructHelper(pNextFeatures);
     GetPhysicalDeviceFeatures2(tf_features);
@@ -64,7 +64,7 @@ void NegativeTransformFeedback::InitBasicTransformFeedback(void *pNextFeatures) 
         GTEST_SKIP() << "transformFeedback not supported";
     }
 
-    RETURN_IF_SKIP(InitState(nullptr, &tf_features, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    RETURN_IF_SKIP(InitState(nullptr, &tf_features));
 }
 
 TEST_F(NegativeTransformFeedback, FeatureEnabled) {
@@ -72,10 +72,10 @@ TEST_F(NegativeTransformFeedback, FeatureEnabled) {
 
     AddRequiredExtensions(VK_EXT_TRANSFORM_FEEDBACK_EXTENSION_NAME);
 
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     // transformFeedback not enabled
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
     CreatePipelineHelper pipe(*this);
@@ -116,7 +116,7 @@ TEST_F(NegativeTransformFeedback, FeatureEnabled) {
 TEST_F(NegativeTransformFeedback, NoBoundPipeline) {
     TEST_DESCRIPTION("Call vkCmdBeginTransformFeedbackEXT without a bound pipeline");
     SetTargetApiVersion(VK_API_VERSION_1_1);
-    RETURN_IF_SKIP(InitBasicTransformFeedback())
+    RETURN_IF_SKIP(InitBasicTransformFeedback());
 
     InitRenderTarget();
 
@@ -131,7 +131,7 @@ TEST_F(NegativeTransformFeedback, NoBoundPipeline) {
 
 TEST_F(NegativeTransformFeedback, CmdBindTransformFeedbackBuffersEXT) {
     TEST_DESCRIPTION("Submit invalid arguments to vkCmdBindTransformFeedbackBuffersEXT");
-    RETURN_IF_SKIP(InitBasicTransformFeedback())
+    RETURN_IF_SKIP(InitBasicTransformFeedback());
 
     InitRenderTarget();
 
@@ -235,7 +235,7 @@ TEST_F(NegativeTransformFeedback, CmdBindTransformFeedbackBuffersEXT) {
         }
 
         // Bind while transform feedback is active.
-        if (!IsDriver(VK_DRIVER_ID_MESA_RADV)) {
+        {
             vk::CmdBeginTransformFeedbackEXT(m_commandBuffer->handle(), 0, 1, nullptr, nullptr);
 
             VkDeviceSize const offsets[1]{};
@@ -282,7 +282,7 @@ TEST_F(NegativeTransformFeedback, CmdBindTransformFeedbackBuffersEXT) {
 
 TEST_F(NegativeTransformFeedback, CmdBeginTransformFeedbackEXT) {
     TEST_DESCRIPTION("Submit invalid arguments to vkCmdBeginTransformFeedbackEXT");
-    RETURN_IF_SKIP(InitBasicTransformFeedback())
+    RETURN_IF_SKIP(InitBasicTransformFeedback());
 
     InitRenderTarget();
 
@@ -356,7 +356,7 @@ TEST_F(NegativeTransformFeedback, CmdBeginTransformFeedbackEXT) {
     }
 
     // Begin while transform feedback is active.
-    if (!IsDriver(VK_DRIVER_ID_MESA_RADV)) {
+    {
         vk::CmdBeginTransformFeedbackEXT(m_commandBuffer->handle(), 0, 1, nullptr, nullptr);
 
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBeginTransformFeedbackEXT-None-02367");
@@ -369,7 +369,7 @@ TEST_F(NegativeTransformFeedback, CmdBeginTransformFeedbackEXT) {
 
 TEST_F(NegativeTransformFeedback, CmdEndTransformFeedbackEXT) {
     TEST_DESCRIPTION("Submit invalid arguments to vkCmdEndTransformFeedbackEXT");
-    RETURN_IF_SKIP(InitBasicTransformFeedback())
+    RETURN_IF_SKIP(InitBasicTransformFeedback());
 
     InitRenderTarget();
 
@@ -383,86 +383,84 @@ TEST_F(NegativeTransformFeedback, CmdEndTransformFeedbackEXT) {
     m_commandBuffer->BeginRenderPass(renderPassBeginInfo(), VK_SUBPASS_CONTENTS_INLINE);
     vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_);
 
-    if (!IsDriver(VK_DRIVER_ID_MESA_RADV)) {
+    {
+        // Activate transform feedback.
+        vk::CmdBeginTransformFeedbackEXT(m_commandBuffer->handle(), 0, 1, nullptr, nullptr);
+
         {
-            // Activate transform feedback.
-            vk::CmdBeginTransformFeedbackEXT(m_commandBuffer->handle(), 0, 1, nullptr, nullptr);
+            VkPhysicalDeviceTransformFeedbackPropertiesEXT tf_properties = vku::InitStructHelper();
+            GetPhysicalDeviceProperties2(tf_properties);
 
+            // Request a firstCounterBuffer that is too large.
             {
-                VkPhysicalDeviceTransformFeedbackPropertiesEXT tf_properties = vku::InitStructHelper();
-                GetPhysicalDeviceProperties2(tf_properties);
+                auto const firstCounterBuffer = tf_properties.maxTransformFeedbackBuffers;
 
-                // Request a firstCounterBuffer that is too large.
-                {
-                    auto const firstCounterBuffer = tf_properties.maxTransformFeedbackBuffers;
-
-                    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEndTransformFeedbackEXT-firstCounterBuffer-02376");
-                    m_errorMonitor->SetUnexpectedError("VUID-vkCmdEndTransformFeedbackEXT-firstCounterBuffer-02377");
-                    vk::CmdEndTransformFeedbackEXT(m_commandBuffer->handle(), firstCounterBuffer, 1, nullptr, nullptr);
-                    m_errorMonitor->VerifyFound();
-                }
-
-                // Request too many buffers.
-                if (tf_properties.maxTransformFeedbackBuffers < std::numeric_limits<uint32_t>::max()) {
-                    auto const counterBufferCount = tf_properties.maxTransformFeedbackBuffers + 1;
-
-                    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEndTransformFeedbackEXT-firstCounterBuffer-02377");
-                    vk::CmdEndTransformFeedbackEXT(m_commandBuffer->handle(), 0, counterBufferCount, nullptr, nullptr);
-                    m_errorMonitor->VerifyFound();
-                }
-            }
-
-            // Request an out-of-bounds location.
-            {
-                VkBufferCreateInfo info = vku::InitStructHelper();
-                info.usage = VK_BUFFER_USAGE_TRANSFORM_FEEDBACK_COUNTER_BUFFER_BIT_EXT;
-                info.size = 4;
-                vkt::Buffer const buffer_obj(*m_device, info);
-
-                VkDeviceSize const offsets[1]{1};
-
-                m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEndTransformFeedbackEXT-pCounterBufferOffsets-02378");
-                vk::CmdEndTransformFeedbackEXT(m_commandBuffer->handle(), 0, 1, &buffer_obj.handle(), offsets);
+                m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEndTransformFeedbackEXT-firstCounterBuffer-02376");
+                m_errorMonitor->SetUnexpectedError("VUID-vkCmdEndTransformFeedbackEXT-firstCounterBuffer-02377");
+                vk::CmdEndTransformFeedbackEXT(m_commandBuffer->handle(), firstCounterBuffer, 1, nullptr, nullptr);
                 m_errorMonitor->VerifyFound();
             }
 
-            // Request specific offsets without specifying buffers.
-            {
-                VkDeviceSize const offsets[1]{};
+            // Request too many buffers.
+            if (tf_properties.maxTransformFeedbackBuffers < std::numeric_limits<uint32_t>::max()) {
+                auto const counterBufferCount = tf_properties.maxTransformFeedbackBuffers + 1;
 
-                m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEndTransformFeedbackEXT-pCounterBuffer-02379");
-                vk::CmdEndTransformFeedbackEXT(m_commandBuffer->handle(), 0, 1, nullptr, offsets);
-                m_errorMonitor->VerifyFound();
-            }
-
-            // Don't set VK_BUFFER_USAGE_TRANSFORM_FEEDBACK_COUNTER_BUFFER_BIT_EXT.
-            {
-                VkBufferCreateInfo info = vku::InitStructHelper();
-                info.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-                info.size = 4;
-                vkt::Buffer const buffer_obj(*m_device, info);
-
-                m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEndTransformFeedbackEXT-pCounterBuffers-02380");
-                vk::CmdEndTransformFeedbackEXT(m_commandBuffer->handle(), 0, 1, &buffer_obj.handle(), nullptr);
+                m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEndTransformFeedbackEXT-firstCounterBuffer-02377");
+                vk::CmdEndTransformFeedbackEXT(m_commandBuffer->handle(), 0, counterBufferCount, nullptr, nullptr);
                 m_errorMonitor->VerifyFound();
             }
         }
 
-        // End while transform feedback is inactive.
+        // Request an out-of-bounds location.
         {
-            vk::CmdEndTransformFeedbackEXT(m_commandBuffer->handle(), 0, 1, nullptr, nullptr);
+            VkBufferCreateInfo info = vku::InitStructHelper();
+            info.usage = VK_BUFFER_USAGE_TRANSFORM_FEEDBACK_COUNTER_BUFFER_BIT_EXT;
+            info.size = 4;
+            vkt::Buffer const buffer_obj(*m_device, info);
 
-            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEndTransformFeedbackEXT-None-02375");
-            vk::CmdEndTransformFeedbackEXT(m_commandBuffer->handle(), 0, 1, nullptr, nullptr);
+            VkDeviceSize const offsets[1]{1};
+
+            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEndTransformFeedbackEXT-pCounterBufferOffsets-02378");
+            vk::CmdEndTransformFeedbackEXT(m_commandBuffer->handle(), 0, 1, &buffer_obj.handle(), offsets);
             m_errorMonitor->VerifyFound();
         }
+
+        // Request specific offsets without specifying buffers.
+        {
+            VkDeviceSize const offsets[1]{};
+
+            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEndTransformFeedbackEXT-pCounterBuffer-02379");
+            vk::CmdEndTransformFeedbackEXT(m_commandBuffer->handle(), 0, 1, nullptr, offsets);
+            m_errorMonitor->VerifyFound();
+        }
+
+        // Don't set VK_BUFFER_USAGE_TRANSFORM_FEEDBACK_COUNTER_BUFFER_BIT_EXT.
+        {
+            VkBufferCreateInfo info = vku::InitStructHelper();
+            info.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+            info.size = 4;
+            vkt::Buffer const buffer_obj(*m_device, info);
+
+            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEndTransformFeedbackEXT-pCounterBuffers-02380");
+            vk::CmdEndTransformFeedbackEXT(m_commandBuffer->handle(), 0, 1, &buffer_obj.handle(), nullptr);
+            m_errorMonitor->VerifyFound();
+        }
+    }
+
+    // End while transform feedback is inactive.
+    {
+        vk::CmdEndTransformFeedbackEXT(m_commandBuffer->handle(), 0, 1, nullptr, nullptr);
+
+        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEndTransformFeedbackEXT-None-02375");
+        vk::CmdEndTransformFeedbackEXT(m_commandBuffer->handle(), 0, 1, nullptr, nullptr);
+        m_errorMonitor->VerifyFound();
     }
 }
 
 TEST_F(NegativeTransformFeedback, ExecuteSecondaryCommandBuffers) {
     TEST_DESCRIPTION("Call CmdExecuteCommandBuffers when transform feedback is active");
     SetTargetApiVersion(VK_API_VERSION_1_1);
-    RETURN_IF_SKIP(InitBasicTransformFeedback())
+    RETURN_IF_SKIP(InitBasicTransformFeedback());
 
     InitRenderTarget();
 
@@ -491,7 +489,7 @@ TEST_F(NegativeTransformFeedback, ExecuteSecondaryCommandBuffers) {
     m_commandBuffer->begin();
     vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_);
     m_commandBuffer->BeginRenderPass(renderPassBeginInfo(), VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-CoreValidation-DrawState-InvalidCommandBuffer");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBeginTransformFeedbackEXT-commandBuffer-recording");
     vk::CmdBeginTransformFeedbackEXT(m_commandBuffer->handle(), 0, 1, nullptr, nullptr);
     m_errorMonitor->VerifyFound();
     // TODO - When proper VU above is added, see if 02286 is still needed
@@ -502,7 +500,7 @@ TEST_F(NegativeTransformFeedback, ExecuteSecondaryCommandBuffers) {
 
 TEST_F(NegativeTransformFeedback, BindPipeline) {
     TEST_DESCRIPTION("Call CmdBindPipeline when transform feedback is active");
-    RETURN_IF_SKIP(InitBasicTransformFeedback())
+    RETURN_IF_SKIP(InitBasicTransformFeedback());
 
     InitRenderTarget();
 
@@ -531,7 +529,7 @@ TEST_F(NegativeTransformFeedback, BindPipeline) {
 TEST_F(NegativeTransformFeedback, EndRenderPass) {
     TEST_DESCRIPTION("Call CmdEndRenderPass when transform feedback is active");
     SetTargetApiVersion(VK_API_VERSION_1_1);
-    RETURN_IF_SKIP(InitBasicTransformFeedback())
+    RETURN_IF_SKIP(InitBasicTransformFeedback());
 
     InitRenderTarget();
 
@@ -555,7 +553,7 @@ TEST_F(NegativeTransformFeedback, EndRenderPass) {
 
 TEST_F(NegativeTransformFeedback, DrawIndirectByteCountEXT) {
     TEST_DESCRIPTION("Test covered valid usage for vkCmdDrawIndirectByteCountEXT");
-    RETURN_IF_SKIP(InitBasicTransformFeedback())
+    RETURN_IF_SKIP(InitBasicTransformFeedback());
 
     InitRenderTarget();
 
@@ -649,14 +647,14 @@ TEST_F(NegativeTransformFeedback, UsingRasterizationStateStreamExtDisabled) {
     TEST_DESCRIPTION("Test using TestRasterizationStateStreamCreateInfoEXT but it doesn't enable geometryStreams.");
 
     AddRequiredExtensions(VK_EXT_TRANSFORM_FEEDBACK_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceTransformFeedbackFeaturesEXT transform_feedback_features = vku::InitStructHelper();
     transform_feedback_features.geometryStreams = VK_FALSE;  // Invalid
 
     // Extension enabled via VK_EXT_transform_feedback dependency
     VkPhysicalDeviceFeatures2KHR features2 = vku::InitStructHelper(&transform_feedback_features);
-    RETURN_IF_SKIP(InitState(nullptr, &features2))
+    RETURN_IF_SKIP(InitState(nullptr, &features2));
     InitRenderTarget();
 
     CreatePipelineHelper pipe(*this);
@@ -675,13 +673,7 @@ TEST_F(NegativeTransformFeedback, RuntimeSpirv) {
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_EXT_TRANSFORM_FEEDBACK_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
-
-    // Test currently crashes with valid SPIR-V
-    // Using EmitStreamVertex() with transfer_feedback_props.maxTransformFeedbackStreams
-    if (IsDriver(VK_DRIVER_ID_AMD_PROPRIETARY)) {
-        GTEST_SKIP() << "Test does not run on AMD proprietary driver";
-    }
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceTransformFeedbackFeaturesEXT transform_feedback_features =
         vku::InitStructHelper();
@@ -697,7 +689,7 @@ TEST_F(NegativeTransformFeedback, RuntimeSpirv) {
         GTEST_SKIP() << "transformFeedback or geometryStreams feature is not supported";
     }
 
-    RETURN_IF_SKIP(InitState(nullptr, &features2))
+    RETURN_IF_SKIP(InitState(nullptr, &features2));
     InitRenderTarget();
 
     VkPhysicalDeviceTransformFeedbackPropertiesEXT transform_feedback_props = vku::InitStructHelper();
@@ -1057,7 +1049,7 @@ TEST_F(NegativeTransformFeedback, PipelineRasterizationStateStreamCreateInfoEXT)
 
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_TRANSFORM_FEEDBACK_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceTransformFeedbackFeaturesEXT transform_feedback_features = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(transform_feedback_features);
@@ -1096,7 +1088,7 @@ TEST_F(NegativeTransformFeedback, PipelineRasterizationStateStreamCreateInfoEXT)
 TEST_F(NegativeTransformFeedback, CmdNextSubpass) {
     TEST_DESCRIPTION("Call CmdNextSubpass while transform feeback is active");
     SetTargetApiVersion(VK_API_VERSION_1_1);
-    RETURN_IF_SKIP(InitBasicTransformFeedback())
+    RETURN_IF_SKIP(InitBasicTransformFeedback());
 
     // A renderpass with two subpasses, both writing the same attachment.
     VkAttachmentDescription attach[] = {
@@ -1129,12 +1121,12 @@ TEST_F(NegativeTransformFeedback, CmdNextSubpass) {
 
     VkImageObj image(m_device);
     image.InitNoLayout(32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_IMAGE_TILING_OPTIMAL, 0);
-    VkImageView imageView = image.targetView(VK_FORMAT_R8G8B8A8_UNORM);
+    vkt::ImageView imageView = image.CreateView();
 
     VkFramebufferCreateInfo fbci = vku::InitStructHelper();
     fbci.renderPass = rp.handle();
     fbci.attachmentCount = 1;
-    fbci.pAttachments = &imageView;
+    fbci.pAttachments = &imageView.handle();
     fbci.width = 32;
     fbci.height = 32;
     fbci.layers = 1;
@@ -1166,7 +1158,7 @@ TEST_F(NegativeTransformFeedback, CmdNextSubpass) {
 
 TEST_F(NegativeTransformFeedback, CmdBeginTransformFeedbackOutsideRenderPass) {
     TEST_DESCRIPTION("call vkCmdBeginTransformFeedbackEXT without renderpass");
-    RETURN_IF_SKIP(InitBasicTransformFeedback())
+    RETURN_IF_SKIP(InitBasicTransformFeedback());
     InitRenderTarget();
 
     CreatePipelineHelper pipe(*this);
@@ -1189,7 +1181,7 @@ TEST_F(NegativeTransformFeedback, CmdBeginTransformFeedbackOutsideRenderPass) {
 
 TEST_F(NegativeTransformFeedback, XfbExecutionModeCommand) {
     TEST_DESCRIPTION("missing Xfb execution mode");
-    RETURN_IF_SKIP(InitBasicTransformFeedback())
+    RETURN_IF_SKIP(InitBasicTransformFeedback());
 
     InitRenderTarget();
 
@@ -1210,7 +1202,7 @@ TEST_F(NegativeTransformFeedback, XfbExecutionModeCommand) {
 
 TEST_F(NegativeTransformFeedback, XfbExecutionModePipeline) {
     TEST_DESCRIPTION("missing Xfb execution mode");
-    RETURN_IF_SKIP(InitBasicTransformFeedback())
+    RETURN_IF_SKIP(InitBasicTransformFeedback());
 
     InitRenderTarget();
 

@@ -135,7 +135,7 @@ class SCCoreChecks : public SCValidationStateTracker<CoreChecks> {
 
     // Intercept instance creation to set up VUID filters
     void PreCallRecordCreateInstance(const VkInstanceCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator,
-                                     VkInstance* pInstance) override;
+                                     VkInstance* pInstance, const RecordObject& record_obj) override;
 
     // Functions requiring additional/modified validation for Vulkan SC
     bool PreCallValidateCreateInstance(const VkInstanceCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator,

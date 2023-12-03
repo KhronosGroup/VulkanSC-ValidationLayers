@@ -735,45 +735,27 @@ bool PreCallValidateCmdSetVertexInputEXT(VkCommandBuffer commandBuffer, uint32_t
 #ifdef VK_USE_PLATFORM_SCI
 bool PreCallValidateGetFenceSciSyncFenceNV(VkDevice device, const VkFenceGetSciSyncInfoNV* pGetSciSyncHandleInfo, void* pHandle,
                                            const ErrorObject& error_obj) const override;
-#endif  // VK_USE_PLATFORM_SCI
-#ifdef VK_USE_PLATFORM_SCI
 bool PreCallValidateGetFenceSciSyncObjNV(VkDevice device, const VkFenceGetSciSyncInfoNV* pGetSciSyncHandleInfo, void* pHandle,
                                          const ErrorObject& error_obj) const override;
-#endif  // VK_USE_PLATFORM_SCI
-#ifdef VK_USE_PLATFORM_SCI
 bool PreCallValidateImportFenceSciSyncFenceNV(VkDevice device, const VkImportFenceSciSyncInfoNV* pImportFenceSciSyncInfo,
                                               const ErrorObject& error_obj) const override;
-#endif  // VK_USE_PLATFORM_SCI
-#ifdef VK_USE_PLATFORM_SCI
 bool PreCallValidateImportFenceSciSyncObjNV(VkDevice device, const VkImportFenceSciSyncInfoNV* pImportFenceSciSyncInfo,
                                             const ErrorObject& error_obj) const override;
-#endif  // VK_USE_PLATFORM_SCI
-#ifdef VK_USE_PLATFORM_SCI
 bool PreCallValidateGetPhysicalDeviceSciSyncAttributesNV(VkPhysicalDevice physicalDevice,
                                                          const VkSciSyncAttributesInfoNV* pSciSyncAttributesInfo,
                                                          NvSciSyncAttrList pAttributes,
                                                          const ErrorObject& error_obj) const override;
-#endif  // VK_USE_PLATFORM_SCI
-#ifdef VK_USE_PLATFORM_SCI
 bool PreCallValidateGetSemaphoreSciSyncObjNV(VkDevice device, const VkSemaphoreGetSciSyncInfoNV* pGetSciSyncInfo, void* pHandle,
                                              const ErrorObject& error_obj) const override;
-#endif  // VK_USE_PLATFORM_SCI
-#ifdef VK_USE_PLATFORM_SCI
 bool PreCallValidateImportSemaphoreSciSyncObjNV(VkDevice device, const VkImportSemaphoreSciSyncInfoNV* pImportSemaphoreSciSyncInfo,
                                                 const ErrorObject& error_obj) const override;
-#endif  // VK_USE_PLATFORM_SCI
-#ifdef VK_USE_PLATFORM_SCI
 bool PreCallValidateGetMemorySciBufNV(VkDevice device, const VkMemoryGetSciBufInfoNV* pGetSciBufInfo, NvSciBufObj* pHandle,
                                       const ErrorObject& error_obj) const override;
-#endif  // VK_USE_PLATFORM_SCI
-#ifdef VK_USE_PLATFORM_SCI
 bool PreCallValidateGetPhysicalDeviceExternalMemorySciBufPropertiesNV(VkPhysicalDevice physicalDevice,
                                                                       VkExternalMemoryHandleTypeFlagBits handleType,
                                                                       NvSciBufObj handle,
                                                                       VkMemorySciBufPropertiesNV* pMemorySciBufProperties,
                                                                       const ErrorObject& error_obj) const override;
-#endif  // VK_USE_PLATFORM_SCI
-#ifdef VK_USE_PLATFORM_SCI
 bool PreCallValidateGetPhysicalDeviceSciBufAttributesNV(VkPhysicalDevice physicalDevice, NvSciBufAttrList pAttributes,
                                                         const ErrorObject& error_obj) const override;
 #endif  // VK_USE_PLATFORM_SCI
@@ -798,5 +780,11 @@ bool PreCallValidateGetScreenBufferPropertiesQNX(VkDevice device, const struct _
                                                  VkScreenBufferPropertiesQNX* pProperties,
                                                  const ErrorObject& error_obj) const override;
 #endif  // VK_USE_PLATFORM_SCREEN_QNX
-
+bool ValidatePipelineViewportStateCreateInfo(const VkPipelineViewportStateCreateInfo& info, const Location& loc) const;
+bool ValidatePipelineTessellationStateCreateInfo(const VkPipelineTessellationStateCreateInfo& info, const Location& loc) const;
+bool ValidatePipelineVertexInputStateCreateInfo(const VkPipelineVertexInputStateCreateInfo& info, const Location& loc) const;
+bool ValidatePipelineMultisampleStateCreateInfo(const VkPipelineMultisampleStateCreateInfo& info, const Location& loc) const;
+bool ValidatePipelineColorBlendStateCreateInfo(const VkPipelineColorBlendStateCreateInfo& info, const Location& loc) const;
+bool ValidatePipelineDepthStencilStateCreateInfo(const VkPipelineDepthStencilStateCreateInfo& info, const Location& loc) const;
+bool ValidatePipelineInputAssemblyStateCreateInfo(const VkPipelineInputAssemblyStateCreateInfo& info, const Location& loc) const;
 // NOLINTEND

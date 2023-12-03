@@ -24,3 +24,7 @@ template <>
 std::vector<VkGeometryTypeKHR> ValidationObject::ValidParamValues() const {
     return {};
 }
+template <>
+std::vector<VkBuildAccelerationStructureModeKHR> ValidationObject::ValidParamValues() const {
+    return {};
+}

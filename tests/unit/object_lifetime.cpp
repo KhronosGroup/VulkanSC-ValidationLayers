@@ -16,6 +16,7 @@
 #include "generated/enum_flag_bits.h"
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
+#include "../framework/descriptor_helper.h"
 
 // Validation of dispatchable handles is not performed until VVL's chassis will be
 // able to do this validation (if ever) instead of crashing (which is also an option).
@@ -23,7 +24,7 @@
 // dispatchable handle can cause a crash.
 TEST_F(NegativeObjectLifetime, DISABLED_CreateBufferUsingInvalidDevice) {
     TEST_DESCRIPTION("Create buffer using invalid device handle.");
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     VkBufferCreateInfo buffer_ci = vku::InitStructHelper();
     buffer_ci.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
@@ -38,7 +39,7 @@ TEST_F(NegativeObjectLifetime, DISABLED_CreateBufferUsingInvalidDevice) {
 
 TEST_F(NegativeObjectLifetime, CmdBufferBufferDestroyed) {
     TEST_DESCRIPTION("Attempt to draw with a command buffer that is invalid due to a buffer dependency being destroyed.");
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     VkBuffer buffer;
     VkDeviceMemory mem;
@@ -71,7 +72,7 @@ TEST_F(NegativeObjectLifetime, CmdBufferBufferDestroyed) {
     vk::CmdFillBuffer(m_commandBuffer->handle(), buffer, 0, VK_WHOLE_SIZE, 0);
     m_commandBuffer->end();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-CoreValidation-DrawState-InvalidCommandBuffer-VkBuffer");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkQueueSubmit-pCommandBuffers-00070");
     // Destroy buffer dependency prior to submit to cause ERROR
     vk::DestroyBuffer(m_device->device(), buffer, NULL);
 
@@ -86,7 +87,7 @@ TEST_F(NegativeObjectLifetime, CmdBufferBufferDestroyed) {
 }
 
 TEST_F(NegativeObjectLifetime, CmdBarrierBufferDestroyed) {
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     VkBufferCreateInfo buf_info = vku::InitStructHelper();
     buf_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
@@ -133,7 +134,7 @@ TEST_F(NegativeObjectLifetime, CmdBarrierBufferDestroyed) {
 }
 
 TEST_F(NegativeObjectLifetime, CmdBarrierImageDestroyed) {
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     vkt::Image image;
     vkt::DeviceMemory image_mem;
@@ -183,10 +184,10 @@ TEST_F(NegativeObjectLifetime, CmdBarrierImageDestroyed) {
 TEST_F(NegativeObjectLifetime, Sync2CmdBarrierBufferDestroyed) {
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
     VkPhysicalDeviceSynchronization2FeaturesKHR sync2_features = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(sync2_features);
-    RETURN_IF_SKIP(InitState(nullptr, &sync2_features, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    RETURN_IF_SKIP(InitState(nullptr, &sync2_features));
 
     VkBuffer buffer;
     VkDeviceMemory mem;
@@ -215,7 +216,7 @@ TEST_F(NegativeObjectLifetime, Sync2CmdBarrierBufferDestroyed) {
     err = vk::BindBufferMemory(m_device->device(), buffer, mem, 0);
     ASSERT_EQ(VK_SUCCESS, err);
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-CoreValidation-DrawState-InvalidCommandBuffer-VkDeviceMemory");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkEndCommandBuffer-commandBuffer-00059");
     m_commandBuffer->begin();
     VkBufferMemoryBarrier2KHR buf_barrier = vku::InitStructHelper();
     buf_barrier.buffer = buffer;
@@ -235,7 +236,7 @@ TEST_F(NegativeObjectLifetime, Sync2CmdBarrierBufferDestroyed) {
     vk::EndCommandBuffer(m_commandBuffer->handle());
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-CoreValidation-DrawState-InvalidCommandBuffer-VkDeviceMemory");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkQueueSubmit-pCommandBuffers-00070");
     VkSubmitInfo submit_info = vku::InitStructHelper();
     submit_info.commandBufferCount = 1;
     submit_info.pCommandBuffers = &m_commandBuffer->handle();
@@ -250,10 +251,10 @@ TEST_F(NegativeObjectLifetime, Sync2CmdBarrierBufferDestroyed) {
 TEST_F(NegativeObjectLifetime, Sync2CmdBarrierImageDestroyed) {
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
     VkPhysicalDeviceSynchronization2FeaturesKHR sync2_features = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(sync2_features);
-    RETURN_IF_SKIP(InitState(nullptr, &sync2_features, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    RETURN_IF_SKIP(InitState(nullptr, &sync2_features));
 
     VkImage image;
     VkDeviceMemory image_mem;
@@ -279,7 +280,7 @@ TEST_F(NegativeObjectLifetime, Sync2CmdBarrierImageDestroyed) {
     err = vk::BindImageMemory(m_device->device(), image, image_mem, 0);
     ASSERT_EQ(VK_SUCCESS, err);
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-CoreValidation-DrawState-InvalidCommandBuffer-VkDeviceMemory");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkEndCommandBuffer-commandBuffer-00059");
     m_commandBuffer->begin();
     VkImageMemoryBarrier2KHR img_barrier = vku::InitStructHelper();
     img_barrier.image = image;
@@ -298,7 +299,7 @@ TEST_F(NegativeObjectLifetime, Sync2CmdBarrierImageDestroyed) {
     vk::EndCommandBuffer(m_commandBuffer->handle());
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-CoreValidation-DrawState-InvalidCommandBuffer-VkDeviceMemory");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkQueueSubmit-pCommandBuffers-00070");
     VkSubmitInfo submit_info = vku::InitStructHelper();
     submit_info.commandBufferCount = 1;
     submit_info.pCommandBuffers = &m_commandBuffer->handle();
@@ -313,7 +314,7 @@ TEST_F(NegativeObjectLifetime, Sync2CmdBarrierImageDestroyed) {
 TEST_F(NegativeObjectLifetime, CmdBufferBufferViewDestroyed) {
     TEST_DESCRIPTION("Delete bufferView bound to cmd buffer, then attempt to submit cmd buffer.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     OneOffDescriptorSet descriptor_set(m_device,
@@ -401,7 +402,7 @@ TEST_F(NegativeObjectLifetime, CmdBufferBufferViewDestroyed) {
     VkSubmitInfo submit_info = vku::InitStructHelper();
     submit_info.commandBufferCount = 1;
     submit_info.pCommandBuffers = &m_commandBuffer->handle();
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-CoreValidation-DrawState-InvalidCommandBuffer-VkBufferView");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkQueueSubmit-pCommandBuffers-00070");
     vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
     m_errorMonitor->VerifyFound();
 }
@@ -441,7 +442,7 @@ TEST_F(NegativeObjectLifetime, CmdBufferImageDestroyed) {
         m_commandBuffer->end();
     }
     // Destroy image dependency prior to submit to cause ERROR
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-CoreValidation-DrawState-InvalidCommandBuffer-VkImage");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkQueueSubmit-pCommandBuffers-00070");
 
     VkSubmitInfo submit_info = vku::InitStructHelper();
     submit_info.commandBufferCount = 1;
@@ -454,7 +455,7 @@ TEST_F(NegativeObjectLifetime, CmdBufferImageDestroyed) {
 TEST_F(NegativeObjectLifetime, CmdBufferFramebufferImageDestroyed) {
     TEST_DESCRIPTION(
         "Attempt to draw with a command buffer that is invalid due to a framebuffer image dependency being destroyed.");
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     VkFormatProperties format_properties;
     VkResult err = VK_SUCCESS;
     vk::GetPhysicalDeviceFormatProperties(gpu(), VK_FORMAT_B8G8R8A8_UNORM, &format_properties);
@@ -511,7 +512,7 @@ TEST_F(NegativeObjectLifetime, CmdBufferFramebufferImageDestroyed) {
     }
     // Destroy image attached to framebuffer to invalidate cmd buffer
     // Now attempt to submit cmd buffer and verify error
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-CoreValidation-DrawState-InvalidCommandBuffer-VkImage");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkQueueSubmit-pCommandBuffers-00070");
     m_commandBuffer->QueueCommandBuffer(false);
     m_errorMonitor->VerifyFound();
 
@@ -521,7 +522,7 @@ TEST_F(NegativeObjectLifetime, CmdBufferFramebufferImageDestroyed) {
 
 TEST_F(NegativeObjectLifetime, FramebufferAttachmentMemoryFreed) {
     TEST_DESCRIPTION("Attempt to create framebuffer with attachment which memory was freed.");
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     VkFormatProperties format_properties;
     vk::GetPhysicalDeviceFormatProperties(gpu(), VK_FORMAT_B8G8R8A8_UNORM, &format_properties);
     if (!(format_properties.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT)) {
@@ -576,7 +577,7 @@ TEST_F(NegativeObjectLifetime, FramebufferAttachmentMemoryFreed) {
 
 TEST_F(NegativeObjectLifetime, DescriptorPoolInUseDestroyedSignaled) {
     TEST_DESCRIPTION("Delete a DescriptorPool with a DescriptorSet that is in use.");
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     // Create image to update the descriptor with
@@ -584,7 +585,7 @@ TEST_F(NegativeObjectLifetime, DescriptorPoolInUseDestroyedSignaled) {
     image.Init(32, 32, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_TILING_OPTIMAL, 0);
     ASSERT_TRUE(image.initialized());
 
-    VkImageView view = image.targetView(VK_FORMAT_B8G8R8A8_UNORM);
+    vkt::ImageView view = image.CreateView();
     vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
     // Create PSO to be used for draw-time errors below
     VkShaderObj fs(this, kFragmentSamplerGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -629,7 +630,7 @@ TEST_F(NegativeObjectLifetime, DescriptorPoolInUseDestroyedSignaled) {
 
 TEST_F(NegativeObjectLifetime, FramebufferInUseDestroyedSignaled) {
     TEST_DESCRIPTION("Delete in-use framebuffer.");
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     VkFormatProperties format_properties;
     VkResult err = VK_SUCCESS;
     vk::GetPhysicalDeviceFormatProperties(gpu(), VK_FORMAT_B8G8R8A8_UNORM, &format_properties);
@@ -639,9 +640,10 @@ TEST_F(NegativeObjectLifetime, FramebufferInUseDestroyedSignaled) {
     VkImageObj image(m_device);
     image.Init(256, 256, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_IMAGE_TILING_OPTIMAL, 0);
     ASSERT_TRUE(image.initialized());
-    VkImageView view = image.targetView(VK_FORMAT_B8G8R8A8_UNORM);
+    vkt::ImageView view = image.CreateView();
 
-    VkFramebufferCreateInfo fci = {VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO, nullptr, 0, m_renderPass, 1, &view, 256, 256, 1};
+    VkFramebufferCreateInfo fci = {
+        VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO, nullptr, 0, m_renderPass, 1, &view.handle(), 256, 256, 1};
     VkFramebuffer fb;
     err = vk::CreateFramebuffer(m_device->device(), &fci, nullptr, &fb);
     ASSERT_EQ(VK_SUCCESS, err);
@@ -674,8 +676,8 @@ TEST_F(NegativeObjectLifetime, PushDescriptorUniformDestroySignaled) {
 
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
     VkDescriptorSetLayoutBinding dsl_binding = {};
@@ -734,7 +736,7 @@ TEST_F(NegativeObjectLifetime, PushDescriptorUniformDestroySignaled) {
 
 TEST_F(NegativeObjectLifetime, FramebufferImageInUseDestroyedSignaled) {
     TEST_DESCRIPTION("Delete in-use image that's child of framebuffer.");
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     VkFormatProperties format_properties;
     VkResult err = VK_SUCCESS;
     vk::GetPhysicalDeviceFormatProperties(gpu(), VK_FORMAT_B8G8R8A8_UNORM, &format_properties);
@@ -757,9 +759,10 @@ TEST_F(NegativeObjectLifetime, FramebufferImageInUseDestroyedSignaled) {
     VkImageObj image(m_device);
     image.init(&image_ci);
 
-    VkImageView view = image.targetView(VK_FORMAT_B8G8R8A8_UNORM);
+    vkt::ImageView view = image.CreateView();
 
-    VkFramebufferCreateInfo fci = {VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO, nullptr, 0, m_renderPass, 1, &view, 256, 256, 1};
+    VkFramebufferCreateInfo fci = {
+        VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO, nullptr, 0, m_renderPass, 1, &view.handle(), 256, 256, 1};
     VkFramebuffer fb;
     err = vk::CreateFramebuffer(m_device->device(), &fci, nullptr, &fb);
     ASSERT_EQ(VK_SUCCESS, err);
@@ -789,7 +792,7 @@ TEST_F(NegativeObjectLifetime, FramebufferImageInUseDestroyedSignaled) {
 }
 
 TEST_F(NegativeObjectLifetime, EventInUseDestroyedSignaled) {
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     m_commandBuffer->begin();
@@ -805,7 +808,7 @@ TEST_F(NegativeObjectLifetime, EventInUseDestroyedSignaled) {
     VkSubmitInfo submit_info = vku::InitStructHelper();
     submit_info.commandBufferCount = 1;
     submit_info.pCommandBuffers = &m_commandBuffer->handle();
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-CoreValidation-DrawState-InvalidCommandBuffer-VkEvent");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkQueueSubmit-pCommandBuffers-00070");
     vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
     m_errorMonitor->VerifyFound();
 }
@@ -815,7 +818,7 @@ TEST_F(NegativeObjectLifetime, InUseDestroyedSignaled) {
         "Use vkCmdExecuteCommands with invalid state in primary and secondary command buffers. Delete objects that are in use. "
         "Call VkQueueSubmit with an event that has been deleted.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     VkSemaphoreCreateInfo semaphore_create_info = vku::InitStructHelper();
@@ -859,7 +862,7 @@ TEST_F(NegativeObjectLifetime, InUseDestroyedSignaled) {
     vk::DestroyEvent(m_device->device(), event, nullptr);
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkDestroySemaphore-semaphore-01137");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkDestroySemaphore-semaphore-05149");
     vk::DestroySemaphore(m_device->device(), semaphore, nullptr);
     m_errorMonitor->VerifyFound();
 
@@ -882,7 +885,7 @@ TEST_F(NegativeObjectLifetime, InUseDestroyedSignaled) {
 TEST_F(NegativeObjectLifetime, PipelineInUseDestroyedSignaled) {
     TEST_DESCRIPTION("Delete in-use pipeline.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     const vkt::PipelineLayout pipeline_layout(*m_device);
@@ -922,7 +925,7 @@ TEST_F(NegativeObjectLifetime, PipelineInUseDestroyedSignaled) {
 TEST_F(NegativeObjectLifetime, ImageViewInUseDestroyedSignaled) {
     TEST_DESCRIPTION("Delete in-use imageView.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     VkSamplerCreateInfo sampler_ci = SafeSaneSamplerCreateInfo();
@@ -936,7 +939,7 @@ TEST_F(NegativeObjectLifetime, ImageViewInUseDestroyedSignaled) {
     image.Init(128, 128, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_TILING_OPTIMAL, 0);
     ASSERT_TRUE(image.initialized());
 
-    VkImageView view = image.targetView(VK_FORMAT_R8G8B8A8_UNORM);
+    vkt::ImageView view = image.CreateView();
 
     // Create PSO to use the sampler
     VkShaderObj fs(this, kFragmentSamplerGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -983,7 +986,7 @@ TEST_F(NegativeObjectLifetime, ImageViewInUseDestroyedSignaled) {
 TEST_F(NegativeObjectLifetime, BufferViewInUseDestroyedSignaled) {
     TEST_DESCRIPTION("Delete in-use bufferView.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     uint32_t queue_family_index = 0;
@@ -1057,7 +1060,7 @@ TEST_F(NegativeObjectLifetime, BufferViewInUseDestroyedSignaled) {
 TEST_F(NegativeObjectLifetime, SamplerInUseDestroyedSignaled) {
     TEST_DESCRIPTION("Delete in-use sampler.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     VkSamplerCreateInfo sampler_ci = SafeSaneSamplerCreateInfo();
@@ -1071,7 +1074,7 @@ TEST_F(NegativeObjectLifetime, SamplerInUseDestroyedSignaled) {
     image.Init(128, 128, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_TILING_OPTIMAL, 0);
     ASSERT_TRUE(image.initialized());
 
-    VkImageView view = image.targetView(VK_FORMAT_R8G8B8A8_UNORM);
+    vkt::ImageView view = image.CreateView();
 
     // Create PSO to use the sampler
     VkShaderObj fs(this, kFragmentSamplerGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -1118,7 +1121,7 @@ TEST_F(NegativeObjectLifetime, SamplerInUseDestroyedSignaled) {
 
 TEST_F(NegativeObjectLifetime, CmdBufferEventDestroyed) {
     TEST_DESCRIPTION("Attempt to draw with a command buffer that is invalid due to an event dependency being destroyed.");
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     VkEvent event;
     VkEventCreateInfo evci = vku::InitStructHelper();
@@ -1129,7 +1132,7 @@ TEST_F(NegativeObjectLifetime, CmdBufferEventDestroyed) {
     vk::CmdSetEvent(m_commandBuffer->handle(), event, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
     m_commandBuffer->end();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-CoreValidation-DrawState-InvalidCommandBuffer-VkEvent");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkQueueSubmit-pCommandBuffers-00070");
     // Destroy event dependency prior to submit to cause ERROR
     vk::DestroyEvent(m_device->device(), event, NULL);
 
@@ -1145,8 +1148,8 @@ TEST_F(NegativeObjectLifetime, ImportFdSemaphoreInUse) {
     TEST_DESCRIPTION("Import semaphore when semaphore is in use.");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitState());
 
     constexpr auto handle_type = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT;
     if (!SemaphoreExportImportSupported(gpu(), handle_type)) {
@@ -1180,8 +1183,8 @@ TEST_F(NegativeObjectLifetime, ImportWin32SemaphoreInUse) {
     TEST_DESCRIPTION("Import semaphore when semaphore is in use.");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitState());
 
     constexpr auto handle_type = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT;
     if (!SemaphoreExportImportSupported(gpu(), handle_type)) {

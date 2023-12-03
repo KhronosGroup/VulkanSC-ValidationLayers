@@ -1,7 +1,8 @@
-/* THIS FILE IS GENERATED - DO NOT EDIT (scripts/vk_validation_stats.py) */
-/* Vulkan specification version: 1.0.13 */
-/*
- * Vulkan
+// *** THIS FILE IS GENERATED - DO NOT EDIT ***
+// See generate_spec_error_message.py for modifications
+// Based on Vulkan specification version: 1.0.13
+
+/***************************************************************************
  *
  * Copyright (c) 2016-2023 Google Inc.
  * Copyright (c) 2016-2023 LunarG, Inc.
@@ -17,11 +18,9 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */
-
+ ****************************************************************************/
 #pragma once
 
-// Disable auto-formatting for generated file
 // clang-format off
 
 // Mapping from VUID string to the corresponding spec text

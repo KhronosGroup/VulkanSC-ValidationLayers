@@ -41,6 +41,7 @@ extern PFN_vkResetCommandBuffer ResetCommandBuffer;
 extern PFN_vkCreateRenderPass CreateRenderPass;
 extern PFN_vkCreateRenderPass2 CreateRenderPass2;
 extern PFN_vkCreateFramebuffer CreateFramebuffer;
+extern PFN_vkCreateSemaphore CreateSemaphore;
 
 const VkDeviceObjectReservationCreateInfo& GetDefaultObjectReservationCreateInfo();
 
@@ -63,8 +64,6 @@ class TestDispatchHelper {
     };
 
     static void PatchDispatchTable();
-    static void InitCompatibilityInstanceExtensionEntryPoints(VkInstance instance);
-    static void InitCompatibilityDeviceExtensionEntryPoints(VkInstance instance, VkDevice device);
 
     TestDispatchHelper(VkSCCompatibilityRenderFramework* test_case);
     virtual ~TestDispatchHelper();

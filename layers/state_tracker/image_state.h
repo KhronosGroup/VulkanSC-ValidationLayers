@@ -28,9 +28,14 @@
 #include "state_tracker/image_layout_map.h"
 #include "utils/vk_layer_utils.h"
 
+namespace vvl {
+class Fence;
+class Semaphore;
+class Surface;
+} // namespace vvl
+
 class ValidationStateTracker;
 class VideoProfileDesc;
-class SURFACE_STATE;
 class SWAPCHAIN_NODE;
 
 static inline bool operator==(const VkImageSubresource &lhs, const VkImageSubresource &rhs) {
@@ -276,7 +281,7 @@ class IMAGE_VIEW_STATE : public BASE_NODE {
     const VkImageSubresourceRange normalized_subresource_range;
     const image_layout_map::RangeGenerator range_generator;
     const VkSampleCountFlagBits samples;
-    const unsigned descriptor_format_bits;
+    const uint32_t descriptor_format_bits;
     const VkSamplerYcbcrConversion samplerConversion;  // Handle of the ycbcr sampler conversion the image was created with, if any
     const VkFilterCubicImageViewImageFormatPropertiesEXT filter_cubic_props;
     const float min_lod;
@@ -318,11 +323,13 @@ class IMAGE_VIEW_STATE : public BASE_NODE {
 struct SWAPCHAIN_IMAGE {
     IMAGE_STATE *image_state = nullptr;
     bool acquired = false;
+    std::shared_ptr<vvl::Semaphore> acquire_semaphore;
+    std::shared_ptr<vvl::Fence> acquire_fence;
 };
 
 // State for VkSwapchainKHR objects.
 // Parent -> child relationships in the object usage tree:
-//    SWAPCHAIN_NODE [N] -> [1] SURFACE_STATE
+//    SWAPCHAIN_NODE [N] -> [1] vvl::Surface
 //    However, only 1 swapchain for each surface can be !retired.
 class SWAPCHAIN_NODE : public BASE_NODE {
   public:
@@ -336,7 +343,7 @@ class SWAPCHAIN_NODE : public BASE_NODE {
     uint64_t max_present_id = 0;
     const safe_VkImageCreateInfo image_create_info;
 
-    std::shared_ptr<SURFACE_STATE> surface;
+    std::shared_ptr<vvl::Surface> surface;
     ValidationStateTracker *dev_data;
     uint32_t acquired_images = 0;
 
@@ -352,7 +359,8 @@ class SWAPCHAIN_NODE : public BASE_NODE {
 
     void PresentImage(uint32_t image_index, uint64_t present_id);
 
-    void AcquireImage(uint32_t image_index);
+    void AcquireImage(uint32_t image_index, const std::shared_ptr<vvl::Semaphore> &semaphore_state,
+                      const std::shared_ptr<vvl::Fence> &fence_state);
 
     void Destroy() override;
 
@@ -391,13 +399,15 @@ struct PresentModeState {
     std::vector<VkPresentModeKHR> compatible_present_modes_;
 };
 
-// Parent -> child relationships in the object usage tree:
-//    SURFACE_STATE -> nothing
-class SURFACE_STATE : public BASE_NODE {
-  public:
-    SURFACE_STATE(VkSurfaceKHR s) : BASE_NODE(s, kVulkanObjectTypeSurfaceKHR) {}
+namespace vvl {
 
-    ~SURFACE_STATE() {
+// Parent -> child relationships in the object usage tree:
+//    vvl::Surface -> nothing
+class Surface : public BASE_NODE {
+  public:
+    Surface(VkSurfaceKHR s) : BASE_NODE(s, kVulkanObjectTypeSurfaceKHR) {}
+
+    ~Surface() {
         if (!Destroyed()) {
             Destroy();
         }
@@ -419,16 +429,18 @@ class SURFACE_STATE : public BASE_NODE {
     bool GetQueueSupport(VkPhysicalDevice phys_dev, uint32_t qfi) const;
 
     void SetPresentModes(VkPhysicalDevice phys_dev, vvl::span<const VkPresentModeKHR> modes);
-    std::vector<VkPresentModeKHR> GetPresentModes(VkPhysicalDevice phys_dev, const ValidationObject *validation_obj) const;
+    std::vector<VkPresentModeKHR> GetPresentModes(VkPhysicalDevice phys_dev, const Location &loc,
+                                                  const ValidationObject *validation_obj) const;
 
     void SetFormats(VkPhysicalDevice phys_dev, std::vector<safe_VkSurfaceFormat2KHR> &&fmts);
     vvl::span<const safe_VkSurfaceFormat2KHR> GetFormats(bool get_surface_capabilities2, VkPhysicalDevice phys_dev,
-                                                         const void *surface_info2_pnext,
+                                                         const void *surface_info2_pnext, const Location &loc,
                                                          const ValidationObject *validation_obj) const;
 
     void SetCapabilities(VkPhysicalDevice phys_dev, const safe_VkSurfaceCapabilities2KHR &caps);
     safe_VkSurfaceCapabilities2KHR GetCapabilities(bool get_surface_capabilities2, VkPhysicalDevice phys_dev,
-                                                   const void *surface_info2_pnext, const ValidationObject *validation_obj) const;
+                                                   const void *surface_info2_pnext, const Location &loc,
+                                                   const ValidationObject *validation_obj) const;
 
     void SetCompatibleModes(VkPhysicalDevice phys_dev, const VkPresentModeKHR present_mode,
                             vvl::span<const VkPresentModeKHR> compatible_modes);
@@ -452,3 +464,5 @@ class SURFACE_STATE : public BASE_NODE {
                                       vvl::unordered_map<VkPresentModeKHR, std::optional<std::shared_ptr<PresentModeState>>>>
         present_modes_data_;
 };
+
+}  // namespace vvl

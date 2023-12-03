@@ -16,7 +16,9 @@
 
 #include "../framework/layer_validation_tests.h"
 #include "../framework/ray_tracing_objects.h"
-#include "../framework/ray_tracing_nv.h"
+#include "../framework/descriptor_helper.h"
+#include "../framework/shader_helper.h"
+#include "../framework/gpu_av_helper.h"
 
 TEST_F(NegativeGpuAssistedRayTracing, ArrayOOBRayTracingShaders) {
     TEST_DESCRIPTION(
@@ -25,491 +27,167 @@ TEST_F(NegativeGpuAssistedRayTracing, ArrayOOBRayTracingShaders) {
     OOBRayTracingShadersTestBody(true);
 }
 
-TEST_F(NegativeGpuAssistedRayTracingNV, BuildAccelerationStructureValidationInvalidHandle) {
-    TEST_DESCRIPTION(
-        "Acceleration structure gpu validation should report an invalid handle when trying to build a top level "
-        "acceleration structure with an invalid handle for a bottom level acceleration structure.");
+TEST_F(NegativeGpuAssistedRayTracing, CmdTraceRaysIndirectKHR) {
+    TEST_DESCRIPTION("Invalid parameters used in vkCmdTraceRaysIndirectKHR");
 
-    SetTargetApiVersion(VK_API_VERSION_1_1);
-    VkValidationFeaturesEXT validation_features = GetValidationFeatures();
-    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(this, false, nullptr, &validation_features))
+    SetTargetApiVersion(VK_API_VERSION_1_2);
 
-    if (!CanEnableGpuAV()) {
-        GTEST_SKIP() << "Requirements for GPU-AV are not met";
-    }
-    RETURN_IF_SKIP(InitState())
+    VkPhysicalDeviceBufferDeviceAddressFeaturesKHR bda_features = vku::InitStructHelper();
+    bda_features.bufferDeviceAddress = VK_TRUE;
+    VkPhysicalDeviceRayTracingPipelineFeaturesKHR ray_tracing_features = vku::InitStructHelper(&bda_features);
+    VkPhysicalDeviceFeatures2KHR features2 = vku::InitStructHelper(&ray_tracing_features);
+    VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(true, &features2, &validation_features))
 
-    vkt::Buffer vbo;
-    vkt::Buffer ibo;
-    VkGeometryNV geometry;
-    nv::rt::GetSimpleGeometryForAccelerationStructureTests(*m_device, &vbo, &ibo, &geometry);
-
-    VkAccelerationStructureCreateInfoNV top_level_as_create_info = vku::InitStructHelper();
-    top_level_as_create_info.info = vku::InitStructHelper();
-    top_level_as_create_info.info.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_NV;
-    top_level_as_create_info.info.instanceCount = 1;
-    top_level_as_create_info.info.geometryCount = 0;
-
-    vkt::CommandPool command_pool(*m_device, 0, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
-
-    struct VkGeometryInstanceNV {
-        float transform[12];
-        uint32_t instanceCustomIndex : 24;
-        uint32_t mask : 8;
-        uint32_t instanceOffset : 24;
-        uint32_t flags : 8;
-        uint64_t accelerationStructureHandle;
-    };
-
-    VkGeometryInstanceNV instance = {
-        {
-            // clang-format off
-            1.0f, 0.0f, 0.0f, 0.0f,
-            0.0f, 1.0f, 0.0f, 0.0f,
-            0.0f, 0.0f, 1.0f, 0.0f,
-            // clang-format on
-        },
-        0,
-        0xFF,
-        0,
-        VK_GEOMETRY_INSTANCE_TRIANGLE_CULL_DISABLE_BIT_NV,
-        1234567890,  // invalid
-    };
-
-    VkDeviceSize instance_buffer_size = sizeof(VkGeometryInstanceNV);
-    vkt::Buffer instance_buffer(*m_device, instance_buffer_size, VK_BUFFER_USAGE_RAY_TRACING_BIT_NV,
-                                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-    uint8_t *mapped_instance_buffer_data = (uint8_t *)instance_buffer.memory().map();
-    std::memcpy(mapped_instance_buffer_data, (uint8_t *)&instance, static_cast<std::size_t>(instance_buffer_size));
-    instance_buffer.memory().unmap();
-
-    vkt::AccelerationStructure top_level_as(*m_device, top_level_as_create_info);
-
-    const vkt::Buffer top_level_as_scratch = top_level_as.create_scratch_buffer(*m_device);
-
-    vkt::CommandBuffer command_buffer(m_device, &command_pool);
-    command_buffer.begin();
-    vk::CmdBuildAccelerationStructureNV(command_buffer.handle(), &top_level_as_create_info.info, instance_buffer.handle(), 0,
-                                        VK_FALSE, top_level_as.handle(), VK_NULL_HANDLE, top_level_as_scratch.handle(), 0);
-    command_buffer.end();
-
-    m_errorMonitor->SetDesiredFailureMsg(
-        kErrorBit, "Attempted to build top level acceleration structure using invalid bottom level acceleration structure handle");
-
-    VkSubmitInfo submit_info = vku::InitStructHelper();
-    submit_info.commandBufferCount = 1;
-    submit_info.pCommandBuffers = &command_buffer.handle();
-    vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
-    vk::QueueWaitIdle(m_default_queue);
-    m_errorMonitor->VerifyFound();
-}
-
-TEST_F(NegativeGpuAssistedRayTracingNV, BuildAccelerationStructureValidationBottomLevelNotYetBuilt) {
-    TEST_DESCRIPTION(
-        "Acceleration structure gpu validation should report an invalid handle when trying to build a top level "
-        "acceleration structure with a handle for a bottom level acceleration structure that has not yet been built.");
-
-    SetTargetApiVersion(VK_API_VERSION_1_1);
-    VkValidationFeaturesEXT validation_features = GetValidationFeatures();
-    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(this, false, nullptr, &validation_features))
-
-    if (!CanEnableGpuAV()) {
-        GTEST_SKIP() << "Requirements for GPU-AV are not met";
-    }
-    RETURN_IF_SKIP(InitState())
-
-    vkt::Buffer vbo;
-    vkt::Buffer ibo;
-    VkGeometryNV geometry;
-    nv::rt::GetSimpleGeometryForAccelerationStructureTests(*m_device, &vbo, &ibo, &geometry);
-
-    VkAccelerationStructureCreateInfoNV bot_level_as_create_info = vku::InitStructHelper();
-    bot_level_as_create_info.info = vku::InitStructHelper();
-    bot_level_as_create_info.info.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_NV;
-    bot_level_as_create_info.info.instanceCount = 0;
-    bot_level_as_create_info.info.geometryCount = 1;
-    bot_level_as_create_info.info.pGeometries = &geometry;
-
-    VkAccelerationStructureCreateInfoNV top_level_as_create_info = vku::InitStructHelper();
-    top_level_as_create_info.info = vku::InitStructHelper();
-    top_level_as_create_info.info.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_NV;
-    top_level_as_create_info.info.instanceCount = 1;
-    top_level_as_create_info.info.geometryCount = 0;
-
-    vkt::CommandPool command_pool(*m_device, 0, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
-
-    struct VkGeometryInstanceNV {
-        float transform[12];
-        uint32_t instanceCustomIndex : 24;
-        uint32_t mask : 8;
-        uint32_t instanceOffset : 24;
-        uint32_t flags : 8;
-        uint64_t accelerationStructureHandle;
-    };
-
-    vkt::AccelerationStructure bot_level_as_never_built(*m_device, bot_level_as_create_info);
-
-    VkGeometryInstanceNV instance = {
-        {
-            // clang-format off
-            1.0f, 0.0f, 0.0f, 0.0f,
-            0.0f, 1.0f, 0.0f, 0.0f,
-            0.0f, 0.0f, 1.0f, 0.0f,
-            // clang-format on
-        },
-        0,
-        0xFF,
-        0,
-        VK_GEOMETRY_INSTANCE_TRIANGLE_CULL_DISABLE_BIT_NV,
-        bot_level_as_never_built.opaque_handle(),
-    };
-
-    VkDeviceSize instance_buffer_size = sizeof(VkGeometryInstanceNV);
-    vkt::Buffer instance_buffer(*m_device, instance_buffer_size, VK_BUFFER_USAGE_RAY_TRACING_BIT_NV,
-                                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-    uint8_t *mapped_instance_buffer_data = (uint8_t *)instance_buffer.memory().map();
-    std::memcpy(mapped_instance_buffer_data, (uint8_t *)&instance, static_cast<std::size_t>(instance_buffer_size));
-    instance_buffer.memory().unmap();
-
-    vkt::AccelerationStructure top_level_as(*m_device, top_level_as_create_info);
-
-    const vkt::Buffer top_level_as_scratch = top_level_as.create_scratch_buffer(*m_device);
-
-    vkt::CommandBuffer command_buffer(m_device, &command_pool);
-    command_buffer.begin();
-    vk::CmdBuildAccelerationStructureNV(command_buffer.handle(), &top_level_as_create_info.info, instance_buffer.handle(), 0,
-                                        VK_FALSE, top_level_as.handle(), VK_NULL_HANDLE, top_level_as_scratch.handle(), 0);
-    command_buffer.end();
-
-    m_errorMonitor->SetDesiredFailureMsg(
-        kErrorBit, "Attempted to build top level acceleration structure using invalid bottom level acceleration structure handle");
-
-    VkSubmitInfo submit_info = vku::InitStructHelper();
-    submit_info.commandBufferCount = 1;
-    submit_info.pCommandBuffers = &command_buffer.handle();
-    vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
-    vk::QueueWaitIdle(m_default_queue);
-    m_errorMonitor->VerifyFound();
-}
-
-TEST_F(NegativeGpuAssistedRayTracingNV, BuildAccelerationStructureValidationBottomLevelDestroyed) {
-    TEST_DESCRIPTION(
-        "Acceleration structure gpu validation should report an invalid handle when trying to build a top level "
-        "acceleration structure with a handle for a destroyed bottom level acceleration structure.");
-
-    SetTargetApiVersion(VK_API_VERSION_1_1);
-    VkValidationFeaturesEXT validation_features = GetValidationFeatures();
-    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(this, false, nullptr, &validation_features))
-
-    if (!CanEnableGpuAV()) {
-        GTEST_SKIP() << "Requirements for GPU-AV are not met";
-    }
-    RETURN_IF_SKIP(InitState())
-
-    vkt::Buffer vbo;
-    vkt::Buffer ibo;
-    VkGeometryNV geometry;
-    nv::rt::GetSimpleGeometryForAccelerationStructureTests(*m_device, &vbo, &ibo, &geometry);
-
-    VkAccelerationStructureCreateInfoNV bot_level_as_create_info = vku::InitStructHelper();
-    bot_level_as_create_info.info = vku::InitStructHelper();
-    bot_level_as_create_info.info.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_NV;
-    bot_level_as_create_info.info.instanceCount = 0;
-    bot_level_as_create_info.info.geometryCount = 1;
-    bot_level_as_create_info.info.pGeometries = &geometry;
-
-    VkAccelerationStructureCreateInfoNV top_level_as_create_info = vku::InitStructHelper();
-    top_level_as_create_info.info = vku::InitStructHelper();
-    top_level_as_create_info.info.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_NV;
-    top_level_as_create_info.info.instanceCount = 1;
-    top_level_as_create_info.info.geometryCount = 0;
-
-    vkt::CommandPool command_pool(*m_device, 0, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
-
-    struct VkGeometryInstanceNV {
-        float transform[12];
-        uint32_t instanceCustomIndex : 24;
-        uint32_t mask : 8;
-        uint32_t instanceOffset : 24;
-        uint32_t flags : 8;
-        uint64_t accelerationStructureHandle;
-    };
-
-    uint64_t destroyed_bot_level_as_handle = 0;
-    {
-        vkt::AccelerationStructure destroyed_bot_level_as(*m_device, bot_level_as_create_info);
-
-        destroyed_bot_level_as_handle = destroyed_bot_level_as.opaque_handle();
-
-        const vkt::Buffer bot_level_as_scratch = destroyed_bot_level_as.create_scratch_buffer(*m_device);
-
-        vkt::CommandBuffer command_buffer(m_device, &command_pool);
-        command_buffer.begin();
-        vk::CmdBuildAccelerationStructureNV(command_buffer.handle(), &bot_level_as_create_info.info, VK_NULL_HANDLE, 0, VK_FALSE,
-                                            destroyed_bot_level_as.handle(), VK_NULL_HANDLE, bot_level_as_scratch.handle(), 0);
-        command_buffer.end();
-
-        VkSubmitInfo submit_info = vku::InitStructHelper();
-        submit_info.commandBufferCount = 1;
-        submit_info.pCommandBuffers = &command_buffer.handle();
-        vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
-        vk::QueueWaitIdle(m_default_queue);
-
-        // vk::DestroyAccelerationStructureNV called on destroyed_bot_level_as during destruction.
+    if (IsPlatformMockICD()) {
+        GTEST_SKIP() << "Test not supported by MockICD";
     }
 
-    VkGeometryInstanceNV instance = {
-        {
-            // clang-format off
-            1.0f, 0.0f, 0.0f, 0.0f,
-            0.0f, 1.0f, 0.0f, 0.0f,
-            0.0f, 0.0f, 1.0f, 0.0f,
-            // clang-format on
-        },
-        0,
-        0xFF,
-        0,
-        VK_GEOMETRY_INSTANCE_TRIANGLE_CULL_DISABLE_BIT_NV,
-        destroyed_bot_level_as_handle,
-    };
+    RETURN_IF_SKIP(InitState(nullptr, &features2))
 
-    VkDeviceSize instance_buffer_size = sizeof(VkGeometryInstanceNV);
-    vkt::Buffer instance_buffer(*m_device, instance_buffer_size, VK_BUFFER_USAGE_RAY_TRACING_BIT_NV,
-                                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    // Create ray tracing pipeline
+    std::vector<VkDescriptorSetLayoutBinding> bindings(1);
+    bindings[0].binding = 0;
+    bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    bindings[0].descriptorCount = 1;
+    bindings[0].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
 
-    uint8_t *mapped_instance_buffer_data = (uint8_t *)instance_buffer.memory().map();
-    std::memcpy(mapped_instance_buffer_data, (uint8_t *)&instance, static_cast<std::size_t>(instance_buffer_size));
-    instance_buffer.memory().unmap();
+    const vkt::DescriptorSetLayout desc_set_layout(*m_device, bindings);
+    OneOffDescriptorSet desc_set(m_device, bindings);
 
-    vkt::AccelerationStructure top_level_as(*m_device, top_level_as_create_info);
+    const vkt::PipelineLayout rt_pipeline_layout(*m_device, {&desc_set_layout});
 
-    const vkt::Buffer top_level_as_scratch = top_level_as.create_scratch_buffer(*m_device);
+    VkShaderObj rgen_shader(this, kRayTracingMinimalGlsl, VK_SHADER_STAGE_RAYGEN_BIT_KHR, SPV_ENV_VULKAN_1_2);
+    VkShaderObj chit_shader(this, kRayTracingMinimalGlsl, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, SPV_ENV_VULKAN_1_2);
 
-    vkt::CommandBuffer command_buffer(m_device, &command_pool);
-    command_buffer.begin();
-    vk::CmdBuildAccelerationStructureNV(command_buffer.handle(), &top_level_as_create_info.info, instance_buffer.handle(), 0,
-                                        VK_FALSE, top_level_as.handle(), VK_NULL_HANDLE, top_level_as_scratch.handle(), 0);
-    command_buffer.end();
+    std::array<VkPipelineShaderStageCreateInfo, 2> shader_stages;
+    shader_stages[0] = vku::InitStructHelper();
+    shader_stages[0].stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+    shader_stages[0].module = chit_shader.handle();
+    shader_stages[0].pName = "main";
 
-    m_errorMonitor->SetDesiredFailureMsg(
-        kErrorBit, "Attempted to build top level acceleration structure using invalid bottom level acceleration structure handle");
+    shader_stages[1] = vku::InitStructHelper();
+    shader_stages[1].stage = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+    shader_stages[1].module = rgen_shader.handle();
+    shader_stages[1].pName = "main";
 
-    VkSubmitInfo submit_info = vku::InitStructHelper();
-    submit_info.commandBufferCount = 1;
-    submit_info.pCommandBuffers = &command_buffer.handle();
-    vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
-    vk::QueueWaitIdle(m_default_queue);
-    m_errorMonitor->VerifyFound();
-}
+    std::array<VkRayTracingShaderGroupCreateInfoKHR, 1> shader_groups;
+    shader_groups[0] = vku::InitStructHelper();
+    shader_groups[0].type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
+    shader_groups[0].generalShader = 1;
+    shader_groups[0].closestHitShader = VK_SHADER_UNUSED_KHR;
+    shader_groups[0].anyHitShader = VK_SHADER_UNUSED_KHR;
+    shader_groups[0].intersectionShader = VK_SHADER_UNUSED_KHR;
 
-TEST_F(NegativeGpuAssistedRayTracingNV, BuildAccelerationStructureValidationRestoresState) {
-    TEST_DESCRIPTION("Validate that acceleration structure gpu validation correctly restores compute state.");
+    VkRayTracingPipelineCreateInfoKHR raytracing_pipeline_ci = vku::InitStructHelper();
+    raytracing_pipeline_ci.flags = 0;
+    raytracing_pipeline_ci.stageCount = static_cast<uint32_t>(shader_stages.size());
+    raytracing_pipeline_ci.pStages = shader_stages.data();
+    raytracing_pipeline_ci.pGroups = shader_groups.data();
+    raytracing_pipeline_ci.groupCount = shader_groups.size();
+    raytracing_pipeline_ci.layout = rt_pipeline_layout;
 
-    SetTargetApiVersion(VK_API_VERSION_1_1);
-    AddRequiredExtensions(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
-    VkValidationFeaturesEXT validation_features = GetValidationFeatures();
-    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(this, false, nullptr, &validation_features))
+    VkPipeline raytracing_pipeline = VK_NULL_HANDLE;
 
-    if (!CanEnableGpuAV()) {
-        GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    const VkResult result = vk::CreateRayTracingPipelinesKHR(m_device->handle(), VK_NULL_HANDLE, VK_NULL_HANDLE, 1,
+                                                             &raytracing_pipeline_ci, nullptr, &raytracing_pipeline);
+    ASSERT_EQ(VK_SUCCESS, result);
+
+    // Create dummy shader binding table (SBT)
+    vkt::Buffer sbt_buffer;
+    VkBufferCreateInfo buffer_ci = vku::InitStructHelper();
+    buffer_ci.usage =
+        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR;
+    buffer_ci.size = 4096;
+    buffer_ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    sbt_buffer.init_no_mem(*m_device, buffer_ci);
+
+    VkMemoryRequirements mem_reqs;
+    vk::GetBufferMemoryRequirements(device(), sbt_buffer.handle(), &mem_reqs);
+
+    VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
+    alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR;
+    VkMemoryAllocateInfo alloc_info = vku::InitStructHelper(&alloc_flags);
+    alloc_info.allocationSize = 4096;
+    vkt::DeviceMemory mem(*m_device, alloc_info);
+    vk::BindBufferMemory(device(), sbt_buffer.handle(), mem.handle(), 0);
+
+    VkPhysicalDeviceRayTracingPipelinePropertiesKHR ray_tracing_properties = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(ray_tracing_properties);
+
+    const VkDeviceAddress sbt_address = sbt_buffer.address();
+
+    VkStridedDeviceAddressRegionKHR stridebufregion = {};
+    stridebufregion.deviceAddress = sbt_address;
+    stridebufregion.stride = ray_tracing_properties.shaderGroupHandleAlignment;
+    stridebufregion.size = stridebufregion.stride;
+
+    // Create and fill buffers storing indirect data (ray query dimensions)
+    vkt::Buffer ray_query_dimensions_buffer_1(
+        *m_device, 4096, VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &alloc_flags);
+
+    VkTraceRaysIndirectCommandKHR ray_query_dimensions{vvl::kU32Max, 1, 1};
+
+    uint8_t *ray_query_dimensions_buffer_1_ptr = (uint8_t *)ray_query_dimensions_buffer_1.memory().map();
+    std::memcpy(ray_query_dimensions_buffer_1_ptr, &ray_query_dimensions, sizeof(ray_query_dimensions));
+    ray_query_dimensions_buffer_1.memory().unmap();
+
+    ray_query_dimensions = {1, vvl::kU32Max, 1};
+
+    vkt::Buffer ray_query_dimensions_buffer_2(
+        *m_device, 4096, VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &alloc_flags);
+
+    uint8_t *ray_query_dimensions_buffer_2_ptr = (uint8_t *)ray_query_dimensions_buffer_2.memory().map();
+    std::memcpy(ray_query_dimensions_buffer_2_ptr, &ray_query_dimensions, sizeof(ray_query_dimensions));
+    ray_query_dimensions_buffer_2.memory().unmap();
+
+    ray_query_dimensions = {1, 1, vvl::kU32Max};
+
+    vkt::Buffer ray_query_dimensions_buffer_3(
+        *m_device, 4096, VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &alloc_flags);
+
+    uint8_t *ray_query_dimensions_buffer_3_ptr = (uint8_t *)ray_query_dimensions_buffer_3.memory().map();
+    std::memcpy(ray_query_dimensions_buffer_3_ptr, &ray_query_dimensions, sizeof(ray_query_dimensions));
+    ray_query_dimensions_buffer_3.memory().unmap();
+
+    // Trace rays
+    m_commandBuffer->begin();
+
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, raytracing_pipeline);
+
+    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, rt_pipeline_layout.handle(), 0, 1,
+                              &desc_set.set_, 0, nullptr);
+
+    vk::CmdTraceRaysIndirectKHR(m_commandBuffer->handle(), &stridebufregion, &stridebufregion, &stridebufregion, &stridebufregion,
+                                ray_query_dimensions_buffer_1.address());
+
+    vk::CmdTraceRaysIndirectKHR(m_commandBuffer->handle(), &stridebufregion, &stridebufregion, &stridebufregion, &stridebufregion,
+                                ray_query_dimensions_buffer_2.address());
+
+    vk::CmdTraceRaysIndirectKHR(m_commandBuffer->handle(), &stridebufregion, &stridebufregion, &stridebufregion, &stridebufregion,
+                                ray_query_dimensions_buffer_3.address());
+
+    m_commandBuffer->end();
+
+    if (uint64_t(physDevProps().limits.maxComputeWorkGroupCount[0]) * uint64_t(physDevProps().limits.maxComputeWorkGroupSize[0]) <
+        uint64_t(vvl::kU32Max)) {
+        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkTraceRaysIndirectCommandKHR-width-03638");
     }
-    RETURN_IF_SKIP(InitState())
-
-    vkt::Buffer vbo;
-    vkt::Buffer ibo;
-    VkGeometryNV geometry;
-    nv::rt::GetSimpleGeometryForAccelerationStructureTests(*m_device, &vbo, &ibo, &geometry);
-
-    VkAccelerationStructureCreateInfoNV top_level_as_create_info = vku::InitStructHelper();
-    top_level_as_create_info.info = vku::InitStructHelper();
-    top_level_as_create_info.info.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_NV;
-    top_level_as_create_info.info.instanceCount = 1;
-    top_level_as_create_info.info.geometryCount = 0;
-
-    vkt::CommandPool command_pool(*m_device, 0, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
-
-    struct VkGeometryInstanceNV {
-        float transform[12];
-        uint32_t instanceCustomIndex : 24;
-        uint32_t mask : 8;
-        uint32_t instanceOffset : 24;
-        uint32_t flags : 8;
-        uint64_t accelerationStructureHandle;
-    };
-
-    VkGeometryInstanceNV instance = {
-        {
-            // clang-format off
-            1.0f, 0.0f, 0.0f, 0.0f,
-            0.0f, 1.0f, 0.0f, 0.0f,
-            0.0f, 0.0f, 1.0f, 0.0f,
-            // clang-format on
-        },
-        0,
-        0xFF,
-        0,
-        VK_GEOMETRY_INSTANCE_TRIANGLE_CULL_DISABLE_BIT_NV,
-        1234567,
-    };
-
-    VkDeviceSize instance_buffer_size = sizeof(VkGeometryInstanceNV);
-    vkt::Buffer instance_buffer(*m_device, instance_buffer_size, VK_BUFFER_USAGE_RAY_TRACING_BIT_NV,
-                                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-    uint8_t *mapped_instance_buffer_data = (uint8_t *)instance_buffer.memory().map();
-    std::memcpy(mapped_instance_buffer_data, (uint8_t *)&instance, static_cast<std::size_t>(instance_buffer_size));
-    instance_buffer.memory().unmap();
-
-    vkt::AccelerationStructure top_level_as(*m_device, top_level_as_create_info);
-
-    const vkt::Buffer top_level_as_scratch = top_level_as.create_scratch_buffer(*m_device);
-
-    struct ComputeOutput {
-        uint32_t push_constant_value;
-        uint32_t push_descriptor_value;
-        uint32_t normal_descriptor_value;
-    };
-
-    vkt::Buffer push_descriptor_buffer(*m_device, 4, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-    vkt::Buffer normal_descriptor_buffer(*m_device, 4, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-    VkDeviceSize output_descriptor_buffer_size = static_cast<VkDeviceSize>(sizeof(ComputeOutput));
-    vkt::Buffer output_descriptor_buffer(*m_device, output_descriptor_buffer_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-    const char *cs_source = R"glsl(
-        #version 450
-        layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
-
-        layout(push_constant) uniform PushConstants { uint value; } push_constant;
-        layout(set = 0, binding = 0, std430) buffer PushDescriptorBuffer { uint value; } push_descriptor;
-        layout(set = 1, binding = 0, std430) buffer NormalDescriptorBuffer { uint value; } normal_descriptor;
-
-        layout(set = 2, binding = 0, std430) buffer ComputeOutputBuffer {
-            uint push_constant_value;
-            uint push_descriptor_value;
-            uint normal_descriptor_value;
-        } compute_output;
-
-        void main() {
-            compute_output.push_constant_value = push_constant.value;
-            compute_output.push_descriptor_value = push_descriptor.value;
-            compute_output.normal_descriptor_value = normal_descriptor.value;
-        }
-    )glsl";
-    VkShaderObj cs(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
-
-    OneOffDescriptorSet push_descriptor_set(m_device,
-                                            {
-                                                {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
-                                            },
-                                            VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR);
-    OneOffDescriptorSet normal_descriptor_set(m_device,
-                                              {
-                                                  {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
-                                              });
-    OneOffDescriptorSet output_descriptor_set(m_device,
-                                              {
-                                                  {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
-                                              });
-
-    VkPushConstantRange push_constant_range = {};
-    push_constant_range.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-    push_constant_range.size = 4;
-    push_constant_range.offset = 0;
-
-    const vkt::PipelineLayout compute_pipeline_layout(*m_device,
-                                                      {
-                                                          &push_descriptor_set.layout_,
-                                                          &normal_descriptor_set.layout_,
-                                                          &output_descriptor_set.layout_,
-                                                      },
-                                                      {push_constant_range});
-
-    VkComputePipelineCreateInfo compute_pipeline_ci = vku::InitStructHelper();
-    compute_pipeline_ci.layout = compute_pipeline_layout.handle();
-    compute_pipeline_ci.stage = cs.GetStageCreateInfo();
-
-    VkPipeline compute_pipeline;
-    ASSERT_EQ(VK_SUCCESS,
-        vk::CreateComputePipelines(m_device->device(), VK_NULL_HANDLE, 1, &compute_pipeline_ci, nullptr, &compute_pipeline));
-
-    normal_descriptor_set.WriteDescriptorBufferInfo(0, normal_descriptor_buffer.handle(), 0, 4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-    normal_descriptor_set.UpdateDescriptorSets();
-
-    output_descriptor_set.WriteDescriptorBufferInfo(0, output_descriptor_buffer.handle(), 0, output_descriptor_buffer_size,
-                                                    VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
-    output_descriptor_set.UpdateDescriptorSets();
-
-    // Set input data
-    const uint32_t push_constant_value = 1234567890;
-    const uint32_t push_descriptor_value = 98765432;
-    const uint32_t normal_descriptor_value = 1111111;
-
-    uint32_t *mapped_push_descriptor_buffer_data = (uint32_t *)push_descriptor_buffer.memory().map();
-    *mapped_push_descriptor_buffer_data = push_descriptor_value;
-    push_descriptor_buffer.memory().unmap();
-
-    uint32_t *mapped_normal_descriptor_buffer_data = (uint32_t *)normal_descriptor_buffer.memory().map();
-    *mapped_normal_descriptor_buffer_data = normal_descriptor_value;
-    normal_descriptor_buffer.memory().unmap();
-
-    ComputeOutput *mapped_output_buffer_data = (ComputeOutput *)output_descriptor_buffer.memory().map();
-    mapped_output_buffer_data->push_constant_value = 0;
-    mapped_output_buffer_data->push_descriptor_value = 0;
-    mapped_output_buffer_data->normal_descriptor_value = 0;
-    output_descriptor_buffer.memory().unmap();
-
-    VkDescriptorBufferInfo push_descriptor_buffer_info = {};
-    push_descriptor_buffer_info.buffer = push_descriptor_buffer.handle();
-    push_descriptor_buffer_info.offset = 0;
-    push_descriptor_buffer_info.range = 4;
-    VkWriteDescriptorSet push_descriptor_set_write = vku::InitStructHelper();
-    push_descriptor_set_write.descriptorCount = 1;
-    push_descriptor_set_write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    push_descriptor_set_write.dstBinding = 0;
-    push_descriptor_set_write.pBufferInfo = &push_descriptor_buffer_info;
-
-    vkt::CommandBuffer command_buffer(m_device, &command_pool);
-    command_buffer.begin();
-    vk::CmdBindPipeline(command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, compute_pipeline);
-    vk::CmdPushConstants(command_buffer.handle(), compute_pipeline_layout.handle(), VK_SHADER_STAGE_COMPUTE_BIT, 0, 4,
-                         &push_constant_value);
-    vk::CmdPushDescriptorSetKHR(command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, compute_pipeline_layout.handle(), 0, 1,
-                                &push_descriptor_set_write);
-    vk::CmdBindDescriptorSets(command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, compute_pipeline_layout.handle(), 1, 1,
-                              &normal_descriptor_set.set_, 0, nullptr);
-    vk::CmdBindDescriptorSets(command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, compute_pipeline_layout.handle(), 2, 1,
-                              &output_descriptor_set.set_, 0, nullptr);
-
-    vk::CmdBuildAccelerationStructureNV(command_buffer.handle(), &top_level_as_create_info.info, instance_buffer.handle(), 0,
-                                        VK_FALSE, top_level_as.handle(), VK_NULL_HANDLE, top_level_as_scratch.handle(), 0);
-
-    vk::CmdDispatch(command_buffer.handle(), 1, 1, 1);
-    command_buffer.end();
-
-    m_errorMonitor->SetDesiredFailureMsg(
-        kErrorBit, "Attempted to build top level acceleration structure using invalid bottom level acceleration structure handle");
-
-    VkSubmitInfo submit_info = vku::InitStructHelper();
-    submit_info.commandBufferCount = 1;
-    submit_info.pCommandBuffers = &command_buffer.handle();
-    vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
-    vk::QueueWaitIdle(m_default_queue);
-
+    if (uint64_t(physDevProps().limits.maxComputeWorkGroupCount[1]) * uint64_t(physDevProps().limits.maxComputeWorkGroupSize[1]) <
+        uint64_t(vvl::kU32Max)) {
+        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkTraceRaysIndirectCommandKHR-height-03639");
+    }
+    if (uint64_t(physDevProps().limits.maxComputeWorkGroupCount[2]) * uint64_t(physDevProps().limits.maxComputeWorkGroupSize[2]) <
+        uint64_t(vvl::kU32Max)) {
+        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkTraceRaysIndirectCommandKHR-depth-03640");
+    }
+    m_commandBuffer->QueueCommandBuffer(true);
     m_errorMonitor->VerifyFound();
 
-    mapped_output_buffer_data = (ComputeOutput *)output_descriptor_buffer.memory().map();
-    EXPECT_EQ(mapped_output_buffer_data->push_constant_value, push_constant_value);
-    EXPECT_EQ(mapped_output_buffer_data->push_descriptor_value, push_descriptor_value);
-    EXPECT_EQ(mapped_output_buffer_data->normal_descriptor_value, normal_descriptor_value);
-    output_descriptor_buffer.memory().unmap();
+    vk::DeviceWaitIdle(m_device->handle());
 
-    // Clean up
-    vk::DestroyPipeline(m_device->device(), compute_pipeline, nullptr);
+    vk::DestroyPipeline(device(), raytracing_pipeline, nullptr);
 }

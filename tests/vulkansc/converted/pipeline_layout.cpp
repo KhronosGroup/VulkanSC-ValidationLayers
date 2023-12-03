@@ -17,11 +17,12 @@
 
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
+#include "../framework/descriptor_helper.h"
 
 TEST_F(NegativePipelineLayout, ExceedsSetLimit) {
     TEST_DESCRIPTION("Attempt to create a pipeline layout using more than the physical limit of SetLayouts.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     VkDescriptorSetLayoutBinding layout_binding = {};
     layout_binding.binding = 0;
@@ -53,12 +54,12 @@ TEST_F(NegativePipelineLayout, ExcessSubsampledPerStageDescriptors) {
     TEST_DESCRIPTION("Attempt to create a pipeline layout where total subsampled descriptors exceed limits");
 
     AddRequiredExtensions(VK_EXT_FRAGMENT_DENSITY_MAP_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceFragmentDensityMap2PropertiesEXT density_map2_properties = vku::InitStructHelper();
     auto properties2 = GetPhysicalDeviceProperties2(density_map2_properties);
 
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitState());
 
     uint32_t max_subsampled_samplers = density_map2_properties.maxDescriptorSetSubsampledSamplers;
 
@@ -125,8 +126,8 @@ TEST_F(VkLayerTest, CreatePipelineLayoutExcessPerStageDescriptors) {
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddOptionalExtensions(VK_KHR_MAINTENANCE_3_EXTENSION_NAME);
     AddOptionalExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitState());
     bool descriptor_indexing =
         IsExtensionsEnabled(VK_KHR_MAINTENANCE_3_EXTENSION_NAME) && IsExtensionsEnabled(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
 
@@ -433,8 +434,8 @@ TEST_F(VkLayerTest, CreatePipelineLayoutExcessDescriptorsOverall) {
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_MAINTENANCE_3_EXTENSION_NAME);
     AddOptionalExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitState());
     const bool descriptor_indexing = IsExtensionsEnabled(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
 
     uint32_t max_uniform_buffers = m_device->phy().limits_.maxPerStageDescriptorUniformBuffers;
@@ -791,7 +792,7 @@ TEST_F(VkLayerTest, CreatePipelineLayoutExcessDescriptorsOverall) {
 TEST_F(NegativePipelineLayout, DISABLED_DescriptorTypeMismatch) {
     TEST_DESCRIPTION("Challenge core_validation with shader validation issues related to vkCreateGraphicsPipelines.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     OneOffDescriptorSet descriptor_set(m_device, {
@@ -823,7 +824,7 @@ TEST_F(NegativePipelineLayout, DISABLED_DescriptorTypeMismatch) {
 TEST_F(NegativePipelineLayout, DISABLED_DescriptorTypeMismatchCompute) {
     TEST_DESCRIPTION("Test that an error is produced for a pipeline consuming a descriptor-backed resource of a mismatched type");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     char const *csSource = R"glsl(
         #version 450
@@ -845,7 +846,7 @@ TEST_F(NegativePipelineLayout, DISABLED_DescriptorTypeMismatchNonCombinedImageSa
     TEST_DESCRIPTION(
         "HLSL will sometimes produce a SAMPLED_IMAGE / SAMPLER on the same slot that is same as COMBINED_IMAGE_SAMPLER");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget(0, nullptr);
 
     char const *fsSource = R"(
@@ -903,7 +904,7 @@ TEST_F(NegativePipelineLayout, DISABLED_DescriptorNotAccessible) {
     TEST_DESCRIPTION(
         "Create a pipeline in which a descriptor used by a shader stage does not include that stage in its stageFlags.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     OneOffDescriptorSet ds(m_device, {
@@ -938,7 +939,7 @@ TEST_F(NegativePipelineLayout, DISABLED_UniformBlockNotProvided) {
         "layout");
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-layout-07988");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     VkShaderObj fs(this, kFragmentUniformGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -946,10 +947,10 @@ TEST_F(NegativePipelineLayout, DISABLED_UniformBlockNotProvided) {
     pipe.InitState();
     pipe.shader_stages_[1] = fs.GetStageCreateInfo();
 
-    VkDescriptorSetObj descriptorSet(m_device);
-    descriptorSet.CreateVKDescriptorSet(m_commandBuffer);
+    OneOffDescriptorSet descriptor_set(m_device, {});  // no descriptor in layout
+    vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
 
-    pipe.gp_ci_.layout = descriptorSet.GetPipelineLayout();
+    pipe.gp_ci_.layout = pipeline_layout.handle();
     pipe.CreateGraphicsPipeline();
 
     m_errorMonitor->VerifyFound();
@@ -960,7 +961,7 @@ TEST_F(NegativePipelineLayout, DISABLED_MissingDescriptor) {
         "Test that an error is produced for a compute pipeline consuming a descriptor which is not provided in the pipeline "
         "layout");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     char const *csSource = R"glsl(
         #version 450
@@ -985,8 +986,8 @@ TEST_F(NegativePipelineLayout, MultiplePushDescriptorSets) {
 
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitState());
 
     VkDescriptorSetLayoutBinding dsl_binding = {};
     dsl_binding.binding = 0;
@@ -1020,7 +1021,7 @@ TEST_F(NegativePipelineLayout, SetLayoutFlags) {
     TEST_DESCRIPTION("Validate setLayout flags in create pipeline layout.");
 
     AddRequiredExtensions(VK_EXT_MUTABLE_DESCRIPTOR_TYPE_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceMutableDescriptorTypeFeaturesEXT mut_features = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(mut_features);

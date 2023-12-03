@@ -71,7 +71,7 @@ static const char *NoPointSizeVertShader = R"glsl(
 TEST_F(NegativePipelineTopology, DISABLED_PointSize) {
     TEST_DESCRIPTION("Create a pipeline using TOPOLOGY_POINT_LIST but do not set PointSize in vertex shader.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     VkShaderObj vs(this, NoPointSizeVertShader, VK_SHADER_STAGE_VERTEX_BIT);
@@ -89,8 +89,8 @@ TEST_F(NegativePipelineTopology, PointSizeNonDynamicAndRestricted) {
         "dynamicPrimitiveTopologyUnrestricted is false.");
 
     AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
     VkPhysicalDeviceExtendedDynamicState3PropertiesEXT dynamic_state_3_props = vku::InitStructHelper();
@@ -114,8 +114,8 @@ TEST_F(NegativePipelineTopology, PointSizeNonDynamicAndUnrestricted) {
         "dynamicPrimitiveTopologyUnrestricted is true, but not dynamic state.");
 
     AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
     VkPhysicalDeviceExtendedDynamicState3PropertiesEXT dynamic_state_3_props = vku::InitStructHelper();
@@ -140,7 +140,7 @@ TEST_F(NegativePipelineTopology, PointSizeDynamicAndRestricted) {
 
     AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
     VkPhysicalDeviceExtendedDynamicStateFeaturesEXT extended_dynamic_state_features = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(extended_dynamic_state_features);
     if (!extended_dynamic_state_features.extendedDynamicState) {
@@ -233,7 +233,7 @@ TEST_F(NegativePipelineTopology, PrimitiveTopologyListRestart) {
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_EXT_PRIMITIVE_TOPOLOGY_LIST_RESTART_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDevicePrimitiveTopologyListRestartFeaturesEXT ptl_restart_features = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(ptl_restart_features);
@@ -271,7 +271,7 @@ TEST_F(NegativePipelineTopology, PatchListNoTessellation) {
     TEST_DESCRIPTION("Use VK_PRIMITIVE_TOPOLOGY_PATCH_LIST without tessellation shader");
 
     AddOptionalExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     if (!m_device->phy().features().tessellationShader) {
@@ -292,7 +292,7 @@ TEST_F(NegativePipelineTopology, PatchListNoTessellation) {
 TEST_F(NegativePipelineTopology, FillRectangleNV) {
     TEST_DESCRIPTION("Verify VK_NV_fill_rectangle");
     AddRequiredExtensions(VK_NV_FILL_RECTANGLE_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceFeatures device_features = {};
     GetPhysicalDeviceFeatures(&device_features);

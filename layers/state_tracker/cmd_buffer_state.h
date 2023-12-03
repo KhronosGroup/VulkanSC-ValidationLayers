@@ -32,12 +32,15 @@
 #include "containers/custom_containers.h"
 
 struct SUBPASS_INFO;
-class FRAMEBUFFER_STATE;
-class RENDER_PASS_STATE;
 class VIDEO_SESSION_STATE;
 class VIDEO_SESSION_PARAMETERS_STATE;
 class CoreChecks;
 class ValidationStateTracker;
+
+namespace vvl {
+class Framebuffer;
+class RenderPass;
+}  // namespace vvl
 
 #ifdef VK_USE_PLATFORM_METAL_EXT
 static bool GetMetalExport(const VkEventCreateInfo *info) {
@@ -60,8 +63,13 @@ class EVENT_STATE : public BASE_NODE {
 #ifdef VK_USE_PLATFORM_METAL_EXT
     const bool metal_event_export;
 #endif  // VK_USE_PLATFORM_METAL_EXT
-    VkPipelineStageFlags2KHR stageMask = VkPipelineStageFlags2KHR(0);
-    VkEventCreateFlags flags;
+    const VkEventCreateFlags flags;
+
+    // Source stage specified by the "set event" command
+    VkPipelineStageFlags2 signal_src_stage_mask = VK_PIPELINE_STAGE_2_NONE;
+
+    // Queue that signaled this event. It's null if event was signaled from the host
+    VkQueue signaling_queue = VK_NULL_HANDLE;
 
     EVENT_STATE(VkEvent event_, const VkEventCreateInfo *pCreateInfo)
         : BASE_NODE(event_, kVulkanObjectTypeEvent),
@@ -113,17 +121,16 @@ enum class CbState {
 };
 
 struct BufferBinding {
-    std::shared_ptr<BUFFER_STATE> buffer_state;
+    std::shared_ptr<vvl::Buffer> buffer_state;
     VkDeviceSize size;
     VkDeviceSize offset;
     VkDeviceSize stride;
 
     BufferBinding() : buffer_state(), size(0), offset(0), stride(0) {}
-    BufferBinding(const std::shared_ptr<BUFFER_STATE> &buffer_state_, VkDeviceSize size_, VkDeviceSize offset_,
-                  VkDeviceSize stride_)
+    BufferBinding(const std::shared_ptr<vvl::Buffer> &buffer_state_, VkDeviceSize size_, VkDeviceSize offset_, VkDeviceSize stride_)
         : buffer_state(buffer_state_), size(size_), offset(offset_), stride(stride_) {}
-    BufferBinding(const std::shared_ptr<BUFFER_STATE> &buffer_state_, VkDeviceSize offset_)
-        : BufferBinding(buffer_state_, BUFFER_STATE::ComputeSize(buffer_state_, offset_, VK_WHOLE_SIZE), offset_, 0U) {}
+    BufferBinding(const std::shared_ptr<vvl::Buffer> &buffer_state_, VkDeviceSize offset_)
+        : BufferBinding(buffer_state_, vvl::Buffer::ComputeSize(buffer_state_, offset_, VK_WHOLE_SIZE), offset_, 0U) {}
     virtual ~BufferBinding() {}
 
     virtual void reset() { *this = BufferBinding(); }
@@ -134,12 +141,12 @@ struct IndexBufferBinding : BufferBinding {
     VkIndexType index_type;
 
     IndexBufferBinding() : BufferBinding(), index_type(static_cast<VkIndexType>(0)) {}
-    IndexBufferBinding(const std::shared_ptr<BUFFER_STATE> &buffer_state_, VkDeviceSize offset_, VkIndexType index_type_)
+    IndexBufferBinding(const std::shared_ptr<vvl::Buffer> &buffer_state_, VkDeviceSize offset_, VkIndexType index_type_)
         : BufferBinding(buffer_state_, offset_), index_type(index_type_) {}
     // TODO - We could clean up the BufferBinding interface now we have 2 ways to bind both the Vertex and Index buffer
-    IndexBufferBinding(const std::shared_ptr<BUFFER_STATE> &buffer_state_, VkDeviceSize size_, VkDeviceSize offset_,
+    IndexBufferBinding(const std::shared_ptr<vvl::Buffer> &buffer_state_, VkDeviceSize size_, VkDeviceSize offset_,
                        VkIndexType index_type_)
-        : BufferBinding(buffer_state_, BUFFER_STATE::ComputeSize(buffer_state_, offset_, size_), offset_, 0U),
+        : BufferBinding(buffer_state_, vvl::Buffer::ComputeSize(buffer_state_, offset_, size_), offset_, 0U),
           index_type(index_type_) {}
     virtual ~IndexBufferBinding() {}
 
@@ -213,6 +220,8 @@ class CMD_BUFFER_STATE : public REFCOUNTED_NODE {
         VkCullModeFlags cull_mode;
         // VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY
         VkPrimitiveTopology primitive_topology;
+        // VK_DYNAMIC_STATE_SAMPLE_LOCATIONS_EXT
+        VkSampleLocationsInfoEXT sample_locations_info;
         // VK_DYNAMIC_STATE_DISCARD_RECTANGLE_ENABLE_EXT
         bool discard_rectangle_enable;
         // VK_DYNAMIC_STATE_DISCARD_RECTANGLE_EXT
@@ -222,12 +231,18 @@ class CMD_BUFFER_STATE : public REFCOUNTED_NODE {
         VkPolygonMode polygon_mode;
         // VK_DYNAMIC_STATE_RASTERIZATION_SAMPLES_EXT
         VkSampleCountFlagBits rasterization_samples;
+        // VK_DYNAMIC_STATE_RASTERIZATION_STREAM_EXT
+        uint32_t rasterization_stream;
+        // VK_DYNAMIC_STATE_SAMPLE_MASK_EXT
+        VkSampleCountFlagBits samples_mask_samples;
         // VK_DYNAMIC_STATE_LINE_RASTERIZATION_MODE_EXT
         VkLineRasterizationModeEXT line_rasterization_mode;
         // VK_DYNAMIC_STATE_LINE_STIPPLE_ENABLE_EXT
         bool stippled_line_enable;
         // VK_DYNAMIC_STATE_COVERAGE_TO_COLOR_ENABLE_NV
         bool coverage_to_color_enable;
+        // VK_DYNAMIC_STATE_COVERAGE_TO_COLOR_LOCATION_NV
+        uint32_t coverage_to_color_location;
         // VK_DYNAMIC_STATE_COVERAGE_MODULATION_MODE_NV
         VkCoverageModulationModeNV coverage_modulation_mode;
         // VK_DYNAMIC_STATE_COVERAGE_MODULATION_TABLE_ENABLE_NV
@@ -242,6 +257,8 @@ class CMD_BUFFER_STATE : public REFCOUNTED_NODE {
         bool alpha_to_coverage_enable;
         // VK_DYNAMIC_STATE_LOGIC_OP_ENABLE_EXT
         bool logic_op_enable;
+        // VK_DYNAMIC_STATE_FRAGMENT_SHADING_RATE_KHR
+        VkExtent2D fragment_size;
 
         uint32_t color_write_enable_attachment_count;
 
@@ -262,6 +279,8 @@ class CMD_BUFFER_STATE : public REFCOUNTED_NODE {
         VkConservativeRasterizationModeEXT conservative_rasterization_mode;
         // VK_DYNAMIC_STATE_SAMPLE_LOCATIONS_ENABLE_EXT
         bool sample_locations_enable;
+        // VK_DYNAMIC_STATE_ATTACHMENT_FEEDBACK_LOOP_ENABLE_EXT
+        VkImageAspectFlags attachment_feedback_loop_enable;
 
         // VK_DYNAMIC_STATE_VIEWPORT
         std::vector<VkViewport> viewports;
@@ -275,6 +294,8 @@ class CMD_BUFFER_STATE : public REFCOUNTED_NODE {
         uint32_t viewport_w_scaling_count;
         // VK_DYNAMIC_STATE_VIEWPORT_W_SCALING_ENABLE
         bool viewport_w_scaling_enable;
+        // VK_DYNAMIC_STATE_VIEWPORT_SWIZZLE_NV
+        uint32_t viewport_swizzle_count;
         // VK_DYNAMIC_STATE_VIEWPORT_SHADING_RATE_PALETTE_NV
         uint32_t shading_rate_palette_count;
         // VK_DYNAMIC_STATE_EXCLUSIVE_SCISSOR_ENABLE_NV
@@ -322,16 +343,6 @@ class CMD_BUFFER_STATE : public REFCOUNTED_NODE {
     std::shared_ptr<const CMD_BUFFER_STATE> shared_from_this() const { return SharedFromThisImpl(this); }
     std::shared_ptr<CMD_BUFFER_STATE> shared_from_this() { return SharedFromThisImpl(this); }
 
-    using DescriptorBindingInfo = std::pair<const uint32_t, DescriptorRequirement>;
-    struct CmdDrawDispatchInfo {
-        Func command;
-        std::vector<DescriptorBindingInfo> binding_infos;
-        VkFramebuffer framebuffer;
-        std::shared_ptr<std::vector<SUBPASS_INFO>> subpasses;
-        std::shared_ptr<std::vector<IMAGE_VIEW_STATE *>> attachments;
-    };
-    vvl::unordered_map<VkDescriptorSet, std::vector<CmdDrawDispatchInfo>> validate_descriptorsets_in_queuesubmit;
-
     // If VK_NV_inherited_viewport_scissor is enabled and VkCommandBufferInheritanceViewportScissorInfoNV::viewportScissor2D is
     // true, then is the nonempty list of viewports passed in pViewportDepths. Otherwise, this is empty.
     std::vector<VkViewport> inheritedViewportDepths;
@@ -364,7 +375,7 @@ class CMD_BUFFER_STATE : public REFCOUNTED_NODE {
     uint32_t initial_device_mask;
 
     // The RenderPass created from vkCmdBeginRenderPass or vkCmdBeginRendering
-    std::shared_ptr<RENDER_PASS_STATE> activeRenderPass;
+    std::shared_ptr<vvl::RenderPass> activeRenderPass;
     // Used for both type of renderPass
     vvl::unordered_set<uint32_t> active_color_attachments_index;
     uint32_t active_render_pass_device_mask;
@@ -381,7 +392,7 @@ class CMD_BUFFER_STATE : public REFCOUNTED_NODE {
     void SetActiveSubpassRasterizationSampleCount(VkSampleCountFlagBits rasterization_sample_count) {
         active_subpass_sample_count_ = rasterization_sample_count;
     }
-    std::shared_ptr<FRAMEBUFFER_STATE> activeFramebuffer;
+    std::shared_ptr<vvl::Framebuffer> activeFramebuffer;
     // Unified data structs to track objects bound to this command buffer as well as object
     //  dependencies that have been broken : either destroyed objects, or updated descriptor sets
     vvl::unordered_set<std::shared_ptr<BASE_NODE>> object_bindings;
@@ -406,22 +417,23 @@ class CMD_BUFFER_STATE : public REFCOUNTED_NODE {
     // If primary, the secondary command buffers we will call.
     vvl::unordered_set<CMD_BUFFER_STATE *> linkedCommandBuffers;
     // Validation functions run at primary CB queue submit time
-    using QueueCallback = std::function<bool(const ValidationStateTracker &device_data, const class QUEUE_STATE &queue_state,
+    using QueueCallback = std::function<bool(const ValidationStateTracker &device_data, const class vvl::Queue &queue_state,
                                              const CMD_BUFFER_STATE &cb_state)>;
     std::vector<QueueCallback> queue_submit_functions;
     // Used by some layers to defer actions until vkCmdEndRenderPass time.
     // Layers using this are responsible for inserting the callbacks into queue_submit_functions.
     std::vector<QueueCallback> queue_submit_functions_after_render_pass;
     // Validation functions run when secondary CB is executed in primary
-    std::vector<std::function<bool(const CMD_BUFFER_STATE &secondary, const CMD_BUFFER_STATE *primary, const FRAMEBUFFER_STATE *)>>
+    std::vector<std::function<bool(const CMD_BUFFER_STATE &secondary, const CMD_BUFFER_STATE *primary, const vvl::Framebuffer *)>>
         cmd_execute_commands_functions;
-    std::vector<std::function<bool(CMD_BUFFER_STATE &cb_state, bool do_validate, EventToStageMap *localEventToStageMap)>>
-        eventUpdates;
+
+    using EventCallback = std::function<bool(CMD_BUFFER_STATE &cb_state, bool do_validate, EventToStageMap &local_event_signal_info,
+                                             VkQueue waiting_queue, const Location &loc)>;
+    std::vector<EventCallback> eventUpdates;
+
     std::vector<std::function<bool(CMD_BUFFER_STATE &cb_state, bool do_validate, VkQueryPool &firstPerfQueryPool,
                                    uint32_t perfQueryPass, QueryMap *localQueryToStateMap)>>
         queryUpdates;
-    vvl::unordered_map<const cvdescriptorset::DescriptorSet *, cvdescriptorset::DescriptorSet::CachedValidation>
-        descriptorset_cache;
     IndexBufferBinding index_buffer_binding;
     bool performance_lock_acquired = false;
     bool performance_lock_released = false;
@@ -540,7 +552,7 @@ class CMD_BUFFER_STATE : public REFCOUNTED_NODE {
 
     void UpdateLastBoundDescriptorSets(VkPipelineBindPoint pipeline_bind_point, const PIPELINE_LAYOUT_STATE &pipeline_layout,
                                        uint32_t first_set, uint32_t set_count, const VkDescriptorSet *pDescriptorSets,
-                                       std::shared_ptr<cvdescriptorset::DescriptorSet> &push_descriptor_set,
+                                       std::shared_ptr<vvl::DescriptorSet> &push_descriptor_set,
                                        uint32_t dynamic_offset_count, const uint32_t *p_dynamic_offsets);
 
     void UpdateLastBoundDescriptorBuffers(VkPipelineBindPoint pipeline_bind_point, const PIPELINE_LAYOUT_STATE &pipeline_layout,
@@ -581,7 +593,7 @@ class CMD_BUFFER_STATE : public REFCOUNTED_NODE {
     void SetImageInitialLayout(const IMAGE_STATE &image_state, const VkImageSubresourceRange &range, VkImageLayout layout);
     void SetImageInitialLayout(const IMAGE_STATE &image_state, const VkImageSubresourceLayers &layers, VkImageLayout layout);
 
-    void Submit(uint32_t perf_submit_pass);
+    void Submit(VkQueue queue, uint32_t perf_submit_pass, const Location &loc);
     void Retire(uint32_t perf_submit_pass, const std::function<bool(const QueryObject &)> &is_query_updated_after);
 
     uint32_t GetDynamicColorAttachmentCount() const {
@@ -595,7 +607,6 @@ class CMD_BUFFER_STATE : public REFCOUNTED_NODE {
         }
         return 0;
     }
-    bool IsValidDynamicColorAttachmentImageIndex(uint32_t index) const { return index < GetDynamicColorAttachmentCount(); }
     uint32_t GetDynamicColorAttachmentImageIndex(uint32_t index) const { return index; }
     uint32_t GetDynamicColorResolveAttachmentImageIndex(uint32_t index) const { return index + GetDynamicColorAttachmentCount(); }
     uint32_t GetDynamicDepthAttachmentImageIndex() const { return 2 * GetDynamicColorAttachmentCount(); }
@@ -621,6 +632,14 @@ class CMD_BUFFER_STATE : public REFCOUNTED_NODE {
             if (activeRenderPass->use_dynamic_rendering) {
                 return activeRenderPass->dynamic_rendering_begin_rendering_info.pStencilAttachment != nullptr;
             }
+        }
+        return false;
+    }
+    bool HasExternalFormatResolveAttachment() const {
+        if (activeRenderPass && activeRenderPass->use_dynamic_rendering &&
+            activeRenderPass->dynamic_rendering_begin_rendering_info.colorAttachmentCount > 0) {
+            return activeRenderPass->dynamic_rendering_begin_rendering_info.pColorAttachments->resolveMode ==
+                   VK_RESOLVE_MODE_EXTERNAL_FORMAT_DOWNSAMPLE_ANDROID;
         }
         return false;
     }

@@ -13,13 +13,14 @@
  */
 
 #include "../framework/layer_validation_tests.h"
+#include "../framework/descriptor_helper.h"
 
 #if GTEST_IS_THREADSAFE
 TEST_F(NegativeThreading, CommandBufferCollision) {
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "THREADING ERROR");
     m_errorMonitor->SetAllowedFailureMsg("THREADING ERROR");  // Ignore any extra threading errors found beyond the first one
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     // Test takes magnitude of time longer for profiles and slows down testing
@@ -72,10 +73,10 @@ TEST_F(NegativeThreading, CommandBufferCollision) {
 TEST_F(NegativeThreading, UpdateDescriptorCollision) {
     TEST_DESCRIPTION("Two threads updating the same descriptor set, expected to generate a threading error");
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "THREADING ERROR : vkUpdateDescriptorSets");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "vkUpdateDescriptorSets():  THREADING ERROR");
     m_errorMonitor->SetAllowedFailureMsg("THREADING ERROR");  // Ignore any extra threading errors found beyond the first one
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     OneOffDescriptorSet normal_descriptor_set(m_device,

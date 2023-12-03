@@ -79,10 +79,8 @@ template<> std::vector<VkValidationFeatureDisableEXT> ValidationObject::ValidPar
 template<> std::vector<VkLineRasterizationModeEXT> ValidationObject::ValidParamValues() const;
 #ifdef VK_USE_PLATFORM_SCI
 template<> std::vector<VkSciSyncClientTypeNV> ValidationObject::ValidParamValues() const;
-#endif //VK_USE_PLATFORM_SCI
-#ifdef VK_USE_PLATFORM_SCI
 template<> std::vector<VkSciSyncPrimitiveTypeNV> ValidationObject::ValidParamValues() const;
-#endif //VK_USE_PLATFORM_SCI
+#endif  // VK_USE_PLATFORM_SCI
 // clang-format on
 
 // NOLINTEND

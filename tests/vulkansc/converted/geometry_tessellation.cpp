@@ -24,7 +24,7 @@ TEST_F(NegativeGeometryTessellation, StageMaskGsTsEnabled) {
         "Attempt to use a stageMask w/ geometry shader and tesselation shader bits enabled when those features are disabled on the "
         "device.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     std::vector<const char *> device_extension_names;
@@ -153,7 +153,7 @@ TEST_F(NegativeGeometryTessellation, DISABLED_PointSizeGeomShaderDontWrite) {
     TEST_DESCRIPTION(
         "Create a pipeline using TOPOLOGY_POINT_LIST, set PointSize vertex shader, but not in the final geometry stage.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     if ((!m_device->phy().features().geometryShader) || (!m_device->phy().features().shaderTessellationAndGeometryPointSize)) {
         GTEST_SKIP() << "Device does not support the required geometry shader features";
@@ -188,7 +188,7 @@ TEST_F(NegativeGeometryTessellation, DISABLED_PointSizeGeomShaderWrite) {
     TEST_DESCRIPTION(
         "Create a pipeline using TOPOLOGY_POINT_LIST, set PointSize vertex shader, but not in the final geometry stage.");
 
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
     VkPhysicalDeviceFeatures features{};
     vk::GetPhysicalDeviceFeatures(gpu(), &features);
     if (features.geometryShader == VK_FALSE) {
@@ -265,7 +265,7 @@ TEST_F(NegativeGeometryTessellation, DISABLED_PointSizeGeomShaderWrite) {
 TEST_F(NegativeGeometryTessellation, DISABLED_BuiltinBlockOrderMismatchVsGs) {
     TEST_DESCRIPTION("Use different order of gl_Position and gl_PointSize in builtin block interface between VS and GS.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     if (!m_device->phy().features().geometryShader || !m_device->phy().features().shaderTessellationAndGeometryPointSize) {
         GTEST_SKIP() << "Device does not support geometry shaders";
@@ -355,7 +355,7 @@ TEST_F(NegativeGeometryTessellation, DISABLED_BuiltinBlockOrderMismatchVsGs) {
 TEST_F(NegativeGeometryTessellation, DISABLED_BuiltinBlockSizeMismatchVsGs) {
     TEST_DESCRIPTION("Use different number of elements in builtin block interface between VS and GS.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     if (!m_device->phy().features().geometryShader || !m_device->phy().features().shaderTessellationAndGeometryPointSize) {
         GTEST_SKIP() << "Device does not support geometry shaders";
@@ -397,7 +397,7 @@ TEST_F(NegativeGeometryTessellation, DISABLED_MaxTessellationControlInputOutputC
         "Test that errors are produced when the number of per-vertex input and/or output components to the tessellation control "
         "stage exceeds the device limit");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     // overflow == 0: no overflow, 1: too many components, 2: location number too large
@@ -478,6 +478,8 @@ TEST_F(NegativeGeometryTessellation, DISABLED_MaxTessellationControlInputOutputC
         tessInfo.flags = 0;
         tessInfo.patchControlPoints = 3;
 
+        m_errorMonitor->SetUnexpectedError("Undefined-Value-ShaderInputNotProduced");
+
         const auto set_info = [&](CreatePipelineHelper &helper) {
             helper.shader_stages_ = {helper.vs_->GetStageCreateInfo(), tcs.GetStageCreateInfo(), tes.GetStageCreateInfo(),
                                      helper.fs_->GetStageCreateInfo()};
@@ -514,7 +516,7 @@ TEST_F(NegativeGeometryTessellation, DISABLED_MaxTessellationEvaluationInputOutp
         "Test that errors are produced when the number of input and/or output components to the tessellation evaluation stage "
         "exceeds the device limit");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     // overflow == 0: no overflow, 1: too many components, 2: location number too large
@@ -596,6 +598,8 @@ TEST_F(NegativeGeometryTessellation, DISABLED_MaxTessellationEvaluationInputOutp
         tessInfo.flags = 0;
         tessInfo.patchControlPoints = 3;
 
+        m_errorMonitor->SetUnexpectedError("Undefined-Value-ShaderInputNotProduced");
+
         const auto set_info = [&](CreatePipelineHelper &helper) {
             helper.shader_stages_ = {helper.vs_->GetStageCreateInfo(), tcs.GetStageCreateInfo(), tes.GetStageCreateInfo(),
                                      helper.fs_->GetStageCreateInfo()};
@@ -633,7 +637,7 @@ TEST_F(NegativeGeometryTessellation, DISABLED_MaxGeometryInputOutputComponents) 
         "Test that errors are produced when the number of input and/or output components to the geometry stage exceeds the device "
         "limit");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     // overflow == 0: no overflow, 1: too many components, 2: location number too large
@@ -742,7 +746,7 @@ TEST_F(NegativeGeometryTessellation, DISABLED_MaxGeometryInstanceVertexCount) {
         "Test that errors are produced when the number of output vertices/instances in the geometry stage exceeds the device "
         "limit");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     for (int overflow = 0; overflow < 2; ++overflow) {
@@ -802,7 +806,7 @@ TEST_F(NegativeGeometryTessellation, DISABLED_TessellationPatchDecorationMismatc
         "Test that an error is produced for a variable output from the TCS without the patch decoration, but consumed in the TES "
         "with the decoration.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     if (!m_device->phy().features().tessellationShader) {
@@ -848,7 +852,7 @@ TEST_F(NegativeGeometryTessellation, DISABLED_TessellationPatchDecorationMismatc
 TEST_F(NegativeGeometryTessellation, Tessellation) {
     TEST_DESCRIPTION("Test various errors when creating a graphics pipeline with tessellation stages active.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     if (!m_device->phy().features().tessellationShader) {
@@ -933,7 +937,7 @@ TEST_F(NegativeGeometryTessellation, PatchListTopology) {
     TEST_DESCRIPTION("Need to have VK_PRIMITIVE_TOPOLOGY_PATCH_LIST.");
 
     AddOptionalExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     if (!m_device->phy().features().tessellationShader) {
@@ -963,7 +967,7 @@ TEST_F(NegativeGeometryTessellation, PatchControlPoints)
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "Invalid Pipeline CreateInfo State: VK_PRIMITIVE_TOPOLOGY_PATCH primitive ");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     VkDescriptorPoolSize ds_type_count = {};
@@ -1062,7 +1066,7 @@ VK_DESCRIPTOR_SET_USAGE_NON_FREE, 1, &ds_layout.handle(), &descriptorSet);
 TEST_F(NegativeGeometryTessellation, DISABLED_IncompatiblePrimitiveTopology) {
     TEST_DESCRIPTION("Create pipeline with primitive topology incompatible with shaders.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     if ((!m_device->phy().features().geometryShader) || (!m_device->phy().features().shaderTessellationAndGeometryPointSize)) {
         GTEST_SKIP() << "Device does not support the required geometry shader features";
     }
@@ -1077,7 +1081,6 @@ TEST_F(NegativeGeometryTessellation, DISABLED_IncompatiblePrimitiveTopology) {
         {
             vec4 gl_Position;
             float gl_PointSize;
-            float gl_ClipDistance[];
         } gl_in[];
         void main()
         {
@@ -1100,7 +1103,7 @@ TEST_F(NegativeGeometryTessellation, DISABLED_IncompatiblePrimitiveTopology) {
 TEST_F(NegativeGeometryTessellation, DISABLED_IncompatibleTessGeomPrimitiveTopology) {
     TEST_DESCRIPTION("Create pipeline with incompatible topology between tess and geom shaders.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     if ((!m_device->phy().features().geometryShader) || (!m_device->phy().features().shaderTessellationAndGeometryPointSize)) {
         GTEST_SKIP() << "Device does not support the required geometry shader features";
     }
@@ -1167,7 +1170,7 @@ TEST_F(NegativeGeometryTessellation, DISABLED_PipelineTessellationMissingPointSi
     TEST_DESCRIPTION("Create pipeline with tessellation shader with missing point size");
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
     if (IsExtensionsEnabled(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME)) {
         VkPhysicalDevicePortabilitySubsetFeaturesKHR portability_subset_features = vku::InitStructHelper();
         VkPhysicalDeviceFeatures2 features2;
@@ -1178,7 +1181,7 @@ TEST_F(NegativeGeometryTessellation, DISABLED_PipelineTessellationMissingPointSi
         if (!portability_subset_features.tessellationPointMode) {
             GTEST_SKIP() << "tessellationPointMode not supported";
         }
-        RETURN_IF_SKIP(InitState(nullptr, &features2))
+        RETURN_IF_SKIP(InitState(nullptr, &features2));
     } else {
         VkPhysicalDeviceFeatures features;
         GetPhysicalDeviceFeatures(&features);
@@ -1216,7 +1219,7 @@ TEST_F(NegativeGeometryTessellation, DISABLED_PipelineTessellationPointSize) {
     TEST_DESCRIPTION("Create pipeline with tessellation shader with missing point size");
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
     if (IsExtensionsEnabled(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME)) {
         VkPhysicalDevicePortabilitySubsetFeaturesKHR portability_subset_features = vku::InitStructHelper();
         VkPhysicalDeviceFeatures2 features2;
@@ -1228,7 +1231,7 @@ TEST_F(NegativeGeometryTessellation, DISABLED_PipelineTessellationPointSize) {
             GTEST_SKIP() << "tessellationPointMode not supported";
         }
         features2.features.shaderTessellationAndGeometryPointSize = VK_FALSE;
-        RETURN_IF_SKIP(InitState(nullptr, &features2))
+        RETURN_IF_SKIP(InitState(nullptr, &features2));
     } else {
         VkPhysicalDeviceFeatures features;
         GetPhysicalDeviceFeatures(&features);
@@ -1265,4 +1268,306 @@ TEST_F(NegativeGeometryTessellation, DISABLED_PipelineTessellationPointSize) {
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-TessellationEvaluation-07724");
     pipe.CreateGraphicsPipeline();
     m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeGeometryTessellation, GeometryStreamsCapability) {
+    TEST_DESCRIPTION("Use geometry shader with geometryStreams capability, but geometryStreams feature not enabled");
+
+    AddRequiredExtensions(VK_EXT_TRANSFORM_FEEDBACK_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitFramework());
+    VkPhysicalDeviceTransformFeedbackFeaturesEXT xfb_features = vku::InitStructHelper();
+    auto features2 = GetPhysicalDeviceFeatures2(xfb_features);
+    if (!xfb_features.transformFeedback) {
+        GTEST_SKIP() << "transformFeedback not supported";
+    }
+    xfb_features.geometryStreams = VK_FALSE;
+    features2.features.shaderTessellationAndGeometryPointSize = VK_FALSE;
+    RETURN_IF_SKIP(InitState(nullptr, &features2));
+    InitRenderTarget();
+
+    VkPhysicalDeviceTransformFeedbackPropertiesEXT xfb_props = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(xfb_props);
+
+    if (xfb_props.maxTransformFeedbackStreams <= 1) {
+        GTEST_SKIP() << "maxTransformFeedbackStreams lower than required";
+    }
+
+    static char const geom_src[] = R"glsl(
+               OpCapability Geometry
+               OpCapability TransformFeedback
+               OpCapability GeometryStreams
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Geometry %main "main" %output1 %_
+               OpExecutionMode %main Xfb
+               OpExecutionMode %main InputPoints
+               OpExecutionMode %main Invocations 1
+               OpExecutionMode %main OutputPoints
+               OpExecutionMode %main OutputVertices 1
+
+               ; Debug Information
+               OpSource GLSL 460
+               OpName %main "main"  ; id %4
+               OpName %output1 "output1"  ; id %8
+               OpName %gl_PerVertex "gl_PerVertex"  ; id %14
+               OpMemberName %gl_PerVertex 0 "gl_Position"
+               OpMemberName %gl_PerVertex 1 "gl_PointSize"
+               OpMemberName %gl_PerVertex 2 "gl_ClipDistance"
+               OpMemberName %gl_PerVertex 3 "gl_CullDistance"
+               OpName %_ ""  ; id %16
+
+               ; Annotations
+               OpDecorate %output1 Location 0
+               OpDecorate %output1 Stream 1
+               OpDecorate %output1 XfbBuffer 0
+               OpDecorate %output1 XfbStride 4
+               OpDecorate %output1 Offset 0
+               OpMemberDecorate %gl_PerVertex 0 BuiltIn Position
+               OpMemberDecorate %gl_PerVertex 1 BuiltIn PointSize
+               OpMemberDecorate %gl_PerVertex 2 BuiltIn ClipDistance
+               OpMemberDecorate %gl_PerVertex 3 BuiltIn CullDistance
+               OpDecorate %gl_PerVertex Block
+               OpDecorate %_ Stream 0
+               OpDecorate %_ XfbBuffer 0
+               OpDecorate %_ XfbStride 4
+
+               ; Types, variables and constants
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+%_ptr_Output_float = OpTypePointer Output %float
+    %output1 = OpVariable %_ptr_Output_float Output
+    %float_1 = OpConstant %float 1
+    %v4float = OpTypeVector %float 4
+       %uint = OpTypeInt 32 0
+     %uint_1 = OpConstant %uint 1
+%_arr_float_uint_1 = OpTypeArray %float %uint_1
+%gl_PerVertex = OpTypeStruct %v4float %float %_arr_float_uint_1 %_arr_float_uint_1
+%_ptr_Output_gl_PerVertex = OpTypePointer Output %gl_PerVertex
+          %_ = OpVariable %_ptr_Output_gl_PerVertex Output
+        %int = OpTypeInt 32 1
+      %int_0 = OpConstant %int 0
+         %19 = OpConstantComposite %v4float %float_1 %float_1 %float_1 %float_1
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+
+               ; Function main
+       %main = OpFunction %void None %3
+          %5 = OpLabel
+               OpStore %output1 %float_1
+         %21 = OpAccessChain %_ptr_Output_v4float %_ %int_0
+               OpStore %21 %19
+               OpEmitVertex
+               OpReturn
+               OpFunctionEnd
+    )glsl";
+
+    VkShaderObj gs(this, geom_src, VK_SHADER_STAGE_GEOMETRY_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
+
+    CreatePipelineHelper pipe(*this);
+    pipe.InitState();
+    pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), gs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
+    pipe.ia_ci_.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkShaderModuleCreateInfo-pCode-08740");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-geometryStreams-02321");
+    pipe.CreateGraphicsPipeline();
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeGeometryTessellation, DISABLED_MismatchedTessellationExecutionModes) {
+    TEST_DESCRIPTION("Test mismatched tessellation shaders execution modes");
+
+    RETURN_IF_SKIP(InitFramework());
+    if (IsExtensionsEnabled(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME)) {
+        VkPhysicalDevicePortabilitySubsetFeaturesKHR portability_subset_features = vku::InitStructHelper();
+        auto features2 = GetPhysicalDeviceFeatures2(portability_subset_features);
+        if (!portability_subset_features.tessellationPointMode) {
+            GTEST_SKIP() << "tessellationPointMode not supported";
+        }
+        if (features2.features.tessellationShader == VK_FALSE) {
+            GTEST_SKIP() << "geometryShader not supported";
+        }
+        features2.features.shaderTessellationAndGeometryPointSize = VK_FALSE;
+        RETURN_IF_SKIP(InitState(nullptr, &features2));
+    } else {
+        VkPhysicalDeviceFeatures features{};
+        vk::GetPhysicalDeviceFeatures(gpu(), &features);
+        if (features.tessellationShader == VK_FALSE) {
+            GTEST_SKIP() << "geometryShader not supported";
+        }
+        features.shaderTessellationAndGeometryPointSize = VK_FALSE;
+        RETURN_IF_SKIP(InitState(&features));
+    }
+    if (m_device->phy().limits_.maxTessellationPatchSize == 0) {
+        GTEST_SKIP() << "Tessellation shaders not supported";
+    }
+    InitRenderTarget();
+
+    std::string vuids[4] = {
+        "VUID-VkGraphicsPipelineCreateInfo-pStages-00732",
+        "VUID-VkGraphicsPipelineCreateInfo-pStages-00733",
+        "VUID-VkGraphicsPipelineCreateInfo-pStages-00734",
+        "VUID-VkGraphicsPipelineCreateInfo-pStages-00735",
+    };
+
+    std::string tesc_subdivision[4] = {
+        "",
+        "OpExecutionMode %main Quads",
+        "",
+        "",
+    };
+
+    std::string tese_subdivision[4] = {
+        "",
+        "OpExecutionMode %main Triangles",
+        "OpExecutionMode %main Triangles",
+        "OpExecutionMode %main Triangles",
+    };
+
+    std::string tesc_output_vertices[4] = {
+        "OpExecutionMode %main OutputVertices 4",
+        "OpExecutionMode %main OutputVertices 4",
+        "",
+        "OpExecutionMode %main OutputVertices 4",
+    };
+
+    std::string tese_output_vertices[4] = {
+        "",
+        "",
+        "",
+        "OpExecutionMode %main OutputVertices 3",
+    };
+
+    for (uint32_t i = 0; i < 4; ++i) {
+        std::string tesc_source = R"(
+               OpCapability Tessellation
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint TessellationControl %main "main" %gl_TessLevelOuter %gl_TessLevelInner
+)";
+        tesc_source += tesc_output_vertices[i];
+        tesc_source += R"(
+)";
+        tesc_source += tesc_subdivision[i];
+        tesc_source += R"(
+
+               ; Debug Information
+               OpSource GLSL 460
+               OpName %main "main"  ; id %4
+               OpName %gl_TessLevelOuter "gl_TessLevelOuter"  ; id %11
+               OpName %gl_TessLevelInner "gl_TessLevelInner"  ; id %24
+
+               ; Annotations
+               OpDecorate %gl_TessLevelOuter Patch
+               OpDecorate %gl_TessLevelOuter BuiltIn TessLevelOuter
+               OpDecorate %gl_TessLevelInner Patch
+               OpDecorate %gl_TessLevelInner BuiltIn TessLevelInner
+
+               ; Types, variables and constants
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+       %uint = OpTypeInt 32 0
+     %uint_4 = OpConstant %uint 4
+%_arr_float_uint_4 = OpTypeArray %float %uint_4
+%_ptr_Output__arr_float_uint_4 = OpTypePointer Output %_arr_float_uint_4
+%gl_TessLevelOuter = OpVariable %_ptr_Output__arr_float_uint_4 Output
+        %int = OpTypeInt 32 1
+      %int_0 = OpConstant %int 0
+      %int_1 = OpConstant %int 1
+      %int_2 = OpConstant %int 2
+    %float_1 = OpConstant %float 1
+%_ptr_Output_float = OpTypePointer Output %float
+     %uint_2 = OpConstant %uint 2
+%_arr_float_uint_2 = OpTypeArray %float %uint_2
+%_ptr_Output__arr_float_uint_2 = OpTypePointer Output %_arr_float_uint_2
+%gl_TessLevelInner = OpVariable %_ptr_Output__arr_float_uint_2 Output
+
+               ; Function main
+       %main = OpFunction %void None %3
+          %5 = OpLabel
+         %18 = OpAccessChain %_ptr_Output_float %gl_TessLevelOuter %int_2
+               OpStore %18 %float_1
+         %19 = OpAccessChain %_ptr_Output_float %gl_TessLevelOuter %int_1
+               OpStore %19 %float_1
+         %20 = OpAccessChain %_ptr_Output_float %gl_TessLevelOuter %int_0
+               OpStore %20 %float_1
+         %25 = OpAccessChain %_ptr_Output_float %gl_TessLevelInner %int_0
+               OpStore %25 %float_1
+               OpReturn
+               OpFunctionEnd)";
+
+        std::string tese_source = R"(
+               OpCapability Tessellation
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint TessellationEvaluation %main "main" %_
+)";
+        tese_source += tese_output_vertices[i];
+        tese_source += R"(
+)";
+        tese_source += tese_subdivision[i];
+        tese_source += R"(
+               OpExecutionMode %main SpacingEqual
+               OpExecutionMode %main VertexOrderCw
+               OpExecutionMode %main PointMode
+
+               ; Debug Information
+               OpSource GLSL 460
+               OpName %main "main"  ; id %4
+               OpName %gl_PerVertex "gl_PerVertex"  ; id %11
+               OpMemberName %gl_PerVertex 0 "gl_Position"
+               OpMemberName %gl_PerVertex 1 "gl_PointSize"
+               OpMemberName %gl_PerVertex 2 "gl_ClipDistance"
+               OpMemberName %gl_PerVertex 3 "gl_CullDistance"
+               OpName %_ ""  ; id %13
+
+               ; Annotations
+               OpMemberDecorate %gl_PerVertex 0 BuiltIn Position
+               OpMemberDecorate %gl_PerVertex 1 BuiltIn PointSize
+               OpMemberDecorate %gl_PerVertex 2 BuiltIn ClipDistance
+               OpMemberDecorate %gl_PerVertex 3 BuiltIn CullDistance
+               OpDecorate %gl_PerVertex Block
+
+               ; Types, variables and constants
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+    %v4float = OpTypeVector %float 4
+       %uint = OpTypeInt 32 0
+     %uint_1 = OpConstant %uint 1
+%_arr_float_uint_1 = OpTypeArray %float %uint_1
+%gl_PerVertex = OpTypeStruct %v4float %float %_arr_float_uint_1 %_arr_float_uint_1
+%_ptr_Output_gl_PerVertex = OpTypePointer Output %gl_PerVertex
+          %_ = OpVariable %_ptr_Output_gl_PerVertex Output
+        %int = OpTypeInt 32 1
+      %int_0 = OpConstant %int 0
+    %float_1 = OpConstant %float 1
+         %17 = OpConstantComposite %v4float %float_1 %float_1 %float_1 %float_1
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+
+               ; Function main
+       %main = OpFunction %void None %3
+          %5 = OpLabel
+         %19 = OpAccessChain %_ptr_Output_v4float %_ %int_0
+               OpStore %19 %17
+               OpReturn
+               OpFunctionEnd)";
+
+        VkShaderObj tesc(this, tesc_source.c_str(), VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
+        VkShaderObj tese(this, tese_source.c_str(), VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT, SPV_ENV_VULKAN_1_0,
+                         SPV_SOURCE_ASM);
+
+        VkPipelineTessellationStateCreateInfo tess_ci = vku::InitStructHelper();
+        tess_ci.patchControlPoints = 4u;
+
+        CreatePipelineHelper pipe(*this);
+        pipe.InitState();
+        pipe.ia_ci_.topology = VK_PRIMITIVE_TOPOLOGY_PATCH_LIST;
+        pipe.tess_ci_ = tess_ci;
+        pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), tesc.GetStageCreateInfo(), tese.GetStageCreateInfo(),
+                               pipe.fs_->GetStageCreateInfo()};
+        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, vuids[i]);
+        pipe.CreateGraphicsPipeline();
+        m_errorMonitor->VerifyFound();
+    }
 }

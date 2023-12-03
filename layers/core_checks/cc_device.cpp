@@ -157,7 +157,7 @@ bool CoreChecks::ValidateDeviceMaskToRenderPass(const CMD_BUFFER_STATE &cb_state
     return skip;
 }
 
-bool CoreChecks::ValidateQueueFamilyIndex(const PHYSICAL_DEVICE_STATE *pd_state, uint32_t requested_queue_family, const char *vuid,
+bool CoreChecks::ValidateQueueFamilyIndex(const vvl::PhysicalDevice *pd_state, uint32_t requested_queue_family, const char *vuid,
                                           const Location &loc) const {
     bool skip = false;
 
@@ -174,7 +174,7 @@ bool CoreChecks::ValidateQueueFamilyIndex(const PHYSICAL_DEVICE_STATE *pd_state,
     return skip;
 }
 
-bool CoreChecks::ValidateDeviceQueueCreateInfos(const PHYSICAL_DEVICE_STATE *pd_state, uint32_t info_count,
+bool CoreChecks::ValidateDeviceQueueCreateInfos(const vvl::PhysicalDevice *pd_state, uint32_t info_count,
                                                 const VkDeviceQueueCreateInfo *infos, const Location &loc) const {
     bool skip = false;
 
@@ -188,6 +188,7 @@ bool CoreChecks::ValidateDeviceQueueCreateInfos(const PHYSICAL_DEVICE_STATE *pd_
     vvl::unordered_map<uint32_t, create_flags> queue_family_map;
     vvl::unordered_map<uint32_t, VkQueueGlobalPriorityKHR> global_priorities;
 
+    std::vector<uint32_t> queue_counts;
     for (uint32_t i = 0; i < info_count; ++i) {
         const Location info_loc = loc.dot(Field::pQueueCreateInfos, i);
         const uint32_t requested_queue_family = infos[i].queueFamilyIndex;
@@ -297,7 +298,20 @@ bool CoreChecks::ValidateDeviceQueueCreateInfos(const PHYSICAL_DEVICE_STATE *pd_
                     ") is not less than or equal to available queue count for this pCreateInfo->pQueueCreateInfos[%" PRIu32
                     "].queueFamilyIndex} (%" PRIu32 ") obtained previously from vkGetPhysicalDeviceQueueFamilyProperties%s (%s).",
                     requested_queue_count, i, requested_queue_family, conditional_ext_cmd, count_note.c_str());
+            } else {
+                if (requested_queue_family >= queue_counts.size()) {
+                    queue_counts.resize(requested_queue_family + 1);
+                }
+                queue_counts[requested_queue_family] += infos[i].queueCount;
             }
+        }
+    }
+    for (uint32_t i = 0; i < static_cast<uint32_t>(queue_counts.size()); ++i) {
+        if (queue_counts[i] > pd_state->queue_family_properties[i].queueCount) {
+            skip |= LogError("VUID-VkDeviceCreateInfo-pQueueCreateInfos-06755", pd_state->Handle(), loc,
+                             "Total queue count requested from queue family index %" PRIu32 " is %" PRIu32
+                             ", which is greater than queue count available in the queue family (%" PRIu32 ").",
+                             i, queue_counts[i], pd_state->queue_family_properties[i].queueCount);
         }
     }
 
@@ -308,7 +322,7 @@ bool CoreChecks::PreCallValidateCreateDevice(VkPhysicalDevice gpu, const VkDevic
                                              const VkAllocationCallbacks *pAllocator, VkDevice *pDevice,
                                              const ErrorObject &error_obj) const {
     bool skip = false;
-    auto pd_state = Get<PHYSICAL_DEVICE_STATE>(gpu);
+    auto pd_state = Get<vvl::PhysicalDevice>(gpu);
 
     // TODO: object_tracker should perhaps do this instead
     //       and it does not seem to currently work anyway -- the loader just crashes before this point
@@ -459,10 +473,11 @@ void CoreChecks::CreateDevice(const VkDeviceCreateInfo *pCreateInfo) {
     }
 }
 
-void CoreChecks::PreCallRecordDestroyDevice(VkDevice device, const VkAllocationCallbacks *pAllocator) {
+void CoreChecks::PreCallRecordDestroyDevice(VkDevice device, const VkAllocationCallbacks *pAllocator,
+                                            const RecordObject &record_obj) {
     if (!device) return;
 
-    StateTracker::PreCallRecordDestroyDevice(device, pAllocator);
+    StateTracker::PreCallRecordDestroyDevice(device, pAllocator, record_obj);
 
     if (core_validation_cache) {
         Location loc(Func::vkDestroyDevice);
@@ -714,7 +729,7 @@ bool CoreChecks::PreCallValidateCreatePrivateDataSlot(VkDevice device, const VkP
                                                       const VkAllocationCallbacks *pAllocator, VkPrivateDataSlot *pPrivateDataSlot,
                                                       const ErrorObject &error_obj) const {
     bool skip = false;
-    if (!enabled_features.core13.privateData) {
+    if (!enabled_features.privateData) {
         skip |= LogError("VUID-vkCreatePrivateDataSlot-privateData-04564", device, error_obj.location,
                          "The privateData feature was not enabled.");
     }
@@ -728,8 +743,7 @@ bool CoreChecks::PreCallValidateCreateCommandPool(VkDevice device, const VkComma
     const Location create_info_loc = error_obj.location.dot(Field::pCreateInfo);
     skip |= ValidateDeviceQueueFamily(pCreateInfo->queueFamilyIndex, create_info_loc.dot(Field::queueFamilyIndex),
                                       "VUID-vkCreateCommandPool-queueFamilyIndex-01937");
-    if ((enabled_features.core11.protectedMemory == VK_FALSE) &&
-        ((pCreateInfo->flags & VK_COMMAND_POOL_CREATE_PROTECTED_BIT) != 0)) {
+    if ((enabled_features.protectedMemory == VK_FALSE) && ((pCreateInfo->flags & VK_COMMAND_POOL_CREATE_PROTECTED_BIT) != 0)) {
         skip |= LogError("VUID-VkCommandPoolCreateInfo-flags-02860", device, create_info_loc.dot(Field::flags),
                          "includes VK_COMMAND_POOL_CREATE_PROTECTED_BIT, but the protectedMemory feature was not enabled.");
     }

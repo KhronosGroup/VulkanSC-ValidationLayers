@@ -24,7 +24,7 @@ TEST_F(NegativeHostImageCopy, HostCopyImageToFromMemory) {
         width, height, 1, 1, format,
         VK_IMAGE_USAGE_HOST_TRANSFER_BIT_EXT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
         VK_IMAGE_TILING_OPTIMAL);
-    RETURN_IF_SKIP(InitHostImageCopyTest(image_ci))
+    RETURN_IF_SKIP(InitHostImageCopyTest(image_ci));
 
     VkImageFormatProperties img_prop = {};
     VkImageLayout layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
@@ -658,6 +658,22 @@ TEST_F(NegativeHostImageCopy, HostCopyImageToFromMemory) {
     m_errorMonitor->VerifyFound();
     region_to_image.imageExtent.height = height;
     region_from_image.imageExtent.height = height;
+
+    // When VK_HOST_IMAGE_COPY_MEMCPY_EXT is in flags, memoryRowLength and memoryImageHeight must be zero
+    region_to_image.memoryRowLength = width;
+    copy_to_image.flags = VK_HOST_IMAGE_COPY_MEMCPY_EXT;
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkCopyMemoryToImageInfoEXT-flags-09393");
+    vk::CopyMemoryToImageEXT(*m_device, &copy_to_image);
+    m_errorMonitor->VerifyFound();
+    region_from_image.memoryImageHeight = height;
+    copy_from_image.flags = VK_HOST_IMAGE_COPY_MEMCPY_EXT;
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkCopyImageToMemoryInfoEXT-flags-09394");
+    vk::CopyImageToMemoryEXT(*m_device, &copy_from_image);
+    m_errorMonitor->VerifyFound();
+    copy_to_image.flags = 0;
+    copy_from_image.flags = 0;
+    region_to_image.memoryRowLength = 0;
+    region_from_image.memoryImageHeight = 0;
 }
 
 TEST_F(NegativeHostImageCopy, HostCopyImageToImage) {
@@ -670,7 +686,7 @@ TEST_F(NegativeHostImageCopy, HostCopyImageToImage) {
         width, height, 1, 1, format,
         VK_IMAGE_USAGE_HOST_TRANSFER_BIT_EXT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
         VK_IMAGE_TILING_OPTIMAL);
-    RETURN_IF_SKIP(InitHostImageCopyTest(image_ci))
+    RETURN_IF_SKIP(InitHostImageCopyTest(image_ci));
 
     VkImageFormatProperties img_prop = {};
     VkImageLayout layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
@@ -1197,7 +1213,7 @@ TEST_F(NegativeHostImageCopy, HostTransitionImageLayout) {
         width, height, 1, 1, format,
         VK_IMAGE_USAGE_HOST_TRANSFER_BIT_EXT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
         VK_IMAGE_TILING_OPTIMAL);
-    RETURN_IF_SKIP(InitHostImageCopyTest(image_ci))
+    RETURN_IF_SKIP(InitHostImageCopyTest(image_ci));
 
     VkImageFormatProperties img_prop = {};
     VkImageSubresourceRange range = {};
@@ -1418,7 +1434,7 @@ TEST_F(NegativeHostImageCopy, Features) {
     TEST_DESCRIPTION("Use VK_EXT_host_image_copy routines without enabling the hostImageCopy feature");
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_EXT_HOST_IMAGE_COPY_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceHostImageCopyFeaturesEXT host_copy_features = vku::InitStructHelper();
     RETURN_IF_SKIP(InitState(nullptr, &host_copy_features));
@@ -1501,7 +1517,7 @@ TEST_F(NegativeHostImageCopy, ImageMemoryOverlap) {
         width, height, 4, 1, format,
         VK_IMAGE_USAGE_HOST_TRANSFER_BIT_EXT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
         VK_IMAGE_TILING_OPTIMAL);
-    RETURN_IF_SKIP(InitHostImageCopyTest(image_ci))
+    RETURN_IF_SKIP(InitHostImageCopyTest(image_ci));
 
     VkImageLayout layout = VK_IMAGE_LAYOUT_GENERAL;
     VkImageObj image(m_device);
@@ -1577,7 +1593,7 @@ TEST_F(NegativeHostImageCopy, ImageMemorySparseUnbound) {
                                                   VK_IMAGE_USAGE_HOST_TRANSFER_BIT_EXT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
                                                   VK_IMAGE_TILING_OPTIMAL);
     image_ci.flags = VK_IMAGE_CREATE_SPARSE_BINDING_BIT;
-    RETURN_IF_SKIP(InitHostImageCopyTest(image_ci))
+    RETURN_IF_SKIP(InitHostImageCopyTest(image_ci));
 
     if (!m_device->phy().features().sparseBinding) {
         GTEST_SKIP() << "sparseBinding feature is required.";

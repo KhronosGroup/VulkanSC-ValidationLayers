@@ -210,7 +210,9 @@ typedef struct _debug_report_data {
         }
     }
 
-    std::string DebugReportGetUtilsObjectName(const uint64_t object) const {
+    // NoLock suffix means that the function itself does not hold debug_output_mutex lock,
+    // and it's **mandatory responsibility** of the caller to hold this lock.
+    std::string DebugReportGetUtilsObjectNameNoLock(const uint64_t object) const {
         std::string label = "";
         const auto utils_name_iter = debugUtilsObjectNameMap.find(object);
         if (utils_name_iter != debugUtilsObjectNameMap.end()) {
@@ -219,7 +221,9 @@ typedef struct _debug_report_data {
         return label;
     }
 
-    std::string DebugReportGetMarkerObjectName(const uint64_t object) const {
+    // NoLock suffix means that the function itself does not hold debug_output_mutex lock,
+    // and it's **mandatory responsibility** of the caller to hold this lock.
+    std::string DebugReportGetMarkerObjectNameNoLock(const uint64_t object) const {
         std::string label = "";
         const auto marker_name_iter = debugObjectNameMap.find(object);
         if (marker_name_iter != debugObjectNameMap.end()) {
@@ -229,9 +233,10 @@ typedef struct _debug_report_data {
     }
 
     std::string FormatHandle(const char *handle_type_name, uint64_t handle) const {
-        std::string handle_name = DebugReportGetUtilsObjectName(handle);
+        std::unique_lock<std::mutex> lock(debug_output_mutex);
+        std::string handle_name = DebugReportGetUtilsObjectNameNoLock(handle);
         if (handle_name.empty()) {
-            handle_name = DebugReportGetMarkerObjectName(handle);
+            handle_name = DebugReportGetMarkerObjectNameNoLock(handle);
         }
 
         std::ostringstream str;
@@ -281,25 +286,6 @@ static inline void DebugReportFlagsToAnnotFlags(VkDebugReportFlagsEXT dr_flags, 
         *da_type |= VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT;
         *da_severity |= VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
     }
-}
-
-static inline LogMessageTypeFlags DebugAnnotFlagsToMsgTypeFlags(VkDebugUtilsMessageSeverityFlagBitsEXT da_severity,
-                                                                VkDebugUtilsMessageTypeFlagsEXT da_type) {
-    LogMessageTypeFlags msg_type_flags = 0;
-    if ((da_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) != 0) {
-        msg_type_flags |= kErrorBit;
-    } else if ((da_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) != 0) {
-        if ((da_type & VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT) != 0) {
-            msg_type_flags |= kPerformanceWarningBit;
-        } else {
-            msg_type_flags |= kWarningBit;
-        }
-    } else if ((da_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) != 0) {
-        msg_type_flags |= kInformationBit;
-    } else if ((da_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) != 0) {
-        msg_type_flags |= kVerboseBit;
-    }
-    return msg_type_flags;
 }
 
 struct Location;
@@ -449,5 +435,3 @@ static inline void EraseCmdDebugUtilsLabel(debug_report_data *report_data, VkCom
     std::unique_lock<std::mutex> lock(report_data->debug_output_mutex);
     report_data->debugUtilsCmdBufLabels.erase(command_buffer);
 }
-
-uint32_t vvl_vuid_hash(std::string_view vuid);

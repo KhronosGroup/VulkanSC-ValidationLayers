@@ -111,9 +111,8 @@ def BuildLoader():
     BUILD_DIR = f'{SRC_DIR}/build'
 
     if not os.path.exists(SRC_DIR):
-        print("Clone Loader Source Code")
-        clone_loader_cmd = 'git clone https://github.com/KhronosGroup/Vulkan-Loader.git'
-        RunShellCmd(clone_loader_cmd, CI_EXTERNAL_DIR)
+        print("Unable to find Vulkan-Loader")
+        sys.exit(1)
 
     print("Run CMake for Loader")
     cmake_cmd = f'cmake -S {SRC_DIR} -B {BUILD_DIR}'
@@ -140,9 +139,8 @@ def BuildMockICD(mockAndroid):
     BUILD_DIR = f'{SRC_DIR}/build'
 
     if not os.path.exists(SRC_DIR):
-        print("Clone Vulkan-Tools Repository")
-        clone_tools_cmd = 'git clone https://github.com/KhronosGroup/Vulkan-Tools.git'
-        RunShellCmd(clone_tools_cmd, CI_EXTERNAL_DIR)
+        print("Unable to find Vulkan-Tools")
+        sys.exit(1)
 
     print("Configure Mock ICD")
     cmake_cmd = f'cmake -S {SRC_DIR} -B {BUILD_DIR} -D CMAKE_BUILD_TYPE=Release '
@@ -161,21 +159,22 @@ def BuildMockICD(mockAndroid):
 
 #
 # Prepare Profile Layer for use with Layer Validation Tests
-def BuildProfileLayer():
+def BuildProfileLayer(mockAndroid):
     RunShellCmd('pip3 install jsonschema')
 
     SRC_DIR = f'{CI_EXTERNAL_DIR}/Vulkan-Profiles'
     BUILD_DIR = f'{SRC_DIR}/build'
 
     if not os.path.exists(SRC_DIR):
-        print("Clone Vulkan-Profiles Repository")
-        clone_cmd = 'git clone https://github.com/KhronosGroup/Vulkan-Profiles.git'
-        RunShellCmd(clone_cmd, CI_EXTERNAL_DIR)
+        print("Unable to find Vulkan-Profiles")
+        sys.exit(1)
 
     print("Run CMake for Profile Layer")
     cmake_cmd = f'cmake -S {SRC_DIR} -B {BUILD_DIR}'
     cmake_cmd += ' -D CMAKE_BUILD_TYPE=Release'
     cmake_cmd += ' -D UPDATE_DEPS=ON'
+    if mockAndroid:
+        cmake_cmd += ' -DBUILD_MOCK_ANDROID_SUPPORT=ON'
     RunShellCmd(cmake_cmd)
 
     print("Build Profile Layer")
@@ -200,6 +199,7 @@ def RunVVLTests(args):
         lvt_env['VK_DRIVER_FILES'] = os.path.join(CI_INSTALL_DIR, 'bin\\VkICD_mock_icd.json')
     else:
         lvt_env['LD_LIBRARY_PATH'] = os.path.join(CI_INSTALL_DIR, 'lib')
+        lvt_env['DYLD_LIBRARY_PATH'] = os.path.join(CI_INSTALL_DIR, 'lib')
         lvt_env['VK_LAYER_PATH'] = os.path.join(CI_INSTALL_DIR, 'share/vulkan/explicit_layer.d')
         lvt_env['VK_DRIVER_FILES'] = os.path.join(CI_INSTALL_DIR, 'share/vulkan/icd.d/VkICD_mock_icd.json')
 
@@ -235,15 +235,20 @@ def RunVVLTests(args):
     # NOTE: These test(s) fails sporadically.
     # These need extra care to prevent a regression in the future.
     failing_tsan_tests += ':PositiveSyncObject.WaitTimelineSemThreadRace'
+    failing_tsan_tests += ':PositiveSyncObject.WaitEventThenSet'
     failing_tsan_tests += ':PositiveQuery.ResetQueryPoolFromDifferentCB'
+    failing_tsan_tests += ':PositiveQuery.PerformanceQueries'
 
     if args.mockAndroid:
         # TODO - only reason running this subset, is mockAndoid fails any test that does
         # a manual vkCreateDevice call and need to investigate more why
-        RunShellCmd(lvt_cmd + " --gtest_filter=*AndroidHardwareBuffer.*", env=lvt_env)
+        RunShellCmd(lvt_cmd + " --gtest_filter=*AndroidHardwareBuffer.*:*AndroidExternalResolve.*", env=lvt_env)
         return
 
     RunShellCmd(lvt_cmd + f" --gtest_filter={failing_tsan_tests}", env=lvt_env)
+
+    print("Re-Running syncval tests with core validation enabled")
+    RunShellCmd(lvt_cmd + f' --gtest_filter=*SyncVal*:{failing_tsan_tests} --syncval-enable-core', env=lvt_env)
 
     print("Re-Running multithreaded tests with VK_LAYER_FINE_GRAINED_LOCKING disabled")
     lvt_env['VK_LAYER_FINE_GRAINED_LOCKING'] = '0'
@@ -252,9 +257,6 @@ def RunVVLTests(args):
 def GetArgParser():
     configs = ['release', 'debug']
     default_config = configs[0]
-
-    osx_choices = ['min', 'latest']
-    osx_default = osx_choices[1]
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -273,8 +275,5 @@ def GetArgParser():
     parser.add_argument(
         '--test', dest='test',
         action='store_true', help='Tests the layers')
-    parser.add_argument(
-        '--osx', dest='osx', action='store',
-        choices=osx_choices, default=osx_default,
-        help='Sets MACOSX_DEPLOYMENT_TARGET on Apple platforms.')
+
     return parser

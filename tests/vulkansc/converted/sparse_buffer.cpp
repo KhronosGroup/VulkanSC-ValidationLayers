@@ -22,7 +22,7 @@
 TEST_F(NegativeSparseBuffer, DISABLED_QueueBindSparseMemoryBindSize) {
     TEST_DESCRIPTION("Test QueueBindSparse with invalid sparse memory bind size");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     if (!m_device->phy().features().sparseBinding) {
         GTEST_SKIP() << "Test requires unsupported sparseBinding feature";
@@ -70,7 +70,7 @@ TEST_F(NegativeSparseBuffer, DISABLED_QueueBindSparseMemoryBindSize) {
 TEST_F(NegativeSparseBuffer, DISABLED_QueueBindSparseMemoryBindResourceOffset) {
     TEST_DESCRIPTION("Test QueueBindSparse with invalid sparse memory bind resource offset");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     if (!m_device->phy().features().sparseBinding) {
         GTEST_SKIP() << "Test requires unsupported sparseBinding feature";
@@ -120,7 +120,7 @@ TEST_F(NegativeSparseBuffer, DISABLED_QueueBindSparseMemoryBindResourceOffset) {
 TEST_F(NegativeSparseBuffer, DISABLED_QueueBindSparseMemoryBindSizeResourceOffset) {
     TEST_DESCRIPTION("Test QueueBindSparse with invalid sparse memory bind size due to resource offset");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     if (!m_device->phy().features().sparseBinding) {
         GTEST_SKIP() << "Test requires unsupported sparseBinding feature";
@@ -170,7 +170,7 @@ TEST_F(NegativeSparseBuffer, DISABLED_QueueBindSparseMemoryBindSizeResourceOffse
 TEST_F(NegativeSparseBuffer, DISABLED_QueueBindSparseMemoryBindSizeMemoryOffset) {
     TEST_DESCRIPTION("Test QueueBindSparse with invalid sparse memory bind size due to memory offset");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     if (!m_device->phy().features().sparseBinding) {
         GTEST_SKIP() << "Test requires unsupported sparseBinding feature";
@@ -223,7 +223,7 @@ TEST_F(NegativeSparseBuffer, DISABLED_QueueBindSparseMemoryBindSizeMemoryOffset)
 TEST_F(NegativeSparseBuffer, DISABLED_OverlappingBufferCopy) {
     TEST_DESCRIPTION("Test overlapping sparse buffers' copy with overlapping device memory");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     if (!m_device->phy().features().sparseBinding) {
         GTEST_SKIP() << "Requires unsupported sparseBinding feature.";
@@ -309,7 +309,7 @@ TEST_F(NegativeSparseBuffer, DISABLED_OverlappingBufferCopy) {
 TEST_F(NegativeSparseBuffer, DISABLED_OverlappingBufferCopy2) {
     TEST_DESCRIPTION("Test overlapping sparse buffers' copy with overlapping device memory");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     if (!m_device->phy().features().sparseBinding) {
         GTEST_SKIP() << "Requires unsupported sparseBinding feature.";
@@ -402,7 +402,7 @@ TEST_F(NegativeSparseBuffer, DISABLED_OverlappingBufferCopy2) {
 TEST_F(NegativeSparseBuffer, DISABLED_OverlappingBufferCopy3) {
     TEST_DESCRIPTION("Test coyping from a range that spans two different memory chunks");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     if (!m_device->phy().features().sparseBinding) {
         GTEST_SKIP() << "Requires unsupported sparseBinding feature.";
@@ -496,7 +496,7 @@ TEST_F(NegativeSparseBuffer, DISABLED_BufferFlagsFeature) {
     features.sparseResidencyBuffer = VK_FALSE;
     features.sparseResidencyAliased = VK_FALSE;
 
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
     RETURN_IF_SKIP(InitState(&features));
 
     VkBufferCreateInfo buffer_create_info = vku::InitStructHelper();
@@ -518,7 +518,7 @@ TEST_F(NegativeSparseBuffer, DISABLED_BufferFlagsFeature) {
 TEST_F(NegativeSparseBuffer, DISABLED_VkSparseMemoryBindMemory) {
     TEST_DESCRIPTION("test VkSparseMemoryBind::memory is valid");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     VkBufferCreateInfo buffer_create_info = vku::InitStructHelper();
     buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
@@ -558,7 +558,7 @@ TEST_F(NegativeSparseBuffer, DISABLED_VkSparseMemoryBindMemory) {
 TEST_F(NegativeSparseBuffer, DISABLED_VkSparseMemoryBindFlags) {
     TEST_DESCRIPTION("test VkSparseMemoryBind::flags is valid");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     VkBufferCreateInfo buffer_create_info = vku::InitStructHelper();
     buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;

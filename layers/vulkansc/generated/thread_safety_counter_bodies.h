@@ -61,16 +61,18 @@ WRAPPER(VkValidationCacheEXT)
 WRAPPER(VkAccelerationStructureNV)
 WRAPPER(VkPerformanceConfigurationINTEL)
 WRAPPER(VkIndirectCommandsLayoutNV)
+WRAPPER(VkCudaModuleNV)
+WRAPPER(VkCudaFunctionNV)
 WRAPPER(VkAccelerationStructureKHR)
 #ifdef VK_USE_PLATFORM_FUCHSIA
 WRAPPER(VkBufferCollectionFUCHSIA)
-#endif // VK_USE_PLATFORM_FUCHSIA
+#endif  // VK_USE_PLATFORM_FUCHSIA
 WRAPPER(VkMicromapEXT)
 WRAPPER(VkOpticalFlowSessionNV)
 WRAPPER(VkShaderEXT)
 #ifdef VK_USE_PLATFORM_SCI
 WRAPPER(VkSemaphoreSciSyncPoolNV)
-#endif // VK_USE_PLATFORM_SCI
+#endif  // VK_USE_PLATFORM_SCI
 // clang-format on
 
 // NOLINTEND

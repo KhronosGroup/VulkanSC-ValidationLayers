@@ -21,7 +21,7 @@ TEST_F(PositiveAndroidHardwareBuffer, MemoryRequirements) {
     TEST_DESCRIPTION("Verify AndroidHardwareBuffer doesn't conflict with memory requirements.");
 
     AddRequiredExtensions(VK_ANDROID_EXTERNAL_MEMORY_ANDROID_HARDWARE_BUFFER_EXTENSION_NAME);
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     vkt::AHB ahb(AHARDWAREBUFFER_FORMAT_BLOB, AHARDWAREBUFFER_USAGE_GPU_DATA_BUFFER, 64);
 
@@ -54,7 +54,7 @@ TEST_F(PositiveAndroidHardwareBuffer, DepthStencil) {
     TEST_DESCRIPTION("Verify AndroidHardwareBuffer can import Depth/Stencil");
 
     AddRequiredExtensions(VK_ANDROID_EXTERNAL_MEMORY_ANDROID_HARDWARE_BUFFER_EXTENSION_NAME);
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     vkt::AHB ahb(AHARDWAREBUFFER_FORMAT_D16_UNORM, AHARDWAREBUFFER_USAGE_GPU_FRAMEBUFFER, 64);
     if (!ahb.handle()) {
@@ -116,9 +116,9 @@ TEST_F(PositiveAndroidHardwareBuffer, BindBufferMemory) {
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_ANDROID_EXTERNAL_MEMORY_ANDROID_HARDWARE_BUFFER_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitState());
 
     VkExternalMemoryBufferCreateInfo ext_buf_info = vku::InitStructHelper();
     ext_buf_info.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID;
@@ -164,7 +164,7 @@ TEST_F(PositiveAndroidHardwareBuffer, ExportBuffer) {
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_ANDROID_EXTERNAL_MEMORY_ANDROID_HARDWARE_BUFFER_EXTENSION_NAME);
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     // Create VkBuffer to be exported to an AHB
     VkExternalMemoryBufferCreateInfo ext_buf_info = vku::InitStructHelper();
@@ -210,7 +210,7 @@ TEST_F(PositiveAndroidHardwareBuffer, ExportImage) {
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_ANDROID_EXTERNAL_MEMORY_ANDROID_HARDWARE_BUFFER_EXTENSION_NAME);
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     // Create VkImage to be exported to an AHB
     VkExternalMemoryImageCreateInfo ext_image_info = vku::InitStructHelper();
@@ -269,7 +269,7 @@ TEST_F(PositiveAndroidHardwareBuffer, ExternalImage) {
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_ANDROID_EXTERNAL_MEMORY_ANDROID_HARDWARE_BUFFER_EXTENSION_NAME);
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     // FORMAT_Y8Cb8Cr8_420 is a known/public valid AHB Format but does not have a Vulkan mapping to it
     // Will use the external image feature to get access to it
@@ -308,26 +308,6 @@ TEST_F(PositiveAndroidHardwareBuffer, ExternalImage) {
     image_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     image_create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     image_create_info.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
-
-    {
-        VkPhysicalDeviceExternalImageFormatInfo external_image_info = vku::InitStructHelper();
-        external_image_info.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID;
-        VkPhysicalDeviceImageFormatInfo2 image_info = vku::InitStructHelper(&external_image_info);
-        image_info.format = image_create_info.format;
-        image_info.type = image_create_info.imageType;
-        image_info.tiling = image_create_info.tiling;
-        image_info.usage = image_create_info.usage;
-        image_info.flags = image_create_info.flags;
-
-        VkAndroidHardwareBufferUsageANDROID ahb_usage = vku::InitStructHelper();
-        VkExternalImageFormatProperties external_image_properties = vku::InitStructHelper(&ahb_usage);
-        VkImageFormatProperties2 image_properties = vku::InitStructHelper(&external_image_properties);
-
-        if (vk::GetPhysicalDeviceImageFormatProperties2(gpu(), &image_info, &image_properties) != VK_SUCCESS) {
-            GTEST_SKIP() << "could not create image with external format";
-        }
-    }
-
     image.init_no_mem(*m_device, image_create_info);
 
     VkMemoryDedicatedAllocateInfo memory_dedicated_info = vku::InitStructHelper();
@@ -352,7 +332,7 @@ TEST_F(PositiveAndroidHardwareBuffer, ExternalCameraFormat) {
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_ANDROID_EXTERNAL_MEMORY_ANDROID_HARDWARE_BUFFER_EXTENSION_NAME);
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     // Simulate camera usage of AHB
     AHardwareBuffer_Desc ahb_desc = {};
@@ -398,25 +378,6 @@ TEST_F(PositiveAndroidHardwareBuffer, ExternalCameraFormat) {
     image_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     image_create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     image_create_info.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
-    {
-        VkPhysicalDeviceExternalImageFormatInfo external_image_info = vku::InitStructHelper();
-        external_image_info.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID;
-        VkPhysicalDeviceImageFormatInfo2 image_info = vku::InitStructHelper(&external_image_info);
-        image_info.format = image_create_info.format;
-        image_info.type = image_create_info.imageType;
-        image_info.tiling = image_create_info.tiling;
-        image_info.usage = image_create_info.usage;
-        image_info.flags = image_create_info.flags;
-
-        VkAndroidHardwareBufferUsageANDROID ahb_usage = vku::InitStructHelper();
-        VkExternalImageFormatProperties external_image_properties = vku::InitStructHelper(&ahb_usage);
-        VkImageFormatProperties2 image_properties = vku::InitStructHelper(&external_image_properties);
-
-        if (vk::GetPhysicalDeviceImageFormatProperties2(gpu(), &image_info, &image_properties) != VK_SUCCESS) {
-            GTEST_SKIP() << "could not create image with external format";
-        }
-    }
-
     image.init_no_mem(*m_device, image_create_info);
 
     VkMemoryDedicatedAllocateInfo memory_dedicated_info = vku::InitStructHelper();
@@ -442,7 +403,7 @@ TEST_F(PositiveAndroidHardwareBuffer, DeviceImageMemoryReq) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_ANDROID_EXTERNAL_MEMORY_ANDROID_HARDWARE_BUFFER_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     VkExternalFormatANDROID external_format = vku::InitStructHelper();
     external_format.externalFormat = 0;

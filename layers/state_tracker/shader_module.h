@@ -31,6 +31,7 @@
 
 class PIPELINE_STATE;
 struct EntryPoint;
+struct SPIRV_MODULE_STATE;
 
 static constexpr uint32_t kInvalidSpirvValue = std::numeric_limits<uint32_t>::max();
 
@@ -115,6 +116,9 @@ struct ExecutionModeSet {
         rounding_mode_rtz_width_16 = 1 << 21,
         rounding_mode_rtz_width_32 = 1 << 22,
         rounding_mode_rtz_width_64 = 1 << 23,
+
+        depth_replacing_bit = 1 << 24,
+        stencil_ref_replacing_bit = 1 << 25,
     };
 
     // bits to know if things have been set or not by a Decoration
@@ -140,6 +144,22 @@ struct ExecutionModeSet {
     bool Has(FlagBit flag_bit) const { return (flags & flag_bit) != 0; }
 };
 
+struct AtomicInstructionInfo {
+    uint32_t storage_class;
+    uint32_t bit_width;
+    uint32_t type;  // ex. OpTypeInt
+};
+
+// This info *could* be found/saved in TypeStructInfo, but since
+//  - Only a few places (Push Constants, workgroup size) use this
+//  - It is only good when you know there are no nested strcuts
+// we only get this info when needed, not for every struct
+struct TypeStructSize {
+    uint32_t offset;  // where first member is
+    // This is the "padded" size, if you wanted the packed size, use GetTypeBytesSize(struct_type)
+    uint32_t size;  // total size of block
+};
+
 // Contains all the details for a OpTypeStruct
 struct TypeStructInfo {
     const uint32_t id;
@@ -156,23 +176,30 @@ struct TypeStructInfo {
     std::vector<Member> members;
 
     TypeStructInfo(const SPIRV_MODULE_STATE &module_state, const Instruction &struct_insn);
+
+    TypeStructSize GetSize(const SPIRV_MODULE_STATE &module_state) const;
 };
 
 // Represents the OpImage* instructions and how it maps to the variable
 // This is created in the SPIRV_MODULE_STATE but then used with VariableBase objects
 struct ImageAccess {
     const Instruction &image_insn;  // OpImage*
-    const Instruction *variable_image_insn = nullptr;
+    std::vector<const Instruction *> variable_image_insn;
     // If there is a OpSampledImage there will also be a sampler variable
-    const Instruction *variable_sampler_insn = nullptr;
-    bool no_function_jump = true;  // TODO 5614 - Handle function jumps
+    std::vector<const Instruction *> variable_sampler_insn;
+    // incase uncaught set of SPIR-V instruction is found, skips validating instead of crashing
+    bool valid_access = true;
 
     bool is_dref = false;
     bool is_sampler_implicitLod_dref_proj = false;
-    bool is_sampler_sampled = false;
+    bool is_sampler_sampled = false;  // OpImageSample* or OpImageSparseSample*
+    bool is_not_sampler_sampled = false;
     bool is_sampler_bias_offset = false;
+    bool is_sampler_offset = false;  // ConstOffset or Offset (not ConstOffsets)
     bool is_written_to = false;
     bool is_read_from = false;
+    bool is_sign_extended = false;
+    bool is_zero_extended = false;
 
     uint32_t image_access_chain_index = kInvalidSpirvValue;    // OpAccessChain's Index 0
     uint32_t sampler_access_chain_index = kInvalidSpirvValue;  // OpAccessChain's Index 0
@@ -305,13 +332,40 @@ struct ResourceInterfaceVariable : public VariableBase {
     // most likly will be OpTypeImage, OpTypeStruct, OpTypeSampler, or OpTypeAccelerationStructureKHR
     const Instruction &base_type;
 
-    const NumericType image_format_type;
-    bool IsImage() const { return image_format_type != NumericTypeUnknown; }
-    const spv::Dim image_dim;
-    const bool is_image_array;
-    const bool is_multisampled;
     // Sampled Type width of the OpTypeImage the variable points to, 0 if doesn't use the image
-    uint32_t image_sampled_type_width = 0;
+    const uint32_t image_sampled_type_width;
+
+    // All info regarding what will be validated from requirements imposed by the pipeline on a descriptor. These
+    // can't be checked at pipeline creation time as they depend on the Image or ImageView bound.
+    // That is perf-critical code and hashing if 2 variables have same info provides a 20% perf bonus
+    struct Info {
+        NumericType image_format_type;
+        spv::Dim image_dim;
+        bool is_image_array;
+        bool is_multisampled;
+        bool is_atomic_operation;
+
+        bool is_sampler_sampled{false};  // OpImageSample* or OpImageSparseSample*
+        bool is_not_sampler_sampled{false};
+        bool is_sampler_implicitLod_dref_proj{false};
+        bool is_sampler_bias_offset{false};
+        bool is_sampler_offset{false};        // ConstOffset or Offset (not ConstOffsets)
+        bool is_read_without_format{false};   // For storage images
+        bool is_write_without_format{false};  // For storage images
+        bool is_dref{false};
+
+        // vkspec.html#spirvenv-image-signedness describes how SignExtend/ZeroExtend can be used per-access to adjust the Signedness
+        // Only need to check if one access has explicit signedness, mixing should be caught in spirv-val
+        bool is_sign_extended{false};  // if at least one access has SignExtended
+        bool is_zero_extended{false};  // if at least one access has ZeroExtended
+
+        // If a variable is used as a function arguement, but never actually used, it will be found in EntryPoint::accessible_ids so
+        // we need to have a dedicated mark if it was accessed
+        // TODO - merge with is_read_from and is_written_to
+        bool is_image_accessed{false};
+    } info;
+    uint64_t descriptor_hash = 0;
+    bool IsImage() const { return info.image_format_type != NumericTypeUnknown; }
 
     bool is_read_from{false};   // has operation to reads from the variable
     bool is_written_to{false};  // has operation to writes to the variable
@@ -322,21 +376,15 @@ struct ResourceInterfaceVariable : public VariableBase {
     const bool is_storage_buffer;
     bool is_input_attachment{false};
 
-    bool is_atomic_operation{false};
-    bool is_sampler_sampled{false};
-    bool is_sampler_implicitLod_dref_proj{false};
-    bool is_sampler_bias_offset{false};
-    bool is_read_without_format{false};   // For storage images
-    bool is_write_without_format{false};  // For storage images
-    bool is_dref{false};
-
     ResourceInterfaceVariable(const SPIRV_MODULE_STATE &module_state, const EntryPoint &entrypoint, const Instruction &insn,
                               const ImageAccessMap &image_access_map);
 
   protected:
     static const Instruction &FindBaseType(ResourceInterfaceVariable &variable, const SPIRV_MODULE_STATE &module_state);
+    static uint32_t FindImageSampledTypeWidth(const SPIRV_MODULE_STATE &module_state, const Instruction &base_type);
     static NumericType FindImageFormatType(const SPIRV_MODULE_STATE &module_state, const Instruction &base_type);
     static bool IsStorageBuffer(const ResourceInterfaceVariable &variable);
+    static bool IsAtomicOperation(const SPIRV_MODULE_STATE &module_state, const ResourceInterfaceVariable &variable);
 };
 
 // Used to help detect if different variable is being used
@@ -371,6 +419,7 @@ struct EntryPoint {
     bool emit_vertex_geometry;
 
     // All ids that can be accessed from the entry point
+    // being accessed doesn't guarantee it is statically used
     const vvl::unordered_set<uint32_t> accessible_ids;
 
     // only one Push Constant block is allowed per entry point
@@ -441,10 +490,7 @@ struct SPIRV_MODULE_STATE {
         vvl::unordered_map<uint32_t, ExecutionModeSet> execution_modes;
         ExecutionModeSet empty_execution_mode;  // all zero values, allows use to return a reference and not a copy each time
 
-        // <Specialization constant ID -> target ID> mapping
-        vvl::unordered_map<uint32_t, uint32_t> spec_const_map;
-        // <target ID - > Specialization constant ID> mapping
-        // TODO - Remove having a second copy for the map in reverse
+        // [OpSpecConstant Result ID -> OpDecorate SpecID value] mapping
         vvl::unordered_map<uint32_t, uint32_t> id_to_spec_id;
         // Find all decoration instructions to prevent relooping module later - many checks need this info
         std::vector<const Instruction *> decoration_inst;
@@ -471,10 +517,14 @@ struct SPIRV_MODULE_STATE {
         std::vector<const Instruction *> group_inst;
         std::vector<const Instruction *> read_clock_inst;
         std::vector<const Instruction *> cooperative_matrix_inst;
+
         std::vector<spv::Capability> capability_list;
+        // Code on the hot path can cache capabilities for fast access.
+        bool has_capability_runtime_descriptor_array{false};
 
         bool has_specialization_constants{false};
         bool has_invocation_repack_instruction{false};
+        bool uses_interpolate_at_sample{false};
 
         // EntryPoint has pointer references inside it that need to be preserved
         std::vector<std::shared_ptr<EntryPoint>> entry_points;
@@ -494,6 +544,15 @@ struct SPIRV_MODULE_STATE {
         vvl::unordered_map<uint32_t, uint32_t> load_members;                              // <result id, pointer>
         vvl::unordered_map<uint32_t, std::pair<uint32_t, uint32_t>> accesschain_members;  // <result id, <base,index[0]>>
         vvl::unordered_map<uint32_t, uint32_t> image_texel_pointer_members;               // <result id, image>
+
+        // Track all paths from %param to %arg so can walk back functions
+        //
+        // %arg   = OpVariable
+        // %call  = OpFunctionCall %result %func %arg
+        // %param = OpFunctionParameter
+        //
+        // < %param, vector<%arg> >
+        vvl::unordered_map<uint32_t, std::vector<uint32_t>> func_parameter_map;
     };
 
     // This is the SPIR-V module data content
@@ -584,6 +643,7 @@ struct SPIRV_MODULE_STATE {
     uint32_t GetTypeId(uint32_t id) const;
     uint32_t GetTexelComponentCount(const Instruction &insn) const;
     uint32_t GetFlattenArraySize(const Instruction &insn) const;
+    AtomicInstructionInfo GetAtomicInfo(const Instruction &insn) const;
 
     bool HasCapability(spv::Capability find_capability) const {
         return std::any_of(static_data_.capability_list.begin(), static_data_.capability_list.end(),

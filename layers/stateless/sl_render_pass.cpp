@@ -88,20 +88,38 @@ bool StatelessValidation::ValidateCreateRenderPass(VkDevice device, const VkRend
             synchronization2 = synchronization2_features->synchronization2;
         }
     }
+
+    VkBool32 android_external_format_resolve_feature = false;
+#if defined(VK_USE_PLATFORM_ANDROID_KHR)
+    const auto *external_format_resolve_features =
+        vku::FindStructInPNextChain<VkPhysicalDeviceExternalFormatResolveFeaturesANDROID>(device_createinfo_pnext);
+    if (external_format_resolve_features) {
+        android_external_format_resolve_feature = external_format_resolve_features->externalFormatResolve;
+    }
+#endif
+
     for (uint32_t i = 0; i < pCreateInfo->attachmentCount; ++i) {
         const Location &attachment_loc = create_info_loc.dot(Field::pAttachments, i);
+
         // if not null, also confirms rp2 is being used
+        const void *pNext =
+            (use_rp2) ? reinterpret_cast<VkAttachmentDescription2 const *>(&pCreateInfo->pAttachments[i])->pNext : nullptr;
         const auto *attachment_description_stencil_layout =
-            (use_rp2) ? vku::FindStructInPNextChain<VkAttachmentDescriptionStencilLayout>(
-                            reinterpret_cast<VkAttachmentDescription2 const *>(&pCreateInfo->pAttachments[i])->pNext)
-                      : nullptr;
+            (use_rp2) ? vku::FindStructInPNextChain<VkAttachmentDescriptionStencilLayout>(pNext) : nullptr;
 
         const VkFormat attachment_format = pCreateInfo->pAttachments[i].format;
         const VkImageLayout initial_layout = pCreateInfo->pAttachments[i].initialLayout;
         const VkImageLayout final_layout = pCreateInfo->pAttachments[i].finalLayout;
         if (attachment_format == VK_FORMAT_UNDEFINED) {
-            vuid = use_rp2 ? "VUID-VkAttachmentDescription2-format-06698" : "VUID-VkAttachmentDescription-format-06698";
-            skip |= LogError(vuid, device, attachment_loc.dot(Field::format), "is VK_FORMAT_UNDEFINED.");
+            if (use_rp2 && android_external_format_resolve_feature) {
+                if (GetExternalFormat(pNext) == 0) {
+                    skip |= LogError("VUID-VkAttachmentDescription2-format-09334", device, attachment_loc.dot(Field::format),
+                                     "is VK_FORMAT_UNDEFINED.");
+                }
+            } else {
+                vuid = use_rp2 ? "VUID-VkAttachmentDescription2-format-09332" : "VUID-VkAttachmentDescription-format-06698";
+                skip |= LogError(vuid, device, attachment_loc.dot(Field::format), "is VK_FORMAT_UNDEFINED.");
+            }
         }
         if (final_layout == VK_IMAGE_LAYOUT_UNDEFINED || final_layout == VK_IMAGE_LAYOUT_PREINITIALIZED) {
             vuid = use_rp2 ? "VUID-VkAttachmentDescription2-finalLayout-00843" : "VUID-VkAttachmentDescription-finalLayout-00843";
@@ -375,13 +393,6 @@ bool StatelessValidation::manual_PreCallValidateCreateRenderPass2(VkDevice devic
                                                                   VkRenderPass *pRenderPass, const ErrorObject &error_obj) const {
     safe_VkRenderPassCreateInfo2 create_info_2(pCreateInfo);
     return ValidateCreateRenderPass(device, create_info_2.ptr(), pAllocator, pRenderPass, error_obj);
-}
-
-bool StatelessValidation::manual_PreCallValidateCreateRenderPass2KHR(VkDevice device, const VkRenderPassCreateInfo2 *pCreateInfo,
-                                                                     const VkAllocationCallbacks *pAllocator,
-                                                                     VkRenderPass *pRenderPass,
-                                                                     const ErrorObject &error_obj) const {
-    return manual_PreCallValidateCreateRenderPass2(device, pCreateInfo, pAllocator, pRenderPass, error_obj);
 }
 
 void StatelessValidation::RecordRenderPass(VkRenderPass renderPass, const VkRenderPassCreateInfo2 *pCreateInfo) {

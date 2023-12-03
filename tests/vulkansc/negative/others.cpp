@@ -696,6 +696,8 @@ TEST_F(VkSCLayerTest, GetFaultDataExceedsMaxQueryFaultCount) {
     m_errorMonitor->VerifyFound();
 }
 
+static VKAPI_ATTR void VKAPI_CALL FaultCallback(VkBool32, uint32_t, const VkFaultData*) {}
+
 TEST_F(VkSCLayerTest, FaultCallbackInfoFaultCount) {
     TEST_DESCRIPTION("VkFaultCallbackInfo - faultCount is not zero and does not equal maxCallbackFaultCount");
 
@@ -708,7 +710,7 @@ TEST_F(VkSCLayerTest, FaultCallbackInfoFaultCount) {
 
     std::vector<VkFaultData> fault_data(fault_callback_info.faultCount, vku::InitStruct<VkFaultData>());
     fault_callback_info.pFaults = fault_data.data();
-    fault_callback_info.pfnFaultCallback = (PFN_vkFaultCallbackFunction)0xDEADBEEF;
+    fault_callback_info.pfnFaultCallback = &FaultCallback;
 
     auto sc_10_features = vku::InitStruct<VkPhysicalDeviceVulkanSC10Features>(&fault_callback_info);
     auto object_reservation_info = vku::InitStruct<VkDeviceObjectReservationCreateInfo>(&sc_10_features);

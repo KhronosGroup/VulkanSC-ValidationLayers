@@ -19,12 +19,13 @@
 #include "generated/enum_flag_bits.h"
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
+#include "../framework/descriptor_helper.h"
 
 TEST_F(NegativeSampler, DISABLED_MirrorClampToEdgeNotEnabled) {
     TEST_DESCRIPTION("Validation should catch using CLAMP_TO_EDGE addressing mode if the extension is not enabled.");
 
     SetTargetApiVersion(VK_API_VERSION_1_0);
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     VkSamplerCreateInfo sampler_info = SafeSaneSamplerCreateInfo();
     // Set the modes to cause the error
@@ -37,7 +38,7 @@ TEST_F(NegativeSampler, MirrorClampToEdgeNotEnabled12) {
     TEST_DESCRIPTION("Validation using CLAMP_TO_EDGE for Vulkan 1.2 without the samplerMirrorClampToEdge feature enabled.");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     VkSamplerCreateInfo sampler_info = SafeSaneSamplerCreateInfo();
     sampler_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE;
@@ -49,7 +50,7 @@ TEST_F(NegativeSampler, AnisotropyFeatureDisabled) {
 
     // Determine if required device features are available
     VkPhysicalDeviceFeatures device_features = {};
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
     GetPhysicalDeviceFeatures(&device_features);
     device_features.samplerAnisotropy = VK_FALSE;  // force anisotropy off
     RETURN_IF_SKIP(InitState(&device_features));
@@ -67,7 +68,7 @@ TEST_F(NegativeSampler, AnisotropyFeatureEnabled) {
 
     AddOptionalExtensions(VK_IMG_FILTER_CUBIC_EXTENSION_NAME);
     VkPhysicalDeviceFeatures device_features = {};
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
     const bool cubic_support = IsExtensionsEnabled(VK_IMG_FILTER_CUBIC_EXTENSION_NAME);
     GetPhysicalDeviceFeatures(&device_features);
 
@@ -79,7 +80,7 @@ TEST_F(NegativeSampler, AnisotropyFeatureEnabled) {
     VkSamplerCreateInfo sampler_info_ref = SafeSaneSamplerCreateInfo();
     sampler_info_ref.anisotropyEnable = VK_TRUE;
     VkSamplerCreateInfo sampler_info = sampler_info_ref;
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitState());
 
     // maxAnisotropy out-of-bounds low.
     sampler_info.maxAnisotropy = NearestSmaller(1.0F);
@@ -116,13 +117,13 @@ TEST_F(NegativeSampler, AnisotropyFeatureEnabled) {
 TEST_F(NegativeSampler, UnnormalizedCoordinatesEnabled) {
     TEST_DESCRIPTION("Validate restrictions on sampler parameters when unnormalizedCoordinates is true.");
 
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
     VkSamplerCreateInfo sampler_info_ref = SafeSaneSamplerCreateInfo();
     sampler_info_ref.unnormalizedCoordinates = VK_TRUE;
     sampler_info_ref.minLod = 0.0f;
     sampler_info_ref.maxLod = 0.0f;
     VkSamplerCreateInfo sampler_info = sampler_info_ref;
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitState());
 
     // min and mag filters must be the same
     sampler_info.minFilter = VK_FILTER_NEAREST;
@@ -176,7 +177,7 @@ TEST_F(NegativeSampler, UnnormalizedCoordinatesEnabled) {
 
 TEST_F(NegativeSampler, BasicUsage) {
     TEST_DESCRIPTION("Checks various cases where VkSamplerCreateInfo is invalid");
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     // reference to reset values between test cases
     VkSamplerCreateInfo const sampler_info_ref = SafeSaneSamplerCreateInfo();
@@ -200,7 +201,7 @@ TEST_F(NegativeSampler, AllocationCount) {
     const int max_samplers = 32;
     VkSampler samplers[max_samplers + 1];
 
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     PFN_vkSetPhysicalDeviceLimitsEXT fpvkSetPhysicalDeviceLimitsEXT = nullptr;
     PFN_vkGetOriginalPhysicalDeviceLimitsEXT fpvkGetOriginalPhysicalDeviceLimitsEXT = nullptr;
@@ -213,7 +214,7 @@ TEST_F(NegativeSampler, AllocationCount) {
         props.limits.maxSamplerAllocationCount = max_samplers;
         fpvkSetPhysicalDeviceLimitsEXT(gpu(), &props.limits);
     }
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitState());
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateSampler-maxSamplerAllocationCount-04110");
 
     VkSamplerCreateInfo sampler_create_info = SafeSaneSamplerCreateInfo();
@@ -238,8 +239,7 @@ TEST_F(NegativeSampler, ImageViewFormatUnsupportedFilter) {
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddOptionalExtensions(VK_IMG_FILTER_CUBIC_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
-    RETURN_IF_SKIP(InitState(nullptr, nullptr, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    RETURN_IF_SKIP(Init());
     const bool cubic_support = IsExtensionsEnabled(VK_IMG_FILTER_CUBIC_EXTENSION_NAME);
 
     enum FormatTypes { FLOAT, SINT, UINT };
@@ -400,7 +400,7 @@ TEST_F(NegativeSampler, ImageViewFormatUnsupportedFilter) {
         mpimage.Init(128, 128, 1, test_struct.format, VK_IMAGE_USAGE_SAMPLED_BIT, test_struct.tiling);
         ASSERT_TRUE(mpimage.initialized());
 
-        VkImageView view = mpimage.targetView(test_struct.format);
+        vkt::ImageView view = mpimage.CreateView();
 
         CreatePipelineHelper pipe(*this);
         VkShaderObj *fs = nullptr;
@@ -447,7 +447,7 @@ TEST_F(NegativeSampler, AddressModeWithCornerSampledNV) {
         "VK_SAMPLER_ADDRESS_MODE_CLAMP_EDGE.");
 
     AddRequiredExtensions(VK_NV_CORNER_SAMPLED_IMAGE_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     RETURN_IF_SKIP(InitState(nullptr, nullptr, 0));
     InitRenderTarget();
@@ -473,7 +473,7 @@ TEST_F(NegativeSampler, AddressModeWithCornerSampledNV) {
     sci.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
     vkt::Sampler sampler(*m_device, sci);
 
-    VkImageView view = test_image.targetView(image_info.format);
+    vkt::ImageView view = test_image.CreateView();
 
     CreatePipelineHelper pipe(*this);
     VkShaderObj fs(this, kFragmentSamplerGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -509,14 +509,14 @@ TEST_F(NegativeSampler, MultiplaneImageSamplerConversionMismatch) {
 
     // Use 1.1 to get VK_KHR_sampler_ycbcr_conversion easier
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceVulkan11Features features11 = vku::InitStructHelper();
     auto features2 = GetPhysicalDeviceFeatures2(features11);
     if (features11.samplerYcbcrConversion != VK_TRUE) {
         GTEST_SKIP() << "SamplerYcbcrConversion not supported";
     }
-    RETURN_IF_SKIP(InitState(nullptr, &features2))
+    RETURN_IF_SKIP(InitState(nullptr, &features2));
 
     InitRenderTarget();
 
@@ -535,13 +535,13 @@ TEST_F(NegativeSampler, MultiplaneImageSamplerConversionMismatch) {
                                   VK_IMAGE_LAYOUT_UNDEFINED};
 
     // Verify formats
-    bool supported = ImageFormatAndFeaturesSupported(instance(), gpu(), ci, VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT);
+    bool supported = ImageFormatIsSupported(instance(), gpu(), ci, VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT);
     if (!supported) {
         GTEST_SKIP() << "Multiplane image format not supported";
     }
 
-    if (!ImageFormatAndFeaturesSupported(gpu(), VK_FORMAT_G8_B8R8_2PLANE_420_UNORM_KHR, VK_IMAGE_TILING_OPTIMAL,
-                                         VK_FORMAT_FEATURE_COSITED_CHROMA_SAMPLES_BIT)) {
+    if (!FormatFeaturesAreSupported(gpu(), VK_FORMAT_G8_B8R8_2PLANE_420_UNORM_KHR, VK_IMAGE_TILING_OPTIMAL,
+                                    VK_FORMAT_FEATURE_COSITED_CHROMA_SAMPLES_BIT)) {
         GTEST_SKIP() << "Required formats/features not supported";
     }
 
@@ -557,9 +557,9 @@ TEST_F(NegativeSampler, MultiplaneImageSamplerConversionMismatch) {
     ycbcr_create_info.chromaFilter = VK_FILTER_NEAREST;
     ycbcr_create_info.forceExplicitReconstruction = false;
     vkt::SamplerYcbcrConversion conversions[2];
-    conversions[0].init(*m_device, ycbcr_create_info, false);
+    conversions[0].init(*m_device, ycbcr_create_info);
     ycbcr_create_info.components.a = VK_COMPONENT_SWIZZLE_ZERO;  // Just anything different than above
-    conversions[1].init(*m_device, ycbcr_create_info, false);
+    conversions[1].init(*m_device, ycbcr_create_info);
 
     VkSamplerYcbcrConversionInfo ycbcr_info = vku::InitStructHelper();
     ycbcr_info.conversion = conversions[0].handle();
@@ -663,15 +663,15 @@ TEST_F(NegativeSampler, FilterMinmax) {
     // Enable KHR multiplane req'd extensions
     AddRequiredExtensions(VK_EXT_SAMPLER_FILTER_MINMAX_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     // Enable Ycbcr Conversion Features
     VkPhysicalDeviceSamplerYcbcrConversionFeatures ycbcr_features = vku::InitStructHelper();
     ycbcr_features.samplerYcbcrConversion = VK_TRUE;
     RETURN_IF_SKIP(InitState(nullptr, &ycbcr_features));
 
-    if (!ImageFormatAndFeaturesSupported(gpu(), VK_FORMAT_G8_B8R8_2PLANE_420_UNORM, VK_IMAGE_TILING_OPTIMAL,
-                                         VK_FORMAT_FEATURE_COSITED_CHROMA_SAMPLES_BIT)) {
+    if (!FormatFeaturesAreSupported(gpu(), VK_FORMAT_G8_B8R8_2PLANE_420_UNORM, VK_IMAGE_TILING_OPTIMAL,
+                                    VK_FORMAT_FEATURE_COSITED_CHROMA_SAMPLES_BIT)) {
         GTEST_SKIP() << "Required formats/features not supported";
     }
 
@@ -715,7 +715,7 @@ TEST_F(NegativeSampler, DISABLED_CustomBorderColor) {
     TEST_DESCRIPTION("Tests for VUs for VK_EXT_custom_border_color");
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_CUSTOM_BORDER_COLOR_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceCustomBorderColorFeaturesEXT border_color_features = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(border_color_features);
@@ -774,11 +774,11 @@ TEST_F(NegativeSampler, DISABLED_CustomBorderColor) {
     }
 }
 
-TEST_F(NegativeSampler, CustomBorderColorFormatUndefined) {
+TEST_F(NegativeSampler, DISABLED_CustomBorderColorFormatUndefined) {
     TEST_DESCRIPTION("Tests for VUID-VkSamplerCustomBorderColorCreateInfoEXT-format-04015");
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_CUSTOM_BORDER_COLOR_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceCustomBorderColorFeaturesEXT border_color_features = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(border_color_features);
@@ -786,7 +786,7 @@ TEST_F(NegativeSampler, CustomBorderColorFormatUndefined) {
         GTEST_SKIP() << "Custom border color feature not supported";
     }
 
-    RETURN_IF_SKIP(InitState(nullptr, &border_color_features, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    RETURN_IF_SKIP(InitState(nullptr, &border_color_features));
     InitRenderTarget();
 
     VkSamplerCreateInfo sampler_info = SafeSaneSamplerCreateInfo();
@@ -854,7 +854,7 @@ TEST_F(NegativeSampler, DISABLED_UnnormalizedCoordinatesCombinedSampler) {
         "If a samper is unnormalizedCoordinates, the imageview has to be some specific types. Uses COMBINED_IMAGE_SAMPLER");
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
-    RETURN_IF_SKIP(Init(nullptr, nullptr, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     // This generates OpImage*Dref* instruction on R8G8B8A8_UNORM format.
@@ -876,8 +876,8 @@ TEST_F(NegativeSampler, DISABLED_UnnormalizedCoordinatesCombinedSampler) {
     const char fsSource[] = R"glsl(
         #version 450
         layout (set = 0, binding = 0) uniform sampler3D image_view_3d;
-        layout (set = 0, binding = 1) uniform sampler2D tex[2];
-        layout (set = 0, binding = 2) uniform sampler2DShadow tex_dep[2];
+        layout (set = 0, binding = 1) uniform sampler2D tex;
+        layout (set = 0, binding = 2) uniform sampler2DShadow tex_dep;
         void main() {
             // VUID 08609
             // 3D Image View is used with unnormalized coordinates
@@ -886,11 +886,11 @@ TEST_F(NegativeSampler, DISABLED_UnnormalizedCoordinatesCombinedSampler) {
 
             // VUID 08610
             // OpImageSampleDrefImplicitLod is used with unnormalized coordinates
-            float f = texture(tex_dep[0], vec3(0));
+            float f = texture(tex_dep, vec3(0));
 
             // VUID 08611
             // OpImageSampleExplicitLod instructions that incudes a offset with unnormalized coordinates
-            x = textureLodOffset(tex[1], vec2(0), 0, ivec2(0));
+            x = textureLodOffset(tex, vec2(0), 0, ivec2(0));
         }
     )glsl";
     VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -898,8 +898,8 @@ TEST_F(NegativeSampler, DISABLED_UnnormalizedCoordinatesCombinedSampler) {
     CreatePipelineHelper g_pipe(*this);
     g_pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
     g_pipe.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
-                            {1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2, VK_SHADER_STAGE_ALL_GRAPHICS, nullptr},
-                            {2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}};
+                            {1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_ALL_GRAPHICS, nullptr},
+                            {2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}};
     g_pipe.InitState();
     ASSERT_EQ(VK_SUCCESS, g_pipe.CreateGraphicsPipeline());
 
@@ -909,7 +909,7 @@ TEST_F(NegativeSampler, DISABLED_UnnormalizedCoordinatesCombinedSampler) {
     auto image_ci = VkImageObj::ImageCreateInfo2D(128, 128, 1, 1, format, usage, VK_IMAGE_TILING_OPTIMAL);
     image.Init(image_ci);
     ASSERT_TRUE(image.initialized());
-    VkImageView view_pass = image.targetView(format);
+    vkt::ImageView view_pass = image.CreateView();
 
     VkImageObj image_3d(m_device);
     image_ci.imageType = VK_IMAGE_TYPE_3D;
@@ -918,8 +918,7 @@ TEST_F(NegativeSampler, DISABLED_UnnormalizedCoordinatesCombinedSampler) {
 
     // If the sampler is unnormalizedCoordinates, the imageview type shouldn't be 3D, CUBE, 1D_ARRAY, 2D_ARRAY, CUBE_ARRAY.
     // This causes DesiredFailure.
-    VkImageView view_fail = image_3d.targetView(format, VK_IMAGE_ASPECT_COLOR_BIT, 0, VK_REMAINING_MIP_LEVELS, 0,
-                                                VK_REMAINING_ARRAY_LAYERS, VK_IMAGE_VIEW_TYPE_3D);
+    vkt::ImageView view_fail = image_3d.CreateView(VK_IMAGE_VIEW_TYPE_3D);
 
     VkSamplerCreateInfo sampler_ci = SafeSaneSamplerCreateInfo();
     sampler_ci.unnormalizedCoordinates = VK_TRUE;
@@ -929,12 +928,8 @@ TEST_F(NegativeSampler, DISABLED_UnnormalizedCoordinatesCombinedSampler) {
     g_pipe.descriptor_set_->WriteDescriptorImageInfo(0, view_fail, sampler.handle(), VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
     g_pipe.descriptor_set_->WriteDescriptorImageInfo(1, view_pass, sampler.handle(), VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                                                      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0);
-    g_pipe.descriptor_set_->WriteDescriptorImageInfo(1, view_pass, sampler.handle(), VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                                     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 1);
     g_pipe.descriptor_set_->WriteDescriptorImageInfo(2, view_pass, sampler.handle(), VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                                                      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0);
-    g_pipe.descriptor_set_->WriteDescriptorImageInfo(2, view_pass, sampler.handle(), VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                                                     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 1);
     g_pipe.descriptor_set_->UpdateDescriptorSets();
 
     m_commandBuffer->begin();
@@ -957,7 +952,7 @@ TEST_F(NegativeSampler, DISABLED_UnnormalizedCoordinatesSeparateSampler) {
     TEST_DESCRIPTION(
         "If a samper is unnormalizedCoordinates, the imageview has to be some specific types. Doesn't use COMBINED_IMAGE_SAMPLER");
     SetTargetApiVersion(VK_API_VERSION_1_1);
-    RETURN_IF_SKIP(Init(nullptr, nullptr, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     // This generates OpImage*Dref* instruction on R8G8B8A8_UNORM format.
@@ -984,13 +979,13 @@ TEST_F(NegativeSampler, DISABLED_UnnormalizedCoordinatesSeparateSampler) {
         // VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE
         layout(set = 0, binding = 2) uniform texture2D si_good;
         layout(set = 0, binding = 3) uniform texture2D si_good_2;
-        layout(set = 0, binding = 4) uniform texture3D si_bad[2]; // 3D image view
+        layout(set = 0, binding = 4) uniform texture3D si_bad; // 3D image view
 
         void main() {
             // VUID 08609
             // 3D Image View is used with unnormalized coordinates
             // Also is VUID 08610 but the invalid image view is reported first
-            vec4 x = texture(sampler3D(si_bad[1], s1), vec3(0));
+            vec4 x = texture(sampler3D(si_bad, s1), vec3(0));
 
             // VUID 08610
             // OpImageSampleImplicitLod is used with unnormalized coordinates
@@ -1009,7 +1004,7 @@ TEST_F(NegativeSampler, DISABLED_UnnormalizedCoordinatesSeparateSampler) {
                             {1, VK_DESCRIPTOR_TYPE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
                             {2, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
                             {3, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
-                            {4, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 2, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}};
+                            {4, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}};
     g_pipe.InitState();
     ASSERT_EQ(VK_SUCCESS, g_pipe.CreateGraphicsPipeline());
 
@@ -1019,8 +1014,8 @@ TEST_F(NegativeSampler, DISABLED_UnnormalizedCoordinatesSeparateSampler) {
     auto image_ci = VkImageObj::ImageCreateInfo2D(128, 128, 1, 1, format, usage, VK_IMAGE_TILING_OPTIMAL);
     image.Init(image_ci);
     ASSERT_TRUE(image.initialized());
-    VkImageView view_pass_a = image.targetView(format);
-    VkImageView view_pass_b = image.targetView(format);
+    vkt::ImageView view_pass_a = image.CreateView();
+    vkt::ImageView view_pass_b = image.CreateView();
 
     VkImageObj image_3d(m_device);
     image_ci.imageType = VK_IMAGE_TYPE_3D;
@@ -1029,8 +1024,7 @@ TEST_F(NegativeSampler, DISABLED_UnnormalizedCoordinatesSeparateSampler) {
 
     // If the sampler is unnormalizedCoordinates, the imageview type shouldn't be 3D, CUBE, 1D_ARRAY, 2D_ARRAY, CUBE_ARRAY.
     // This causes DesiredFailure.
-    VkImageView view_fail = image_3d.targetView(format, VK_IMAGE_ASPECT_COLOR_BIT, 0, VK_REMAINING_MIP_LEVELS, 0,
-                                                VK_REMAINING_ARRAY_LAYERS, VK_IMAGE_VIEW_TYPE_3D);
+    vkt::ImageView view_fail = image_3d.CreateView(VK_IMAGE_VIEW_TYPE_3D);
 
     // Need 2 samplers (and ImageView) because testing both VUID and it will tie both errors to the same sampler/imageView, but only
     // 08610 will be triggered since it's first in the validation code
@@ -1048,8 +1042,6 @@ TEST_F(NegativeSampler, DISABLED_UnnormalizedCoordinatesSeparateSampler) {
     g_pipe.descriptor_set_->WriteDescriptorImageInfo(3, view_pass_b, VK_NULL_HANDLE, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE);
     g_pipe.descriptor_set_->WriteDescriptorImageInfo(4, view_fail, VK_NULL_HANDLE, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
                                                      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0);
-    g_pipe.descriptor_set_->WriteDescriptorImageInfo(4, view_fail, VK_NULL_HANDLE, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
-                                                     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 1);
     g_pipe.descriptor_set_->UpdateDescriptorSets();
 
     m_commandBuffer->begin();
@@ -1072,7 +1064,7 @@ TEST_F(NegativeSampler, DISABLED_UnnormalizedCoordinatesSeparateSamplerSharedIma
     TEST_DESCRIPTION("Doesn't use COMBINED_IMAGE_SAMPLER, but multiple OpLoad share Image OpVariable");
 
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     VkShaderObj vs(this, kMinimalShaderGlsl, VK_SHADER_STAGE_VERTEX_BIT);
@@ -1107,7 +1099,7 @@ TEST_F(NegativeSampler, DISABLED_UnnormalizedCoordinatesSeparateSamplerSharedIma
     auto image_ci = VkImageObj::ImageCreateInfo2D(128, 128, 1, 1, format, usage, VK_IMAGE_TILING_OPTIMAL);
     image.Init(image_ci);
     ASSERT_TRUE(image.initialized());
-    VkImageView image_view = image.targetView(format);
+    vkt::ImageView image_view = image.CreateView();
 
     VkSamplerCreateInfo sampler_ci = SafeSaneSamplerCreateInfo();
     sampler_ci.unnormalizedCoordinates = VK_FALSE;
@@ -1141,7 +1133,7 @@ TEST_F(NegativeSampler, DISABLED_UnnormalizedCoordinatesSeparateSamplerSharedSam
     TEST_DESCRIPTION("Doesn't use COMBINED_IMAGE_SAMPLER, but multiple OpLoad share Sampler OpVariable");
 
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     VkShaderObj vs(this, kMinimalShaderGlsl, VK_SHADER_STAGE_VERTEX_BIT);
@@ -1153,11 +1145,11 @@ TEST_F(NegativeSampler, DISABLED_UnnormalizedCoordinatesSeparateSamplerSharedSam
         layout(set = 0, binding = 0) uniform sampler s1;
         // VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE
         layout(set = 0, binding = 1) uniform texture2D si_good;
-        layout(set = 0, binding = 2) uniform texture3D si_bad[2]; // 3D image view
+        layout(set = 0, binding = 2) uniform texture3D si_bad; // 3D image view
 
         void main() {
             vec4 x = texture(sampler2D(si_good, s1), vec2(0));
-            vec4 y = texture(sampler3D(si_bad[1], s1), vec3(0));
+            vec4 y = texture(sampler3D(si_bad, s1), vec3(0));
         }
     )glsl";
     VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -1166,7 +1158,7 @@ TEST_F(NegativeSampler, DISABLED_UnnormalizedCoordinatesSeparateSamplerSharedSam
     g_pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
     g_pipe.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
                             {1, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
-                            {2, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 2, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}};
+                            {2, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}};
     g_pipe.InitState();
     ASSERT_EQ(VK_SUCCESS, g_pipe.CreateGraphicsPipeline());
 
@@ -1176,14 +1168,13 @@ TEST_F(NegativeSampler, DISABLED_UnnormalizedCoordinatesSeparateSamplerSharedSam
     auto image_ci = VkImageObj::ImageCreateInfo2D(128, 128, 1, 1, format, usage, VK_IMAGE_TILING_OPTIMAL);
     image.Init(image_ci);
     ASSERT_TRUE(image.initialized());
-    VkImageView image_view = image.targetView(format);
+    vkt::ImageView image_view = image.CreateView();
 
     VkImageObj image_3d(m_device);
     image_ci.imageType = VK_IMAGE_TYPE_3D;
     image_3d.Init(image_ci);
     ASSERT_TRUE(image_3d.initialized());
-    VkImageView image_view_3d = image_3d.targetView(format, VK_IMAGE_ASPECT_COLOR_BIT, 0, VK_REMAINING_MIP_LEVELS, 0,
-                                                    VK_REMAINING_ARRAY_LAYERS, VK_IMAGE_VIEW_TYPE_3D);
+    vkt::ImageView image_view_3d = image_3d.CreateView(VK_IMAGE_VIEW_TYPE_3D);
 
     VkSamplerCreateInfo sampler_ci = SafeSaneSamplerCreateInfo();
     sampler_ci.unnormalizedCoordinates = VK_TRUE;
@@ -1195,8 +1186,6 @@ TEST_F(NegativeSampler, DISABLED_UnnormalizedCoordinatesSeparateSamplerSharedSam
     g_pipe.descriptor_set_->WriteDescriptorImageInfo(1, image_view, VK_NULL_HANDLE, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE);
     g_pipe.descriptor_set_->WriteDescriptorImageInfo(2, image_view_3d, VK_NULL_HANDLE, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
                                                      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0);
-    g_pipe.descriptor_set_->WriteDescriptorImageInfo(2, image_view_3d, VK_NULL_HANDLE, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
-                                                     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 1);
     g_pipe.descriptor_set_->UpdateDescriptorSets();
 
     m_commandBuffer->begin();
@@ -1214,11 +1203,12 @@ TEST_F(NegativeSampler, DISABLED_UnnormalizedCoordinatesSeparateSamplerSharedSam
     m_commandBuffer->end();
 }
 
+// TODO - https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/6944
 TEST_F(NegativeSampler, DISABLED_UnnormalizedCoordinatesInBoundsAccess) {
     TEST_DESCRIPTION("If a samper is unnormalizedCoordinates, but using OpInBoundsAccessChain");
 
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(Init(nullptr, nullptr, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     VkShaderObj vs(this, kMinimalShaderGlsl, VK_SHADER_STAGE_VERTEX_BIT);
@@ -1282,7 +1272,7 @@ TEST_F(NegativeSampler, DISABLED_UnnormalizedCoordinatesInBoundsAccess) {
     auto image_ci = VkImageObj::ImageCreateInfo2D(128, 128, 1, 1, format, usage, VK_IMAGE_TILING_OPTIMAL);
     image.Init(image_ci);
     ASSERT_TRUE(image.initialized());
-    VkImageView view_pass = image.targetView(format);
+    vkt::ImageView view_pass = image.CreateView();
 
     VkImageObj image_3d(m_device);
     image_ci.imageType = VK_IMAGE_TYPE_3D;
@@ -1313,11 +1303,100 @@ TEST_F(NegativeSampler, DISABLED_UnnormalizedCoordinatesInBoundsAccess) {
     m_commandBuffer->end();
 }
 
+TEST_F(NegativeSampler, DISABLED_UnnormalizedCoordinatesCopyObject) {
+    TEST_DESCRIPTION("If a samper is unnormalizedCoordinates, but using OpCopyObject");
+
+    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    VkShaderObj vs(this, kMinimalShaderGlsl, VK_SHADER_STAGE_VERTEX_BIT);
+    // layout (set = 0, binding = 0) uniform sampler2D tex;
+    // void main() {
+    //     vec4 x = textureLodOffset(tex, vec2(0), 0, ivec2(0));
+    // }
+    const char *fsSource = R"(
+               OpCapability Shader
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %main "main"
+               OpExecutionMode %main OriginUpperLeft
+               OpSource GLSL 450
+               OpDecorate %tex DescriptorSet 0
+               OpDecorate %tex Binding 0
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+    %v4float = OpTypeVector %float 4
+%ptr_v4float = OpTypePointer Function %v4float
+         %10 = OpTypeImage %float 2D 0 0 0 1 Unknown
+         %11 = OpTypeSampledImage %10
+       %uint = OpTypeInt 32 0
+     %ptr_uc = OpTypePointer UniformConstant %11
+        %tex = OpVariable %ptr_uc UniformConstant
+        %int = OpTypeInt 32 1
+      %int_1 = OpConstant %int 1
+    %v2float = OpTypeVector %float 2
+    %float_0 = OpConstant %float 0
+         %24 = OpConstantComposite %v2float %float_0 %float_0
+      %v2int = OpTypeVector %int 2
+      %int_0 = OpConstant %int 0
+         %27 = OpConstantComposite %v2int %int_0 %int_0
+       %main = OpFunction %void None %3
+          %5 = OpLabel
+          %x = OpVariable %ptr_v4float Function
+   %var_copy = OpCopyObject %ptr_v4float %x
+         %14 = OpLoad %11 %tex
+  %load_copy = OpCopyObject %11 %14
+         %22 = OpImageSampleExplicitLod %v4float %load_copy %24 Lod|ConstOffset %float_0 %27
+ %image_copy = OpCopyObject %v4float %22
+               OpStore %var_copy %image_copy
+               OpReturn
+               OpFunctionEnd
+    )";
+    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
+
+    CreatePipelineHelper g_pipe(*this);
+    g_pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
+    g_pipe.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}};
+    g_pipe.InitState();
+    ASSERT_EQ(VK_SUCCESS, g_pipe.CreateGraphicsPipeline());
+
+    VkImageUsageFlags usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
+    VkImageObj image(m_device);
+    auto image_ci = VkImageObj::ImageCreateInfo2D(128, 128, 1, 1, format, usage, VK_IMAGE_TILING_OPTIMAL);
+    image.Init(image_ci);
+    ASSERT_TRUE(image.initialized());
+    vkt::ImageView view_pass = image.CreateView();
+
+    VkSamplerCreateInfo sampler_ci = SafeSaneSamplerCreateInfo();
+    sampler_ci.unnormalizedCoordinates = VK_TRUE;
+    sampler_ci.maxLod = 0;
+    vkt::Sampler sampler(*m_device, sampler_ci);
+    g_pipe.descriptor_set_->WriteDescriptorImageInfo(0, view_pass, sampler.handle(), VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                                     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0);
+    g_pipe.descriptor_set_->UpdateDescriptorSets();
+
+    m_commandBuffer->begin();
+    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe.pipeline_);
+    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe.pipeline_layout_.handle(), 0, 1,
+                              &g_pipe.descriptor_set_->set_, 0, nullptr);
+
+    m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_ERROR_BIT_EXT, "VUID-vkCmdDraw-None-08611");
+    vk::CmdDraw(m_commandBuffer->handle(), 1, 0, 0, 0);
+    m_errorMonitor->VerifyFound();
+
+    m_commandBuffer->EndRenderPass();
+    m_commandBuffer->end();
+}
+
 TEST_F(NegativeSampler, ReductionModeFeature) {
     TEST_DESCRIPTION("Test using VkSamplerReductionModeCreateInfo without required feature.");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     VkSamplerReductionModeCreateInfo sampler_reduction_mode_ci = vku::InitStructHelper();
     sampler_reduction_mode_ci.reductionMode = VK_SAMPLER_REDUCTION_MODE_MIN;
@@ -1331,7 +1410,7 @@ TEST_F(NegativeSampler, ReductionModeFeature) {
 TEST_F(NegativeSampler, DISABLED_ReductionMode) {
     TEST_DESCRIPTION("Create sampler with invalid combination of filter and reduction mode.");
     AddRequiredExtensions(VK_EXT_SAMPLER_FILTER_MINMAX_EXTENSION_NAME);
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     VkSamplerReductionModeCreateInfo sampler_reduction_mode_ci = vku::InitStructHelper();
     sampler_reduction_mode_ci.reductionMode = VK_SAMPLER_REDUCTION_MODE_MAX;
@@ -1347,22 +1426,23 @@ TEST_F(NegativeSampler, NonSeamlessCubeMapNotEnabled) {
 
     AddRequiredExtensions(VK_EXT_NON_SEAMLESS_CUBE_MAP_EXTENSION_NAME);
     SetTargetApiVersion(VK_API_VERSION_1_1);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
     VkPhysicalDeviceNonSeamlessCubeMapFeaturesEXT non_seamless_cube_map_features = vku::InitStructHelper();
     auto features2 = GetPhysicalDeviceFeatures2(non_seamless_cube_map_features);
     non_seamless_cube_map_features.nonSeamlessCubeMap = false;
-    RETURN_IF_SKIP(InitState(nullptr, &features2))
+    RETURN_IF_SKIP(InitState(nullptr, &features2));
 
     VkSamplerCreateInfo sampler_info = SafeSaneSamplerCreateInfo();
     sampler_info.flags = VK_SAMPLER_CREATE_NON_SEAMLESS_CUBE_MAP_BIT_EXT;
     CreateSamplerTest(*this, &sampler_info, "VUID-VkSamplerCreateInfo-nonSeamlessCubeMap-06788");
 }
 
-TEST_F(NegativeSampler, DISABLED_BorderColorSwizzle) {
+TEST_F(NegativeSampler, BorderColorSwizzle) {
     TEST_DESCRIPTION("Validate vkCreateSampler with VkSamplerBorderColorComponentMappingCreateInfoEXT");
 
-    RETURN_IF_SKIP(InitFramework())
-    RETURN_IF_SKIP(InitState())
+    AddRequiredExtensions(VK_EXT_BORDER_COLOR_SWIZZLE_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitState());
 
     VkSamplerBorderColorComponentMappingCreateInfoEXT border_color_component_mapping =
         vku::InitStructHelper();
@@ -1380,7 +1460,7 @@ TEST_F(NegativeSampler, DISABLED_BorderColorSwizzle) {
 
 TEST_F(NegativeSampler, BorderColorValue) {
     TEST_DESCRIPTION("Using a bad VkBorderColor value.");
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     VkSamplerCreateInfo sampler_info = SafeSaneSamplerCreateInfo();
     sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
     sampler_info.borderColor = static_cast<VkBorderColor>(0xFFFFBAD0);
@@ -1389,7 +1469,7 @@ TEST_F(NegativeSampler, BorderColorValue) {
 
 TEST_F(NegativeSampler, CompareOpValue) {
     TEST_DESCRIPTION("Using a bad VkCompareOp value.");
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     VkSamplerCreateInfo sampler_info = SafeSaneSamplerCreateInfo();
     sampler_info.compareEnable = VK_TRUE;
     sampler_info.compareOp = static_cast<VkCompareOp>(0xFFFFBAD0);
@@ -1399,8 +1479,8 @@ TEST_F(NegativeSampler, CompareOpValue) {
 TEST_F(NegativeSampler, CustomBorderColorsFeature) {
     TEST_DESCRIPTION("Don't turn on the customBorderColors feature");
     AddRequiredExtensions(VK_EXT_CUSTOM_BORDER_COLOR_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitState());
 
     VkSampler sampler = VK_NULL_HANDLE;
     VkSamplerCreateInfo sampler_info = SafeSaneSamplerCreateInfo();

@@ -188,6 +188,25 @@ VkResult DispatchCreateGraphicsPipelines(VkDevice device, VkPipelineCache pipeli
                     unwrapped_libs[idx1] = layer_data->Unwrap(link_info->pLibraries[idx1]);
                 }
             }
+
+            auto device_generated_commands =
+                vku::FindStructInPNextChain<VkGraphicsPipelineShaderGroupsCreateInfoNV>(local_pCreateInfos[idx0].pNext);
+            if (device_generated_commands) {
+                for (uint32_t idx1 = 0; idx1 < device_generated_commands->groupCount; ++idx1) {
+                    for (uint32_t idx2 = 0; idx2 < device_generated_commands->pGroups[idx1].stageCount; ++idx2) {
+                        auto unwrapped_stage =
+                            const_cast<VkPipelineShaderStageCreateInfo *>(&device_generated_commands->pGroups[idx1].pStages[idx2]);
+                        if (device_generated_commands->pGroups[idx1].pStages[idx2].module) {
+                            unwrapped_stage->module =
+                                layer_data->Unwrap(device_generated_commands->pGroups[idx1].pStages[idx2].module);
+                        }
+                    }
+                }
+                auto unwrapped_pipelines = const_cast<VkPipeline *>(device_generated_commands->pPipelines);
+                for (uint32_t idx1 = 0; idx1 < device_generated_commands->pipelineCount; ++idx1) {
+                    unwrapped_pipelines[idx1] = layer_data->Unwrap(device_generated_commands->pPipelines[idx1]);
+                }
+            }
         }
     }
     if (pipelineCache) {
@@ -229,6 +248,39 @@ static void UpdateCreateRenderPassState(ValidationObject *layer_data, const T *p
 
         if (uses_color) renderpass_state.subpasses_using_color_attachment.insert(subpass);
         if (uses_depthstencil) renderpass_state.subpasses_using_depthstencil_attachment.insert(subpass);
+    }
+}
+
+template <>
+void UpdateCreateRenderPassState(ValidationObject *layer_data, const VkRenderPassCreateInfo2 *pCreateInfo, VkRenderPass renderPass) {
+    auto &renderpass_state = layer_data->renderpasses_states[renderPass];
+
+    for (uint32_t subpassIndex = 0; subpassIndex < pCreateInfo->subpassCount; ++subpassIndex) {
+        bool uses_color = false;
+        const VkSubpassDescription2& subpass = pCreateInfo->pSubpasses[subpassIndex];
+        for (uint32_t i = 0; i < subpass.colorAttachmentCount && !uses_color; ++i)
+            if (subpass.pColorAttachments[i].attachment != VK_ATTACHMENT_UNUSED) uses_color = true;
+
+#if defined(VK_USE_PLATFORM_ANDROID_KHR)
+        // VK_ANDROID_external_format_resolve allows for the only color attachment to be VK_ATTACHMENT_UNUSED
+        // but in this case, it will use the resolve attachment as color attachment. Which means that we do
+        // actually use color attachments
+        if (subpass.pResolveAttachments != nullptr) {
+            for (uint32_t i = 0; i < subpass.colorAttachmentCount && !uses_color; ++i) {
+                uint32_t resolveAttachmentIndex = subpass.pResolveAttachments[i].attachment;
+                const void* resolveAtatchmentPNextChain = pCreateInfo->pAttachments[resolveAttachmentIndex].pNext;
+                if (vku::FindStructInPNextChain<VkExternalFormatANDROID>(resolveAtatchmentPNextChain)) uses_color = true;
+            }
+        }
+#endif
+
+        bool uses_depthstencil = false;
+        if (subpass.pDepthStencilAttachment)
+            if (subpass.pDepthStencilAttachment->attachment != VK_ATTACHMENT_UNUSED)
+                uses_depthstencil = true;
+
+        if (uses_color) renderpass_state.subpasses_using_color_attachment.insert(subpassIndex);
+        if (uses_depthstencil) renderpass_state.subpasses_using_depthstencil_attachment.insert(subpassIndex);
     }
 }
 

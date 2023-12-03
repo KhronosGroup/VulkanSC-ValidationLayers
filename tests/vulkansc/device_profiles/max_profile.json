@@ -802,7 +802,9 @@
                     "advancedBlendCorrelatedOverlap": false,
                     "advancedBlendAllOperations": false
                 },
-                "VkPhysicalDeviceExternalMemoryHostPropertiesEXT": {},
+                "VkPhysicalDeviceExternalMemoryHostPropertiesEXT": {
+                    "minImportedHostPointerAlignment": 4096
+                },
                 "VkPhysicalDeviceVertexAttributeDivisorPropertiesEXT": {
                     "maxVertexAttribDivisor": 4294967000
                 },

@@ -13,6 +13,7 @@
 
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
+#include "../framework/descriptor_helper.h"
 
 #include "generated/vk_extension_helper.h"
 #include "../framework/ray_tracing_objects.h"
@@ -21,7 +22,7 @@ TEST_F(PositiveDescriptors, CopyNonupdatedDescriptors) {
     TEST_DESCRIPTION("Copy non-updated descriptors");
     unsigned int i;
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     OneOffDescriptorSet src_descriptor_set(m_device, {
                                                          {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
                                                          {1, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr},
@@ -48,7 +49,7 @@ TEST_F(PositiveDescriptors, CopyNonupdatedDescriptors) {
 
 TEST_F(PositiveDescriptors, DeleteDescriptorSetLayoutsBeforeDescriptorSets) {
     TEST_DESCRIPTION("Create DSLayouts and DescriptorSets and then delete the DSLayouts before the DescriptorSets.");
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
     VkResult err;
 
@@ -87,7 +88,7 @@ TEST_F(PositiveDescriptors, DeleteDescriptorSetLayoutsBeforeDescriptorSets) {
 
 TEST_F(PositiveDescriptors, PoolSizeCountZero) {
     TEST_DESCRIPTION("Allow poolSizeCount to zero.");
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     VkDescriptorPoolCreateInfo ds_pool_ci = vku::InitStructHelper();
     ds_pool_ci.maxSets = 1;
@@ -103,7 +104,7 @@ TEST_F(PositiveDescriptors, IgnoreUnrelatedDescriptor) {
 
     const uintptr_t invalid_ptr = 0xcdcdcdcd;
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     // Verify VK_FORMAT_R8_UNORM supports VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT
     const VkFormat format_texel_case = VK_FORMAT_R8_UNORM;
@@ -117,8 +118,7 @@ TEST_F(PositiveDescriptors, IgnoreUnrelatedDescriptor) {
     {
         VkImageObj image(m_device);
         image.Init(32, 32, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_TILING_OPTIMAL, 0);
-
-        VkImageView view = image.targetView(VK_FORMAT_B8G8R8A8_UNORM);
+        vkt::ImageView view = image.CreateView();
 
         OneOffDescriptorSet descriptor_set(m_device, {
                                                          {0, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr},
@@ -231,7 +231,7 @@ TEST_F(PositiveDescriptors, IgnoreUnrelatedDescriptor) {
 TEST_F(PositiveDescriptors, ImmutableSamplerOnlyDescriptor) {
     TEST_DESCRIPTION("Bind a DescriptorSet with only an immutable sampler and make sure that we don't warn for no update.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     OneOffDescriptorSet descriptor_set(m_device, {
@@ -257,7 +257,7 @@ TEST_F(PositiveDescriptors, ImmutableSamplerOnlyDescriptor) {
 TEST_F(PositiveDescriptors, EmptyDescriptorUpdate) {
     TEST_DESCRIPTION("Update last descriptor in a set that includes an empty binding");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     // Create layout with two uniform buffer descriptors w/ empty binding between them
     OneOffDescriptorSet ds(m_device, {
@@ -294,7 +294,7 @@ TEST_F(PositiveDescriptors, DynamicOffsetWithInactiveBinding) {
     // Create a descriptorSet w/ dynamic descriptors where 1 binding is inactive
     // We previously had a bug where dynamic offset of inactive bindings was still being used
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     OneOffDescriptorSet descriptor_set(m_device,
@@ -378,7 +378,7 @@ TEST_F(PositiveDescriptors, CopyMutableDescriptors) {
     TEST_DESCRIPTION("Copy mutable descriptors.");
 
     AddRequiredExtensions(VK_EXT_MUTABLE_DESCRIPTOR_TYPE_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
     VkPhysicalDeviceMutableDescriptorTypeFeaturesEXT mutable_descriptor_type_features = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(mutable_descriptor_type_features);
     RETURN_IF_SKIP(InitState(nullptr, &mutable_descriptor_type_features));
@@ -435,7 +435,10 @@ TEST_F(PositiveDescriptors, CopyMutableDescriptors) {
     allocate_info.pSetLayouts = layouts;
 
     VkDescriptorSet descriptor_sets[2];
-    vk::AllocateDescriptorSets(device(), &allocate_info, descriptor_sets);
+    VkResult result = vk::AllocateDescriptorSets(device(), &allocate_info, descriptor_sets);
+    if (result == VK_ERROR_OUT_OF_POOL_MEMORY) {
+        GTEST_SKIP() << "Pool memory not allocated";
+    }
 
     VkBufferCreateInfo buffer_ci = vku::InitStructHelper();
     buffer_ci.size = 32;
@@ -474,7 +477,7 @@ TEST_F(PositiveDescriptors, CopyAccelerationStructureMutableDescriptors) {
     AddRequiredExtensions(VK_EXT_MUTABLE_DESCRIPTOR_TYPE_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceMutableDescriptorTypeFeaturesEXT mutable_descriptor_type_features = vku::InitStructHelper();
     VkPhysicalDeviceAccelerationStructureFeaturesKHR acc_struct_features = vku::InitStructHelper(&mutable_descriptor_type_features);
@@ -562,7 +565,7 @@ TEST_F(PositiveDescriptors, CopyAccelerationStructureMutableDescriptors) {
 TEST_F(PositiveDescriptors, tImageViewAsDescriptorReadAndInputAttachment) {
     TEST_DESCRIPTION("Test reading from a descriptor that uses same image view as framebuffer input attachment");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     const uint32_t width = 32;
@@ -714,7 +717,7 @@ TEST_F(PositiveDescriptors, UpdateImageDescriptorSetThatHasImageViewUsage) {
     TEST_DESCRIPTION("Update a descriptor set with an image view that includes VkImageViewUsageCreateInfo");
 
     AddRequiredExtensions(VK_KHR_MAINTENANCE_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     VkImageObj image(m_device);
@@ -750,7 +753,7 @@ TEST_F(PositiveDescriptors, MultipleThreadsUsingHostOnlyDescriptorSet) {
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_EXT_MUTABLE_DESCRIPTOR_TYPE_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceMutableDescriptorTypeFeaturesEXT mutable_descriptor = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(mutable_descriptor);
@@ -761,8 +764,8 @@ TEST_F(PositiveDescriptors, MultipleThreadsUsingHostOnlyDescriptorSet) {
     image1.Init(32, 32, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_TILING_OPTIMAL, 0);
     image2.Init(32, 32, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_TILING_OPTIMAL, 0);
 
-    VkImageView view1 = image1.targetView(VK_FORMAT_B8G8R8A8_UNORM);
-    VkImageView view2 = image2.targetView(VK_FORMAT_B8G8R8A8_UNORM);
+    vkt::ImageView view1 = image1.CreateView();
+    vkt::ImageView view2 = image2.CreateView();
 
     OneOffDescriptorSet descriptor_set(m_device,
                                        {
@@ -806,7 +809,7 @@ TEST_F(PositiveDescriptors, MultipleThreadsUsingHostOnlyDescriptorSet) {
 }
 
 TEST_F(PositiveDescriptors, BindingEmptyDescriptorSets) {
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     OneOffDescriptorSet empty_ds(m_device, {});
     const vkt::PipelineLayout pipeline_layout(*m_device, {&empty_ds.layout_});
@@ -823,7 +826,7 @@ TEST_F(PositiveDescriptors, DrawingWithUnboundUnusedSetWithInputAttachments) {
         "The second descriptor set is unused and unbound. Its purpose is to catch regression of the following bug or similar "
         "issues when accessing unbound set: https://github.com/KhronosGroup/Vulkan-ValidationLayers/pull/4576");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     const uint32_t width = m_width;
@@ -833,7 +836,7 @@ TEST_F(PositiveDescriptors, DrawingWithUnboundUnusedSetWithInputAttachments) {
 
     VkImageObj image_input(m_device);
     image_input.Init(width, height, 1, format, usage, VK_IMAGE_TILING_OPTIMAL);
-    VkImageView view_input = image_input.targetView(format);
+    vkt::ImageView view_input = image_input.CreateView();
 
     // Create render pass with a subpass that has input attachment.
     vkt::RenderPass render_pass;
@@ -868,7 +871,7 @@ TEST_F(PositiveDescriptors, DrawingWithUnboundUnusedSetWithInputAttachments) {
     VkFramebufferCreateInfo fbci = vku::InitStructHelper();
     fbci.renderPass = render_pass.handle();
     fbci.attachmentCount = 1;
-    fbci.pAttachments = &view_input;
+    fbci.pAttachments = &view_input.handle();
     fbci.width = width;
     fbci.height = height;
     fbci.layers = 1;
@@ -916,8 +919,7 @@ TEST_F(PositiveDescriptors, DrawingWithUnboundUnusedSetWithInputAttachments) {
 
 TEST_F(PositiveDescriptors, UpdateDescritorSetsNoLongerInUse) {
     TEST_DESCRIPTION("Use descriptor in the draw call and then update descriptor when it is no longer in use");
-    RETURN_IF_SKIP(InitFramework())
-    RETURN_IF_SKIP(InitState(nullptr, nullptr, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     vkt::CommandBuffer cb0(m_device, m_commandPool);
@@ -1044,7 +1046,7 @@ TEST_F(PositiveDescriptors, DSUsageBitsFlags2) {
         "Attempt to update descriptor sets for buffers that do not have correct usage bits sets with VkBufferUsageFlagBits2KHR.");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
     VkPhysicalDeviceMaintenance5FeaturesKHR maintenance5_features = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(maintenance5_features);
     RETURN_IF_SKIP(InitState(nullptr, &maintenance5_features));
@@ -1090,7 +1092,7 @@ TEST_F(PositiveDescriptors, AttachmentFeedbackLoopLayout) {
     TEST_DESCRIPTION("Read from image with layout attachment feedback loop");
 
     AddRequiredExtensions(VK_EXT_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
     VkPhysicalDeviceAttachmentFeedbackLoopLayoutFeaturesEXT afll_features = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(afll_features);
     if (!afll_features.attachmentFeedbackLoopLayout) {
@@ -1104,7 +1106,7 @@ TEST_F(PositiveDescriptors, AttachmentFeedbackLoopLayout) {
                VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT,
                VK_IMAGE_TILING_OPTIMAL, 0);
 
-    VkImageView image_view = image.targetView(format);
+    vkt::ImageView image_view = image.CreateView();
 
     VkSamplerCreateInfo sampler_ci = SafeSaneSamplerCreateInfo();
     vkt::Sampler sampler(*m_device, sampler_ci);
@@ -1154,7 +1156,7 @@ TEST_F(PositiveDescriptors, AttachmentFeedbackLoopLayout) {
     framebuffer_ci.layers = 1u;
     framebuffer_ci.renderPass = render_pass.handle();
     framebuffer_ci.attachmentCount = 1;
-    framebuffer_ci.pAttachments = &image_view;
+    framebuffer_ci.pAttachments = &image_view.handle();
 
     vkt::Framebuffer framebuffer(*m_device, framebuffer_ci);
 
@@ -1200,4 +1202,69 @@ TEST_F(PositiveDescriptors, AttachmentFeedbackLoopLayout) {
     vk::CmdDraw(m_commandBuffer->handle(), 3u, 1u, 0u, 0u);
     vk::CmdEndRenderPass(m_commandBuffer->handle());
     m_commandBuffer->end();
+}
+
+TEST_F(PositiveDescriptors, VariableDescriptorCount) {
+    TEST_DESCRIPTION("Allocate descriptors with variable count.");
+    SetTargetApiVersion(VK_API_VERSION_1_0);
+
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitFramework());
+    VkPhysicalDeviceDescriptorIndexingFeatures descriptor_indexing_features = vku::InitStructHelper();
+    GetPhysicalDeviceFeatures2(descriptor_indexing_features);
+    if (!descriptor_indexing_features.descriptorBindingVariableDescriptorCount) {
+        GTEST_SKIP() << "descriptorBindingVariableDescriptorCount not supported";
+    }
+    RETURN_IF_SKIP(InitState(nullptr, &descriptor_indexing_features));
+    InitRenderTarget();
+
+    // This test is valid for Vulkan 1.0 only -- skip if device has an API version greater than 1.0.
+    if (DeviceValidationVersion() >= VK_API_VERSION_1_1) {
+        GTEST_SKIP() << "Tests for 1.0 only";
+    }
+
+    // Create Pool w/ 1 Sampler descriptor, but try to alloc Uniform Buffer
+    // descriptor from it
+    VkDescriptorPoolSize pool_sizes[2] = {};
+    pool_sizes[0].type = VK_DESCRIPTOR_TYPE_SAMPLER;
+    pool_sizes[0].descriptorCount = 2;
+    pool_sizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    pool_sizes[1].descriptorCount = 2;
+
+    VkDescriptorPoolCreateInfo ds_pool_ci = vku::InitStructHelper();
+    ds_pool_ci.maxSets = 3;
+    ds_pool_ci.poolSizeCount = 2;
+    ds_pool_ci.pPoolSizes = pool_sizes;
+
+    vkt::DescriptorPool ds_pool(*m_device, ds_pool_ci);
+    VkDescriptorSetLayoutBinding dsl_binding = {};
+    dsl_binding.binding = 0;
+    dsl_binding.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+    dsl_binding.descriptorCount = 3;
+    dsl_binding.stageFlags = VK_SHADER_STAGE_ALL;
+    dsl_binding.pImmutableSamplers = NULL;
+
+    VkDescriptorBindingFlags binding_flags = VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT;
+
+    VkDescriptorSetLayoutBindingFlagsCreateInfo dsl_binding_flags = vku::InitStructHelper();
+    dsl_binding_flags.bindingCount = 1u;
+    dsl_binding_flags.pBindingFlags = &binding_flags;
+
+    VkDescriptorSetLayoutCreateInfo dsl_ci = vku::InitStructHelper(&dsl_binding_flags);
+    dsl_ci.bindingCount = 1u;
+    dsl_ci.pBindings = &dsl_binding;
+
+    const vkt::DescriptorSetLayout ds_layout(*m_device, dsl_ci);
+
+    uint32_t descriptor_count = 1u;
+    VkDescriptorSetVariableDescriptorCountAllocateInfo variable_allocate = vku::InitStructHelper();
+    variable_allocate.descriptorSetCount = 1u;
+    variable_allocate.pDescriptorCounts = &descriptor_count;
+    VkDescriptorSetAllocateInfo alloc_info = vku::InitStructHelper(&variable_allocate);
+    alloc_info.descriptorSetCount = 1;
+    alloc_info.descriptorPool = ds_pool.handle();
+    alloc_info.pSetLayouts = &ds_layout.handle();
+
+    VkDescriptorSet descriptor_set;
+    vk::AllocateDescriptorSets(m_device->device(), &alloc_info, &descriptor_set);
 }

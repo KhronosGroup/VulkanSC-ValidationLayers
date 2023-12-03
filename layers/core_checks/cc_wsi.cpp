@@ -64,11 +64,11 @@ static VkImageCreateInfo GetSwapchainImpliedImageCreateInfo(VkSwapchainCreateInf
 
 bool CoreChecks::ValidateSwapchainPresentModesCreateInfo(VkPresentModeKHR present_mode, const Location &create_info_loc,
                                                          VkSwapchainCreateInfoKHR const *create_info,
-                                                         const SURFACE_STATE *surface_state) const {
+                                                         const vvl::Surface *surface_state) const {
     bool skip = false;
     std::vector<VkPresentModeKHR> present_modes{};
     if (surface_state) {
-        present_modes = surface_state->GetPresentModes(physical_device, this);
+        present_modes = surface_state->GetPresentModes(physical_device, create_info_loc, this);
     } else if (IsExtEnabled(instance_extensions.vk_google_surfaceless_query)) {
         present_modes = physical_device_state->surfaceless_query_state.present_modes;
     }
@@ -124,7 +124,7 @@ bool CoreChecks::ValidateSwapchainPresentModesCreateInfo(VkPresentModeKHR presen
 bool CoreChecks::ValidateSwapchainPresentScalingCreateInfo(VkPresentModeKHR present_mode, const Location &create_info_loc,
                                                            const VkSurfaceCapabilitiesKHR *capabilities,
                                                            VkSwapchainCreateInfoKHR const *create_info,
-                                                           const SURFACE_STATE *surface_state) const {
+                                                           const vvl::Surface *surface_state) const {
     bool skip = false;
     auto pres_scale_ci = vku::FindStructInPNextChain<VkSwapchainPresentScalingCreateInfoEXT>(create_info->pNext);
     if ((!pres_scale_ci) || (pres_scale_ci && (pres_scale_ci->scalingBehavior == 0))) {
@@ -294,13 +294,13 @@ bool CoreChecks::ValidateSwapchainPresentScalingCreateInfo(VkPresentModeKHR pres
     return skip;
 }
 
-bool CoreChecks::ValidateCreateSwapchain(VkSwapchainCreateInfoKHR const *pCreateInfo, const SURFACE_STATE *surface_state,
+bool CoreChecks::ValidateCreateSwapchain(VkSwapchainCreateInfoKHR const *pCreateInfo, const vvl::Surface *surface_state,
                                          const SWAPCHAIN_NODE *old_swapchain_state, const Location &create_info_loc) const {
     // All physical devices and queue families are required to be able to present to any native window on Android; require the
     // application to have established support on any other platform.
     if (!instance_extensions.vk_khr_android_surface) {
         // restrict search only to queue families of VkDeviceQueueCreateInfos, not the whole physical device
-        const bool is_supported = AnyOf<QUEUE_STATE>([this, surface_state](const QUEUE_STATE &queue_state) {
+        const bool is_supported = AnyOf<vvl::Queue>([this, surface_state](const vvl::Queue &queue_state) {
             return surface_state->GetQueueSupport(physical_device, queue_state.queueFamilyIndex);
         });
 
@@ -370,8 +370,9 @@ bool CoreChecks::ValidateCreateSwapchain(VkSwapchainCreateInfoKHR const *pCreate
         surface_caps_query_pnext = &present_mode_info;
     }
 
-    const auto surface_caps2 = surface_state->GetCapabilities(IsExtEnabled(instance_extensions.vk_khr_get_surface_capabilities2),
-                                                              physical_device_state->PhysDev(), surface_caps_query_pnext, this);
+    const auto surface_caps2 =
+        surface_state->GetCapabilities(IsExtEnabled(instance_extensions.vk_khr_get_surface_capabilities2),
+                                       physical_device_state->PhysDev(), surface_caps_query_pnext, create_info_loc, this);
 
     bool skip = false;
     VkSurfaceTransformFlagBitsKHR current_transform = surface_caps2.surfaceCapabilities.currentTransform;
@@ -451,8 +452,8 @@ bool CoreChecks::ValidateCreateSwapchain(VkSwapchainCreateInfoKHR const *pCreate
     // Shared Present Mode uses different set of capabilities to check imageUsage support
     if ((image_usage != (image_usage & surface_caps2.surfaceCapabilities.supportedUsageFlags)) && !shared_present_mode) {
         if (LogError("VUID-VkSwapchainCreateInfoKHR-presentMode-01427", device, create_info_loc.dot(Field::imageUsage),
-                     "(0x%08x) are not in supportedUsageFlags (0x%08x).", image_usage,
-                     surface_caps2.surfaceCapabilities.supportedUsageFlags)) {
+                     "(%s) are not in supportedUsageFlags (%s).", string_VkImageUsageFlags(image_usage).c_str(),
+                     string_VkImageUsageFlags(surface_caps2.surfaceCapabilities.supportedUsageFlags).c_str())) {
             return true;
         }
     }
@@ -494,7 +495,7 @@ bool CoreChecks::ValidateCreateSwapchain(VkSwapchainCreateInfoKHR const *pCreate
         vvl::span<const safe_VkSurfaceFormat2KHR> formats{};
         if (surface_state) {
             formats = surface_state->GetFormats(IsExtEnabled(instance_extensions.vk_khr_get_surface_capabilities2),
-                                                physical_device_state->PhysDev(), surface_caps_query_pnext, this);
+                                                physical_device_state->PhysDev(), surface_caps_query_pnext, create_info_loc, this);
         } else if (IsExtEnabled(instance_extensions.vk_google_surfaceless_query)) {
             formats = physical_device_state->surfaceless_query_state.formats;
         }
@@ -534,9 +535,9 @@ bool CoreChecks::ValidateCreateSwapchain(VkSwapchainCreateInfoKHR const *pCreate
                                   surface_caps2.surfaceCapabilities.maxImageExtent)) {
             safe_VkSurfaceCapabilities2KHR cached_capabilities{};
             if (surface_state) {
-                cached_capabilities =
-                    surface_state->GetCapabilities(IsExtEnabled(instance_extensions.vk_khr_get_surface_capabilities2),
-                                                   physical_device_state->PhysDev(), surface_caps_query_pnext, this);
+                cached_capabilities = surface_state->GetCapabilities(
+                    IsExtEnabled(instance_extensions.vk_khr_get_surface_capabilities2), physical_device_state->PhysDev(),
+                    surface_caps_query_pnext, create_info_loc, this);
             } else if (IsExtEnabled(instance_extensions.vk_google_surfaceless_query)) {
                 cached_capabilities = physical_device_state->surfaceless_query_state.capabilities;
             }
@@ -587,10 +588,9 @@ bool CoreChecks::ValidateCreateSwapchain(VkSwapchainCreateInfoKHR const *pCreate
 
         if (image_usage != (image_usage & shared_present_capabilities.sharedPresentSupportedUsageFlags)) {
             if (LogError("VUID-VkSwapchainCreateInfoKHR-imageUsage-01384", device, create_info_loc.dot(Field::imageUsage),
-                         "(0x%08x), but the supported flag bits for %s "
-                         "present mode are 0x%08x.",
-                         image_usage, string_VkPresentModeKHR(pCreateInfo->presentMode),
-                         shared_present_capabilities.sharedPresentSupportedUsageFlags)) {
+                         "(%s), but the supported flag bits for %s present mode are %s.",
+                         string_VkImageUsageFlags(image_usage).c_str(), string_VkPresentModeKHR(pCreateInfo->presentMode),
+                         string_VkImageUsageFlags(shared_present_capabilities.sharedPresentSupportedUsageFlags).c_str())) {
                 return true;
             }
         }
@@ -708,20 +708,27 @@ bool CoreChecks::ValidateCreateSwapchain(VkSwapchainCreateInfoKHR const *pCreate
             return true;
         }
     }
+
+    const auto image_compression_control = vku::FindStructInPNextChain<VkImageCompressionControlEXT>(pCreateInfo->pNext);
+    if (image_compression_control && !enabled_features.imageCompressionControlSwapchain) {
+        skip |= LogError("VUID-VkSwapchainCreateInfoKHR-pNext-06752", device, create_info_loc.dot(Field::pNext),
+                         "contains VkImageCompressionControlEXT, but imageCompressionControlSwapchain is not enabled");
+    }
+
     return skip;
 }
 
 bool CoreChecks::PreCallValidateCreateSwapchainKHR(VkDevice device, const VkSwapchainCreateInfoKHR *pCreateInfo,
                                                    const VkAllocationCallbacks *pAllocator, VkSwapchainKHR *pSwapchain,
                                                    const ErrorObject &error_obj) const {
-    auto surface_state = Get<SURFACE_STATE>(pCreateInfo->surface);
+    auto surface_state = Get<vvl::Surface>(pCreateInfo->surface);
     auto old_swapchain_state = Get<SWAPCHAIN_NODE>(pCreateInfo->oldSwapchain);
     return ValidateCreateSwapchain(pCreateInfo, surface_state.get(), old_swapchain_state.get(),
                                    error_obj.location.dot(Field::pCreateInfo));
 }
 
 void CoreChecks::PreCallRecordDestroySwapchainKHR(VkDevice device, VkSwapchainKHR swapchain,
-                                                  const VkAllocationCallbacks *pAllocator) {
+                                                  const VkAllocationCallbacks *pAllocator, const RecordObject &record_obj) {
     if (swapchain) {
         auto swapchain_data = Get<SWAPCHAIN_NODE>(swapchain);
         if (swapchain_data) {
@@ -731,7 +738,7 @@ void CoreChecks::PreCallRecordDestroySwapchainKHR(VkDevice device, VkSwapchainKH
             }
         }
     }
-    StateTracker::PreCallRecordDestroySwapchainKHR(device, swapchain, pAllocator);
+    StateTracker::PreCallRecordDestroySwapchainKHR(device, swapchain, pAllocator, record_obj);
 }
 
 void CoreChecks::PostCallRecordGetSwapchainImagesKHR(VkDevice device, VkSwapchainKHR swapchain, uint32_t *pSwapchainImageCount,
@@ -765,17 +772,79 @@ void CoreChecks::PostCallRecordGetSwapchainImagesKHR(VkDevice device, VkSwapchai
     }
 }
 
+bool CoreChecks::ValidateImageAcquireWait(const SWAPCHAIN_IMAGE &swapchain_image, uint32_t image_index,
+                                          const VkPresentInfoKHR &present_info, const Location present_info_loc) const {
+    bool skip = false;
+
+    const auto &semaphore = swapchain_image.acquire_semaphore;
+    const auto &fence = swapchain_image.acquire_fence;
+    // The specification requires that either a semaphore or fence is specified (or both).
+    // If neither is specified the error is reported by the stateless validation.
+    if (!semaphore && !fence) {
+        return skip;
+    }
+
+    const bool is_external_semaphore = semaphore && semaphore->Scope() != vvl::Semaphore::kInternal;
+    const bool is_external_fence = fence && fence->Scope() != vvl::Fence::kInternal;
+    // Skip validation if external sync object is used.
+    // Validation error according to regular vulkan rules could be a false-positive,
+    // because synchronization could be established via external means.
+    if (is_external_semaphore || is_external_fence) {
+        return skip;
+    }
+
+    bool semaphore_was_waited = false;
+    if (semaphore) {
+        const auto wait_list = vvl::make_span(present_info.pWaitSemaphores, present_info.waitSemaphoreCount);
+        const bool in_wait_list = IsValueIn(semaphore->VkHandle(), wait_list);
+        // The acquire semaphore has been waited on if either of the following is true:
+        // - pWaitSemaphores list contains the acquire semaphore
+        // - the acquire semaphore has been waited on previously, in which case CanBinaryBeWaited() reports false
+        semaphore_was_waited = in_wait_list || !semaphore->CanBinaryBeWaited();
+    }
+    bool fence_was_waited = false;
+    if (fence) {
+        fence_was_waited = fence->State() != vvl::Fence::kInflight;
+    }
+
+    // Either semaphore or fence should be waited on (or both)
+    if (!semaphore_was_waited && !fence_was_waited) {
+        // TODO: Replace UNASSIGNED with official VUID when ready: https://gitlab.khronos.org/vulkan/vulkan/-/issues/3616
+        static const char *missing_acquire_wait_vuid = "UNASSIGNED-VkPresentInfoKHR-pImageIndices-MissingAcquireWait";
+
+        const Location image_index_loc = present_info_loc.dot(Field::pImageIndices, image_index);
+        if (semaphore && fence) {
+            const LogObjectList objlist(swapchain_image.image_state->image(), semaphore->Handle(), fence->Handle());
+            skip |= LogError(missing_acquire_wait_vuid, objlist, image_index_loc,
+                             "was acquired with a semaphore %s and fence %s and neither of them have since been waited on",
+                             FormatHandle(semaphore->Handle()).c_str(), FormatHandle(fence->Handle()).c_str());
+        } else if (semaphore) {
+            const LogObjectList objlist(swapchain_image.image_state->image(), semaphore->Handle());
+            skip |= LogError(missing_acquire_wait_vuid, objlist, image_index_loc,
+                             "was acquired with a semaphore %s that has not since been waited on",
+                             FormatHandle(semaphore->Handle()).c_str());
+        } else {
+            assert(fence != nullptr);  // if both fence and semaphore are not provided we have an early exit
+            const LogObjectList objlist(swapchain_image.image_state->image(), fence->Handle());
+            skip |=
+                LogError(missing_acquire_wait_vuid, objlist, image_index_loc,
+                         "was acquired with a fence %s that has not since been waited on", FormatHandle(fence->Handle()).c_str());
+        }
+    }
+    return skip;
+}
+
 bool CoreChecks::PreCallValidateQueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo,
                                                 const ErrorObject &error_obj) const {
     bool skip = false;
-    auto queue_state = Get<QUEUE_STATE>(queue);
+    auto queue_state = Get<vvl::Queue>(queue);
 
     SemaphoreSubmitState sem_submit_state(this, queue,
                                           physical_device_state->queue_family_properties[queue_state->queueFamilyIndex].queueFlags);
 
     const Location present_info_loc = error_obj.location.dot(Struct::VkPresentInfoKHR, Field::pPresentInfo);
     for (uint32_t i = 0; i < pPresentInfo->waitSemaphoreCount; ++i) {
-        auto semaphore_state = Get<SEMAPHORE_STATE>(pPresentInfo->pWaitSemaphores[i]);
+        auto semaphore_state = Get<vvl::Semaphore>(pPresentInfo->pWaitSemaphores[i]);
         if (semaphore_state && semaphore_state->type != VK_SEMAPHORE_TYPE_BINARY) {
             skip |= LogError("VUID-vkQueuePresentKHR-pWaitSemaphores-03267", pPresentInfo->pWaitSemaphores[i],
                              present_info_loc.dot(Field::pWaitSemaphores, i), "(%s) is not a VK_SEMAPHORE_TYPE_BINARY",
@@ -834,11 +903,15 @@ bool CoreChecks::PreCallValidateQueuePresentKHR(VkQueue queue, const VkPresentIn
                                          image_state->createInfo.extent.width, image_state->createInfo.extent.height);
                     }
                 }
+
+                // Check that image acquire's semaphore/fence has been waited on
+                skip |= ValidateImageAcquireWait(swapchain_data->images[pPresentInfo->pImageIndices[i]], i, *pPresentInfo,
+                                                 present_info_loc);
             }
 
             // All physical devices and queue families are required to be able to present to any native window on Android
             if (!instance_extensions.vk_khr_android_surface) {
-                auto surface_state = Get<SURFACE_STATE>(swapchain_data->createInfo.surface);
+                auto surface_state = Get<vvl::Surface>(swapchain_data->createInfo.surface);
                 if (!surface_state->GetQueueSupport(physical_device, queue_state->queueFamilyIndex)) {
                     skip |= LogError("VUID-vkQueuePresentKHR-pSwapchains-01292", pPresentInfo->pSwapchains[i], swapchain_loc,
                                      "image on queue that cannot present to this surface.");
@@ -906,7 +979,7 @@ bool CoreChecks::PreCallValidateQueuePresentKHR(VkQueue queue, const VkPresentIn
 
         const auto *present_id_info = vku::FindStructInPNextChain<VkPresentIdKHR>(pPresentInfo->pNext);
         if (present_id_info) {
-            if (!enabled_features.present_id_features.presentId) {
+            if (!enabled_features.presentId) {
                 for (uint32_t i = 0; i < present_id_info->swapchainCount; i++) {
                     if (present_id_info->pPresentIds[i] != 0) {
                         skip |= LogError("VUID-VkPresentInfoKHR-pNext-06235", pPresentInfo->pSwapchains[0],
@@ -947,7 +1020,7 @@ bool CoreChecks::PreCallValidateQueuePresentKHR(VkQueue queue, const VkPresentIn
 
             for (uint32_t i = 0; i < swapchain_present_fence_info->swapchainCount; i++) {
                 if (swapchain_present_fence_info->pFences[i]) {
-                    const auto fence_state = Get<FENCE_STATE>(swapchain_present_fence_info->pFences[i]);
+                    const auto fence_state = Get<vvl::Fence>(swapchain_present_fence_info->pFences[i]);
                     const LogObjectList objlist(queue, swapchain_present_fence_info->pFences[i]);
                     skip |=
                         ValidateFenceForSubmit(fence_state.get(), "VUID-VkSwapchainPresentFenceInfoEXT-pFences-07759",
@@ -1033,7 +1106,7 @@ bool CoreChecks::PreCallValidateCreateSharedSwapchainsKHR(VkDevice device, uint3
     bool skip = false;
     if (pCreateInfos) {
         for (uint32_t i = 0; i < swapchainCount; i++) {
-            auto surface_state = Get<SURFACE_STATE>(pCreateInfos[i].surface);
+            auto surface_state = Get<vvl::Surface>(pCreateInfos[i].surface);
             auto old_swapchain_state = Get<SWAPCHAIN_NODE>(pCreateInfos[i].oldSwapchain);
             skip |= ValidateCreateSwapchain(&pCreateInfos[i], surface_state.get(), old_swapchain_state.get(),
                                             error_obj.location.dot(Field::pCreateInfos, i));
@@ -1047,18 +1120,18 @@ bool CoreChecks::ValidateAcquireNextImage(VkDevice device, VkSwapchainKHR swapch
                                           const char *semaphore_type_vuid) const {
     bool skip = false;
     const bool version_2 = loc.function != Func::vkAcquireNextImageKHR;
-    auto semaphore_state = Get<SEMAPHORE_STATE>(semaphore);
+    auto semaphore_state = Get<vvl::Semaphore>(semaphore);
     if (semaphore_state) {
         if (semaphore_state->type != VK_SEMAPHORE_TYPE_BINARY) {
             skip |= LogError(semaphore_type_vuid, semaphore, loc, "%s is not a VK_SEMAPHORE_TYPE_BINARY.",
                              FormatHandle(semaphore).c_str());
-        } else if (semaphore_state->Scope() == kSyncScopeInternal) {
+        } else if (semaphore_state->Scope() == vvl::Semaphore::kInternal) {
             // TODO: VUIDs 01779 and 01781 cover the case where there are pending wait or signal operations on the
             // semaphore. But we don't currently have a good enough way to track when acquire & present operations
             // are completed. So it is possible to get in a condition where the semaphore is doing
             // acquire / wait / acquire and the first acquire (and thus the wait) have completed, but our state
             // isn't aware of it yet. This results in MANY false positives.
-            if (!semaphore_state->CanBeSignaled()) {
+            if (!semaphore_state->CanBinaryBeSignaled()) {
                 const char *vuid =
                     version_2 ? "VUID-VkAcquireNextImageInfoKHR-semaphore-01288" : "VUID-vkAcquireNextImageKHR-semaphore-01286";
                 skip |= LogError(vuid, semaphore, loc, "Semaphore must not be currently signaled.");
@@ -1066,7 +1139,7 @@ bool CoreChecks::ValidateAcquireNextImage(VkDevice device, VkSwapchainKHR swapch
         }
     }
 
-    auto fence_state = Get<FENCE_STATE>(fence);
+    auto fence_state = Get<vvl::Fence>(fence);
     if (fence_state) {
         const LogObjectList objlist(device, fence);
         skip |= ValidateFenceForSubmit(fence_state.get(), "VUID-vkAcquireNextImageKHR-fence-01287",
@@ -1089,7 +1162,7 @@ bool CoreChecks::ValidateAcquireNextImage(VkDevice device, VkSwapchainKHR swapch
         safe_VkSurfaceCapabilities2KHR surface_caps2{};
         if (swapchain_data->surface) {
             surface_caps2 = swapchain_data->surface->GetCapabilities(
-                IsExtEnabled(device_extensions.vk_khr_get_surface_capabilities2), physical_device, nullptr, this);
+                IsExtEnabled(device_extensions.vk_khr_get_surface_capabilities2), physical_device, nullptr, loc, this);
         } else if (IsExtEnabled(instance_extensions.vk_google_surfaceless_query)) {
             surface_caps2 = physical_device_state->surfaceless_query_state.capabilities;
         }
@@ -1097,7 +1170,7 @@ bool CoreChecks::ValidateAcquireNextImage(VkDevice device, VkSwapchainKHR swapch
         const VkSwapchainPresentModesCreateInfoEXT *present_modes_ci =
             vku::FindStructInPNextChain<VkSwapchainPresentModesCreateInfoEXT>(swapchain_data->createInfo.pNext);
         if (present_modes_ci) {
-            auto surface_state = Get<SURFACE_STATE>(swapchain_data->createInfo.surface);
+            auto surface_state = Get<vvl::Surface>(swapchain_data->createInfo.surface);
             // If a SwapchainPresentModesCreateInfo struct was included, min_image_count becomes the max of the
             // minImageCount values returned via VkSurfaceCapabilitiesKHR for each of the present modes in
             // SwapchainPresentModesCreateInfo
@@ -1151,7 +1224,7 @@ bool CoreChecks::PreCallValidateAcquireNextImage2KHR(VkDevice device, const VkAc
 bool CoreChecks::PreCallValidateWaitForPresentKHR(VkDevice device, VkSwapchainKHR swapchain, uint64_t presentId, uint64_t timeout,
                                                   const ErrorObject &error_obj) const {
     bool skip = false;
-    if (!enabled_features.present_wait_features.presentWait) {
+    if (!enabled_features.presentWait) {
         skip |= LogError("VUID-vkWaitForPresentKHR-presentWait-06234", swapchain, error_obj.location,
                          "presentWait feature is not enabled.");
     }
@@ -1167,7 +1240,7 @@ bool CoreChecks::PreCallValidateWaitForPresentKHR(VkDevice device, VkSwapchainKH
 
 bool CoreChecks::PreCallValidateDestroySurfaceKHR(VkInstance instance, VkSurfaceKHR surface,
                                                   const VkAllocationCallbacks *pAllocator, const ErrorObject &error_obj) const {
-    auto surface_state = Get<SURFACE_STATE>(surface);
+    auto surface_state = Get<vvl::Surface>(surface);
     bool skip = false;
     if ((surface_state) && (surface_state->swapchain)) {
         skip |= LogError("VUID-vkDestroySurfaceKHR-surface-01266", instance, error_obj.location,
@@ -1181,7 +1254,7 @@ bool CoreChecks::PreCallValidateGetPhysicalDeviceWaylandPresentationSupportKHR(V
                                                                                uint32_t queueFamilyIndex,
                                                                                struct wl_display *display,
                                                                                const ErrorObject &error_obj) const {
-    auto pd_state = Get<PHYSICAL_DEVICE_STATE>(physicalDevice);
+    auto pd_state = Get<vvl::PhysicalDevice>(physicalDevice);
     return ValidateQueueFamilyIndex(pd_state.get(), queueFamilyIndex,
                                     "VUID-vkGetPhysicalDeviceWaylandPresentationSupportKHR-queueFamilyIndex-01306",
                                     error_obj.location.dot(Field::queueFamilyIndex));
@@ -1192,7 +1265,7 @@ bool CoreChecks::PreCallValidateGetPhysicalDeviceWaylandPresentationSupportKHR(V
 bool CoreChecks::PreCallValidateGetPhysicalDeviceWin32PresentationSupportKHR(VkPhysicalDevice physicalDevice,
                                                                              uint32_t queueFamilyIndex,
                                                                              const ErrorObject &error_obj) const {
-    auto pd_state = Get<PHYSICAL_DEVICE_STATE>(physicalDevice);
+    auto pd_state = Get<vvl::PhysicalDevice>(physicalDevice);
     return ValidateQueueFamilyIndex(pd_state.get(), queueFamilyIndex,
                                     "VUID-vkGetPhysicalDeviceWin32PresentationSupportKHR-queueFamilyIndex-01309",
                                     error_obj.location.dot(Field::queueFamilyIndex));
@@ -1204,7 +1277,7 @@ bool CoreChecks::PreCallValidateGetPhysicalDeviceXcbPresentationSupportKHR(VkPhy
                                                                            uint32_t queueFamilyIndex, xcb_connection_t *connection,
                                                                            xcb_visualid_t visual_id,
                                                                            const ErrorObject &error_obj) const {
-    auto pd_state = Get<PHYSICAL_DEVICE_STATE>(physicalDevice);
+    auto pd_state = Get<vvl::PhysicalDevice>(physicalDevice);
     return ValidateQueueFamilyIndex(pd_state.get(), queueFamilyIndex,
                                     "VUID-vkGetPhysicalDeviceXcbPresentationSupportKHR-queueFamilyIndex-01312",
                                     error_obj.location.dot(Field::queueFamilyIndex));
@@ -1215,7 +1288,7 @@ bool CoreChecks::PreCallValidateGetPhysicalDeviceXcbPresentationSupportKHR(VkPhy
 bool CoreChecks::PreCallValidateGetPhysicalDeviceXlibPresentationSupportKHR(VkPhysicalDevice physicalDevice,
                                                                             uint32_t queueFamilyIndex, Display *dpy,
                                                                             VisualID visualID, const ErrorObject &error_obj) const {
-    auto pd_state = Get<PHYSICAL_DEVICE_STATE>(physicalDevice);
+    auto pd_state = Get<vvl::PhysicalDevice>(physicalDevice);
     return ValidateQueueFamilyIndex(pd_state.get(), queueFamilyIndex,
                                     "VUID-vkGetPhysicalDeviceXlibPresentationSupportKHR-queueFamilyIndex-01315",
                                     error_obj.location.dot(Field::queueFamilyIndex));
@@ -1227,7 +1300,7 @@ bool CoreChecks::PreCallValidateGetPhysicalDeviceScreenPresentationSupportQNX(Vk
                                                                               uint32_t queueFamilyIndex,
                                                                               struct _screen_window *window,
                                                                               const ErrorObject &error_obj) const {
-    auto pd_state = Get<PHYSICAL_DEVICE_STATE>(physicalDevice);
+    auto pd_state = Get<vvl::PhysicalDevice>(physicalDevice);
     return ValidateQueueFamilyIndex(pd_state.get(), queueFamilyIndex,
                                     "VUID-vkGetPhysicalDeviceScreenPresentationSupportQNX-queueFamilyIndex-04743",
                                     error_obj.location.dot(Field::queueFamilyIndex));
@@ -1237,7 +1310,7 @@ bool CoreChecks::PreCallValidateGetPhysicalDeviceScreenPresentationSupportQNX(Vk
 bool CoreChecks::PreCallValidateGetPhysicalDeviceSurfaceSupportKHR(VkPhysicalDevice physicalDevice, uint32_t queueFamilyIndex,
                                                                    VkSurfaceKHR surface, VkBool32 *pSupported,
                                                                    const ErrorObject &error_obj) const {
-    auto pd_state = Get<PHYSICAL_DEVICE_STATE>(physicalDevice);
+    auto pd_state = Get<vvl::PhysicalDevice>(physicalDevice);
     return ValidateQueueFamilyIndex(pd_state.get(), queueFamilyIndex,
                                     "VUID-vkGetPhysicalDeviceSurfaceSupportKHR-queueFamilyIndex-01269",
                                     error_obj.location.dot(Field::queueFamilyIndex));
@@ -1287,11 +1360,11 @@ bool CoreChecks::PreCallValidateCreateDisplayPlaneSurfaceKHR(VkInstance instance
         }
     }
 
-    auto dm_state = Get<DISPLAY_MODE_STATE>(display_mode);
+    auto dm_state = Get<vvl::DisplayMode>(display_mode);
     if (dm_state != nullptr) {
         // Get physical device from VkDisplayModeKHR state tracking
         const VkPhysicalDevice physical_device = dm_state->physical_device;
-        auto pd_state = Get<PHYSICAL_DEVICE_STATE>(physical_device);
+        auto pd_state = Get<vvl::PhysicalDevice>(physical_device);
         VkPhysicalDeviceProperties device_properties = {};
         DispatchGetPhysicalDeviceProperties(physical_device, &device_properties);
 
@@ -1327,10 +1400,10 @@ bool CoreChecks::PreCallValidateCreateDisplayPlaneSurfaceKHR(VkInstance instance
                 if ((pCreateInfo->alphaMode & plane_capabilities.supportedAlpha) == 0) {
                     skip |= LogError("VUID-VkDisplaySurfaceCreateInfoKHR-alphaMode-01255", display_mode, create_info_loc,
                                      "alphaMode is %s but planeIndex %" PRIu32
-                                     " supportedAlpha (0x%x) "
+                                     " supportedAlpha (%s) "
                                      "does not support the mode.",
                                      string_VkDisplayPlaneAlphaFlagBitsKHR(pCreateInfo->alphaMode), plane_index,
-                                     plane_capabilities.supportedAlpha);
+                                     string_VkDisplayPlaneAlphaFlagsKHR(plane_capabilities.supportedAlpha).c_str());
                 }
             }
         }
@@ -1399,8 +1472,8 @@ bool CoreChecks::ValidatePhysicalDeviceSurfaceSupport(VkPhysicalDevice physicalD
                                                       const Location &loc) const {
     bool skip = false;
 
-    auto pd_state = Get<PHYSICAL_DEVICE_STATE>(physicalDevice);
-    auto surface_state = Get<SURFACE_STATE>(surface);
+    auto pd_state = Get<vvl::PhysicalDevice>(physicalDevice);
+    auto surface_state = Get<vvl::Surface>(surface);
     if (pd_state && surface_state) {
         bool is_supported = false;
         for (uint32_t i = 0; i < pd_state->queue_family_properties.size(); i++) {
@@ -1510,7 +1583,7 @@ bool CoreChecks::PreCallValidateGetPhysicalDeviceSurfaceCapabilities2KHR(VkPhysi
                                                  "VUID-vkGetPhysicalDeviceSurfaceCapabilities2KHR-pSurfaceInfo-06522",
                                                  error_obj.location);
 
-    const auto surface_state = Get<SURFACE_STATE>(pSurfaceInfo->surface);
+    const auto surface_state = Get<vvl::Surface>(pSurfaceInfo->surface);
 
     if (IsExtEnabled(device_extensions.vk_ext_surface_maintenance1)) {
         const auto *surface_present_mode = vku::FindStructInPNextChain<VkSurfacePresentModeEXT>(pSurfaceInfo->pNext);
@@ -1518,7 +1591,7 @@ bool CoreChecks::PreCallValidateGetPhysicalDeviceSurfaceCapabilities2KHR(VkPhysi
             VkPresentModeKHR present_mode = surface_present_mode->presentMode;
             std::vector<VkPresentModeKHR> present_modes{};
             if (surface_state) {
-                present_modes = surface_state->GetPresentModes(physicalDevice, this);
+                present_modes = surface_state->GetPresentModes(physicalDevice, error_obj.location, this);
             }
             bool found_match = std::find(present_modes.begin(), present_modes.end(), present_mode) != present_modes.end();
             if (!found_match) {
@@ -1607,7 +1680,7 @@ bool CoreChecks::PreCallValidateGetPhysicalDeviceSurfacePresentModesKHR(VkPhysic
 bool CoreChecks::ValidateGetPhysicalDeviceDisplayPlanePropertiesKHRQuery(VkPhysicalDevice physicalDevice, uint32_t planeIndex,
                                                                          const Location &loc) const {
     bool skip = false;
-    auto pd_state = Get<PHYSICAL_DEVICE_STATE>(physicalDevice);
+    auto pd_state = Get<vvl::PhysicalDevice>(physicalDevice);
     if (pd_state->vkGetPhysicalDeviceDisplayPlanePropertiesKHR_called) {
         if (planeIndex >= pd_state->display_plane_property_count) {
             skip |= LogError("VUID-vkGetDisplayPlaneSupportedDisplaysKHR-planeIndex-01249", physicalDevice, loc,

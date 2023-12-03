@@ -24,7 +24,7 @@ struct icd_spv_header {
 TEST_F(NegativeShaderSpirv, CodeSize) {
     TEST_DESCRIPTION("Test that errors are produced for a spirv modules with invalid code sizes");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     {
@@ -58,7 +58,7 @@ TEST_F(NegativeShaderSpirv, CodeSize) {
 TEST_F(NegativeShaderSpirv, Magic) {
     TEST_DESCRIPTION("Test that an error is produced for a spirv module with a bad magic number");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     VkShaderModule module;
@@ -84,9 +84,9 @@ TEST_F(NegativeShaderSpirv, ShaderFloatControl) {
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     // The issue with revision 4 of this extension should not be an issue with the tests
     AddRequiredExtensions(VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
     VkPhysicalDeviceFloatControlsProperties shader_float_control = vku::InitStructHelper();
@@ -233,7 +233,7 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitCapability) {
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     // Prevent extra errors for not having the support for the SPV extensions
 
@@ -609,13 +609,13 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitFeatures) {
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     // Prevent extra errors for not having the support for the SPV extensions
 
     VkPhysicalDeviceShaderFloat16Int8Features float16Int8 = vku::InitStructHelper();
     auto features2 = GetPhysicalDeviceFeatures2(float16Int8);
-    RETURN_IF_SKIP(InitState(nullptr, &features2))
+    RETURN_IF_SKIP(InitState(nullptr, &features2));
     InitRenderTarget();
 
     if (float16Int8.shaderInt8 == VK_TRUE) {
@@ -1096,10 +1096,10 @@ TEST_F(NegativeShaderSpirv, ReadShaderClock) {
 
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_SHADER_CLOCK_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     // Don't enable either feature bit on purpose
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
     // Device scope using GL_EXT_shader_realtime_clock
@@ -1139,7 +1139,7 @@ TEST_F(NegativeShaderSpirv, SpecializationApplied) {
     TEST_DESCRIPTION(
         "Make sure specialization constants get applied during shader validation by using a value that breaks compilation.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     // Size an array using a specialization constant of default value equal to 1.
@@ -1197,7 +1197,7 @@ TEST_F(NegativeShaderSpirv, SpecializationApplied) {
 TEST_F(NegativeShaderSpirv, SpecializationOffsetOutOfBounds) {
     TEST_DESCRIPTION("Validate VkSpecializationInfo offset.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     char const *fsSource = R"glsl(
@@ -1232,7 +1232,7 @@ TEST_F(NegativeShaderSpirv, SpecializationOffsetOutOfBoundsWithIdentifier) {
     TEST_DESCRIPTION("Validate VkSpecializationInfo offset using a shader module identifier.");
 
     AddRequiredExtensions(VK_EXT_SHADER_MODULE_IDENTIFIER_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDevicePipelineCreationCacheControlFeatures shader_cache_control_features = vku::InitStructHelper();
     VkPhysicalDeviceShaderModuleIdentifierFeaturesEXT shader_module_id_features =
@@ -1286,7 +1286,7 @@ TEST_F(NegativeShaderSpirv, SpecializationOffsetOutOfBoundsWithIdentifier) {
 TEST_F(NegativeShaderSpirv, SpecializationSizeOutOfBounds) {
     TEST_DESCRIPTION("Challenge core_validation with shader validation issues related to vkCreateGraphicsPipelines.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     char const *fsSource = R"glsl(
@@ -1320,7 +1320,7 @@ TEST_F(NegativeShaderSpirv, SpecializationSizeOutOfBounds) {
 TEST_F(NegativeShaderSpirv, SpecializationSizeZero) {
     TEST_DESCRIPTION("Make sure an error is logged when a specialization map entry's size is 0");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     const char *cs_src = R"glsl(
@@ -1370,7 +1370,7 @@ TEST_F(NegativeShaderSpirv, SpecializationSizeMismatch) {
 
     // require to make enable logic simpler
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceVulkan12Features features12 = vku::InitStructHelper();
     features12.shaderInt8 = VK_TRUE;
@@ -1379,7 +1379,7 @@ TEST_F(NegativeShaderSpirv, SpecializationSizeMismatch) {
         int8_support = true;
     }
 
-    RETURN_IF_SKIP(InitState(nullptr, &features2))
+    RETURN_IF_SKIP(InitState(nullptr, &features2));
     InitRenderTarget();
 
     if (m_device->phy().features().shaderFloat64) {
@@ -1442,7 +1442,7 @@ TEST_F(NegativeShaderSpirv, SpecializationSizeMismatch) {
     // Sanity check
     cs = VkShaderObj::CreateFromASM(this, cs_src, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, &specialization_info);
     if (cs) {
-        CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit | kWarningBit);
+        CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
 
         // signed int mismatch
         entries[0].size = 0;
@@ -1522,7 +1522,7 @@ TEST_F(NegativeShaderSpirv, SpecializationSizeMismatch) {
         cs = VkShaderObj::CreateFromASM(this, cs_int8, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, &specialization_info);
         if (cs) {
             // Sanity check
-            CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit | kWarningBit);
+            CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
 
             // signed int 8 mismatch
             entries[0].size = 0;
@@ -1577,7 +1577,7 @@ TEST_F(NegativeShaderSpirv, SpecializationSizeMismatch) {
         cs = VkShaderObj::CreateFromASM(this, cs_float64, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, &specialization_info);
         if (cs) {
             // Sanity check
-            CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit | kWarningBit);
+            CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
 
             // float 64 mismatch
             entries[0].size = 1;
@@ -1602,7 +1602,7 @@ TEST_F(NegativeShaderSpirv, SpecializationSizeMismatch) {
 
 TEST_F(NegativeShaderSpirv, DuplicatedSpecializationConstantID) {
     TEST_DESCRIPTION("Create a pipeline with non unique constantID in specialization pMapEntries.");
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     char const *fsSource = R"glsl(
@@ -1641,7 +1641,7 @@ TEST_F(NegativeShaderSpirv, ShaderModuleCheckCapability) {
     TEST_DESCRIPTION("Create a shader in which a capability declared by the shader is not supported.");
     // Note that this failure message comes from spirv-tools, specifically the validator.
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     const char *spv_source = R"(
@@ -1661,7 +1661,7 @@ TEST_F(NegativeShaderSpirv, ShaderNotEnabled) {
     TEST_DESCRIPTION(
         "Create a graphics pipeline in which a capability declared by the shader requires a feature not enabled on the device.");
 
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     // Some awkward steps are required to test with custom device features.
     VkPhysicalDeviceFeatures device_features = {};
@@ -1693,11 +1693,11 @@ TEST_F(NegativeShaderSpirv, ShaderNotEnabled) {
 TEST_F(NegativeShaderSpirv, NonSemanticInfoEnabled) {
     TEST_DESCRIPTION("Test VK_KHR_shader_non_semantic_info.");
 
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
     if (!DeviceExtensionSupported(gpu(), nullptr, VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME)) {
         GTEST_SKIP() << "VK_KHR_shader_non_semantic_info not supported";
     }
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitState());
 
     std::vector<VkDescriptorSetLayoutBinding> bindings(0);
     const vkt::DescriptorSetLayout dsl(*m_device, bindings);
@@ -1731,7 +1731,7 @@ TEST_F(NegativeShaderSpirv, ShaderImageFootprintEnabled) {
     TEST_DESCRIPTION("Create a pipeline requiring the shader image footprint feature which has not enabled on the device.");
 
     AddRequiredExtensions(VK_NV_SHADER_IMAGE_FOOTPRINT_EXTENSION_NAME);
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     std::vector<const char *> device_extension_names;
     auto features = m_device->phy().features();
@@ -1808,7 +1808,7 @@ TEST_F(NegativeShaderSpirv, FragmentShaderBarycentricEnabled) {
     TEST_DESCRIPTION("Create a pipeline requiring the fragment shader barycentric feature which has not enabled on the device.");
 
     AddRequiredExtensions(VK_NV_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME);
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     auto features = m_device->phy().features();
 
@@ -1871,7 +1871,7 @@ TEST_F(NegativeShaderSpirv, ComputeShaderDerivativesEnabled) {
     TEST_DESCRIPTION("Create a pipeline requiring the compute shader derivatives feature which has not enabled on the device.");
 
     AddRequiredExtensions(VK_NV_COMPUTE_SHADER_DERIVATIVES_EXTENSION_NAME);
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     std::vector<const char *> device_extension_names;
     auto features = m_device->phy().features();
@@ -1923,7 +1923,7 @@ TEST_F(NegativeShaderSpirv, ComputeShaderDerivativesEnabled) {
 TEST_F(NegativeShaderSpirv, FragmentShaderInterlockEnabled) {
     TEST_DESCRIPTION("Create a pipeline requiring the fragment shader interlock feature which has not enabled on the device.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     std::vector<const char *> device_extension_names;
     if (DeviceExtensionSupported(gpu(), nullptr, VK_EXT_FRAGMENT_SHADER_INTERLOCK_EXTENSION_NAME)) {
@@ -1999,7 +1999,7 @@ TEST_F(NegativeShaderSpirv, DemoteToHelperInvocation) {
     TEST_DESCRIPTION("Create a pipeline requiring the demote to helper invocation feature which has not enabled on the device.");
 
     AddRequiredExtensions(VK_EXT_SHADER_DEMOTE_TO_HELPER_INVOCATION_EXTENSION_NAME);
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     auto features = m_device->phy().features();
 
@@ -2060,7 +2060,7 @@ TEST_F(NegativeShaderSpirv, DemoteToHelperInvocation) {
 TEST_F(NegativeShaderSpirv, NoUniformBufferStandardLayout10) {
     TEST_DESCRIPTION("Don't enable uniformBufferStandardLayout in Vulkan 1.0 and have spirv-val catch invalid shader");
     SetTargetApiVersion(VK_API_VERSION_1_0);
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     if (DeviceValidationVersion() > VK_API_VERSION_1_0) {
         GTEST_SKIP() << "Tests for 1.0 only";
     }
@@ -2104,7 +2104,7 @@ TEST_F(NegativeShaderSpirv, NoUniformBufferStandardLayout12) {
     TEST_DESCRIPTION(
         "Don't enable uniformBufferStandardLayout in Vulkan1.2 when VK_KHR_uniform_buffer_standard_layout was promoted");
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     // layout(std430, set = 0, binding = 0) uniform ubo430 {
     //     float floatArray430[8];
@@ -2144,7 +2144,7 @@ TEST_F(NegativeShaderSpirv, NoUniformBufferStandardLayout12) {
 TEST_F(NegativeShaderSpirv, NoScalarBlockLayout10) {
     TEST_DESCRIPTION("Don't enable scalarBlockLayout in Vulkan 1.0 and have spirv-val catch invalid shader");
     SetTargetApiVersion(VK_API_VERSION_1_0);
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     if (DeviceValidationVersion() > VK_API_VERSION_1_0) {
         GTEST_SKIP() << "Tests for 1.0 only";
     }
@@ -2187,7 +2187,7 @@ TEST_F(NegativeShaderSpirv, NoScalarBlockLayout10) {
 TEST_F(NegativeShaderSpirv, NoScalarBlockLayout12) {
     TEST_DESCRIPTION("Don't enable scalarBlockLayout in Vulkan1.2 when VK_EXT_scalar_block_layout was promoted");
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     // layout (scalar, set = 0, binding = 0) buffer ssbo {
     //     layout(offset = 0) vec3 a;
@@ -2228,14 +2228,14 @@ TEST_F(NegativeShaderSpirv, DeviceMemoryScope) {
     TEST_DESCRIPTION("Validate using Device memory scope in spirv.");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
     VkPhysicalDeviceVulkan12Features features12 = vku::InitStructHelper();
     auto features2 = GetPhysicalDeviceFeatures2(features12);
     features12.vulkanMemoryModelDeviceScope = VK_FALSE;
     if (features12.vulkanMemoryModel == VK_FALSE) {
         GTEST_SKIP() << "vulkanMemoryModel feature is not supported";
     }
-    RETURN_IF_SKIP(InitState(nullptr, &features2))
+    RETURN_IF_SKIP(InitState(nullptr, &features2));
 
     char const *csSource = R"glsl(
         #version 450
@@ -2257,14 +2257,14 @@ TEST_F(NegativeShaderSpirv, QueueFamilyMemoryScope) {
     TEST_DESCRIPTION("Validate using QueueFamily memory scope in spirv.");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
     VkPhysicalDeviceVulkan12Features features12 = vku::InitStructHelper();
     auto features2 = GetPhysicalDeviceFeatures2(features12);
     features12.vulkanMemoryModel = VK_FALSE;
     if (features12.vulkanMemoryModelDeviceScope == VK_FALSE) {
         GTEST_SKIP() << "vulkanMemoryModelDeviceScope feature is not supported";
     }
-    RETURN_IF_SKIP(InitState(nullptr, &features2))
+    RETURN_IF_SKIP(InitState(nullptr, &features2));
 
     char const *csSource = R"glsl(
         #version 450
@@ -2289,7 +2289,7 @@ TEST_F(NegativeShaderSpirv, ConservativeRasterizationPostDepthCoverage) {
 
     AddRequiredExtensions(VK_EXT_CONSERVATIVE_RASTERIZATION_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_POST_DEPTH_COVERAGE_EXTENSION_NAME);
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     VkPhysicalDeviceConservativeRasterizationPropertiesEXT conservative_rasterization_props = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(conservative_rasterization_props);
@@ -2405,4 +2405,146 @@ TEST_F(NegativeShaderSpirv, DynamicUniformIndex) {
         CreatePipelineHelper::OneshotTest(*this, info_override, VK_DEBUG_REPORT_ERROR_BIT_EXT,
                                           "VUID-VkShaderModuleCreateInfo-pCode-08740");
     }
+}
+
+// TODO - This logic is illegal, but should be done in SPIRV-Tools
+// see https://github.com/KhronosGroup/SPIRV-Tools/pull/4748
+TEST_F(NegativeShaderSpirv, DISABLED_ImageFormatTypeMismatchWithZeroExtend) {
+    TEST_DESCRIPTION("Use ZeroExtend to turn a SINT resource into a UINT, but only for some of the accesses.");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitRenderTarget());
+    if (DeviceValidationVersion() < VK_API_VERSION_1_2) {
+        GTEST_SKIP() << "At least Vulkan version 1.2 is required";
+    }
+
+    const char *csSource = R"(
+                     OpCapability Shader
+                     OpCapability StorageImageExtendedFormats
+                     OpMemoryModel Logical GLSL450
+                     OpEntryPoint GLCompute %main "main" %image_ptr
+                     OpExecutionMode %main LocalSize 1 1 1
+                     OpSource GLSL 450
+                     OpDecorate %image_ptr DescriptorSet 0
+                     OpDecorate %image_ptr Binding 0
+                     OpDecorate %image_ptr NonReadable
+%type_void         = OpTypeVoid
+%type_u32          = OpTypeInt 32 0
+%type_i32          = OpTypeInt 32 1
+%type_vec3_u32     = OpTypeVector %type_u32 3
+%type_vec4_u32     = OpTypeVector %type_u32 4
+%type_vec2_i32     = OpTypeVector %type_i32 2
+%type_fn_void      = OpTypeFunction %type_void
+%type_ptr_fn       = OpTypePointer Function %type_vec4_u32
+%type_image        = OpTypeImage %type_u32 2D 0 0 0 2 Rgba32ui
+%type_ptr_image    = OpTypePointer UniformConstant %type_image
+%image_ptr         = OpVariable %type_ptr_image UniformConstant
+%const_i32_0       = OpConstant %type_i32 0
+%const_vec2_i32_00 = OpConstantComposite %type_vec2_i32 %const_i32_0 %const_i32_0
+%main              = OpFunction %type_void None %type_fn_void
+%label             = OpLabel
+%store_location    = OpVariable %type_ptr_fn Function
+%image             = OpLoad %type_image %image_ptr
+                   ; Is accessing a SINT, no error
+%value             = OpImageRead %type_vec4_u32 %image %const_vec2_i32_00 SignExtend
+                   ; But this will still be accessing a UINT, so errors
+%value2            = OpImageRead %type_vec4_u32 %image %const_vec2_i32_00
+                     OpStore %store_location %value
+                     OpReturn
+                     OpFunctionEnd
+              )";
+
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-StandaloneSpirv-Image-04965");
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cs_.reset(new VkShaderObj(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM));
+    pipe.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}};
+    pipe.InitState();
+    pipe.CreateComputePipeline();
+    m_errorMonitor->VerifyFound();
+}
+
+// TODO - https://github.com/KhronosGroup/SPIRV-Tools/issues/5468
+TEST_F(NegativeShaderSpirv, DISABLED_SpecConstantTextureIndex) {
+    TEST_DESCRIPTION("Apply spec constant to lower array size and detect array being oob");
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    const char *fragment_source = R"glsl(
+        #version 400
+        #extension GL_ARB_separate_shader_objects : enable
+        #extension GL_ARB_shading_language_420pack : enable
+
+        layout (location = 0) out vec4 out_color;
+
+        layout (constant_id = 0) const int num_textures = 3;
+        layout (binding = 0) uniform sampler2D textures[num_textures];
+
+        void main() {
+            out_color = texture(textures[2], vec2(0.0));
+        }
+    )glsl";
+
+    uint32_t data = 2;  // will make textures[2] OOB
+    VkSpecializationMapEntry entry = {0, 0, sizeof(uint32_t)};
+    VkSpecializationInfo specialization_info = {1, &entry, sizeof(uint32_t), &data};
+    const VkShaderObj fs(this, fragment_source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL,
+                         &specialization_info);
+
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPipelineShaderStageCreateInfo-pSpecializationInfo-06849");
+    CreatePipelineHelper pipe(*this);
+    pipe.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2, VK_SHADER_STAGE_ALL_GRAPHICS, nullptr}};
+    pipe.InitState();
+    pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
+    pipe.CreateGraphicsPipeline();
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeShaderSpirv, DescriptorCountConstant) {
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    char const *fsSource = R"glsl(
+        #version 450
+        layout (set = 0, binding = 0) uniform sampler2D tex[3];
+        layout (location = 0) out vec4 out_color;
+        void main() {
+            out_color = textureLodOffset(tex[1], vec2(0), 0, ivec2(0));
+        }
+    )glsl";
+
+    const VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    const auto set_info = [&](CreatePipelineHelper &helper) {
+        helper.shader_stages_ = {helper.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
+        helper.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}};
+    };
+    CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-layout-07991");
+}
+
+// This is not working because of a bug in the Spec Constant logic
+// https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/5911
+TEST_F(NegativeShaderSpirv, DISABLED_DescriptorCountSpecConstant) {
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    char const *fsSource = R"glsl(
+        #version 450
+        layout (constant_id = 0) const int index = 2;
+        layout (set = 0, binding = 0) uniform sampler2D tex[index];
+        layout (location = 0) out vec4 out_color;
+        void main() {
+            out_color = textureLodOffset(tex[1], vec2(0), 0, ivec2(0));
+        }
+    )glsl";
+
+    uint32_t data = 4;  // over VkDescriptorSetLayoutBinding::descriptorCount
+    VkSpecializationMapEntry entry = {0, 0, sizeof(uint32_t)};
+    VkSpecializationInfo specialization_info = {1, &entry, sizeof(uint32_t), &data};
+    const VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL, &specialization_info);
+
+    const auto set_info = [&](CreatePipelineHelper &helper) {
+        helper.shader_stages_ = {helper.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
+        helper.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}};
+    };
+    CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-layout-07991");
 }

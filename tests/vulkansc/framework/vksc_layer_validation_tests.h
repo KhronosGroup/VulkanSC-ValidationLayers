@@ -18,9 +18,6 @@
 class VkSCLayerTest : public VkLayerTest {
   public:
     VkSCLayerTest();
-
-    static VkPhysicalDeviceVulkanSC10Features GetVulkanSC10Features(VkPhysicalDevice phys_dev);
-    static VkPhysicalDeviceVulkanSC10Properties GetVulkanSC10Properties(VkPhysicalDevice phys_dev);
 };
 
 class VkSCPositiveLayerTest : public VkSCLayerTest {};

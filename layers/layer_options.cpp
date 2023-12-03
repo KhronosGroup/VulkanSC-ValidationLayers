@@ -17,6 +17,7 @@
  */
 
 #include "layer_options.h"
+#include "utils/hash_util.h"
 #include <vulkan/layer/vk_layer_settings.hpp>
 
 // Include new / delete overrides if using mimalloc. This needs to be include exactly once in a file that is
@@ -55,8 +56,7 @@ const char *SETTING_DUPLICATE_MESSAGE_LIMIT = "duplicate_message_limit";
 const char *SETTING_FINE_GRAINED_LOCKING = "fine_grained_locking";
 
 const char *SETTING_GPUAV_VALIDATE_DESCRIPTORS = "gpuav_descriptor_checks";
-const char *SETTING_GPUAV_VALIDATE_DRAW_INDIRECT = "validate_draw_indirect";
-const char *SETTING_GPUAV_VALIDATE_DISPATCH_INDIRECT = "validate_dispatch_indirect";
+const char *SETTING_GPUAV_VALIDATE_INDIRECT_BUFFER = "validate_indirect_buffer";
 const char *SETTING_GPUAV_VMA_LINEAR_OUTPUT = "vma_linear_output";
 const char *SETTING_GPUAV_WARN_ON_ROBUST_OOB = "warn_on_robust_oob";
 const char *SETTING_GPUAV_USE_INSTRUMENTED_SHADER_CACHE = "use_instrumented_shader_cache";
@@ -158,7 +158,7 @@ void SetValidationFeatureEnable(CHECK_ENABLED &enable_data, const VkValidationFe
             enable_data[best_practices] = true;
             break;
         case VK_VALIDATION_FEATURE_ENABLE_DEBUG_PRINTF_EXT:
-            enable_data[debug_printf] = true;
+            enable_data[debug_printf_validation] = true;
             break;
         case VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT:
             enable_data[sync_validation] = true;
@@ -289,7 +289,7 @@ void CreateFilterMessageIdList(std::string raw_id_list, const std::string &delim
         token = GetNextToken(&raw_id_list, delimiter, &pos);
         uint32_t int_id = TokenToUint(token);
         if (int_id == 0) {
-            const uint32_t id_hash = vvl_vuid_hash(token);
+            const uint32_t id_hash = hash_util::VuidHash(token);
             if (id_hash != 0) {
                 int_id = id_hash;
             }
@@ -398,14 +398,9 @@ void ProcessConfigAndEnvSettings(ConfigAndEnvSettings *settings_data) {
                                 settings_data->gpuav_settings->validate_descriptors);
     }
 
-    if (vkuHasLayerSetting(layer_setting_set, SETTING_GPUAV_VALIDATE_DRAW_INDIRECT)) {
-        vkuGetLayerSettingValue(layer_setting_set, SETTING_GPUAV_VALIDATE_DRAW_INDIRECT,
-                                settings_data->gpuav_settings->validate_draw_indirect);
-    }
-
-    if (vkuHasLayerSetting(layer_setting_set, SETTING_GPUAV_VALIDATE_DISPATCH_INDIRECT)) {
-        vkuGetLayerSettingValue(layer_setting_set, SETTING_GPUAV_VALIDATE_DISPATCH_INDIRECT,
-                                settings_data->gpuav_settings->validate_dispatch_indirect);
+    if (vkuHasLayerSetting(layer_setting_set, SETTING_GPUAV_VALIDATE_INDIRECT_BUFFER)) {
+        vkuGetLayerSettingValue(layer_setting_set, SETTING_GPUAV_VALIDATE_INDIRECT_BUFFER,
+                                settings_data->gpuav_settings->validate_indirect_buffer);
     }
 
     if (vkuHasLayerSetting(layer_setting_set, SETTING_GPUAV_VMA_LINEAR_OUTPUT)) {
@@ -461,7 +456,7 @@ void ProcessConfigAndEnvSettings(ConfigAndEnvSettings *settings_data) {
             std::string setting_value;
             vkuGetLayerSettingValue(layer_setting_set, SETTING_VALIDATE_GPU_BASED, setting_value);
             settings_data->enables[gpu_validation] = setting_value == "GPU_BASED_GPU_ASSISTED";
-            settings_data->enables[debug_printf] = setting_value == "GPU_BASED_DEBUG_PRINTF";
+            settings_data->enables[debug_printf_validation] = setting_value == "GPU_BASED_DEBUG_PRINTF";
         }
 
         SetValidationSetting(layer_setting_set, settings_data->enables, gpu_validation_reserve_binding_slot,

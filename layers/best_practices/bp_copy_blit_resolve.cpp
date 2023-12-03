@@ -22,8 +22,9 @@
 
 void BestPractices::PreCallRecordCmdClearAttachments(VkCommandBuffer commandBuffer, uint32_t attachmentCount,
                                                      const VkClearAttachment* pClearAttachments, uint32_t rectCount,
-                                                     const VkClearRect* pRects) {
-    ValidationStateTracker::PreCallRecordCmdClearAttachments(commandBuffer, attachmentCount, pClearAttachments, rectCount, pRects);
+                                                     const VkClearRect* pRects, const RecordObject& record_obj) {
+    ValidationStateTracker::PreCallRecordCmdClearAttachments(commandBuffer, attachmentCount, pClearAttachments, rectCount, pRects,
+                                                             record_obj);
 
     auto cmd_state = GetWrite<bp_state::CommandBuffer>(commandBuffer);
     auto* rp_state = cmd_state->activeRenderPass.get();
@@ -123,7 +124,7 @@ bool BestPractices::ClearAttachmentsIsFullClear(const bp_state::CommandBuffer& c
 
 bool BestPractices::ValidateClearAttachment(const bp_state::CommandBuffer& cmd, uint32_t fb_attachment, uint32_t color_attachment,
                                             VkImageAspectFlags aspects, const Location& loc) const {
-    const RENDER_PASS_STATE* rp = cmd.activeRenderPass.get();
+    const vvl::RenderPass* rp = cmd.activeRenderPass.get();
     bool skip = false;
 
     if (!rp || fb_attachment == VK_ATTACHMENT_UNUSED) {
@@ -206,7 +207,7 @@ bool BestPractices::PreCallValidateCmdClearAttachments(VkCommandBuffer commandBu
 
     // Check for uses of ClearAttachments along with LOAD_OP_LOAD,
     // as it can be more efficient to just use LOAD_OP_CLEAR
-    const RENDER_PASS_STATE* rp = cb_node->activeRenderPass.get();
+    const vvl::RenderPass* rp = cb_node->activeRenderPass.get();
     if (rp) {
         if (rp->use_dynamic_rendering || rp->use_dynamic_rendering_inherited) {
             const auto pColorAttachments = rp->dynamic_rendering_begin_rendering_info.pColorAttachments;
@@ -364,26 +365,27 @@ bool BestPractices::PreCallValidateCmdResolveImage2(VkCommandBuffer commandBuffe
 
 void BestPractices::PreCallRecordCmdResolveImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout,
                                                  VkImage dstImage, VkImageLayout dstImageLayout, uint32_t regionCount,
-                                                 const VkImageResolve* pRegions) {
+                                                 const VkImageResolve* pRegions, const RecordObject& record_obj) {
     auto cb = GetWrite<bp_state::CommandBuffer>(commandBuffer);
     auto& funcs = cb->queue_submit_functions;
     auto src = Get<bp_state::Image>(srcImage);
     auto dst = Get<bp_state::Image>(dstImage);
 
     for (uint32_t i = 0; i < regionCount; i++) {
-        QueueValidateImage(funcs, Func::vkCmdResolveImage, src, IMAGE_SUBRESOURCE_USAGE_BP::RESOLVE_READ,
+        QueueValidateImage(funcs, record_obj.location.function, src, IMAGE_SUBRESOURCE_USAGE_BP::RESOLVE_READ,
                            pRegions[i].srcSubresource);
-        QueueValidateImage(funcs, Func::vkCmdResolveImage, dst, IMAGE_SUBRESOURCE_USAGE_BP::RESOLVE_WRITE,
+        QueueValidateImage(funcs, record_obj.location.function, dst, IMAGE_SUBRESOURCE_USAGE_BP::RESOLVE_WRITE,
                            pRegions[i].dstSubresource);
     }
 }
 
-void BestPractices::PreCallRecordCmdResolveImage2KHR(VkCommandBuffer commandBuffer,
-                                                     const VkResolveImageInfo2KHR* pResolveImageInfo) {
-    PreCallRecordCmdResolveImage2(commandBuffer, pResolveImageInfo);
+void BestPractices::PreCallRecordCmdResolveImage2KHR(VkCommandBuffer commandBuffer, const VkResolveImageInfo2KHR* pResolveImageInfo,
+                                                     const RecordObject& record_obj) {
+    PreCallRecordCmdResolveImage2(commandBuffer, pResolveImageInfo, record_obj);
 }
 
-void BestPractices::PreCallRecordCmdResolveImage2(VkCommandBuffer commandBuffer, const VkResolveImageInfo2* pResolveImageInfo) {
+void BestPractices::PreCallRecordCmdResolveImage2(VkCommandBuffer commandBuffer, const VkResolveImageInfo2* pResolveImageInfo,
+                                                  const RecordObject& record_obj) {
     auto cb = GetWrite<bp_state::CommandBuffer>(commandBuffer);
     auto& funcs = cb->queue_submit_functions;
     auto src = Get<bp_state::Image>(pResolveImageInfo->srcImage);
@@ -391,22 +393,22 @@ void BestPractices::PreCallRecordCmdResolveImage2(VkCommandBuffer commandBuffer,
     uint32_t regionCount = pResolveImageInfo->regionCount;
 
     for (uint32_t i = 0; i < regionCount; i++) {
-        QueueValidateImage(funcs, Func::vkCmdResolveImage2, src, IMAGE_SUBRESOURCE_USAGE_BP::RESOLVE_READ,
+        QueueValidateImage(funcs, record_obj.location.function, src, IMAGE_SUBRESOURCE_USAGE_BP::RESOLVE_READ,
                            pResolveImageInfo->pRegions[i].srcSubresource);
-        QueueValidateImage(funcs, Func::vkCmdResolveImage2, dst, IMAGE_SUBRESOURCE_USAGE_BP::RESOLVE_WRITE,
+        QueueValidateImage(funcs, record_obj.location.function, dst, IMAGE_SUBRESOURCE_USAGE_BP::RESOLVE_WRITE,
                            pResolveImageInfo->pRegions[i].dstSubresource);
     }
 }
 
 void BestPractices::PreCallRecordCmdClearColorImage(VkCommandBuffer commandBuffer, VkImage image, VkImageLayout imageLayout,
                                                     const VkClearColorValue* pColor, uint32_t rangeCount,
-                                                    const VkImageSubresourceRange* pRanges) {
+                                                    const VkImageSubresourceRange* pRanges, const RecordObject& record_obj) {
     auto cb = GetWrite<bp_state::CommandBuffer>(commandBuffer);
     auto& funcs = cb->queue_submit_functions;
     auto dst = Get<bp_state::Image>(image);
 
     for (uint32_t i = 0; i < rangeCount; i++) {
-        QueueValidateImage(funcs, Func::vkCmdClearColorImage, dst, IMAGE_SUBRESOURCE_USAGE_BP::CLEARED, pRanges[i]);
+        QueueValidateImage(funcs, record_obj.location.function, dst, IMAGE_SUBRESOURCE_USAGE_BP::CLEARED, pRanges[i]);
     }
 
     if (VendorCheckEnabled(kBPVendorNVIDIA)) {
@@ -416,16 +418,16 @@ void BestPractices::PreCallRecordCmdClearColorImage(VkCommandBuffer commandBuffe
 
 void BestPractices::PreCallRecordCmdClearDepthStencilImage(VkCommandBuffer commandBuffer, VkImage image, VkImageLayout imageLayout,
                                                            const VkClearDepthStencilValue* pDepthStencil, uint32_t rangeCount,
-                                                           const VkImageSubresourceRange* pRanges) {
+                                                           const VkImageSubresourceRange* pRanges, const RecordObject& record_obj) {
     ValidationStateTracker::PreCallRecordCmdClearDepthStencilImage(commandBuffer, image, imageLayout, pDepthStencil, rangeCount,
-                                                                   pRanges);
+                                                                   pRanges, record_obj);
 
     auto cb = GetWrite<bp_state::CommandBuffer>(commandBuffer);
     auto& funcs = cb->queue_submit_functions;
     auto dst = Get<bp_state::Image>(image);
 
     for (uint32_t i = 0; i < rangeCount; i++) {
-        QueueValidateImage(funcs, Func::vkCmdClearDepthStencilImage, dst, IMAGE_SUBRESOURCE_USAGE_BP::CLEARED, pRanges[i]);
+        QueueValidateImage(funcs, record_obj.location.function, dst, IMAGE_SUBRESOURCE_USAGE_BP::CLEARED, pRanges[i]);
     }
     if (VendorCheckEnabled(kBPVendorNVIDIA)) {
         for (uint32_t i = 0; i < rangeCount; i++) {
@@ -436,9 +438,9 @@ void BestPractices::PreCallRecordCmdClearDepthStencilImage(VkCommandBuffer comma
 
 void BestPractices::PreCallRecordCmdCopyImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout,
                                               VkImage dstImage, VkImageLayout dstImageLayout, uint32_t regionCount,
-                                              const VkImageCopy* pRegions) {
+                                              const VkImageCopy* pRegions, const RecordObject& record_obj) {
     ValidationStateTracker::PreCallRecordCmdCopyImage(commandBuffer, srcImage, srcImageLayout, dstImage, dstImageLayout,
-                                                      regionCount, pRegions);
+                                                      regionCount, pRegions, record_obj);
 
     auto cb = GetWrite<bp_state::CommandBuffer>(commandBuffer);
     auto& funcs = cb->queue_submit_functions;
@@ -446,47 +448,52 @@ void BestPractices::PreCallRecordCmdCopyImage(VkCommandBuffer commandBuffer, VkI
     auto dst = Get<bp_state::Image>(dstImage);
 
     for (uint32_t i = 0; i < regionCount; i++) {
-        QueueValidateImage(funcs, Func::vkCmdCopyImage, src, IMAGE_SUBRESOURCE_USAGE_BP::COPY_READ, pRegions[i].srcSubresource);
-        QueueValidateImage(funcs, Func::vkCmdCopyImage, dst, IMAGE_SUBRESOURCE_USAGE_BP::COPY_WRITE, pRegions[i].dstSubresource);
+        QueueValidateImage(funcs, record_obj.location.function, src, IMAGE_SUBRESOURCE_USAGE_BP::COPY_READ,
+                           pRegions[i].srcSubresource);
+        QueueValidateImage(funcs, record_obj.location.function, dst, IMAGE_SUBRESOURCE_USAGE_BP::COPY_WRITE,
+                           pRegions[i].dstSubresource);
     }
 }
 
 void BestPractices::PreCallRecordCmdCopyBufferToImage(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, VkImage dstImage,
                                                       VkImageLayout dstImageLayout, uint32_t regionCount,
-                                                      const VkBufferImageCopy* pRegions) {
+                                                      const VkBufferImageCopy* pRegions, const RecordObject& record_obj) {
     auto cb = GetWrite<bp_state::CommandBuffer>(commandBuffer);
     auto& funcs = cb->queue_submit_functions;
     auto dst = Get<bp_state::Image>(dstImage);
 
     for (uint32_t i = 0; i < regionCount; i++) {
-        QueueValidateImage(funcs, Func::vkCmdCopyBufferToImage, dst, IMAGE_SUBRESOURCE_USAGE_BP::COPY_WRITE,
+        QueueValidateImage(funcs, record_obj.location.function, dst, IMAGE_SUBRESOURCE_USAGE_BP::COPY_WRITE,
                            pRegions[i].imageSubresource);
     }
 }
 
 void BestPractices::PreCallRecordCmdCopyImageToBuffer(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout,
-                                                      VkBuffer dstBuffer, uint32_t regionCount, const VkBufferImageCopy* pRegions) {
+                                                      VkBuffer dstBuffer, uint32_t regionCount, const VkBufferImageCopy* pRegions,
+                                                      const RecordObject& record_obj) {
     auto cb = GetWrite<bp_state::CommandBuffer>(commandBuffer);
     auto& funcs = cb->queue_submit_functions;
     auto src = Get<bp_state::Image>(srcImage);
 
     for (uint32_t i = 0; i < regionCount; i++) {
-        QueueValidateImage(funcs, Func::vkCmdCopyImageToBuffer, src, IMAGE_SUBRESOURCE_USAGE_BP::COPY_READ,
+        QueueValidateImage(funcs, record_obj.location.function, src, IMAGE_SUBRESOURCE_USAGE_BP::COPY_READ,
                            pRegions[i].imageSubresource);
     }
 }
 
 void BestPractices::PreCallRecordCmdBlitImage(VkCommandBuffer commandBuffer, VkImage srcImage, VkImageLayout srcImageLayout,
                                               VkImage dstImage, VkImageLayout dstImageLayout, uint32_t regionCount,
-                                              const VkImageBlit* pRegions, VkFilter filter) {
+                                              const VkImageBlit* pRegions, VkFilter filter, const RecordObject& record_obj) {
     auto cb = GetWrite<bp_state::CommandBuffer>(commandBuffer);
     auto& funcs = cb->queue_submit_functions;
     auto src = Get<bp_state::Image>(srcImage);
     auto dst = Get<bp_state::Image>(dstImage);
 
     for (uint32_t i = 0; i < regionCount; i++) {
-        QueueValidateImage(funcs, Func::vkCmdBlitImage, src, IMAGE_SUBRESOURCE_USAGE_BP::BLIT_READ, pRegions[i].srcSubresource);
-        QueueValidateImage(funcs, Func::vkCmdBlitImage, dst, IMAGE_SUBRESOURCE_USAGE_BP::BLIT_WRITE, pRegions[i].dstSubresource);
+        QueueValidateImage(funcs, record_obj.location.function, src, IMAGE_SUBRESOURCE_USAGE_BP::BLIT_READ,
+                           pRegions[i].srcSubresource);
+        QueueValidateImage(funcs, record_obj.location.function, dst, IMAGE_SUBRESOURCE_USAGE_BP::BLIT_WRITE,
+                           pRegions[i].dstSubresource);
     }
 }
 

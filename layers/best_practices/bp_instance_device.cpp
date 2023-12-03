@@ -154,8 +154,7 @@ bool BestPractices::PreCallValidateCreateDevice(VkPhysicalDevice physicalDevice,
         std::string inst_api_name = StringAPIVersion(api_version);
         std::string dev_api_name = StringAPIVersion(device_api_version);
 
-        Location loc(Func::vkCreateDevice);
-        LogInfo(kVUID_BestPractices_CreateDevice_API_Mismatch, device, loc,
+        LogInfo(kVUID_BestPractices_CreateDevice_API_Mismatch, device, error_obj.location,
                 "API Version of current instance, %s is higher than API Version on device, %s", inst_api_name.c_str(),
                 dev_api_name.c_str());
     }
@@ -222,7 +221,7 @@ bool BestPractices::PreCallValidateCreateDevice(VkPhysicalDevice physicalDevice,
 }
 
 // Common function to handle validation for GetPhysicalDeviceQueueFamilyProperties & 2KHR version
-bool BestPractices::ValidateCommonGetPhysicalDeviceQueueFamilyProperties(const PHYSICAL_DEVICE_STATE* bp_pd_state,
+bool BestPractices::ValidateCommonGetPhysicalDeviceQueueFamilyProperties(const vvl::PhysicalDevice* bp_pd_state,
                                                                          uint32_t requested_queue_family_property_count,
                                                                          const CALL_STATE call_state, const Location& loc) const {
     bool skip = false;
@@ -351,10 +350,11 @@ void BestPractices::PostCallRecordGetPhysicalDeviceFeatures2KHR(VkPhysicalDevice
     PostCallRecordGetPhysicalDeviceFeatures2(physicalDevice, pFeatures, record_obj);
 }
 
-void BestPractices::PreCallRecordQueueSubmit(VkQueue queue, uint32_t submitCount, const VkSubmitInfo* pSubmits, VkFence fence) {
-    ValidationStateTracker::PreCallRecordQueueSubmit(queue, submitCount, pSubmits, fence);
+void BestPractices::PreCallRecordQueueSubmit(VkQueue queue, uint32_t submitCount, const VkSubmitInfo* pSubmits, VkFence fence,
+                                             const RecordObject& record_obj) {
+    ValidationStateTracker::PreCallRecordQueueSubmit(queue, submitCount, pSubmits, fence, record_obj);
 
-    auto queue_state = Get<QUEUE_STATE>(queue);
+    auto queue_state = Get<vvl::Queue>(queue);
     for (uint32_t submit = 0; submit < submitCount; submit++) {
         const auto& submit_info = pSubmits[submit];
         for (uint32_t cb_index = 0; cb_index < submit_info.commandBufferCount; cb_index++) {
@@ -491,7 +491,7 @@ bool BestPractices::PreCallValidateQueueBindSparse(VkQueue queue, uint32_t bindI
     }
 
     if (VendorCheckEnabled(kBPVendorNVIDIA)) {
-        auto queue_state = Get<QUEUE_STATE>(queue);
+        auto queue_state = Get<vvl::Queue>(queue);
         if (queue_state && queue_state->queueFamilyProperties.queueFlags != (VK_QUEUE_TRANSFER_BIT | VK_QUEUE_SPARSE_BINDING_BIT)) {
             skip |= LogPerformanceWarning(kVUID_BestPractices_QueueBindSparse_NotAsync, queue, error_obj.location,
                                           "vkQueueBindSparse() issued on queue %s. All binds should happen on an asynchronous copy "

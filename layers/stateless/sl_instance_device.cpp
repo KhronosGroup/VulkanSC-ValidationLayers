@@ -139,6 +139,23 @@ bool StatelessValidation::manual_PreCallValidateCreateInstance(const VkInstanceC
         }
     }
 
+    const auto *debug_report_callback = vku::FindStructInPNextChain<VkDebugReportCallbackCreateInfoEXT>(pCreateInfo->pNext);
+    if (debug_report_callback && !local_instance_extensions.vk_ext_debug_report) {
+        skip |= LogError("VUID-VkInstanceCreateInfo-pNext-04925", instance, create_info_loc.dot(Field::ppEnabledExtensionNames),
+                         "does not include VK_EXT_debug_report, but the pNext chain includes VkDebugReportCallbackCreateInfoEXT.");
+    }
+    const auto *debug_utils_messenger = vku::FindStructInPNextChain<VkDebugUtilsMessengerCreateInfoEXT>(pCreateInfo->pNext);
+    if (debug_utils_messenger && !local_instance_extensions.vk_ext_debug_utils) {
+        skip |= LogError("VUID-VkInstanceCreateInfo-pNext-04926", instance, create_info_loc.dot(Field::ppEnabledExtensionNames),
+                         "does not include VK_EXT_debug_utils, but the pNext chain includes VkDebugUtilsMessengerCreateInfoEXT.");
+    }
+    const auto *direct_driver_loading_list = vku::FindStructInPNextChain<VkDirectDriverLoadingListLUNARG>(pCreateInfo->pNext);
+    if (direct_driver_loading_list && !local_instance_extensions.vk_lunarg_direct_driver_loading) {
+        skip |= LogError(
+            "VUID-VkInstanceCreateInfo-pNext-09400", instance, create_info_loc.dot(Field::ppEnabledExtensionNames),
+            "does not include VK_LUNARG_direct_driver_loading, but the pNext chain includes VkDirectDriverLoadingListLUNARG.");
+    }
+
 #ifdef VK_USE_PLATFORM_METAL_EXT
     auto export_metal_object_info = vku::FindStructInPNextChain<VkExportMetalObjectCreateInfoEXT>(pCreateInfo->pNext);
     while (export_metal_object_info) {
@@ -227,7 +244,8 @@ void StatelessValidation::PostCallRecordEnumeratePhysicalDeviceGroups(
     }
 }
 
-void StatelessValidation::PreCallRecordDestroyInstance(VkInstance instance, const VkAllocationCallbacks *pAllocator) {
+void StatelessValidation::PreCallRecordDestroyInstance(VkInstance instance, const VkAllocationCallbacks *pAllocator,
+                                                       const RecordObject &record_obj) {
     for (auto it = physical_device_properties_map.begin(); it != physical_device_properties_map.end();) {
         delete (it->second);
         it = physical_device_properties_map.erase(it);
@@ -350,6 +368,13 @@ void StatelessValidation::PostCallRecordCreateDevice(VkPhysicalDevice physicalDe
         VkPhysicalDeviceProperties2 prop2 = vku::InitStructHelper(&depth_stencil_resolve_props);
         GetPhysicalDeviceProperties2(physicalDevice, prop2);
         phys_dev_ext_props.depth_stencil_resolve_props = depth_stencil_resolve_props;
+    }
+
+    if (IsExtEnabled(device_extensions.vk_ext_external_memory_host)) {
+        VkPhysicalDeviceExternalMemoryHostPropertiesEXT external_memory_host_props = vku::InitStructHelper();
+        VkPhysicalDeviceProperties2 prop2 = vku::InitStructHelper(&external_memory_host_props);
+        GetPhysicalDeviceProperties2(physicalDevice, prop2);
+        phys_dev_ext_props.external_memory_host_props = external_memory_host_props;
     }
 
     stateless_validation->phys_dev_ext_props = this->phys_dev_ext_props;
@@ -695,6 +720,21 @@ bool StatelessValidation::manual_PreCallValidateCreateDevice(VkPhysicalDevice ph
         skip |= LogError("VUID-VkPhysicalDeviceMultiviewFeatures-multiviewTessellationShader-00581", physicalDevice,
                          error_obj.location, "If multiviewTessellationShader is VK_TRUE then multiview also needs to be VK_TRUE");
     }
+    const auto *fsr_features = vku::FindStructInPNextChain<VkPhysicalDeviceFragmentShadingRateFeaturesKHR>(pCreateInfo->pNext);
+    const auto *mesh_shader_features = vku::FindStructInPNextChain<VkPhysicalDeviceMeshShaderFeaturesEXT>(pCreateInfo->pNext);
+    if (mesh_shader_features) {
+        if ((multiview == VK_FALSE) && (mesh_shader_features->multiviewMeshShader)) {
+            skip |= LogError("VUID-VkPhysicalDeviceMeshShaderFeaturesEXT-multiviewMeshShader-07032", physicalDevice,
+                             error_obj.location, "If multiviewMeshShader is VK_TRUE then multiview also needs to be VK_TRUE");
+        }
+        if ((!fsr_features || !fsr_features->primitiveFragmentShadingRate) &&
+            (mesh_shader_features->primitiveFragmentShadingRateMeshShader)) {
+            skip |= LogError(
+                "VUID-VkPhysicalDeviceMeshShaderFeaturesEXT-primitiveFragmentShadingRateMeshShader-07033", physicalDevice,
+                error_obj.location,
+                "If primitiveFragmentShadingRateMeshShader is VK_TRUE then primitiveFragmentShadingRate also needs to be VK_TRUE");
+        }
+    }
 
     return skip;
 }
@@ -788,13 +828,6 @@ bool StatelessValidation::manual_PreCallValidateGetPhysicalDeviceImageFormatProp
     return skip;
 }
 
-bool StatelessValidation::manual_PreCallValidateGetPhysicalDeviceImageFormatProperties2KHR(
-    VkPhysicalDevice physicalDevice, const VkPhysicalDeviceImageFormatInfo2 *pImageFormatInfo,
-    VkImageFormatProperties2 *pImageFormatProperties, const ErrorObject &error_obj) const {
-    return manual_PreCallValidateGetPhysicalDeviceImageFormatProperties2(physicalDevice, pImageFormatInfo, pImageFormatProperties,
-                                                                         error_obj);
-}
-
 bool StatelessValidation::manual_PreCallValidateGetPhysicalDeviceImageFormatProperties(
     VkPhysicalDevice physicalDevice, VkFormat format, VkImageType type, VkImageTiling tiling, VkImageUsageFlags usage,
     VkImageCreateFlags flags, VkImageFormatProperties *pImageFormatProperties, const ErrorObject &error_obj) const {
@@ -806,15 +839,6 @@ bool StatelessValidation::manual_PreCallValidateGetPhysicalDeviceImageFormatProp
     }
 
     return skip;
-}
-
-// TODO - This is being called from anywhere
-bool StatelessValidation::manual_PreCallValidateEnumerateDeviceExtensionProperties(VkPhysicalDevice physicalDevice,
-                                                                                   const char *pLayerName, uint32_t *pPropertyCount,
-                                                                                   VkExtensionProperties *pProperties) const {
-    const Location loc(Func::vkEnumerateDeviceExtensionProperties);
-    return ValidateArray(loc.dot(Field::pPropertyCount), loc.dot(Field::pProperties), pPropertyCount, &pProperties, true, false,
-                         false, kVUIDUndefined, "VUID-vkEnumerateDeviceExtensionProperties-pProperties-parameter");
 }
 
 bool StatelessValidation::manual_PreCallValidateSetDebugUtilsObjectNameEXT(VkDevice device,

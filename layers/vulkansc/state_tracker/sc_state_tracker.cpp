@@ -78,7 +78,7 @@ void SCValidationStateTracker<BASE>::CreateDevice(const VkDeviceCreateInfo *pCre
         for (uint32_t i = 0; i < object_reservation_info->pipelineCacheCreateInfoCount; ++i) {
             const auto &create_info = object_reservation_info->pPipelineCacheCreateInfos[i];
             sc_pipeline_cache_map_.emplace(
-                std::make_pair(create_info.pInitialData, std::make_unique<SCPipelineCacheData>(create_info)));
+                std::make_pair(create_info.pInitialData, std::make_unique<vvl::sc::PipelineCacheData>(create_info)));
         }
 
         for (uint32_t i = 0; i < object_reservation_info->pipelinePoolSizeCount; ++i) {
@@ -179,17 +179,17 @@ void SCValidationStateTracker<BASE>::PostCallRecordCreateCommandPool(VkDevice de
 }
 
 template <typename BASE>
-std::shared_ptr<PIPELINE_CACHE_STATE> SCValidationStateTracker<BASE>::CreatePipelineCacheState(
+std::shared_ptr<vvl::PipelineCache> SCValidationStateTracker<BASE>::CreatePipelineCacheState(
     VkPipelineCache pipeline_cache, const VkPipelineCacheCreateInfo *pCreateInfo) const {
     auto it = sc_pipeline_cache_map_.find(pCreateInfo->pInitialData);
     auto data = (it != sc_pipeline_cache_map_.end()) ? it->second.get() : nullptr;
-    return std::static_pointer_cast<PIPELINE_CACHE_STATE>(
-        std::make_shared<SC_PIPELINE_CACHE_STATE>(pipeline_cache, pCreateInfo, data));
+    return std::static_pointer_cast<vvl::PipelineCache>(
+        std::make_shared<vvl::sc::PipelineCache>(pipeline_cache, pCreateInfo, data));
 }
 
 template <typename BASE>
 std::shared_ptr<PIPELINE_STATE> SCValidationStateTracker<BASE>::CreateGraphicsPipelineState(
-    const VkGraphicsPipelineCreateInfo *pCreateInfo, std::shared_ptr<const RENDER_PASS_STATE> &&render_pass,
+    const VkGraphicsPipelineCreateInfo *pCreateInfo, std::shared_ptr<const vvl::RenderPass> &&render_pass,
     std::shared_ptr<const PIPELINE_LAYOUT_STATE> &&layout, CreateShaderModuleStates *csm_states) const {
     return std::static_pointer_cast<PIPELINE_STATE>(
         std::make_shared<SC_PIPELINE_STATE>(this, pCreateInfo, std::move(render_pass), std::move(layout), csm_states));
@@ -241,7 +241,8 @@ void SCValidationStateTracker<BASE>::PostCallRecordCreateComputePipelines(
 
 template <typename BASE>
 void SCValidationStateTracker<BASE>::PreCallRecordDestroyPipeline(VkDevice device, VkPipeline pipeline,
-                                                                  const VkAllocationCallbacks *pAllocator) {
+                                                                  const VkAllocationCallbacks *pAllocator,
+                                                                  const RecordObject &record_obj) {
     auto pipeline_state = Get<SC_PIPELINE_STATE>(pipeline);
     if (pipeline_state) {
         switch (pipeline_state->pipeline_type) {
@@ -262,7 +263,7 @@ void SCValidationStateTracker<BASE>::PreCallRecordDestroyPipeline(VkDevice devic
         RecyclePipelinePoolEntry(pipeline_state->offline_info);
     }
 
-    BASE::PreCallRecordDestroyPipeline(device, pipeline, pAllocator);
+    BASE::PreCallRecordDestroyPipeline(device, pipeline, pAllocator, record_obj);
 }
 
 template <typename BASE>
@@ -279,7 +280,8 @@ void SCValidationStateTracker<BASE>::PostCallRecordCreateImageView(VkDevice devi
 
 template <typename BASE>
 void SCValidationStateTracker<BASE>::PreCallRecordDestroyImageView(VkDevice device, VkImageView imageView,
-                                                                   const VkAllocationCallbacks *pAllocator) {
+                                                                   const VkAllocationCallbacks *pAllocator,
+                                                                   const RecordObject &record_obj) {
     auto image_view_state = Get<IMAGE_VIEW_STATE>(imageView);
     if (image_view_state) {
         if (image_view_state->create_info.subresourceRange.layerCount > 1) {
@@ -287,7 +289,7 @@ void SCValidationStateTracker<BASE>::PreCallRecordDestroyImageView(VkDevice devi
         }
     }
 
-    BASE::PreCallRecordDestroyImageView(device, imageView, pAllocator);
+    BASE::PreCallRecordDestroyImageView(device, imageView, pAllocator, record_obj);
 }
 
 template <typename BASE>
@@ -305,13 +307,14 @@ void SCValidationStateTracker<BASE>::PostCallRecordCreateDescriptorSetLayout(VkD
 template <typename BASE>
 void SCValidationStateTracker<BASE>::PreCallRecordDestroyDescriptorSetLayout(VkDevice device,
                                                                              VkDescriptorSetLayout descriptorSetLayout,
-                                                                             const VkAllocationCallbacks *pAllocator) {
-    auto set_layout_state = Get<cvdescriptorset::DescriptorSetLayout>(descriptorSetLayout);
+                                                                             const VkAllocationCallbacks *pAllocator,
+                                                                             const RecordObject &record_obj) {
+    auto set_layout_state = Get<vvl::DescriptorSetLayout>(descriptorSetLayout);
     if (set_layout_state) {
         sc_reserved_objects_.descriptor_set_layout_bindings.fetch_sub(set_layout_state->GetBindingCount());
     }
 
-    BASE::PreCallRecordDestroyDescriptorSetLayout(device, descriptorSetLayout, pAllocator);
+    BASE::PreCallRecordDestroyDescriptorSetLayout(device, descriptorSetLayout, pAllocator, record_obj);
 }
 
 template <typename BASE>
@@ -338,14 +341,15 @@ void SCValidationStateTracker<BASE>::PostCallRecordCreateRenderPass2(VkDevice de
 
 template <typename BASE>
 void SCValidationStateTracker<BASE>::PreCallRecordDestroyRenderPass(VkDevice device, VkRenderPass renderPass,
-                                                                    const VkAllocationCallbacks *pAllocator) {
-    auto rp_state = Get<RENDER_PASS_STATE>(renderPass);
+                                                                    const VkAllocationCallbacks *pAllocator,
+                                                                    const RecordObject &record_obj) {
+    auto rp_state = Get<vvl::RenderPass>(renderPass);
     if (rp_state) {
         sc_reserved_objects_.subpass_descriptions.fetch_sub(rp_state->createInfo.subpassCount);
         sc_reserved_objects_.attachment_descriptions.fetch_sub(rp_state->createInfo.attachmentCount);
     }
 
-    BASE::PreCallRecordDestroyRenderPass(device, renderPass, pAllocator);
+    BASE::PreCallRecordDestroyRenderPass(device, renderPass, pAllocator, record_obj);
 }
 
 template <typename BASE>
@@ -362,12 +366,13 @@ void SCValidationStateTracker<BASE>::PostCallRecordCreatePrivateDataSlotEXT(VkDe
 
 template <typename BASE>
 void SCValidationStateTracker<BASE>::PreCallRecordDestroyPrivateDataSlotEXT(VkDevice device, VkPrivateDataSlot privateDataSlot,
-                                                                            const VkAllocationCallbacks *pAllocator) {
+                                                                            const VkAllocationCallbacks *pAllocator,
+                                                                            const RecordObject &record_obj) {
     if (privateDataSlot != VK_NULL_HANDLE) {
         sc_reserved_objects_.private_data_slots--;
     }
 
-    BASE::PreCallRecordDestroyPrivateDataSlotEXT(device, privateDataSlot, pAllocator);
+    BASE::PreCallRecordDestroyPrivateDataSlotEXT(device, privateDataSlot, pAllocator, record_obj);
 }
 
 template <typename BASE>
@@ -385,12 +390,12 @@ void SCValidationStateTracker<BASE>::PostCallRecordBeginCommandBuffer(VkCommandB
 }
 
 template <typename BASE>
-void SCValidationStateTracker<BASE>::PreCallRecordEndCommandBuffer(VkCommandBuffer commandBuffer) {
+void SCValidationStateTracker<BASE>::PreCallRecordEndCommandBuffer(VkCommandBuffer commandBuffer, const RecordObject &record_obj) {
     auto cb_state = Get<CMD_BUFFER_STATE>(commandBuffer);
     if (cb_state) {
         auto cp_state = Get<SC_COMMAND_POOL_STATE>(cb_state->command_pool->commandPool());
         cp_state->command_buffers_recording--;
     }
 
-    BASE::PreCallRecordEndCommandBuffer(commandBuffer);
+    BASE::PreCallRecordEndCommandBuffer(commandBuffer, record_obj);
 }

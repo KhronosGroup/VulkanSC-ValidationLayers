@@ -17,14 +17,33 @@
 
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
+#include "../framework/descriptor_helper.h"
+#include "../framework/gpu_av_helper.h"
 #include "../../layers/gpu_shaders/gpu_shaders_constants.h"
 
-class PositiveGpuAssistedLayer : public VkGpuAssistedLayerTest {};
+static const std::array gpu_av_enables = {VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT,
+                                          VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_RESERVE_BINDING_SLOT_EXT};
+static const std::array gpu_av_disables = {VK_VALIDATION_FEATURE_DISABLE_THREAD_SAFETY_EXT,
+                                           VK_VALIDATION_FEATURE_DISABLE_CORE_CHECKS_EXT};
+
+// All VkGpuAssistedLayerTest should use this for setup as a single access point to more easily toggle which validation features are
+// enabled/disabled
+VkValidationFeaturesEXT VkGpuAssistedLayerTest::GetGpuAvValidationFeatures() {
+    AddRequiredExtensions(VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME);
+    VkValidationFeaturesEXT features = vku::InitStructHelper();
+    features.enabledValidationFeatureCount = size32(gpu_av_enables);
+    features.pEnabledValidationFeatures = gpu_av_enables.data();
+    if (!m_gpuav_enable_core) {
+        features.disabledValidationFeatureCount = size32(gpu_av_disables);
+        features.pDisabledValidationFeatures = gpu_av_disables.data();
+    }
+    return features;
+}
 
 TEST_F(PositiveGpuAssistedLayer, SetSSBOBindDescriptor) {
     TEST_DESCRIPTION("Makes sure we can use vkCmdBindDescriptorSets()");
-    RETURN_IF_SKIP(InitGpuAvFramework())
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
     VkPhysicalDeviceProperties properties = {};
@@ -117,8 +136,8 @@ TEST_F(PositiveGpuAssistedLayer, SetSSBOBindDescriptor) {
 TEST_F(PositiveGpuAssistedLayer, SetSSBOPushDescriptor) {
     TEST_DESCRIPTION("Makes sure we can use vkCmdPushDescriptorSetKHR instead of vkUpdateDescriptorSets");
     AddRequiredExtensions(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitGpuAvFramework())
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
     VkPhysicalDeviceProperties properties = {};
@@ -211,13 +230,7 @@ TEST_F(PositiveGpuAssistedLayer, GpuBufferDeviceAddress) {
     TEST_DESCRIPTION("Makes sure that writing to a buffer that was created after command buffer record doesn't get OOB error");
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitGpuAvFramework())
-    if (IsDriver(VK_DRIVER_ID_MESA_RADV)) {
-        GTEST_SKIP() << "This test should not be run on the RADV driver.";
-    }
-    if (IsDriver(VK_DRIVER_ID_AMD_PROPRIETARY)) {
-        GTEST_SKIP() << "This test should not be run on the AMD proprietary driver.";
-    }
+    RETURN_IF_SKIP(InitGpuAvFramework());
     VkPhysicalDeviceBufferDeviceAddressFeaturesKHR bda_features = vku::InitStructHelper();
     VkPhysicalDeviceFeatures2KHR features2 = GetPhysicalDeviceFeatures2(bda_features);
     if (!features2.features.shaderInt64) {
@@ -225,8 +238,7 @@ TEST_F(PositiveGpuAssistedLayer, GpuBufferDeviceAddress) {
     }
     features2.features.robustBufferAccess = VK_FALSE;
 
-    VkCommandPoolCreateFlags pool_flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    RETURN_IF_SKIP(InitState(nullptr, &features2, pool_flags));
+    RETURN_IF_SKIP(InitState(nullptr, &features2));
     InitRenderTarget();
 
     // Make a uniform buffer to be passed to the shader that contains the pointer and write count
@@ -323,7 +335,7 @@ TEST_F(PositiveGpuAssistedLayer, GpuBufferDeviceAddress) {
 TEST_F(PositiveGpuAssistedLayer, GetCounterFromSignaledSemaphoreAfterSubmit) {
     TEST_DESCRIPTION("Get counter value from the semaphore signaled by queue submit");
     SetTargetApiVersion(VK_API_VERSION_1_3);
-    RETURN_IF_SKIP(InitGpuAvFramework())
+    RETURN_IF_SKIP(InitGpuAvFramework());
 
     VkPhysicalDeviceSynchronization2Features sync2_features = vku::InitStructHelper();
     VkPhysicalDeviceTimelineSemaphoreFeatures timeline_semaphore_features = vku::InitStructHelper(&sync2_features);
@@ -352,7 +364,7 @@ TEST_F(PositiveGpuAssistedLayer, GetCounterFromSignaledSemaphoreAfterSubmit) {
 TEST_F(PositiveGpuAssistedLayer, MutableBuffer) {
     TEST_DESCRIPTION("Makes sure we can use vkCmdBindDescriptorSets()");
     AddRequiredExtensions(VK_EXT_MUTABLE_DESCRIPTOR_TYPE_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitGpuAvFramework())
+    RETURN_IF_SKIP(InitGpuAvFramework());
 
     VkPhysicalDeviceMutableDescriptorTypeFeaturesEXT mutable_descriptor_type_features = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(mutable_descriptor_type_features);
@@ -475,29 +487,29 @@ TEST_F(PositiveGpuAssistedLayer, MutableBuffer) {
 
 TEST_F(PositiveGpuAssistedLayer, MaxDescriptorsClamp) {
     TEST_DESCRIPTION("Make sure maxUpdateAfterBindDescriptorsInAllPools is clamped");
-    RETURN_IF_SKIP(InitGpuAvFramework())
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
 
     auto desc_indexing_props = vku::InitStruct<VkPhysicalDeviceDescriptorIndexingProperties>();
     auto props2 = vku::InitStruct<VkPhysicalDeviceProperties2>(&desc_indexing_props);
 
     vk::GetPhysicalDeviceProperties2(gpu(), &props2);
 
-    ASSERT_GE(gpuav_glsl::kDebugInputBindlessMaxDescriptors, desc_indexing_props.maxUpdateAfterBindDescriptorsInAllPools);
+    ASSERT_GE(gpuav::glsl::kDebugInputBindlessMaxDescriptors, desc_indexing_props.maxUpdateAfterBindDescriptorsInAllPools);
 }
 
 TEST_F(PositiveGpuAssistedLayer, MaxDescriptorsClamp13) {
     TEST_DESCRIPTION("Make sure maxUpdateAfterBindDescriptorsInAllPools is clamped");
     SetTargetApiVersion(VK_API_VERSION_1_3);
-    RETURN_IF_SKIP(InitGpuAvFramework())
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
 
     auto vk12_props = vku::InitStruct<VkPhysicalDeviceVulkan12Properties>();
     auto props2 = vku::InitStruct<VkPhysicalDeviceProperties2>(&vk12_props);
 
     vk::GetPhysicalDeviceProperties2(gpu(), &props2);
 
-    ASSERT_GE(gpuav_glsl::kDebugInputBindlessMaxDescriptors, vk12_props.maxUpdateAfterBindDescriptorsInAllPools);
+    ASSERT_GE(gpuav::glsl::kDebugInputBindlessMaxDescriptors, vk12_props.maxUpdateAfterBindDescriptorsInAllPools);
 }
 
 TEST_F(PositiveGpuAssistedLayer, GpuValidationUnInitImage) {
@@ -505,8 +517,7 @@ TEST_F(PositiveGpuAssistedLayer, GpuValidationUnInitImage) {
 
     AddRequiredExtensions(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
-    AddRequiredExtensions(VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitGpuAvFramework())
+    RETURN_IF_SKIP(InitGpuAvFramework());
 
     auto maintenance4_features = vku::InitStruct<VkPhysicalDeviceMaintenance4Features>();
     maintenance4_features.maintenance4 = true;
@@ -522,8 +533,7 @@ TEST_F(PositiveGpuAssistedLayer, GpuValidationUnInitImage) {
         GTEST_SKIP() << "Not all descriptor indexing features supported, skipping descriptor indexing tests";
     }
 
-    VkCommandPoolCreateFlags pool_flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    RETURN_IF_SKIP(InitState(nullptr, &features2, pool_flags));
+    RETURN_IF_SKIP(InitState(nullptr, &features2));
     InitRenderTarget();
 
     // Make a uniform buffer to be passed to the shader that contains the invalid array index.
@@ -546,20 +556,21 @@ TEST_F(PositiveGpuAssistedLayer, GpuValidationUnInitImage) {
     void *allocate_pnext = nullptr;
     auto pool_create_flags = 0;
     auto layout_create_flags = 0;
-    VkDescriptorBindingFlagsEXT ds_binding_flags[2] = {};
+    VkDescriptorBindingFlagsEXT ds_binding_flags[3] = {};
     VkDescriptorSetLayoutBindingFlagsCreateInfoEXT layout_createinfo_binding_flags[1] = {};
     ds_binding_flags[0] = 0;
-    ds_binding_flags[1] = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT_EXT;
+    ds_binding_flags[1] = 0;
+    ds_binding_flags[2] = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT_EXT;
 
     layout_createinfo_binding_flags[0] = vku::InitStruct<VkDescriptorSetLayoutBindingFlagsCreateInfo>();
-    layout_createinfo_binding_flags[0].bindingCount = 2;
+    layout_createinfo_binding_flags[0].bindingCount = 3;
     layout_createinfo_binding_flags[0].pBindingFlags = ds_binding_flags;
     layout_create_flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT_EXT;
     pool_create_flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT_EXT;
     layout_pnext = layout_createinfo_binding_flags;
 
-    layout_create_flags = 0;
-    pool_create_flags = 0;
+    layout_create_flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
+    pool_create_flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
     ds_binding_flags[1] = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT;
     vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
 
@@ -576,7 +587,7 @@ TEST_F(PositiveGpuAssistedLayer, GpuValidationUnInitImage) {
     const vkt::PipelineLayout pipeline_layout_variable(*m_device, {&descriptor_set_variable.layout_});
     VkImageObj image(m_device);
     image.Init(16, 16, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
-    VkImageView image_view = image.targetView(VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
+    vkt::ImageView image_view = image.CreateView();
 
     VkDescriptorBufferInfo buffer_info[1] = {};
     buffer_info[0].buffer = buffer0.handle();
@@ -607,29 +618,31 @@ TEST_F(PositiveGpuAssistedLayer, GpuValidationUnInitImage) {
 
     // - The vertex shader fetches the invalid index from the uniform buffer and passes it to the fragment shader.
     // - The fragment shader makes the invalid array access.
-    char const *vsSource_frag =
-        "#version 450\n"
-        "\n"
-        "layout(std140, binding = 0) uniform foo { uint tex_index[1]; } uniform_index_buffer;\n"
-        "layout(location = 0) out flat uint index;\n"
-        "vec2 vertices[3];\n"
-        "void main(){\n"
-        "      vertices[0] = vec2(-1.0, -1.0);\n"
-        "      vertices[1] = vec2( 1.0, -1.0);\n"
-        "      vertices[2] = vec2( 0.0,  1.0);\n"
-        "   gl_Position = vec4(vertices[gl_VertexIndex % 3], 0.0, 1.0);\n"
-        "   index = uniform_index_buffer.tex_index[0];\n"
-        "}\n";
-    char const *fsSource_frag_runtime =
-        "#version 450\n"
-        "#extension GL_EXT_nonuniform_qualifier : enable\n"
-        "\n"
-        "layout(set = 0, binding = 2) uniform sampler2D tex[];\n"
-        "layout(location = 0) out vec4 uFragColor;\n"
-        "layout(location = 0) in flat uint index;\n"
-        "void main(){\n"
-        "   uFragColor = texture(tex[index], vec2(0, 0));\n"
-        "}\n";
+    char const *vsSource_frag = R"glsl(
+        #version 450
+
+        layout(std140, binding = 0) uniform foo { uint tex_index[1]; } uniform_index_buffer;
+        layout(location = 0) out flat uint index;
+        vec2 vertices[3];
+        void main(){
+              vertices[0] = vec2(-1.0, -1.0);
+              vertices[1] = vec2( 1.0, -1.0);
+              vertices[2] = vec2( 0.0,  1.0);
+           gl_Position = vec4(vertices[gl_VertexIndex % 3], 0.0, 1.0);
+           index = uniform_index_buffer.tex_index[0];
+        }
+    )glsl";
+    char const *fsSource_frag_runtime = R"glsl(
+        #version 450
+        #extension GL_EXT_nonuniform_qualifier : enable
+
+        layout(set = 0, binding = 2) uniform sampler2D tex[];
+        layout(location = 0) out vec4 uFragColor;
+        layout(location = 0) in flat uint index;
+        void main(){
+           uFragColor = texture(tex[index], vec2(0, 0));
+        }
+    )glsl";
     struct TestCase {
         char const *vertex_source;
         char const *fragment_source;
@@ -686,12 +699,7 @@ TEST_F(PositiveGpuAssistedLayer, SelectInstrumentedShaders) {
                                        &value};
     VkLayerSettingsCreateInfoEXT layer_settings_create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1,
                                                                &setting};
-    VkValidationFeaturesEXT validation_features = GetValidationFeatures();
-    validation_features.pNext = &layer_settings_create_info;
-    RETURN_IF_SKIP(InitFramework(&validation_features));
-    if (!CanEnableGpuAV()) {
-        GTEST_SKIP() << "Requirements for GPU-AV are not met";
-    }
+    RETURN_IF_SKIP(InitGpuAvFramework(&layer_settings_create_info));
     VkPhysicalDeviceFeatures2 features2 = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(features2);
     if (!features2.features.robustBufferAccess) {
@@ -709,13 +717,13 @@ TEST_F(PositiveGpuAssistedLayer, SelectInstrumentedShaders) {
     const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
     descriptor_set.WriteDescriptorBufferInfo(0, write_buffer.handle(), 0, 4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     descriptor_set.UpdateDescriptorSets();
-    static const char vertshader[] =
-        "#version 450\n"
-        "layout(set = 0, binding = 0) buffer StorageBuffer { uint data[]; } Data;\n"
-        "void main() {\n"
-        "        Data.data[4] = 0xdeadca71;\n"
-        "}\n";
-
+    static const char vertshader[] = R"glsl(
+        #version 450
+        layout(set = 0, binding = 0) buffer StorageBuffer { uint data[]; } Data;
+        void main() {
+                Data.data[4] = 0xdeadca71;
+        }
+    )glsl";
     // Don't instrument buggy vertex shader
     VkShaderObj vs(this, vertshader, VK_SHADER_STAGE_VERTEX_BIT);
     // Instrument non-buggy fragment shader
@@ -743,7 +751,108 @@ TEST_F(PositiveGpuAssistedLayer, SelectInstrumentedShaders) {
     m_commandBuffer->EndRenderPass();
     m_commandBuffer->end();
     // Should not get a warning since buggy vertex shader wasn't instrumented
-    m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit);
+    m_errorMonitor->ExpectSuccess(kWarningBit | kErrorBit);
     m_commandBuffer->QueueCommandBuffer();
     vk::QueueWaitIdle(m_default_queue);
+}
+
+TEST_F(PositiveGpuAssistedLayer, BindingPartiallyBound) {
+    TEST_DESCRIPTION("Ensure that no validation errors for invalid descriptors if binding is PARTIALLY_BOUND");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitGpuAvFramework());
+
+    auto indexing_features = vku::InitStruct<VkPhysicalDeviceDescriptorIndexingFeaturesEXT>();
+    auto features2 = vku::InitStruct<VkPhysicalDeviceFeatures2KHR>(&indexing_features);
+    GetPhysicalDeviceFeatures2(features2);
+
+    if (!indexing_features.descriptorBindingPartiallyBound) {
+        GTEST_SKIP() << "Partially bound bindings not supported, skipping test";
+    }
+
+    RETURN_IF_SKIP(InitState(nullptr, &features2));
+    InitRenderTarget();
+
+    VkDescriptorBindingFlagsEXT ds_binding_flags[2] = {};
+    VkDescriptorSetLayoutBindingFlagsCreateInfoEXT layout_createinfo_binding_flags = vku::InitStructHelper();
+    ds_binding_flags[0] = 0;
+    // No Error
+    ds_binding_flags[1] = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT;
+    // Uncomment for Error
+    // ds_binding_flags[1] = 0;
+
+    layout_createinfo_binding_flags.bindingCount = 2;
+    layout_createinfo_binding_flags.pBindingFlags = ds_binding_flags;
+
+    // Prepare descriptors
+    OneOffDescriptorSet descriptor_set(m_device,
+                                       {
+                                           {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
+                                           {1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
+                                       },
+                                       0, &layout_createinfo_binding_flags, 0);
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
+    uint32_t qfi = 0;
+    VkBufferCreateInfo buffer_create_info = vku::InitStructHelper();
+    buffer_create_info.size = 32;
+    buffer_create_info.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+    buffer_create_info.queueFamilyIndexCount = 1;
+    buffer_create_info.pQueueFamilyIndices = &qfi;
+
+    VkMemoryPropertyFlags mem_props = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+    vkt::Buffer buffer(*m_device, buffer_create_info, mem_props);
+    uint32_t *data = (uint32_t*)buffer.memory().map();
+    data[0] = 0;
+    buffer.memory().unmap();
+
+    VkDescriptorBufferInfo buffer_info[2] = {};
+    buffer_info[0].buffer = buffer.handle();
+    buffer_info[0].offset = 0;
+    buffer_info[0].range = sizeof(uint32_t);
+
+    VkBufferCreateInfo index_buffer_create_info = vku::InitStructHelper();
+    index_buffer_create_info.size = sizeof(uint32_t);
+    index_buffer_create_info.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+    vkt::Buffer index_buffer(*m_device, index_buffer_create_info);
+
+    // Only update binding 0
+    VkWriteDescriptorSet descriptor_writes[2] = {};
+    descriptor_writes[0] = vku::InitStructHelper();
+    descriptor_writes[0].dstSet = descriptor_set.set_;
+    descriptor_writes[0].dstBinding = 0;
+    descriptor_writes[0].descriptorCount = 1;
+    descriptor_writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descriptor_writes[0].pBufferInfo = buffer_info;
+    vk::UpdateDescriptorSets(m_device->device(), 1, descriptor_writes, 0, NULL);
+
+    char const *shader_source = R"glsl(
+        #version 450
+        layout(set = 0, binding = 0) uniform foo_0 { int val; } doit;
+        layout(set = 0, binding = 1) uniform foo_1 { int val; } readit;
+        void main() {
+            if (doit.val == 0)
+                gl_Position = vec4(0.0);
+            else
+                gl_Position = vec4(readit.val);
+        }
+    )glsl";
+    VkShaderObj vs(this, shader_source, VK_SHADER_STAGE_VERTEX_BIT);
+
+    CreatePipelineHelper pipe(*this);
+    pipe.InitState();
+    pipe.shader_stages_[0] = vs.GetStageCreateInfo();
+    pipe.gp_ci_.layout = pipeline_layout.handle();
+    pipe.CreateGraphicsPipeline();
+
+    VkCommandBufferBeginInfo begin_info = vku::InitStructHelper();
+    m_commandBuffer->begin(&begin_info);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1,
+                              &descriptor_set.set_, 0, nullptr);
+    vk::CmdBindIndexBuffer(m_commandBuffer->handle(), index_buffer.handle(), 0, VK_INDEX_TYPE_UINT32);
+    vk::CmdDrawIndexed(m_commandBuffer->handle(), 1, 1, 0, 0, 0);
+    m_commandBuffer->EndRenderPass();
+    m_commandBuffer->end();
+    m_commandBuffer->QueueCommandBuffer();
 }

@@ -25,25 +25,6 @@
                 "spec_version": "2"
             }
         ],
-        "device_extensions": [
-            {
-                "name": "VK_EXT_validation_cache",
-                "spec_version": "1",
-                "entrypoints": [
-                    "vkCreateValidationCacheEXT",
-                    "vkDestroyValidationCacheEXT",
-                    "vkGetValidationCacheDataEXT",
-                    "vkMergeValidationCachesEXT"
-                ]
-            },
-            {
-                "name": "VK_EXT_tooling_info",
-                "spec_version": "1",
-                "entrypoints": [
-                    "vkGetPhysicalDeviceToolPropertiesEXT"
-                ]
-            }
-        ],
         "features": {
             "presets": [
                 {

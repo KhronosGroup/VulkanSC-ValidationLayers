@@ -23,7 +23,9 @@
 #include <vector>
 #include <unordered_map>
 
-class SCPipelineCacheData {
+namespace vvl::sc {
+
+class PipelineCacheData {
   public:
     class Entry {
       public:
@@ -111,7 +113,7 @@ class SCPipelineCacheData {
     const std::vector<uint8_t> raw_data;
     const EntryMap entries;
 
-    SCPipelineCacheData(const VkPipelineCacheCreateInfo& in_create_info)
+    PipelineCacheData(const VkPipelineCacheCreateInfo& in_create_info)
         : create_info(in_create_info), raw_data(GetRawData()), entries(ParseEntries()) {
         ParseEntries();
     }
@@ -163,14 +165,15 @@ class SCPipelineCacheData {
     }
 };
 
-class SC_PIPELINE_CACHE_STATE : public PIPELINE_CACHE_STATE {
+class PipelineCache : public vvl::PipelineCache {
   public:
-    const SCPipelineCacheData* contents;
+    const PipelineCacheData* contents;
 
-    SC_PIPELINE_CACHE_STATE(VkPipelineCache pipeline_cache, const VkPipelineCacheCreateInfo* pCreateInfo,
-                            const SCPipelineCacheData* cache_data)
-        : PIPELINE_CACHE_STATE(pipeline_cache, pCreateInfo), contents(cache_data) {}
+    PipelineCache(VkPipelineCache pipeline_cache, const VkPipelineCacheCreateInfo* pCreateInfo, const PipelineCacheData* cache_data)
+        : vvl::PipelineCache(pipeline_cache, pCreateInfo), contents(cache_data) {}
 };
+
+}  // namespace vvl::sc
 
 class SC_PIPELINE_STATE : public PIPELINE_STATE {
   public:

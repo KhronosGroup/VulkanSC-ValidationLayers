@@ -13,6 +13,7 @@
 
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
+#include "../framework/descriptor_helper.h"
 #include "generated/vk_extension_helper.h"
 
 #include "utils/vk_layer_utils.h"
@@ -36,7 +37,7 @@ VkImageCreateInfo ImageTest::DefaultImageInfo() {
 
 TEST_F(PositiveImage, OwnershipTranfersImage) {
     TEST_DESCRIPTION("Valid image ownership transfers that shouldn't create errors");
-    RETURN_IF_SKIP(Init(nullptr, nullptr, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    RETURN_IF_SKIP(Init());
 
     const std::optional<uint32_t> no_gfx = m_device->QueueFamilyWithoutCapabilities(VK_QUEUE_GRAPHICS_BIT);
     if (!no_gfx) {
@@ -77,14 +78,14 @@ TEST_F(PositiveImage, OwnershipTranfersImage) {
 
 TEST_F(PositiveImage, UncompressedToCompressedImageCopy) {
     TEST_DESCRIPTION("Image copies between compressed and uncompressed images");
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     // Verify format support
     // Size-compatible (64-bit) formats. Uncompressed is 64 bits per texel, compressed is 64 bits per 4x4 block (or 4bpt).
-    if (!ImageFormatAndFeaturesSupported(gpu(), VK_FORMAT_R16G16B16A16_UINT, VK_IMAGE_TILING_OPTIMAL,
-                                         VK_FORMAT_FEATURE_TRANSFER_SRC_BIT_KHR | VK_FORMAT_FEATURE_TRANSFER_DST_BIT_KHR) ||
-        !ImageFormatAndFeaturesSupported(gpu(), VK_FORMAT_BC1_RGBA_SRGB_BLOCK, VK_IMAGE_TILING_OPTIMAL,
-                                         VK_FORMAT_FEATURE_TRANSFER_SRC_BIT_KHR | VK_FORMAT_FEATURE_TRANSFER_DST_BIT_KHR)) {
+    if (!FormatFeaturesAreSupported(gpu(), VK_FORMAT_R16G16B16A16_UINT, VK_IMAGE_TILING_OPTIMAL,
+                                    VK_FORMAT_FEATURE_TRANSFER_SRC_BIT_KHR | VK_FORMAT_FEATURE_TRANSFER_DST_BIT_KHR) ||
+        !FormatFeaturesAreSupported(gpu(), VK_FORMAT_BC1_RGBA_SRGB_BLOCK, VK_IMAGE_TILING_OPTIMAL,
+                                    VK_FORMAT_FEATURE_TRANSFER_SRC_BIT_KHR | VK_FORMAT_FEATURE_TRANSFER_DST_BIT_KHR)) {
         GTEST_SKIP() << "Required formats/features not supported - UncompressedToCompressedImageCopy";
     }
 
@@ -141,7 +142,7 @@ TEST_F(PositiveImage, AliasedMemoryTracking) {
     TEST_DESCRIPTION(
         "Create a buffer, allocate memory, bind memory, destroy the buffer, create an image, and bind the same memory to it");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     auto buffer = std::unique_ptr<vkt::Buffer>(new vkt::Buffer());
     VkDeviceSize buff_size = 256;
@@ -195,7 +196,7 @@ TEST_F(PositiveImage, AliasedMemoryTracking) {
 TEST_F(PositiveImage, CreateImageViewFollowsParameterCompatibilityRequirements) {
     TEST_DESCRIPTION("Verify that creating an ImageView with valid usage does not generate validation errors.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     VkImageCreateInfo imgInfo = {VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
                                  nullptr,
@@ -215,13 +216,13 @@ TEST_F(PositiveImage, CreateImageViewFollowsParameterCompatibilityRequirements) 
     VkImageObj image(m_device);
     image.init(&imgInfo);
     ASSERT_TRUE(image.initialized());
-    image.targetView(VK_FORMAT_R8G8B8A8_UNORM);
+    image.CreateView();
 }
 
 TEST_F(PositiveImage, BasicUsage) {
     TEST_DESCRIPTION("Verify that creating an image view from an image with valid usage doesn't generate validation errors");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     // Verify that we can create a view with usage INPUT_ATTACHMENT
     VkImageObj image(m_device);
@@ -242,7 +243,7 @@ TEST_F(PositiveImage, BasicUsage) {
 TEST_F(PositiveImage, BarrierLayoutToImageUsage) {
     TEST_DESCRIPTION("Ensure barriers' new and old VkImageLayout are compatible with their images' VkImageUsageFlags");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     auto depth_format = FindSupportedDepthStencilFormat(gpu());
     InitRenderTarget();
 
@@ -335,9 +336,9 @@ TEST_F(PositiveImage, FormatCompatibility) {
 
     AddRequiredExtensions(VK_KHR_IMAGE_FORMAT_LIST_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitState());
 
     VkFormat format = VK_FORMAT_R12X4G12X4_UNORM_2PACK16;
 
@@ -370,7 +371,7 @@ TEST_F(PositiveImage, MultpilePNext) {
         "DispatchGetPhysicalDeviceImageFormatProperties2 pass them along");
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_EXT_IMAGE_COMPRESSION_CONTROL_EXTENSION_NAME);
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     const VkFormat view_format = VK_FORMAT_R8G8B8A8_UINT;
 
@@ -402,8 +403,8 @@ TEST_F(PositiveImage, FramebufferFrom3DImage) {
     TEST_DESCRIPTION("Validate creating a framebuffer from a 3D image.");
 
     AddRequiredExtensions(VK_KHR_MAINTENANCE_1_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
     VkImageCreateInfo image_ci = vku::InitStructHelper();
@@ -445,7 +446,7 @@ TEST_F(PositiveImage, FramebufferFrom3DImage) {
 }
 
 TEST_F(PositiveImage, SubresourceLayout) {
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     auto image_ci = vkt::Image::create_info();
     image_ci.imageType = VK_IMAGE_TYPE_2D;
@@ -490,12 +491,7 @@ TEST_F(PositiveImage, ImagelessLayoutTracking) {
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_IMAGELESS_FRAMEBUFFER_EXTENSION_NAME);
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    RETURN_IF_SKIP(InitFramework())
-
-    if (IsDriver(VK_DRIVER_ID_MESA_RADV)) {
-        // According to valid usage, VkBindImageMemoryInfo-memory should be NULL. But RADV will crash if memory is NULL, "
-        GTEST_SKIP() << "This test should not be run on the RADV driver";
-    }
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceImagelessFramebufferFeaturesKHR physicalDeviceImagelessFramebufferFeatures =
         vku::InitStructHelper();
@@ -517,7 +513,7 @@ TEST_F(PositiveImage, ImagelessLayoutTracking) {
     create_device_pnext.pPhysicalDevices = physical_device_group[0].physicalDevices;
     create_device_pnext.pNext = &physicalDeviceFeatures2;
 
-    RETURN_IF_SKIP(InitState(nullptr, &create_device_pnext, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    RETURN_IF_SKIP(InitState(nullptr, &create_device_pnext));
     if (!InitSwapchain(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)) {
         GTEST_SKIP() << "Cannot create surface or swapchain";
     }
@@ -585,7 +581,7 @@ TEST_F(PositiveImage, ImagelessLayoutTracking) {
     vkt::Semaphore image_acquired(*m_device);
     vk::AcquireNextImageKHR(device(), m_swapchain, kWaitTimeout, image_acquired, VK_NULL_HANDLE, &current_buffer);
 
-    VkImageView imageView = image.targetView(attachmentFormat);
+    vkt::ImageView imageView = image.CreateView();
     VkFramebufferAttachmentImageInfoKHR framebufferAttachmentImageInfo = {VK_STRUCTURE_TYPE_FRAMEBUFFER_ATTACHMENT_IMAGE_INFO_KHR,
                                                                           nullptr,
                                                                           0,
@@ -610,7 +606,7 @@ TEST_F(PositiveImage, ImagelessLayoutTracking) {
     vkt::Framebuffer framebuffer(*m_device, framebufferCreateInfo);
 
     VkRenderPassAttachmentBeginInfoKHR renderPassAttachmentBeginInfo = {VK_STRUCTURE_TYPE_RENDER_PASS_ATTACHMENT_BEGIN_INFO_KHR,
-                                                                        nullptr, 1, &imageView};
+                                                                        nullptr, 1, &imageView.handle()};
     VkRenderPassBeginInfo renderPassBeginInfo =
         vku::InitStruct<VkRenderPassBeginInfo>(&renderPassAttachmentBeginInfo, renderPass.handle(), framebuffer.handle(),
                                              VkRect2D{{0, 0}, {attachmentWidth, attachmentHeight}}, 0u, nullptr);
@@ -639,7 +635,7 @@ TEST_F(PositiveImage, ExtendedUsageWithDifferentFormatViews) {
     TEST_DESCRIPTION("Create views with different formats of an image with extended usage");
 
     AddRequiredExtensions(VK_KHR_MAINTENANCE_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     VkImageCreateInfo image_ci = vku::InitStructHelper();
     image_ci.flags =
@@ -701,7 +697,7 @@ TEST_F(PositiveImage, ImageCompressionControl) {
 
     AddRequiredExtensions(VK_EXT_IMAGE_COMPRESSION_CONTROL_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
     VkPhysicalDeviceImageCompressionControlFeaturesEXT image_compression_control = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(image_compression_control);
     if (!image_compression_control.imageCompressionControl) {
@@ -782,7 +778,7 @@ TEST_F(PositiveImage, ImageCompressionControl) {
 TEST_F(PositiveImage, Create3DImageView) {
     TEST_DESCRIPTION("Create a 3D image view");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     VkImageObj image(m_device);
     VkImageCreateInfo ci = vku::InitStructHelper();
@@ -815,7 +811,7 @@ TEST_F(PositiveImage, SlicedCreateInfo) {
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_EXT_IMAGE_SLICED_VIEW_OF_3D_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     {
         VkPhysicalDeviceImageSlicedViewOf3DFeaturesEXT slice_feature = vku::InitStructHelper();
@@ -929,8 +925,7 @@ TEST_F(PositiveImage, SlicedCreateInfo) {
 }
 
 TEST_F(PositiveImage, CopyImageSubresource) {
-    RETURN_IF_SKIP(InitFramework())
-    RETURN_IF_SKIP(InitState(nullptr, nullptr, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    RETURN_IF_SKIP(Init());
 
     VkImageUsageFlags usage =
         VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
@@ -1011,8 +1006,7 @@ TEST_F(PositiveImage, CopyImageSubresource) {
 
 TEST_F(PositiveImage, DescriptorSubresourceLayout) {
     AddRequiredExtensions(VK_KHR_MAINTENANCE_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
-    RETURN_IF_SKIP(InitState(nullptr, nullptr, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     OneOffDescriptorSet descriptor_set(m_device,
@@ -1139,10 +1133,7 @@ TEST_F(PositiveImage, DescriptorSubresourceLayout) {
 TEST_F(VkPositiveLayerTest, ImageDescriptor3D2DSubresourceLayout) {
     TEST_DESCRIPTION("Verify renderpass layout transitions for a 2d ImageView created from a 3d Image.");
     SetTargetApiVersion(VK_API_VERSION_1_1);
-    RETURN_IF_SKIP(InitFramework())
-
-    RETURN_IF_SKIP(InitState(nullptr, nullptr, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
-
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     OneOffDescriptorSet descriptor_set(m_device,
@@ -1336,4 +1327,55 @@ TEST_F(VkPositiveLayerTest, ImageDescriptor3D2DSubresourceLayout) {
         }
     };
     do_test(&image_3d, &view_2d, &other_image, &other_view, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+}
+
+TEST_F(PositiveImage, BlitRemainingArrayLayers) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitFramework());
+    VkPhysicalDeviceMaintenance5FeaturesKHR maintenance5_features = vku::InitStructHelper();
+    GetPhysicalDeviceFeatures2(maintenance5_features);
+    RETURN_IF_SKIP(InitState(nullptr, &maintenance5_features));
+
+    VkFormat f_color = VK_FORMAT_R32_SFLOAT;  // Need features ..BLIT_SRC_BIT & ..BLIT_DST_BIT
+    if (!FormatFeaturesAreSupported(gpu(), f_color, VK_IMAGE_TILING_OPTIMAL,
+                                    VK_FORMAT_FEATURE_BLIT_SRC_BIT | VK_FORMAT_FEATURE_BLIT_DST_BIT)) {
+        GTEST_SKIP() << "No blit feature format support";
+    }
+
+    VkImageCreateInfo ci = vku::InitStructHelper();
+    ci.imageType = VK_IMAGE_TYPE_2D;
+    ci.format = f_color;
+    ci.extent = {64, 64, 1};
+    ci.mipLevels = 1;
+    ci.arrayLayers = 4;
+    ci.samples = VK_SAMPLE_COUNT_1_BIT;
+    ci.tiling = VK_IMAGE_TILING_OPTIMAL;
+    ci.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+
+    VkImageObj image(m_device);
+    image.init(&ci);
+
+    VkImageBlit blitRegion = {};
+    blitRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    blitRegion.srcSubresource.baseArrayLayer = 2;
+    blitRegion.srcSubresource.layerCount = VK_REMAINING_ARRAY_LAYERS;
+    blitRegion.srcSubresource.mipLevel = 0;
+    blitRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    blitRegion.dstSubresource.baseArrayLayer = 1;
+    blitRegion.dstSubresource.layerCount = VK_REMAINING_ARRAY_LAYERS;
+    blitRegion.dstSubresource.mipLevel = 0;
+    blitRegion.srcOffsets[0] = {0, 0, 0};
+    blitRegion.srcOffsets[1] = {16, 16, 1};
+    blitRegion.dstOffsets[0] = {32, 32, 0};
+    blitRegion.dstOffsets[1] = {64, 64, 1};
+
+    m_commandBuffer->begin();
+
+    vk::CmdBlitImage(m_commandBuffer->handle(), image.image(), image.Layout(), image.image(), image.Layout(), 1, &blitRegion,
+                     VK_FILTER_NEAREST);
+
+    blitRegion.dstSubresource.layerCount = 2;  // same as VK_REMAINING_ARRAY_LAYERS
+    vk::CmdBlitImage(m_commandBuffer->handle(), image.image(), image.Layout(), image.image(), image.Layout(), 1, &blitRegion,
+                     VK_FILTER_NEAREST);
 }

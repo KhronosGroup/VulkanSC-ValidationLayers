@@ -113,6 +113,7 @@ const char* String(Func func) {
     {"vkCmdCopyMicromapToMemoryEXT", 29},
     {"vkCmdCopyQueryPoolResults", 26},
     {"vkCmdCuLaunchKernelNVX", 23},
+    {"vkCmdCudaLaunchKernelNV", 24},
     {"vkCmdDebugMarkerBeginEXT", 25},
     {"vkCmdDebugMarkerEndEXT", 23},
     {"vkCmdDebugMarkerInsertEXT", 26},
@@ -318,6 +319,8 @@ const char* String(Func func) {
     {"vkCreateComputePipelines", 25},
     {"vkCreateCuFunctionNVX", 22},
     {"vkCreateCuModuleNVX", 20},
+    {"vkCreateCudaFunctionNV", 23},
+    {"vkCreateCudaModuleNV", 21},
     {"vkCreateDebugReportCallbackEXT", 31},
     {"vkCreateDebugUtilsMessengerEXT", 31},
     {"vkCreateDeferredOperationKHR", 29},
@@ -386,6 +389,8 @@ const char* String(Func func) {
     {"vkDestroyCommandPool", 21},
     {"vkDestroyCuFunctionNVX", 23},
     {"vkDestroyCuModuleNVX", 21},
+    {"vkDestroyCudaFunctionNV", 24},
+    {"vkDestroyCudaModuleNV", 22},
     {"vkDestroyDebugReportCallbackEXT", 32},
     {"vkDestroyDebugUtilsMessengerEXT", 32},
     {"vkDestroyDeferredOperationKHR", 30},
@@ -457,6 +462,7 @@ const char* String(Func func) {
     {"vkGetBufferOpaqueCaptureDescriptorDataEXT", 42},
     {"vkGetCalibratedTimestampsEXT", 29},
     {"vkGetCommandPoolMemoryConsumption", 34},
+    {"vkGetCudaModuleCacheNV", 23},
     {"vkGetDeferredOperationMaxConcurrencyKHR", 40},
     {"vkGetDeferredOperationResultKHR", 32},
     {"vkGetDescriptorEXT", 19},
@@ -849,6 +855,9 @@ const char* String(Struct structure) {
     {"VkCuFunctionCreateInfoNVX", 26},
     {"VkCuLaunchInfoNVX", 18},
     {"VkCuModuleCreateInfoNVX", 24},
+    {"VkCudaFunctionCreateInfoNV", 27},
+    {"VkCudaLaunchInfoNV", 19},
+    {"VkCudaModuleCreateInfoNV", 25},
     {"VkD3D12FenceSubmitInfoKHR", 26},
     {"VkDebugMarkerMarkerInfoEXT", 27},
     {"VkDebugMarkerObjectNameInfoEXT", 31},
@@ -919,6 +928,7 @@ const char* String(Struct structure) {
     {"VkDeviceQueueCreateInfo", 24},
     {"VkDeviceQueueGlobalPriorityCreateInfoKHR", 41},
     {"VkDeviceQueueInfo2", 19},
+    {"VkDeviceQueueShaderCoreControlCreateInfoARM", 44},
     {"VkDeviceSemaphoreSciSyncPoolReservationCreateInfoNV", 52},
     {"VkDirectDriverLoadingInfoLUNARG", 32},
     {"VkDirectDriverLoadingListLUNARG", 32},
@@ -1187,6 +1197,8 @@ const char* String(Struct structure) {
     {"VkPhysicalDeviceCoverageReductionModeFeaturesNV", 48},
     {"VkPhysicalDeviceCubicClampFeaturesQCOM", 39},
     {"VkPhysicalDeviceCubicWeightsFeaturesQCOM", 41},
+    {"VkPhysicalDeviceCudaKernelLaunchFeaturesNV", 43},
+    {"VkPhysicalDeviceCudaKernelLaunchPropertiesNV", 45},
     {"VkPhysicalDeviceCustomBorderColorFeaturesEXT", 45},
     {"VkPhysicalDeviceCustomBorderColorPropertiesEXT", 47},
     {"VkPhysicalDeviceDedicatedAllocationImageAliasingFeaturesNV", 59},
@@ -1354,6 +1366,7 @@ const char* String(Struct structure) {
     {"VkPhysicalDeviceRayTracingPipelinePropertiesKHR", 48},
     {"VkPhysicalDeviceRayTracingPositionFetchFeaturesKHR", 51},
     {"VkPhysicalDeviceRayTracingPropertiesNV", 39},
+    {"VkPhysicalDeviceRelaxedLineRasterizationFeaturesIMG", 52},
     {"VkPhysicalDeviceRepresentativeFragmentTestFeaturesNV", 53},
     {"VkPhysicalDeviceRobustness2FeaturesEXT", 39},
     {"VkPhysicalDeviceRobustness2PropertiesEXT", 41},
@@ -1361,6 +1374,8 @@ const char* String(Struct structure) {
     {"VkPhysicalDeviceSamplerFilterMinmaxProperties", 46},
     {"VkPhysicalDeviceSamplerYcbcrConversionFeatures", 47},
     {"VkPhysicalDeviceScalarBlockLayoutFeatures", 42},
+    {"VkPhysicalDeviceSchedulingControlsFeaturesARM", 46},
+    {"VkPhysicalDeviceSchedulingControlsPropertiesARM", 48},
     {"VkPhysicalDeviceSeparateDepthStencilLayoutsFeatures", 52},
     {"VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT", 46},
     {"VkPhysicalDeviceShaderAtomicFloatFeaturesEXT", 45},
@@ -1939,6 +1954,8 @@ const char* String(Field field) {
     {"compositeAlpha", 15},
     {"compressedSize", 15},
     {"compressionControlPlaneCount", 29},
+    {"computeCapabilityMajor", 23},
+    {"computeCapabilityMinor", 23},
     {"computeDerivativeGroupLinear", 29},
     {"computeDerivativeGroupQuads", 28},
     {"computeFullSubgroups", 21},
@@ -1997,6 +2014,7 @@ const char* String(Field field) {
     {"ctbSizes", 9},
     {"cubicRangeClamp", 16},
     {"cubicWeights", 13},
+    {"cudaKernelLaunchFeatures", 25},
     {"cullMode", 9},
     {"currentDisplay", 15},
     {"currentExtent", 14},
@@ -3097,6 +3115,8 @@ const char* String(Field field) {
     {"pBufferMemoryBarriers", 22},
     {"pBuffers", 9},
     {"pBuildInfo", 11},
+    {"pCacheData", 11},
+    {"pCacheSize", 11},
     {"pCallableShaderBindingTable", 28},
     {"pCallback", 10},
     {"pCallbackData", 14},
@@ -3506,7 +3526,6 @@ const char* String(Field field) {
     {"pTimes", 7},
     {"pTimestampInfos", 16},
     {"pTimestamps", 12},
-    {"pTimingCount", 13},
     {"pTimings", 9},
     {"pTokens", 8},
     {"pToolCount", 11},
@@ -3801,6 +3820,7 @@ const char* String(Field field) {
     {"refreshDuration", 16},
     {"refreshRate", 12},
     {"regionCount", 12},
+    {"relaxedLineRasterization", 25},
     {"releaseCount", 13},
     {"remoteDeviceIndex", 18},
     {"renderArea", 11},
@@ -3885,6 +3905,8 @@ const char* String(Field field) {
     {"saturatingAccumulation", 23},
     {"scalarBlockLayout", 18},
     {"scalingBehavior", 16},
+    {"schedulingControls", 19},
+    {"schedulingControlsFlags", 24},
     {"sciBufExport", 13},
     {"sciBufImport", 13},
     {"sciSyncExport", 14},
@@ -4257,6 +4279,7 @@ const char* String(Field field) {
     {"timestampCount", 15},
     {"timestampPeriod", 16},
     {"timestampValidBits", 19},
+    {"timingCount", 12},
     {"tokenCount", 11},
     {"tokenType", 10},
     {"topology", 9},
@@ -4457,6 +4480,8 @@ bool IsFieldPointer(Field field) {
     case Field::pBufferMemoryBarriers:
     case Field::pBuffers:
     case Field::pBuildInfo:
+    case Field::pCacheData:
+    case Field::pCacheSize:
     case Field::pCallableShaderBindingTable:
     case Field::pCallback:
     case Field::pCallbackData:
@@ -4866,7 +4891,6 @@ bool IsFieldPointer(Field field) {
     case Field::pTimes:
     case Field::pTimestampInfos:
     case Field::pTimestamps:
-    case Field::pTimingCount:
     case Field::pTimings:
     case Field::pTokens:
     case Field::pToolCount:

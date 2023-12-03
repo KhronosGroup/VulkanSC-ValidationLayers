@@ -35,8 +35,10 @@ struct SUBPASS_INFO {
     bool used;
     VkImageUsageFlagBits usage;
     VkImageLayout layout;
+    VkImageAspectFlags aspectMask;
 
-    SUBPASS_INFO() : used(false), usage(VkImageUsageFlagBits(0)), layout(VK_IMAGE_LAYOUT_UNDEFINED) {}
+    SUBPASS_INFO()
+        : used(false), usage(VkImageUsageFlagBits(0)), layout(VK_IMAGE_LAYOUT_UNDEFINED), aspectMask(VkImageAspectFlags(0)) {}
 };
 
 // Store the DAG.
@@ -64,7 +66,9 @@ struct SubpassLayout {
     VkImageLayout layout;
 };
 
-class RENDER_PASS_STATE : public BASE_NODE {
+namespace vvl {
+
+class RenderPass : public BASE_NODE {
   public:
     struct AttachmentTransition {
         uint32_t prev_pass;
@@ -98,12 +102,12 @@ class RENDER_PASS_STATE : public BASE_NODE {
     using TransitionVec = std::vector<std::vector<AttachmentTransition>>;
     const TransitionVec subpass_transitions;
 
-    RENDER_PASS_STATE(VkRenderPass rp, VkRenderPassCreateInfo2 const *pCreateInfo);
-    RENDER_PASS_STATE(VkRenderPass rp, VkRenderPassCreateInfo const *pCreateInfo);
+    RenderPass(VkRenderPass rp, VkRenderPassCreateInfo2 const *pCreateInfo);
+    RenderPass(VkRenderPass rp, VkRenderPassCreateInfo const *pCreateInfo);
 
-    RENDER_PASS_STATE(VkPipelineRenderingCreateInfo const *pPipelineRenderingCreateInfo, bool rasterization_enabled);
-    RENDER_PASS_STATE(VkRenderingInfo const *pRenderingInfo, bool rasterization_enabled);
-    RENDER_PASS_STATE(VkCommandBufferInheritanceRenderingInfo const *pInheritanceRenderingInfo);
+    RenderPass(VkPipelineRenderingCreateInfo const *pPipelineRenderingCreateInfo, bool rasterization_enabled);
+    RenderPass(VkRenderingInfo const *pRenderingInfo, bool rasterization_enabled);
+    RenderPass(VkCommandBufferInheritanceRenderingInfo const *pInheritanceRenderingInfo);
 
     VkRenderPass renderPass() const { return handle_.Cast<VkRenderPass>(); }
 
@@ -114,21 +118,24 @@ class RENDER_PASS_STATE : public BASE_NODE {
     uint32_t GetDynamicRenderingColorAttachmentCount() const;
     uint32_t GetDynamicRenderingViewMask() const;
     uint32_t GetViewMaskBits(uint32_t subpass) const;
+    const VkMultisampledRenderToSingleSampledInfoEXT *GetMSRTSSInfo(uint32_t subpass) const;
 };
 
-class FRAMEBUFFER_STATE : public BASE_NODE {
+class Framebuffer : public BASE_NODE {
   public:
     const safe_VkFramebufferCreateInfo createInfo;
-    std::shared_ptr<const RENDER_PASS_STATE> rp_state;
+    std::shared_ptr<const RenderPass> rp_state;
     std::vector<std::shared_ptr<IMAGE_VIEW_STATE>> attachments_view_state;
 
-    FRAMEBUFFER_STATE(VkFramebuffer fb, const VkFramebufferCreateInfo *pCreateInfo, std::shared_ptr<RENDER_PASS_STATE> &&rpstate,
-                      std::vector<std::shared_ptr<IMAGE_VIEW_STATE>> &&attachments);
+    Framebuffer(VkFramebuffer fb, const VkFramebufferCreateInfo *pCreateInfo, std::shared_ptr<RenderPass> &&rpstate,
+                std::vector<std::shared_ptr<IMAGE_VIEW_STATE>> &&attachments);
     void LinkChildNodes() override;
 
     VkFramebuffer framebuffer() const { return handle_.Cast<VkFramebuffer>(); }
 
-    virtual ~FRAMEBUFFER_STATE() { Destroy(); }
+    virtual ~Framebuffer() { Destroy(); }
 
     void Destroy() override;
 };
+
+}  // namespace vvl

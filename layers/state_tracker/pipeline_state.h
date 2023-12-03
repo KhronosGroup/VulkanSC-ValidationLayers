@@ -29,29 +29,30 @@
 #include "utils/shader_utils.h"
 
 // Fwd declarations -- including descriptor_set.h creates an ugly include loop
-namespace cvdescriptorset {
+namespace vvl {
 class DescriptorSetLayoutDef;
 class DescriptorSetLayout;
 class DescriptorSet;
 class Descriptor;
-
-}  // namespace cvdescriptorset
+class RenderPass;
+}  // namespace vvl
 
 class ValidationStateTracker;
 class CMD_BUFFER_STATE;
-class RENDER_PASS_STATE;
 struct SHADER_MODULE_STATE;
 class PIPELINE_STATE;
 
-class PIPELINE_CACHE_STATE : public BASE_NODE {
+namespace vvl {
+class PipelineCache : public BASE_NODE {
   public:
-    PIPELINE_CACHE_STATE(VkPipelineCache pipeline_cache, const VkPipelineCacheCreateInfo *pCreateInfo)
+    PipelineCache(VkPipelineCache pipeline_cache, const VkPipelineCacheCreateInfo *pCreateInfo)
         : BASE_NODE(pipeline_cache, kVulkanObjectTypePipelineCache), create_info(pCreateInfo) {}
 
     VkPipelineCache pipelineCache() const { return handle_.Cast<VkPipelineCache>(); }
 
     const safe_VkPipelineCacheCreateInfo create_info;
 };
+}  // namespace vvl
 
 struct StageCreateInfo {
     const PIPELINE_STATE *pipeline;
@@ -70,7 +71,7 @@ class PIPELINE_STATE : public BASE_NODE {
         template <typename CI>
         struct Traits {};
 
-        CreateInfo(const VkGraphicsPipelineCreateInfo &ci, std::shared_ptr<const RENDER_PASS_STATE> rpstate,
+        CreateInfo(const VkGraphicsPipelineCreateInfo &ci, std::shared_ptr<const vvl::RenderPass> rpstate,
                    const ValidationStateTracker *state_data)
             : graphics() {
             bool use_color = false;
@@ -125,7 +126,7 @@ class PIPELINE_STATE : public BASE_NODE {
     // NOTE: The style guide suggests private data appear at the end, but we need this populated first, so placing it here
 
     // Render pass state for dynamic rendering, etc.
-    std::shared_ptr<const RENDER_PASS_STATE> rp_state;
+    std::shared_ptr<const vvl::RenderPass> rp_state;
 
     const CreateInfo create_info;
 
@@ -135,7 +136,7 @@ class PIPELINE_STATE : public BASE_NODE {
     const VkPipelineLibraryCreateInfoKHR *library_create_info = nullptr;
     VkGraphicsPipelineLibraryFlagsEXT graphics_lib_type = static_cast<VkGraphicsPipelineLibraryFlagsEXT>(0);
     VkPipelineBindPoint pipeline_type;
-    VkPipelineCreateFlags create_flags;
+    VkPipelineCreateFlags2KHR create_flags;
     vvl::span<const safe_VkPipelineShaderStageCreateInfo> shader_stages_ci;
     const safe_VkPipelineLibraryCreateInfoKHR *ray_tracing_library_ci = nullptr;
     // If using a shader module identifier, the module itself is not validated, but the shader stage is still known
@@ -180,7 +181,7 @@ class PIPELINE_STATE : public BASE_NODE {
 
     // Executable or legacy pipeline
     PIPELINE_STATE(const ValidationStateTracker *state_data, const VkGraphicsPipelineCreateInfo *pCreateInfo,
-                   std::shared_ptr<const RENDER_PASS_STATE> &&rpstate, std::shared_ptr<const PIPELINE_LAYOUT_STATE> &&layout,
+                   std::shared_ptr<const vvl::RenderPass> &&rpstate, std::shared_ptr<const PIPELINE_LAYOUT_STATE> &&layout,
                    CreateShaderModuleStates *csm_states = nullptr);
 
     // Compute pipeline
@@ -253,7 +254,7 @@ class PIPELINE_STATE : public BASE_NODE {
     // Important as some pipeline checks need pipeline state that won't be there if the substate is from linking
     bool OwnsSubState(const std::shared_ptr<PipelineSubState> sub_state) const { return sub_state && (&sub_state->parent == this); }
 
-    const std::shared_ptr<const RENDER_PASS_STATE> RenderPassState() const {
+    const std::shared_ptr<const vvl::RenderPass> RenderPassState() const {
         // TODO A render pass object is required for all of these sub-states. Which one should be used for an "executable pipeline"?
         if (fragment_output_state && fragment_output_state->rp_state) {
             return fragment_output_state->rp_state;
@@ -339,6 +340,13 @@ class PIPELINE_STATE : public BASE_NODE {
         return nullptr;
     }
 
+    const safe_VkPipelineTessellationStateCreateInfo *TessellationState() const {
+        if (pre_raster_state) {
+            return pre_raster_state->tess_create_info;
+        }
+        return nullptr;
+    }
+
     const safe_VkPipelineColorBlendStateCreateInfo *ColorBlendState() const {
         if (fragment_output_state) {
             return fragment_output_state->color_blend_state.get();
@@ -397,28 +405,6 @@ class PIPELINE_STATE : public BASE_NODE {
     bool BlendConstantsEnabled() const { return fragment_output_state && fragment_output_state->blend_constants_enabled; }
 
     bool SampleLocationEnabled() const { return fragment_output_state && fragment_output_state->sample_location_enabled; }
-
-    template <typename CI>
-    VkPipeline BasePipeline() const {
-        // TODO this _should_ be a static_assert, but that only works on MSVC currently
-        assert(false && "Not implemented");
-        return {};
-    }
-
-    template <typename CI>
-    int32_t BasePipelineIndex() const {
-        // TODO this _should_ be a static_assert, but that only works on MSVC currently
-        assert(false && "Not implemented");
-        return {};
-    }
-
-    // Return the ith shader module where i indexes into CreateInfo::pStages
-    template <typename CI>
-    VkShaderModule GetShaderModuleByCIIndex(uint32_t i) {
-        // TODO this _should_ be a static_assert, but that only works on MSVC currently
-        assert(false && "Not implemented");
-        return {};
-    }
 
     const safe_VkPipelineDynamicStateCreateInfo *DynamicState() const {
         // TODO Each library can contain its own dynamic state (apparently?). Which one should be returned here? Union?
@@ -577,17 +563,17 @@ class PIPELINE_STATE : public BASE_NODE {
                                                                     const safe_VkGraphicsPipelineCreateInfo &create_info);
     static std::shared_ptr<PreRasterState> CreatePreRasterState(const PIPELINE_STATE &p, const ValidationStateTracker &state,
                                                                 const safe_VkGraphicsPipelineCreateInfo &create_info,
-                                                                const std::shared_ptr<const RENDER_PASS_STATE> &rp);
+                                                                const std::shared_ptr<const vvl::RenderPass> &rp);
     static std::shared_ptr<FragmentShaderState> CreateFragmentShaderState(const PIPELINE_STATE &p,
                                                                           const ValidationStateTracker &state,
                                                                           const VkGraphicsPipelineCreateInfo &create_info,
                                                                           const safe_VkGraphicsPipelineCreateInfo &safe_create_info,
-                                                                          const std::shared_ptr<const RENDER_PASS_STATE> &rp);
+                                                                          const std::shared_ptr<const vvl::RenderPass> &rp);
     static std::shared_ptr<FragmentOutputState> CreateFragmentOutputState(const PIPELINE_STATE &p,
                                                                           const ValidationStateTracker &state,
                                                                           const VkGraphicsPipelineCreateInfo &create_info,
                                                                           const safe_VkGraphicsPipelineCreateInfo &safe_create_info,
-                                                                          const std::shared_ptr<const RENDER_PASS_STATE> &rp);
+                                                                          const std::shared_ptr<const vvl::RenderPass> &rp);
 
     template <typename CreateInfo>
     static bool EnablesRasterizationStates(const CreateInfo &create_info) {
@@ -708,33 +694,6 @@ struct PIPELINE_STATE::CreateInfo::Traits<VkRayTracingPipelineCreateInfoNV> {
     }
 };
 
-template <>
-VkPipeline PIPELINE_STATE::BasePipeline<VkGraphicsPipelineCreateInfo>() const;
-template <>
-VkPipeline PIPELINE_STATE::BasePipeline<VkComputePipelineCreateInfo>() const;
-template <>
-VkPipeline PIPELINE_STATE::BasePipeline<VkRayTracingPipelineCreateInfoKHR>() const;
-template <>
-VkPipeline PIPELINE_STATE::BasePipeline<VkRayTracingPipelineCreateInfoNV>() const;
-
-template <>
-int32_t PIPELINE_STATE::BasePipelineIndex<VkGraphicsPipelineCreateInfo>() const;
-template <>
-int32_t PIPELINE_STATE::BasePipelineIndex<VkComputePipelineCreateInfo>() const;
-template <>
-int32_t PIPELINE_STATE::BasePipelineIndex<VkRayTracingPipelineCreateInfoKHR>() const;
-template <>
-int32_t PIPELINE_STATE::BasePipelineIndex<VkRayTracingPipelineCreateInfoNV>() const;
-
-template <>
-VkShaderModule PIPELINE_STATE::PIPELINE_STATE::GetShaderModuleByCIIndex<VkGraphicsPipelineCreateInfo>(uint32_t i);
-template <>
-VkShaderModule PIPELINE_STATE::GetShaderModuleByCIIndex<VkComputePipelineCreateInfo>(uint32_t);
-template <>
-VkShaderModule PIPELINE_STATE::GetShaderModuleByCIIndex<VkRayTracingPipelineCreateInfoKHR>(uint32_t i);
-template <>
-VkShaderModule PIPELINE_STATE::GetShaderModuleByCIIndex<VkRayTracingPipelineCreateInfoNV>(uint32_t i);
-
 // Track last states that are bound per pipeline bind point (Gfx & Compute)
 struct LAST_BOUND_STATE {
     LAST_BOUND_STATE(CMD_BUFFER_STATE &cb) : cb_state(cb) {}
@@ -746,7 +705,7 @@ struct LAST_BOUND_STATE {
     bool shader_object_bound[SHADER_OBJECT_STAGE_COUNT]{false};
     SHADER_OBJECT_STATE *shader_object_states[SHADER_OBJECT_STAGE_COUNT]{nullptr};
     VkPipelineLayout pipeline_layout{VK_NULL_HANDLE};
-    std::shared_ptr<cvdescriptorset::DescriptorSet> push_descriptor_set;
+    std::shared_ptr<vvl::DescriptorSet> push_descriptor_set;
 
     struct DescriptorBufferBinding {
         uint32_t index{0};
@@ -754,7 +713,7 @@ struct LAST_BOUND_STATE {
     };
     // Ordered bound set tracking where index is set# that given set is bound to
     struct PER_SET {
-        std::shared_ptr<cvdescriptorset::DescriptorSet> bound_descriptor_set;
+        std::shared_ptr<vvl::DescriptorSet> bound_descriptor_set;
         std::optional<DescriptorBufferBinding> bound_descriptor_buffer;
 
         // one dynamic offset per dynamic descriptor bound to this CB
@@ -762,7 +721,7 @@ struct LAST_BOUND_STATE {
         PipelineLayoutCompatId compat_id_for_set{0};
 
         // Cache most recently validated descriptor state for ValidateActionState/UpdateDrawState
-        const cvdescriptorset::DescriptorSet *validated_set{nullptr};
+        const vvl::DescriptorSet *validated_set{nullptr};
         uint64_t validated_set_change_count{~0ULL};
         uint64_t validated_set_image_layout_change_count{~0ULL};
         BindingVariableMap validated_set_binding_req_map;
@@ -778,7 +737,7 @@ struct LAST_BOUND_STATE {
 
     void Reset();
 
-    void UnbindAndResetPushDescriptorSet(std::shared_ptr<cvdescriptorset::DescriptorSet> &&ds);
+    void UnbindAndResetPushDescriptorSet(std::shared_ptr<vvl::DescriptorSet> &&ds);
 
     inline bool IsUsing() const { return pipeline_state != nullptr; }
 

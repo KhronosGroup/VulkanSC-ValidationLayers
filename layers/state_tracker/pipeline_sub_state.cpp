@@ -57,13 +57,13 @@ VertexInputState::VertexInputState(const PIPELINE_STATE &p, const safe_VkGraphic
 }
 
 PreRasterState::PreRasterState(const PIPELINE_STATE &p, const ValidationStateTracker &state_data,
-                               const safe_VkGraphicsPipelineCreateInfo &create_info, std::shared_ptr<const RENDER_PASS_STATE> rp)
+                               const safe_VkGraphicsPipelineCreateInfo &create_info, std::shared_ptr<const vvl::RenderPass> rp)
     : PipelineSubState(p), rp_state(rp), subpass(create_info.subpass) {
     pipeline_layout = state_data.Get<PIPELINE_LAYOUT_STATE>(create_info.layout);
 
     viewport_state = create_info.pViewportState;
 
-    rp_state = state_data.Get<RENDER_PASS_STATE>(create_info.renderPass);
+    rp_state = state_data.Get<vvl::RenderPass>(create_info.renderPass);
 
     raster_state = create_info.pRasterizationState;
 
@@ -212,6 +212,11 @@ void SetFragmentShaderInfoPrivate(FragmentShaderState &fs_state, const Validatio
             if (module_state) {
                 fs_state.fragment_shader = std::move(module_state);
                 fs_state.fragment_shader_ci = ToShaderStageCI(create_info.pStages[i]);
+                // can be null if using VK_EXT_shader_module_identifier
+                if (fs_state.fragment_shader->spirv) {
+                    fs_state.fragment_entry_point = fs_state.fragment_shader->spirv->FindEntrypoint(
+                        fs_state.fragment_shader_ci->pName, fs_state.fragment_shader_ci->stage);
+                }
             }
         }
     }
@@ -230,10 +235,10 @@ void FragmentShaderState::SetFragmentShaderInfo(FragmentShaderState &fs_state, c
 }
 
 FragmentShaderState::FragmentShaderState(const PIPELINE_STATE &p, const ValidationStateTracker &dev_data,
-                                         std::shared_ptr<const RENDER_PASS_STATE> rp, uint32_t subp, VkPipelineLayout layout)
+                                         std::shared_ptr<const vvl::RenderPass> rp, uint32_t subp, VkPipelineLayout layout)
     : PipelineSubState(p), rp_state(rp), subpass(subp), pipeline_layout(dev_data.Get<PIPELINE_LAYOUT_STATE>(layout)) {}
 
-FragmentOutputState::FragmentOutputState(const PIPELINE_STATE &p, std::shared_ptr<const RENDER_PASS_STATE> rp, uint32_t sp)
+FragmentOutputState::FragmentOutputState(const PIPELINE_STATE &p, std::shared_ptr<const vvl::RenderPass> rp, uint32_t sp)
     : PipelineSubState(p), rp_state(rp), subpass(sp) {}
 
 // static

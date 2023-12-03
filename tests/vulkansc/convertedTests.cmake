@@ -19,6 +19,8 @@
 
 set(VKSC_CONVERTED_TEST_FILES
     converted/amd_best_practices.cpp
+    converted/android_external_resolve.cpp
+    converted/android_external_resolve_positive.cpp
     converted/android_hardware_buffer.cpp
     converted/android_hardware_buffer_positive.cpp
     converted/arm_best_practices.cpp
@@ -73,6 +75,7 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/other_positive.cpp
     converted/others.cpp
     converted/parent.cpp
+    converted/parent_positive.cpp
     converted/pipeline.cpp
     converted/pipeline_advanced_blend.cpp
     converted/pipeline_layout.cpp
@@ -89,8 +92,12 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/query_positive.cpp
     converted/ray_tracing.cpp
     converted/ray_tracing_gpu.cpp
+    converted/ray_tracing_gpu_nv.cpp
+    converted/ray_tracing_nv.cpp
     converted/ray_tracing_pipeline.cpp
+    converted/ray_tracing_pipeline_nv.cpp
     converted/ray_tracing_pipeline_positive.cpp
+    converted/ray_tracing_pipeline_positive_nv.cpp
     converted/ray_tracing_positive.cpp
     converted/render_pass_positive.cpp
     converted/renderpass.cpp
@@ -102,6 +109,7 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/shader_compute_positive.cpp
     converted/shader_cooperative_matrix.cpp
     converted/shader_cooperative_matrix_positive.cpp
+    converted/shader_image_access.cpp
     converted/shader_image_access_positive.cpp
     converted/shader_interface.cpp
     converted/shader_interface_positive.cpp

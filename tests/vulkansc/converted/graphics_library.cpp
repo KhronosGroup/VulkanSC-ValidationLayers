@@ -16,12 +16,13 @@
 
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
+#include "../framework/descriptor_helper.h"
 #include "generated/vk_extension_helper.h"
 
 TEST_F(NegativeGraphicsLibrary, DSLs) {
     TEST_DESCRIPTION("Create a pipeline layout with invalid descriptor set layouts");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     VkDescriptorSetLayoutBinding dsl_binding = {};
     dsl_binding.binding = 0;
@@ -51,9 +52,9 @@ TEST_F(NegativeGraphicsLibrary, GPLDSLs) {
     TEST_DESCRIPTION("Create a pipeline layout with invalid descriptor set layouts with VK_EXT_grahpics_pipeline_library enabled");
 
     AddRequiredExtensions(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitState());
 
     VkDescriptorSetLayoutBinding dsl_binding = {};
     dsl_binding.binding = 0;
@@ -81,7 +82,7 @@ TEST_F(NegativeGraphicsLibrary, GPLDSLs) {
 
 TEST_F(NegativeGraphicsLibrary, IndependentSetsLinkOnly) {
     TEST_DESCRIPTION("Link pre-raster and FS subsets with invalid VkPipelineLayout create flags");
-    RETURN_IF_SKIP(InitBasicGraphicsLibrary())
+    RETURN_IF_SKIP(InitBasicGraphicsLibrary());
     InitRenderTarget();
 
     CreatePipelineHelper pre_raster_lib(*this);
@@ -119,7 +120,7 @@ TEST_F(NegativeGraphicsLibrary, IndependentSetsLinkOnly) {
 
 TEST_F(NegativeGraphicsLibrary, IndependentSetsLinkCreate) {
     TEST_DESCRIPTION("Create pre-raster subset while linking FS subset with invalid VkPipelineLayout create flags");
-    RETURN_IF_SKIP(InitBasicGraphicsLibrary())
+    RETURN_IF_SKIP(InitBasicGraphicsLibrary());
     InitRenderTarget();
 
     CreatePipelineHelper pre_raster_lib(*this);
@@ -154,7 +155,7 @@ TEST_F(NegativeGraphicsLibrary, DescriptorSets) {
     TEST_DESCRIPTION(
         "Attempt to bind invalid descriptor sets with and without VK_EXT_graphics_pipeline_library and independent sets");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     // Prepare descriptors
     OneOffDescriptorSet ds(m_device, {
@@ -181,9 +182,9 @@ TEST_F(NegativeGraphicsLibrary, DescriptorSetsGPL) {
     TEST_DESCRIPTION("Attempt to bind invalid descriptor sets with and with VK_EXT_graphics_pipeline_library");
 
     AddRequiredExtensions(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitState());
 
     // Prepare descriptors
     OneOffDescriptorSet ds(m_device, {
@@ -214,7 +215,7 @@ TEST_F(NegativeGraphicsLibrary, MissingDSState) {
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
     VkPhysicalDeviceDynamicRenderingFeaturesKHR dynamic_rendering_features = vku::InitStructHelper();
-    RETURN_IF_SKIP(InitBasicGraphicsLibrary(&dynamic_rendering_features))
+    RETURN_IF_SKIP(InitBasicGraphicsLibrary(&dynamic_rendering_features));
 
     if (!dynamic_rendering_features.dynamicRendering) {
         GTEST_SKIP() << "Test requires (unsupported) dynamicRendering";
@@ -241,7 +242,7 @@ TEST_F(NegativeGraphicsLibrary, MissingDSStateWithFragOutputState) {
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
     VkPhysicalDeviceDynamicRenderingFeaturesKHR dynamic_rendering_features = vku::InitStructHelper();
-    RETURN_IF_SKIP(InitBasicGraphicsLibrary(&dynamic_rendering_features))
+    RETURN_IF_SKIP(InitBasicGraphicsLibrary(&dynamic_rendering_features));
 
     if (!dynamic_rendering_features.dynamicRendering) {
         GTEST_SKIP() << "Test requires (unsupported) dynamicRendering";
@@ -322,7 +323,7 @@ TEST_F(NegativeGraphicsLibrary, DepthStencilStateIgnored) {
     VkPhysicalDeviceExtendedDynamicStateFeaturesEXT extended_dynamic_state_features = vku::InitStructHelper();
     VkPhysicalDeviceDynamicRenderingFeaturesKHR dynamic_rendering_features =
         vku::InitStructHelper(&extended_dynamic_state_features);
-    RETURN_IF_SKIP(InitBasicGraphicsLibrary(&dynamic_rendering_features))
+    RETURN_IF_SKIP(InitBasicGraphicsLibrary(&dynamic_rendering_features));
 
     InitRenderTarget();
 
@@ -341,8 +342,11 @@ TEST_F(NegativeGraphicsLibrary, DepthStencilStateIgnored) {
     frag_shader_lib.AddDynamicState(VK_DYNAMIC_STATE_STENCIL_TEST_ENABLE);
     frag_shader_lib.AddDynamicState(VK_DYNAMIC_STATE_STENCIL_OP);
     frag_shader_lib.AddDynamicState(VK_DYNAMIC_STATE_DEPTH_BOUNDS);
+
     // forgetting VK_EXT_extended_dynamic_state3
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-renderPass-09035");
     frag_shader_lib.CreateGraphicsPipeline();
+    m_errorMonitor->VerifyFound();
 }
 
 TEST_F(NegativeGraphicsLibrary, MissingColorBlendState) {
@@ -351,7 +355,7 @@ TEST_F(NegativeGraphicsLibrary, MissingColorBlendState) {
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
     VkPhysicalDeviceDynamicRenderingFeaturesKHR dynamic_rendering_features = vku::InitStructHelper();
-    RETURN_IF_SKIP(InitBasicGraphicsLibrary(&dynamic_rendering_features))
+    RETURN_IF_SKIP(InitBasicGraphicsLibrary(&dynamic_rendering_features));
 
     if (!dynamic_rendering_features.dynamicRendering) {
         GTEST_SKIP() << "Test requires (unsupported) dynamicRendering";
@@ -398,7 +402,7 @@ TEST_F(NegativeGraphicsLibrary, MissingColorBlendState) {
 TEST_F(NegativeGraphicsLibrary, ImplicitVUIDs) {
     TEST_DESCRIPTION("Test various VUIDs that were previously implicit, but now explicit due to VK_EXT_graphics_pipeline_library");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     CreatePipelineHelper pipe(*this);
@@ -412,7 +416,7 @@ TEST_F(NegativeGraphicsLibrary, ImplicitVUIDs) {
 
     pipe.gp_ci_.layout = pipe.pipeline_layout_.handle();
     pipe.gp_ci_.renderPass = VK_NULL_HANDLE;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-renderPass-06575");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-dynamicRendering-06576");
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-renderPass-06603");
     pipe.CreateGraphicsPipeline(false);
     m_errorMonitor->VerifyFound();
@@ -433,7 +437,7 @@ TEST_F(NegativeGraphicsLibrary, CreateStateGPL) {
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME);
     // Do _not_ enable VkPhysicalDeviceGraphicsPipelineLibraryFeaturesEXT::graphicsPipelineLibrary
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     {
@@ -478,7 +482,7 @@ TEST_F(NegativeGraphicsLibrary, LinkOptimization) {
     TEST_DESCRIPTION("Create graphics pipeline libraries with mismatching link-time optimization flags");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    RETURN_IF_SKIP(InitBasicGraphicsLibrary())
+    RETURN_IF_SKIP(InitBasicGraphicsLibrary());
 
     InitRenderTarget();
 
@@ -543,7 +547,7 @@ TEST_F(NegativeGraphicsLibrary, LinkOptimization) {
 
 TEST_F(NegativeGraphicsLibrary, DSLShaderBindingsNullInCreate) {
     TEST_DESCRIPTION("Link pre-raster state while creating FS state with invalid null DSL + shader stage bindings");
-    RETURN_IF_SKIP(InitBasicGraphicsLibrary())
+    RETURN_IF_SKIP(InitBasicGraphicsLibrary());
     InitRenderTarget();
 
     // Prepare descriptors
@@ -591,7 +595,7 @@ TEST_F(NegativeGraphicsLibrary, DSLShaderBindingsNullInCreate) {
 
 TEST_F(NegativeGraphicsLibrary, DSLShaderBindingsNullInLink) {
     TEST_DESCRIPTION("Link pre-raster state with invalid null DSL + shader stage bindings while creating FS state");
-    RETURN_IF_SKIP(InitBasicGraphicsLibrary())
+    RETURN_IF_SKIP(InitBasicGraphicsLibrary());
     InitRenderTarget();
 
     // Prepare descriptors
@@ -638,7 +642,7 @@ TEST_F(NegativeGraphicsLibrary, DSLShaderBindingsNullInLink) {
 
 TEST_F(NegativeGraphicsLibrary, DSLShaderBindingsLinkOnly) {
     TEST_DESCRIPTION("Link pre-raster and FS subsets with invalid null DSL + shader stage bindings");
-    RETURN_IF_SKIP(InitBasicGraphicsLibrary())
+    RETURN_IF_SKIP(InitBasicGraphicsLibrary());
     InitRenderTarget();
 
     // Prepare descriptors
@@ -693,7 +697,7 @@ TEST_F(NegativeGraphicsLibrary, PreRasterStateNoLayout) {
     TEST_DESCRIPTION("Create a pre-raster graphics library");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    RETURN_IF_SKIP(InitBasicGraphicsLibrary())
+    RETURN_IF_SKIP(InitBasicGraphicsLibrary());
     InitRenderTarget();
 
     CreatePipelineHelper pipe(*this);
@@ -710,7 +714,7 @@ TEST_F(NegativeGraphicsLibrary, PreRasterStateNoLayout) {
 
 TEST_F(NegativeGraphicsLibrary, ImmutableSamplersIncompatibleDSL) {
     TEST_DESCRIPTION("Link pipelines with DSLs that only differ by immutable samplers");
-    RETURN_IF_SKIP(InitBasicGraphicsLibrary())
+    RETURN_IF_SKIP(InitBasicGraphicsLibrary());
     InitRenderTarget();
 
     auto sampler_info = SafeSaneSamplerCreateInfo();
@@ -812,7 +816,7 @@ TEST_F(NegativeGraphicsLibrary, ImmutableSamplersIncompatibleDSL) {
 
 TEST_F(NegativeGraphicsLibrary, PreRasterWithFS) {
     TEST_DESCRIPTION("Create a library with no FS state, but an FS");
-    RETURN_IF_SKIP(InitBasicGraphicsLibrary())
+    RETURN_IF_SKIP(InitBasicGraphicsLibrary());
     InitRenderTarget();
 
     std::vector<VkPipelineShaderStageCreateInfo> stages;
@@ -853,7 +857,7 @@ TEST_F(NegativeGraphicsLibrary, PreRasterWithFS) {
 
 TEST_F(NegativeGraphicsLibrary, FragmentStateWithPreRaster) {
     TEST_DESCRIPTION("Create a library with no pre-raster state, but that contains a pre-raster shader.");
-    RETURN_IF_SKIP(InitBasicGraphicsLibrary())
+    RETURN_IF_SKIP(InitBasicGraphicsLibrary());
     InitRenderTarget();
 
     std::vector<VkPipelineShaderStageCreateInfo> stages;
@@ -893,7 +897,7 @@ TEST_F(NegativeGraphicsLibrary, FragmentStateWithPreRaster) {
 
 TEST_F(NegativeGraphicsLibrary, MissingShaderStages) {
     TEST_DESCRIPTION("Create a library with pre-raster state, but no pre-raster shader");
-    RETURN_IF_SKIP(InitBasicGraphicsLibrary())
+    RETURN_IF_SKIP(InitBasicGraphicsLibrary());
     InitRenderTarget();
 
     {
@@ -917,7 +921,7 @@ TEST_F(NegativeGraphicsLibrary, DescriptorBufferLibrary) {
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME);
     VkPhysicalDeviceDescriptorBufferFeaturesEXT db_features = vku::InitStructHelper();
-    RETURN_IF_SKIP(InitBasicGraphicsLibrary(&db_features))
+    RETURN_IF_SKIP(InitBasicGraphicsLibrary(&db_features));
 
     if (!db_features.descriptorBuffer) {
         GTEST_SKIP() << "VkPhysicalDeviceDescriptorBufferFeaturesEXT::descriptorBuffer not supported";
@@ -979,7 +983,7 @@ TEST_F(NegativeGraphicsLibrary, DescriptorBufferLibrary) {
 TEST_F(NegativeGraphicsLibrary, DSLShaderStageMask) {
     TEST_DESCRIPTION(
         "Attempt to bind invalid descriptor sets with and without VK_EXT_graphics_pipeline_library and independent sets");
-    RETURN_IF_SKIP(InitBasicGraphicsLibrary())
+    RETURN_IF_SKIP(InitBasicGraphicsLibrary());
     InitRenderTarget();
 
     const char vs_src[] = R"glsl(
@@ -1064,7 +1068,7 @@ TEST_F(NegativeGraphicsLibrary, DSLShaderStageMask) {
 
 TEST_F(NegativeGraphicsLibrary, Tessellation) {
     TEST_DESCRIPTION("Test various errors when creating a graphics pipeline with tessellation stages active.");
-    RETURN_IF_SKIP(InitBasicGraphicsLibrary())
+    RETURN_IF_SKIP(InitBasicGraphicsLibrary());
 
     if (!m_device->phy().features().tessellationShader) {
         GTEST_SKIP() << "Device does not support tessellation shaders";
@@ -1267,7 +1271,7 @@ TEST_F(NegativeGraphicsLibrary, PipelineExecutableProperties) {
     SetTargetApiVersion(VK_API_VERSION_1_3);
     AddRequiredExtensions(VK_KHR_PIPELINE_EXECUTABLE_PROPERTIES_EXTENSION_NAME);
     VkPhysicalDevicePipelineExecutablePropertiesFeaturesKHR executable_features = vku::InitStructHelper();
-    RETURN_IF_SKIP(InitBasicGraphicsLibrary(&executable_features))
+    RETURN_IF_SKIP(InitBasicGraphicsLibrary(&executable_features));
     InitRenderTarget();
 
     {
@@ -1338,7 +1342,7 @@ TEST_F(NegativeGraphicsLibrary, PipelineExecutableProperties) {
 TEST_F(NegativeGraphicsLibrary, BindEmptyDS) {
     TEST_DESCRIPTION("Bind an empty descriptor set");
 
-    RETURN_IF_SKIP(InitBasicGraphicsLibrary())
+    RETURN_IF_SKIP(InitBasicGraphicsLibrary());
     InitRenderTarget();
 
     // Prepare descriptors
@@ -1448,7 +1452,7 @@ TEST_F(NegativeGraphicsLibrary, BindLibraryPipeline) {
     TEST_DESCRIPTION("Test binding a pipeline that was created with library flag");
 
     AddRequiredExtensions(VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitBasicGraphicsLibrary())
+    RETURN_IF_SKIP(InitBasicGraphicsLibrary());
 
     // Required for graphics pipeline libraries
     InitRenderTarget();
@@ -1473,7 +1477,7 @@ TEST_F(NegativeGraphicsLibrary, ShaderModuleIdentifier) {
     VkPhysicalDevicePipelineCreationCacheControlFeatures pipeline_cache_control_features = vku::InitStructHelper();
     VkPhysicalDeviceShaderModuleIdentifierFeaturesEXT shader_module_id_features =
         vku::InitStructHelper(&pipeline_cache_control_features);
-    RETURN_IF_SKIP(InitBasicGraphicsLibrary(&shader_module_id_features))
+    RETURN_IF_SKIP(InitBasicGraphicsLibrary(&shader_module_id_features));
 
     if (!pipeline_cache_control_features.pipelineCreationCacheControl) {
         GTEST_SKIP() << "pipelineCreationCacheControl not supported";
@@ -1512,6 +1516,11 @@ TEST_F(NegativeGraphicsLibrary, ShaderModuleIdentifier) {
     pipe.CreateGraphicsPipeline();
     m_errorMonitor->VerifyFound();
 
+    VkShaderModuleIdentifierEXT get_identifier = vku::InitStructHelper();
+    vk::GetShaderModuleIdentifierEXT(device(), vs.handle(), &get_identifier);
+    sm_id_create_info.identifierSize = get_identifier.identifierSize;
+    sm_id_create_info.pIdentifier = get_identifier.identifier;
+
     // shader module id ci and module not VK_NULL_HANDLE
     stage_ci.pNext = &sm_id_create_info;
     stage_ci.module = vs.handle();
@@ -1519,10 +1528,6 @@ TEST_F(NegativeGraphicsLibrary, ShaderModuleIdentifier) {
     pipe.CreateGraphicsPipeline();
     m_errorMonitor->VerifyFound();
 
-    VkShaderModuleIdentifierEXT get_identifier = vku::InitStructHelper();
-    vk::GetShaderModuleIdentifierEXT(device(), vs.handle(), &get_identifier);
-    sm_id_create_info.identifierSize = get_identifier.identifierSize;
-    sm_id_create_info.pIdentifier = get_identifier.identifier;
     stage_ci.module = VK_NULL_HANDLE;
     pipe.gp_ci_.flags = 0;
     // shader module id ci and no VK_PIPELINE_CREATE_FAIL_ON_PIPELINE_COMPILE_REQUIRED_BIT
@@ -1577,11 +1582,11 @@ TEST_F(NegativeGraphicsLibrary, ShaderModuleIdentifierFeatures) {
     AddRequiredExtensions(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_SHADER_MODULE_IDENTIFIER_EXTENSION_NAME);
     SetTargetApiVersion(VK_API_VERSION_1_3);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDevicePipelineCreationCacheControlFeatures pipeline_cache_control_features = vku::InitStructHelper();
     auto features2 = GetPhysicalDeviceFeatures2(pipeline_cache_control_features);
-    RETURN_IF_SKIP(InitState(nullptr, &features2))
+    RETURN_IF_SKIP(InitState(nullptr, &features2));
     InitRenderTarget();
 
     VkPipelineShaderStageCreateInfo stage_ci = vku::InitStructHelper();
@@ -1621,60 +1626,9 @@ TEST_F(NegativeGraphicsLibrary, ShaderModuleIdentifierFeatures) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeGraphicsLibrary, Layouts) {
-    TEST_DESCRIPTION("Various invalid layouts");
-    RETURN_IF_SKIP(InitBasicGraphicsLibrary())
-    InitRenderTarget();
-
-    CreatePipelineHelper vi_lib(*this);
-    vi_lib.InitVertexInputLibInfo();
-    vi_lib.InitState();
-    vi_lib.CreateGraphicsPipeline();
-
-    CreatePipelineHelper fo_lib(*this);
-    fo_lib.InitFragmentOutputLibInfo();
-    fo_lib.InitState();
-    fo_lib.CreateGraphicsPipeline();
-
-    CreatePipelineHelper pre_raster_lib(*this);
-    {
-        const auto vs_spv = GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, kVertexMinimalGlsl);
-        vkt::GraphicsPipelineLibraryStage stage_ci(vs_spv, VK_SHADER_STAGE_VERTEX_BIT);
-
-        pre_raster_lib.InitPreRasterLibInfo(&stage_ci.stage_ci);
-        pre_raster_lib.InitState();
-        pre_raster_lib.CreateGraphicsPipeline();
-    }
-
-    CreatePipelineHelper frag_shader_lib(*this);
-    {
-        const auto fs_spv = GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, kFragmentMinimalGlsl);
-        vkt::GraphicsPipelineLibraryStage stage_ci(fs_spv, VK_SHADER_STAGE_FRAGMENT_BIT);
-
-        frag_shader_lib.InitFragmentLibInfo(&stage_ci.stage_ci);
-        frag_shader_lib.InitState();
-        frag_shader_lib.CreateGraphicsPipeline();
-    }
-
-    VkPipeline libraries[4] = {
-        vi_lib.pipeline_,
-        pre_raster_lib.pipeline_,
-        frag_shader_lib.pipeline_,
-        fo_lib.pipeline_,
-    };
-    VkPipelineLibraryCreateInfoKHR link_info = vku::InitStructHelper();
-    link_info.libraryCount = size(libraries);
-    link_info.pLibraries = libraries;
-
-    VkGraphicsPipelineCreateInfo lib_ci = vku::InitStructHelper(&link_info);
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-None-07826");
-    vkt::Pipeline lib(*m_device, lib_ci);
-    m_errorMonitor->VerifyFound();
-}
-
 TEST_F(NegativeGraphicsLibrary, IncompatibleLayouts) {
     TEST_DESCRIPTION("Link pre-raster state while creating FS state with invalid null DSL + shader stage bindings");
-    RETURN_IF_SKIP(InitBasicGraphicsLibrary())
+    RETURN_IF_SKIP(InitBasicGraphicsLibrary());
     InitRenderTarget();
 
     // Prepare descriptors
@@ -1745,7 +1699,7 @@ TEST_F(NegativeGraphicsLibrary, IncompatibleLayouts) {
 TEST_F(NegativeGraphicsLibrary, NullLibrary) {
     TEST_DESCRIPTION("pLibraries has a null pipeline");
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    RETURN_IF_SKIP(InitBasicGraphicsLibrary())
+    RETURN_IF_SKIP(InitBasicGraphicsLibrary());
     InitRenderTarget();
 
     CreatePipelineHelper vertex_input_lib(*this);
@@ -1784,7 +1738,7 @@ TEST_F(NegativeGraphicsLibrary, NullLibrary) {
 TEST_F(NegativeGraphicsLibrary, BadLibrary) {
     TEST_DESCRIPTION("pLibraries has a bad pipeline");
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    RETURN_IF_SKIP(InitBasicGraphicsLibrary())
+    RETURN_IF_SKIP(InitBasicGraphicsLibrary());
     InitRenderTarget();
 
     CreatePipelineHelper vertex_input_lib(*this);
@@ -1824,7 +1778,7 @@ TEST_F(NegativeGraphicsLibrary, BadLibrary) {
 TEST_F(NegativeGraphicsLibrary, DynamicPrimitiveTopolgyIngoreState) {
     TEST_DESCRIPTION("set VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY in non-Vertex Input state so it is ignored");
     SetTargetApiVersion(VK_API_VERSION_1_3);
-    RETURN_IF_SKIP(InitBasicGraphicsLibrary())
+    RETURN_IF_SKIP(InitBasicGraphicsLibrary());
     InitRenderTarget();
 
     CreatePipelineHelper vertex_input_lib(*this);

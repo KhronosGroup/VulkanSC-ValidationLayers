@@ -22,7 +22,7 @@ TEST_F(NegativeDescriptorIndexing, UpdateAfterBind) {
     AddRequiredExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_MAINTENANCE_3_EXTENSION_NAME);
 
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     // Create a device that enables all supported indexing features except descriptorBindingUniformBufferUpdateAfterBind
     descriptor_indexing_features = vku::InitStructHelper();
@@ -34,7 +34,7 @@ TEST_F(NegativeDescriptorIndexing, UpdateAfterBind) {
         GTEST_SKIP() << "Test requires (unsupported) descriptorBindingStorageBufferUpdateAfterBind";
     }
 
-    RETURN_IF_SKIP(InitState(nullptr, &features2, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    RETURN_IF_SKIP(InitState(nullptr, &features2));
     InitRenderTarget();
 
     if (!m_device->phy().features().fragmentStoresAndAtomics) {
@@ -130,53 +130,21 @@ TEST_F(NegativeDescriptorIndexing, UpdateAfterBind) {
     // Make both bindings valid before binding to the command buffer
     vk::UpdateDescriptorSets(m_device->device(), 2, &descriptor_write[0], 0, NULL);
 
-    VkSubmitInfo submit_info = vku::InitStructHelper();
-    submit_info.commandBufferCount = 1;
-    submit_info.pCommandBuffers = &m_commandBuffer->handle();
+    // Invalid to update binding 0 after being bound. But the error is actually
+    // generated during vk::EndCommandBuffer
+    vk::UpdateDescriptorSets(m_device->device(), 1, &descriptor_write[0], 0, NULL);
 
-    // Two subtests. First only updates the update_after_bind binding and expects
-    // no error. Second updates the other binding and expects an error when the
-    // command buffer is ended.
-    for (uint32_t i = 0; i < 2; ++i) {
-        m_commandBuffer->begin();
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkEndCommandBuffer-commandBuffer-00059");
 
-        vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1, &ds,
-                                  0, NULL);
-
-        m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-        vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-        vk::CmdDraw(m_commandBuffer->handle(), 0, 0, 0, 0);
-        m_commandBuffer->EndRenderPass();
-
-        // Valid to update binding 1 after being bound
-        vk::UpdateDescriptorSets(m_device->device(), 1, &descriptor_write[1], 0, NULL);
-
-        if (i == 0) {
-            // expect no errors
-            m_commandBuffer->end();
-            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDraw-None-08114");
-            vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
-            m_errorMonitor->VerifyFound();
-            vk::QueueWaitIdle(m_default_queue);
-        } else {
-            // Invalid to update binding 0 after being bound. But the error is actually
-            // generated during vk::EndCommandBuffer
-            vk::UpdateDescriptorSets(m_device->device(), 1, &descriptor_write[0], 0, NULL);
-
-            m_errorMonitor->SetDesiredFailureMsg(kErrorBit,
-                                                 "UNASSIGNED-CoreValidation-DrawState-InvalidCommandBuffer-VkDescriptorSet");
-
-            vk::EndCommandBuffer(m_commandBuffer->handle());
-            m_errorMonitor->VerifyFound();
-        }
-    }
+    vk::EndCommandBuffer(m_commandBuffer->handle());
+    m_errorMonitor->VerifyFound();
 }
 
 TEST_F(NegativeDescriptorIndexing, SetNonIdenticalWrite) {
     TEST_DESCRIPTION("VkWriteDescriptorSet must have identical VkDescriptorBindingFlagBits");
 
     AddRequiredExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     descriptor_indexing_features = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(descriptor_indexing_features);
@@ -248,7 +216,7 @@ TEST_F(NegativeDescriptorIndexing, SetNonIdenticalWrite) {
 
 TEST_F(NegativeDescriptorIndexing, SetLayoutWithoutExtension) {
     TEST_DESCRIPTION("Create an update_after_bind set layout without loading the needed extension.");
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     VkDescriptorSetLayoutCreateInfo ds_layout_ci = vku::InitStructHelper();
     ds_layout_ci.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT_EXT;
@@ -264,7 +232,7 @@ TEST_F(NegativeDescriptorIndexing, SetLayout) {
     TEST_DESCRIPTION("Exercise various create/allocate-time errors related to VK_EXT_descriptor_indexing.");
 
     AddRequiredExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     // Create a device that enables all supported indexing features except descriptorBindingUniformBufferUpdateAfterBind
     descriptor_indexing_features = vku::InitStructHelper();
@@ -411,7 +379,7 @@ TEST_F(NegativeDescriptorIndexing, SetLayout) {
 
 TEST_F(NegativeDescriptorIndexing, SetLayoutBindings) {
     TEST_DESCRIPTION("Create descriptor set layout with incompatible bindings.");
-    RETURN_IF_SKIP(InitBasicDescriptorIndexing())
+    RETURN_IF_SKIP(InitBasicDescriptorIndexing());
 
     if (!descriptor_indexing_features.descriptorBindingUniformBufferUpdateAfterBind) {
         GTEST_SKIP() << "Test requires (unsupported) descriptorBindingStorageBufferUpdateAfterBind";

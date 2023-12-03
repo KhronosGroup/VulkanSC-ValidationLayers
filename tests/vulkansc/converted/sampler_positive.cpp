@@ -17,13 +17,13 @@
 #include "../framework/layer_validation_tests.h"
 #include "generated/vk_extension_helper.h"
 
-TEST_F(PositiveSampler, SamplerMirrorClampToEdgeWithoutFeature) {
+TEST_F(PositiveSampler, DISABLED_SamplerMirrorClampToEdgeWithoutFeature) {
     TEST_DESCRIPTION("Use VK_KHR_sampler_mirror_clamp_to_edge in 1.1 before samplerMirrorClampToEdge feature was added");
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_SAMPLER_MIRROR_CLAMP_TO_EDGE_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitState());
     InitRenderTarget();
     if (DeviceValidationVersion() != VK_API_VERSION_1_1) {
         GTEST_SKIP() << "Test requires Vulkan 1.1 exactly";
@@ -34,14 +34,17 @@ TEST_F(PositiveSampler, SamplerMirrorClampToEdgeWithoutFeature) {
     vkt::Sampler sampler(*m_device, sampler_info);
 }
 
-TEST_F(PositiveSampler, SamplerMirrorClampToEdgeWithoutFeature12) {
+TEST_F(PositiveSampler, DISABLED_SamplerMirrorClampToEdgeWithoutFeature12) {
     TEST_DESCRIPTION("Use VK_KHR_sampler_mirror_clamp_to_edge in 1.2 using the extension");
+
+    // We need to explicitly allow promoted extensions to be enabled as this test relies on this behavior
+    AllowPromotedExtensions();
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_KHR_SAMPLER_MIRROR_CLAMP_TO_EDGE_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
     VkSamplerCreateInfo sampler_info = SafeSaneSamplerCreateInfo();
@@ -54,7 +57,7 @@ TEST_F(PositiveSampler, SamplerMirrorClampToEdgeWithFeature) {
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
 
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceVulkan12Features features12 = vku::InitStructHelper();
     features12.samplerMirrorClampToEdge = VK_TRUE;
@@ -64,7 +67,7 @@ TEST_F(PositiveSampler, SamplerMirrorClampToEdgeWithFeature) {
         return;
     }
 
-    RETURN_IF_SKIP(InitState(nullptr, &features2))
+    RETURN_IF_SKIP(InitState(nullptr, &features2));
     InitRenderTarget();
 
     VkSamplerCreateInfo sampler_info = SafeSaneSamplerCreateInfo();

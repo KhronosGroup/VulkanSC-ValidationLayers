@@ -50,7 +50,7 @@ VkRenderFramework::VkRenderFramework()
       m_render_target_fmt(VK_FORMAT_R8G8B8A8_UNORM),
       m_depth_stencil_fmt(VK_FORMAT_UNDEFINED),
       m_depth_stencil_layout(VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL),
-      m_clear_via_load_op(true),
+      m_load_op_clear(true),
       m_depth_clear_color(1.0),
       m_stencil_clear_color(0),
       m_depthStencil(NULL) {
@@ -198,6 +198,14 @@ void *VkRenderFramework::SetupValidationSettings(void *first_pnext) {
 void VkRenderFramework::InitFramework(void *instance_pnext) {
     ASSERT_EQ((VkInstance)0, instance_);
 
+    const auto ExtensionIncludedInTargetVersion = [this](const char *extension) {
+        if (IsPromotedInstanceExtension(extension)) {
+            // Replicate the core entry points into the extension entry points
+            vk::InitExtensionFromCore(extension);
+            return true;
+        }
+        return false;
+    };
     const auto LayerNotSupportedWithReporting = [this](const char *layer) {
         if (InstanceLayerSupported(layer))
             return false;
@@ -234,6 +242,15 @@ void VkRenderFramework::InitFramework(void *instance_pnext) {
     }
 #endif
 
+    vk::ResetAllExtensions();
+
+    // Remove promoted extensions from both the instance and required extension lists
+    if (!allow_promoted_extensions_) {
+        RemoveIf(m_required_extensions, ExtensionIncludedInTargetVersion);
+        RemoveIf(m_optional_extensions, ExtensionIncludedInTargetVersion);
+        RemoveIf(m_instance_extension_names, ExtensionIncludedInTargetVersion);
+    }
+
     RemoveIf(instance_layers_, LayerNotSupportedWithReporting);
     RemoveIf(m_instance_extension_names, ExtensionNotSupportedWithReporting);
 
@@ -258,7 +275,6 @@ void VkRenderFramework::InitFramework(void *instance_pnext) {
     ASSERT_EQ(VK_SUCCESS, vk::CreateInstance(&ici, nullptr, &instance_));
     if (instance_pnext) reinterpret_cast<VkBaseOutStructure *>(last_pnext)->pNext = nullptr;  // reset back borrowed pNext chain
 
-    vk::ResetAllExtensions();
     for (const char *instance_ext_name : m_instance_extension_names) {
         vk::InitInstanceExtension(instance_, instance_ext_name);
     }
@@ -420,8 +436,25 @@ bool VkRenderFramework::AddRequestedInstanceExtensions(const char *ext_name) {
     return true;
 }
 
+bool VkRenderFramework::IsPromotedInstanceExtension(const char *inst_ext_name) const {
+    if (!m_target_api_version.Valid()) return false;
+
+    const auto promotion_info_map = InstanceExtensions::get_promotion_info_map();
+    for (const auto &version_it : promotion_info_map) {
+        if (m_target_api_version >= version_it.first) {
+            const auto promoted_exts = version_it.second.second;
+            if (promoted_exts.find(inst_ext_name) != promoted_exts.end()) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 bool VkRenderFramework::CanEnableInstanceExtension(const std::string &inst_ext_name) const {
-    return std::any_of(m_instance_extension_names.cbegin(), m_instance_extension_names.cend(),
+    return (!allow_promoted_extensions_ && IsPromotedInstanceExtension(inst_ext_name.c_str())) ||
+           std::any_of(m_instance_extension_names.cbegin(), m_instance_extension_names.cend(),
                        [&inst_ext_name](const char *ext) { return inst_ext_name == ext; });
 }
 
@@ -452,8 +485,26 @@ bool VkRenderFramework::AddRequestedDeviceExtensions(const char *dev_ext_name) {
     return true;
 }
 
+bool VkRenderFramework::IsPromotedDeviceExtension(const char *dev_ext_name) const {
+    auto device_version = std::min(m_target_api_version, APIVersion(physDevProps().apiVersion));
+    if (!device_version.Valid()) return false;
+
+    const auto promotion_info_map = DeviceExtensions::get_promotion_info_map();
+    for (const auto &version_it : promotion_info_map) {
+        if (device_version >= version_it.first) {
+            const auto promoted_exts = version_it.second.second;
+            if (promoted_exts.find(dev_ext_name) != promoted_exts.end()) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 bool VkRenderFramework::CanEnableDeviceExtension(const std::string &dev_ext_name) const {
-    return std::any_of(m_device_extension_names.cbegin(), m_device_extension_names.cend(),
+    return (!allow_promoted_extensions_ && IsPromotedDeviceExtension(dev_ext_name.c_str())) ||
+           std::any_of(m_device_extension_names.cbegin(), m_device_extension_names.cend(),
                        [&dev_ext_name](const char *ext) { return dev_ext_name == ext; });
 }
 
@@ -474,6 +525,7 @@ void VkRenderFramework::ShutdownFramework() {
     if (m_renderPass) vk::DestroyRenderPass(device(), m_renderPass, NULL);
     m_renderPass = VK_NULL_HANDLE;
 
+    m_render_target_views.clear();
     m_renderTargets.clear();
 
     delete m_depthStencil;
@@ -537,6 +589,49 @@ VkFormat VkRenderFramework::GetRenderTargetFormat() {
 
 void VkRenderFramework::InitState(VkPhysicalDeviceFeatures *features, void *create_device_pnext,
                                   const VkCommandPoolCreateFlags flags) {
+    VkPhysicalDeviceVulkan12Features vk12_features = vku::InitStructHelper();
+    const auto ExtensionIncludedInDeviceApiVersion = [&](const char *extension) {
+        if (IsPromotedDeviceExtension(extension)) {
+            // Replicate the core entry points into the extension entry points
+            vk::InitExtensionFromCore(extension);
+
+            // Handle special cases which did not have a feature flag in the extension
+            // but do have one in their core promoted form
+            static const std::unordered_map<std::string, std::vector<size_t>> vk12_ext_feature_offsets = {
+                {
+                    VK_KHR_DRAW_INDIRECT_COUNT_EXTENSION_NAME,
+                    { offsetof(VkPhysicalDeviceVulkan12Features, drawIndirectCount) }
+                },
+                {
+                    VK_EXT_SAMPLER_FILTER_MINMAX_EXTENSION_NAME,
+                    { offsetof(VkPhysicalDeviceVulkan12Features, samplerFilterMinmax) }
+                },
+                {
+                    VK_EXT_SHADER_VIEWPORT_INDEX_LAYER_EXTENSION_NAME,
+                    {
+                        offsetof(VkPhysicalDeviceVulkan12Features, shaderOutputViewportIndex),
+                        offsetof(VkPhysicalDeviceVulkan12Features, shaderOutputLayer)
+                    }
+                }
+            };
+            auto it = vk12_ext_feature_offsets.find(extension);
+            if (it != vk12_ext_feature_offsets.end()) {
+                auto vk12_features_ptr = vku::FindStructInPNextChain<VkPhysicalDeviceVulkan12Features>(create_device_pnext);
+                if (vk12_features_ptr == nullptr) {
+                    vk12_features_ptr = &vk12_features;
+                    vk12_features.pNext = create_device_pnext;
+                    create_device_pnext = vk12_features_ptr;
+                }
+                const VkBool32 enabled = VK_TRUE;
+                for (const auto offset : it->second) {
+                    std::memcpy(((uint8_t *)vk12_features_ptr) + offset, &enabled, sizeof(enabled));
+                }
+            }
+
+            return true;
+        }
+        return false;
+    };
     const auto ExtensionNotSupportedWithReporting = [this](const char *extension) {
         if (DeviceExtensionSupported(extension))
             return false;
@@ -546,6 +641,13 @@ void VkRenderFramework::InitState(VkPhysicalDeviceFeatures *features, void *crea
             return true;
         }
     };
+
+    // Remove promoted extensions from both the instance and required extension lists
+    if (!allow_promoted_extensions_) {
+        RemoveIf(m_required_extensions, ExtensionIncludedInDeviceApiVersion);
+        RemoveIf(m_optional_extensions, ExtensionIncludedInDeviceApiVersion);
+        RemoveIf(m_device_extension_names, ExtensionIncludedInDeviceApiVersion);
+    }
 
     RemoveIf(m_device_extension_names, ExtensionNotSupportedWithReporting);
 
@@ -580,6 +682,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
 bool VkRenderFramework::CreateSurface(SurfaceContext &surface_context, VkSurfaceKHR &surface, VkInstance custom_instance) {
     const VkInstance surface_instance = (custom_instance != VK_NULL_HANDLE) ? custom_instance : instance();
+    (void)surface_instance;
 #if defined(VK_USE_PLATFORM_WIN32_KHR)
     if (IsExtensionsEnabled(VK_KHR_WIN32_SURFACE_EXTENSION_NAME)) {
         HINSTANCE window_instance = GetModuleHandle(nullptr);
@@ -811,9 +914,9 @@ void VkRenderFramework::InitRenderTarget() { InitRenderTarget(1); }
 
 void VkRenderFramework::InitRenderTarget(uint32_t targets) { InitRenderTarget(targets, NULL); }
 
-void VkRenderFramework::InitRenderTarget(VkImageView *dsBinding) { InitRenderTarget(1, dsBinding); }
+void VkRenderFramework::InitRenderTarget(const VkImageView *dsBinding) { InitRenderTarget(1, dsBinding); }
 
-void VkRenderFramework::InitRenderTarget(uint32_t targets, VkImageView *dsBinding) {
+void VkRenderFramework::InitRenderTarget(uint32_t targets, const VkImageView *dsBinding) {
     vector<VkAttachmentDescription> &attachments = m_renderPass_attachments;
     vector<VkAttachmentReference> color_references;
     vector<VkImageView> &bindings = m_framebuffer_attachments;
@@ -824,15 +927,18 @@ void VkRenderFramework::InitRenderTarget(uint32_t targets, VkImageView *dsBindin
     VkAttachmentDescription att = {};
     att.format = m_render_target_fmt;
     att.samples = VK_SAMPLE_COUNT_1_BIT;
-    att.loadOp = (m_clear_via_load_op) ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
+    att.loadOp = m_load_op_clear ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
     att.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     att.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     att.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    att.initialLayout = (m_clear_via_load_op) ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    att.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    const bool has_color_layout = m_color_layout != VK_IMAGE_LAYOUT_UNDEFINED;
+    const auto color_layout = has_color_layout ? m_color_layout : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    att.initialLayout = m_load_op_clear ? VK_IMAGE_LAYOUT_UNDEFINED : color_layout;
+    att.finalLayout = color_layout;
 
     VkAttachmentReference ref = {};
-    ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    ref.layout = color_layout;
 
     m_renderPassClearValues.clear();
     VkClearValue clear = {};
@@ -864,7 +970,8 @@ void VkRenderFramework::InitRenderTarget(uint32_t targets, VkImageView *dsBindin
             FAIL() << "Neither Linear nor Optimal allowed for render target";
         }
 
-        bindings.push_back(img->targetView(m_render_target_fmt));
+        m_render_target_views.push_back(img->CreateView());
+        bindings.push_back(m_render_target_views.back().handle());
         m_renderTargets.push_back(std::move(img));
     }
 
@@ -882,9 +989,9 @@ void VkRenderFramework::InitRenderTarget(uint32_t targets, VkImageView *dsBindin
     VkAttachmentReference ds_reference;
     if (dsBinding) {
         att.format = m_depth_stencil_fmt;
-        att.loadOp = (m_clear_via_load_op) ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
+        att.loadOp = (m_load_op_clear) ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
         att.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-        att.stencilLoadOp = (m_clear_via_load_op) ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
+        att.stencilLoadOp = (m_load_op_clear) ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
         att.stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
         att.initialLayout = m_depth_stencil_layout;
         att.finalLayout = m_depth_stencil_layout;
@@ -959,8 +1066,8 @@ void VkRenderFramework::InitRenderTarget(uint32_t targets, VkImageView *dsBindin
     VkFramebufferCreateInfo &fb_info = m_framebuffer_info;
     fb_info = vku::InitStructHelper();
     fb_info.renderPass = m_renderPass;
-    fb_info.attachmentCount = bindings.size();
-    fb_info.pAttachments = bindings.data();
+    fb_info.attachmentCount = m_framebuffer_attachments.size();
+    fb_info.pAttachments = m_framebuffer_attachments.data();
     fb_info.width = m_width;
     fb_info.height = m_height;
     fb_info.layers = 1;
@@ -998,7 +1105,8 @@ void VkRenderFramework::InitDynamicRenderTarget(VkFormat format) {
         FAIL() << "Optimal tiling not allowed for render target";
     }
 
-    m_framebuffer_attachments.push_back(img->targetView(m_render_target_fmt));
+    m_render_target_views.push_back(img->CreateView());
+    m_framebuffer_attachments.push_back(m_render_target_views.back().handle());
     m_renderTargets.push_back(std::move(img));
 }
 
@@ -1014,104 +1122,7 @@ void VkRenderFramework::DestroyRenderTarget() {
     m_framebuffer = VK_NULL_HANDLE;
 }
 
-VkDescriptorSetObj::VkDescriptorSetObj(vkt::Device *device) : m_device(device), m_nextSlot(0) {}
-
-VkDescriptorSetObj::~VkDescriptorSetObj() noexcept {
-    if (m_set) {
-        delete m_set;
-    }
-}
-
-int VkDescriptorSetObj::AppendDummy() {
-    /* request a descriptor but do not update it */
-    VkDescriptorSetLayoutBinding binding = {};
-    binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    binding.descriptorCount = 1;
-    binding.binding = m_layout_bindings.size();
-    binding.stageFlags = VK_SHADER_STAGE_ALL;
-    binding.pImmutableSamplers = NULL;
-
-    m_layout_bindings.push_back(binding);
-    m_type_counts[VK_DESCRIPTOR_TYPE_STORAGE_BUFFER] += binding.descriptorCount;
-
-    return m_nextSlot++;
-}
-
-int VkDescriptorSetObj::AppendSamplerTexture(VkDescriptorImageInfo &image_info) {
-    VkDescriptorSetLayoutBinding binding = {};
-    binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    binding.descriptorCount = 1;
-    binding.binding = m_layout_bindings.size();
-    binding.stageFlags = VK_SHADER_STAGE_ALL;
-    binding.pImmutableSamplers = NULL;
-
-    m_layout_bindings.push_back(binding);
-    m_type_counts[VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER] += binding.descriptorCount;
-    m_imageSamplerDescriptors.push_back(image_info);
-
-    m_writes.push_back(vkt::Device::write_descriptor_set(vkt::DescriptorSet(), m_nextSlot, 0,
-                                                         VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &image_info));
-
-    return m_nextSlot++;
-}
-
-void VkDescriptorSetObj::CreateVKDescriptorSet(vkt::CommandBuffer *commandBuffer) {
-    if (m_type_counts.size()) {
-        // create VkDescriptorPool
-        VkDescriptorPoolSize poolSize;
-        vector<VkDescriptorPoolSize> sizes;
-        for (auto it = m_type_counts.begin(); it != m_type_counts.end(); ++it) {
-            poolSize.descriptorCount = it->second;
-            poolSize.type = it->first;
-            sizes.push_back(poolSize);
-        }
-        VkDescriptorPoolCreateInfo pool = vku::InitStructHelper();
-        pool.poolSizeCount = sizes.size();
-        pool.maxSets = 1;
-        pool.pPoolSizes = sizes.data();
-        init(*m_device, pool);
-    }
-
-    // create VkDescriptorSetLayout
-    VkDescriptorSetLayoutCreateInfo layout = vku::InitStructHelper();
-    layout.bindingCount = m_layout_bindings.size();
-    layout.pBindings = m_layout_bindings.data();
-
-    m_layout.init(*m_device, layout);
-    vector<const vkt::DescriptorSetLayout *> layouts;
-    layouts.push_back(&m_layout);
-
-    // create VkPipelineLayout
-    VkPipelineLayoutCreateInfo pipeline_layout = vku::InitStructHelper();
-    pipeline_layout.setLayoutCount = layouts.size();
-    pipeline_layout.pSetLayouts = NULL;
-
-    m_pipeline_layout.init(*m_device, pipeline_layout, layouts);
-
-    if (m_type_counts.size()) {
-        // create VkDescriptorSet
-        m_set = alloc_sets(*m_device, m_layout);
-
-        // build the update array
-        size_t imageSamplerCount = 0;
-        for (vector<VkWriteDescriptorSet>::iterator it = m_writes.begin(); it != m_writes.end(); it++) {
-            it->dstSet = m_set->handle();
-            if (it->descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-                it->pImageInfo = &m_imageSamplerDescriptors[imageSamplerCount++];
-        }
-
-        // do the updates
-        m_device->update_descriptor_sets(m_writes);
-    }
-}
-
-VkImageObj::VkImageObj(vkt::Device *dev) {
-    m_device = dev;
-    m_descriptorImageInfo.imageView = VK_NULL_HANDLE;
-    m_descriptorImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-    m_arrayLayers = 0;
-    m_mipLevels = 0;
-}
+VkImageObj::VkImageObj(vkt::Device *dev) : m_device(dev) {}
 
 // clang-format off
 void VkImageObj::ImageMemoryBarrier(vkt::CommandBuffer *cmd_buf, VkImageAspectFlags aspect,
@@ -1348,6 +1359,7 @@ void VkImageObj::InitNoLayout(const VkImageCreateInfo &create_info, VkMemoryProp
     VkImageCreateInfo imageCreateInfo = create_info;
     imageCreateInfo.tiling = tiling;
 
+    m_format = imageCreateInfo.format;
     m_mipLevels = imageCreateInfo.mipLevels;
     m_arrayLayers = imageCreateInfo.arrayLayers;
 
@@ -1419,6 +1431,7 @@ void VkImageObj::init(const VkImageCreateInfo *create_info) {
     Layout(create_info->initialLayout);
 
     vkt::Image::init(*m_device, *create_info, 0);
+    m_format = create_info->format;
     m_mipLevels = create_info->mipLevels;
     m_arrayLayers = create_info->arrayLayers;
 
@@ -1438,6 +1451,7 @@ void VkImageObj::init(const VkImageCreateInfo *create_info) {
 void VkImageObj::init_no_mem(const vkt::Device &dev, const VkImageCreateInfo &info) {
     vkt::Image::init_no_mem(dev, info);
     Layout(info.initialLayout);
+    m_format = info.format;
     m_mipLevels = info.mipLevels;
     m_arrayLayers = info.arrayLayers;
 }
@@ -1553,105 +1567,4 @@ std::array<std::array<uint32_t, 16>, 16> VkImageObj::Read() {
     }
     stagingImage.UnmapMemory();
     return m;
-}
-
-VkPipelineShaderStageCreateInfo const &VkShaderObj::GetStageCreateInfo() const { return m_stage_info; }
-
-VkShaderObj::VkShaderObj(VkRenderFramework *framework, const char *source, VkShaderStageFlagBits stage, const spv_target_env env,
-                         SpvSourceType source_type, const VkSpecializationInfo *spec_info, char const *entry_point, bool debug, const void *pNext)
-    : m_framework(*framework), m_device(*(framework->DeviceObj())), m_source(source), m_spv_env(env) {
-    m_stage_info = vku::InitStructHelper();
-    m_stage_info.flags = 0;
-    m_stage_info.stage = stage;
-    m_stage_info.module = VK_NULL_HANDLE;
-    m_stage_info.pName = entry_point;
-    m_stage_info.pSpecializationInfo = spec_info;
-    if (source_type == SPV_SOURCE_GLSL) {
-        InitFromGLSL(debug, pNext);
-    } else if (source_type == SPV_SOURCE_ASM) {
-        InitFromASM();
-    }
-}
-
-bool VkShaderObj::InitFromGLSL(bool debug, const void *pNext) {
-    std::vector<uint32_t> spv;
-    m_framework.GLSLtoSPV(&m_device.phy().limits_, m_stage_info.stage, m_source, spv, debug, m_spv_env);
-
-    VkShaderModuleCreateInfo moduleCreateInfo = vku::InitStructHelper();
-    moduleCreateInfo.pNext = pNext;
-    moduleCreateInfo.codeSize = spv.size() * sizeof(uint32_t);
-    moduleCreateInfo.pCode = spv.data();
-
-    init(m_device, moduleCreateInfo);
-    m_stage_info.module = handle();
-    return VK_NULL_HANDLE != handle();
-}
-
-// Because shaders are currently validated at pipeline creation time, there are test cases that might fail shader module
-// creation due to supplying an invalid/unknown SPIR-V capability/operation. This is called after VkShaderObj creation when
-// tests are found to crash on a CI device
-VkResult VkShaderObj::InitFromGLSLTry(bool debug, const vkt::Device *custom_device) {
-    std::vector<uint32_t> spv;
-    // 99% of tests just use the framework's VkDevice, but this allows for tests to use custom device object
-    // Can't set at contructor time since all reference members need to be initialized then.
-    VkPhysicalDeviceLimits limits = (custom_device) ? custom_device->phy().limits_ : m_device.phy().limits_;
-    m_framework.GLSLtoSPV(&limits, m_stage_info.stage, m_source, spv, debug, m_spv_env);
-
-    VkShaderModuleCreateInfo moduleCreateInfo = vku::InitStructHelper();
-    moduleCreateInfo.codeSize = spv.size() * sizeof(uint32_t);
-    moduleCreateInfo.pCode = spv.data();
-
-    const auto result = init_try(((custom_device) ? *custom_device : m_device), moduleCreateInfo);
-    m_stage_info.module = handle();
-    return result;
-}
-
-bool VkShaderObj::InitFromASM() {
-    vector<uint32_t> spv;
-    m_framework.ASMtoSPV(m_spv_env, 0, m_source, spv);
-
-    VkShaderModuleCreateInfo moduleCreateInfo = vku::InitStructHelper();
-    moduleCreateInfo.codeSize = spv.size() * sizeof(uint32_t);
-    moduleCreateInfo.pCode = spv.data();
-
-    init(m_device, moduleCreateInfo);
-    m_stage_info.module = handle();
-    return VK_NULL_HANDLE != handle();
-}
-
-VkResult VkShaderObj::InitFromASMTry() {
-    vector<uint32_t> spv;
-    m_framework.ASMtoSPV(m_spv_env, 0, m_source, spv);
-
-    VkShaderModuleCreateInfo moduleCreateInfo = vku::InitStructHelper();
-    moduleCreateInfo.codeSize = spv.size() * sizeof(uint32_t);
-    moduleCreateInfo.pCode = spv.data();
-
-    const auto result = init_try(m_device, moduleCreateInfo);
-    m_stage_info.module = handle();
-    return result;
-}
-
-// static
-std::unique_ptr<VkShaderObj> VkShaderObj::CreateFromGLSL(VkRenderFramework *framework, const char *source,
-                                                         VkShaderStageFlagBits stage, const spv_target_env spv_env,
-                                                         const VkSpecializationInfo *spec_info, const char *entry_point,
-                                                         bool debug) {
-    auto shader =
-        std::make_unique<VkShaderObj>(framework, source, stage, spv_env, SPV_SOURCE_GLSL_TRY, spec_info, entry_point, debug);
-    if (VK_SUCCESS == shader->InitFromGLSLTry(debug)) {
-        return shader;
-    }
-    return {};
-}
-
-// static
-std::unique_ptr<VkShaderObj> VkShaderObj::CreateFromASM(VkRenderFramework *framework, const char *source,
-                                                        VkShaderStageFlagBits stage, const spv_target_env spv_env,
-                                                        const VkSpecializationInfo *spec_info, const char *entry_point) {
-    auto shader = std::make_unique<VkShaderObj>(framework, source, stage, spv_env, SPV_SOURCE_ASM_TRY, spec_info, entry_point);
-    if (VK_SUCCESS == shader->InitFromASMTry()) {
-        return shader;
-    }
-    return {};
 }

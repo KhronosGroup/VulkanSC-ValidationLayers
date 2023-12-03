@@ -24,7 +24,7 @@ TEST_F(NegativeProtectedMemory, Queue) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
 
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceProtectedMemoryFeatures protected_features = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(protected_features);
@@ -80,10 +80,10 @@ TEST_F(NegativeProtectedMemory, Submit) {
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     // creates a queue without VK_DEVICE_QUEUE_CREATE_PROTECTED_BIT
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitState());
 
     VkCommandPool command_pool;
     VkCommandPoolCreateInfo pool_create_info = vku::InitStructHelper();
@@ -155,7 +155,7 @@ TEST_F(NegativeProtectedMemory, Memory) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
 
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceProtectedMemoryFeatures protected_memory_features = vku::InitStructHelper();
     auto features2 = GetPhysicalDeviceFeatures2(protected_memory_features);
@@ -283,7 +283,7 @@ TEST_F(NegativeProtectedMemory, UniqueQueueDeviceCreationBothProtected) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
 
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     // Needed for both protected memory and vkGetDeviceQueue2
     VkPhysicalDeviceProtectedMemoryFeatures protected_features = vku::InitStructHelper();
@@ -354,13 +354,7 @@ TEST_F(NegativeProtectedMemory, GetDeviceQueue) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
 
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
-
-    // Needed for both protected memory and vkGetDeviceQueue2
-
-    if (IsDriver(VK_DRIVER_ID_MESA_RADV)) {
-        GTEST_SKIP() << "This test should not be run on the RADV driver.";
-    }
+    RETURN_IF_SKIP(InitFramework());
 
     VkDeviceQueueInfo2 queue_info_2 = vku::InitStructHelper();
     VkDevice test_device = VK_NULL_HANDLE;
@@ -484,7 +478,7 @@ TEST_F(NegativeProtectedMemory, PipelineProtectedAccess) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_EXT_PIPELINE_PROTECTED_ACCESS_EXTENSION_NAME);
     AddOptionalExtensions(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
     const bool pipeline_libraries = IsExtensionsEnabled(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME);
     VkPhysicalDeviceGraphicsPipelineLibraryFeaturesEXT gpl_features = vku::InitStructHelper();
     VkPhysicalDeviceProtectedMemoryFeatures protected_memory_features = vku::InitStructHelper();
@@ -643,7 +637,7 @@ TEST_F(NegativeProtectedMemory, UnprotectedCommands) {
 
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceProtectedMemoryFeatures protected_memory_features = vku::InitStructHelper();
     auto features2 = GetPhysicalDeviceFeatures2(protected_memory_features);
@@ -707,13 +701,13 @@ TEST_F(NegativeProtectedMemory, UnprotectedCommands) {
     m_commandBuffer->end();
 }
 
-TEST_F(NegativeProtectedMemory, MixingProtectedResources) {
+TEST_F(NegativeProtectedMemory, DISABLED_MixingProtectedResources) {
     TEST_DESCRIPTION("Test where there is mixing of protectedMemory backed resource in command buffers");
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceProtectedMemoryFeatures protected_memory_features = vku::InitStructHelper();
     auto features2 = GetPhysicalDeviceFeatures2(protected_memory_features);
@@ -726,7 +720,7 @@ TEST_F(NegativeProtectedMemory, MixingProtectedResources) {
     GetPhysicalDeviceProperties2(protected_memory_properties);
 
     // Turns m_commandBuffer into a unprotected command buffer without passing in a VkCommandPoolCreateFlags
-    RETURN_IF_SKIP(InitState(nullptr, &features2))
+    RETURN_IF_SKIP(InitState(nullptr, &features2));
 
     vkt::CommandPool protectedCommandPool(*m_device, m_device->graphics_queue_node_index_, VK_COMMAND_POOL_CREATE_PROTECTED_BIT);
     vkt::CommandBuffer protectedCommandBuffer(m_device, &protectedCommandPool);
@@ -819,10 +813,14 @@ TEST_F(NegativeProtectedMemory, MixingProtectedResources) {
     image_unprotected_descriptor.SetLayout(VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL);
 
     // need memory bound at image view creation time
-    image_views[0] = image_protected.targetView(image_format);
-    image_views[1] = image_unprotected.targetView(image_format);
-    image_views_descriptor[0] = image_protected_descriptor.targetView(image_format);
-    image_views_descriptor[1] = image_unprotected_descriptor.targetView(image_format);
+    vkt::ImageView view0 = image_protected.CreateView();
+    vkt::ImageView view1 = image_unprotected.CreateView();
+    image_views[0] = view0;
+    image_views[1] = view1;
+    vkt::ImageView view_descriptor0 = image_protected_descriptor.CreateView();
+    vkt::ImageView view_descriptor1 = image_unprotected_descriptor.CreateView();
+    image_views_descriptor[0] = view_descriptor0;
+    image_views_descriptor[1] = view_descriptor1;
 
     // A renderpass and framebuffer that contains a protected and unprotected image view
     VkAttachmentDescription attachments[2] = {
@@ -1093,4 +1091,76 @@ TEST_F(NegativeProtectedMemory, MixingProtectedResources) {
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSubmitInfo-pNext-04120");
     vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
     m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeProtectedMemory, RayTracingPipeline) {
+    TEST_DESCRIPTION("Bind ray tracing pipeline in a protected command buffer");
+
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_RAY_QUERY_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_SPIRV_1_4_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitFramework());
+    VkPhysicalDeviceProtectedMemoryFeatures protected_memory_features = vku::InitStructHelper();
+    VkPhysicalDeviceRayTracingPipelineFeaturesKHR ray_tracing_features = vku::InitStructHelper(&protected_memory_features);
+    auto features2 = GetPhysicalDeviceFeatures2(ray_tracing_features);
+
+    if (!protected_memory_features.protectedMemory) {
+        GTEST_SKIP() << "protectedMemory feature not supported";
+    };
+    if (!ray_tracing_features.rayTracingPipeline) {
+        GTEST_SKIP() << "rayTracingPipeline feature not supported";
+    }
+
+    RETURN_IF_SKIP(InitState(nullptr, &features2, VK_COMMAND_POOL_CREATE_PROTECTED_BIT));
+
+    const vkt::PipelineLayout empty_pipeline_layout(*m_device, {});
+    VkShaderObj rgen_shader(this, kRayTracingMinimalGlsl, VK_SHADER_STAGE_RAYGEN_BIT_KHR, SPV_ENV_VULKAN_1_2);
+    VkShaderObj chit_shader(this, kRayTracingMinimalGlsl, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, SPV_ENV_VULKAN_1_2);
+
+    const vkt::PipelineLayout pipeline_layout(*m_device, {});
+
+    std::array<VkPipelineShaderStageCreateInfo, 2> shader_stages;
+    shader_stages[0] = vku::InitStructHelper();
+    shader_stages[0].stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+    shader_stages[0].module = chit_shader.handle();
+    shader_stages[0].pName = "main";
+
+    shader_stages[1] = vku::InitStructHelper();
+    shader_stages[1].stage = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+    shader_stages[1].module = rgen_shader.handle();
+    shader_stages[1].pName = "main";
+
+    std::array<VkRayTracingShaderGroupCreateInfoKHR, 1> shader_groups;
+    shader_groups[0] = vku::InitStructHelper();
+    shader_groups[0].type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
+    shader_groups[0].generalShader = 1;
+    shader_groups[0].closestHitShader = VK_SHADER_UNUSED_KHR;
+    shader_groups[0].anyHitShader = VK_SHADER_UNUSED_KHR;
+    shader_groups[0].intersectionShader = VK_SHADER_UNUSED_KHR;
+
+    VkRayTracingPipelineCreateInfoKHR raytracing_pipeline_ci = vku::InitStructHelper();
+    raytracing_pipeline_ci.flags = 0;
+    raytracing_pipeline_ci.stageCount = static_cast<uint32_t>(shader_stages.size());
+    raytracing_pipeline_ci.pStages = shader_stages.data();
+    raytracing_pipeline_ci.pGroups = shader_groups.data();
+    raytracing_pipeline_ci.groupCount = shader_groups.size();
+    raytracing_pipeline_ci.layout = pipeline_layout.handle();
+
+    VkPipeline raytracing_pipeline = VK_NULL_HANDLE;
+    vk::CreateRayTracingPipelinesKHR(m_device->handle(), VK_NULL_HANDLE, VK_NULL_HANDLE, 1, &raytracing_pipeline_ci, nullptr,
+                                     &raytracing_pipeline);
+
+    m_commandBuffer->begin();
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBindPipeline-pipelineBindPoint-06721");
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, raytracing_pipeline);
+    m_errorMonitor->VerifyFound();
+    m_commandBuffer->end();
+
+    vk::DestroyPipeline(device(), raytracing_pipeline, nullptr);
 }

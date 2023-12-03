@@ -104,6 +104,17 @@ namespace vk {
 namespace compatibility {
 
 static vksc::TestDispatchHelper* DispatchHelper() { return VkSCCompatibilityRenderFramework::DispatchHelper(); }
+static VkSCCompatibilityRenderFramework& RenderFramework() { return VkSCCompatibilityRenderFramework::RenderFrameworkInstance(); }
+
+template <typename T>
+static T Features() {
+    return RenderFramework().GetVulkanFeatures<T>();
+}
+
+template <typename T>
+static T Props() {
+    return RenderFramework().GetVulkanProperties<T>();
+}
 
 static const char* GetCompatibilityProcName(const char* pName) {
     // Make KHR Vulkan entry points for Vulkan SC core features available, as many test
@@ -321,7 +332,7 @@ static VkResult CreatePipelines(VkDevice device, VkPipelineCache pipeline_cache,
                                 const CREATE_INFO* create_infos, VkPipeline* pipelines, CREATE_FUNC create_func) {
     // If the application did not provide a pipeline cache, let's use a default one
     if (pipeline_cache == VK_NULL_HANDLE) {
-        pipeline_cache = VkSCCompatibilityRenderFramework::RenderFrameworkInstance().GetDefaultPipelineCache();
+        pipeline_cache = RenderFramework().GetDefaultPipelineCache();
     }
 
     // When running Vulkan validation layer tests against the Vulkan SC validation layers
@@ -438,7 +449,25 @@ static VKAPI_ATTR VkResult VKAPI_CALL CreateRenderPass(VkDevice device, const Vk
             .SkipOnMessage("VUID-VkSubpassDescription-inputAttachmentCount-05053",
                            "Test requires higher limit for VkPhysicalDeviceVulkanSC10Properties::maxSubpassInputAttachments")
             .SkipOnMessage("VUID-VkSubpassDescription-preserveAttachmentCount-05054",
-                           "Test requires higher limit for VkPhysicalDeviceVulkanSC10Properties::maxSubpassPreserveAttachments");
+                           "Test requires higher limit for VkPhysicalDeviceVulkanSC10Properties::maxSubpassPreserveAttachments")
+            .SkipOnMessage("VUID-VkRenderPassMultiviewCreateInfo-pViewMasks-06697",
+                           "Test requires multiview support which is not required in Vulkan SC.",
+                           !Features<VkPhysicalDeviceVulkan11Features>().multiview)
+            .SkipOnMessage("VUID-VkSubpassDescription2-viewMask-06706",
+                           "Test requires multiview support which is not required in Vulkan SC..",
+                           !Features<VkPhysicalDeviceVulkan11Features>().multiview)
+            .SkipOnMessage("VUID-VkSubpassDescription2-multiview-06558",
+                           "Test requires multiview support which is not required in Vulkan SC..",
+                           !Features<VkPhysicalDeviceVulkan11Features>().multiview)
+            .SkipOnMessage("VUID-VkRenderPassMultiviewCreateInfo-multiview-06555",
+                           "Test requires multiview support which is not required in Vulkan SC..",
+                           !Features<VkPhysicalDeviceVulkan11Features>().multiview)
+            .SkipOnMessage("VUID-VkSubpassDescriptionDepthStencilResolve-depthResolveMode-03183",
+                           "Test requires depth/stencil resolve modes which are not required in Vulkan SC.",
+                           Props<VkPhysicalDeviceVulkan12Properties>().supportedDepthResolveModes == 0)
+            .SkipOnMessage("VUID-VkSubpassDescriptionDepthStencilResolve-stencilResolveMode-03184",
+                           "Test requires stencil resolve modes which are not required in Vulkan SC.",
+                           Props<VkPhysicalDeviceVulkan12Properties>().supportedStencilResolveModes == 0);
     DispatchHelper()->BeginDispatchPolicy(policy);
     VkResult result = vksc::CreateRenderPass(device, pCreateInfo, pAllocator, pRenderPass);
     DispatchHelper()->EndDispatchPolicy(policy);
@@ -459,7 +488,25 @@ static VKAPI_ATTR VkResult VKAPI_CALL CreateRenderPass2(VkDevice device, const V
             .SkipOnMessage("VUID-VkSubpassDescription2-inputAttachmentCount-05058",
                            "Test requires higher limit for VkPhysicalDeviceVulkanSC10Properties::maxSubpassInputAttachments")
             .SkipOnMessage("VUID-VkSubpassDescription2-preserveAttachmentCount-05059",
-                           "Test requires higher limit for VkPhysicalDeviceVulkanSC10Properties::maxSubpassPreserveAttachments");
+                           "Test requires higher limit for VkPhysicalDeviceVulkanSC10Properties::maxSubpassPreserveAttachments")
+            .SkipOnMessage("VUID-VkRenderPassMultiviewCreateInfo-pViewMasks-06697",
+                           "Test requires multiview support which is not required in Vulkan SC.",
+                           !Features<VkPhysicalDeviceVulkan11Features>().multiview)
+            .SkipOnMessage("VUID-VkSubpassDescription2-viewMask-06706",
+                           "Test requires multiview support which is not required in Vulkan SC..",
+                           !Features<VkPhysicalDeviceVulkan11Features>().multiview)
+            .SkipOnMessage("VUID-VkSubpassDescription2-multiview-06558",
+                           "Test requires multiview support which is not required in Vulkan SC..",
+                           !Features<VkPhysicalDeviceVulkan11Features>().multiview)
+            .SkipOnMessage("VUID-VkRenderPassMultiviewCreateInfo-multiview-06555",
+                           "Test requires multiview support which is not required in Vulkan SC..",
+                           !Features<VkPhysicalDeviceVulkan11Features>().multiview)
+            .SkipOnMessage("VUID-VkSubpassDescriptionDepthStencilResolve-depthResolveMode-03183",
+                           "Test requires depth/stencil resolve modes which are not required in Vulkan SC.",
+                           Props<VkPhysicalDeviceVulkan12Properties>().supportedDepthResolveModes == 0)
+            .SkipOnMessage("VUID-VkSubpassDescriptionDepthStencilResolve-stencilResolveMode-03184",
+                           "Test requires stencil resolve modes which are not required in Vulkan SC.",
+                           Props<VkPhysicalDeviceVulkan12Properties>().supportedStencilResolveModes == 0);
     DispatchHelper()->BeginDispatchPolicy(policy);
     VkResult result = vksc::CreateRenderPass2(device, pCreateInfo, pAllocator, pRenderPass);
     DispatchHelper()->EndDispatchPolicy(policy);
@@ -477,6 +524,18 @@ static VKAPI_ATTR VkResult VKAPI_CALL CreateFramebuffer(VkDevice device, const V
             "Test case relies on Vulkan minimum for maxFramebufferLayers but Vulkan SC allows for lower values");
     }
     return vksc::CreateFramebuffer(device, pCreateInfo, pAllocator, pFramebuffer);
+}
+
+static VKAPI_ATTR VkResult VKAPI_CALL CreateSemaphore(VkDevice device, const VkSemaphoreCreateInfo* pCreateInfo,
+                                                      const VkAllocationCallbacks* pAllocator, VkSemaphore* pSemaphore) {
+    static auto policy = DispatchHelper()->CreateDispatchPolicy().SkipOnMessage(
+        "VUID-VkSemaphoreTypeCreateInfo-timelineSemaphore-03252",
+        "Test requires timelineSemaphore support which is not required in Vulkan SC.",
+        !Features<VkPhysicalDeviceVulkan12Features>().timelineSemaphore);
+    DispatchHelper()->BeginDispatchPolicy(policy);
+    VkResult result = vksc::CreateSemaphore(device, pCreateInfo, pAllocator, pSemaphore);
+    DispatchHelper()->EndDispatchPolicy(policy);
+    return result;
 }
 
 }  // namespace compatibility
@@ -499,6 +558,7 @@ PFN_vkResetCommandBuffer ResetCommandBuffer = nullptr;
 PFN_vkCreateRenderPass CreateRenderPass = nullptr;
 PFN_vkCreateRenderPass2 CreateRenderPass2 = nullptr;
 PFN_vkCreateFramebuffer CreateFramebuffer = nullptr;
+PFN_vkCreateSemaphore CreateSemaphore = nullptr;
 
 void TestDispatchHelper::PatchDispatchTable() {
     // Add compatibility implementations for entry points that are not supported in Vulkan SC
@@ -534,36 +594,10 @@ void TestDispatchHelper::PatchDispatchTable() {
     VKSC__SWAP_COMPAT_EP(CreateRenderPass);
     VKSC__SWAP_COMPAT_EP(CreateRenderPass2);
     VKSC__SWAP_COMPAT_EP(CreateFramebuffer);
+    VKSC__SWAP_COMPAT_EP(CreateSemaphore);
 
     InitDefaultPipelineCacheData();
     InitDefaultObjectReservationInfo();
-}
-
-void TestDispatchHelper::InitCompatibilityInstanceExtensionEntryPoints(VkInstance instance) {
-    // Make KHR Vulkan entry points for Vulkan SC core features available, as many test
-    // cases do not actually check for the right pre-conditions to decide whether to use
-    // the core or extension entry points of promoted features
-    vk::InitInstanceExtension(instance, VK_KHR_DEVICE_GROUP_CREATION_EXTENSION_NAME);
-    vk::InitInstanceExtension(instance, VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-    vk::InitInstanceExtension(instance, VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME);
-    vk::InitInstanceExtension(instance, VK_KHR_EXTERNAL_FENCE_CAPABILITIES_EXTENSION_NAME);
-    vk::InitInstanceExtension(instance, VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_EXTENSION_NAME);
-}
-
-void TestDispatchHelper::InitCompatibilityDeviceExtensionEntryPoints(VkInstance instance, VkDevice device) {
-    // Make KHR Vulkan entry points for Vulkan SC core features available, as many test
-    // cases do not actually check for the right pre-conditions to decide whether to use
-    // the core or extension entry points of promoted features
-    vk::InitDeviceExtension(instance, device, VK_KHR_BIND_MEMORY_2_EXTENSION_NAME);
-    vk::InitDeviceExtension(instance, device, VK_KHR_DEVICE_GROUP_EXTENSION_NAME);
-    vk::InitDeviceExtension(instance, device, VK_KHR_GET_MEMORY_REQUIREMENTS_2_EXTENSION_NAME);
-    vk::InitDeviceExtension(instance, device, VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME);
-    vk::InitDeviceExtension(instance, device, VK_KHR_MAINTENANCE3_EXTENSION_NAME);
-    vk::InitDeviceExtension(instance, device, VK_KHR_DRAW_INDIRECT_COUNT_EXTENSION_NAME);
-    vk::InitDeviceExtension(instance, device, VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME);
-    vk::InitDeviceExtension(instance, device, VK_EXT_HOST_QUERY_RESET_EXTENSION_NAME);
-    vk::InitDeviceExtension(instance, device, VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
-    vk::InitDeviceExtension(instance, device, VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
 }
 
 TestDispatchHelper::TestDispatchHelper(VkSCCompatibilityRenderFramework* test_case) : test_case_(test_case) {}

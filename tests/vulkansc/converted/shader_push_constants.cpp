@@ -23,7 +23,7 @@ TEST_F(NegativeShaderPushConstants, DISABLED_NotDeclared) {
         "Create a graphics pipeline in which a push constant range containing a push constant block member is not declared in the "
         "layout.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     char const *vsSource = R"glsl(
@@ -57,7 +57,7 @@ TEST_F(NegativeShaderPushConstants, DISABLED_NotDeclared) {
 TEST_F(NegativeShaderPushConstants, PipelineRange) {
     TEST_DESCRIPTION("Invalid use of VkPushConstantRange structs.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     VkPhysicalDeviceProperties device_props = {};
     vk::GetPhysicalDeviceProperties(gpu(), &device_props);
@@ -129,7 +129,7 @@ TEST_F(NegativeShaderPushConstants, DISABLED_NotInLayout) {
     TEST_DESCRIPTION(
         "Test that an error is produced for a shader consuming push constants which are not provided in the pipeline layout");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     char const *vsSource = R"glsl(
@@ -155,7 +155,7 @@ TEST_F(NegativeShaderPushConstants, DISABLED_NotInLayout) {
 TEST_F(NegativeShaderPushConstants, Range) {
     TEST_DESCRIPTION("Invalid use of VkPushConstantRange values in vkCmdPushConstants.");
 
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     PFN_vkSetPhysicalDeviceLimitsEXT fpvkSetPhysicalDeviceLimitsEXT = nullptr;
     PFN_vkGetOriginalPhysicalDeviceLimitsEXT fpvkGetOriginalPhysicalDeviceLimitsEXT = nullptr;
@@ -170,7 +170,7 @@ TEST_F(NegativeShaderPushConstants, Range) {
     props.limits.maxPushConstantsSize = maxPushConstantsSize;
     fpvkSetPhysicalDeviceLimitsEXT(gpu(), &props.limits);
 
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
     char const *const vsSource = R"glsl(
@@ -236,7 +236,7 @@ TEST_F(NegativeShaderPushConstants, Range) {
 TEST_F(NegativeShaderPushConstants, DISABLED_DrawWithoutUpdate) {
     TEST_DESCRIPTION("Not every bytes in used push constant ranges has been set before Draw ");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     // push constant range: 0-99
@@ -353,7 +353,7 @@ TEST_F(NegativeShaderPushConstants, DISABLED_DrawWithoutUpdate) {
 TEST_F(NegativeShaderPushConstants, DISABLED_MultipleEntryPoint) {
     TEST_DESCRIPTION("Test push-constant detect the write entrypoint with the push constants.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     // #version 460
@@ -452,7 +452,7 @@ TEST_F(NegativeShaderPushConstants, DISABLED_MultipleEntryPoint) {
 // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/5911
 TEST_F(NegativeShaderPushConstants, DISABLED_SpecConstantSize) {
     TEST_DESCRIPTION("Use SpecConstant to adjust size of Push Constant Block");
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     const char *cs_source = R"glsl(
         #version 460

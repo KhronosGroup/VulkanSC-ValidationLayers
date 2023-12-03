@@ -25,8 +25,29 @@ class VkSCRenderFramework : public VkRenderFramework {
     virtual ~VkSCRenderFramework() override;
 
     void InitFramework(void *instance_pnext = NULL);
+    void InitState(VkPhysicalDeviceFeatures *features = nullptr, void *create_device_pnext = nullptr,
+                   const VkCommandPoolCreateFlags flags = 0);
 
     VkPipelineCache GetDefaultPipelineCache();
+
+    static VkPhysicalDeviceVulkanSC10Features GetVulkanSC10Features(VkPhysicalDevice phys_dev);
+    static VkPhysicalDeviceVulkanSC10Properties GetVulkanSC10Properties(VkPhysicalDevice phys_dev);
+
+    template <typename T>
+    T GetVulkanFeatures() const {
+        auto features = vku::InitStruct<T>();
+        auto features2 = vku::InitStruct<VkPhysicalDeviceFeatures2>(&features);
+        vksc::GetPhysicalDeviceFeatures2(gpu(), &features2);
+        return features;
+    }
+
+    template <typename T>
+    T GetVulkanProperties() const {
+        auto props = vku::InitStruct<T>();
+        auto props2 = vku::InitStruct<VkPhysicalDeviceProperties2>(&props);
+        vksc::GetPhysicalDeviceProperties2(gpu(), &props2);
+        return props;
+    }
 
   private:
     VkPipelineCache default_pipeline_cache_{VK_NULL_HANDLE};
@@ -46,7 +67,7 @@ class VkSCCompatibilityRenderFramework : public VkSCRenderFramework {
 
     void InitFramework(void *instance_pnext = NULL);
     void InitState(VkPhysicalDeviceFeatures *features = nullptr, void *create_device_pnext = nullptr,
-                   const VkCommandPoolCreateFlags flags = 0);
+                   const VkCommandPoolCreateFlags flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
 
     static VkSCCompatibilityRenderFramework &RenderFrameworkInstance() {
         assert(s_instance != nullptr);

@@ -16,19 +16,16 @@
 
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
+#include "../framework/descriptor_helper.h"
 
 TEST_F(PositiveShaderStorageImage, WriteMoreComponent) {
     TEST_DESCRIPTION("Test writing to image with less components.");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    RETURN_IF_SKIP(InitFramework())
-
-    VkPhysicalDeviceFeatures available_features = {};
-    GetPhysicalDeviceFeatures(&available_features);
-    if (!available_features.shaderStorageImageExtendedFormats) {
-        GTEST_SKIP() << "shaderStorageImageExtendedFormats is not supported";
+    RETURN_IF_SKIP(Init());
+    if (m_device->phy().features().shaderStorageImageExtendedFormats == VK_FALSE) {
+        GTEST_SKIP() << "shaderStorageImageExtendedFormats feature is not supported";
     }
-    RETURN_IF_SKIP(InitState(&available_features));
 
     // not valid GLSL, but would look like:
     // layout(set = 0, binding = 0, Rg32ui) uniform uimage2D storageImage;
@@ -69,15 +66,16 @@ TEST_F(PositiveShaderStorageImage, WriteMoreComponent) {
                                      });
 
     const VkFormat format = VK_FORMAT_R32G32_UINT;  // Rg32ui
-    if (!ImageFormatAndFeaturesSupported(gpu(), format, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT)) {
+    if (!FormatFeaturesAreSupported(gpu(), format, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT)) {
         GTEST_SKIP() << "Format doesn't support storage image";
     }
 
     VkImageObj image(m_device);
     image.Init(32, 32, 1, format, VK_IMAGE_USAGE_STORAGE_BIT, VK_IMAGE_TILING_OPTIMAL);
+    vkt::ImageView view = image.CreateView();
 
     VkDescriptorImageInfo image_info = {};
-    image_info.imageView = image.targetView(format);
+    image_info.imageView = view;
     image_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
     VkWriteDescriptorSet descriptor_write = vku::InitStructHelper();
@@ -102,20 +100,18 @@ TEST_F(PositiveShaderStorageImage, WriteMoreComponent) {
     m_commandBuffer->end();
 }
 
-TEST_F(PositiveShaderStorageImage, DISABLED_UnknownWriteMoreComponent) {
+TEST_F(PositiveShaderStorageImage, UnknownWriteMoreComponent) {
     TEST_DESCRIPTION("Test writing to image with less components for Unknown for OpTypeImage.");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    RETURN_IF_SKIP(InitFramework())
-
-    VkPhysicalDeviceFeatures available_features = {};
-    GetPhysicalDeviceFeatures(&available_features);
-    if (!available_features.shaderStorageImageExtendedFormats) {
-        GTEST_SKIP() << "shaderStorageImageExtendedFormats is not supported";
-    } else if (!available_features.shaderStorageImageWriteWithoutFormat) {
-        GTEST_SKIP() << "shaderStorageImageWriteWithoutFormat is not supported";
+    AddRequiredExtensions(VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME);
+    RETURN_IF_SKIP(Init());
+    if (m_device->phy().features().shaderStorageImageExtendedFormats == VK_FALSE) {
+        GTEST_SKIP() << "shaderStorageImageExtendedFormats feature is not supported";
     }
-    RETURN_IF_SKIP(InitState(&available_features));
+    if (m_device->phy().features().shaderStorageImageWriteWithoutFormat == VK_FALSE) {
+        GTEST_SKIP() << "shaderStorageImageWriteWithoutFormat feature is not supported";
+    }
 
     // not valid GLSL, but would look like:
     // layout(set = 0, binding = 0, Unknown) readonly uniform uimage2D storageImage;
@@ -158,7 +154,7 @@ TEST_F(PositiveShaderStorageImage, DISABLED_UnknownWriteMoreComponent) {
                                      });
 
     const VkFormat format = VK_FORMAT_R32G32_UINT;
-    if (!ImageFormatAndFeaturesSupported(gpu(), format, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT)) {
+    if (!FormatFeaturesAreSupported(gpu(), format, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT)) {
         GTEST_SKIP() << "Format doesn't support storage image";
     }
 
@@ -171,9 +167,10 @@ TEST_F(PositiveShaderStorageImage, DISABLED_UnknownWriteMoreComponent) {
 
     VkImageObj image(m_device);
     image.Init(32, 32, 1, format, VK_IMAGE_USAGE_STORAGE_BIT, VK_IMAGE_TILING_OPTIMAL);
+    vkt::ImageView view = image.CreateView();
 
     VkDescriptorImageInfo image_info = {};
-    image_info.imageView = image.targetView(format);
+    image_info.imageView = view;
     image_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
     VkWriteDescriptorSet descriptor_write = vku::InitStructHelper();
@@ -202,14 +199,10 @@ TEST_F(PositiveShaderStorageImage, WriteSpecConstantMoreComponent) {
     TEST_DESCRIPTION("Test writing to image with less components with Texel being a spec constant.");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    RETURN_IF_SKIP(InitFramework())
-
-    VkPhysicalDeviceFeatures available_features = {};
-    GetPhysicalDeviceFeatures(&available_features);
-    if (!available_features.shaderStorageImageExtendedFormats) {
-        GTEST_SKIP() << "shaderStorageImageExtendedFormats is not supported";
+    RETURN_IF_SKIP(Init());
+    if (m_device->phy().features().shaderStorageImageExtendedFormats == VK_FALSE) {
+        GTEST_SKIP() << "shaderStorageImageExtendedFormats feature is not supported";
     }
-    RETURN_IF_SKIP(InitState(&available_features));
 
     // not valid GLSL, but would look like:
     // layout (constant_id = 0) const uint sc = 1;
@@ -253,15 +246,16 @@ TEST_F(PositiveShaderStorageImage, WriteSpecConstantMoreComponent) {
                                      });
 
     const VkFormat format = VK_FORMAT_R32G32_UINT;  // Rg32ui
-    if (!ImageFormatAndFeaturesSupported(gpu(), format, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT)) {
+    if (!FormatFeaturesAreSupported(gpu(), format, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT)) {
         GTEST_SKIP() << "Format doesn't support storage image";
     }
 
     VkImageObj image(m_device);
     image.Init(32, 32, 1, format, VK_IMAGE_USAGE_STORAGE_BIT, VK_IMAGE_TILING_OPTIMAL);
+    vkt::ImageView view = image.CreateView();
 
     VkDescriptorImageInfo image_info = {};
-    image_info.imageView = image.targetView(format);
+    image_info.imageView = view;
     image_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
     VkWriteDescriptorSet descriptor_write = vku::InitStructHelper();
@@ -302,8 +296,8 @@ TEST_F(PositiveShaderStorageImage, UnknownWriteLessComponentMultiEntrypoint) {
     TEST_DESCRIPTION("Test writing to image unknown format with less components, but in unused Entrypoint.");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    RETURN_IF_SKIP(InitFramework())
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
     // The vertex and fragment shader are just a passthrough
@@ -381,15 +375,16 @@ TEST_F(PositiveShaderStorageImage, UnknownWriteLessComponentMultiEntrypoint) {
                                      });
 
     const VkFormat format = VK_FORMAT_R8G8B8A8_UINT;
-    if (!ImageFormatAndFeaturesSupported(gpu(), format, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT)) {
+    if (!FormatFeaturesAreSupported(gpu(), format, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT)) {
         GTEST_SKIP() << "Format doesn't support storage image";
     }
 
     VkImageObj image(m_device);
     image.Init(32, 32, 1, format, VK_IMAGE_USAGE_STORAGE_BIT, VK_IMAGE_TILING_OPTIMAL);
+    vkt::ImageView view = image.CreateView();
 
     VkDescriptorImageInfo image_info = {};
-    image_info.imageView = image.targetView(format);
+    image_info.imageView = view;
     image_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
     VkWriteDescriptorSet descriptor_write = vku::InitStructHelper();

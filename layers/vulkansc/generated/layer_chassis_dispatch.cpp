@@ -50,7 +50,6 @@ void WrapPnextChainHandles(ValidationObject* layer_data, const void* pNext) {
                     }
                 }
             } break;
-
 #ifdef VK_USE_PLATFORM_WIN32_KHR
             case VK_STRUCTURE_TYPE_WIN32_KEYED_MUTEX_ACQUIRE_RELEASE_INFO_KHR: {
                 safe_VkWin32KeyedMutexAcquireReleaseInfoKHR* safe_struct =
@@ -66,9 +65,6 @@ void WrapPnextChainHandles(ValidationObject* layer_data, const void* pNext) {
                     }
                 }
             } break;
-#endif  // VK_USE_PLATFORM_WIN32_KHR
-
-#ifdef VK_USE_PLATFORM_WIN32_KHR
             case VK_STRUCTURE_TYPE_WIN32_KEYED_MUTEX_ACQUIRE_RELEASE_INFO_NV: {
                 safe_VkWin32KeyedMutexAcquireReleaseInfoNV* safe_struct =
                     reinterpret_cast<safe_VkWin32KeyedMutexAcquireReleaseInfoNV*>(cur_pnext);
@@ -84,7 +80,6 @@ void WrapPnextChainHandles(ValidationObject* layer_data, const void* pNext) {
                 }
             } break;
 #endif  // VK_USE_PLATFORM_WIN32_KHR
-
             case VK_STRUCTURE_TYPE_DEDICATED_ALLOCATION_MEMORY_ALLOCATE_INFO_NV: {
                 safe_VkDedicatedAllocationMemoryAllocateInfoNV* safe_struct =
                     reinterpret_cast<safe_VkDedicatedAllocationMemoryAllocateInfoNV*>(cur_pnext);
@@ -96,7 +91,6 @@ void WrapPnextChainHandles(ValidationObject* layer_data, const void* pNext) {
                     safe_struct->buffer = layer_data->Unwrap(safe_struct->buffer);
                 }
             } break;
-
 #ifdef VK_USE_PLATFORM_FUCHSIA
             case VK_STRUCTURE_TYPE_IMPORT_MEMORY_BUFFER_COLLECTION_FUCHSIA: {
                 safe_VkImportMemoryBufferCollectionFUCHSIA* safe_struct =
@@ -107,7 +101,6 @@ void WrapPnextChainHandles(ValidationObject* layer_data, const void* pNext) {
                 }
             } break;
 #endif  // VK_USE_PLATFORM_FUCHSIA
-
             case VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO: {
                 safe_VkMemoryDedicatedAllocateInfo* safe_struct = reinterpret_cast<safe_VkMemoryDedicatedAllocateInfo*>(cur_pnext);
 
@@ -118,7 +111,6 @@ void WrapPnextChainHandles(ValidationObject* layer_data, const void* pNext) {
                     safe_struct->buffer = layer_data->Unwrap(safe_struct->buffer);
                 }
             } break;
-
 #ifdef VK_USE_PLATFORM_SCI
             case VK_STRUCTURE_TYPE_SEMAPHORE_SCI_SYNC_CREATE_INFO_NV: {
                 safe_VkSemaphoreSciSyncCreateInfoNV* safe_struct =
@@ -129,7 +121,6 @@ void WrapPnextChainHandles(ValidationObject* layer_data, const void* pNext) {
                 }
             } break;
 #endif  // VK_USE_PLATFORM_SCI
-
 #ifdef VK_USE_PLATFORM_FUCHSIA
             case VK_STRUCTURE_TYPE_BUFFER_COLLECTION_BUFFER_CREATE_INFO_FUCHSIA: {
                 safe_VkBufferCollectionBufferCreateInfoFUCHSIA* safe_struct =
@@ -139,9 +130,6 @@ void WrapPnextChainHandles(ValidationObject* layer_data, const void* pNext) {
                     safe_struct->collection = layer_data->Unwrap(safe_struct->collection);
                 }
             } break;
-#endif  // VK_USE_PLATFORM_FUCHSIA
-
-#ifdef VK_USE_PLATFORM_FUCHSIA
             case VK_STRUCTURE_TYPE_BUFFER_COLLECTION_IMAGE_CREATE_INFO_FUCHSIA: {
                 safe_VkBufferCollectionImageCreateInfoFUCHSIA* safe_struct =
                     reinterpret_cast<safe_VkBufferCollectionImageCreateInfoFUCHSIA*>(cur_pnext);
@@ -151,7 +139,6 @@ void WrapPnextChainHandles(ValidationObject* layer_data, const void* pNext) {
                 }
             } break;
 #endif  // VK_USE_PLATFORM_FUCHSIA
-
             case VK_STRUCTURE_TYPE_IMAGE_SWAPCHAIN_CREATE_INFO_KHR: {
                 safe_VkImageSwapchainCreateInfoKHR* safe_struct = reinterpret_cast<safe_VkImageSwapchainCreateInfoKHR*>(cur_pnext);
 
@@ -159,7 +146,6 @@ void WrapPnextChainHandles(ValidationObject* layer_data, const void* pNext) {
                     safe_struct->swapchain = layer_data->Unwrap(safe_struct->swapchain);
                 }
             } break;
-
             case VK_STRUCTURE_TYPE_SAMPLER_YCBCR_CONVERSION_INFO: {
                 safe_VkSamplerYcbcrConversionInfo* safe_struct = reinterpret_cast<safe_VkSamplerYcbcrConversionInfo*>(cur_pnext);
 
@@ -167,7 +153,6 @@ void WrapPnextChainHandles(ValidationObject* layer_data, const void* pNext) {
                     safe_struct->conversion = layer_data->Unwrap(safe_struct->conversion);
                 }
             } break;
-
             case VK_STRUCTURE_TYPE_SHADER_MODULE_VALIDATION_CACHE_CREATE_INFO_EXT: {
                 safe_VkShaderModuleValidationCacheCreateInfoEXT* safe_struct =
                     reinterpret_cast<safe_VkShaderModuleValidationCacheCreateInfoEXT*>(cur_pnext);
@@ -176,7 +161,6 @@ void WrapPnextChainHandles(ValidationObject* layer_data, const void* pNext) {
                     safe_struct->validationCache = layer_data->Unwrap(safe_struct->validationCache);
                 }
             } break;
-
             case VK_STRUCTURE_TYPE_SUBPASS_SHADING_PIPELINE_CREATE_INFO_HUAWEI: {
                 safe_VkSubpassShadingPipelineCreateInfoHUAWEI* safe_struct =
                     reinterpret_cast<safe_VkSubpassShadingPipelineCreateInfoHUAWEI*>(cur_pnext);
@@ -185,7 +169,6 @@ void WrapPnextChainHandles(ValidationObject* layer_data, const void* pNext) {
                     safe_struct->renderPass = layer_data->Unwrap(safe_struct->renderPass);
                 }
             } break;
-
             case VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_SHADER_GROUPS_CREATE_INFO_NV: {
                 safe_VkGraphicsPipelineShaderGroupsCreateInfoNV* safe_struct =
                     reinterpret_cast<safe_VkGraphicsPipelineShaderGroupsCreateInfoNV*>(cur_pnext);
@@ -207,7 +190,6 @@ void WrapPnextChainHandles(ValidationObject* layer_data, const void* pNext) {
                     }
                 }
             } break;
-
             case VK_STRUCTURE_TYPE_PIPELINE_LIBRARY_CREATE_INFO_KHR: {
                 safe_VkPipelineLibraryCreateInfoKHR* safe_struct =
                     reinterpret_cast<safe_VkPipelineLibraryCreateInfoKHR*>(cur_pnext);
@@ -217,7 +199,6 @@ void WrapPnextChainHandles(ValidationObject* layer_data, const void* pNext) {
                     }
                 }
             } break;
-
             case VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR: {
                 safe_VkWriteDescriptorSetAccelerationStructureKHR* safe_struct =
                     reinterpret_cast<safe_VkWriteDescriptorSetAccelerationStructureKHR*>(cur_pnext);
@@ -228,7 +209,6 @@ void WrapPnextChainHandles(ValidationObject* layer_data, const void* pNext) {
                     }
                 }
             } break;
-
             case VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_NV: {
                 safe_VkWriteDescriptorSetAccelerationStructureNV* safe_struct =
                     reinterpret_cast<safe_VkWriteDescriptorSetAccelerationStructureNV*>(cur_pnext);
@@ -239,7 +219,6 @@ void WrapPnextChainHandles(ValidationObject* layer_data, const void* pNext) {
                     }
                 }
             } break;
-
             case VK_STRUCTURE_TYPE_RENDER_PASS_ATTACHMENT_BEGIN_INFO: {
                 safe_VkRenderPassAttachmentBeginInfo* safe_struct =
                     reinterpret_cast<safe_VkRenderPassAttachmentBeginInfo*>(cur_pnext);
@@ -249,7 +228,6 @@ void WrapPnextChainHandles(ValidationObject* layer_data, const void* pNext) {
                     }
                 }
             } break;
-
             case VK_STRUCTURE_TYPE_BIND_IMAGE_MEMORY_SWAPCHAIN_INFO_KHR: {
                 safe_VkBindImageMemorySwapchainInfoKHR* safe_struct =
                     reinterpret_cast<safe_VkBindImageMemorySwapchainInfoKHR*>(cur_pnext);
@@ -258,7 +236,6 @@ void WrapPnextChainHandles(ValidationObject* layer_data, const void* pNext) {
                     safe_struct->swapchain = layer_data->Unwrap(safe_struct->swapchain);
                 }
             } break;
-
             case VK_STRUCTURE_TYPE_RENDERING_FRAGMENT_DENSITY_MAP_ATTACHMENT_INFO_EXT: {
                 safe_VkRenderingFragmentDensityMapAttachmentInfoEXT* safe_struct =
                     reinterpret_cast<safe_VkRenderingFragmentDensityMapAttachmentInfoEXT*>(cur_pnext);
@@ -267,7 +244,6 @@ void WrapPnextChainHandles(ValidationObject* layer_data, const void* pNext) {
                     safe_struct->imageView = layer_data->Unwrap(safe_struct->imageView);
                 }
             } break;
-
             case VK_STRUCTURE_TYPE_RENDERING_FRAGMENT_SHADING_RATE_ATTACHMENT_INFO_KHR: {
                 safe_VkRenderingFragmentShadingRateAttachmentInfoKHR* safe_struct =
                     reinterpret_cast<safe_VkRenderingFragmentShadingRateAttachmentInfoKHR*>(cur_pnext);
@@ -276,7 +252,6 @@ void WrapPnextChainHandles(ValidationObject* layer_data, const void* pNext) {
                     safe_struct->imageView = layer_data->Unwrap(safe_struct->imageView);
                 }
             } break;
-
             case VK_STRUCTURE_TYPE_SWAPCHAIN_PRESENT_FENCE_INFO_EXT: {
                 safe_VkSwapchainPresentFenceInfoEXT* safe_struct =
                     reinterpret_cast<safe_VkSwapchainPresentFenceInfoEXT*>(cur_pnext);
@@ -286,7 +261,6 @@ void WrapPnextChainHandles(ValidationObject* layer_data, const void* pNext) {
                     }
                 }
             } break;
-
 #ifdef VK_USE_PLATFORM_METAL_EXT
             case VK_STRUCTURE_TYPE_EXPORT_METAL_BUFFER_INFO_EXT: {
                 safe_VkExportMetalBufferInfoEXT* safe_struct = reinterpret_cast<safe_VkExportMetalBufferInfoEXT*>(cur_pnext);
@@ -295,9 +269,6 @@ void WrapPnextChainHandles(ValidationObject* layer_data, const void* pNext) {
                     safe_struct->memory = layer_data->Unwrap(safe_struct->memory);
                 }
             } break;
-#endif  // VK_USE_PLATFORM_METAL_EXT
-
-#ifdef VK_USE_PLATFORM_METAL_EXT
             case VK_STRUCTURE_TYPE_EXPORT_METAL_IO_SURFACE_INFO_EXT: {
                 safe_VkExportMetalIOSurfaceInfoEXT* safe_struct = reinterpret_cast<safe_VkExportMetalIOSurfaceInfoEXT*>(cur_pnext);
 
@@ -305,9 +276,6 @@ void WrapPnextChainHandles(ValidationObject* layer_data, const void* pNext) {
                     safe_struct->image = layer_data->Unwrap(safe_struct->image);
                 }
             } break;
-#endif  // VK_USE_PLATFORM_METAL_EXT
-
-#ifdef VK_USE_PLATFORM_METAL_EXT
             case VK_STRUCTURE_TYPE_EXPORT_METAL_SHARED_EVENT_INFO_EXT: {
                 safe_VkExportMetalSharedEventInfoEXT* safe_struct =
                     reinterpret_cast<safe_VkExportMetalSharedEventInfoEXT*>(cur_pnext);
@@ -319,9 +287,6 @@ void WrapPnextChainHandles(ValidationObject* layer_data, const void* pNext) {
                     safe_struct->event = layer_data->Unwrap(safe_struct->event);
                 }
             } break;
-#endif  // VK_USE_PLATFORM_METAL_EXT
-
-#ifdef VK_USE_PLATFORM_METAL_EXT
             case VK_STRUCTURE_TYPE_EXPORT_METAL_TEXTURE_INFO_EXT: {
                 safe_VkExportMetalTextureInfoEXT* safe_struct = reinterpret_cast<safe_VkExportMetalTextureInfoEXT*>(cur_pnext);
 
@@ -336,7 +301,6 @@ void WrapPnextChainHandles(ValidationObject* layer_data, const void* pNext) {
                 }
             } break;
 #endif  // VK_USE_PLATFORM_METAL_EXT
-
             case VK_STRUCTURE_TYPE_DESCRIPTOR_BUFFER_BINDING_PUSH_DESCRIPTOR_BUFFER_HANDLE_EXT: {
                 safe_VkDescriptorBufferBindingPushDescriptorBufferHandleEXT* safe_struct =
                     reinterpret_cast<safe_VkDescriptorBufferBindingPushDescriptorBufferHandleEXT*>(cur_pnext);
@@ -345,7 +309,6 @@ void WrapPnextChainHandles(ValidationObject* layer_data, const void* pNext) {
                     safe_struct->buffer = layer_data->Unwrap(safe_struct->buffer);
                 }
             } break;
-
 #ifdef VK_ENABLE_BETA_EXTENSIONS
             case VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_TRIANGLES_DISPLACEMENT_MICROMAP_NV: {
                 safe_VkAccelerationStructureTrianglesDisplacementMicromapNV* safe_struct =
@@ -356,7 +319,6 @@ void WrapPnextChainHandles(ValidationObject* layer_data, const void* pNext) {
                 }
             } break;
 #endif  // VK_ENABLE_BETA_EXTENSIONS
-
             case VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_TRIANGLES_OPACITY_MICROMAP_EXT: {
                 safe_VkAccelerationStructureTrianglesOpacityMicromapEXT* safe_struct =
                     reinterpret_cast<safe_VkAccelerationStructureTrianglesOpacityMicromapEXT*>(cur_pnext);
@@ -3221,8 +3183,6 @@ VkResult DispatchCreateXlibSurfaceKHR(VkInstance instance, const VkXlibSurfaceCr
     }
     return result;
 }
-#endif  // VK_USE_PLATFORM_XLIB_KHR
-#ifdef VK_USE_PLATFORM_XLIB_KHR
 
 VkBool32 DispatchGetPhysicalDeviceXlibPresentationSupportKHR(VkPhysicalDevice physicalDevice, uint32_t queueFamilyIndex,
                                                              Display* dpy, VisualID visualID) {
@@ -3247,8 +3207,6 @@ VkResult DispatchCreateXcbSurfaceKHR(VkInstance instance, const VkXcbSurfaceCrea
     }
     return result;
 }
-#endif  // VK_USE_PLATFORM_XCB_KHR
-#ifdef VK_USE_PLATFORM_XCB_KHR
 
 VkBool32 DispatchGetPhysicalDeviceXcbPresentationSupportKHR(VkPhysicalDevice physicalDevice, uint32_t queueFamilyIndex,
                                                             xcb_connection_t* connection, xcb_visualid_t visual_id) {
@@ -3274,8 +3232,6 @@ VkResult DispatchCreateWaylandSurfaceKHR(VkInstance instance, const VkWaylandSur
     }
     return result;
 }
-#endif  // VK_USE_PLATFORM_WAYLAND_KHR
-#ifdef VK_USE_PLATFORM_WAYLAND_KHR
 
 VkBool32 DispatchGetPhysicalDeviceWaylandPresentationSupportKHR(VkPhysicalDevice physicalDevice, uint32_t queueFamilyIndex,
                                                                 struct wl_display* display) {
@@ -3316,8 +3272,6 @@ VkResult DispatchCreateWin32SurfaceKHR(VkInstance instance, const VkWin32Surface
     }
     return result;
 }
-#endif  // VK_USE_PLATFORM_WIN32_KHR
-#ifdef VK_USE_PLATFORM_WIN32_KHR
 
 VkBool32 DispatchGetPhysicalDeviceWin32PresentationSupportKHR(VkPhysicalDevice physicalDevice, uint32_t queueFamilyIndex) {
     auto layer_data = GetLayerDataPtr(get_dispatch_key(physicalDevice), layer_data_map);
@@ -3739,8 +3693,6 @@ VkResult DispatchGetMemoryWin32HandleKHR(VkDevice device, const VkMemoryGetWin32
 
     return result;
 }
-#endif  // VK_USE_PLATFORM_WIN32_KHR
-#ifdef VK_USE_PLATFORM_WIN32_KHR
 
 VkResult DispatchGetMemoryWin32HandlePropertiesKHR(VkDevice device, VkExternalMemoryHandleTypeFlagBits handleType, HANDLE handle,
                                                    VkMemoryWin32HandlePropertiesKHR* pMemoryWin32HandleProperties) {
@@ -3814,8 +3766,6 @@ VkResult DispatchImportSemaphoreWin32HandleKHR(VkDevice device,
 
     return result;
 }
-#endif  // VK_USE_PLATFORM_WIN32_KHR
-#ifdef VK_USE_PLATFORM_WIN32_KHR
 
 VkResult DispatchGetSemaphoreWin32HandleKHR(VkDevice device, const VkSemaphoreGetWin32HandleInfoKHR* pGetWin32HandleInfo,
                                             HANDLE* pHandle) {
@@ -4013,8 +3963,6 @@ VkResult DispatchImportFenceWin32HandleKHR(VkDevice device, const VkImportFenceW
 
     return result;
 }
-#endif  // VK_USE_PLATFORM_WIN32_KHR
-#ifdef VK_USE_PLATFORM_WIN32_KHR
 
 VkResult DispatchGetFenceWin32HandleKHR(VkDevice device, const VkFenceGetWin32HandleInfoKHR* pGetWin32HandleInfo, HANDLE* pHandle) {
     auto layer_data = GetLayerDataPtr(get_dispatch_key(device), layer_data_map);
@@ -4692,8 +4640,6 @@ VkResult DispatchGetPhysicalDeviceVideoEncodeQualityLevelPropertiesKHR(
 
     return result;
 }
-#endif  // VK_ENABLE_BETA_EXTENSIONS
-#ifdef VK_ENABLE_BETA_EXTENSIONS
 
 VkResult DispatchGetEncodedVideoSessionParametersKHR(VkDevice device,
                                                      const VkVideoEncodeSessionParametersGetInfoKHR* pVideoSessionParametersInfo,
@@ -4722,8 +4668,6 @@ VkResult DispatchGetEncodedVideoSessionParametersKHR(VkDevice device,
 
     return result;
 }
-#endif  // VK_ENABLE_BETA_EXTENSIONS
-#ifdef VK_ENABLE_BETA_EXTENSIONS
 
 void DispatchCmdEncodeVideoKHR(VkCommandBuffer commandBuffer, const VkVideoEncodeInfoKHR* pEncodeInfo) {
     auto layer_data = GetLayerDataPtr(get_dispatch_key(commandBuffer), layer_data_map);
@@ -5565,8 +5509,6 @@ VkResult DispatchAcquireXlibDisplayEXT(VkPhysicalDevice physicalDevice, Display*
 
     return result;
 }
-#endif  // VK_USE_PLATFORM_XLIB_XRANDR_EXT
-#ifdef VK_USE_PLATFORM_XLIB_XRANDR_EXT
 
 VkResult DispatchGetRandROutputDisplayEXT(VkPhysicalDevice physicalDevice, Display* dpy, RROutput rrOutput,
                                           VkDisplayKHR* pDisplay) {
@@ -5815,8 +5757,6 @@ VkResult DispatchGetAndroidHardwareBufferPropertiesANDROID(VkDevice device, cons
 
     return result;
 }
-#endif  // VK_USE_PLATFORM_ANDROID_KHR
-#ifdef VK_USE_PLATFORM_ANDROID_KHR
 
 VkResult DispatchGetMemoryAndroidHardwareBufferANDROID(VkDevice device, const VkMemoryGetAndroidHardwareBufferInfoANDROID* pInfo,
                                                        struct AHardwareBuffer** pBuffer) {
@@ -5895,8 +5835,6 @@ VkResult DispatchCreateExecutionGraphPipelinesAMDX(VkDevice device, VkPipelineCa
     }
     return result;
 }
-#endif  // VK_ENABLE_BETA_EXTENSIONS
-#ifdef VK_ENABLE_BETA_EXTENSIONS
 
 VkResult DispatchGetExecutionGraphPipelineScratchSizeAMDX(VkDevice device, VkPipeline executionGraph,
                                                           VkExecutionGraphPipelineScratchSizeAMDX* pSizeInfo) {
@@ -5908,8 +5846,6 @@ VkResult DispatchGetExecutionGraphPipelineScratchSizeAMDX(VkDevice device, VkPip
 
     return result;
 }
-#endif  // VK_ENABLE_BETA_EXTENSIONS
-#ifdef VK_ENABLE_BETA_EXTENSIONS
 
 VkResult DispatchGetExecutionGraphPipelineNodeIndexAMDX(VkDevice device, VkPipeline executionGraph,
                                                         const VkPipelineShaderStageNodeCreateInfoAMDX* pNodeInfo,
@@ -5924,16 +5860,12 @@ VkResult DispatchGetExecutionGraphPipelineNodeIndexAMDX(VkDevice device, VkPipel
 
     return result;
 }
-#endif  // VK_ENABLE_BETA_EXTENSIONS
-#ifdef VK_ENABLE_BETA_EXTENSIONS
 
 void DispatchCmdInitializeGraphScratchMemoryAMDX(VkCommandBuffer commandBuffer, VkDeviceAddress scratch) {
     auto layer_data = GetLayerDataPtr(get_dispatch_key(commandBuffer), layer_data_map);
 
     layer_data->device_dispatch_table.CmdInitializeGraphScratchMemoryAMDX(commandBuffer, scratch);
 }
-#endif  // VK_ENABLE_BETA_EXTENSIONS
-#ifdef VK_ENABLE_BETA_EXTENSIONS
 
 void DispatchCmdDispatchGraphAMDX(VkCommandBuffer commandBuffer, VkDeviceAddress scratch,
                                   const VkDispatchGraphCountInfoAMDX* pCountInfo) {
@@ -5941,8 +5873,6 @@ void DispatchCmdDispatchGraphAMDX(VkCommandBuffer commandBuffer, VkDeviceAddress
 
     layer_data->device_dispatch_table.CmdDispatchGraphAMDX(commandBuffer, scratch, pCountInfo);
 }
-#endif  // VK_ENABLE_BETA_EXTENSIONS
-#ifdef VK_ENABLE_BETA_EXTENSIONS
 
 void DispatchCmdDispatchGraphIndirectAMDX(VkCommandBuffer commandBuffer, VkDeviceAddress scratch,
                                           const VkDispatchGraphCountInfoAMDX* pCountInfo) {
@@ -5950,8 +5880,6 @@ void DispatchCmdDispatchGraphIndirectAMDX(VkCommandBuffer commandBuffer, VkDevic
 
     layer_data->device_dispatch_table.CmdDispatchGraphIndirectAMDX(commandBuffer, scratch, pCountInfo);
 }
-#endif  // VK_ENABLE_BETA_EXTENSIONS
-#ifdef VK_ENABLE_BETA_EXTENSIONS
 
 void DispatchCmdDispatchGraphIndirectCountAMDX(VkCommandBuffer commandBuffer, VkDeviceAddress scratch, VkDeviceAddress countInfo) {
     auto layer_data = GetLayerDataPtr(get_dispatch_key(commandBuffer), layer_data_map);
@@ -6609,8 +6537,6 @@ VkResult DispatchGetPhysicalDeviceSurfacePresentModes2EXT(VkPhysicalDevice physi
 
     return result;
 }
-#endif  // VK_USE_PLATFORM_WIN32_KHR
-#ifdef VK_USE_PLATFORM_WIN32_KHR
 
 VkResult DispatchAcquireFullScreenExclusiveModeEXT(VkDevice device, VkSwapchainKHR swapchain) {
     auto layer_data = GetLayerDataPtr(get_dispatch_key(device), layer_data_map);
@@ -6620,8 +6546,6 @@ VkResult DispatchAcquireFullScreenExclusiveModeEXT(VkDevice device, VkSwapchainK
 
     return result;
 }
-#endif  // VK_USE_PLATFORM_WIN32_KHR
-#ifdef VK_USE_PLATFORM_WIN32_KHR
 
 VkResult DispatchReleaseFullScreenExclusiveModeEXT(VkDevice device, VkSwapchainKHR swapchain) {
     auto layer_data = GetLayerDataPtr(get_dispatch_key(device), layer_data_map);
@@ -6631,8 +6555,6 @@ VkResult DispatchReleaseFullScreenExclusiveModeEXT(VkDevice device, VkSwapchainK
 
     return result;
 }
-#endif  // VK_USE_PLATFORM_WIN32_KHR
-#ifdef VK_USE_PLATFORM_WIN32_KHR
 
 VkResult DispatchGetDeviceGroupSurfacePresentModes2EXT(VkDevice device, const VkPhysicalDeviceSurfaceInfo2KHR* pSurfaceInfo,
                                                        VkDeviceGroupPresentModeFlagsKHR* pModes) {
@@ -7118,6 +7040,97 @@ void DispatchDestroyPrivateDataSlotEXT(VkDevice device, VkPrivateDataSlot privat
     layer_data->device_dispatch_table.DestroyPrivateDataSlotEXT(device, privateDataSlot, pAllocator);
 }
 
+VkResult DispatchCreateCudaModuleNV(VkDevice device, const VkCudaModuleCreateInfoNV* pCreateInfo,
+                                    const VkAllocationCallbacks* pAllocator, VkCudaModuleNV* pModule) {
+    auto layer_data = GetLayerDataPtr(get_dispatch_key(device), layer_data_map);
+    if (!wrap_handles) return layer_data->device_dispatch_table.CreateCudaModuleNV(device, pCreateInfo, pAllocator, pModule);
+
+    VkResult result = layer_data->device_dispatch_table.CreateCudaModuleNV(device, pCreateInfo, pAllocator, pModule);
+    if (VK_SUCCESS == result) {
+        *pModule = layer_data->WrapNew(*pModule);
+    }
+    return result;
+}
+
+VkResult DispatchGetCudaModuleCacheNV(VkDevice device, VkCudaModuleNV module, size_t* pCacheSize, void* pCacheData) {
+    auto layer_data = GetLayerDataPtr(get_dispatch_key(device), layer_data_map);
+    if (!wrap_handles) return layer_data->device_dispatch_table.GetCudaModuleCacheNV(device, module, pCacheSize, pCacheData);
+    { module = layer_data->Unwrap(module); }
+    VkResult result = layer_data->device_dispatch_table.GetCudaModuleCacheNV(device, module, pCacheSize, pCacheData);
+
+    return result;
+}
+
+VkResult DispatchCreateCudaFunctionNV(VkDevice device, const VkCudaFunctionCreateInfoNV* pCreateInfo,
+                                      const VkAllocationCallbacks* pAllocator, VkCudaFunctionNV* pFunction) {
+    auto layer_data = GetLayerDataPtr(get_dispatch_key(device), layer_data_map);
+    if (!wrap_handles) return layer_data->device_dispatch_table.CreateCudaFunctionNV(device, pCreateInfo, pAllocator, pFunction);
+    safe_VkCudaFunctionCreateInfoNV var_local_pCreateInfo;
+    safe_VkCudaFunctionCreateInfoNV* local_pCreateInfo = nullptr;
+    {
+        if (pCreateInfo) {
+            local_pCreateInfo = &var_local_pCreateInfo;
+            local_pCreateInfo->initialize(pCreateInfo);
+
+            if (pCreateInfo->module) {
+                local_pCreateInfo->module = layer_data->Unwrap(pCreateInfo->module);
+            }
+        }
+    }
+    VkResult result = layer_data->device_dispatch_table.CreateCudaFunctionNV(
+        device, (const VkCudaFunctionCreateInfoNV*)local_pCreateInfo, pAllocator, pFunction);
+    if (VK_SUCCESS == result) {
+        *pFunction = layer_data->WrapNew(*pFunction);
+    }
+    return result;
+}
+
+void DispatchDestroyCudaModuleNV(VkDevice device, VkCudaModuleNV module, const VkAllocationCallbacks* pAllocator) {
+    auto layer_data = GetLayerDataPtr(get_dispatch_key(device), layer_data_map);
+    if (!wrap_handles) return layer_data->device_dispatch_table.DestroyCudaModuleNV(device, module, pAllocator);
+
+    uint64_t module_id = CastToUint64(module);
+    auto iter = unique_id_mapping.pop(module_id);
+    if (iter != unique_id_mapping.end()) {
+        module = (VkCudaModuleNV)iter->second;
+    } else {
+        module = (VkCudaModuleNV)0;
+    }
+    layer_data->device_dispatch_table.DestroyCudaModuleNV(device, module, pAllocator);
+}
+
+void DispatchDestroyCudaFunctionNV(VkDevice device, VkCudaFunctionNV function, const VkAllocationCallbacks* pAllocator) {
+    auto layer_data = GetLayerDataPtr(get_dispatch_key(device), layer_data_map);
+    if (!wrap_handles) return layer_data->device_dispatch_table.DestroyCudaFunctionNV(device, function, pAllocator);
+
+    uint64_t function_id = CastToUint64(function);
+    auto iter = unique_id_mapping.pop(function_id);
+    if (iter != unique_id_mapping.end()) {
+        function = (VkCudaFunctionNV)iter->second;
+    } else {
+        function = (VkCudaFunctionNV)0;
+    }
+    layer_data->device_dispatch_table.DestroyCudaFunctionNV(device, function, pAllocator);
+}
+
+void DispatchCmdCudaLaunchKernelNV(VkCommandBuffer commandBuffer, const VkCudaLaunchInfoNV* pLaunchInfo) {
+    auto layer_data = GetLayerDataPtr(get_dispatch_key(commandBuffer), layer_data_map);
+    if (!wrap_handles) return layer_data->device_dispatch_table.CmdCudaLaunchKernelNV(commandBuffer, pLaunchInfo);
+    safe_VkCudaLaunchInfoNV var_local_pLaunchInfo;
+    safe_VkCudaLaunchInfoNV* local_pLaunchInfo = nullptr;
+    {
+        if (pLaunchInfo) {
+            local_pLaunchInfo = &var_local_pLaunchInfo;
+            local_pLaunchInfo->initialize(pLaunchInfo);
+
+            if (pLaunchInfo->function) {
+                local_pLaunchInfo->function = layer_data->Unwrap(pLaunchInfo->function);
+            }
+        }
+    }
+    layer_data->device_dispatch_table.CmdCudaLaunchKernelNV(commandBuffer, (const VkCudaLaunchInfoNV*)local_pLaunchInfo);
+}
+
 void DispatchGetDescriptorSetLayoutSizeEXT(VkDevice device, VkDescriptorSetLayout layout, VkDeviceSize* pLayoutSizeInBytes) {
     auto layer_data = GetLayerDataPtr(get_dispatch_key(device), layer_data_map);
     if (!wrap_handles) return layer_data->device_dispatch_table.GetDescriptorSetLayoutSizeEXT(device, layout, pLayoutSizeInBytes);
@@ -7316,8 +7329,6 @@ VkResult DispatchAcquireWinrtDisplayNV(VkPhysicalDevice physicalDevice, VkDispla
 
     return result;
 }
-#endif  // VK_USE_PLATFORM_WIN32_KHR
-#ifdef VK_USE_PLATFORM_WIN32_KHR
 
 VkResult DispatchGetWinrtDisplayNV(VkPhysicalDevice physicalDevice, uint32_t deviceRelativeId, VkDisplayKHR* pDisplay) {
     auto layer_data = GetLayerDataPtr(get_dispatch_key(physicalDevice), layer_data_map);
@@ -7342,8 +7353,6 @@ VkResult DispatchCreateDirectFBSurfaceEXT(VkInstance instance, const VkDirectFBS
     }
     return result;
 }
-#endif  // VK_USE_PLATFORM_DIRECTFB_EXT
-#ifdef VK_USE_PLATFORM_DIRECTFB_EXT
 
 VkBool32 DispatchGetPhysicalDeviceDirectFBPresentationSupportEXT(VkPhysicalDevice physicalDevice, uint32_t queueFamilyIndex,
                                                                  IDirectFB* dfb) {
@@ -7389,8 +7398,6 @@ VkResult DispatchGetMemoryZirconHandleFUCHSIA(VkDevice device, const VkMemoryGet
 
     return result;
 }
-#endif  // VK_USE_PLATFORM_FUCHSIA
-#ifdef VK_USE_PLATFORM_FUCHSIA
 
 VkResult DispatchGetMemoryZirconHandlePropertiesFUCHSIA(VkDevice device, VkExternalMemoryHandleTypeFlagBits handleType,
                                                         zx_handle_t zirconHandle,
@@ -7402,8 +7409,6 @@ VkResult DispatchGetMemoryZirconHandlePropertiesFUCHSIA(VkDevice device, VkExter
 
     return result;
 }
-#endif  // VK_USE_PLATFORM_FUCHSIA
-#ifdef VK_USE_PLATFORM_FUCHSIA
 
 VkResult DispatchImportSemaphoreZirconHandleFUCHSIA(
     VkDevice device, const VkImportSemaphoreZirconHandleInfoFUCHSIA* pImportSemaphoreZirconHandleInfo) {
@@ -7427,8 +7432,6 @@ VkResult DispatchImportSemaphoreZirconHandleFUCHSIA(
 
     return result;
 }
-#endif  // VK_USE_PLATFORM_FUCHSIA
-#ifdef VK_USE_PLATFORM_FUCHSIA
 
 VkResult DispatchGetSemaphoreZirconHandleFUCHSIA(VkDevice device, const VkSemaphoreGetZirconHandleInfoFUCHSIA* pGetZirconHandleInfo,
                                                  zx_handle_t* pZirconHandle) {
@@ -7452,8 +7455,6 @@ VkResult DispatchGetSemaphoreZirconHandleFUCHSIA(VkDevice device, const VkSemaph
 
     return result;
 }
-#endif  // VK_USE_PLATFORM_FUCHSIA
-#ifdef VK_USE_PLATFORM_FUCHSIA
 
 VkResult DispatchCreateBufferCollectionFUCHSIA(VkDevice device, const VkBufferCollectionCreateInfoFUCHSIA* pCreateInfo,
                                                const VkAllocationCallbacks* pAllocator, VkBufferCollectionFUCHSIA* pCollection) {
@@ -7467,8 +7468,6 @@ VkResult DispatchCreateBufferCollectionFUCHSIA(VkDevice device, const VkBufferCo
     }
     return result;
 }
-#endif  // VK_USE_PLATFORM_FUCHSIA
-#ifdef VK_USE_PLATFORM_FUCHSIA
 
 VkResult DispatchSetBufferCollectionImageConstraintsFUCHSIA(VkDevice device, VkBufferCollectionFUCHSIA collection,
                                                             const VkImageConstraintsInfoFUCHSIA* pImageConstraintsInfo) {
@@ -7482,8 +7481,6 @@ VkResult DispatchSetBufferCollectionImageConstraintsFUCHSIA(VkDevice device, VkB
 
     return result;
 }
-#endif  // VK_USE_PLATFORM_FUCHSIA
-#ifdef VK_USE_PLATFORM_FUCHSIA
 
 VkResult DispatchSetBufferCollectionBufferConstraintsFUCHSIA(VkDevice device, VkBufferCollectionFUCHSIA collection,
                                                              const VkBufferConstraintsInfoFUCHSIA* pBufferConstraintsInfo) {
@@ -7497,8 +7494,6 @@ VkResult DispatchSetBufferCollectionBufferConstraintsFUCHSIA(VkDevice device, Vk
 
     return result;
 }
-#endif  // VK_USE_PLATFORM_FUCHSIA
-#ifdef VK_USE_PLATFORM_FUCHSIA
 
 void DispatchDestroyBufferCollectionFUCHSIA(VkDevice device, VkBufferCollectionFUCHSIA collection,
                                             const VkAllocationCallbacks* pAllocator) {
@@ -7514,8 +7509,6 @@ void DispatchDestroyBufferCollectionFUCHSIA(VkDevice device, VkBufferCollectionF
     }
     layer_data->device_dispatch_table.DestroyBufferCollectionFUCHSIA(device, collection, pAllocator);
 }
-#endif  // VK_USE_PLATFORM_FUCHSIA
-#ifdef VK_USE_PLATFORM_FUCHSIA
 
 VkResult DispatchGetBufferCollectionPropertiesFUCHSIA(VkDevice device, VkBufferCollectionFUCHSIA collection,
                                                       VkBufferCollectionPropertiesFUCHSIA* pProperties) {
@@ -7608,8 +7601,6 @@ VkResult DispatchGetFenceSciSyncFenceNV(VkDevice device, const VkFenceGetSciSync
 
     return result;
 }
-#endif  // VK_USE_PLATFORM_SCI
-#ifdef VK_USE_PLATFORM_SCI
 
 VkResult DispatchGetFenceSciSyncObjNV(VkDevice device, const VkFenceGetSciSyncInfoNV* pGetSciSyncHandleInfo, void* pHandle) {
     auto layer_data = GetLayerDataPtr(get_dispatch_key(device), layer_data_map);
@@ -7631,8 +7622,6 @@ VkResult DispatchGetFenceSciSyncObjNV(VkDevice device, const VkFenceGetSciSyncIn
 
     return result;
 }
-#endif  // VK_USE_PLATFORM_SCI
-#ifdef VK_USE_PLATFORM_SCI
 
 VkResult DispatchImportFenceSciSyncFenceNV(VkDevice device, const VkImportFenceSciSyncInfoNV* pImportFenceSciSyncInfo) {
     auto layer_data = GetLayerDataPtr(get_dispatch_key(device), layer_data_map);
@@ -7654,8 +7643,6 @@ VkResult DispatchImportFenceSciSyncFenceNV(VkDevice device, const VkImportFenceS
 
     return result;
 }
-#endif  // VK_USE_PLATFORM_SCI
-#ifdef VK_USE_PLATFORM_SCI
 
 VkResult DispatchImportFenceSciSyncObjNV(VkDevice device, const VkImportFenceSciSyncInfoNV* pImportFenceSciSyncInfo) {
     auto layer_data = GetLayerDataPtr(get_dispatch_key(device), layer_data_map);
@@ -7677,8 +7664,6 @@ VkResult DispatchImportFenceSciSyncObjNV(VkDevice device, const VkImportFenceSci
 
     return result;
 }
-#endif  // VK_USE_PLATFORM_SCI
-#ifdef VK_USE_PLATFORM_SCI
 
 VkResult DispatchGetPhysicalDeviceSciSyncAttributesNV(VkPhysicalDevice physicalDevice,
                                                       const VkSciSyncAttributesInfoNV* pSciSyncAttributesInfo,
@@ -7690,8 +7675,6 @@ VkResult DispatchGetPhysicalDeviceSciSyncAttributesNV(VkPhysicalDevice physicalD
 
     return result;
 }
-#endif  // VK_USE_PLATFORM_SCI
-#ifdef VK_USE_PLATFORM_SCI
 
 VkResult DispatchGetSemaphoreSciSyncObjNV(VkDevice device, const VkSemaphoreGetSciSyncInfoNV* pGetSciSyncInfo, void* pHandle) {
     auto layer_data = GetLayerDataPtr(get_dispatch_key(device), layer_data_map);
@@ -7713,8 +7696,6 @@ VkResult DispatchGetSemaphoreSciSyncObjNV(VkDevice device, const VkSemaphoreGetS
 
     return result;
 }
-#endif  // VK_USE_PLATFORM_SCI
-#ifdef VK_USE_PLATFORM_SCI
 
 VkResult DispatchImportSemaphoreSciSyncObjNV(VkDevice device, const VkImportSemaphoreSciSyncInfoNV* pImportSemaphoreSciSyncInfo) {
     auto layer_data = GetLayerDataPtr(get_dispatch_key(device), layer_data_map);
@@ -7736,8 +7717,6 @@ VkResult DispatchImportSemaphoreSciSyncObjNV(VkDevice device, const VkImportSema
 
     return result;
 }
-#endif  // VK_USE_PLATFORM_SCI
-#ifdef VK_USE_PLATFORM_SCI
 
 VkResult DispatchGetMemorySciBufNV(VkDevice device, const VkMemoryGetSciBufInfoNV* pGetSciBufInfo, NvSciBufObj* pHandle) {
     auto layer_data = GetLayerDataPtr(get_dispatch_key(device), layer_data_map);
@@ -7759,8 +7738,6 @@ VkResult DispatchGetMemorySciBufNV(VkDevice device, const VkMemoryGetSciBufInfoN
 
     return result;
 }
-#endif  // VK_USE_PLATFORM_SCI
-#ifdef VK_USE_PLATFORM_SCI
 
 VkResult DispatchGetPhysicalDeviceExternalMemorySciBufPropertiesNV(VkPhysicalDevice physicalDevice,
                                                                    VkExternalMemoryHandleTypeFlagBits handleType,
@@ -7773,8 +7750,6 @@ VkResult DispatchGetPhysicalDeviceExternalMemorySciBufPropertiesNV(VkPhysicalDev
 
     return result;
 }
-#endif  // VK_USE_PLATFORM_SCI
-#ifdef VK_USE_PLATFORM_SCI
 
 VkResult DispatchGetPhysicalDeviceSciBufAttributesNV(VkPhysicalDevice physicalDevice, NvSciBufAttrList pAttributes) {
     auto layer_data = GetLayerDataPtr(get_dispatch_key(physicalDevice), layer_data_map);
@@ -7828,8 +7803,6 @@ VkResult DispatchCreateScreenSurfaceQNX(VkInstance instance, const VkScreenSurfa
     }
     return result;
 }
-#endif  // VK_USE_PLATFORM_SCREEN_QNX
-#ifdef VK_USE_PLATFORM_SCREEN_QNX
 
 VkBool32 DispatchGetPhysicalDeviceScreenPresentationSupportQNX(VkPhysicalDevice physicalDevice, uint32_t queueFamilyIndex,
                                                                struct _screen_window* window) {
@@ -8767,8 +8740,6 @@ VkResult DispatchCreateSemaphoreSciSyncPoolNV(VkDevice device, const VkSemaphore
     }
     return result;
 }
-#endif  // VK_USE_PLATFORM_SCI
-#ifdef VK_USE_PLATFORM_SCI
 
 void DispatchDestroySemaphoreSciSyncPoolNV(VkDevice device, VkSemaphoreSciSyncPoolNV semaphorePool,
                                            const VkAllocationCallbacks* pAllocator) {
@@ -8824,13 +8795,11 @@ void DispatchSetLatencyMarkerNV(VkDevice device, VkSwapchainKHR swapchain, const
     layer_data->device_dispatch_table.SetLatencyMarkerNV(device, swapchain, pLatencyMarkerInfo);
 }
 
-void DispatchGetLatencyTimingsNV(VkDevice device, VkSwapchainKHR swapchain, uint32_t* pTimingCount,
-                                 VkGetLatencyMarkerInfoNV* pLatencyMarkerInfo) {
+void DispatchGetLatencyTimingsNV(VkDevice device, VkSwapchainKHR swapchain, VkGetLatencyMarkerInfoNV* pLatencyMarkerInfo) {
     auto layer_data = GetLayerDataPtr(get_dispatch_key(device), layer_data_map);
-    if (!wrap_handles)
-        return layer_data->device_dispatch_table.GetLatencyTimingsNV(device, swapchain, pTimingCount, pLatencyMarkerInfo);
+    if (!wrap_handles) return layer_data->device_dispatch_table.GetLatencyTimingsNV(device, swapchain, pLatencyMarkerInfo);
     { swapchain = layer_data->Unwrap(swapchain); }
-    layer_data->device_dispatch_table.GetLatencyTimingsNV(device, swapchain, pTimingCount, pLatencyMarkerInfo);
+    layer_data->device_dispatch_table.GetLatencyTimingsNV(device, swapchain, pLatencyMarkerInfo);
 }
 
 void DispatchQueueNotifyOutOfBandNV(VkQueue queue, const VkOutOfBandQueueTypeInfoNV* pQueueTypeInfo) {

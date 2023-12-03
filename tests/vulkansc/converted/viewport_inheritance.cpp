@@ -245,7 +245,7 @@ class ViewportInheritanceTestData {
             features2.features.multiViewport = VK_FALSE;
         }
 
-        p_framework->InitState(nullptr, &features2, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+        p_framework->InitState(nullptr, &features2);
         return true;
     }
 
@@ -403,10 +403,10 @@ class ViewportInheritanceTestData {
     }
 };
 
-TEST_F(NegativeViewportInheritance, DISABLED_BasicUsage) {
+TEST_F(NegativeViewportInheritance, BasicUsage) {
     TEST_DESCRIPTION("Simple correct and incorrect usage of VK_NV_inherited_viewport_scissor");
-    m_instance_extension_names.push_back("VK_KHR_get_physical_device_properties2");
-    RETURN_IF_SKIP(InitFramework())
+    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitFramework());
     bool has_features = false;
     const char* missing_feature_string = nullptr;
     auto self = this;
@@ -637,10 +637,10 @@ TEST_F(NegativeViewportInheritance, DISABLED_BasicUsage) {
     }
 }
 
-TEST_F(NegativeViewportInheritance, DISABLED_MissingFeature) {
+TEST_F(NegativeViewportInheritance, MissingFeature) {
     TEST_DESCRIPTION("Error using VK_NV_inherited_viewport_scissor without enabling feature.");
-    m_instance_extension_names.push_back("VK_KHR_get_physical_device_properties2");
-    RETURN_IF_SKIP(InitFramework())
+    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitFramework());
     bool has_features = false;
     const char* missing_feature_string = nullptr;
     auto self = this;
@@ -664,10 +664,10 @@ TEST_F(NegativeViewportInheritance, DISABLED_MissingFeature) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeViewportInheritance, DISABLED_MultiViewport) {
+TEST_F(NegativeViewportInheritance, MultiViewport) {
     TEST_DESCRIPTION("VK_NV_inherited_viewport_scissor tests with multiple viewports/scissors");
-    m_instance_extension_names.push_back("VK_KHR_get_physical_device_properties2");
-    RETURN_IF_SKIP(InitFramework())
+    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitFramework());
     bool has_features = false;
     const char* missing_feature_string = nullptr;
     auto self = this;
@@ -894,10 +894,10 @@ TEST_F(NegativeViewportInheritance, DISABLED_MultiViewport) {
     }
 }
 
-TEST_F(NegativeViewportInheritance, DISABLED_ScissorMissingFeature) {
+TEST_F(NegativeViewportInheritance, ScissorMissingFeature) {
     TEST_DESCRIPTION("Error using VK_NV_inherited_viewport_scissor without enabling multiViewport feature.");
-    m_instance_extension_names.push_back("VK_KHR_get_physical_device_properties2");
-    RETURN_IF_SKIP(InitFramework())
+    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitFramework());
     bool has_features = false;
     const char* missing_feature_string = nullptr;
     auto self = this;
@@ -924,7 +924,7 @@ TEST_F(NegativeViewportInheritance, PipelineMissingDynamicStateDiscardRectangle)
 
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_DISCARD_RECTANGLES_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceDiscardRectanglePropertiesEXT discard_rect_props = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(discard_rect_props);
@@ -966,12 +966,12 @@ TEST_F(NegativeViewportInheritance, PipelineMissingDynamicStateDiscardRectangle)
     cbbi.pInheritanceInfo = &cbii;
 
     VkRect2D discard_rectangle = {};
-    VkPipelineDiscardRectangleStateCreateInfoEXT discard_rectangle_state =
-        vku::InitStructHelper();
+    VkPipelineDiscardRectangleStateCreateInfoEXT discard_rectangle_state = vku::InitStructHelper();
     discard_rectangle_state.discardRectangleCount = 1;
     discard_rectangle_state.pDiscardRectangles = &discard_rectangle;
 
-    const VkDynamicState dyn_states[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+    const VkDynamicState dyn_states[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR,
+                                         VK_DYNAMIC_STATE_DISCARD_RECTANGLE_ENABLE_EXT};
     VkPipelineDynamicStateCreateInfo dyn_state_ci = vku::InitStructHelper();
     dyn_state_ci.dynamicStateCount = 2;
     dyn_state_ci.pDynamicStates = dyn_states;
@@ -987,6 +987,18 @@ TEST_F(NegativeViewportInheritance, PipelineMissingDynamicStateDiscardRectangle)
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBindPipeline-commandBuffer-04809");
     vk::CmdBindPipeline(secondary.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_);
     m_errorMonitor->VerifyFound();
+
+    if (DeviceExtensionSupported(VK_EXT_DISCARD_RECTANGLES_EXTENSION_NAME, 2)) {
+        dyn_state_ci.dynamicStateCount = 3;
+
+        CreatePipelineHelper pipe2(*this);
+        pipe2.gp_ci_.pDynamicState = &dyn_state_ci;
+        pipe2.InitState();
+        pipe2.CreateGraphicsPipeline();
+        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBindPipeline-commandBuffer-04809");
+        vk::CmdBindPipeline(secondary.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe2.pipeline_);
+        m_errorMonitor->VerifyFound();
+    }
 }
 
 // SPIR-V blobs for graphics pipeline.

@@ -30,6 +30,8 @@ target_sources(vk_layer_validation_tests PRIVATE
     framework/layer_validation_tests.cpp
     framework/pipeline_helper.h
     framework/pipeline_helper.cpp
+    framework/shader_helper.h
+    framework/shader_helper.cpp
     framework/test_common.h
     framework/shader_templates.h
     framework/error_monitor.cpp
@@ -42,13 +44,22 @@ target_sources(vk_layer_validation_tests PRIVATE
     framework/test_framework.cpp
     framework/ray_tracing_objects.h
     framework/ray_tracing_objects.cpp
-    framework/ray_tracing_nv.h
-    framework/ray_tracing_nv.cpp
+    framework/ray_tracing_helper_nv.h
+    framework/ray_tracing_helper_nv.cpp
     framework/external_memory_sync.h
     framework/external_memory_sync.cpp
+    framework/barrier_queue_family.h
+    framework/barrier_queue_family.cpp
+    framework/descriptor_helper.h
+    framework/descriptor_helper.cpp
+    framework/thread_timeout_helper.h
+    framework/thread_timeout_helper.cpp
+    framework/gpu_av_helper.h
     unit/amd_best_practices.cpp
     unit/android_hardware_buffer.cpp
     unit/android_hardware_buffer_positive.cpp
+    unit/android_external_resolve.cpp
+    unit/android_external_resolve_positive.cpp
     unit/arm_best_practices.cpp
     unit/atomics.cpp
     unit/atomics_positive.cpp
@@ -101,6 +112,7 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/other_positive.cpp
     unit/others.cpp
     unit/parent.cpp
+    unit/parent_positive.cpp
     unit/pipeline.cpp
     unit/pipeline_advanced_blend.cpp
     unit/pipeline_layout.cpp
@@ -116,9 +128,13 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/push_descriptor_positive.cpp
     unit/query_positive.cpp
     unit/ray_tracing.cpp
+    unit/ray_tracing_nv.cpp
+    unit/ray_tracing_gpu_nv.cpp
     unit/ray_tracing_gpu.cpp
     unit/ray_tracing_pipeline.cpp
     unit/ray_tracing_pipeline_positive.cpp
+    unit/ray_tracing_pipeline_nv.cpp
+    unit/ray_tracing_pipeline_positive_nv.cpp
     unit/ray_tracing_positive.cpp
     unit/render_pass_positive.cpp
     unit/renderpass.cpp
@@ -130,6 +146,7 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/shader_compute_positive.cpp
     unit/shader_cooperative_matrix.cpp
     unit/shader_cooperative_matrix_positive.cpp
+    unit/shader_image_access.cpp
     unit/shader_image_access_positive.cpp
     unit/shader_interface.cpp
     unit/shader_interface_positive.cpp
@@ -211,12 +228,6 @@ find_package(glslang CONFIG)
 
 target_link_libraries(vk_layer_validation_tests PRIVATE
     VkLayer_utils
-    glslang::glslang
-    glslang::OGLCompiler
-    glslang::OSDependent
-    glslang::MachineIndependent
-    glslang::GenericCodeGen
-    glslang::HLSL
     glslang::SPIRV
     glslang::SPVRemapper
     SPIRV-Headers::SPIRV-Headers

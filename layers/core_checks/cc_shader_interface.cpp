@@ -210,7 +210,7 @@ bool CoreChecks::ValidatePrimitiveTopology(const SPIRV_MODULE_STATE &module_stat
     bool skip = false;
 
     if (!create_info.pipeline || !create_info.pipeline->pre_raster_state || !create_info.pipeline->InputAssemblyState() ||
-        entrypoint.stage != VK_SHADER_STAGE_GEOMETRY_BIT) {
+        entrypoint.stage != VK_SHADER_STAGE_GEOMETRY_BIT || create_info.pipeline->IsDynamic(VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY)) {
         return skip;
     }
 
@@ -224,7 +224,11 @@ bool CoreChecks::ValidatePrimitiveTopology(const SPIRV_MODULE_STATE &module_stat
         if (stage == VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT || stage == VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT) {
             has_tess = true;
             if (stage == VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT) {
-                topology = stage_state.entrypoint->execution_mode.primitive_topology;
+                if (stage_state.entrypoint->execution_mode.Has(ExecutionModeSet::point_mode_bit)) {
+                    topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+                } else {
+                    topology = stage_state.entrypoint->execution_mode.primitive_topology;
+                }
             }
         }
     }
@@ -346,12 +350,12 @@ bool CoreChecks::ValidateShaderStageInputOutputLimits(const SPIRV_MODULE_STATE &
             }
             // Portability validation
             if (IsExtEnabled(device_extensions.vk_khr_portability_subset)) {
-                if (is_iso_lines && (VK_FALSE == enabled_features.portability_subset_features.tessellationIsolines)) {
+                if (is_iso_lines && (VK_FALSE == enabled_features.tessellationIsolines)) {
                     skip |= LogError("VUID-RuntimeSpirv-tessellationShader-06326", module_state.handle(), loc,
                                      "(portability error) SPIR-V (Tessellation evaluation stage)"
                                      " is using abstract patch type IsoLines, but this is not supported on this platform.");
                 }
-                if (is_point_mode && (VK_FALSE == enabled_features.portability_subset_features.tessellationPointMode)) {
+                if (is_point_mode && (VK_FALSE == enabled_features.tessellationPointMode)) {
                     skip |= LogError("VUID-RuntimeSpirv-tessellationShader-06327", module_state.handle(), loc,
                                      "(portability error) SPIR-V (Tessellation evaluation stage)"
                                      " is using abstract patch type PointMode, but this is not supported on this platform.");
@@ -522,7 +526,7 @@ bool CoreChecks::ValidateInterfaceBetweenStages(const SPIRV_MODULE_STATE &produc
                 }
 
                 // If using maintenance4 need to check Vectors incase different sizes
-                if (!enabled_features.core13.maintenance4 && (output_var->base_type.Opcode() == spv::OpTypeVector) &&
+                if (!enabled_features.maintenance4 && (output_var->base_type.Opcode() == spv::OpTypeVector) &&
                     (input_var->base_type.Opcode() == spv::OpTypeVector)) {
                     // Note the "Component Count" in the VU refers to OpTypeVector's operand and NOT the "Component slot"
                     const uint32_t output_vec_size = output_var->base_type.Word(3);
@@ -544,7 +548,7 @@ bool CoreChecks::ValidateInterfaceBetweenStages(const SPIRV_MODULE_STATE &produc
                 // It is not an error if a stage does not consume all outputs from the previous stage
                 // The values will be undefined, but still legal
                 // Don't give any warning if maintenance4 with vectors
-                if (!enabled_features.core13.maintenance4 && (output_var->base_type.Opcode() != spv::OpTypeVector)) {
+                if (!enabled_features.maintenance4 && (output_var->base_type.Opcode() != spv::OpTypeVector)) {
                     const LogObjectList objlist(producer.handle(), consumer.handle());
                     skip |= LogPerformanceWarning(kVUID_Core_Shader_OutputNotConsumed, objlist, create_info_loc,
                                                   "(SPIR-V Interface) %s declared to output location %" PRIu32 " Component %" PRIu32
@@ -627,6 +631,177 @@ bool CoreChecks::ValidateInterfaceBetweenStages(const SPIRV_MODULE_STATE &produc
     return skip;
 }
 
+bool CoreChecks::ValidateFsOutputsAgainstRenderPass(const SPIRV_MODULE_STATE &module_state, const EntryPoint &entrypoint,
+                                                    const PIPELINE_STATE &pipeline, uint32_t subpass_index,
+                                                    const Location &create_info_loc) const {
+    bool skip = false;
+
+    struct Attachment {
+        const VkAttachmentReference2 *reference = nullptr;
+        const VkAttachmentDescription2 *attachment = nullptr;
+        const StageInteraceVariable *output = nullptr;
+    };
+    std::map<uint32_t, Attachment> location_map;
+
+    const auto &rp_state = pipeline.RenderPassState();
+    if (rp_state && !rp_state->UsesDynamicRendering()) {
+        const auto rpci = rp_state->createInfo.ptr();
+        if (subpass_index < rpci->subpassCount) {
+            const auto subpass = rpci->pSubpasses[subpass_index];
+            for (uint32_t i = 0; i < subpass.colorAttachmentCount; ++i) {
+                auto const &reference = subpass.pColorAttachments[i];
+                location_map[i].reference = &reference;
+                if (reference.attachment != VK_ATTACHMENT_UNUSED &&
+                    rpci->pAttachments[reference.attachment].format != VK_FORMAT_UNDEFINED) {
+                    location_map[i].attachment = &rpci->pAttachments[reference.attachment];
+                }
+            }
+        }
+    }
+
+    // TODO: dual source blend index (spv::DecIndex, zero if not provided)
+    for (const auto *variable : entrypoint.user_defined_interface_variables) {
+        if ((variable->storage_class != spv::StorageClassOutput) || variable->interface_slots.empty()) {
+            continue;  // not an output interface
+        }
+        // It is not allowed to have Block Fragment or 64-bit vectors output in Frag shader
+        // This means all Locations in slots will be the same
+        location_map[variable->interface_slots[0].Location()].output = variable;
+    }
+
+    const auto *ms_state = pipeline.MultisampleState();
+    const bool alpha_to_coverage_enabled = ms_state && (ms_state->alphaToCoverageEnable == VK_TRUE);
+
+    // Don't check any color attachments if rasterization is disabled
+    const auto raster_state = pipeline.RasterizationState();
+    if (raster_state && !raster_state->rasterizerDiscardEnable) {
+        for (const auto &location_it : location_map) {
+            const auto reference = location_it.second.reference;
+            if (reference != nullptr && reference->attachment == VK_ATTACHMENT_UNUSED) {
+                continue;
+            }
+
+            const auto location = location_it.first;
+            const auto attachment = location_it.second.attachment;
+            const auto output = location_it.second.output;
+            if (attachment && !output) {
+                const auto &attachments = pipeline.Attachments();
+                if (location < attachments.size() && attachments[location].colorWriteMask != 0) {
+                    skip |= LogUndefinedValue("Undefined-Value-ShaderInputNotProduced", module_state.handle(), create_info_loc,
+                                              "Attachment %" PRIu32
+                                              " not written by fragment shader; undefined values will be written to attachment",
+                                              location);
+                }
+            } else if (!attachment && output) {
+                if (!(alpha_to_coverage_enabled && location == 0)) {
+                    skip |= LogUndefinedValue("Undefined-Value-ShaderOutputNotConsumed", module_state.handle(), create_info_loc,
+                                              "fragment shader writes to output location %" PRIu32 " with no matching attachment",
+                                              location);
+                }
+            } else if (attachment && output) {
+                const auto attachment_type = GetFormatType(attachment->format);
+                const auto output_type = module_state.GetNumericType(output->type_id);
+
+                // Type checking
+                if (!(output_type & attachment_type)) {
+                    skip |= LogUndefinedValue(
+                        "Undefined-Value-ShaderFragmentOutputMismatch", module_state.handle(), create_info_loc,
+                        "Attachment %" PRIu32
+                        " of type `%s` does not match fragment shader output type of `%s`; resulting values are undefined",
+                        location, string_VkFormat(attachment->format), module_state.DescribeType(output->type_id).c_str());
+                }
+            } else {            // !attachment && !output
+                assert(false);  // at least one exists in the map
+            }
+        }
+    }
+
+    return skip;
+}
+
+bool CoreChecks::ValidateFsOutputsAgainstDynamicRenderingRenderPass(const SPIRV_MODULE_STATE &module_state,
+                                                                    const EntryPoint &entrypoint, const PIPELINE_STATE &pipeline,
+                                                                    const Location &create_info_loc) const {
+    bool skip = false;
+
+    struct Attachment {
+        const StageInteraceVariable *output = nullptr;
+    };
+    std::map<uint32_t, Attachment> location_map;
+
+    // TODO: dual source blend index (spv::DecIndex, zero if not provided)
+    for (const auto *variable : entrypoint.user_defined_interface_variables) {
+        if ((variable->storage_class != spv::StorageClassOutput) || variable->interface_slots.empty()) {
+            continue;  // not an output interface
+        }
+        // It is not allowed to have Block Fragment or 64-bit vectors output in Frag shader
+        // This means all Locations in slots will be the same
+        location_map[variable->interface_slots[0].Location()].output = variable;
+    }
+
+    for (uint32_t location = 0; location < location_map.size(); ++location) {
+        const auto output = location_map[location].output;
+
+        const auto &rp_state = pipeline.RenderPassState();
+        const auto &attachments = pipeline.Attachments();
+        if (!output && location < attachments.size() && attachments[location].colorWriteMask != 0) {
+            skip |= LogUndefinedValue(
+                "Undefined-Value-ShaderInputNotProduced", module_state.handle(), create_info_loc,
+                "Attachment %" PRIu32 " not written by fragment shader; undefined values will be written to attachment", location);
+        } else if (pipeline.fragment_output_state && output &&
+                   (location < rp_state->dynamic_rendering_pipeline_create_info.colorAttachmentCount)) {
+            auto format = rp_state->dynamic_rendering_pipeline_create_info.pColorAttachmentFormats[location];
+            const auto attachment_type = GetFormatType(format);
+            const auto output_type = module_state.GetNumericType(output->type_id);
+
+            // Type checking
+            if (!(output_type & attachment_type)) {
+                skip |= LogUndefinedValue(
+                    "Undefined-Value-ShaderFragmentOutputMismatch", module_state.handle(), create_info_loc,
+                    "Attachment %" PRIu32
+                    " of type `%s` does not match fragment shader output type of `%s`; resulting values are undefined",
+                    location, string_VkFormat(format), module_state.DescribeType(output->type_id).c_str());
+            }
+        }
+    }
+
+    return skip;
+}
+
+bool CoreChecks::ValidatePipelineTessellationStages(const SPIRV_MODULE_STATE &tesc_module_state, const EntryPoint &tesc_entrypoint,
+                                                    const SPIRV_MODULE_STATE &tese_module_state, const EntryPoint &tese_entrypoint,
+                                                    const Location &create_info_loc) const {
+    bool skip = false;
+
+    const auto tesc_subdivision = tesc_entrypoint.execution_mode.tessellation_subdivision;
+    const auto tese_subdivision = tese_entrypoint.execution_mode.tessellation_subdivision;
+    const auto tesc_patch_size = tesc_entrypoint.execution_mode.output_vertices;
+    const auto tese_patch_size = tese_entrypoint.execution_mode.output_vertices;
+    if (tesc_subdivision == 0 && tese_subdivision == 0) {
+        const LogObjectList objlist(tesc_module_state.handle(), tese_module_state.handle());
+        skip |= LogError("VUID-VkGraphicsPipelineCreateInfo-pStages-00732", objlist, create_info_loc,
+                         "Subdivision type is not specified in either of tessellation stages");
+    } else if (tesc_subdivision != 0 && tese_subdivision != 0 && tesc_subdivision != tese_subdivision) {
+        const LogObjectList objlist(tesc_module_state.handle(), tese_module_state.handle());
+        skip |= LogError("VUID-VkGraphicsPipelineCreateInfo-pStages-00733", objlist, create_info_loc,
+                         "Subdivision type specified in tessellation control shader is %s, but subdivison type specified in "
+                         "tessellation evaluation shader is %s",
+                         string_SpvExecutionMode(tesc_subdivision), string_SpvExecutionMode(tese_subdivision));
+    }
+    if (tesc_patch_size == 0 && tese_patch_size == 0) {
+        const LogObjectList objlist(tesc_module_state.handle(), tese_module_state.handle());
+        skip |= LogError("VUID-VkGraphicsPipelineCreateInfo-pStages-00734", objlist, create_info_loc,
+                         "Output patch size is not specified in either of tessellation stages");
+    } else if (tesc_patch_size != 0 && tese_patch_size != 0 && tesc_patch_size != tese_patch_size) {
+        const LogObjectList objlist(tesc_module_state.handle(), tese_module_state.handle());
+        skip |= LogError("VUID-VkGraphicsPipelineCreateInfo-pStages-00735", objlist, create_info_loc,
+                         "Output patch size specified in tessellation control shader is %" PRIu32
+                         ", but subdivison type specified in tessellation evaluation shader is %" PRIu32,
+                         tesc_patch_size, tese_patch_size);
+    }
+    return skip;
+}
+
 // Validate that the shaders used by the given pipeline and store the active_slots
 //  that are actually used by the pipeline into pPipeline->active_slots
 bool CoreChecks::ValidateGraphicsPipelineShaderState(const PIPELINE_STATE &pipeline, const Location &create_info_loc) const {
@@ -637,7 +812,7 @@ bool CoreChecks::ValidateGraphicsPipelineShaderState(const PIPELINE_STATE &pipel
         return skip;
     }
 
-    const PipelineStageState *vertex_stage = nullptr, *fragment_stage = nullptr;
+    const PipelineStageState *vertex_stage = nullptr, *tesc_stage = nullptr, *tese_stage = nullptr, *fragment_stage = nullptr;
     for (uint32_t i = 0; i < pipeline.stage_states.size(); i++) {
         auto &stage_state = pipeline.stage_states[i];
         const VkShaderStageFlagBits stage = stage_state.GetStage();
@@ -648,8 +823,11 @@ bool CoreChecks::ValidateGraphicsPipelineShaderState(const PIPELINE_STATE &pipel
         }
         if (stage == VK_SHADER_STAGE_VERTEX_BIT) {
             vertex_stage = &stage_state;
-        }
-        if (stage == VK_SHADER_STAGE_FRAGMENT_BIT) {
+        } else if (stage == VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT) {
+            tesc_stage = &stage_state;
+        } else if (stage == VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT) {
+            tese_stage = &stage_state;
+        } else if (stage == VK_SHADER_STAGE_FRAGMENT_BIT) {
             fragment_stage = &stage_state;
         }
     }
@@ -684,5 +862,23 @@ bool CoreChecks::ValidateGraphicsPipelineShaderState(const PIPELINE_STATE &pipel
                                                    *consumer.entrypoint, create_info_loc);
         }
     }
+
+    if (fragment_stage && fragment_stage->entrypoint && fragment_stage->spirv_state) {
+        const auto &rp_state = pipeline.RenderPassState();
+        if (rp_state && rp_state->UsesDynamicRendering()) {
+            skip |= ValidateFsOutputsAgainstDynamicRenderingRenderPass(*fragment_stage->spirv_state.get(),
+                                                                       *fragment_stage->entrypoint, pipeline, create_info_loc);
+        } else {
+            skip |= ValidateFsOutputsAgainstRenderPass(*fragment_stage->spirv_state.get(), *fragment_stage->entrypoint, pipeline,
+                                                       pipeline.Subpass(), create_info_loc);
+        }
+    }
+
+    if (tesc_stage && tesc_stage->spirv_state && tesc_stage->entrypoint && tese_stage && tese_stage->spirv_state &&
+        tese_stage->entrypoint) {
+        skip |= ValidatePipelineTessellationStages(*tesc_stage->spirv_state, *tesc_stage->entrypoint, *tese_stage->spirv_state,
+                                                   *tese_stage->entrypoint, create_info_loc);
+    }
+
     return skip;
 }

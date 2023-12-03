@@ -182,14 +182,14 @@ It is very common for state objects to contain data that is set up at creation t
 
 The following objects have already been updated to meet the above construction requirements and now only have `const` data members. They do not require any additional locking. This is the best way to make a state object thread safe and should be used whenever possible!
 
-* VkSampler / SAMPLER_STATE
-* VkSamplerYcbcrConversion / SAMPLER_YCBCR_CONVERSION_STATE
-* VkRenderPass / RENDER_PASS_STATE
-* VkFramebuffer / FRAMEBUFFER_STATE
-* VkBufferView / BUFFER_VIEW_STATE
+* VkSampler / vvl::Sampler
+* VkSamplerYcbcrConversion / vvl::SamplerYcbcrConversion
+* VkRenderPass / vvl::RenderPass
+* VkFramebuffer / vvl::Framebuffer
+* VkBufferView / vvl::BufferView
 * VkImageView / IMAGE_VIEW_STATE
 * VkPipelineLayout / PIPELINE_LAYOUT_STATE
-* VkDescriptorSetLayout / cvdescriptorset::DescriptorSetLayout
+* VkDescriptorSetLayout / vvl::DescriptorSetLayout
 * VkQueryPool / QUERY_POOL_STATE
 * VkShaderModule / SPIRV_MODULE_STATE
 * VkPipeline / Pipeline state
@@ -202,11 +202,11 @@ For data that must change after object creation, the next best strategy is to ma
 
 Thread safe accessors are very important for complex data structures such as vectors, sets, and maps. It may be possible in some cases to make simple counters or flags thread safe using `std::atomic` instead.
 
-`SURFACE_STATE` is an example of a state object with fully encapsulated non-const data members.
+`vvl::Surface` is an example of a state object with fully encapsulated non-const data members.
 
 #### Encapsulated with limited interactions with other state objects
 
-In some cases, state objects need to interact with each other. If possible, this should be done through accessor methods that manage each objects locking. Usually each object should only hold a lock while modifying its own state, and only call methods on other state objects after unlocking. This helps to prevent deadlock. `QUEUE_STATE`, `SEMAPHORE_STATE` and `FENCE_STATE` are an example of encapsulated but interacting state objects.
+In some cases, state objects need to interact with each other. If possible, this should be done through accessor methods that manage each objects locking. Usually each object should only hold a lock while modifying its own state, and only call methods on other state objects after unlocking. This helps to prevent deadlock. `vvl::Queue`, `vvl::Semaphore` and `vvl::Fence` are an example of encapsulated but interacting state objects.
 
 #### Public non-const data and user controlled locking
 
@@ -225,17 +225,17 @@ The following sections cover state objects with non-const data and describe how 
 There it not any instance member data in `ValidationStateTracker` other than state object maps. It would be nice if there were separate classes for `VkInstance` and `VkDevice` state but that is beyond the scope of this project.
 
 
-### VkPhysicalDevice / PHYSICAL_DEVICE_STATE
+### VkPhysicalDevice / vvl::PhysicalDevice
 
 Since VkPhysicalDevice handles persist until the VkInstance is destroyed, it is not necessary to hold shared_ptr reference counts on them.
 
 The `queue_family_known_count` field is an uint32_t storing the maximum property count used in a call to `vkGetPhysicalDeviceQueueFamilyProperties2()`. The `vkGetPhysicalDeviceDisplayPlanePropertiesKHR_called` field and `display_plane_property_count uint32_t` field are similar but for display plane properties.
 
-The `perf_counters` map is a per-queue family map of the results of calls to `vkEnumeratePhysicalDeviceQueueFamilyPerformanceQueryCounters()` which are not otherwise modified. These could be made const by adding query code to `PHYSICAL_DEVICE_STATE` construction.
+The `perf_counters` map is a per-queue family map of the results of calls to `vkEnumeratePhysicalDeviceQueueFamilyPerformanceQueryCounters()` which are not otherwise modified. These could be made const by adding query code to `vvl::PhysicalDevice` construction.
 
 ###### PRs:
 
-[layers: Set up QUEUE_STATE and PHYSICAL_DEVICE_STATE at create time](https://github.com/KhronosGroup/Vulkan-ValidationLayers/pull/3370)
+[layers: Set up vvl::Queue and vvl::PhysicalDevice at create time](https://github.com/KhronosGroup/Vulkan-ValidationLayers/pull/3370)
 
 
 ## Device Data
@@ -291,58 +291,58 @@ TODO: the counter flag members should be atomic.
 ## Queue state
 
 
-### VkQueue / QUEUE_STATE
+### VkQueue / vvl::Queue
 
-QUEUE_STATE tracks command buffers, semaphores and fences that have been submitted to the to the queue, but have not finished executing:
+vvl::Queue tracks command buffers, semaphores and fences that have been submitted to the to the queue, but have not finished executing:
 
 
 ```
-    struct CB_SUBMISSION {
+    struct QueueSubmission {
         struct SemaphoreInfo {
-            std::shared_ptr<SEMAPHORE_STATE> semaphore;
+            std::shared_ptr<vvl::Semaphore> semaphore;
             uint64_t payload{0};
         };
 
         std::vector<std::shared_ptr<CMD_BUFFER_STATE>> cbs;
         std::vector<SemaphoreInfo> wait_semaphores;
         std::vector<SemaphoreInfo> signal_semaphores;
-        std::shared_ptr<FENCE_STATE> fence;
+        std::shared_ptr<vvl::Fence> fence;
         uint32_t perf_submit_pass{0};
     };
 
     uint64_t seq_;
-    std::deque<CB_SUBMISSION> submissions_;
+    std::deque<QueueSubmission> submissions_;
 ```
 
-Each `CB_SUBMISSION` structure contains the state for a single call to `vkQueueSubmit()`, `vkQueueSubmit2()` or `vkQueueBindSparse()`. They are stored in order in the `submissions_` dequeue until the state tracker determines that they have completed execution.
+Each `QueueSubmission` structure contains the state for a single call to `vkQueueSubmit()`, `vkQueueSubmit2()` or `vkQueueBindSparse()`. They are stored in order in the `submissions_` dequeue until the state tracker determines that they have completed execution.
 
-`seq_` is a sequence number that increments in every `vkQueueSubmit()` call. It is also stored in `SEMAPHORE_STATE` and `FENCE_STATE`, to track at what point in the queue they will signal.
+`seq_` is a sequence number that increments in every `vkQueueSubmit()` call. It is also stored in `vvl::Semaphore` and `vvl::Fence`, to track at what point in the queue they will signal.
 
-`QUEUE_STATE::submissions_` and `seq_` are accessed during queue submissions, as well as when semaphore or fence state changes cause updates to the completion state of queues. In Vulkan calls to check the status of a fence or semaphore, the state tracker uses the sequence numbers to figure out how far execution of the queue has progressed and update the state of any objects earlier in the queue, which must have finished executing. Because this process happens in functions that do not require external synchronization on the queue, such as `vkGetFenceStatus()` and `vkWaitSemaphores()`, access to the dequeue and `seq_` are  lock guarded.
+`vvl::Queue::submissions_` and `seq_` are accessed during queue submissions, as well as when semaphore or fence state changes cause updates to the completion state of queues. In Vulkan calls to check the status of a fence or semaphore, the state tracker uses the sequence numbers to figure out how far execution of the queue has progressed and update the state of any objects earlier in the queue, which must have finished executing. Because this process happens in functions that do not require external synchronization on the queue, such as `vkGetFenceStatus()` and `vkWaitSemaphores()`, access to the dequeue and `seq_` are  lock guarded.
 
 Snce `VkQueues`  exist until their `VkDevice` is destroyed, it is not necessary to use shared pointers for every reference to them.
 
-### VkFence / FENCE_STATE
+### VkFence / vvl::Fence
 
-`FENCE_STATE` contains the following non-const members, which are used through accessor methods that manage locking:
+`vvl::Fence` contains the following non-const members, which are used through accessor methods that manage locking:
 
 
-        QUEUE_STATE *queue_{nullptr};
+        vvl::Queue *queue_{nullptr};
         uint64_t seq_{0};
-        FENCE_STATUS state;
-        SyncScope scope{kSyncScopeInternal};
+        State state_;
+        Scope scope_{kInternal};
 
-This data is used to track the current state of the `VkFence`, and its position in the `VkQueue` that will signal it. `FENCE_STATE` calls `QUEUE_STATE::Retire()` when it detects that the `VkFence` has been signaled. `QUEUE_STATE::Retire()` then updates its state for anything submitted before the fence.
+This data is used to track the current state of the `VkFence`, and its position in the `VkQueue` that will signal it. `vvl::Fence` calls `vvl::Queue::Retire()` when it detects that the `VkFence` has been signaled. `vvl::Queue::Retire()` then updates its state for anything submitted before the fence.
 
-### VkSemaphore / SEMAPHORE_STATE
+### VkSemaphore / vvl::Semaphore
 
-`SEMAPHORE_STATE` contains the following non-const members, which are used through accessor methods that manage locking:
+`vvl::Semaphore` contains the following non-const members, which are used through accessor methods that manage locking:
 
 
-        SyncScope scope_{kSyncScopeInternal};
-         struct SemOp {
+        Scope scope_{kInternal};
+        struct SemOp {
             enum OpType op_type; /* values: kNone, kWait, kSignal, kBinaryAcquire, kBinaryPresent */
-            QUEUE_STATE *queue;
+            vvl::Queue *queue;
             uint64_t seq;
             uint64_t payload;
         };
@@ -351,25 +351,25 @@ This data is used to track the current state of the `VkFence`, and its position 
         uint64_t next_payload_;
         std::multiset<SemOp> operations_;
 
-Vulkan semaphores are extremely complicated, and timeline semaphores behave very differently from binary semaphores. `SEMAPHORE_STATE` behaves slightly differently depending on if it is used for a timeline or binary semaphore.
+Vulkan semaphores are extremely complicated, and timeline semaphores behave very differently from binary semaphores. `vvl::Semaphore` behaves slightly differently depending on if it is used for a timeline or binary semaphore.
 
-For timeline semaphores, the `operations_` multiset stores all pending waits or signals, sorted by the `SemOp::payload` field, which is the user specified value. There can be multiple operations associated with each `payload` value and they can be added in almost any order.  Additionally, one signal operation could cause many wait operations to be completed.  All of these operations could be on different `VkQueues`. Because of this, the code for updating the state of the semaphore is more complex than for `FENCE_STATE`:
+For timeline semaphores, the `operations_` multiset stores all pending waits or signals, sorted by the `SemOp::payload` field, which is the user specified value. There can be multiple operations associated with each `payload` value and they can be added in almost any order.  Additionally, one signal operation could cause many wait operations to be completed.  All of these operations could be on different `VkQueues`. Because of this, the code for updating the state of the semaphore is more complex than for `vvl::Fence`:
 
     // Remove completed operations and return highest sequence numbers for all affected queues
-    using RetireResult = vvl::unordered_map<QUEUE_STATE *, uint64_t>;
-    RetireResult Retire(QUEUE_STATE *queue, uint64_t payload);
+    using RetireResult = vvl::unordered_map<vvl::Queue *, uint64_t>;
+    RetireResult Retire(vvl::Queue *queue, uint64_t payload);
 
-`RetireResult` makes it possible to handle state changes for several queues.  When called from `QUEUE_STATE::Retire()`, the `RetireResult`(s) for all `CB_SUBMISSIONS` is saved until the end of the current queue's processing, so that Retire() can be called on other queues without any locks held. `SEMAPHORE_STATE::Retire()` can also be called from `vkWaitSemaphores()` or `vkGetSemaphoreCounterValueKHR()`, but these cases are much simpler.
+`RetireResult` makes it possible to handle state changes for several queues.  When called from `vvl::Queue::Retire()`, the `RetireResult`(s) for all `QueueSubmission` is saved until the end of the current queue's processing, so that Retire() can be called on other queues without any locks held. `vvl::Semaphore::Retire()` can also be called from `vkWaitSemaphores()` or `vkGetSemaphoreCounterValueKHR()`, but these cases are much simpler.
 
 For binary semaphores, `SemOp::payload` is set from the `next_payload_` counter. Each semaphore operation will have a unique `payload` value. Having a `payload` value lets binary semaphores be treated as very simple and restricted timeline semaphores in most of the code.  Additionally, semaphores used with `vkQueuePresentKHR()` or `vkAcquireNextImageKHR()` must be treated specially because it isn't currently possible for the state tracker to reliably know when these semaphores change state.
 
 ###### PRs:
 
-[layers: Clean up QUEUE_STATE, FENCE_STATE and SEMAPHORE_STATE](https://github.com/KhronosGroup/Vulkan-ValidationLayers/pull/3284)
+[layers: Clean up vvl::Queue, vvl::Fence and vvl::Semaphore](https://github.com/KhronosGroup/Vulkan-ValidationLayers/pull/3284)
 
-[layers: Further clean up of FENCE_STATE, SEMAPHORE_STATE and QUEUE_STATE](https://github.com/KhronosGroup/Vulkan-ValidationLayers/pull/3610)
+[layers: Further clean up of vvl::Fence, vvl::Semaphore and vvl::Queue](https://github.com/KhronosGroup/Vulkan-ValidationLayers/pull/3610)
 
-[layers: Make QUEUE_STATE and related classes threadsafe](https://github.com/KhronosGroup/Vulkan-ValidationLayers/pull/3656)
+[layers: Make vvl::Queue and related classes threadsafe](https://github.com/KhronosGroup/Vulkan-ValidationLayers/pull/3656)
 
 ## Command Buffers
 
@@ -402,7 +402,7 @@ The only dynamic data in `COMMAND_POOL_STATE` is a set of all the command buffer
 ```
 
 
-This state is only changed in Vulkan functions that require external synchronization of the `VkCommandPool` handle. TODO: currently this object is not lock guarded but it could be converted to work like `DESCRIPTOR_POOL_STATE`, which is.
+This state is only changed in Vulkan functions that require external synchronization of the `VkCommandPool` handle. TODO: currently this object is not lock guarded but it could be converted to work like `vvl::DescriptorPool`, which is.
 
 
 ### VkCommandBuffer / CMD_BUFFER_STATE
@@ -647,9 +647,9 @@ The image_layout_map maintains a local copy of the layout state for any images u
 
 [layers: Make global QFO and Image Layout state threadsafe](https://github.com/KhronosGroup/Vulkan-ValidationLayers/pull/3669)
 
-VkBuffer / BUFFER_STATE
+VkBuffer / vvl::Buffer
 
-`BUFFER_STATE` has a flag used only by Best Practices:
+`vvl::Buffer` has a flag used only by Best Practices:
 
 
 ```
@@ -657,18 +657,18 @@ VkBuffer / BUFFER_STATE
 ```
 
 
-And `BUFFER_STATE::deviceAddress` field is used for lookups in a separate map used by ray tracing validation in CoreChecks and GPUAV:
+And `vvl::Buffer::deviceAddress` field is used for lookups in a separate map used by ray tracing validation in CoreChecks and GPUAV:
 
 
 ```
-    vl_concurrent_unordered_map<VkDeviceAddress, BUFFER_STATE*> buffer_address_map_;
+    vl_concurrent_unordered_map<VkDeviceAddress, vvl::Buffer*> buffer_address_map_;
 ```
 
 
 The `deviceAddress` field can only be set after memory is bound to the buffer, so it cannot be const. But once it is set it is not modified.
 
 
-### VkAccelerationStructureKHR / ACCELERATION_STRUCTURE_STATE_KHR
+### VkAccelerationStructureKHR / vvl::AccelerationStructureKHR
 
 There are separate state objects for the KHR and NV versions of the extensions. Unfortunately, due to differences in how memory is bound in the 2 extensions, these objects cannot be easily combined.
 
@@ -716,9 +716,9 @@ Some of this data is set in `vkGetSwapchainImagesKHR()` and `vkBindImageMemory2K
 TODO: Accesses to most of these fields will need to be atomic or lock guarded.
 
 
-### VkSurfaceState / SURFACE_STATE
+### VkSurfaceState / vvl::Surface
 
-`SURFACE_STATE` tracks the results of several calls that involve both `VkPhysicalDevice` and `VkSurface`:
+`vvl::Surface` tracks the results of several calls that involve both `VkPhysicalDevice` and `VkSurface`:
 
 
 ```
@@ -740,7 +740,7 @@ Also, surfaces are instance level objects but they hold a reference on the curre
 
 ###### PRs:
 
-[layers: Make SURFACE_STATE, DESCRIPTOR_POOL_STATE, QUERY_POOL_STATE and ValidationCache threadsafe](https://github.com/KhronosGroup/Vulkan-ValidationLayers/pull/3649)
+[layers: Make vvl::Surface, vvl::DescriptorPool, QUERY_POOL_STATE and ValidationCache threadsafe](https://github.com/KhronosGroup/Vulkan-ValidationLayers/pull/3649)
 
 [layers: Don't pre-query surface attributes during creation](https://github.com/KhronosGroup/Vulkan-ValidationLayers/pull/3452)
 
@@ -750,16 +750,16 @@ Also, surfaces are instance level objects but they hold a reference on the curre
 ## Descriptor sets
 
 
-### VkDescriptorPool / DESCRIPTOR_POOL_STATE
+### VkDescriptorPool / vvl::DescriptorPool
 
-All of the dynamic data in `DESCRIPTOR_POOL_STATE` is associated with tracking the currently allocated descriptor sets and the remaining resources available for allocating new ones:
+All of the dynamic data in `vvl::DescriptorPool` is associated with tracking the currently allocated descriptor sets and the remaining resources available for allocating new ones:
 
 
 
 
 ```
    // Collection of all sets in this pool`
-    vvl::unordered_set<cvdescriptorset::DescriptorSet *> sets;
+    vvl::unordered_set<vvl::DescriptorSet *> sets;
     // Available descriptor sets in this pool
     uint32_t availableSets;
     // Available # of descriptors of each type in this pool
@@ -770,10 +770,10 @@ This data is fully encapsulated by accessor methods that manage the locking.
 
 ###### PRs:
 
-[layers: Make SURFACE_STATE, DESCRIPTOR_POOL_STATE, QUERY_POOL_STATE and ValidationCache threadsafe](https://github.com/KhronosGroup/Vulkan-ValidationLayers/pull/3649)
+[layers: Make vvl::Surface, vvl::DescriptorPool, QUERY_POOL_STATE and ValidationCache threadsafe](https://github.com/KhronosGroup/Vulkan-ValidationLayers/pull/3649)
 
 
-### VkDescriptorSet / cvdescriptorset::DescriptorSet
+### VkDescriptorSet / vvl::DescriptorSet
 
 Descriptor set validation, especially of image descriptors, is currently the most CPU intensive part of validation. The state for descriptor sets consists mostly of an efficient way to store descriptors of various types in a single vector:
 
@@ -816,7 +816,7 @@ This data is fully encapsulated by accessor methods that manage the locking.
 
 [layers: remove global queryToStateMap](https://github.com/KhronosGroup/Vulkan-ValidationLayers/pull/3586)
 
-[layers: Make SURFACE_STATE, DESCRIPTOR_POOL_STATE, QUERY_POOL_STATE and ValidationCache threadsafe](https://github.com/KhronosGroup/Vulkan-ValidationLayers/pull/3649)
+[layers: Make vvl::Surface, vvl::DescriptorPool, QUERY_POOL_STATE and ValidationCache threadsafe](https://github.com/KhronosGroup/Vulkan-ValidationLayers/pull/3649)
 
 
 

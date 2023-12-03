@@ -16,11 +16,12 @@
 
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
+#include "../framework/descriptor_helper.h"
 #include "generated/vk_extension_helper.h"
 
 TEST_F(PositivePipeline, ComplexTypes) {
     TEST_DESCRIPTION("Smoke test for complex types across VS/FS boundary");
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     if (!m_device->phy().features().tessellationShader) {
@@ -45,7 +46,7 @@ TEST_F(PositivePipeline, ComplexTypes) {
 }
 
 TEST_F(PositivePipeline, BasicUsage) {
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     CreatePipelineHelper pipe(*this);
@@ -59,7 +60,7 @@ TEST_F(PositivePipeline, MissingDescriptorUnused) {
         "provided, but the shader does not statically use it. This is interesting because it requires compute pipelines to have a "
         "proper descriptor use walk, which they didn't for some time.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     char const *csSource = R"glsl(
         #version 450
@@ -81,7 +82,7 @@ TEST_F(PositivePipeline, FragmentShadingRate) {
 
     AddRequiredExtensions(VK_KHR_MAINTENANCE_1_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceFragmentShadingRateFeaturesKHR fsr_features = vku::InitStructHelper();
     VkPhysicalDeviceFeatures2 features2 = GetPhysicalDeviceFeatures2(fsr_features);
@@ -89,7 +90,7 @@ TEST_F(PositivePipeline, FragmentShadingRate) {
         GTEST_SKIP() << "Test requires (unsupported) pipelineFragmentShadingRate and primitiveFragmentShadingRate";
     }
 
-    RETURN_IF_SKIP(InitState(nullptr, &features2))
+    RETURN_IF_SKIP(InitState(nullptr, &features2));
 
     char const *csSource = R"glsl(
         #version 450
@@ -110,7 +111,7 @@ TEST_F(PositivePipeline, CombinedImageSamplerConsumedAsSampler) {
     TEST_DESCRIPTION(
         "Test that pipeline validation accepts a shader consuming only the sampler portion of a combined image + sampler");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     std::vector<VkDescriptorSetLayoutBinding> bindings = {
         {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
@@ -140,7 +141,7 @@ TEST_F(PositivePipeline, CombinedImageSamplerConsumedAsImage) {
     TEST_DESCRIPTION(
         "Test that pipeline validation accepts a shader consuming only the image portion of a combined image + sampler");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     std::vector<VkDescriptorSetLayoutBinding> bindings = {
         {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
@@ -171,7 +172,7 @@ TEST_F(PositivePipeline, CombinedImageSamplerConsumedAsBoth) {
         "Test that pipeline validation accepts a shader consuming both the sampler and the image of a combined image+sampler but "
         "via separate variables");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     std::vector<VkDescriptorSetLayoutBinding> bindings = {
         {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
@@ -199,14 +200,13 @@ TEST_F(PositivePipeline, CombinedImageSamplerConsumedAsBoth) {
 TEST_F(VkPositiveLayerTest, CreateGraphicsPipelineWithIgnoredPointers) {
     TEST_DESCRIPTION("Create Graphics Pipeline with pointers that must be ignored by layers");
     SetTargetApiVersion(VK_API_VERSION_1_1);
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     m_depth_stencil_fmt = FindSupportedDepthStencilFormat(gpu());
     m_depthStencil->Init(m_width, m_height, 1, m_depth_stencil_fmt, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
                          VK_IMAGE_TILING_OPTIMAL);
-    VkImageView depth_image_view =
-        m_depthStencil->targetView(m_depth_stencil_fmt, VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
-    InitRenderTarget(&depth_image_view);
+    vkt::ImageView depth_image_view = m_depthStencil->CreateView(VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
+    InitRenderTarget(&depth_image_view.handle());
 
     const uint64_t fake_address_64 = 0xCDCDCDCDCDCDCDCD;
     const uint64_t fake_address_32 = 0xCDCDCDCD;
@@ -447,8 +447,7 @@ TEST_F(PositivePipeline, CoreChecksDisabled) {
     features.disabledValidationFeatureCount = 1;
     features.pDisabledValidationFeatures = disables;
 
-    VkCommandPoolCreateFlags pool_flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    RETURN_IF_SKIP(Init(nullptr, nullptr, pool_flags, &features));
+    RETURN_IF_SKIP(Init(nullptr, nullptr, &features));
     InitRenderTarget();
     VkShaderObj vs(this, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
     VkShaderObj fs(this, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -468,8 +467,8 @@ TEST_F(PositivePipeline, TessellationDomainOrigin) {
         "VkPipelineTessellationDomainOriginStateCreateInfo");
     SetTargetApiVersion(VK_API_VERSION_1_1);
 
-    AddRequiredExtensions(VK_KHR_MAINTENANCE2_EXTENSION_NAME);
-    RETURN_IF_SKIP(Init())
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_2_EXTENSION_NAME);
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     if (!m_device->phy().features().tessellationShader) {
@@ -503,7 +502,7 @@ TEST_F(PositivePipeline, ViewportArray2NV) {
     TEST_DESCRIPTION("Test to validate VK_NV_viewport_array2");
 
     AddRequiredExtensions(VK_NV_VIEWPORT_ARRAY_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceFeatures available_features = {};
     GetPhysicalDeviceFeatures(&available_features);
@@ -518,7 +517,7 @@ TEST_F(PositivePipeline, ViewportArray2NV) {
         GTEST_SKIP() << "VkPhysicalDeviceFeatures::geometryShader is not supported";
     }
 
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
     const char tcs_src[] = R"glsl(
@@ -634,7 +633,7 @@ TEST_F(PositivePipeline, ViewportArray2NV) {
 TEST_F(PositivePipeline, AttachmentUnused) {
     TEST_DESCRIPTION("Make sure unused attachments are correctly ignored.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     char const *fsSource = R"glsl(
@@ -664,16 +663,16 @@ TEST_F(PositivePipeline, AttachmentUnused) {
         helper.shader_stages_ = {helper.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
         helper.gp_ci_.renderPass = render_pass.handle();
     };
-    CreatePipelineHelper::OneshotTest(*this, override_info, kErrorBit | kWarningBit);
+    CreatePipelineHelper::OneshotTest(*this, override_info, kErrorBit);
 }
 
 TEST_F(PositivePipeline, SampleMaskOverrideCoverageNV) {
     TEST_DESCRIPTION("Test to validate VK_NV_sample_mask_override_coverage");
 
     AddRequiredExtensions(VK_NV_SAMPLE_MASK_OVERRIDE_COVERAGE_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitState());
 
     const char vs_src[] = R"glsl(
         #version 450
@@ -759,7 +758,7 @@ TEST_F(PositivePipeline, SampleMaskOverrideCoverageNV) {
 
 TEST_F(PositivePipeline, RasterizationDiscardEnableTrue) {
     TEST_DESCRIPTION("Ensure it doesn't crash and trigger error msg when rasterizerDiscardEnable = true");
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     VkAttachmentDescription att[1] = {{}};
@@ -800,7 +799,7 @@ TEST_F(PositivePipeline, RasterizationDiscardEnableTrue) {
 
 TEST_F(PositivePipeline, SamplerDataForCombinedImageSampler) {
     TEST_DESCRIPTION("Shader code uses sampler data for CombinedImageSampler");
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     const char *fsSource = R"(
@@ -843,7 +842,7 @@ TEST_F(PositivePipeline, SamplerDataForCombinedImageSampler) {
 
     VkImageObj image(m_device);
     image.Init(32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_TILING_OPTIMAL, 0);
-    VkImageView view = image.targetView(VK_FORMAT_R8G8B8A8_UNORM);
+    vkt::ImageView view = image.CreateView();
 
     vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
 
@@ -867,7 +866,7 @@ TEST_F(PositivePipeline, ConditionalRendering) {
 
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_CONDITIONAL_RENDERING_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceConditionalRenderingFeaturesEXT cond_rendering_feature = vku::InitStructHelper();
     auto features2 = GetPhysicalDeviceFeatures2(cond_rendering_feature);
@@ -875,7 +874,7 @@ TEST_F(PositivePipeline, ConditionalRendering) {
         GTEST_SKIP() << "conditionalRendering feature not supported";
     }
 
-    RETURN_IF_SKIP(InitState(nullptr, &features2))
+    RETURN_IF_SKIP(InitState(nullptr, &features2));
     InitRenderTarget();
 
     // A renderpass with a single subpass that declared a self-dependency
@@ -901,9 +900,10 @@ TEST_F(PositivePipeline, ConditionalRendering) {
 
     VkImageObj image(m_device);
     image.Init(32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
-    VkImageView imageView = image.targetView(VK_FORMAT_R8G8B8A8_UNORM);
+    vkt::ImageView imageView = image.CreateView();
 
-    VkFramebufferCreateInfo fbci = {VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO, nullptr, 0, rp.handle(), 1, &imageView, 32, 32, 1};
+    VkFramebufferCreateInfo fbci = {
+        VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO, nullptr, 0, rp.handle(), 1, &imageView.handle(), 32, 32, 1};
     vkt::Framebuffer fb(*m_device, fbci);
 
     m_commandBuffer->begin();
@@ -938,7 +938,7 @@ TEST_F(PositivePipeline, ShaderTileImage) {
     SetTargetApiVersion(VK_API_VERSION_1_3);
     AddRequiredExtensions(VK_EXT_SHADER_TILE_IMAGE_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceDynamicRenderingFeaturesKHR dynamic_rendering_features = vku::InitStructHelper();
     VkPhysicalDeviceShaderTileImageFeaturesEXT shader_tile_image_features = vku::InitStructHelper();
@@ -954,7 +954,7 @@ TEST_F(PositivePipeline, ShaderTileImage) {
         GTEST_SKIP() << "Test requires (unsupported) shader tile image extension.";
     }
 
-    RETURN_IF_SKIP(InitState(nullptr, &features2))
+    RETURN_IF_SKIP(InitState(nullptr, &features2));
 
     VkFormat depth_format = VK_FORMAT_D32_SFLOAT_S8_UINT;
     VkFormat color_format = VK_FORMAT_B8G8R8A8_UNORM;
@@ -1028,13 +1028,13 @@ TEST_F(VkPositiveLayerTest, TestPervertexNVShaderAttributes) {
     TEST_DESCRIPTION("Test using TestRasterizationStateStreamCreateInfoEXT with invalid rasterizationStream.");
 
     AddRequiredExtensions(VK_NV_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceFragmentShaderBarycentricFeaturesNV fragment_shader_barycentric_features =
         vku::InitStructHelper();
     fragment_shader_barycentric_features.fragmentShaderBarycentric = VK_TRUE;
     VkPhysicalDeviceFeatures2KHR features2 = vku::InitStructHelper(&fragment_shader_barycentric_features);
-    RETURN_IF_SKIP(InitState(nullptr, &features2))
+    RETURN_IF_SKIP(InitState(nullptr, &features2));
 
     InitRenderTarget();
 
@@ -1099,8 +1099,7 @@ TEST_F(PositivePipeline, MutableStorageImageFormatWriteForFormat) {
     const VkFormat image_view_format = VK_FORMAT_R32_SFLOAT;
 
     AddRequiredExtensions(VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
-    RETURN_IF_SKIP(InitState(nullptr, nullptr, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    RETURN_IF_SKIP(Init());
 
     PFN_vkSetPhysicalDeviceFormatProperties2EXT fpvkSetPhysicalDeviceFormatProperties2EXT = nullptr;
     PFN_vkGetOriginalPhysicalDeviceFormatProperties2EXT fpvkGetOriginalPhysicalDeviceFormatProperties2EXT = nullptr;
@@ -1197,9 +1196,10 @@ TEST_F(PositivePipeline, MutableStorageImageFormatWriteForFormat) {
     image_create_info.usage = VK_IMAGE_USAGE_STORAGE_BIT;
     VkImageObj image(m_device);
     image.Init(image_create_info);
+    vkt::ImageView view = image.CreateView();
 
     VkDescriptorImageInfo image_info = {};
-    image_info.imageView = image.targetView(image_view_format);
+    image_info.imageView = view;
     image_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
     VkWriteDescriptorSet descriptor_write = vku::InitStructHelper();
@@ -1240,7 +1240,7 @@ TEST_F(PositivePipeline, CreateGraphicsPipelineRasterizationOrderAttachmentAcces
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_ARM_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceRasterizationOrderAttachmentAccessFeaturesARM rasterization_order_features = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(rasterization_order_features);
@@ -1352,7 +1352,7 @@ TEST_F(PositivePipeline, AttachmentsDisableRasterization) {
         "Create a pipeline with rasterization disabled, containing a valid pColorBlendState and color attachments, "
         "without a fragment shader");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     CreatePipelineHelper pipe(*this);
@@ -1367,7 +1367,7 @@ TEST_F(PositivePipeline, DualBlendShader) {
     TEST_DESCRIPTION("Test drawing with dual source blending with too many fragment output attachments.");
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceFeatures2 features2 = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(features2);
@@ -1376,7 +1376,7 @@ TEST_F(PositivePipeline, DualBlendShader) {
         GTEST_SKIP() << "dualSrcBlend feature is not available";
     }
 
-    RETURN_IF_SKIP(InitState(nullptr, &features2))
+    RETURN_IF_SKIP(InitState(nullptr, &features2));
     InitRenderTarget();
 
     char const *fsSource = R"glsl(
@@ -1423,14 +1423,8 @@ TEST_F(PositivePipeline, DISABLED_CreationFeedbackCount0) {
     TEST_DESCRIPTION("Test graphics pipeline feedback stage count check with 0.");
 
     AddRequiredExtensions(VK_EXT_PIPELINE_CREATION_FEEDBACK_EXTENSION_NAME);
-    // need for IsDriver check
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
-    // This test hits a bug in the driver, CTS was written, but incase using an old driver
-    if (IsDriver(VK_DRIVER_ID_NVIDIA_PROPRIETARY)) {
-        GTEST_SKIP() << "This test should not be run on the NVIDIA proprietary driver.";
-    }
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     VkPipelineCreationFeedbackCreateInfoEXT feedback_info = vku::InitStructHelper();
@@ -1450,14 +1444,14 @@ TEST_F(PositivePipeline, ShaderModuleIdentifier) {
     TEST_DESCRIPTION("Create a pipeline using a shader module identifier");
     SetTargetApiVersion(VK_API_VERSION_1_3);
     AddRequiredExtensions(VK_EXT_SHADER_MODULE_IDENTIFIER_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDevicePipelineCreationCacheControlFeatures shader_cache_control_features = vku::InitStructHelper();
     VkPhysicalDeviceShaderModuleIdentifierFeaturesEXT shader_module_id_features =
         vku::InitStructHelper(&shader_cache_control_features);
     auto features2 = GetPhysicalDeviceFeatures2(shader_module_id_features);
 
-    RETURN_IF_SKIP(InitState(nullptr, &features2))
+    RETURN_IF_SKIP(InitState(nullptr, &features2));
     InitRenderTarget();
     VkPipelineShaderStageModuleIdentifierCreateInfoEXT sm_id_create_info = vku::InitStructHelper();
     VkShaderObj vs(this, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
@@ -1483,9 +1477,9 @@ TEST_F(PositivePipeline, ShaderModuleIdentifier) {
 
 TEST_F(PositivePipeline, ViewportSwizzleNV) {
     AddRequiredExtensions(VK_NV_VIEWPORT_SWIZZLE_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
     std::array<VkViewportSwizzleNV, 2> swizzle = {};
@@ -1543,7 +1537,7 @@ TEST_F(PositivePipeline, RasterStateWithDepthBiasRepresentationInfo) {
 
     AddRequiredExtensions(VK_EXT_DEPTH_BIAS_CONTROL_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceDepthBiasControlFeaturesEXT depth_bias_control_features = vku::InitStructHelper();
     auto features2 = GetPhysicalDeviceFeatures2(depth_bias_control_features);
@@ -1565,7 +1559,7 @@ TEST_F(PositivePipeline, RasterStateWithDepthBiasRepresentationInfo) {
         GTEST_SKIP() << "depthBiasExact not supported";
     }
 
-    RETURN_IF_SKIP(InitState(nullptr, &features2))
+    RETURN_IF_SKIP(InitState(nullptr, &features2));
     InitRenderTarget();
 
     const auto create_pipe_with_depth_bias_representation = [this](VkDepthBiasRepresentationInfoEXT &depth_bias_representation) {
@@ -1583,4 +1577,248 @@ TEST_F(PositivePipeline, RasterStateWithDepthBiasRepresentationInfo) {
 
     depth_bias_representation.depthBiasRepresentation = VK_DEPTH_BIAS_REPRESENTATION_FLOAT_EXT;
     create_pipe_with_depth_bias_representation(depth_bias_representation);
+}
+
+TEST_F(PositivePipeline, DeviceGeneratedCommands) {
+    TEST_DESCRIPTION("Test creating pipeline with device generated commands");
+
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_NV_DEVICE_GENERATED_COMMANDS_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitFramework());
+    VkPhysicalDeviceDeviceGeneratedCommandsFeaturesNV dgc_features = vku::InitStructHelper();
+    GetPhysicalDeviceFeatures2(dgc_features);
+    if (!dgc_features.deviceGeneratedCommands) {
+        GTEST_SKIP() << "deviceGeneratedCommands not supported";
+    }
+    RETURN_IF_SKIP(InitState());
+    RETURN_IF_SKIP(InitRenderTarget());
+
+    VkShaderObj vs(this, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(this, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkPipelineShaderStageCreateInfo stages[2] = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
+
+    VkPipelineVertexInputStateCreateInfo vertex_input_state = vku::InitStructHelper();
+    VkPipelineTessellationStateCreateInfo tessellation_state = vku::InitStructHelper();
+
+    VkGraphicsShaderGroupCreateInfoNV group = vku::InitStructHelper();
+    group.stageCount = 2u;
+    group.pStages = stages;
+    group.pVertexInputState = &vertex_input_state;
+    group.pTessellationState = &tessellation_state;
+
+    VkGraphicsPipelineShaderGroupsCreateInfoNV shader_groups_ci = vku::InitStructHelper();
+    shader_groups_ci.groupCount = 1u;
+    shader_groups_ci.pGroups = &group;
+    shader_groups_ci.pipelineCount = 0u;
+    shader_groups_ci.pPipelines = nullptr;
+
+    CreatePipelineHelper pipe(*this);
+    pipe.InitState();
+    pipe.gp_ci_.pNext = &shader_groups_ci;
+    pipe.shader_stages_ = {stages[0], stages[1]};
+    pipe.CreateGraphicsPipeline();
+}
+
+TEST_F(PositivePipeline, DepthStencilStateIgnored) {
+    TEST_DESCRIPTION("Have a valid null pDepthStencilState with a Depth attachment");
+
+    AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitFramework());
+    VkPhysicalDeviceExtendedDynamicStateFeaturesEXT extended_dynamic_state_features = vku::InitStructHelper();
+    GetPhysicalDeviceFeatures2(extended_dynamic_state_features);
+    if (!extended_dynamic_state_features.extendedDynamicState) {
+        GTEST_SKIP() << "Test requires (unsupported) extendedDynamicState";
+    }
+    RETURN_IF_SKIP(InitState(nullptr, &extended_dynamic_state_features));
+    InitRenderTarget();
+
+    VkAttachmentDescription attachments[] = {
+        {
+            0,
+            VK_FORMAT_B8G8R8A8_UNORM,
+            VK_SAMPLE_COUNT_1_BIT,
+            VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+            VK_ATTACHMENT_STORE_OP_DONT_CARE,
+            VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+            VK_ATTACHMENT_STORE_OP_DONT_CARE,
+            VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        },
+        {
+            0,
+            VK_FORMAT_D16_UNORM,
+            VK_SAMPLE_COUNT_1_BIT,
+            VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+            VK_ATTACHMENT_STORE_OP_DONT_CARE,
+            VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+            VK_ATTACHMENT_STORE_OP_DONT_CARE,
+            VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+        },
+    };
+    VkAttachmentReference refs[] = {
+        {0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL},
+        {1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL},
+    };
+    VkSubpassDescription subpass = {0, VK_PIPELINE_BIND_POINT_GRAPHICS, 0, nullptr, 1, &refs[0], nullptr, &refs[1], 0, nullptr};
+    VkRenderPassCreateInfo rpci = {VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO, nullptr, 0, 2, attachments, 1, &subpass, 0, nullptr};
+    vkt::RenderPass rp(*m_device, rpci);
+
+    // disable with rasterizerDiscardEnable
+    {
+        CreatePipelineHelper pipe(*this);
+        pipe.InitState();
+        pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo()};
+        pipe.rs_state_ci_.rasterizerDiscardEnable = VK_TRUE;
+        pipe.gp_ci_.renderPass = rp.handle();
+        pipe.CreateGraphicsPipeline();
+    }
+
+    // disable with dynamic state
+    {
+        CreatePipelineHelper pipe(*this);
+        pipe.InitState();
+        pipe.AddDynamicState(VK_DYNAMIC_STATE_DEPTH_TEST_ENABLE);
+        pipe.AddDynamicState(VK_DYNAMIC_STATE_DEPTH_WRITE_ENABLE);
+        pipe.AddDynamicState(VK_DYNAMIC_STATE_DEPTH_COMPARE_OP);
+        pipe.AddDynamicState(VK_DYNAMIC_STATE_DEPTH_BOUNDS_TEST_ENABLE);
+        pipe.AddDynamicState(VK_DYNAMIC_STATE_STENCIL_TEST_ENABLE);
+        pipe.AddDynamicState(VK_DYNAMIC_STATE_STENCIL_OP);
+        pipe.AddDynamicState(VK_DYNAMIC_STATE_DEPTH_BOUNDS);
+        pipe.gp_ci_.renderPass = rp.handle();
+        pipe.CreateGraphicsPipeline();
+    }
+}
+
+TEST_F(PositivePipeline, ViewportStateNotSet) {
+    TEST_DESCRIPTION("Create pipeline with viewport state not set");
+
+    AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitFramework());
+    VkPhysicalDeviceExtendedDynamicStateFeaturesEXT eds_features = vku::InitStructHelper();
+    VkPhysicalDeviceExtendedDynamicState2FeaturesEXT eds2_features = vku::InitStructHelper(&eds_features);
+    GetPhysicalDeviceFeatures2(eds2_features);
+    if (!eds_features.extendedDynamicState) {
+        GTEST_SKIP() << "extendedDynamicState not supported";
+    }
+    if (!eds2_features.extendedDynamicState2) {
+        GTEST_SKIP() << "extendedDynamicState2 not supported";
+    }
+    RETURN_IF_SKIP(InitState(nullptr, &eds2_features));
+    RETURN_IF_SKIP(InitRenderTarget());
+
+    CreatePipelineHelper pipe(*this);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_SCISSOR_WITH_COUNT);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_VIEWPORT_WITH_COUNT_EXT);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_RASTERIZER_DISCARD_ENABLE);
+    pipe.gp_ci_.pViewportState = nullptr;
+    pipe.InitState();
+    pipe.CreateGraphicsPipeline();
+}
+
+TEST_F(PositivePipeline, ViewportStateNotSetRasterizerDiscardEnabled) {
+    TEST_DESCRIPTION("Create pipeline with viewport state not set");
+
+    AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitFramework());
+    VkPhysicalDeviceExtendedDynamicStateFeaturesEXT eds_features = vku::InitStructHelper();
+    VkPhysicalDeviceExtendedDynamicState2FeaturesEXT eds2_features = vku::InitStructHelper(&eds_features);
+    GetPhysicalDeviceFeatures2(eds2_features);
+    if (!eds_features.extendedDynamicState) {
+        GTEST_SKIP() << "extendedDynamicState not supported";
+    }
+    if (!eds2_features.extendedDynamicState2) {
+        GTEST_SKIP() << "extendedDynamicState2 not supported";
+    }
+    RETURN_IF_SKIP(InitState(nullptr, &eds2_features));
+    RETURN_IF_SKIP(InitRenderTarget());
+
+    VkPipelineRasterizationStateCreateInfo rasterization_state = vku::InitStructHelper();
+    rasterization_state.rasterizerDiscardEnable = VK_TRUE;
+    rasterization_state.polygonMode = VK_POLYGON_MODE_FILL;
+    rasterization_state.cullMode = VK_CULL_MODE_NONE;
+    rasterization_state.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+
+    CreatePipelineHelper pipe(*this);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_SCISSOR_WITH_COUNT);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_VIEWPORT_WITH_COUNT_EXT);
+    pipe.gp_ci_.pRasterizationState = &rasterization_state;
+    pipe.gp_ci_.pViewportState = nullptr;
+    pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo()};
+    pipe.InitState();
+    pipe.CreateGraphicsPipeline();
+}
+
+TEST_F(PositivePipeline, InterpolateAtSample) {
+    TEST_DESCRIPTION("Test using spirv instruction InterpolateAtSample");
+
+    RETURN_IF_SKIP(InitFramework());
+    if (IsExtensionsEnabled(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME)) {
+        VkPhysicalDevicePortabilitySubsetFeaturesKHR portability_subset_features = vku::InitStructHelper();
+        auto features2 = GetPhysicalDeviceFeatures2(portability_subset_features);
+        if (!portability_subset_features.shaderSampleRateInterpolationFunctions) {
+            GTEST_SKIP() << "shaderSampleRateInterpolationFunctions not supported";
+        }
+        RETURN_IF_SKIP(InitState(nullptr, &features2));
+        if (!features2.features.sampleRateShading) {
+            GTEST_SKIP() << "sampleRateShading not supported";
+        }
+    } else {
+        RETURN_IF_SKIP(InitState());
+        if (!m_device->phy().features().sampleRateShading) {
+            GTEST_SKIP() << "sampleRateShading not supported";
+        }
+    }
+    RETURN_IF_SKIP(InitRenderTarget());
+
+    static const char vs_src[] = R"glsl(
+        #version 460
+        layout(location = 0) out vec2 uv;
+        void main() {
+            uv = vec2(gl_VertexIndex & 1, (gl_VertexIndex >> 1) & 1);
+		    gl_Position = vec4(uv, 0.0f, 1.0f);
+        }
+    )glsl";
+    static const char fs_src[] = R"glsl(
+        #version 460
+        layout(location = 0) out vec4 uFragColor;
+        layout(location = 0) in vec2 v;
+        void main() {
+		    vec2 sample1 = interpolateAtSample(v, 0);
+            uFragColor = vec4(0.1f);
+        }
+    )glsl";
+    VkShaderObj vs(this, vs_src, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(this, fs_src, VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    CreatePipelineHelper pipe(*this);
+    pipe.InitState();
+    pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
+    pipe.CreateGraphicsPipeline();
+
+    m_commandBuffer->begin();
+    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_);
+    vk::CmdDraw(m_commandBuffer->handle(), 3u, 1u, 0u, 0u);
+    m_commandBuffer->EndRenderPass();
+    m_commandBuffer->end();
+}
+
+TEST_F(PositivePipeline, ShaderModuleIdentifierZeroLength) {
+    TEST_DESCRIPTION("Use shader module identifier with zero size and provide a shader module");
+
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    VkPipelineShaderStageModuleIdentifierCreateInfoEXT moduleIdentifier = vku::InitStructHelper();
+
+    CreatePipelineHelper pipe(*this);
+    pipe.InitState();
+    pipe.shader_stages_[0].pNext = &moduleIdentifier;
+    pipe.CreateGraphicsPipeline();
 }

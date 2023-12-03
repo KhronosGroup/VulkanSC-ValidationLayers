@@ -32,40 +32,12 @@ struct DeviceFeatures;
 struct DeviceExtensions;
 class APIVersion;
 
-enum DescriptorReqBits {
-    DESCRIPTOR_REQ_VIEW_TYPE_1D = 1 << VK_IMAGE_VIEW_TYPE_1D,
-    DESCRIPTOR_REQ_VIEW_TYPE_1D_ARRAY = 1 << VK_IMAGE_VIEW_TYPE_1D_ARRAY,
-    DESCRIPTOR_REQ_VIEW_TYPE_2D = 1 << VK_IMAGE_VIEW_TYPE_2D,
-    DESCRIPTOR_REQ_VIEW_TYPE_2D_ARRAY = 1 << VK_IMAGE_VIEW_TYPE_2D_ARRAY,
-    DESCRIPTOR_REQ_VIEW_TYPE_3D = 1 << VK_IMAGE_VIEW_TYPE_3D,
-    DESCRIPTOR_REQ_VIEW_TYPE_CUBE = 1 << VK_IMAGE_VIEW_TYPE_CUBE,
-    DESCRIPTOR_REQ_VIEW_TYPE_CUBE_ARRAY = 1 << VK_IMAGE_VIEW_TYPE_CUBE_ARRAY,
-
-    DESCRIPTOR_REQ_ALL_VIEW_TYPE_BITS = (1 << (VK_IMAGE_VIEW_TYPE_CUBE_ARRAY + 1)) - 1,
-
-    DESCRIPTOR_REQ_SINGLE_SAMPLE = 2 << VK_IMAGE_VIEW_TYPE_CUBE_ARRAY,
-    DESCRIPTOR_REQ_MULTI_SAMPLE = DESCRIPTOR_REQ_SINGLE_SAMPLE << 1,
-
-    DESCRIPTOR_REQ_COMPONENT_TYPE_FLOAT = DESCRIPTOR_REQ_MULTI_SAMPLE << 1,
-    DESCRIPTOR_REQ_COMPONENT_TYPE_SINT = DESCRIPTOR_REQ_COMPONENT_TYPE_FLOAT << 1,
-    DESCRIPTOR_REQ_COMPONENT_TYPE_UINT = DESCRIPTOR_REQ_COMPONENT_TYPE_SINT << 1,
-
-    DESCRIPTOR_REQ_VIEW_ATOMIC_OPERATION = DESCRIPTOR_REQ_COMPONENT_TYPE_UINT << 1,
-    DESCRIPTOR_REQ_SAMPLER_SAMPLED = DESCRIPTOR_REQ_VIEW_ATOMIC_OPERATION << 1,
-    DESCRIPTOR_REQ_SAMPLER_IMPLICITLOD_DREF_PROJ = DESCRIPTOR_REQ_SAMPLER_SAMPLED << 1,
-    DESCRIPTOR_REQ_SAMPLER_BIAS_OFFSET = DESCRIPTOR_REQ_SAMPLER_IMPLICITLOD_DREF_PROJ << 1,
-    DESCRIPTOR_REQ_IMAGE_READ_WITHOUT_FORMAT = DESCRIPTOR_REQ_SAMPLER_BIAS_OFFSET << 1,
-    DESCRIPTOR_REQ_IMAGE_WRITE_WITHOUT_FORMAT = DESCRIPTOR_REQ_IMAGE_READ_WITHOUT_FORMAT << 1,
-    DESCRIPTOR_REQ_IMAGE_DREF = DESCRIPTOR_REQ_IMAGE_WRITE_WITHOUT_FORMAT << 1,
-};
-typedef uint32_t DescriptorReqFlags;
-
 struct ResourceInterfaceVariable;
 
 struct DescriptorRequirement {
-    DescriptorReqFlags reqs;
+    uint64_t revalidate_hash;
     const ResourceInterfaceVariable *variable;
-    DescriptorRequirement() : reqs(0) {}
+    DescriptorRequirement() : revalidate_hash(0), variable(nullptr) {}
 };
 
 enum class ShaderObjectStage : uint32_t {
@@ -107,12 +79,16 @@ inline ShaderObjectStage VkShaderStageToShaderObjectStage(VkShaderStageFlagBits 
     return ShaderObjectStage::LAST;
 }
 
-inline bool operator==(const DescriptorRequirement &a, const DescriptorRequirement &b) noexcept { return a.reqs == b.reqs; }
+inline bool operator==(const DescriptorRequirement &a, const DescriptorRequirement &b) noexcept {
+    return a.revalidate_hash == b.revalidate_hash;
+}
 
-inline bool operator<(const DescriptorRequirement &a, const DescriptorRequirement &b) noexcept { return a.reqs < b.reqs; }
+inline bool operator<(const DescriptorRequirement &a, const DescriptorRequirement &b) noexcept {
+    return a.revalidate_hash < b.revalidate_hash;
+}
 
 // < binding index (of descriptor set) : meta data >
-typedef std::map<uint32_t, DescriptorRequirement> BindingVariableMap;
+typedef vvl::unordered_map<uint32_t, DescriptorRequirement> BindingVariableMap;
 
 // Capture which slots (set#->bindings) are actually used by the shaders of this pipeline
 using ActiveSlotMap = vvl::unordered_map<uint32_t, BindingVariableMap>;
@@ -123,6 +99,7 @@ struct SPIRV_MODULE_STATE;
 struct safe_VkPipelineShaderStageCreateInfo;
 struct safe_VkShaderCreateInfoEXT;
 struct safe_VkSpecializationInfo;
+class Instruction;
 
 struct PipelineStageState {
     // We use this over a SPIRV_MODULE_STATE because there are times we need to create empty objects
@@ -142,6 +119,7 @@ struct PipelineStageState {
     VkShaderStageFlagBits GetStage() const;
     safe_VkSpecializationInfo *GetSpecializationInfo() const;
     const void *GetPNext() const;
+    bool GetInt32ConstantValue(const Instruction &insn, uint32_t *value) const;
 };
 
 using StageStateVec = std::vector<PipelineStageState>;
@@ -216,8 +194,6 @@ class ValidationCache {
         good_shader_hashes_.reserve(good_shader_hashes_.size() + other->good_shader_hashes_.size());
         for (auto h : other->good_shader_hashes_) good_shader_hashes_.insert(h);
     }
-
-    static uint32_t MakeShaderHash(const void *pCode, const size_t codeSize);
 
     bool Contains(uint32_t hash) {
         auto guard = ReadLock();

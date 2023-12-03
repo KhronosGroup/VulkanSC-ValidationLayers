@@ -87,7 +87,7 @@ TEST_F(VkSCPositiveLayerTest, CopyImagePlane) {
 
     RETURN_IF_SKIP(Init())
 
-    if (!ImageFormatIsSupported(gpu(), VK_FORMAT_G8_B8R8_2PLANE_420_UNORM)) {
+    if (!FormatIsSupported(gpu(), VK_FORMAT_G8_B8R8_2PLANE_420_UNORM)) {
         GTEST_SKIP() << "VK_FORMAT_G8_B8R8_2PLANE_420_UNORM is unsupported";
     }
 

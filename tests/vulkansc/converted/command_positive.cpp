@@ -16,11 +16,12 @@
 
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
+#include "../framework/thread_timeout_helper.h"
 #include "generated/vk_extension_helper.h"
 
 TEST_F(PositiveCommand, SecondaryCommandBufferBarrier) {
     TEST_DESCRIPTION("Add a pipeline barrier in a secondary command buffer");
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     // A renderpass with a single subpass that declared a self-dependency
     VkAttachmentDescription attach[] = {
@@ -44,9 +45,9 @@ TEST_F(PositiveCommand, SecondaryCommandBufferBarrier) {
 
     VkImageObj image(m_device);
     image.Init(32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_IMAGE_TILING_OPTIMAL, 0);
-    VkImageView imageView = image.targetView(VK_FORMAT_R8G8B8A8_UNORM);
+    vkt::ImageView imageView = image.CreateView();
 
-    VkFramebufferCreateInfo fbci = {VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO, nullptr, 0, rp, 1, &imageView, 32, 32, 1};
+    VkFramebufferCreateInfo fbci = {VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO, nullptr, 0, rp, 1, &imageView.handle(), 32, 32, 1};
     vkt::Framebuffer fb(*m_device, fbci);
 
     m_commandBuffer->begin();
@@ -96,7 +97,7 @@ TEST_F(PositiveCommand, ClearAttachmentsCalledInSecondaryCB) {
         "This test is to verify that when vkCmdClearAttachments is called by a secondary commandbuffer, the validation layers do "
         "not throw an error if the primary commandbuffer begins a renderpass before executing the secondary commandbuffer.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     vkt::CommandBuffer secondary(m_device, m_commandPool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
@@ -138,14 +139,13 @@ TEST_F(PositiveCommand, ClearAttachmentsCalledWithoutFbInSecondaryCB) {
         "Verify calling vkCmdClearAttachments inside secondary commandbuffer without linking framebuffer pointer to"
         "inheritance struct");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     m_depth_stencil_fmt = FindSupportedDepthStencilFormat(gpu());
     m_depthStencil->Init(m_width, m_height, 1, m_depth_stencil_fmt, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
                          VK_IMAGE_TILING_OPTIMAL);
-    VkImageView depth_image_view =
-        m_depthStencil->targetView(m_depth_stencil_fmt, VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
-    InitRenderTarget(&depth_image_view);
+    vkt::ImageView depth_image_view = m_depthStencil->CreateView(VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
+    InitRenderTarget(&depth_image_view.handle());
 
     vkt::CommandBuffer secondary(m_device, m_commandPool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
 
@@ -157,13 +157,7 @@ TEST_F(PositiveCommand, ClearAttachmentsCalledWithoutFbInSecondaryCB) {
     info.pInheritanceInfo = &hinfo;
 
     secondary.begin(&info);
-    VkClearAttachment color_attachment = {};
-    color_attachment.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    color_attachment.clearValue.color.float32[0] = 0.0;
-    color_attachment.clearValue.color.float32[1] = 0.0;
-    color_attachment.clearValue.color.float32[2] = 0.0;
-    color_attachment.clearValue.color.float32[3] = 0.0;
-    color_attachment.colorAttachment = 0;
+    VkClearAttachment color_attachment = {VK_IMAGE_ASPECT_COLOR_BIT, 0, VkClearValue{}};
 
     VkClearAttachment ds_attachment = {};
     ds_attachment.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
@@ -184,7 +178,7 @@ TEST_F(PositiveCommand, ClearAttachmentsCalledWithoutFbInSecondaryCB) {
 
 TEST_F(PositiveCommand, CommandPoolDeleteWithReferences) {
     TEST_DESCRIPTION("Ensure the validation layers bookkeeping tracks the implicit command buffer frees.");
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     VkCommandPoolCreateInfo cmd_pool_info = vku::InitStructHelper();
     cmd_pool_info.queueFamilyIndex = m_device->graphics_queue_node_index_;
@@ -230,7 +224,7 @@ TEST_F(PositiveCommand, CommandPoolDeleteWithReferences) {
 
 TEST_F(PositiveCommand, SecondaryCommandBufferClearColorAttachments) {
     TEST_DESCRIPTION("Create a secondary command buffer and record a CmdClearAttachments call into it");
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     VkCommandBufferAllocateInfo command_buffer_allocate_info = vku::InitStructHelper();
@@ -269,7 +263,7 @@ TEST_F(PositiveCommand, SecondaryCommandBufferClearColorAttachments) {
 
 TEST_F(PositiveCommand, SecondaryCommandBufferImageLayoutTransitions) {
     TEST_DESCRIPTION("Perform an image layout transition in a secondary command buffer followed by a transition in the primary.");
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     auto depth_format = FindSupportedDepthStencilFormat(gpu());
     InitRenderTarget();
     // Allocate a secondary and primary cmd buffer
@@ -343,7 +337,7 @@ TEST_F(PositiveCommand, DrawIndirectCountWithoutFeature) {
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_DRAW_INDIRECT_COUNT_EXTENSION_NAME);
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
     if (DeviceValidationVersion() != VK_API_VERSION_1_1) {
         GTEST_SKIP() << "Tests requires Vulkan 1.1 exactly";
@@ -379,9 +373,12 @@ TEST_F(PositiveCommand, DrawIndirectCountWithoutFeature) {
 TEST_F(PositiveCommand, DrawIndirectCountWithoutFeature12) {
     TEST_DESCRIPTION("Use VK_KHR_draw_indirect_count in 1.2 using the extension");
 
+    // We need to explicitly allow promoted extensions to be enabled as this test relies on this behavior
+    AllowPromotedExtensions();
+
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_KHR_DRAW_INDIRECT_COUNT_EXTENSION_NAME);
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     vkt::Buffer indirect_buffer(*m_device, sizeof(VkDrawIndirectCommand), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
@@ -415,7 +412,7 @@ TEST_F(PositiveCommand, DrawIndirectCountWithFeature) {
     TEST_DESCRIPTION("Use VK_KHR_draw_indirect_count in 1.2 with feature bit enabled");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceVulkan12Features features12 = vku::InitStructHelper();
     features12.drawIndirectCount = VK_TRUE;
@@ -425,7 +422,7 @@ TEST_F(PositiveCommand, DrawIndirectCountWithFeature) {
         return;
     }
 
-    RETURN_IF_SKIP(InitState(nullptr, &features2))
+    RETURN_IF_SKIP(InitState(nullptr, &features2));
     InitRenderTarget();
 
     vkt::Buffer indirect_buffer(*m_device, sizeof(VkDrawIndirectCommand), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
@@ -456,7 +453,7 @@ TEST_F(PositiveCommand, DrawIndirectCountWithFeature) {
 }
 
 TEST_F(PositiveCommand, CommandBufferSimultaneousUseSync) {
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     // Record (empty!) command buffer that can be submitted multiple times
     // simultaneously.
@@ -500,7 +497,7 @@ TEST_F(PositiveCommand, FramebufferBindingDestroyCommandPool) {
         "This test should pass. Create a Framebuffer and command buffer, bind them together, then destroy command pool and "
         "framebuffer and verify there are no errors.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     // A renderpass with one color attachment.
     VkAttachmentDescription attachment = {0,
@@ -525,9 +522,10 @@ TEST_F(PositiveCommand, FramebufferBindingDestroyCommandPool) {
     image.Init(32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_IMAGE_TILING_OPTIMAL, 0);
     ASSERT_TRUE(image.initialized());
 
-    VkImageView view = image.targetView(VK_FORMAT_R8G8B8A8_UNORM);
+    vkt::ImageView view = image.CreateView();
 
-    VkFramebufferCreateInfo fci = {VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO, nullptr, 0, rp.handle(), 1, &view, 32, 32, 1};
+    VkFramebufferCreateInfo fci = {
+        VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO, nullptr, 0, rp.handle(), 1, &view.handle(), 32, 32, 1};
     vkt::Framebuffer fb(*m_device, fci);
 
     // Explicitly create a command buffer to bind the FB to so that we can then
@@ -562,7 +560,7 @@ TEST_F(PositiveCommand, ClearRectWith2DArray) {
     TEST_DESCRIPTION("Test using VkClearRect with an image that is of a 2D array type.");
 
     AddRequiredExtensions(VK_KHR_MAINTENANCE_1_EXTENSION_NAME);
-    RETURN_IF_SKIP(Init(nullptr, nullptr, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    RETURN_IF_SKIP(Init());
 
     for (uint32_t i = 0; i < 2; ++i) {
         VkImageCreateInfo image_ci = vku::InitStructHelper();
@@ -582,8 +580,7 @@ TEST_F(PositiveCommand, ClearRectWith2DArray) {
         VkImageObj image(m_device);
         image.init(&image_ci);
         uint32_t layer_count = i == 0 ? image_ci.extent.depth : VK_REMAINING_ARRAY_LAYERS;
-        VkImageView image_view =
-            image.targetView(image_ci.format, VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, layer_count, VK_IMAGE_VIEW_TYPE_2D_ARRAY);
+        vkt::ImageView image_view = image.CreateView(VK_IMAGE_VIEW_TYPE_2D_ARRAY, 0, 1, 0, layer_count);
 
         VkAttachmentDescription attach_desc = {};
         attach_desc.format = image_ci.format;
@@ -614,7 +611,7 @@ TEST_F(PositiveCommand, ClearRectWith2DArray) {
         VkFramebufferCreateInfo fbci = vku::InitStructHelper();
         fbci.renderPass = render_pass.handle();
         fbci.attachmentCount = 1;
-        fbci.pAttachments = &image_view;
+        fbci.pAttachments = &image_view.handle();
         fbci.width = image_ci.extent.width;
         fbci.height = image_ci.extent.height;
         fbci.layers = image_ci.extent.depth;
@@ -654,7 +651,7 @@ TEST_F(PositiveCommand, ClearRectWith2DArray) {
 
 TEST_F(PositiveCommand, EventStageMaskSecondaryCommandBuffer) {
     TEST_DESCRIPTION("Check secondary command buffers transfer event data when executed by primary ones");
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     vkt::CommandBuffer commandBuffer(m_device, m_commandPool);
     vkt::CommandBuffer secondary(m_device, m_commandPool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
@@ -681,7 +678,7 @@ TEST_F(PositiveCommand, EventStageMaskSecondaryCommandBuffer) {
 
 TEST_F(PositiveCommand, EventsInSecondaryCommandBuffers) {
     TEST_DESCRIPTION("Test setting and waiting for an event in a secondary command buffer");
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     if (IsExtensionsEnabled(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME)) {
         GTEST_SKIP() << "VK_KHR_portability_subset enabled, skipping.\n";
@@ -709,7 +706,7 @@ TEST_F(PositiveCommand, EventsInSecondaryCommandBuffers) {
 
 TEST_F(PositiveCommand, ThreadedCommandBuffersWithLabels) {
     AddRequiredExtensions(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     constexpr int worker_count = 8;
     ThreadTimeoutHelper timeout_helper(worker_count);
@@ -753,7 +750,7 @@ TEST_F(PositiveCommand, ThreadedCommandBuffersWithLabels) {
 TEST_F(PositiveCommand, ClearAttachmentsDepthStencil) {
     TEST_DESCRIPTION("Call CmdClearAttachments with no depth/stencil attachment.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     m_commandBuffer->begin();
@@ -781,7 +778,7 @@ TEST_F(PositiveCommand, ClearAttachmentsDepthStencil) {
 TEST_F(PositiveCommand, ClearColorImageWithValidRange) {
     TEST_DESCRIPTION("Record clear color with a valid VkImageSubresourceRange");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     VkImageObj image(m_device);
@@ -814,7 +811,7 @@ TEST_F(PositiveCommand, ClearColorImageWithValidRange) {
 TEST_F(PositiveCommand, ClearDepthStencilWithValidRange) {
     TEST_DESCRIPTION("Record clear depth with a valid VkImageSubresourceRange");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     auto depth_format = FindSupportedDepthStencilFormat(gpu());
@@ -852,7 +849,7 @@ TEST_F(PositiveCommand, FillBufferCmdPoolTransferQueue) {
         "compute opeartions");
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     const std::optional<uint32_t> transfer =
         m_device->QueueFamilyMatching(VK_QUEUE_TRANSFER_BIT, (VK_QUEUE_COMPUTE_BIT | VK_QUEUE_GRAPHICS_BIT));
@@ -874,7 +871,7 @@ TEST_F(PositiveCommand, DebugLabelPrimaryCommandBuffer) {
     TEST_DESCRIPTION("Create a debug label on a primary command buffer");
 
     AddRequiredExtensions(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     m_commandBuffer->begin();
 
     VkDebugUtilsLabelEXT label = vku::InitStructHelper();
@@ -898,7 +895,7 @@ TEST_F(PositiveCommand, DebugLabelPrimaryCommandBuffers) {
     TEST_DESCRIPTION("Begin a debug label on 1 command buffer, then end it on another command buffer");
 
     AddRequiredExtensions(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     vkt::CommandBuffer command_buffer_start(m_device, m_commandPool);
     vkt::CommandBuffer command_buffer_end(m_device, m_commandPool);
@@ -931,7 +928,7 @@ TEST_F(PositiveCommand, DebugLabelPrimaryCommandBuffers) {
 
 TEST_F(PositiveCommand, DebugLabelSecondaryCommandBuffer) {
     AddRequiredExtensions(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     vkt::CommandBuffer cb(m_device, m_commandPool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
     cb.begin();
     {
@@ -948,7 +945,7 @@ TEST_F(PositiveCommand, CopyImageRemainingLayersMaintenance5) {
         "Test copying an image with VkImageSubresourceLayers.layerCount = VK_REMAINING_ARRAY_LAYERS using VK_KHR_maintenance5");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceMaintenance5FeaturesKHR maintenance5_features = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(maintenance5_features);
@@ -993,7 +990,7 @@ TEST_F(PositiveCommand, CopyImageRemainingLayersMaintenance5) {
                      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy_region);
 
     // layerCount can explicitly list value
-    copy_region.dstSubresource.layerCount = 2;
+    copy_region.dstSubresource.layerCount = 6;
     vk::CmdCopyImage(m_commandBuffer->handle(), image_a.image(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image_b.image(),
                      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy_region);
     m_commandBuffer->end();
@@ -1003,7 +1000,7 @@ TEST_F(PositiveCommand, CopyImageTypeExtentMismatchMaintenance5) {
     TEST_DESCRIPTION("Test copying an image with extent mistmatch using VK_KHR_maintenance5");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceMaintenance5FeaturesKHR maintenance5_features = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(maintenance5_features);
@@ -1057,7 +1054,7 @@ TEST_F(PositiveCommand, MultiDrawMaintenance5) {
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_EXT_MULTI_DRAW_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
     VkPhysicalDeviceMaintenance5FeaturesKHR maintenance5_features = vku::InitStructHelper();
     VkPhysicalDeviceMultiDrawFeaturesEXT multi_draw_features = vku::InitStructHelper(&maintenance5_features);
     GetPhysicalDeviceFeatures2(multi_draw_features);
@@ -1101,7 +1098,7 @@ TEST_F(PositiveCommand, MultiDrawMaintenance5Mixed) {
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_EXT_MULTI_DRAW_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
     VkPhysicalDeviceMaintenance5FeaturesKHR maintenance5_features = vku::InitStructHelper();
     VkPhysicalDeviceMultiDrawFeaturesEXT multi_draw_features = vku::InitStructHelper(&maintenance5_features);
     GetPhysicalDeviceFeatures2(multi_draw_features);
@@ -1136,7 +1133,7 @@ TEST_F(PositiveCommand, CopyImageLayerCount) {
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
     VkPhysicalDeviceMaintenance5FeaturesKHR maintenance5_features = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(maintenance5_features);
     RETURN_IF_SKIP(InitState(nullptr, &maintenance5_features));
@@ -1168,6 +1165,144 @@ TEST_F(PositiveCommand, CopyImageLayerCount) {
     copyRegion.extent = {16, 16, 1};
     vk::CmdCopyImage(m_commandBuffer->handle(), image.handle(), VK_IMAGE_LAYOUT_GENERAL, image.handle(), VK_IMAGE_LAYOUT_GENERAL, 1,
                      &copyRegion);
+    m_commandBuffer->end();
+}
+
+TEST_F(PositiveCommand, ImageFormatTypeMismatchWithZeroExtend) {
+    TEST_DESCRIPTION("Use SignExtend to turn a UINT resource into a SINT.");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitRenderTarget());
+    if (DeviceValidationVersion() < VK_API_VERSION_1_2) {
+        GTEST_SKIP() << "At least Vulkan version 1.2 is required";
+    }
+
+    const char *csSource = R"(
+                     OpCapability Shader
+                     OpCapability StorageImageExtendedFormats
+                     OpMemoryModel Logical GLSL450
+                     OpEntryPoint GLCompute %main "main" %image_ptr
+                     OpExecutionMode %main LocalSize 1 1 1
+                     OpSource GLSL 450
+                     OpDecorate %image_ptr DescriptorSet 0
+                     OpDecorate %image_ptr Binding 0
+                     OpDecorate %image_ptr NonReadable
+%type_void         = OpTypeVoid
+%type_u32          = OpTypeInt 32 0
+%type_i32          = OpTypeInt 32 1
+%type_vec3_u32     = OpTypeVector %type_u32 3
+%type_vec4_u32     = OpTypeVector %type_u32 4
+%type_vec2_i32     = OpTypeVector %type_i32 2
+%type_fn_void      = OpTypeFunction %type_void
+%type_ptr_fn       = OpTypePointer Function %type_vec4_u32
+%type_image        = OpTypeImage %type_u32 2D 0 0 0 2 Rgba32ui
+%type_ptr_image    = OpTypePointer UniformConstant %type_image
+%image_ptr         = OpVariable %type_ptr_image UniformConstant
+%const_i32_0       = OpConstant %type_i32 0
+%const_vec2_i32_00 = OpConstantComposite %type_vec2_i32 %const_i32_0 %const_i32_0
+%main              = OpFunction %type_void None %type_fn_void
+%label             = OpLabel
+%store_location    = OpVariable %type_ptr_fn Function
+%image             = OpLoad %type_image %image_ptr
+%value             = OpImageRead %type_vec4_u32 %image %const_vec2_i32_00 SignExtend
+                     OpStore %store_location %value
+                     OpReturn
+                     OpFunctionEnd
+              )";
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cs_.reset(new VkShaderObj(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM));
+    pipe.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}};
+    pipe.InitState();
+    pipe.CreateComputePipeline();
+
+    VkFormat format = VK_FORMAT_R32G32B32A32_SINT;
+    VkImageObj image(m_device);
+    image.Init(32, 32, 1, format, VK_IMAGE_USAGE_STORAGE_BIT, VK_IMAGE_TILING_OPTIMAL);
+    vkt::ImageView view = image.CreateView();
+
+    pipe.descriptor_set_->WriteDescriptorImageInfo(0, view, VK_NULL_HANDLE, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+                                                   VK_IMAGE_LAYOUT_GENERAL);
+    pipe.descriptor_set_->UpdateDescriptorSets();
+
+    m_commandBuffer->begin();
+
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_);
+    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0, 1,
+                              &pipe.descriptor_set_->set_, 0, nullptr);
+
+    vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
+
+    m_commandBuffer->end();
+}
+
+TEST_F(PositiveCommand, ImageFormatTypeMismatchRedundantExtend) {
+    TEST_DESCRIPTION("Use ZeroExtend as a redundant was to be SINT.");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitRenderTarget());
+    if (DeviceValidationVersion() < VK_API_VERSION_1_2) {
+        GTEST_SKIP() << "At least Vulkan version 1.2 is required";
+    }
+
+    const char *csSource = R"(
+                     OpCapability Shader
+                     OpCapability StorageImageExtendedFormats
+                     OpMemoryModel Logical GLSL450
+                     OpEntryPoint GLCompute %main "main" %image_ptr
+                     OpExecutionMode %main LocalSize 1 1 1
+                     OpSource GLSL 450
+                     OpDecorate %image_ptr DescriptorSet 0
+                     OpDecorate %image_ptr Binding 0
+                     OpDecorate %image_ptr NonReadable
+%type_void         = OpTypeVoid
+%type_u32          = OpTypeInt 32 0
+%type_i32          = OpTypeInt 32 1
+%type_vec3_u32     = OpTypeVector %type_u32 3
+%type_vec4_u32     = OpTypeVector %type_u32 4
+%type_vec2_i32     = OpTypeVector %type_i32 2
+%type_fn_void      = OpTypeFunction %type_void
+%type_ptr_fn       = OpTypePointer Function %type_vec4_u32
+%type_image        = OpTypeImage %type_u32 2D 0 0 0 2 Rgba32i
+%type_ptr_image    = OpTypePointer UniformConstant %type_image
+%image_ptr         = OpVariable %type_ptr_image UniformConstant
+%const_i32_0       = OpConstant %type_i32 0
+%const_vec2_i32_00 = OpConstantComposite %type_vec2_i32 %const_i32_0 %const_i32_0
+%main              = OpFunction %type_void None %type_fn_void
+%label             = OpLabel
+%store_location    = OpVariable %type_ptr_fn Function
+%image             = OpLoad %type_image %image_ptr
+                   ; both valid, ZeroExtend is acting as redundant
+%value             = OpImageRead %type_vec4_u32 %image %const_vec2_i32_00
+%value2            = OpImageRead %type_vec4_u32 %image %const_vec2_i32_00 ZeroExtend
+                     OpStore %store_location %value
+                     OpReturn
+                     OpFunctionEnd
+              )";
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cs_.reset(new VkShaderObj(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM));
+    pipe.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}};
+    pipe.InitState();
+    pipe.CreateComputePipeline();
+
+    VkFormat format = VK_FORMAT_R32G32B32A32_UINT;
+    VkImageObj image(m_device);
+    image.Init(32, 32, 1, format, VK_IMAGE_USAGE_STORAGE_BIT, VK_IMAGE_TILING_OPTIMAL);
+    vkt::ImageView view = image.CreateView();
+
+    pipe.descriptor_set_->WriteDescriptorImageInfo(0, view, VK_NULL_HANDLE, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+                                                   VK_IMAGE_LAYOUT_GENERAL);
+    pipe.descriptor_set_->UpdateDescriptorSets();
+
+    m_commandBuffer->begin();
+
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_);
+    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0, 1,
+                              &pipe.descriptor_set_->set_, 0, nullptr);
+
+    vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
+
     m_commandBuffer->end();
 }
 
@@ -1207,5 +1342,117 @@ TEST_F(PositiveCommand, CopyBufferToRemaingImageLayers) {
 
     m_commandBuffer->begin();
     vk::CmdCopyBufferToImage2KHR(m_commandBuffer->handle(), &copy_buffer_to_image);
+    m_commandBuffer->end();
+}
+
+// TODO - Currently crashing on Linux-Mesa-6800
+// added in https://github.com/KhronosGroup/Vulkan-ValidationLayers/pull/6769
+TEST_F(PositiveCommand, DISABLED_ClearAttachmentBasicUsage) {
+    TEST_DESCRIPTION("Points to a wrong colorAttachment index in a VkClearAttachment structure passed to vkCmdClearAttachments");
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    CreatePipelineHelper pipe(*this);
+    pipe.InitState();
+    pipe.CreateGraphicsPipeline();
+
+    m_commandBuffer->begin();
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
+
+    VkClearAttachment color_attachment = {VK_IMAGE_ASPECT_COLOR_BIT, 1, VkClearValue{}};
+    VkClearRect clear_rect = {{{0, 0}, {m_width, m_height}}, 0, 1};
+
+    vk::CmdClearAttachments(m_commandBuffer->handle(), 1, &color_attachment, 1, &clear_rect);
+}
+
+TEST_F(PositiveCommand, CopyImageOverlappingMemory) {
+    TEST_DESCRIPTION("Validate Copy Image from/to Buffer with overlapping memory");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+
+    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitState());
+
+    auto image_ci =
+        VkImageObj::ImageCreateInfo2D(32, 32, 1, 1, VK_FORMAT_R8G8B8A8_UNORM,
+                                      VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_TILING_LINEAR);
+
+    vkt::Buffer buffer;
+    VkDeviceSize buff_size = 32 * 32 * 4;
+    buffer.init_no_mem(*DeviceObj(),
+                       vkt::Buffer::create_info(buff_size, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT));
+    auto buffer_memory_requirements = buffer.memory_requirements();
+
+    VkImageObj image(m_device);
+    image.init_no_mem(*m_device, image_ci);
+    auto image_memory_requirements = image.memory_requirements();
+
+    vkt::DeviceMemory mem;
+    VkMemoryAllocateInfo alloc_info = vku::InitStructHelper();
+    alloc_info.allocationSize = buffer_memory_requirements.size + image_memory_requirements.size;
+    bool has_memtype = m_device->phy().set_memory_type(
+        buffer_memory_requirements.memoryTypeBits & image_memory_requirements.memoryTypeBits, &alloc_info, 0);
+    if (!has_memtype) {
+        GTEST_SKIP() << "Failed to find a memory type for both a buffer and an image";
+    }
+    mem.init(*DeviceObj(), alloc_info);
+
+    buffer.bind_memory(mem, 0);
+    image.bind_memory(mem, buffer_memory_requirements.size);
+
+    VkBufferImageCopy region = {};
+    region.bufferRowLength = 0;
+    region.bufferImageHeight = 0;
+    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    region.imageSubresource.layerCount = 1;
+    region.imageOffset = {0, 0, 0};
+    region.bufferOffset = 0;
+
+    region.imageExtent = {32, 32, 1};
+    region.imageSubresource.mipLevel = 0;
+    m_commandBuffer->begin();
+    vk::CmdCopyImageToBuffer(m_commandBuffer->handle(), image.handle(), VK_IMAGE_LAYOUT_GENERAL, buffer.handle(), 1, &region);
+    vk::CmdCopyBufferToImage(m_commandBuffer->handle(), buffer.handle(), image.handle(), VK_IMAGE_LAYOUT_GENERAL, 1, &region);
+    m_commandBuffer->end();
+
+    auto compressed_image2_ci =
+        VkImageObj::ImageCreateInfo2D(32, 32, 1, 1, VK_FORMAT_BC7_UNORM_BLOCK,
+                                      VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_IMAGE_TILING_LINEAR);
+    VkFormatProperties format_properties;
+    vk::GetPhysicalDeviceFormatProperties(m_device->phy().handle(), VK_FORMAT_BC7_UNORM_BLOCK, &format_properties);
+    if (((format_properties.linearTilingFeatures & VK_FORMAT_FEATURE_TRANSFER_SRC_BIT) == 0) ||
+        ((format_properties.linearTilingFeatures & VK_FORMAT_FEATURE_TRANSFER_DST_BIT) == 0)) {
+        printf("VK_FORMAT_BC7_UNORM_BLOCK with linear tiling not supported - skipping compressed format test.\n");
+        return;
+    }
+    vkt::Buffer buffer2;
+    // 1 byte per texel
+    buff_size = 32 * 32 * 1;
+    buffer2.init_no_mem(*DeviceObj(),
+                        vkt::Buffer::create_info(buff_size, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT));
+    buffer_memory_requirements = buffer.memory_requirements();
+
+    VkImageObj image2(m_device);
+    image2.init_no_mem(*m_device, compressed_image2_ci);
+    image_memory_requirements = image2.memory_requirements();
+
+    vkt::DeviceMemory mem2;
+    alloc_info = vku::InitStructHelper();
+    alloc_info.allocationSize = buffer_memory_requirements.size + image_memory_requirements.size;
+    has_memtype = m_device->phy().set_memory_type(
+        buffer_memory_requirements.memoryTypeBits & image_memory_requirements.memoryTypeBits, &alloc_info, 0);
+    if (!has_memtype) {
+        GTEST_SKIP() << "Failed to find a memory type for both a buffer and an image";
+    }
+
+    mem2.init(*DeviceObj(), alloc_info);
+
+    buffer2.bind_memory(mem2, 0);
+    image2.bind_memory(mem2, buffer_memory_requirements.size);
+
+    m_commandBuffer->begin();
+    vk::CmdCopyImageToBuffer(m_commandBuffer->handle(), image2.handle(), VK_IMAGE_LAYOUT_GENERAL, buffer2.handle(), 1, &region);
+    vk::CmdCopyBufferToImage(m_commandBuffer->handle(), buffer2.handle(), image2.handle(), VK_IMAGE_LAYOUT_GENERAL, 1, &region);
     m_commandBuffer->end();
 }

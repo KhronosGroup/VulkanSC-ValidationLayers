@@ -22,10 +22,10 @@ TEST_F(PositiveSyncObject, Sync2OwnershipTranfersImage) {
     TEST_DESCRIPTION("Valid image ownership transfers that shouldn't create errors");
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
     VkPhysicalDeviceSynchronization2FeaturesKHR sync2_features = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(sync2_features);
-    RETURN_IF_SKIP(InitState(nullptr, &sync2_features, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    RETURN_IF_SKIP(InitState(nullptr, &sync2_features));
 
     const std::optional<uint32_t> no_gfx = m_device->QueueFamilyMatching(VK_QUEUE_TRANSFER_BIT, VK_QUEUE_GRAPHICS_BIT, false);
     if (!no_gfx) {
@@ -69,10 +69,10 @@ TEST_F(PositiveSyncObject, Sync2OwnershipTranfersBuffer) {
     TEST_DESCRIPTION("Valid buffer ownership transfers that shouldn't create errors");
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
     VkPhysicalDeviceSynchronization2FeaturesKHR sync2_features = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(sync2_features);
-    RETURN_IF_SKIP(InitState(nullptr, &sync2_features, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    RETURN_IF_SKIP(InitState(nullptr, &sync2_features));
 
     const std::optional<uint32_t> no_gfx = m_device->QueueFamilyMatching(VK_QUEUE_TRANSFER_BIT, VK_QUEUE_GRAPHICS_BIT, false);
     if (!no_gfx) {
@@ -115,7 +115,7 @@ TEST_F(PositiveSyncObject, LayoutFromPresentWithoutAccessMemoryRead) {
     // work without warnings.
 
     AddRequiredExtensions(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     VkImageObj image(m_device);
     image.Init(128, 128, 1, VK_FORMAT_B8G8R8A8_UNORM, (VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT),
                VK_IMAGE_TILING_OPTIMAL, 0);
@@ -149,7 +149,7 @@ TEST_F(PositiveSyncObject, LayoutFromPresentWithoutAccessMemoryRead) {
 TEST_F(PositiveSyncObject, QueueSubmitSemaphoresAndLayoutTracking) {
     TEST_DESCRIPTION("Submit multiple command buffers with chained semaphore signals and layout transitions");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     VkCommandBuffer cmd_bufs[4];
     VkCommandBufferAllocateInfo alloc_info = vku::InitStructHelper();
     alloc_info.commandBufferCount = 4;
@@ -238,7 +238,7 @@ TEST_F(PositiveSyncObject, ResetUnsignaledFence) {
     vkt::Fence testFence;
     VkFenceCreateInfo fenceInfo = vku::InitStructHelper();
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     testFence.init(*m_device, fenceInfo);
     VkFence fences[1] = {testFence.handle()};
     VkResult result = vk::ResetFences(m_device->device(), 1, fences);
@@ -246,7 +246,7 @@ TEST_F(PositiveSyncObject, ResetUnsignaledFence) {
 }
 
 TEST_F(PositiveSyncObject, FenceCreateSignaledWaitHandling) {
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     // A fence created signaled
     VkFenceCreateInfo fci = {VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, nullptr, VK_FENCE_CREATE_SIGNALED_BIT};
@@ -271,7 +271,7 @@ TEST_F(PositiveSyncObject, TwoFencesThreeFrames) {
         "Two command buffers with two separate fences are each run through a Submit & WaitForFences cycle 3 times. This previously "
         "revealed a bug so running this positive test to prevent a regression.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     VkQueue queue = VK_NULL_HANDLE;
     vk::GetDeviceQueue(m_device->device(), m_device->graphics_queue_node_index_, 0, &queue);
 
@@ -324,7 +324,7 @@ TEST_F(PositiveSyncObject, TwoQueueSubmitsSeparateQueuesWithSemaphoreAndOneFence
     TEST_DESCRIPTION(
         "Two command buffers, each in a separate QueueSubmit call submitted on separate queues followed by a QueueWaitIdle.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     if ((m_device->phy().queue_properties_.empty()) || (m_device->phy().queue_properties_[0].queueCount < 2)) {
         GTEST_SKIP() << "Queue family needs to have multiple queues to run this test";
     }
@@ -406,7 +406,7 @@ TEST_F(PositiveSyncObject, TwoQueueSubmitsSeparateQueuesWithSemaphoreAndOneFence
         "Two command buffers, each in a separate QueueSubmit call submitted on separate queues, the second having a fence followed "
         "by a QueueWaitIdle.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     if ((m_device->phy().queue_properties_.empty()) || (m_device->phy().queue_properties_[0].queueCount < 2)) {
         GTEST_SKIP() << "Queue family needs to have multiple queues to run this test";
     }
@@ -491,7 +491,7 @@ TEST_F(PositiveSyncObject, TwoQueueSubmitsSeparateQueuesWithSemaphoreAndOneFence
         "Two command buffers, each in a separate QueueSubmit call submitted on separate queues, the second having a fence followed "
         "by two consecutive WaitForFences calls on the same fence.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     if ((m_device->phy().queue_properties_.empty()) || (m_device->phy().queue_properties_[0].queueCount < 2)) {
         GTEST_SKIP() << "Queue family needs to have multiple queues to run this test";
     }
@@ -573,7 +573,7 @@ TEST_F(PositiveSyncObject, TwoQueueSubmitsSeparateQueuesWithSemaphoreAndOneFence
 }
 
 TEST_F(PositiveSyncObject, TwoQueuesEnsureCorrectRetirementWithWorkStolen) {
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     if ((m_device->phy().queue_properties_.empty()) || (m_device->phy().queue_properties_[0].queueCount < 2)) {
         GTEST_SKIP() << "Test requires two queues";
     }
@@ -627,7 +627,7 @@ TEST_F(PositiveSyncObject, TwoQueueSubmitsSeparateQueuesWithSemaphoreAndOneFence
         "Two command buffers, each in a separate QueueSubmit call submitted on separate queues, the second having a fence, "
         "followed by a WaitForFences call.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     if ((m_device->phy().queue_properties_.empty()) || (m_device->phy().queue_properties_[0].queueCount < 2)) {
         GTEST_SKIP() << "Queue family needs to have multiple queues to run this test";
     }
@@ -714,11 +714,11 @@ TEST_F(PositiveSyncObject, TwoQueueSubmitsSeparateQueuesWithTimelineSemaphoreAnd
 
     AddRequiredExtensions(VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
 
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceTimelineSemaphoreFeatures timeline_semaphore_features = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(timeline_semaphore_features);
-    RETURN_IF_SKIP(InitState(nullptr, &timeline_semaphore_features, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    RETURN_IF_SKIP(InitState(nullptr, &timeline_semaphore_features));
 
     if ((m_device->phy().queue_properties_.empty()) || (m_device->phy().queue_properties_[0].queueCount < 2)) {
         GTEST_SKIP() << "Queue family needs to have multiple queues to run this test";
@@ -816,7 +816,7 @@ TEST_F(PositiveSyncObject, TwoQueueSubmitsOneQueueWithSemaphoreAndOneFence) {
         "Two command buffers, each in a separate QueueSubmit call on the same queue, sharing a signal/wait semaphore, the second "
         "having a fence, followed by a WaitForFences call.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     VkFenceCreateInfo fence_create_info = vku::InitStructHelper();
     vkt::Fence fence(*m_device, fence_create_info);
 
@@ -894,7 +894,7 @@ TEST_F(PositiveSyncObject, TwoQueueSubmitsOneQueueNullQueueSubmitWithFence) {
         "Two command buffers, each in a separate QueueSubmit call on the same queue, no fences, followed by a third QueueSubmit "
         "with NO SubmitInfos but with a fence, followed by a WaitForFences call.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     VkFenceCreateInfo fence_create_info = vku::InitStructHelper();
     vkt::Fence fence(*m_device, fence_create_info);
 
@@ -973,7 +973,7 @@ TEST_F(PositiveSyncObject, TwoQueueSubmitsOneQueueOneFence) {
         "Two command buffers, each in a separate QueueSubmit call on the same queue, the second having a fence, followed by a "
         "WaitForFences call.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     VkFenceCreateInfo fence_create_info = vku::InitStructHelper();
     vkt::Fence fence(*m_device, fence_create_info);
 
@@ -1047,7 +1047,7 @@ TEST_F(PositiveSyncObject, TwoQueueSubmitsOneQueueOneFence) {
 TEST_F(PositiveSyncObject, TwoSubmitInfosWithSemaphoreOneQueueSubmitsOneFence) {
     TEST_DESCRIPTION(
         "Two command buffers each in a separate SubmitInfo sent in a single QueueSubmit call followed by a WaitForFences call.");
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     VkFenceCreateInfo fence_create_info = vku::InitStructHelper();
     vkt::Fence fence(*m_device, fence_create_info);
@@ -1127,7 +1127,7 @@ TEST_F(PositiveSyncObject, TwoSubmitInfosWithSemaphoreOneQueueSubmitsOneFence) {
 }
 
 TEST_F(PositiveSyncObject, LongSemaphoreChain) {
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     std::vector<VkSemaphore> semaphores;
 
     const int chainLength = 32768;
@@ -1175,8 +1175,8 @@ TEST_F(PositiveSyncObject, ExternalSemaphore) {
     AddRequiredExtensions(VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME);
 
-    RETURN_IF_SKIP(InitFramework())
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitState());
 
     // Check for external semaphore import and export capability
     VkPhysicalDeviceExternalSemaphoreInfoKHR esi = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_SEMAPHORE_INFO_KHR, nullptr,
@@ -1250,7 +1250,7 @@ TEST_F(PositiveSyncObject, ExternalTimelineSemaphore) {
     AddRequiredExtensions(VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
 
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
     if (IsPlatformMockICD()) {
         GTEST_SKIP() << "Test not supported by MockICD";
     }
@@ -1337,8 +1337,8 @@ TEST_F(PositiveSyncObject, ExternalFence) {
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_EXTERNAL_FENCE_EXTENSION_NAME);
     AddRequiredExtensions(extension_name);
-    RETURN_IF_SKIP(InitFramework())
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitState());
 
     // Check for external fence import and export capability
     VkPhysicalDeviceExternalFenceInfoKHR efi = vku::InitStructHelper();
@@ -1393,8 +1393,8 @@ TEST_F(PositiveSyncObject, ExternalFenceSyncFdLoop) {
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_EXTERNAL_FENCE_EXTENSION_NAME);
     AddRequiredExtensions(extension_name);
-    RETURN_IF_SKIP(InitFramework())
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitState());
 
     // Check for external fence import and export capability
     VkPhysicalDeviceExternalFenceInfoKHR efi = vku::InitStructHelper();
@@ -1446,8 +1446,7 @@ TEST_F(PositiveSyncObject, ExternalFenceSubmitCmdBuffer) {
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_EXTERNAL_FENCE_EXTENSION_NAME);
     AddRequiredExtensions(extension_name);
-    RETURN_IF_SKIP(InitFramework())
-    RETURN_IF_SKIP(InitState(nullptr, nullptr, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    RETURN_IF_SKIP(Init());
     if (IsPlatformMockICD()) {
         GTEST_SKIP() << "Test not supported by MockICD";
     }
@@ -1513,10 +1512,65 @@ TEST_F(PositiveSyncObject, ExternalFenceSubmitCmdBuffer) {
     vk::QueueWaitIdle(m_default_queue);
 }
 
+TEST_F(PositiveSyncObject, BasicSetAndWaitEvent) {
+    TEST_DESCRIPTION("Sets event and then wait for it using CmdSetEvent/CmdWaitEvents");
+    RETURN_IF_SKIP(Init());
+
+    const vkt::Event event(*m_device);
+
+    // Record time validation
+    m_commandBuffer->begin();
+    vk::CmdSetEvent(*m_commandBuffer, event, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
+    vk::CmdWaitEvents(*m_commandBuffer, 1, &event.handle(), VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                      0, nullptr, 0, nullptr, 0, nullptr);
+    m_commandBuffer->end();
+
+    // Also submit to the queue to test submit time validation
+    VkSubmitInfo submit_info = vku::InitStructHelper();
+    submit_info.commandBufferCount = 1;
+    submit_info.pCommandBuffers = &m_commandBuffer->handle();
+    vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
+    vk::DeviceWaitIdle(*m_device);
+}
+
+TEST_F(PositiveSyncObject, BasicSetAndWaitEvent2) {
+    TEST_DESCRIPTION("Sets event and then wait for it using CmdSetEvent2/CmdWaitEvents2");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    RETURN_IF_SKIP(InitFramework());
+    VkPhysicalDeviceSynchronization2Features sync2_features = vku::InitStructHelper();
+    sync2_features.synchronization2 = VK_TRUE;
+    RETURN_IF_SKIP(InitState(nullptr, &sync2_features));
+
+    VkMemoryBarrier2 barrier = vku::InitStructHelper();
+    barrier.srcAccessMask = 0;
+    barrier.dstAccessMask = 0;
+    barrier.srcStageMask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+    barrier.dstStageMask = VK_PIPELINE_STAGE_NONE;
+
+    VkDependencyInfo dependency_info = vku::InitStructHelper();
+    dependency_info.memoryBarrierCount = 1;
+    dependency_info.pMemoryBarriers = &barrier;
+
+    const vkt::Event event(*m_device);
+
+    // Record time validation
+    m_commandBuffer->begin();
+    vk::CmdSetEvent2(*m_commandBuffer, event, &dependency_info);
+    vk::CmdWaitEvents2(*m_commandBuffer, 1, &event.handle(), &dependency_info);
+    m_commandBuffer->end();
+
+    // Also submit to the queue to test submit time validation
+    VkSubmitInfo submit_info = vku::InitStructHelper();
+    submit_info.commandBufferCount = 1;
+    submit_info.pCommandBuffers = &m_commandBuffer->handle();
+    vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
+    vk::DeviceWaitIdle(*m_device);
+}
+
 TEST_F(PositiveSyncObject, WaitEventThenSet) {
     TEST_DESCRIPTION("Wait on a event then set it after the wait has been submitted.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     vkt::Event event(*m_device);
 
@@ -1562,8 +1616,8 @@ TEST_F(PositiveSyncObject, WaitEventThenSet) {
 TEST_F(PositiveSyncObject, DoubleLayoutTransition) {
     TEST_DESCRIPTION("Attempt vkCmdPipelineBarrier with 2 layout transitions of the same image.");
 
-    RETURN_IF_SKIP(InitFramework())
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitState());
 
     VkImageCreateInfo image_create_info = vku::InitStructHelper();
     image_create_info.imageType = VK_IMAGE_TYPE_2D;
@@ -1612,11 +1666,11 @@ TEST_F(PositiveSyncObject, QueueSubmitTimelineSemaphore2Queue) {
     TEST_DESCRIPTION("Signal a timeline semaphore on 2 queues.");
     AddRequiredExtensions(VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
 
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceTimelineSemaphoreFeatures timeline_semaphore_features = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(timeline_semaphore_features);
-    RETURN_IF_SKIP(InitState(nullptr, &timeline_semaphore_features, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    RETURN_IF_SKIP(InitState(nullptr, &timeline_semaphore_features));
 
     vkt::Queue *q0 = m_device->graphics_queues()[0];
     vkt::Queue *q1 = nullptr;
@@ -1734,7 +1788,7 @@ TEST_F(PositiveSyncObject, QueueSubmitTimelineSemaphore2Queue) {
 TEST_F(PositiveSyncObject, ResetQueryPoolFromDifferentCBWithFenceAfter) {
     TEST_DESCRIPTION("Reset query pool from a different command buffer and wait on fence after both are submitted");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     uint32_t queue_count;
     vk::GetPhysicalDeviceQueueFamilyProperties(gpu(), &queue_count, NULL);
@@ -1805,8 +1859,6 @@ TEST_F(PositiveSyncObject, ResetQueryPoolFromDifferentCBWithFenceAfter) {
     }
 
     vk::QueueWaitIdle(m_default_queue);
-
-    vk::FreeCommandBuffers(m_device->device(), m_commandPool->handle(), 2, command_buffer);
 }
 
 struct FenceSemRaceData {
@@ -1836,10 +1888,7 @@ void WaitTimelineSem(FenceSemRaceData *data) {
 TEST_F(PositiveSyncObject, FenceSemThreadRace) {
     AddRequiredExtensions(VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
 
-    RETURN_IF_SKIP(InitFramework())
-    if (IsDriver(VK_DRIVER_ID_GOOGLE_SWIFTSHADER)) {
-        GTEST_SKIP() << "This test hangs on SwiftShader.";
-    }
+    RETURN_IF_SKIP(InitFramework());
     VkPhysicalDeviceTimelineSemaphoreFeatures timeline_semaphore_features = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(timeline_semaphore_features);
     RETURN_IF_SKIP(InitState(nullptr, &timeline_semaphore_features));
@@ -1889,8 +1938,8 @@ TEST_F(PositiveSyncObject, SubmitFenceButWaitIdle) {
     TEST_DESCRIPTION("Submit a CB and Fence but synchronize with vkQueueWaitIdle() (Issue 2756)");
     AddSurfaceExtension();
     AddRequiredExtensions(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
-    RETURN_IF_SKIP(InitState())
+    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(InitState());
     if (!InitSwapchain()) {
         GTEST_SKIP() << "Cannot create surface or swapchain, skipping CmdCopySwapchainImage test";
     }
@@ -2081,10 +2130,10 @@ struct WaitTimelineSemThreadData : public SemBufferRaceData {
 TEST_F(PositiveSyncObject, WaitTimelineSemThreadRace) {
     AddRequiredExtensions(VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
 
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
     VkPhysicalDeviceTimelineSemaphoreFeatures timeline_semaphore_features = vku::InitStructHelper();
     GetPhysicalDeviceFeatures2(timeline_semaphore_features);
-    RETURN_IF_SKIP(InitState(nullptr, &timeline_semaphore_features, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    RETURN_IF_SKIP(InitState(nullptr, &timeline_semaphore_features));
     WaitTimelineSemThreadData data(*m_device);
 
     data.Run(*m_commandPool, *m_errorMonitor);
@@ -2096,11 +2145,7 @@ TEST_F(PositiveSyncObject, WaitTimelineSemaphoreWithWin32HandleRetrieved) {
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME);
 
-    RETURN_IF_SKIP(InitFramework())
-    if (IsDriver(VK_DRIVER_ID_AMD_PROPRIETARY)) {
-        // Older AMD driver does not like timeline + export properties combo
-        GTEST_SKIP() << "Please update AMD drivers at least to Adrenalin 23.5.2 to run this test. Then remove this check.";
-    }
+    RETURN_IF_SKIP(InitFramework());
     if (IsPlatformMockICD()) {
         GTEST_SKIP() << "Test not supported by MockICD";
     }
@@ -2150,7 +2195,7 @@ TEST_F(PositiveSyncObject, WaitTimelineSemaphoreWithWin32HandleRetrieved) {
 // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/6204
 TEST_F(PositiveSyncObject, SubpassBarrierWithExpandableStages) {
     TEST_DESCRIPTION("Specify expandable stages in subpass barrier");
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     VkSubpassDescription subpass{};
@@ -2201,10 +2246,10 @@ TEST_F(PositiveSyncObject, SubpassBarrierWithExpandableStages) {
 TEST_F(PositiveSyncObject, BarrierWithHostStage) {
     TEST_DESCRIPTION("Barrier includes VK_PIPELINE_STAGE_2_HOST_BIT as srcStageMask or dstStageMask");
     SetTargetApiVersion(VK_API_VERSION_1_3);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
     VkPhysicalDeviceSynchronization2FeaturesKHR sync2_features = vku::InitStructHelper();
     sync2_features.synchronization2 = VK_TRUE;
-    RETURN_IF_SKIP(InitState(nullptr, &sync2_features, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    RETURN_IF_SKIP(InitState(nullptr, &sync2_features));
 
     // HOST stage as source
     vkt::Buffer buffer(*m_device, 32);
@@ -2255,7 +2300,7 @@ TEST_F(PositiveSyncObject, BarrierASBuildWithShaderReadAccess) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework())
+    RETURN_IF_SKIP(InitFramework());
     VkPhysicalDeviceSynchronization2FeaturesKHR sync2_features = vku::InitStructHelper();
     sync2_features.synchronization2 = VK_TRUE;
     RETURN_IF_SKIP(InitState(nullptr, &sync2_features));

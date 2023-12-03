@@ -26,8 +26,8 @@ concurrency:
 
 on:
     push:
-        branches:
-            - '!main'
+        branches-ignore:
+            - main
     pull_request:
         branches:
             - sc_main
@@ -50,7 +50,7 @@ jobs:
             config: debug
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: lukka/get-cmake@latest
         with:
           cmakeVersion: 3.17.2
@@ -88,37 +88,9 @@ jobs:
         env:
           VKSC_DEVSIM_PROFILE_FILE: ${{ github.workspace }}/tests/vulkansc/device_profiles/max_profile.json
 
-  linux-cpp20:
-    runs-on: ubuntu-22.04
-    strategy:
-      fail-fast: false
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-      - uses: lukka/get-cmake@latest
-      - name: Install build dependencies
-        run: |
-          python3 -m pip install jsonschema pyparsing
-          sudo apt-get -qq update
-          sudo apt-get install -y libwayland-dev xorg-dev
-      # Turn on ccache this way, which is easier than figuring out how to turn it on for all deps
-      # PATH changes need to be done in an action before any action that needs it
-      - name: Add ccache to PATH
-        run: echo "/usr/lib/ccache" >> $GITHUB_PATH
-      - name: Set PYTHONPATH
-        run: echo "PYTHONPATH=$GITHUB_WORKSPACE/external/release/Vulkan-Headers/build/install/share/vulkan/registry:$PYTHONPATH" >> $GITHUB_ENV
-      - name: Build VulkanSC-ValidationLayers
-        run: python3 scripts/vksc_github_ci.py --build --config release --cmake='-DVVL_CPP_STANDARD=20 -DVVL_ENABLE_ASAN=ON'
-        env:
-          CC: gcc
-          CXX: g++
-
   windows:
     runs-on: ${{matrix.os}}
     strategy:
-      fail-fast: false
       matrix:
         arch: [ x64, Win32 ]
         config: [ debug, release ]
@@ -130,7 +102,7 @@ jobs:
             config: debug
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: '3.10'
@@ -150,10 +122,8 @@ jobs:
     defaults:
       run:
         shell: bash
-    strategy:
-      fail-fast: false
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: '3.10'
@@ -163,10 +133,22 @@ jobs:
       - name: GCC Version
         run: gcc --version # If this fails MINGW is not setup correctly
       - name: Configure
-        run: cmake -S. -B build -D BUILD_WERROR=ON -D UPDATE_DEPS=ON -D CMAKE_BUILD_TYPE=Debug -D UPDATE_DEPS_SKIP_EXISTING_INSTALL=ON -D VULKANSC=ON -G "Ninja"
+        run: cmake -S. -B build -D BUILD_WERROR=ON -D UPDATE_DEPS=ON -D CMAKE_BUILD_TYPE=Release -D VULKANSC=ON -G "Ninja"
         env:
-          LDFLAGS: "-fuse-ld=lld" # MINGW linking is very slow. Use llvm linker instead.
+          LDFLAGS: -fuse-ld=lld # MINGW linking is very slow. Use llvm linker instead.
       - name: Build
-        run: cmake --build build
+        run: cmake --build build -- --quiet
       - name: Install
         run: cmake --install build --prefix build/install
+
+  check_vvl:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      - run: python3 -m pip install jsonschema pyparsing
+      - run: scripts/update_deps.py --dir ext --no-build --api vulkansc
+      - run: scripts/generate_source.py --verify ext/Vulkan-Headers/registry/ ext/SPIRV-Headers/include/spirv/unified1/ --api vulkansc
+      - run: scripts/vk_validation_stats.py ext/Vulkan-Headers/registry/validusage.json -summary -c -api vulkansc

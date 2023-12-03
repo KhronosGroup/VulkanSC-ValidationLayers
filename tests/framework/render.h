@@ -98,8 +98,8 @@ class VkRenderFramework : public VkTestFramework {
 
     void InitRenderTarget();
     void InitRenderTarget(uint32_t targets);
-    void InitRenderTarget(VkImageView *dsBinding);
-    void InitRenderTarget(uint32_t targets, VkImageView *dsBinding);
+    void InitRenderTarget(const VkImageView *dsBinding);
+    void InitRenderTarget(uint32_t targets, const VkImageView *dsBinding);
     void InitDynamicRenderTarget(VkFormat format = VK_FORMAT_UNDEFINED);
     VkImageView GetDynamicRenderTarget() const;
     void DestroyRenderTarget();
@@ -109,8 +109,9 @@ class VkRenderFramework : public VkTestFramework {
     void GetPhysicalDeviceFeatures(VkPhysicalDeviceFeatures *features);
     void GetPhysicalDeviceProperties(VkPhysicalDeviceProperties *props);
     VkFormat GetRenderTargetFormat();
+    // default to CommandPool Reset flag to allow recording multiple command buffers simpler
     void InitState(VkPhysicalDeviceFeatures *features = nullptr, void *create_device_pnext = nullptr,
-                   const VkCommandPoolCreateFlags flags = 0);
+                   const VkCommandPoolCreateFlags flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
 
     const VkRenderPassBeginInfo &renderPassBeginInfo() const { return m_renderPassBeginInfo; }
 
@@ -133,6 +134,10 @@ class VkRenderFramework : public VkTestFramework {
     // if requested extensions are not supported, helper function to get string to print out
     std::string RequiredExtensionsNotSupported() const;
 
+    // By default, requested extensions that are promoted to the effective API version (and thus are redundant)
+    // are not enabled, but this can be overridden for individual test cases that explicitly test such use cases.
+    void AllowPromotedExtensions() { allow_promoted_extensions_ = true; }
+
     void *SetupValidationSettings(void *first_pnext);
 
     template <typename GLSLContainer>
@@ -143,6 +148,17 @@ class VkRenderFramework : public VkTestFramework {
         GLSLtoSPV(&m_device->phy().limits_, stage, code, spv, debug, env);
         return spv;
     }
+
+    void DeviceWaitIdle() { m_device->wait(); }
+    void QueueWaitIdle() { vk::QueueWaitIdle(m_default_queue); }
+
+    void SetDesiredFailureMsg(const VkFlags msgFlags, const std::string &msg) {
+        m_errorMonitor->SetDesiredFailureMsg(msgFlags, msg);
+    };
+    void SetDesiredFailureMsg(const VkFlags msgFlags, const char *const msgString) {
+        m_errorMonitor->SetDesiredFailureMsg(msgFlags, msgString);
+    };
+    void VerifyFound() { m_errorMonitor->VerifyFound(); }
 
   protected:
     APIVersion m_instance_api_version = 0;
@@ -157,6 +173,8 @@ class VkRenderFramework : public VkTestFramework {
 
     ErrorMonitor monitor_ = ErrorMonitor(m_print_vu);
     ErrorMonitor *m_errorMonitor = &monitor_;  // TODO: Removing this properly is it's own PR. It's a big change.
+
+    bool allow_promoted_extensions_ = false;
 
     VkApplicationInfo app_info_;
     std::vector<const char *> instance_layers_;
@@ -177,7 +195,8 @@ class VkRenderFramework : public VkTestFramework {
 
     VkFramebuffer m_framebuffer;
     VkFramebufferCreateInfo m_framebuffer_info;
-    std::vector<VkImageView> m_framebuffer_attachments;
+    std::vector<vkt::ImageView> m_render_target_views;   // color attachments but not depth
+    std::vector<VkImageView> m_framebuffer_attachments;  // all attachments, can be consumed directly by the API
 
     // WSI items
     SurfaceContext m_surface_context{};
@@ -200,8 +219,9 @@ class VkRenderFramework : public VkTestFramework {
     VkFormat m_render_target_fmt;
     VkFormat m_depth_stencil_fmt;
     VkImageLayout m_depth_stencil_layout;
+    VkImageLayout m_color_layout = VK_IMAGE_LAYOUT_UNDEFINED;
     VkClearColorValue m_clear_color;
-    bool m_clear_via_load_op;
+    bool m_load_op_clear;
     float m_depth_clear_color;
     uint32_t m_stencil_clear_color;
     VkImageObj *m_depthStencil;
@@ -229,21 +249,27 @@ class VkRenderFramework : public VkTestFramework {
     // extension is not supported, no extension names are added for instance creation. `ext_name` can refer to a device or instance
     // extension.
     bool AddRequestedInstanceExtensions(const char *ext_name);
+    // Returns true if the instance extension is promoted to core in the target API version requested using SetTargetApiVersion().
+    bool IsPromotedInstanceExtension(const char *inst_ext_name) const;
     // Returns true if the instance extension inst_ext_name is enabled. This call is only valid _after_ previous
     // `AddRequired*Extensions` calls and InitFramework has been called. `inst_ext_name` must be an instance extension name; false
     // is returned for all device extension names.
+    // This function also returns true if the instance extension is implicitly supported in the target API version
+    // requested using SetTargetApiVersion().
     bool CanEnableInstanceExtension(const std::string &inst_ext_name) const;
     // Add dev_ext_name, then names of _device_ extensions required by dev_ext_name, and return true if dev_ext_name is supported.
     // If the extension is not supported, no extension names are added for device creation. This function has no effect if
     // dev_ext_name refers to an instance extension.
     bool AddRequestedDeviceExtensions(const char *dev_ext_name);
+    // Returns true if the device extension is promoted to core in the API version supported by the device.
+    bool IsPromotedDeviceExtension(const char *dev_ext_name) const;
     // Returns true if the device extension is enabled. This call is only valid _after_ previous `AddRequired*Extensions` calls and
     // InitFramework has been called.
     // `dev_ext_name` must be an instance extension name; false is returned for all instance extension names.
+    // This function also returns true if the device extension is implicitly supported by the API version supported
+    // by the device, as queriable using DeviceValidationVersion().
     bool CanEnableDeviceExtension(const std::string &dev_ext_name) const;
 };
-
-class VkDescriptorSetObj;
 
 class VkImageObj : public vkt::Image {
   public:
@@ -303,35 +329,23 @@ class VkImageObj : public vkt::Image {
         ci.components.b = VK_COMPONENT_SWIZZLE_B;
         ci.components.a = VK_COMPONENT_SWIZZLE_A;
         ci.subresourceRange = {aspect_mask, 0, 1, 0, 1};
-        ci.flags = 0;
         return ci;
     }
 
-    const VkImageView &targetView(VkImageViewCreateInfo ci) {
-        if (!m_targetView.initialized()) {
-            ci.image = handle();
-            m_targetView.init(*m_device, ci);
-        }
-        return m_targetView.handle();
+    vkt::ImageView CreateView(VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT) const {
+        VkImageViewCreateInfo ci = BasicViewCreatInfo(aspect);
+        ci.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
+        ci.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
+        return vkt::ImageView(*m_device, ci);
     }
 
-    const VkImageView &targetView(VkFormat format, VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT, uint32_t baseMipLevel = 0,
-                                  uint32_t levelCount = VK_REMAINING_MIP_LEVELS, uint32_t baseArrayLayer = 0,
-                                  uint32_t layerCount = VK_REMAINING_ARRAY_LAYERS, VkImageViewType type = VK_IMAGE_VIEW_TYPE_2D) {
-        if (!m_targetView.initialized()) {
-            VkImageViewCreateInfo createView = vku::InitStructHelper();
-            createView.image = handle();
-            createView.viewType = type;
-            createView.format = format;
-            createView.components.r = VK_COMPONENT_SWIZZLE_R;
-            createView.components.g = VK_COMPONENT_SWIZZLE_G;
-            createView.components.b = VK_COMPONENT_SWIZZLE_B;
-            createView.components.a = VK_COMPONENT_SWIZZLE_A;
-            createView.subresourceRange = {aspect, baseMipLevel, levelCount, baseArrayLayer, layerCount};
-            createView.flags = 0;
-            m_targetView.init(*m_device, createView);
-        }
-        return m_targetView.handle();
+    vkt::ImageView CreateView(VkImageViewType type, uint32_t baseMipLevel = 0, uint32_t levelCount = VK_REMAINING_MIP_LEVELS,
+                              uint32_t baseArrayLayer = 0, uint32_t layerCount = VK_REMAINING_ARRAY_LAYERS,
+                              VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT) const {
+        VkImageViewCreateInfo ci = BasicViewCreatInfo();
+        ci.viewType = type;
+        ci.subresourceRange = {aspect, baseMipLevel, levelCount, baseArrayLayer, layerCount};
+        return vkt::ImageView(*m_device, ci);
     }
 
     void SetLayout(vkt::CommandBuffer *cmd_buf, VkImageAspectFlags aspect, VkImageLayout image_layout);
@@ -344,79 +358,9 @@ class VkImageObj : public vkt::Image {
     vkt::Device *device() const { return m_device; }
 
   protected:
-    vkt::Device *m_device;
-
-    vkt::ImageView m_targetView;
-    VkDescriptorImageInfo m_descriptorImageInfo;
-    uint32_t m_mipLevels;
-    uint32_t m_arrayLayers;
-};
-
-class VkDescriptorSetObj : public vkt::DescriptorPool {
-  public:
-    VkDescriptorSetObj(vkt::Device *device);
-    ~VkDescriptorSetObj() noexcept;
-
-    int AppendDummy();
-    int AppendSamplerTexture(VkDescriptorImageInfo &image_info);
-    void CreateVKDescriptorSet(vkt::CommandBuffer *commandBuffer);
-
-    VkDescriptorSet GetDescriptorSetHandle() const { return m_set ? m_set->handle() : VK_NULL_HANDLE; }
-    VkPipelineLayout GetPipelineLayout() const { return m_pipeline_layout.handle(); }
-    VkDescriptorSetLayout GetDescriptorSetLayout() const { return m_layout.handle(); }
-
-  protected:
-    vkt::Device *m_device;
-    std::vector<VkDescriptorSetLayoutBinding> m_layout_bindings;
-    std::map<VkDescriptorType, int> m_type_counts;
-    int m_nextSlot;
-
-    std::vector<VkDescriptorImageInfo> m_imageSamplerDescriptors;
-    std::vector<VkWriteDescriptorSet> m_writes;
-
-    vkt::DescriptorSetLayout m_layout;
-    vkt::PipelineLayout m_pipeline_layout;
-    vkt::DescriptorSet *m_set = NULL;
-};
-
-// What is the incoming source to be turned into VkShaderModuleCreateInfo::pCode
-typedef enum {
-    SPV_SOURCE_GLSL,
-    SPV_SOURCE_ASM,
-    // TRY == Won't try in contructor as need to be called as function that can return the VkResult
-    SPV_SOURCE_GLSL_TRY,
-    SPV_SOURCE_ASM_TRY,
-} SpvSourceType;
-
-class VkShaderObj : public vkt::ShaderModule {
-  public:
-    // optional arguments listed order of most likely to be changed manually by a test
-    VkShaderObj(VkRenderFramework *framework, const char *source, VkShaderStageFlagBits stage,
-                const spv_target_env env = SPV_ENV_VULKAN_1_0, SpvSourceType source_type = SPV_SOURCE_GLSL,
-                const VkSpecializationInfo *spec_info = nullptr, char const *entry_point = "main", bool debug = false,
-                const void *pNext = nullptr);
-    VkPipelineShaderStageCreateInfo const &GetStageCreateInfo() const;
-
-    bool InitFromGLSL(bool debug = false, const void *pNext = nullptr);
-    VkResult InitFromGLSLTry(bool debug = false, const vkt::Device *custom_device = nullptr);
-    bool InitFromASM();
-    VkResult InitFromASMTry();
-
-    // These functions return a pointer to a newly created _and initialized_ VkShaderObj if initialization was successful.
-    // Otherwise, {} is returned.
-    static std::unique_ptr<VkShaderObj> CreateFromGLSL(VkRenderFramework *framework, const char *source,
-                                                       VkShaderStageFlagBits stage, const spv_target_env = SPV_ENV_VULKAN_1_0,
-                                                       const VkSpecializationInfo *spec_info = nullptr,
-                                                       const char *entry_point = "main", bool debug = false);
-    static std::unique_ptr<VkShaderObj> CreateFromASM(VkRenderFramework *framework, const char *source, VkShaderStageFlagBits stage,
-                                                      const spv_target_env spv_env = SPV_ENV_VULKAN_1_0,
-                                                      const VkSpecializationInfo *spec_info = nullptr,
-                                                      const char *entry_point = "main");
-
-  protected:
-    VkPipelineShaderStageCreateInfo m_stage_info;
-    VkRenderFramework &m_framework;
-    vkt::Device &m_device;
-    const char *m_source;
-    spv_target_env m_spv_env;
+    vkt::Device *m_device = nullptr;
+    VkFormat m_format = VK_FORMAT_UNDEFINED;
+    uint32_t m_mipLevels = 0;
+    uint32_t m_arrayLayers = 0;
+    VkDescriptorImageInfo m_descriptorImageInfo = {VK_NULL_HANDLE, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL};
 };

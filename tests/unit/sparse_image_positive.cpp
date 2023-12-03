@@ -13,11 +13,12 @@
 
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
+#include "../framework/descriptor_helper.h"
 
 TEST_F(PositiveSparseImage, MultipleBinds) {
     TEST_DESCRIPTION("Bind 2 memory ranges to one image using vkQueueBindSparse, destroy the image and then free the memory");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     auto index = m_device->graphics_queue_node_index_;
     if (!(m_device->phy().queue_properties_[index].queueFlags & VK_QUEUE_SPARSE_BINDING_BIT)) {
@@ -92,7 +93,7 @@ TEST_F(PositiveSparseImage, MultipleBinds) {
 TEST_F(PositiveSparseImage, BindFreeMemory) {
     TEST_DESCRIPTION("Test using a sparse image after freeing memory that was bound to it.");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     auto index = m_device->graphics_queue_node_index_;
     if (!(m_device->phy().queue_properties_[index].queueFlags & VK_QUEUE_SPARSE_BINDING_BIT)) {
@@ -188,7 +189,7 @@ TEST_F(PositiveSparseImage, BindFreeMemory) {
 TEST_F(PositiveSparseImage, BindMetadata) {
     TEST_DESCRIPTION("Bind memory for the metadata aspect of a sparse image");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     auto index = m_device->graphics_queue_node_index_;
     if (!(m_device->phy().queue_properties_[index].queueFlags & VK_QUEUE_SPARSE_BINDING_BIT)) {
@@ -268,7 +269,7 @@ TEST_F(PositiveSparseImage, BindMetadata) {
 TEST_F(PositiveSparseImage, OpImageSparse) {
     TEST_DESCRIPTION("Use OpImageSparse* operations at draw time");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     auto index = m_device->graphics_queue_node_index_;
     if (!(m_device->phy().queue_properties_[index].queueFlags & VK_QUEUE_SPARSE_BINDING_BIT)) {
@@ -297,7 +298,7 @@ TEST_F(PositiveSparseImage, OpImageSparse) {
     VkImageObj image(m_device);
     image.init_no_mem(*m_device, image_create_info);
 
-    VkImageView image_view = image.targetView(VK_FORMAT_B8G8R8A8_UNORM);
+    vkt::ImageView image_view = image.CreateView();
 
     VkSamplerCreateInfo sampler_ci = SafeSaneSamplerCreateInfo();
     vkt::Sampler sampler(*m_device, sampler_ci);
