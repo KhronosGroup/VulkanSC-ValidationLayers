@@ -261,12 +261,12 @@ std::vector<debug_printf::Substring> debug_printf::Validator::ParseFormatString(
 
 std::string debug_printf::Validator::FindFormatString(vvl::span<const uint32_t> pgm, uint32_t string_id) {
     std::string format_string;
-    SPIRV_MODULE_STATE module_state(pgm);
+    spirv::Module module_state(pgm);
     if (module_state.words_.empty()) {
         return {};
     }
 
-    for (const Instruction *insn : module_state.static_data_.debug_string_inst) {
+    for (const spirv::Instruction *insn : module_state.static_data_.debug_string_inst) {
         if (insn->Word(1) == string_id) {
             format_string = insn->GetAsString(2);
             break;
@@ -719,7 +719,7 @@ void debug_printf::Validator::AllocateDebugPrintfResources(const VkCommandBuffer
     DispatchUpdateDescriptorSets(device, desc_count, &desc_writes, 0, NULL);
 
     const auto pipeline_layout =
-        pipeline_state ? pipeline_state->PipelineLayoutState() : Get<PIPELINE_LAYOUT_STATE>(last_bound.pipeline_layout);
+        pipeline_state ? pipeline_state->PipelineLayoutState() : Get<vvl::PipelineLayout>(last_bound.pipeline_layout);
     if (pipeline_layout) {
         // If GPL is used, it's possible the pipeline layout used at pipeline creation time is null. If CmdBindDescriptorSets has
         // not been called yet (i.e., state.pipeline_null), then fall back to the layout associated with pre-raster state.
@@ -742,25 +742,25 @@ void debug_printf::Validator::AllocateDebugPrintfResources(const VkCommandBuffer
     cb_node->buffer_infos.emplace_back(output_block, desc_sets[0], desc_pool, bind_point);
 }
 
-std::shared_ptr<CMD_BUFFER_STATE> debug_printf::Validator::CreateCmdBufferState(VkCommandBuffer cb,
-                                                                                const VkCommandBufferAllocateInfo *pCreateInfo,
-                                                                                const COMMAND_POOL_STATE *pool) {
-    return std::static_pointer_cast<CMD_BUFFER_STATE>(std::make_shared<debug_printf::CommandBuffer>(this, cb, pCreateInfo, pool));
+std::shared_ptr<vvl::CommandBuffer> debug_printf::Validator::CreateCmdBufferState(VkCommandBuffer cb,
+                                                                                  const VkCommandBufferAllocateInfo *pCreateInfo,
+                                                                                  const vvl::CommandPool *pool) {
+    return std::static_pointer_cast<vvl::CommandBuffer>(std::make_shared<debug_printf::CommandBuffer>(this, cb, pCreateInfo, pool));
 }
 
 debug_printf::CommandBuffer::CommandBuffer(debug_printf::Validator *dp, VkCommandBuffer cb,
-                                           const VkCommandBufferAllocateInfo *pCreateInfo, const COMMAND_POOL_STATE *pool)
+                                           const VkCommandBufferAllocateInfo *pCreateInfo, const vvl::CommandPool *pool)
     : gpu_tracker::CommandBuffer(dp, cb, pCreateInfo, pool) {}
 
 debug_printf::CommandBuffer::~CommandBuffer() { Destroy(); }
 
 void debug_printf::CommandBuffer::Destroy() {
     ResetCBState();
-    CMD_BUFFER_STATE::Destroy();
+    vvl::CommandBuffer::Destroy();
 }
 
 void debug_printf::CommandBuffer::Reset() {
-    CMD_BUFFER_STATE::Reset();
+    vvl::CommandBuffer::Reset();
     ResetCBState();
 }
 

@@ -53,15 +53,15 @@ WriteLockGuard BestPractices::WriteLock() {
     }
 }
 
-std::shared_ptr<CMD_BUFFER_STATE> BestPractices::CreateCmdBufferState(VkCommandBuffer cb,
-                                                                      const VkCommandBufferAllocateInfo* pCreateInfo,
-                                                                      const COMMAND_POOL_STATE* pool) {
-    return std::static_pointer_cast<CMD_BUFFER_STATE>(std::make_shared<bp_state::CommandBuffer>(this, cb, pCreateInfo, pool));
+std::shared_ptr<vvl::CommandBuffer> BestPractices::CreateCmdBufferState(VkCommandBuffer cb,
+                                                                        const VkCommandBufferAllocateInfo* pCreateInfo,
+                                                                        const vvl::CommandPool* pool) {
+    return std::static_pointer_cast<vvl::CommandBuffer>(std::make_shared<bp_state::CommandBuffer>(this, cb, pCreateInfo, pool));
 }
 
 bp_state::CommandBuffer::CommandBuffer(BestPractices* bp, VkCommandBuffer cb, const VkCommandBufferAllocateInfo* pCreateInfo,
-                                       const COMMAND_POOL_STATE* pool)
-    : CMD_BUFFER_STATE(bp, cb, pCreateInfo, pool) {}
+                                       const vvl::CommandPool* pool)
+    : vvl::CommandBuffer(bp, cb, pCreateInfo, pool) {}
 
 bool BestPractices::VendorCheckEnabled(BPVendorFlags vendors) const {
     for (const auto& vendor : kVendorInfo) {
@@ -159,7 +159,7 @@ void BestPractices::RecordBindZcullScope(bp_state::CommandBuffer& cmd_state, VkI
 
     assert((subresource_range.aspectMask & VK_IMAGE_ASPECT_DEPTH_BIT) != 0U);
 
-    auto image_state = Get<IMAGE_STATE>(depth_attachment);
+    auto image_state = Get<vvl::Image>(depth_attachment);
     assert(image_state);
 
     const uint32_t mip_levels = image_state->createInfo.mipLevels;
@@ -191,7 +191,7 @@ void BestPractices::RecordResetScopeZcullDirection(bp_state::CommandBuffer& cmd_
 }
 
 template <typename Func>
-static void ForEachSubresource(const IMAGE_STATE& image, const VkImageSubresourceRange& range, Func&& func) {
+static void ForEachSubresource(const vvl::Image& image, const VkImageSubresourceRange& range, Func&& func) {
     const uint32_t layerCount =
         (range.layerCount == VK_REMAINING_ARRAY_LAYERS) ? (image.full_range.layerCount - range.baseArrayLayer) : range.layerCount;
     const uint32_t levelCount =
@@ -218,7 +218,7 @@ void BestPractices::RecordResetZcullDirection(bp_state::CommandBuffer& cmd_state
     }
     auto& tree = image_it->second;
 
-    auto image = Get<IMAGE_STATE>(depth_image);
+    auto image = Get<vvl::Image>(depth_image);
     if (!image) return;
 
     ForEachSubresource(*image, subresource_range, [&tree](uint32_t layer, uint32_t level) {
@@ -247,7 +247,7 @@ void BestPractices::RecordSetZcullDirection(bp_state::CommandBuffer& cmd_state, 
     }
     auto& tree = image_it->second;
 
-    auto image = Get<IMAGE_STATE>(depth_image);
+    auto image = Get<vvl::Image>(depth_image);
     if (!image) return;
 
     ForEachSubresource(*image, subresource_range, [&tree, &cmd_state](uint32_t layer, uint32_t level) {
@@ -261,7 +261,7 @@ void BestPractices::RecordZcullDraw(bp_state::CommandBuffer& cmd_state) {
     // Add one draw to each subresource depending on the current Z-cull direction
     auto& scope = cmd_state.nv.zcull_scope;
 
-    auto image = Get<IMAGE_STATE>(scope.image);
+    auto image = Get<vvl::Image>(scope.image);
     if (!image) return;
 
     ForEachSubresource(*image, scope.range, [&scope](uint32_t layer, uint32_t level) {
@@ -309,7 +309,7 @@ bool BestPractices::ValidateZcull(const bp_state::CommandBuffer& cmd_state, VkIm
     }
     const auto& tree = image_it->second;
 
-    auto image_state = Get<IMAGE_STATE>(image);
+    auto image_state = Get<vvl::Image>(image);
     if (!image_state) {
         return skip;
     }
@@ -484,7 +484,7 @@ bool BestPractices::ValidateClearColor(VkCommandBuffer commandBuffer, VkFormat f
     return skip;
 }
 
-void BestPractices::QueueValidateImageView(QueueCallbacks& funcs, Func command, IMAGE_VIEW_STATE* view,
+void BestPractices::QueueValidateImageView(QueueCallbacks& funcs, Func command, vvl::ImageView* view,
                                            IMAGE_SUBRESOURCE_USAGE_BP usage) {
     if (view) {
         auto image_state = std::static_pointer_cast<bp_state::Image>(view->image_state);
@@ -523,7 +523,7 @@ void BestPractices::QueueValidateImage(QueueCallbacks& funcs, Func command, std:
 void BestPractices::QueueValidateImage(QueueCallbacks& funcs, Func command, std::shared_ptr<bp_state::Image>& state,
                                        IMAGE_SUBRESOURCE_USAGE_BP usage, uint32_t array_layer, uint32_t mip_level) {
     funcs.push_back([this, command, state, usage, array_layer, mip_level](const ValidationStateTracker& vst, const vvl::Queue& qs,
-                                                                          const CMD_BUFFER_STATE& cbs) -> bool {
+                                                                          const vvl::CommandBuffer& cbs) -> bool {
         ValidateImageInQueue(qs, cbs, command, *state, usage, array_layer, mip_level);
         return false;
     });
@@ -602,7 +602,7 @@ void BestPractices::ValidateImageInQueueArmImg(Func command, const bp_state::Ima
     }
 }
 
-void BestPractices::ValidateImageInQueue(const vvl::Queue& qs, const CMD_BUFFER_STATE& cbs, Func command, bp_state::Image& state,
+void BestPractices::ValidateImageInQueue(const vvl::Queue& qs, const vvl::CommandBuffer& cbs, Func command, bp_state::Image& state,
                                          IMAGE_SUBRESOURCE_USAGE_BP usage, uint32_t array_layer, uint32_t mip_level) {
     auto queue_family = qs.queueFamilyIndex;
     auto last_usage = state.UpdateUsage(array_layer, mip_level, usage, queue_family);

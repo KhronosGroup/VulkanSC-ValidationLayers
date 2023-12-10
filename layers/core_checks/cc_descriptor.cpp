@@ -161,7 +161,7 @@ bool CoreChecks::VerifySetLayoutCompatibility(
     }
 }
 
-bool CoreChecks::VerifySetLayoutCompatibility(const PIPELINE_LAYOUT_STATE &layout_a, const PIPELINE_LAYOUT_STATE &layout_b,
+bool CoreChecks::VerifySetLayoutCompatibility(const vvl::PipelineLayout &layout_a, const vvl::PipelineLayout &layout_b,
                                               std::string &error_msg) const {
     const uint32_t num_sets = static_cast<uint32_t>(std::min(layout_a.set_layouts.size(), layout_b.set_layouts.size()));
     for (uint32_t i = 0; i < num_sets; ++i) {
@@ -180,7 +180,7 @@ bool CoreChecks::PreCallValidateCmdBindDescriptorSets(VkCommandBuffer commandBuf
                                                       VkPipelineLayout layout, uint32_t firstSet, uint32_t setCount,
                                                       const VkDescriptorSet *pDescriptorSets, uint32_t dynamicOffsetCount,
                                                       const uint32_t *pDynamicOffsets, const ErrorObject &error_obj) const {
-    auto cb_state = GetRead<CMD_BUFFER_STATE>(commandBuffer);
+    auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
     assert(cb_state);
     bool skip = false;
     skip |= ValidateCmd(*cb_state, error_obj.location);
@@ -188,7 +188,7 @@ bool CoreChecks::PreCallValidateCmdBindDescriptorSets(VkCommandBuffer commandBuf
     uint32_t total_dynamic_descriptors = 0;
     std::string error_string = "";
 
-    auto pipeline_layout = Get<PIPELINE_LAYOUT_STATE>(layout);
+    auto pipeline_layout = Get<vvl::PipelineLayout>(layout);
     for (uint32_t set_idx = 0; set_idx < setCount; set_idx++) {
         const Location set_loc = error_obj.location.dot(Field::pDescriptorSets, set_idx);
         auto descriptor_set = Get<vvl::DescriptorSet>(pDescriptorSets[set_idx]);
@@ -681,15 +681,15 @@ bool CoreChecks::PreCallValidateCreateDescriptorSetLayout(VkDevice device, const
 //  that any update buffers are valid, and that any dynamic offsets are within the bounds of their buffers.
 // Return true if state is acceptable, or false and write an error message into error string
 bool CoreChecks::ValidateDrawState(const DescriptorSet &descriptor_set, const BindingVariableMap &bindings,
-                                   const std::vector<uint32_t> &dynamic_offsets, const CMD_BUFFER_STATE &cb_state,
+                                   const std::vector<uint32_t> &dynamic_offsets, const vvl::CommandBuffer &cb_state,
                                    const Location &loc, const vvl::DrawDispatchVuid &vuids) const {
     bool result = false;
     VkFramebuffer framebuffer = cb_state.activeFramebuffer ? cb_state.activeFramebuffer->framebuffer() : VK_NULL_HANDLE;
     // NOTE: GPU-AV needs non-const state objects to do lazy updates of descriptor state of only the dynamically used
     // descriptors, via the non-const version of ValidateBinding(), this code uses the const path only even it gives up
     // non-const versions of its state objects here.
-    const vvl::DescriptorValidator desc_val(const_cast<CoreChecks&>(*this), const_cast<CMD_BUFFER_STATE&>(cb_state),
-                                           const_cast<DescriptorSet&>(descriptor_set), framebuffer, loc);
+    const vvl::DescriptorValidator desc_val(const_cast<CoreChecks &>(*this), const_cast<vvl::CommandBuffer &>(cb_state),
+                                            const_cast<DescriptorSet &>(descriptor_set), framebuffer, loc);
 
     for (const auto &binding_pair : bindings) {
         const auto *binding = descriptor_set.GetBinding(binding_pair.first);
@@ -993,7 +993,7 @@ bool CoreChecks::ValidateSampler(const VkSampler sampler) const { return Get<vvl
 bool CoreChecks::ValidateImageUpdate(VkImageView image_view, VkImageLayout image_layout, VkDescriptorType type,
                                      const Location &image_info_loc) const {
     bool skip = false;
-    auto iv_state = Get<IMAGE_VIEW_STATE>(image_view);
+    auto iv_state = Get<vvl::ImageView>(image_view);
 
     // Note that when an imageview is created, we validated that memory is bound so no need to re-check here
     // Validate that imageLayout is compatible with aspect_mask and image format
@@ -1811,7 +1811,7 @@ bool CoreChecks::VerifyWriteUpdateContents(const DescriptorSet &dst_set, const V
                 }
                 auto image_layout = update.pImageInfo[di].imageLayout;
                 auto sampler = update.pImageInfo[di].sampler;
-                auto iv_state = Get<IMAGE_VIEW_STATE>(image_view);
+                auto iv_state = Get<vvl::ImageView>(image_view);
                 const ImageSamplerDescriptor &desc = (const ImageSamplerDescriptor &)*iter;
 
                 const auto *image_state = iv_state->image_state.get();
@@ -1974,8 +1974,8 @@ bool CoreChecks::PreCallValidateCmdSetDescriptorBufferOffsetsEXT(VkCommandBuffer
                                                                  uint32_t firstSet, uint32_t setCount,
                                                                  const uint32_t *pBufferIndices, const VkDeviceSize *pOffsets,
                                                                  const ErrorObject &error_obj) const {
-    auto cb_state = GetRead<CMD_BUFFER_STATE>(commandBuffer);
-    auto pipeline_layout = Get<PIPELINE_LAYOUT_STATE>(layout);
+    auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
+    auto pipeline_layout = Get<vvl::PipelineLayout>(layout);
     assert(cb_state);
     assert(pipeline_layout);
 
@@ -2116,7 +2116,7 @@ bool CoreChecks::PreCallValidateCmdBindDescriptorBufferEmbeddedSamplersEXT(VkCom
                                                                            VkPipelineBindPoint pipelineBindPoint,
                                                                            VkPipelineLayout layout, uint32_t set,
                                                                            const ErrorObject &error_obj) const {
-    auto cb_state = GetRead<CMD_BUFFER_STATE>(commandBuffer);
+    auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
     assert(cb_state);
 
     bool skip = false;
@@ -2127,7 +2127,7 @@ bool CoreChecks::PreCallValidateCmdBindDescriptorBufferEmbeddedSamplersEXT(VkCom
     }
     skip |= ValidatePipelineBindPoint(cb_state.get(), pipelineBindPoint, error_obj.location);
 
-    auto pipeline_layout = Get<PIPELINE_LAYOUT_STATE>(layout);
+    auto pipeline_layout = Get<vvl::PipelineLayout>(layout);
     if (set >= pipeline_layout->set_layouts.size()) {
         skip |= LogError("VUID-vkCmdBindDescriptorBufferEmbeddedSamplersEXT-set-08071", commandBuffer, error_obj.location,
                          "set (%" PRIu32
@@ -2149,7 +2149,7 @@ bool CoreChecks::PreCallValidateCmdBindDescriptorBufferEmbeddedSamplersEXT(VkCom
 bool CoreChecks::PreCallValidateCmdBindDescriptorBuffersEXT(VkCommandBuffer commandBuffer, uint32_t bufferCount,
                                                             const VkDescriptorBufferBindingInfoEXT *pBindingInfos,
                                                             const ErrorObject &error_obj) const {
-    auto cb_state = GetRead<CMD_BUFFER_STATE>(commandBuffer);
+    auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
     assert(cb_state);
 
     bool skip = false;
@@ -2420,7 +2420,7 @@ bool CoreChecks::PreCallValidateGetImageOpaqueCaptureDescriptorDataEXT(VkDevice 
                          physical_device_count);
     }
 
-    auto image_state = Get<IMAGE_STATE>(pInfo->image);
+    auto image_state = Get<vvl::Image>(pInfo->image);
 
     if (image_state) {
         if (!(image_state->createInfo.flags & VK_IMAGE_CREATE_DESCRIPTOR_BUFFER_CAPTURE_REPLAY_BIT_EXT)) {
@@ -2452,7 +2452,7 @@ bool CoreChecks::PreCallValidateGetImageViewOpaqueCaptureDescriptorDataEXT(VkDev
                          physical_device_count);
     }
 
-    auto image_view_state = Get<IMAGE_VIEW_STATE>(pInfo->imageView);
+    auto image_view_state = Get<vvl::ImageView>(pInfo->imageView);
 
     if (image_view_state) {
         if (!(image_view_state->create_info.flags & VK_IMAGE_VIEW_CREATE_DESCRIPTOR_BUFFER_CAPTURE_REPLAY_BIT_EXT)) {
@@ -2632,14 +2632,14 @@ bool CoreChecks::PreCallValidateGetDescriptorEXT(VkDevice device, const VkDescri
                                  "pCombinedImageSampler->sampler is not a valid sampler.");
             }
             if ((pDescriptorInfo->data.pCombinedImageSampler->imageView != VK_NULL_HANDLE) &&
-                (Get<IMAGE_VIEW_STATE>(pDescriptorInfo->data.pCombinedImageSampler->imageView).get() == nullptr)) {
+                (Get<vvl::ImageView>(pDescriptorInfo->data.pCombinedImageSampler->imageView).get() == nullptr)) {
                 skip |= LogError("VUID-VkDescriptorGetInfoEXT-type-08020", device, descriptor_info_loc.dot(Field::type),
                                  "is VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, but "
                                  "pCombinedImageSampler->imageView is not a valid image view.");
             }
             break;
         case VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:
-            if (Get<IMAGE_VIEW_STATE>(pDescriptorInfo->data.pInputAttachmentImage->imageView).get() == nullptr) {
+            if (Get<vvl::ImageView>(pDescriptorInfo->data.pInputAttachmentImage->imageView).get() == nullptr) {
                 skip |= LogError("VUID-VkDescriptorGetInfoEXT-type-08021", device, descriptor_info_loc.dot(Field::type),
                                  "is VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, but "
                                  "pInputAttachmentImage->imageView is not valid image view.");
@@ -2647,7 +2647,7 @@ bool CoreChecks::PreCallValidateGetDescriptorEXT(VkDevice device, const VkDescri
             break;
         case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
             if (pDescriptorInfo->data.pSampledImage && (pDescriptorInfo->data.pSampledImage->imageView != VK_NULL_HANDLE) &&
-                (Get<IMAGE_VIEW_STATE>(pDescriptorInfo->data.pSampledImage->imageView).get() == nullptr)) {
+                (Get<vvl::ImageView>(pDescriptorInfo->data.pSampledImage->imageView).get() == nullptr)) {
                 skip |= LogError("VUID-VkDescriptorGetInfoEXT-type-08022", device, descriptor_info_loc.dot(Field::type),
                                  "is VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, but "
                                  "pSampledImage->imageView is not a valid image view.");
@@ -2655,7 +2655,7 @@ bool CoreChecks::PreCallValidateGetDescriptorEXT(VkDevice device, const VkDescri
             break;
         case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
             if (pDescriptorInfo->data.pStorageImage && (pDescriptorInfo->data.pStorageImage->imageView != VK_NULL_HANDLE) &&
-                (Get<IMAGE_VIEW_STATE>(pDescriptorInfo->data.pStorageImage->imageView).get() == nullptr)) {
+                (Get<vvl::ImageView>(pDescriptorInfo->data.pStorageImage->imageView).get() == nullptr)) {
                 skip |= LogError("VUID-VkDescriptorGetInfoEXT-type-08023", device, descriptor_info_loc.dot(Field::type),
                                  "is VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, but "
                                  "pStorageImage->imageView is not a valid image view.");
@@ -3192,12 +3192,12 @@ bool CoreChecks::PreCallValidateCmdPushDescriptorSetKHR(VkCommandBuffer commandB
                                                         VkPipelineLayout layout, uint32_t set, uint32_t descriptorWriteCount,
                                                         const VkWriteDescriptorSet *pDescriptorWrites,
                                                         const ErrorObject &error_obj) const {
-    auto cb_state = GetRead<CMD_BUFFER_STATE>(commandBuffer);
+    auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
     assert(cb_state);
     bool skip = false;
     skip |= ValidateCmd(*cb_state, error_obj.location);
     skip |= ValidatePipelineBindPoint(cb_state.get(), pipelineBindPoint, error_obj.location);
-    auto layout_data = Get<PIPELINE_LAYOUT_STATE>(layout);
+    auto layout_data = Get<vvl::PipelineLayout>(layout);
 
     // Validate the set index points to a push descriptor set and is in range
     if (layout_data) {
@@ -3249,7 +3249,7 @@ bool CoreChecks::PreCallValidateCreateDescriptorUpdateTemplate(VkDevice device,
             skip |= LogError("VUID-VkDescriptorUpdateTemplateCreateInfo-templateType-00351", device,
                              create_info_loc.dot(Field::pipelineBindPoint), "is %s.", string_VkPipelineBindPoint(bind_point));
         }
-        auto pipeline_layout = Get<PIPELINE_LAYOUT_STATE>(pCreateInfo->pipelineLayout);
+        auto pipeline_layout = Get<vvl::PipelineLayout>(pCreateInfo->pipelineLayout);
         if (!pipeline_layout) {
             skip |= LogError("VUID-VkDescriptorUpdateTemplateCreateInfo-templateType-00352", pCreateInfo->pipelineLayout,
                              create_info_loc.dot(Field::pipelineLayout), "(%s) is invalid.",
@@ -3337,12 +3337,12 @@ bool CoreChecks::PreCallValidateCmdPushDescriptorSetWithTemplateKHR(VkCommandBuf
                                                                     VkDescriptorUpdateTemplate descriptorUpdateTemplate,
                                                                     VkPipelineLayout layout, uint32_t set, const void *pData,
                                                                     const ErrorObject &error_obj) const {
-    auto cb_state = GetRead<CMD_BUFFER_STATE>(commandBuffer);
+    auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
     assert(cb_state);
     bool skip = false;
     skip |= ValidateCmd(*cb_state, error_obj.location);
 
-    auto layout_data = Get<PIPELINE_LAYOUT_STATE>(layout);
+    auto layout_data = Get<vvl::PipelineLayout>(layout);
     const auto dsl = layout_data ? layout_data->GetDsl(set) : nullptr;
     // Validate the set index points to a push descriptor set and is in range
     if (dsl) {
@@ -3376,7 +3376,7 @@ bool CoreChecks::PreCallValidateCmdPushDescriptorSetWithTemplateKHR(VkCommandBuf
                              "%s created with set %" PRIu32 " does not match command parameter set %" PRIu32 ".",
                              FormatHandle(descriptorUpdateTemplate).c_str(), template_ci.set, set);
         }
-        auto template_layout = Get<PIPELINE_LAYOUT_STATE>(template_ci.pipelineLayout);
+        auto template_layout = Get<vvl::PipelineLayout>(template_ci.pipelineLayout);
         if (!IsPipelineLayoutSetCompat(set, layout_data.get(), template_layout.get())) {
             const LogObjectList objlist(commandBuffer, descriptorUpdateTemplate, template_ci.pipelineLayout, layout);
             skip |= LogError("VUID-vkCmdPushDescriptorSetWithTemplateKHR-layout-07993", objlist,
@@ -4089,7 +4089,7 @@ bool CoreChecks::PreCallValidateCmdPushConstants(VkCommandBuffer commandBuffer, 
                                                  VkShaderStageFlags stageFlags, uint32_t offset, uint32_t size, const void *pValues,
                                                  const ErrorObject &error_obj) const {
     bool skip = false;
-    auto cb_state = GetRead<CMD_BUFFER_STATE>(commandBuffer);
+    auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
     assert(cb_state);
     skip |= ValidateCmd(*cb_state, error_obj.location);
 
@@ -4098,7 +4098,7 @@ bool CoreChecks::PreCallValidateCmdPushConstants(VkCommandBuffer commandBuffer, 
     if (skip) {
         return skip;
     }
-    auto layout_state = Get<PIPELINE_LAYOUT_STATE>(layout);
+    auto layout_state = Get<vvl::PipelineLayout>(layout);
     const auto &ranges = *layout_state->push_constant_ranges;
     VkShaderStageFlags found_stages = 0;
     for (const auto &range : ranges) {

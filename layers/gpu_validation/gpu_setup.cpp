@@ -47,8 +47,8 @@ std::shared_ptr<vvl::BufferView> gpuav::Validator::CreateBufferViewState(const s
     return std::make_shared<BufferView>(bf, bv, ci, buf_ff, *desc_heap);
 }
 
-std::shared_ptr<IMAGE_VIEW_STATE> gpuav::Validator::CreateImageViewState(
-    const std::shared_ptr<IMAGE_STATE> &image_state, VkImageView iv, const VkImageViewCreateInfo *ci, VkFormatFeatureFlags2KHR ff,
+std::shared_ptr<vvl::ImageView> gpuav::Validator::CreateImageViewState(
+    const std::shared_ptr<vvl::Image> &image_state, VkImageView iv, const VkImageViewCreateInfo *ci, VkFormatFeatureFlags2KHR ff,
     const VkFilterCubicImageViewImageFormatPropertiesEXT &cubic_props) {
     return std::make_shared<ImageView>(image_state, iv, ci, ff, cubic_props, *desc_heap);
 }
@@ -74,10 +74,10 @@ std::shared_ptr<vvl::DescriptorSet> gpuav::Validator::CreateDescriptorSet(
     return std::static_pointer_cast<vvl::DescriptorSet>(std::make_shared<DescriptorSet>(set, pool, layout, variable_count, this));
 }
 
-std::shared_ptr<CMD_BUFFER_STATE> gpuav::Validator::CreateCmdBufferState(VkCommandBuffer cb,
-                                                                         const VkCommandBufferAllocateInfo *pCreateInfo,
-                                                                         const COMMAND_POOL_STATE *pool) {
-    return std::static_pointer_cast<CMD_BUFFER_STATE>(std::make_shared<CommandBuffer>(this, cb, pCreateInfo, pool));
+std::shared_ptr<vvl::CommandBuffer> gpuav::Validator::CreateCmdBufferState(VkCommandBuffer cb,
+                                                                           const VkCommandBufferAllocateInfo *pCreateInfo,
+                                                                           const vvl::CommandPool *pool) {
+    return std::static_pointer_cast<vvl::CommandBuffer>(std::make_shared<CommandBuffer>(this, cb, pCreateInfo, pool));
 }
 
 // Perform initializations that can be done at Create Device time.
@@ -86,7 +86,7 @@ void gpuav::Validator::CreateDevice(const VkDeviceCreateInfo *pCreateInfo) {
     // would be messier without.
     // TODO: Find a good way to do this hooklessly.
     SetSetImageViewInitialLayoutCallback(
-        [](CMD_BUFFER_STATE *cb_state, const IMAGE_VIEW_STATE &iv_state, VkImageLayout layout) -> void {
+        [](vvl::CommandBuffer *cb_state, const vvl::ImageView &iv_state, VkImageLayout layout) -> void {
             cb_state->SetImageViewInitialLayout(iv_state, layout);
         });
 
@@ -170,6 +170,14 @@ void gpuav::Validator::CreateDevice(const VkDeviceCreateInfo *pCreateInfo) {
         LogWarning("UNASSIGNED-GPU-Assisted Validation Warning", device, loc,
                    "Buffer Device Address + feature is not available.  No descriptor checking will be attempted");
     }
+
+    if (gpuav_settings.validate_indirect_buffer && (phys_dev_props.limits.maxPushConstantsSize < 4 * sizeof(uint32_t))) {
+        gpuav_settings.validate_indirect_buffer = false;
+        LogWarning("UNASSIGNED-GPU-Assisted Validation Warning", device, loc,
+                   "Device does not support the minimum range of push constants (32 bytes).  No indirect buffer checking will be "
+                   "attempted");
+    }
+
     if (gpuav_settings.validate_descriptors) {
         VkPhysicalDeviceDescriptorIndexingProperties desc_indexing_props = vku::InitStructHelper();
         VkPhysicalDeviceProperties2 props2 = vku::InitStructHelper(&desc_indexing_props);
@@ -681,11 +689,11 @@ void gpuav::AccelerationStructureBuildValidationState::Destroy(VkDevice device, 
     initialized = false;
 }
 
-void gpuav::RestorablePipelineState::Create(CMD_BUFFER_STATE *cb_state, VkPipelineBindPoint bind_point) {
+void gpuav::RestorablePipelineState::Create(vvl::CommandBuffer *cb_state, VkPipelineBindPoint bind_point) {
     pipeline_bind_point = bind_point;
     const auto lv_bind_point = ConvertToLvlBindPoint(bind_point);
 
-    LAST_BOUND_STATE &last_bound = cb_state->lastBound[lv_bind_point];
+    LastBound &last_bound = cb_state->lastBound[lv_bind_point];
     if (last_bound.pipeline_state) {
         pipeline = last_bound.pipeline_state->pipeline();
         pipeline_layout = last_bound.pipeline_layout;

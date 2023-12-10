@@ -160,17 +160,17 @@ enum IMAGE_SUBRESOURCE_USAGE_BP {
 class BestPractices;
 
 namespace bp_state {
-class Image : public IMAGE_STATE {
+class Image : public vvl::Image {
   public:
     Image(const ValidationStateTracker* dev_data, VkImage img, const VkImageCreateInfo* pCreateInfo,
           VkFormatFeatureFlags2KHR features)
-        : IMAGE_STATE(dev_data, img, pCreateInfo, features) {
+        : vvl::Image(dev_data, img, pCreateInfo, features) {
         SetupUsages();
     }
 
     Image(const ValidationStateTracker* dev_data, VkImage img, const VkImageCreateInfo* pCreateInfo, VkSwapchainKHR swapchain,
           uint32_t swapchain_index, VkFormatFeatureFlags2KHR features)
-        : IMAGE_STATE(dev_data, img, pCreateInfo, swapchain, swapchain_index, features) {
+        : vvl::Image(dev_data, img, pCreateInfo, swapchain, swapchain_index, features) {
         SetupUsages();
     }
 
@@ -229,21 +229,21 @@ class PhysicalDevice : public vvl::PhysicalDevice {
     CALL_STATE vkGetPhysicalDeviceDisplayPlanePropertiesKHRState = UNCALLED;
 };
 
-class Swapchain : public SWAPCHAIN_NODE {
+class Swapchain : public vvl::Swapchain {
   public:
     Swapchain(ValidationStateTracker* dev_data, const VkSwapchainCreateInfoKHR* pCreateInfo, VkSwapchainKHR swapchain)
-        : SWAPCHAIN_NODE(dev_data, pCreateInfo, swapchain) {}
+        : vvl::Swapchain(dev_data, pCreateInfo, swapchain) {}
 
     CALL_STATE vkGetSwapchainImagesKHRState = UNCALLED;
 };
 
-class DeviceMemory : public DEVICE_MEMORY_STATE {
+class DeviceMemory : public vvl::DeviceMemory {
   public:
     DeviceMemory(VkDeviceMemory mem, const VkMemoryAllocateInfo* p_alloc_info, uint64_t fake_address,
                  const VkMemoryType& memory_type, const VkMemoryHeap& memory_heap,
                  std::optional<DedicatedBinding>&& dedicated_binding, uint32_t physical_device_count)
-        : DEVICE_MEMORY_STATE(mem, p_alloc_info, fake_address, memory_type, memory_heap, std::move(dedicated_binding),
-                              physical_device_count) {}
+        : vvl::DeviceMemory(mem, p_alloc_info, fake_address, memory_type, memory_heap, std::move(dedicated_binding),
+                            physical_device_count) {}
 
     std::optional<float> dynamic_priority;  // VK_EXT_pageable_device_local_memory priority
 };
@@ -323,10 +323,10 @@ struct CommandBufferStateNV {
     bool depth_test_enable = false;
 };
 
-class CommandBuffer : public CMD_BUFFER_STATE {
+class CommandBuffer : public vvl::CommandBuffer {
   public:
     CommandBuffer(BestPractices* bp, VkCommandBuffer cb, const VkCommandBufferAllocateInfo* pCreateInfo,
-                  const COMMAND_POOL_STATE* pool);
+                  const vvl::CommandPool* pool);
 
     RenderPassState render_pass_state;
     CommandBufferStateNV nv;
@@ -345,10 +345,10 @@ class DescriptorPool : public vvl::DescriptorPool {
     uint32_t freed_count{0};
 };
 
-class Pipeline : public PIPELINE_STATE {
+class Pipeline : public vvl::Pipeline {
   public:
     Pipeline(const ValidationStateTracker* state_data, const VkGraphicsPipelineCreateInfo* pCreateInfo,
-             std::shared_ptr<const vvl::RenderPass>&& rpstate, std::shared_ptr<const PIPELINE_LAYOUT_STATE>&& layout,
+             std::shared_ptr<const vvl::RenderPass>&& rpstate, std::shared_ptr<const vvl::PipelineLayout>&& layout,
              CreateShaderModuleStates* csm_states);
 
     const std::vector<AttachmentInfo> access_framebuffer_attachments;
@@ -356,11 +356,11 @@ class Pipeline : public PIPELINE_STATE {
 }  // namespace bp_state
 
 VALSTATETRACK_DERIVED_STATE_OBJECT(VkPhysicalDevice, bp_state::PhysicalDevice, vvl::PhysicalDevice)
-VALSTATETRACK_DERIVED_STATE_OBJECT(VkCommandBuffer, bp_state::CommandBuffer, CMD_BUFFER_STATE)
-VALSTATETRACK_DERIVED_STATE_OBJECT(VkSwapchainKHR, bp_state::Swapchain, SWAPCHAIN_NODE)
-VALSTATETRACK_DERIVED_STATE_OBJECT(VkImage, bp_state::Image, IMAGE_STATE)
+VALSTATETRACK_DERIVED_STATE_OBJECT(VkCommandBuffer, bp_state::CommandBuffer, vvl::CommandBuffer)
+VALSTATETRACK_DERIVED_STATE_OBJECT(VkSwapchainKHR, bp_state::Swapchain, vvl::Swapchain)
+VALSTATETRACK_DERIVED_STATE_OBJECT(VkImage, bp_state::Image, vvl::Image)
 VALSTATETRACK_DERIVED_STATE_OBJECT(VkDescriptorPool, bp_state::DescriptorPool, vvl::DescriptorPool)
-VALSTATETRACK_DERIVED_STATE_OBJECT(VkPipeline, bp_state::Pipeline, PIPELINE_STATE)
+VALSTATETRACK_DERIVED_STATE_OBJECT(VkPipeline, bp_state::Pipeline, vvl::Pipeline)
 
 class BestPractices : public ValidationStateTracker {
   public:
@@ -778,16 +778,16 @@ class BestPractices : public ValidationStateTracker {
     bool PreCallValidateCmdResolveImage2(VkCommandBuffer commandBuffer, const VkResolveImageInfo2* pResolveImageInfo,
                                          const ErrorObject& error_obj) const override;
 
-    using QueueCallbacks = std::vector<CMD_BUFFER_STATE::QueueCallback>;
+    using QueueCallbacks = std::vector<vvl::CommandBuffer::QueueCallback>;
 
-    void QueueValidateImageView(QueueCallbacks& func, Func command, IMAGE_VIEW_STATE* view, IMAGE_SUBRESOURCE_USAGE_BP usage);
+    void QueueValidateImageView(QueueCallbacks& func, Func command, vvl::ImageView* view, IMAGE_SUBRESOURCE_USAGE_BP usage);
     void QueueValidateImage(QueueCallbacks& func, Func command, std::shared_ptr<bp_state::Image>& state,
                             IMAGE_SUBRESOURCE_USAGE_BP usage, const VkImageSubresourceRange& subresource_range);
     void QueueValidateImage(QueueCallbacks& func, Func command, std::shared_ptr<bp_state::Image>& state,
                             IMAGE_SUBRESOURCE_USAGE_BP usage, const VkImageSubresourceLayers& range);
     void QueueValidateImage(QueueCallbacks& func, Func command, std::shared_ptr<bp_state::Image>& state,
                             IMAGE_SUBRESOURCE_USAGE_BP usage, uint32_t array_layer, uint32_t mip_level);
-    void ValidateImageInQueue(const vvl::Queue& qs, const CMD_BUFFER_STATE& cbs, Func command, bp_state::Image& state,
+    void ValidateImageInQueue(const vvl::Queue& qs, const vvl::CommandBuffer& cbs, Func command, bp_state::Image& state,
                               IMAGE_SUBRESOURCE_USAGE_BP usage, uint32_t array_layer, uint32_t mip_level);
     void ValidateImageInQueueArmImg(Func command, const bp_state::Image& image, IMAGE_SUBRESOURCE_USAGE_BP last_usage,
                                     IMAGE_SUBRESOURCE_USAGE_BP usage, uint32_t array_layer, uint32_t mip_level);
@@ -993,24 +993,24 @@ class BestPractices : public ValidationStateTracker {
 // Include code-generated functions
 #include "generated/best_practices.h"
   protected:
-    std::shared_ptr<CMD_BUFFER_STATE> CreateCmdBufferState(VkCommandBuffer cb, const VkCommandBufferAllocateInfo* create_info,
-                                                           const COMMAND_POOL_STATE* pool) final;
+    std::shared_ptr<vvl::CommandBuffer> CreateCmdBufferState(VkCommandBuffer cb, const VkCommandBufferAllocateInfo* create_info,
+                                                             const vvl::CommandPool* pool) final;
 
-    std::shared_ptr<SWAPCHAIN_NODE> CreateSwapchainState(const VkSwapchainCreateInfoKHR* create_info,
+    std::shared_ptr<vvl::Swapchain> CreateSwapchainState(const VkSwapchainCreateInfoKHR* create_info,
                                                          VkSwapchainKHR swapchain) final {
-        return std::static_pointer_cast<SWAPCHAIN_NODE>(std::make_shared<bp_state::Swapchain>(this, create_info, swapchain));
+        return std::static_pointer_cast<vvl::Swapchain>(std::make_shared<bp_state::Swapchain>(this, create_info, swapchain));
     }
 
     std::shared_ptr<vvl::PhysicalDevice> CreatePhysicalDeviceState(VkPhysicalDevice phys_dev) final {
         return std::static_pointer_cast<vvl::PhysicalDevice>(std::make_shared<bp_state::PhysicalDevice>(phys_dev));
     }
-    std::shared_ptr<IMAGE_STATE> CreateImageState(VkImage img, const VkImageCreateInfo* pCreateInfo,
-                                                  VkFormatFeatureFlags2KHR features) final {
+    std::shared_ptr<vvl::Image> CreateImageState(VkImage img, const VkImageCreateInfo* pCreateInfo,
+                                                 VkFormatFeatureFlags2KHR features) final {
         return std::make_shared<bp_state::Image>(this, img, pCreateInfo, features);
     }
 
-    std::shared_ptr<IMAGE_STATE> CreateImageState(VkImage img, const VkImageCreateInfo* pCreateInfo, VkSwapchainKHR swapchain,
-                                                  uint32_t swapchain_index, VkFormatFeatureFlags2KHR features) final {
+    std::shared_ptr<vvl::Image> CreateImageState(VkImage img, const VkImageCreateInfo* pCreateInfo, VkSwapchainKHR swapchain,
+                                                 uint32_t swapchain_index, VkFormatFeatureFlags2KHR features) final {
         return std::make_shared<bp_state::Image>(this, img, pCreateInfo, swapchain, swapchain_index, features);
     }
 
@@ -1019,19 +1019,19 @@ class BestPractices : public ValidationStateTracker {
         return std::static_pointer_cast<vvl::DescriptorPool>(std::make_shared<bp_state::DescriptorPool>(this, pool, pCreateInfo));
     }
 
-    std::shared_ptr<DEVICE_MEMORY_STATE> CreateDeviceMemoryState(VkDeviceMemory mem, const VkMemoryAllocateInfo* p_alloc_info,
-                                                                 uint64_t fake_address, const VkMemoryType& memory_type,
-                                                                 const VkMemoryHeap& memory_heap,
-                                                                 std::optional<DedicatedBinding>&& dedicated_binding,
-                                                                 uint32_t physical_device_count) final {
-        return std::static_pointer_cast<DEVICE_MEMORY_STATE>(std::make_shared<bp_state::DeviceMemory>(
+    std::shared_ptr<vvl::DeviceMemory> CreateDeviceMemoryState(VkDeviceMemory mem, const VkMemoryAllocateInfo* p_alloc_info,
+                                                               uint64_t fake_address, const VkMemoryType& memory_type,
+                                                               const VkMemoryHeap& memory_heap,
+                                                               std::optional<DedicatedBinding>&& dedicated_binding,
+                                                               uint32_t physical_device_count) final {
+        return std::static_pointer_cast<vvl::DeviceMemory>(std::make_shared<bp_state::DeviceMemory>(
             mem, p_alloc_info, fake_address, memory_type, memory_heap, std::move(dedicated_binding), physical_device_count));
     }
 
-    std::shared_ptr<PIPELINE_STATE> CreateGraphicsPipelineState(const VkGraphicsPipelineCreateInfo* pCreateInfo,
-                                                                std::shared_ptr<const vvl::RenderPass>&& render_pass,
-                                                                std::shared_ptr<const PIPELINE_LAYOUT_STATE>&& layout,
-                                                                CreateShaderModuleStates* csm_states) const final;
+    std::shared_ptr<vvl::Pipeline> CreateGraphicsPipelineState(const VkGraphicsPipelineCreateInfo* pCreateInfo,
+                                                               std::shared_ptr<const vvl::RenderPass>&& render_pass,
+                                                               std::shared_ptr<const vvl::PipelineLayout>&& layout,
+                                                               CreateShaderModuleStates* csm_states) const final;
 
   private:
     // CacheEntry and PostTransformLRUCacheModel are used on the stack

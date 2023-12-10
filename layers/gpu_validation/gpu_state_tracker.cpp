@@ -226,8 +226,8 @@ VkResult UtilInitializeVma(VkInstance instance, VkPhysicalDevice physical_device
 }
 
 gpu_tracker::CommandBuffer::CommandBuffer(gpu_tracker::Validator *ga, VkCommandBuffer cb,
-                                          const VkCommandBufferAllocateInfo *pCreateInfo, const COMMAND_POOL_STATE *pool)
-    : CMD_BUFFER_STATE(ga, cb, pCreateInfo, pool) {}
+                                          const VkCommandBufferAllocateInfo *pCreateInfo, const vvl::CommandPool *pool)
+    : vvl::CommandBuffer(ga, cb, pCreateInfo, pool) {}
 
 ReadLockGuard gpu_tracker::Validator::ReadLock() const {
     if (fine_grained_locking) {
@@ -940,7 +940,7 @@ bool gpu_tracker::Validator::CheckForGpuAvEnabled(const void *pNext) {
 template <typename CreateInfo, typename SafeCreateInfo, typename GPUAVState>
 void gpu_tracker::Validator::PreCallRecordPipelineCreations(uint32_t count, const CreateInfo *pCreateInfos,
                                                             const VkAllocationCallbacks *pAllocator, VkPipeline *pPipelines,
-                                                            std::vector<std::shared_ptr<PIPELINE_STATE>> &pipe_state,
+                                                            std::vector<std::shared_ptr<vvl::Pipeline>> &pipe_state,
                                                             std::vector<SafeCreateInfo> *new_pipeline_create_infos,
                                                             const VkPipelineBindPoint bind_point, const RecordObject &record_obj,
                                                             GPUAVState &cgpl_state) {
@@ -990,7 +990,7 @@ void gpu_tracker::Validator::PreCallRecordPipelineCreations(uint32_t count, cons
             // library created with pre-raster or fragment shader state, it contains shaders that have not yet been instrumented
             if (!pipe->HasFullState() && (pipe->pre_raster_state || pipe->fragment_shader_state)) {
                 for (const auto &stage_state : pipe->stage_states) {
-                    auto module_state = std::const_pointer_cast<SHADER_MODULE_STATE>(stage_state.module_state);
+                    auto module_state = std::const_pointer_cast<vvl::ShaderModule>(stage_state.module_state);
                     if (!module_state->Handle()) {
                         // If the shader module's handle is non-null, then it was defined with CreateShaderModule and covered by the
                         // case above. Otherwise, it is being defined during CGPL time
@@ -1060,7 +1060,7 @@ void gpu_tracker::Validator::PostCallRecordPipelineCreations(const uint32_t coun
         return;
     }
     for (uint32_t pipeline = 0; pipeline < count; ++pipeline) {
-        auto pipeline_state = Get<PIPELINE_STATE>(pPipelines[pipeline]);
+        auto pipeline_state = Get<vvl::Pipeline>(pPipelines[pipeline]);
         if (!pipeline_state) continue;
 
         if (!pipeline_state->stage_states.empty() && !(pipeline_state->create_flags & VK_PIPELINE_CREATE_LIBRARY_BIT_KHR)) {

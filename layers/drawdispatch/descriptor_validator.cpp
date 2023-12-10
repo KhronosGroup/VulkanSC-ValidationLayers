@@ -161,7 +161,7 @@ bool vvl::DescriptorValidator::ValidateDescriptor(const DescriptorBindingInfo &b
                                     const vvl::ImageDescriptor &image_descriptor) const {
     std::vector<const vvl::Sampler *> sampler_states;
     const VkImageView image_view = image_descriptor.GetImageView();
-    const IMAGE_VIEW_STATE *image_view_state = image_descriptor.GetImageViewState();
+    const vvl::ImageView *image_view_state = image_descriptor.GetImageViewState();
     const auto binding = binding_info.first;
 
     if (image_descriptor.GetClass() == vvl::DescriptorClass::ImageSampler) {
@@ -246,16 +246,19 @@ bool vvl::DescriptorValidator::ValidateDescriptor(const DescriptorBindingInfo &b
         }
 
         if (!(variable.info.image_format_type & image_view_state->descriptor_format_bits)) {
-            const bool signed_override = ((variable.info.image_format_type & NumericTypeUint) && variable.info.is_sign_extended);
-            const bool unsigned_override = ((variable.info.image_format_type & NumericTypeSint) && variable.info.is_zero_extended);
+            const bool signed_override =
+                ((variable.info.image_format_type & spirv::NumericTypeUint) && variable.info.is_sign_extended);
+            const bool unsigned_override =
+                ((variable.info.image_format_type & spirv::NumericTypeSint) && variable.info.is_zero_extended);
             if (!signed_override && !unsigned_override) {
                 auto set = descriptor_set.Handle();
                 const LogObjectList objlist(set, image_view);
                 return dev_state.LogError(vuids.image_view_numeric_format_07753, objlist, loc,
-                                "the descriptor (%s, binding %" PRIu32 ", index %" PRIu32
-                                ") requires %s component type, but bound descriptor format is %s.",
-                                FormatHandle(set).c_str(), binding, index, string_NumericType(variable.info.image_format_type),
-                                string_VkFormat(image_view_ci.format));
+                                          "the descriptor (%s, binding %" PRIu32 ", index %" PRIu32
+                                          ") requires %s component type, but bound descriptor format is %s.",
+                                          FormatHandle(set).c_str(), binding, index,
+                                          spirv::string_NumericType(variable.info.image_format_type),
+                                          string_VkFormat(image_view_ci.format));
             }
         }
 
@@ -407,12 +410,12 @@ bool vvl::DescriptorValidator::ValidateDescriptor(const DescriptorBindingInfo &b
     }
 
     // Verify if attachments are used in DescriptorSet
-    const std::vector<IMAGE_VIEW_STATE *> *attachments = cb_state.active_attachments.get();
-    const std::vector<SUBPASS_INFO> *subpasses = cb_state.active_subpasses.get();
+    const std::vector<vvl::ImageView *> *attachments = cb_state.active_attachments.get();
+    const std::vector<SubpassInfo> *subpasses = cb_state.active_subpasses.get();
     if (attachments && attachments->size() > 0 && subpasses && (descriptor_type != VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT)) {
         for (uint32_t att_index = 0; att_index < attachments->size(); ++att_index) {
             const auto &view_state = (*attachments)[att_index];
-            const SUBPASS_INFO &subpass = (*subpasses)[att_index];
+            const SubpassInfo &subpass = (*subpasses)[att_index];
             if (!view_state || view_state->Destroyed()) {
                 continue;
             }
@@ -847,18 +850,20 @@ bool vvl::DescriptorValidator::ValidateDescriptor(const DescriptorBindingInfo &b
                         "the descriptor (%s, binding %" PRIu32 ", index %" PRIu32 ") is using buffer %s that has been destroyed.",
                         FormatHandle(set).c_str(), binding, index, FormatHandle(buffer).c_str());
     }
-    const auto format_bits = GetFormatType(buffer_view_format);
+    const auto format_bits = spirv::GetFormatType(buffer_view_format);
 
     if (!(variable.info.image_format_type & format_bits)) {
-        const bool signed_override = ((variable.info.image_format_type & NumericTypeUint) && variable.info.is_sign_extended);
-        const bool unsigned_override = ((variable.info.image_format_type & NumericTypeSint) && variable.info.is_zero_extended);
+        const bool signed_override = ((variable.info.image_format_type & spirv::NumericTypeUint) && variable.info.is_sign_extended);
+        const bool unsigned_override =
+            ((variable.info.image_format_type & spirv::NumericTypeSint) && variable.info.is_zero_extended);
         if (!signed_override && !unsigned_override) {
             auto set = descriptor_set.Handle();
             return dev_state.LogError(vuids.descriptor_buffer_bit_set_08114, set, loc,
-                            "the descriptor (%s, binding %" PRIu32 ", index %" PRIu32
-                            ") requires %s component type, but bound descriptor format is %s.",
-                            FormatHandle(set).c_str(), binding, index, string_NumericType(variable.info.image_format_type),
-                            string_VkFormat(buffer_view_format));
+                                      "the descriptor (%s, binding %" PRIu32 ", index %" PRIu32
+                                      ") requires %s component type, but bound descriptor format is %s.",
+                                      FormatHandle(set).c_str(), binding, index,
+                                      spirv::string_NumericType(variable.info.image_format_type),
+                                      string_VkFormat(buffer_view_format));
         }
     }
 

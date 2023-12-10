@@ -31,7 +31,7 @@
 #include "containers/qfo_transfer.h"
 #include "containers/custom_containers.h"
 
-struct SUBPASS_INFO;
+struct SubpassInfo;
 class VIDEO_SESSION_STATE;
 class VIDEO_SESSION_PARAMETERS_STATE;
 class CoreChecks;
@@ -57,7 +57,9 @@ static bool GetMetalExport(const VkEventCreateInfo *info) {
 }
 #endif  // VK_USE_PLATFORM_METAL_EXT
 
-class EVENT_STATE : public BASE_NODE {
+namespace vvl {
+
+class Event : public BASE_NODE {
   public:
     int write_in_use;
 #ifdef VK_USE_PLATFORM_METAL_EXT
@@ -71,7 +73,7 @@ class EVENT_STATE : public BASE_NODE {
     // Queue that signaled this event. It's null if event was signaled from the host
     VkQueue signaling_queue = VK_NULL_HANDLE;
 
-    EVENT_STATE(VkEvent event_, const VkEventCreateInfo *pCreateInfo)
+    Event(VkEvent event_, const VkEventCreateInfo *pCreateInfo)
         : BASE_NODE(event_, kVulkanObjectTypeEvent),
           write_in_use(0),
 #ifdef VK_USE_PLATFORM_METAL_EXT
@@ -83,13 +85,16 @@ class EVENT_STATE : public BASE_NODE {
     VkEvent event() const { return handle_.Cast<VkEvent>(); }
 };
 
+}  // namespace vvl
+
 // Only CoreChecks uses this, but the state tracker stores it.
 constexpr static auto kInvalidLayout = image_layout_map::kInvalidLayout;
 using ImageSubresourceLayoutMap = image_layout_map::ImageSubresourceLayoutMap;
 typedef vvl::unordered_map<VkEvent, VkPipelineStageFlags2KHR> EventToStageMap;
 
+namespace vvl {
 // Track command pools and their command buffers
-class COMMAND_POOL_STATE : public BASE_NODE {
+class CommandPool : public BASE_NODE {
   public:
     ValidationStateTracker *dev_data;
     const VkCommandPoolCreateFlags createFlags;
@@ -97,11 +102,10 @@ class COMMAND_POOL_STATE : public BASE_NODE {
     const VkQueueFlags queue_flags;
     const bool unprotected;  // can't be used for protected memory
     // Cmd buffers allocated from this pool
-    vvl::unordered_map<VkCommandBuffer, CMD_BUFFER_STATE *> commandBuffers;
+    vvl::unordered_map<VkCommandBuffer, CommandBuffer *> commandBuffers;
 
-    COMMAND_POOL_STATE(ValidationStateTracker *dev, VkCommandPool cp, const VkCommandPoolCreateInfo *pCreateInfo,
-                       VkQueueFlags flags);
-    virtual ~COMMAND_POOL_STATE() { Destroy(); }
+    CommandPool(ValidationStateTracker *dev, VkCommandPool cp, const VkCommandPoolCreateInfo *pCreateInfo, VkQueueFlags flags);
+    virtual ~CommandPool() { Destroy(); }
 
     VkCommandPool commandPool() const { return handle_.Cast<VkCommandPool>(); }
 
@@ -111,6 +115,7 @@ class COMMAND_POOL_STATE : public BASE_NODE {
 
     void Destroy() override;
 };
+}  // namespace vvl
 
 enum class CbState {
     New,                // Newly created CB w/o any cmds
@@ -157,12 +162,14 @@ struct CBVertexBufferBindingInfo {
     std::vector<BufferBinding> vertex_buffer_bindings;
 };
 
-typedef vvl::unordered_map<const IMAGE_STATE *, std::shared_ptr<ImageSubresourceLayoutMap>> CommandBufferImageLayoutMap;
+typedef vvl::unordered_map<const vvl::Image *, std::shared_ptr<ImageSubresourceLayoutMap>> CommandBufferImageLayoutMap;
 
 typedef vvl::unordered_map<const GlobalImageLayoutRangeMap *, std::shared_ptr<ImageSubresourceLayoutMap>>
     CommandBufferAliasedLayoutMap;
 
-class CMD_BUFFER_STATE : public REFCOUNTED_NODE {
+namespace vvl {
+
+class CommandBuffer : public REFCOUNTED_NODE {
     using Func = vvl::Func;
 
   public:
@@ -170,7 +177,7 @@ class CMD_BUFFER_STATE : public REFCOUNTED_NODE {
     VkCommandBufferBeginInfo beginInfo;
     VkCommandBufferInheritanceInfo inheritanceInfo;
     // since command buffers can only be destroyed by their command pool, this does not need to be a shared_ptr
-    const COMMAND_POOL_STATE *command_pool;
+    const vvl::CommandPool *command_pool;
     ValidationStateTracker *dev_data;
     bool unprotected;  // can't be used for protected memory
     bool hasRenderPassInstance;
@@ -337,11 +344,11 @@ class CMD_BUFFER_STATE : public REFCOUNTED_NODE {
     //  long-term may want to create caches of "lastBound" states and could have
     //  each individual CMD_NODE referencing its own "lastBound" state
     // Store last bound state for Gfx & Compute pipeline bind points
-    std::array<LAST_BOUND_STATE, BindPoint_Count> lastBound;  // index is LvlBindPoint.
+    std::array<LastBound, BindPoint_Count> lastBound;  // index is LvlBindPoint.
 
     // Use the casting boilerplate from BASE_NODE to implement the derived shared_from_this
-    std::shared_ptr<const CMD_BUFFER_STATE> shared_from_this() const { return SharedFromThisImpl(this); }
-    std::shared_ptr<CMD_BUFFER_STATE> shared_from_this() { return SharedFromThisImpl(this); }
+    std::shared_ptr<const CommandBuffer> shared_from_this() const { return SharedFromThisImpl(this); }
+    std::shared_ptr<CommandBuffer> shared_from_this() { return SharedFromThisImpl(this); }
 
     // If VK_NV_inherited_viewport_scissor is enabled and VkCommandBufferInheritanceViewportScissorInfoNV::viewportScissor2D is
     // true, then is the nonempty list of viewports passed in pViewportDepths. Otherwise, this is empty.
@@ -381,9 +388,9 @@ class CMD_BUFFER_STATE : public REFCOUNTED_NODE {
     uint32_t active_render_pass_device_mask;
     // only when not using dynamic rendering
     safe_VkRenderPassBeginInfo active_render_pass_begin_info;
-    std::shared_ptr<std::vector<SUBPASS_INFO>> active_subpasses;
-    std::shared_ptr<std::vector<IMAGE_VIEW_STATE *>> active_attachments;
-    std::set<std::shared_ptr<IMAGE_VIEW_STATE>> attachments_view_states;
+    std::shared_ptr<std::vector<SubpassInfo>> active_subpasses;
+    std::shared_ptr<std::vector<vvl::ImageView *>> active_attachments;
+    std::set<std::shared_ptr<vvl::ImageView>> attachments_view_states;
 
     VkSubpassContents activeSubpassContents;
     uint32_t GetActiveSubpass() const { return active_subpass_; }
@@ -415,23 +422,23 @@ class CMD_BUFFER_STATE : public REFCOUNTED_NODE {
     bool vertex_buffer_used;  // Track for perf warning to make sure any bound vtx buffer used
     VkCommandBuffer primaryCommandBuffer;
     // If primary, the secondary command buffers we will call.
-    vvl::unordered_set<CMD_BUFFER_STATE *> linkedCommandBuffers;
+    vvl::unordered_set<CommandBuffer *> linkedCommandBuffers;
     // Validation functions run at primary CB queue submit time
     using QueueCallback = std::function<bool(const ValidationStateTracker &device_data, const class vvl::Queue &queue_state,
-                                             const CMD_BUFFER_STATE &cb_state)>;
+                                             const CommandBuffer &cb_state)>;
     std::vector<QueueCallback> queue_submit_functions;
     // Used by some layers to defer actions until vkCmdEndRenderPass time.
     // Layers using this are responsible for inserting the callbacks into queue_submit_functions.
     std::vector<QueueCallback> queue_submit_functions_after_render_pass;
     // Validation functions run when secondary CB is executed in primary
-    std::vector<std::function<bool(const CMD_BUFFER_STATE &secondary, const CMD_BUFFER_STATE *primary, const vvl::Framebuffer *)>>
+    std::vector<std::function<bool(const CommandBuffer &secondary, const CommandBuffer *primary, const vvl::Framebuffer *)>>
         cmd_execute_commands_functions;
 
-    using EventCallback = std::function<bool(CMD_BUFFER_STATE &cb_state, bool do_validate, EventToStageMap &local_event_signal_info,
+    using EventCallback = std::function<bool(CommandBuffer &cb_state, bool do_validate, EventToStageMap &local_event_signal_info,
                                              VkQueue waiting_queue, const Location &loc)>;
     std::vector<EventCallback> eventUpdates;
 
-    std::vector<std::function<bool(CMD_BUFFER_STATE &cb_state, bool do_validate, VkQueryPool &firstPerfQueryPool,
+    std::vector<std::function<bool(CommandBuffer &cb_state, bool do_validate, VkQueryPool &firstPerfQueryPool,
                                    uint32_t perfQueryPass, QueryMap *localQueryToStateMap)>>
         queryUpdates;
     IndexBufferBinding index_buffer_binding;
@@ -463,17 +470,17 @@ class CMD_BUFFER_STATE : public REFCOUNTED_NODE {
     ReadLockGuard ReadLock() const { return ReadLockGuard(lock); }
     WriteLockGuard WriteLock() { return WriteLockGuard(lock); }
 
-    CMD_BUFFER_STATE(ValidationStateTracker *, VkCommandBuffer cb, const VkCommandBufferAllocateInfo *pCreateInfo,
-                     const COMMAND_POOL_STATE *cmd_pool);
+    CommandBuffer(ValidationStateTracker *, VkCommandBuffer cb, const VkCommandBufferAllocateInfo *pCreateInfo,
+                  const vvl::CommandPool *cmd_pool);
 
-    virtual ~CMD_BUFFER_STATE() { Destroy(); }
+    virtual ~CommandBuffer() { Destroy(); }
 
     void Destroy() override;
 
     VkCommandBuffer commandBuffer() const { return handle_.Cast<VkCommandBuffer>(); }
 
-    IMAGE_VIEW_STATE *GetActiveAttachmentImageViewState(uint32_t index);
-    const IMAGE_VIEW_STATE *GetActiveAttachmentImageViewState(uint32_t index) const;
+    vvl::ImageView *GetActiveAttachmentImageViewState(uint32_t index);
+    const vvl::ImageView *GetActiveAttachmentImageViewState(uint32_t index) const;
 
     void AddChild(std::shared_ptr<BASE_NODE> &base_node);
     template <typename StateObject>
@@ -493,10 +500,10 @@ class CMD_BUFFER_STATE : public REFCOUNTED_NODE {
 
     void IncrementResources();
 
-    void ResetPushConstantDataIfIncompatible(const PIPELINE_LAYOUT_STATE *pipeline_layout_state);
+    void ResetPushConstantDataIfIncompatible(const vvl::PipelineLayout *pipeline_layout_state);
 
-    const ImageSubresourceLayoutMap *GetImageSubresourceLayoutMap(const IMAGE_STATE &image_state) const;
-    ImageSubresourceLayoutMap *GetImageSubresourceLayoutMap(const IMAGE_STATE &image_state);
+    const ImageSubresourceLayoutMap *GetImageSubresourceLayoutMap(const vvl::Image &image_state) const;
+    ImageSubresourceLayoutMap *GetImageSubresourceLayoutMap(const vvl::Image &image_state);
     const CommandBufferImageLayoutMap &GetImageSubresourceLayoutMap() const;
 
     const QFOTransferBarrierSets<QFOImageTransferBarrier> &GetQFOBarrierSets(const QFOImageTransferBarrier &type_tag) const {
@@ -511,9 +518,9 @@ class CMD_BUFFER_STATE : public REFCOUNTED_NODE {
     LogObjectList GetObjectList(VkShaderStageFlagBits stage) const;
     LogObjectList GetObjectList(VkPipelineBindPoint pipeline_bind_point) const;
 
-    PIPELINE_STATE *GetCurrentPipeline(VkPipelineBindPoint pipelineBindPoint) const;
-    void GetCurrentPipelineAndDesriptorSets(VkPipelineBindPoint pipelineBindPoint, const PIPELINE_STATE **rtn_pipe,
-                                            const std::vector<LAST_BOUND_STATE::PER_SET> **rtn_sets) const;
+    vvl::Pipeline *GetCurrentPipeline(VkPipelineBindPoint pipelineBindPoint) const;
+    void GetCurrentPipelineAndDesriptorSets(VkPipelineBindPoint pipelineBindPoint, const vvl::Pipeline **rtn_pipe,
+                                            const std::vector<LastBound::PER_SET> **rtn_sets) const;
 
     VkQueueFlags GetQueueFlags() const { return command_pool->queue_flags; }
 
@@ -537,7 +544,7 @@ class CMD_BUFFER_STATE : public REFCOUNTED_NODE {
 
     void BeginRenderPass(Func command, const VkRenderPassBeginInfo *pRenderPassBegin, VkSubpassContents contents);
     void NextSubpass(Func command, VkSubpassContents contents);
-    void UpdateSubpassAttachments(const safe_VkSubpassDescription2 &subpass, std::vector<SUBPASS_INFO> &subpasses);
+    void UpdateSubpassAttachments(const safe_VkSubpassDescription2 &subpass, std::vector<SubpassInfo> &subpasses);
     void EndRenderPass(Func command);
 
     void BeginRendering(Func command, const VkRenderingInfo *pRenderingInfo);
@@ -550,16 +557,16 @@ class CMD_BUFFER_STATE : public REFCOUNTED_NODE {
 
     void ExecuteCommands(vvl::span<const VkCommandBuffer> secondary_command_buffers);
 
-    void UpdateLastBoundDescriptorSets(VkPipelineBindPoint pipeline_bind_point, const PIPELINE_LAYOUT_STATE &pipeline_layout,
+    void UpdateLastBoundDescriptorSets(VkPipelineBindPoint pipeline_bind_point, const vvl::PipelineLayout &pipeline_layout,
                                        uint32_t first_set, uint32_t set_count, const VkDescriptorSet *pDescriptorSets,
-                                       std::shared_ptr<vvl::DescriptorSet> &push_descriptor_set,
-                                       uint32_t dynamic_offset_count, const uint32_t *p_dynamic_offsets);
+                                       std::shared_ptr<vvl::DescriptorSet> &push_descriptor_set, uint32_t dynamic_offset_count,
+                                       const uint32_t *p_dynamic_offsets);
 
-    void UpdateLastBoundDescriptorBuffers(VkPipelineBindPoint pipeline_bind_point, const PIPELINE_LAYOUT_STATE &pipeline_layout,
+    void UpdateLastBoundDescriptorBuffers(VkPipelineBindPoint pipeline_bind_point, const vvl::PipelineLayout &pipeline_layout,
                                           uint32_t first_set, uint32_t set_count, const uint32_t *buffer_indicies,
                                           const VkDeviceSize *buffer_offsets);
 
-    void PushDescriptorSetState(VkPipelineBindPoint pipelineBindPoint, const PIPELINE_LAYOUT_STATE &pipeline_layout, uint32_t set,
+    void PushDescriptorSetState(VkPipelineBindPoint pipelineBindPoint, const vvl::PipelineLayout &pipeline_layout, uint32_t set,
                                 uint32_t descriptorWriteCount, const VkWriteDescriptorSet *pDescriptorWrites);
 
     void UpdateDrawCmd(Func command);
@@ -582,16 +589,16 @@ class CMD_BUFFER_STATE : public REFCOUNTED_NODE {
                         const VkImageMemoryBarrier *pImageMemoryBarriers);
     void RecordBarriers(const VkDependencyInfoKHR &dep_info);
 
-    void SetImageViewLayout(const IMAGE_VIEW_STATE &view_state, VkImageLayout layout, VkImageLayout layoutStencil);
-    void SetImageViewInitialLayout(const IMAGE_VIEW_STATE &view_state, VkImageLayout layout);
+    void SetImageViewLayout(const vvl::ImageView &view_state, VkImageLayout layout, VkImageLayout layoutStencil);
+    void SetImageViewInitialLayout(const vvl::ImageView &view_state, VkImageLayout layout);
 
-    void SetImageLayout(const IMAGE_STATE &image_state, const VkImageSubresourceRange &image_subresource_range,
-                        VkImageLayout layout, VkImageLayout expected_layout = kInvalidLayout);
-    void SetImageLayout(const IMAGE_STATE &image_state, const VkImageSubresourceLayers &image_subresource_layers,
+    void SetImageLayout(const vvl::Image &image_state, const VkImageSubresourceRange &image_subresource_range, VkImageLayout layout,
+                        VkImageLayout expected_layout = kInvalidLayout);
+    void SetImageLayout(const vvl::Image &image_state, const VkImageSubresourceLayers &image_subresource_layers,
                         VkImageLayout layout);
     void SetImageInitialLayout(VkImage image, const VkImageSubresourceRange &range, VkImageLayout layout);
-    void SetImageInitialLayout(const IMAGE_STATE &image_state, const VkImageSubresourceRange &range, VkImageLayout layout);
-    void SetImageInitialLayout(const IMAGE_STATE &image_state, const VkImageSubresourceLayers &layers, VkImageLayout layout);
+    void SetImageInitialLayout(const vvl::Image &image_state, const VkImageSubresourceRange &range, VkImageLayout layout);
+    void SetImageInitialLayout(const vvl::Image &image_state, const VkImageSubresourceLayers &layers, VkImageLayout layout);
 
     void Submit(VkQueue queue, uint32_t perf_submit_pass, const Location &loc);
     void Retire(uint32_t perf_submit_pass, const std::function<bool(const QueryObject &)> &is_query_updated_after);
@@ -660,10 +667,10 @@ class CMD_BUFFER_STATE : public REFCOUNTED_NODE {
         return false;
     }
 
-    inline void BindPipeline(LvlBindPoint bind_point, PIPELINE_STATE *pipe_state) {
+    inline void BindPipeline(LvlBindPoint bind_point, vvl::Pipeline *pipe_state) {
         lastBound[bind_point].pipeline_state = pipe_state;
     }
-    void BindShader(VkShaderStageFlagBits shader_stage, SHADER_OBJECT_STATE *shader_object_state) {
+    void BindShader(VkShaderStageFlagBits shader_stage, vvl::ShaderObject *shader_object_state) {
         auto &lastBoundState = lastBound[ConvertToPipelineBindPoint(shader_stage)];
         const auto stage_index = static_cast<uint32_t>(ConvertToShaderObjectStage(shader_stage));
         lastBoundState.shader_object_bound[stage_index] = true;
@@ -694,26 +701,28 @@ class CMD_BUFFER_STATE : public REFCOUNTED_NODE {
 
 // specializations for barriers that cannot do queue family ownership transfers
 template <>
-inline bool CMD_BUFFER_STATE::IsReleaseOp(const sync_utils::MemoryBarrier &barrier) const {
+inline bool CommandBuffer::IsReleaseOp(const sync_utils::MemoryBarrier &barrier) const {
     return false;
 }
 template <>
-inline bool CMD_BUFFER_STATE::IsReleaseOp(const VkMemoryBarrier &barrier) const {
+inline bool CommandBuffer::IsReleaseOp(const VkMemoryBarrier &barrier) const {
     return false;
 }
 template <>
-inline bool CMD_BUFFER_STATE::IsReleaseOp(const VkMemoryBarrier2KHR &barrier) const {
+inline bool CommandBuffer::IsReleaseOp(const VkMemoryBarrier2KHR &barrier) const {
     return false;
 }
 template <>
-inline bool CMD_BUFFER_STATE::IsAcquireOp(const sync_utils::MemoryBarrier &barrier) const {
+inline bool CommandBuffer::IsAcquireOp(const sync_utils::MemoryBarrier &barrier) const {
     return false;
 }
 template <>
-inline bool CMD_BUFFER_STATE::IsAcquireOp(const VkMemoryBarrier &barrier) const {
+inline bool CommandBuffer::IsAcquireOp(const VkMemoryBarrier &barrier) const {
     return false;
 }
 template <>
-inline bool CMD_BUFFER_STATE::IsAcquireOp(const VkMemoryBarrier2KHR &barrier) const {
+inline bool CommandBuffer::IsAcquireOp(const VkMemoryBarrier2KHR &barrier) const {
     return false;
 }
+
+}  // namespace vvl

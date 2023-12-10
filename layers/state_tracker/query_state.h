@@ -32,10 +32,12 @@ enum QueryState {
     QUERYSTATE_AVAILABLE,  // Results available.
 };
 
-class QUERY_POOL_STATE : public BASE_NODE {
+namespace vvl {
+
+class QueryPool : public BASE_NODE {
   public:
-    QUERY_POOL_STATE(VkQueryPool qp, const VkQueryPoolCreateInfo *pCreateInfo, uint32_t index_count, uint32_t n_perf_pass,
-                     bool has_cb, bool has_rb, std::shared_ptr<const VideoProfileDesc> &&supp_video_profile)
+    QueryPool(VkQueryPool qp, const VkQueryPoolCreateInfo *pCreateInfo, uint32_t index_count, uint32_t n_perf_pass, bool has_cb,
+              bool has_rb, std::shared_ptr<const VideoProfileDesc> &&supp_video_profile)
         : BASE_NODE(qp, kVulkanObjectTypeQueryPool),
           createInfo(*pCreateInfo),
           has_perf_scope_command_buffer(has_cb),
@@ -92,6 +94,7 @@ class QUERY_POOL_STATE : public BASE_NODE {
     std::vector<small_vector<QueryState, 1, uint32_t>> query_states_;
     mutable std::shared_mutex lock_;
 };
+}  // namespace vvl
 
 struct QueryObject {
     VkQueryPool pool;
@@ -121,7 +124,7 @@ struct QueryObject {
           indexed(indexed_),
           end_command_index(0) {}
 
-    // This is needed because CMD_BUFFER_STATE::BeginQuery() and EndQuery() need to make a copy to update
+    // This is needed because vvl::CommandBuffer::BeginQuery() and EndQuery() need to make a copy to update
     QueryObject(const QueryObject &obj, uint32_t perf_pass_)
         : pool(obj.pool),
           slot(obj.slot),

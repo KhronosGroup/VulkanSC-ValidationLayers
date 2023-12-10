@@ -177,7 +177,7 @@ bool BestPractices::PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPi
                 auto rpci = rp_state->createInfo.ptr();
                 auto subpass = pipeline.Subpass();
                 for (const auto& variable : stage.entrypoint->resource_interface_variables) {
-                    if (!variable.decorations.Has(DecorationSet::input_attachment_bit)) {
+                    if (!variable.decorations.Has(spirv::DecorationSet::input_attachment_bit)) {
                         continue;
                     }
                     auto slot = variable.decorations.input_attachment_index_start;
@@ -253,16 +253,16 @@ static std::vector<bp_state::AttachmentInfo> GetAttachmentAccess(bp_state::Pipel
 }
 
 bp_state::Pipeline::Pipeline(const ValidationStateTracker* state_data, const VkGraphicsPipelineCreateInfo* pCreateInfo,
-                             std::shared_ptr<const vvl::RenderPass>&& rpstate,
-                             std::shared_ptr<const PIPELINE_LAYOUT_STATE>&& layout, CreateShaderModuleStates* csm_states)
-    : PIPELINE_STATE(state_data, pCreateInfo, std::move(rpstate), std::move(layout), csm_states),
+                             std::shared_ptr<const vvl::RenderPass>&& rpstate, std::shared_ptr<const vvl::PipelineLayout>&& layout,
+                             CreateShaderModuleStates* csm_states)
+    : vvl::Pipeline(state_data, pCreateInfo, std::move(rpstate), std::move(layout), csm_states),
       access_framebuffer_attachments(GetAttachmentAccess(*this)) {}
 
-std::shared_ptr<PIPELINE_STATE> BestPractices::CreateGraphicsPipelineState(const VkGraphicsPipelineCreateInfo* pCreateInfo,
-                                                                           std::shared_ptr<const vvl::RenderPass>&& render_pass,
-                                                                           std::shared_ptr<const PIPELINE_LAYOUT_STATE>&& layout,
-                                                                           CreateShaderModuleStates* csm_states) const {
-    return std::static_pointer_cast<PIPELINE_STATE>(
+std::shared_ptr<vvl::Pipeline> BestPractices::CreateGraphicsPipelineState(const VkGraphicsPipelineCreateInfo* pCreateInfo,
+                                                                          std::shared_ptr<const vvl::RenderPass>&& render_pass,
+                                                                          std::shared_ptr<const vvl::PipelineLayout>&& layout,
+                                                                          CreateShaderModuleStates* csm_states) const {
+    return std::static_pointer_cast<vvl::Pipeline>(
         std::make_shared<bp_state::Pipeline>(this, pCreateInfo, std::move(render_pass), std::move(layout), csm_states));
 }
 
@@ -311,7 +311,7 @@ bool BestPractices::PreCallValidateCreateComputePipelines(VkDevice device, VkPip
         }
 
         if (IsExtEnabled(device_extensions.vk_khr_maintenance4)) {
-            auto module_state = Get<SHADER_MODULE_STATE>(createInfo.stage.module);
+            auto module_state = Get<vvl::ShaderModule>(createInfo.stage.module);
             if (module_state &&
                 module_state->spirv->static_data_.has_builtin_workgroup_size) {  // No module if creating from module identifier
                 skip |= LogWarning(kVUID_BestPractices_SpirvDeprecated_WorkgroupSize, device, create_info_loc,
@@ -327,7 +327,7 @@ bool BestPractices::PreCallValidateCreateComputePipelines(VkDevice device, VkPip
 bool BestPractices::ValidateCreateComputePipelineArm(const VkComputePipelineCreateInfo& createInfo,
                                                      const Location& create_info_loc) const {
     bool skip = false;
-    auto module_state = Get<SHADER_MODULE_STATE>(createInfo.stage.module);
+    auto module_state = Get<vvl::ShaderModule>(createInfo.stage.module);
     if (!module_state || !module_state->spirv) {
         return false;  // No module if creating from module identifier
     }
@@ -398,7 +398,7 @@ bool BestPractices::ValidateCreateComputePipelineArm(const VkComputePipelineCrea
 bool BestPractices::ValidateCreateComputePipelineAmd(const VkComputePipelineCreateInfo& createInfo,
                                                      const Location& create_info_loc) const {
     bool skip = false;
-    auto module_state = Get<SHADER_MODULE_STATE>(createInfo.stage.module);
+    auto module_state = Get<vvl::ShaderModule>(createInfo.stage.module);
     if (!module_state || !module_state->spirv) {
         return false;
     }
@@ -432,7 +432,7 @@ void BestPractices::PreCallRecordCmdBindPipeline(VkCommandBuffer commandBuffer, 
                                                  VkPipeline pipeline, const RecordObject& record_obj) {
     StateTracker::PreCallRecordCmdBindPipeline(commandBuffer, pipelineBindPoint, pipeline, record_obj);
 
-    auto pipeline_info = Get<PIPELINE_STATE>(pipeline);
+    auto pipeline_info = Get<vvl::Pipeline>(pipeline);
     auto cb = GetWrite<bp_state::CommandBuffer>(commandBuffer);
 
     assert(pipeline_info);

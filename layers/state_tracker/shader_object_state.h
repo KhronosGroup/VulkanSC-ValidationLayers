@@ -26,15 +26,16 @@
 #include "utils/shader_utils.h"
 #include "descriptor_sets.h"
 
+namespace vvl {
 // Represents a VkShaderEXT (VK_EXT_shader_object) handle
-struct SHADER_OBJECT_STATE : public BASE_NODE {
-    SHADER_OBJECT_STATE(ValidationStateTracker *dev_data, const VkShaderCreateInfoEXT &create_info, VkShaderEXT shader_object,
-                        std::shared_ptr<SPIRV_MODULE_STATE> &spirv_module, uint32_t createInfoCount, VkShaderEXT *pShaders,
-                        uint32_t unique_shader_id = 0);
+struct ShaderObject : public BASE_NODE {
+    ShaderObject(ValidationStateTracker *dev_data, const VkShaderCreateInfoEXT &create_info, VkShaderEXT shader_object,
+                 std::shared_ptr<spirv::Module> &spirv_module, uint32_t createInfoCount, VkShaderEXT *pShaders,
+                 uint32_t unique_shader_id = 0);
 
     const safe_VkShaderCreateInfoEXT create_info;
-    std::shared_ptr<const SPIRV_MODULE_STATE> spirv;
-    std::shared_ptr<const EntryPoint> entrypoint;
+    std::shared_ptr<const spirv::Module> spirv;
+    std::shared_ptr<const spirv::EntryPoint> entrypoint;
     std::vector<VkShaderEXT> linked_shaders;
 
     // Used as way to match instrumented GPU-AV shader to a VkShaderEXT handle
@@ -55,3 +56,4 @@ struct SHADER_OBJECT_STATE : public BASE_NODE {
     bool IsGraphicsShaderState() const { return create_info.stage != VK_SHADER_STAGE_COMPUTE_BIT; };
     VkPrimitiveTopology GetTopology() const;
 };
+}  // namespace vvl

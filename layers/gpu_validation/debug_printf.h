@@ -63,8 +63,7 @@ class CommandBuffer : public gpu_tracker::CommandBuffer {
   public:
     std::vector<BufferInfo> buffer_infos;
 
-    CommandBuffer(Validator* dp, VkCommandBuffer cb, const VkCommandBufferAllocateInfo* create_info,
-                  const COMMAND_POOL_STATE* pool);
+    CommandBuffer(Validator* dp, VkCommandBuffer cb, const VkCommandBufferAllocateInfo* create_info, const vvl::CommandPool* pool);
     ~CommandBuffer();
 
     bool NeedsProcessing() const final { return !buffer_infos.empty(); }
@@ -78,7 +77,7 @@ class CommandBuffer : public gpu_tracker::CommandBuffer {
 };
 }  // namespace debug_printf
 
-VALSTATETRACK_DERIVED_STATE_OBJECT(VkCommandBuffer, debug_printf::CommandBuffer, CMD_BUFFER_STATE)
+VALSTATETRACK_DERIVED_STATE_OBJECT(VkCommandBuffer, debug_printf::CommandBuffer, vvl::CommandBuffer)
 
 namespace debug_printf {
 class Validator : public gpu_tracker::Validator {
@@ -182,8 +181,8 @@ class Validator : public gpu_tracker::Validator {
                                                const RecordObject& record_obj) override;
     void AllocateDebugPrintfResources(const VkCommandBuffer cmd_buffer, const VkPipelineBindPoint bind_point);
 
-    std::shared_ptr<CMD_BUFFER_STATE> CreateCmdBufferState(VkCommandBuffer cb, const VkCommandBufferAllocateInfo* create_info,
-                                                           const COMMAND_POOL_STATE* pool) final;
+    std::shared_ptr<vvl::CommandBuffer> CreateCmdBufferState(VkCommandBuffer cb, const VkCommandBufferAllocateInfo* create_info,
+                                                             const vvl::CommandPool* pool) final;
 
     void DestroyBuffer(BufferInfo& buffer_info);
 

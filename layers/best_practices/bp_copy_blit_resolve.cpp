@@ -56,7 +56,7 @@ void BestPractices::PreCallRecordCmdClearAttachments(VkCommandBuffer commandBuff
                     clear_attachment.colorAttachment != VK_ATTACHMENT_UNUSED && pColorAttachments) {
                     const auto& attachment = pColorAttachments[clear_attachment.colorAttachment];
                     if (attachment.imageView) {
-                        auto image_view_state = Get<IMAGE_VIEW_STATE>(attachment.imageView);
+                        auto image_view_state = Get<vvl::ImageView>(attachment.imageView);
                         const VkFormat format = image_view_state->create_info.format;
                         RecordClearColor(format, clear_attachment.clearValue.color);
                     }
@@ -221,7 +221,7 @@ bool BestPractices::PreCallValidateCmdClearAttachments(VkCommandBuffer commandBu
                     if ((attachment.aspectMask & VK_IMAGE_ASPECT_COLOR_BIT) && attachment.colorAttachment != VK_ATTACHMENT_UNUSED) {
                         const auto& color_attachment = pColorAttachments[attachment.colorAttachment];
                         if (color_attachment.imageView) {
-                            auto image_view_state = Get<IMAGE_VIEW_STATE>(color_attachment.imageView);
+                            auto image_view_state = Get<vvl::ImageView>(color_attachment.imageView);
                             const VkFormat format = image_view_state->create_info.format;
                             skip |= ValidateClearColor(commandBuffer, format, attachment.clearValue.color, error_obj.location);
                         }
@@ -323,8 +323,8 @@ bool BestPractices::PreCallValidateCmdClearAttachments(VkCommandBuffer commandBu
 bool BestPractices::ValidateCmdResolveImage(VkCommandBuffer command_buffer, VkImage src_image, VkImage dst_image,
                                             const Location& loc) const {
     bool skip = false;
-    auto src_image_type = Get<IMAGE_STATE>(src_image)->createInfo.imageType;
-    auto dst_image_type = Get<IMAGE_STATE>(dst_image)->createInfo.imageType;
+    auto src_image_type = Get<vvl::Image>(src_image)->createInfo.imageType;
+    auto dst_image_type = Get<vvl::Image>(dst_image)->createInfo.imageType;
 
     if (src_image_type != dst_image_type) {
         skip |= LogPerformanceWarning(kVUID_BestPractices_DrawState_MismatchedImageType, command_buffer, loc,
@@ -589,8 +589,8 @@ bool BestPractices::PreCallValidateCmdCopyImage(VkCommandBuffer commandBuffer, V
     dst_image_hex << "0x" << std::hex << HandleToUint64(dstImage);
 
     if (VendorCheckEnabled(kBPVendorAMD)) {
-        auto src_state = Get<IMAGE_STATE>(srcImage);
-        auto dst_state = Get<IMAGE_STATE>(dstImage);
+        auto src_state = Get<vvl::Image>(srcImage);
+        auto dst_state = Get<vvl::Image>(dstImage);
 
         if (src_state && dst_state) {
             VkImageTiling src_Tiling = src_state->createInfo.tiling;

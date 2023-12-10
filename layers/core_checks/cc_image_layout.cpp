@@ -65,7 +65,7 @@ struct LayoutUseCheckAndMessage {
 };
 
 template <typename RangeFactory>
-bool CoreChecks::VerifyImageLayoutRange(const CMD_BUFFER_STATE &cb_state, const IMAGE_STATE &image_state,
+bool CoreChecks::VerifyImageLayoutRange(const vvl::CommandBuffer &cb_state, const vvl::Image &image_state,
                                         VkImageAspectFlags aspect_mask, VkImageLayout explicit_layout,
                                         const RangeFactory &range_factory, const Location &loc, const char *mismatch_layout_vuid,
                                         bool *error) const {
@@ -96,7 +96,7 @@ bool CoreChecks::VerifyImageLayoutRange(const CMD_BUFFER_STATE &cb_state, const 
     return skip;
 }
 
-bool CoreChecks::VerifyImageLayoutSubresource(const CMD_BUFFER_STATE &cb_state, const IMAGE_STATE &image_state,
+bool CoreChecks::VerifyImageLayoutSubresource(const vvl::CommandBuffer &cb_state, const vvl::Image &image_state,
                                               const VkImageSubresourceLayers &subresource_layers, VkImageLayout explicit_layout,
                                               VkImageLayout optimal_layout, const Location &loc, const char *invalid_layout_vuid,
                                               const char *mismatch_layout_vuid) const {
@@ -140,7 +140,7 @@ bool CoreChecks::VerifyImageLayoutSubresource(const CMD_BUFFER_STATE &cb_state, 
     return skip;
 }
 
-bool CoreChecks::VerifyImageLayout(const CMD_BUFFER_STATE &cb_state, const IMAGE_VIEW_STATE &image_view_state,
+bool CoreChecks::VerifyImageLayout(const vvl::CommandBuffer &cb_state, const vvl::ImageView &image_view_state,
                                    VkImageLayout explicit_layout, const Location &loc, const char *mismatch_layout_vuid,
                                    bool *error) const {
     if (disabled[image_layout_validation]) return false;
@@ -153,7 +153,7 @@ bool CoreChecks::VerifyImageLayout(const CMD_BUFFER_STATE &cb_state, const IMAGE
                                   explicit_layout, range_factory, loc, mismatch_layout_vuid, error);
 }
 
-bool CoreChecks::VerifyImageLayout(const CMD_BUFFER_STATE &cb_state, const IMAGE_STATE &image_state,
+bool CoreChecks::VerifyImageLayout(const vvl::CommandBuffer &cb_state, const vvl::Image &image_state,
                                    const VkImageSubresourceRange &range, VkImageLayout explicit_layout, const Location &loc,
                                    const char *mismatch_layout_vuid, bool *error) const {
     if (disabled[image_layout_validation]) return false;
@@ -164,7 +164,7 @@ bool CoreChecks::VerifyImageLayout(const CMD_BUFFER_STATE &cb_state, const IMAGE
                                   mismatch_layout_vuid, error);
 }
 
-void CoreChecks::TransitionFinalSubpassLayouts(CMD_BUFFER_STATE *cb_state) {
+void CoreChecks::TransitionFinalSubpassLayouts(vvl::CommandBuffer *cb_state) {
     auto render_pass_state = cb_state->activeRenderPass.get();
     auto framebuffer_state = cb_state->activeFramebuffer.get();
     if (!render_pass_state || !framebuffer_state) {
@@ -186,7 +186,7 @@ void CoreChecks::TransitionFinalSubpassLayouts(CMD_BUFFER_STATE *cb_state) {
     }
 }
 
-static GlobalImageLayoutRangeMap *GetLayoutRangeMap(GlobalImageLayoutMap &map, const IMAGE_STATE &image_state) {
+static GlobalImageLayoutRangeMap *GetLayoutRangeMap(GlobalImageLayoutMap &map, const vvl::Image &image_state) {
     // This approach allows for a single hash lookup or/create new
     auto &layout_map = map[&image_state];
     if (!layout_map) {
@@ -215,7 +215,7 @@ struct GlobalLayoutUpdater {
 };
 
 // This validates that the initial layout specified in the command buffer for the IMAGE is the same as the global IMAGE layout
-bool CoreChecks::ValidateCmdBufImageLayouts(const Location &loc, const CMD_BUFFER_STATE &cb_state,
+bool CoreChecks::ValidateCmdBufImageLayouts(const Location &loc, const vvl::CommandBuffer &cb_state,
                                             GlobalImageLayoutMap &overlayLayoutMap) const {
     if (disabled[image_layout_validation]) return false;
     bool skip = false;
@@ -291,7 +291,7 @@ bool CoreChecks::ValidateCmdBufImageLayouts(const Location &loc, const CMD_BUFFE
     return skip;
 }
 
-void CoreChecks::UpdateCmdBufImageLayouts(const CMD_BUFFER_STATE &cb_state) {
+void CoreChecks::UpdateCmdBufImageLayouts(const vvl::CommandBuffer &cb_state) {
     for (const auto &layout_map_entry : cb_state.image_layout_map) {
         const auto *image_state = layout_map_entry.first;
         const auto &subres_map = layout_map_entry.second;
@@ -357,7 +357,7 @@ bool CoreChecks::ValidateLayoutVsAttachmentDescription(const VkImageLayout first
 }
 
 bool CoreChecks::ValidateMultipassRenderedToSingleSampledSampleCount(VkFramebuffer framebuffer, VkRenderPass renderpass,
-                                                                     IMAGE_STATE *image_state, VkSampleCountFlagBits msrtss_samples,
+                                                                     vvl::Image *image_state, VkSampleCountFlagBits msrtss_samples,
                                                                      const Location &rasterization_samples_loc) const {
     bool skip = false;
     const auto image_create_info = image_state->createInfo;
@@ -382,8 +382,7 @@ bool CoreChecks::ValidateMultipassRenderedToSingleSampledSampleCount(VkFramebuff
     return skip;
 }
 
-bool CoreChecks::ValidateRenderPassLayoutAgainstFramebufferImageUsage(VkImageLayout layout,
-                                                                      const IMAGE_VIEW_STATE &image_view_state,
+bool CoreChecks::ValidateRenderPassLayoutAgainstFramebufferImageUsage(VkImageLayout layout, const vvl::ImageView &image_view_state,
                                                                       VkFramebuffer framebuffer, VkRenderPass renderpass,
                                                                       uint32_t attachment_index, const Location &rp_loc,
                                                                       const Location &attachment_reference_loc) const {
@@ -458,7 +457,7 @@ bool CoreChecks::ValidateRenderPassLayoutAgainstFramebufferImageUsage(VkImageLay
 }
 
 bool CoreChecks::ValidateRenderPassStencilLayoutAgainstFramebufferImageUsage(VkImageLayout layout,
-                                                                             const IMAGE_VIEW_STATE &image_view_state,
+                                                                             const vvl::ImageView &image_view_state,
                                                                              VkFramebuffer framebuffer, VkRenderPass renderpass,
                                                                              const Location &layout_loc) const {
     bool skip = false;
@@ -490,7 +489,7 @@ bool CoreChecks::ValidateRenderPassStencilLayoutAgainstFramebufferImageUsage(VkI
     return skip;
 }
 
-bool CoreChecks::VerifyFramebufferAndRenderPassLayouts(const CMD_BUFFER_STATE &cb_state,
+bool CoreChecks::VerifyFramebufferAndRenderPassLayouts(const vvl::CommandBuffer &cb_state,
                                                        const VkRenderPassBeginInfo *pRenderPassBegin,
                                                        const vvl::Framebuffer &framebuffer_state,
                                                        const Location &rp_begin_loc) const {
@@ -528,7 +527,7 @@ bool CoreChecks::VerifyFramebufferAndRenderPassLayouts(const CMD_BUFFER_STATE &c
     for (uint32_t i = 0; i < render_pass_info->attachmentCount && i < framebuffer_info.attachmentCount; ++i) {
         const Location attachment_loc = rp_create_info.dot(Field::pAttachments, i);
         auto image_view = attachments[i];
-        auto view_state = Get<IMAGE_VIEW_STATE>(image_view);
+        auto view_state = Get<vvl::ImageView>(image_view);
 
         if (!view_state) {
             const LogObjectList objlist(pRenderPassBegin->renderPass, framebuffer_state.framebuffer(), image_view);
@@ -647,7 +646,7 @@ bool CoreChecks::VerifyFramebufferAndRenderPassLayouts(const CMD_BUFFER_STATE &c
             if (attachment_ref.attachment != VK_ATTACHMENT_UNUSED) {
                 const Location input_loc = subpass_loc.dot(Field::pInputAttachments, k);
                 auto image_view = attachments[attachment_ref.attachment];
-                auto view_state = Get<IMAGE_VIEW_STATE>(image_view);
+                auto view_state = Get<vvl::ImageView>(image_view);
 
                 if (view_state) {
                     skip |= ValidateRenderPassLayoutAgainstFramebufferImageUsage(attachment_ref.layout, *view_state, framebuffer,
@@ -670,7 +669,7 @@ bool CoreChecks::VerifyFramebufferAndRenderPassLayouts(const CMD_BUFFER_STATE &c
             if (attachment_ref.attachment != VK_ATTACHMENT_UNUSED) {
                 const Location color_loc = subpass_loc.dot(Field::pColorAttachments, k);
                 auto image_view = attachments[attachment_ref.attachment];
-                auto view_state = Get<IMAGE_VIEW_STATE>(image_view);
+                auto view_state = Get<vvl::ImageView>(image_view);
 
                 if (view_state) {
                     skip |= ValidateRenderPassLayoutAgainstFramebufferImageUsage(attachment_ref.layout, *view_state, framebuffer,
@@ -698,7 +697,7 @@ bool CoreChecks::VerifyFramebufferAndRenderPassLayouts(const CMD_BUFFER_STATE &c
             if (attachment_ref.attachment != VK_ATTACHMENT_UNUSED) {
                 const Location ds_loc = subpass_loc.dot(Field::pDepthStencilAttachment);
                 auto image_view = attachments[attachment_ref.attachment];
-                auto view_state = Get<IMAGE_VIEW_STATE>(image_view);
+                auto view_state = Get<vvl::ImageView>(image_view);
 
                 if (view_state) {
                     skip |= ValidateRenderPassLayoutAgainstFramebufferImageUsage(attachment_ref.layout, *view_state, framebuffer,
@@ -726,9 +725,9 @@ bool CoreChecks::VerifyFramebufferAndRenderPassLayouts(const CMD_BUFFER_STATE &c
     return skip;
 }
 
-void CoreChecks::TransitionAttachmentRefLayout(CMD_BUFFER_STATE *cb_state, const safe_VkAttachmentReference2 &ref) {
+void CoreChecks::TransitionAttachmentRefLayout(vvl::CommandBuffer *cb_state, const safe_VkAttachmentReference2 &ref) {
     if (ref.attachment != VK_ATTACHMENT_UNUSED) {
-        IMAGE_VIEW_STATE *image_view = cb_state->GetActiveAttachmentImageViewState(ref.attachment);
+        vvl::ImageView *image_view = cb_state->GetActiveAttachmentImageViewState(ref.attachment);
         if (image_view) {
             VkImageLayout stencil_layout = kInvalidLayout;
             const auto *attachment_reference_stencil_layout = vku::FindStructInPNextChain<VkAttachmentReferenceStencilLayout>(ref.pNext);
@@ -741,7 +740,7 @@ void CoreChecks::TransitionAttachmentRefLayout(CMD_BUFFER_STATE *cb_state, const
     }
 }
 
-void CoreChecks::TransitionSubpassLayouts(CMD_BUFFER_STATE *cb_state, const vvl::RenderPass &render_pass_state,
+void CoreChecks::TransitionSubpassLayouts(vvl::CommandBuffer *cb_state, const vvl::RenderPass &render_pass_state,
                                           const int subpass_index) {
     auto const &subpass = render_pass_state.createInfo.pSubpasses[subpass_index];
     for (uint32_t j = 0; j < subpass.inputAttachmentCount; ++j) {
@@ -758,13 +757,13 @@ void CoreChecks::TransitionSubpassLayouts(CMD_BUFFER_STATE *cb_state, const vvl:
 // Transition the layout state for renderpass attachments based on the BeginRenderPass() call. This includes:
 // 1. Transition into initialLayout state
 // 2. Transition from initialLayout to layout used in subpass 0
-void CoreChecks::TransitionBeginRenderPassLayouts(CMD_BUFFER_STATE *cb_state, const vvl::RenderPass &render_pass_state) {
+void CoreChecks::TransitionBeginRenderPassLayouts(vvl::CommandBuffer *cb_state, const vvl::RenderPass &render_pass_state) {
     // First record expected initialLayout as a potential initial layout usage.
     auto const rpci = render_pass_state.createInfo.ptr();
     for (uint32_t i = 0; i < rpci->attachmentCount; ++i) {
         auto *view_state = cb_state->GetActiveAttachmentImageViewState(i);
         if (view_state) {
-            IMAGE_STATE *image_state = view_state->image_state.get();
+            vvl::Image *image_state = view_state->image_state.get();
             const auto initial_layout = rpci->pAttachments[i].initialLayout;
             const auto *attachment_description_stencil_layout =
                 vku::FindStructInPNextChain<VkAttachmentDescriptionStencilLayout>(rpci->pAttachments[i].pNext);
@@ -793,7 +792,7 @@ void CoreChecks::TransitionBeginRenderPassLayouts(CMD_BUFFER_STATE *cb_state, co
     TransitionSubpassLayouts(cb_state, render_pass_state, 0);
 }
 
-bool CoreChecks::VerifyClearImageLayout(const CMD_BUFFER_STATE &cb_state, const IMAGE_STATE &image_state,
+bool CoreChecks::VerifyClearImageLayout(const vvl::CommandBuffer &cb_state, const vvl::Image &image_state,
                                         const VkImageSubresourceRange &range, VkImageLayout dest_image_layout,
                                         const Location &loc) const {
     bool skip = false;
@@ -842,11 +841,11 @@ bool CoreChecks::VerifyClearImageLayout(const CMD_BUFFER_STATE &cb_state, const 
     return skip;
 }
 
-bool CoreChecks::UpdateCommandBufferImageLayoutMap(const CMD_BUFFER_STATE *cb_state, const Location &image_loc,
+bool CoreChecks::UpdateCommandBufferImageLayoutMap(const vvl::CommandBuffer *cb_state, const Location &image_loc,
                                                    const ImageBarrier &img_barrier, const CommandBufferImageLayoutMap &current_map,
                                                    CommandBufferImageLayoutMap &layout_updates) const {
     bool skip = false;
-    auto image_state = Get<IMAGE_STATE>(img_barrier.image);
+    auto image_state = Get<vvl::Image>(img_barrier.image);
     auto &write_subresource_map = layout_updates[image_state.get()];
     bool new_write = false;
     if (!write_subresource_map) {
@@ -892,7 +891,7 @@ bool CoreChecks::UpdateCommandBufferImageLayoutMap(const CMD_BUFFER_STATE *cb_st
     return skip;
 }
 
-bool CoreChecks::FindLayouts(const IMAGE_STATE &image_state, std::vector<VkImageLayout> &layouts) const {
+bool CoreChecks::FindLayouts(const vvl::Image &image_state, std::vector<VkImageLayout> &layouts) const {
     const auto *layout_range_map = image_state.layout_range_map.get();
     if (!layout_range_map) return false;
 
@@ -913,13 +912,13 @@ bool CoreChecks::FindLayouts(const IMAGE_STATE &image_state, std::vector<VkImage
     return true;
 }
 
-void CoreChecks::RecordTransitionImageLayout(CMD_BUFFER_STATE *cb_state, const ImageBarrier &mem_barrier) {
+void CoreChecks::RecordTransitionImageLayout(vvl::CommandBuffer *cb_state, const ImageBarrier &mem_barrier) {
     if (enabled_features.synchronization2) {
         if (mem_barrier.oldLayout == mem_barrier.newLayout) {
             return;
         }
     }
-    auto image_state = Get<IMAGE_STATE>(mem_barrier.image);
+    auto image_state = Get<vvl::Image>(mem_barrier.image);
     if (!image_state) {
         return;
     }
@@ -949,7 +948,7 @@ void CoreChecks::RecordTransitionImageLayout(CMD_BUFFER_STATE *cb_state, const I
     }
 }
 
-void CoreChecks::TransitionImageLayouts(CMD_BUFFER_STATE *cb_state, uint32_t barrier_count,
+void CoreChecks::TransitionImageLayouts(vvl::CommandBuffer *cb_state, uint32_t barrier_count,
                                         const VkImageMemoryBarrier2 *image_barriers) {
     for (uint32_t i = 0; i < barrier_count; i++) {
         const ImageBarrier barrier(image_barriers[i]);
@@ -957,7 +956,7 @@ void CoreChecks::TransitionImageLayouts(CMD_BUFFER_STATE *cb_state, uint32_t bar
     }
 }
 
-void CoreChecks::TransitionImageLayouts(CMD_BUFFER_STATE *cb_state, uint32_t barrier_count,
+void CoreChecks::TransitionImageLayouts(vvl::CommandBuffer *cb_state, uint32_t barrier_count,
                                         const VkImageMemoryBarrier *image_barriers, VkPipelineStageFlags src_stage_mask,
                                         VkPipelineStageFlags dst_stage_mask) {
     for (uint32_t i = 0; i < barrier_count; i++) {
@@ -966,7 +965,7 @@ void CoreChecks::TransitionImageLayouts(CMD_BUFFER_STATE *cb_state, uint32_t bar
     }
 }
 
-bool CoreChecks::IsCompliantSubresourceRange(const VkImageSubresourceRange &subres_range, const IMAGE_STATE &image_state) const {
+bool CoreChecks::IsCompliantSubresourceRange(const VkImageSubresourceRange &subres_range, const vvl::Image &image_state) const {
     if (!(subres_range.layerCount) || !(subres_range.levelCount)) return false;
     if (subres_range.baseMipLevel + subres_range.levelCount > image_state.createInfo.mipLevels) return false;
     if ((subres_range.baseArrayLayer + subres_range.layerCount) > image_state.createInfo.arrayLayers) {
@@ -988,7 +987,7 @@ bool CoreChecks::IsCompliantSubresourceRange(const VkImageSubresourceRange &subr
 
 bool CoreChecks::ValidateHostCopyCurrentLayout(VkDevice device, const VkImageLayout expected_layout,
                                                const VkImageSubresourceLayers &subres_layers, uint32_t region_index,
-                                               const IMAGE_STATE &image_state, const Location &loc, const char *image_label,
+                                               const vvl::Image &image_state, const Location &loc, const char *image_label,
                                                const char *vuid) const {
     return ValidateHostCopyCurrentLayout(device, expected_layout, RangeFromLayers(subres_layers), region_index, image_state, loc,
                                          image_label, vuid);
@@ -996,7 +995,7 @@ bool CoreChecks::ValidateHostCopyCurrentLayout(VkDevice device, const VkImageLay
 
 bool CoreChecks::ValidateHostCopyCurrentLayout(VkDevice device, const VkImageLayout expected_layout,
                                                const VkImageSubresourceRange &validate_range, uint32_t region_index,
-                                               const IMAGE_STATE &image_state, const Location &loc, const char *image_label,
+                                               const vvl::Image &image_state, const Location &loc, const char *image_label,
                                                const char *vuid) const {
     using Map = GlobalImageLayoutRangeMap;
     bool skip = false;

@@ -52,21 +52,21 @@ void gpuav::BufferView::NotifyInvalidate(const NodeList &invalid_nodes, bool unl
     vvl::BufferView::NotifyInvalidate(invalid_nodes, unlink);
 }
 
-gpuav::ImageView::ImageView(const std::shared_ptr<IMAGE_STATE> &image_state, VkImageView iv, const VkImageViewCreateInfo *ci,
+gpuav::ImageView::ImageView(const std::shared_ptr<vvl::Image> &image_state, VkImageView iv, const VkImageViewCreateInfo *ci,
                             VkFormatFeatureFlags2KHR ff, const VkFilterCubicImageViewImageFormatPropertiesEXT &cubic_props,
                             DescriptorHeap &desc_heap_)
-    : IMAGE_VIEW_STATE(image_state, iv, ci, ff, cubic_props),
+    : vvl::ImageView(image_state, iv, ci, ff, cubic_props),
       desc_heap(desc_heap_),
       id(desc_heap.NextId(VulkanTypedHandle(iv, kVulkanObjectTypeImageView))) {}
 
 void gpuav::ImageView::Destroy() {
     desc_heap.DeleteId(id);
-    IMAGE_VIEW_STATE::Destroy();
+    vvl::ImageView::Destroy();
 }
 
 void gpuav::ImageView::NotifyInvalidate(const NodeList &invalid_nodes, bool unlink) {
     desc_heap.DeleteId(id);
-    IMAGE_VIEW_STATE::NotifyInvalidate(invalid_nodes, unlink);
+    vvl::ImageView::NotifyInvalidate(invalid_nodes, unlink);
 }
 
 gpuav::Sampler::Sampler(const VkSampler s, const VkSamplerCreateInfo *pci, DescriptorHeap &desc_heap_)
@@ -117,18 +117,18 @@ void gpuav::AccelerationStructureNV::NotifyInvalidate(const NodeList &invalid_no
 }
 
 gpuav::CommandBuffer::CommandBuffer(gpuav::Validator *ga, VkCommandBuffer cb, const VkCommandBufferAllocateInfo *pCreateInfo,
-                                    const COMMAND_POOL_STATE *pool)
+                                    const vvl::CommandPool *pool)
     : gpu_tracker::CommandBuffer(ga, cb, pCreateInfo, pool) {}
 
 gpuav::CommandBuffer::~CommandBuffer() { Destroy(); }
 
 void gpuav::CommandBuffer::Destroy() {
     ResetCBState();
-    CMD_BUFFER_STATE::Destroy();
+    vvl::CommandBuffer::Destroy();
 }
 
 void gpuav::CommandBuffer::Reset() {
-    CMD_BUFFER_STATE::Reset();
+    vvl::CommandBuffer::Reset();
     ResetCBState();
 }
 

@@ -20,7 +20,7 @@
 #include "sync/sync_validation.h"
 
 SyncStageAccessIndex GetSyncStageAccessIndexsByDescriptorSet(VkDescriptorType descriptor_type,
-                                                             const ResourceInterfaceVariable &variable,
+                                                             const spirv::ResourceInterfaceVariable &variable,
                                                              VkShaderStageFlagBits stage_flag) {
     if (descriptor_type == VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT) {
         assert(stage_flag == VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -270,8 +270,8 @@ void CommandBufferAccessContext::RecordEndRendering(const RecordObject &record_o
 bool CommandBufferAccessContext::ValidateDispatchDrawDescriptorSet(VkPipelineBindPoint pipelineBindPoint,
                                                                    const Location &loc) const {
     bool skip = false;
-    const PIPELINE_STATE *pipe = nullptr;
-    const std::vector<LAST_BOUND_STATE::PER_SET> *per_sets = nullptr;
+    const vvl::Pipeline *pipe = nullptr;
+    const std::vector<LastBound::PER_SET> *per_sets = nullptr;
     cb_state_->GetCurrentPipelineAndDesriptorSets(pipelineBindPoint, &pipe, &per_sets);
     if (!pipe || !per_sets) {
         return skip;
@@ -416,8 +416,8 @@ bool CommandBufferAccessContext::ValidateDispatchDrawDescriptorSet(VkPipelineBin
 
 void CommandBufferAccessContext::RecordDispatchDrawDescriptorSet(VkPipelineBindPoint pipelineBindPoint,
                                                                  const ResourceUsageTag tag) {
-    const PIPELINE_STATE *pipe = nullptr;
-    const std::vector<LAST_BOUND_STATE::PER_SET> *per_sets = nullptr;
+    const vvl::Pipeline *pipe = nullptr;
+    const std::vector<LastBound::PER_SET> *per_sets = nullptr;
     cb_state_->GetCurrentPipelineAndDesriptorSets(pipelineBindPoint, &pipe, &per_sets);
     if (!pipe || !per_sets) {
         return;
@@ -807,7 +807,7 @@ ResourceUsageTag CommandBufferAccessContext::RecordEndRenderPass(vvl::Func comma
     return barrier_tag;
 }
 
-void CommandBufferAccessContext::RecordDestroyEvent(EVENT_STATE *event_state) { GetCurrentEventsContext()->Destroy(event_state); }
+void CommandBufferAccessContext::RecordDestroyEvent(vvl::Event *event_state) { GetCurrentEventsContext()->Destroy(event_state); }
 
 void CommandBufferAccessContext::RecordExecutedCommandBuffer(const CommandBufferAccessContext &recorded_cb_context) {
     const AccessContext *recorded_context = recorded_cb_context.GetCurrentAccessContext();
@@ -1111,10 +1111,10 @@ std::ostream &operator<<(std::ostream &out, const HazardResult::HazardState &haz
     return out;
 }
 
-SyncNodeFormatter::SyncNodeFormatter(const SyncValidator &sync_state, const CMD_BUFFER_STATE *cb_state)
+SyncNodeFormatter::SyncNodeFormatter(const SyncValidator &sync_state, const vvl::CommandBuffer *cb_state)
     : report_data(sync_state.report_data), node(cb_state), label("command_buffer") {}
 
-SyncNodeFormatter::SyncNodeFormatter(const SyncValidator &sync_state, const IMAGE_STATE *image)
+SyncNodeFormatter::SyncNodeFormatter(const SyncValidator &sync_state, const vvl::Image *image)
     : report_data(sync_state.report_data), node(image), label("image") {}
 
 SyncNodeFormatter::SyncNodeFormatter(const SyncValidator &sync_state, const vvl::Queue *q_state)
@@ -1132,16 +1132,16 @@ std::string SyncValidationInfo::FormatHazard(const HazardResult &hazard) const {
 }
 
 syncval_state::CommandBuffer::CommandBuffer(SyncValidator *dev, VkCommandBuffer cb, const VkCommandBufferAllocateInfo *pCreateInfo,
-                                            const COMMAND_POOL_STATE *pool)
-    : CMD_BUFFER_STATE(dev, cb, pCreateInfo, pool), access_context(*dev, this) {}
+                                            const vvl::CommandPool *pool)
+    : vvl::CommandBuffer(dev, cb, pCreateInfo, pool), access_context(*dev, this) {}
 
 void syncval_state::CommandBuffer::Destroy() {
     access_context.Destroy();  // must be first to clean up self references correctly.
-    CMD_BUFFER_STATE::Destroy();
+    vvl::CommandBuffer::Destroy();
 }
 
 void syncval_state::CommandBuffer::Reset() {
-    CMD_BUFFER_STATE::Reset();
+    vvl::CommandBuffer::Reset();
     access_context.Reset();
 }
 
@@ -1149,11 +1149,11 @@ void syncval_state::CommandBuffer::NotifyInvalidate(const BASE_NODE::NodeList &i
     for (auto &obj : invalid_nodes) {
         switch (obj->Type()) {
             case kVulkanObjectTypeEvent:
-                access_context.RecordDestroyEvent(static_cast<EVENT_STATE *>(obj.get()));
+                access_context.RecordDestroyEvent(static_cast<vvl::Event *>(obj.get()));
                 break;
             default:
                 break;
         }
-        CMD_BUFFER_STATE::NotifyInvalidate(invalid_nodes, unlink);
+        vvl::CommandBuffer::NotifyInvalidate(invalid_nodes, unlink);
     }
 }

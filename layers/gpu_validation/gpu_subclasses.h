@@ -173,7 +173,8 @@ class PreDrawResources : public CommandResources {
     VkDeviceSize indirect_buffer_offset = 0;
     uint32_t indirect_buffer_stride = 0;
     VkDeviceSize indirect_buffer_size = 0;
-    static constexpr uint32_t push_constant_words = 4;
+    static constexpr uint32_t push_constant_words = 11;
+    bool emit_task_error = false;  // Used to decide between mesh error and task error
 
     void Destroy(gpuav::Validator &validator) final;
     bool LogValidationMessage(gpuav::Validator &validator, VkQueue queue, VkCommandBuffer cmd_buffer, const uint32_t *debug_record,
@@ -218,8 +219,7 @@ class CommandBuffer : public gpu_tracker::CommandBuffer {
     std::vector<AccelerationStructureBuildValidationInfo> as_validation_buffers;
     VkBuffer current_bindless_buffer = VK_NULL_HANDLE;
 
-    CommandBuffer(Validator *ga, VkCommandBuffer cb, const VkCommandBufferAllocateInfo *pCreateInfo,
-                  const COMMAND_POOL_STATE *pool);
+    CommandBuffer(Validator *ga, VkCommandBuffer cb, const VkCommandBufferAllocateInfo *pCreateInfo, const vvl::CommandPool *pool);
     ~CommandBuffer();
 
     bool NeedsProcessing() const final { return !per_command_resources.empty() || has_build_as_cmd; }
@@ -256,9 +256,9 @@ class BufferView : public vvl::BufferView {
     const DescriptorId id;
 };
 
-class ImageView : public IMAGE_VIEW_STATE {
+class ImageView : public vvl::ImageView {
   public:
-    ImageView(const std::shared_ptr<IMAGE_STATE> &image_state, VkImageView iv, const VkImageViewCreateInfo *ci,
+    ImageView(const std::shared_ptr<vvl::Image> &image_state, VkImageView iv, const VkImageViewCreateInfo *ci,
               VkFormatFeatureFlags2KHR ff, const VkFilterCubicImageViewImageFormatPropertiesEXT &cubic_props,
               DescriptorHeap &desc_heap_);
 

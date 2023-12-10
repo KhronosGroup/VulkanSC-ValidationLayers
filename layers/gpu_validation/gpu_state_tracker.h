@@ -36,18 +36,17 @@ class Queue : public vvl::Queue {
     VkCommandBuffer barrier_command_buffer_{VK_NULL_HANDLE};
 };
 
-class CommandBuffer : public CMD_BUFFER_STATE {
+class CommandBuffer : public vvl::CommandBuffer {
   public:
-    CommandBuffer(Validator *ga, VkCommandBuffer cb, const VkCommandBufferAllocateInfo *pCreateInfo,
-                  const COMMAND_POOL_STATE *pool);
+    CommandBuffer(Validator *ga, VkCommandBuffer cb, const VkCommandBufferAllocateInfo *pCreateInfo, const vvl::CommandPool *pool);
 
     virtual bool NeedsProcessing() const = 0;
     virtual void Process(VkQueue queue, const Location &loc) = 0;
 };
 }  // namespace gpu_tracker
- 
+
 VALSTATETRACK_DERIVED_STATE_OBJECT(VkQueue, gpu_tracker::Queue, vvl::Queue)
-VALSTATETRACK_DERIVED_STATE_OBJECT(VkCommandBuffer, gpu_tracker::CommandBuffer, CMD_BUFFER_STATE)
+VALSTATETRACK_DERIVED_STATE_OBJECT(VkCommandBuffer, gpu_tracker::CommandBuffer, vvl::CommandBuffer)
 
 namespace gpu_tracker {
 
@@ -206,7 +205,7 @@ class Validator : public ValidationStateTracker {
 
     template <typename CreateInfo, typename SafeCreateInfo, typename GPUAVState>
     void PreCallRecordPipelineCreations(uint32_t count, const CreateInfo *pCreateInfos, const VkAllocationCallbacks *pAllocator,
-                                        VkPipeline *pPipelines, std::vector<std::shared_ptr<PIPELINE_STATE>> &pipe_state,
+                                        VkPipeline *pPipelines, std::vector<std::shared_ptr<vvl::Pipeline>> &pipe_state,
                                         std::vector<SafeCreateInfo> *new_pipeline_create_infos,
                                         const VkPipelineBindPoint bind_point, const RecordObject &record_obj,
                                         GPUAVState &cgpl_state);

@@ -117,33 +117,33 @@ std::shared_ptr<QueueSyncState> SyncValidator::GetQueueSyncStateShared(VkQueue q
     return syncval_state::GetMapped(queue_sync_states_, queue, []() { return std::shared_ptr<QueueSyncState>(); });
 }
 
-std::shared_ptr<CMD_BUFFER_STATE> SyncValidator::CreateCmdBufferState(VkCommandBuffer cb,
-                                                                      const VkCommandBufferAllocateInfo *pCreateInfo,
-                                                                      const COMMAND_POOL_STATE *cmd_pool) {
+std::shared_ptr<vvl::CommandBuffer> SyncValidator::CreateCmdBufferState(VkCommandBuffer cb,
+                                                                        const VkCommandBufferAllocateInfo *pCreateInfo,
+                                                                        const vvl::CommandPool *cmd_pool) {
     auto cb_state = std::make_shared<syncval_state::CommandBuffer>(this, cb, pCreateInfo, cmd_pool);
     if (cb_state) {
         cb_state->access_context.SetSelfReference();
     }
-    return std::static_pointer_cast<CMD_BUFFER_STATE>(cb_state);
+    return std::static_pointer_cast<vvl::CommandBuffer>(cb_state);
 }
 
-std::shared_ptr<SWAPCHAIN_NODE> SyncValidator::CreateSwapchainState(const VkSwapchainCreateInfoKHR *create_info,
+std::shared_ptr<vvl::Swapchain> SyncValidator::CreateSwapchainState(const VkSwapchainCreateInfoKHR *create_info,
                                                                     VkSwapchainKHR swapchain) {
-    return std::static_pointer_cast<SWAPCHAIN_NODE>(std::make_shared<syncval_state::Swapchain>(this, create_info, swapchain));
+    return std::static_pointer_cast<vvl::Swapchain>(std::make_shared<syncval_state::Swapchain>(this, create_info, swapchain));
 }
 
-std::shared_ptr<IMAGE_STATE> SyncValidator::CreateImageState(VkImage img, const VkImageCreateInfo *pCreateInfo,
-                                                             VkFormatFeatureFlags2KHR features) {
+std::shared_ptr<vvl::Image> SyncValidator::CreateImageState(VkImage img, const VkImageCreateInfo *pCreateInfo,
+                                                            VkFormatFeatureFlags2KHR features) {
     return std::make_shared<ImageState>(this, img, pCreateInfo, features);
 }
 
-std::shared_ptr<IMAGE_STATE> SyncValidator::CreateImageState(VkImage img, const VkImageCreateInfo *pCreateInfo,
-                                                             VkSwapchainKHR swapchain, uint32_t swapchain_index,
-                                                             VkFormatFeatureFlags2KHR features) {
+std::shared_ptr<vvl::Image> SyncValidator::CreateImageState(VkImage img, const VkImageCreateInfo *pCreateInfo,
+                                                            VkSwapchainKHR swapchain, uint32_t swapchain_index,
+                                                            VkFormatFeatureFlags2KHR features) {
     return std::make_shared<ImageState>(this, img, pCreateInfo, swapchain, swapchain_index, features);
 }
-std::shared_ptr<IMAGE_VIEW_STATE> SyncValidator::CreateImageViewState(
-    const std::shared_ptr<IMAGE_STATE> &image_state, VkImageView iv, const VkImageViewCreateInfo *ci, VkFormatFeatureFlags2KHR ff,
+std::shared_ptr<vvl::ImageView> SyncValidator::CreateImageViewState(
+    const std::shared_ptr<vvl::Image> &image_state, VkImageView iv, const VkImageViewCreateInfo *ci, VkFormatFeatureFlags2KHR ff,
     const VkFilterCubicImageViewImageFormatPropertiesEXT &cubic_props) {
     return std::make_shared<ImageViewState>(image_state, iv, ci, ff, cubic_props);
 }
@@ -2779,11 +2779,11 @@ void SyncValidator::PostCallRecordGetSwapchainImagesKHR(VkDevice device, VkSwapc
                                                         VkImage *pSwapchainImages, const RecordObject &record_obj) {
     StateTracker::PostCallRecordGetSwapchainImagesKHR(device, swapchain, pSwapchainImageCount, pSwapchainImages, record_obj);
     if ((record_obj.result != VK_SUCCESS) && (record_obj.result != VK_INCOMPLETE)) return;
-    auto swapchain_state = Get<SWAPCHAIN_NODE>(swapchain);
+    auto swapchain_state = Get<vvl::Swapchain>(swapchain);
 
     if (pSwapchainImages) {
         for (uint32_t i = 0; i < *pSwapchainImageCount; ++i) {
-            SWAPCHAIN_IMAGE &swapchain_image = swapchain_state->images[i];
+            vvl::SwapchainImage &swapchain_image = swapchain_state->images[i];
             if (swapchain_image.image_state) {
                 auto *sync_image = static_cast<ImageState *>(swapchain_image.image_state);
                 assert(sync_image->IsTiled());  // This is the assumption from the spec, and the implementation relies on it
@@ -2808,7 +2808,7 @@ void syncval_state::ImageState::SetOpaqueBaseAddress(ValidationStateTracker &dev
     if (opaque_base_address_) return;
 
     VkDeviceSize opaque_base = 0U;  // Fakespace Allocator starts > 0
-    auto get_opaque_base = [&opaque_base](const IMAGE_STATE &other) {
+    auto get_opaque_base = [&opaque_base](const vvl::Image &other) {
         const ImageState &other_sync = static_cast<const ImageState &>(other);
         opaque_base = other_sync.opaque_base_address_;
         return true;
@@ -2858,10 +2858,10 @@ ImageRangeGen syncval_state::ImageState::MakeImageRangeGen(const VkImageSubresou
     return range_gen;
 }
 
-syncval_state::ImageViewState::ImageViewState(const std::shared_ptr<IMAGE_STATE> &image_state, VkImageView iv,
+syncval_state::ImageViewState::ImageViewState(const std::shared_ptr<vvl::Image> &image_state, VkImageView iv,
                                               const VkImageViewCreateInfo *ci, VkFormatFeatureFlags2KHR ff,
                                               const VkFilterCubicImageViewImageFormatPropertiesEXT &cubic_props)
-    : IMAGE_VIEW_STATE(image_state, iv, ci, ff, cubic_props), view_range_gen(MakeImageRangeGen()) {}
+    : vvl::ImageView(image_state, iv, ci, ff, cubic_props), view_range_gen(MakeImageRangeGen()) {}
 
 ImageRangeGen syncval_state::ImageViewState::MakeImageRangeGen() const {
     return GetImageState()->MakeImageRangeGen(normalized_subresource_range, IsDepthSliced());
