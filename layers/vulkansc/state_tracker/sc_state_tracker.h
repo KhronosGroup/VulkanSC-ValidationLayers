@@ -30,8 +30,8 @@
 #include <atomic>
 
 VALSTATETRACK_DERIVED_STATE_OBJECT(VkPipelineCache, vvl::sc::PipelineCache, vvl::PipelineCache);
-VALSTATETRACK_DERIVED_STATE_OBJECT(VkPipeline, SC_PIPELINE_STATE, PIPELINE_STATE);
-VALSTATETRACK_DERIVED_STATE_OBJECT(VkCommandPool, SC_COMMAND_POOL_STATE, COMMAND_POOL_STATE);
+VALSTATETRACK_DERIVED_STATE_OBJECT(VkPipeline, vvl::sc::Pipeline, vvl::Pipeline);
+VALSTATETRACK_DERIVED_STATE_OBJECT(VkCommandPool, vvl::sc::CommandPool, vvl::CommandPool);
 
 template <typename BASE>
 class SCValidationStateTracker : public BASE {
@@ -74,20 +74,20 @@ class SCValidationStateTracker : public BASE {
 
     // Functions requiring additional/modified state tracking for Vulkan SC
     void CreateDevice(const VkDeviceCreateInfo* pCreateInfo) override;
-    virtual std::shared_ptr<COMMAND_POOL_STATE> CreateCommandPoolState(VkCommandPool command_pool,
-                                                                       const VkCommandPoolCreateInfo* pCreateInfo) override;
+    virtual std::shared_ptr<vvl::CommandPool> CreateCommandPoolState(VkCommandPool command_pool,
+                                                                     const VkCommandPoolCreateInfo* pCreateInfo) override;
     void PostCallRecordCreateCommandPool(VkDevice device, const VkCommandPoolCreateInfo* pCreateInfo,
                                          const VkAllocationCallbacks* pAllocator, VkCommandPool* pCommandPool,
                                          const RecordObject& record_obj) override;
     std::shared_ptr<vvl::PipelineCache> CreatePipelineCacheState(VkPipelineCache pipeline_cache,
                                                                  const VkPipelineCacheCreateInfo* pCreateInfo) const override;
 
-    std::shared_ptr<PIPELINE_STATE> CreateGraphicsPipelineState(const VkGraphicsPipelineCreateInfo* pCreateInfo,
-                                                                std::shared_ptr<const vvl::RenderPass>&& render_pass,
-                                                                std::shared_ptr<const PIPELINE_LAYOUT_STATE>&& layout,
-                                                                CreateShaderModuleStates* csm_states) const override;
-    std::shared_ptr<PIPELINE_STATE> CreateComputePipelineState(
-        const VkComputePipelineCreateInfo* pCreateInfo, std::shared_ptr<const PIPELINE_LAYOUT_STATE>&& layout) const override;
+    std::shared_ptr<vvl::Pipeline> CreateGraphicsPipelineState(const VkGraphicsPipelineCreateInfo* pCreateInfo,
+                                                               std::shared_ptr<const vvl::RenderPass>&& render_pass,
+                                                               std::shared_ptr<const vvl::PipelineLayout>&& layout,
+                                                               CreateShaderModuleStates* csm_states) const override;
+    std::shared_ptr<vvl::Pipeline> CreateComputePipelineState(const VkComputePipelineCreateInfo* pCreateInfo,
+                                                              std::shared_ptr<const vvl::PipelineLayout>&& layout) const override;
     void PostCallRecordCreateGraphicsPipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t count,
                                                const VkGraphicsPipelineCreateInfo* pCreateInfos,
                                                const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,

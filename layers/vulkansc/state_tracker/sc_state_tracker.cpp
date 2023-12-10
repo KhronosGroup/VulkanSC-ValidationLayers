@@ -159,10 +159,10 @@ void SCValidationStateTracker<BASE>::CreateDevice(const VkDeviceCreateInfo *pCre
 }
 
 template <typename BASE>
-std::shared_ptr<COMMAND_POOL_STATE> SCValidationStateTracker<BASE>::CreateCommandPoolState(
+std::shared_ptr<vvl::CommandPool> SCValidationStateTracker<BASE>::CreateCommandPoolState(
     VkCommandPool command_pool, const VkCommandPoolCreateInfo *pCreateInfo) {
     auto queue_flags = BASE::physical_device_state->queue_family_properties[pCreateInfo->queueFamilyIndex].queueFlags;
-    return std::make_shared<SC_COMMAND_POOL_STATE>(this, command_pool, pCreateInfo, queue_flags);
+    return std::make_shared<vvl::sc::CommandPool>(this, command_pool, pCreateInfo, queue_flags);
 }
 
 template <typename BASE>
@@ -188,17 +188,17 @@ std::shared_ptr<vvl::PipelineCache> SCValidationStateTracker<BASE>::CreatePipeli
 }
 
 template <typename BASE>
-std::shared_ptr<PIPELINE_STATE> SCValidationStateTracker<BASE>::CreateGraphicsPipelineState(
+std::shared_ptr<vvl::Pipeline> SCValidationStateTracker<BASE>::CreateGraphicsPipelineState(
     const VkGraphicsPipelineCreateInfo *pCreateInfo, std::shared_ptr<const vvl::RenderPass> &&render_pass,
-    std::shared_ptr<const PIPELINE_LAYOUT_STATE> &&layout, CreateShaderModuleStates *csm_states) const {
-    return std::static_pointer_cast<PIPELINE_STATE>(
-        std::make_shared<SC_PIPELINE_STATE>(this, pCreateInfo, std::move(render_pass), std::move(layout), csm_states));
+    std::shared_ptr<const vvl::PipelineLayout> &&layout, CreateShaderModuleStates *csm_states) const {
+    return std::static_pointer_cast<vvl::Pipeline>(
+        std::make_shared<vvl::sc::Pipeline>(this, pCreateInfo, std::move(render_pass), std::move(layout), csm_states));
 }
 
 template <typename BASE>
-std::shared_ptr<PIPELINE_STATE> SCValidationStateTracker<BASE>::CreateComputePipelineState(
-    const VkComputePipelineCreateInfo *pCreateInfo, std::shared_ptr<const PIPELINE_LAYOUT_STATE> &&layout) const {
-    return std::static_pointer_cast<PIPELINE_STATE>(std::make_shared<SC_PIPELINE_STATE>(this, pCreateInfo, std::move(layout)));
+std::shared_ptr<vvl::Pipeline> SCValidationStateTracker<BASE>::CreateComputePipelineState(
+    const VkComputePipelineCreateInfo *pCreateInfo, std::shared_ptr<const vvl::PipelineLayout> &&layout) const {
+    return std::static_pointer_cast<vvl::Pipeline>(std::make_shared<vvl::sc::Pipeline>(this, pCreateInfo, std::move(layout)));
 }
 
 template <typename BASE>
@@ -243,7 +243,7 @@ template <typename BASE>
 void SCValidationStateTracker<BASE>::PreCallRecordDestroyPipeline(VkDevice device, VkPipeline pipeline,
                                                                   const VkAllocationCallbacks *pAllocator,
                                                                   const RecordObject &record_obj) {
-    auto pipeline_state = Get<SC_PIPELINE_STATE>(pipeline);
+    auto pipeline_state = Get<vvl::sc::Pipeline>(pipeline);
     if (pipeline_state) {
         switch (pipeline_state->pipeline_type) {
             case VK_PIPELINE_BIND_POINT_GRAPHICS:
@@ -282,7 +282,7 @@ template <typename BASE>
 void SCValidationStateTracker<BASE>::PreCallRecordDestroyImageView(VkDevice device, VkImageView imageView,
                                                                    const VkAllocationCallbacks *pAllocator,
                                                                    const RecordObject &record_obj) {
-    auto image_view_state = Get<IMAGE_VIEW_STATE>(imageView);
+    auto image_view_state = Get<vvl::ImageView>(imageView);
     if (image_view_state) {
         if (image_view_state->create_info.subresourceRange.layerCount > 1) {
             sc_reserved_objects_.layered_image_views--;
@@ -382,18 +382,18 @@ void SCValidationStateTracker<BASE>::PostCallRecordBeginCommandBuffer(VkCommandB
     BASE::PostCallRecordBeginCommandBuffer(commandBuffer, pBeginInfo, record_obj);
     if (VK_SUCCESS != record_obj.result) return;
 
-    auto cb_state = Get<CMD_BUFFER_STATE>(commandBuffer);
+    auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
     if (cb_state) {
-        auto cp_state = Get<SC_COMMAND_POOL_STATE>(cb_state->command_pool->commandPool());
+        auto cp_state = Get<vvl::sc::CommandPool>(cb_state->command_pool->commandPool());
         cp_state->command_buffers_recording++;
     }
 }
 
 template <typename BASE>
 void SCValidationStateTracker<BASE>::PreCallRecordEndCommandBuffer(VkCommandBuffer commandBuffer, const RecordObject &record_obj) {
-    auto cb_state = Get<CMD_BUFFER_STATE>(commandBuffer);
+    auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
     if (cb_state) {
-        auto cp_state = Get<SC_COMMAND_POOL_STATE>(cb_state->command_pool->commandPool());
+        auto cp_state = Get<vvl::sc::CommandPool>(cb_state->command_pool->commandPool());
         cp_state->command_buffers_recording--;
     }
 

@@ -27,8 +27,6 @@
 #include "stateless/stateless_validation.h"
 #include "enum_flag_bits.h"
 
-#include <vulkan/layer/vk_layer_settings_ext.h>
-
 bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const VkBaseOutStructure* header, const char* pnext_vuid,
                                                       bool is_physdev_api, bool is_const_param) const {
     bool skip = false;

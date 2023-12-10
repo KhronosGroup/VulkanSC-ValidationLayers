@@ -1101,6 +1101,8 @@ const char* String(Struct structure) {
     {"VkLatencySurfaceCapabilitiesNV", 31},
     {"VkLatencyTimingsFrameReportNV", 30},
     {"VkLayerProperties", 18},
+    {"VkLayerSettingEXT", 18},
+    {"VkLayerSettingsCreateInfoEXT", 29},
     {"VkMacOSSurfaceCreateInfoMVK", 28},
     {"VkMappedMemoryRange", 20},
     {"VkMemoryAllocateFlagsInfo", 26},
@@ -1182,6 +1184,7 @@ const char* String(Struct structure) {
     {"VkPhysicalDeviceBufferDeviceAddressFeaturesEXT", 47},
     {"VkPhysicalDeviceClusterCullingShaderFeaturesHUAWEI", 51},
     {"VkPhysicalDeviceClusterCullingShaderPropertiesHUAWEI", 53},
+    {"VkPhysicalDeviceClusterCullingShaderVrsFeaturesHUAWEI", 54},
     {"VkPhysicalDeviceCoherentMemoryFeaturesAMD", 42},
     {"VkPhysicalDeviceColorWriteEnableFeaturesEXT", 44},
     {"VkPhysicalDeviceComputeShaderDerivativesFeaturesNV", 51},
@@ -1367,6 +1370,8 @@ const char* String(Struct structure) {
     {"VkPhysicalDeviceRayTracingPositionFetchFeaturesKHR", 51},
     {"VkPhysicalDeviceRayTracingPropertiesNV", 39},
     {"VkPhysicalDeviceRelaxedLineRasterizationFeaturesIMG", 52},
+    {"VkPhysicalDeviceRenderPassStripedFeaturesARM", 45},
+    {"VkPhysicalDeviceRenderPassStripedPropertiesARM", 47},
     {"VkPhysicalDeviceRepresentativeFragmentTestFeaturesNV", 53},
     {"VkPhysicalDeviceRobustness2FeaturesEXT", 39},
     {"VkPhysicalDeviceRobustness2PropertiesEXT", 41},
@@ -1556,6 +1561,9 @@ const char* String(Struct structure) {
     {"VkRenderPassInputAttachmentAspectCreateInfo", 44},
     {"VkRenderPassMultiviewCreateInfo", 32},
     {"VkRenderPassSampleLocationsBeginInfoEXT", 40},
+    {"VkRenderPassStripeBeginInfoARM", 31},
+    {"VkRenderPassStripeInfoARM", 26},
+    {"VkRenderPassStripeSubmitInfoARM", 32},
     {"VkRenderPassSubpassFeedbackCreateInfoEXT", 41},
     {"VkRenderPassSubpassFeedbackInfoEXT", 35},
     {"VkRenderPassTransformBeginInfoQCOM", 35},
@@ -1906,6 +1914,7 @@ const char* String(Field field) {
     {"clientType", 11},
     {"clipped", 8},
     {"closestHitShader", 17},
+    {"clusterShadingRate", 19},
     {"clustercullingShader", 21},
     {"cmdBufLabelCount", 17},
     {"codeOffset", 11},
@@ -2830,6 +2839,7 @@ const char* String(Field field) {
     {"maxRayRecursionDepth", 21},
     {"maxRecursionDepth", 18},
     {"maxRenderPassDependencies", 26},
+    {"maxRenderPassStripes", 21},
     {"maxRenderPassSubpasses", 23},
     {"maxResourceDescriptorBufferBindings", 36},
     {"maxResourceDescriptorBufferRange", 33},
@@ -3460,6 +3470,8 @@ const char* String(Field field) {
     {"pSession", 9},
     {"pSetLayout", 11},
     {"pSetLayouts", 12},
+    {"pSettingName", 13},
+    {"pSettings", 10},
     {"pSetupReferenceSlot", 20},
     {"pShaderGroupCaptureReplayHandle", 32},
     {"pShaderModule", 14},
@@ -3500,6 +3512,8 @@ const char* String(Field field) {
     {"pStreamStrides", 15},
     {"pStreams", 9},
     {"pStrides", 9},
+    {"pStripeInfos", 13},
+    {"pStripeSemaphoreInfos", 22},
     {"pSubmits", 9},
     {"pSubpassBeginInfo", 18},
     {"pSubpassEndInfo", 16},
@@ -3828,6 +3842,8 @@ const char* String(Field field) {
     {"renderMinor", 12},
     {"renderPass", 11},
     {"renderPassRequestCount", 23},
+    {"renderPassStripeGranularity", 28},
+    {"renderPassStriped", 18},
     {"renderSubmitEndTimeUs", 22},
     {"renderSubmitStartTimeUs", 24},
     {"renderpass", 11},
@@ -3941,6 +3957,7 @@ const char* String(Field field) {
     {"set", 4},
     {"setCount", 9},
     {"setLayoutCount", 15},
+    {"settingCount", 13},
     {"sgprAllocationGranularity", 26},
     {"sgprsPerSimd", 13},
     {"shader", 7},
@@ -4183,6 +4200,9 @@ const char* String(Field field) {
     {"streamDescriptor", 17},
     {"strictLines", 12},
     {"stride", 7},
+    {"stripeArea", 11},
+    {"stripeInfoCount", 16},
+    {"stripeSemaphoreInfoCount", 25},
     {"subLayerCount", 14},
     {"subPixelInterpolationOffsetBits", 32},
     {"subPixelPrecisionBits", 22},
@@ -4338,6 +4358,7 @@ const char* String(Field field) {
     {"value32", 8},
     {"value64", 8},
     {"valueBool", 10},
+    {"valueCount", 11},
     {"valueFloat", 11},
     {"valueString", 12},
     {"variableMultisampleRate", 24},
@@ -4825,6 +4846,8 @@ bool IsFieldPointer(Field field) {
     case Field::pSession:
     case Field::pSetLayout:
     case Field::pSetLayouts:
+    case Field::pSettingName:
+    case Field::pSettings:
     case Field::pSetupReferenceSlot:
     case Field::pShaderGroupCaptureReplayHandle:
     case Field::pShaderModule:
@@ -4865,6 +4888,8 @@ bool IsFieldPointer(Field field) {
     case Field::pStreamStrides:
     case Field::pStreams:
     case Field::pStrides:
+    case Field::pStripeInfos:
+    case Field::pStripeSemaphoreInfos:
     case Field::pSubmits:
     case Field::pSubpassBeginInfo:
     case Field::pSubpassEndInfo:

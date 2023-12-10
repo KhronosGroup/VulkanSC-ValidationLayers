@@ -419,7 +419,7 @@ bool SCCoreChecks::ValidateSwapchainCreateInfo(VkDevice device, const VkSwapchai
     return skip;
 }
 
-bool SCCoreChecks::ValidateShaderModuleId(const PIPELINE_STATE& pipeline, const Location& loc) const {
+bool SCCoreChecks::ValidateShaderModuleId(const vvl::Pipeline& pipeline, const Location& loc) const {
     bool skip = false;
 
     for (const auto& stage_ci : pipeline.shader_stages_ci) {
@@ -592,7 +592,7 @@ bool SCCoreChecks::PreCallValidateCreateCommandPool(VkDevice device, const VkCom
     bool skip = BASE::PreCallValidateCreateCommandPool(device, pCreateInfo, pAllocator, pCommandPool, error_obj);
 
     skip |= ValidateObjectRequestCount(device, "vkCreateCommandPool", "VUID-vkCreateCommandPool-device-05068", "command pools",
-                                       Count<COMMAND_POOL_STATE>(), "commandPoolRequestCount",
+                                       Count<vvl::CommandPool>(), "commandPoolRequestCount",
                                        sc_object_limits_.commandPoolRequestCount, 1);
 
     const auto* mem_reservation_info = vku::FindStructInPNextChain<VkCommandPoolMemoryReservationCreateInfo>(pCreateInfo->pNext);
@@ -688,9 +688,9 @@ bool SCCoreChecks::PreCallValidateCreatePipelineLayout(VkDevice device, const Vk
                                                        const ErrorObject& error_obj) const {
     bool skip = BASE::PreCallValidateCreatePipelineLayout(device, pCreateInfo, pAllocator, pPipelineLayout, error_obj);
 
-    skip |= ValidateObjectRequestCount(device, "vkCreatePipelineLayout", "VUID-vkCreatePipelineLayout-device-05068",
-                                       "pipeline layouts", Count<PIPELINE_LAYOUT_STATE>(), "pipelineLayout",
-                                       sc_object_limits_.pipelineLayoutRequestCount, 1);
+    skip |=
+        ValidateObjectRequestCount(device, "vkCreatePipelineLayout", "VUID-vkCreatePipelineLayout-device-05068", "pipeline layouts",
+                                   Count<vvl::PipelineLayout>(), "pipelineLayout", sc_object_limits_.pipelineLayoutRequestCount, 1);
 
     return skip;
 }
@@ -711,7 +711,7 @@ bool SCCoreChecks::PreCallValidateAllocateCommandBuffers(VkDevice device, const 
                                                          VkCommandBuffer* pCommandBuffers, const ErrorObject& error_obj) const {
     bool skip = BASE::PreCallValidateAllocateCommandBuffers(device, pAllocateInfo, pCommandBuffers, error_obj);
 
-    auto cp_state = Get<SC_COMMAND_POOL_STATE>(pAllocateInfo->commandPool);
+    auto cp_state = Get<vvl::sc::CommandPool>(pAllocateInfo->commandPool);
     if (!cp_state) return false;
 
     if (cp_state->commandBuffers.size() + pAllocateInfo->commandBufferCount > cp_state->max_command_buffers) {
@@ -748,7 +748,7 @@ bool SCCoreChecks::PreCallValidateAllocateMemory(VkDevice device, const VkMemory
     bool skip = BASE::PreCallValidateAllocateMemory(device, pAllocateInfo, pAllocator, pMemory, error_obj);
 
     skip |= ValidateObjectRequestCount(device, "vkAllocateMemory", "VUID-vkAllocateMemory-device-05068", "device memory objects",
-                                       Count<DEVICE_MEMORY_STATE>(), "deviceMemory", sc_object_limits_.deviceMemoryRequestCount, 1);
+                                       Count<vvl::DeviceMemory>(), "deviceMemory", sc_object_limits_.deviceMemoryRequestCount, 1);
 
     return skip;
 }
@@ -849,7 +849,7 @@ bool SCCoreChecks::PreCallValidateCreateQueryPool(VkDevice device, const VkQuery
     bool skip = BASE::PreCallValidateCreateQueryPool(device, pCreateInfo, pAllocator, pQueryPool, error_obj);
 
     skip |= ValidateObjectRequestCount(device, "vkCreateQueryPool", "VUID-vkCreateQueryPool-device-05068", "query pools",
-                                       Count<QUERY_POOL_STATE>(), "queryPool", sc_object_limits_.queryPoolRequestCount, 1);
+                                       Count<vvl::QueryPool>(), "queryPool", sc_object_limits_.queryPoolRequestCount, 1);
 
     if (pCreateInfo) {
         if (pCreateInfo->queryType == VK_QUERY_TYPE_OCCLUSION &&
@@ -1060,7 +1060,7 @@ bool SCCoreChecks::PreCallValidateCreateImage(VkDevice device, const VkImageCrea
                                               const ErrorObject& error_obj) const {
     bool skip = BASE::PreCallValidateCreateImage(device, pCreateInfo, pAllocator, pImage, error_obj);
 
-    skip |= ValidateObjectRequestCount(device, "vkCreateImage", "VUID-vkCreateImage-device-05068", "images", Count<IMAGE_STATE>(),
+    skip |= ValidateObjectRequestCount(device, "vkCreateImage", "VUID-vkCreateImage-device-05068", "images", Count<vvl::Image>(),
                                        "image", sc_object_limits_.imageRequestCount, 1);
 
     if (pCreateInfo) {
@@ -1081,13 +1081,13 @@ bool SCCoreChecks::PreCallValidateCreateImageView(VkDevice device, const VkImage
                                                   const VkAllocationCallbacks* pAllocator, VkImageView* pView,
                                                   const ErrorObject& error_obj) const {
     bool skip = BASE::PreCallValidateCreateImageView(device, pCreateInfo, pAllocator, pView, error_obj);
-    auto image_state = Get<IMAGE_STATE>(pCreateInfo->image);
+    auto image_state = Get<vvl::Image>(pCreateInfo->image);
     if (!image_state) {
         return skip;
     }
 
     skip |= ValidateObjectRequestCount(device, "vkCreateImageView", "VUID-vkCreateImageView-device-05068", "image views",
-                                       Count<IMAGE_VIEW_STATE>(), "imageView", sc_object_limits_.imageViewRequestCount, 1);
+                                       Count<vvl::ImageView>(), "imageView", sc_object_limits_.imageViewRequestCount, 1);
 
     if (pCreateInfo) {
         const uint32_t effective_mip_levels = ResolveRemainingLevels(image_state->createInfo, pCreateInfo->subresourceRange);
@@ -1191,7 +1191,7 @@ bool SCCoreChecks::PreCallValidateCreateEvent(VkDevice device, const VkEventCrea
                                               const ErrorObject& error_obj) const {
     bool skip = BASE::PreCallValidateCreateEvent(device, pCreateInfo, pAllocator, pEvent, error_obj);
 
-    skip |= ValidateObjectRequestCount(device, "vkCreateEvent", "VUID-vkCreateEvent-device-05068", "events", Count<EVENT_STATE>(),
+    skip |= ValidateObjectRequestCount(device, "vkCreateEvent", "VUID-vkCreateEvent-device-05068", "events", Count<vvl::Event>(),
                                        "event", sc_object_limits_.eventRequestCount, 1);
 
     return skip;
@@ -1203,7 +1203,7 @@ bool SCCoreChecks::PreCallValidateCreateSwapchainKHR(VkDevice device, const VkSw
     bool skip = BASE::PreCallValidateCreateSwapchainKHR(device, pCreateInfo, pAllocator, pSwapchain, error_obj);
 
     skip |= ValidateObjectRequestCount(device, "vkCreateSwapchainKHR", "VUID-vkCreateSwapchainKHR-device-05068", "swapchains",
-                                       Count<SWAPCHAIN_NODE>(), "swapchain", sc_object_limits_.swapchainRequestCount, 1);
+                                       Count<vvl::Swapchain>(), "swapchain", sc_object_limits_.swapchainRequestCount, 1);
 
     skip |= ValidateSwapchainCreateInfo(device, *pCreateInfo, "vkCreateSwapchainKHR", "pCreateInfo");
 
@@ -1218,7 +1218,7 @@ bool SCCoreChecks::PreCallValidateCreateSharedSwapchainsKHR(VkDevice device, uin
         BASE::PreCallValidateCreateSharedSwapchainsKHR(device, swapchainCount, pCreateInfos, pAllocator, pSwapchains, error_obj);
 
     skip |= ValidateObjectRequestCount(device, "vkCreateSharedSwapchainsKHR", "VUID-vkCreateSharedSwapchainsKHR-device-05068",
-                                       "swapchains", Count<SWAPCHAIN_NODE>(), "swapchain", sc_object_limits_.swapchainRequestCount,
+                                       "swapchains", Count<vvl::Swapchain>(), "swapchain", sc_object_limits_.swapchainRequestCount,
                                        "swapchainCount", swapchainCount);
 
     char where[64];
@@ -1269,10 +1269,10 @@ bool SCCoreChecks::PreCallValidateBeginCommandBuffer(VkCommandBuffer commandBuff
                                                      const ErrorObject& error_obj) const {
     bool skip = BASE::PreCallValidateBeginCommandBuffer(commandBuffer, pBeginInfo, error_obj);
 
-    auto cb_state = GetRead<CMD_BUFFER_STATE>(commandBuffer);
+    auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
     if (!cb_state) return false;
 
-    auto cp_state = Get<SC_COMMAND_POOL_STATE>(cb_state->command_pool->commandPool());
+    auto cp_state = Get<vvl::sc::CommandPool>(cb_state->command_pool->commandPool());
 
     if (cb_state->state != CbState::New && !phys_dev_props_sc_10_.commandPoolResetCommandBuffer) {
         skip |= LogError(commandBuffer, "VUID-vkBeginCommandBuffer-commandPoolResetCommandBuffer-05136",

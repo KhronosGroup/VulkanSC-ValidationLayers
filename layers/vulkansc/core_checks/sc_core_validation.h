@@ -131,7 +131,7 @@ class SCCoreChecks : public SCValidationStateTracker<CoreChecks> {
                                         const ErrorObject& error_obj) const override;
 
     // Validation utility functions overridden for Vulkan SC
-    bool ValidateShaderModuleId(const PIPELINE_STATE& pipeline, const Location& loc) const override;
+    bool ValidateShaderModuleId(const vvl::Pipeline& pipeline, const Location& loc) const override;
 
     // Intercept instance creation to set up VUID filters
     void PreCallRecordCreateInstance(const VkInstanceCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator,

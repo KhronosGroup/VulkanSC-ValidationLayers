@@ -27,7 +27,6 @@ TEST_F(NegativeDescriptors, DescriptorPoolConsistency) {
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkFreeDescriptorSets-pDescriptorSets-parent");
 
     RETURN_IF_SKIP(Init());
-    InitRenderTarget();
 
     VkDescriptorPoolSize ds_type_count = {};
     ds_type_count.type = VK_DESCRIPTOR_TYPE_SAMPLER;
@@ -55,7 +54,6 @@ TEST_F(NegativeDescriptors, AllocDescriptorFromEmptyPool) {
     SetTargetApiVersion(VK_API_VERSION_1_0);
 
     RETURN_IF_SKIP(Init());
-    InitRenderTarget();
 
     // This test is valid for Vulkan 1.0 only -- skip if device has an API version greater than 1.0.
     if (DeviceValidationVersion() >= VK_API_VERSION_1_1) {
@@ -117,7 +115,6 @@ TEST_F(NegativeDescriptors, AllocDescriptorFromEmptyPool) {
 
 TEST_F(NegativeDescriptors, FreeDescriptorFromOneShotPool) {
     RETURN_IF_SKIP(Init());
-    InitRenderTarget();
 
     VkDescriptorPoolSize ds_type_count = {};
     ds_type_count.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;

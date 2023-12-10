@@ -20,14 +20,15 @@
 
 #include <atomic>
 
-class SC_COMMAND_POOL_STATE : public COMMAND_POOL_STATE {
+namespace vvl::sc {
+
+class CommandPool : public vvl::CommandPool {
   public:
     uint32_t max_command_buffers;
     std::atomic_uint32_t command_buffers_recording;
 
-    SC_COMMAND_POOL_STATE(ValidationStateTracker *dev, VkCommandPool cp, const VkCommandPoolCreateInfo *pCreateInfo,
-                          VkQueueFlags flags)
-        : COMMAND_POOL_STATE(dev, cp, pCreateInfo, flags), max_command_buffers(0), command_buffers_recording(0) {
+    CommandPool(ValidationStateTracker *dev, VkCommandPool cp, const VkCommandPoolCreateInfo *pCreateInfo, VkQueueFlags flags)
+        : vvl::CommandPool(dev, cp, pCreateInfo, flags), max_command_buffers(0), command_buffers_recording(0) {
         const auto *mem_reservation_info =
             vku::FindStructInPNextChain<VkCommandPoolMemoryReservationCreateInfo>(pCreateInfo->pNext);
         if (mem_reservation_info) {
@@ -35,3 +36,5 @@ class SC_COMMAND_POOL_STATE : public COMMAND_POOL_STATE {
         }
     }
 };
+
+}  // namespace vvl::sc

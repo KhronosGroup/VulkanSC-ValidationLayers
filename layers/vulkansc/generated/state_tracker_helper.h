@@ -85,6 +85,8 @@ struct DeviceFeatures {
     bool clustercullingShader;
     // VkPhysicalDeviceClusterCullingShaderFeaturesHUAWEI
     bool multiviewClusterCullingShader;
+    // VkPhysicalDeviceClusterCullingShaderVrsFeaturesHUAWEI
+    bool clusterShadingRate;
     // VkPhysicalDeviceCoherentMemoryFeaturesAMD
     bool deviceCoherentMemory;
     // VkPhysicalDeviceColorWriteEnableFeaturesEXT
@@ -657,6 +659,8 @@ struct DeviceFeatures {
     bool rayTracingPositionFetch;
     // VkPhysicalDeviceRelaxedLineRasterizationFeaturesIMG
     bool relaxedLineRasterization;
+    // VkPhysicalDeviceRenderPassStripedFeaturesARM
+    bool renderPassStriped;
     // VkPhysicalDeviceRepresentativeFragmentTestFeaturesNV
     bool representativeFragmentTest;
     // VkPhysicalDeviceRobustness2FeaturesEXT

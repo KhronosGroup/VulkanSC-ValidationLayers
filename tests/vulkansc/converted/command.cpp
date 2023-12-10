@@ -652,7 +652,7 @@ TEST_F(NegativeCommand, ClearColorAttachmentsZeroLayercount) {
     InitRenderTarget();
 
     m_commandBuffer->begin();
-    vk::CmdBeginRenderPass(m_commandBuffer->handle(), &renderPassBeginInfo(), VK_SUBPASS_CONTENTS_INLINE);
+    vk::CmdBeginRenderPass(m_commandBuffer->handle(), &m_renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
     VkClearAttachment color_attachment;
     color_attachment.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -674,7 +674,7 @@ TEST_F(NegativeCommand, ClearColorAttachmentsZeroExtent) {
     InitRenderTarget();
 
     m_commandBuffer->begin();
-    vk::CmdBeginRenderPass(m_commandBuffer->handle(), &renderPassBeginInfo(), VK_SUBPASS_CONTENTS_INLINE);
+    vk::CmdBeginRenderPass(m_commandBuffer->handle(), &m_renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
     VkClearAttachment color_attachment;
     color_attachment.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -706,7 +706,7 @@ TEST_F(NegativeCommand, ClearAttachmentsAspectMasks) {
     InitRenderTarget();
 
     m_commandBuffer->begin();
-    vk::CmdBeginRenderPass(m_commandBuffer->handle(), &renderPassBeginInfo(), VK_SUBPASS_CONTENTS_INLINE);
+    vk::CmdBeginRenderPass(m_commandBuffer->handle(), &m_renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
     VkClearAttachment attachment;
     attachment.clearValue.color.float32[0] = 0;
@@ -748,7 +748,7 @@ TEST_F(NegativeCommand, ClearAttachmentsImplicitCheck) {
     InitRenderTarget();
 
     m_commandBuffer->begin();
-    vk::CmdBeginRenderPass(m_commandBuffer->handle(), &renderPassBeginInfo(), VK_SUBPASS_CONTENTS_INLINE);
+    vk::CmdBeginRenderPass(m_commandBuffer->handle(), &m_renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
     VkClearAttachment color_attachment;
     color_attachment.clearValue.color.float32[0] = 0;
@@ -788,7 +788,7 @@ TEST_F(NegativeCommand, ClearAttachmentsDepth) {
     InitRenderTarget(&depth_image_view.handle());
 
     m_commandBuffer->begin();
-    vk::CmdBeginRenderPass(m_commandBuffer->handle(), &renderPassBeginInfo(), VK_SUBPASS_CONTENTS_INLINE);
+    vk::CmdBeginRenderPass(m_commandBuffer->handle(), &m_renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
     VkClearAttachment attachment;
     attachment.colorAttachment = 0;
@@ -819,7 +819,7 @@ TEST_F(NegativeCommand, ClearAttachmentsStencil) {
     InitRenderTarget(&depth_image_view.handle());
 
     m_commandBuffer->begin();
-    vk::CmdBeginRenderPass(m_commandBuffer->handle(), &renderPassBeginInfo(), VK_SUBPASS_CONTENTS_INLINE);
+    vk::CmdBeginRenderPass(m_commandBuffer->handle(), &m_renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
     VkClearAttachment attachment;
     attachment.colorAttachment = 0;
@@ -911,7 +911,7 @@ TEST_F(NegativeCommand, ExecuteCommandsPrimaryCB) {
     cb.end();
 
     m_commandBuffer->begin();
-    vk::CmdBeginRenderPass(m_commandBuffer->handle(), &renderPassBeginInfo(), VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
+    vk::CmdBeginRenderPass(m_commandBuffer->handle(), &m_renderPassBeginInfo, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
     VkCommandBuffer handle = cb.handle();
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdExecuteCommands-pCommandBuffers-00088");
@@ -7101,10 +7101,13 @@ TEST_F(NegativeCommand, CmdClearAttachmentTests) {
     ivci.components.b = VK_COMPONENT_SWIZZLE_B;
     ivci.components.a = VK_COMPONENT_SWIZZLE_A;
     vkt::ImageView render_target_view(*m_device, ivci);
-    VkFramebufferCreateInfo fb_info = m_framebuffer_info;
+    VkFramebufferCreateInfo fb_info = vku::InitStructHelper();
+    fb_info.renderPass = renderPass();
     fb_info.layers = 2;
     fb_info.attachmentCount = 1;
     fb_info.pAttachments = &render_target_view.handle();
+    fb_info.width = m_width;
+    fb_info.height = m_height;
     vkt::Framebuffer framebuffer(*m_device, fb_info);
     m_renderPassBeginInfo.framebuffer = framebuffer.handle();
 
@@ -7137,7 +7140,7 @@ TEST_F(NegativeCommand, CmdClearAttachmentTests) {
     auto clear_cmds = [this, &color_attachment](VkCommandBuffer cmd_buffer, VkClearRect clear_rect) {
         // extent too wide
         VkClearRect clear_rect_too_large = clear_rect;
-        clear_rect_too_large.rect.extent.width = renderPassBeginInfo().renderArea.extent.width + 4;
+        clear_rect_too_large.rect.extent.width = m_renderPassBeginInfo.renderArea.extent.width + 4;
         clear_rect_too_large.rect.extent.height = clear_rect_too_large.rect.extent.height / 2;
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdClearAttachments-pRects-00016");
         vk::CmdClearAttachments(cmd_buffer, 1, &color_attachment, 1, &clear_rect_too_large);

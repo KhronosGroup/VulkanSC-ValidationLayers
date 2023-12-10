@@ -173,15 +173,13 @@ class PipelineCache : public vvl::PipelineCache {
         : vvl::PipelineCache(pipeline_cache, pCreateInfo), contents(cache_data) {}
 };
 
-}  // namespace vvl::sc
-
-class SC_PIPELINE_STATE : public PIPELINE_STATE {
+class Pipeline : public vvl::Pipeline {
   public:
     const VkPipelineOfflineCreateInfo *offline_info;
 
     template <typename CreateInfo, typename... Args>
-    SC_PIPELINE_STATE(const ValidationStateTracker* state_data, const CreateInfo* pCreateInfo, Args&&... args)
-        : PIPELINE_STATE(state_data, pCreateInfo, std::forward<Args>(args)...), offline_info(FindOfflineCreateInfo(pCreateInfo)) {}
+    Pipeline(const ValidationStateTracker* state_data, const CreateInfo* pCreateInfo, Args&&... args)
+        : vvl::Pipeline(state_data, pCreateInfo, std::forward<Args>(args)...), offline_info(FindOfflineCreateInfo(pCreateInfo)) {}
 
   private:
     const VkPipelineOfflineCreateInfo* FindOfflineCreateInfo(const VkGraphicsPipelineCreateInfo*) const {
@@ -192,3 +190,5 @@ class SC_PIPELINE_STATE : public PIPELINE_STATE {
         return vku::FindStructInPNextChain<VkPipelineOfflineCreateInfo>(create_info.compute.pNext);
     }
 };
+
+}  // namespace vvl::sc

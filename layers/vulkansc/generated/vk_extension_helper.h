@@ -114,6 +114,7 @@ struct InstanceExtensions {
     ExtEnabled vk_google_surfaceless_query{kNotEnabled};
     ExtEnabled vk_ext_application_parameters{kNotEnabled};
     ExtEnabled vk_lunarg_direct_driver_loading{kNotEnabled};
+    ExtEnabled vk_ext_layer_settings{kNotEnabled};
 
     static const PromotedExtensionInfoMap &get_promotion_info_map() {
         static const PromotedExtensionInfoMap promoted_map = {
@@ -281,6 +282,7 @@ struct InstanceExtensions {
             {VK_EXT_APPLICATION_PARAMETERS_EXTENSION_NAME, InstanceInfo(&InstanceExtensions::vk_ext_application_parameters, {})},
             {VK_LUNARG_DIRECT_DRIVER_LOADING_EXTENSION_NAME,
              InstanceInfo(&InstanceExtensions::vk_lunarg_direct_driver_loading, {})},
+            {VK_EXT_LAYER_SETTINGS_EXTENSION_NAME, InstanceInfo(&InstanceExtensions::vk_ext_layer_settings, {})},
 
         };
         return info_map;
@@ -393,6 +395,7 @@ static const std::set<std::string> kInstanceExtensionNames = {
     VK_GOOGLE_SURFACELESS_QUERY_EXTENSION_NAME,
     VK_EXT_APPLICATION_PARAMETERS_EXTENSION_NAME,
     VK_LUNARG_DIRECT_DRIVER_LOADING_EXTENSION_NAME,
+    VK_EXT_LAYER_SETTINGS_EXTENSION_NAME,
 };
 
 struct DeviceExtensions : public InstanceExtensions {
@@ -673,6 +676,7 @@ struct DeviceExtensions : public InstanceExtensions {
     ExtEnabled vk_valve_descriptor_set_host_mapping{kNotEnabled};
     ExtEnabled vk_ext_depth_clamp_zero_one{kNotEnabled};
     ExtEnabled vk_ext_non_seamless_cube_map{kNotEnabled};
+    ExtEnabled vk_arm_render_pass_striped{kNotEnabled};
     ExtEnabled vk_qcom_fragment_density_map_offset{kNotEnabled};
     ExtEnabled vk_nv_copy_memory_indirect{kNotEnabled};
     ExtEnabled vk_nv_memory_decompression{kNotEnabled};
@@ -1681,6 +1685,11 @@ struct DeviceExtensions : public InstanceExtensions {
             {VK_EXT_NON_SEAMLESS_CUBE_MAP_EXTENSION_NAME, DeviceInfo(&DeviceExtensions::vk_ext_non_seamless_cube_map,
                                                                      {{{&DeviceExtensions::vk_khr_get_physical_device_properties2,
                                                                         VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME}}})},
+            {VK_ARM_RENDER_PASS_STRIPED_EXTENSION_NAME,
+             DeviceInfo(&DeviceExtensions::vk_arm_render_pass_striped,
+                        {{{&DeviceExtensions::vk_khr_get_physical_device_properties2,
+                           VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME},
+                          {&DeviceExtensions::vk_khr_synchronization2, VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME}}})},
             {VK_QCOM_FRAGMENT_DENSITY_MAP_OFFSET_EXTENSION_NAME,
              DeviceInfo(&DeviceExtensions::vk_qcom_fragment_density_map_offset,
                         {{{&DeviceExtensions::vk_khr_get_physical_device_properties2,
@@ -2235,6 +2244,7 @@ static const std::set<std::string> kDeviceExtensionNames = {
     VK_VALVE_DESCRIPTOR_SET_HOST_MAPPING_EXTENSION_NAME,
     VK_EXT_DEPTH_CLAMP_ZERO_ONE_EXTENSION_NAME,
     VK_EXT_NON_SEAMLESS_CUBE_MAP_EXTENSION_NAME,
+    VK_ARM_RENDER_PASS_STRIPED_EXTENSION_NAME,
     VK_QCOM_FRAGMENT_DENSITY_MAP_OFFSET_EXTENSION_NAME,
     VK_NV_COPY_MEMORY_INDIRECT_EXTENSION_NAME,
     VK_NV_MEMORY_DECOMPRESSION_EXTENSION_NAME,
