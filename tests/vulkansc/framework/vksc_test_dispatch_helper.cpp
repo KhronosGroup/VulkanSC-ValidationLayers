@@ -260,7 +260,7 @@ static VKAPI_ATTR VkResult VKAPI_CALL CreateInstance(const VkInstanceCreateInfo*
     }
     create_info.pApplicationInfo = &app_info;
     if (VK_API_VERSION_VARIANT(app_info.apiVersion) != VKSC_API_VARIANT) {
-        if (app_info.apiVersion <= VK_API_VERSION_1_2) {
+        if (app_info.apiVersion < VK_API_VERSION_1_3) {
             app_info.apiVersion = VKSC_API_VERSION_1_0;
         } else {
             DispatchHelper()->SkipUnsupportedTest("Test case was written against Vulkan 1.3");

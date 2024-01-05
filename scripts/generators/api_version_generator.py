@@ -61,7 +61,7 @@ class APISpecific:
                             if (VK_API_VERSION_VARIANT(api_version) == VKSC_API_VARIANT) {
                                 return api_version;
                             } else {
-                                if (api_version <= VK_API_VERSION_1_2) {
+                                if (api_version < VK_API_VERSION_1_3) {
                                     // Vulkan SC 1.0 includes Vulkan 1.2
                                     return VKSC_API_VERSION_1_0;
                                 } else {
@@ -73,11 +73,8 @@ class APISpecific:
                         uint32_t api_version_;
                     };
 
-                    static inline APIVersion NormalizeApiVersion(APIVersion specified_version) {
-                        if (specified_version <= VKSC_API_VERSION_1_0)
-                            return VKSC_API_VERSION_1_0;
-                        else
-                            return VVL_UNRECOGNIZED_API_VERSION;
+                    static inline APIVersion NormalizeApiVersion(APIVersion) {
+                        return VKSC_API_VERSION_1_0;
                     }
                     '''
 
