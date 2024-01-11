@@ -557,7 +557,11 @@ bool VkRenderFramework::IgnoreDisableChecks() {
     return skip_disable_checks;
 }
 
+#ifdef VULKANSC
+static const std::string mock_icd_device_name = "Vulkan SC Mock Device";
+#else
 static const std::string mock_icd_device_name = "Vulkan Mock Device";
+#endif  // VULKANSC
 bool VkRenderFramework::IsPlatformMockICD() {
     if (VkRenderFramework::IgnoreDisableChecks()) {
         return false;

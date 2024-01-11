@@ -8923,10 +8923,9 @@ bool StatelessValidation::PreCallValidateGetFaultData(VkDevice device, VkFaultQu
                                "VUID-vkGetFaultData-faultQueryBehavior-parameter");
     skip |= ValidateRequiredPointer(loc.dot(Field::pUnrecordedFaults), pUnrecordedFaults,
                                     "VUID-vkGetFaultData-pUnrecordedFaults-parameter");
-    skip |=
-        ValidateStructTypeArray(loc.dot(Field::pFaultCount), loc.dot(Field::pFaults), "VK_STRUCTURE_TYPE_FAULT_DATA", pFaultCount,
-                                pFaults, VK_STRUCTURE_TYPE_FAULT_DATA, true, false, false, "VUID-VkFaultData-sType-sType",
-                                "VUID-vkGetFaultData-pFaults-parameter", "VUID-vkGetFaultData-pFaultCount-arraylength");
+    skip |= ValidateStructTypeArray(loc.dot(Field::pFaultCount), loc.dot(Field::pFaults), "VK_STRUCTURE_TYPE_FAULT_DATA",
+                                    pFaultCount, pFaults, VK_STRUCTURE_TYPE_FAULT_DATA, true, false, false,
+                                    "VUID-VkFaultData-sType-sType", "VUID-vkGetFaultData-pFaults-parameter", kVUIDUndefined);
     if (pFaults != nullptr) {
         for (uint32_t pFaultIndex = 0; pFaultIndex < *pFaultCount; ++pFaultIndex) {
             [[maybe_unused]] const Location pFaults_loc = loc.dot(Field::pFaults, pFaultIndex);

@@ -83,11 +83,11 @@ else()
     endif()
 
     if(BUILD_WSI_SCREEN_QNX_SUPPORT)
-        target_compile_definitions(Vulkan::Headers INTERFACE VK_USE_PLATFORM_SCREEN_QNX)
+        add_compile_definitions(VK_USE_PLATFORM_SCREEN_QNX)
     endif()
 
     if(BUILD_WSI_SCI_SUPPORT)
-        target_compile_definitions(Vulkan::Headers INTERFACE VK_USE_PLATFORM_SCI)
+        add_compile_definitions(VK_USE_PLATFORM_SCI)
     endif()
 endif()
 

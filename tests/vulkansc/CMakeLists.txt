@@ -15,6 +15,8 @@
 # ~~~
 include(convertedTests.cmake) # include generated test source file list
 
+add_definitions(-DVULKANSC)
+
 add_executable(vksc_layer_validation_tests)
 set_target_properties(vksc_layer_validation_tests PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../)
 
