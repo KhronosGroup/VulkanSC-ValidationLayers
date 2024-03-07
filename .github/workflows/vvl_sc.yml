@@ -76,15 +76,15 @@ jobs:
           CC: ${{ matrix.cc }}
           CXX: ${{ matrix.cxx }}
       - name: Test VulkanSC-ValidationLayers - Min Core
-        run: python3 scripts/vksc_github_ci.py --test --config release
+        run: python3 scripts/vksc_github_ci.py --test --config ${{ matrix.config }}
         env:
           VKSC_DEVSIM_PROFILE_FILE: ${{ github.workspace }}/tests/vulkansc/device_profiles/min_core.json
       - name: Test VulkanSC-ValidationLayers - Max Core
-        run: python3 scripts/vksc_github_ci.py --test --config release
+        run: python3 scripts/vksc_github_ci.py --test --config ${{ matrix.config }}
         env:
           VKSC_DEVSIM_PROFILE_FILE: ${{ github.workspace }}/tests/vulkansc/device_profiles/max_core.json
       - name: Test VulkanSC-ValidationLayers - Max Profile
-        run: python3 scripts/vksc_github_ci.py --test --config release
+        run: python3 scripts/vksc_github_ci.py --test --config ${{ matrix.config }}
         env:
           VKSC_DEVSIM_PROFILE_FILE: ${{ github.workspace }}/tests/vulkansc/device_profiles/max_profile.json
 

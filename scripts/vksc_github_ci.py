@@ -98,7 +98,7 @@ def BuildVVL(config, cmake_args, build_tests):
 #
 # Prepare Loader for executing Layer Validation Tests
 def BuildLoader(config):
-    SRC_DIR = RepoRelative(os.path.join(externalDir(config), 'Vulkan-Loader'))
+    SRC_DIR = os.path.join(externalDir(config), 'Vulkan-Loader')
     BUILD_DIR = os.path.join(SRC_DIR, 'build')
 
     if not os.path.exists(SRC_DIR):
@@ -125,7 +125,7 @@ def BuildLoader(config):
 #
 # Prepare Mock ICD and device simulation layer for use with Layer Validation Tests
 def BuildTools(config):
-    SRC_DIR = RepoRelative(os.path.join(externalDir(config), 'Vulkan-Tools'))
+    SRC_DIR = os.path.join(externalDir(config), 'Vulkan-Tools')
     BUILD_DIR = os.path.join(SRC_DIR, 'build')
 
     if not os.path.exists(SRC_DIR):
