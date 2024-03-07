@@ -1,7 +1,7 @@
 /*
- * Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
+ * Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -305,10 +305,14 @@ void Device::init_queues(const VkDeviceCreateInfo &info) {
             if (queue_family_prop.queueFlags & VK_QUEUE_TRANSFER_BIT) {
                 queues_[DMA].push_back(queue_storage.back().get());
             }
+
+            if (queue_family_prop.queueFlags & VK_QUEUE_SPARSE_BINDING_BIT) {
+                queues_[SPARSE].push_back(queue_storage.back().get());
+            }
         }
     }
 
-    ASSERT_TRUE(!queues_[GRAPHICS].empty() || !queues_[COMPUTE].empty() || !queues_[DMA].empty());
+    ASSERT_TRUE(!queues_[GRAPHICS].empty() || !queues_[COMPUTE].empty() || !queues_[DMA].empty() || !queues_[SPARSE].empty());
 }
 
 const Device::QueueFamilyQueues &Device::queue_family_queues(uint32_t queue_family) const {
@@ -359,7 +363,7 @@ VkFormatProperties Device::format_properties(VkFormat format) {
     return data;
 }
 
-void Device::wait() { ASSERT_EQ(VK_SUCCESS, vk::DeviceWaitIdle(handle())); }
+void Device::wait() const { ASSERT_EQ(VK_SUCCESS, vk::DeviceWaitIdle(handle())); }
 
 VkResult Device::wait(const std::vector<const Fence *> &fences, bool wait_all, uint64_t timeout) {
     const std::vector<VkFence> fence_handles = MakeVkHandles<VkFence>(fences);
@@ -750,11 +754,6 @@ VkSubresourceLayout Image::subresource_layout(const VkImageSubresourceLayers &su
     return data;
 }
 
-bool Image::transparent() const {
-    return (create_info_.tiling == VK_IMAGE_TILING_LINEAR && create_info_.samples == VK_SAMPLE_COUNT_1_BIT &&
-            !(create_info_.usage & (VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)));
-}
-
 VkImageAspectFlags Image::aspect_mask(VkFormat format) {
     VkImageAspectFlags image_aspect;
     if (vkuFormatIsDepthAndStencil(format)) {
@@ -821,7 +820,7 @@ void ImageView::init(const Device &dev, const VkImageViewCreateInfo &info) {
     NON_DISPATCHABLE_HANDLE_INIT(vk::CreateImageView, dev, &info);
 }
 
-void AccelerationStructure::destroy() noexcept {
+void AccelerationStructureNV::destroy() noexcept {
     if (!initialized()) {
         return;
     }
@@ -832,9 +831,9 @@ void AccelerationStructure::destroy() noexcept {
     vkDestroyAccelerationStructureNV(device(), handle(), nullptr);
     handle_ = VK_NULL_HANDLE;
 }
-AccelerationStructure::~AccelerationStructure() noexcept { destroy(); }
+AccelerationStructureNV::~AccelerationStructureNV() noexcept { destroy(); }
 
-VkMemoryRequirements2 AccelerationStructure::memory_requirements() const {
+VkMemoryRequirements2 AccelerationStructureNV::memory_requirements() const {
     PFN_vkGetAccelerationStructureMemoryRequirementsNV vkGetAccelerationStructureMemoryRequirementsNV =
         (PFN_vkGetAccelerationStructureMemoryRequirementsNV)vk::GetDeviceProcAddr(device(),
                                                                                   "vkGetAccelerationStructureMemoryRequirementsNV");
@@ -847,7 +846,7 @@ VkMemoryRequirements2 AccelerationStructure::memory_requirements() const {
     return memoryRequirements;
 }
 
-VkMemoryRequirements2 AccelerationStructure::build_scratch_memory_requirements() const {
+VkMemoryRequirements2 AccelerationStructureNV::build_scratch_memory_requirements() const {
     PFN_vkGetAccelerationStructureMemoryRequirementsNV vkGetAccelerationStructureMemoryRequirementsNV =
         (PFN_vkGetAccelerationStructureMemoryRequirementsNV)vk::GetDeviceProcAddr(device(),
                                                                                   "vkGetAccelerationStructureMemoryRequirementsNV");
@@ -862,7 +861,7 @@ VkMemoryRequirements2 AccelerationStructure::build_scratch_memory_requirements()
     return memoryRequirements;
 }
 
-void AccelerationStructure::init(const Device &dev, const VkAccelerationStructureCreateInfoNV &info, bool init_memory) {
+void AccelerationStructureNV::init(const Device &dev, const VkAccelerationStructureCreateInfoNV &info, bool init_memory) {
     PFN_vkCreateAccelerationStructureNV vkCreateAccelerationStructureNV =
         (PFN_vkCreateAccelerationStructureNV)vk::GetDeviceProcAddr(dev.handle(), "vkCreateAccelerationStructureNV");
     assert(vkCreateAccelerationStructureNV != nullptr);
@@ -890,8 +889,8 @@ void AccelerationStructure::init(const Device &dev, const VkAccelerationStructur
         ASSERT_EQ(VK_SUCCESS, vkGetAccelerationStructureHandleNV(dev.handle(), handle(), sizeof(uint64_t), &opaque_handle_));
     }
 }
-vkt::Buffer AccelerationStructure::create_scratch_buffer(const Device &device, VkBufferCreateInfo *pCreateInfo /*= nullptr*/,
-                                                         bool buffer_device_address /*= false*/) const {
+vkt::Buffer AccelerationStructureNV::create_scratch_buffer(const Device &device, VkBufferCreateInfo *pCreateInfo /*= nullptr*/,
+                                                           bool buffer_device_address /*= false*/) const {
     VkMemoryRequirements scratch_buffer_memory_requirements = build_scratch_memory_requirements().memoryRequirements;
     VkBufferCreateInfo create_info = {};
     create_info.size = scratch_buffer_memory_requirements.size;
@@ -994,6 +993,12 @@ Shader::Shader(const Device &dev, const VkShaderStageFlagBits stage, const std::
     init(dev, createInfo);
 }
 
+NON_DISPATCHABLE_HANDLE_DTOR(PipelineCache, vk::DestroyPipelineCache)
+
+void PipelineCache::init(const Device &dev, const VkPipelineCacheCreateInfo &info) {
+    NON_DISPATCHABLE_HANDLE_INIT(vk::CreatePipelineCache, dev, &info);
+}
+
 NON_DISPATCHABLE_HANDLE_DTOR(Pipeline, vk::DestroyPipeline)
 
 void Pipeline::init(const Device &dev, const VkGraphicsPipelineCreateInfo &info) {
@@ -1031,6 +1036,10 @@ void Pipeline::init(const Device &dev, const VkComputePipelineCreateInfo &info) 
         NON_DISPATCHABLE_HANDLE_INIT(vk::CreateComputePipelines, dev, cache, 1, &info);
         vk::DestroyPipelineCache(dev.handle(), cache, NULL);
     }
+}
+
+void Pipeline::init(const Device &dev, const VkRayTracingPipelineCreateInfoKHR &info) {
+    NON_DISPATCHABLE_HANDLE_INIT(vk::CreateRayTracingPipelinesKHR, dev, VK_NULL_HANDLE, VK_NULL_HANDLE, 1, &info);
 }
 
 NON_DISPATCHABLE_HANDLE_DTOR(PipelineLayout, vk::DestroyPipelineLayout)
@@ -1156,10 +1165,10 @@ void CommandBuffer::Init(Device *device, const CommandPool *pool, VkCommandBuffe
 
 void CommandBuffer::begin(const VkCommandBufferBeginInfo *info) { ASSERT_EQ(VK_SUCCESS, vk::BeginCommandBuffer(handle(), info)); }
 
-void CommandBuffer::begin() {
+void CommandBuffer::begin(VkCommandBufferUsageFlags flags) {
     VkCommandBufferBeginInfo info = vku::InitStructHelper();
     VkCommandBufferInheritanceInfo hinfo = vku::InitStructHelper();
-    info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    info.flags = flags;
     info.pInheritanceInfo = &hinfo;
     hinfo.renderPass = VK_NULL_HANDLE;
     hinfo.subpass = 0;
@@ -1184,6 +1193,18 @@ VkCommandBufferAllocateInfo CommandBuffer::create_info(VkCommandPool const &pool
 
 void CommandBuffer::BeginRenderPass(const VkRenderPassBeginInfo &info, VkSubpassContents contents) {
     vk::CmdBeginRenderPass(handle(), &info, contents);
+}
+
+void CommandBuffer::BeginRenderPass(VkRenderPass rp, VkFramebuffer fb, uint32_t render_area_width, uint32_t render_area_height,
+                                    uint32_t clear_count, VkClearValue *clear_values) {
+    VkRenderPassBeginInfo render_pass_begin_info = vku::InitStructHelper();
+    render_pass_begin_info.renderPass = rp;
+    render_pass_begin_info.framebuffer = fb;
+    render_pass_begin_info.renderArea.extent.width = render_area_width;
+    render_pass_begin_info.renderArea.extent.height = render_area_height;
+    render_pass_begin_info.clearValueCount = clear_count;
+    render_pass_begin_info.pClearValues = clear_values;
+    vk::CmdBeginRenderPass(handle(), &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
 }
 
 void CommandBuffer::NextSubpass(VkSubpassContents contents) { vk::CmdNextSubpass(handle(), contents); }
@@ -1242,6 +1263,14 @@ void CommandBuffer::DecodeVideo(const VkVideoDecodeInfoKHR &decodeInfo) {
     assert(vkCmdDecodeVideoKHR);
 
     vkCmdDecodeVideoKHR(handle(), &decodeInfo);
+}
+
+void CommandBuffer::EncodeVideo(const VkVideoEncodeInfoKHR &encodeInfo) {
+    PFN_vkCmdEncodeVideoKHR vkCmdEncodeVideoKHR =
+        (PFN_vkCmdEncodeVideoKHR)vk::GetDeviceProcAddr(dev_handle_, "vkCmdEncodeVideoKHR");
+    assert(vkCmdEncodeVideoKHR);
+
+    vkCmdEncodeVideoKHR(handle(), &encodeInfo);
 }
 
 void CommandBuffer::EndVideoCoding(const VkVideoEndCodingInfoKHR &endInfo) {

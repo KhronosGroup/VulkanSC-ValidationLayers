@@ -54,7 +54,7 @@ VkPhysicalDeviceVulkanSC10Properties VkSCRenderFramework::GetVulkanSC10Propertie
 }
 
 bool VkSCRenderFramework::GLSLtoSPV(VkPhysicalDeviceLimits const *const device_limits, const VkShaderStageFlagBits shader_type,
-                                        const char *pshader, std::vector<uint32_t> &spv, bool debug, const spv_target_env spv_env) {
+                                        const char *pshader, std::vector<uint32_t> &spv, const spv_target_env spv_env) {
     // Vulkan SC tests should never call this
     assert(false);
     return false;
@@ -86,7 +86,7 @@ void VkSCCompatibilityRenderFramework::InitState(VkPhysicalDeviceFeatures *featu
 
 bool VkSCCompatibilityRenderFramework::GLSLtoSPV(VkPhysicalDeviceLimits const *const device_limits,
                                                  const VkShaderStageFlagBits shader_type, const char *pshader,
-                                                 std::vector<uint32_t> &spv, bool debug, const spv_target_env spv_env) {
+                                                 std::vector<uint32_t> &spv, const spv_target_env spv_env) {
     if (IsPlatformMockICD()) {
         // For mock ICD runs we simply skip shader compilation as it won't affect test execution
         return true;

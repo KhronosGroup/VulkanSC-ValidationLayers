@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2019-2023 Valve Corporation
- * Copyright (c) 2019-2023 LunarG, Inc.
+ * Copyright (c) 2019-2024 Valve Corporation
+ * Copyright (c) 2019-2024 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,12 +23,16 @@ class QueueBatchContext;
 struct QueueSubmitCmdState;
 class QueueSyncState;
 
+namespace vvl {
+class Semaphore;
+}  // namespace vvl
+
 struct AcquiredImage {
     std::shared_ptr<const syncval_state::ImageState> image;
     subresource_adapter::ImageRangeGenerator generator;
     ResourceUsageTag present_tag;
     ResourceUsageTag acquire_tag;
-    bool Invalid() const { return BASE_NODE::Invalid(image); }
+    bool Invalid() const;
 
     AcquiredImage() = default;
     AcquiredImage(const PresentedImage &presented, ResourceUsageTag acq_tag);
@@ -122,26 +126,11 @@ struct PresentedImage : public PresentedImageRecord {
                    uint32_t image_index, uint32_t present_index, ResourceUsageTag present_tag_);
     // For non-previsously presented images..
     PresentedImage(std::shared_ptr<const syncval_state::Swapchain> swapchain, uint32_t at_index);
-    bool Invalid() const { return BASE_NODE::Invalid(image); }
+    bool Invalid() const;
     void ExportToSwapchain(SyncValidator &);
     void SetImage(uint32_t at_index);
 };
 using PresentedImages = std::vector<PresentedImage>;
-
-namespace syncval_state {
-class Swapchain : public vvl::Swapchain {
-  public:
-    Swapchain(ValidationStateTracker *dev_data, const VkSwapchainCreateInfoKHR *pCreateInfo, VkSwapchainKHR swapchain);
-    ~Swapchain() { Destroy(); }
-    void RecordPresentedImage(PresentedImage &&presented_images);
-    PresentedImage MovePresentedImage(uint32_t image_index);
-    std::shared_ptr<const Swapchain> shared_from_this() const { return SharedFromThisImpl(this); }
-    std::shared_ptr<Swapchain> shared_from_this() { return SharedFromThisImpl(this); }
-
-  private:
-    PresentedImages presented;  // Build this on demand
-};
-}  // namespace syncval_state
 
 // Store references to ResourceUsageRecords with global tag range within a batch
 class BatchAccessLog {
@@ -163,10 +152,11 @@ class BatchAccessLog {
     struct AccessRecord {
         const BatchRecord *batch;
         const ResourceUsageRecord *record;
+        const DebugNameProvider *debug_name_provider;
         bool IsValid() const { return batch && record; }
     };
 
-    struct CBSubmitLog {
+    struct CBSubmitLog : DebugNameProvider {
       public:
         CBSubmitLog() = default;
         CBSubmitLog(const CBSubmitLog &batch) = default;
@@ -174,19 +164,35 @@ class BatchAccessLog {
         CBSubmitLog &operator=(const CBSubmitLog &other) = default;
         CBSubmitLog &operator=(CBSubmitLog &&other) = default;
         CBSubmitLog(const BatchRecord &batch, std::shared_ptr<const CommandExecutionContext::CommandBufferSet> cbs,
-                    std::shared_ptr<const CommandExecutionContext::AccessLog> log)
-            : batch_(batch), cbs_(cbs), log_(log) {}
-        CBSubmitLog(const BatchRecord &batch, const CommandBufferAccessContext &cb);
+                    std::shared_ptr<const CommandExecutionContext::AccessLog> log);
+        CBSubmitLog(const BatchRecord &batch, const CommandBufferAccessContext &cb,
+                    const std::vector<std::string> &initial_label_stack);
         size_t Size() const { return log_->size(); }
         AccessRecord operator[](ResourceUsageTag tag) const;
+
+        // DebugNameProvider
+        std::string GetDebugRegionName(const ResourceUsageRecord &record) const override;
 
       private:
         BatchRecord batch_;
         std::shared_ptr<const CommandExecutionContext::CommandBufferSet> cbs_;
         std::shared_ptr<const CommandExecutionContext::AccessLog> log_;
+        // label stack at the point when command buffer is submitted to the queue
+        std::vector<std::string> initial_label_stack_;
+
+        // TODO: remove this field and use (*cbs_)[0]->GetLabelCommands() directly
+        // when timeline semaphore support is implemented.
+        //
+        // Until then, there is no guarantee command buffers stored in cbs_ are what
+        // they are supposed to be when timeline semaphores are used (they can be reused
+        // after wait on timeline semaphore). When this happens, validation might report
+        // false positives (which is okay for unsupported feeature), but label code can crash.
+        // Make a copy of label commands as a temporary protection measure.
+        std::vector<vvl::CommandBuffer::LabelCommand> label_commands_;
     };
 
-    ResourceUsageTag Import(const BatchRecord &batch, const CommandBufferAccessContext &cb_access);
+    ResourceUsageTag Import(const BatchRecord &batch, const CommandBufferAccessContext &cb_access,
+                            const std::vector<std::string> &initial_label_stack);
     void Import(const BatchAccessLog &other);
     void Insert(const BatchRecord &batch, const ResourceUsageRange &range,
                 std::shared_ptr<const CommandExecutionContext::AccessLog> log);
@@ -258,6 +264,7 @@ class QueueBatchContext : public CommandExecutionContext {
 
     void SetupBatchTags(const ResourceUsageRange &tag_range);
     void SetupBatchTags();
+    void SetCurrentLabelStack(std::vector<std::string>* current_label_stack);
     void ResetEventsContext() { events_context_.Clear(); }
     ResourceUsageTag GetTagLimit() const override { return batch_.bias; }
     // begin is the tag bias  / .size() is the number of total records that should eventually be in access_log_
@@ -295,6 +302,7 @@ class QueueBatchContext : public CommandExecutionContext {
     void NextSubpassReplaySetup(ReplayState &replay) override;
     void EndRenderPassReplayCleanup(ReplayState &replay) override;
 
+    void ReplayLabelCommandsFromEmptyBatch();
     void Cleanup();
 
   private:
@@ -319,6 +327,7 @@ class QueueBatchContext : public CommandExecutionContext {
     BatchAccessLog::BatchRecord batch_;  // Holds the cumulative tag bias, and command buffer counts for Import support.
     CommandBuffers command_buffers_;
     ConstBatchSet async_batches_;
+    std::vector<std::string> *current_label_stack_ = nullptr;
 };
 
 class QueueSyncState {

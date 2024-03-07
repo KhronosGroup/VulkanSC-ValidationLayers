@@ -50,7 +50,7 @@ TEST_F(VkSCLayerTest, CreatePipelinesDerivativeBitNotAllowed) {
         // VkComputePipelineCreateInfo::flags must not contain VK_PIPELINE_CREATE_DERIVATIVE_BIT
         create_info.flags = VK_PIPELINE_CREATE_DERIVATIVE_BIT;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkComputePipelineCreateInfo-flags-parameter");
+        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkComputePipelineCreateInfo-None-09497");
         vksc::CreateComputePipelines(m_device->handle(), GetDefaultPipelineCache(), 1, &create_info, nullptr, &pipeline);
         m_errorMonitor->VerifyFound();
     }
@@ -100,7 +100,7 @@ TEST_F(VkSCLayerTest, CreatePipelinesDerivativeBitNotAllowed) {
         // VkGraphicsPipelineCreateInfo::flags must not contain VK_PIPELINE_CREATE_DERIVATIVE_BIT
         create_info.flags = VK_PIPELINE_CREATE_DERIVATIVE_BIT;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-flags-parameter");
+        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-None-09497");
         vksc::CreateGraphicsPipelines(m_device->handle(), GetDefaultPipelineCache(), 1, &create_info, nullptr, &pipeline);
         m_errorMonitor->VerifyFound();
         create_info.flags = 0;
@@ -124,7 +124,7 @@ TEST_F(VkSCLayerTest, CreatePipelinesMissingPipelineCache) {
         create_info.stage.pName = "main";
         create_info.layout = pipeline_layout.handle();
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-GeneralParameterError-RequiredParameter");
+        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-GeneralParameterError-RequiredHandle");
         // pipelineCache must not be VK_NULL_HANDLE
         vksc::CreateComputePipelines(m_device->handle(), VK_NULL_HANDLE, 1, &create_info, nullptr, &pipeline);
         m_errorMonitor->VerifyFound();
@@ -173,7 +173,7 @@ TEST_F(VkSCLayerTest, CreatePipelinesMissingPipelineCache) {
         create_info.layout = pipeline_layout.handle();
         create_info.renderPass = render_pass.handle();
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-GeneralParameterError-RequiredParameter");
+        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-GeneralParameterError-RequiredHandle");
         // pipelineCache must not be VK_NULL_HANDLE
         vksc::CreateGraphicsPipelines(m_device->handle(), VK_NULL_HANDLE, 1, &create_info, nullptr, &pipeline);
         m_errorMonitor->VerifyFound();

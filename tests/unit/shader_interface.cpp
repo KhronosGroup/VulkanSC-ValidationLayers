@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (c) 2015-2023 Google, Inc.
+ * Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (c) 2015-2024 Google, Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -562,11 +562,9 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockStruct) {
 TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockStruct64bit) {
     TEST_DESCRIPTION("Have a struct inside a block between shaders");
 
+    AddRequiredFeature(vkt::Feature::shaderFloat64);
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
-    if (!m_device->phy().features().shaderFloat64) {
-        GTEST_SKIP() << "Device does not support 64bit floats";
-    }
 
     char const *vsSource = R"glsl(
         #version 450
@@ -903,11 +901,9 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockStructOuter2DArraySize) {
 TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockNestedStructType64bit) {
     TEST_DESCRIPTION("Have nested struct inside a block between shaders");
 
+    AddRequiredFeature(vkt::Feature::shaderFloat64);
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
-    if (!m_device->phy().features().shaderFloat64) {
-        GTEST_SKIP() << "Device does not support 64bit floats";
-    }
 
     char const *vsSource = R"glsl(
         #version 450
@@ -1152,8 +1148,7 @@ TEST_F(NegativeShaderInterface, VertexOutputNotConsumed) {
     const auto set_info = [&](CreatePipelineHelper &helper) {
         helper.shader_stages_ = {vs.GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
     };
-    CreatePipelineHelper::OneshotTest(*this, set_info, kPerformanceWarningBit,
-                                      "UNASSIGNED-CoreValidation-Shader-OutputNotConsumed");
+    CreatePipelineHelper::OneshotTest(*this, set_info, kPerformanceWarningBit, "WARNING-Shader-OutputNotConsumed");
 }
 
 // Spec doesn't clarify if this is valid or not
@@ -1225,8 +1220,7 @@ TEST_F(NegativeShaderInterface, DISABLED_InputAndOutputComponents) {
         const auto set_info = [&](CreatePipelineHelper &helper) {
             helper.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
         };
-        CreatePipelineHelper::OneshotTest(*this, set_info, kPerformanceWarningBit,
-                                          "UNASSIGNED-CoreValidation-Shader-OutputNotConsumed");
+        CreatePipelineHelper::OneshotTest(*this, set_info, kPerformanceWarningBit, "WARNING-Shader-OutputNotConsumed");
     }
 
     {
@@ -1489,11 +1483,9 @@ TEST_F(NegativeShaderInterface, MultidimensionalArrayDim) {
 TEST_F(NegativeShaderInterface, MultidimensionalArray64bit) {
     TEST_DESCRIPTION("Make sure multidimensional arrays are handled for 64bits");
 
+    AddRequiredFeature(vkt::Feature::shaderFloat64);
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
-    if (!m_device->phy().features().shaderFloat64) {
-        GTEST_SKIP() << "Device does not support 64bit floats";
-    }
 
     char const *vsSource = R"glsl(
         #version 450
@@ -1612,4 +1604,139 @@ TEST_F(NegativeShaderInterface, CreatePipelineFragmentOutputNotConsumed) {
         helper.shader_stages_ = {helper.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
     };
     CreatePipelineHelper::OneshotTest(*this, set_info, kWarningBit, "Undefined-Value-ShaderOutputNotConsumed");
+}
+
+TEST_F(NegativeShaderInterface, InvalidStaticSpirv) {
+    TEST_DESCRIPTION(
+        "Test that a warning is produced for a fragment shader which provides a spurious output with no matching attachment");
+
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    const char *spv_source = R"(
+               OpCapability Shader
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %main "main" %fragCoord %block_var
+               OpExecutionMode %main OriginUpperLeft
+               OpSource GLSL 450
+               OpDecorate %fragCoord Location 0
+               OpDecorate %block Block
+               OpMemberDecorate %block 0 Location 1
+       %void = OpTypeVoid
+      %voidfn = OpTypeFunction %void
+      %float = OpTypeFloat 32
+    %v4float = OpTypeVector %float 4
+%ptr_v4float = OpTypePointer Output %v4float
+  %fragCoord = OpVariable %ptr_v4float Output
+      %block = OpTypeStruct %v4float %v4float
+  %block_ptr = OpTypePointer Output %block
+  %block_var = OpVariable %block_ptr Output
+       %main = OpFunction %void None %voidfn
+       %label = OpLabel
+               OpReturn
+               OpFunctionEnd
+        )";
+
+    // VUID-StandaloneSpirv-Location-04919
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkShaderModuleCreateInfo-pCode-08737");
+    auto fs = VkShaderObj::CreateFromASM(this, spv_source, VK_SHADER_STAGE_FRAGMENT_BIT);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeShaderInterface, PhysicalStorageBufferGlslang3) {
+    TEST_DESCRIPTION("Taken from glslang spv.bufferhandle3.frag test");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitFramework());
+
+    VkPhysicalDeviceVulkan12Features features12 = vku::InitStructHelper();
+    GetPhysicalDeviceFeatures2(features12);
+    if (VK_TRUE != features12.bufferDeviceAddress) {
+        GTEST_SKIP() << "bufferDeviceAddress not supported and is required";
+    }
+
+    RETURN_IF_SKIP(InitState(nullptr, &features12));
+
+    char const *fsSource = R"glsl(
+        #version 450
+        #extension GL_EXT_buffer_reference : enable
+
+        layout(buffer_reference, std430) buffer t3 {
+            int h;
+        };
+
+        layout(set = 1, binding = 2, buffer_reference, std430) buffer t4 {
+            layout(offset = 0)  int j;
+            t3 k;
+        } x;
+
+        layout(set = 0, binding = 0, std430) buffer t5 {
+            t4 m;
+        } s5;
+
+        layout(location = 0) flat in t4 k;
+
+        t4 foo(t4 y) { return y; }
+        void main() {}
+    )glsl";
+
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkShaderModuleCreateInfo-pCode-08737");
+    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeShaderInterface, PhysicalStorageBuffer) {
+    TEST_DESCRIPTION("Regression shaders from https://github.com/KhronosGroup/Vulkan-ValidationLayers/pull/5349");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitFramework());
+
+    VkPhysicalDeviceVulkan12Features features12 = vku::InitStructHelper();
+    GetPhysicalDeviceFeatures2(features12);
+    if (VK_TRUE != features12.bufferDeviceAddress) {
+        GTEST_SKIP() << "bufferDeviceAddress not supported and is required";
+    }
+
+    RETURN_IF_SKIP(InitState(nullptr, &features12));
+
+    InitRenderTarget();
+
+    char const *vsSource = R"glsl(
+        #version 450
+        #extension GL_EXT_buffer_reference_uvec2 : enable
+
+        layout(set=0, binding=0) layout(buffer_reference, std430) buffer dataBuffer {
+            highp int value1;
+            highp int value2;
+        };
+
+        layout(location=0) out dataBuffer outgoingPtr;
+        void main() {
+            outgoingPtr = dataBuffer(uvec2(2.0));
+        }
+    )glsl";
+
+    char const *fsSource = R"glsl(
+        #version 450
+        #extension GL_EXT_buffer_reference_uvec2 : enable
+
+        layout(set=0, binding=0) layout(buffer_reference, std430) buffer dataBuffer {
+            highp int value1;
+            highp int value2;
+        };
+
+        layout(location=0) in dataBuffer incomingPtr;
+        layout(location=0) out highp vec4 fragColor;
+        void main() {
+            highp ivec2 v = ivec2(incomingPtr.value1, incomingPtr.value2);
+            fragColor = vec4(float(v.x)/255.0,float(v.y)/255.0, float(v.x+v.y)/255.0,1.0);
+        }
+    )glsl";
+
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkShaderModuleCreateInfo-pCode-08737");
+    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
+    m_errorMonitor->VerifyFound();
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkShaderModuleCreateInfo-pCode-08737");
+    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    m_errorMonitor->VerifyFound();
 }

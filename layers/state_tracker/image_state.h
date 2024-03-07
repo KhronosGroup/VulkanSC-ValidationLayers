@@ -1,7 +1,7 @@
-/* Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (C) 2015-2022 Google Inc.
+/* Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (C) 2015-2024 Google Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  * Modifications Copyright (C) 2022 RasterGrid Kft.
  *
@@ -33,10 +33,10 @@ class Fence;
 class Semaphore;
 class Surface;
 class Swapchain;
+class VideoProfileDesc;
 } // namespace vvl
 
 class ValidationStateTracker;
-class VideoProfileDesc;
 
 static inline bool operator==(const VkImageSubresource &lhs, const VkImageSubresource &rhs) {
     return (lhs.aspectMask == rhs.aspectMask) && (lhs.mipLevel == rhs.mipLevel) && (lhs.arrayLayer == rhs.arrayLayer);
@@ -67,21 +67,6 @@ static inline VkImageSubresourceRange RangeFromLayers(const VkImageSubresourceLa
     return subresource_range;
 }
 
-class GlobalImageLayoutRangeMap : public subresource_adapter::BothRangeMap<VkImageLayout, 16> {
-  public:
-    using RangeGenerator = image_layout_map::RangeGenerator;
-    using RangeType = key_type;
-
-    GlobalImageLayoutRangeMap(index_type index) : BothRangeMap<VkImageLayout, 16>(index) {}
-    ReadLockGuard ReadLock() const { return ReadLockGuard(lock_); }
-    WriteLockGuard WriteLock() { return WriteLockGuard(lock_); }
-
-    bool AnyInRange(RangeGenerator &gen, std::function<bool(const key_type &range, const mapped_type &state)> &&func) const;
-
-  private:
-    mutable std::shared_mutex lock_;
-};
-
 namespace vvl {
 
 // State for VkImage objects.
@@ -102,7 +87,7 @@ namespace vvl {
 //    Note that the images for *every* image_index will show up as parents of the swapchain,
 //    so swapchain_image_index values must be compared.
 //
-class Image : public BINDABLE {
+class Image : public Bindable {
   public:
     const safe_VkImageCreateInfo safe_create_info;
     const VkImageCreateInfo &createInfo;
@@ -141,7 +126,7 @@ class Image : public BINDABLE {
 
     std::shared_ptr<GlobalImageLayoutRangeMap> layout_range_map;
 
-    vvl::unordered_set<std::shared_ptr<const VideoProfileDesc>> supported_video_profiles;
+    vvl::unordered_set<std::shared_ptr<const vvl::VideoProfileDesc>> supported_video_profiles;
 
     Image(const ValidationStateTracker *dev_data, VkImage img, const VkImageCreateInfo *pCreateInfo,
           VkFormatFeatureFlags2KHR features);
@@ -151,7 +136,7 @@ class Image : public BINDABLE {
     std::shared_ptr<const Image> shared_from_this() const { return SharedFromThisImpl(this); }
     std::shared_ptr<Image> shared_from_this() { return SharedFromThisImpl(this); }
 
-    VkImage image() const { return handle_.Cast<VkImage>(); }
+    VkImage VkHandle() const { return handle_.Cast<VkImage>(); }
 
     bool HasAHBFormat() const { return ahb_format != 0; }
     bool IsCompatibleAliasing(const Image *other_image_state) const;
@@ -235,15 +220,15 @@ class Image : public BINDABLE {
     void SetImageLayout(const VkImageSubresourceRange &range, VkImageLayout layout);
 
   protected:
-    void NotifyInvalidate(const BASE_NODE::NodeList &invalid_nodes, bool unlink) override;
+    void NotifyInvalidate(const StateObject::NodeList &invalid_nodes, bool unlink) override;
 
     template <typename UnaryPredicate>
-    bool AnyAliasBindingOf(const BASE_NODE::NodeMap &bindings, const UnaryPredicate &pred) const {
+    bool AnyAliasBindingOf(const StateObject::NodeMap &bindings, const UnaryPredicate &pred) const {
         for (auto &entry : bindings) {
             if (entry.first.type == kVulkanObjectTypeImage) {
-                auto base_node = entry.second.lock();
-                if (base_node) {
-                    auto other_image = static_cast<Image *>(base_node.get());
+                auto state_object = entry.second.lock();
+                if (state_object) {
+                    auto other_image = static_cast<Image *>(state_object.get());
                     if ((other_image != this) && other_image->IsCompatibleAliasing(this)) {
                         if (pred(*other_image)) return true;
                     }
@@ -276,7 +261,7 @@ class Image : public BINDABLE {
 // State for VkImageView objects.
 // Parent -> child relationships in the object usage tree:
 //    ImageView [N] -> [1] vv::Image
-class ImageView : public BASE_NODE {
+class ImageView : public StateObject {
   public:
     const safe_VkImageViewCreateInfo safe_create_info;
     const VkImageViewCreateInfo &create_info;
@@ -298,7 +283,7 @@ class ImageView : public BASE_NODE {
     ImageView(const std::shared_ptr<vvl::Image> &image_state, VkImageView iv, const VkImageViewCreateInfo *ci,
               VkFormatFeatureFlags2KHR ff, const VkFilterCubicImageViewImageFormatPropertiesEXT &cubic_props);
     ImageView(const ImageView &rh_obj) = delete;
-    VkImageView image_view() const { return handle_.Cast<VkImageView>(); }
+    VkImageView VkHandle() const { return handle_.Cast<VkImageView>(); }
 
     void LinkChildNodes() override {
         // Connect child node(s), which cannot safely be done in the constructor.
@@ -333,7 +318,7 @@ struct SwapchainImage {
 // Parent -> child relationships in the object usage tree:
 //    vvl::Swapchain [N] -> [1] vvl::Surface
 //    However, only 1 swapchain for each surface can be !retired.
-class Swapchain : public BASE_NODE {
+class Swapchain : public StateObject {
   public:
     const safe_VkSwapchainCreateInfoKHR createInfo;
     std::vector<VkPresentModeKHR> present_modes;
@@ -357,7 +342,7 @@ class Swapchain : public BASE_NODE {
         }
     }
 
-    VkSwapchainKHR swapchain() const { return handle_.Cast<VkSwapchainKHR>(); }
+    VkSwapchainKHR VkHandle() const { return handle_.Cast<VkSwapchainKHR>(); }
 
     void PresentImage(uint32_t image_index, uint64_t present_id);
 
@@ -371,7 +356,7 @@ class Swapchain : public BASE_NODE {
     std::shared_ptr<const vvl::Image> GetSwapChainImageShared(uint32_t index) const;
 
   protected:
-    void NotifyInvalidate(const BASE_NODE::NodeList &invalid_nodes, bool unlink) override;
+    void NotifyInvalidate(const StateObject::NodeList &invalid_nodes, bool unlink) override;
 };
 
 }  // namespace vvl
@@ -407,9 +392,9 @@ namespace vvl {
 
 // Parent -> child relationships in the object usage tree:
 //    vvl::Surface -> nothing
-class Surface : public BASE_NODE {
+class Surface : public StateObject {
   public:
-    Surface(VkSurfaceKHR s) : BASE_NODE(s, kVulkanObjectTypeSurfaceKHR) {}
+    Surface(VkSurfaceKHR s) : StateObject(s, kVulkanObjectTypeSurfaceKHR) {}
 
     ~Surface() {
         if (!Destroyed()) {
@@ -417,17 +402,17 @@ class Surface : public BASE_NODE {
         }
     }
 
-    VkSurfaceKHR surface() const { return handle_.Cast<VkSurfaceKHR>(); }
+    VkSurfaceKHR VkHandle() const { return handle_.Cast<VkSurfaceKHR>(); }
     VkPhysicalDeviceSurfaceInfo2KHR GetSurfaceInfo2(const void *surface_info2_pnext = nullptr) const {
         VkPhysicalDeviceSurfaceInfo2KHR surface_info2 = vku::InitStructHelper();
         surface_info2.pNext = surface_info2_pnext;
-        surface_info2.surface = surface();
+        surface_info2.surface = VkHandle();
         return surface_info2;
     }
 
     void Destroy() override;
 
-    void RemoveParent(BASE_NODE *parent_node) override;
+    void RemoveParent(StateObject *parent_node) override;
 
     void SetQueueSupport(VkPhysicalDevice phys_dev, uint32_t qfi, bool supported);
     bool GetQueueSupport(VkPhysicalDevice phys_dev, uint32_t qfi) const;

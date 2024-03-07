@@ -1,6 +1,6 @@
 # ~~~
-# Copyright (c) 2014-2023 Valve Corporation
-# Copyright (c) 2014-2023 LunarG, Inc.
+# Copyright (c) 2014-2024 Valve Corporation
+# Copyright (c) 2014-2024 LunarG, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -52,9 +52,15 @@ target_sources(vk_layer_validation_tests PRIVATE
     framework/barrier_queue_family.cpp
     framework/descriptor_helper.h
     framework/descriptor_helper.cpp
-    framework/thread_timeout_helper.h
-    framework/thread_timeout_helper.cpp
+    framework/thread_helper.h
+    framework/thread_helper.cpp
     framework/gpu_av_helper.h
+    framework/render_pass_helper.h
+    framework/render_pass_helper.cpp
+    framework/feature_requirements.h
+    framework/feature_requirements.cpp
+    framework/queue_submit_context.h
+    framework/queue_submit_context.cpp
     unit/amd_best_practices.cpp
     unit/android_hardware_buffer.cpp
     unit/android_hardware_buffer_positive.cpp
@@ -69,6 +75,8 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/buffer_positive.cpp
     unit/command.cpp
     unit/command_positive.cpp
+    unit/debug_extensions.cpp
+    unit/debug_extensions_positive.cpp
     unit/debug_printf.cpp
     unit/descriptor_buffer.cpp
     unit/descriptor_buffer_positive.cpp
@@ -88,7 +96,16 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/geometry_tessellation.cpp
     unit/geometry_tessellation_positive.cpp
     unit/gpu_av.cpp
+    unit/gpu_av_buffer_device_address.cpp
+    unit/gpu_av_buffer_device_address_positive.cpp
+    unit/gpu_av_descriptor_indexing.cpp
+    unit/gpu_av_descriptor_indexing_positive.cpp
+    unit/gpu_av_indirect_buffer.cpp
+    unit/gpu_av_oob.cpp
+    unit/gpu_av_oob_positive.cpp
     unit/gpu_av_positive.cpp
+    unit/gpu_av_spirv.cpp
+    unit/gpu_av_spirv_positive.cpp
     unit/graphics_library.cpp
     unit/graphics_library_positive.cpp
     unit/host_image_copy.cpp
@@ -109,6 +126,7 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/multiview.cpp
     unit/nvidia_best_practices.cpp
     unit/object_lifetime.cpp
+    unit/object_lifetime_positive.cpp
     unit/other_positive.cpp
     unit/others.cpp
     unit/parent.cpp
@@ -137,7 +155,7 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/ray_tracing_pipeline_positive_nv.cpp
     unit/ray_tracing_positive.cpp
     unit/render_pass_positive.cpp
-    unit/renderpass.cpp
+    unit/render_pass.cpp
     unit/robustness.cpp
     unit/robustness_positive.cpp
     unit/sampler.cpp
@@ -176,6 +194,7 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/sync_val_positive.cpp
     unit/threading.cpp
     unit/threading_positive.cpp
+    unit/tooling.cpp
     unit/tooling_positive.cpp
     unit/transform_feedback.cpp
     unit/vertex_input.cpp
@@ -190,6 +209,15 @@ target_sources(vk_layer_validation_tests PRIVATE
     vvl_utils/small_vector.cpp
     vvl_utils/pnext_chain_extraction.cpp
 )
+if (APPLE)
+    target_sources(vk_layer_validation_tests PRIVATE
+        framework/apple_wsi.h
+        framework/apple_wsi.mm
+    )
+    # QuartzCore framework is needed for minimal Metal interaction
+    target_link_libraries(vk_layer_validation_tests PRIVATE "-framework QuartzCore")
+endif()
+
 get_target_property(TEST_SOURCES vk_layer_validation_tests SOURCES)
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${TEST_SOURCES})
 
@@ -225,11 +253,13 @@ endif()
 
 find_package(GTest CONFIG)
 find_package(glslang CONFIG)
+find_package(SPIRV-Tools CONFIG)
 
 target_link_libraries(vk_layer_validation_tests PRIVATE
     VkLayer_utils
     glslang::SPIRV
     glslang::SPVRemapper
+    SPIRV-Tools-static
     SPIRV-Headers::SPIRV-Headers
     GTest::gtest
     GTest::gtest_main
@@ -237,21 +267,6 @@ target_link_libraries(vk_layer_validation_tests PRIVATE
     $<TARGET_NAME_IF_EXISTS:PkgConfig::X11>
     $<TARGET_NAME_IF_EXISTS:PkgConfig::WAYlAND_CLIENT>
 )
-
-find_package(SPIRV-Tools CONFIG QUIET)
-
-# See https://github.com/KhronosGroup/SPIRV-Tools/issues/3909 for background on this.
-# The targets available from SPIRV-Tools change depending on how SPIRV_TOOLS_BUILD_STATIC is set.
-# Try to handle all possible combinations so that we work with externally built packages.
-if (TARGET SPIRV-Tools)
-    target_link_libraries(vk_layer_validation_tests PRIVATE SPIRV-Tools)
-elseif(TARGET SPIRV-Tools-static)
-    target_link_libraries(vk_layer_validation_tests PRIVATE SPIRV-Tools-static)
-elseif(TARGET SPIRV-Tools-shared)
-    target_link_libraries(vk_layer_validation_tests PRIVATE SPIRV-Tools-shared)
-else()
-    message(FATAL_ERROR "Cannot determine SPIRV-Tools target name")
-endif()
 
 # More details in tests/android/mock/README.md
 option(VVL_MOCK_ANDROID "Enable building for Android on desktop for testing with MockICD setup")
@@ -270,4 +285,5 @@ install(TARGETS vk_layer_validation_tests)
 include(GoogleTest)
 gtest_discover_tests(vk_layer_validation_tests DISCOVERY_TIMEOUT 100)
 
+add_subdirectory(spirv)
 add_subdirectory(layers)

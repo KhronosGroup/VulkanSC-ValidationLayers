@@ -1,7 +1,7 @@
-/* Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (C) 2015-2023 Google Inc.
+/* Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (C) 2015-2024 Google Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,8 @@
  * limitations under the License.
  */
 
-#include "gpu_validation.h"
+#include "gpu_validation/gpu_validation.h"
+#include "gpu_validation/gpu_subclasses.h"
 #include "generated/spirv_grammar_helper.h"
 #include "utils/image_layout_utils.h"
 
@@ -77,10 +78,13 @@ struct GlobalLayoutUpdater {
 
 void gpuav::Validator::UpdateCmdBufImageLayouts(const vvl::CommandBuffer &cb_state) {
     for (const auto &layout_map_entry : cb_state.image_layout_map) {
-        const auto *image_state = layout_map_entry.first;
+        const auto image = layout_map_entry.first;
         const auto &subres_map = layout_map_entry.second;
-        auto guard = image_state->layout_range_map->WriteLock();
-        sparse_container::splice(*image_state->layout_range_map, subres_map->GetLayoutMap(), GlobalLayoutUpdater());
+        auto image_state = Get<vvl::Image>(image);
+        if (image_state && subres_map) {
+            auto guard = image_state->layout_range_map->WriteLock();
+            sparse_container::splice(*image_state->layout_range_map, subres_map->GetLayoutMap(), GlobalLayoutUpdater());
+        }
     }
 }
 
@@ -345,30 +349,43 @@ void gpuav::Validator::PreCallRecordCmdCopyBufferToImage(VkCommandBuffer command
     BaseClass::PreCallRecordCmdCopyBufferToImage(commandBuffer, srcBuffer, dstImage, dstImageLayout, regionCount, pRegions,
                                                  record_obj);
 
-    auto cb_state_ptr = GetWrite<vvl::CommandBuffer>(commandBuffer);
-    auto dst_image_state = Get<vvl::Image>(dstImage);
-    if (cb_state_ptr && dst_image_state) {
-        // Make sure that all image slices are record referenced layout
-        for (uint32_t i = 0; i < regionCount; ++i) {
-            cb_state_ptr->SetImageInitialLayout(*dst_image_state, pRegions[i].imageSubresource, dstImageLayout);
+    {
+        auto cb_state_ptr = GetWrite<vvl::CommandBuffer>(commandBuffer);
+        auto dst_image_state = Get<vvl::Image>(dstImage);
+        if (cb_state_ptr && dst_image_state) {
+            // Make sure that all image slices are record referenced layout
+            for (uint32_t i = 0; i < regionCount; ++i) {
+                cb_state_ptr->SetImageInitialLayout(*dst_image_state, pRegions[i].imageSubresource, dstImageLayout);
+            }
         }
     }
+
+    std::vector<VkBufferImageCopy2> regions_2(regionCount);
+    for (const auto [i, region] : vvl::enumerate(pRegions, regionCount)) {
+        regions_2[i].bufferOffset = region->bufferOffset;
+        regions_2[i].bufferRowLength = region->bufferRowLength;
+        regions_2[i].bufferImageHeight = region->bufferImageHeight;
+        regions_2[i].imageSubresource = region->imageSubresource;
+        regions_2[i].imageOffset = region->imageOffset;
+        regions_2[i].imageExtent = region->imageExtent;
+    }
+
+    VkCopyBufferToImageInfo2 copy_buffer_to_image_info = vku::InitStructHelper();
+    copy_buffer_to_image_info.srcBuffer = srcBuffer;
+    copy_buffer_to_image_info.dstImage = dstImage;
+    copy_buffer_to_image_info.dstImageLayout = dstImageLayout;
+    copy_buffer_to_image_info.regionCount = regionCount;
+    copy_buffer_to_image_info.pRegions = regions_2.data();
+
+    auto copy_buffer_to_image =
+        AllocatePreCopyBufferToImageValidationResources(record_obj.location.function, commandBuffer, &copy_buffer_to_image_info);
+    StoreCommandResources(commandBuffer, std::move(copy_buffer_to_image));
 }
 
 void gpuav::Validator::PreCallRecordCmdCopyBufferToImage2KHR(VkCommandBuffer commandBuffer,
                                                              const VkCopyBufferToImageInfo2KHR *pCopyBufferToImageInfo2KHR,
                                                              const RecordObject &record_obj) {
-    BaseClass::PreCallRecordCmdCopyBufferToImage2KHR(commandBuffer, pCopyBufferToImageInfo2KHR, record_obj);
-
-    auto cb_state_ptr = GetWrite<vvl::CommandBuffer>(commandBuffer);
-    auto dst_image_state = Get<vvl::Image>(pCopyBufferToImageInfo2KHR->dstImage);
-    if (cb_state_ptr && dst_image_state) {
-        // Make sure that all image slices are record referenced layout
-        for (uint32_t i = 0; i < pCopyBufferToImageInfo2KHR->regionCount; ++i) {
-            cb_state_ptr->SetImageInitialLayout(*dst_image_state, pCopyBufferToImageInfo2KHR->pRegions[i].imageSubresource,
-                                                pCopyBufferToImageInfo2KHR->dstImageLayout);
-        }
-    }
+    PreCallRecordCmdCopyBufferToImage2(commandBuffer, pCopyBufferToImageInfo2KHR, record_obj);
 }
 
 void gpuav::Validator::PreCallRecordCmdCopyBufferToImage2(VkCommandBuffer commandBuffer,
@@ -376,15 +393,21 @@ void gpuav::Validator::PreCallRecordCmdCopyBufferToImage2(VkCommandBuffer comman
                                                           const RecordObject &record_obj) {
     BaseClass::PreCallRecordCmdCopyBufferToImage2(commandBuffer, pCopyBufferToImageInfo, record_obj);
 
-    auto cb_state_ptr = GetWrite<vvl::CommandBuffer>(commandBuffer);
-    auto dst_image_state = Get<vvl::Image>(pCopyBufferToImageInfo->dstImage);
-    if (cb_state_ptr && dst_image_state) {
-        // Make sure that all image slices are record referenced layout
-        for (uint32_t i = 0; i < pCopyBufferToImageInfo->regionCount; ++i) {
-            cb_state_ptr->SetImageInitialLayout(*dst_image_state, pCopyBufferToImageInfo->pRegions[i].imageSubresource,
-                                                pCopyBufferToImageInfo->dstImageLayout);
+    {
+        auto cb_state_ptr = GetWrite<vvl::CommandBuffer>(commandBuffer);
+        auto dst_image_state = Get<vvl::Image>(pCopyBufferToImageInfo->dstImage);
+        if (cb_state_ptr && dst_image_state) {
+            // Make sure that all image slices are record referenced layout
+            for (uint32_t i = 0; i < pCopyBufferToImageInfo->regionCount; ++i) {
+                cb_state_ptr->SetImageInitialLayout(*dst_image_state, pCopyBufferToImageInfo->pRegions[i].imageSubresource,
+                                                    pCopyBufferToImageInfo->dstImageLayout);
+            }
         }
     }
+
+    auto copy_buffer_to_image =
+        AllocatePreCopyBufferToImageValidationResources(record_obj.location.function, commandBuffer, pCopyBufferToImageInfo);
+    StoreCommandResources(commandBuffer, std::move(copy_buffer_to_image));
 }
 
 template <typename RegionType>
@@ -670,7 +693,7 @@ bool gpuav::Validator::VerifyImageLayoutRange(const vvl::CommandBuffer &cb_state
                                               const RangeFactory &range_factory, const Location &loc,
                                               const char *mismatch_layout_vuid, bool *error) const {
     bool skip = false;
-    const auto *subresource_map = cb_state.GetImageSubresourceLayoutMap(image_state);
+    const auto *subresource_map = cb_state.GetImageSubresourceLayoutMap(image_state.VkHandle());
     if (!subresource_map) {
         return skip;
     }
@@ -708,15 +731,15 @@ bool gpuav::Validator::VerifyImageLayoutRange(const vvl::CommandBuffer &cb_state
                 // We can report all the errors for the intersected range directly
                 for (auto index : sparse_container::range_view<decltype(intersected_range)>(intersected_range)) {
                     const auto subresource = image_state.subresource_encoder.Decode(index);
-                    const LogObjectList objlist(cb_state.commandBuffer(), image_state.Handle());
-                    skip |= LogError(objlist, kVUID_Core_DrawState_InvalidImageLayout,
-                                     "%s command buffer %s expects %s (subresource: aspectMask 0x%x array layer %" PRIu32
+                    const LogObjectList objlist(cb_state.Handle(), image_state.Handle());
+                    skip |= LogError("UNASSIGNED-CoreValidation-DrawState-InvalidImageLayout", objlist, loc,
+                                     "command buffer %s expects %s (subresource: aspectMask 0x%x array layer %" PRIu32
                                      ", mip level %" PRIu32
                                      ") "
                                      "to be in layout %s--instead, current layout is %s.",
-                                     loc.Message().c_str(), FormatHandle(cb_state).c_str(), FormatHandle(image_state).c_str(),
-                                     subresource.aspectMask, subresource.arrayLayer, subresource.mipLevel,
-                                     string_VkImageLayout(initial_layout), string_VkImageLayout(image_layout));
+                                     FormatHandle(cb_state).c_str(), FormatHandle(image_state).c_str(), subresource.aspectMask,
+                                     subresource.arrayLayer, subresource.mipLevel, string_VkImageLayout(initial_layout),
+                                     string_VkImageLayout(image_layout));
                 }
             }
         }

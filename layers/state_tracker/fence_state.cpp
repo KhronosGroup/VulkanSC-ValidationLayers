@@ -1,7 +1,7 @@
-/* Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (C) 2015-2023 Google Inc.
+/* Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (C) 2015-2024 Google Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -32,9 +32,20 @@ bool vvl::Fence::EnqueueSignal(vvl::Queue *queue_state, uint64_t next_seq) {
     return false;
 }
 
-// Called from a non-queue operation, such as vkWaitForFences()
+void vvl::Fence::SetPresentSync(const PresentSync &present_sync) {
+    auto guard = WriteLock();
+    present_sync_ = present_sync;
+}
+
+bool vvl::Fence::IsPresentSyncSwapchainChanged(const std::shared_ptr<vvl::Swapchain> &current_swapchain) const {
+    auto guard = ReadLock();
+    return present_sync_.swapchain != current_swapchain;
+}
+
+// Called from a non-queue operation, such as vkWaitForFences()|
 void vvl::Fence::NotifyAndWait(const Location &loc) {
     std::shared_future<void> waiter;
+    PresentSync present_sync;
     {
         // Hold the lock only while updating members, but not
         // while waiting
@@ -49,14 +60,20 @@ void vvl::Fence::NotifyAndWait(const Location &loc) {
                 queue_ = nullptr;
                 seq_ = 0;
             }
+            present_sync = std::move(present_sync_);
+            present_sync_ = PresentSync{};
         }
     }
     if (waiter.valid()) {
         auto result = waiter.wait_until(GetCondWaitTimeout());
         if (result != std::future_status::ready) {
-            dev_data_.LogError("UNASSIGNED-VkFence-state-timeout", Handle(), loc,
-                               "Timeout waiting for fence state to update. This is most likely a validation bug.");
+            dev_data_.LogError(
+                "INTERNAL-ERROR-VkFence-state-timeout", Handle(), loc,
+                "The Validation Layers hit a timeout waiting for fence state to update (this is most likely a validation bug).");
         }
+    }
+    for (const auto &submission : present_sync.submissions) {
+        submission.queue->NotifyAndWait(loc, submission.seq);
     }
 }
 
@@ -80,10 +97,12 @@ void vvl::Fence::Reset() {
     // therefore operate on the restored payload.
     if (scope_ == kExternalTemporary) {
         scope_ = kInternal;
+        imported_handle_type_.reset();
     }
     state_ = kUnsignaled;
     completed_ = std::promise<void>();
     waiter_ = std::shared_future<void>(completed_.get_future());
+    present_sync_ = PresentSync{};
 }
 
 void vvl::Fence::Import(VkExternalFenceHandleTypeFlagBits handle_type, VkFenceImportFlags flags) {
@@ -95,6 +114,7 @@ void vvl::Fence::Import(VkExternalFenceHandleTypeFlagBits handle_type, VkFenceIm
             scope_ = kExternalTemporary;
         }
     }
+    imported_handle_type_ = handle_type;
 }
 
 void vvl::Fence::Export(VkExternalFenceHandleTypeFlagBits handle_type) {
@@ -106,6 +126,7 @@ void vvl::Fence::Export(VkExternalFenceHandleTypeFlagBits handle_type) {
         // Export with copy transference has a side effect of resetting the fence
         if (scope_ == kExternalTemporary) {
             scope_ = kInternal;
+            imported_handle_type_.reset();
         }
         state_ = kUnsignaled;
         completed_ = std::promise<void>();

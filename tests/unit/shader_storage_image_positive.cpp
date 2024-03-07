@@ -19,10 +19,8 @@ TEST_F(PositiveShaderStorageImage, WriteMoreComponent) {
     TEST_DESCRIPTION("Test writing to image with less components.");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredFeature(vkt::Feature::shaderStorageImageExtendedFormats);
     RETURN_IF_SKIP(Init());
-    if (m_device->phy().features().shaderStorageImageExtendedFormats == VK_FALSE) {
-        GTEST_SKIP() << "shaderStorageImageExtendedFormats feature is not supported";
-    }
 
     // not valid GLSL, but would look like:
     // layout(set = 0, binding = 0, Rg32ui) uniform uimage2D storageImage;
@@ -68,7 +66,7 @@ TEST_F(PositiveShaderStorageImage, WriteMoreComponent) {
     }
 
     VkImageObj image(m_device);
-    image.Init(32, 32, 1, format, VK_IMAGE_USAGE_STORAGE_BIT, VK_IMAGE_TILING_OPTIMAL);
+    image.Init(32, 32, 1, format, VK_IMAGE_USAGE_STORAGE_BIT);
     vkt::ImageView view = image.CreateView();
 
     VkDescriptorImageInfo image_info = {};
@@ -102,13 +100,9 @@ TEST_F(PositiveShaderStorageImage, UnknownWriteMoreComponent) {
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::shaderStorageImageExtendedFormats);
+    AddRequiredFeature(vkt::Feature::shaderStorageImageWriteWithoutFormat);
     RETURN_IF_SKIP(Init());
-    if (m_device->phy().features().shaderStorageImageExtendedFormats == VK_FALSE) {
-        GTEST_SKIP() << "shaderStorageImageExtendedFormats feature is not supported";
-    }
-    if (m_device->phy().features().shaderStorageImageWriteWithoutFormat == VK_FALSE) {
-        GTEST_SKIP() << "shaderStorageImageWriteWithoutFormat feature is not supported";
-    }
 
     // not valid GLSL, but would look like:
     // layout(set = 0, binding = 0, Unknown) readonly uniform uimage2D storageImage;
@@ -163,7 +157,7 @@ TEST_F(PositiveShaderStorageImage, UnknownWriteMoreComponent) {
     }
 
     VkImageObj image(m_device);
-    image.Init(32, 32, 1, format, VK_IMAGE_USAGE_STORAGE_BIT, VK_IMAGE_TILING_OPTIMAL);
+    image.Init(32, 32, 1, format, VK_IMAGE_USAGE_STORAGE_BIT);
     vkt::ImageView view = image.CreateView();
 
     VkDescriptorImageInfo image_info = {};
@@ -196,10 +190,8 @@ TEST_F(PositiveShaderStorageImage, WriteSpecConstantMoreComponent) {
     TEST_DESCRIPTION("Test writing to image with less components with Texel being a spec constant.");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredFeature(vkt::Feature::shaderStorageImageExtendedFormats);
     RETURN_IF_SKIP(Init());
-    if (m_device->phy().features().shaderStorageImageExtendedFormats == VK_FALSE) {
-        GTEST_SKIP() << "shaderStorageImageExtendedFormats feature is not supported";
-    }
 
     // not valid GLSL, but would look like:
     // layout (constant_id = 0) const uint sc = 1;
@@ -248,7 +240,7 @@ TEST_F(PositiveShaderStorageImage, WriteSpecConstantMoreComponent) {
     }
 
     VkImageObj image(m_device);
-    image.Init(32, 32, 1, format, VK_IMAGE_USAGE_STORAGE_BIT, VK_IMAGE_TILING_OPTIMAL);
+    image.Init(32, 32, 1, format, VK_IMAGE_USAGE_STORAGE_BIT);
     vkt::ImageView view = image.CreateView();
 
     VkDescriptorImageInfo image_info = {};
@@ -293,8 +285,7 @@ TEST_F(PositiveShaderStorageImage, UnknownWriteLessComponentMultiEntrypoint) {
     TEST_DESCRIPTION("Test writing to image unknown format with less components, but in unused Entrypoint.");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    RETURN_IF_SKIP(InitFramework());
-    RETURN_IF_SKIP(InitState());
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     // The vertex and fragment shader are just a passthrough
@@ -377,7 +368,7 @@ TEST_F(PositiveShaderStorageImage, UnknownWriteLessComponentMultiEntrypoint) {
     }
 
     VkImageObj image(m_device);
-    image.Init(32, 32, 1, format, VK_IMAGE_USAGE_STORAGE_BIT, VK_IMAGE_TILING_OPTIMAL);
+    image.Init(32, 32, 1, format, VK_IMAGE_USAGE_STORAGE_BIT);
     vkt::ImageView view = image.CreateView();
 
     VkDescriptorImageInfo image_info = {};

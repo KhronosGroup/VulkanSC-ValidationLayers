@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
  * Copyright (c) 2015-2023 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -41,11 +41,9 @@ TEST_F(PositiveInstance, TwoInstances) {
 }
 
 TEST_F(PositiveInstance, ValidationInstanceExtensions) {
-    RETURN_IF_SKIP(Init());
-
     std::string layer_name = "VK_LAYER_KHRONOS_validation";
     std::vector<std::string> extensions = {VK_EXT_DEBUG_UTILS_EXTENSION_NAME, VK_EXT_DEBUG_REPORT_EXTENSION_NAME,
-                                           VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME};
+                                           VK_EXT_LAYER_SETTINGS_EXTENSION_NAME, VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME};
     uint32_t property_count;
     vk::EnumerateInstanceExtensionProperties(layer_name.c_str(), &property_count, NULL);
     std::vector<VkExtensionProperties> properties(property_count);
@@ -68,7 +66,6 @@ TEST_F(PositiveInstance, ValidEnumBeforeLogicalDevice) {
     TEST_DESCRIPTION("Call a VkPhysicalDevice query API that uses an enum that is only valid with a promoted extension");
     SetTargetApiVersion(VK_API_VERSION_1_3);
     RETURN_IF_SKIP(InitFramework());
-    // RETURN_IF_SKIP(InitState());
 
     VkImageCreateInfo ci = vku::InitStructHelper();
     ci.flags = 0;

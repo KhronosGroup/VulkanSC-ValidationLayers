@@ -1,6 +1,6 @@
-// Copyright (c) 2021-2022 The Khronos Group Inc.
-// Copyright (c) 2021-2023 Valve Corporation
-// Copyright (c) 2021-2023 LunarG, Inc.
+// Copyright (c) 2021-2024 The Khronos Group Inc.
+// Copyright (c) 2021-2024 Valve Corporation
+// Copyright (c) 2021-2024 LunarG, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -31,6 +31,19 @@ using uint = unsigned int;
 const uint kDebugInputBindlessMaxDescriptors = 1024u*1024u*4u;
 
 #endif
+
+// Instead of having to create a variable and pass it in each time for every function call made, we use these values to map
+// constants in the GLSL to be updated with constant values known when we are doing the linking at GPU-AV runtime. (Similar to
+// Specialization Constant)
+const uint kLinkShaderId = 0x0DEAD001;
+
+// This is just a placeholder, honestly could be anything, will be replaced when linking to the runtime descriptor set choosen
+const int kDefaultDescriptorSet = 7;
+
+// Inside the descriptor set used by GPU-AV, binding #0 is reserved for the output, but each check that requires additional input
+// must reserve its own binding slot
+const int kBindingBindlessDescriptor = 1;
+const int kBindingBufferDeviceAddress = 2;
 
 // Common Stream Record Offsets
 //
@@ -168,7 +181,8 @@ const int kInstErrorPreDrawValidate = 5;
 const int kInstErrorPreDispatchValidate = 6;
 const int kInstErrorBindlessDestroyed = 7;
 const int kInstErrorPreTraceRaysKhrValidate = 8;
-const int kInstErrorMax = 8;
+const int kInstErrorCopyBufferToImage = 9;
+const int kInstErrorMax = 9;
 
 // Direct Input Buffer Offsets
 //
@@ -228,16 +242,21 @@ const int kDebugInputBuffAddrLengthOffset = 0;
 const int pre_draw_count_exceeds_bufsize_error = 1;
 const int pre_draw_count_exceeds_limit_error = 2;
 const int pre_draw_first_instance_error = 3;
-const int pre_dispatch_count_exceeds_limit_x_error = 1;
-const int pre_dispatch_count_exceeds_limit_y_error = 2;
-const int pre_dispatch_count_exceeds_limit_z_error = 3;
-const int pre_trace_rays_query_dimensions_exceeds_width_limit = 1;
-const int pre_trace_rays_query_dimensions_exceeds_height_limit = 2;
-const int pre_trace_rays_query_dimensions_exceeds_depth_limit = 3;
+
 const int pre_draw_group_count_exceeds_limit_x_error = 4;
 const int pre_draw_group_count_exceeds_limit_y_error = 5;
 const int pre_draw_group_count_exceeds_limit_z_error = 6;
 const int pre_draw_group_count_exceeds_total_error = 7;
+
+const int pre_dispatch_count_exceeds_limit_x_error = 1;
+const int pre_dispatch_count_exceeds_limit_y_error = 2;
+const int pre_dispatch_count_exceeds_limit_z_error = 3;
+
+const int pre_trace_rays_query_dimensions_exceeds_width_limit = 1;
+const int pre_trace_rays_query_dimensions_exceeds_height_limit = 2;
+const int pre_trace_rays_query_dimensions_exceeds_depth_limit = 3;
+
+const int pre_copy_buffer_to_image_out_of_range_value = 1;
 
 // These values select which pre-draw validation will be performed
 const int pre_draw_select_count_buffer = 1;

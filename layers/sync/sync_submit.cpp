@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2019-2023 Valve Corporation
- * Copyright (c) 2019-2023 LunarG, Inc.
+ * Copyright (c) 2019-2024 Valve Corporation
+ * Copyright (c) 2019-2024 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,9 +17,12 @@
 
 #include "sync/sync_submit.h"
 #include "sync/sync_validation.h"
+#include "sync/sync_image.h"
 
 AcquiredImage::AcquiredImage(const PresentedImage& presented, ResourceUsageTag acq_tag)
     : image(presented.image), generator(presented.range_gen), present_tag(presented.tag), acquire_tag(acq_tag) {}
+
+bool AcquiredImage::Invalid() const { return vvl::StateObject::Invalid(image); }
 
 // This is a const method, force the returned value to be const
 std::shared_ptr<const SignaledSemaphores::Signal> SignaledSemaphores::GetPrev(VkSemaphore sem) const {
@@ -315,11 +318,19 @@ void QueueBatchContext::EndRenderPassReplayCleanup(ReplayState& replay) {
     current_access_context_ = &access_context_;
 }
 
+void QueueBatchContext::ReplayLabelCommandsFromEmptyBatch() {
+    for (const auto& cb : command_buffers_) {
+        assert(cb.cb->access_context.GetTagLimit() == 0);
+        vvl::CommandBuffer::ReplayLabelCommands(cb.cb->GetLabelCommands(), *current_label_stack_);
+    }
+}
+
 void QueueBatchContext::Cleanup() {
     // Clear these after validation and import, not valid after.
     batch_ = BatchAccessLog::BatchRecord();
     command_buffers_.clear();
     async_batches_.clear();
+    current_label_stack_ = nullptr;
 }
 
 // Overload for QueuePresent semaphore waiting.  Not applicable to QueueSubmit semaphores
@@ -449,9 +460,9 @@ bool QueueBatchContext::DoQueuePresentValidate(const Location& loc, const Presen
             access_context_.DetectHazard(presented.range_gen, SYNC_PRESENT_ENGINE_SYNCVAL_PRESENT_PRESENTED_SYNCVAL);
         if (hazard.IsHazard()) {
             const auto queue_handle = queue_state_->Handle();
-            const auto swap_handle = BASE_NODE::Handle(presented.swapchain_state.lock());
-            const auto image_handle = BASE_NODE::Handle(presented.image);
-            skip = sync_state_->LogError(
+            const auto swap_handle = vvl::StateObject::Handle(presented.swapchain_state.lock());
+            const auto image_handle = vvl::StateObject::Handle(presented.image);
+            skip |= sync_state_->LogError(
                 string_SyncHazardVUID(hazard.Hazard()), queue_handle, loc,
                 "Hazard %s for present pSwapchains[%" PRIu32 "] , swapchain %s, image index %" PRIu32 " %s, Access info %s.",
                 string_SyncHazard(hazard.Hazard()), presented.present_index, sync_state_->FormatHandle(swap_handle).c_str(),
@@ -587,7 +598,7 @@ std::string QueueBatchContext::FormatUsage(ResourceUsageTag tag) const {
         out << ", batch_tag: " << batch.bias;
 
         // Commandbuffer Usages Information
-        out << ", " << record.Formatter(*sync_state_, nullptr);
+        out << ", " << record.Formatter(*sync_state_, nullptr, access.debug_name_provider);
     }
     return out.str();
 }
@@ -613,8 +624,13 @@ void QueueBatchContext::SetupBatchTags() {
     SetTagBias(global_tags.begin);
 }
 
+void QueueBatchContext::SetCurrentLabelStack(std::vector<std::string>* current_label_stack) {
+    assert(current_label_stack != nullptr);
+    this->current_label_stack_ = current_label_stack;
+}
+
 void QueueBatchContext::InsertRecordedAccessLogEntries(const CommandBufferAccessContext& submitted_cb) {
-    const ResourceUsageTag end_tag = batch_log_.Import(batch_, submitted_cb);
+    const ResourceUsageTag end_tag = batch_log_.Import(batch_, submitted_cb, *current_label_stack_);
     batch_.bias = end_tag;
     batch_.cb_index++;
 }
@@ -641,15 +657,19 @@ bool QueueBatchContext::DoQueueSubmitValidate(const SyncValidator& sync_state, Q
     //  For each submit in the batch...
     for (const auto& cb : command_buffers_) {
         const auto& cb_access_context = cb.cb->access_context;
-        if (cb_access_context.GetTagLimit() == 0) {
+        if (cb_access_context.GetTagLimit() == 0) {  // skip CBs without tagged commands
+            // Command buffer might still contain label commands
+            vvl::CommandBuffer::ReplayLabelCommands(cb.cb->GetLabelCommands(), *current_label_stack_);
+            // Skip index for correct reporting
             batch_.cb_index++;
-            continue;  // Skip empty CB's but also skip the unused index for correct reporting
+            continue;
         }
         skip |= ReplayState(*this, cb_access_context, cmd_state.error_obj, cb.index).ValidateFirstUse();
 
         // The barriers have already been applied in ValidatFirstUse
         ResourceUsageRange tag_range = ImportRecordedAccessLog(cb_access_context);
         ResolveSubmittedCommandBuffer(*cb_access_context.GetCurrentAccessContext(), tag_range.begin);
+        vvl::CommandBuffer::ReplayLabelCommands(cb.cb->GetLabelCommands(), *current_label_stack_);
     }
     return skip;
 }
@@ -808,11 +828,12 @@ SubmitInfoConverter::SubmitInfoConverter(uint32_t count, const VkSubmitInfo* inf
     }
 }
 
-ResourceUsageTag BatchAccessLog::Import(const BatchRecord& batch, const CommandBufferAccessContext& cb_access) {
+ResourceUsageTag BatchAccessLog::Import(const BatchRecord& batch, const CommandBufferAccessContext& cb_access,
+                                        const std::vector<std::string>& initial_label_stack) {
     ResourceUsageTag bias = batch.bias;
     ResourceUsageTag tag_limit = bias + cb_access.GetTagLimit();
     ResourceUsageRange import_range = {bias, tag_limit};
-    log_map_.insert(std::make_pair(import_range, CBSubmitLog(batch, cb_access)));
+    log_map_.insert(std::make_pair(import_range, CBSubmitLog(batch, cb_access, initial_label_stack)));
     return tag_limit;
 }
 
@@ -892,16 +913,32 @@ BatchAccessLog::AccessRecord BatchAccessLog::operator[](ResourceUsageTag tag) co
     return AccessRecord();
 }
 
+std::string BatchAccessLog::CBSubmitLog::GetDebugRegionName(const ResourceUsageRecord& record) const {
+    // const auto& label_commands = (*cbs_)[0]->GetLabelCommands();
+    const auto& label_commands = label_commands_;  // TODO: use the above line when timelines are supported
+    return vvl::CommandBuffer::GetDebugRegionName(label_commands, record.label_command_index, initial_label_stack_);
+}
+
 BatchAccessLog::AccessRecord BatchAccessLog::CBSubmitLog::operator[](ResourceUsageTag tag) const {
     assert(tag >= batch_.bias);
     const size_t index = tag - batch_.bias;
     assert(log_);
     assert(index < log_->size());
-    return AccessRecord{&batch_, &(*log_)[index]};
+    const ResourceUsageRecord* record = &(*log_)[index];
+    const auto debug_name_provider = (record->label_command_index == vvl::kU32Max) ? nullptr : this;
+    return AccessRecord{&batch_, record, debug_name_provider};
 }
 
-BatchAccessLog::CBSubmitLog::CBSubmitLog(const BatchRecord& batch, const CommandBufferAccessContext& cb)
-    : CBSubmitLog(batch, cb.GetCBReferencesShared(), cb.GetAccessLogShared()) {}
+BatchAccessLog::CBSubmitLog::CBSubmitLog(const BatchRecord& batch,
+                                         std::shared_ptr<const CommandExecutionContext::CommandBufferSet> cbs,
+                                         std::shared_ptr<const CommandExecutionContext::AccessLog> log)
+    : batch_(batch), cbs_(cbs), log_(log) {}
+
+BatchAccessLog::CBSubmitLog::CBSubmitLog(const BatchRecord& batch, const CommandBufferAccessContext& cb,
+                                         const std::vector<std::string>& initial_label_stack)
+    : batch_(batch), cbs_(cb.GetCBReferencesShared()), log_(cb.GetAccessLogShared()), initial_label_stack_(initial_label_stack) {
+    label_commands_ = (*cbs_)[0]->GetLabelCommands();  // TODO: when timelines are supported use cbs directly
+}
 
 PresentedImage::PresentedImage(const SyncValidator& sync_state, const std::shared_ptr<QueueBatchContext> batch_,
                                VkSwapchainKHR swapchain, uint32_t image_index_, uint32_t present_index_, ResourceUsageTag tag_)
@@ -916,11 +953,13 @@ PresentedImage::PresentedImage(std::shared_ptr<const syncval_state::Swapchain> s
     SetImage(at_index);
 }
 
+bool PresentedImage::Invalid() const { return vvl::StateObject::Invalid(image); }
+
 // Export uses move semantics...
 void PresentedImage::ExportToSwapchain(SyncValidator&) {  // Include this argument to prove the const cast is safe
     // If the swapchain is dead just ignore the present
     auto swap_lock = swapchain_state.lock();
-    if (BASE_NODE::Invalid(swap_lock)) return;
+    if (vvl::StateObject::Invalid(swap_lock)) return;
     auto swap = std::const_pointer_cast<syncval_state::Swapchain>(swap_lock);
     swap->RecordPresentedImage(std::move(*this));
 }
@@ -929,7 +968,7 @@ void PresentedImage::SetImage(uint32_t at_index) {
     image_index = at_index;
 
     auto swap_lock = swapchain_state.lock();
-    if (BASE_NODE::Invalid(swap_lock)) return;
+    if (vvl::StateObject::Invalid(swap_lock)) return;
     image = std::static_pointer_cast<const syncval_state::ImageState>(swap_lock->GetSwapChainImageShared(image_index));
     if (Invalid()) {
         range_gen = ImageRangeGen();

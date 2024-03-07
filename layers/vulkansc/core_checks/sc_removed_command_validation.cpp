@@ -25,66 +25,66 @@
 #include "vulkansc/core_checks/sc_core_validation.h"
 
 template <typename VkHandle>
-bool SCCoreChecks::ValidateRemovedCommand(VkHandle handle, const char* cmd) const {
-    (void)LogError(handle, kVUID_SC_RemovedCommand, "%s(): command not supported in Vulkan SC", cmd);
+bool SCCoreChecks::ValidateRemovedCommand(VkHandle handle, const Location& loc) const {
+    (void)LogError(kVUID_SC_RemovedCommand, handle, loc, "command not supported in Vulkan SC");
     return false;
 }
 
 bool SCCoreChecks::PreCallValidateCreateShaderModule(VkDevice device, const VkShaderModuleCreateInfo* pCreateInfo,
                                                      const VkAllocationCallbacks* pAllocator, VkShaderModule* pShaderModule,
                                                      const ErrorObject& error_obj) const {
-    return ValidateRemovedCommand(device, "vkCreateShaderModule");
+    return ValidateRemovedCommand(device, error_obj.location);
 }
 
 bool SCCoreChecks::PreCallValidateDestroyShaderModule(VkDevice device, VkShaderModule shaderModule,
                                                       const VkAllocationCallbacks* pAllocator, const ErrorObject& error_obj) const {
-    return ValidateRemovedCommand(device, "vkDestroyShaderModule");
+    return ValidateRemovedCommand(device, error_obj.location);
 }
 
 bool SCCoreChecks::PreCallValidateMergePipelineCaches(VkDevice device, VkPipelineCache dstCache, uint32_t srcCacheCount,
                                                       const VkPipelineCache* pSrcCaches, const ErrorObject& error_obj) const {
-    return ValidateRemovedCommand(device, "vkMergePipelineCaches");
+    return ValidateRemovedCommand(device, error_obj.location);
 }
 
 bool SCCoreChecks::PreCallValidateGetPipelineCacheData(VkDevice device, VkPipelineCache pipelineCache, size_t* pDataSize,
                                                        void* pData, const ErrorObject& error_obj) const {
-    return ValidateRemovedCommand(device, "vkGetPipelineCacheData");
+    return ValidateRemovedCommand(device, error_obj.location);
 }
 
 bool SCCoreChecks::PreCallValidateTrimCommandPool(VkDevice device, VkCommandPool commandPool, VkCommandPoolTrimFlags flags,
                                                   const ErrorObject& error_obj) const {
-    return ValidateRemovedCommand(device, "vkTrimCommandPool");
+    return ValidateRemovedCommand(device, error_obj.location);
 }
 
 bool SCCoreChecks::PreCallValidateTrimCommandPoolKHR(VkDevice device, VkCommandPool commandPool, VkCommandPoolTrimFlags flags,
                                                      const ErrorObject& error_obj) const {
-    return ValidateRemovedCommand(device, "vkTrimCommandPoolKHR");
+    return ValidateRemovedCommand(device, error_obj.location);
 }
 
 bool SCCoreChecks::PreCallValidateDestroyCommandPool(VkDevice device, VkCommandPool commandPool,
                                                      const VkAllocationCallbacks* pAllocator, const ErrorObject& error_obj) const {
-    return ValidateRemovedCommand(device, "vkDestroyCommandPool");
+    return ValidateRemovedCommand(device, error_obj.location);
 }
 
 bool SCCoreChecks::PreCallValidateDestroyDescriptorPool(VkDevice device, VkDescriptorPool descriptorPool,
                                                         const VkAllocationCallbacks* pAllocator,
                                                         const ErrorObject& error_obj) const {
-    return ValidateRemovedCommand(device, "vkDestroyDescriptorPool");
+    return ValidateRemovedCommand(device, error_obj.location);
 }
 
 bool SCCoreChecks::PreCallValidateDestroyQueryPool(VkDevice device, VkQueryPool queryPool, const VkAllocationCallbacks* pAllocator,
                                                    const ErrorObject& error_obj) const {
-    return ValidateRemovedCommand(device, "vkDestroyQueryPool");
+    return ValidateRemovedCommand(device, error_obj.location);
 }
 
 bool SCCoreChecks::PreCallValidateDestroySwapchainKHR(VkDevice device, VkSwapchainKHR swapchain,
                                                       const VkAllocationCallbacks* pAllocator, const ErrorObject& error_obj) const {
-    return ValidateRemovedCommand(device, "vkDestroySwapchainKHR");
+    return ValidateRemovedCommand(device, error_obj.location);
 }
 
 bool SCCoreChecks::PreCallValidateFreeMemory(VkDevice device, VkDeviceMemory mem, const VkAllocationCallbacks* pAllocator,
                                              const ErrorObject& error_obj) const {
-    return ValidateRemovedCommand(device, "vkFreeMemory");
+    return ValidateRemovedCommand(device, error_obj.location);
 }
 
 bool SCCoreChecks::PreCallValidateCreateDescriptorUpdateTemplate(VkDevice device,
@@ -92,7 +92,7 @@ bool SCCoreChecks::PreCallValidateCreateDescriptorUpdateTemplate(VkDevice device
                                                                  const VkAllocationCallbacks* pAllocator,
                                                                  VkDescriptorUpdateTemplate* pDescriptorUpdateTemplate,
                                                                  const ErrorObject& error_obj) const {
-    return ValidateRemovedCommand(device, "vkCreateDescriptorUpdateTemplate");
+    return ValidateRemovedCommand(device, error_obj.location);
 }
 
 bool SCCoreChecks::PreCallValidateCreateDescriptorUpdateTemplateKHR(VkDevice device,
@@ -100,33 +100,33 @@ bool SCCoreChecks::PreCallValidateCreateDescriptorUpdateTemplateKHR(VkDevice dev
                                                                     const VkAllocationCallbacks* pAllocator,
                                                                     VkDescriptorUpdateTemplate* pDescriptorUpdateTemplate,
                                                                     const ErrorObject& error_obj) const {
-    return ValidateRemovedCommand(device, "vkCreateDescriptorUpdateTemplateKHR");
+    return ValidateRemovedCommand(device, error_obj.location);
 }
 
 bool SCCoreChecks::PreCallValidateDestroyDescriptorUpdateTemplate(VkDevice device,
                                                                   VkDescriptorUpdateTemplate descriptorUpdateTemplate,
                                                                   const VkAllocationCallbacks* pAllocator,
                                                                   const ErrorObject& error_obj) const {
-    return ValidateRemovedCommand(device, "vkDestroyDescriptorUpdateTemplate");
+    return ValidateRemovedCommand(device, error_obj.location);
 }
 
 bool SCCoreChecks::PreCallValidateDestroyDescriptorUpdateTemplateKHR(VkDevice device,
                                                                      VkDescriptorUpdateTemplate descriptorUpdateTemplate,
                                                                      const VkAllocationCallbacks* pAllocator,
                                                                      const ErrorObject& error_obj) const {
-    return ValidateRemovedCommand(device, "vkDestroyDescriptorUpdateTemplateKHR");
+    return ValidateRemovedCommand(device, error_obj.location);
 }
 
 bool SCCoreChecks::PreCallValidateUpdateDescriptorSetWithTemplate(VkDevice device, VkDescriptorSet descriptorSet,
                                                                   VkDescriptorUpdateTemplate descriptorUpdateTemplate,
                                                                   const void* pData, const ErrorObject& error_obj) const {
-    return ValidateRemovedCommand(device, "vkUpdateDescriptorSetWithTemplate");
+    return ValidateRemovedCommand(device, error_obj.location);
 }
 
 bool SCCoreChecks::PreCallValidateUpdateDescriptorSetWithTemplateKHR(VkDevice device, VkDescriptorSet descriptorSet,
                                                                      VkDescriptorUpdateTemplate descriptorUpdateTemplate,
                                                                      const void* pData, const ErrorObject& error_obj) const {
-    return ValidateRemovedCommand(device, "vkUpdateDescriptorSetWithTemplateKHR");
+    return ValidateRemovedCommand(device, error_obj.location);
 }
 
 bool SCCoreChecks::PreCallValidateGetPhysicalDeviceSparseImageFormatProperties(VkPhysicalDevice physicalDevice, VkFormat format,
@@ -135,26 +135,26 @@ bool SCCoreChecks::PreCallValidateGetPhysicalDeviceSparseImageFormatProperties(V
                                                                                uint32_t* pPropertyCount,
                                                                                VkSparseImageFormatProperties* pProperties,
                                                                                const ErrorObject& error_obj) const {
-    return ValidateRemovedCommand(device, "vkGetPhysicalDeviceSparseImageFormatProperties");
+    return ValidateRemovedCommand(device, error_obj.location);
 }
 
 bool SCCoreChecks::PreCallValidateGetPhysicalDeviceSparseImageFormatProperties2(
     VkPhysicalDevice physicalDevice, const VkPhysicalDeviceSparseImageFormatInfo2* pFormatInfo, uint32_t* pPropertyCount,
     VkSparseImageFormatProperties2* pProperties, const ErrorObject& error_obj) const {
-    return ValidateRemovedCommand(device, "vkGetPhysicalDeviceSparseImageFormatProperties2");
+    return ValidateRemovedCommand(device, error_obj.location);
 }
 
 bool SCCoreChecks::PreCallValidateGetPhysicalDeviceSparseImageFormatProperties2KHR(
     VkPhysicalDevice physicalDevice, const VkPhysicalDeviceSparseImageFormatInfo2* pFormatInfo, uint32_t* pPropertyCount,
     VkSparseImageFormatProperties2* pProperties, const ErrorObject& error_obj) const {
-    return ValidateRemovedCommand(device, "vkGetPhysicalDeviceSparseImageFormatProperties2KHR");
+    return ValidateRemovedCommand(device, error_obj.location);
 }
 
 bool SCCoreChecks::PreCallValidateGetImageSparseMemoryRequirements(VkDevice device, VkImage image,
                                                                    uint32_t* pSparseMemoryRequirementCount,
                                                                    VkSparseImageMemoryRequirements* pSparseMemoryRequirements,
                                                                    const ErrorObject& error_obj) const {
-    return ValidateRemovedCommand(device, "vkGetImageSparseMemoryRequirements");
+    return ValidateRemovedCommand(device, error_obj.location);
 }
 
 bool SCCoreChecks::PreCallValidateGetImageSparseMemoryRequirements2(VkDevice device,
@@ -162,7 +162,7 @@ bool SCCoreChecks::PreCallValidateGetImageSparseMemoryRequirements2(VkDevice dev
                                                                     uint32_t* pSparseMemoryRequirementCount,
                                                                     VkSparseImageMemoryRequirements2* pSparseMemoryRequirements,
                                                                     const ErrorObject& error_obj) const {
-    return ValidateRemovedCommand(device, "vkGetImageSparseMemoryRequirements2");
+    return ValidateRemovedCommand(device, error_obj.location);
 }
 
 bool SCCoreChecks::PreCallValidateGetImageSparseMemoryRequirements2KHR(VkDevice device,
@@ -170,10 +170,10 @@ bool SCCoreChecks::PreCallValidateGetImageSparseMemoryRequirements2KHR(VkDevice 
                                                                        uint32_t* pSparseMemoryRequirementCount,
                                                                        VkSparseImageMemoryRequirements2* pSparseMemoryRequirements,
                                                                        const ErrorObject& error_obj) const {
-    return ValidateRemovedCommand(device, "vkGetImageSparseMemoryRequirements2KHR");
+    return ValidateRemovedCommand(device, error_obj.location);
 }
 
 bool SCCoreChecks::PreCallValidateQueueBindSparse(VkQueue queue, uint32_t bindInfoCount, const VkBindSparseInfo* pBindInfo,
                                                   VkFence fence, const ErrorObject& error_obj) const {
-    return ValidateRemovedCommand(device, "vkQueueBindSparse");
+    return ValidateRemovedCommand(device, error_obj.location);
 }

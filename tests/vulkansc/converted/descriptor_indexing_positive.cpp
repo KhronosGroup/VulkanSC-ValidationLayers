@@ -18,17 +18,9 @@
 #include "../framework/pipeline_helper.h"
 #include "../framework/descriptor_helper.h"
 
-void DescriptorIndexingTest::InitBasicDescriptorIndexing(void* pNextFeatures) {
-    AddRequiredExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-
-    descriptor_indexing_features = vku::InitStructHelper(pNextFeatures);
-    GetPhysicalDeviceFeatures2(descriptor_indexing_features);
-    RETURN_IF_SKIP(InitState(nullptr, &descriptor_indexing_features));
-}
-
 void DescriptorIndexingTest::ComputePipelineShaderTest(const char *shader, std::vector<VkDescriptorSetLayoutBinding> &bindings) {
-    RETURN_IF_SKIP(InitBasicDescriptorIndexing());
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     CreateComputePipelineHelper pipe(*this);
@@ -42,12 +34,9 @@ void DescriptorIndexingTest::ComputePipelineShaderTest(const char *shader, std::
 TEST_F(PositiveDescriptorIndexing, BindingPartiallyBound) {
     TEST_DESCRIPTION("Ensure that no validation errors for invalid descriptors if binding is PARTIALLY_BOUND");
     SetTargetApiVersion(VK_API_VERSION_1_1);
-    RETURN_IF_SKIP(InitBasicDescriptorIndexing());
-
-    if (!descriptor_indexing_features.descriptorBindingPartiallyBound) {
-        GTEST_SKIP() << "Partially bound bindings not supported, skipping test";
-    }
-
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::descriptorBindingPartiallyBound);
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     VkDescriptorBindingFlagsEXT ds_binding_flags[2] = {};
@@ -135,15 +124,10 @@ TEST_F(PositiveDescriptorIndexing, UpdateAfterBind) {
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
-    VkPhysicalDeviceSynchronization2FeaturesKHR synchronization2 = vku::InitStructHelper();
-    RETURN_IF_SKIP(InitBasicDescriptorIndexing(&synchronization2));
-
-    if (descriptor_indexing_features.descriptorBindingStorageBufferUpdateAfterBind == VK_FALSE) {
-        GTEST_SKIP() << "descriptorBindingStorageBufferUpdateAfterBind feature is not available";
-    }
-    if (synchronization2.synchronization2 == VK_FALSE) {
-        GTEST_SKIP() << "synchronization2 feature is not available";
-    }
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::descriptorBindingStorageBufferUpdateAfterBind);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     VkBufferCreateInfo buffer_ci = vku::InitStructHelper();
@@ -238,8 +222,8 @@ TEST_F(PositiveDescriptorIndexing, UpdateAfterBind) {
     submit_info.commandBufferInfoCount = 1;
     submit_info.pCommandBufferInfos = &cb_info;
 
-    vk::QueueSubmit2KHR(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
-    vk::QueueWaitIdle(m_default_queue);
+    vk::QueueSubmit2KHR(m_default_queue->handle(), 1, &submit_info, VK_NULL_HANDLE);
+    m_default_queue->wait();
 
     vk::DestroyBuffer(device(), buffer2, nullptr);
     vk::DestroyBuffer(device(), buffer3, nullptr);
@@ -254,16 +238,10 @@ TEST_F(PositiveDescriptorIndexing, PartiallyBoundDescriptors) {
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
-    VkPhysicalDeviceSynchronization2FeaturesKHR synchronization2 = vku::InitStructHelper();
-    RETURN_IF_SKIP(InitBasicDescriptorIndexing(&synchronization2));
-
-    if (descriptor_indexing_features.descriptorBindingStorageBufferUpdateAfterBind == VK_FALSE) {
-        GTEST_SKIP() << "descriptorBindingStorageBufferUpdateAfterBind feature is not available";
-    }
-    if (synchronization2.synchronization2 == VK_FALSE) {
-        GTEST_SKIP() << "synchronization2 feature is not available";
-    }
-
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::descriptorBindingStorageBufferUpdateAfterBind);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     VkBufferCreateInfo buffer_ci = vku::InitStructHelper();
@@ -353,8 +331,8 @@ TEST_F(PositiveDescriptorIndexing, PartiallyBoundDescriptors) {
     submit_info.commandBufferInfoCount = 1;
     submit_info.pCommandBufferInfos = &cb_info;
 
-    vk::QueueSubmit2KHR(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
-    vk::QueueWaitIdle(m_default_queue);
+    vk::QueueSubmit2KHR(m_default_queue->handle(), 1, &submit_info, VK_NULL_HANDLE);
+    m_default_queue->wait();
 
     vk::DestroyBuffer(device(), buffer3, nullptr);
 
@@ -422,6 +400,7 @@ TEST_F(PositiveDescriptorIndexing, PipelineShaderImageBufferArray) {
         }
     )glsl";
 
+    AddRequiredFeature(vkt::Feature::runtimeDescriptorArray);
     ComputePipelineShaderTest(csSource, bindings);
 }
 
@@ -447,5 +426,6 @@ TEST_F(PositiveDescriptorIndexing, PipelineShaderMultiArrayIndexing) {
         }
     )glsl";
 
+    AddRequiredFeature(vkt::Feature::shaderSampledImageArrayNonUniformIndexing);
     ComputePipelineShaderTest(csSource, bindings);
 }

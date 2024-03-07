@@ -1,7 +1,7 @@
-/* Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (C) 2015-2023 Google Inc.
+/* Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (C) 2015-2024 Google Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 #pragma once
-#include "state_tracker/base_node.h"
+#include "state_tracker/state_object.h"
 #include "generated/layer_chassis_dispatch.h"
 #include "generated/vk_safe_struct.h"
 #include <vector>
@@ -36,7 +36,7 @@ class SurfacelessQueryState {
 
 namespace vvl {
 
-class PhysicalDevice : public BASE_NODE {
+class PhysicalDevice : public StateObject {
   public:
     uint32_t queue_family_known_count = 1;  // spec implies one QF must always be supported
     const std::vector<VkQueueFamilyProperties> queue_family_properties;
@@ -45,15 +45,15 @@ class PhysicalDevice : public BASE_NODE {
     uint32_t display_plane_property_count = 0;
 
     // Map of queue family index to QueueFamilyPerfCounters
-    vvl::unordered_map<uint32_t, std::unique_ptr<QueueFamilyPerfCounters>> perf_counters;
+    unordered_map<uint32_t, std::unique_ptr<QueueFamilyPerfCounters>> perf_counters;
 
     // Surfaceless Query extension needs 'global' surface_state data
     SurfacelessQueryState surfaceless_query_state{};
 
     PhysicalDevice(VkPhysicalDevice phys_dev)
-        : BASE_NODE(phys_dev, kVulkanObjectTypePhysicalDevice), queue_family_properties(GetQueueFamilyProps(phys_dev)) {}
+        : StateObject(phys_dev, kVulkanObjectTypePhysicalDevice), queue_family_properties(GetQueueFamilyProps(phys_dev)) {}
 
-    VkPhysicalDevice PhysDev() const { return handle_.Cast<VkPhysicalDevice>(); }
+    VkPhysicalDevice VkHandle() const { return handle_.Cast<VkPhysicalDevice>(); }
 
   private:
     const std::vector<VkQueueFamilyProperties> GetQueueFamilyProps(VkPhysicalDevice phys_dev) {
@@ -66,14 +66,14 @@ class PhysicalDevice : public BASE_NODE {
     }
 };
 
-class DisplayMode : public BASE_NODE {
+class DisplayMode : public StateObject {
   public:
     const VkPhysicalDevice physical_device;
 
     DisplayMode(VkDisplayModeKHR dm, VkPhysicalDevice phys_dev)
-        : BASE_NODE(dm, kVulkanObjectTypeDisplayModeKHR), physical_device(phys_dev) {}
+        : StateObject(dm, kVulkanObjectTypeDisplayModeKHR), physical_device(phys_dev) {}
 
-    VkDisplayModeKHR display_mode() const { return handle_.Cast<VkDisplayModeKHR>(); }
+    VkDisplayModeKHR VkHandle() const { return handle_.Cast<VkDisplayModeKHR>(); }
 };
 
 }  // namespace vvl

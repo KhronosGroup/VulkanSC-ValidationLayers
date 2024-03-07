@@ -221,7 +221,7 @@ static bool debug_log_msg(const debug_report_data *debug_data, VkFlags msg_flags
                 object_name_infos.emplace_back(null_object_name);
             }
             if (current_callback.debug_report_callback_function_ptr(
-                    msg_flags, convertCoreObjectToDebugReportObject(object_name_infos[0].objectType),
+                    msg_flags, ConvertCoreObjectToDebugReportObject(object_name_infos[0].objectType),
                     object_name_infos[0].objectHandle, message_id_number, 0, layer_prefix, composite.c_str(),
                     current_callback.pUserData)) {
                 bail = true;
@@ -405,8 +405,7 @@ VKAPI_ATTR bool LogMsg(const debug_report_data *debug_data, VkFlags msg_flags, c
     }
 
     // Append the spec error text to the error message, unless it contains a word treated as special
-    if ((vuid_text.find("UNASSIGNED-") == std::string::npos) && (vuid_text.find(kVUIDUndefined) == std::string::npos) &&
-        (vuid_text.rfind("SYNC-", 0) == std::string::npos) && (vuid_text.find("INTERNAL-ERROR-") == std::string::npos)) {
+    if ((vuid_text.find("VUID-") != std::string::npos)) {
         // Linear search makes no assumptions about the layout of the string table. This is not fast, but it does not need to be at
         // this point in the error reporting path
         uint32_t num_vuids = sizeof(vuid_spec_text) / sizeof(vuid_spec_text_pair);
@@ -444,12 +443,17 @@ VKAPI_ATTR bool LogMsg(const debug_report_data *debug_data, VkFlags msg_flags, c
                 str_plus_spec_text.append(".");
             }
 
+#ifdef VULKANSC
+            str_plus_spec_text.append(" The Vulkan SC spec states: ");
+#else
             str_plus_spec_text.append(" The Vulkan spec states: ");
+#endif
             str_plus_spec_text.append(spec_text);
             if (0 == spec_type.compare("default")) {
-                str_plus_spec_text.append(" (https://github.com/KhronosGroup/Vulkan-Docs/search?q=)");
 #ifdef VULKANSC
                 str_plus_spec_text.append(" (https://github.com/KhronosGroup/VulkanSC-Docs/search?q=)");
+#else
+                str_plus_spec_text.append(" (https://github.com/KhronosGroup/Vulkan-Docs/search?q=)");
 #endif
             } else {
                 str_plus_spec_text.append(" (");

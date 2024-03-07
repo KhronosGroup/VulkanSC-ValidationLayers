@@ -1,7 +1,7 @@
-/* Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (C) 2015-2023 Google Inc.
+/* Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (C) 2015-2024 Google Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 #pragma once
-#include "state_tracker/base_node.h"
+#include "state_tracker/state_object.h"
 #include "generated/vk_safe_struct.h"
 
 namespace vvl {
@@ -70,7 +70,7 @@ struct SubpassLayout {
 
 namespace vvl {
 
-class RenderPass : public BASE_NODE {
+class RenderPass : public StateObject {
   public:
     struct AttachmentTransition {
         uint32_t prev_pass;
@@ -111,10 +111,11 @@ class RenderPass : public BASE_NODE {
     RenderPass(VkRenderingInfo const *pRenderingInfo, bool rasterization_enabled);
     RenderPass(VkCommandBufferInheritanceRenderingInfo const *pInheritanceRenderingInfo);
 
-    VkRenderPass renderPass() const { return handle_.Cast<VkRenderPass>(); }
+    VkRenderPass VkHandle() const { return handle_.Cast<VkRenderPass>(); }
 
     bool UsesColorAttachment(uint32_t subpass) const;
     bool UsesDepthStencilAttachment(uint32_t subpass) const;
+    bool UsesNoAttachment(uint32_t subpass) const;
     // prefer this to checking the individual flags unless you REALLY need to check one or the other
     bool UsesDynamicRendering() const { return use_dynamic_rendering || use_dynamic_rendering_inherited; }
     uint32_t GetDynamicRenderingColorAttachmentCount() const;
@@ -123,7 +124,7 @@ class RenderPass : public BASE_NODE {
     const VkMultisampledRenderToSingleSampledInfoEXT *GetMSRTSSInfo(uint32_t subpass) const;
 };
 
-class Framebuffer : public BASE_NODE {
+class Framebuffer : public StateObject {
   public:
     const safe_VkFramebufferCreateInfo createInfo;
     std::shared_ptr<const RenderPass> rp_state;
@@ -133,7 +134,7 @@ class Framebuffer : public BASE_NODE {
                 std::vector<std::shared_ptr<vvl::ImageView>> &&attachments);
     void LinkChildNodes() override;
 
-    VkFramebuffer framebuffer() const { return handle_.Cast<VkFramebuffer>(); }
+    VkFramebuffer VkHandle() const { return handle_.Cast<VkFramebuffer>(); }
 
     virtual ~Framebuffer() { Destroy(); }
 

@@ -1,7 +1,7 @@
-/* Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (C) 2015-2023 Google Inc.
+/* Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (C) 2015-2024 Google Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  * Modifications Copyright (C) 2022 RasterGrid Kft.
  *
@@ -23,11 +23,12 @@
 #include "containers/range_vector.h"
 
 class ValidationStateTracker;
-class VideoProfileDesc;
 
 namespace vvl {
 
-class Buffer : public BINDABLE {
+class VideoProfileDesc;
+
+class Buffer : public Bindable {
   public:
     const safe_VkBufferCreateInfo safe_create_info;
     const VkBufferCreateInfo &createInfo;
@@ -36,21 +37,21 @@ class Buffer : public BINDABLE {
     // VkBufferUsageFlags2CreateInfoKHR can be used instead over the VkBufferCreateInfo::usage
     const VkBufferUsageFlags2KHR usage;
 
-    vvl::unordered_set<std::shared_ptr<const VideoProfileDesc>> supported_video_profiles;
+    unordered_set<std::shared_ptr<const VideoProfileDesc>> supported_video_profiles;
 
     Buffer(ValidationStateTracker *dev_data, VkBuffer buff, const VkBufferCreateInfo *pCreateInfo);
 
     Buffer(Buffer const &rh_obj) = delete;
 
-    // This destructor is needed because BINDABLE depends on the tracker_ variant defined in this
+    // This destructor is needed because Bindable depends on the tracker_ variant defined in this
     // class. So we need to do the Destroy() work before tracker_ is destroyed.
     virtual ~Buffer() {
         if (!Destroyed()) {
-            BINDABLE::Destroy();
+            Bindable::Destroy();
         }
     }
 
-    VkBuffer buffer() const { return handle_.Cast<VkBuffer>(); }
+    VkBuffer VkHandle() const { return handle_.Cast<VkBuffer>(); }
     std::optional<VkDeviceSize> ComputeValidSize(VkDeviceSize offset, VkDeviceSize size) const {
         return ::ComputeValidSize(offset, size, createInfo.size);
     }
@@ -58,7 +59,7 @@ class Buffer : public BINDABLE {
         std::optional<VkDeviceSize> valid_size = ComputeValidSize(offset, size);
         return valid_size.has_value() ? *valid_size : VkDeviceSize(0);
     }
-    static VkDeviceSize ComputeSize(const std::shared_ptr<const vvl::Buffer> &buffer_state, VkDeviceSize offset,
+    static VkDeviceSize ComputeSize(const std::shared_ptr<const Buffer> &buffer_state, VkDeviceSize offset,
                                     VkDeviceSize size) {
         return buffer_state ? buffer_state->ComputeSize(offset, size) : VkDeviceSize(0);
     }
@@ -69,10 +70,10 @@ class Buffer : public BINDABLE {
     std::variant<std::monostate, BindableLinearMemoryTracker, BindableSparseMemoryTracker> tracker_;
 };
 
-class BufferView : public BASE_NODE {
+class BufferView : public StateObject {
   public:
     const VkBufferViewCreateInfo create_info;
-    std::shared_ptr<vvl::Buffer> buffer_state;
+    std::shared_ptr<Buffer> buffer_state;
 #ifdef VK_USE_PLATFORM_METAL_EXT
     const bool metal_bufferview_export;
 #endif  // VK_USE_PLATFORM_METAL_EXT
@@ -80,7 +81,7 @@ class BufferView : public BASE_NODE {
     // both as a buffer (ex OpLoad) or image (ex OpImageWrite)
     const VkFormatFeatureFlags2KHR buf_format_features;
 
-    BufferView(const std::shared_ptr<vvl::Buffer> &bf, VkBufferView bv, const VkBufferViewCreateInfo *ci,
+    BufferView(const std::shared_ptr<Buffer> &bf, VkBufferView bv, const VkBufferViewCreateInfo *ci,
                VkFormatFeatureFlags2KHR buf_ff);
 
     void LinkChildNodes() override {
@@ -95,14 +96,14 @@ class BufferView : public BASE_NODE {
 
     BufferView(const BufferView &rh_obj) = delete;
 
-    VkBufferView buffer_view() const { return handle_.Cast<VkBufferView>(); }
+    VkBufferView VkHandle() const { return handle_.Cast<VkBufferView>(); }
 
     void Destroy() override {
         if (buffer_state) {
             buffer_state->RemoveParent(this);
             buffer_state = nullptr;
         }
-        BASE_NODE::Destroy();
+        StateObject::Destroy();
     }
     bool Invalid() const override { return Destroyed() || !buffer_state || buffer_state->Invalid(); }
 

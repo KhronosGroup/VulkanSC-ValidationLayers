@@ -1,5 +1,5 @@
-/* Copyright (c) 2023 Nintendo
- * Copyright (c) 2023 LunarG, Inc.
+/* Copyright (c) 2023-2024 Nintendo
+ * Copyright (c) 2023-2024 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -121,10 +121,6 @@ bool CoreChecks::PreCallValidateCreateShadersEXT(VkDevice device, uint32_t creat
                              string_VkShaderCreateFlagsEXT(createInfo.flags).c_str());
         }
 
-        if ((createInfo.flags & VK_SHADER_CREATE_LINK_STAGE_BIT_EXT) != 0 && createInfoCount == 1) {
-            skip |= LogError("VUID-vkCreateShadersEXT-pCreateInfos-08401", device, create_info_loc.dot(Field::flags),
-                             "is %s, but createInfoCount is 1.", string_VkShaderCreateFlagsEXT(createInfo.flags).c_str());
-        }
         if ((createInfo.flags & VK_SHADER_CREATE_LINK_STAGE_BIT_EXT) != 0) {
             const auto nextStage = FindNextStage(createInfoCount, pCreateInfos, createInfo.stage);
             if (nextStage != 0 && createInfo.nextStage != nextStage) {
@@ -278,6 +274,10 @@ bool CoreChecks::PreCallValidateCreateShadersEXT(VkDevice device, uint32_t creat
     for (uint32_t i = 0; i < createInfoCount; ++i) {
         if (pCreateInfos[i].codeType == VK_SHADER_CODE_TYPE_SPIRV_EXT) {
             const Location create_info_loc = error_obj.location.dot(Field::pCreateInfos, i);
+
+            spv_const_binary_t binary{static_cast<const uint32_t*>(pCreateInfos[i].pCode), pCreateInfos[i].codeSize / sizeof(uint32_t)};
+            skip |= RunSpirvValidation(binary, create_info_loc);
+
             const StageCreateInfo stage_create_info(pCreateInfos[i]);
             const auto spirv =
                 std::make_shared<spirv::Module>(pCreateInfos[i].codeSize, static_cast<const uint32_t*>(pCreateInfos[i].pCode));

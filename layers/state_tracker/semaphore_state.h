@@ -1,7 +1,7 @@
-/* Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (C) 2015-2023 Google Inc.
+/* Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (C) 2015-2024 Google Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 #pragma once
-#include "state_tracker/base_node.h"
+#include "state_tracker/state_object.h"
 #include <future>
 #include <map>
 #include <mutex>
@@ -29,8 +29,9 @@ class ValidationStateTracker;
 namespace vvl {
 
 class Queue;
+struct SubmissionLocator;
 
-class Semaphore : public REFCOUNTED_NODE {
+class Semaphore : public RefcountedStateObject {
   public:
     // possible payload values for binary semaphore
     enum OpType {
@@ -125,7 +126,7 @@ class Semaphore : public REFCOUNTED_NODE {
 
     Semaphore(ValidationStateTracker &dev, VkSemaphore sem, const VkSemaphoreTypeCreateInfo *type_create_info,
                     const VkSemaphoreCreateInfo *pCreateInfo)
-        : REFCOUNTED_NODE(sem, kVulkanObjectTypeSemaphore),
+        : RefcountedStateObject(sem, kVulkanObjectTypeSemaphore),
 #ifdef VK_USE_PLATFORM_METAL_EXT
           metal_semaphore_export(GetMetalExport(pCreateInfo)),
 #endif  // VK_USE_PLATFORM_METAL_EXT
@@ -142,6 +143,11 @@ class Semaphore : public REFCOUNTED_NODE {
     Scope Scope() const {
         auto guard = ReadLock();
         return scope_;
+    }
+    VkExternalSemaphoreHandleTypeFlagBits ImportedHandleType() const {
+        auto guard = ReadLock();
+        assert(imported_handle_type_.has_value());
+        return imported_handle_type_.value();
     }
     // This is the most recently completed operation. It is returned by value so that the caller
     // has a correct copy even if something else is completing on this queue in a different thread.
@@ -172,6 +178,9 @@ class Semaphore : public REFCOUNTED_NODE {
     // look for most recent / highest payload operation that matches
     std::optional<SemOp> LastOp(const std::function<bool(const SemOp &, bool is_pending)> &filter = nullptr) const;
 
+    // Returns queue submission associated with the last binary signal.
+    std::optional<SubmissionLocator> GetLastBinarySignalSubmission() const;
+
     bool CanBinaryBeSignaled() const;
     bool CanBinaryBeWaited() const;
     bool HasPendingOps() const {
@@ -192,7 +201,9 @@ class Semaphore : public REFCOUNTED_NODE {
     ReadLockGuard ReadLock() const { return ReadLockGuard(lock_); }
     WriteLockGuard WriteLock() { return WriteLockGuard(lock_); }
 
-    enum Scope scope_{kInternal};
+    enum Scope scope_ { kInternal };
+    std::optional<VkExternalSemaphoreHandleTypeFlagBits> imported_handle_type_;  // has value when scope is not kInternal
+
     // the most recently completed operation
     SemOp completed_;
     // next payload value for binary semaphore operations

@@ -1,6 +1,6 @@
-/* Copyright (c) 2020-2023 The Khronos Group Inc.
- * Copyright (c) 2020-2023 Valve Corporation
- * Copyright (c) 2020-2023 LunarG, Inc.
+/* Copyright (c) 2020-2024 The Khronos Group Inc.
+ * Copyright (c) 2020-2024 Valve Corporation
+ * Copyright (c) 2020-2024 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1067,13 +1067,12 @@ void gpu_tracker::Validator::PostCallRecordPipelineCreations(const uint32_t coun
             const auto pipeline_layout = pipeline_state->PipelineLayoutState();
             for (auto &stage_state : pipeline_state->stage_states) {
                 auto &module_state = stage_state.module_state;
-                const auto shader_module = module_state->Handle();
 
                 if (pipeline_state->active_slots.find(desc_set_bind_index) != pipeline_state->active_slots.end() ||
                     (pipeline_layout->set_layouts.size() >= adjusted_max_desc_sets)) {
                     auto *modified_ci = reinterpret_cast<const CreateInfo *>(modified_create_infos[pipeline].ptr());
                     auto uninstrumented_module = GetShaderModule(*modified_ci, stage_state.GetStage());
-                    assert(uninstrumented_module != shader_module.Cast<VkShaderModule>());
+                    assert(uninstrumented_module != module_state->VkHandle());
                     DispatchDestroyShaderModule(device, uninstrumented_module, pAllocator);
                 }
 
@@ -1084,8 +1083,8 @@ void gpu_tracker::Validator::PostCallRecordPipelineCreations(const uint32_t coun
                 // the pipeline is used, so we have to keep another copy.
                 if (module_state && module_state->spirv) code = module_state->spirv->words_;
 
-                shader_map.insert_or_assign(module_state->gpu_validation_shader_id, pipeline_state->pipeline(),
-                                            shader_module.Cast<VkShaderModule>(), VK_NULL_HANDLE, std::move(code));
+                shader_map.insert_or_assign(module_state->gpu_validation_shader_id, pipeline_state->VkHandle(),
+                                            module_state->VkHandle(), VK_NULL_HANDLE, std::move(code));
             }
         }
     }

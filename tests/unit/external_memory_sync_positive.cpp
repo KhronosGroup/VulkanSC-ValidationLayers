@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (c) 2015-2023 Google, Inc.
+ * Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (c) 2015-2024 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,9 +20,7 @@ TEST_F(PositiveExternalMemorySync, GetMemoryFdHandle) {
     TEST_DESCRIPTION("Get POXIS handle for memory allocation");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-    RETURN_IF_SKIP(InitState());
-
+    RETURN_IF_SKIP(Init());
     VkExportMemoryAllocateInfo export_info = vku::InitStructHelper();
     export_info.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
 
@@ -45,6 +43,7 @@ TEST_F(PositiveExternalMemorySync, ImportMemoryFd) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
+    IgnoreHandleTypeError(m_errorMonitor);
 
     VkExternalMemoryBufferCreateInfo external_buffer_info = vku::InitStructHelper();
     external_buffer_info.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
@@ -61,8 +60,7 @@ TEST_F(PositiveExternalMemorySync, ImportMemoryFd) {
         GTEST_SKIP() << "Cannot find handle types that are supported but not compatible with each other";
     }
 
-    vkt::Buffer buffer;
-    buffer.init_no_mem(*m_device, buffer_info);
+    vkt::Buffer buffer(*m_device, buffer_info, vkt::no_mem);
 
     VkMemoryDedicatedAllocateInfoKHR dedicated_info = vku::InitStructHelper();
     dedicated_info.image = VK_NULL_HANDLE;
@@ -176,10 +174,8 @@ TEST_F(PositiveExternalMemorySync, ExternalMemory) {
                                                                       nullptr, handle_type};
     auto buffer_info = vkt::Buffer::create_info(buffer_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
     buffer_info.pNext = &external_buffer_info;
-    vkt::Buffer buffer_export;
-    buffer_export.init_no_mem(*m_device, buffer_info);
-    vkt::Buffer buffer_import;
-    buffer_import.init_no_mem(*m_device, buffer_info);
+    vkt::Buffer buffer_export(*m_device, buffer_info, vkt::no_mem);
+    vkt::Buffer buffer_import(*m_device, buffer_info, vkt::no_mem);
 
     // Allocation info
     auto alloc_info = vkt::DeviceMemory::get_resource_alloc_info(*m_device, buffer_export.memory_requirements(), mem_flags);
@@ -258,6 +254,7 @@ TEST_F(PositiveExternalMemorySync, BufferDedicatedAllocation) {
     TEST_DESCRIPTION("Create external buffer that requires dedicated allocation.");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     RETURN_IF_SKIP(Init());
+    IgnoreHandleTypeError(m_errorMonitor);
 
     VkExternalMemoryBufferCreateInfo external_buffer_info = vku::InitStructHelper();
     const auto buffer_info = vkt::Buffer::create_info(4096, VK_BUFFER_USAGE_TRANSFER_DST_BIT, nullptr, &external_buffer_info);
@@ -318,7 +315,7 @@ TEST_F(PositiveExternalMemorySync, SyncFdSemaphore) {
     si.signalSemaphoreCount = 1;
     si.pSignalSemaphores = &binary_sem.handle();
 
-    vk::QueueSubmit(m_default_queue, 1, &si, VK_NULL_HANDLE);
+    vk::QueueSubmit(m_default_queue->handle(), 1, &si, VK_NULL_HANDLE);
 
     int fd_handle = -1;
     binary_sem.export_handle(fd_handle, handle_type);
@@ -326,5 +323,176 @@ TEST_F(PositiveExternalMemorySync, SyncFdSemaphore) {
     vkt::Semaphore import_semaphore(*m_device);
     import_semaphore.import_handle(fd_handle, handle_type, VK_SEMAPHORE_IMPORT_TEMPORARY_BIT);
 
-    vk::QueueWaitIdle(m_default_queue);
+    m_default_queue->wait();
 }
+
+#ifdef VK_USE_PLATFORM_METAL_EXT
+TEST_F(PositiveExternalMemorySync, ExportMetalObjects) {
+    TEST_DESCRIPTION("Test vkExportMetalObjectsEXT");
+
+    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_METAL_OBJECTS_EXTENSION_NAME);
+
+    // Initialize framework
+    {
+        VkExportMetalObjectCreateInfoEXT queue_info = vku::InitStructHelper();
+        queue_info.exportObjectType = VK_EXPORT_METAL_OBJECT_TYPE_METAL_COMMAND_QUEUE_BIT_EXT;
+
+        VkExportMetalObjectCreateInfoEXT metal_info = vku::InitStructHelper();
+        metal_info.exportObjectType = VK_EXPORT_METAL_OBJECT_TYPE_METAL_DEVICE_BIT_EXT;
+        metal_info.pNext = &queue_info;
+
+        RETURN_IF_SKIP(InitFramework(&metal_info));
+
+        VkPhysicalDevicePortabilitySubsetFeaturesKHR portability_features = vku::InitStructHelper();
+        auto features2 = GetPhysicalDeviceFeatures2(portability_features);
+
+        RETURN_IF_SKIP(InitState(nullptr, &features2));
+    }
+
+    const VkDevice device = m_device->device();
+
+    // Get Metal Device and Metal Command Queue in 1 call
+    {
+        const VkQueue queue = m_default_queue->handle();
+
+        VkExportMetalCommandQueueInfoEXT queueInfo = vku::InitStructHelper();
+        queueInfo.queue = queue;
+        VkExportMetalDeviceInfoEXT deviceInfo = vku::InitStructHelper(&queueInfo);
+        VkExportMetalObjectsInfoEXT objectsInfo = vku::InitStructHelper(&deviceInfo);
+
+        // This tests both device, queue, and pNext chaining
+        vk::ExportMetalObjectsEXT(device, &objectsInfo);
+
+        ASSERT_TRUE(deviceInfo.mtlDevice != nullptr);
+        ASSERT_TRUE(queueInfo.mtlCommandQueue != nullptr);
+    }
+
+    // Get Metal Buffer
+    {
+        VkExportMetalObjectCreateInfoEXT metalBufferCreateInfo = vku::InitStructHelper();
+        metalBufferCreateInfo.exportObjectType = VK_EXPORT_METAL_OBJECT_TYPE_METAL_BUFFER_BIT_EXT;
+
+        VkMemoryAllocateInfo mem_info = vku::InitStructHelper();
+        mem_info.allocationSize = 1024;
+        mem_info.pNext = &metalBufferCreateInfo;
+
+        VkDeviceMemory memory;
+        const VkResult err = vk::AllocateMemory(device, &mem_info, NULL, &memory);
+        ASSERT_EQ(VK_SUCCESS, err);
+
+        VkExportMetalBufferInfoEXT bufferInfo = vku::InitStructHelper();
+        bufferInfo.memory = memory;
+        VkExportMetalObjectsInfoEXT objectsInfo = vku::InitStructHelper(&bufferInfo);
+
+        vk::ExportMetalObjectsEXT(device, &objectsInfo);
+
+        ASSERT_TRUE(bufferInfo.mtlBuffer != nullptr);
+
+        vk::FreeMemory(device, memory, nullptr);
+    }
+
+    // Get Metal Texture and Metal IOSurfaceRef
+    {
+        VkExportMetalObjectCreateInfoEXT metalSurfaceInfo = vku::InitStructHelper();
+        metalSurfaceInfo.exportObjectType = VK_EXPORT_METAL_OBJECT_TYPE_METAL_IOSURFACE_BIT_EXT;
+        VkExportMetalObjectCreateInfoEXT metalTextureCreateInfo = vku::InitStructHelper(&metalSurfaceInfo);
+        metalTextureCreateInfo.exportObjectType = VK_EXPORT_METAL_OBJECT_TYPE_METAL_TEXTURE_BIT_EXT;
+
+        // Image contents don't matter
+        VkImageCreateInfo ici = vku::InitStructHelper(&metalTextureCreateInfo);
+        ici.imageType = VK_IMAGE_TYPE_2D;
+        ici.format = VK_FORMAT_B8G8R8A8_UNORM;
+        ici.extent = {32, 32, 1};
+        ici.mipLevels = 1;
+        ici.arrayLayers = 1;
+        ici.samples = VK_SAMPLE_COUNT_1_BIT;
+        ici.tiling = VK_IMAGE_TILING_LINEAR;
+        ici.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+        VkImageObj image(m_device);
+        image.Init(ici);
+        ASSERT_TRUE(image.initialized());
+
+        VkExportMetalIOSurfaceInfoEXT surfaceInfo = vku::InitStructHelper();
+        surfaceInfo.image = image.handle();
+        VkExportMetalTextureInfoEXT textureInfo = vku::InitStructHelper(&surfaceInfo);
+        textureInfo.image = image.handle();
+        textureInfo.plane = VK_IMAGE_ASPECT_PLANE_0_BIT;  // Image is not multi-planar
+        VkExportMetalObjectsInfoEXT objectsInfo = vku::InitStructHelper(&textureInfo);
+
+        // This tests both texture, surface, and pNext chaining
+        vk::ExportMetalObjectsEXT(device, &objectsInfo);
+
+        ASSERT_TRUE(textureInfo.mtlTexture != nullptr);
+        ASSERT_TRUE(surfaceInfo.ioSurface != nullptr);
+    }
+
+    // Get Metal Shared Event
+    {
+        VkExportMetalObjectCreateInfoEXT metalEventCreateInfo = vku::InitStructHelper();
+        metalEventCreateInfo.exportObjectType = VK_EXPORT_METAL_OBJECT_TYPE_METAL_SHARED_EVENT_BIT_EXT;
+
+        VkEventCreateInfo eventCreateInfo = vku::InitStructHelper(&metalEventCreateInfo);
+        vkt::Event event(*m_device, eventCreateInfo);
+        ASSERT_TRUE(event.initialized());
+
+        VkExportMetalSharedEventInfoEXT eventInfo = vku::InitStructHelper();
+        eventInfo.event = event.handle();
+        VkExportMetalObjectsInfoEXT objectsInfo = vku::InitStructHelper(&eventInfo);
+
+        vk::ExportMetalObjectsEXT(device, &objectsInfo);
+
+        ASSERT_TRUE(eventInfo.mtlSharedEvent != nullptr);
+    }
+}
+#endif  // VK_USE_PLATFORM_METAL_EXT
+
+#ifdef VK_USE_PLATFORM_WIN32_KHR
+TEST_F(PositiveExternalMemorySync, ExportFromImportedFence) {
+    TEST_DESCRIPTION("Export from fence with imported payload");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_KHR_EXTERNAL_FENCE_WIN32_EXTENSION_NAME);
+    RETURN_IF_SKIP(Init());
+    IgnoreHandleTypeError(m_errorMonitor);
+
+    const auto handle_type = VK_EXTERNAL_FENCE_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+    {
+        const auto handle_types = FindSupportedExternalFenceHandleTypes(
+            gpu(), VK_EXTERNAL_FENCE_FEATURE_EXPORTABLE_BIT | VK_EXTERNAL_FENCE_FEATURE_IMPORTABLE_BIT);
+        if ((handle_types & VK_EXTERNAL_FENCE_HANDLE_TYPE_OPAQUE_WIN32_BIT) == 0) {
+            GTEST_SKIP() << "VK_EXTERNAL_FENCE_HANDLE_TYPE_OPAQUE_WIN32_BIT is not both exportable and importable";
+        }
+    }
+    VkPhysicalDeviceExternalFenceInfo fence_info = vku::InitStructHelper();
+    fence_info.handleType = handle_type;
+    VkExternalFenceProperties fence_properties = vku::InitStructHelper();
+    vk::GetPhysicalDeviceExternalFenceProperties(gpu(), &fence_info, &fence_properties);
+    if ((handle_type & fence_properties.exportFromImportedHandleTypes) == 0) {
+        GTEST_SKIP() << "can't find handle type that can be exported from imported fence";
+    }
+
+    // create fence and export payload
+    VkExportFenceCreateInfo export_info = vku::InitStructHelper();
+    export_info.handleTypes = handle_type;  // at first export handle type, then import it
+    const VkFenceCreateInfo create_info = vku::InitStructHelper(&export_info);
+    vkt::Fence fence(*m_device, create_info);
+    HANDLE handle = NULL;
+    fence.export_handle(handle, handle_type);
+
+    // create fence and import payload
+    VkExportFenceCreateInfo export_info2 = vku::InitStructHelper();  // prepare to export from imported fence
+    export_info2.handleTypes = handle_type;
+    const VkFenceCreateInfo create_info2 = vku::InitStructHelper(&export_info2);
+    vkt::Fence import_fence(*m_device, create_info2);
+    import_fence.import_handle(handle, handle_type);
+
+    // export from imported fence
+    HANDLE handle2 = NULL;
+    import_fence.export_handle(handle2, handle_type);
+
+    ::CloseHandle(handle);
+    if (handle2 != handle) {
+        ::CloseHandle(handle2);
+    }
+}
+#endif  // VK_USE_PLATFORM_WIN32_KHR

@@ -1,6 +1,6 @@
-/* Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
+/* Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  * Modifications Copyright (C) 2022 RasterGrid Kft.
  *
@@ -20,98 +20,74 @@
 #include "best_practices/best_practices_validation.h"
 #include "generated/layer_chassis_dispatch.h"
 #include "best_practices/best_practices_error_enums.h"
+#include "best_practices/bp_state.h"
 
-const SpecialUseVUIDs kSpecialUseInstanceVUIDs{
-    kVUID_BestPractices_CreateInstance_SpecialUseExtension_CADSupport,
-    kVUID_BestPractices_CreateInstance_SpecialUseExtension_D3DEmulation,
-    kVUID_BestPractices_CreateInstance_SpecialUseExtension_DevTools,
-    kVUID_BestPractices_CreateInstance_SpecialUseExtension_Debugging,
-    kVUID_BestPractices_CreateInstance_SpecialUseExtension_GLEmulation,
-};
-
-const SpecialUseVUIDs kSpecialUseDeviceVUIDs{
-    kVUID_BestPractices_CreateDevice_SpecialUseExtension_CADSupport,
-    kVUID_BestPractices_CreateDevice_SpecialUseExtension_D3DEmulation,
-    kVUID_BestPractices_CreateDevice_SpecialUseExtension_DevTools,
-    kVUID_BestPractices_CreateDevice_SpecialUseExtension_Debugging,
-    kVUID_BestPractices_CreateDevice_SpecialUseExtension_GLEmulation,
-};
-
-const char* DepReasonToString(ExtDeprecationReason reason) {
-    switch (reason) {
-        case kExtPromoted:
-            return "promoted to";
-            break;
-        case kExtObsoleted:
-            return "obsoleted by";
-            break;
-        case kExtDeprecated:
-            return "deprecated by";
-            break;
-        default:
-            return "";
-            break;
-    }
-}
-
-bool BestPractices::ValidateDeprecatedExtensions(const Location& loc, const char* extension_name, APIVersion version,
-                                                 const char* vuid) const {
+bool BestPractices::ValidateDeprecatedExtensions(const Location& loc, vvl::Extension extension, APIVersion version) const {
     bool skip = false;
-    auto dep_info_it = deprecated_extensions.find(extension_name);
-    if (dep_info_it != deprecated_extensions.end()) {
-        auto dep_info = dep_info_it->second;
-        if (((dep_info.target.compare("VK_VERSION_1_1") == 0) && (version >= VK_API_VERSION_1_1)) ||
-            ((dep_info.target.compare("VK_VERSION_1_2") == 0) && (version >= VK_API_VERSION_1_2)) ||
-            ((dep_info.target.compare("VK_VERSION_1_3") == 0) && (version >= VK_API_VERSION_1_3))) {
+    const auto dep_info = GetDeprecatedData(extension);
+    if (dep_info.reason != DeprecationReason::Empty) {
+        auto reason_to_string = [](DeprecationReason reason) {
+            switch (reason) {
+                case DeprecationReason::Promoted:
+                    return "promoted to";
+                case DeprecationReason::Obsoleted:
+                    return "obsoleted by";
+                case DeprecationReason::Deprecated:
+                    return "deprecated by";
+                default:
+                    return "";
+            }
+        };
+
+        const char* vuid = "BestPractices-deprecated-extension";
+        if ((dep_info.target.version == vvl::Version::_VK_VERSION_1_1 && (version >= VK_API_VERSION_1_1)) ||
+            (dep_info.target.version == vvl::Version::_VK_VERSION_1_2 && (version >= VK_API_VERSION_1_2)) ||
+            (dep_info.target.version == vvl::Version::_VK_VERSION_1_3 && (version >= VK_API_VERSION_1_3))) {
             skip |=
                 LogWarning(vuid, instance, loc, "Attempting to enable deprecated extension %s, but this extension has been %s %s.",
-                           extension_name, DepReasonToString(dep_info.reason), (dep_info.target).c_str());
-        } else if (dep_info.target.find("VK_VERSION") == std::string::npos) {
-            if (dep_info.target.length() == 0) {
+                           String(extension), reason_to_string(dep_info.reason), String(dep_info.target).c_str());
+        } else if (dep_info.target.version == vvl::Version::Empty) {
+            if (dep_info.target.extension == vvl::Extension::Empty) {
                 skip |= LogWarning(vuid, instance, loc,
                                    "Attempting to enable deprecated extension %s, but this extension has been deprecated "
                                    "without replacement.",
-                                   extension_name);
+                                   String(extension));
             } else {
                 skip |= LogWarning(vuid, instance, loc,
                                    "Attempting to enable deprecated extension %s, but this extension has been %s %s.",
-                                   extension_name, DepReasonToString(dep_info.reason), (dep_info.target).c_str());
+                                   String(extension), reason_to_string(dep_info.reason), String(dep_info.target).c_str());
             }
         }
     }
     return skip;
 }
 
-bool BestPractices::ValidateSpecialUseExtensions(const Location& loc, const char* extension_name,
-                                                 const SpecialUseVUIDs& special_use_vuids) const {
+bool BestPractices::ValidateSpecialUseExtensions(const Location& loc, vvl::Extension extension) const {
     bool skip = false;
-    auto dep_info_it = special_use_extensions.find(extension_name);
+    const std::string special_uses = GetSpecialUse(extension);
 
-    if (dep_info_it != special_use_extensions.end()) {
+    if (!special_uses.empty()) {
         const char* const format =
             "Attempting to enable extension %s, but this extension is intended to support %s "
             "and it is strongly recommended that it be otherwise avoided.";
-        auto& special_uses = dep_info_it->second;
-
+        const char* vuid = "BestPractices-specialuse-extension";
         if (special_uses.find("cadsupport") != std::string::npos) {
-            skip |= LogWarning(special_use_vuids.cadsupport, instance, loc, format, extension_name,
+            skip |= LogWarning(vuid, instance, loc, format, String(extension),
                                "specialized functionality used by CAD/CAM applications");
         }
         if (special_uses.find("d3demulation") != std::string::npos) {
-            skip |= LogWarning(special_use_vuids.d3demulation, instance, loc, format, extension_name,
+            skip |= LogWarning(vuid, instance, loc, format, String(extension),
                                "D3D emulation layers, and applications ported from D3D, by adding functionality specific to D3D");
         }
         if (special_uses.find("devtools") != std::string::npos) {
-            skip |= LogWarning(special_use_vuids.devtools, instance, loc, format, extension_name,
-                               "developer tools such as capture-replay libraries");
+            skip |= LogWarning(vuid, instance, loc, format, String(extension), "developer tools such as capture-replay libraries");
         }
         if (special_uses.find("debugging") != std::string::npos) {
-            skip |= LogWarning(special_use_vuids.debugging, instance, loc, format, extension_name,
-                               "use by applications when debugging");
+            skip |= LogWarning(vuid, instance, loc, format, String(extension), "use by applications when debugging");
         }
         if (special_uses.find("glemulation") != std::string::npos) {
             skip |= LogWarning(
-                special_use_vuids.glemulation, instance, loc, format, extension_name,
+                vuid, instance, loc, format, String(extension),
                 "OpenGL and/or OpenGL ES emulation layers, and applications ported from those APIs, by adding functionality "
                 "specific to those APIs");
         }
@@ -124,16 +100,15 @@ bool BestPractices::PreCallValidateCreateInstance(const VkInstanceCreateInfo* pC
     bool skip = false;
 
     for (uint32_t i = 0; i < pCreateInfo->enabledExtensionCount; i++) {
-        if (white_list(pCreateInfo->ppEnabledExtensionNames[i], kDeviceExtensionNames)) {
+        vvl::Extension extension = GetExtension(pCreateInfo->ppEnabledExtensionNames[i]);
+        if (IsDeviceExtension(extension)) {
             skip |= LogWarning(kVUID_BestPractices_CreateInstance_ExtensionMismatch, instance, error_obj.location,
-                               "Attempting to enable Device Extension %s at CreateInstance time.",
-                               pCreateInfo->ppEnabledExtensionNames[i]);
+                               "Attempting to enable Device Extension %s at CreateInstance time.", String(extension));
         }
         uint32_t specified_version =
             (pCreateInfo->pApplicationInfo ? pCreateInfo->pApplicationInfo->apiVersion : VK_API_VERSION_1_0);
-        skip |= ValidateDeprecatedExtensions(error_obj.location, pCreateInfo->ppEnabledExtensionNames[i], specified_version,
-                                             kVUID_BestPractices_CreateInstance_DeprecatedExtension);
-        skip |= ValidateSpecialUseExtensions(error_obj.location, pCreateInfo->ppEnabledExtensionNames[i], kSpecialUseInstanceVUIDs);
+        skip |= ValidateDeprecatedExtensions(error_obj.location, extension, specified_version);
+        skip |= ValidateSpecialUseExtensions(error_obj.location, extension);
     }
 
     return skip;
@@ -179,15 +154,15 @@ bool BestPractices::PreCallValidateCreateDevice(VkPhysicalDevice physicalDevice,
 
         APIVersion extension_api_version = std::min(api_version, APIVersion(device_api_version));
 
-        if (white_list(extension_name, kInstanceExtensionNames)) {
+        vvl::Extension extension = GetExtension(extension_name);
+        if (IsInstanceExtension(extension)) {
             skip |= LogWarning(kVUID_BestPractices_CreateDevice_ExtensionMismatch, instance, error_obj.location,
-                               "Attempting to enable Instance Extension %s at CreateDevice time.", extension_name);
+                               "Attempting to enable Instance Extension %s at CreateDevice time.", String(extension));
             extension_api_version = api_version;
         }
 
-        skip |= ValidateDeprecatedExtensions(error_obj.location, extension_name, extension_api_version,
-                                             kVUID_BestPractices_CreateDevice_DeprecatedExtension);
-        skip |= ValidateSpecialUseExtensions(error_obj.location, extension_name, kSpecialUseDeviceVUIDs);
+        skip |= ValidateDeprecatedExtensions(error_obj.location, extension, extension_api_version);
+        skip |= ValidateSpecialUseExtensions(error_obj.location, extension);
     }
 
     const auto bp_pd_state = Get<bp_state::PhysicalDevice>(physicalDevice);
@@ -435,18 +410,18 @@ bool BestPractices::PreCallValidateQueueBindSparse(VkQueue queue, uint32_t bindI
             if (image_state->sparse_residency) {
                 if (!image_state->get_sparse_reqs_called || image_state->sparse_requirements.empty()) {
                     // For now just warning if sparse image binding occurs without calling to get reqs first
-                    skip |= LogWarning(kVUID_BestPractices_MemTrack_InvalidState, image_state->image(), error_obj.location,
+                    skip |= LogWarning(kVUID_BestPractices_MemTrack_InvalidState, image_state->Handle(), error_obj.location,
                                        "Binding sparse memory to %s without first calling "
                                        "vkGetImageSparseMemoryRequirements[2KHR]() to retrieve requirements.",
-                                       FormatHandle(image_state->image()).c_str());
+                                       FormatHandle(image_state->Handle()).c_str());
                 }
             }
             if (!image_state->memory_requirements_checked[0]) {
                 // For now just warning if sparse image binding occurs without calling to get reqs first
-                skip |= LogWarning(kVUID_BestPractices_MemTrack_InvalidState, image_state->image(), error_obj.location,
+                skip |= LogWarning(kVUID_BestPractices_MemTrack_InvalidState, image_state->Handle(), error_obj.location,
                                    "Binding sparse memory to %s without first calling "
                                    "vkGetImageMemoryRequirements() to retrieve requirements.",
-                                   FormatHandle(image_state->image()).c_str());
+                                   FormatHandle(image_state->Handle()).c_str());
             }
         }
         for (uint32_t i = 0; i < bind_info.imageOpaqueBindCount; ++i) {
@@ -459,18 +434,18 @@ bool BestPractices::PreCallValidateQueueBindSparse(VkQueue queue, uint32_t bindI
             if (image_state->sparse_residency) {
                 if (!image_state->get_sparse_reqs_called || image_state->sparse_requirements.empty()) {
                     // For now just warning if sparse image binding occurs without calling to get reqs first
-                    skip |= LogWarning(kVUID_BestPractices_MemTrack_InvalidState, image_state->image(), error_obj.location,
+                    skip |= LogWarning(kVUID_BestPractices_MemTrack_InvalidState, image_state->Handle(), error_obj.location,
                                        "Binding opaque sparse memory to %s without first calling "
                                        "vkGetImageSparseMemoryRequirements[2KHR]() to retrieve requirements.",
-                                       FormatHandle(image_state->image()).c_str());
+                                       FormatHandle(image_state->Handle()).c_str());
                 }
             }
             if (!image_state->memory_requirements_checked[0]) {
                 // For now just warning if sparse image binding occurs without calling to get reqs first
-                skip |= LogWarning(kVUID_BestPractices_MemTrack_InvalidState, image_state->image(), error_obj.location,
+                skip |= LogWarning(kVUID_BestPractices_MemTrack_InvalidState, image_state->Handle(), error_obj.location,
                                    "Binding opaque sparse memory to %s without first calling "
                                    "vkGetImageMemoryRequirements() to retrieve requirements.",
-                                   FormatHandle(image_state->image()).c_str());
+                                   FormatHandle(image_state->Handle()).c_str());
             }
             for (uint32_t j = 0; j < image_opaque_bind.bindCount; ++j) {
                 if (image_opaque_bind.pBinds[j].flags & VK_SPARSE_MEMORY_BIND_METADATA_BIT) {
@@ -482,10 +457,10 @@ bool BestPractices::PreCallValidateQueueBindSparse(VkQueue queue, uint32_t bindI
             if (sparse_image_state->sparse_metadata_required && !sparse_image_state->sparse_metadata_bound &&
                 sparse_images_with_metadata.find(sparse_image_state) == sparse_images_with_metadata.end()) {
                 // Warn if sparse image binding metadata required for image with sparse binding, but metadata not bound
-                skip |= LogWarning(kVUID_BestPractices_MemTrack_InvalidState, sparse_image_state->image(), error_obj.location,
+                skip |= LogWarning(kVUID_BestPractices_MemTrack_InvalidState, sparse_image_state->Handle(), error_obj.location,
                                    "Binding sparse memory to %s which requires a metadata aspect but no "
                                    "binding with VK_SPARSE_MEMORY_BIND_METADATA_BIT set was made.",
-                                   FormatHandle(sparse_image_state->image()).c_str());
+                                   FormatHandle(sparse_image_state->Handle()).c_str());
             }
         }
     }
@@ -494,7 +469,7 @@ bool BestPractices::PreCallValidateQueueBindSparse(VkQueue queue, uint32_t bindI
         auto queue_state = Get<vvl::Queue>(queue);
         if (queue_state && queue_state->queueFamilyProperties.queueFlags != (VK_QUEUE_TRANSFER_BIT | VK_QUEUE_SPARSE_BINDING_BIT)) {
             skip |= LogPerformanceWarning(kVUID_BestPractices_QueueBindSparse_NotAsync, queue, error_obj.location,
-                                          "vkQueueBindSparse() issued on queue %s. All binds should happen on an asynchronous copy "
+                                          "issued on queue %s. All binds should happen on an asynchronous copy "
                                           "queue to hide the OS scheduling and submit costs.",
                                           FormatHandle(queue).c_str());
         }
@@ -530,4 +505,15 @@ void BestPractices::ManualPostCallRecordQueueSubmit(VkQueue queue, uint32_t subm
                                                     VkFence fence, const RecordObject& record_obj) {
     // AMD best practice
     num_queue_submissions_ += submitCount;
+}
+
+std::shared_ptr<vvl::PhysicalDevice> BestPractices::CreatePhysicalDeviceState(VkPhysicalDevice phys_dev) {
+    return std::static_pointer_cast<vvl::PhysicalDevice>(std::make_shared<bp_state::PhysicalDevice>(phys_dev));
+}
+
+bp_state::PhysicalDevice* BestPractices::GetPhysicalDeviceState() {
+    return static_cast<bp_state::PhysicalDevice*>(physical_device_state);
+}
+const bp_state::PhysicalDevice* BestPractices::GetPhysicalDeviceState() const {
+    return static_cast<const bp_state::PhysicalDevice*>(physical_device_state);
 }

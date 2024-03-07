@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (c) 2015-2023 Google, Inc.
+ * Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (c) 2015-2024 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,19 @@ static const char kVertexMinimalGlsl[] = R"glsl(
     #version 460
     void main() {
        gl_Position = vec4(1);
+    }
+)glsl";
+
+// for GPU-AV tests, we need the vertex shader to actually run and produce
+// work for the next shader stages
+static const char kVertexDrawPassthroughGlsl[] = R"glsl(
+    #version 450
+    vec2 vertices[3];
+    void main(){
+        vertices[0] = vec2(-1.0, -1.0);
+        vertices[1] = vec2( 1.0, -1.0);
+        vertices[2] = vec2( 0.0,  1.0);
+        gl_Position = vec4(vertices[gl_VertexIndex % 3], 0.0, 1.0);
     }
 )glsl";
 
@@ -109,14 +122,6 @@ static char const kFragmentSubpassLoadGlsl[] = R"glsl(
     layout(input_attachment_index=0, set=0, binding=0) uniform subpassInput x;
     void main() {
         vec4 color = subpassLoad(x);
-    }
-)glsl";
-
-static char const kFragmentColorOutputGlsl[] = R"glsl(
-    #version 460
-    layout(location=0) out vec4 color;
-    void main() {
-        color = vec4(1.0f);
     }
 )glsl";
 

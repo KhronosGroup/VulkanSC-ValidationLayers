@@ -1,3 +1,22 @@
+/* Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (C) 2015-2024 Google Inc.
+ * Modifications Copyright (C) 2020-2024 Advanced Micro Devices, Inc. All rights reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #pragma once
 
 #include "error_message/error_location.h"
@@ -19,7 +38,7 @@ struct DrawDispatchVuid {
     const char* linear_filter_sampler_04553 = kVUIDUndefined;
     const char* linear_mipmap_sampler_04770 = kVUIDUndefined;
     const char* cubic_sampler_02692 = kVUIDUndefined;
-    const char* indirect_protected_cb_02646 = kVUIDUndefined;
+    const char* indirect_protected_cb_02711 = kVUIDUndefined;
     const char* indirect_contiguous_memory_02708 = kVUIDUndefined;
     const char* indirect_count_contiguous_memory_02714 = kVUIDUndefined;
     const char* indirect_buffer_bit_02290 = kVUIDUndefined;
@@ -45,6 +64,7 @@ struct DrawDispatchVuid {
     const char* unprotected_command_buffer_02707 = kVUIDUndefined;
     const char* protected_command_buffer_02712 = kVUIDUndefined;
     const char* ray_query_protected_cb_03635 = kVUIDUndefined;
+    const char* ray_query_04617 = kVUIDUndefined;
     // TODO: Some instance values are in VkBuffer. The validation in those Cmds is skipped.
     const char* max_multiview_instance_index_02688 = kVUIDUndefined;
     const char* img_filter_cubic_02693 = kVUIDUndefined;
@@ -59,6 +79,7 @@ struct DrawDispatchVuid {
     const char* vertex_input_04912 = kVUIDUndefined;
     const char* vertex_input_binding_stride_04913 = kVUIDUndefined;
     const char* vertex_input_04914 = kVUIDUndefined;
+    const char* vertex_input_08734 = kVUIDUndefined;
     const char* blend_enable_04727 = kVUIDUndefined;
     const char* dynamic_discard_rectangle_07751 = kVUIDUndefined;
     const char* dynamic_discard_rectangle_enable_07880 = kVUIDUndefined;
@@ -185,6 +206,10 @@ struct DrawDispatchVuid {
     const char* external_format_resolve_09368 = kVUIDUndefined;
     const char* external_format_resolve_09369 = kVUIDUndefined;
     const char* external_format_resolve_09372 = kVUIDUndefined;
+    const char* external_format_resolve_09366 = kVUIDUndefined;
+    const char* external_format_resolve_09367 = kVUIDUndefined;
+    const char* external_format_resolve_09370 = kVUIDUndefined;
+    const char* external_format_resolve_09371 = kVUIDUndefined;
     const char* set_rasterizer_discard_enable_08639 = kVUIDUndefined;
     const char* set_depth_bias_enable_08640 = kVUIDUndefined;
     const char* set_logic_op_08641 = kVUIDUndefined;
@@ -312,6 +337,14 @@ struct DrawDispatchVuid {
     const char* rasterization_samples_09211 = kVUIDUndefined;
     const char* dynamic_rendering_undefined_depth_format_08913 = kVUIDUndefined;
     const char* primitives_generated_query_07481 = kVUIDUndefined;
+    const char* vertex_input_09461 = kVUIDUndefined;
+    const char* vertex_input_09462 = kVUIDUndefined;
+    const char* color_blend_enable_07627 = kVUIDUndefined;
+    const char* color_blend_equation_07628 = kVUIDUndefined;
+    const char* color_write_mask_07629 = kVUIDUndefined;
+    const char* color_blend_advanced_07635 = kVUIDUndefined;
+    // Ray tracing
+    const char* ray_tracing_pipeline_stack_size_09458 = kVUIDUndefined;
 };
 
 const DrawDispatchVuid& GetDrawDispatchVuid(vvl::Func function);

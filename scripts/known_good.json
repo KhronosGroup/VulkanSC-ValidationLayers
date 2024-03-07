@@ -7,7 +7,7 @@
             "sub_dir": "Vulkan-Headers",
             "build_dir": "Vulkan-Headers/build",
             "install_dir": "Vulkan-Headers/build/install",
-            "commit": "v1.3.272"
+            "commit": "v1.3.278"
         },
         {
             "name": "Vulkan-Headers",
@@ -20,7 +20,7 @@
                 "-DVULKANSC=ON",
                 "-DGEN_VULKANSC_COMBINED=ON"
             ],
-            "commit": "vksc1.0.14"
+            "commit": "downstream-1.3.278"
         },
         {
             "name": "Vulkan-Utility-Libraries",
@@ -29,7 +29,7 @@
             "sub_dir": "Vulkan-Utility-Libraries",
             "build_dir": "Vulkan-Utility-Libraries/build",
             "install_dir": "Vulkan-Utility-Libraries/build/install",
-            "commit": "v1.3.272",
+            "commit": "v1.3.278",
             "deps": [
                 {
                     "var_name": "VULKAN_HEADERS_INSTALL_DIR",
@@ -44,7 +44,7 @@
             "sub_dir": "Vulkan-Utility-Libraries",
             "build_dir": "Vulkan-Utility-Libraries/build",
             "install_dir": "Vulkan-Utility-Libraries/build/install",
-            "commit": "vksc1.0.14",
+            "commit": "downstream-1.3.278",
             "cmake_options": [
                 "-DVULKANSC=ON"
             ],
@@ -61,7 +61,7 @@
             "sub_dir": "SPIRV-Headers",
             "build_dir": "SPIRV-Headers/build",
             "install_dir": "SPIRV-Headers/build/install",
-            "commit": "e867c06631767a2d96424cbec530f9ee5e78180f"
+            "commit": "1c9115b562bab79ee2160fbd845f41b815b9f21f"
         },
         {
             "name": "SPIRV-Tools",
@@ -75,7 +75,7 @@
                 "-DSPIRV_SKIP_TESTS=ON",
                 "-DSPIRV_SKIP_EXECUTABLES=ON"
             ],
-            "commit": "360d469b9eac54d6c6e20f609f9ec35e3a5380ad"
+            "commit": "784b064f90a597d2478064161438f4986485b5d4"
         },
         {
             "name": "robin-hood-hashing",
@@ -100,7 +100,7 @@
                 "-DMI_BUILD_SHARED=OFF",
                 "-DMI_BUILD_TESTS=OFF"
             ],
-            "commit": "v2.0.7",
+            "commit": "v2.1.2",
             "build_platforms": [
                 "windows"
             ]
@@ -127,7 +127,7 @@
             "sub_dir": "glslang",
             "build_dir": "glslang/build",
             "install_dir": "glslang/build/install",
-            "commit": "719b6b7debbfe75bd427daa0e39c347fce16cf9a",
+            "commit": "b1f7affe94ea108de7e38ee764f855a2130da398",
             "cmake_options": [
                 "-DENABLE_OPT=OFF"
             ],
@@ -142,7 +142,7 @@
             "sub_dir": "Vulkan-Loader",
             "build_dir": "Vulkan-Loader/build",
             "install_dir": "Vulkan-Loader/build/install",
-            "commit": "v1.3.272",
+            "commit": "v1.3.278",
             "build_step": "skip",
             "optional": [
                 "tests"
@@ -159,7 +159,7 @@
                 "-DVULKANSC=ON",
                 "-DLOADER_USE_UNSAFE_FILE_SEARCH=ON"
             ],
-            "commit": "vksc1.0.14",
+            "commit": "downstream-1.3.278",
             "build_step": "skip",
             "optional": [
                 "tests"
@@ -172,7 +172,7 @@
             "sub_dir": "Vulkan-Profiles",
             "build_dir": "Vulkan-Profiles/build",
             "install_dir": "Vulkan-Profiles/build/install",
-            "commit": "5e4b686c6072daba252836d48b13a2e4e100bd62",
+            "commit": "439ed61787525eda26e1d8fa7de7398cc8a824fa",
             "build_step": "skip",
             "optional": [
                 "tests"
@@ -185,7 +185,7 @@
             "sub_dir": "Vulkan-Tools",
             "build_dir": "Vulkan-Tools/build",
             "install_dir": "Vulkan-Tools/build/install",
-            "commit": "2d956672d73321bfb22b378c06033f0bd885d61c",
+            "commit": "v1.3.278",
             "build_step": "skip",
             "optional": [
                 "tests"
@@ -198,7 +198,7 @@
             "sub_dir": "Vulkan-Tools",
             "build_dir": "Vulkan-Tools/build",
             "install_dir": "Vulkan-Tools/build/install",
-            "commit": "vksc1.0.14",
+            "commit": "downstream-1.3.278",
             "build_step": "skip",
             "optional": [
                 "tests"

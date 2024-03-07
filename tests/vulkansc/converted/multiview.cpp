@@ -20,6 +20,7 @@
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
 #include "../framework/descriptor_helper.h"
+#include "../framework/render_pass_helper.h"
 
 TEST_F(NegativeMultiview, MaxInstanceIndex) {
     TEST_DESCRIPTION("Verify if instance index in CmdDraw is greater than maxMultiviewInstanceIndex.");
@@ -67,35 +68,17 @@ TEST_F(NegativeMultiview, ClearColorAttachments) {
         GTEST_SKIP() << "VkPhysicalDeviceMultiviewFeatures::multiview not supported";
     }
     RETURN_IF_SKIP(InitState(nullptr, &features2));
-    InitRenderTarget();
-
-    VkAttachmentDescription attachmentDescription = {};
-    attachmentDescription.format = VK_FORMAT_R8G8B8A8_UNORM;
-    attachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT;
-    attachmentDescription.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    attachmentDescription.finalLayout = VK_IMAGE_LAYOUT_GENERAL;
-
-    VkAttachmentReference colorAttachmentReference = {};
-    colorAttachmentReference.layout = VK_IMAGE_LAYOUT_GENERAL;
-    colorAttachmentReference.attachment = 0;
-
-    VkSubpassDescription subpassDescription = {};
-    subpassDescription.colorAttachmentCount = 1;
-    subpassDescription.pColorAttachments = &colorAttachmentReference;
 
     uint32_t viewMask = 0x1u;
     VkRenderPassMultiviewCreateInfo renderPassMultiviewCreateInfo = vku::InitStructHelper();
     renderPassMultiviewCreateInfo.subpassCount = 1;
     renderPassMultiviewCreateInfo.pViewMasks = &viewMask;
 
-    VkRenderPassCreateInfo renderPassCreateInfo = vku::InitStructHelper(&renderPassMultiviewCreateInfo);
-    renderPassCreateInfo.attachmentCount = 1;
-    renderPassCreateInfo.pAttachments = &attachmentDescription;
-    renderPassCreateInfo.subpassCount = 1;
-    renderPassCreateInfo.pSubpasses = &subpassDescription;
-
-    vkt::RenderPass renderPass(*m_device, renderPassCreateInfo);
-    ASSERT_TRUE(renderPass.initialized());
+    RenderPassSingleSubpass rp(*this);
+    rp.AddAttachmentDescription(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED);
+    rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_GENERAL});
+    rp.AddColorAttachment(0);
+    rp.CreateRenderPass(&renderPassMultiviewCreateInfo);
 
     VkImageCreateInfo image_create_info = vku::InitStructHelper();
     image_create_info.imageType = VK_IMAGE_TYPE_2D;
@@ -114,16 +97,7 @@ TEST_F(NegativeMultiview, ClearColorAttachments) {
     image.Init(image_create_info);
     vkt::ImageView imageView = image.CreateView(VK_IMAGE_VIEW_TYPE_2D_ARRAY);
 
-    VkFramebufferCreateInfo framebufferCreateInfo = vku::InitStructHelper();
-    framebufferCreateInfo.width = 32;
-    framebufferCreateInfo.height = 32;
-    framebufferCreateInfo.layers = 1;
-    framebufferCreateInfo.renderPass = renderPass.handle();
-    framebufferCreateInfo.attachmentCount = 1;
-    framebufferCreateInfo.pAttachments = &imageView.handle();
-
-    vkt::Framebuffer framebuffer(*m_device, framebufferCreateInfo);
-    ASSERT_TRUE(framebuffer.initialized());
+    vkt::Framebuffer framebuffer(*m_device, rp.Handle(), 1, &imageView.handle());
 
     // Start no RenderPass
     m_commandBuffer->begin();
@@ -140,13 +114,7 @@ TEST_F(NegativeMultiview, ClearColorAttachments) {
     clear_rect.rect.extent.width = 32;
     clear_rect.rect.extent.height = 32;
 
-    VkRenderPassBeginInfo render_pass_begin_info = vku::InitStructHelper();
-    render_pass_begin_info.renderPass = renderPass.handle();
-    render_pass_begin_info.framebuffer = framebuffer.handle();
-    render_pass_begin_info.renderArea.extent.width = 32;
-    render_pass_begin_info.renderArea.extent.height = 32;
-
-    vk::CmdBeginRenderPass(m_commandBuffer->handle(), &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
+    m_commandBuffer->BeginRenderPass(rp.Handle(), framebuffer.handle(), 32, 32);
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdClearAttachments-baseArrayLayer-00018");
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdClearAttachments-pRects-06937");
     clear_rect.layerCount = 2;
@@ -257,21 +225,13 @@ TEST_F(NegativeMultiview, DISABLED_UnboundResourcesAfterBeginRenderPassAndNextSu
     image.SetLayout(VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL);
     vkt::ImageView imageView = image.CreateView(VK_IMAGE_VIEW_TYPE_2D_ARRAY);
 
-    VkFramebufferCreateInfo framebufferCreateInfo = vku::InitStructHelper();
-    framebufferCreateInfo.width = m_width;
-    framebufferCreateInfo.height = m_height;
-    framebufferCreateInfo.layers = 1;
-    framebufferCreateInfo.renderPass = m_renderPass;
-    framebufferCreateInfo.attachmentCount = 1;
-    framebufferCreateInfo.pAttachments = &imageView.handle();
-
-    vk::CreateFramebuffer(m_device->device(), &framebufferCreateInfo, nullptr, &m_framebuffer);
+    vkt::Framebuffer fb(*m_device, m_renderPass, 1, &imageView.handle(), m_width, m_height);
 
     VkClearValue clear{};
     clear.color = m_clear_color;
     m_renderPassClearValues.emplace_back(clear);
     m_renderPassBeginInfo.renderPass = m_renderPass;
-    m_renderPassBeginInfo.framebuffer = m_framebuffer;
+    m_renderPassBeginInfo.framebuffer = fb.handle();
     m_renderPassBeginInfo.renderArea.extent.width = m_width;
     m_renderPassBeginInfo.renderArea.extent.height = m_height;
     m_renderPassBeginInfo.clearValueCount = m_renderPassClearValues.size();
@@ -664,35 +624,17 @@ TEST_F(NegativeMultiview, BeginTransformFeedback) {
     }
 
     RETURN_IF_SKIP(InitState(nullptr, &pd_features));
-    InitRenderTarget();
-
-    VkAttachmentDescription attachmentDescription = {};
-    attachmentDescription.format = VK_FORMAT_R8G8B8A8_UNORM;
-    attachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT;
-    attachmentDescription.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    attachmentDescription.finalLayout = VK_IMAGE_LAYOUT_GENERAL;
-
-    VkAttachmentReference colorAttachmentReference = {};
-    colorAttachmentReference.layout = VK_IMAGE_LAYOUT_GENERAL;
-    colorAttachmentReference.attachment = 0;
-
-    VkSubpassDescription subpassDescription = {};
-    subpassDescription.colorAttachmentCount = 1;
-    subpassDescription.pColorAttachments = &colorAttachmentReference;
 
     uint32_t viewMask = 0x1u;
     VkRenderPassMultiviewCreateInfo renderPassMultiviewCreateInfo = vku::InitStructHelper();
     renderPassMultiviewCreateInfo.subpassCount = 1;
     renderPassMultiviewCreateInfo.pViewMasks = &viewMask;
 
-    VkRenderPassCreateInfo renderPassCreateInfo = vku::InitStructHelper(&renderPassMultiviewCreateInfo);
-    renderPassCreateInfo.attachmentCount = 1;
-    renderPassCreateInfo.pAttachments = &attachmentDescription;
-    renderPassCreateInfo.subpassCount = 1;
-    renderPassCreateInfo.pSubpasses = &subpassDescription;
-
-    vkt::RenderPass render_pass;
-    render_pass.init(*m_device, renderPassCreateInfo);
+    RenderPassSingleSubpass rp(*this);
+    rp.AddAttachmentDescription(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED);
+    rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_GENERAL});
+    rp.AddColorAttachment(0);
+    rp.CreateRenderPass(&renderPassMultiviewCreateInfo);
 
     VkImageCreateInfo image_create_info = vku::InitStructHelper();
     image_create_info.imageType = VK_IMAGE_TYPE_2D;
@@ -713,28 +655,15 @@ TEST_F(NegativeMultiview, BeginTransformFeedback) {
     image_view_ci.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
     const vkt::ImageView imageView(*m_device, image_view_ci);
 
-    VkFramebufferCreateInfo framebufferCreateInfo = vku::InitStructHelper();
-    framebufferCreateInfo.width = 32;
-    framebufferCreateInfo.height = 32;
-    framebufferCreateInfo.layers = 1;
-    framebufferCreateInfo.renderPass = render_pass.handle();
-    framebufferCreateInfo.attachmentCount = 1;
-    framebufferCreateInfo.pAttachments = &imageView.handle();
-
-    vkt::Framebuffer framebuffer(*m_device, framebufferCreateInfo);
-
-    VkRenderPassBeginInfo render_pass_begin_info = vku::InitStructHelper();
-    render_pass_begin_info.renderPass = render_pass.handle();
-    render_pass_begin_info.framebuffer = framebuffer.handle();
-    render_pass_begin_info.renderArea.extent.width = 32;
-    render_pass_begin_info.renderArea.extent.height = 32;
+    vkt::Framebuffer framebuffer(*m_device, rp.Handle(), 1, &imageView.handle());
 
     CreatePipelineHelper pipe(*this);
+    pipe.gp_ci_.renderPass = rp.Handle();
     pipe.InitState();
     pipe.CreateGraphicsPipeline();
 
     m_commandBuffer->begin();
-    m_commandBuffer->BeginRenderPass(render_pass_begin_info);
+    m_commandBuffer->BeginRenderPass(rp.Handle(), framebuffer.handle(), 32, 32);
     vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_);
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBeginTransformFeedbackEXT-None-04128");
@@ -872,9 +801,8 @@ TEST_F(NegativeMultiview, RenderPassCreateSubpassMissingAttributesBitNVX) {
     AddRequiredExtensions(VK_NVX_MULTIVIEW_PER_VIEW_ATTRIBUTES_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_MULTIVIEW_EXTENSION_NAME);
     AddOptionalExtensions(VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(Init());
     const bool rp2Supported = IsExtensionsEnabled(VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitState());
 
     VkSubpassDescription subpasses[] = {
         {VK_SUBPASS_DESCRIPTION_PER_VIEW_POSITION_X_ONLY_BIT_NVX, VK_PIPELINE_BIND_POINT_GRAPHICS, 0, nullptr, 0, nullptr, nullptr,
@@ -989,8 +917,7 @@ TEST_F(NegativeMultiview, DrawWithPipelineIncompatibleWithRenderPass) {
 
     // Create image view
     VkImageObj image(m_device);
-    auto ici2d = image.ImageCreateInfo2D(128, 128, 1, 2, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-                                         VK_IMAGE_TILING_OPTIMAL, 0);
+    auto ici2d = image.ImageCreateInfo2D(128, 128, 1, 2, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     image.Init(ici2d);
     ASSERT_TRUE(image.initialized());
 
@@ -1118,13 +1045,8 @@ TEST_F(NegativeMultiview, RenderPassViewMasksZero) {
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_MULTIVIEW_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-    VkPhysicalDeviceMultiviewFeatures multiview_features = vku::InitStructHelper();
-    GetPhysicalDeviceFeatures2(multiview_features);
-    if (!multiview_features.multiview) {
-        GTEST_SKIP() << "multiview not supported";
-    }
-    RETURN_IF_SKIP(InitState(nullptr, &multiview_features));
+    AddRequiredFeature(vkt::Feature::multiview);
+    RETURN_IF_SKIP(Init());
 
     VkPhysicalDeviceMultiviewProperties render_pass_multiview_props = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(render_pass_multiview_props);
@@ -1150,13 +1072,8 @@ TEST_F(NegativeMultiview, RenderPassViewOffsets) {
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_MULTIVIEW_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-    VkPhysicalDeviceMultiviewFeatures multiview_features = vku::InitStructHelper();
-    GetPhysicalDeviceFeatures2(multiview_features);
-    if (!multiview_features.multiview) {
-        GTEST_SKIP() << "multiview not supported";
-    }
-    RETURN_IF_SKIP(InitState(nullptr, &multiview_features));
+    AddRequiredFeature(vkt::Feature::multiview);
+    RETURN_IF_SKIP(Init());
 
     VkPhysicalDeviceMultiviewProperties render_pass_multiview_props = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(render_pass_multiview_props);
@@ -1183,13 +1100,8 @@ TEST_F(NegativeMultiview, RenderPassViewMasksLimit) {
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_MULTIVIEW_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-    VkPhysicalDeviceMultiviewFeatures multiview_features = vku::InitStructHelper();
-    GetPhysicalDeviceFeatures2(multiview_features);
-    if (!multiview_features.multiview) {
-        GTEST_SKIP() << "multiview not supported";
-    }
-    RETURN_IF_SKIP(InitState(nullptr, &multiview_features));
+    AddRequiredFeature(vkt::Feature::multiview);
+    RETURN_IF_SKIP(Init());
 
     VkPhysicalDeviceMultiviewProperties render_pass_multiview_props = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(render_pass_multiview_props);
@@ -1212,45 +1124,22 @@ TEST_F(NegativeMultiview, FeaturesDisabled) {
     TEST_DESCRIPTION("Create graphics pipeline using multiview features which are not enabled.");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    RETURN_IF_SKIP(InitFramework());
+    AddRequiredFeature(vkt::Feature::multiview);
+    AddRequiredFeature(vkt::Feature::tessellationShader);
+    AddRequiredFeature(vkt::Feature::geometryShader);
+    AddDisabledFeature(vkt::Feature::multiviewTessellationShader);
+    AddDisabledFeature(vkt::Feature::multiviewGeometryShader);
+    RETURN_IF_SKIP(Init());
 
-    VkPhysicalDeviceMultiviewFeatures multiview_features = vku::InitStructHelper();
-    auto features2 = GetPhysicalDeviceFeatures2(multiview_features);
+    RenderPass2SingleSubpass rp(*this);
+    rp.AddAttachmentDescription(VK_FORMAT_B8G8R8A8_UNORM);
+    rp.AddAttachmentReference(0, VK_IMAGE_LAYOUT_GENERAL);
+    rp.AddColorAttachment(0);
+    rp.SetViewMask(0x3u);
+    rp.CreateRenderPass();
 
-    if (!multiview_features.multiview) {
-        GTEST_SKIP() << "Multiview support is required";
-    }
-
-    multiview_features.multiviewTessellationShader = VK_FALSE;
-    multiview_features.multiviewGeometryShader = VK_FALSE;
-    RETURN_IF_SKIP(InitState(nullptr, &features2));
-
-    VkAttachmentReference2 color_attachment = vku::InitStructHelper();
-    color_attachment.layout = VK_IMAGE_LAYOUT_GENERAL;
-
-    VkAttachmentDescription2 description = vku::InitStructHelper();
-    description.samples = VK_SAMPLE_COUNT_1_BIT;
-    description.format = VK_FORMAT_B8G8R8A8_UNORM;
-    description.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    description.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    description.finalLayout = VK_IMAGE_LAYOUT_GENERAL;
-
-    VkSubpassDescription2 subpass = vku::InitStructHelper();
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.viewMask = 0x3u;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &color_attachment;
-
-    VkRenderPassCreateInfo2 rpci = vku::InitStructHelper();
-    rpci.attachmentCount = 1;
-    rpci.pAttachments = &description;
-    rpci.subpassCount = 1;
-    rpci.pSubpasses = &subpass;
-
-    vkt::RenderPass render_pass(*m_device, rpci);
-    ASSERT_TRUE(render_pass.initialized());
-
-    if (features2.features.tessellationShader) {
+    // tessellationShader
+    {
         char const *tcsSource = R"glsl(
         #version 450
         layout(vertices=3) out;
@@ -1277,7 +1166,7 @@ TEST_F(NegativeMultiview, FeaturesDisabled) {
         VkPipelineTessellationStateCreateInfo tsci{VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO, nullptr, 0, 3};
 
         CreatePipelineHelper pipe(*this);
-        pipe.gp_ci_.renderPass = render_pass.handle();
+        pipe.gp_ci_.renderPass = rp.Handle();
         pipe.gp_ci_.subpass = 0;
         pipe.cb_ci_.attachmentCount = 1;
         pipe.gp_ci_.pTessellationState = &tsci;
@@ -1290,7 +1179,8 @@ TEST_F(NegativeMultiview, FeaturesDisabled) {
         pipe.CreateGraphicsPipeline();
         m_errorMonitor->VerifyFound();
     }
-    if (features2.features.geometryShader) {
+    // geometryShader
+    {
         static char const *gsSource = R"glsl(
         #version 450
         layout (points) in;
@@ -1306,7 +1196,7 @@ TEST_F(NegativeMultiview, FeaturesDisabled) {
         VkShaderObj gs(this, gsSource, VK_SHADER_STAGE_GEOMETRY_BIT);
 
         CreatePipelineHelper pipe(*this);
-        pipe.gp_ci_.renderPass = render_pass.handle();
+        pipe.gp_ci_.renderPass = rp.Handle();
         pipe.gp_ci_.subpass = 0;
         pipe.cb_ci_.attachmentCount = 1;
         pipe.shader_stages_ = {vs.GetStageCreateInfo(), gs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
@@ -1351,7 +1241,7 @@ TEST_F(NegativeMultiview, DynamicRenderingMaxMultiviewInstanceIndex) {
     pipe.CreateGraphicsPipeline();
 
     VkImageObj img(m_device);
-    img.Init(m_width, m_height, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_IMAGE_TILING_OPTIMAL);
+    img.Init(m_width, m_height, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     vkt::ImageView view = img.CreateView();
 
     VkRenderingAttachmentInfo color_attachment = vku::InitStructHelper();

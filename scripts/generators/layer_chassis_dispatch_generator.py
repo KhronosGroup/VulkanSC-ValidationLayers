@@ -1,9 +1,9 @@
 #!/usr/bin/python3 -i
 #
-# Copyright (c) 2015-2023 The Khronos Group Inc.
-# Copyright (c) 2015-2023 Valve Corporation
-# Copyright (c) 2015-2023 LunarG, Inc.
-# Copyright (c) 2015-2023 Google Inc.
+# Copyright (c) 2015-2024 The Khronos Group Inc.
+# Copyright (c) 2015-2024 Valve Corporation
+# Copyright (c) 2015-2024 LunarG, Inc.
+# Copyright (c) 2015-2024 Google Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -53,6 +53,7 @@ class LayerChassisDispatchOutputGenerator(BaseGenerator):
             'vkUpdateDescriptorSetWithTemplate',
             'vkUpdateDescriptorSetWithTemplateKHR',
             'vkCmdPushDescriptorSetWithTemplateKHR',
+            'vkCmdPushDescriptorSetWithTemplate2KHR',
             'vkDebugMarkerSetObjectTagEXT',
             'vkDebugMarkerSetObjectNameEXT',
             'vkCreateRenderPass',
@@ -73,6 +74,7 @@ class LayerChassisDispatchOutputGenerator(BaseGenerator):
             'vkEnumerateDeviceExtensionProperties',
             'vkEnumerateDeviceLayerProperties',
             'vkEnumerateInstanceVersion',
+            'vkGetPhysicalDeviceToolProperties',
             'vkGetPhysicalDeviceToolPropertiesEXT',
             'vkSetPrivateDataEXT',
             'vkGetPrivateDataEXT',
@@ -84,6 +86,9 @@ class LayerChassisDispatchOutputGenerator(BaseGenerator):
             'vkGetDescriptorEXT',
             'vkReleasePerformanceConfigurationINTEL',
             'vkExportMetalObjectsEXT',
+            'vkGetWinrtDisplayNV',
+            'vkGetRandROutputDisplayEXT',
+            'vkGetDrmDisplayEXT',
             # These are for special-casing the pInheritanceInfo issue (must be ignored for primary CBs)
             'vkAllocateCommandBuffers',
             'vkFreeCommandBuffers',
@@ -116,9 +121,9 @@ class LayerChassisDispatchOutputGenerator(BaseGenerator):
 
             /***************************************************************************
             *
-            * Copyright (c) 2015-2023 The Khronos Group Inc.
-            * Copyright (c) 2015-2023 Valve Corporation
-            * Copyright (c) 2015-2023 LunarG, Inc.
+            * Copyright (c) 2015-2024 The Khronos Group Inc.
+            * Copyright (c) 2015-2024 Valve Corporation
+            * Copyright (c) 2015-2024 LunarG, Inc.
             *
             * Licensed under the Apache License, Version 2.0 (the "License");
             * you may not use this file except in compliance with the License.
@@ -217,7 +222,7 @@ class LayerChassisDispatchOutputGenerator(BaseGenerator):
             out.extend(guard_helper.add_guard(command.protect))
 
             # Generate NDO wrapping/unwrapping code for all parameters
-            isCreate = any(x in command.name for x in ['Create', 'Allocate', 'GetRandROutputDisplayEXT', 'GetDrmDisplayEXT', 'RegisterDeviceEvent', 'RegisterDisplayEvent', 'AcquirePerformanceConfigurationINTEL'])
+            isCreate = any(x in command.name for x in ['Create', 'Allocate', 'RegisterDeviceEvent', 'RegisterDisplayEvent', 'AcquirePerformanceConfigurationINTEL'])
             isDestroy = any(x in command.name for x in ['Destroy', 'Free'])
 
             # Handle ndo create/allocate operations

@@ -13,16 +13,14 @@
  */
 
 #include "../framework/layer_validation_tests.h"
+#include "../framework/render_pass_helper.h"
 
 TEST_F(PositiveImagelessFramebuffer, BasicUsage) {
     TEST_DESCRIPTION("Create an imageless framebuffer");
 
     AddRequiredExtensions(VK_KHR_IMAGELESS_FRAMEBUFFER_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-
-    VkPhysicalDeviceImagelessFramebufferFeaturesKHR imageless_features = vku::InitStructHelper();
-    GetPhysicalDeviceFeatures2(imageless_features);
-    RETURN_IF_SKIP(InitState(nullptr, &imageless_features));
+    AddRequiredFeature(vkt::Feature::imagelessFramebuffer);
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     uint32_t attachment_width = 512;
@@ -30,22 +28,11 @@ TEST_F(PositiveImagelessFramebuffer, BasicUsage) {
     VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
 
     // Create a renderPass with a single attachment
-    VkAttachmentDescription attachment_description = {};
-    attachment_description.format = format;
-    attachment_description.samples = VK_SAMPLE_COUNT_1_BIT;
-    attachment_description.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    attachment_description.finalLayout = VK_IMAGE_LAYOUT_GENERAL;
-    VkAttachmentReference attachment_reference = {};
-    attachment_reference.layout = VK_IMAGE_LAYOUT_GENERAL;
-    VkSubpassDescription subpass = {};
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &attachment_reference;
-    VkRenderPassCreateInfo rp_ci = vku::InitStructHelper();
-    rp_ci.subpassCount = 1;
-    rp_ci.pSubpasses = &subpass;
-    rp_ci.attachmentCount = 1;
-    rp_ci.pAttachments = &attachment_description;
-    vkt::RenderPass render_pass(*m_device, rp_ci);
+    RenderPassSingleSubpass rp(*this);
+    rp.AddAttachmentDescription(format);
+    rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_GENERAL});
+    rp.AddColorAttachment(0);
+    rp.CreateRenderPass();
 
     VkFramebufferAttachmentImageInfoKHR fb_attachment_image_info = vku::InitStructHelper();
     fb_attachment_image_info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
@@ -62,7 +49,7 @@ TEST_F(PositiveImagelessFramebuffer, BasicUsage) {
     fb_ci.width = attachment_width;
     fb_ci.height = attachment_height;
     fb_ci.layers = 1;
-    fb_ci.renderPass = render_pass.handle();
+    fb_ci.renderPass = rp.Handle();
     fb_ci.attachmentCount = 1;
 
     fb_ci.pAttachments  = nullptr;
@@ -78,37 +65,19 @@ TEST_F(PositiveImagelessFramebuffer, Image3D) {
     TEST_DESCRIPTION("Create imageless framebuffer with image view from 3D image.");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    RETURN_IF_SKIP(InitFramework());
-    VkPhysicalDeviceImagelessFramebufferFeatures imageless_framebuffer = vku::InitStructHelper();
-    GetPhysicalDeviceFeatures2(imageless_framebuffer);
-    RETURN_IF_SKIP(InitState(nullptr, &imageless_framebuffer));
+    AddRequiredFeature(vkt::Feature::imagelessFramebuffer);
+    RETURN_IF_SKIP(Init());
 
     if (IsExtensionsEnabled(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME)) {
         GTEST_SKIP() << "VK_KHR_portability_subset enabled - requires imageView2DOn3DImage to be VK_TRUE.\n";
     }
 
-    VkSubpassDescription subpass = {};
-
     VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
-
-    VkAttachmentDescription attachment = {};
-    attachment.format = format;
-    attachment.samples = VK_SAMPLE_COUNT_1_BIT;
-    attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachment.initialLayout = VK_IMAGE_LAYOUT_GENERAL;
-    attachment.finalLayout = VK_IMAGE_LAYOUT_GENERAL;
-
-    VkRenderPassCreateInfo rp_ci = vku::InitStructHelper();
-    rp_ci.subpassCount = 1;
-    rp_ci.pSubpasses = &subpass;
-    rp_ci.attachmentCount = 1;
-    rp_ci.pAttachments = &attachment;
-
-    vkt::RenderPass render_pass;
-    render_pass.init(*m_device, rp_ci);
+    RenderPassSingleSubpass rp(*this);
+    rp.AddAttachmentDescription(format);
+    rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL});
+    rp.AddColorAttachment(0);
+    rp.CreateRenderPass();
 
     VkImageCreateInfo image_ci = vku::InitStructHelper();
     image_ci.flags = VK_IMAGE_CREATE_2D_ARRAY_COMPATIBLE_BIT;
@@ -142,7 +111,7 @@ TEST_F(PositiveImagelessFramebuffer, Image3D) {
 
     VkFramebufferCreateInfo framebuffer_ci = vku::InitStructHelper(&framebuffer_attachments);
     framebuffer_ci.flags = VK_FRAMEBUFFER_CREATE_IMAGELESS_BIT;
-    framebuffer_ci.renderPass = render_pass.handle();
+    framebuffer_ci.renderPass = rp.Handle();
     framebuffer_ci.attachmentCount = 1;
     framebuffer_ci.pAttachments = &imageView.handle();
     framebuffer_ci.width = 32;
@@ -159,7 +128,7 @@ TEST_F(PositiveImagelessFramebuffer, Image3D) {
     render_pass_attachment_bi.pAttachments = &imageView.handle();
 
     VkRenderPassBeginInfo render_pass_bi = vku::InitStructHelper(&render_pass_attachment_bi);
-    render_pass_bi.renderPass = render_pass.handle();
+    render_pass_bi.renderPass = rp.Handle();
     render_pass_bi.framebuffer = framebuffer.handle();
     render_pass_bi.renderArea.extent = {1, 1};
     render_pass_bi.clearValueCount = 1;

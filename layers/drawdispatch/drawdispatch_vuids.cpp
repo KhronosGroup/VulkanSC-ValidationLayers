@@ -1,8 +1,8 @@
-/* Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (C) 2015-2023 Google Inc.
- * Modifications Copyright (C) 2020-2023 Advanced Micro Devices, Inc. All rights reserved.
+/* Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (C) 2015-2024 Google Inc.
+ * Modifications Copyright (C) 2020-2024 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -54,6 +54,7 @@ struct DispatchVuidsCmdDraw : DrawDispatchVuid {
         msrtss_rasterization_samples_07284       = "VUID-vkCmdDraw-multisampledRenderToSingleSampled-07284";
         unprotected_command_buffer_02707         = "VUID-vkCmdDraw-commandBuffer-02707";
         protected_command_buffer_02712           = "VUID-vkCmdDraw-commandBuffer-02712";
+        ray_query_04617                          = "VUID-vkCmdDraw-commandBuffer-04617";
         max_multiview_instance_index_02688       = "VUID-vkCmdDraw-maxMultiviewInstanceIndex-02688";
         img_filter_cubic_02693                   = "VUID-vkCmdDraw-None-02693";
         filter_cubic_02694                       = "VUID-vkCmdDraw-filterCubic-02694";
@@ -67,6 +68,7 @@ struct DispatchVuidsCmdDraw : DrawDispatchVuid {
         vertex_input_04912                       = "VUID-vkCmdDraw-None-04912";
         vertex_input_binding_stride_04913        = "VUID-vkCmdDraw-pStrides-04913";
         vertex_input_04914                       = "VUID-vkCmdDraw-None-04914";
+        vertex_input_08734                       = "VUID-vkCmdDraw-Input-08734";
         blend_enable_04727                       = "VUID-vkCmdDraw-blendEnable-04727";
         dynamic_discard_rectangle_07751          = "VUID-vkCmdDraw-None-07751";
         dynamic_discard_rectangle_enable_07880   = "VUID-vkCmdDraw-None-07880";
@@ -190,6 +192,10 @@ struct DispatchVuidsCmdDraw : DrawDispatchVuid {
         external_format_resolve_09368            = "VUID-vkCmdDraw-None-09368";
         external_format_resolve_09369            = "VUID-vkCmdDraw-None-09369";
         external_format_resolve_09372            = "VUID-vkCmdDraw-colorAttachmentCount-09372";
+        external_format_resolve_09366            = "VUID-vkCmdDraw-None-09366";
+        external_format_resolve_09367            = "VUID-vkCmdDraw-rasterizationSamples-09367";
+        external_format_resolve_09370            = "VUID-vkCmdDraw-pFragmentSize-09370";
+        external_format_resolve_09371            = "VUID-vkCmdDraw-pFragmentSize-09371";
         set_rasterizer_discard_enable_08639      = "VUID-vkCmdDraw-None-08639";
         set_depth_bias_enable_08640              = "VUID-vkCmdDraw-None-08640";
         set_logic_op_08641                       = "VUID-vkCmdDraw-None-08641";
@@ -315,6 +321,12 @@ struct DispatchVuidsCmdDraw : DrawDispatchVuid {
         rasterization_samples_09211              = "VUID-vkCmdDraw-None-09211";
         dynamic_rendering_undefined_depth_format_08913 = "VUID-vkCmdDraw-dynamicRenderingUnusedAttachments-08913";
         primitives_generated_query_07481         = "VUID-vkCmdDraw-primitivesGeneratedQueryWithNonZeroStreams-07481";
+        vertex_input_09461                       = "VUID-vkCmdDraw-pNext-09461";
+        vertex_input_09462                       = "VUID-vkCmdDraw-None-09462";
+        color_blend_enable_07627                 = "VUID-vkCmdDraw-None-07627";
+        color_blend_equation_07628               = "VUID-vkCmdDraw-None-07628";
+        color_write_mask_07629                   = "VUID-vkCmdDraw-None-07629";
+        color_blend_advanced_07635               = "VUID-vkCmdDraw-None-07635";
     }
 };
 
@@ -351,6 +363,7 @@ struct DispatchVuidsCmdDrawMultiEXT : DrawDispatchVuid {
         msrtss_rasterization_samples_07284       = "VUID-vkCmdDrawMultiEXT-multisampledRenderToSingleSampled-07284";
         unprotected_command_buffer_02707         = "VUID-vkCmdDrawMultiEXT-commandBuffer-02707";
         protected_command_buffer_02712           = "VUID-vkCmdDrawMultiEXT-commandBuffer-02712";
+        ray_query_04617                          = "VUID-vkCmdDrawMultiEXT-commandBuffer-04617";
         max_multiview_instance_index_02688       = "VUID-vkCmdDrawMultiEXT-maxMultiviewInstanceIndex-02688";
         img_filter_cubic_02693                   = "VUID-vkCmdDrawMultiEXT-None-02693";
         filter_cubic_02694                       = "VUID-vkCmdDrawMultiEXT-filterCubic-02694";
@@ -364,6 +377,7 @@ struct DispatchVuidsCmdDrawMultiEXT : DrawDispatchVuid {
         vertex_input_04912                       = "VUID-vkCmdDrawMultiEXT-None-04912";
         vertex_input_binding_stride_04913        = "VUID-vkCmdDrawMultiEXT-pStrides-04913";
         vertex_input_04914                       = "VUID-vkCmdDrawMultiEXT-None-04914";
+        vertex_input_08734                       = "VUID-vkCmdDrawMultiEXT-Input-08734";
         blend_enable_04727                       = "VUID-vkCmdDrawMultiEXT-blendEnable-04727";
         dynamic_discard_rectangle_07751          = "VUID-vkCmdDrawMultiEXT-None-07751";
         dynamic_discard_rectangle_enable_07880   = "VUID-vkCmdDrawMultiEXT-None-07880";
@@ -487,6 +501,10 @@ struct DispatchVuidsCmdDrawMultiEXT : DrawDispatchVuid {
         external_format_resolve_09368            = "VUID-vkCmdDrawMultiEXT-None-09368";
         external_format_resolve_09369            = "VUID-vkCmdDrawMultiEXT-None-09369";
         external_format_resolve_09372            = "VUID-vkCmdDrawMultiEXT-colorAttachmentCount-09372";
+        external_format_resolve_09366            = "VUID-vkCmdDrawMultiEXT-None-09366";
+        external_format_resolve_09367            = "VUID-vkCmdDrawMultiEXT-rasterizationSamples-09367";
+        external_format_resolve_09370            = "VUID-vkCmdDrawMultiEXT-pFragmentSize-09370";
+        external_format_resolve_09371            = "VUID-vkCmdDrawMultiEXT-pFragmentSize-09371";
         set_rasterizer_discard_enable_08639      = "VUID-vkCmdDrawMultiEXT-None-08639";
         set_depth_bias_enable_08640              = "VUID-vkCmdDrawMultiEXT-None-08640";
         set_logic_op_08641                       = "VUID-vkCmdDrawMultiEXT-None-08641";
@@ -612,6 +630,12 @@ struct DispatchVuidsCmdDrawMultiEXT : DrawDispatchVuid {
         rasterization_samples_09211              = "VUID-vkCmdDrawMultiEXT-None-09211";
         dynamic_rendering_undefined_depth_format_08913 = "VUID-vkCmdDrawMultiEXT-dynamicRenderingUnusedAttachments-08913";
         primitives_generated_query_07481         = "VUID-vkCmdDrawMultiEXT-primitivesGeneratedQueryWithNonZeroStreams-07481";
+        vertex_input_09461                       = "VUID-vkCmdDrawMultiEXT-pNext-09461";
+        vertex_input_09462                       = "VUID-vkCmdDrawMultiEXT-None-09462";
+        color_blend_enable_07627                 = "VUID-vkCmdDrawMultiEXT-None-07627";
+        color_blend_equation_07628               = "VUID-vkCmdDrawMultiEXT-None-07628";
+        color_write_mask_07629                   = "VUID-vkCmdDrawMultiEXT-None-07629";
+        color_blend_advanced_07635               = "VUID-vkCmdDrawMultiEXT-None-07635";
     }
 };
 
@@ -649,6 +673,7 @@ struct DispatchVuidsCmdDrawIndexed : DrawDispatchVuid {
         msrtss_rasterization_samples_07284       = "VUID-vkCmdDrawIndexed-multisampledRenderToSingleSampled-07284";
         unprotected_command_buffer_02707         = "VUID-vkCmdDrawIndexed-commandBuffer-02707";
         protected_command_buffer_02712           = "VUID-vkCmdDrawIndexed-commandBuffer-02712";
+        ray_query_04617                          = "VUID-vkCmdDrawIndexed-commandBuffer-04617";
         max_multiview_instance_index_02688       = "VUID-vkCmdDrawIndexed-maxMultiviewInstanceIndex-02688";
         img_filter_cubic_02693                   = "VUID-vkCmdDrawIndexed-None-02693";
         filter_cubic_02694                       = "VUID-vkCmdDrawIndexed-filterCubic-02694";
@@ -662,6 +687,7 @@ struct DispatchVuidsCmdDrawIndexed : DrawDispatchVuid {
         vertex_input_04912                       = "VUID-vkCmdDrawIndexed-None-04912";
         vertex_input_binding_stride_04913        = "VUID-vkCmdDrawIndexed-pStrides-04913";
         vertex_input_04914                       = "VUID-vkCmdDrawIndexed-None-04914";
+        vertex_input_08734                       = "VUID-vkCmdDrawIndexed-Input-08734";
         blend_enable_04727                       = "VUID-vkCmdDrawIndexed-blendEnable-04727";
         dynamic_discard_rectangle_07751          = "VUID-vkCmdDrawIndexed-None-07751";
         dynamic_discard_rectangle_enable_07880   = "VUID-vkCmdDrawIndexed-None-07880";
@@ -785,6 +811,10 @@ struct DispatchVuidsCmdDrawIndexed : DrawDispatchVuid {
         external_format_resolve_09368            = "VUID-vkCmdDrawIndexed-None-09368";
         external_format_resolve_09369            = "VUID-vkCmdDrawIndexed-None-09369";
         external_format_resolve_09372            = "VUID-vkCmdDrawIndexed-colorAttachmentCount-09372";
+        external_format_resolve_09366            = "VUID-vkCmdDrawIndexed-None-09366";
+        external_format_resolve_09367            = "VUID-vkCmdDrawIndexed-rasterizationSamples-09367";
+        external_format_resolve_09370            = "VUID-vkCmdDrawIndexed-pFragmentSize-09370";
+        external_format_resolve_09371            = "VUID-vkCmdDrawIndexed-pFragmentSize-09371";
         set_rasterizer_discard_enable_08639      = "VUID-vkCmdDrawIndexed-None-08639";
         set_depth_bias_enable_08640              = "VUID-vkCmdDrawIndexed-None-08640";
         set_logic_op_08641                       = "VUID-vkCmdDrawIndexed-None-08641";
@@ -910,6 +940,12 @@ struct DispatchVuidsCmdDrawIndexed : DrawDispatchVuid {
         rasterization_samples_09211              = "VUID-vkCmdDrawIndexed-None-09211";
         dynamic_rendering_undefined_depth_format_08913 = "VUID-vkCmdDrawIndexed-dynamicRenderingUnusedAttachments-08913";
         primitives_generated_query_07481         = "VUID-vkCmdDrawIndexed-primitivesGeneratedQueryWithNonZeroStreams-07481";
+        vertex_input_09461                       = "VUID-vkCmdDrawIndexed-pNext-09461";
+        vertex_input_09462                       = "VUID-vkCmdDrawIndexed-None-09462";
+        color_blend_enable_07627                 = "VUID-vkCmdDrawIndexed-None-07627";
+        color_blend_equation_07628               = "VUID-vkCmdDrawIndexed-None-07628";
+        color_write_mask_07629                   = "VUID-vkCmdDrawIndexed-None-07629";
+        color_blend_advanced_07635               = "VUID-vkCmdDrawIndexed-None-07635";
     }
 };
 
@@ -947,6 +983,7 @@ struct DispatchVuidsCmdDrawMultiIndexedEXT : DrawDispatchVuid {
         msrtss_rasterization_samples_07284       = "VUID-vkCmdDrawMultiIndexedEXT-multisampledRenderToSingleSampled-07284";
         unprotected_command_buffer_02707         = "VUID-vkCmdDrawMultiIndexedEXT-commandBuffer-02707";
         protected_command_buffer_02712           = "VUID-vkCmdDrawMultiIndexedEXT-commandBuffer-02712";
+        ray_query_04617                          = "VUID-vkCmdDrawMultiIndexedEXT-commandBuffer-04617";
         max_multiview_instance_index_02688       = "VUID-vkCmdDrawMultiIndexedEXT-maxMultiviewInstanceIndex-02688";
         img_filter_cubic_02693                   = "VUID-vkCmdDrawMultiIndexedEXT-None-02693";
         filter_cubic_02694                       = "VUID-vkCmdDrawMultiIndexedEXT-filterCubic-02694";
@@ -960,6 +997,7 @@ struct DispatchVuidsCmdDrawMultiIndexedEXT : DrawDispatchVuid {
         vertex_input_04912                       = "VUID-vkCmdDrawMultiIndexedEXT-None-04912";
         vertex_input_binding_stride_04913        = "VUID-vkCmdDrawMultiIndexedEXT-pStrides-04913";
         vertex_input_04914                       = "VUID-vkCmdDrawMultiIndexedEXT-None-04914";
+        vertex_input_08734                       = "VUID-vkCmdDrawMultiIndexedEXT-Input-08734";
         blend_enable_04727                       = "VUID-vkCmdDrawMultiIndexedEXT-blendEnable-04727";
         dynamic_discard_rectangle_07751          = "VUID-vkCmdDrawMultiIndexedEXT-None-07751";
         dynamic_discard_rectangle_enable_07880   = "VUID-vkCmdDrawMultiIndexedEXT-None-07880";
@@ -1083,6 +1121,10 @@ struct DispatchVuidsCmdDrawMultiIndexedEXT : DrawDispatchVuid {
         external_format_resolve_09368            = "VUID-vkCmdDrawMultiIndexedEXT-None-09368";
         external_format_resolve_09369            = "VUID-vkCmdDrawMultiIndexedEXT-None-09369";
         external_format_resolve_09372            = "VUID-vkCmdDrawMultiIndexedEXT-colorAttachmentCount-09372";
+        external_format_resolve_09366            = "VUID-vkCmdDrawMultiIndexedEXT-None-09366";
+        external_format_resolve_09367            = "VUID-vkCmdDrawMultiIndexedEXT-rasterizationSamples-09367";
+        external_format_resolve_09370            = "VUID-vkCmdDrawMultiIndexedEXT-pFragmentSize-09370";
+        external_format_resolve_09371            = "VUID-vkCmdDrawMultiIndexedEXT-pFragmentSize-09371";
         set_rasterizer_discard_enable_08639      = "VUID-vkCmdDrawMultiIndexedEXT-None-08639";
         set_depth_bias_enable_08640              = "VUID-vkCmdDrawMultiIndexedEXT-None-08640";
         set_logic_op_08641                       = "VUID-vkCmdDrawMultiIndexedEXT-None-08641";
@@ -1208,6 +1250,12 @@ struct DispatchVuidsCmdDrawMultiIndexedEXT : DrawDispatchVuid {
         rasterization_samples_09211              = "VUID-vkCmdDrawMultiIndexedEXT-None-09211";
         dynamic_rendering_undefined_depth_format_08913 = "VUID-vkCmdDrawMultiIndexedEXT-dynamicRenderingUnusedAttachments-08913";
         primitives_generated_query_07481         = "VUID-vkCmdDrawMultiIndexedEXT-primitivesGeneratedQueryWithNonZeroStreams-07481";
+        vertex_input_09461                       = "VUID-vkCmdDrawMultiIndexedEXT-pNext-09461";
+        vertex_input_09462                       = "VUID-vkCmdDrawMultiIndexedEXT-None-09462";
+        color_blend_enable_07627                 = "VUID-vkCmdDrawMultiIndexedEXT-None-07627";
+        color_blend_equation_07628               = "VUID-vkCmdDrawMultiIndexedEXT-None-07628";
+        color_write_mask_07629                   = "VUID-vkCmdDrawMultiIndexedEXT-None-07629";
+        color_blend_advanced_07635               = "VUID-vkCmdDrawMultiIndexedEXT-None-07635";
     }
 };
 
@@ -1225,7 +1273,7 @@ struct DispatchVuidsCmdDrawIndirect : DrawDispatchVuid {
         linear_filter_sampler_04553              = "VUID-vkCmdDrawIndirect-magFilter-04553";
         linear_mipmap_sampler_04770              = "VUID-vkCmdDrawIndirect-mipmapMode-04770";
         cubic_sampler_02692                      = "VUID-vkCmdDrawIndirect-None-02692";
-        indirect_protected_cb_02646              = "VUID-vkCmdDrawIndirect-commandBuffer-02711";
+        indirect_protected_cb_02711              = "VUID-vkCmdDrawIndirect-commandBuffer-02711";
         indirect_contiguous_memory_02708         = "VUID-vkCmdDrawIndirect-buffer-02708";
         indirect_buffer_bit_02290                = "VUID-vkCmdDrawIndirect-buffer-02709";
         viewport_count_03417                     = "VUID-vkCmdDrawIndirect-viewportCount-03417";
@@ -1259,6 +1307,7 @@ struct DispatchVuidsCmdDrawIndirect : DrawDispatchVuid {
         vertex_input_04912                       = "VUID-vkCmdDrawIndirect-None-04912";
         vertex_input_binding_stride_04913        = "VUID-vkCmdDrawIndirect-pStrides-04913";
         vertex_input_04914                       = "VUID-vkCmdDrawIndirect-None-04914";
+        vertex_input_08734                       = "VUID-vkCmdDrawIndirect-Input-08734";
         blend_enable_04727                       = "VUID-vkCmdDrawIndirect-blendEnable-04727";
         dynamic_discard_rectangle_07751          = "VUID-vkCmdDrawIndirect-None-07751";
         dynamic_discard_rectangle_enable_07880   = "VUID-vkCmdDrawIndirect-None-07880";
@@ -1382,6 +1431,10 @@ struct DispatchVuidsCmdDrawIndirect : DrawDispatchVuid {
         external_format_resolve_09368            = "VUID-vkCmdDrawIndirect-None-09368";
         external_format_resolve_09369            = "VUID-vkCmdDrawIndirect-None-09369";
         external_format_resolve_09372            = "VUID-vkCmdDrawIndirect-colorAttachmentCount-09372";
+        external_format_resolve_09366            = "VUID-vkCmdDrawIndirect-None-09366";
+        external_format_resolve_09367            = "VUID-vkCmdDrawIndirect-rasterizationSamples-09367";
+        external_format_resolve_09370            = "VUID-vkCmdDrawIndirect-pFragmentSize-09370";
+        external_format_resolve_09371            = "VUID-vkCmdDrawIndirect-pFragmentSize-09371";
         set_rasterizer_discard_enable_08639      = "VUID-vkCmdDrawIndirect-None-08639";
         set_depth_bias_enable_08640              = "VUID-vkCmdDrawIndirect-None-08640";
         set_logic_op_08641                       = "VUID-vkCmdDrawIndirect-None-08641";
@@ -1507,6 +1560,10 @@ struct DispatchVuidsCmdDrawIndirect : DrawDispatchVuid {
         rasterization_samples_09211              = "VUID-vkCmdDrawIndirect-None-09211";
         dynamic_rendering_undefined_depth_format_08913 = "VUID-vkCmdDrawIndirect-dynamicRenderingUnusedAttachments-08913";
         primitives_generated_query_07481         = "VUID-vkCmdDrawIndirect-primitivesGeneratedQueryWithNonZeroStreams-07481";
+        color_blend_enable_07627                 = "VUID-vkCmdDrawIndirect-None-07627";
+        color_blend_equation_07628               = "VUID-vkCmdDrawIndirect-None-07628";
+        color_write_mask_07629                   = "VUID-vkCmdDrawIndirect-None-07629";
+        color_blend_advanced_07635               = "VUID-vkCmdDrawIndirect-None-07635";
     }
 };
 
@@ -1525,7 +1582,7 @@ struct DispatchVuidsCmdDrawIndexedIndirect : DrawDispatchVuid {
         linear_filter_sampler_04553              = "VUID-vkCmdDrawIndexedIndirect-magFilter-04553";
         linear_mipmap_sampler_04770              = "VUID-vkCmdDrawIndexedIndirect-mipmapMode-04770";
         cubic_sampler_02692                      = "VUID-vkCmdDrawIndexedIndirect-None-02692";
-        indirect_protected_cb_02646              = "VUID-vkCmdDrawIndexedIndirect-commandBuffer-02711";
+        indirect_protected_cb_02711              = "VUID-vkCmdDrawIndexedIndirect-commandBuffer-02711";
         indirect_contiguous_memory_02708         = "VUID-vkCmdDrawIndexedIndirect-buffer-02708";
         indirect_buffer_bit_02290                = "VUID-vkCmdDrawIndexedIndirect-buffer-02709";
         viewport_count_03417                     = "VUID-vkCmdDrawIndexedIndirect-viewportCount-03417";
@@ -1559,6 +1616,7 @@ struct DispatchVuidsCmdDrawIndexedIndirect : DrawDispatchVuid {
         vertex_input_04912                       = "VUID-vkCmdDrawIndexedIndirect-None-04912";
         vertex_input_binding_stride_04913        = "VUID-vkCmdDrawIndexedIndirect-pStrides-04913";
         vertex_input_04914                       = "VUID-vkCmdDrawIndexedIndirect-None-04914";
+        vertex_input_08734                       = "VUID-vkCmdDrawIndexedIndirect-Input-08734";
         blend_enable_04727                       = "VUID-vkCmdDrawIndexedIndirect-blendEnable-04727";
         dynamic_discard_rectangle_07751          = "VUID-vkCmdDrawIndexedIndirect-None-07751";
         dynamic_discard_rectangle_enable_07880   = "VUID-vkCmdDrawIndexedIndirect-None-07880";
@@ -1682,6 +1740,10 @@ struct DispatchVuidsCmdDrawIndexedIndirect : DrawDispatchVuid {
         external_format_resolve_09368            = "VUID-vkCmdDrawIndexedIndirect-None-09368";
         external_format_resolve_09369            = "VUID-vkCmdDrawIndexedIndirect-None-09369";
         external_format_resolve_09372            = "VUID-vkCmdDrawIndexedIndirect-colorAttachmentCount-09372";
+        external_format_resolve_09366            = "VUID-vkCmdDrawIndexedIndirect-None-09366";
+        external_format_resolve_09367            = "VUID-vkCmdDrawIndexedIndirect-rasterizationSamples-09367";
+        external_format_resolve_09370            = "VUID-vkCmdDrawIndexedIndirect-pFragmentSize-09370";
+        external_format_resolve_09371            = "VUID-vkCmdDrawIndexedIndirect-pFragmentSize-09371";
         set_rasterizer_discard_enable_08639      = "VUID-vkCmdDrawIndexedIndirect-None-08639";
         set_depth_bias_enable_08640              = "VUID-vkCmdDrawIndexedIndirect-None-08640";
         set_logic_op_08641                       = "VUID-vkCmdDrawIndexedIndirect-None-08641";
@@ -1807,6 +1869,10 @@ struct DispatchVuidsCmdDrawIndexedIndirect : DrawDispatchVuid {
         rasterization_samples_09211              = "VUID-vkCmdDrawIndexedIndirect-None-09211";
         dynamic_rendering_undefined_depth_format_08913 = "VUID-vkCmdDrawIndexedIndirect-dynamicRenderingUnusedAttachments-08913";
         primitives_generated_query_07481         = "VUID-vkCmdDrawIndexedIndirect-primitivesGeneratedQueryWithNonZeroStreams-07481";
+        color_blend_enable_07627                 = "VUID-vkCmdDrawIndexedIndirect-None-07627";
+        color_blend_equation_07628               = "VUID-vkCmdDrawIndexedIndirect-None-07628";
+        color_write_mask_07629                   = "VUID-vkCmdDrawIndexedIndirect-None-07629";
+        color_blend_advanced_07635               = "VUID-vkCmdDrawIndexedIndirect-None-07635";
     }
 };
 
@@ -1828,6 +1894,7 @@ struct DispatchVuidsCmdDispatch : DrawDispatchVuid {
         dynamic_state_setting_commands_08608     = "VUID-vkCmdDispatch-None-08608";
         unprotected_command_buffer_02707         = "VUID-vkCmdDispatch-commandBuffer-02707";
         protected_command_buffer_02712           = "VUID-vkCmdDispatch-commandBuffer-02712";
+        ray_query_04617                          = "VUID-vkCmdDispatch-commandBuffer-04617";
         img_filter_cubic_02693                   = "VUID-vkCmdDispatch-None-02693";
         filter_cubic_02694                       = "VUID-vkCmdDispatch-filterCubic-02694";
         filter_cubic_min_max_02695               = "VUID-vkCmdDispatch-filterCubicMinmax-02695";
@@ -1862,7 +1929,7 @@ struct DispatchVuidsCmdDispatchIndirect : DrawDispatchVuid {
         linear_filter_sampler_04553              = "VUID-vkCmdDispatchIndirect-magFilter-04553";
         linear_mipmap_sampler_04770              = "VUID-vkCmdDispatchIndirect-mipmapMode-04770";
         cubic_sampler_02692                      = "VUID-vkCmdDispatchIndirect-None-02692";
-        indirect_protected_cb_02646              = "VUID-vkCmdDispatchIndirect-commandBuffer-02711";
+        indirect_protected_cb_02711              = "VUID-vkCmdDispatchIndirect-commandBuffer-02711";
         indirect_contiguous_memory_02708         = "VUID-vkCmdDispatchIndirect-buffer-02708";
         indirect_buffer_bit_02290                = "VUID-vkCmdDispatchIndirect-buffer-02709";
         corner_sampled_address_mode_02696        = "VUID-vkCmdDispatchIndirect-flags-02696";
@@ -1914,7 +1981,7 @@ struct DispatchVuidsCmdDrawIndirectCount : DrawDispatchVuid {
         linear_filter_sampler_04553              = "VUID-vkCmdDrawIndirectCount-magFilter-04553";
         linear_mipmap_sampler_04770              = "VUID-vkCmdDrawIndirectCount-mipmapMode-04770";
         cubic_sampler_02692                      = "VUID-vkCmdDrawIndirectCount-None-02692";
-        indirect_protected_cb_02646              = "VUID-vkCmdDrawIndirectCount-commandBuffer-02711";
+        indirect_protected_cb_02711              = "VUID-vkCmdDrawIndirectCount-commandBuffer-02711";
         indirect_contiguous_memory_02708         = "VUID-vkCmdDrawIndirectCount-buffer-02708";
         indirect_count_contiguous_memory_02714   = "VUID-vkCmdDrawIndirectCount-countBuffer-02714";
         indirect_buffer_bit_02290                = "VUID-vkCmdDrawIndirectCount-buffer-02709";
@@ -1951,6 +2018,7 @@ struct DispatchVuidsCmdDrawIndirectCount : DrawDispatchVuid {
         vertex_input_04912                       = "VUID-vkCmdDrawIndirectCount-None-04912";
         vertex_input_binding_stride_04913        = "VUID-vkCmdDrawIndirectCount-pStrides-04913";
         vertex_input_04914                       = "VUID-vkCmdDrawIndirectCount-None-04914";
+        vertex_input_08734                       = "VUID-vkCmdDrawIndirectCount-Input-08734";
         blend_enable_04727                       = "VUID-vkCmdDrawIndirectCount-blendEnable-04727";
         dynamic_discard_rectangle_07751          = "VUID-vkCmdDrawIndirectCount-None-07751";
         dynamic_discard_rectangle_enable_07880   = "VUID-vkCmdDrawIndirectCount-None-07880";
@@ -2074,6 +2142,10 @@ struct DispatchVuidsCmdDrawIndirectCount : DrawDispatchVuid {
         external_format_resolve_09368            = "VUID-vkCmdDrawIndirectCount-None-09368";
         external_format_resolve_09369            = "VUID-vkCmdDrawIndirectCount-None-09369";
         external_format_resolve_09372            = "VUID-vkCmdDrawIndirectCount-colorAttachmentCount-09372";
+        external_format_resolve_09366            = "VUID-vkCmdDrawIndirectCount-None-09366";
+        external_format_resolve_09367            = "VUID-vkCmdDrawIndirectCount-rasterizationSamples-09367";
+        external_format_resolve_09370            = "VUID-vkCmdDrawIndirectCount-pFragmentSize-09370";
+        external_format_resolve_09371            = "VUID-vkCmdDrawIndirectCount-pFragmentSize-09371";
         set_rasterizer_discard_enable_08639      = "VUID-vkCmdDrawIndirectCount-None-08639";
         set_depth_bias_enable_08640              = "VUID-vkCmdDrawIndirectCount-None-08640";
         set_logic_op_08641                       = "VUID-vkCmdDrawIndirectCount-None-08641";
@@ -2199,6 +2271,10 @@ struct DispatchVuidsCmdDrawIndirectCount : DrawDispatchVuid {
         rasterization_samples_09211              = "VUID-vkCmdDrawIndirectCount-None-09211";
         dynamic_rendering_undefined_depth_format_08913 = "VUID-vkCmdDrawIndirectCount-dynamicRenderingUnusedAttachments-08913";
         primitives_generated_query_07481         = "VUID-vkCmdDrawIndirectCount-primitivesGeneratedQueryWithNonZeroStreams-07481";
+        color_blend_enable_07627                 = "VUID-vkCmdDrawIndirectCount-None-07627";
+        color_blend_equation_07628               = "VUID-vkCmdDrawIndirectCount-None-07628";
+        color_write_mask_07629                   = "VUID-vkCmdDrawIndirectCount-None-07629";
+        color_blend_advanced_07635               = "VUID-vkCmdDrawIndirectCount-None-07635";
     }
 };
 
@@ -2217,7 +2293,7 @@ struct DispatchVuidsCmdDrawIndexedIndirectCount : DrawDispatchVuid {
         linear_filter_sampler_04553              = "VUID-vkCmdDrawIndexedIndirectCount-magFilter-04553";
         linear_mipmap_sampler_04770              = "VUID-vkCmdDrawIndexedIndirectCount-mipmapMode-04770";
         cubic_sampler_02692                      = "VUID-vkCmdDrawIndexedIndirectCount-None-02692";
-        indirect_protected_cb_02646              = "VUID-vkCmdDrawIndexedIndirectCount-commandBuffer-02711";
+        indirect_protected_cb_02711              = "VUID-vkCmdDrawIndexedIndirectCount-commandBuffer-02711";
         indirect_contiguous_memory_02708         = "VUID-vkCmdDrawIndexedIndirectCount-buffer-02708";
         indirect_count_contiguous_memory_02714   = "VUID-vkCmdDrawIndexedIndirectCount-countBuffer-02714";
         indirect_buffer_bit_02290                = "VUID-vkCmdDrawIndexedIndirectCount-buffer-02709";
@@ -2254,6 +2330,7 @@ struct DispatchVuidsCmdDrawIndexedIndirectCount : DrawDispatchVuid {
         vertex_input_04912                       = "VUID-vkCmdDrawIndexedIndirectCount-None-04912";
         vertex_input_binding_stride_04913        = "VUID-vkCmdDrawIndexedIndirectCount-pStrides-04913";
         vertex_input_04914                       = "VUID-vkCmdDrawIndexedIndirectCount-None-04914";
+        vertex_input_08734                       = "VUID-vkCmdDrawIndexedIndirectCount-Input-08734";
         blend_enable_04727                       = "VUID-vkCmdDrawIndexedIndirectCount-blendEnable-04727";
         dynamic_discard_rectangle_07751          = "VUID-vkCmdDrawIndexedIndirectCount-None-07751";
         dynamic_discard_rectangle_enable_07880   = "VUID-vkCmdDrawIndexedIndirectCount-None-07880";
@@ -2377,6 +2454,10 @@ struct DispatchVuidsCmdDrawIndexedIndirectCount : DrawDispatchVuid {
         external_format_resolve_09368            = "VUID-vkCmdDrawIndexedIndirectCount-None-09368";
         external_format_resolve_09369            = "VUID-vkCmdDrawIndexedIndirectCount-None-09369";
         external_format_resolve_09372            = "VUID-vkCmdDrawIndexedIndirectCount-colorAttachmentCount-09372";
+        external_format_resolve_09366            = "VUID-vkCmdDrawIndexedIndirectCount-None-09366";
+        external_format_resolve_09367            = "VUID-vkCmdDrawIndexedIndirectCount-rasterizationSamples-09367";
+        external_format_resolve_09370            = "VUID-vkCmdDrawIndexedIndirectCount-pFragmentSize-09370";
+        external_format_resolve_09371            = "VUID-vkCmdDrawIndexedIndirectCount-pFragmentSize-09371";
         set_rasterizer_discard_enable_08639      = "VUID-vkCmdDrawIndexedIndirectCount-None-08639";
         set_depth_bias_enable_08640              = "VUID-vkCmdDrawIndexedIndirectCount-None-08640";
         set_logic_op_08641                       = "VUID-vkCmdDrawIndexedIndirectCount-None-08641";
@@ -2502,6 +2583,10 @@ struct DispatchVuidsCmdDrawIndexedIndirectCount : DrawDispatchVuid {
         rasterization_samples_09211              = "VUID-vkCmdDrawIndexedIndirectCount-None-09211";
         dynamic_rendering_undefined_depth_format_08913 = "VUID-vkCmdDrawIndexedIndirectCount-dynamicRenderingUnusedAttachments-08913";
         primitives_generated_query_07481         = "VUID-vkCmdDrawIndexedIndirectCount-primitivesGeneratedQueryWithNonZeroStreams-07481";
+        color_blend_enable_07627                 = "VUID-vkCmdDrawIndexedIndirectCount-None-07627";
+        color_blend_equation_07628               = "VUID-vkCmdDrawIndexedIndirectCount-None-07628";
+        color_write_mask_07629                   = "VUID-vkCmdDrawIndexedIndirectCount-None-07629";
+        color_blend_advanced_07635               = "VUID-vkCmdDrawIndexedIndirectCount-None-07635";
     }
 };
 
@@ -2546,6 +2631,7 @@ struct DispatchVuidsCmdTraceRaysNV: DrawDispatchVuid {
         image_ycbcr_offset_06551                 = "VUID-vkCmdTraceRaysNV-ConstOffset-06551";
         image_view_dim_07752                     = "VUID-vkCmdTraceRaysNV-viewType-07752";
         image_view_numeric_format_07753          = "VUID-vkCmdTraceRaysNV-format-07753";
+        ray_tracing_pipeline_stack_size_09458    = "VUID-vkCmdTraceRaysNV-None-09458";
     }
 };
 
@@ -2590,6 +2676,7 @@ struct DispatchVuidsCmdTraceRaysKHR: DrawDispatchVuid {
         image_ycbcr_offset_06551                 = "VUID-vkCmdTraceRaysKHR-ConstOffset-06551";
         image_view_dim_07752                     = "VUID-vkCmdTraceRaysKHR-viewType-07752";
         image_view_numeric_format_07753          = "VUID-vkCmdTraceRaysKHR-format-07753";
+        ray_tracing_pipeline_stack_size_09458    = "VUID-vkCmdTraceRaysKHR-None-09458";
     }
 };
 
@@ -2636,6 +2723,7 @@ struct DispatchVuidsCmdTraceRaysIndirectKHR: DrawDispatchVuid {
         image_ycbcr_offset_06551                 = "VUID-vkCmdTraceRaysIndirectKHR-ConstOffset-06551";
         image_view_dim_07752                     = "VUID-vkCmdTraceRaysIndirectKHR-viewType-07752";
         image_view_numeric_format_07753          = "VUID-vkCmdTraceRaysIndirectKHR-format-07753";
+        ray_tracing_pipeline_stack_size_09458    = "VUID-vkCmdTraceRaysIndirectKHR-None-09458";
     }
 };
 
@@ -2682,6 +2770,7 @@ struct DispatchVuidsCmdTraceRaysIndirect2KHR: DrawDispatchVuid {
         image_ycbcr_offset_06551                 = "VUID-vkCmdTraceRaysIndirect2KHR-ConstOffset-06551";
         image_view_dim_07752                     = "VUID-vkCmdTraceRaysIndirect2KHR-viewType-07752";
         image_view_numeric_format_07753          = "VUID-vkCmdTraceRaysIndirect2KHR-format-07753";
+        ray_tracing_pipeline_stack_size_09458    = "VUID-vkCmdTraceRaysIndirect2KHR-None-09458";
     }
 };
 
@@ -2844,6 +2933,10 @@ struct DispatchVuidsCmdDrawMeshTasksNV: DrawDispatchVuid {
         external_format_resolve_09368            = "VUID-vkCmdDrawMeshTasksNV-None-09368";
         external_format_resolve_09369            = "VUID-vkCmdDrawMeshTasksNV-None-09369";
         external_format_resolve_09372            = "VUID-vkCmdDrawMeshTasksNV-colorAttachmentCount-09372";
+        external_format_resolve_09366            = "VUID-vkCmdDrawMeshTasksNV-None-09366";
+        external_format_resolve_09367            = "VUID-vkCmdDrawMeshTasksNV-rasterizationSamples-09367";
+        external_format_resolve_09370            = "VUID-vkCmdDrawMeshTasksNV-pFragmentSize-09370";
+        external_format_resolve_09371            = "VUID-vkCmdDrawMeshTasksNV-pFragmentSize-09371";
         set_rasterizer_discard_enable_08639      = "VUID-vkCmdDrawMeshTasksNV-None-08639";
         set_depth_bias_enable_08640              = "VUID-vkCmdDrawMeshTasksNV-None-08640";
         set_logic_op_08641                       = "VUID-vkCmdDrawMeshTasksNV-None-08641";
@@ -2966,6 +3059,10 @@ struct DispatchVuidsCmdDrawMeshTasksNV: DrawDispatchVuid {
         rasterization_samples_09211              = "VUID-vkCmdDrawMeshTasksNV-None-09211";
         dynamic_rendering_undefined_depth_format_08913 = "VUID-vkCmdDrawMeshTasksNV-dynamicRenderingUnusedAttachments-08913";
         primitives_generated_query_07481         = "VUID-vkCmdDrawMeshTasksNV-primitivesGeneratedQueryWithNonZeroStreams-07481";
+        color_blend_enable_07627                 = "VUID-vkCmdDrawMeshTasksNV-None-07627";
+        color_blend_equation_07628               = "VUID-vkCmdDrawMeshTasksNV-None-07628";
+        color_write_mask_07629                   = "VUID-vkCmdDrawMeshTasksNV-None-07629";
+        color_blend_advanced_07635               = "VUID-vkCmdDrawMeshTasksNV-None-07635";
     }
 };
 
@@ -2981,7 +3078,7 @@ struct DispatchVuidsCmdDrawMeshTasksIndirectNV: DrawDispatchVuid {
         linear_filter_sampler_04553              = "VUID-vkCmdDrawMeshTasksIndirectNV-magFilter-04553";
         linear_mipmap_sampler_04770              = "VUID-vkCmdDrawMeshTasksIndirectNV-mipmapMode-04770";
         cubic_sampler_02692                      = "VUID-vkCmdDrawMeshTasksIndirectNV-None-02692";
-        indirect_protected_cb_02646              = "VUID-vkCmdDrawMeshTasksIndirectNV-commandBuffer-02711";
+        indirect_protected_cb_02711              = "VUID-vkCmdDrawMeshTasksIndirectNV-commandBuffer-02711";
         indirect_contiguous_memory_02708         = "VUID-vkCmdDrawMeshTasksIndirectNV-buffer-02708";
         indirect_buffer_bit_02290                = "VUID-vkCmdDrawMeshTasksIndirectNV-buffer-02709";
         viewport_count_03417                     = "VUID-vkCmdDrawMeshTasksIndirectNV-viewportCount-03417";
@@ -3131,6 +3228,10 @@ struct DispatchVuidsCmdDrawMeshTasksIndirectNV: DrawDispatchVuid {
         external_format_resolve_09368            = "VUID-vkCmdDrawMeshTasksIndirectNV-None-09368";
         external_format_resolve_09369            = "VUID-vkCmdDrawMeshTasksIndirectNV-None-09369";
         external_format_resolve_09372            = "VUID-vkCmdDrawMeshTasksIndirectNV-colorAttachmentCount-09372";
+        external_format_resolve_09366            = "VUID-vkCmdDrawMeshTasksIndirectNV-None-09366";
+        external_format_resolve_09367            = "VUID-vkCmdDrawMeshTasksIndirectNV-rasterizationSamples-09367";
+        external_format_resolve_09370            = "VUID-vkCmdDrawMeshTasksIndirectNV-pFragmentSize-09370";
+        external_format_resolve_09371            = "VUID-vkCmdDrawMeshTasksIndirectNV-pFragmentSize-09371";
         set_rasterizer_discard_enable_08639      = "VUID-vkCmdDrawMeshTasksIndirectNV-None-08639";
         set_depth_bias_enable_08640              = "VUID-vkCmdDrawMeshTasksIndirectNV-None-08640";
         set_logic_op_08641                       = "VUID-vkCmdDrawMeshTasksIndirectNV-None-08641";
@@ -3253,6 +3354,10 @@ struct DispatchVuidsCmdDrawMeshTasksIndirectNV: DrawDispatchVuid {
         rasterization_samples_09211              = "VUID-vkCmdDrawMeshTasksIndirectNV-None-09211";
         dynamic_rendering_undefined_depth_format_08913 = "VUID-vkCmdDrawMeshTasksIndirectNV-dynamicRenderingUnusedAttachments-08913";
         primitives_generated_query_07481         = "VUID-vkCmdDrawMeshTasksIndirectNV-primitivesGeneratedQueryWithNonZeroStreams-07481";
+        color_blend_enable_07627                 = "VUID-vkCmdDrawMeshTasksIndirectNV-None-07627";
+        color_blend_equation_07628               = "VUID-vkCmdDrawMeshTasksIndirectNV-None-07628";
+        color_write_mask_07629                   = "VUID-vkCmdDrawMeshTasksIndirectNV-None-07629";
+        color_blend_advanced_07635               = "VUID-vkCmdDrawMeshTasksIndirectNV-None-07635";
     }
 };
 
@@ -3268,7 +3373,7 @@ struct DispatchVuidsCmdDrawMeshTasksIndirectCountNV : DrawDispatchVuid {
         linear_filter_sampler_04553              = "VUID-vkCmdDrawMeshTasksIndirectCountNV-magFilter-04553";
         linear_mipmap_sampler_04770              = "VUID-vkCmdDrawMeshTasksIndirectCountNV-mipmapMode-04770";
         cubic_sampler_02692                      = "VUID-vkCmdDrawMeshTasksIndirectCountNV-None-02692";
-        indirect_protected_cb_02646              = "VUID-vkCmdDrawMeshTasksIndirectCountNV-commandBuffer-02711";
+        indirect_protected_cb_02711              = "VUID-vkCmdDrawMeshTasksIndirectCountNV-commandBuffer-02711";
         indirect_contiguous_memory_02708         = "VUID-vkCmdDrawMeshTasksIndirectCountNV-buffer-02708";
         indirect_buffer_bit_02290                = "VUID-vkCmdDrawMeshTasksIndirectCountNV-buffer-02709";
         indirect_count_contiguous_memory_02714   = "VUID-vkCmdDrawMeshTasksIndirectCountNV-countBuffer-02714";
@@ -3421,6 +3526,10 @@ struct DispatchVuidsCmdDrawMeshTasksIndirectCountNV : DrawDispatchVuid {
         external_format_resolve_09368            = "VUID-vkCmdDrawMeshTasksIndirectCountNV-None-09368";
         external_format_resolve_09369            = "VUID-vkCmdDrawMeshTasksIndirectCountNV-None-09369";
         external_format_resolve_09372            = "VUID-vkCmdDrawMeshTasksIndirectCountNV-colorAttachmentCount-09372";
+        external_format_resolve_09366            = "VUID-vkCmdDrawMeshTasksIndirectCountNV-None-09366";
+        external_format_resolve_09367            = "VUID-vkCmdDrawMeshTasksIndirectCountNV-rasterizationSamples-09367";
+        external_format_resolve_09370            = "VUID-vkCmdDrawMeshTasksIndirectCountNV-pFragmentSize-09370";
+        external_format_resolve_09371            = "VUID-vkCmdDrawMeshTasksIndirectCountNV-pFragmentSize-09371";
         set_rasterizer_discard_enable_08639      = "VUID-vkCmdDrawMeshTasksIndirectCountNV-None-08639";
         set_depth_bias_enable_08640              = "VUID-vkCmdDrawMeshTasksIndirectCountNV-None-08640";
         set_logic_op_08641                       = "VUID-vkCmdDrawMeshTasksIndirectCountNV-None-08641";
@@ -3543,6 +3652,10 @@ struct DispatchVuidsCmdDrawMeshTasksIndirectCountNV : DrawDispatchVuid {
         rasterization_samples_09211              = "VUID-vkCmdDrawMeshTasksIndirectCountNV-None-09211";
         dynamic_rendering_undefined_depth_format_08913 = "VUID-vkCmdDrawMeshTasksIndirectCountNV-dynamicRenderingUnusedAttachments-08913";
         primitives_generated_query_07481         = "VUID-vkCmdDrawMeshTasksIndirectCountNV-primitivesGeneratedQueryWithNonZeroStreams-07481";
+        color_blend_enable_07627                 = "VUID-vkCmdDrawMeshTasksIndirectCountNV-None-07627";
+        color_blend_equation_07628               = "VUID-vkCmdDrawMeshTasksIndirectCountNV-None-07628";
+        color_write_mask_07629                   = "VUID-vkCmdDrawMeshTasksIndirectCountNV-None-07629";
+        color_blend_advanced_07635               = "VUID-vkCmdDrawMeshTasksIndirectCountNV-None-07635";
     }
 };
 
@@ -3705,6 +3818,10 @@ struct DispatchVuidsCmdDrawMeshTasksEXT: DrawDispatchVuid {
         external_format_resolve_09368            = "VUID-vkCmdDrawMeshTasksEXT-None-09368";
         external_format_resolve_09369            = "VUID-vkCmdDrawMeshTasksEXT-None-09369";
         external_format_resolve_09372            = "VUID-vkCmdDrawMeshTasksEXT-colorAttachmentCount-09372";
+        external_format_resolve_09366            = "VUID-vkCmdDrawMeshTasksEXT-None-09366";
+        external_format_resolve_09367            = "VUID-vkCmdDrawMeshTasksEXT-rasterizationSamples-09367";
+        external_format_resolve_09370            = "VUID-vkCmdDrawMeshTasksEXT-pFragmentSize-09370";
+        external_format_resolve_09371            = "VUID-vkCmdDrawMeshTasksEXT-pFragmentSize-09371";
         set_rasterizer_discard_enable_08639      = "VUID-vkCmdDrawMeshTasksEXT-None-08639";
         set_depth_bias_enable_08640              = "VUID-vkCmdDrawMeshTasksEXT-None-08640";
         set_logic_op_08641                       = "VUID-vkCmdDrawMeshTasksEXT-None-08641";
@@ -3827,6 +3944,10 @@ struct DispatchVuidsCmdDrawMeshTasksEXT: DrawDispatchVuid {
         rasterization_samples_09211              = "VUID-vkCmdDrawMeshTasksEXT-None-09211";
         dynamic_rendering_undefined_depth_format_08913 = "VUID-vkCmdDrawMeshTasksEXT-dynamicRenderingUnusedAttachments-08913";
         primitives_generated_query_07481         = "VUID-vkCmdDrawMeshTasksEXT-primitivesGeneratedQueryWithNonZeroStreams-07481";
+        color_blend_enable_07627                 = "VUID-vkCmdDrawMeshTasksEXT-None-07627";
+        color_blend_equation_07628               = "VUID-vkCmdDrawMeshTasksEXT-None-07628";
+        color_write_mask_07629                   = "VUID-vkCmdDrawMeshTasksEXT-None-07629";
+        color_blend_advanced_07635               = "VUID-vkCmdDrawMeshTasksEXT-None-07635";
     }
 };
 
@@ -3842,7 +3963,7 @@ struct DispatchVuidsCmdDrawMeshTasksIndirectEXT: DrawDispatchVuid {
         linear_filter_sampler_04553              = "VUID-vkCmdDrawMeshTasksIndirectEXT-magFilter-04553";
         linear_mipmap_sampler_04770              = "VUID-vkCmdDrawMeshTasksIndirectEXT-mipmapMode-04770";
         cubic_sampler_02692                      = "VUID-vkCmdDrawMeshTasksIndirectEXT-None-02692";
-        indirect_protected_cb_02646              = "VUID-vkCmdDrawMeshTasksIndirectEXT-commandBuffer-02711";
+        indirect_protected_cb_02711              = "VUID-vkCmdDrawMeshTasksIndirectEXT-commandBuffer-02711";
         indirect_contiguous_memory_02708         = "VUID-vkCmdDrawMeshTasksIndirectEXT-buffer-02708";
         indirect_buffer_bit_02290                = "VUID-vkCmdDrawMeshTasksIndirectEXT-buffer-02709";
         viewport_count_03417                     = "VUID-vkCmdDrawMeshTasksIndirectEXT-viewportCount-03417";
@@ -3992,6 +4113,10 @@ struct DispatchVuidsCmdDrawMeshTasksIndirectEXT: DrawDispatchVuid {
         external_format_resolve_09368            = "VUID-vkCmdDrawMeshTasksIndirectEXT-None-09368";
         external_format_resolve_09369            = "VUID-vkCmdDrawMeshTasksIndirectEXT-None-09369";
         external_format_resolve_09372            = "VUID-vkCmdDrawMeshTasksIndirectEXT-colorAttachmentCount-09372";
+        external_format_resolve_09366            = "VUID-vkCmdDrawMeshTasksIndirectEXT-None-09366";
+        external_format_resolve_09367            = "VUID-vkCmdDrawMeshTasksIndirectEXT-rasterizationSamples-09367";
+        external_format_resolve_09370            = "VUID-vkCmdDrawMeshTasksIndirectEXT-pFragmentSize-09370";
+        external_format_resolve_09371            = "VUID-vkCmdDrawMeshTasksIndirectEXT-pFragmentSize-09371";
         set_rasterizer_discard_enable_08639      = "VUID-vkCmdDrawMeshTasksIndirectEXT-None-08639";
         set_depth_bias_enable_08640              = "VUID-vkCmdDrawMeshTasksIndirectEXT-None-08640";
         set_logic_op_08641                       = "VUID-vkCmdDrawMeshTasksIndirectEXT-None-08641";
@@ -4114,6 +4239,10 @@ struct DispatchVuidsCmdDrawMeshTasksIndirectEXT: DrawDispatchVuid {
         rasterization_samples_09211              = "VUID-vkCmdDrawMeshTasksIndirectEXT-None-09211";
         dynamic_rendering_undefined_depth_format_08913 = "VUID-vkCmdDrawMeshTasksIndirectEXT-dynamicRenderingUnusedAttachments-08913";
         primitives_generated_query_07481         = "VUID-vkCmdDrawMeshTasksIndirectEXT-primitivesGeneratedQueryWithNonZeroStreams-07481";
+        color_blend_enable_07627                 = "VUID-vkCmdDrawMeshTasksIndirectEXT-None-07627";
+        color_blend_equation_07628               = "VUID-vkCmdDrawMeshTasksIndirectEXT-None-07628";
+        color_write_mask_07629                   = "VUID-vkCmdDrawMeshTasksIndirectEXT-None-07629";
+        color_blend_advanced_07635               = "VUID-vkCmdDrawMeshTasksIndirectEXT-None-07635";
     }
 };
 
@@ -4129,7 +4258,7 @@ struct DispatchVuidsCmdDrawMeshTasksIndirectCountEXT : DrawDispatchVuid {
         linear_filter_sampler_04553              = "VUID-vkCmdDrawMeshTasksIndirectCountEXT-magFilter-04553";
         linear_mipmap_sampler_04770              = "VUID-vkCmdDrawMeshTasksIndirectCountEXT-mipmapMode-04770";
         cubic_sampler_02692                      = "VUID-vkCmdDrawMeshTasksIndirectCountEXT-None-02692";
-        indirect_protected_cb_02646              = "VUID-vkCmdDrawMeshTasksIndirectCountEXT-commandBuffer-02711";
+        indirect_protected_cb_02711              = "VUID-vkCmdDrawMeshTasksIndirectCountEXT-commandBuffer-02711";
         indirect_contiguous_memory_02708         = "VUID-vkCmdDrawMeshTasksIndirectCountEXT-buffer-02708";
         indirect_buffer_bit_02290                = "VUID-vkCmdDrawMeshTasksIndirectCountEXT-buffer-02709";
         indirect_count_contiguous_memory_02714   = "VUID-vkCmdDrawMeshTasksIndirectCountEXT-countBuffer-02714";
@@ -4282,6 +4411,10 @@ struct DispatchVuidsCmdDrawMeshTasksIndirectCountEXT : DrawDispatchVuid {
         external_format_resolve_09368            = "VUID-vkCmdDrawMeshTasksIndirectCountEXT-None-09368";
         external_format_resolve_09369            = "VUID-vkCmdDrawMeshTasksIndirectCountEXT-None-09369";
         external_format_resolve_09372            = "VUID-vkCmdDrawMeshTasksIndirectCountEXT-colorAttachmentCount-09372";
+        external_format_resolve_09366            = "VUID-vkCmdDrawMeshTasksIndirectCountEXT-None-09366";
+        external_format_resolve_09367            = "VUID-vkCmdDrawMeshTasksIndirectCountEXT-rasterizationSamples-09367";
+        external_format_resolve_09370            = "VUID-vkCmdDrawMeshTasksIndirectCountEXT-pFragmentSize-09370";
+        external_format_resolve_09371            = "VUID-vkCmdDrawMeshTasksIndirectCountEXT-pFragmentSize-09371";
         set_rasterizer_discard_enable_08639      = "VUID-vkCmdDrawMeshTasksIndirectCountEXT-None-08639";
         set_depth_bias_enable_08640              = "VUID-vkCmdDrawMeshTasksIndirectCountEXT-None-08640";
         set_logic_op_08641                       = "VUID-vkCmdDrawMeshTasksIndirectCountEXT-None-08641";
@@ -4404,6 +4537,10 @@ struct DispatchVuidsCmdDrawMeshTasksIndirectCountEXT : DrawDispatchVuid {
         rasterization_samples_09211              = "VUID-vkCmdDrawMeshTasksIndirectCountEXT-None-09211";
         dynamic_rendering_undefined_depth_format_08913 = "VUID-vkCmdDrawMeshTasksIndirectCountEXT-dynamicRenderingUnusedAttachments-08913";
         primitives_generated_query_07481         = "VUID-vkCmdDrawMeshTasksIndirectCountEXT-primitivesGeneratedQueryWithNonZeroStreams-07481";
+        color_blend_enable_07627                 = "VUID-vkCmdDrawMeshTasksIndirectCountEXT-None-07627";
+        color_blend_equation_07628               = "VUID-vkCmdDrawMeshTasksIndirectCountEXT-None-07628";
+        color_write_mask_07629                   = "VUID-vkCmdDrawMeshTasksIndirectCountEXT-None-07629";
+        color_blend_advanced_07635               = "VUID-vkCmdDrawMeshTasksIndirectCountEXT-None-07635";
     }
 };
 
@@ -4421,7 +4558,7 @@ struct DispatchVuidsCmdDrawIndirectByteCountEXT: DrawDispatchVuid {
         linear_filter_sampler_04553              = "VUID-vkCmdDrawIndirectByteCountEXT-magFilter-04553";
         linear_mipmap_sampler_04770              = "VUID-vkCmdDrawIndirectByteCountEXT-mipmapMode-04770";
         cubic_sampler_02692                      = "VUID-vkCmdDrawIndirectByteCountEXT-None-02692";
-        indirect_protected_cb_02646              = "VUID-vkCmdDrawIndirectByteCountEXT-commandBuffer-02646";
+        indirect_protected_cb_02711              = "VUID-vkCmdDrawIndirectByteCountEXT-commandBuffer-02646";
         indirect_contiguous_memory_02708         = "VUID-vkCmdDrawIndirectByteCountEXT-counterBuffer-04567",
         indirect_buffer_bit_02290                = "VUID-vkCmdDrawIndirectByteCountEXT-counterBuffer-02290";
         viewport_count_03417                     = "VUID-vkCmdDrawIndirectByteCountEXT-viewportCount-03417";
@@ -4455,6 +4592,7 @@ struct DispatchVuidsCmdDrawIndirectByteCountEXT: DrawDispatchVuid {
         vertex_input_04912                       = "VUID-vkCmdDrawIndirectByteCountEXT-None-04912";
         vertex_input_binding_stride_04913        = "VUID-vkCmdDrawIndirectByteCountEXT-pStrides-04913";
         vertex_input_04914                       = "VUID-vkCmdDrawIndirectByteCountEXT-None-04914";
+        vertex_input_08734                       = "VUID-vkCmdDrawIndirectByteCountEXT-Input-08734";
         blend_enable_04727                       = "VUID-vkCmdDrawIndirectByteCountEXT-blendEnable-04727";
         dynamic_discard_rectangle_07751          = "VUID-vkCmdDrawIndirectByteCountEXT-None-07751";
         dynamic_discard_rectangle_enable_07880   = "VUID-vkCmdDrawIndirectByteCountEXT-None-07880";
@@ -4578,6 +4716,10 @@ struct DispatchVuidsCmdDrawIndirectByteCountEXT: DrawDispatchVuid {
         external_format_resolve_09368            = "VUID-vkCmdDrawIndirectByteCountEXT-None-09368";
         external_format_resolve_09369            = "VUID-vkCmdDrawIndirectByteCountEXT-None-09369";
         external_format_resolve_09372            = "VUID-vkCmdDrawIndirectByteCountEXT-colorAttachmentCount-09372";
+        external_format_resolve_09366            = "VUID-vkCmdDrawIndirectByteCountEXT-None-09366";
+        external_format_resolve_09367            = "VUID-vkCmdDrawIndirectByteCountEXT-rasterizationSamples-09367";
+        external_format_resolve_09370            = "VUID-vkCmdDrawIndirectByteCountEXT-pFragmentSize-09370";
+        external_format_resolve_09371            = "VUID-vkCmdDrawIndirectByteCountEXT-pFragmentSize-09371";
         set_rasterizer_discard_enable_08639      = "VUID-vkCmdDrawIndirectByteCountEXT-None-08639";
         set_depth_bias_enable_08640              = "VUID-vkCmdDrawIndirectByteCountEXT-None-08640";
         set_logic_op_08641                       = "VUID-vkCmdDrawIndirectByteCountEXT-None-08641";
@@ -4703,6 +4845,10 @@ struct DispatchVuidsCmdDrawIndirectByteCountEXT: DrawDispatchVuid {
         rasterization_samples_09211              = "VUID-vkCmdDrawIndirectByteCountEXT-None-09211";
         dynamic_rendering_undefined_depth_format_08913 = "VUID-vkCmdDrawIndirectByteCountEXT-dynamicRenderingUnusedAttachments-08913";
         primitives_generated_query_07481         = "VUID-vkCmdDrawIndirectByteCountEXT-primitivesGeneratedQueryWithNonZeroStreams-07481";
+        color_blend_enable_07627                 = "VUID-vkCmdDrawIndirectByteCountEXT-None-07627";
+        color_blend_equation_07628               = "VUID-vkCmdDrawIndirectByteCountEXT-None-07628";
+        color_write_mask_07629                   = "VUID-vkCmdDrawIndirectByteCountEXT-None-07629";
+        color_blend_advanced_07635               = "VUID-vkCmdDrawIndirectByteCountEXT-None-07635";
     }
 };
 
@@ -4724,6 +4870,7 @@ struct DispatchVuidsCmdDispatchBase: DrawDispatchVuid {
         dynamic_state_setting_commands_08608     = "VUID-vkCmdDispatchBase-None-08608";
         unprotected_command_buffer_02707         = "VUID-vkCmdDispatchBase-commandBuffer-02707";
         protected_command_buffer_02712           = "VUID-vkCmdDispatchBase-commandBuffer-02712";
+        ray_query_04617                          = "VUID-vkCmdDispatchBase-commandBuffer-04617";
         img_filter_cubic_02693                   = "VUID-vkCmdDispatchBase-None-02693";
         filter_cubic_02694                       = "VUID-vkCmdDispatchBase-filterCubic-02694";
         filter_cubic_min_max_02695               = "VUID-vkCmdDispatchBase-filterCubicMinmax-02695";

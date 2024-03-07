@@ -3,11 +3,11 @@
 
 /***************************************************************************
  *
- * Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (c) 2015-2023 Google Inc.
- * Copyright (c) 2023-2023 RasterGrid Kft.
+ * Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (c) 2015-2024 Google Inc.
+ * Copyright (c) 2023-2024 RasterGrid Kft.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -759,6 +759,12 @@ typedef enum InterceptId {
     InterceptIdPreCallValidateCmdSetFragmentShadingRateKHR,
     InterceptIdPreCallRecordCmdSetFragmentShadingRateKHR,
     InterceptIdPostCallRecordCmdSetFragmentShadingRateKHR,
+    InterceptIdPreCallValidateCmdSetRenderingAttachmentLocationsKHR,
+    InterceptIdPreCallRecordCmdSetRenderingAttachmentLocationsKHR,
+    InterceptIdPostCallRecordCmdSetRenderingAttachmentLocationsKHR,
+    InterceptIdPreCallValidateCmdSetRenderingInputAttachmentIndicesKHR,
+    InterceptIdPreCallRecordCmdSetRenderingInputAttachmentIndicesKHR,
+    InterceptIdPostCallRecordCmdSetRenderingInputAttachmentIndicesKHR,
     InterceptIdPreCallValidateWaitForPresentKHR,
     InterceptIdPreCallRecordWaitForPresentKHR,
     InterceptIdPostCallRecordWaitForPresentKHR,
@@ -873,6 +879,30 @@ typedef enum InterceptId {
     InterceptIdPreCallValidateGetImageSubresourceLayout2KHR,
     InterceptIdPreCallRecordGetImageSubresourceLayout2KHR,
     InterceptIdPostCallRecordGetImageSubresourceLayout2KHR,
+    InterceptIdPreCallValidateCmdSetLineStippleKHR,
+    InterceptIdPreCallRecordCmdSetLineStippleKHR,
+    InterceptIdPostCallRecordCmdSetLineStippleKHR,
+    InterceptIdPreCallValidateGetCalibratedTimestampsKHR,
+    InterceptIdPreCallRecordGetCalibratedTimestampsKHR,
+    InterceptIdPostCallRecordGetCalibratedTimestampsKHR,
+    InterceptIdPreCallValidateCmdBindDescriptorSets2KHR,
+    InterceptIdPreCallRecordCmdBindDescriptorSets2KHR,
+    InterceptIdPostCallRecordCmdBindDescriptorSets2KHR,
+    InterceptIdPreCallValidateCmdPushConstants2KHR,
+    InterceptIdPreCallRecordCmdPushConstants2KHR,
+    InterceptIdPostCallRecordCmdPushConstants2KHR,
+    InterceptIdPreCallValidateCmdPushDescriptorSet2KHR,
+    InterceptIdPreCallRecordCmdPushDescriptorSet2KHR,
+    InterceptIdPostCallRecordCmdPushDescriptorSet2KHR,
+    InterceptIdPreCallValidateCmdPushDescriptorSetWithTemplate2KHR,
+    InterceptIdPreCallRecordCmdPushDescriptorSetWithTemplate2KHR,
+    InterceptIdPostCallRecordCmdPushDescriptorSetWithTemplate2KHR,
+    InterceptIdPreCallValidateCmdSetDescriptorBufferOffsets2EXT,
+    InterceptIdPreCallRecordCmdSetDescriptorBufferOffsets2EXT,
+    InterceptIdPostCallRecordCmdSetDescriptorBufferOffsets2EXT,
+    InterceptIdPreCallValidateCmdBindDescriptorBufferEmbeddedSamplers2EXT,
+    InterceptIdPreCallRecordCmdBindDescriptorBufferEmbeddedSamplers2EXT,
+    InterceptIdPostCallRecordCmdBindDescriptorBufferEmbeddedSamplers2EXT,
     InterceptIdPreCallValidateDebugMarkerSetObjectTagEXT,
     InterceptIdPreCallRecordDebugMarkerSetObjectTagEXT,
     InterceptIdPostCallRecordDebugMarkerSetObjectTagEXT,
@@ -1452,9 +1482,6 @@ typedef enum InterceptId {
     InterceptIdPreCallValidateGetPipelineIndirectDeviceAddressNV,
     InterceptIdPreCallRecordGetPipelineIndirectDeviceAddressNV,
     InterceptIdPostCallRecordGetPipelineIndirectDeviceAddressNV,
-    InterceptIdPreCallValidateCmdSetTessellationDomainOriginEXT,
-    InterceptIdPreCallRecordCmdSetTessellationDomainOriginEXT,
-    InterceptIdPostCallRecordCmdSetTessellationDomainOriginEXT,
     InterceptIdPreCallValidateCmdSetDepthClampEnableEXT,
     InterceptIdPreCallRecordCmdSetDepthClampEnableEXT,
     InterceptIdPostCallRecordCmdSetDepthClampEnableEXT,
@@ -1485,6 +1512,9 @@ typedef enum InterceptId {
     InterceptIdPreCallValidateCmdSetColorWriteMaskEXT,
     InterceptIdPreCallRecordCmdSetColorWriteMaskEXT,
     InterceptIdPostCallRecordCmdSetColorWriteMaskEXT,
+    InterceptIdPreCallValidateCmdSetTessellationDomainOriginEXT,
+    InterceptIdPreCallRecordCmdSetTessellationDomainOriginEXT,
+    InterceptIdPostCallRecordCmdSetTessellationDomainOriginEXT,
     InterceptIdPreCallValidateCmdSetRasterizationStreamEXT,
     InterceptIdPreCallRecordCmdSetRasterizationStreamEXT,
     InterceptIdPostCallRecordCmdSetRasterizationStreamEXT,
@@ -2470,6 +2500,12 @@ void ValidationObject::InitObjectDispatchVectors() {
     BUILD_DISPATCH_VECTOR(PreCallValidateCmdSetFragmentShadingRateKHR);
     BUILD_DISPATCH_VECTOR(PreCallRecordCmdSetFragmentShadingRateKHR);
     BUILD_DISPATCH_VECTOR(PostCallRecordCmdSetFragmentShadingRateKHR);
+    BUILD_DISPATCH_VECTOR(PreCallValidateCmdSetRenderingAttachmentLocationsKHR);
+    BUILD_DISPATCH_VECTOR(PreCallRecordCmdSetRenderingAttachmentLocationsKHR);
+    BUILD_DISPATCH_VECTOR(PostCallRecordCmdSetRenderingAttachmentLocationsKHR);
+    BUILD_DISPATCH_VECTOR(PreCallValidateCmdSetRenderingInputAttachmentIndicesKHR);
+    BUILD_DISPATCH_VECTOR(PreCallRecordCmdSetRenderingInputAttachmentIndicesKHR);
+    BUILD_DISPATCH_VECTOR(PostCallRecordCmdSetRenderingInputAttachmentIndicesKHR);
     BUILD_DISPATCH_VECTOR(PreCallValidateWaitForPresentKHR);
     BUILD_DISPATCH_VECTOR(PreCallRecordWaitForPresentKHR);
     BUILD_DISPATCH_VECTOR(PostCallRecordWaitForPresentKHR);
@@ -2512,14 +2548,12 @@ void ValidationObject::InitObjectDispatchVectors() {
     BUILD_DISPATCH_VECTOR(PreCallValidateUnmapMemory2KHR);
     BUILD_DISPATCH_VECTOR(PreCallRecordUnmapMemory2KHR);
     BUILD_DISPATCH_VECTOR(PostCallRecordUnmapMemory2KHR);
-#ifdef VK_ENABLE_BETA_EXTENSIONS
     BUILD_DISPATCH_VECTOR(PreCallValidateGetEncodedVideoSessionParametersKHR);
     BUILD_DISPATCH_VECTOR(PreCallRecordGetEncodedVideoSessionParametersKHR);
     BUILD_DISPATCH_VECTOR(PostCallRecordGetEncodedVideoSessionParametersKHR);
     BUILD_DISPATCH_VECTOR(PreCallValidateCmdEncodeVideoKHR);
     BUILD_DISPATCH_VECTOR(PreCallRecordCmdEncodeVideoKHR);
     BUILD_DISPATCH_VECTOR(PostCallRecordCmdEncodeVideoKHR);
-#endif  // VK_ENABLE_BETA_EXTENSIONS
     BUILD_DISPATCH_VECTOR(PreCallValidateCmdSetEvent2KHR);
     BUILD_DISPATCH_VECTOR(PreCallRecordCmdSetEvent2KHR);
     BUILD_DISPATCH_VECTOR(PostCallRecordCmdSetEvent2KHR);
@@ -2586,6 +2620,30 @@ void ValidationObject::InitObjectDispatchVectors() {
     BUILD_DISPATCH_VECTOR(PreCallValidateGetImageSubresourceLayout2KHR);
     BUILD_DISPATCH_VECTOR(PreCallRecordGetImageSubresourceLayout2KHR);
     BUILD_DISPATCH_VECTOR(PostCallRecordGetImageSubresourceLayout2KHR);
+    BUILD_DISPATCH_VECTOR(PreCallValidateCmdSetLineStippleKHR);
+    BUILD_DISPATCH_VECTOR(PreCallRecordCmdSetLineStippleKHR);
+    BUILD_DISPATCH_VECTOR(PostCallRecordCmdSetLineStippleKHR);
+    BUILD_DISPATCH_VECTOR(PreCallValidateGetCalibratedTimestampsKHR);
+    BUILD_DISPATCH_VECTOR(PreCallRecordGetCalibratedTimestampsKHR);
+    BUILD_DISPATCH_VECTOR(PostCallRecordGetCalibratedTimestampsKHR);
+    BUILD_DISPATCH_VECTOR(PreCallValidateCmdBindDescriptorSets2KHR);
+    BUILD_DISPATCH_VECTOR(PreCallRecordCmdBindDescriptorSets2KHR);
+    BUILD_DISPATCH_VECTOR(PostCallRecordCmdBindDescriptorSets2KHR);
+    BUILD_DISPATCH_VECTOR(PreCallValidateCmdPushConstants2KHR);
+    BUILD_DISPATCH_VECTOR(PreCallRecordCmdPushConstants2KHR);
+    BUILD_DISPATCH_VECTOR(PostCallRecordCmdPushConstants2KHR);
+    BUILD_DISPATCH_VECTOR(PreCallValidateCmdPushDescriptorSet2KHR);
+    BUILD_DISPATCH_VECTOR(PreCallRecordCmdPushDescriptorSet2KHR);
+    BUILD_DISPATCH_VECTOR(PostCallRecordCmdPushDescriptorSet2KHR);
+    BUILD_DISPATCH_VECTOR(PreCallValidateCmdPushDescriptorSetWithTemplate2KHR);
+    BUILD_DISPATCH_VECTOR(PreCallRecordCmdPushDescriptorSetWithTemplate2KHR);
+    BUILD_DISPATCH_VECTOR(PostCallRecordCmdPushDescriptorSetWithTemplate2KHR);
+    BUILD_DISPATCH_VECTOR(PreCallValidateCmdSetDescriptorBufferOffsets2EXT);
+    BUILD_DISPATCH_VECTOR(PreCallRecordCmdSetDescriptorBufferOffsets2EXT);
+    BUILD_DISPATCH_VECTOR(PostCallRecordCmdSetDescriptorBufferOffsets2EXT);
+    BUILD_DISPATCH_VECTOR(PreCallValidateCmdBindDescriptorBufferEmbeddedSamplers2EXT);
+    BUILD_DISPATCH_VECTOR(PreCallRecordCmdBindDescriptorBufferEmbeddedSamplers2EXT);
+    BUILD_DISPATCH_VECTOR(PostCallRecordCmdBindDescriptorBufferEmbeddedSamplers2EXT);
     BUILD_DISPATCH_VECTOR(PreCallValidateDebugMarkerSetObjectTagEXT);
     BUILD_DISPATCH_VECTOR(PreCallRecordDebugMarkerSetObjectTagEXT);
     BUILD_DISPATCH_VECTOR(PostCallRecordDebugMarkerSetObjectTagEXT);
@@ -3177,9 +3235,6 @@ void ValidationObject::InitObjectDispatchVectors() {
     BUILD_DISPATCH_VECTOR(PreCallValidateGetPipelineIndirectDeviceAddressNV);
     BUILD_DISPATCH_VECTOR(PreCallRecordGetPipelineIndirectDeviceAddressNV);
     BUILD_DISPATCH_VECTOR(PostCallRecordGetPipelineIndirectDeviceAddressNV);
-    BUILD_DISPATCH_VECTOR(PreCallValidateCmdSetTessellationDomainOriginEXT);
-    BUILD_DISPATCH_VECTOR(PreCallRecordCmdSetTessellationDomainOriginEXT);
-    BUILD_DISPATCH_VECTOR(PostCallRecordCmdSetTessellationDomainOriginEXT);
     BUILD_DISPATCH_VECTOR(PreCallValidateCmdSetDepthClampEnableEXT);
     BUILD_DISPATCH_VECTOR(PreCallRecordCmdSetDepthClampEnableEXT);
     BUILD_DISPATCH_VECTOR(PostCallRecordCmdSetDepthClampEnableEXT);
@@ -3210,6 +3265,9 @@ void ValidationObject::InitObjectDispatchVectors() {
     BUILD_DISPATCH_VECTOR(PreCallValidateCmdSetColorWriteMaskEXT);
     BUILD_DISPATCH_VECTOR(PreCallRecordCmdSetColorWriteMaskEXT);
     BUILD_DISPATCH_VECTOR(PostCallRecordCmdSetColorWriteMaskEXT);
+    BUILD_DISPATCH_VECTOR(PreCallValidateCmdSetTessellationDomainOriginEXT);
+    BUILD_DISPATCH_VECTOR(PreCallRecordCmdSetTessellationDomainOriginEXT);
+    BUILD_DISPATCH_VECTOR(PostCallRecordCmdSetTessellationDomainOriginEXT);
     BUILD_DISPATCH_VECTOR(PreCallValidateCmdSetRasterizationStreamEXT);
     BUILD_DISPATCH_VECTOR(PreCallRecordCmdSetRasterizationStreamEXT);
     BUILD_DISPATCH_VECTOR(PostCallRecordCmdSetRasterizationStreamEXT);

@@ -3,10 +3,10 @@
 
 /***************************************************************************
  *
- * Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (c) 2015-2023 Google Inc.
+ * Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (c) 2015-2024 Google Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -10998,6 +10998,7 @@ safe_VkAccelerationStructureTrianglesDisplacementMicromapNV::safe_VkAcceleration
     ppUsageCounts = nullptr;
     micromap = copy_src.micromap;
     pNext = SafePnextCopy(copy_src.pNext);
+
     if (copy_src.pUsageCounts) {
         pUsageCounts = new VkMicromapUsageEXT[copy_src.usageCountsCount];
         memcpy((void*)pUsageCounts, (void*)copy_src.pUsageCounts, sizeof(VkMicromapUsageEXT) * copy_src.usageCountsCount);
@@ -11042,6 +11043,7 @@ safe_VkAccelerationStructureTrianglesDisplacementMicromapNV& safe_VkAcceleration
     ppUsageCounts = nullptr;
     micromap = copy_src.micromap;
     pNext = SafePnextCopy(copy_src.pNext);
+
     if (copy_src.pUsageCounts) {
         pUsageCounts = new VkMicromapUsageEXT[copy_src.usageCountsCount];
         memcpy((void*)pUsageCounts, (void*)copy_src.pUsageCounts, sizeof(VkMicromapUsageEXT) * copy_src.usageCountsCount);
@@ -11096,6 +11098,7 @@ void safe_VkAccelerationStructureTrianglesDisplacementMicromapNV::initialize(
     ppUsageCounts = nullptr;
     micromap = in_struct->micromap;
     pNext = SafePnextCopy(in_struct->pNext, copy_state);
+
     if (in_struct->pUsageCounts) {
         pUsageCounts = new VkMicromapUsageEXT[in_struct->usageCountsCount];
         memcpy((void*)pUsageCounts, (void*)in_struct->pUsageCounts, sizeof(VkMicromapUsageEXT) * in_struct->usageCountsCount);
@@ -11129,6 +11132,7 @@ void safe_VkAccelerationStructureTrianglesDisplacementMicromapNV::initialize(
     ppUsageCounts = nullptr;
     micromap = copy_src->micromap;
     pNext = SafePnextCopy(copy_src->pNext);
+
     if (copy_src->pUsageCounts) {
         pUsageCounts = new VkMicromapUsageEXT[copy_src->usageCountsCount];
         memcpy((void*)pUsageCounts, (void*)copy_src->pUsageCounts, sizeof(VkMicromapUsageEXT) * copy_src->usageCountsCount);
@@ -15261,6 +15265,65 @@ void safe_VkMultiviewPerViewRenderAreasRenderPassBeginInfoQCOM::initialize(
     }
 }
 
+safe_VkPhysicalDevicePerStageDescriptorSetFeaturesNV::safe_VkPhysicalDevicePerStageDescriptorSetFeaturesNV(
+    const VkPhysicalDevicePerStageDescriptorSetFeaturesNV* in_struct, [[maybe_unused]] PNextCopyState* copy_state, bool copy_pnext)
+    : sType(in_struct->sType),
+      perStageDescriptorSet(in_struct->perStageDescriptorSet),
+      dynamicPipelineLayout(in_struct->dynamicPipelineLayout) {
+    if (copy_pnext) {
+        pNext = SafePnextCopy(in_struct->pNext, copy_state);
+    }
+}
+
+safe_VkPhysicalDevicePerStageDescriptorSetFeaturesNV::safe_VkPhysicalDevicePerStageDescriptorSetFeaturesNV()
+    : sType(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PER_STAGE_DESCRIPTOR_SET_FEATURES_NV),
+      pNext(nullptr),
+      perStageDescriptorSet(),
+      dynamicPipelineLayout() {}
+
+safe_VkPhysicalDevicePerStageDescriptorSetFeaturesNV::safe_VkPhysicalDevicePerStageDescriptorSetFeaturesNV(
+    const safe_VkPhysicalDevicePerStageDescriptorSetFeaturesNV& copy_src) {
+    sType = copy_src.sType;
+    perStageDescriptorSet = copy_src.perStageDescriptorSet;
+    dynamicPipelineLayout = copy_src.dynamicPipelineLayout;
+    pNext = SafePnextCopy(copy_src.pNext);
+}
+
+safe_VkPhysicalDevicePerStageDescriptorSetFeaturesNV& safe_VkPhysicalDevicePerStageDescriptorSetFeaturesNV::operator=(
+    const safe_VkPhysicalDevicePerStageDescriptorSetFeaturesNV& copy_src) {
+    if (&copy_src == this) return *this;
+
+    FreePnextChain(pNext);
+
+    sType = copy_src.sType;
+    perStageDescriptorSet = copy_src.perStageDescriptorSet;
+    dynamicPipelineLayout = copy_src.dynamicPipelineLayout;
+    pNext = SafePnextCopy(copy_src.pNext);
+
+    return *this;
+}
+
+safe_VkPhysicalDevicePerStageDescriptorSetFeaturesNV::~safe_VkPhysicalDevicePerStageDescriptorSetFeaturesNV() {
+    FreePnextChain(pNext);
+}
+
+void safe_VkPhysicalDevicePerStageDescriptorSetFeaturesNV::initialize(
+    const VkPhysicalDevicePerStageDescriptorSetFeaturesNV* in_struct, [[maybe_unused]] PNextCopyState* copy_state) {
+    FreePnextChain(pNext);
+    sType = in_struct->sType;
+    perStageDescriptorSet = in_struct->perStageDescriptorSet;
+    dynamicPipelineLayout = in_struct->dynamicPipelineLayout;
+    pNext = SafePnextCopy(in_struct->pNext, copy_state);
+}
+
+void safe_VkPhysicalDevicePerStageDescriptorSetFeaturesNV::initialize(
+    const safe_VkPhysicalDevicePerStageDescriptorSetFeaturesNV* copy_src, [[maybe_unused]] PNextCopyState* copy_state) {
+    sType = copy_src->sType;
+    perStageDescriptorSet = copy_src->perStageDescriptorSet;
+    dynamicPipelineLayout = copy_src->dynamicPipelineLayout;
+    pNext = SafePnextCopy(copy_src->pNext);
+}
+
 safe_VkPhysicalDeviceImageProcessing2FeaturesQCOM::safe_VkPhysicalDeviceImageProcessing2FeaturesQCOM(
     const VkPhysicalDeviceImageProcessing2FeaturesQCOM* in_struct, [[maybe_unused]] PNextCopyState* copy_state, bool copy_pnext)
     : sType(in_struct->sType), textureBlockMatch2(in_struct->textureBlockMatch2) {
@@ -16124,6 +16187,59 @@ void safe_VkPhysicalDeviceDescriptorPoolOverallocationFeaturesNV::initialize(
     const safe_VkPhysicalDeviceDescriptorPoolOverallocationFeaturesNV* copy_src, [[maybe_unused]] PNextCopyState* copy_state) {
     sType = copy_src->sType;
     descriptorPoolOverallocation = copy_src->descriptorPoolOverallocation;
+    pNext = SafePnextCopy(copy_src->pNext);
+}
+
+safe_VkPhysicalDeviceShaderAtomicFloat16VectorFeaturesNV::safe_VkPhysicalDeviceShaderAtomicFloat16VectorFeaturesNV(
+    const VkPhysicalDeviceShaderAtomicFloat16VectorFeaturesNV* in_struct, [[maybe_unused]] PNextCopyState* copy_state,
+    bool copy_pnext)
+    : sType(in_struct->sType), shaderFloat16VectorAtomics(in_struct->shaderFloat16VectorAtomics) {
+    if (copy_pnext) {
+        pNext = SafePnextCopy(in_struct->pNext, copy_state);
+    }
+}
+
+safe_VkPhysicalDeviceShaderAtomicFloat16VectorFeaturesNV::safe_VkPhysicalDeviceShaderAtomicFloat16VectorFeaturesNV()
+    : sType(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_FLOAT16_VECTOR_FEATURES_NV),
+      pNext(nullptr),
+      shaderFloat16VectorAtomics() {}
+
+safe_VkPhysicalDeviceShaderAtomicFloat16VectorFeaturesNV::safe_VkPhysicalDeviceShaderAtomicFloat16VectorFeaturesNV(
+    const safe_VkPhysicalDeviceShaderAtomicFloat16VectorFeaturesNV& copy_src) {
+    sType = copy_src.sType;
+    shaderFloat16VectorAtomics = copy_src.shaderFloat16VectorAtomics;
+    pNext = SafePnextCopy(copy_src.pNext);
+}
+
+safe_VkPhysicalDeviceShaderAtomicFloat16VectorFeaturesNV& safe_VkPhysicalDeviceShaderAtomicFloat16VectorFeaturesNV::operator=(
+    const safe_VkPhysicalDeviceShaderAtomicFloat16VectorFeaturesNV& copy_src) {
+    if (&copy_src == this) return *this;
+
+    FreePnextChain(pNext);
+
+    sType = copy_src.sType;
+    shaderFloat16VectorAtomics = copy_src.shaderFloat16VectorAtomics;
+    pNext = SafePnextCopy(copy_src.pNext);
+
+    return *this;
+}
+
+safe_VkPhysicalDeviceShaderAtomicFloat16VectorFeaturesNV::~safe_VkPhysicalDeviceShaderAtomicFloat16VectorFeaturesNV() {
+    FreePnextChain(pNext);
+}
+
+void safe_VkPhysicalDeviceShaderAtomicFloat16VectorFeaturesNV::initialize(
+    const VkPhysicalDeviceShaderAtomicFloat16VectorFeaturesNV* in_struct, [[maybe_unused]] PNextCopyState* copy_state) {
+    FreePnextChain(pNext);
+    sType = in_struct->sType;
+    shaderFloat16VectorAtomics = in_struct->shaderFloat16VectorAtomics;
+    pNext = SafePnextCopy(in_struct->pNext, copy_state);
+}
+
+void safe_VkPhysicalDeviceShaderAtomicFloat16VectorFeaturesNV::initialize(
+    const safe_VkPhysicalDeviceShaderAtomicFloat16VectorFeaturesNV* copy_src, [[maybe_unused]] PNextCopyState* copy_state) {
+    sType = copy_src->sType;
+    shaderFloat16VectorAtomics = copy_src->shaderFloat16VectorAtomics;
     pNext = SafePnextCopy(copy_src->pNext);
 }
 

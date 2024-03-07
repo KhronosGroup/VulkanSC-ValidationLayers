@@ -17,8 +17,7 @@
 class VkSCRenderFramework : public VkRenderFramework {
   public:
     virtual bool GLSLtoSPV(VkPhysicalDeviceLimits const *const device_limits, const VkShaderStageFlagBits shader_type,
-                           const char *pshader, std::vector<uint32_t> &spv, bool debug = false,
-                           const spv_target_env spv_env = SPV_ENV_VULKAN_1_0) override;
+                           const char *pshader, std::vector<uint32_t> &spv, const spv_target_env spv_env = SPV_ENV_VULKAN_1_0) override;
     virtual bool ASMtoSPV(const spv_target_env target_env, const uint32_t options, const char *pasm,
                           std::vector<uint32_t> &spv) override;
 
@@ -57,8 +56,7 @@ class VkSCRenderFramework : public VkRenderFramework {
 class VkSCCompatibilityRenderFramework : public VkSCRenderFramework {
   public:
     virtual bool GLSLtoSPV(VkPhysicalDeviceLimits const *const device_limits, const VkShaderStageFlagBits shader_type,
-                           const char *pshader, std::vector<uint32_t> &spv, bool debug = false,
-                           const spv_target_env spv_env = SPV_ENV_VULKAN_1_0) override;
+                           const char *pshader, std::vector<uint32_t> &spv, const spv_target_env spv_env = SPV_ENV_VULKAN_1_0) override;
     virtual bool ASMtoSPV(const spv_target_env target_env, const uint32_t options, const char *pasm,
                           std::vector<uint32_t> &spv) override;
 

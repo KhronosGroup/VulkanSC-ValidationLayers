@@ -1,6 +1,6 @@
-/* Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
+/* Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
  * Copyright (C) 2015-2023 Google Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,6 +18,8 @@
 
 #include "stateless/stateless_validation.h"
 #include "generated/enum_flag_bits.h"
+
+#include "utils/ray_tracing_utils.h"
 
 bool StatelessValidation::ValidateGeometryTrianglesNV(const VkGeometryTrianglesNV &triangles,
                                                       VkAccelerationStructureNV object_handle, const Location &loc) const {
@@ -84,9 +86,9 @@ bool StatelessValidation::ValidateGeometryNV(const VkGeometryNV &geometry, VkAcc
                                              const Location &loc) const {
     bool skip = false;
     if (geometry.geometryType == VK_GEOMETRY_TYPE_TRIANGLES_NV) {
-        skip = ValidateGeometryTrianglesNV(geometry.geometry.triangles, object_handle, loc);
+        skip |= ValidateGeometryTrianglesNV(geometry.geometry.triangles, object_handle, loc);
     } else if (geometry.geometryType == VK_GEOMETRY_TYPE_AABBS_NV) {
-        skip = ValidateGeometryAABBNV(geometry.geometry.aabbs, object_handle, loc);
+        skip |= ValidateGeometryAABBNV(geometry.geometry.aabbs, object_handle, loc);
     }
     return skip;
 }
@@ -166,9 +168,9 @@ bool StatelessValidation::ValidateAccelerationStructureInfoNV(const VkAccelerati
                              "or VK_GEOMETRY_TYPE_AABBS_NV.");
         }
     }
-    skip |=
-        ValidateFlags(loc.dot(Field::flags), "VkBuildAccelerationStructureFlagBitsNV", AllVkBuildAccelerationStructureFlagBitsKHR,
-                      info.flags, kOptionalFlags, "VUID-VkAccelerationStructureInfoNV-flags-parameter");
+    skip |= ValidateFlags(loc.dot(Field::flags), vvl::FlagBitmask::VkBuildAccelerationStructureFlagBitsKHR,
+                          AllVkBuildAccelerationStructureFlagBitsKHR, info.flags, kOptionalFlags,
+                          "VUID-VkAccelerationStructureInfoNV-flags-parameter");
     return skip;
 }
 
@@ -209,17 +211,14 @@ bool StatelessValidation::manual_PreCallValidateCreateAccelerationStructureKHR(
     bool skip = false;
     const auto *acceleration_structure_features =
         vku::FindStructInPNextChain<VkPhysicalDeviceAccelerationStructureFeaturesKHR>(device_createinfo_pnext);
-    if (!acceleration_structure_features ||
-        (acceleration_structure_features && acceleration_structure_features->accelerationStructure == VK_FALSE)) {
+    if (!acceleration_structure_features || acceleration_structure_features->accelerationStructure == VK_FALSE) {
         skip |= LogError("VUID-vkCreateAccelerationStructureKHR-accelerationStructure-03611", device, error_obj.location,
                          "accelerationStructure feature was not enabled.");
     }
     if (pCreateInfo) {
         const Location create_info_loc = error_obj.location.dot(Field::pCreateInfo);
         if (pCreateInfo->createFlags & VK_ACCELERATION_STRUCTURE_CREATE_DEVICE_ADDRESS_CAPTURE_REPLAY_BIT_KHR &&
-            (!acceleration_structure_features ||
-             (acceleration_structure_features &&
-              acceleration_structure_features->accelerationStructureCaptureReplay == VK_FALSE))) {
+            (!acceleration_structure_features || acceleration_structure_features->accelerationStructureCaptureReplay == VK_FALSE)) {
             skip |= LogError("VUID-VkAccelerationStructureCreateInfoKHR-createFlags-03613", device,
                              create_info_loc.dot(Field::createFlags),
                              "includes "
@@ -233,9 +232,8 @@ bool StatelessValidation::manual_PreCallValidateCreateAccelerationStructureKHR(
                              string_VkAccelerationStructureCreateFlagsKHR(pCreateInfo->createFlags).c_str(),
                              pCreateInfo->deviceAddress);
         }
-        if (pCreateInfo->deviceAddress && (!acceleration_structure_features ||
-                                           (acceleration_structure_features &&
-                                            acceleration_structure_features->accelerationStructureCaptureReplay == VK_FALSE))) {
+        if (pCreateInfo->deviceAddress &&
+            (!acceleration_structure_features || acceleration_structure_features->accelerationStructureCaptureReplay == VK_FALSE)) {
             skip |= LogError(
                 "VUID-vkCreateAccelerationStructureKHR-deviceAddress-03488", device, create_info_loc.dot(Field::deviceAddress),
                 "is %" PRIu64 " but accelerationStructureCaptureReplay feature was not enabled.", pCreateInfo->deviceAddress);
@@ -269,14 +267,28 @@ bool StatelessValidation::manual_PreCallValidateCreateAccelerationStructureKHR(
     return skip;
 }
 
+bool StatelessValidation::manual_PreCallValidateDestroyAccelerationStructureKHR(VkDevice device,
+                                                                                VkAccelerationStructureKHR accelerationStructure,
+                                                                                const VkAllocationCallbacks *pAllocator,
+                                                                                const ErrorObject &error_obj) const {
+    bool skip = false;
+    const auto *acceleration_structure_features =
+        vku::FindStructInPNextChain<VkPhysicalDeviceAccelerationStructureFeaturesKHR>(device_createinfo_pnext);
+    if (!acceleration_structure_features || acceleration_structure_features->accelerationStructure == VK_FALSE) {
+        skip |= LogError("VUID-vkDestroyAccelerationStructureKHR-accelerationStructure-08934", device, error_obj.location,
+                         "accelerationStructure feature was not enabled.");
+    }
+    return skip;
+}
+
 bool StatelessValidation::manual_PreCallValidateGetAccelerationStructureHandleNV(VkDevice device,
                                                                                  VkAccelerationStructureNV accelerationStructure,
                                                                                  size_t dataSize, void *pData,
                                                                                  const ErrorObject &error_obj) const {
     bool skip = false;
     if (dataSize < 8) {
-        skip = LogError("VUID-vkGetAccelerationStructureHandleNV-dataSize-02240", accelerationStructure,
-                        error_obj.location.dot(Field::dataSize), "must be greater than or equal to 8.");
+        skip |= LogError("VUID-vkGetAccelerationStructureHandleNV-dataSize-02240", accelerationStructure,
+                         error_obj.location.dot(Field::dataSize), "must be greater than or equal to 8.");
     }
     return skip;
 }
@@ -312,6 +324,13 @@ bool StatelessValidation::manual_PreCallValidateCreateRayTracingPipelinesNV(
                              "(%" PRIu32 ") must equal VkPipelineCreationFeedbackEXT::pipelineStageCreationFeedbackCount (%" PRIu32
                              ").",
                              pCreateInfos[i].stageCount, feedback_struct->pipelineStageCreationFeedbackCount);
+        }
+
+        const auto *pipeline_create_flags = vku::FindStructInPNextChain<VkPipelineCreateFlags2CreateInfoKHR>(pCreateInfos[i].pNext);
+        if (!pipeline_create_flags) {
+            skip |= ValidateFlags(create_info_loc.dot(Field::flags), vvl::FlagBitmask::VkPipelineCreateFlagBits,
+                                  AllVkPipelineCreateFlagBits, pCreateInfos[i].flags, kOptionalFlags,
+                                  "VUID-VkRayTracingPipelineCreateInfoNV-None-09497");
         }
 
         const auto *vulkan_13_features = vku::FindStructInPNextChain<VkPhysicalDeviceVulkan13Features>(device_createinfo_pnext);
@@ -421,7 +440,8 @@ bool StatelessValidation::manual_PreCallValidateCreateRayTracingPipelinesKHR(
     const VkRayTracingPipelineCreateInfoKHR *pCreateInfos, const VkAllocationCallbacks *pAllocator, VkPipeline *pPipelines,
     const ErrorObject &error_obj) const {
     bool skip = false;
-    const auto *raytracing_features = vku::FindStructInPNextChain<VkPhysicalDeviceRayTracingPipelineFeaturesKHR>(device_createinfo_pnext);
+    const auto *raytracing_features =
+        vku::FindStructInPNextChain<VkPhysicalDeviceRayTracingPipelineFeaturesKHR>(device_createinfo_pnext);
     if (!raytracing_features || raytracing_features->rayTracingPipeline == VK_FALSE) {
         skip |= LogError("VUID-vkCreateRayTracingPipelinesKHR-rayTracingPipeline-03586", device, error_obj.location,
                          "The rayTracingPipeline feature was not enabled.");
@@ -463,6 +483,13 @@ bool StatelessValidation::manual_PreCallValidateCreateRayTracingPipelinesKHR(
                 create_info_loc.pNext(Struct::VkPipelineCreationFeedbackCreateInfo, Field::pipelineStageCreationFeedbackCount),
                 "(%" PRIu32 ") is not equal to %s (%" PRIu32 ").", feedback_struct->pipelineStageCreationFeedbackCount,
                 create_info_loc.Fields().c_str(), pCreateInfos[i].stageCount);
+        }
+
+        const auto *pipeline_create_flags = vku::FindStructInPNextChain<VkPipelineCreateFlags2CreateInfoKHR>(pCreateInfos[i].pNext);
+        if (!pipeline_create_flags) {
+            skip |= ValidateFlags(create_info_loc.dot(Field::flags), vvl::FlagBitmask::VkPipelineCreateFlagBits,
+                                  AllVkPipelineCreateFlagBits, pCreateInfos[i].flags, kOptionalFlags,
+                                  "VUID-VkRayTracingPipelineCreateInfoKHR-None-09497");
         }
 
         const auto *vulkan_13_features = vku::FindStructInPNextChain<VkPhysicalDeviceVulkan13Features>(device_createinfo_pnext);
@@ -640,7 +667,8 @@ bool StatelessValidation::manual_PreCallValidateCopyAccelerationStructureToMemor
         skip |= LogError("VUID-VkCopyAccelerationStructureToMemoryInfoKHR-mode-03412", device, info_loc.dot(Field::mode), "is %s.",
                          string_VkCopyAccelerationStructureModeKHR(pInfo->mode));
     }
-    const auto *acc_struct_features = vku::FindStructInPNextChain<VkPhysicalDeviceAccelerationStructureFeaturesKHR>(device_createinfo_pnext);
+    const auto *acc_struct_features =
+        vku::FindStructInPNextChain<VkPhysicalDeviceAccelerationStructureFeaturesKHR>(device_createinfo_pnext);
     if (!acc_struct_features || acc_struct_features->accelerationStructureHostCommands == VK_FALSE) {
         skip |= LogError("VUID-vkCopyAccelerationStructureToMemoryKHR-accelerationStructureHostCommands-03584", device,
                          error_obj.location, "accelerationStructureHostCommands feature was not enabled.");
@@ -658,6 +686,14 @@ bool StatelessValidation::manual_PreCallValidateCopyAccelerationStructureToMemor
 bool StatelessValidation::manual_PreCallValidateCmdCopyAccelerationStructureToMemoryKHR(
     VkCommandBuffer commandBuffer, const VkCopyAccelerationStructureToMemoryInfoKHR *pInfo, const ErrorObject &error_obj) const {
     bool skip = false;
+
+    const auto *acceleration_structure_features =
+        vku::FindStructInPNextChain<VkPhysicalDeviceAccelerationStructureFeaturesKHR>(device_createinfo_pnext);
+    if (!acceleration_structure_features || acceleration_structure_features->accelerationStructure == VK_FALSE) {
+        skip |= LogError("VUID-vkCmdCopyAccelerationStructureToMemoryKHR-accelerationStructure-08926", device, error_obj.location,
+                         "accelerationStructure feature was not enabled.");
+    }
+
     const Location info_loc = error_obj.location.dot(Field::pInfo);
     if (pInfo->mode != VK_COPY_ACCELERATION_STRUCTURE_MODE_SERIALIZE_KHR) {
         skip |=  // to update VUID to VkCmdCopyAccelerationStructureToMemoryInfoKHR after spec update
@@ -691,7 +727,8 @@ bool StatelessValidation::manual_PreCallValidateCopyAccelerationStructureKHR(VkD
                                                                              const ErrorObject &error_obj) const {
     bool skip = false;
     skip |= ValidateCopyAccelerationStructureInfoKHR(pInfo, error_obj.handle, error_obj.location.dot(Field::pInfo));
-    const auto *acc_struct_features = vku::FindStructInPNextChain<VkPhysicalDeviceAccelerationStructureFeaturesKHR>(device_createinfo_pnext);
+    const auto *acc_struct_features =
+        vku::FindStructInPNextChain<VkPhysicalDeviceAccelerationStructureFeaturesKHR>(device_createinfo_pnext);
     if (!acc_struct_features || acc_struct_features->accelerationStructureHostCommands == VK_FALSE) {
         skip |= LogError("VUID-vkCopyAccelerationStructureKHR-accelerationStructureHostCommands-03582", device, error_obj.location,
                          "feature was not enabled.");
@@ -703,6 +740,14 @@ bool StatelessValidation::manual_PreCallValidateCmdCopyAccelerationStructureKHR(
                                                                                 const VkCopyAccelerationStructureInfoKHR *pInfo,
                                                                                 const ErrorObject &error_obj) const {
     bool skip = false;
+
+    const auto *acceleration_structure_features =
+        vku::FindStructInPNextChain<VkPhysicalDeviceAccelerationStructureFeaturesKHR>(device_createinfo_pnext);
+    if (!acceleration_structure_features || acceleration_structure_features->accelerationStructure == VK_FALSE) {
+        skip |= LogError("VUID-vkCmdCopyAccelerationStructureKHR-accelerationStructure-08925", device, error_obj.location,
+                         "accelerationStructure feature was not enabled.");
+    }
+
     skip |= ValidateCopyAccelerationStructureInfoKHR(pInfo, error_obj.handle, error_obj.location.dot(Field::pInfo));
     return skip;
 }
@@ -725,19 +770,35 @@ bool StatelessValidation::manual_PreCallValidateCopyMemoryToAccelerationStructur
     bool skip = false;
     const Location info_loc = error_obj.location.dot(Field::pInfo);
     skip |= ValidateCopyMemoryToAccelerationStructureInfoKHR(pInfo, error_obj.handle, info_loc);
-    const auto *acc_struct_features = vku::FindStructInPNextChain<VkPhysicalDeviceAccelerationStructureFeaturesKHR>(device_createinfo_pnext);
+    const auto *acc_struct_features =
+        vku::FindStructInPNextChain<VkPhysicalDeviceAccelerationStructureFeaturesKHR>(device_createinfo_pnext);
     if (!acc_struct_features || acc_struct_features->accelerationStructureHostCommands == VK_FALSE) {
         skip |= LogError("VUID-vkCopyMemoryToAccelerationStructureKHR-accelerationStructureHostCommands-03583", device,
                          error_obj.location, "accelerationStructureHostCommands feature was not enabled.");
     }
     skip |= ValidateRequiredPointer(info_loc.dot(Field::src).dot(Field::hostAddress), pInfo->src.hostAddress,
                                     "VUID-vkCopyMemoryToAccelerationStructureKHR-pInfo-03729");
+
+    if (SafeModulo((VkDeviceAddress)pInfo->src.hostAddress, 16) != 0) {
+        skip |= LogError("VUID-vkCopyMemoryToAccelerationStructureKHR-pInfo-03750", device,
+                         info_loc.dot(Field::src).dot(Field::hostAddress), "(0x%" PRIx64 ") must be aligned to 16 bytes.",
+                         (VkDeviceAddress)pInfo->src.hostAddress);
+    }
+
     return skip;
 }
 
 bool StatelessValidation::manual_PreCallValidateCmdCopyMemoryToAccelerationStructureKHR(
     VkCommandBuffer commandBuffer, const VkCopyMemoryToAccelerationStructureInfoKHR *pInfo, const ErrorObject &error_obj) const {
     bool skip = false;
+
+    const auto *acceleration_structure_features =
+        vku::FindStructInPNextChain<VkPhysicalDeviceAccelerationStructureFeaturesKHR>(device_createinfo_pnext);
+    if (!acceleration_structure_features || acceleration_structure_features->accelerationStructure == VK_FALSE) {
+        skip |= LogError("VUID-vkCmdCopyMemoryToAccelerationStructureKHR-accelerationStructure-08927", device, error_obj.location,
+                         "accelerationStructure feature was not enabled.");
+    }
+
     const Location info_loc = error_obj.location.dot(Field::pInfo);
     skip |= ValidateCopyMemoryToAccelerationStructureInfoKHR(pInfo, error_obj.handle, info_loc);
     if (SafeModulo(pInfo->src.deviceAddress, 256) != 0) {
@@ -752,6 +813,14 @@ bool StatelessValidation::manual_PreCallValidateCmdWriteAccelerationStructuresPr
     VkCommandBuffer commandBuffer, uint32_t accelerationStructureCount, const VkAccelerationStructureKHR *pAccelerationStructures,
     VkQueryType queryType, VkQueryPool queryPool, uint32_t firstQuery, const ErrorObject &error_obj) const {
     bool skip = false;
+
+    const auto *acceleration_structure_features =
+        vku::FindStructInPNextChain<VkPhysicalDeviceAccelerationStructureFeaturesKHR>(device_createinfo_pnext);
+    if (!acceleration_structure_features || acceleration_structure_features->accelerationStructure == VK_FALSE) {
+        skip |= LogError("VUID-vkCmdWriteAccelerationStructuresPropertiesKHR-accelerationStructure-08924", device,
+                         error_obj.location, "accelerationStructure feature was not enabled.");
+    }
+
     if (!(queryType == VK_QUERY_TYPE_ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR ||
           queryType == VK_QUERY_TYPE_ACCELERATION_STRUCTURE_SERIALIZATION_SIZE_KHR ||
           queryType == VK_QUERY_TYPE_ACCELERATION_STRUCTURE_SIZE_KHR ||
@@ -766,7 +835,8 @@ bool StatelessValidation::manual_PreCallValidateWriteAccelerationStructuresPrope
     VkDevice device, uint32_t accelerationStructureCount, const VkAccelerationStructureKHR *pAccelerationStructures,
     VkQueryType queryType, size_t dataSize, void *pData, size_t stride, const ErrorObject &error_obj) const {
     bool skip = false;
-    const auto *acc_structure_features = vku::FindStructInPNextChain<VkPhysicalDeviceAccelerationStructureFeaturesKHR>(device_createinfo_pnext);
+    const auto *acc_structure_features =
+        vku::FindStructInPNextChain<VkPhysicalDeviceAccelerationStructureFeaturesKHR>(device_createinfo_pnext);
     if (!acc_structure_features || acc_structure_features->accelerationStructureHostCommands == VK_FALSE) {
         skip |= LogError("VUID-vkWriteAccelerationStructuresPropertiesKHR-accelerationStructureHostCommands-03585", device,
                          error_obj.location, "accelerationStructureHostCommands feature was not enabled.");
@@ -777,6 +847,30 @@ bool StatelessValidation::manual_PreCallValidateWriteAccelerationStructuresPrope
                          "(%zu) is less than "
                          "accelerationStructureCount (%" PRIu32 ") x stride (%zu).",
                          dataSize, accelerationStructureCount, stride);
+    }
+    const Location query_type_loc = error_obj.location.dot(Field::queryType);
+    const Location data_size_loc = error_obj.location.dot(Field::dataSize);
+    if (dataSize < sizeof(VkDeviceSize)) {
+        switch (queryType) {
+            case VK_QUERY_TYPE_ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR:
+                skip |= LogError("VUID-vkWriteAccelerationStructuresPropertiesKHR-queryType-03449", device, query_type_loc,
+                                 "is %s, but %s is %zu.", string_VkQueryType(queryType), data_size_loc.Fields().c_str(), dataSize);
+                break;
+            case VK_QUERY_TYPE_ACCELERATION_STRUCTURE_SERIALIZATION_SIZE_KHR:
+                skip |= LogError("VUID-vkWriteAccelerationStructuresPropertiesKHR-queryType-03451", device, query_type_loc,
+                                 "is %s, but %s is %zu.", string_VkQueryType(queryType), data_size_loc.Fields().c_str(), dataSize);
+                break;
+            case VK_QUERY_TYPE_ACCELERATION_STRUCTURE_SERIALIZATION_BOTTOM_LEVEL_POINTERS_KHR:
+                skip |= LogError("VUID-vkWriteAccelerationStructuresPropertiesKHR-queryType-06734", device, query_type_loc,
+                                 "is %s, but %s is %zu.", string_VkQueryType(queryType), data_size_loc.Fields().c_str(), dataSize);
+                break;
+            case VK_QUERY_TYPE_ACCELERATION_STRUCTURE_SIZE_KHR:
+                skip |= LogError("VUID-vkWriteAccelerationStructuresPropertiesKHR-queryType-06732", device, query_type_loc,
+                                 "is %s, but %s is %zu.", string_VkQueryType(queryType), data_size_loc.Fields().c_str(), dataSize);
+                break;
+            default:
+                break;
+        }
     }
 
     if (!(queryType == VK_QUERY_TYPE_ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR ||
@@ -821,7 +915,8 @@ bool StatelessValidation::manual_PreCallValidateGetRayTracingCaptureReplayShader
     VkDevice device, VkPipeline pipeline, uint32_t firstGroup, uint32_t groupCount, size_t dataSize, void *pData,
     const ErrorObject &error_obj) const {
     bool skip = false;
-    const auto *raytracing_features = vku::FindStructInPNextChain<VkPhysicalDeviceRayTracingPipelineFeaturesKHR>(device_createinfo_pnext);
+    const auto *raytracing_features =
+        vku::FindStructInPNextChain<VkPhysicalDeviceRayTracingPipelineFeaturesKHR>(device_createinfo_pnext);
     if (!raytracing_features || raytracing_features->rayTracingPipelineShaderGroupHandleCaptureReplay == VK_FALSE) {
         skip |= LogError(
             "VUID-vkGetRayTracingCaptureReplayShaderGroupHandlesKHR-rayTracingPipelineShaderGroupHandleCaptureReplay-03606", device,
@@ -834,7 +929,8 @@ bool StatelessValidation::manual_PreCallValidateGetDeviceAccelerationStructureCo
     VkDevice device, const VkAccelerationStructureVersionInfoKHR *pVersionInfo,
     VkAccelerationStructureCompatibilityKHR *pCompatibility, const ErrorObject &error_obj) const {
     bool skip = false;
-    const auto *accel_struct_features = vku::FindStructInPNextChain<VkPhysicalDeviceAccelerationStructureFeaturesKHR>(device_createinfo_pnext);
+    const auto *accel_struct_features =
+        vku::FindStructInPNextChain<VkPhysicalDeviceAccelerationStructureFeaturesKHR>(device_createinfo_pnext);
     if (!(accel_struct_features && accel_struct_features->accelerationStructure)) {
         skip |= LogError("VUID-vkGetDeviceAccelerationStructureCompatibilityKHR-accelerationStructure-08928", device,
                          error_obj.location, "accelerationStructure feature was not enabled.");
@@ -842,305 +938,260 @@ bool StatelessValidation::manual_PreCallValidateGetDeviceAccelerationStructureCo
     return skip;
 }
 
-bool StatelessValidation::ValidateAccelerationStructureBuildGeometryInfoKHR(
-    const VkAccelerationStructureBuildGeometryInfoKHR *pInfos, uint32_t infoCount, uint64_t total_primitive_count,
-    const VulkanTypedHandle &handle, const Location &loc) const {
+bool StatelessValidation::ValidateTotalPrimitivesCount(uint64_t total_triangles_count, uint64_t total_aabbs_count,
+                                                       const VulkanTypedHandle &handle, const Location &loc) const {
     bool skip = false;
-    const LogObjectList objlist(handle);
-    for (uint32_t i = 0; i < infoCount; ++i) {
-        const Location info_loc = loc.dot(Field::pInfos, i);
-        if (pInfos[i].type == VK_ACCELERATION_STRUCTURE_TYPE_GENERIC_KHR) {
-            skip |= LogError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-type-03654", objlist, info_loc.dot(Field::type),
-                             "must not be VK_ACCELERATION_STRUCTURE_TYPE_GENERIC_KHR.");
-        }
-        if (pInfos[i].flags & VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR &&
-            pInfos[i].flags & VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_BUILD_BIT_KHR) {
-            skip |= LogError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-flags-03796", objlist, info_loc.dot(Field::flags),
-                             "has the VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR bit set,"
-                             "then it must not have the VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_BUILD_BIT_KHR bit set.");
-        }
-        if (pInfos[i].pGeometries && pInfos[i].ppGeometries) {
-            skip |= LogError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-pGeometries-03788", objlist, info_loc,
-                             "both pGeometries and ppGeometries are not NULL.");
-        }
-        if (pInfos[i].type == VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR && pInfos[i].geometryCount != 1) {
-            skip |= LogError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-type-03790", objlist, info_loc.dot(Field::type),
-                             "is VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR, but geometryCount is %" PRIu32 ".",
-                             pInfos[i].geometryCount);
-        }
-        if (pInfos[i].type == VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR &&
-            pInfos[i].geometryCount > phys_dev_ext_props.acc_structure_props.maxGeometryCount) {
-            skip |= LogError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-type-03793", objlist, info_loc.dot(Field::type),
-                             "is VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR but geometryCount (%" PRIu32
-                             ") is greater than maxGeometryCount (%" PRIu64 ").",
-                             pInfos[i].geometryCount, phys_dev_ext_props.acc_structure_props.maxGeometryCount);
-        }
 
-        const VkAccelerationStructureGeometryKHR *pGeometry = pInfos[i].pGeometries    ? pInfos[i].pGeometries
-                                                              : pInfos[i].ppGeometries ? pInfos[i].ppGeometries[0]
-                                                                                       : nullptr;
-        if (pGeometry) {
-            if (total_primitive_count > phys_dev_ext_props.acc_structure_props.maxPrimitiveCount) {
-                switch (pGeometry->geometryType) {
-                    case VK_GEOMETRY_TYPE_TRIANGLES_KHR:
-                        skip |= LogError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-type-03795", objlist, info_loc,
-                                         "total number of triangles in all geometries (%" PRIu64
-                                         ") is superior to maxPrimitiveCount "
-                                         "(%" PRIu64 ")",
-                                         total_primitive_count, phys_dev_ext_props.acc_structure_props.maxPrimitiveCount);
-                        break;
-                    case VK_GEOMETRY_TYPE_AABBS_KHR:
-                        skip |= LogError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-type-03794", objlist, info_loc,
-                                         "total number of AABBs in all geometries (%" PRIu64
-                                         ") is superior to maxPrimitiveCount "
-                                         "(%" PRIu64 ")",
-                                         total_primitive_count, phys_dev_ext_props.acc_structure_props.maxPrimitiveCount);
-                        break;
-                    default:
-                        break;
-                }
+    if (total_triangles_count > phys_dev_ext_props.acc_structure_props.maxPrimitiveCount) {
+        skip |= LogError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-type-03795", handle, loc,
+                         "total number of triangles in all geometries (%" PRIu64
+                         ") is larger than maxPrimitiveCount "
+                         "(%" PRIu64 ")",
+                         total_triangles_count, phys_dev_ext_props.acc_structure_props.maxPrimitiveCount);
+    }
+
+    if (total_aabbs_count > phys_dev_ext_props.acc_structure_props.maxPrimitiveCount) {
+        skip |= LogError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-type-03794", handle, loc,
+                         "total number of AABBs in all geometries (%" PRIu64
+                         ") is larger than maxPrimitiveCount "
+                         "(%" PRIu64 ")",
+                         total_aabbs_count, phys_dev_ext_props.acc_structure_props.maxPrimitiveCount);
+    }
+
+    return skip;
+}
+
+bool StatelessValidation::ValidateAccelerationStructureBuildGeometryInfoKHR(const VkAccelerationStructureBuildGeometryInfoKHR &info,
+                                                                            const VulkanTypedHandle &handle,
+                                                                            const Location &info_loc) const {
+    bool skip = false;
+
+    if (info.type == VK_ACCELERATION_STRUCTURE_TYPE_GENERIC_KHR) {
+        skip |= LogError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-type-03654", handle, info_loc.dot(Field::type),
+                         "must not be VK_ACCELERATION_STRUCTURE_TYPE_GENERIC_KHR.");
+    }
+    if (info.flags & VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR &&
+        info.flags & VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_BUILD_BIT_KHR) {
+        skip |= LogError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-flags-03796", handle, info_loc.dot(Field::flags),
+                         "has the VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR bit set,"
+                         "then it must not have the VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_BUILD_BIT_KHR bit set.");
+    }
+    if (info.pGeometries && info.ppGeometries) {
+        skip |= LogError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-pGeometries-03788", handle, info_loc,
+                         "both pGeometries and ppGeometries are not NULL.");
+    }
+    if (info.type == VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR && info.geometryCount != 1) {
+        skip |= LogError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-type-03790", handle, info_loc.dot(Field::type),
+                         "is VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR, but geometryCount is %" PRIu32 ".", info.geometryCount);
+    }
+    if (info.type == VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR &&
+        info.geometryCount > phys_dev_ext_props.acc_structure_props.maxGeometryCount) {
+        skip |= LogError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-type-03793", handle, info_loc.dot(Field::type),
+                         "is VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR but geometryCount (%" PRIu32
+                         ") is greater than maxGeometryCount (%" PRIu64 ").",
+                         info.geometryCount, phys_dev_ext_props.acc_structure_props.maxGeometryCount);
+    }
+
+    if (info.geometryCount > 0 && !info.pGeometries && !info.ppGeometries) {
+        skip |= LogError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-pGeometries-03788", handle,
+                         info_loc.dot(Field::geometryCount), "is (%" PRIu32 ") but both pGeometries and ppGeometries are NULL.",
+                         info.geometryCount);
+        return skip;
+    }
+
+    for (uint32_t geom_i = 0; geom_i < info.geometryCount; ++geom_i) {
+        const VkAccelerationStructureGeometryKHR &geom = rt::GetGeometry(info, geom_i);
+
+        const Location geometry_loc = info_loc.dot(info.pGeometries ? Field::pGeometries : Field::ppGeometries, geom_i);
+
+        skip |= ValidateRangedEnum(geometry_loc.dot(Field::geometryType), vvl::Enum::VkGeometryTypeKHR, geom.geometryType,
+                                   "VUID-VkAccelerationStructureGeometryKHR-geometryType-parameter");
+        if (geom.geometryType == VK_GEOMETRY_TYPE_TRIANGLES_KHR) {
+            constexpr std::array allowed_structs = {VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_TRIANGLES_OPACITY_MICROMAP_EXT};
+
+            skip |=
+                ValidateStructType(geometry_loc.dot(Field::geometry).dot(Field::triangles),
+                                   "VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR",
+                                   &(geom.geometry.triangles), VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR,
+                                   false, kVUIDUndefined, "VUID-VkAccelerationStructureGeometryTrianglesDataKHR-sType-sType");
+            skip |= ValidateStructPnext(geometry_loc.dot(Field::geometry).dot(Field::triangles), geom.geometry.triangles.pNext,
+                                        allowed_structs.size(), allowed_structs.data(), GeneratedVulkanHeaderVersion,
+                                        "VUID-VkAccelerationStructureGeometryTrianglesDataKHR-pNext-pNext", kVUIDUndefined);
+            skip |= ValidateRangedEnum(geometry_loc.dot(Field::geometry).dot(Field::triangles).dot(Field::vertexFormat),
+                                       vvl::Enum::VkFormat, geom.geometry.triangles.vertexFormat,
+                                       "VUID-VkAccelerationStructureGeometryTrianglesDataKHR-vertexFormat-parameter");
+            skip |=
+                ValidateStructType(geometry_loc.dot(Field::geometry).dot(Field::triangles),
+                                   "VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR", &geom.geometry.triangles,
+                                   VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR, true,
+                                   "VUID-VkAccelerationStructureGeometryKHR-triangles-parameter", kVUIDUndefined);
+            skip |= ValidateRangedEnum(geometry_loc.dot(Field::geometry).dot(Field::triangles).dot(Field::indexType),
+                                       vvl::Enum::VkIndexType, geom.geometry.triangles.indexType,
+                                       "VUID-VkAccelerationStructureGeometryTrianglesDataKHR-indexType-parameter");
+
+            if (geom.geometry.triangles.vertexStride > vvl::kU32Max) {
+                skip |= LogError("VUID-VkAccelerationStructureGeometryTrianglesDataKHR-vertexStride-03819", handle,
+                                 geometry_loc.dot(Field::geometry).dot(Field::triangles).dot(Field::vertexStride),
+                                 "(%" PRIu64 ") must be less than or equal to 2^32-1.", geom.geometry.triangles.vertexStride);
+            }
+            if (geom.geometry.triangles.indexType != VK_INDEX_TYPE_UINT16 &&
+                geom.geometry.triangles.indexType != VK_INDEX_TYPE_UINT32 &&
+                geom.geometry.triangles.indexType != VK_INDEX_TYPE_NONE_KHR) {
+                skip |= LogError("VUID-VkAccelerationStructureGeometryTrianglesDataKHR-indexType-03798", handle,
+                                 geometry_loc.dot(Field::geometry).dot(Field::triangles).dot(Field::indexType), "is %s.",
+                                 string_VkIndexType(geom.geometry.triangles.indexType));
             }
         }
+        if (geom.geometryType == VK_GEOMETRY_TYPE_INSTANCES_KHR) {
+            skip |=
+                ValidateStructType(geometry_loc.dot(Field::geometry).dot(Field::instances),
+                                   "VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR", &geom.geometry.instances,
+                                   VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR, true,
+                                   "VUID-VkAccelerationStructureGeometryKHR-instances-parameter", kVUIDUndefined);
+            skip |=
+                ValidateStructType(geometry_loc.dot(Field::geometry).dot(Field::instances),
+                                   "VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR",
+                                   &(geom.geometry.instances), VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR,
+                                   false, kVUIDUndefined, "VUID-VkAccelerationStructureGeometryInstancesDataKHR-sType-sType");
+            skip |= ValidateStructPnext(geometry_loc.dot(Field::geometry).dot(Field::instances), geom.geometry.instances.pNext, 0,
+                                        nullptr, GeneratedVulkanHeaderVersion,
+                                        "VUID-VkAccelerationStructureGeometryInstancesDataKHR-pNext-pNext", kVUIDUndefined);
 
-        if (pInfos[i].pGeometries) {
-            for (uint32_t j = 0; j < pInfos[i].geometryCount; ++j) {
-                const Location geometry_loc = info_loc.dot(Field::pGeometries, j);
-                skip |= ValidateRangedEnum(geometry_loc.dot(Field::geometryType), "VkGeometryTypeKHR",
-                                           pInfos[i].pGeometries[j].geometryType,
-                                           "VUID-VkAccelerationStructureGeometryKHR-geometryType-parameter");
-                if (pInfos[i].pGeometries[j].geometryType == VK_GEOMETRY_TYPE_TRIANGLES_KHR) {
-                    constexpr std::array allowed_structs = {
-                        VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_TRIANGLES_OPACITY_MICROMAP_EXT};
-
-                    skip |= ValidateStructType(geometry_loc.dot(Field::geometry).dot(Field::triangles),
-                                               "VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR",
-                                               &(pInfos[i].pGeometries[j].geometry.triangles),
-                                               VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR, false,
-                                               kVUIDUndefined, "VUID-VkAccelerationStructureGeometryTrianglesDataKHR-sType-sType");
-                    skip |= ValidateStructPnext(geometry_loc.dot(Field::geometry).dot(Field::triangles),
-                                                pInfos[i].pGeometries[j].geometry.triangles.pNext, allowed_structs.size(),
-                                                allowed_structs.data(), GeneratedVulkanHeaderVersion,
-                                                "VUID-VkAccelerationStructureGeometryTrianglesDataKHR-pNext-pNext", kVUIDUndefined);
-                    skip |= ValidateRangedEnum(geometry_loc.dot(Field::geometry).dot(Field::triangles).dot(Field::vertexFormat),
-                                               "VkFormat", pInfos[i].pGeometries[j].geometry.triangles.vertexFormat,
-                                               "VUID-VkAccelerationStructureGeometryTrianglesDataKHR-vertexFormat-parameter");
-                    skip |= ValidateStructType(geometry_loc.dot(Field::geometry).dot(Field::triangles),
-                                               "VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR",
-                                               &pInfos[i].pGeometries[j].geometry.triangles,
-                                               VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR, true,
-                                               "VUID-VkAccelerationStructureGeometryKHR-triangles-parameter", kVUIDUndefined);
-                    skip |= ValidateRangedEnum(geometry_loc.dot(Field::geometry).dot(Field::triangles).dot(Field::indexType),
-                                               "VkIndexType", pInfos[i].pGeometries[j].geometry.triangles.indexType,
-                                               "VUID-VkAccelerationStructureGeometryTrianglesDataKHR-indexType-parameter");
-
-                    if (pInfos[i].pGeometries[j].geometry.triangles.vertexStride > vvl::kU32Max) {
-                        skip |= LogError("VUID-VkAccelerationStructureGeometryTrianglesDataKHR-vertexStride-03819", objlist,
-                                         geometry_loc.dot(Field::geometry).dot(Field::triangles).dot(Field::vertexStride),
-                                         "(%" PRIu64 ") must be less than or equal to 2^32-1.",
-                                         pInfos[i].pGeometries[j].geometry.triangles.vertexStride);
-                    }
-                    if (pInfos[i].pGeometries[j].geometry.triangles.indexType != VK_INDEX_TYPE_UINT16 &&
-                        pInfos[i].pGeometries[j].geometry.triangles.indexType != VK_INDEX_TYPE_UINT32 &&
-                        pInfos[i].pGeometries[j].geometry.triangles.indexType != VK_INDEX_TYPE_NONE_KHR) {
-                        skip |= LogError("VUID-VkAccelerationStructureGeometryTrianglesDataKHR-indexType-03798", objlist,
-                                         geometry_loc.dot(Field::geometry).dot(Field::triangles).dot(Field::indexType), "is %s.",
-                                         string_VkIndexType(pInfos[i].pGeometries[j].geometry.triangles.indexType));
-                    }
-                }
-                if (pInfos[i].pGeometries[j].geometryType == VK_GEOMETRY_TYPE_INSTANCES_KHR) {
-                    skip |= ValidateStructType(geometry_loc.dot(Field::geometry).dot(Field::instances),
-                                               "VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR",
-                                               &pInfos[i].pGeometries[j].geometry.instances,
-                                               VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR, true,
-                                               "VUID-VkAccelerationStructureGeometryKHR-instances-parameter", kVUIDUndefined);
-                    skip |= ValidateStructType(geometry_loc.dot(Field::geometry).dot(Field::instances),
-                                               "VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR",
-                                               &(pInfos[i].pGeometries[j].geometry.instances),
-                                               VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR, false,
-                                               kVUIDUndefined, "VUID-VkAccelerationStructureGeometryInstancesDataKHR-sType-sType");
-                    skip |= ValidateStructPnext(geometry_loc.dot(Field::geometry).dot(Field::instances),
-                                                pInfos[i].pGeometries[j].geometry.instances.pNext, 0, nullptr,
-                                                GeneratedVulkanHeaderVersion,
-                                                "VUID-VkAccelerationStructureGeometryInstancesDataKHR-pNext-pNext", kVUIDUndefined);
-
-                    skip |= ValidateBool32(geometry_loc.dot(Field::geometry).dot(Field::instances).dot(Field::arrayOfPointers),
-                                           pInfos[i].pGeometries[j].geometry.instances.arrayOfPointers);
-                }
-                if (pInfos[i].pGeometries[j].geometryType == VK_GEOMETRY_TYPE_AABBS_KHR) {
-                    skip |= ValidateStructType(geometry_loc.dot(Field::geometry).dot(Field::aabbs),
-                                               "VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_AABBS_DATA_KHR",
-                                               &pInfos[i].pGeometries[j].geometry.aabbs,
-                                               VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_AABBS_DATA_KHR, true,
-                                               "VUID-VkAccelerationStructureGeometryKHR-aabbs-parameter", kVUIDUndefined);
-                    skip |= ValidateStructType(geometry_loc.dot(Field::geometry).dot(Field::aabbs),
-                                               "VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_AABBS_DATA_KHR",
-                                               &(pInfos[i].pGeometries[j].geometry.aabbs),
-                                               VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_AABBS_DATA_KHR, false,
-                                               kVUIDUndefined, "VUID-VkAccelerationStructureGeometryAabbsDataKHR-sType-sType");
-                    skip |=
-                        ValidateStructPnext(geometry_loc.dot(Field::geometry).dot(Field::aabbs),
-                                            pInfos[i].pGeometries[j].geometry.aabbs.pNext, 0, nullptr, GeneratedVulkanHeaderVersion,
-                                            "VUID-VkAccelerationStructureGeometryAabbsDataKHR-pNext-pNext", kVUIDUndefined);
-                    if (pInfos[i].pGeometries[j].geometry.aabbs.stride % 8) {
-                        skip |= LogError("VUID-VkAccelerationStructureGeometryAabbsDataKHR-stride-03545", objlist,
-                                         geometry_loc.dot(Field::geometry).dot(Field::aabbs).dot(Field::stride),
-                                         "(%" PRIu64 ") is not a multiple of 8.", pInfos[i].pGeometries[j].geometry.aabbs.stride);
-                    }
-                    if (pInfos[i].pGeometries[j].geometry.aabbs.stride > vvl::kU32Max) {
-                        skip |= LogError("VUID-VkAccelerationStructureGeometryAabbsDataKHR-stride-03820", objlist,
-                                         geometry_loc.dot(Field::geometry).dot(Field::aabbs).dot(Field::stride),
-                                         "(%" PRIu64 ") must be less than or equal to 2^32-1.",
-                                         pInfos[i].pGeometries[j].geometry.aabbs.stride);
-                    }
-                }
-                if (pInfos[i].type == VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR &&
-                    pInfos[i].pGeometries[j].geometryType != VK_GEOMETRY_TYPE_INSTANCES_KHR) {
-                    skip |= LogError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-type-03789", objlist,
-                                     geometry_loc.dot(Field::geometryType),
-                                     "is %s but %s is VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR.",
-                                     string_VkGeometryTypeKHR(pInfos[i].pGeometries[j].geometryType),
-                                     info_loc.dot(Field::type).Fields().c_str());
-                }
-                if (pInfos[i].type == VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR) {
-                    if (pInfos[i].pGeometries[j].geometryType == VK_GEOMETRY_TYPE_INSTANCES_KHR) {
-                        skip |= LogError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-type-03791", objlist,
-                                         geometry_loc.dot(Field::geometryType),
-                                         "is %s but %s is VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR.",
-                                         string_VkGeometryTypeKHR(pInfos[i].pGeometries[j].geometryType),
-                                         info_loc.dot(Field::type).Fields().c_str());
-                    }
-                    if (pInfos[i].pGeometries[j].geometryType != pInfos[i].pGeometries[0].geometryType) {
-                        skip |= LogError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-type-03792", objlist,
-                                         geometry_loc.dot(Field::geometryType),
-                                         "(%s) is different than pGeometries[0].geometryType (%s)",
-                                         string_VkGeometryTypeKHR(pInfos[i].pGeometries[j].geometryType),
-                                         string_VkGeometryTypeKHR(pInfos[i].pGeometries[0].geometryType));
-                    }
-                }
+            skip |= ValidateBool32(geometry_loc.dot(Field::geometry).dot(Field::instances).dot(Field::arrayOfPointers),
+                                   geom.geometry.instances.arrayOfPointers);
+        }
+        if (geom.geometryType == VK_GEOMETRY_TYPE_AABBS_KHR) {
+            skip |= ValidateStructType(geometry_loc.dot(Field::geometry).dot(Field::aabbs),
+                                       "VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_AABBS_DATA_KHR", &geom.geometry.aabbs,
+                                       VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_AABBS_DATA_KHR, true,
+                                       "VUID-VkAccelerationStructureGeometryKHR-aabbs-parameter", kVUIDUndefined);
+            skip |= ValidateStructType(geometry_loc.dot(Field::geometry).dot(Field::aabbs),
+                                       "VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_AABBS_DATA_KHR", &(geom.geometry.aabbs),
+                                       VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_AABBS_DATA_KHR, false, kVUIDUndefined,
+                                       "VUID-VkAccelerationStructureGeometryAabbsDataKHR-sType-sType");
+            skip |= ValidateStructPnext(geometry_loc.dot(Field::geometry).dot(Field::aabbs), geom.geometry.aabbs.pNext, 0, nullptr,
+                                        GeneratedVulkanHeaderVersion,
+                                        "VUID-VkAccelerationStructureGeometryAabbsDataKHR-pNext-pNext", kVUIDUndefined);
+            if (geom.geometry.aabbs.stride % 8) {
+                skip |= LogError("VUID-VkAccelerationStructureGeometryAabbsDataKHR-stride-03545", handle,
+                                 geometry_loc.dot(Field::geometry).dot(Field::aabbs).dot(Field::stride),
+                                 "(%" PRIu64 ") is not a multiple of 8.", geom.geometry.aabbs.stride);
+            }
+            if (geom.geometry.aabbs.stride > vvl::kU32Max) {
+                skip |= LogError("VUID-VkAccelerationStructureGeometryAabbsDataKHR-stride-03820", handle,
+                                 geometry_loc.dot(Field::geometry).dot(Field::aabbs).dot(Field::stride),
+                                 "(%" PRIu64 ") must be less than or equal to 2^32-1.", geom.geometry.aabbs.stride);
             }
         }
-        if (pInfos[i].ppGeometries != nullptr) {
-            for (uint32_t j = 0; j < pInfos[i].geometryCount; ++j) {
-                const Location geometry_loc = info_loc.dot(Field::ppGeometries, j);
-                skip |= ValidateRangedEnum(geometry_loc.dot(Field::geometryType), "VkGeometryTypeKHR",
-                                           pInfos[i].ppGeometries[j]->geometryType,
-                                           "VUID-VkAccelerationStructureGeometryKHR-geometryType-parameter");
-                if (pInfos[i].ppGeometries[j]->geometryType == VK_GEOMETRY_TYPE_TRIANGLES_KHR) {
-                    skip |= ValidateStructType(geometry_loc.dot(Field::geometry).dot(Field::triangles),
-                                               "VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR",
-                                               &pInfos[i].ppGeometries[j]->geometry.triangles,
-                                               VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR, true,
-                                               "VUID-VkAccelerationStructureGeometryKHR-triangles-parameter", kVUIDUndefined);
-                    skip |= ValidateStructType(geometry_loc.dot(Field::geometry).dot(Field::triangles),
-                                               "VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR",
-                                               &(pInfos[i].ppGeometries[j]->geometry.triangles),
-                                               VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR, false,
-                                               kVUIDUndefined, "VUID-VkAccelerationStructureGeometryTrianglesDataKHR-sType-sType");
-                    skip |= ValidateStructPnext(geometry_loc.dot(Field::geometry).dot(Field::triangles),
-                                                pInfos[i].ppGeometries[j]->geometry.triangles.pNext, 0, nullptr,
-                                                GeneratedVulkanHeaderVersion,
-                                                "VUID-VkAccelerationStructureGeometryTrianglesDataKHR-pNext-pNext", kVUIDUndefined);
-                    skip |= ValidateRangedEnum(geometry_loc.dot(Field::geometry).dot(Field::triangles).dot(Field::vertexFormat),
-                                               "VkFormat", pInfos[i].ppGeometries[j]->geometry.triangles.vertexFormat,
-                                               "VUID-VkAccelerationStructureGeometryTrianglesDataKHR-vertexFormat-parameter");
-                    skip |= ValidateRangedEnum(geometry_loc.dot(Field::geometry).dot(Field::triangles).dot(Field::indexType),
-                                               "VkIndexType", pInfos[i].ppGeometries[j]->geometry.triangles.indexType,
-                                               "VUID-VkAccelerationStructureGeometryTrianglesDataKHR-indexType-parameter");
-                    if (pInfos[i].ppGeometries[j]->geometry.triangles.vertexStride > vvl::kU32Max) {
-                        skip |= LogError("VUID-VkAccelerationStructureGeometryTrianglesDataKHR-vertexStride-03819", objlist,
-                                         geometry_loc.dot(Field::geometry).dot(Field::vertexStride),
-                                         "(%" PRIu64 ") must be less than or equal to 2^32-1.",
-                                         pInfos[i].ppGeometries[j]->geometry.triangles.vertexStride);
-                    }
-                    if (pInfos[i].ppGeometries[j]->geometry.triangles.indexType != VK_INDEX_TYPE_UINT16 &&
-                        pInfos[i].ppGeometries[j]->geometry.triangles.indexType != VK_INDEX_TYPE_UINT32 &&
-                        pInfos[i].ppGeometries[j]->geometry.triangles.indexType != VK_INDEX_TYPE_NONE_KHR) {
-                        skip |= LogError("VUID-VkAccelerationStructureGeometryTrianglesDataKHR-indexType-03798", objlist,
-                                         geometry_loc.dot(Field::geometry).dot(Field::triangles).dot(Field::indexType), "is %s.",
-                                         string_VkIndexType(pInfos[i].ppGeometries[j]->geometry.triangles.indexType));
-                    }
-                }
-                if (pInfos[i].ppGeometries[j]->geometryType == VK_GEOMETRY_TYPE_INSTANCES_KHR) {
-                    skip |= ValidateStructType(geometry_loc.dot(Field::geometry).dot(Field::instances),
-                                               "VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR",
-                                               &pInfos[i].ppGeometries[j]->geometry.instances,
-                                               VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR, true,
-                                               "VUID-VkAccelerationStructureGeometryKHR-instances-parameter", kVUIDUndefined);
-                    skip |= ValidateStructType(geometry_loc.dot(Field::geometry).dot(Field::instances),
-                                               "VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR",
-                                               &(pInfos[i].ppGeometries[j]->geometry.instances),
-                                               VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR, false,
-                                               kVUIDUndefined, "VUID-VkAccelerationStructureGeometryInstancesDataKHR-sType-sType");
-                    skip |= ValidateStructPnext(geometry_loc.dot(Field::geometry).dot(Field::instances),
-                                                pInfos[i].ppGeometries[j]->geometry.instances.pNext, 0, nullptr,
-                                                GeneratedVulkanHeaderVersion,
-                                                "VUID-VkAccelerationStructureGeometryInstancesDataKHR-pNext-pNext", kVUIDUndefined);
-                    skip |= ValidateBool32(geometry_loc.dot(Field::geometry).dot(Field::instances).dot(Field::arrayOfPointers),
-                                           pInfos[i].ppGeometries[j]->geometry.instances.arrayOfPointers);
-                }
-                if (pInfos[i].ppGeometries[j]->geometryType == VK_GEOMETRY_TYPE_AABBS_KHR) {
-                    skip |= ValidateStructType(geometry_loc.dot(Field::geometry).dot(Field::aabbs),
-                                               "VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_AABBS_DATA_KHR",
-                                               &pInfos[i].ppGeometries[j]->geometry.aabbs,
-                                               VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_AABBS_DATA_KHR, true,
-                                               "VUID-VkAccelerationStructureGeometryKHR-aabbs-parameter", kVUIDUndefined);
-                    skip |= ValidateStructType(geometry_loc.dot(Field::geometry).dot(Field::aabbs),
-                                               "VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_AABBS_DATA_KHR",
-                                               &(pInfos[i].ppGeometries[j]->geometry.aabbs),
-                                               VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_AABBS_DATA_KHR, false,
-                                               kVUIDUndefined, "VUID-VkAccelerationStructureGeometryAabbsDataKHR-sType-sType");
-                    skip |= ValidateStructPnext(geometry_loc.dot(Field::geometry).dot(Field::aabbs),
-                                                pInfos[i].ppGeometries[j]->geometry.aabbs.pNext, 0, nullptr,
-                                                GeneratedVulkanHeaderVersion,
-                                                "VUID-VkAccelerationStructureGeometryAabbsDataKHR-pNext-pNext", kVUIDUndefined);
-                    if (pInfos[i].ppGeometries[j]->geometry.aabbs.stride > vvl::kU32Max) {
-                        skip |= LogError("VUID-VkAccelerationStructureGeometryAabbsDataKHR-stride-03820", objlist,
-                                         geometry_loc.dot(Field::geometry).dot(Field::aabbs).dot(Field::stride),
-                                         "(%" PRIu64 ") must be less than or equal to 2^32-1.",
-                                         pInfos[i].ppGeometries[j]->geometry.aabbs.stride);
-                    }
-                    if (pInfos[i].ppGeometries[j]->geometry.aabbs.stride % 8) {
-                        skip |= LogError("VUID-VkAccelerationStructureGeometryAabbsDataKHR-stride-03545", objlist,
-                                         geometry_loc.dot(Field::geometry).dot(Field::aabbs).dot(Field::stride),
-                                         "(%" PRIu64 ") is not a multiple of 8.", pInfos[i].ppGeometries[j]->geometry.aabbs.stride);
-                    }
-                }
-                if (pInfos[i].type == VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR &&
-                    pInfos[i].ppGeometries[j]->geometryType != VK_GEOMETRY_TYPE_INSTANCES_KHR) {
-                    skip |= LogError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-type-03789", objlist,
-                                     geometry_loc.dot(Field::geometryType),
-                                     "is %s but %s is VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR.",
-                                     string_VkGeometryTypeKHR(pInfos[i].ppGeometries[j]->geometryType),
-                                     info_loc.dot(Field::type).Fields().c_str());
-                }
-                if (pInfos[i].type == VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR) {
-                    if (pInfos[i].ppGeometries[j]->geometryType == VK_GEOMETRY_TYPE_INSTANCES_KHR) {
-                        skip |= LogError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-type-03791", objlist,
-                                         geometry_loc.dot(Field::geometryType),
-                                         "is %s but %s is VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR.",
-                                         string_VkGeometryTypeKHR(pInfos[i].ppGeometries[j]->geometryType),
-                                         info_loc.dot(Field::type).Fields().c_str());
-                    }
-                    if (pInfos[i].ppGeometries[j]->geometryType != pInfos[i].ppGeometries[0]->geometryType) {
-                        skip |= LogError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-type-03792", objlist,
-                                         geometry_loc.dot(Field::geometryType),
-                                         "(%s) is different than ppGeometries[0]->geometryType (%s)",
-                                         string_VkGeometryTypeKHR(pInfos[i].ppGeometries[j]->geometryType),
-                                         string_VkGeometryTypeKHR(pInfos[i].ppGeometries[0]->geometryType));
-                    }
-                }
+        if (info.type == VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR && geom.geometryType != VK_GEOMETRY_TYPE_INSTANCES_KHR) {
+            skip |= LogError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-type-03789", handle,
+                             geometry_loc.dot(Field::geometryType), "is %s but %s is VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR.",
+                             string_VkGeometryTypeKHR(geom.geometryType), info_loc.dot(Field::type).Fields().c_str());
+        }
+        if (info.type == VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR) {
+            if (geom.geometryType == VK_GEOMETRY_TYPE_INSTANCES_KHR) {
+                skip |= LogError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-type-03791", handle,
+                                 geometry_loc.dot(Field::geometryType),
+                                 "is %s but %s is VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR.",
+                                 string_VkGeometryTypeKHR(geom.geometryType), info_loc.dot(Field::type).Fields().c_str());
+            }
+            if (geom.geometryType != rt::GetGeometry(info, 0).geometryType) {
+                skip |= LogError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-type-03792", handle,
+                                 geometry_loc.dot(Field::geometryType), "(%s) is different than pGeometries[0].geometryType (%s)",
+                                 string_VkGeometryTypeKHR(geom.geometryType),
+                                 string_VkGeometryTypeKHR(rt::GetGeometry(info, 0).geometryType));
             }
         }
     }
+
     return skip;
 }
+
+static void ComputeTotalPrimitiveCountWithBuildRanges(uint32_t info_count,
+                                                      const VkAccelerationStructureBuildGeometryInfoKHR *build_geometry_infos,
+                                                      const VkAccelerationStructureBuildRangeInfoKHR *const *build_ranges,
+                                                      uint64_t *out_total_triangles_count, uint64_t *out_total_aabbs_count) {
+    *out_total_triangles_count = 0;
+    *out_total_aabbs_count = 0;
+
+    for (const auto [info_i, info] : vvl::enumerate(build_geometry_infos, info_count)) {
+        if (!info->pGeometries && !info->ppGeometries) {
+            *out_total_triangles_count = 0;
+            *out_total_aabbs_count = 0;
+            return;
+        }
+
+        for (uint32_t geom_i = 0; geom_i < info->geometryCount; ++geom_i) {
+            const VkAccelerationStructureGeometryKHR &geom = rt::GetGeometry(*info, geom_i);
+            switch (geom.geometryType) {
+                case VK_GEOMETRY_TYPE_TRIANGLES_KHR:
+                    *out_total_triangles_count += build_ranges[info_i][geom_i].primitiveCount;
+                    break;
+                case VK_GEOMETRY_TYPE_AABBS_KHR:
+                    *out_total_aabbs_count += build_ranges[info_i][geom_i].primitiveCount;
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+
+    return;
+}
+
+static void ComputeTotalPrimitiveCountWithMaxPrimitivesCount(
+    uint32_t info_count, const VkAccelerationStructureBuildGeometryInfoKHR *build_geometry_infos,
+    const uint32_t *const *max_primitives, uint64_t *out_total_triangles_count, uint64_t *out_total_aabbs_count) {
+    *out_total_triangles_count = 0;
+    *out_total_aabbs_count = 0;
+
+    for (const auto [info_i, info] : vvl::enumerate(build_geometry_infos, info_count)) {
+        if (!info->pGeometries && !info->ppGeometries) {
+            *out_total_triangles_count = 0;
+            *out_total_aabbs_count = 0;
+            return;
+        }
+
+        for (uint32_t geom_i = 0; geom_i < info->geometryCount; ++geom_i) {
+            const VkAccelerationStructureGeometryKHR &geom = rt::GetGeometry(*info, geom_i);
+            switch (geom.geometryType) {
+                case VK_GEOMETRY_TYPE_TRIANGLES_KHR:
+                    *out_total_triangles_count += max_primitives[info_i][geom_i];
+                    break;
+                case VK_GEOMETRY_TYPE_AABBS_KHR:
+                    *out_total_aabbs_count += max_primitives[info_i][geom_i];
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+
+    return;
+}
+
 bool StatelessValidation::manual_PreCallValidateCmdBuildAccelerationStructuresKHR(
     VkCommandBuffer commandBuffer, uint32_t infoCount, const VkAccelerationStructureBuildGeometryInfoKHR *pInfos,
     const VkAccelerationStructureBuildRangeInfoKHR *const *ppBuildRangeInfos, const ErrorObject &error_obj) const {
     bool skip = false;
-    skip |= ValidateAccelerationStructureBuildGeometryInfoKHR(pInfos, infoCount, 0, error_obj.handle, error_obj.location);
+
+    const auto *acceleration_structure_features =
+        vku::FindStructInPNextChain<VkPhysicalDeviceAccelerationStructureFeaturesKHR>(device_createinfo_pnext);
+    if (!acceleration_structure_features || acceleration_structure_features->accelerationStructure == VK_FALSE) {
+        skip |= LogError("VUID-vkCmdBuildAccelerationStructuresKHR-accelerationStructure-08923", device, error_obj.location,
+                         "accelerationStructure feature was not enabled.");
+    }
+
+    uint64_t total_triangles_count = 0;
+    uint64_t total_aabbs_count = 0;
+    ComputeTotalPrimitiveCountWithBuildRanges(infoCount, pInfos, ppBuildRangeInfos, &total_triangles_count, &total_aabbs_count);
+    ValidateTotalPrimitivesCount(total_triangles_count, total_aabbs_count, error_obj.handle, error_obj.location);
+
     for (const auto [info_i, info] : vvl::enumerate(pInfos, infoCount)) {
         const Location info_loc = error_obj.location.dot(Field::pInfos, info_i);
+
+        skip |= ValidateAccelerationStructureBuildGeometryInfoKHR(*info, error_obj.handle, info_loc);
+
         if (SafeModulo(info->scratchData.deviceAddress,
                        phys_dev_ext_props.acc_structure_props.minAccelerationStructureScratchOffsetAlignment) != 0) {
             skip |= LogError("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03710", commandBuffer,
@@ -1149,8 +1200,13 @@ bool StatelessValidation::manual_PreCallValidateCmdBuildAccelerationStructuresKH
                              info->scratchData.deviceAddress,
                              phys_dev_ext_props.acc_structure_props.minAccelerationStructureScratchOffsetAlignment);
         }
-        skip |= ValidateRangedEnum(info_loc.dot(Field::mode), "VkBuildAccelerationStructureModeKHR", info->mode,
+        skip |= ValidateRangedEnum(info_loc.dot(Field::mode), vvl::Enum::VkBuildAccelerationStructureModeKHR, info->mode,
                                    "VUID-vkCmdBuildAccelerationStructuresKHR-mode-04628");
+        if (info->mode == VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR && info->srcAccelerationStructure == VK_NULL_HANDLE) {
+            skip |= LogError("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-04630", commandBuffer, info_loc.dot(Field::mode),
+                             "is VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR, but srcAccelerationStructure is VK_NULL_HANDLE.");
+        }
+
         for (const auto [other_info_j, other_info] : vvl::enumerate(pInfos, infoCount)) {
             if (info_i == other_info_j) continue;
             if (info->dstAccelerationStructure == other_info->dstAccelerationStructure) {
@@ -1170,102 +1226,90 @@ bool StatelessValidation::manual_PreCallValidateCmdBuildAccelerationStructuresKH
                 break;
             }
         }
-        for (uint32_t geom_i = 0; geom_i < info->geometryCount; ++geom_i) {
-            if (info->pGeometries) {
-                const VkAccelerationStructureGeometryKHR &as_geometry = info->pGeometries[geom_i];
-                const Location geometry_loc = error_obj.location.dot(Field::pGeometries, geom_i);
-                if (as_geometry.geometryType == VK_GEOMETRY_TYPE_INSTANCES_KHR) {
-                    if (as_geometry.geometry.instances.arrayOfPointers == VK_TRUE) {
-                        if (SafeModulo(as_geometry.geometry.instances.data.deviceAddress, 8) != 0) {
-                            skip |= LogError(
-                                "VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03716", commandBuffer,
-                                geometry_loc.dot(Field::geometry).dot(Field::instances).dot(Field::data).dot(Field::deviceAddress),
-                                "(%" PRIu64
-                                ") must be aligned to 8 bytes when geometryType is VK_GEOMETRY_TYPE_INSTANCES_KHR and "
-                                "geometry.instances.arrayOfPointers is "
-                                "VK_TRUE.",
-                                as_geometry.geometry.instances.data.deviceAddress);
+
+            for (uint32_t geom_i = 0; geom_i < info->geometryCount; ++geom_i) {
+                const VkAccelerationStructureGeometryKHR &as_geometry = rt::GetGeometry(*info, geom_i);
+                const Location p_geom_loc = info_loc.dot(info->pGeometries ? Field::pGeometries : Field::ppGeometries, geom_i);
+                const Location p_geom_geom_loc = p_geom_loc.dot(Field::geometry);
+                switch (as_geometry.geometryType) {
+                    case VK_GEOMETRY_TYPE_TRIANGLES_KHR: {
+                        const VkDeviceSize index_buffer_alignment = GetIndexAlignment(as_geometry.geometry.triangles.indexType);
+                        if (SafeModulo(as_geometry.geometry.triangles.indexData.deviceAddress, index_buffer_alignment) != 0) {
+                            skip |= LogError("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03712", commandBuffer,
+                                             p_geom_geom_loc.dot(Field::triangles).dot(Field::indexData).dot(Field::deviceAddress),
+                                             "(0x%" PRIx64
+                                             ") is not aligned to the size in bytes of its corresponding index type (%s).",
+                                             as_geometry.geometry.triangles.indexData.deviceAddress,
+                                             string_VkIndexType(as_geometry.geometry.triangles.indexType));
                         }
-                    } else {
-                        if (SafeModulo(as_geometry.geometry.instances.data.deviceAddress, 16) != 0) {
+
+                        if (SafeModulo(as_geometry.geometry.triangles.transformData.deviceAddress, 16) != 0) {
                             skip |= LogError(
-                                "VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03715", commandBuffer,
-                                geometry_loc.dot(Field::geometry).dot(Field::instances).dot(Field::data).dot(Field::deviceAddress),
-                                "(%" PRIu64
-                                ") must be aligned to 16 bytes when geometryType is VK_GEOMETRY_TYPE_INSTANCES_KHR and "
-                                "geometry.instances.arrayOfPointers is VK_FALSE.",
-                                as_geometry.geometry.instances.data.deviceAddress);
+                                "VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03810", commandBuffer,
+                                p_geom_geom_loc.dot(Field::triangles).dot(Field::transformData).dot(Field::deviceAddress),
+                                "(%" PRIu64 ") must be aligned to 16 bytes when geometryType is VK_GEOMETRY_TYPE_TRIANGLES_KHR.",
+                                as_geometry.geometry.triangles.transformData.deviceAddress);
                         }
+
+                        break;
                     }
-                } else if (as_geometry.geometryType == VK_GEOMETRY_TYPE_AABBS_KHR) {
-                    if (SafeModulo(as_geometry.geometry.instances.data.deviceAddress, 8) != 0) {
-                        skip |= LogError(
-                            "VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03714", commandBuffer,
-                            geometry_loc.dot(Field::geometry).dot(Field::instances).dot(Field::data).dot(Field::deviceAddress),
-                            "(%" PRIu64 ") must be aligned to 8 bytes when geometryType is VK_GEOMETRY_TYPE_AABBS_KHR.",
-                            as_geometry.geometry.instances.data.deviceAddress);
+                    case VK_GEOMETRY_TYPE_AABBS_KHR: {
+                        if (SafeModulo(as_geometry.geometry.aabbs.data.deviceAddress, 8) != 0) {
+                            skip |= LogError("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03714", commandBuffer,
+                                             p_geom_geom_loc.dot(Field::aabbs).dot(Field::data).dot(Field::deviceAddress),
+                                             "(0x%" PRIx64
+                                             ") must be aligned to 8 bytes when geometryType is VK_GEOMETRY_TYPE_AABBS_KHR.",
+                                             as_geometry.geometry.aabbs.data.deviceAddress);
+                        }
+                        break;
                     }
-                } else if (as_geometry.geometryType == VK_GEOMETRY_TYPE_TRIANGLES_KHR) {
-                    if (SafeModulo(as_geometry.geometry.triangles.transformData.deviceAddress, 16) != 0) {
-                        skip |= LogError("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03810", commandBuffer,
-                                         geometry_loc.dot(Field::geometry)
-                                             .dot(Field::triangles)
-                                             .dot(Field::transformData)
-                                             .dot(Field::deviceAddress),
-                                         "(%" PRIu64
-                                         ") must be aligned to 16 bytes when geometryType is VK_GEOMETRY_TYPE_TRIANGLES_KHR.",
-                                         as_geometry.geometry.triangles.transformData.deviceAddress);
+                    case VK_GEOMETRY_TYPE_INSTANCES_KHR: {
+                        if (as_geometry.geometry.instances.arrayOfPointers == VK_TRUE) {
+                            if (SafeModulo(as_geometry.geometry.instances.data.deviceAddress, 8) != 0) {
+                                skip |=
+                                    LogError("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03716", commandBuffer,
+                                             p_geom_geom_loc.dot(Field::instances).dot(Field::data).dot(Field::deviceAddress),
+                                             "(%" PRIu64
+                                             ") must be aligned to 8 bytes when geometryType is VK_GEOMETRY_TYPE_INSTANCES_KHR and "
+                                             "geometry.instances.arrayOfPointers is "
+                                             "VK_TRUE.",
+                                             as_geometry.geometry.instances.data.deviceAddress);
+                            }
+                        } else {
+                            if (SafeModulo(as_geometry.geometry.instances.data.deviceAddress, 16) != 0) {
+                                skip |= LogError(
+                                    "VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03715", commandBuffer,
+                                    p_geom_geom_loc.dot(Field::instances).dot(Field::data).dot(Field::deviceAddress),
+                                    "(%" PRIu64
+                                    ") must be aligned to 16 bytes when geometryType is VK_GEOMETRY_TYPE_INSTANCES_KHR and "
+                                    "geometry.instances.arrayOfPointers is VK_FALSE.",
+                                    as_geometry.geometry.instances.data.deviceAddress);
+                            }
+                        }
+                        const Location p_build_range_loc = error_obj.location.dot(Field::ppBuildRangeInfos, info_i);
+                        for (const auto [build_range_i, build_range] :
+                             vvl::enumerate(ppBuildRangeInfos[geom_i], info->geometryCount)) {
+                            if (build_range->primitiveCount > phys_dev_ext_props.acc_structure_props.maxInstanceCount) {
+                                skip |= LogError(
+                                    "VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03801", commandBuffer, p_build_range_loc,
+                                    "[%" PRIu32 "].primitiveCount (%" PRIu32
+                                    ") is superior to VkPhysicalDeviceAccelerationStructurePropertiesKHR::maxInstanceCount "
+                                    "(%" PRIu64 ").",
+                                    build_range_i, build_range->primitiveCount,
+                                    phys_dev_ext_props.acc_structure_props.maxPrimitiveCount);
+                            }
+                        }
+                        break;
                     }
+                    default:
+                        break;
                 }
-            } else if (info->ppGeometries) {
-                const VkAccelerationStructureGeometryKHR *as_geometry = info->ppGeometries[geom_i];
-                const Location geometry_loc = error_obj.location.dot(Field::ppGeometries, geom_i);
-                if (as_geometry->geometryType == VK_GEOMETRY_TYPE_INSTANCES_KHR) {
-                    if (as_geometry->geometry.instances.arrayOfPointers == VK_TRUE) {
-                        if (SafeModulo(as_geometry->geometry.instances.data.deviceAddress, 8) != 0) {
-                            skip |= LogError(
-                                "VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03716", commandBuffer,
-                                geometry_loc.dot(Field::geometry).dot(Field::instances).dot(Field::data).dot(Field::deviceAddress),
-                                "(%" PRIu64
-                                ") must be aligned to 8 bytes when geometryType is VK_GEOMETRY_TYPE_INSTANCES_KHR and "
-                                "geometry.instances.arrayOfPointers is "
-                                "VK_TRUE.",
-                                info->ppGeometries[geom_i]->geometry.instances.data.deviceAddress);
-                        }
-                    } else {
-                        if (SafeModulo(as_geometry->geometry.instances.data.deviceAddress, 16) != 0) {
-                            skip |= LogError(
-                                "VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03715", commandBuffer,
-                                geometry_loc.dot(Field::geometry).dot(Field::instances).dot(Field::data).dot(Field::deviceAddress),
-                                "(%" PRIu64
-                                ") must be aligned to 16 bytes when geometryType is VK_GEOMETRY_TYPE_INSTANCES_KHR and "
-                                "geometry.instances.arrayOfPointers is VK_FALSE.",
-                                info->ppGeometries[geom_i]->geometry.instances.data.deviceAddress);
-                        }
-                    }
-                } else if (as_geometry->geometryType == VK_GEOMETRY_TYPE_AABBS_KHR) {
-                    if (SafeModulo(as_geometry->geometry.instances.data.deviceAddress, 8) != 0) {
-                        skip |= LogError(
-                            "VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03714", commandBuffer,
-                            geometry_loc.dot(Field::geometry).dot(Field::instances).dot(Field::data).dot(Field::deviceAddress),
-                            "(%" PRIu64 ") must be aligned to 8 bytes when geometryType is VK_GEOMETRY_TYPE_AABBS_KHR.",
-                            info->ppGeometries[geom_i]->geometry.instances.data.deviceAddress);
-                    }
-                } else if (as_geometry->geometryType == VK_GEOMETRY_TYPE_TRIANGLES_KHR) {
-                    if (SafeModulo(as_geometry->geometry.triangles.transformData.deviceAddress, 16) != 0) {
-                        skip |= LogError("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03810", commandBuffer,
-                                         geometry_loc.dot(Field::geometry)
-                                             .dot(Field::triangles)
-                                             .dot(Field::transformData)
-                                             .dot(Field::deviceAddress),
-                                         "(%" PRIu64
-                                         ") must be aligned to 16 bytes when geometryType is VK_GEOMETRY_TYPE_TRIANGLES_KHR.",
-                                         info->ppGeometries[geom_i]->geometry.triangles.transformData.deviceAddress);
-                    }
-                }
-            }
         }
+        skip |= ValidateArray(info_loc.dot(Field::geometryCount), error_obj.location.dot(Field::ppBuildRangeInfos, info_i),
+                              info->geometryCount, &ppBuildRangeInfos[info_i], false, true, kVUIDUndefined,
+                              "VUID-vkCmdBuildAccelerationStructuresKHR-ppBuildRangeInfos-03676");
     }
+
     return skip;
 }
 
@@ -1274,7 +1318,6 @@ bool StatelessValidation::manual_PreCallValidateCmdBuildAccelerationStructuresIn
     const VkDeviceAddress *pIndirectDeviceAddresses, const uint32_t *pIndirectStrides, const uint32_t *const *ppMaxPrimitiveCounts,
     const ErrorObject &error_obj) const {
     bool skip = false;
-    skip |= ValidateAccelerationStructureBuildGeometryInfoKHR(pInfos, infoCount, 0, error_obj.handle, error_obj.location);
     const auto *ray_tracing_acceleration_structure_features =
         vku::FindStructInPNextChain<VkPhysicalDeviceAccelerationStructureFeaturesKHR>(device_createinfo_pnext);
     if (!ray_tracing_acceleration_structure_features ||
@@ -1282,30 +1325,57 @@ bool StatelessValidation::manual_PreCallValidateCmdBuildAccelerationStructuresIn
         skip |= LogError("VUID-vkCmdBuildAccelerationStructuresIndirectKHR-accelerationStructureIndirectBuild-03650", commandBuffer,
                          error_obj.location, "the accelerationStructureIndirectBuild feature was not enabled.");
     }
-    for (uint32_t i = 0; i < infoCount; ++i) {
-        const Location info_loc = error_obj.location.dot(Field::pInfos, i);
-        if (SafeModulo(pInfos[i].scratchData.deviceAddress,
+
+    uint64_t total_triangles_count = 0;
+    uint64_t total_aabbs_count = 0;
+    ComputeTotalPrimitiveCountWithMaxPrimitivesCount(infoCount, pInfos, ppMaxPrimitiveCounts, &total_triangles_count,
+                                                     &total_aabbs_count);
+    ValidateTotalPrimitivesCount(total_triangles_count, total_aabbs_count, error_obj.handle, error_obj.location);
+
+    for (const auto [info_i, info] : vvl::enumerate(pInfos, infoCount)) {
+        const Location info_loc = error_obj.location.dot(Field::pInfos, info_i);
+
+        skip |= ValidateAccelerationStructureBuildGeometryInfoKHR(pInfos[info_i], error_obj.handle, info_loc);
+
+        if (SafeModulo(info->scratchData.deviceAddress,
                        phys_dev_ext_props.acc_structure_props.minAccelerationStructureScratchOffsetAlignment) != 0) {
             skip |= LogError("VUID-vkCmdBuildAccelerationStructuresIndirectKHR-pInfos-03710", commandBuffer,
                              info_loc.dot(Field::scratchData).dot(Field::deviceAddress),
                              "(%" PRIu64 ") must be a multiple of minAccelerationStructureScratchOffsetAlignment (%" PRIu32 ").",
-                             pInfos[i].scratchData.deviceAddress,
+                             info->scratchData.deviceAddress,
                              phys_dev_ext_props.acc_structure_props.minAccelerationStructureScratchOffsetAlignment);
         }
-        for (uint32_t k = 0; k < infoCount; ++k) {
-            if (i == k) continue;
-            if (pInfos[i].srcAccelerationStructure == pInfos[k].dstAccelerationStructure) {
-                const LogObjectList objlist(commandBuffer, pInfos[i].srcAccelerationStructure);
+        skip |= ValidateRangedEnum(info_loc.dot(Field::mode), vvl::Enum::VkBuildAccelerationStructureModeKHR, info->mode,
+                                   "VUID-vkCmdBuildAccelerationStructuresIndirectKHR-mode-04628");
+
+        if (info->mode == VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR && info->srcAccelerationStructure == VK_NULL_HANDLE) {
+            skip |=
+                LogError("VUID-vkCmdBuildAccelerationStructuresIndirectKHR-pInfos-04630", commandBuffer, info_loc.dot(Field::mode),
+                         "is VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR, but srcAccelerationStructure is VK_NULL_HANDLE.");
+        }
+
+        for (uint32_t info_k = 0; info_k < infoCount; ++info_k) {
+            if (info_i == info_k) continue;
+            if (info->dstAccelerationStructure == pInfos[info_k].dstAccelerationStructure) {
+                const LogObjectList objlist(commandBuffer, info->dstAccelerationStructure);
+                skip |= LogError("VUID-vkCmdBuildAccelerationStructuresIndirectKHR-dstAccelerationStructure-03698", objlist,
+                                 info_loc.dot(Field::dstAccelerationStructure),
+                                 "and pInfos[%" PRIu32 "].dstAccelerationStructure are both %s.", info_k,
+                                 FormatHandle(info->dstAccelerationStructure).c_str());
+                break;
+            }
+            if (info->srcAccelerationStructure == pInfos[info_k].dstAccelerationStructure) {
+                const LogObjectList objlist(commandBuffer, info->srcAccelerationStructure);
                 skip |= LogError("VUID-vkCmdBuildAccelerationStructuresIndirectKHR-pInfos-03403", objlist,
                                  info_loc.dot(Field::srcAccelerationStructure),
-                                 "and pInfos[%" PRIu32 "].dstAccelerationStructure are both %s.", k,
-                                 FormatHandle(pInfos[i].srcAccelerationStructure).c_str());
+                                 "and pInfos[%" PRIu32 "].dstAccelerationStructure are both %s.", info_k,
+                                 FormatHandle(info->srcAccelerationStructure).c_str());
                 break;
             }
         }
-        for (uint32_t j = 0; j < pInfos[i].geometryCount; ++j) {
-            if (pInfos[i].pGeometries) {
-                const VkAccelerationStructureGeometryKHR &as_geometry = pInfos[i].pGeometries[j];
+        for (uint32_t j = 0; j < info->geometryCount; ++j) {
+            if (info->pGeometries) {
+                const VkAccelerationStructureGeometryKHR &as_geometry = info->pGeometries[j];
                 const Location geometry_loc = error_obj.location.dot(Field::pGeometries, j);
                 if (as_geometry.geometryType == VK_GEOMETRY_TYPE_INSTANCES_KHR) {
                     if (as_geometry.geometry.instances.arrayOfPointers == VK_TRUE) {
@@ -1352,8 +1422,8 @@ bool StatelessValidation::manual_PreCallValidateCmdBuildAccelerationStructuresIn
                                          as_geometry.geometry.triangles.transformData.deviceAddress);
                     }
                 }
-            } else if (pInfos[i].ppGeometries) {
-                const VkAccelerationStructureGeometryKHR *as_geometry = pInfos[i].ppGeometries[j];
+            } else if (info->ppGeometries) {
+                const VkAccelerationStructureGeometryKHR *as_geometry = info->ppGeometries[j];
                 const Location geometry_loc = error_obj.location.dot(Field::ppGeometries, j);
                 if (as_geometry->geometryType == VK_GEOMETRY_TYPE_INSTANCES_KHR) {
                     if (as_geometry->geometry.instances.arrayOfPointers == VK_TRUE) {
@@ -1365,7 +1435,7 @@ bool StatelessValidation::manual_PreCallValidateCmdBuildAccelerationStructuresIn
                                 ") must be aligned to 8 bytes when geometryType is VK_GEOMETRY_TYPE_INSTANCES_KHR and "
                                 "geometry.instances.arrayOfPointers is "
                                 "VK_TRUE.",
-                                pInfos[i].pGeometries[j].geometry.instances.data.deviceAddress);
+                                info->pGeometries[j].geometry.instances.data.deviceAddress);
                         }
                     } else {
                         if (SafeModulo(as_geometry->geometry.instances.data.deviceAddress, 16) != 0) {
@@ -1375,7 +1445,7 @@ bool StatelessValidation::manual_PreCallValidateCmdBuildAccelerationStructuresIn
                                 "(%" PRIu64
                                 ") must be aligned to 16 bytes when geometryType is VK_GEOMETRY_TYPE_INSTANCES_KHR and "
                                 "geometry.instances.arrayOfPointers is VK_FALSE.",
-                                pInfos[i].pGeometries[j].geometry.instances.data.deviceAddress);
+                                info->pGeometries[j].geometry.instances.data.deviceAddress);
                         }
                     }
                 }
@@ -1385,7 +1455,7 @@ bool StatelessValidation::manual_PreCallValidateCmdBuildAccelerationStructuresIn
                             "VUID-vkCmdBuildAccelerationStructuresIndirectKHR-pInfos-03714", commandBuffer,
                             geometry_loc.dot(Field::geometry).dot(Field::instances).dot(Field::data).dot(Field::deviceAddress),
                             "(%" PRIu64 ") must be aligned to 8 bytes when geometryType is VK_GEOMETRY_TYPE_AABBS_KHR.",
-                            pInfos[i].pGeometries[j].geometry.instances.data.deviceAddress);
+                            info->pGeometries[j].geometry.instances.data.deviceAddress);
                     }
                 }
                 if (as_geometry->geometryType == VK_GEOMETRY_TYPE_TRIANGLES_KHR) {
@@ -1397,10 +1467,21 @@ bool StatelessValidation::manual_PreCallValidateCmdBuildAccelerationStructuresIn
                                              .dot(Field::deviceAddress),
                                          "(%" PRIu64
                                          ") must be aligned to 16 bytes when geometryType is VK_GEOMETRY_TYPE_TRIANGLES_KHR.",
-                                         pInfos[i].pGeometries[j].geometry.triangles.transformData.deviceAddress);
+                                         info->pGeometries[j].geometry.triangles.transformData.deviceAddress);
                     }
                 }
             }
+        }
+
+        if (SafeModulo(pIndirectDeviceAddresses[info_i], 4) != 0) {
+            skip |= LogError("VUID-vkCmdBuildAccelerationStructuresIndirectKHR-pIndirectDeviceAddresses-03648", commandBuffer,
+                             error_obj.location.dot(Field::pIndirectStrides, info_i), "is 0x%" PRIx64 ".",
+                             pIndirectDeviceAddresses[info_i]);
+        }
+
+        if (SafeModulo(pIndirectStrides[info_i], 4) != 0) {
+            skip |= LogError("VUID-vkCmdBuildAccelerationStructuresIndirectKHR-pIndirectStrides-03787", commandBuffer,
+                             error_obj.location.dot(Field::pIndirectStrides, info_i), "is %" PRIu32 ".", pIndirectStrides[info_i]);
         }
     }
     return skip;
@@ -1411,7 +1492,6 @@ bool StatelessValidation::manual_PreCallValidateBuildAccelerationStructuresKHR(
     const VkAccelerationStructureBuildGeometryInfoKHR *pInfos,
     const VkAccelerationStructureBuildRangeInfoKHR *const *ppBuildRangeInfos, const ErrorObject &error_obj) const {
     bool skip = false;
-    skip |= ValidateAccelerationStructureBuildGeometryInfoKHR(pInfos, infoCount, 0, error_obj.handle, error_obj.location);
     const auto *ray_tracing_acceleration_structure_features =
         vku::FindStructInPNextChain<VkPhysicalDeviceAccelerationStructureFeaturesKHR>(device_createinfo_pnext);
     if (!ray_tracing_acceleration_structure_features ||
@@ -1419,21 +1499,89 @@ bool StatelessValidation::manual_PreCallValidateBuildAccelerationStructuresKHR(
         skip |= LogError("VUID-vkBuildAccelerationStructuresKHR-accelerationStructureHostCommands-03581", device,
                          error_obj.location, "accelerationStructureHostCommands feature was not enabled.");
     }
-    for (uint32_t i = 0; i < infoCount; ++i) {
-        for (uint32_t j = 0; j < infoCount; ++j) {
-            if (i == j) continue;
-            if (pInfos[i].dstAccelerationStructure == pInfos[j].dstAccelerationStructure) {
+
+    uint64_t total_triangles_count = 0;
+    uint64_t total_aabbs_count = 0;
+    ComputeTotalPrimitiveCountWithBuildRanges(infoCount, pInfos, ppBuildRangeInfos, &total_triangles_count, &total_aabbs_count);
+    ValidateTotalPrimitivesCount(total_triangles_count, total_aabbs_count, error_obj.handle, error_obj.location);
+
+    for (const auto [info_i, info] : vvl::enumerate(pInfos, infoCount)) {
+        const Location info_loc = error_obj.location.dot(Field::pInfos, info_i);
+
+        skip |= ValidateAccelerationStructureBuildGeometryInfoKHR(*info, error_obj.handle, error_obj.location);
+
+        skip |= ValidateRangedEnum(info_loc.dot(Field::mode), vvl::Enum::VkBuildAccelerationStructureModeKHR, info->mode,
+                                   "VUID-vkBuildAccelerationStructuresKHR-mode-04628");
+
+        if (info->mode == VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR) {
+            if (info->scratchData.hostAddress == nullptr) {
+                skip |= LogError("VUID-vkBuildAccelerationStructuresKHR-pInfos-03725", device,
+                                 info_loc.dot(Field::scratchData).dot(Field::hostAddress), "is NULL.");
+            }
+        } else if (info->mode == VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR) {
+            if (info->scratchData.hostAddress == nullptr) {
+                skip |= LogError("VUID-vkBuildAccelerationStructuresKHR-pInfos-03726", device,
+                                 info_loc.dot(Field::scratchData).dot(Field::hostAddress), "is NULL.");
+            }
+
+            if (info->srcAccelerationStructure == VK_NULL_HANDLE) {
+                skip |= LogError("VUID-vkBuildAccelerationStructuresKHR-pInfos-04630", device, info_loc.dot(Field::mode),
+                                 "is VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR, but %s is VK_NULL_HANDLE.",
+                                 info_loc.dot(Field::srcAccelerationStructure).Fields().c_str());
+            }
+        }
+
+        for (uint32_t geom_i = 0; geom_i < info->geometryCount; ++geom_i) {
+            const VkAccelerationStructureGeometryKHR &geom = rt::GetGeometry(*info, geom_i);
+            switch (geom.geometryType) {
+                case VK_GEOMETRY_TYPE_TRIANGLES_KHR: {
+                    if (geom.geometry.triangles.vertexData.hostAddress == nullptr) {
+                        skip |= LogError("VUID-vkBuildAccelerationStructuresKHR-pInfos-03771", device,
+                                         info_loc.dot(Field::triangles).dot(Field::vertexData).dot(Field::hostAddress), "is NULL.");
+                    }
+                    if (geom.geometry.triangles.indexType != VK_INDEX_TYPE_NONE_KHR) {
+                        if (geom.geometry.triangles.indexData.hostAddress == nullptr) {
+                            skip |=
+                                LogError("VUID-vkBuildAccelerationStructuresKHR-pInfos-03772", device,
+                                         info_loc.dot(Field::triangles).dot(Field::indexData).dot(Field::hostAddress), "is NULL.");
+                        }
+                    }
+                    break;
+                }
+                case VK_GEOMETRY_TYPE_AABBS_KHR: {
+                    if (geom.geometry.aabbs.data.hostAddress == nullptr) {
+                        skip |= LogError("VUID-vkBuildAccelerationStructuresKHR-pInfos-03774", device,
+                                         info_loc.dot(Field::aabbs).dot(Field::data).dot(Field::hostAddress), "is NULL.");
+                    }
+                    break;
+                }
+                case VK_GEOMETRY_TYPE_INSTANCES_KHR: {
+                    if (geom.geometry.instances.data.hostAddress == nullptr) {
+                        skip |= LogError("VUID-vkBuildAccelerationStructuresKHR-pInfos-03778", device,
+                                         info_loc.dot(Field::instances).dot(Field::data).dot(Field::hostAddress), "is NULL.");
+                    }
+                    break;
+                }
+
+                default:
+                    break;
+            }
+        }
+
+        for (uint32_t info_k = 0; info_k < infoCount; ++info_k) {
+            if (info_i == info_k) continue;
+            if (info->dstAccelerationStructure == pInfos[info_k].dstAccelerationStructure) {
                 skip |= LogError("VUID-vkBuildAccelerationStructuresKHR-dstAccelerationStructure-03698", device,
-                                 error_obj.location.dot(Field::pInfos, i).dot(Field::dstAccelerationStructure),
-                                 "and pInfos[%" PRIu32 "].dstAccelerationStructure are both %s.", j,
-                                 FormatHandle(pInfos[i].dstAccelerationStructure).c_str());
+                                 info_loc.dot(Field::dstAccelerationStructure),
+                                 "and pInfos[%" PRIu32 "].dstAccelerationStructure are both %s.", info_k,
+                                 FormatHandle(info->dstAccelerationStructure).c_str());
                 break;
             }
-            if (pInfos[i].srcAccelerationStructure == pInfos[j].dstAccelerationStructure) {
+            if (info->srcAccelerationStructure == pInfos[info_k].dstAccelerationStructure) {
                 skip |= LogError("VUID-vkBuildAccelerationStructuresKHR-pInfos-03403", device,
-                                 error_obj.location.dot(Field::pInfos, i).dot(Field::srcAccelerationStructure),
-                                 "and pInfos[%" PRIu32 "].dstAccelerationStructure are both %s.", j,
-                                 FormatHandle(pInfos[i].srcAccelerationStructure).c_str());
+                                 info_loc.dot(Field::srcAccelerationStructure),
+                                 "and pInfos[%" PRIu32 "].dstAccelerationStructure are both %s.", info_k,
+                                 FormatHandle(info->srcAccelerationStructure).c_str());
                 break;
             }
         }
@@ -1445,15 +1593,17 @@ bool StatelessValidation::manual_PreCallValidateGetAccelerationStructureBuildSiz
     VkDevice device, VkAccelerationStructureBuildTypeKHR buildType, const VkAccelerationStructureBuildGeometryInfoKHR *pBuildInfo,
     const uint32_t *pMaxPrimitiveCounts, VkAccelerationStructureBuildSizesInfoKHR *pSizeInfo, const ErrorObject &error_obj) const {
     bool skip = false;
-    uint64_t total_primitive_count = 0;
-    if (pBuildInfo && pMaxPrimitiveCounts) {
-        for (uint32_t i = 0; i < pBuildInfo->geometryCount; ++i) {
-            total_primitive_count += pMaxPrimitiveCounts[i];
-        }
-    }
-    skip |= ValidateAccelerationStructureBuildGeometryInfoKHR(pBuildInfo, 1, total_primitive_count, error_obj.handle,
-                                                              error_obj.location);
-    const auto *accel_struct_features = vku::FindStructInPNextChain<VkPhysicalDeviceAccelerationStructureFeaturesKHR>(device_createinfo_pnext);
+
+    uint64_t total_triangles_count = 0;
+    uint64_t total_aabbs_count = 0;
+    ComputeTotalPrimitiveCountWithMaxPrimitivesCount(1, pBuildInfo, &pMaxPrimitiveCounts, &total_triangles_count,
+                                                     &total_aabbs_count);
+    ValidateTotalPrimitivesCount(total_triangles_count, total_aabbs_count, error_obj.handle, error_obj.location);
+
+    skip |= ValidateAccelerationStructureBuildGeometryInfoKHR(*pBuildInfo, error_obj.handle,
+                                                              error_obj.location.dot(Field::pBuildInfo, 0));
+    const auto *accel_struct_features =
+        vku::FindStructInPNextChain<VkPhysicalDeviceAccelerationStructureFeaturesKHR>(device_createinfo_pnext);
     if (!(accel_struct_features && accel_struct_features->accelerationStructure)) {
         skip |= LogError("VUID-vkGetAccelerationStructureBuildSizesKHR-accelerationStructure-08933", device, error_obj.location,
                          "accelerationStructure feature was not enabled.");
@@ -1464,6 +1614,31 @@ bool StatelessValidation::manual_PreCallValidateGetAccelerationStructureBuildSiz
                              error_obj.location.dot(Field::pBuildInfo).dot(Field::geometryCount),
                              "is %" PRIu32 ", but pMaxPrimitiveCounts is NULL.", pBuildInfo->geometryCount);
         }
+
+        if (pMaxPrimitiveCounts && (pBuildInfo->pGeometries || pBuildInfo->ppGeometries)) {
+            for (uint32_t geom_i = 0; geom_i < pBuildInfo->geometryCount; ++geom_i) {
+                const VkAccelerationStructureGeometryKHR &geom = rt::GetGeometry(*pBuildInfo, geom_i);
+                switch (geom.geometryType) {
+                    case VK_GEOMETRY_TYPE_INSTANCES_KHR: {
+                        if (pMaxPrimitiveCounts[geom_i] > phys_dev_ext_props.acc_structure_props.maxInstanceCount) {
+                            const Field p_geom = pBuildInfo->pGeometries ? Field::pGeometries : Field::ppGeometries;
+                            skip |= LogError(
+                                "VUID-vkGetAccelerationStructureBuildSizesKHR-pBuildInfo-03785", device,
+                                error_obj.location.dot(Field::pBuildInfo).dot(p_geom, geom_i).dot(Field::geometryType),
+                                "is %s, but pMaxPrimitiveCount[%" PRIu32 "] (%" PRIu32
+                                ") is larger than VkPhysicalDeviceAccelerationStructurePropertiesKHR::maxInstanceCount (%" PRIu64
+                                ").",
+                                string_VkGeometryTypeKHR(geom.geometryType), geom_i, pMaxPrimitiveCounts[geom_i],
+                                phys_dev_ext_props.acc_structure_props.maxInstanceCount);
+                        }
+                        break;
+                    }
+                    default:
+                        break;
+                }
+            }
+        }
     }
+
     return skip;
 }

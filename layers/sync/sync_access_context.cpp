@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2019-2023 Valve Corporation
- * Copyright (c) 2019-2023 LunarG, Inc.
+ * Copyright (c) 2019-2024 Valve Corporation
+ * Copyright (c) 2019-2024 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,9 +17,12 @@
 
 #include <cinttypes>
 #include "state_tracker/buffer_state.h"
+#include "state_tracker/video_session_state.h"
+#include "state_tracker/render_pass_state.h"
 #include "sync/sync_access_context.h"
+#include "sync/sync_image.h"
 
-bool SimpleBinding(const BINDABLE &bindable) { return !bindable.sparse && bindable.Binding(); }
+bool SimpleBinding(const vvl::Bindable &bindable) { return !bindable.sparse && bindable.Binding(); }
 VkDeviceSize ResourceBaseAddress(const vvl::Buffer &buffer) { return buffer.GetFakeBaseAddress(); }
 
 class HazardDetector {
@@ -218,6 +221,15 @@ void AccessContext::UpdateAccessState(const AttachmentViewGen &view_gen, Attachm
     }
 }
 
+void AccessContext::UpdateAccessState(const vvl::VideoSession &vs_state, const vvl::VideoPictureResource &resource,
+                                      SyncStageAccessIndex current_usage, ResourceUsageTag tag) {
+    const auto image = static_cast<const ImageState *>(resource.image_state.get());
+    const auto offset = resource.GetEffectiveImageOffset(vs_state);
+    const auto extent = resource.GetEffectiveImageExtent(vs_state);
+    ImageRangeGen range_gen(image->MakeImageRangeGen(resource.range, offset, extent, false));
+    UpdateAccessState(range_gen, current_usage, SyncOrdering::kNonAttachment, tag);
+}
+
 void AccessContext::UpdateAccessState(ImageRangeGen &range_gen, SyncStageAccessIndex current_usage, SyncOrdering ordering_rule,
                                       ResourceUsageTag tag) {
     UpdateMemoryAccessStateFunctor action(*this, current_usage, ordering_rule, tag);
@@ -341,6 +353,16 @@ HazardResult AccessContext::DetectHazard(const AttachmentViewGen &view_gen, Atta
                                          SyncStageAccessIndex current_usage, SyncOrdering ordering_rule) const {
     HazardDetectorWithOrdering detector(current_usage, ordering_rule);
     return DetectHazard(detector, view_gen, gen_type, DetectOptions::kDetectAll);
+}
+
+HazardResult AccessContext::DetectHazard(const vvl::VideoSession &vs_state, const vvl::VideoPictureResource &resource,
+                                         SyncStageAccessIndex current_usage) const {
+    const auto image = static_cast<const ImageState *>(resource.image_state.get());
+    const auto offset = resource.GetEffectiveImageOffset(vs_state);
+    const auto extent = resource.GetEffectiveImageExtent(vs_state);
+    ImageRangeGen range_gen(image->MakeImageRangeGen(resource.range, offset, extent, false));
+    HazardDetector detector(current_usage);
+    return DetectHazardGeneratedRanges(detector, range_gen, DetectOptions::kDetectAll);
 }
 
 HazardResult AccessContext::DetectHazard(const ImageState &image, const VkImageSubresourceRange &subresource_range,
@@ -484,11 +506,6 @@ HazardResult AccessContext::DetectImageBarrierHazard(const ImageState &image, Vk
                                                      const DetectOptions options) const {
     BarrierHazardDetector detector(SyncStageAccessIndex::SYNC_IMAGE_LAYOUT_TRANSITION, src_exec_scope, src_access_scope);
     return DetectHazard(detector, image, subresource_range, false, options);
-}
-
-HazardResult AccessContext::DetectImageBarrierHazard(const SyncImageMemoryBarrier &image_barrier) const {
-    return DetectImageBarrierHazard(*image_barrier.image.get(), image_barrier.barrier.src_exec_scope.exec_scope,
-                                    image_barrier.barrier.src_access_scope, image_barrier.range, kDetectAll);
 }
 
 ResourceAccessRangeMap::iterator AccessContext::UpdateMemoryAccessStateFunctor::Infill(ResourceAccessRangeMap *accesses,

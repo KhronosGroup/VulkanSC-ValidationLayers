@@ -1,7 +1,7 @@
-/* Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (C) 2015-2022 Google Inc.
+/* Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (C) 2015-2024 Google Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  * Modifications Copyright (C) 2022 RasterGrid Kft.
  *
@@ -172,7 +172,7 @@ static bool GetMetalExport(const VkImageCreateInfo *info, VkExportMetalObjectTyp
 namespace vvl {
 
 Image::Image(const ValidationStateTracker *dev_data, VkImage img, const VkImageCreateInfo *pCreateInfo, VkFormatFeatureFlags2KHR ff)
-    : BINDABLE(img, kVulkanObjectTypeImage, (pCreateInfo->flags & VK_IMAGE_CREATE_SPARSE_BINDING_BIT) != 0,
+    : Bindable(img, kVulkanObjectTypeImage, (pCreateInfo->flags & VK_IMAGE_CREATE_SPARSE_BINDING_BIT) != 0,
                (pCreateInfo->flags & VK_IMAGE_CREATE_PROTECTED_BIT) == 0, GetExternalHandleTypes(pCreateInfo)),
       safe_create_info(pCreateInfo),
       createInfo(*safe_create_info.ptr()),
@@ -199,7 +199,7 @@ Image::Image(const ValidationStateTracker *dev_data, VkImage img, const VkImageC
       fragment_encoder(nullptr),
       store_device_as_workaround(dev_data->device),  // TODO REMOVE WHEN encoder can be const
       supported_video_profiles(dev_data->video_profile_cache_.Get(
-          dev_data, vku::FindStructInPNextChain<VkVideoProfileListInfoKHR>(pCreateInfo->pNext))) {
+          dev_data->physical_device, vku::FindStructInPNextChain<VkVideoProfileListInfoKHR>(pCreateInfo->pNext))) {
     if (pCreateInfo->flags & VK_IMAGE_CREATE_SPARSE_BINDING_BIT) {
         bool is_resident = (pCreateInfo->flags & VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT) != 0;
         tracker_.emplace<BindableSparseMemoryTracker>(requirements.data(), is_resident);
@@ -215,7 +215,7 @@ Image::Image(const ValidationStateTracker *dev_data, VkImage img, const VkImageC
 
 Image::Image(const ValidationStateTracker *dev_data, VkImage img, const VkImageCreateInfo *pCreateInfo, VkSwapchainKHR swapchain,
              uint32_t swapchain_index, VkFormatFeatureFlags2KHR ff)
-    : BINDABLE(img, kVulkanObjectTypeImage, (pCreateInfo->flags & VK_IMAGE_CREATE_SPARSE_BINDING_BIT) != 0,
+    : Bindable(img, kVulkanObjectTypeImage, (pCreateInfo->flags & VK_IMAGE_CREATE_SPARSE_BINDING_BIT) != 0,
                (pCreateInfo->flags & VK_IMAGE_CREATE_PROTECTED_BIT) == 0, GetExternalHandleTypes(pCreateInfo)),
       safe_create_info(pCreateInfo),
       createInfo(*safe_create_info.ptr()),
@@ -242,7 +242,7 @@ Image::Image(const ValidationStateTracker *dev_data, VkImage img, const VkImageC
       fragment_encoder(nullptr),
       store_device_as_workaround(dev_data->device),  // TODO REMOVE WHEN encoder can be const
       supported_video_profiles(dev_data->video_profile_cache_.Get(
-          dev_data, vku::FindStructInPNextChain<VkVideoProfileListInfoKHR>(pCreateInfo->pNext))) {
+          dev_data->physical_device, vku::FindStructInPNextChain<VkVideoProfileListInfoKHR>(pCreateInfo->pNext))) {
     fragment_encoder =
         std::unique_ptr<const subresource_adapter::ImageRangeEncoder>(new subresource_adapter::ImageRangeEncoder(*this));
 
@@ -262,11 +262,11 @@ void Image::Destroy() {
         bind_swapchain->RemoveParent(this);
         bind_swapchain = nullptr;
     }
-    BINDABLE::Destroy();
+    Bindable::Destroy();
 }
 
-void Image::NotifyInvalidate(const BASE_NODE::NodeList &invalid_nodes, bool unlink) {
-    BINDABLE::NotifyInvalidate(invalid_nodes, unlink);
+void Image::NotifyInvalidate(const StateObject::NodeList &invalid_nodes, bool unlink) {
+    Bindable::NotifyInvalidate(invalid_nodes, unlink);
     if (unlink) {
         bind_swapchain = nullptr;
     }
@@ -406,7 +406,7 @@ namespace vvl {
 
 ImageView::ImageView(const std::shared_ptr<vvl::Image> &im, VkImageView iv, const VkImageViewCreateInfo *ci,
                      VkFormatFeatureFlags2KHR ff, const VkFilterCubicImageViewImageFormatPropertiesEXT &cubic_props)
-    : BASE_NODE(iv, kVulkanObjectTypeImageView),
+    : StateObject(iv, kVulkanObjectTypeImageView),
       safe_create_info(ci),
       create_info(*safe_create_info.ptr()),
       normalized_subresource_range(::NormalizeSubresourceRange(im->createInfo, *ci)),
@@ -434,7 +434,7 @@ void ImageView::Destroy() {
         image_state->RemoveParent(this);
         image_state = nullptr;
     }
-    BASE_NODE::Destroy();
+    StateObject::Destroy();
 }
 
 uint32_t ImageView::GetAttachmentLayerCount() const {
@@ -445,10 +445,10 @@ uint32_t ImageView::GetAttachmentLayerCount() const {
 }
 
 bool ImageView::OverlapSubresource(const ImageView &compare_view) const {
-    if (image_view() == compare_view.image_view()) {
+    if (VkHandle() == compare_view.VkHandle()) {
         return true;
     }
-    if (image_state->image() != compare_view.image_state->image()) {
+    if (image_state->VkHandle() != compare_view.image_state->VkHandle()) {
         return false;
     }
     if (normalized_subresource_range.aspectMask != compare_view.normalized_subresource_range.aspectMask) {
@@ -529,7 +529,7 @@ static safe_VkImageCreateInfo GetImageCreateInfo(const VkSwapchainCreateInfoKHR 
 namespace vvl {
 
 Swapchain::Swapchain(ValidationStateTracker *dev_data_, const VkSwapchainCreateInfoKHR *pCreateInfo, VkSwapchainKHR swapchain)
-    : BASE_NODE(swapchain, kVulkanObjectTypeSwapchainKHR),
+    : StateObject(swapchain, kVulkanObjectTypeSwapchainKHR),
       createInfo(pCreateInfo),
       images(),
       exclusive_full_screen_access(false),
@@ -578,7 +578,7 @@ void Swapchain::Destroy() {
     for (auto &swapchain_image : images) {
         if (swapchain_image.image_state) {
             RemoveParent(swapchain_image.image_state);
-            dev_data->Destroy<vvl::Image>(swapchain_image.image_state->image());
+            dev_data->Destroy<vvl::Image>(swapchain_image.image_state->VkHandle());
         }
         // NOTE: We don't have access to dev_data->fake_memory.Free() here, but it is currently a no-op
     }
@@ -587,11 +587,11 @@ void Swapchain::Destroy() {
         surface->RemoveParent(this);
         surface = nullptr;
     }
-    BASE_NODE::Destroy();
+    StateObject::Destroy();
 }
 
-void Swapchain::NotifyInvalidate(const BASE_NODE::NodeList &invalid_nodes, bool unlink) {
-    BASE_NODE::NotifyInvalidate(invalid_nodes, unlink);
+void Swapchain::NotifyInvalidate(const StateObject::NodeList &invalid_nodes, bool unlink) {
+    StateObject::NotifyInvalidate(invalid_nodes, unlink);
     if (unlink) {
         surface = nullptr;
     }
@@ -616,14 +616,14 @@ void Surface::Destroy() {
     if (swapchain) {
         swapchain = nullptr;
     }
-    BASE_NODE::Destroy();
+    StateObject::Destroy();
 }
 
-void Surface::RemoveParent(BASE_NODE *parent_node) {
+void Surface::RemoveParent(StateObject *parent_node) {
     if (swapchain == parent_node) {
         swapchain = nullptr;
     }
-    BASE_NODE::RemoveParent(parent_node);
+    StateObject::RemoveParent(parent_node);
 }
 
 void Surface::SetQueueSupport(VkPhysicalDevice phys_dev, uint32_t qfi, bool supported) {
@@ -642,7 +642,7 @@ bool Surface::GetQueueSupport(VkPhysicalDevice phys_dev, uint32_t qfi) const {
         return iter->second;
     }
     VkBool32 supported = VK_FALSE;
-    DispatchGetPhysicalDeviceSurfaceSupportKHR(phys_dev, qfi, surface(), &supported);
+    DispatchGetPhysicalDeviceSurfaceSupportKHR(phys_dev, qfi, VkHandle(), &supported);
     gpu_queue_support_[key] = (supported == VK_TRUE);
     return supported == VK_TRUE;
 }
@@ -680,15 +680,15 @@ std::vector<VkPresentModeKHR> Surface::GetPresentModes(VkPhysicalDevice phys_dev
     };
 
     uint32_t count = 0;
-    if (const VkResult err = DispatchGetPhysicalDeviceSurfacePresentModesKHR(phys_dev, surface(), &count, nullptr);
+    if (const VkResult err = DispatchGetPhysicalDeviceSurfacePresentModesKHR(phys_dev, VkHandle(), &count, nullptr);
         !IsValueIn(err, {VK_SUCCESS, VK_INCOMPLETE})) {
-        log_internal_error(err, phys_dev, surface());
+        log_internal_error(err, phys_dev, VkHandle());
         return result;
     }
     result.resize(count);
-    if (const VkResult err = DispatchGetPhysicalDeviceSurfacePresentModesKHR(phys_dev, surface(), &count, result.data());
+    if (const VkResult err = DispatchGetPhysicalDeviceSurfacePresentModesKHR(phys_dev, VkHandle(), &count, result.data());
         err != VK_SUCCESS) {
-        log_internal_error(err, phys_dev, surface());
+        log_internal_error(err, phys_dev, VkHandle());
         return result;
     }
     return result;
@@ -749,16 +749,16 @@ vvl::span<const safe_VkSurfaceFormat2KHR> Surface::GetFormats(bool get_surface_c
 
         std::vector<VkSurfaceFormatKHR> formats;
         uint32_t count = 0;
-        if (const VkResult err = DispatchGetPhysicalDeviceSurfaceFormatsKHR(phys_dev, surface(), &count, nullptr);
+        if (const VkResult err = DispatchGetPhysicalDeviceSurfaceFormatsKHR(phys_dev, VkHandle(), &count, nullptr);
             !IsValueIn(err, {VK_SUCCESS, VK_INCOMPLETE})) {
-            log_internal_error(err, phys_dev, surface());
+            log_internal_error(err, phys_dev, VkHandle());
             return result;
         }
         formats.resize(count);
 
-        if (const VkResult err = DispatchGetPhysicalDeviceSurfaceFormatsKHR(phys_dev, surface(), &count, formats.data());
+        if (const VkResult err = DispatchGetPhysicalDeviceSurfaceFormatsKHR(phys_dev, VkHandle(), &count, formats.data());
             err != VK_SUCCESS) {
-            log_internal_error(err, phys_dev, surface());
+            log_internal_error(err, phys_dev, VkHandle());
             result.clear();
         } else {
             result.reserve(count);
@@ -805,8 +805,8 @@ safe_VkSurfaceCapabilities2KHR Surface::GetCapabilities(bool get_surface_capabil
         }
     } else {
         VkSurfaceCapabilitiesKHR caps{};
-        if (const VkResult err = DispatchGetPhysicalDeviceSurfaceCapabilitiesKHR(phys_dev, surface(), &caps); err != VK_SUCCESS) {
-            log_internal_error(err, phys_dev, surface());
+        if (const VkResult err = DispatchGetPhysicalDeviceSurfaceCapabilitiesKHR(phys_dev, VkHandle(), &caps); err != VK_SUCCESS) {
+            log_internal_error(err, phys_dev, VkHandle());
         }
         surface_caps2.surfaceCapabilities = caps;
     }
@@ -851,7 +851,7 @@ std::vector<VkPresentModeKHR> Surface::GetCompatibleModes(VkPhysicalDevice phys_
     // Compatible modes not in state tracker, call to get compatible modes
     std::vector<VkPresentModeKHR> result;
     VkPhysicalDeviceSurfaceInfo2KHR surface_info = vku::InitStructHelper();
-    surface_info.surface = surface();
+    surface_info.surface = VkHandle();
     VkSurfacePresentModeEXT surface_present_mode = vku::InitStructHelper();
     surface_present_mode.presentMode = present_mode;
     surface_info.pNext = &surface_present_mode;
@@ -893,7 +893,7 @@ VkSurfaceCapabilitiesKHR Surface::GetPresentModeSurfaceCapabilities(VkPhysicalDe
 
     // Present mode surface capabilties not in state tracker, call to get surface capabilities
     VkPhysicalDeviceSurfaceInfo2KHR surface_info = vku::InitStructHelper();
-    surface_info.surface = surface();
+    surface_info.surface = VkHandle();
     VkSurfacePresentModeEXT surface_present_mode = vku::InitStructHelper();
     surface_present_mode.presentMode = present_mode;
     surface_info.pNext = &surface_present_mode;
@@ -916,7 +916,7 @@ VkSurfacePresentScalingCapabilitiesEXT Surface::GetPresentModeScalingCapabilitie
 
     // Present mode scaling capabilties not in state tracker, call to get scaling capabilities
     VkPhysicalDeviceSurfaceInfo2KHR surface_info = vku::InitStructHelper();
-    surface_info.surface = surface();
+    surface_info.surface = VkHandle();
     VkSurfacePresentModeEXT surface_present_mode = vku::InitStructHelper();
     surface_present_mode.presentMode = present_mode;
     surface_info.pNext = &surface_present_mode;

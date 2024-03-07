@@ -9,7 +9,6 @@
         "InvalidImageCreateFlagWithPhysicalDeviceCount": false,
 
         "@disabled-replaced": "Replaced by Vulkan SC specific test",
-        "LeakAnObject": false,
         "SpecLinks": false,
 
         "@disabled-assumes-preVulkan12": "Not supported in Vulkan SC: assumes availability of pre-Vulkan 1.2 functionality",
@@ -18,18 +17,19 @@
         "UsePnextOnlyStructWithoutExtensionEnabled": false,
         "RequiredPromotedFeaturesExtensions": false,
         "MissingExtensionPhysicalDeviceProperties": false,
+        "ExtensionXmlDependsLogic3": false,
 
         "@disabled-depends-VK_EXT_validation_cache": "Not supported in Vulkan SC: VK_EXT_validation_cache",
         "ValidationCacheTestBadMerge": false,
 
-        "@disabled-depends-VK_EXT_debug_marker": "Not supported in Vulkan SC: VK_EXT_debug_marker",
-        "DebugMarkerNameTest": false,
-
-        "@disabled-depends-VK_KHR_portability_enumeration": "Not supported in Vulkan SC: VK_KHR_portability_enumeration",
-        "InstanceCreateEnumeratePortability": false,
-
-        "@disabled-depends-SPIRV-validation": "Depends on availabilty of SPIR-V data to validate",
-        "InvalidSpirvExtension": false
+        "@disabled-depends-VK_EXT_layer_settings": "Not supported in Vulkan SC: VK_EXT_layer_settings",
+        "CustomStypeStructIntegerArray": false,
+        "CustomStypeStructString": false,
+        "CustomStypeStructStringArray": false,
+        "DuplicateMessageLimit": false,
+        "VuidFilterHexInt": false,
+        "VuidFilterInt": false,
+        "VuidIdFilterString": false
     },
     "VkPositiveLayerTest": {
         "*": "VkPositiveLayerTest",
@@ -39,6 +39,7 @@
 
         "@disabled-assumes-preVulkan12": "Not supported in Vulkan SC: assumes availability of pre-Vulkan 1.2 functionality",
         "Vulkan12FeaturesBufferDeviceAddress": false,
+        "UseInteractionApi2": false,
 
         "@disabled-not-relevant": "Not relevant for Vulkan SC",
         "ExtensionsInCreateInstance": false
@@ -67,6 +68,12 @@
         "DrawTimeImageViewTypeMismatchWithPipelineFunction": false,
         "DrawTimeImageComponentTypeMismatchWithPipeline": false,
         "FilterCubicSamplerInCmdDraw": false
+    },
+    "NegativeDebugExtensions": {
+        "@disabled-depends-VK_EXT_debug_marker": "Not supported in Vulkan SC: VK_EXT_debug_marker",
+        "DebugMarkerName": false,
+        "DebugMarkerSetObject": false,
+        "DebugMarkerSetUtils": false
     },
     "NegativeDescriptorIndexing": {
         "@disabled-assumes-preVulkan12": "Not supported in Vulkan SC: assumes availability of pre-Vulkan 1.2 functionality",
@@ -128,6 +135,14 @@
         "PrimitiveFragmentShadingRateWriteMultiViewportLimitDynamic": false,
         "PrimitiveWriteMultiViewportLimit": false
     },
+    "NegativeGraphicsLibrary": {
+        "@disabled-depends-VK_EXT_graphics_pipeline_library": "Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library",
+        "*": false
+    },
+    "PositiveGraphicsLibrary": {
+        "@disabled-depends-VK_EXT_graphics_pipeline_library": "Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library",
+        "*": false
+    },
     "NegativeImage": {
         "@disabled-replaced": "These test cases are replaced with Vulkan SC specific ones",
         "ImageMisc": false,
@@ -172,6 +187,9 @@
         "UnboundResourcesAfterBeginRenderPassAndNextSubpass": false
     },
     "NegativeObjectLifetime": {
+        "@disabled-replaced": "Replaced by Vulkan SC specific test",
+        "LeakAnObject": false,
+
         "@disabled-depends-vkFreeMemory": "Not supported in Vulkan SC: vkFreeMemory",
         "CmdBarrierBufferDestroyed": false,
         "CmdBarrierImageDestroyed": false,
@@ -257,6 +275,7 @@
         "@disabled-depends-SPIRV-validation": "Depends on availabilty of SPIR-V data to validate",
         "UnnormalizedCoordinatesCombinedSampler": false,
         "UnnormalizedCoordinatesCopyObject": false,
+        "UnnormalizedCoordinatesInBoundsAccess": false,
         "UnnormalizedCoordinatesSeparateSampler": false,
         "UnnormalizedCoordinatesSeparateSamplerSharedImage": false,
         "UnnormalizedCoordinatesSeparateSamplerSharedSampler": false,
@@ -330,7 +349,11 @@
         "PackingInsideArray": false,
         "CreatePipelineFragmentOutputNotConsumed": false,
         "CreatePipelineFragmentOutputNotWritten": false,
-        "CreatePipelineFragmentOutputTypeMismatch": false
+        "CreatePipelineFragmentOutputTypeMismatch": false,
+        "InvalidStaticSpirv": false,
+        "PhysicalStorageBuffer": false,
+        "PhysicalStorageBufferGlslang3": false
+
     },
     "NegativeShaderLimits": {
         "@disabled-depends-SPIRV-validation": "Depends on availabilty of SPIR-V data to validate",
@@ -369,7 +392,8 @@
         "Storage8and16bitCapability": false,
         "Storage8and16bitFeatures": false,
         "DescriptorCountConstant": false,
-        "ShaderFloatControl": false
+        "ShaderFloatControl": false,
+        "InvalidExtension": false
     },
     "NegativeShaderStorageImage": {
         "@disabled-depends-SPIRV-validation": "Depends on availabilty of SPIR-V data to validate",
@@ -427,7 +451,9 @@
         ],
         "CmdDispatchDrawHazards": false,
         "StageAccessExpansion": false,
-        "RenderPassAsyncHazard": false
+        "RenderPassAsyncHazard": false,
+        "WriteOnlyBufferWriteHazard": false,
+        "WriteOnlyImageWriteHazard": false
     },
     "PositiveThreading": {
         "@disabled-excessive-objects": [
@@ -437,12 +463,17 @@
         ],
         "DebugObjectNames": false
     },
+    "PositiveTooling": {
+        "@disabled-depends-VK_EXT_tooling_info": "Not supported in Vulkan SC: VK_EXT_tooling_info",
+        "InfoExt": false
+    },
     "NegativeVertexInput": {
         "@disabled-depends-SPIRV-validation": "Depends on availabilty of SPIR-V data to validate",
         "AttributeNotConsumed": false,
         "AttributeLocationMismatch": false,
         "AttributeNotProvided": false,
         "AttributeTypeMismatch": false,
+        "AttributeTypeMismatchDynamic": false,
         "Attribute64bitInputAttribute": false,
         "Attribute64bitShaderInput": false,
         "Attribute64bitUnusedComponent": false,
@@ -471,67 +502,44 @@
         "DrawConstOffset": false,
         "DrawFetch": false
     },
-    "VkVideoLayerTest": {
-        "*": "VkVideoLayerTest"
-    },
-    "VkPositiveVideoLayerTest": {
-        "*": "VkPositiveVideoLayerTest"
-    },
     "VkPortabilitySubsetTest": {
-        "*": "VkPortabilitySubsetTest"
+        "@disabled-depends-portability": "Not supported in Vulkan SC: portability subset",
+        "*": false
     },
     "VkBestPracticesLayerTest": {
-        "@disabled": [
-            "We disable all best practices tests because Vulkan SC does not currently have best practices layers enabled"
-        ],
+        "@disabled": "We disable all best practices tests because Vulkan SC does not currently have best practices layers enabled",
         "*": false
     },
     "VkPositiveBestPracticesLayerTest": {
-        "@disabled": [
-            "We disable all best practices tests because Vulkan SC does not currently have best practices layers enabled"
-        ],
+        "@disabled": "We disable all best practices tests because Vulkan SC does not currently have best practices layers enabled",
         "*": false
     },
     "VkAmdBestPracticesLayerTest": {
-        "@disabled": [
-            "We disable all best practices tests because Vulkan SC does not currently have best practices layers enabled"
-        ],
+        "@disabled": "We disable all best practices tests because Vulkan SC does not currently have best practices layers enabled",
         "*": false
     },
     "VkArmBestPracticesLayerTest": {
-        "@disabled": [
-            "We disable all best practices tests because Vulkan SC does not currently have best practices layers enabled"
-        ],
+        "@disabled": "We disable all best practices tests because Vulkan SC does not currently have best practices layers enabled",
         "*": false
     },
     "VkNvidiaBestPracticesLayerTest": {
-        "@disabled": [
-            "We disable all best practices tests because Vulkan SC does not currently have best practices layers enabled"
-        ],
+        "@disabled": "We disable all best practices tests because Vulkan SC does not currently have best practices layers enabled",
         "*": false
     },
-    "VkVideoBestPracticesLayerTest": {
-        "@disabled": [
-            "We disable all best practices tests because Vulkan SC does not currently have best practices layers enabled"
-        ],
+    "NegativeGpuAV": {
+        "@disabled": "We disable all GPU assisted validation test cases as they are not applicable to Vulkan SC",
         "*": false
     },
-    "VkGpuAssistedLayerTest": {
-        "@disabled": [
-            "We disable all GPU assisted validation test cases as they are not applicable to Vulkan SC"
-        ],
+    "PositiveGpuAV": {
+        "@disabled": "We disable all GPU assisted validation test cases as they are not applicable to Vulkan SC",
         "*": false
     },
-    "PositiveGpuAssistedLayer": {
-        "@disabled": [
-            "We disable all GPU assisted validation test cases as they are not applicable to Vulkan SC"
-        ],
+    "PositiveGpuAVShaderObject": {
+        "@disabled": "We disable all GPU assisted validation test cases as they are not applicable to Vulkan SC",
         "*": false
     },
     "NegativeDebugPrintf": {
-        "@disabled": [
-            "We disable all debug printf validation test cases as they are not applicable to Vulkan SC"
-        ],
+        "@disabled": "We disable all debug printf validation test cases as they are not applicable to Vulkan SC",
         "*": false
     }
 }

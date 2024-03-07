@@ -1,7 +1,7 @@
-/* Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (C) 2015-2023 Google Inc.
+/* Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (C) 2015-2024 Google Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -23,10 +23,10 @@
 
 namespace vvl {
 
-class AccelerationStructureNV : public BINDABLE {
+class AccelerationStructureNV : public Bindable {
   public:
     AccelerationStructureNV(VkDevice device, VkAccelerationStructureNV as, const VkAccelerationStructureCreateInfoNV *ci)
-        : BINDABLE(as, kVulkanObjectTypeAccelerationStructureNV, false, false, 0),
+        : Bindable(as, kVulkanObjectTypeAccelerationStructureNV, false, false, 0),
           create_infoNV(ci),
           memory_requirements(GetMemReqs(device, as, VK_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_TYPE_OBJECT_NV)),
           build_scratch_memory_requirements(
@@ -34,11 +34,11 @@ class AccelerationStructureNV : public BINDABLE {
           update_scratch_memory_requirements(
               GetMemReqs(device, as, VK_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_TYPE_UPDATE_SCRATCH_NV)),
           tracker_(&memory_requirements) {
-        BINDABLE::SetMemoryTracker(&tracker_);
+        Bindable::SetMemoryTracker(&tracker_);
     }
     AccelerationStructureNV(const AccelerationStructureNV &rh_obj) = delete;
 
-    VkAccelerationStructureNV acceleration_structure() const { return handle_.Cast<VkAccelerationStructureNV>(); }
+    VkAccelerationStructureNV VkHandle() const { return handle_.Cast<VkAccelerationStructureNV>(); }
 
     void Build(const VkAccelerationStructureInfoNV *pInfo) {
         built = true;
@@ -69,14 +69,20 @@ class AccelerationStructureNV : public BINDABLE {
     BindableLinearMemoryTracker tracker_;
 };
 
-class AccelerationStructureKHR : public BASE_NODE {
+class AccelerationStructureKHR : public StateObject {
   public:
     AccelerationStructureKHR(VkAccelerationStructureKHR as, const VkAccelerationStructureCreateInfoKHR *ci,
-                             std::shared_ptr<vvl::Buffer> &&buf_state, VkDeviceAddress address)
-        : BASE_NODE(as, kVulkanObjectTypeAccelerationStructureKHR), create_infoKHR(ci), buffer_state(buf_state), address(address) {}
+                             std::shared_ptr<Buffer> &&buf_state)
+        : StateObject(as, kVulkanObjectTypeAccelerationStructureKHR), create_infoKHR(ci), buffer_state(buf_state) {}
     AccelerationStructureKHR(const AccelerationStructureKHR &rh_obj) = delete;
 
-    VkAccelerationStructureKHR acceleration_structure() const { return handle_.Cast<VkAccelerationStructureKHR>(); }
+    virtual ~AccelerationStructureKHR() {
+        if (!Destroyed()) {
+            Destroy();
+        }
+    }
+
+    VkAccelerationStructureKHR VkHandle() const { return handle_.Cast<VkAccelerationStructureKHR>(); }
 
     void LinkChildNodes() override {
         // Connect child node(s), which cannot safely be done in the constructor.
@@ -88,13 +94,7 @@ class AccelerationStructureKHR : public BASE_NODE {
             buffer_state->RemoveParent(this);
             buffer_state = nullptr;
         }
-        BASE_NODE::Destroy();
-    }
-
-    virtual ~AccelerationStructureKHR() {
-        if (!Destroyed()) {
-            Destroy();
-        }
+        StateObject::Destroy();
     }
 
     void Build(const VkAccelerationStructureBuildGeometryInfoKHR *pInfo, const bool is_host,
@@ -103,12 +103,19 @@ class AccelerationStructureKHR : public BASE_NODE {
         build_info_khr.initialize(pInfo, is_host, build_range_info);
     };
 
-    const safe_VkAccelerationStructureCreateInfoKHR create_infoKHR = {};
-    safe_VkAccelerationStructureBuildGeometryInfoKHR build_info_khr;
+    void UpdateBuildRangeInfos(const VkAccelerationStructureBuildRangeInfoKHR *p_build_range_infos, uint32_t geometry_count) {
+        build_range_infos.resize(geometry_count);
+        for (const auto [i, build_range] : vvl::enumerate(p_build_range_infos, geometry_count)) {
+            build_range_infos[i] = *build_range;
+        }
+    }
+
+    const safe_VkAccelerationStructureCreateInfoKHR create_infoKHR{};
+    safe_VkAccelerationStructureBuildGeometryInfoKHR build_info_khr{};
     bool built = false;
     uint64_t opaque_handle = 0;
-    std::shared_ptr<vvl::Buffer> buffer_state;
-    VkDeviceAddress address;
+    std::shared_ptr<vvl::Buffer> buffer_state{};
+    std::vector<VkAccelerationStructureBuildRangeInfoKHR> build_range_infos{};
 };
 
 }  // namespace vvl

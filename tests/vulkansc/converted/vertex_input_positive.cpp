@@ -16,6 +16,7 @@
 
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
+#include "../framework/render_pass_helper.h"
 #include "generated/vk_extension_helper.h"
 
 TEST_F(PositiveVertexInput, AttributeMatrixType) {
@@ -315,12 +316,9 @@ TEST_F(PositiveVertexInput, AttributeComponents) {
         "Test that pipeline validation accepts consuming a vertex attribute through multiple vertex shader inputs, each consuming "
         "a different subset of the components, and that fragment shader-attachment validation tolerates multiple duplicate "
         "location outputs");
-
+    AddRequiredFeature(vkt::Feature::independentBlend);
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
-    if (!m_device->phy().features().independentBlend) {
-        GTEST_SKIP() << "independentBlend not supported";
-    }
 
     VkVertexInputBindingDescription input_binding;
     memset(&input_binding, 0, sizeof(input_binding));
@@ -361,39 +359,19 @@ TEST_F(PositiveVertexInput, AttributeComponents) {
     VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     // Create a renderPass with two color attachments
-    VkAttachmentReference attachments[2] = {};
-    attachments[0].layout = VK_IMAGE_LAYOUT_GENERAL;
-    attachments[1].attachment = 1;
-    attachments[1].layout = VK_IMAGE_LAYOUT_GENERAL;
-
-    VkSubpassDescription subpass = {};
-    subpass.pColorAttachments = attachments;
-    subpass.colorAttachmentCount = 2;
-
-    VkRenderPassCreateInfo rpci = vku::InitStructHelper();
-    rpci.subpassCount = 1;
-    rpci.pSubpasses = &subpass;
-    rpci.attachmentCount = 2;
-
-    VkAttachmentDescription attach_desc[2] = {};
-    attach_desc[0].format = VK_FORMAT_B8G8R8A8_UNORM;
-    attach_desc[0].samples = VK_SAMPLE_COUNT_1_BIT;
-    attach_desc[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    attach_desc[0].finalLayout = VK_IMAGE_LAYOUT_GENERAL;
-    attach_desc[0].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    attach_desc[1].format = VK_FORMAT_B8G8R8A8_UNORM;
-    attach_desc[1].samples = VK_SAMPLE_COUNT_1_BIT;
-    attach_desc[1].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    attach_desc[1].finalLayout = VK_IMAGE_LAYOUT_GENERAL;
-    attach_desc[1].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-
-    rpci.pAttachments = attach_desc;
-    vkt::RenderPass renderpass(*m_device, rpci);
+    RenderPassSingleSubpass rp(*this);
+    rp.AddAttachmentDescription(VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED);
+    rp.AddAttachmentDescription(VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED);
+    rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_GENERAL});
+    rp.AddAttachmentReference({1, VK_IMAGE_LAYOUT_GENERAL});
+    rp.AddColorAttachment(0);
+    rp.AddColorAttachment(1);
+    rp.CreateRenderPass();
 
     CreatePipelineHelper pipe(*this, 2);
     pipe.InitState();
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
-    pipe.gp_ci_.renderPass = renderpass.handle();
+    pipe.gp_ci_.renderPass = rp.Handle();
     pipe.cb_attachments_[0].dstAlphaBlendFactor = VK_BLEND_FACTOR_CONSTANT_COLOR;
     pipe.cb_attachments_[0].blendEnable = VK_FALSE;
     pipe.vi_ci_.pVertexBindingDescriptions = &input_binding;
@@ -408,13 +386,9 @@ TEST_F(PositiveVertexInput, CreatePipeline64BitAttributes) {
         "Test that pipeline validation accepts basic use of 64bit vertex attributes. This is interesting because they consume "
         "multiple locations.");
 
-    RETURN_IF_SKIP(InitFramework());
-    RETURN_IF_SKIP(InitState());
+    AddRequiredFeature(vkt::Feature::shaderFloat64);
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
-
-    if (!m_device->phy().features().shaderFloat64) {
-        GTEST_SKIP() << "Device does not support 64bit vertex attributes";
-    }
 
     VkFormatProperties format_props;
     vk::GetPhysicalDeviceFormatProperties(gpu(), VK_FORMAT_R64G64B64A64_SFLOAT, &format_props);
@@ -464,12 +438,9 @@ TEST_F(PositiveVertexInput, CreatePipeline64BitAttributes) {
 TEST_F(PositiveVertexInput, VertexAttribute64bit) {
     TEST_DESCRIPTION("Use 64-bit Vertex format");
 
+    AddRequiredFeature(vkt::Feature::shaderFloat64);
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
-
-    if (!m_device->phy().features().shaderFloat64) {
-        GTEST_SKIP() << "Device does not support 64bit vertex attributes";
-    }
 
     const VkFormat format = VK_FORMAT_R64_SFLOAT;
     VkFormatProperties format_props = m_device->format_properties(format);
@@ -503,12 +474,9 @@ TEST_F(PositiveVertexInput, VertexAttribute64bit) {
 TEST_F(PositiveVertexInput, AttributeStructTypeBlockLocation64bit) {
     TEST_DESCRIPTION("Input is OpTypeStruct where the Block has the Location with 64-bit Vertex format");
 
+    AddRequiredFeature(vkt::Feature::shaderFloat64);
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
-
-    if (!m_device->phy().features().shaderFloat64) {
-        GTEST_SKIP() << "Device does not support 64bit vertex attributes";
-    }
 
     VkFormatProperties format_props;
     vk::GetPhysicalDeviceFormatProperties(gpu(), VK_FORMAT_R64G64B64A64_SFLOAT, &format_props);
@@ -568,12 +536,9 @@ TEST_F(PositiveVertexInput, AttributeStructTypeBlockLocation64bit) {
 TEST_F(PositiveVertexInput, Attribute64bitMissingComponent) {
     TEST_DESCRIPTION("Shader uses f64vec2, but provides too many component with R64G64B64A64, which is valid");
 
+    AddRequiredFeature(vkt::Feature::shaderFloat64);
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
-
-    if (!m_device->phy().features().shaderFloat64) {
-        GTEST_SKIP() << "Device does not support 64bit vertex attributes";
-    }
 
     const VkFormat format = VK_FORMAT_R64G64B64A64_SFLOAT;
     VkFormatProperties format_props = m_device->format_properties(format);
@@ -601,4 +566,47 @@ TEST_F(PositiveVertexInput, Attribute64bitMissingComponent) {
     pipe.InitState();
 
     pipe.CreateGraphicsPipeline();
+}
+
+TEST_F(PositiveVertexInput, VertexAttributeDivisorFirstInstance) {
+    TEST_DESCRIPTION("Test VK_EXT_vertex_attribute_divisor with non zero first instance");
+
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_EXT_VERTEX_ATTRIBUTE_DIVISOR_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::vertexAttributeInstanceRateZeroDivisor);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    VkPhysicalDeviceVertexAttributeDivisorPropertiesEXT pdvad_props = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(pdvad_props);
+
+    VkVertexInputBindingDivisorDescriptionEXT vibdd = {};
+    VkPipelineVertexInputDivisorStateCreateInfoEXT pvids_ci = vku::InitStructHelper();
+    pvids_ci.vertexBindingDivisorCount = 1;
+    pvids_ci.pVertexBindingDivisors = &vibdd;
+    VkVertexInputBindingDescription vibd = {};
+    vibd.stride = 16;
+    vibd.inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
+
+    if (pdvad_props.maxVertexAttribDivisor < pvids_ci.vertexBindingDivisorCount) {
+        GTEST_SKIP() << "This device does not support vertexBindingDivisors";
+    }
+
+    CreatePipelineHelper pipe(*this);
+    pipe.InitState();
+    pipe.vi_ci_.pNext = &pvids_ci;
+    pipe.vi_ci_.vertexBindingDescriptionCount = 1;
+    pipe.vi_ci_.pVertexBindingDescriptions = &vibd;
+    pipe.CreateGraphicsPipeline();
+
+    vkt::Buffer vertex_buffer(*m_device, 256, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+    VkDeviceSize offset = 0u;
+
+    m_commandBuffer->begin();
+    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindVertexBuffers(m_commandBuffer->handle(), 0u, 1u, &vertex_buffer.handle(), &offset);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_);
+    vk::CmdDraw(m_commandBuffer->handle(), 3u, 1u, 0u, 1u);
+    m_commandBuffer->EndRenderPass();
+    m_commandBuffer->end();
 }

@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2019-2023 Valve Corporation
- * Copyright (c) 2019-2023 LunarG, Inc.
+ * Copyright (c) 2019-2024 Valve Corporation
+ * Copyright (c) 2019-2024 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -161,7 +161,7 @@ HazardResult ResourceAccessState::DetectHazard(const ResourceAccessState &record
             --count;
         }
 
-        for (Size i = 0; i < count; ++count) {
+        for (Size i = 0; i < count; ++i) {
             const auto &first = recorded_accesses[i];
             // Skip and quit logic
             if (first.tag < tag_range.begin) continue;
@@ -264,7 +264,7 @@ HazardResult ResourceAccessState::DetectBarrierHazard(const SyncStageAccessInfoT
     if (last_reads.size()) {
         // Look at the reads if any
         for (const auto &read_access : last_reads) {
-            if (read_access.IsReadBarrierHazard(queue_id, src_exec_scope)) {
+            if (read_access.IsReadBarrierHazard(queue_id, src_exec_scope, src_access_scope)) {
                 hazard.Set(this, usage_info, WRITE_AFTER_READ, read_access.access, read_access.tag);
                 break;
             }
@@ -312,7 +312,7 @@ HazardResult ResourceAccessState::DetectBarrierHazard(const SyncStageAccessInfoT
                     // If the read stage is not in the src sync scope
                     // *AND* not execution chained with an existing sync barrier (that's the or)
                     // then the barrier access is unsafe (R/W after R)
-                    if (scope_read.IsReadBarrierHazard(event_queue, src_exec_scope)) {
+                    if (scope_read.IsReadBarrierHazard(event_queue, src_exec_scope, src_access_scope)) {
                         hazard.Set(this, usage_info, WRITE_AFTER_READ, scope_read.access, scope_read.tag);
                         break;
                     }
@@ -972,6 +972,10 @@ SyncExecScope SyncExecScope::MakeSrc(VkQueueFlags queue_flags, VkPipelineStageFl
     result.expanded_mask = sync_utils::ExpandPipelineStages(mask_param, queue_flags, disabled_feature_mask);
     result.exec_scope = sync_utils::WithEarlierPipelineStages(result.expanded_mask);
     result.valid_accesses = SyncStageAccess::AccessScopeByStage(result.expanded_mask);
+    // ALL_COMMANDS stage includes all accesses performed by the gpu, not only accesses defined by the stages
+    if (mask_param & VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT) {
+        result.valid_accesses |= SYNC_IMAGE_LAYOUT_TRANSITION_BIT;
+    }
     return result;
 }
 
@@ -981,6 +985,10 @@ SyncExecScope SyncExecScope::MakeDst(VkQueueFlags queue_flags, VkPipelineStageFl
     result.expanded_mask = sync_utils::ExpandPipelineStages(mask_param, queue_flags);
     result.exec_scope = sync_utils::WithLaterPipelineStages(result.expanded_mask);
     result.valid_accesses = SyncStageAccess::AccessScopeByStage(result.expanded_mask);
+    // ALL_COMMANDS stage includes all accesses performed by the gpu, not only accesses defined by the stages
+    if (mask_param & VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT) {
+        result.valid_accesses |= SYNC_IMAGE_LAYOUT_TRANSITION_BIT;
+    }
     return result;
 }
 

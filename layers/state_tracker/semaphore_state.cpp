@@ -1,7 +1,7 @@
-/* Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (C) 2015-2023 Google Inc.
+/* Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (C) 2015-2024 Google Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -88,6 +88,26 @@ std::optional<SemOp> vvl::Semaphore::LastOp(const std::function<bool(const SemOp
     return result;
 }
 
+std::optional<vvl::SubmissionLocator> vvl::Semaphore::GetLastBinarySignalSubmission() const {
+    assert(type == VK_SEMAPHORE_TYPE_BINARY);
+    auto guard = ReadLock();
+    if (timeline_.empty()) {
+        return {};
+    }
+    const auto &timepoint = timeline_.rbegin()->second;
+    const auto &signal_op = timepoint.signal_op;
+    // Binary wait without a signal is not a valid semaphore state (part of binary semaphore validation).
+    // Return an empty locator in this case.
+    if (!signal_op.has_value()) {
+        return {};
+    }
+    // Also skip signals that are not associated with a queue (e.g. swapchain acquire semaphore signaling).
+    if (signal_op->queue == nullptr) {
+        return {};
+    }
+    return vvl::SubmissionLocator{signal_op->queue, signal_op->seq};
+}
+
 bool vvl::Semaphore::CanBinaryBeSignaled() const {
     assert(type == VK_SEMAPHORE_TYPE_BINARY);
     auto guard = ReadLock();
@@ -168,6 +188,7 @@ void vvl::Semaphore::Retire(vvl::Queue *current_queue, const Location &loc, uint
         timeline_.erase(timeline_.begin());
         if (scope_ == kExternalTemporary) {
             scope_ = kInternal;
+            imported_handle_type_.reset();
         }
     } else {
         // Wait for some other queue or a host operation to retire
@@ -177,8 +198,9 @@ void vvl::Semaphore::Retire(vvl::Queue *current_queue, const Location &loc, uint
         guard.unlock();
         auto result = waiter.wait_until(GetCondWaitTimeout());
         if (result != std::future_status::ready) {
-            dev_data_.LogError("UNASSIGNED-VkSemaphore-state-timeout", Handle(), loc,
-                               "Timeout waiting for timeline semaphore state to update. This is most likely a validation bug."
+            dev_data_.LogError("INTERNAL-ERROR-VkSemaphore-state-timeout", Handle(), loc,
+                               "The Validation Layers hit a timeout waiting for timeline semaphore state to update (this is most "
+                               "likely a validation bug)."
                                " completed_.payload=%" PRIu64 " wait_payload=%" PRIu64,
                                completed_.payload, payload);
         }
@@ -244,6 +266,7 @@ void vvl::Semaphore::Import(VkExternalSemaphoreHandleTypeFlagBits handle_type, V
             scope_ = kExternalPermanent;
         }
     }
+    imported_handle_type_ = handle_type;
 }
 
 void vvl::Semaphore::Export(VkExternalSemaphoreHandleTypeFlagBits handle_type) {

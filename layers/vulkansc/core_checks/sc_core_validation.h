@@ -32,31 +32,30 @@ class SCCoreChecks : public SCValidationStateTracker<CoreChecks> {
 
     SCCoreChecks() {}
 
-    bool ValidateObjectRequestCount(VkDevice device, const char* cmd, const char* vuid, const char* object_name_plural,
+    bool ValidateObjectRequestCount(VkDevice device, const Location& loc, const char* vuid, const char* object_name_plural,
                                     size_t existing_count, const char* requested_count_name, uint32_t requested_count,
                                     const char* create_count_name, uint32_t create_count) const;
-    bool ValidateObjectRequestCount(VkDevice device, const char* cmd, const char* vuid, const char* object_name_plural,
+    bool ValidateObjectRequestCount(VkDevice device, const Location& loc, const char* vuid, const char* object_name_plural,
                                     size_t existing_count, const char* requested_count_name, uint32_t requested_count,
                                     uint32_t create_count) const;
-    bool ValidateCombinedRequestCount(VkDevice device, const char* cmd, const char* vuid, const char* parent_object_name,
+    bool ValidateCombinedRequestCount(VkDevice device, const Location& loc, const char* vuid, const char* parent_object_name,
                                       const char* object_name_plural, uint32_t existing_count, const char* requested_count_name,
                                       uint32_t requested_count, const char* create_count_name, uint32_t create_count) const;
 
     template <typename CreateInfo>
-    bool ValidatePipelinePoolMemory(VkDevice device, const char* cmd, uint32_t create_info_count,
+    bool ValidatePipelinePoolMemory(VkDevice device, const Location& loc, uint32_t create_info_count,
                                     const CreateInfo* create_info) const;
 
     template <typename VkHandle>
-    bool ValidatePipelineCacheCreateInfo(VkHandle handle, const char* cmd, const VkPipelineCacheCreateInfo& create_info) const;
+    bool ValidatePipelineCacheCreateInfo(VkHandle handle, const Location& loc, const VkPipelineCacheCreateInfo& create_info) const;
     bool ValidatePipelineCacheData(VkPhysicalDevice physicalDevice, const VkPipelineCacheCreateInfo& create_info,
                                    const Location& loc) const;
 
-    bool ValidateSwapchainCreateInfo(VkDevice device, const VkSwapchainCreateInfoKHR& create_info, const char* api_name,
-                                     const char* where) const;
+    bool ValidateSwapchainCreateInfo(VkDevice device, const VkSwapchainCreateInfoKHR& create_info, const Location& loc) const;
 
     // Functions removed in Vulkan SC
     template <typename VkHandle>
-    bool ValidateRemovedCommand(VkHandle handle, const char* cmd) const;
+    bool ValidateRemovedCommand(VkHandle handle, const Location& loc) const;
     bool PreCallValidateCreateShaderModule(VkDevice device, const VkShaderModuleCreateInfo* pCreateInfo,
                                            const VkAllocationCallbacks* pAllocator, VkShaderModule* pShaderModule,
                                            const ErrorObject& error_obj) const override;

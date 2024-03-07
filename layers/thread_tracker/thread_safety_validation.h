@@ -1,7 +1,7 @@
-/* Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (c) 2015-2023 Google Inc.
+/* Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (c) 2015-2024 Google Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,10 +41,6 @@ static_assert(std::is_pointer<DISTINCT_NONDISPATCHABLE_PHONY_HANDLE>::value,
 static_assert(std::is_same<uint64_t, DISTINCT_NONDISPATCHABLE_PHONY_HANDLE>::value,
               "Mismatched non-dispatchable handle handle, expected uint64_t.");
 #endif
-
-[[maybe_unused]] static const char *kVUID_Threading_Info = "UNASSIGNED-Threading-Info";
-[[maybe_unused]] static const char *kVUID_Threading_MultipleThreads = "UNASSIGNED-Threading-MultipleThreads";
-[[maybe_unused]] static const char *kVUID_Threading_SingleThreadReuse = "UNASSIGNED-Threading-SingleThreadReuse";
 
 // Modern CPUs have 64 or 128-byte cache line sizes (Apple M1 has 128-byte cache line size).
 // Use alignment of 64 bytes (instead of 128) to prioritize using less memory and decrease
@@ -121,10 +117,10 @@ class counter {
         if (iter != object_table.end()) {
             return iter->second;
         } else {
-            object_data->LogError(kVUID_Threading_Info, object, loc,
+            object_data->LogError("UNASSIGNED-Threading-Info", object, loc,
                                   "Couldn't find %s Object 0x%" PRIxLEAST64
                                   ". This should not happen and may indicate a bug in the application.",
-                                  object_string[object_type], (uint64_t)(object));
+                                  string_VulkanObjectType(object_type), (uint64_t)(object));
             return nullptr;
         }
     }
@@ -221,7 +217,7 @@ class counter {
   private:
     std::string GetErrorMessage(std::thread::id tid, std::thread::id other_tid) const {
         std::stringstream err_str;
-        err_str << "THREADING ERROR : object of type " << object_string[object_type]
+        err_str << "THREADING ERROR : object of type " << string_VulkanObjectType(object_type)
                 << " is simultaneously used in current thread " << tid << " and thread " << other_tid;
         return err_str.str();
     }
@@ -229,7 +225,8 @@ class counter {
     void HandleErrorOnWrite(const std::shared_ptr<ObjectUseData> &use_data, T object, const Location& loc) {
         const std::thread::id tid = std::this_thread::get_id();
         const std::string error_message = GetErrorMessage(tid, use_data->thread.load(std::memory_order_relaxed));
-        const bool skip = object_data->LogError(kVUID_Threading_MultipleThreads, object, loc, "%s", error_message.c_str());
+        const bool skip =
+            object_data->LogError("UNASSIGNED-Threading-MultipleThreads-Write", object, loc, "%s", error_message.c_str());
         if (skip) {
             // Wait for thread-safe access to object instead of skipping call.
             use_data->WaitForObjectIdle(true);
@@ -245,7 +242,8 @@ class counter {
         const std::thread::id tid = std::this_thread::get_id();
         // There is a writer of the object.
         const auto error_message = GetErrorMessage(tid, use_data->thread.load(std::memory_order_relaxed));
-        const bool skip = object_data->LogError(kVUID_Threading_MultipleThreads, object, loc, "%s", error_message.c_str());
+        const bool skip =
+            object_data->LogError("UNASSIGNED-Threading-MultipleThreads-Read", object, loc, "%s", error_message.c_str());
         if (skip) {
             // Wait for thread-safe access to object instead of skipping call.
             use_data->WaitForObjectIdle(false);

@@ -43,10 +43,9 @@ void NegativeDebugPrintf::InitDebugPrintfFramework() {
 TEST_F(NegativeDebugPrintf, DISABLED_BasicCompute) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::multiDraw);
     RETURN_IF_SKIP(InitDebugPrintfFramework());
-    VkPhysicalDeviceMultiDrawFeaturesEXT multi_draw_features = vku::InitStructHelper();
-    GetPhysicalDeviceFeatures2(multi_draw_features);
-    RETURN_IF_SKIP(InitState(nullptr, &multi_draw_features));
+    RETURN_IF_SKIP(InitState());
 
     InitRenderTarget();
 
@@ -61,24 +60,17 @@ TEST_F(NegativeDebugPrintf, DISABLED_BasicCompute) {
 
     CreateComputePipelineHelper pipe(*this);
     pipe.InitState();
-    pipe.cs_ = std::make_unique<VkShaderObj>(this, shader_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL,
-                                             nullptr, "main", true);
+    pipe.cs_ = std::make_unique<VkShaderObj>(this, shader_source, VK_SHADER_STAGE_COMPUTE_BIT);
     pipe.CreateComputePipeline();
 
     m_commandBuffer->begin();
-    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
     vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_);
     vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
-    m_commandBuffer->EndRenderPass();
     m_commandBuffer->end();
 
-    VkSubmitInfo submit_info = vku::InitStructHelper();
-    submit_info.commandBufferCount = 1;
-    submit_info.pCommandBuffers = &m_commandBuffer->handle();
-
     m_errorMonitor->SetDesiredFailureMsg(kInformationBit, "float == 3.141500");
-    vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
-    vk::QueueWaitIdle(m_default_queue);
+    m_default_queue->submit(*m_commandBuffer, false);
+    m_default_queue->wait();
     m_errorMonitor->VerifyFound();
 }
 
@@ -113,7 +105,9 @@ TEST_F(NegativeDebugPrintf, DISABLED_BasicUsage) {
         void main() {
             float myfloat = 3.1415f;
             int foo = -135;
-            if (gl_VertexIndex == 0) {
+            // referencing gl_InstanceIndex appears to be required to ensure this shader runs multiple times
+            // when called from vkCmdDrawMultiEXT().
+            if (gl_VertexIndex == 0 && gl_InstanceIndex < 10000) {
                 switch(u_info.whichtest) {
                     case 0:
                         debugPrintfEXT("Here are two float values %f, %f", 1.0, myfloat);
@@ -170,11 +164,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_BasicUsage) {
     // Two error messages have to be last in the vector
     messages.push_back("First printf with a % and no value");
     messages.push_back("Second printf with a value -135");
-    VkShaderObj vs(this, shader_source, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL, nullptr, "main", true);
-
-    VkSubmitInfo submit_info = vku::InitStructHelper();
-    submit_info.commandBufferCount = 1;
-    submit_info.pCommandBuffers = &m_commandBuffer->handle();
+    VkShaderObj vs(this, shader_source, VK_SHADER_STAGE_VERTEX_BIT);
 
     CreatePipelineHelper pipe(*this);
     pipe.InitState();
@@ -201,8 +191,8 @@ TEST_F(NegativeDebugPrintf, DISABLED_BasicUsage) {
             m_errorMonitor->SetDesiredFailureMsg(kInformationBit, messages[i + 1]);
             i++;
         }
-        vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
-        vk::QueueWaitIdle(m_default_queue);
+        m_default_queue->submit(*m_commandBuffer, false);
+        m_default_queue->wait();
         m_errorMonitor->VerifyFound();
     }
 
@@ -226,8 +216,8 @@ TEST_F(NegativeDebugPrintf, DISABLED_BasicUsage) {
         for (auto i = 0; i < 3; i++) {
             m_errorMonitor->SetDesiredFailureMsg(kInformationBit, messages[0]);
         }
-        vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
-        vk::QueueWaitIdle(m_default_queue);
+        m_default_queue->submit(*m_commandBuffer, false);
+        m_default_queue->wait();
         m_errorMonitor->VerifyFound();
 
         vkt::Buffer buffer(*m_device, 1024, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
@@ -252,8 +242,8 @@ TEST_F(NegativeDebugPrintf, DISABLED_BasicUsage) {
         for (auto i = 0; i < 3; i++) {
             m_errorMonitor->SetDesiredFailureMsg(kInformationBit, messages[1]);
         }
-        vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
-        vk::QueueWaitIdle(m_default_queue);
+        m_default_queue->submit(*m_commandBuffer, false);
+        m_default_queue->wait();
         m_errorMonitor->VerifyFound();
     }
 
@@ -284,8 +274,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_BasicUsage) {
                 gl_Position = vec4(0.0, 0.0, 0.0, 0.0);
             }
             )glsl";
-        VkShaderObj vs_int64(this, shader_source_int64, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL, nullptr,
-                             "main", true);
+        VkShaderObj vs_int64(this, shader_source_int64, VK_SHADER_STAGE_VERTEX_BIT);
 
         CreatePipelineHelper pipe2(*this);
         pipe2.InitState();
@@ -307,8 +296,8 @@ TEST_F(NegativeDebugPrintf, DISABLED_BasicUsage) {
         data[0] = 0;
         buffer_in.memory().unmap();
         m_errorMonitor->SetDesiredFailureMsg(kInformationBit, "Here's an unsigned long 0x2000000000000001");
-        vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
-        vk::QueueWaitIdle(m_default_queue);
+        m_default_queue->submit(*m_commandBuffer, false);
+        m_default_queue->wait();
         m_errorMonitor->VerifyFound();
 
         data = (VkDeviceAddress *)buffer_in.memory().map();
@@ -316,8 +305,8 @@ TEST_F(NegativeDebugPrintf, DISABLED_BasicUsage) {
         buffer_in.memory().unmap();
         m_errorMonitor->SetDesiredFailureMsg(
             kInformationBit, "Here's a vector of ul 2000000000000001, 2000000000000001, 2000000000000001, 2000000000000001");
-        vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
-        vk::QueueWaitIdle(m_default_queue);
+        m_default_queue->submit(*m_commandBuffer, false);
+        m_default_queue->wait();
         m_errorMonitor->VerifyFound();
 
         data = (VkDeviceAddress *)buffer_in.memory().map();
@@ -325,8 +314,8 @@ TEST_F(NegativeDebugPrintf, DISABLED_BasicUsage) {
         buffer_in.memory().unmap();
         m_errorMonitor->SetDesiredFailureMsg(kInformationBit,
                                              "Unsigned long as decimal 2305843009213693953 and as hex 0x2000000000000001");
-        vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
-        vk::QueueWaitIdle(m_default_queue);
+        m_default_queue->submit(*m_commandBuffer, false);
+        m_default_queue->wait();
         m_errorMonitor->VerifyFound();
     }
 }
@@ -396,7 +385,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MeshTaskShaders) {
     m_errorMonitor->SetDesiredFailureMsg(kInformationBit, "hello from task shader");
     m_errorMonitor->SetDesiredFailureMsg(kInformationBit, "hello from mesh shader");
     m_commandBuffer->QueueCommandBuffer();
-    vk::QueueWaitIdle(m_default_queue);
+    m_default_queue->wait();
     m_errorMonitor->VerifyFound();
 }
 
@@ -436,7 +425,9 @@ TEST_F(NegativeDebugPrintf, DISABLED_GPL) {
         void main() {
             float myfloat = 3.1415f;
             int foo = -135;
-            if (gl_VertexIndex == 0) {
+            // referencing gl_InstanceIndex appears to be required to ensure this shader runs multiple times
+            // when called from vkCmdDrawMultiEXT().
+            if (gl_VertexIndex == 0 && gl_InstanceIndex < 10000) {
                 switch(u_info.whichtest) {
                     case 0:
                         debugPrintfEXT("Here are two float values %f, %f", 1.0, myfloat);
@@ -522,10 +513,6 @@ TEST_F(NegativeDebugPrintf, DISABLED_GPL) {
     };
     vkt::GraphicsPipelineFromLibraries pipe(*m_device, libraries, pipeline_layout.handle());
 
-    VkSubmitInfo submit_info = vku::InitStructHelper();
-    submit_info.commandBufferCount = 1;
-    submit_info.pCommandBuffers = &m_commandBuffer->handle();
-
     m_commandBuffer->begin();
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
     vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
@@ -558,8 +545,8 @@ TEST_F(NegativeDebugPrintf, DISABLED_GPL) {
             m_errorMonitor->SetDesiredFailureMsg(kInformationBit, messages[i + 1]);
             i++;
         }
-        vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
-        vk::QueueWaitIdle(m_default_queue);
+        m_default_queue->submit(*m_commandBuffer, false);
+        m_default_queue->wait();
         m_errorMonitor->VerifyFound();
     }
 
@@ -583,8 +570,8 @@ TEST_F(NegativeDebugPrintf, DISABLED_GPL) {
         for (auto i = 0; i < 3; i++) {
             m_errorMonitor->SetDesiredFailureMsg(kInformationBit, messages[0]);
         }
-        vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
-        vk::QueueWaitIdle(m_default_queue);
+        m_default_queue->submit(*m_commandBuffer, false);
+        m_default_queue->wait();
         m_errorMonitor->VerifyFound();
 
         vkt::Buffer buffer(*m_device, 1024, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
@@ -609,8 +596,8 @@ TEST_F(NegativeDebugPrintf, DISABLED_GPL) {
         for (auto i = 0; i < 3; i++) {
             m_errorMonitor->SetDesiredFailureMsg(kInformationBit, messages[1]);
         }
-        vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
-        vk::QueueWaitIdle(m_default_queue);
+        m_default_queue->submit(*m_commandBuffer, false);
+        m_default_queue->wait();
         m_errorMonitor->VerifyFound();
     }
 
@@ -674,8 +661,8 @@ TEST_F(NegativeDebugPrintf, DISABLED_GPL) {
         data[0] = 0;
         buffer_in.memory().unmap();
         m_errorMonitor->SetDesiredFailureMsg(kInformationBit, "Here's an unsigned long 0x2000000000000001");
-        vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
-        vk::QueueWaitIdle(m_default_queue);
+        m_default_queue->submit(*m_commandBuffer, false);
+        m_default_queue->wait();
         m_errorMonitor->VerifyFound();
 
         data = (VkDeviceAddress *)buffer_in.memory().map();
@@ -683,8 +670,8 @@ TEST_F(NegativeDebugPrintf, DISABLED_GPL) {
         buffer_in.memory().unmap();
         m_errorMonitor->SetDesiredFailureMsg(
             kInformationBit, "Here's a vector of ul 2000000000000001, 2000000000000001, 2000000000000001, 2000000000000001");
-        vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
-        vk::QueueWaitIdle(m_default_queue);
+        m_default_queue->submit(*m_commandBuffer, false);
+        m_default_queue->wait();
         m_errorMonitor->VerifyFound();
 
         data = (VkDeviceAddress *)buffer_in.memory().map();
@@ -692,8 +679,8 @@ TEST_F(NegativeDebugPrintf, DISABLED_GPL) {
         buffer_in.memory().unmap();
         m_errorMonitor->SetDesiredFailureMsg(kInformationBit,
                                              "Unsigned long as decimal 2305843009213693953 and as hex 0x2000000000000001");
-        vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
-        vk::QueueWaitIdle(m_default_queue);
+        m_default_queue->submit(*m_commandBuffer, false);
+        m_default_queue->wait();
         m_errorMonitor->VerifyFound();
     }
 }
@@ -829,7 +816,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_GPLFragment) {
     m_errorMonitor->SetDesiredFailureMsg(kInformationBit, "Vertex shader 0, 0x1030507");
     m_errorMonitor->SetDesiredFailureMsg(kInformationBit, "Fragment shader 0x2040608");
     m_commandBuffer->QueueCommandBuffer();
-    vk::QueueWaitIdle(m_default_queue);
+    m_default_queue->wait();
     m_errorMonitor->VerifyFound();
 }
 
@@ -969,7 +956,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_GPLFragmentIndependentSets) {
     m_errorMonitor->SetDesiredFailureMsg(kInformationBit, "Vertex shader 0, 0x1030507");
     m_errorMonitor->SetDesiredFailureMsg(kInformationBit, "Fragment shader 0x2040608");
     m_commandBuffer->QueueCommandBuffer();
-    vk::QueueWaitIdle(m_default_queue);
+    m_default_queue->wait();
     m_errorMonitor->VerifyFound();
 }
 
@@ -1008,7 +995,9 @@ TEST_F(NegativeDebugPrintf, DISABLED_BasicUsageShaderObjects) {
         void main() {
             float myfloat = 3.1415f;
             int foo = -135;
-            if (gl_VertexIndex == 0) {
+            // referencing gl_InstanceIndex appears to be required to ensure this shader runs multiple times
+            // when called from vkCmdDrawMultiEXT().
+            if (gl_VertexIndex == 0 && gl_InstanceIndex < 10000) {
                 switch(u_info.whichtest) {
                     case 0:
                         debugPrintfEXT("Here are two float values %f, %f", 1.0, myfloat);
@@ -1069,10 +1058,6 @@ TEST_F(NegativeDebugPrintf, DISABLED_BasicUsageShaderObjects) {
     const vkt::Shader vs(*m_device, VK_SHADER_STAGE_VERTEX_BIT, GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, shader_source),
                          &descriptor_set.layout_.handle());
 
-    VkSubmitInfo submit_info = vku::InitStructHelper();
-    submit_info.commandBufferCount = 1;
-    submit_info.pCommandBuffers = &m_commandBuffer->handle();
-
     m_commandBuffer->begin();
     m_commandBuffer->BeginRenderingColor(GetDynamicRenderTarget());
     {
@@ -1098,8 +1083,8 @@ TEST_F(NegativeDebugPrintf, DISABLED_BasicUsageShaderObjects) {
             m_errorMonitor->SetDesiredFailureMsg(kInformationBit, messages[i + 1]);
             i++;
         }
-        vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
-        vk::QueueWaitIdle(m_default_queue);
+        m_default_queue->submit(*m_commandBuffer, false);
+        m_default_queue->wait();
         m_errorMonitor->VerifyFound();
     }
 
@@ -1130,8 +1115,8 @@ TEST_F(NegativeDebugPrintf, DISABLED_BasicUsageShaderObjects) {
         for (auto i = 0; i < 3; i++) {
             m_errorMonitor->SetDesiredFailureMsg(kInformationBit, messages[0]);
         }
-        vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
-        vk::QueueWaitIdle(m_default_queue);
+        m_default_queue->submit(*m_commandBuffer, false);
+        m_default_queue->wait();
         m_errorMonitor->VerifyFound();
 
         vkt::Buffer buffer(*m_device, 1024, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
@@ -1163,8 +1148,8 @@ TEST_F(NegativeDebugPrintf, DISABLED_BasicUsageShaderObjects) {
         for (auto i = 0; i < 3; i++) {
             m_errorMonitor->SetDesiredFailureMsg(kInformationBit, messages[1]);
         }
-        vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
-        vk::QueueWaitIdle(m_default_queue);
+        m_default_queue->submit(*m_commandBuffer, false);
+        m_default_queue->wait();
         m_errorMonitor->VerifyFound();
     }
 
@@ -1218,8 +1203,8 @@ TEST_F(NegativeDebugPrintf, DISABLED_BasicUsageShaderObjects) {
         data[0] = 0;
         buffer_in.memory().unmap();
         m_errorMonitor->SetDesiredFailureMsg(kInformationBit, "Here's an unsigned long 0x2000000000000001");
-        vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
-        vk::QueueWaitIdle(m_default_queue);
+        m_default_queue->submit(*m_commandBuffer, false);
+        m_default_queue->wait();
         m_errorMonitor->VerifyFound();
 
         data = (VkDeviceAddress *)buffer_in.memory().map();
@@ -1227,8 +1212,8 @@ TEST_F(NegativeDebugPrintf, DISABLED_BasicUsageShaderObjects) {
         buffer_in.memory().unmap();
         m_errorMonitor->SetDesiredFailureMsg(
             kInformationBit, "Here's a vector of ul 2000000000000001, 2000000000000001, 2000000000000001, 2000000000000001");
-        vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
-        vk::QueueWaitIdle(m_default_queue);
+        m_default_queue->submit(*m_commandBuffer, false);
+        m_default_queue->wait();
         m_errorMonitor->VerifyFound();
 
         data = (VkDeviceAddress *)buffer_in.memory().map();
@@ -1236,8 +1221,8 @@ TEST_F(NegativeDebugPrintf, DISABLED_BasicUsageShaderObjects) {
         buffer_in.memory().unmap();
         m_errorMonitor->SetDesiredFailureMsg(kInformationBit,
                                              "Unsigned long as decimal 2305843009213693953 and as hex 0x2000000000000001");
-        vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
-        vk::QueueWaitIdle(m_default_queue);
+        m_default_queue->submit(*m_commandBuffer, false);
+        m_default_queue->wait();
         m_errorMonitor->VerifyFound();
     }
 }
@@ -1257,7 +1242,9 @@ TEST_F(NegativeDebugPrintf, DISABLED_MeshTaskShaderObjects) {
     VkPhysicalDeviceMaintenance4Features maintenance_4_features = vku::InitStructHelper();
     VkPhysicalDeviceDynamicRenderingFeatures dynamic_rendering_features = vku::InitStructHelper(&maintenance_4_features);
     VkPhysicalDeviceShaderObjectFeaturesEXT shader_object_features = vku::InitStructHelper(&dynamic_rendering_features);
-    VkPhysicalDeviceMeshShaderFeaturesEXT mesh_shader_features = vku::InitStructHelper(&shader_object_features);
+    VkPhysicalDeviceMultiviewFeaturesKHR multiview_features = vku::InitStructHelper(&shader_object_features);
+    VkPhysicalDeviceFragmentShadingRateFeaturesKHR shading_rate_features = vku::InitStructHelper(&multiview_features);
+    VkPhysicalDeviceMeshShaderFeaturesEXT mesh_shader_features = vku::InitStructHelper(&shading_rate_features);
     GetPhysicalDeviceFeatures2(mesh_shader_features);
     if (!mesh_shader_features.taskShader || !mesh_shader_features.meshShader) {
         GTEST_SKIP() << "Task or mesh shader not supported";
@@ -1289,9 +1276,9 @@ TEST_F(NegativeDebugPrintf, DISABLED_MeshTaskShaderObjects) {
     )glsl";
 
     const vkt::Shader ts(*m_device, VK_SHADER_STAGE_TASK_BIT_EXT,
-                         GLSLToSPV(VK_SHADER_STAGE_TASK_BIT_EXT, taskShaderText, "main", nullptr, SPV_ENV_VULKAN_1_3));
+                         GLSLToSPV(VK_SHADER_STAGE_TASK_BIT_EXT, taskShaderText, SPV_ENV_VULKAN_1_3));
     const vkt::Shader ms(*m_device, VK_SHADER_STAGE_MESH_BIT_EXT,
-                         GLSLToSPV(VK_SHADER_STAGE_MESH_BIT_EXT, meshShaderText, "main", nullptr, SPV_ENV_VULKAN_1_3));
+                         GLSLToSPV(VK_SHADER_STAGE_MESH_BIT_EXT, meshShaderText, SPV_ENV_VULKAN_1_3));
 
     m_commandBuffer->begin();
     m_commandBuffer->BeginRenderingColor(GetDynamicRenderTarget());
@@ -1315,6 +1302,6 @@ TEST_F(NegativeDebugPrintf, DISABLED_MeshTaskShaderObjects) {
     m_errorMonitor->SetDesiredFailureMsg(kInformationBit, "hello from task shader");
     m_errorMonitor->SetDesiredFailureMsg(kInformationBit, "hello from mesh shader");
     m_commandBuffer->QueueCommandBuffer();
-    vk::QueueWaitIdle(m_default_queue);
+    m_default_queue->wait();
     m_errorMonitor->VerifyFound();
 }

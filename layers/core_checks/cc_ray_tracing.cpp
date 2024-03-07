@@ -1,7 +1,7 @@
-/* Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (C) 2015-2023 Google Inc.
+/* Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (C) 2015-2024 Google Inc.
  * Modifications Copyright (C) 2020-2022 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -143,9 +143,9 @@ bool CoreChecks::PreCallValidateGetAccelerationStructureHandleNV(VkDevice device
 
     auto as_state = Get<vvl::AccelerationStructureNV>(accelerationStructure);
     if (as_state != nullptr) {
-        skip = VerifyBoundMemoryIsValid(as_state->MemState(), LogObjectList(accelerationStructure), as_state->Handle(),
-                                        error_obj.location.dot(Field::accelerationStructure),
-                                        "VUID-vkGetAccelerationStructureHandleNV-accelerationStructure-02787");
+        skip |= VerifyBoundMemoryIsValid(as_state->MemState(), LogObjectList(accelerationStructure), as_state->Handle(),
+                                         error_obj.location.dot(Field::accelerationStructure),
+                                         "VUID-vkGetAccelerationStructureHandleNV-accelerationStructure-02787");
     }
 
     return skip;
@@ -162,45 +162,11 @@ bool CoreChecks::ValidateAccelerationStructuresMemoryAlisasing(VkCommandBuffer c
     const auto src_as_state = Get<vvl::AccelerationStructureKHR>(info.srcAccelerationStructure);
     const auto dst_as_state = Get<vvl::AccelerationStructureKHR>(info.dstAccelerationStructure);
 
-    auto validate_no_as_buffer_memory_overlap =
-        [this, commandBuffer, error_obj](const vvl::AccelerationStructureKHR &accel_struct_a, const Location &location_a,
-                                         const vvl::Buffer &buffer_a, const sparse_container::range<VkDeviceSize> &range_a,
-
-                                         const vvl::AccelerationStructureKHR &accel_struct_b, const Location &location_b,
-                                         const vvl::Buffer &buffer_b, const sparse_container::range<VkDeviceSize> &range_b,
-
-                                         const char *vuid) {
-            bool skip = false;
-
-            if (const auto [memory, overlap_range] = buffer_a.GetResourceMemoryOverlap(range_a, &buffer_b, range_b);
-                memory != VK_NULL_HANDLE) {
-                const LogObjectList objlist(commandBuffer, accel_struct_a.Handle(), buffer_a.Handle(), accel_struct_b.Handle(),
-                                            buffer_b.Handle());
-                skip |= LogError(
-                    vuid, objlist, error_obj.location,
-                    "memory backing buffer (%s) used as storage for %s (%s) overlaps memory backing buffer (%s) used as "
-                    "storage for %s (%s). Overlapped memory is (%s) on range %s.",
-                    FormatHandle(buffer_a).c_str(), location_a.Fields().c_str(), FormatHandle(accel_struct_a.Handle()).c_str(),
-                    FormatHandle(buffer_b).c_str(), location_b.Fields().c_str(), FormatHandle(accel_struct_b.Handle()).c_str(),
-                    FormatHandle(memory).c_str(), string_range(overlap_range).c_str());
-            }
-
-            return skip;
-        };
-
     if (info.srcAccelerationStructure != info.dstAccelerationStructure && src_as_state && dst_as_state) {
-        const std::shared_ptr<vvl::Buffer> src_as_buffer = src_as_state->buffer_state;
-        const std::shared_ptr<vvl::Buffer> dst_as_buffer = dst_as_state->buffer_state;
-
-        if (src_as_buffer && dst_as_buffer) {
-            const range<VkDeviceSize> src_as_range(src_as_state->create_infoKHR.offset, src_as_state->create_infoKHR.size);
-            const range<VkDeviceSize> dst_as_range(dst_as_state->create_infoKHR.offset, dst_as_state->create_infoKHR.size);
-
-            skip |= validate_no_as_buffer_memory_overlap(*src_as_state, info_i_loc.dot(Field::srcAccelerationStructure),
-                                                         *src_as_buffer, src_as_range, *dst_as_state,
-                                                         info_i_loc.dot(Field::dstAccelerationStructure), *dst_as_buffer,
-                                                         dst_as_range, "VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03668");
-        }
+        skip |= ValidateAccelStructsMemoryDoNotOverlap(error_obj.location, LogObjectList(commandBuffer), *src_as_state,
+                                                       info_i_loc.dot(Field::srcAccelerationStructure), *dst_as_state,
+                                                       info_i_loc.dot(Field::dstAccelerationStructure),
+                                                       "VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03668");
     }
 
     for (auto [other_info_j, other_info] : vvl::enumerate(pInfos + info_i, infoCount - info_i)) {
@@ -211,237 +177,6 @@ bool CoreChecks::ValidateAccelerationStructuresMemoryAlisasing(VkCommandBuffer c
 
         other_info_j += info_i;
         const Location other_info_j_loc = error_obj.location.dot(Field::pInfos, other_info_j);
-// https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/6040
-#if 0
-            if (auto other_scratches = GetBuffersByAddress(pInfos[other_info_j].scratchData.deviceAddress);
-                !other_scratches.empty()) {
-                using BUFFER_STATE_PTR = ValidationStateTracker::BUFFER_STATE_PTR;
-                BufferAddressValidation<3> other_scratches_validator;
-
-                // Validate that scratch buffer's memory does not overlap destination acceleration structure's memory
-                if (dst_as_state && dst_as_state->buffer_state) {
-                    const vvl::Buffer &dst_as_buffer = *dst_as_state->buffer_state;
-                    const range<VkDeviceSize> dst_as_buffer_range(
-                        dst_as_state->create_infoKHR.offset,
-                        dst_as_state->create_infoKHR.offset + dst_as_state->create_infoKHR.size);
-
-                    other_scratches_validator.AddVuidValidation(
-                        {"VUID-vkCmdBuildAccelerationStructuresKHR-dstAccelerationStructure-03703",
-                         LogObjectList(commandBuffer, dst_as_state->Handle(), dst_as_buffer.Handle()),
-                         // clang-format off
-                         [info_i,
-                         other_info_j,
-                         &no_as_buffer_memory_overlap_msg,
-                         &dst_as_buffer,
-                         dst_as_buffer_range,
-                         // Since scratch buffer size is unknown, compute an assumed scratch buffer size the idiomatic way
-                         assumed_other_scratch_size = rt::ComputeScratchSize(device, pInfos[other_info_j], ppBuildRangeInfos[other_info_j]),
-                         other_scratch_address = pInfos[other_info_j].scratchData.deviceAddress]
-                         // clang-format on
-                         (const BUFFER_STATE_PTR &other_scratch, std::string *out_error_msg) -> bool {
-                             assert(other_scratch->DeviceAddressRange().includes(other_scratch_address));
-
-                             const VkDeviceSize other_scratch_offset = other_scratch_address - other_scratch->deviceAddress;
-                             const range<VkDeviceSize> other_scratch_range(
-                                 other_scratch_offset,
-                                 std::min(other_scratch_offset + assumed_other_scratch_size, other_scratch->createInfo.size));
-                             if (other_scratch_range.invalid()) {
-                                 // Do not validate this VU if range is invalid
-                                 return true;
-                             }
-
-                             if (const auto [memory, overlap_range] = dst_as_buffer.GetResourceMemoryOverlap(
-                                     dst_as_buffer_range, other_scratch, other_scratch_range);
-                                 memory != VK_NULL_HANDLE) {
-                                 if (out_error_msg) {
-                                     std::stringstream dst_as_var_name_ss;
-                                     dst_as_var_name_ss << "pInfos[" << info_i << "].dstAccelerationStructure";
-                                     std::stringstream other_scratch_var_name_ss;
-                                     other_scratch_var_name_ss << "pInfos[" << other_info_j << "].scratchData";
-
-                                     *out_error_msg += no_as_buffer_memory_overlap_msg(
-                                         dst_as_var_name_ss.str().c_str(), dst_as_buffer.buffer(),
-                                         other_scratch_var_name_ss.str().c_str(), other_scratch->buffer(), memory, overlap_range);
-                                 }
-                                 return false;
-                             }
-                             return true;
-                         },
-                         [info_i, other_info_j]() {
-                             return std::string("Some buffers associated to pInfos[") + std::to_string(other_info_j) +
-                                    "].scratchData.deviceAddress have their underlying memory overlapping with the memory "
-                                    "backing pInfos[" +
-                                    std::to_string(info_i) + "].dstAccelerationStructure.\n";
-                         }});
-                }
-
-                // Validate that scratch buffer's memory does not overlap source acceleration structure's memory if build mode is
-                // update
-                if (info->mode == VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR && src_as_state &&
-                    src_as_state->buffer_state) {
-                    const vvl::Buffer &src_as_buffer = *src_as_state->buffer_state;
-                    const range<VkDeviceSize> src_as_buffer_range(
-                        src_as_state->create_infoKHR.offset,
-                        src_as_state->create_infoKHR.offset + src_as_state->create_infoKHR.size);
-
-                    other_scratches_validator.AddVuidValidation(
-                        {"VUID-vkCmdBuildAccelerationStructuresKHR-scratchData-03705",
-                         LogObjectList(commandBuffer, src_as_state->Handle(), src_as_buffer.Handle()),
-                         // clang-format off
-                         [info_i,
-                         other_info_j,
-                         &no_as_buffer_memory_overlap_msg,
-                         &src_as_buffer,
-                         src_as_buffer_range,
-                         // Since scratch buffer size is unknown, compute an assumed scratch buffer size the idiomatic way
-                         assumed_other_scratch_size = rt::ComputeScratchSize(device, pInfos[other_info_j], ppBuildRangeInfos[other_info_j]),
-                         other_scratch_address = pInfos[other_info_j].scratchData.deviceAddress]
-                         // clang-format on
-                         (const BUFFER_STATE_PTR &other_scratch, std::string *out_error_msg) -> bool {
-                             assert(other_scratch->DeviceAddressRange().includes(other_scratch_address));
-
-                             const VkDeviceSize other_scratch_offset = other_scratch_address - other_scratch->deviceAddress;
-                             const range<VkDeviceSize> other_scratch_range(
-                                 other_scratch_offset,
-                                 std::min(other_scratch_offset + assumed_other_scratch_size, other_scratch->createInfo.size));
-                             if (other_scratch_range.invalid()) {
-                                 // Do not validate this VU if range is invalid
-                                 return true;
-                             }
-
-                             if (const auto [memory, overlap_range] = src_as_buffer.GetResourceMemoryOverlap(
-                                     src_as_buffer_range, other_scratch, other_scratch_range);
-                                 memory != VK_NULL_HANDLE) {
-                                 if (out_error_msg) {
-                                     std::stringstream src_as_var_name_ss;
-                                     src_as_var_name_ss << "pInfos[" << info_i << "].srcAccelerationStructure";
-                                     std::stringstream other_scratch_var_name_ss;
-                                     other_scratch_var_name_ss << "pInfos[" << other_info_j << "].scratchData";
-
-                                     *out_error_msg += no_as_buffer_memory_overlap_msg(
-                                         src_as_var_name_ss.str().c_str(), src_as_buffer.buffer(),
-                                         other_scratch_var_name_ss.str().c_str(), other_scratch->buffer(), memory, overlap_range);
-                                 }
-                                 return false;
-                             }
-                             return true;
-                         },
-                         [info_i, other_info_j]() {
-                             return std::string("Some buffers associated to pInfos[") + std::to_string(other_info_j) +
-                                    "].scratchData.deviceAddress have their underlying memory overlapping with the memory "
-                                    "backing pInfos[" +
-                                    std::to_string(info_i) + "].srcAccelerationStructure:\n";
-                         }});
-                }
-
-                // Validate that scratch buffers' memory do not overlap.
-                // Since info->scratchData.deviceAddress can point to multiple buffers,
-                // `other_scratch` needs to be validated against all of these buffers: if one pair has their respective memory
-                // overlapping, validation failed
-                auto scratches = GetBuffersByAddress(info->scratchData.deviceAddress);
-                if (info_i != other_info_j) {
-                    if (!scratches.empty()) {
-                        other_scratches_validator.AddVuidValidation(
-                            {"VUID-vkCmdBuildAccelerationStructuresKHR-scratchData-03704", LogObjectList(commandBuffer),
-                             // clang-format off
-                             [this,
-                             commandBuffer,
-                             info_i,
-                             scratch_address = info->scratchData.deviceAddress,
-                             assumed_scratch_size = rt::ComputeScratchSize(device, info-> ppBuildRangeInfos[info_i]),
-                             &scratches,
-                             other_scratch_address = pInfos[other_info_j].scratchData.deviceAddress,
-                             assumed_other_scratch_size = rt::ComputeScratchSize(device, pInfos[other_info_j], ppBuildRangeInfos[other_info_j])]
-                             // clang-format on
-                             (const BUFFER_STATE_PTR &other_scratch, std::string *out_error_msg) -> bool {
-                                 assert(other_scratch->DeviceAddressRange().includes(other_scratch_address));
-
-                                 const VkDeviceSize other_scratch_offset = other_scratch_address - other_scratch->deviceAddress;
-                                 const range<VkDeviceSize> other_scratch_range(
-                                     other_scratch_offset,
-                                     std::min(other_scratch_offset + assumed_other_scratch_size, other_scratch->createInfo.size));
-                                 if (other_scratch_range.invalid()) {
-                                     // Do not validate this VU if range is invalid
-                                     return true;
-                                 }
-
-                                 // Create a nested BufferAddressValidation object, this time to loop over buffers associated to
-                                 // info->scratchData.deviceAddress
-                                 // If one does overlap "other_scratch", then validation of 03704 failed
-                                 BufferAddressValidation<1> scratch_and_other_scratch_overlap_validator = {
-                                     {{{"No-VUID", LogObjectList(commandBuffer),
-                                        // clang-format off
-                                        [this,
-                                        scratch_address,
-                                        assumed_scratch_size,
-                                        &other_scratch,
-                                        other_scratch_range,
-                                        parent_out_error_msg = out_error_msg]
-                                        // clang-format on
-                                        (const BUFFER_STATE_PTR &scratch, std::string *) -> bool {
-                                            const VkDeviceSize scratch_offset = scratch_address - scratch->deviceAddress;
-                                            const range<VkDeviceSize> scratch_range(
-                                                scratch_offset,
-                                                std::min(scratch_offset + assumed_scratch_size, scratch->createInfo.size));
-
-                                            // Do not validate this VU if range is invalid
-                                            if (scratch_range.invalid()) {
-                                                return true;
-                                            }
-
-                                            if (const auto [memory, overlap_range] = scratch->GetResourceMemoryOverlap(
-                                                    scratch_range, other_scratch, other_scratch_range);
-                                                memory != VK_NULL_HANDLE) {
-                                                if (parent_out_error_msg) {
-                                                    std::stringstream scratch_error_msg_ss;
-                                                    scratch_error_msg_ss << " {" << FormatHandle(scratch->buffer())
-                                                                         << ", backed by " << FormatHandle(memory)
-                                                                         << " - overlap on VkDeviceMemory space range "
-                                                                         << string_range(overlap_range) << "}";
-                                                    *parent_out_error_msg += scratch_error_msg_ss.str();
-                                                }
-                                                return false;
-                                            }
-                                            return true;
-                                        }}}}};
-
-                                 if (!out_error_msg) {
-                                     return !scratch_and_other_scratch_overlap_validator.HasInvalidBuffer(scratches);
-                                 } else {
-                                     const std::string address_name = [&]() {
-                                         std::stringstream address_name_ss;
-                                         address_name_ss << "pInfos[" << info_i << "].scratchData.deviceAddress";
-                                         return address_name_ss.str();
-                                     }();
-                                     *out_error_msg +=
-                                         "Memory backing this buffer is overlapped by memory backing the following buffer(s) "
-                                         "associated to ";
-                                     *out_error_msg += address_name;
-                                     *out_error_msg += ':';
-                                     // Buffer from the `scratches` list overlapping `other_scratch` will be
-                                     // appended in out_error_msg in the LogInvalidBuffers call
-                                     return scratch_and_other_scratch_overlap_validator.LogInvalidBuffers(
-                                         *this, scratches, "vkCmdBuildAccelerationStructures", address_name.c_str(),
-                                         scratch_address);
-                                 }
-                             },
-                             [info_i]() {
-                                 return std::string(
-                                            "The following buffers have their underlying memory overlapping buffers "
-                                            "associated to pInfos[") +
-                                        std::to_string(info_i) + "].scratchData.deviceAddress:\n";
-                             }});
-                    }
-                }
-
-                std::stringstream address_name_ss;
-                address_name_ss << "pInfos[" << other_info_j << "].scratchData.deviceAddress";
-
-                skip |= other_scratches_validator.LogErrorsIfInvalidBufferFound(
-                    *this, other_scratches, "vkCmdBuildAccelerationStructuresKHR()", address_name_ss.str(),
-                    pInfos[other_info_j].scratchData.deviceAddress);
-            }
-#endif
         // skip comparing to self info
         if (other_info_j != info_i) {
             const auto other_dst_as_state = Get<vvl::AccelerationStructureKHR>(pInfos[other_info_j].dstAccelerationStructure);
@@ -449,38 +184,22 @@ bool CoreChecks::ValidateAccelerationStructuresMemoryAlisasing(VkCommandBuffer c
 
             // Validate destination acceleration structure's memory is not overlapped by another source acceleration structure's
             // memory that is going to be updated by this cmd
-            if (dst_as_state && dst_as_state->buffer_state && other_src_as_state && other_src_as_state->buffer_state) {
+            if (dst_as_state && other_src_as_state) {
                 if (pInfos[other_info_j].mode == VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR) {
-                    const vvl::Buffer &buffer_a = *dst_as_state->buffer_state;
-                    const range<VkDeviceSize> range_a(dst_as_state->create_infoKHR.offset,
-                                                      dst_as_state->create_infoKHR.offset + dst_as_state->create_infoKHR.size);
-
-                    const vvl::Buffer &buffer_b = *other_src_as_state->buffer_state;
-                    const range<VkDeviceSize> range_b(
-                        other_src_as_state->create_infoKHR.offset,
-                        other_src_as_state->create_infoKHR.offset + other_src_as_state->create_infoKHR.size);
-
-                    skip |= validate_no_as_buffer_memory_overlap(
-                        *dst_as_state, info_i_loc.dot(Field::dstAccelerationStructure), buffer_a, range_a, *other_src_as_state,
-                        other_info_j_loc.dot(Field::srcAccelerationStructure), buffer_b, range_b,
+                    skip |= ValidateAccelStructsMemoryDoNotOverlap(
+                        error_obj.location, LogObjectList(commandBuffer), *dst_as_state,
+                        info_i_loc.dot(Field::dstAccelerationStructure), *other_src_as_state,
+                        other_info_j_loc.dot(Field::srcAccelerationStructure),
                         "VUID-vkCmdBuildAccelerationStructuresKHR-dstAccelerationStructure-03701");
                 }
             }
 
             // Validate that there is no destination acceleration structures' memory overlaps
-            if (dst_as_state && dst_as_state->buffer_state && other_dst_as_state && other_dst_as_state->buffer_state) {
-                const vvl::Buffer &buffer_a = *dst_as_state->buffer_state;
-                const range<VkDeviceSize> range_a(dst_as_state->create_infoKHR.offset,
-                                                  dst_as_state->create_infoKHR.offset + dst_as_state->create_infoKHR.size);
-
-                const vvl::Buffer &buffer_b = *other_dst_as_state->buffer_state;
-                const range<VkDeviceSize> range_b(
-                    other_dst_as_state->create_infoKHR.offset,
-                    other_dst_as_state->create_infoKHR.offset + other_dst_as_state->create_infoKHR.size);
-
-                skip |= validate_no_as_buffer_memory_overlap(
-                    *dst_as_state, info_i_loc.dot(Field::dstAccelerationStructure), buffer_a, range_a, *other_dst_as_state,
-                    other_info_j_loc.dot(Field::dstAccelerationStructure), buffer_b, range_b,
+            if (dst_as_state && other_dst_as_state) {
+                skip |= ValidateAccelStructsMemoryDoNotOverlap(
+                    error_obj.location, LogObjectList(commandBuffer), *dst_as_state,
+                    info_i_loc.dot(Field::dstAccelerationStructure), *other_dst_as_state,
+                    other_info_j_loc.dot(Field::dstAccelerationStructure),
                     "VUID-vkCmdBuildAccelerationStructuresKHR-dstAccelerationStructure-03702");
             }
         }
@@ -488,22 +207,49 @@ bool CoreChecks::ValidateAccelerationStructuresMemoryAlisasing(VkCommandBuffer c
 
     return skip;
 }
-
-bool CoreChecks::ValidateAccelerationBuffers(uint32_t info_index, const VkAccelerationStructureBuildGeometryInfoKHR &info,
-                                             const Location &loc) const {
+bool CoreChecks::PreCallValidateGetAccelerationStructureDeviceAddressKHR(VkDevice device,
+                                                                         const VkAccelerationStructureDeviceAddressInfoKHR *pInfo,
+                                                                         const ErrorObject &error_obj) const {
     bool skip = false;
-    const auto geometry_count = info.geometryCount;
-    const auto *p_geometries = info.pGeometries;
-    const auto *const *const pp_geometries = info.ppGeometries;
+    if (!enabled_features.accelerationStructure) {
+        skip |= LogError("VUID-vkGetAccelerationStructureDeviceAddressKHR-accelerationStructure-08935", device, error_obj.location,
+                         "accelerationStructure feature was not enabled.");
+    }
+    if (physical_device_count > 1 && !enabled_features.bufferDeviceAddressMultiDevice &&
+        !enabled_features.bufferDeviceAddressMultiDeviceEXT) {
+        skip |= LogError("VUID-vkGetAccelerationStructureDeviceAddressKHR-device-03504", device, error_obj.location,
+                         "bufferDeviceAddressMultiDevice feature was not enabled.");
+    }
+
+    const auto accel_struct = Get<vvl::AccelerationStructureKHR>(pInfo->accelerationStructure);
+    if (accel_struct) {
+        const Location info_loc = error_obj.location.dot(Field::pInfo);
+        skip |= ValidateMemoryIsBoundToBuffer(device, *accel_struct->buffer_state,
+                                              info_loc.dot(Field::accelerationStructure).dot(Field::buffer),
+                                              "VUID-vkGetAccelerationStructureDeviceAddressKHR-pInfo-09541");
+
+        if (!(accel_struct->buffer_state->createInfo.usage & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT)) {
+            skip |= LogError("VUID-vkGetAccelerationStructureDeviceAddressKHR-pInfo-09542", LogObjectList(device),
+                             info_loc.dot(Field::accelerationStructure).dot(Field::buffer), "was created with usage flag(s) %s.",
+                             string_VkBufferUsageFlags(accel_struct->buffer_state->createInfo.usage).c_str());
+        }
+    }
+
+    return skip;
+}
+
+bool CoreChecks::ValidateAccelerationBuffers(VkCommandBuffer cmd_buffer, uint32_t info_i,
+                                             const VkAccelerationStructureBuildGeometryInfoKHR &info,
+                                             const VkAccelerationStructureBuildRangeInfoKHR *geometry_build_ranges,
+                                             const Location &info_loc) const {
+    bool skip = false;
 
     auto buffer_check = [this](uint32_t gi, const VkDeviceOrHostAddressConstKHR address, const Location &geom_loc) -> bool {
         const auto buffer_states = GetBuffersByAddress(address.deviceAddress);
         const bool no_valid_buffer_found =
-            !buffer_states.empty() &&
-            std::none_of(buffer_states.begin(), buffer_states.end(),
-                         [](const ValidationStateTracker::BUFFER_STATE_PTR &buffer_state) {
-                             return buffer_state->usage & VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
-                         });
+            !buffer_states.empty() && std::none_of(buffer_states.begin(), buffer_states.end(), [](const vvl::Buffer *buffer_state) {
+                return buffer_state->usage & VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
+            });
         if (no_valid_buffer_found) {
             LogObjectList objlist(device);
             for (const auto &buffer_state : buffer_states) {
@@ -517,67 +263,283 @@ bool CoreChecks::ValidateAccelerationBuffers(uint32_t info_index, const VkAccele
         return false;
     };
 
-    // Parameter validation has already checked VUID-VkAccelerationStructureBuildGeometryInfoKHR-pGeometries-03788
-    // !(pGeometries && ppGeometries)
-    std::function<const VkAccelerationStructureGeometryKHR &(uint32_t)> geom_accessor;
-    if (p_geometries) {
-        geom_accessor = [p_geometries](uint32_t i) -> const VkAccelerationStructureGeometryKHR & { return p_geometries[i]; };
-    } else if (pp_geometries) {
-        geom_accessor = [pp_geometries](uint32_t i) -> const VkAccelerationStructureGeometryKHR & {
-            // pp_geometries[i] is assumed to be a valid pointer
-            return *pp_geometries[i];
-        };
+    const Location pp_build_range_info_loc(info_loc.function, Field::ppBuildRangeInfos, info_i);
+    for (uint32_t geom_i = 0; geom_i < info.geometryCount; ++geom_i) {
+        const Location p_geom_loc = info_loc.dot(info.pGeometries ? Field::pGeometries : Field::ppGeometries, geom_i);
+        const Location p_geom_geom_loc = p_geom_loc.dot(Field::geometry);
+        const Location p_geom_geom_triangles_loc = p_geom_geom_loc.dot(Field::triangles);
+        const VkAccelerationStructureGeometryKHR &geom_data = rt::GetGeometry(info, geom_i);
+
+        switch (geom_data.geometryType) {
+            case VK_GEOMETRY_TYPE_TRIANGLES_KHR:  // == VK_GEOMETRY_TYPE_TRIANGLES_NV
+            {
+                skip |=
+                    buffer_check(geom_i, geom_data.geometry.triangles.vertexData, p_geom_geom_triangles_loc.dot(Field::vertexData));
+                skip |=
+                    buffer_check(geom_i, geom_data.geometry.triangles.indexData, p_geom_geom_triangles_loc.dot(Field::indexData));
+                skip |= buffer_check(geom_i, geom_data.geometry.triangles.transformData,
+                                     p_geom_geom_triangles_loc.dot(Field::transformData));
+
+                auto vertex_buffer_states = GetBuffersByAddress(geom_data.geometry.triangles.vertexData.deviceAddress);
+                if (vertex_buffer_states.empty()) {
+                    skip |= LogError("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03804", cmd_buffer,
+                                     p_geom_geom_triangles_loc.dot(Field::vertexData).dot(Field::deviceAddress),
+                                     "(0x%" PRIx64 ") is not an address belonging to an existing buffer.",
+                                     geom_data.geometry.triangles.vertexData.deviceAddress);
+                } else {
+                    BufferAddressValidation<1> buffer_address_validator = {
+                        {{{"VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03805",
+                           [this](vvl::Buffer *const buffer_state, std::string *out_error_msg) {
+                               return BufferAddressValidation<1>::ValidateMemoryBoundToBuffer(*this, buffer_state, out_error_msg);
+                           },
+                           []() { return BufferAddressValidation<1>::ValidateMemoryBoundToBufferErrorMsgHeader(); }}}}};
+
+                    skip |= buffer_address_validator.LogErrorsIfNoValidBuffer(
+                        *this, vertex_buffer_states, p_geom_geom_triangles_loc.dot(Field::vertexData).dot(Field::deviceAddress),
+                        LogObjectList(cmd_buffer), geom_data.geometry.triangles.vertexData.deviceAddress);
+                }
+
+                if (geom_data.geometry.triangles.indexType != VK_INDEX_TYPE_NONE_KHR) {
+                    auto index_buffer_states = GetBuffersByAddress(geom_data.geometry.triangles.indexData.deviceAddress);
+                    if (index_buffer_states.empty()) {
+                        skip |= LogError("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03806", cmd_buffer,
+                                         p_geom_geom_triangles_loc.dot(Field::indexData).dot(Field::deviceAddress),
+                                         "(0x%" PRIx64 ") is not an address belonging to an existing buffer. %s is %s.",
+                                         geom_data.geometry.triangles.indexData.deviceAddress,
+                                         p_geom_geom_triangles_loc.dot(Field::indexType).Fields().c_str(),
+                                         string_VkIndexType(geom_data.geometry.triangles.indexType));
+                    } else {
+                        BufferAddressValidation<1> buffer_address_validator = {
+                            {{{"VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03807",
+                               [this](vvl::Buffer *const buffer_state, std::string *out_error_msg) {
+                                   return BufferAddressValidation<1>::ValidateMemoryBoundToBuffer(*this, buffer_state,
+                                                                                                  out_error_msg);
+                               },
+                               []() { return BufferAddressValidation<1>::ValidateMemoryBoundToBufferErrorMsgHeader(); }}}}};
+
+                        skip |= buffer_address_validator.LogErrorsIfNoValidBuffer(
+                            *this, index_buffer_states, p_geom_geom_triangles_loc.dot(Field::indexData).dot(Field::deviceAddress),
+                            LogObjectList(cmd_buffer), geom_data.geometry.triangles.indexData.deviceAddress);
+                    }
+
+                    if (const auto src_as_state = Get<vvl::AccelerationStructureKHR>(info.srcAccelerationStructure)) {
+                        if (geom_i < src_as_state->build_range_infos.size()) {
+                            if (const uint32_t recorded_first_vertex = src_as_state->build_range_infos[geom_i].firstVertex;
+                                recorded_first_vertex != geometry_build_ranges[geom_i].firstVertex) {
+                                const LogObjectList objlist(cmd_buffer, info.srcAccelerationStructure);
+                                skip |= LogError("VUID-vkCmdBuildAccelerationStructuresKHR-firstVertex-03770", objlist, p_geom_loc,
+                                                 " has corresponding VkAccelerationStructureBuildRangeInfoKHR %s[%" PRIu32
+                                                 "], but this build range has its firstVertex member set to (%" PRIu32
+                                                 ") when it was last specified as (%" PRIu32 ").",
+                                                 pp_build_range_info_loc.Fields().c_str(), geom_i,
+                                                 geometry_build_ranges[geom_i].firstVertex, recorded_first_vertex);
+                            }
+
+                            if (const uint32_t recorded_primitive_count = src_as_state->build_range_infos[geom_i].primitiveCount;
+                                recorded_primitive_count != geometry_build_ranges[geom_i].primitiveCount) {
+                                const LogObjectList objlist(cmd_buffer, info.srcAccelerationStructure);
+                                skip |=
+                                    LogError("VUID-vkCmdBuildAccelerationStructuresKHR-primitiveCount-03769", objlist, p_geom_loc,
+                                             " has corresponding VkAccelerationStructureBuildRangeInfoKHR %s[%" PRIu32
+                                             "], but this build range has its primitiveCount member set to (%" PRIu32
+                                             ") when it was last specified as (%" PRIu32 ").",
+                                             pp_build_range_info_loc.Fields().c_str(), geom_i,
+                                             geometry_build_ranges[geom_i].primitiveCount, recorded_primitive_count);
+                            }
+                        }
+                    }
+                }
+
+                VkFormatProperties vertex_format_props{};
+                DispatchGetPhysicalDeviceFormatProperties(physical_device, geom_data.geometry.triangles.vertexFormat,
+                                                          &vertex_format_props);
+                if (!(vertex_format_props.bufferFeatures & VK_FORMAT_FEATURE_ACCELERATION_STRUCTURE_VERTEX_BUFFER_BIT_KHR)) {
+                    skip |= LogError("VUID-VkAccelerationStructureGeometryTrianglesDataKHR-vertexFormat-03797", cmd_buffer,
+                                     p_geom_geom_triangles_loc.dot(Field::vertexFormat),
+                                     "is %s, and only has the following VkFormatProperties::bufferFeatures: %s.",
+                                     string_VkFormat(geom_data.geometry.triangles.vertexFormat),
+                                     string_VkFormatFeatureFlags(vertex_format_props.bufferFeatures).c_str());
+                }
+                // Only try to get format info if vertex format is valid
+                else {
+                    const VKU_FORMAT_INFO format_info = vkuGetFormatInfo(geom_data.geometry.triangles.vertexFormat);
+                    uint32_t min_component_bits_size = format_info.components[0].size;
+                    for (uint32_t component_i = 1; component_i < format_info.component_count; ++component_i) {
+                        min_component_bits_size = std::min(format_info.components[component_i].size, min_component_bits_size);
+                    }
+                    const uint32_t min_component_byte_size = min_component_bits_size / 8;
+                    if (SafeModulo(geom_data.geometry.triangles.vertexData.deviceAddress, min_component_byte_size) != 0) {
+                        skip |= LogError("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03711", cmd_buffer,
+                                         p_geom_geom_triangles_loc.dot(Field::vertexData).dot(Field::deviceAddress),
+                                         "is 0x%" PRIx64 " and is not aligned to the minimum component byte size (%" PRIu32
+                                         ") of its corresponding vertex "
+                                         "format (%s).",
+                                         geom_data.geometry.triangles.vertexData.deviceAddress, min_component_byte_size,
+                                         string_VkFormat(geom_data.geometry.triangles.vertexFormat));
+                    }
+                    if (SafeModulo(geom_data.geometry.triangles.vertexStride, min_component_byte_size) != 0) {
+                        skip |= LogError("VUID-VkAccelerationStructureGeometryTrianglesDataKHR-vertexStride-03735", cmd_buffer,
+                                         p_geom_geom_triangles_loc.dot(Field::vertexStride),
+                                         "is %" PRIu64 " and is not aligned to the minimum component byte size (%" PRIu32
+                                         ") of its corresponding vertex "
+                                         "format (%s).",
+                                         geom_data.geometry.triangles.vertexStride, min_component_byte_size,
+                                         string_VkFormat(geom_data.geometry.triangles.vertexFormat));
+                    }
+                }
+                if (geom_data.geometry.triangles.transformData.deviceAddress != 0) {
+                    auto tranform_buffer_states = GetBuffersByAddress(geom_data.geometry.triangles.transformData.deviceAddress);
+                    if (tranform_buffer_states.empty()) {
+                        skip |= LogError("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03808", cmd_buffer,
+                                         p_geom_geom_triangles_loc.dot(Field::transformData).dot(Field::deviceAddress),
+                                         "(0x%" PRIx64 ") is not an address belonging to an existing buffer.",
+                                         geom_data.geometry.triangles.transformData.deviceAddress);
+                    } else {
+                        BufferAddressValidation<1> buffer_address_validator = {
+                            {{{"VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03809",
+                               [this](vvl::Buffer *const buffer_state, std::string *out_error_msg) {
+                                   return BufferAddressValidation<1>::ValidateMemoryBoundToBuffer(*this, buffer_state,
+                                                                                                  out_error_msg);
+                               },
+                               []() { return BufferAddressValidation<1>::ValidateMemoryBoundToBufferErrorMsgHeader(); }}}}};
+
+                        skip |= buffer_address_validator.LogErrorsIfNoValidBuffer(
+                            *this, tranform_buffer_states,
+                            p_geom_geom_triangles_loc.dot(Field::transformData).dot(Field::deviceAddress),
+                            LogObjectList(cmd_buffer), geom_data.geometry.triangles.transformData.deviceAddress);
+                    }
+                }
+                break;
+            }
+            case VK_GEOMETRY_TYPE_INSTANCES_KHR: {
+                const Location instances_loc = p_geom_geom_loc.dot(Field::instances);
+                const Location instances_data_loc = instances_loc.dot(Field::data);
+
+                skip |= buffer_check(geom_i, geom_data.geometry.instances.data, instances_data_loc);
+
+                auto buffer_states = GetBuffersByAddress(geom_data.geometry.instances.data.deviceAddress);
+                if (buffer_states.empty()) {
+                    skip |= LogError("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03813", cmd_buffer,
+                                     instances_data_loc.dot(Field::deviceAddress),
+                                     "(%" PRIu64 ") is not an address belonging to an existing buffer.",
+                                     geom_data.geometry.instances.data.deviceAddress);
+                } else {
+                    BufferAddressValidation<1> buffer_address_validator = {
+                        {{{"VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03814",
+                           [this](vvl::Buffer *const buffer_state, std::string *out_error_msg) {
+                               return BufferAddressValidation<1>::ValidateMemoryBoundToBuffer(*this, buffer_state, out_error_msg);
+                           },
+                           []() { return BufferAddressValidation<1>::ValidateMemoryBoundToBufferErrorMsgHeader(); }}}}};
+
+                    skip |= buffer_address_validator.LogErrorsIfNoValidBuffer(
+                        *this, buffer_states, instances_data_loc.dot(Field::deviceAddress), LogObjectList(cmd_buffer),
+                        geom_data.geometry.instances.data.deviceAddress);
+                }
+
+                break;
+            }
+            case VK_GEOMETRY_TYPE_AABBS_KHR:  // == VK_GEOMETRY_TYPE_AABBS_NV
+            {
+                skip |= buffer_check(geom_i, geom_data.geometry.aabbs.data, p_geom_geom_loc.dot(Field::aabbs).dot(Field::data));
+
+                auto aabb_buffer_states = GetBuffersByAddress(geom_data.geometry.aabbs.data.deviceAddress);
+                if (aabb_buffer_states.empty()) {
+                    skip |= LogError("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03811", cmd_buffer,
+                                     p_geom_geom_loc.dot(Field::aabbs).dot(Field::data).dot(Field::deviceAddress),
+                                     "(0x%" PRIx64 ") is not an address belonging to an existing buffer.",
+                                     geom_data.geometry.aabbs.data.deviceAddress);
+                } else {
+                    BufferAddressValidation<1> buffer_address_validator = {
+                        {{{"VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03812",
+                           [this](vvl::Buffer *const buffer_state, std::string *out_error_msg) {
+                               return BufferAddressValidation<1>::ValidateMemoryBoundToBuffer(*this, buffer_state, out_error_msg);
+                           },
+                           []() { return BufferAddressValidation<1>::ValidateMemoryBoundToBufferErrorMsgHeader(); }}}}};
+
+                    skip |= buffer_address_validator.LogErrorsIfNoValidBuffer(
+                        *this, aabb_buffer_states, p_geom_geom_loc.dot(Field::aabbs).dot(Field::data).dot(Field::deviceAddress),
+                        LogObjectList(cmd_buffer), geom_data.geometry.aabbs.data.deviceAddress);
+                }
+                break;
+            }
+            default:
+                // no-op
+                break;
+        }
     }
 
-    if (geom_accessor) {
-        for (uint32_t geom_index = 0; geom_index < geometry_count; ++geom_index) {
-            const Location geom_loc = loc.dot(Field::pGeometries, geom_index);
-            const auto &geom_data = geom_accessor(geom_index);
-            switch (geom_data.geometryType) {
-                case VK_GEOMETRY_TYPE_TRIANGLES_KHR:  // == VK_GEOMETRY_TYPE_TRIANGLES_NV
-                    skip |= buffer_check(geom_index, geom_data.geometry.triangles.vertexData,
-                                         geom_loc.dot(Field::geometry).dot(Field::triangles).dot(Field::vertexData));
-                    skip |= buffer_check(geom_index, geom_data.geometry.triangles.indexData,
-                                         geom_loc.dot(Field::geometry).dot(Field::triangles).dot(Field::indexData));
-                    skip |= buffer_check(geom_index, geom_data.geometry.triangles.transformData,
-                                         geom_loc.dot(Field::geometry).dot(Field::triangles).dot(Field::transformData));
-                    break;
-                case VK_GEOMETRY_TYPE_INSTANCES_KHR:
-                    skip |= buffer_check(geom_index, geom_data.geometry.instances.data,
-                                         geom_loc.dot(Field::geometry).dot(Field::instances).dot(Field::data));
-                    break;
-                case VK_GEOMETRY_TYPE_AABBS_KHR:  // == VK_GEOMETRY_TYPE_AABBS_NV
-                    skip |= buffer_check(geom_index, geom_data.geometry.aabbs.data,
-                                         geom_loc.dot(Field::geometry).dot(Field::aabbs).dot(Field::data));
-                    break;
-                default:
-                    // no-op
-                    break;
-            }
+    if (const auto dst_as_state = Get<vvl::AccelerationStructureKHR>(info.dstAccelerationStructure)) {
+        const VkDeviceSize as_minimum_size = rt::ComputeAccelerationStructureSize(device, info, geometry_build_ranges);
+        if (dst_as_state->create_infoKHR.size < as_minimum_size) {
+            const LogObjectList objlist(cmd_buffer, info.dstAccelerationStructure);
+            skip |= LogError("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03675", objlist,
+                             info_loc.dot(Field::dstAccelerationStructure),
+                             " was created with size (%" PRIu64
+                             "), but an acceleration structure build with corresponding ppBuildRangeInfos[%" PRIu32
+                             "] requires a minimum size of (%" PRIu64 ").",
+                             dst_as_state->create_infoKHR.size, info_i, as_minimum_size);
         }
     }
 
     const auto buffer_states = GetBuffersByAddress(info.scratchData.deviceAddress);
     if (buffer_states.empty()) {
         skip |= LogError("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03802", device,
-                         loc.dot(Field::scratchData).dot(Field::deviceAddress),
+                         info_loc.dot(Field::scratchData).dot(Field::deviceAddress),
                          "(0x%" PRIx64 ") has no buffer is associated with it.", info.scratchData.deviceAddress);
     } else {
-        const bool no_valid_buffer_found = std::none_of(buffer_states.begin(), buffer_states.end(),
-                                                        [](const ValidationStateTracker::BUFFER_STATE_PTR &buffer_state) {
-                                                            return buffer_state->usage & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-                                                        });
-        if (no_valid_buffer_found) {
-            LogObjectList objlist(device);
-            for (const auto &buffer_state : buffer_states) {
-                objlist.add(buffer_state->Handle());
-            }
-            skip |= LogError("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03674", objlist,
-                             loc.dot(Field::scratchData).dot(Field::deviceAddress),
-                             "(0x%" PRIx64
-                             ") has no buffer is associated with it that was created with VK_BUFFER_USAGE_STORAGE_BUFFER_BIT bit.",
-                             info.scratchData.deviceAddress);
-        }
+        const VkDeviceSize scratch_size = rt::ComputeScratchSize(device, info, geometry_build_ranges);
+        const sparse_container::range<VkDeviceSize> scratch_address_range(info.scratchData.deviceAddress,
+                                                                          info.scratchData.deviceAddress + scratch_size);
+        const char *scratch_address_range_vuid = info.mode == VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR
+                                                     ? "VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03671"
+                                                     : "VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03672";
+
+        BufferAddressValidation<3> buffer_address_validator = {{{
+            {"VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03803",
+             [this, info_loc, cmd_buffer](vvl::Buffer *const buffer_state, std::string *out_error_msg) {
+                 if (!out_error_msg) {
+                     return !buffer_state->sparse && buffer_state->IsMemoryBound();
+                 } else {
+                     return ValidateMemoryIsBoundToBuffer(cmd_buffer, *buffer_state,
+                                                          info_loc.dot(Field::scratchData).dot(Field::deviceAddress),
+                                                          "VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03803");
+                 }
+             }},
+
+            {"VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03674",
+             [](vvl::Buffer *const buffer_state, std::string *out_error_msg) {
+                 if (!(buffer_state->usage & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)) {
+                     if (out_error_msg) {
+                         *out_error_msg += "buffer usage is " + string_VkBufferUsageFlags2KHR(buffer_state->usage) + '\n';
+                     }
+                     return false;
+                 }
+                 return true;
+             },
+             []() { return "The following buffers are missing VK_BUFFER_USAGE_STORAGE_BUFFER_BIT usage flag:"; }},
+
+            {scratch_address_range_vuid,
+             [scratch_address_range](vvl::Buffer *const buffer_state, std::string *out_error_msg) {
+                 const sparse_container::range<VkDeviceSize> buffer_address_range = buffer_state->DeviceAddressRange();
+
+                 if (!buffer_address_range.includes(scratch_address_range)) {
+                     if (out_error_msg) {
+                         *out_error_msg += "buffer address range is " + string_range_hex(buffer_address_range) + '\n';
+                     }
+                     return false;
+                 }
+                 return true;
+             },
+             [scratch_address_range]() {
+                 return "The following buffers have an address range that does not include scratch address range " +
+                        string_range_hex(scratch_address_range) + ":";
+             }},
+
+        }}};
+
+        skip |= buffer_address_validator.LogErrorsIfNoValidBuffer(*this, buffer_states,
+                                                                  info_loc.dot(Field::scratchData).dot(Field::deviceAddress),
+                                                                  LogObjectList(cmd_buffer), info.scratchData.deviceAddress);
     }
 
     return skip;
@@ -609,13 +571,8 @@ bool CoreChecks::PreCallValidateCmdBuildAccelerationStructuresKHR(
         }
 
         if (info->mode == VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR) {
-            if (info->srcAccelerationStructure == VK_NULL_HANDLE || !src_as_state) {
-                const LogObjectList objlist(device, commandBuffer);
-                skip |=
-                    LogError("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-04630", objlist, info_loc.dot(Field::mode),
-                             "is VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR but srcAccelerationStructure is VK_NULL_HANDLE.");
-            } else if (src_as_state->built &&
-                       !(src_as_state->build_info_khr.flags & VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR)) {
+            if (src_as_state->built &&
+                !(src_as_state->build_info_khr.flags & VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR)) {
                 const LogObjectList objlist(device, commandBuffer, info->srcAccelerationStructure);
                 skip |= LogError("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03667", objlist, info_loc.dot(Field::mode),
                                  "is VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR, srcAccelerationStructure has been previously "
@@ -767,7 +724,7 @@ bool CoreChecks::PreCallValidateCmdBuildAccelerationStructuresKHR(
             }
         }
 
-        skip |= ValidateAccelerationBuffers(info_i, *info, info_loc);
+        skip |= ValidateAccelerationBuffers(commandBuffer, info_i, *info, ppBuildRangeInfos[info_i], info_loc);
 
         skip |= ValidateAccelerationStructuresMemoryAlisasing(commandBuffer, infoCount, pInfos, info_i, error_obj);
     }
@@ -780,76 +737,140 @@ bool CoreChecks::PreCallValidateBuildAccelerationStructuresKHR(
     const VkAccelerationStructureBuildGeometryInfoKHR *pInfos,
     const VkAccelerationStructureBuildRangeInfoKHR *const *ppBuildRangeInfos, const ErrorObject &error_obj) const {
     bool skip = false;
-    for (uint32_t i = 0; i < infoCount; ++i) {
-        const Location info_loc = error_obj.location.dot(Field::pInfos, i);
-        auto src_as_state = Get<vvl::AccelerationStructureKHR>(pInfos[i].srcAccelerationStructure);
-        auto dst_as_state = Get<vvl::AccelerationStructureKHR>(pInfos[i].dstAccelerationStructure);
+    skip |= ValidateDeferredOperation(device, deferredOperation, error_obj.location.dot(Field::deferredOperation),
+                                      "VUID-vkBuildAccelerationStructuresKHR-deferredOperation-03678");
+
+    for (const auto [info_i, info] : vvl::enumerate(pInfos, infoCount)) {
+        const Location info_loc = error_obj.location.dot(Field::pInfos, info_i);
+        auto src_as_state = Get<vvl::AccelerationStructureKHR>(info->srcAccelerationStructure);
+        auto dst_as_state = Get<vvl::AccelerationStructureKHR>(info->dstAccelerationStructure);
         if (dst_as_state) {
-            skip |=
-                ValidateHostVisibleMemoryIsBoundToBuffer(*dst_as_state->buffer_state, info_loc.dot(Field::dstAccelerationStructure),
-                                                         "VUID-vkBuildAccelerationStructuresKHR-pInfos-03722");
+            skip |= ValidateAccelStructBufferMemoryIsHostVisible(*dst_as_state, info_loc.dot(Field::dstAccelerationStructure),
+                                                                 "VUID-vkBuildAccelerationStructuresKHR-pInfos-03722");
+
+            skip |= ValidateAccelStructBufferMemoryIsNotMultiInstance(*dst_as_state, info_loc.dot(Field::dstAccelerationStructure),
+                                                                      "VUID-vkBuildAccelerationStructuresKHR-pInfos-03775");
         }
-        if (pInfos[i].mode == VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR) {
+        if (info->mode == VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR) {
             if (src_as_state == nullptr || !src_as_state->built ||
                 !(src_as_state->build_info_khr.flags & VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR)) {
                 skip |= LogError(
-                    "VUID-vkBuildAccelerationStructuresKHR-pInfos-03667", pInfos[i].srcAccelerationStructure,
-                    info_loc.dot(Field::mode),
+                    "VUID-vkBuildAccelerationStructuresKHR-pInfos-03667", info->srcAccelerationStructure, info_loc.dot(Field::mode),
                     "is "
                     "VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR, but its srcAccelerationStructure was built before with %s.",
                     string_VkBuildAccelerationStructureFlagsKHR(src_as_state->build_info_khr.flags).c_str());
             }
             if (src_as_state) {
-                skip |= ValidateHostVisibleMemoryIsBoundToBuffer(*src_as_state->buffer_state,
-                                                                 info_loc.dot(Field::srcAccelerationStructure),
-                                                                 "VUID-vkBuildAccelerationStructuresKHR-pInfos-03723");
-                if (pInfos[i].geometryCount != src_as_state->build_info_khr.geometryCount) {
+                skip |= ValidateAccelStructBufferMemoryIsHostVisible(*src_as_state, info_loc.dot(Field::srcAccelerationStructure),
+                                                                     "VUID-vkBuildAccelerationStructuresKHR-pInfos-03723");
+
+                skip |=
+                    ValidateAccelStructBufferMemoryIsNotMultiInstance(*src_as_state, info_loc.dot(Field::srcAccelerationStructure),
+                                                                      "VUID-vkBuildAccelerationStructuresKHR-pInfos-03776");
+
+                if (info->geometryCount != src_as_state->build_info_khr.geometryCount) {
                     skip |=
-                        LogError("VUID-vkBuildAccelerationStructuresKHR-pInfos-03758", pInfos[i].srcAccelerationStructure,
+                        LogError("VUID-vkBuildAccelerationStructuresKHR-pInfos-03758", info->srcAccelerationStructure,
                                  info_loc.dot(Field::mode),
                                  "is VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR,"
                                  " but geometryCount (%" PRIu32 ") is different then srcAccelerationStructure value (%" PRIu32 ").",
-                                 pInfos[i].geometryCount, src_as_state->build_info_khr.geometryCount);
+                                 info->geometryCount, src_as_state->build_info_khr.geometryCount);
                 }
-                if (pInfos[i].flags != src_as_state->build_info_khr.flags) {
-                    skip |= LogError("VUID-vkBuildAccelerationStructuresKHR-pInfos-03759", pInfos[i].srcAccelerationStructure,
+                if (info->flags != src_as_state->build_info_khr.flags) {
+                    skip |= LogError("VUID-vkBuildAccelerationStructuresKHR-pInfos-03759", info->srcAccelerationStructure,
                                      info_loc.dot(Field::mode),
                                      "is VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR,"
                                      " but %s (%s) is different then srcAccelerationStructure value (%s).",
                                      info_loc.dot(Field::flags).Fields().c_str(),
-                                     string_VkBuildAccelerationStructureFlagsKHR(pInfos[i].flags).c_str(),
+                                     string_VkBuildAccelerationStructureFlagsKHR(info->flags).c_str(),
                                      string_VkBuildAccelerationStructureFlagsKHR(src_as_state->build_info_khr.flags).c_str());
                 }
-                if (pInfos[i].type != src_as_state->build_info_khr.type) {
-                    skip |= LogError("VUID-vkBuildAccelerationStructuresKHR-pInfos-03760", pInfos[i].srcAccelerationStructure,
+                if (info->type != src_as_state->build_info_khr.type) {
+                    skip |= LogError("VUID-vkBuildAccelerationStructuresKHR-pInfos-03760", info->srcAccelerationStructure,
                                      info_loc.dot(Field::mode),
                                      "is VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR,"
                                      " but type (%s) is different then srcAccelerationStructure value (%s).",
-                                     string_VkAccelerationStructureTypeKHR(pInfos[i].type),
+                                     string_VkAccelerationStructureTypeKHR(info->type),
                                      string_VkAccelerationStructureTypeKHR(src_as_state->build_info_khr.type));
                 }
             }
         }
-        if (pInfos[i].type == VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR) {
+        if (info->type == VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR) {
             if (!dst_as_state ||
                 (dst_as_state && dst_as_state->create_infoKHR.type != VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR &&
                  dst_as_state->create_infoKHR.type != VK_ACCELERATION_STRUCTURE_TYPE_GENERIC_KHR)) {
                 skip |= LogError(
-                    "VUID-vkBuildAccelerationStructuresKHR-pInfos-03700", pInfos[i].dstAccelerationStructure,
-                    info_loc.dot(Field::type),
+                    "VUID-vkBuildAccelerationStructuresKHR-pInfos-03700", info->dstAccelerationStructure, info_loc.dot(Field::type),
                     "is VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR, but its dstAccelerationStructure was built with type %s.",
                     string_VkAccelerationStructureTypeKHR(dst_as_state->create_infoKHR.type));
             }
         }
-        if (pInfos[i].type == VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR) {
+        if (info->type == VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR) {
             if (!dst_as_state ||
                 (dst_as_state && dst_as_state->create_infoKHR.type != VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR &&
                  dst_as_state->create_infoKHR.type != VK_ACCELERATION_STRUCTURE_TYPE_GENERIC_KHR)) {
                 skip |= LogError(
-                    "VUID-vkBuildAccelerationStructuresKHR-pInfos-03699", pInfos[i].dstAccelerationStructure,
-                    info_loc.dot(Field::type),
+                    "VUID-vkBuildAccelerationStructuresKHR-pInfos-03699", info->dstAccelerationStructure, info_loc.dot(Field::type),
                     "is VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR, but its dstAccelerationStructure was built with type %s.",
                     string_VkAccelerationStructureTypeKHR(dst_as_state->create_infoKHR.type));
+            }
+        }
+        for (uint32_t geom_i = 0; geom_i < info->geometryCount; ++geom_i) {
+            const VkAccelerationStructureGeometryKHR &geom = rt::GetGeometry(*info, geom_i);
+
+            if (geom.geometryType != VK_GEOMETRY_TYPE_INSTANCES_KHR) {
+                continue;
+            }
+
+            const Location geometry_loc = info_loc.dot(info->pGeometries ? Field::pGeometries : Field::ppGeometries, geom_i);
+
+            for (uint32_t instance_i = 0; instance_i < ppBuildRangeInfos[info_i][geom_i].primitiveCount; ++instance_i) {
+                const VkAccelerationStructureInstanceKHR *instance = nullptr;
+                if (geom.geometry.instances.data.hostAddress) {
+                    if (geom.geometry.instances.arrayOfPointers) {
+                        auto instance_pointers_array = reinterpret_cast<VkAccelerationStructureInstanceKHR const *const *>(
+                            geom.geometry.instances.data.hostAddress);
+                        instance = instance_pointers_array[instance_i];
+                    } else {
+                        auto instances_array =
+                            reinterpret_cast<VkAccelerationStructureInstanceKHR const *>(geom.geometry.instances.data.hostAddress);
+                        instance = instances_array + instance_i;
+                    }
+
+                    // Can only get here if geom.geometry.instances.arrayOfPointers is true
+                    if (!instance) {
+                        skip |= LogError(
+                            "VUID-vkBuildAccelerationStructuresKHR-pInfos-03779", device,
+                            geometry_loc.dot(Field::geometry)
+                                .dot(Field::instances)
+                                .dot(Field::data)
+                                .dot(Field::hostAddress, instance_i),
+                            "(0x%p) does not reference a valid VkAccelerationStructureKHR object. %s is %s.", instance,
+                            geometry_loc.dot(Field::geometry).dot(Field::instances).dot(Field::arrayOfPointers).Fields().c_str(),
+                            geom.geometry.instances.arrayOfPointers ? "VK_TRUE" : "VK_FALSE");
+
+                        // Following checks rely on instance not being null
+                        continue;
+                    }
+
+                    const VkAccelerationStructureKHR accel_struct =
+                        CastFromUint64<VkAccelerationStructureKHR>(instance->accelerationStructureReference);
+                    auto accel_struct_state = Get<vvl::AccelerationStructureKHR>(accel_struct);
+
+                    if (!accel_struct_state) {
+                        skip |= LogError(
+                            "VUID-vkBuildAccelerationStructuresKHR-pInfos-03779", device,
+                            geometry_loc.dot(Field::geometry)
+                                .dot(Field::instances)
+                                .dot(Field::data)
+                                .dot(Field::hostAddress, instance_i)
+                                .dot(Field::accelerationStructureReference),
+                            "(%" PRIu64 ") does not reference a valid VkAccelerationStructureKHR object. %s is %s.",
+                            instance->accelerationStructureReference,
+                            geometry_loc.dot(Field::geometry).dot(Field::instances).dot(Field::arrayOfPointers).Fields().c_str(),
+                            geom.geometry.instances.arrayOfPointers ? "VK_TRUE" : "VK_FALSE");
+                    }
+                }
             }
         }
     }
@@ -969,10 +990,10 @@ bool CoreChecks::PreCallValidateCmdBuildAccelerationStructureNV(VkCommandBuffer 
             }
         }
         if (dst_as_state != nullptr && !dst_as_state->update_scratch_memory_requirements_checked) {
-            skip |= LogWarning(kVUID_Core_CmdBuildAccelNV_NoUpdateMemReqQuery, dst, error_obj.location,
+            skip |= LogWarning("WARNING-vkCmdBuildAccelerationStructureNV-update-requirements", dst, error_obj.location,
                                "Updating %s but vkGetAccelerationStructureMemoryRequirementsNV() "
                                "has not been called for update scratch memory.",
-                               FormatHandle(dst_as_state->acceleration_structure()).c_str());
+                               FormatHandle(dst_as_state->Handle()).c_str());
             // Use requirements fetched at create time
         }
         if (scratch_buffer_state != nullptr && dst_as_state != nullptr &&
@@ -988,10 +1009,10 @@ bool CoreChecks::PreCallValidateCmdBuildAccelerationStructureNV(VkCommandBuffer 
         }
     } else {
         if (dst_as_state != nullptr && !dst_as_state->build_scratch_memory_requirements_checked) {
-            skip |= LogWarning(kVUID_Core_CmdBuildAccelNV_NoScratchMemReqQuery, dst, error_obj.location,
+            skip |= LogWarning("WARNING-vkCmdBuildAccelerationStructureNV-scratch-requirements", dst, error_obj.location,
                                "Assigning scratch buffer to %s but "
                                "vkGetAccelerationStructureMemoryRequirementsNV() has not been called for scratch memory.",
-                               FormatHandle(dst_as_state->acceleration_structure()).c_str());
+                               FormatHandle(dst_as_state->Handle()).c_str());
             // Use requirements fetched at create time
         }
         if (scratch_buffer_state != nullptr && dst_as_state != nullptr &&
@@ -1125,16 +1146,27 @@ bool CoreChecks::PreCallValidateWriteAccelerationStructuresPropertiesKHR(VkDevic
         const Location as_loc = error_obj.location.dot(Field::pAccelerationStructures, i);
         auto as_state = Get<vvl::AccelerationStructureKHR>(pAccelerationStructures[i]);
         const auto &as_info = as_state->build_info_khr;
-        if (queryType == VK_QUERY_TYPE_ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR) {
-            if (!(as_info.flags & VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR)) {
-                const LogObjectList objlist(device, pAccelerationStructures[i]);
-                skip |= LogError("VUID-vkWriteAccelerationStructuresPropertiesKHR-accelerationStructures-03431", objlist, as_loc,
-                                 "has flags %s.", string_VkBuildAccelerationStructureFlagsKHR(as_info.flags).c_str());
-            }
-        }
+
         if (as_state) {
-            skip |= ValidateHostVisibleMemoryIsBoundToBuffer(*as_state->buffer_state, as_loc,
-                                                             "VUID-vkWriteAccelerationStructuresPropertiesKHR-buffer-03733");
+            skip |= ValidateAccelStructBufferMemoryIsHostVisible(*as_state, as_loc,
+                                                                 "VUID-vkWriteAccelerationStructuresPropertiesKHR-buffer-03733");
+
+            skip |= ValidateAccelStructBufferMemoryIsNotMultiInstance(
+                *as_state, as_loc, "VUID-vkWriteAccelerationStructuresPropertiesKHR-buffer-03784");
+
+            if (!as_state->built) {
+                skip |= LogError("VUID-vkWriteAccelerationStructuresPropertiesKHR-pAccelerationStructures-04964", device, as_loc,
+                                 "has not been built.");
+            } else {
+                if (queryType == VK_QUERY_TYPE_ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR) {
+                    if (!(as_info.flags & VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR)) {
+                        const LogObjectList objlist(device, pAccelerationStructures[i]);
+                        skip |=
+                            LogError("VUID-vkWriteAccelerationStructuresPropertiesKHR-accelerationStructures-03431", objlist,
+                                     as_loc, "has flags %s.", string_VkBuildAccelerationStructureFlagsKHR(as_info.flags).c_str());
+                    }
+                }
+            }
         }
     }
     return skip;
@@ -1151,17 +1183,27 @@ bool CoreChecks::PreCallValidateCmdWriteAccelerationStructuresPropertiesKHR(
     if (query_pool_ci.queryType != queryType) {
         skip |= LogError("VUID-vkCmdWriteAccelerationStructuresPropertiesKHR-queryPool-02493", commandBuffer,
                          error_obj.location.dot(Field::queryType),
-                         "was created with %s which is differnent from the type queryPool was created with %s.",
+                         "was created with %s which is different from the type queryPool was created with (%s).",
                          string_VkQueryType(queryType), string_VkQueryType(query_pool_ci.queryType));
     }
     for (uint32_t i = 0; i < accelerationStructureCount; ++i) {
-        if (queryType == VK_QUERY_TYPE_ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR) {
-            auto as_state = Get<vvl::AccelerationStructureKHR>(pAccelerationStructures[i]);
-            if (!(as_state->build_info_khr.flags & VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR)) {
-                skip |= LogError("VUID-vkCmdWriteAccelerationStructuresPropertiesKHR-accelerationStructures-03431", commandBuffer,
-                                 error_obj.location.dot(Field::pAccelerationStructures, i),
-                                 "was built with %s, but queryType is VK_QUERY_TYPE_ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR.",
-                                 string_VkBuildAccelerationStructureFlagsKHR(as_state->build_info_khr.flags).c_str());
+        const Location as_loc = error_obj.location.dot(Field::pAccelerationStructures, i);
+        auto as_state = Get<vvl::AccelerationStructureKHR>(pAccelerationStructures[i]);
+
+        skip |= ValidateMemoryIsBoundToBuffer(commandBuffer, *as_state->buffer_state, as_loc.dot(Field::buffer),
+                                              "VUID-vkCmdWriteAccelerationStructuresPropertiesKHR-buffer-03736");
+
+        if (!as_state->built) {
+            skip |= LogError("VUID-vkCmdWriteAccelerationStructuresPropertiesKHR-pAccelerationStructures-04964", device, as_loc,
+                             "has not been built.");
+        } else {
+            if (queryType == VK_QUERY_TYPE_ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR) {
+                if (!(as_state->build_info_khr.flags & VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR)) {
+                    skip |= LogError("VUID-vkCmdWriteAccelerationStructuresPropertiesKHR-accelerationStructures-03431",
+                                     commandBuffer, as_loc,
+                                     "was built with %s, but queryType is VK_QUERY_TYPE_ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR.",
+                                     string_VkBuildAccelerationStructureFlagsKHR(as_state->build_info_khr.flags).c_str());
+                }
             }
         }
     }
@@ -1206,8 +1248,10 @@ bool CoreChecks::PreCallValidateCmdBuildAccelerationStructuresIndirectKHR(VkComm
     assert(cb_state);
     bool skip = false;
     skip |= ValidateCmd(*cb_state, error_obj.location);
-    // TODO - This is not called in vkCmdBuildAccelerationStructuresKHR and only seems used for ValidateActionState
-    skip |= ValidateCmdRayQueryState(*cb_state, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, error_obj.location);
+    if (!cb_state->unprotected) {
+        skip |= LogError("VUID-vkCmdBuildAccelerationStructuresIndirectKHR-commandBuffer-09547", commandBuffer, error_obj.location,
+                         "called in a protected command buffer.");
+    }
     for (uint32_t i = 0; i < infoCount; ++i) {
         const Location info_loc = error_obj.location.dot(Field::pInfos, i);
         auto src_as_state = Get<vvl::AccelerationStructureKHR>(pInfos[i].srcAccelerationStructure);
@@ -1293,6 +1337,11 @@ bool CoreChecks::ValidateCopyAccelerationStructureInfoKHR(const VkCopyAccelerati
     }
     auto src_accel_state = Get<vvl::AccelerationStructureKHR>(pInfo->src);
     if (src_accel_state) {
+        if (!src_accel_state->built) {
+            skip |= LogError("VUID-VkCopyAccelerationStructureInfoKHR-src-04963", device, info_loc.dot(Field::src),
+                             "has not been built.");
+        }
+
         auto buffer_state = Get<vvl::Buffer>(src_accel_state->create_infoKHR.buffer);
         skip |= ValidateMemoryIsBoundToBuffer(device, *buffer_state, info_loc.dot(Field::src),
                                               "VUID-VkCopyAccelerationStructureInfoKHR-buffer-03718");
@@ -1303,6 +1352,13 @@ bool CoreChecks::ValidateCopyAccelerationStructureInfoKHR(const VkCopyAccelerati
         skip |= ValidateMemoryIsBoundToBuffer(device, *buffer_state, info_loc.dot(Field::dst),
                                               "VUID-VkCopyAccelerationStructureInfoKHR-buffer-03719");
     }
+
+    if (src_accel_state && dst_accel_state) {
+        skip |= ValidateAccelStructsMemoryDoNotOverlap(info_loc.function, LogObjectList(), *src_accel_state,
+                                                       info_loc.dot(Field::src), *dst_accel_state, info_loc.dot(Field::dst),
+                                                       "VUID-VkCopyAccelerationStructureInfoKHR-dst-07791");
+    }
+
     return skip;
 }
 
@@ -1330,26 +1386,83 @@ bool CoreChecks::PreCallValidateCmdCopyAccelerationStructureKHR(VkCommandBuffer 
     return skip;
 }
 
+bool CoreChecks::PreCallValidateDestroyDeferredOperationKHR(VkDevice device, VkDeferredOperationKHR operation,
+                                                            const VkAllocationCallbacks *pAllocator,
+                                                            const ErrorObject &error_obj) const {
+    bool skip = false;
+    skip |= ValidateDeferredOperation(device, operation, error_obj.location.dot(Field::operation),
+                                      "VUID-vkDestroyDeferredOperationKHR-operation-03436");
+    return skip;
+}
+
 bool CoreChecks::PreCallValidateCopyAccelerationStructureKHR(VkDevice device, VkDeferredOperationKHR deferredOperation,
                                                              const VkCopyAccelerationStructureInfoKHR *pInfo,
                                                              const ErrorObject &error_obj) const {
     bool skip = false;
+    skip |= ValidateDeferredOperation(device, deferredOperation, error_obj.location.dot(Field::deferredOperation),
+                                      "VUID-vkCopyAccelerationStructureKHR-deferredOperation-03678");
+
     if (pInfo) {
         const Location info_loc = error_obj.location.dot(Field::pInfo);
         skip |= ValidateCopyAccelerationStructureInfoKHR(pInfo, error_obj.handle, error_obj.location.dot(Field::pInfo));
         auto src_accel_state = Get<vvl::AccelerationStructureKHR>(pInfo->src);
         if (src_accel_state) {
-            skip |= ValidateHostVisibleMemoryIsBoundToBuffer(*src_accel_state->buffer_state, info_loc.dot(Field::src),
-                                                             "VUID-vkCopyAccelerationStructureKHR-buffer-03727");
+            skip |= ValidateAccelStructBufferMemoryIsHostVisible(*src_accel_state, info_loc.dot(Field::src),
+                                                                 "VUID-vkCopyAccelerationStructureKHR-buffer-03727");
+
+            skip |= ValidateAccelStructBufferMemoryIsNotMultiInstance(*src_accel_state, info_loc.dot(Field::src),
+                                                                      "VUID-vkCopyAccelerationStructureKHR-buffer-03780");
         }
         auto dst_accel_state = Get<vvl::AccelerationStructureKHR>(pInfo->dst);
         if (dst_accel_state) {
-            skip |= ValidateHostVisibleMemoryIsBoundToBuffer(*dst_accel_state->buffer_state, info_loc.dot(Field::dst),
-                                                             "VUID-vkCopyAccelerationStructureKHR-buffer-03728");
+            skip |= ValidateAccelStructBufferMemoryIsHostVisible(*dst_accel_state, info_loc.dot(Field::dst),
+                                                                 "VUID-vkCopyAccelerationStructureKHR-buffer-03728");
+
+            skip |= ValidateAccelStructBufferMemoryIsNotMultiInstance(*dst_accel_state, info_loc.dot(Field::dst),
+                                                                      "VUID-vkCopyAccelerationStructureKHR-buffer-03781");
         }
     }
     return skip;
 }
+
+bool CoreChecks::ValidateVkCopyAccelerationStructureToMemoryInfoKHR(const vvl::AccelerationStructureKHR &src_accel_struct,
+                                                                    LogObjectList objlist, const Location &loc) const {
+    bool skip = false;
+    if (!src_accel_struct.built) {
+        objlist.add(src_accel_struct.Handle());
+        skip |= LogError("VUID-VkCopyAccelerationStructureToMemoryInfoKHR-src-04959", objlist, loc.dot(Field::src),
+                         "has not been built.");
+    }
+
+    return skip;
+}
+
+bool CoreChecks::PreCallValidateCopyAccelerationStructureToMemoryKHR(VkDevice device, VkDeferredOperationKHR deferredOperation,
+                                                                     const VkCopyAccelerationStructureToMemoryInfoKHR *pInfo,
+                                                                     const ErrorObject &error_obj) const {
+    bool skip = false;
+    skip |= ValidateDeferredOperation(device, deferredOperation, error_obj.location.dot(Field::deferredOperation),
+                                      "VUID-vkCopyAccelerationStructureToMemoryKHR-deferredOperation-03678");
+
+    const Location info_loc = error_obj.location.dot(Field::pInfo);
+
+    const auto src_accel_struct = Get<vvl::AccelerationStructureKHR>(pInfo->src);
+
+    if (src_accel_struct) {
+        skip |= ValidateVkCopyAccelerationStructureToMemoryInfoKHR(*src_accel_struct, LogObjectList(device), info_loc);
+
+        if (auto buffer_state = Get<vvl::Buffer>(src_accel_struct->create_infoKHR.buffer)) {
+            skip |= ValidateAccelStructBufferMemoryIsHostVisible(*src_accel_struct, info_loc.dot(Field::src),
+                                                                 "VUID-vkCopyAccelerationStructureToMemoryKHR-buffer-03731");
+
+            skip |= ValidateAccelStructBufferMemoryIsNotMultiInstance(*src_accel_struct, info_loc.dot(Field::src),
+                                                                      "VUID-vkCopyAccelerationStructureToMemoryKHR-buffer-03783");
+        }
+    }
+
+    return skip;
+}
+
 bool CoreChecks::PreCallValidateCmdCopyAccelerationStructureToMemoryKHR(VkCommandBuffer commandBuffer,
                                                                         const VkCopyAccelerationStructureToMemoryInfoKHR *pInfo,
                                                                         const ErrorObject &error_obj) const {
@@ -1358,11 +1471,33 @@ bool CoreChecks::PreCallValidateCmdCopyAccelerationStructureToMemoryKHR(VkComman
     bool skip = false;
     skip |= ValidateCmd(*cb_state, error_obj.location);
 
-    auto accel_state = Get<vvl::AccelerationStructureKHR>(pInfo->src);
-    if (accel_state) {
-        auto buffer_state = Get<vvl::Buffer>(accel_state->create_infoKHR.buffer);
+    if (auto src_accel_struct = Get<vvl::AccelerationStructureKHR>(pInfo->src)) {
+        skip |= ValidateVkCopyAccelerationStructureToMemoryInfoKHR(*src_accel_struct, LogObjectList(commandBuffer),
+                                                                   error_obj.location.dot(Field::pInfo));
+
+        auto buffer_state = Get<vvl::Buffer>(src_accel_struct->create_infoKHR.buffer);
         skip |= ValidateMemoryIsBoundToBuffer(commandBuffer, *buffer_state, error_obj.location.dot(Field::pInfo).dot(Field::src),
                                               "VUID-vkCmdCopyAccelerationStructureToMemoryKHR-None-03559");
+    }
+
+    const VkDeviceAddress dst_address = pInfo->dst.deviceAddress;
+
+    const auto buffer_states = GetBuffersByAddress(dst_address);
+    if (buffer_states.empty()) {
+        skip |= LogError("VUID-vkCmdCopyAccelerationStructureToMemoryKHR-pInfo-03739", device,
+                         error_obj.location.dot(Field::pInfo).dot(Field::dst).dot(Field::deviceAddress),
+                         "(0x%" PRIx64 ") is not a valid buffer address.", dst_address);
+    } else {
+        BufferAddressValidation<1> buffer_address_validator = {
+            {{{"VUID-vkCmdCopyAccelerationStructureToMemoryKHR-pInfo-03741",
+               [this](vvl::Buffer *const buffer_state, std::string *out_error_msg) {
+                   return BufferAddressValidation<1>::ValidateMemoryBoundToBuffer(*this, buffer_state, out_error_msg);
+               },
+               []() { return BufferAddressValidation<1>::ValidateMemoryBoundToBufferErrorMsgHeader(); }}}}};
+
+        skip |= buffer_address_validator.LogErrorsIfNoValidBuffer(
+            *this, buffer_states, error_obj.location.dot(Field::pInfo).dot(Field::dst).dot(Field::deviceAddress),
+            LogObjectList(commandBuffer), dst_address);
     }
     return skip;
 }
@@ -1371,12 +1506,17 @@ bool CoreChecks::PreCallValidateCopyMemoryToAccelerationStructureKHR(VkDevice de
                                                                      const VkCopyMemoryToAccelerationStructureInfoKHR *pInfo,
                                                                      const ErrorObject &error_obj) const {
     bool skip = false;
+    skip |= ValidateDeferredOperation(device, deferredOperation, error_obj.location.dot(Field::deferredOperation),
+                                      "VUID-vkCopyMemoryToAccelerationStructureKHR-deferredOperation-03678");
 
     auto accel_state = Get<vvl::AccelerationStructureKHR>(pInfo->dst);
     if (accel_state) {
-        skip |= ValidateHostVisibleMemoryIsBoundToBuffer(*accel_state->buffer_state,
-                                                         error_obj.location.dot(Field::pInfo).dot(Field::dst),
-                                                         "VUID-vkCopyMemoryToAccelerationStructureKHR-buffer-03730");
+        skip |= ValidateAccelStructBufferMemoryIsHostVisible(*accel_state, error_obj.location.dot(Field::pInfo).dot(Field::dst),
+                                                             "VUID-vkCopyMemoryToAccelerationStructureKHR-buffer-03730");
+
+        skip |=
+            ValidateAccelStructBufferMemoryIsNotMultiInstance(*accel_state, error_obj.location.dot(Field::pInfo).dot(Field::dst),
+                                                              "VUID-vkCopyMemoryToAccelerationStructureKHR-buffer-03782");
     }
 
     return skip;
@@ -1396,29 +1536,25 @@ bool CoreChecks::PreCallValidateCmdCopyMemoryToAccelerationStructureKHR(VkComman
                                               error_obj.location.dot(Field::pInfo).dot(Field::dst),
                                               "VUID-vkCmdCopyMemoryToAccelerationStructureKHR-buffer-03745");
     }
-    return skip;
-}
 
-bool CoreChecks::ValidateCmdRayQueryState(const vvl::CommandBuffer &cb_state, const VkPipelineBindPoint bind_point,
-                                          const Location &loc) const {
-    bool skip = false;
-    const vvl::DrawDispatchVuid &vuid = vvl::GetDrawDispatchVuid(loc.function);
-    const auto lv_bind_point = ConvertToLvlBindPoint(bind_point);
-    const auto &last_bound = cb_state.lastBound[lv_bind_point];
-    const auto *pipe = last_bound.pipeline_state;
+    const VkDeviceAddress src_address = pInfo->src.deviceAddress;
 
-    bool ray_query_shader = false;
-    if (nullptr != pipe) {
-        if (bind_point == VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR) {
-            ray_query_shader = true;
-        } else {
-            // TODO - Loop through shader for RayQueryKHR for draw/dispatch commands
-        }
-    }
+    const auto buffer_states = GetBuffersByAddress(src_address);
+    if (buffer_states.empty()) {
+        skip |= LogError("VUID-vkCmdCopyMemoryToAccelerationStructureKHR-pInfo-03742", device,
+                         error_obj.location.dot(Field::pInfo).dot(Field::src).dot(Field::deviceAddress),
+                         "(0x%" PRIx64 ") is not a valid buffer address.", src_address);
+    } else {
+        BufferAddressValidation<1> buffer_address_validator = {
+            {{{"VUID-vkCmdCopyMemoryToAccelerationStructureKHR-pInfo-03744",
+               [this](vvl::Buffer *const buffer_state, std::string *out_error_msg) {
+                   return BufferAddressValidation<1>::ValidateMemoryBoundToBuffer(*this, buffer_state, out_error_msg);
+               },
+               []() { return BufferAddressValidation<1>::ValidateMemoryBoundToBufferErrorMsgHeader(); }}}}};
 
-    if (cb_state.unprotected == false && ray_query_shader) {
-        skip |= LogError(vuid.ray_query_protected_cb_03635, cb_state.commandBuffer(), loc,
-                         "can't use in protected command buffers for RayQuery operations.");
+        skip |= buffer_address_validator.LogErrorsIfNoValidBuffer(
+            *this, buffer_states, error_obj.location.dot(Field::pInfo).dot(Field::src).dot(Field::deviceAddress),
+            LogObjectList(commandBuffer), src_address);
     }
 
     return skip;
@@ -1458,7 +1594,13 @@ bool CoreChecks::PreCallValidateGetRayTracingShaderGroupHandlesKHR(VkDevice devi
     auto pPipeline = Get<vvl::Pipeline>(pipeline);
     if (!pPipeline) {
         return skip;
+    } else if (pPipeline->pipeline_type != VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR) {
+        skip |=
+            LogError("VUID-vkGetRayTracingShaderGroupHandlesKHR-pipeline-04619", pipeline, error_obj.location.dot(Field::pipeline),
+                     "is a %s pipeline.", string_VkPipelineBindPoint(pPipeline->pipeline_type));
+        return skip;
     }
+
     const vvl::Pipeline &pipeline_state = *pPipeline;
     if (pipeline_state.create_flags & VK_PIPELINE_CREATE_LIBRARY_BIT_KHR) {
         if (!enabled_features.pipelineLibraryGroupHandles) {
@@ -1510,7 +1652,13 @@ bool CoreChecks::PreCallValidateGetRayTracingCaptureReplayShaderGroupHandlesKHR(
     auto pipeline_state = Get<vvl::Pipeline>(pipeline);
     if (!pipeline_state) {
         return skip;
+    } else if (pipeline_state->pipeline_type != VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR) {
+        skip |= LogError("VUID-vkGetRayTracingCaptureReplayShaderGroupHandlesKHR-pipeline-04620", pipeline,
+                         error_obj.location.dot(Field::pipeline), "is a %s pipeline.",
+                         string_VkPipelineBindPoint(pipeline_state->pipeline_type));
+        return skip;
     }
+
     const auto &create_info = pipeline_state->GetCreateInfo<VkRayTracingPipelineCreateInfoKHR>();
     if (create_info.flags & VK_PIPELINE_CREATE_LIBRARY_BIT_KHR) {
         if (!enabled_features.pipelineLibraryGroupHandles) {
@@ -1560,13 +1708,51 @@ bool CoreChecks::PreCallValidateGetRayTracingShaderGroupStackSizeKHR(VkDevice de
     if (pipeline_state) {
         if (pipeline_state->pipeline_type != VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR) {
             skip |= LogError("VUID-vkGetRayTracingShaderGroupStackSizeKHR-pipeline-04622", pipeline,
-                             error_obj.location.dot(Field::pipeline), "must be a ray-tracing pipeline, but is a %s pipeline.",
+                             error_obj.location.dot(Field::pipeline), "is a %s pipeline.",
                              string_VkPipelineBindPoint(pipeline_state->pipeline_type));
-        } else if (group >= pipeline_state->GetCreateInfo<VkRayTracingPipelineCreateInfoKHR>().groupCount) {
-            skip |=
-                LogError("VUID-vkGetRayTracingShaderGroupStackSizeKHR-group-03608", pipeline, error_obj.location.dot(Field::group),
-                         "(%" PRIu32 ") must be less than the number of shader groups in pipeline (%" PRIu32 ").", group,
-                         pipeline_state->GetCreateInfo<VkRayTracingPipelineCreateInfoKHR>().groupCount);
+        } else {
+            auto create_info = pipeline_state->GetCreateInfo<VkRayTracingPipelineCreateInfoKHR>();
+            if (group >= create_info.groupCount) {
+                skip |= LogError("VUID-vkGetRayTracingShaderGroupStackSizeKHR-group-03608", pipeline,
+                                 error_obj.location.dot(Field::group),
+                                 "(%" PRIu32 ") must be less than the number of shader groups in pipeline (%" PRIu32 ").", group,
+                                 create_info.groupCount);
+            } else {
+                const auto &group_info = create_info.pGroups[group];
+                bool unused_group = false;
+                switch (groupShader) {
+                    case VK_SHADER_GROUP_SHADER_GENERAL_KHR:
+                        if (group_info.generalShader == VK_SHADER_UNUSED_KHR) {
+                            unused_group = true;
+                        }
+                        break;
+                    case VK_SHADER_GROUP_SHADER_CLOSEST_HIT_KHR:
+                        if (group_info.closestHitShader == VK_SHADER_UNUSED_KHR) {
+                            unused_group = true;
+                        }
+                        break;
+                    case VK_SHADER_GROUP_SHADER_ANY_HIT_KHR:
+                        if (group_info.anyHitShader == VK_SHADER_UNUSED_KHR) {
+                            unused_group = true;
+                        }
+                        break;
+                    case VK_SHADER_GROUP_SHADER_INTERSECTION_KHR:
+                        if (group_info.intersectionShader == VK_SHADER_UNUSED_KHR) {
+                            unused_group = true;
+                        }
+                        break;
+
+                    default:
+                        break;
+                }
+                if (unused_group) {
+                    const LogObjectList objlist(device, pipeline);
+                    skip |= LogError("VUID-vkGetRayTracingShaderGroupStackSizeKHR-groupShader-03609", objlist,
+                                     error_obj.location.dot(Field::groupShader),
+                                     "is %s but the corresponding shader in shader group (%" PRIu32 ") is VK_SHADER_UNUSED_KHR.",
+                                     string_VkShaderGroupShaderKHR(groupShader), group);
+                }
+            }
         }
     }
     return skip;
@@ -1607,9 +1793,9 @@ bool CoreChecks::ValidateGeometryAABBNV(const VkGeometryAABBNV &aabbs, const Loc
 bool CoreChecks::ValidateGeometryNV(const VkGeometryNV &geometry, const Location &loc) const {
     bool skip = false;
     if (geometry.geometryType == VK_GEOMETRY_TYPE_TRIANGLES_NV) {
-        skip = ValidateGeometryTrianglesNV(geometry.geometry.triangles, loc);
+        skip |= ValidateGeometryTrianglesNV(geometry.geometry.triangles, loc);
     } else if (geometry.geometryType == VK_GEOMETRY_TYPE_AABBS_NV) {
-        skip = ValidateGeometryAABBNV(geometry.geometry.aabbs, loc);
+        skip |= ValidateGeometryAABBNV(geometry.geometry.aabbs, loc);
     }
     return skip;
 }
@@ -1630,24 +1816,19 @@ bool CoreChecks::ValidateRaytracingShaderBindingTable(VkCommandBuffer commandBuf
     } else {
         const sparse_container::range<VkDeviceSize> requested_range(binding_table.deviceAddress,
                                                                     binding_table.deviceAddress + binding_table.size - 1);
-        using BUFFER_STATE_PTR = ValidationStateTracker::BUFFER_STATE_PTR;
-        BufferAddressValidation<4> buffer_address_validator = {{{
-            {vuid_single_device_memory, LogObjectList(commandBuffer),
-             [this, commandBuffer, table_loc, vuid_single_device_memory](const BUFFER_STATE_PTR &buffer_state,
-                                                                         std::string *out_error_msg) {
-                 if (!out_error_msg) {
-                     return !buffer_state->sparse && buffer_state->IsMemoryBound();
-                 } else {
-                     return ValidateMemoryIsBoundToBuffer(commandBuffer, *buffer_state, table_loc.dot(Field::deviceAddress),
-                                                          vuid_single_device_memory);
-                 }
-             }},
 
-            {vuid_binding_table_flag, LogObjectList(commandBuffer),
-             [](const BUFFER_STATE_PTR &buffer_state, std::string *out_error_msg) {
+        BufferAddressValidation<4> buffer_address_validator = {{{
+            {vuid_single_device_memory,
+             [this](vvl::Buffer *const buffer_state, std::string *out_error_msg) {
+                 return BufferAddressValidation<1>::ValidateMemoryBoundToBuffer(*this, buffer_state, out_error_msg);
+             },
+             []() { return BufferAddressValidation<1>::ValidateMemoryBoundToBufferErrorMsgHeader(); }},
+
+            {vuid_binding_table_flag,
+             [](vvl::Buffer *const buffer_state, std::string *out_error_msg) {
                  if (!(static_cast<uint32_t>(buffer_state->usage) & VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR)) {
                      if (out_error_msg) {
-                         *out_error_msg += "buffer has usage " + string_VkBufferUsageFlags2KHR(buffer_state->usage) + '\n';
+                         *out_error_msg += "buffer has usage " + string_VkBufferUsageFlags2KHR(buffer_state->usage);
                      }
                      return false;
                  }
@@ -1655,16 +1836,16 @@ bool CoreChecks::ValidateRaytracingShaderBindingTable(VkCommandBuffer commandBuf
              },
              []() {
                  return "The following buffers have not been created with the VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR "
-                        "usage flag:\n";
+                        "usage flag:";
              }},
 
-            {"VUID-VkStridedDeviceAddressRegionKHR-size-04631", LogObjectList(commandBuffer),
-             [&requested_range](const BUFFER_STATE_PTR &buffer_state, std::string *out_error_msg) {
+            {"VUID-VkStridedDeviceAddressRegionKHR-size-04631",
+             [&requested_range](vvl::Buffer *const buffer_state, std::string *out_error_msg) {
                  const auto buffer_address_range = buffer_state->DeviceAddressRange();
                  if (!buffer_address_range.includes(requested_range)) {
                      if (out_error_msg) {
                          const std::string buffer_address_range_string = string_range_hex(buffer_address_range);
-                         *out_error_msg += "buffer device address range is " + buffer_address_range_string + '\n';
+                         *out_error_msg += "buffer device address range is " + buffer_address_range_string;
                      }
                      return false;
                  }
@@ -1673,14 +1854,14 @@ bool CoreChecks::ValidateRaytracingShaderBindingTable(VkCommandBuffer commandBuf
              },
              [table_loc, requested_range_string = string_range_hex(requested_range)]() {
                  return "The following buffers do not include " + table_loc.Fields() + " buffer device address range " +
-                        requested_range_string + ":\n";
+                        requested_range_string + ':';
              }},
 
-            {"VUID-VkStridedDeviceAddressRegionKHR-size-04632", LogObjectList(commandBuffer),
-             [&binding_table](const BUFFER_STATE_PTR &buffer_state, std::string *out_error_msg) {
+            {"VUID-VkStridedDeviceAddressRegionKHR-size-04632",
+             [&binding_table](vvl::Buffer *const buffer_state, std::string *out_error_msg) {
                  if (binding_table.stride > buffer_state->createInfo.size) {
                      if (out_error_msg) {
-                         *out_error_msg += "buffer size is " + std::to_string(buffer_state->createInfo.size) + '\n';
+                         *out_error_msg += "buffer size is " + std::to_string(buffer_state->createInfo.size);
                      }
                      return false;
                  }
@@ -1688,14 +1869,28 @@ bool CoreChecks::ValidateRaytracingShaderBindingTable(VkCommandBuffer commandBuf
              },
              [table_loc, &binding_table]() {
                  return "The following buffers have a size inferior to " + table_loc.Fields() + "->stride (" +
-                        std::to_string(binding_table.stride) + "):\n";
+                        std::to_string(binding_table.stride) + "):";
                  ;
              }},
         }}};
 
         skip |= buffer_address_validator.LogErrorsIfNoValidBuffer(*this, buffer_states, table_loc.dot(Field::deviceAddress),
-                                                                  binding_table.deviceAddress);
+                                                                  LogObjectList(commandBuffer), binding_table.deviceAddress);
     }
 
+    return skip;
+}
+
+bool CoreChecks::ValidateDeferredOperation(VkDevice device, VkDeferredOperationKHR deferred_operation, const Location &loc,
+                                           const char *vuid) const {
+    // validate in core check because need to make sure it is a valid VkDeferredOperationKHR object
+    bool skip = false;
+    if (deferred_operation != VK_NULL_HANDLE) {
+        VkResult result = DispatchGetDeferredOperationResultKHR(device, deferred_operation);
+        if (result == VK_NOT_READY) {
+            skip |= LogError(vuid, deferred_operation, loc.dot(Field::deferredOperation), "%s is not completed.",
+                             FormatHandle(deferred_operation).c_str());
+        }
+    }
     return skip;
 }

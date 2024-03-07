@@ -114,7 +114,6 @@ jobs:
       - uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: ${{ matrix.arch }}
-      - run: python3 -m pip install jsonschema pyparsing
       - name: Cache known_good.json installations
         id: cache-deps
         uses: actions/cache@v4
@@ -135,9 +134,6 @@ jobs:
         run: python scripts/tests.py --test
 
   mingw:
-    env:
-      CMAKE_C_COMPILER_LAUNCHER: ccache
-      CMAKE_CXX_COMPILER_LAUNCHER: ccache
     runs-on: windows-latest
     defaults:
       run:
@@ -152,18 +148,24 @@ jobs:
         with:
           python-version: '3.10'
       - uses: lukka/get-cmake@latest
-      - name: GCC Version
-        run: gcc --version # If this fails MINGW is not setup correctly
-      - name: Configure
-        run: cmake -S. -B build -D BUILD_WERROR=ON -D UPDATE_DEPS=ON -D CMAKE_BUILD_TYPE=Release
+      - run: |
+          cmake -S. -B build \
+          -D BUILD_WERROR=ON \
+          -D UPDATE_DEPS=ON \
+          -D CMAKE_BUILD_TYPE=Release
         env:
           LDFLAGS: -fuse-ld=lld # MINGW linking is very slow. Use llvm linker instead.
-      - name: Build
-        run: cmake --build build -- --quiet
-      - name: Install
-        run: cmake --install build --prefix build/install
-      - name: MinGW ccache stats # The Post Setup ccache doesn't work right on MinGW
-        run: ccache --show-stats
+          CMAKE_C_COMPILER_LAUNCHER: ccache
+          CMAKE_CXX_COMPILER_LAUNCHER: ccache
+      - run: cmake --build build
+      - run: cmake --install build --prefix /tmp
+
+  chromium:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get -qq update && sudo apt-get install -y libwayland-dev xorg-dev
+      - run: python scripts/gn/gn.py
 
   check_vvl:
     runs-on: ubuntu-latest
@@ -172,7 +174,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-      - run: python3 -m pip install jsonschema pyparsing
+      - run: python3 -m pip install pyparsing
       - run: scripts/update_deps.py --dir ext --no-build
       - run: scripts/generate_source.py --verify ext/Vulkan-Headers/registry/ ext/SPIRV-Headers/include/spirv/unified1/
       - run: scripts/vk_validation_stats.py ext/Vulkan-Headers/registry/validusage.json -summary -c

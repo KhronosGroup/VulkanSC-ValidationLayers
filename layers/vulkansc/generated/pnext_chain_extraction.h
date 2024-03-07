@@ -3,9 +3,9 @@
 
 /***************************************************************************
  *
- * Copyright (c) 2023 The Khronos Group Inc.
- * Copyright (c) 2023 Valve Corporation
- * Copyright (c) 2023 LunarG, Inc.
+ * Copyright (c) 2023-2024 The Khronos Group Inc.
+ * Copyright (c) 2023-2024 Valve Corporation
+ * Copyright (c) 2023-2024 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,6 +36,9 @@ void *PnextChainAdd(void *chain, void *new_struct);
 
 // Remove last element from a pNext chain
 void PnextChainRemoveLast(void *chain);
+
+// Free dynamically allocated pnext chain structs
+void PnextChainFree(void *chain);
 
 // Helper class relying on RAII to help with adding and removing an element from a pNext chain
 class PnextChainScopedAdd {

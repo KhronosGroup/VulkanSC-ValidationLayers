@@ -1,5 +1,5 @@
-/* Copyright (c) 2023 Nintendo
- * Copyright (c) 2023 LunarG, Inc.
+/* Copyright (c) 2023-2024 Nintendo
+ * Copyright (c) 2023-2024 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,13 +22,13 @@
 #include <unordered_map>
 #include <vector>
 
-#include "state_tracker/base_node.h"
+#include "state_tracker/state_object.h"
 #include "utils/shader_utils.h"
-#include "descriptor_sets.h"
+#include "state_tracker/pipeline_layout_state.h"
 
 namespace vvl {
 // Represents a VkShaderEXT (VK_EXT_shader_object) handle
-struct ShaderObject : public BASE_NODE {
+struct ShaderObject : public StateObject {
     ShaderObject(ValidationStateTracker *dev_data, const VkShaderCreateInfoEXT &create_info, VkShaderEXT shader_object,
                  std::shared_ptr<spirv::Module> &spirv_module, uint32_t createInfoCount, VkShaderEXT *pShaders,
                  uint32_t unique_shader_id = 0);
@@ -52,7 +52,7 @@ struct ShaderObject : public BASE_NODE {
     const PushConstantRangesId push_constant_ranges;
     const std::vector<PipelineLayoutCompatId> set_compat_ids;
 
-    VkShaderEXT shader() const { return handle_.Cast<VkShaderEXT>(); }
+    VkShaderEXT VkHandle() const { return handle_.Cast<VkShaderEXT>(); }
     bool IsGraphicsShaderState() const { return create_info.stage != VK_SHADER_STAGE_COMPUTE_BIT; };
     VkPrimitiveTopology GetTopology() const;
 };

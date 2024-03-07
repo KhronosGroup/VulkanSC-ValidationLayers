@@ -1,7 +1,7 @@
-/* Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (C) 2015-2023 Google Inc.
+/* Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (C) 2015-2024 Google Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,13 +15,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-// clang-format off
-[[maybe_unused]] static const char *kVUID_ObjectTracker_Info = "UNASSIGNED-ObjectTracker-Info";
-[[maybe_unused]] static const char *kVUID_ObjectTracker_InternalError = "UNASSIGNED-ObjectTracker-InternalError";
-[[maybe_unused]] static const char *kVUID_ObjectTracker_ObjectLeak =    "UNASSIGNED-ObjectTracker-ObjectLeak";
-[[maybe_unused]] static const char *kVUID_ObjectTracker_UnknownObject = "UNASSIGNED-ObjectTracker-UnknownObject";
-// clang-format on
 
 extern uint64_t object_track_index;
 
@@ -88,11 +81,12 @@ class ObjectLifetimes : public ValidationObject {
         if (!inserted) {
             // The object should not already exist. If we couldn't add it to the map, there was probably
             // a race condition in the app. Report an error and move on.
-            (void)LogError(kVUID_ObjectTracker_Info, object, loc,
+            // TODO should this be an error? https://gitlab.khronos.org/vulkan/vulkan/-/issues/3616
+            (void)LogError("UNASSIGNED-ObjectTracker-Insert", object, loc,
                            "Couldn't insert %s Object 0x%" PRIxLEAST64
                            ", already existed. This should not happen and may indicate a "
                            "race condition in the application.",
-                           object_string[object_type], object_handle);
+                           string_VulkanObjectType(object_type), object_handle);
         }
     }
 
@@ -110,6 +104,7 @@ class ObjectLifetimes : public ValidationObject {
     void AllocateCommandBuffer(const VkCommandPool command_pool, const VkCommandBuffer command_buffer, VkCommandBufferLevel level,
                                const Location &loc);
     void AllocateDescriptorSet(VkDescriptorPool descriptor_pool, VkDescriptorSet descriptor_set, const Location &loc);
+    void AllocateDisplayKHR(VkPhysicalDevice physical_device, VkDisplayKHR display, const Location &loc);
     void CreateSwapchainImageObject(VkImage swapchain_image, VkSwapchainKHR swapchain, const Location &loc);
     void DestroyLeakedInstanceObjects();
     void DestroyLeakedDeviceObjects();
@@ -119,8 +114,8 @@ class ObjectLifetimes : public ValidationObject {
     bool ValidateSamplerObjects(const VkDescriptorSetLayoutCreateInfo *pCreateInfo, const Location &loc) const;
     bool ValidateDescriptorWrite(VkWriteDescriptorSet const *desc, bool isPush, const Location &loc) const;
     bool ValidateAnonymousObject(uint64_t object, VkObjectType core_object_type, const char *invalid_handle_vuid,
-                                 const Location &loc) const;
-    bool ValidateAccelerationStructures(const char *dst_handle_vuid, uint32_t count,
+                                 const char *wrong_parent_vuid, const Location &loc) const;
+    bool ValidateAccelerationStructures(const char *src_handle_vuid, const char *dst_handle_vuid, uint32_t count,
                                         const VkAccelerationStructureBuildGeometryInfoKHR *infos, const Location &loc) const;
 
     bool TracksObject(uint64_t object_handle, VulkanObjectType object_type) const;
@@ -188,13 +183,13 @@ class ObjectLifetimes : public ValidationObject {
                     skip |= LogError(expected_custom_allocator_code, object_handle, loc,
                                      "Custom allocator not specified while destroying %s obj 0x%" PRIxLEAST64
                                      " but specified at creation.",
-                                     object_string[object_type], object);
+                                     string_VulkanObjectType(object_type), object);
 
                 } else if (!allocated_with_custom && custom_allocator && expected_default_allocator_code != kVUIDUndefined) {
                     skip |= LogError(expected_default_allocator_code, object_handle, loc,
                                      "Custom allocator specified while destroying %s obj 0x%" PRIxLEAST64
                                      " but not specified at creation.",
-                                     object_string[object_type], object);
+                                     string_VulkanObjectType(object_type), object);
                 }
             }
         }

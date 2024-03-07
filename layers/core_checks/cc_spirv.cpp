@@ -1,7 +1,7 @@
-/* Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (C) 2015-2023 Google Inc.
+/* Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (C) 2015-2024 Google Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -55,19 +55,19 @@ bool CoreChecks::ValidateShaderInputAttachment(const spirv::Module &module_state
 
         // Same error, but provide more useful message 'how' VK_ATTACHMENT_UNUSED is derived
         if (!input_attachments) {
-            const LogObjectList objlist(module_state.handle(), rp_state->renderPass());
+            const LogObjectList objlist(module_state.handle(), rp_state->Handle());
             skip |= LogError("VUID-VkGraphicsPipelineCreateInfo-renderPass-06038", objlist, loc,
                              "SPIR-V consumes input attachment index %" PRIu32 " but pSubpasses[%" PRIu32
                              "].pInputAttachments is NULL.",
                              input_attachment_index, subpass);
         } else if (input_attachment_index >= subpass_description.inputAttachmentCount) {
-            const LogObjectList objlist(module_state.handle(), rp_state->renderPass());
+            const LogObjectList objlist(module_state.handle(), rp_state->Handle());
             skip |= LogError("VUID-VkGraphicsPipelineCreateInfo-renderPass-06038", objlist, loc,
                              "SPIR-V consumes input attachment index %" PRIu32 " but that is greater than the pSubpasses[%" PRIu32
                              "].inputAttachmentCount (%" PRIu32 ").",
                              input_attachment_index, subpass, subpass_description.inputAttachmentCount);
         } else if (input_attachments[input_attachment_index].attachment == VK_ATTACHMENT_UNUSED) {
-            const LogObjectList objlist(module_state.handle(), rp_state->renderPass());
+            const LogObjectList objlist(module_state.handle(), rp_state->Handle());
             skip |= LogError("VUID-VkGraphicsPipelineCreateInfo-renderPass-06038", objlist, loc,
                              "SPIR-V consumes input attachment index %" PRIu32 " but pSubpasses[%" PRIu32
                              "].pInputAttachments[%" PRIu32 "].attachment is VK_ATTACHMENT_UNUSED.",
@@ -95,7 +95,7 @@ bool CoreChecks::ValidateConservativeRasterization(const spirv::Module &module_s
     if (module_state.static_data_.has_builtin_fully_covered) {
         LogObjectList objlist(module_state.handle());
         if (stage_create_info.pipeline) {
-            objlist.add(stage_create_info.pipeline->PipelineLayoutState()->layout());
+            objlist.add(stage_create_info.pipeline->PipelineLayoutState()->Handle());
         }
         skip |= LogError("VUID-FullyCoveredEXT-conservativeRasterizationPostDepthCoverage-04235", objlist, loc,
                          "SPIR-V (Fragment stage) has a\nOpExecutionMode EarlyFragmentTests\nOpDecorate BuiltIn "
@@ -154,7 +154,7 @@ bool CoreChecks::ValidatePushConstantUsage(const StageCreateInfo &create_info, c
             // spec: "If a push constant block is declared in a shader"
             // Is checked regardless if element in Block is not statically used
             if ((push_constant_variable->offset < range.offset) | (push_constant_end > range_end)) {
-                const LogObjectList objlist(module_state.handle(), pipeline.PipelineLayoutState()->layout());
+                const LogObjectList objlist(module_state.handle(), pipeline.PipelineLayoutState()->Handle());
                 skip |= LogError(vuid, objlist, loc,
                                  "SPIR-V (%s) has a push constant buffer Block with range [%" PRIu32 ", %" PRIu32
                                  "] which outside the pipeline layout range of [%" PRIu32 ", %" PRIu32 "].",
@@ -166,9 +166,9 @@ bool CoreChecks::ValidatePushConstantUsage(const StageCreateInfo &create_info, c
     }
 
     if (!found_stage) {
-        const LogObjectList objlist(module_state.handle(), pipeline.PipelineLayoutState()->layout());
+        const LogObjectList objlist(module_state.handle(), pipeline.PipelineLayoutState()->Handle());
         skip |= LogError(vuid, objlist, loc, "SPIR-V (%s) Push constant are used, but %s doesn't set %s.",
-                         string_VkShaderStageFlags(stage).c_str(), FormatHandle(pipeline.PipelineLayoutState()->layout()).c_str(),
+                         string_VkShaderStageFlags(stage).c_str(), FormatHandle(pipeline.PipelineLayoutState()->Handle()).c_str(),
                          string_VkShaderStageFlags(stage).c_str());
     }
     return skip;
@@ -312,9 +312,9 @@ bool CoreChecks::ValidateShaderStageGroupNonUniform(const spirv::Module &module_
             // "Group operations with subgroup scope" must have stage support
             const VkSubgroupFeatureFlags supported_stages = phys_dev_props_core11.subgroupSupportedStages;
             if ((supported_stages & stage) == 0) {
-                skip = LogError("VUID-RuntimeSpirv-None-06343", module_state.handle(), loc,
-                                "%s is not supported in subgroupSupportedStages (%s).", string_VkShaderStageFlagBits(stage),
-                                string_VkShaderStageFlags(supported_stages).c_str());
+                skip |= LogError("VUID-RuntimeSpirv-None-06343", module_state.handle(), loc,
+                                 "%s is not supported in subgroupSupportedStages (%s).", string_VkShaderStageFlagBits(stage),
+                                 string_VkShaderStageFlags(supported_stages).c_str());
             }
         }
 
@@ -830,7 +830,7 @@ bool CoreChecks::ValidateShaderResolveQCOM(const spirv::Module &module_state, Vk
         const auto &rp_state = pipeline.RenderPassState();
         auto subpass_flags = (!rp_state) ? 0 : rp_state->createInfo.pSubpasses[pipeline.Subpass()].flags;
         if ((subpass_flags & VK_SUBPASS_DESCRIPTION_FRAGMENT_REGION_BIT_QCOM) != 0) {
-            const LogObjectList objlist(module_state.handle(), rp_state->renderPass());
+            const LogObjectList objlist(module_state.handle(), rp_state->Handle());
             skip |= LogError("VUID-RuntimeSpirv-SampleRateShading-06378", objlist, loc,
                              "SPIR-V (Fragment stage) enables SampleRateShading capability "
                              "and the subpass flags includes VK_SUBPASS_DESCRIPTION_FRAGMENT_REGION_BIT_QCOM.");
@@ -1663,14 +1663,14 @@ bool CoreChecks::ValidateShaderDescriptorVariable(const spirv::Module &module_st
         TypeToDescriptorTypeSet(module_state, variable.type_id, required_descriptor_count, descriptor_type_set, is_khr);
 
         if (!binding) {
-            const LogObjectList objlist(module_state.handle(), pipeline.PipelineLayoutState()->layout());
+            const LogObjectList objlist(module_state.handle(), pipeline.PipelineLayoutState()->Handle());
             skip |= LogError(vuid_07988, objlist, loc,
                              "SPIR-V (%s) uses descriptor slot [Set %" PRIu32 " Binding %" PRIu32
                              "] (type `%s`) but was not declared in the pipeline layout.",
                              string_VkShaderStageFlagBits(variable.stage), variable.decorations.set, variable.decorations.binding,
                              string_DescriptorTypeSet(descriptor_type_set).c_str());
         } else if (~binding->stageFlags & variable.stage) {
-            const LogObjectList objlist(module_state.handle(), pipeline.PipelineLayoutState()->layout());
+            const LogObjectList objlist(module_state.handle(), pipeline.PipelineLayoutState()->Handle());
             skip |= LogError(vuid_07988, objlist, loc,
                              "SPIR-V (%s) uses descriptor slot [Set %" PRIu32 " Binding %" PRIu32
                              "] (type `%s`) but the VkDescriptorSetLayoutBinding::stageFlags was %s.",
@@ -1679,14 +1679,14 @@ bool CoreChecks::ValidateShaderDescriptorVariable(const spirv::Module &module_st
                              string_VkShaderStageFlags(binding->stageFlags).c_str());
         } else if ((binding->descriptorType != VK_DESCRIPTOR_TYPE_MUTABLE_EXT) &&
                    (descriptor_type_set.find(binding->descriptorType) == descriptor_type_set.end())) {
-            const LogObjectList objlist(module_state.handle(), pipeline.PipelineLayoutState()->layout());
+            const LogObjectList objlist(module_state.handle(), pipeline.PipelineLayoutState()->Handle());
             skip |=
                 LogError(vuid_07990, objlist, loc,
                          "SPIR-V (%s) uses descriptor slot [Set %" PRIu32 " Binding %" PRIu32 "] of type %s but expected %s.",
                          string_VkShaderStageFlagBits(variable.stage), variable.decorations.set, variable.decorations.binding,
                          string_VkDescriptorType(binding->descriptorType), string_DescriptorTypeSet(descriptor_type_set).c_str());
         } else if (binding->descriptorCount < required_descriptor_count) {
-            const LogObjectList objlist(module_state.handle(), pipeline.PipelineLayoutState()->layout());
+            const LogObjectList objlist(module_state.handle(), pipeline.PipelineLayoutState()->Handle());
             skip |= LogError(vuid_07991, objlist, loc,
                              "SPIR-V (%s) uses descriptor slot [Set %" PRIu32 " Binding %" PRIu32 "] with %" PRIu32
                              " descriptors, but requires at least %" PRIu32 ".",
@@ -1707,7 +1707,7 @@ bool CoreChecks::ValidateShaderDescriptorVariable(const spirv::Module &module_st
                 case VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT:
                 case VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT:
                 case VK_SHADER_STAGE_GEOMETRY_BIT:
-                    if (!enabled_features.fragmentStoresAndAtomics) {
+                    if (!enabled_features.vertexPipelineStoresAndAtomics) {
                         skip |= LogError("VUID-RuntimeSpirv-NonWritable-06341", module_state.handle(), loc,
                                          "vertexPipelineStoresAndAtomics was not enabled");
                     }
@@ -1807,7 +1807,7 @@ bool CoreChecks::ValidateTexelOffsetLimits(const spirv::Module &module_state, co
         return false;
     }
 
-    uint32_t image_operand_position = OpcodeImageOperandsPosition(opcode);
+    const uint32_t image_operand_position = OpcodeImageOperandsPosition(opcode);
     // Image operands can be optional
     if (image_operand_position == 0 || insn.Length() <= image_operand_position) {
         return false;
@@ -2271,7 +2271,7 @@ bool CoreChecks::ValidatePipelineShaderStage(const StageCreateInfo &stage_create
     if (stage_create_info.pipeline) {
         if (stage == VK_SHADER_STAGE_FRAGMENT_BIT &&
             stage_create_info.pipeline->GetCreateInfo<VkGraphicsPipelineCreateInfo>().renderPass == VK_NULL_HANDLE &&
-            module_state.HasCapability(spv::CapabilityInputAttachment)) {
+            module_state.HasCapability(spv::CapabilityInputAttachment) && !enabled_features.dynamicRenderingLocalRead) {
             skip |= LogError("VUID-VkGraphicsPipelineCreateInfo-renderPass-06061", device, loc,
                              "is being created with fragment shader state and renderPass = VK_NULL_HANDLE, but fragment "
                              "shader includes InputAttachment capability.");
@@ -2406,64 +2406,76 @@ void CoreChecks::PreCallRecordCreateShadersEXT(VkDevice device, uint32_t createI
     csm_state->valid_spirv = true;
 }
 
+bool CoreChecks::RunSpirvValidation(spv_const_binary_t &binary, const Location &loc) const {
+    bool skip = false;
+    // Use SPIRV-Tools validator to try and catch any issues with the module itself. If specialization constants are present,
+    // the default values will be used during validation.
+    spv_target_env spirv_environment = PickSpirvEnv(api_version, IsExtEnabled(device_extensions.vk_khr_spirv_1_4));
+    spv_context ctx = spvContextCreate(spirv_environment);
+    spv_diagnostic diag = nullptr;
+    spvtools::ValidatorOptions options;
+    AdjustValidatorOptions(device_extensions, enabled_features, options);
+    const spv_result_t spv_valid = spvValidateWithOptions(ctx, options, &binary, &diag);
+    if (spv_valid != SPV_SUCCESS) {
+        const char *vuid = loc.function == Func::vkCreateShaderModule ? "VUID-VkShaderModuleCreateInfo-pCode-08737"
+                                                                      : "VUID-VkShaderCreateInfoEXT-pCode-08737";
+        if (spv_valid == SPV_WARNING) {
+            skip |= LogWarning(vuid, device, loc.dot(Field::pCode), "(spirv-val produced a warning):\n%s",
+                               diag && diag->error ? diag->error : "(no error text)");
+        } else {
+            skip |= LogError(vuid, device, loc.dot(Field::pCode), "(spirv-val produced an error):\n%s",
+                             diag && diag->error ? diag->error : "(no error text)");
+        }
+    }
+
+    spvDiagnosticDestroy(diag);
+    spvContextDestroy(ctx);
+
+    return skip;
+}
+
 bool CoreChecks::PreCallValidateCreateShaderModule(VkDevice device, const VkShaderModuleCreateInfo *pCreateInfo,
                                                    const VkAllocationCallbacks *pAllocator, VkShaderModule *pShaderModule,
                                                    const ErrorObject &error_obj) const {
     bool skip = false;
-    spv_result_t spv_valid = SPV_SUCCESS;
 
     if (disabled[shader_validation]) {
         return false;
     }
 
     const Location create_info_loc = error_obj.location.dot(Field::pCreateInfo);
-    auto have_glsl_shader = IsExtEnabled(device_extensions.vk_nv_glsl_shader);
 
-    if (!have_glsl_shader && (pCreateInfo->codeSize % 4)) {
+    if (pCreateInfo->pCode[0] != spv::MagicNumber) {
+        if (!IsExtEnabled(device_extensions.vk_nv_glsl_shader)) {
+            skip |= LogError("VUID-VkShaderModuleCreateInfo-pCode-07912", device, create_info_loc.dot(Field::pCode),
+                             "doesn't point to a SPIR-V module.");
+        }
+    } else if (SafeModulo(pCreateInfo->codeSize, 4) != 0) {
         skip |= LogError("VUID-VkShaderModuleCreateInfo-codeSize-08735", device, create_info_loc.dot(Field::codeSize),
                          "(%zu) must be a multiple of 4.", pCreateInfo->codeSize);
-    } else {
-        auto cache = GetValidationCacheInfo(pCreateInfo);
-        uint32_t hash = 0;
-        // If app isn't using a shader validation cache, use the default one from CoreChecks
-        if (!cache) {
-            cache = CastFromHandle<ValidationCache *>(core_validation_cache);
-        }
-        if (cache) {
-            hash = hash_util::ShaderHash(pCreateInfo->pCode, pCreateInfo->codeSize);
-            if (cache->Contains(hash)) {
-                return false;
-            }
-        }
+    }
 
-        // Use SPIRV-Tools validator to try and catch any issues with the module itself. If specialization constants are present,
-        // the default values will be used during validation.
-        spv_target_env spirv_environment = PickSpirvEnv(api_version, IsExtEnabled(device_extensions.vk_khr_spirv_1_4));
-        spv_context ctx = spvContextCreate(spirv_environment);
-        spv_const_binary_t binary{pCreateInfo->pCode, pCreateInfo->codeSize / sizeof(uint32_t)};
-        spv_diagnostic diag = nullptr;
-        spvtools::ValidatorOptions options;
-        AdjustValidatorOptions(device_extensions, enabled_features, options);
-        spv_valid = spvValidateWithOptions(ctx, options, &binary, &diag);
-        if (spv_valid != SPV_SUCCESS) {
-            if (!have_glsl_shader || (pCreateInfo->pCode[0] == spv::MagicNumber)) {
-                if (spv_valid == SPV_WARNING) {
-                    skip |=
-                        LogWarning("VUID-VkShaderModuleCreateInfo-pCode-08737", device, create_info_loc.dot(Field::pCode),
-                                   "(spirv-val produced a warning):\n%s", diag && diag->error ? diag->error : "(no error text)");
-                } else {
-                    skip |= LogError("VUID-VkShaderModuleCreateInfo-pCode-08737", device, create_info_loc.dot(Field::pCode),
-                                     "(spirv-val produced an error):\n%s", diag && diag->error ? diag->error : "(no error text)");
-                }
-            }
-        } else {
-            if (cache) {
-                cache->Insert(hash);
-            }
-        }
+    if (skip) {
+        return skip;  // if pCode is garbage, don't pass along to spirv-val
+    }
 
-        spvDiagnosticDestroy(diag);
-        spvContextDestroy(ctx);
+    ValidationCache *cache = GetValidationCacheInfo(pCreateInfo);
+    uint32_t hash = 0;
+    // If app isn't using a shader validation cache, use the default one from CoreChecks
+    if (!cache) {
+        cache = CastFromHandle<ValidationCache *>(core_validation_cache);
+    }
+    if (cache) {
+        hash = hash_util::ShaderHash(pCreateInfo->pCode, pCreateInfo->codeSize);
+        if (cache->Contains(hash)) {
+            return false;
+        }
+    }
+
+    spv_const_binary_t binary{pCreateInfo->pCode, pCreateInfo->codeSize / sizeof(uint32_t)};
+    skip |= RunSpirvValidation(binary, create_info_loc);
+    if (!skip && cache) {
+        cache->Insert(hash);
     }
 
     return skip;
@@ -2515,7 +2527,8 @@ bool CoreChecks::ValidateRequiredSubgroupSize(const spirv::Module &module_state,
                          local_size_x, local_size_y, local_size_z, requiredSubgroupSize,
                          phys_dev_ext_props.subgroup_size_control_props.maxComputeWorkgroupSubgroups);
     }
-    if ((stage_state.pipeline_create_info->flags & VK_PIPELINE_SHADER_STAGE_CREATE_REQUIRE_FULL_SUBGROUPS_BIT) > 0) {
+    if (stage_state.pipeline_create_info &&
+        (stage_state.pipeline_create_info->flags & VK_PIPELINE_SHADER_STAGE_CREATE_REQUIRE_FULL_SUBGROUPS_BIT) > 0) {
         if (SafeModulo(local_size_x, requiredSubgroupSize) != 0) {
             skip |= LogError("VUID-VkPipelineShaderStageCreateInfo-pNext-02757", module_state.handle(), loc,
                              "SPIR-V Local workgroup size x (%" PRIu32

@@ -1,6 +1,6 @@
-/* Copyright (c) 2020-2023 The Khronos Group Inc.
- * Copyright (c) 2020-2023 Valve Corporation
- * Copyright (c) 2020-2023 LunarG, Inc.
+/* Copyright (c) 2020-2024 The Khronos Group Inc.
+ * Copyright (c) 2020-2024 Valve Corporation
+ * Copyright (c) 2020-2024 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -51,10 +51,6 @@ struct OutputRecord {
     uint32_t size;
     uint32_t shader_id;
     uint32_t instruction_position;
-    uint32_t stage;
-    uint32_t stage_word_1;
-    uint32_t stage_word_2;
-    uint32_t stage_word_3;
     uint32_t format_string_id;
     uint32_t values;
 };

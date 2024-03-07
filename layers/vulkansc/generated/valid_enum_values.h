@@ -3,9 +3,9 @@
 
 /***************************************************************************
  *
- * Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
+ * Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,66 +21,219 @@
  ****************************************************************************/
 
 // NOLINTBEGIN
-// clang-format off
-template<> std::vector<VkResult> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkPipelineCacheHeaderVersion> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkImageLayout> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkObjectType> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkFormat> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkImageTiling> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkImageType> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkQueryType> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkSharingMode> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkComponentSwizzle> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkImageViewType> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkBlendFactor> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkBlendOp> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkCompareOp> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkDynamicState> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkFrontFace> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkVertexInputRate> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkPrimitiveTopology> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkPolygonMode> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkStencilOp> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkLogicOp> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkBorderColor> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkFilter> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkSamplerAddressMode> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkSamplerMipmapMode> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkDescriptorType> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkAttachmentLoadOp> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkAttachmentStoreOp> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkPipelineBindPoint> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkCommandBufferLevel> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkIndexType> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkSubpassContents> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkTessellationDomainOrigin> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkSamplerYcbcrModelConversion> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkSamplerYcbcrRange> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkChromaLocation> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkSamplerReductionMode> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkSemaphoreType> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkFaultQueryBehavior> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkPipelineMatchControl> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkPipelineCacheValidationVersion> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkPresentModeKHR> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkColorSpaceKHR> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkFragmentShadingRateCombinerOpKHR> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkDisplayPowerStateEXT> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkDeviceEventTypeEXT> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkDisplayEventTypeEXT> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkDiscardRectangleModeEXT> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkConservativeRasterizationModeEXT> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkBlendOverlapEXT> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkQueueGlobalPriorityKHR> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkTimeDomainEXT> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkValidationFeatureEnableEXT> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkValidationFeatureDisableEXT> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkLineRasterizationModeEXT> ValidationObject::ValidParamValues() const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkPipelineCacheHeaderVersion value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkImageLayout value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkObjectType value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkFormat value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkImageTiling value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkImageType value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkQueryType value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkSharingMode value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkComponentSwizzle value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkImageViewType value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkBlendFactor value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkBlendOp value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkCompareOp value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkDynamicState value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkFrontFace value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkVertexInputRate value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkPrimitiveTopology value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkPolygonMode value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkStencilOp value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkLogicOp value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkBorderColor value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkFilter value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkSamplerAddressMode value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkSamplerMipmapMode value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkDescriptorType value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkAttachmentLoadOp value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkAttachmentStoreOp value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkPipelineBindPoint value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkCommandBufferLevel value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkIndexType value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkSubpassContents value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkTessellationDomainOrigin value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkSamplerYcbcrModelConversion value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkSamplerYcbcrRange value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkChromaLocation value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkDescriptorUpdateTemplateType value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkSamplerReductionMode value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkSemaphoreType value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkFaultQueryBehavior value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkPipelineMatchControl value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkPipelineCacheValidationVersion value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkPresentModeKHR value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkColorSpaceKHR value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkQueueGlobalPriorityKHR value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkFragmentShadingRateCombinerOpKHR value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkVideoEncodeTuningModeKHR value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkLineRasterizationModeKHR value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkTimeDomainKHR value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkDebugReportObjectTypeEXT value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkRasterizationOrderAMD value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkShaderInfoTypeAMD value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkValidationCheckEXT value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkPipelineRobustnessBufferBehaviorEXT value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkPipelineRobustnessImageBehaviorEXT value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkDisplayPowerStateEXT value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkDeviceEventTypeEXT value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkDisplayEventTypeEXT value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkViewportCoordinateSwizzleNV value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkDiscardRectangleModeEXT value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkConservativeRasterizationModeEXT value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkBlendOverlapEXT value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkCoverageModulationModeNV value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkShadingRatePaletteEntryNV value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkCoarseSampleOrderTypeNV value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkRayTracingShaderGroupTypeKHR value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkGeometryTypeKHR value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkAccelerationStructureTypeKHR value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkCopyAccelerationStructureModeKHR value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkAccelerationStructureMemoryRequirementsTypeNV value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkMemoryOverallocationBehaviorAMD value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkPerformanceConfigurationTypeINTEL value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkQueryPoolSamplingModeINTEL value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkPerformanceOverrideTypeINTEL value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkPerformanceParameterTypeINTEL value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkValidationFeatureEnableEXT value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkValidationFeatureDisableEXT value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkCoverageReductionModeNV value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkProvokingVertexModeEXT value) const;
+#ifdef VK_USE_PLATFORM_WIN32_KHR
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkFullScreenExclusiveEXT value) const;
+#endif  // VK_USE_PLATFORM_WIN32_KHR
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkIndirectCommandsTokenTypeNV value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkDepthBiasRepresentationEXT value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkFragmentShadingRateTypeNV value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkFragmentShadingRateNV value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkAccelerationStructureMotionInstanceTypeNV value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkDeviceFaultAddressTypeEXT value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkDeviceFaultVendorBinaryHeaderVersionEXT value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkDeviceAddressBindingTypeEXT value) const;
 #ifdef VK_USE_PLATFORM_SCI
-template<> std::vector<VkSciSyncClientTypeNV> ValidationObject::ValidParamValues() const;
-template<> std::vector<VkSciSyncPrimitiveTypeNV> ValidationObject::ValidParamValues() const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkSciSyncClientTypeNV value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkSciSyncPrimitiveTypeNV value) const;
 #endif  // VK_USE_PLATFORM_SCI
-// clang-format on
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkMicromapTypeEXT value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkBuildMicromapModeEXT value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkCopyMicromapModeEXT value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkAccelerationStructureCompatibilityKHR value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkAccelerationStructureBuildTypeKHR value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkDirectDriverLoadingModeLUNARG value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkOpticalFlowPerformanceLevelNV value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkOpticalFlowSessionBindingPointNV value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkShaderCodeTypeEXT value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkLayerSettingTypeEXT value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkLatencyMarkerNV value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkOutOfBandQueueTypeNV value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkBlockMatchWindowCompareModeQCOM value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkCubicFilterWeightsQCOM value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkBuildAccelerationStructureModeKHR value) const;
+template <>
+ValidValue ValidationObject::IsValidEnumValue(VkShaderGroupShaderKHR value) const;
 
 // NOLINTEND

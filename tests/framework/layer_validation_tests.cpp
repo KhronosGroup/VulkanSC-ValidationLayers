@@ -150,48 +150,6 @@ VKAPI_ATTR VkBool32 VKAPI_CALL DebugUtilsCallback(VkDebugUtilsMessageSeverityFla
     return VK_FALSE;
 }
 
-#if GTEST_IS_THREADSAFE
-void AddToCommandBuffer(ThreadTestData *data) {
-    for (int i = 0; i < 80000; i++) {
-        vk::CmdSetEvent(data->commandBuffer, data->event, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
-        if (*data->bailout) {
-            break;
-        }
-    }
-}
-
-void UpdateDescriptor(ThreadTestData *data) {
-    VkDescriptorBufferInfo buffer_info = {};
-    buffer_info.buffer = data->buffer;
-    buffer_info.offset = 0;
-    buffer_info.range = 1;
-
-    VkWriteDescriptorSet descriptor_write = vku::InitStructHelper();
-    descriptor_write.dstSet = data->descriptorSet;
-    descriptor_write.dstBinding = data->binding;
-    descriptor_write.descriptorCount = 1;
-    descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    descriptor_write.pBufferInfo = &buffer_info;
-
-    for (int i = 0; i < 80000; i++) {
-        vk::UpdateDescriptorSets(data->device, 1, &descriptor_write, 0, NULL);
-        if (*data->bailout) {
-            break;
-        }
-    }
-}
-
-#endif  // GTEST_IS_THREADSAFE
-
-void ReleaseNullFence(ThreadTestData *data) {
-    for (int i = 0; i < 40000; i++) {
-        vk::DestroyFence(data->device, VK_NULL_HANDLE, NULL);
-        if (*data->bailout) {
-            break;
-        }
-    }
-}
-
 void TestRenderPassCreate(ErrorMonitor *error_monitor, const vkt::Device &device, const VkRenderPassCreateInfo &create_info,
                           bool rp2_supported, const char *rp1_vuid, const char *rp2_vuid) {
     if (rp1_vuid) {
@@ -269,70 +227,6 @@ void TestRenderPassBegin(ErrorMonitor *error_monitor, const VkDevice device, con
     }
 }
 
-void ValidOwnershipTransferOp(ErrorMonitor *monitor, vkt::CommandBuffer *cb, VkPipelineStageFlags src_stages,
-                              VkPipelineStageFlags dst_stages, const VkBufferMemoryBarrier *buf_barrier,
-                              const VkImageMemoryBarrier *img_barrier) {
-    cb->begin();
-    uint32_t num_buf_barrier = (buf_barrier) ? 1 : 0;
-    uint32_t num_img_barrier = (img_barrier) ? 1 : 0;
-    vk::CmdPipelineBarrier(cb->handle(), src_stages, dst_stages, 0, 0, nullptr, num_buf_barrier, buf_barrier, num_img_barrier,
-                           img_barrier);
-    cb->end();
-    cb->QueueCommandBuffer();  // Implicitly waits
-}
-
-void ValidOwnershipTransfer(ErrorMonitor *monitor, vkt::CommandBuffer *cb_from, vkt::CommandBuffer *cb_to,
-                            VkPipelineStageFlags src_stages, VkPipelineStageFlags dst_stages,
-                            const VkBufferMemoryBarrier *buf_barrier, const VkImageMemoryBarrier *img_barrier) {
-    ValidOwnershipTransferOp(monitor, cb_from, src_stages, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, buf_barrier, img_barrier);
-    ValidOwnershipTransferOp(monitor, cb_to, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, dst_stages, buf_barrier, img_barrier);
-}
-
-void ValidOwnershipTransferOp(ErrorMonitor *monitor, vkt::CommandBuffer *cb, const VkBufferMemoryBarrier2KHR *buf_barrier,
-                              const VkImageMemoryBarrier2KHR *img_barrier) {
-    cb->begin();
-    VkDependencyInfoKHR dep_info = vku::InitStructHelper();
-    dep_info.bufferMemoryBarrierCount = (buf_barrier) ? 1 : 0;
-    dep_info.pBufferMemoryBarriers = buf_barrier;
-    dep_info.imageMemoryBarrierCount = (img_barrier) ? 1 : 0;
-    dep_info.pImageMemoryBarriers = img_barrier;
-    vk::CmdPipelineBarrier2KHR(cb->handle(), &dep_info);
-    cb->end();
-    cb->QueueCommandBuffer();  // Implicitly waits
-}
-
-void ValidOwnershipTransfer(ErrorMonitor *monitor, vkt::CommandBuffer *cb_from, vkt::CommandBuffer *cb_to,
-                            const VkBufferMemoryBarrier2KHR *buf_barrier, const VkImageMemoryBarrier2KHR *img_barrier) {
-    VkBufferMemoryBarrier2KHR fixup_buf_barrier;
-    VkImageMemoryBarrier2KHR fixup_img_barrier;
-    if (buf_barrier) {
-        fixup_buf_barrier = *buf_barrier;
-        fixup_buf_barrier.dstStageMask = VK_PIPELINE_STAGE_2_NONE_KHR;
-        fixup_buf_barrier.dstAccessMask = 0;
-    }
-    if (img_barrier) {
-        fixup_img_barrier = *img_barrier;
-        fixup_img_barrier.dstStageMask = VK_PIPELINE_STAGE_2_NONE_KHR;
-        fixup_img_barrier.dstAccessMask = 0;
-    }
-
-    ValidOwnershipTransferOp(monitor, cb_from, buf_barrier ? &fixup_buf_barrier : nullptr,
-                             img_barrier ? &fixup_img_barrier : nullptr);
-
-    if (buf_barrier) {
-        fixup_buf_barrier = *buf_barrier;
-        fixup_buf_barrier.srcStageMask = VK_PIPELINE_STAGE_2_NONE_KHR;
-        fixup_buf_barrier.srcAccessMask = 0;
-    }
-    if (img_barrier) {
-        fixup_img_barrier = *img_barrier;
-        fixup_img_barrier.srcStageMask = VK_PIPELINE_STAGE_2_NONE_KHR;
-        fixup_img_barrier.srcAccessMask = 0;
-    }
-    ValidOwnershipTransferOp(monitor, cb_to, buf_barrier ? &fixup_buf_barrier : nullptr,
-                             img_barrier ? &fixup_img_barrier : nullptr);
-}
-
 VkResult GPDIFPHelper(VkPhysicalDevice dev, const VkImageCreateInfo *ci, VkImageFormatProperties *limits) {
     VkImageFormatProperties tmp_limits;
     limits = limits ? limits : &tmp_limits;
@@ -374,35 +268,6 @@ VkFormat FindFormatWithoutFeatures2(VkPhysicalDevice gpu, VkImageTiling tiling, 
     }
 
     return return_format;
-}
-
-bool SemaphoreExportImportSupported(VkPhysicalDevice gpu, VkExternalSemaphoreHandleTypeFlagBits handle_type) {
-    constexpr auto export_import_flags =
-        VK_EXTERNAL_SEMAPHORE_FEATURE_EXPORTABLE_BIT_KHR | VK_EXTERNAL_SEMAPHORE_FEATURE_IMPORTABLE_BIT_KHR;
-
-    VkPhysicalDeviceExternalSemaphoreInfo info = vku::InitStructHelper();
-    info.handleType = handle_type;
-    VkExternalSemaphoreProperties properties = vku::InitStructHelper();
-    vk::GetPhysicalDeviceExternalSemaphoreProperties(gpu, &info, &properties);
-    return (properties.externalSemaphoreFeatures & export_import_flags) == export_import_flags;
-}
-
-void AllocateDisjointMemory(vkt::Device *device, PFN_vkGetImageMemoryRequirements2KHR fp, VkImage mp_image,
-                            VkDeviceMemory *mp_image_mem, VkImageAspectFlagBits plane) {
-    VkImagePlaneMemoryRequirementsInfo image_plane_req = vku::InitStructHelper();
-    image_plane_req.planeAspect = plane;
-
-    VkImageMemoryRequirementsInfo2 mem_req_info2 = vku::InitStructHelper(&image_plane_req);
-    mem_req_info2.image = mp_image;
-
-    VkMemoryRequirements2 mp_image_mem_reqs2 = vku::InitStructHelper();
-
-    fp(device->device(), &mem_req_info2, &mp_image_mem_reqs2);
-
-    VkMemoryAllocateInfo mp_image_alloc_info = vku::InitStructHelper();
-    mp_image_alloc_info.allocationSize = mp_image_mem_reqs2.memoryRequirements.size;
-    ASSERT_TRUE(device->phy().set_memory_type(mp_image_mem_reqs2.memoryRequirements.memoryTypeBits, &mp_image_alloc_info, 0));
-    ASSERT_EQ(VK_SUCCESS, vk::AllocateMemory(device->device(), &mp_image_alloc_info, NULL, mp_image_mem));
 }
 
 void CreateSamplerTest(VkLayerTest &test, const VkSamplerCreateInfo *create_info, const std::string &code) {
@@ -527,6 +392,10 @@ void VkLayerTest::AddSurfaceExtension() {
 
 #if defined(VK_USE_PLATFORM_WIN32_KHR)
     AddWsiExtensions(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
+#endif
+
+#if defined(VK_USE_PLATFORM_METAL_EXT)
+    AddWsiExtensions(VK_EXT_METAL_SURFACE_EXTENSION_NAME);
 #endif
 
 #if defined(VK_USE_PLATFORM_ANDROID_KHR)
@@ -698,29 +567,6 @@ bool VkLayerTest::LoadDeviceProfileLayer(PFN_VkSetPhysicalDeviceProperties2EXT &
     }
 
     return true;
-}
-
-void SetImageLayout(vkt::Device *device, VkImageAspectFlags aspect, VkImage image, VkImageLayout image_layout) {
-    vkt::CommandPool pool(*device, device->graphics_queue_node_index_);
-    vkt::CommandBuffer cmd_buf(device, &pool);
-
-    cmd_buf.begin();
-    VkImageMemoryBarrier layout_barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-                                        nullptr,
-                                        0,
-                                        VK_ACCESS_MEMORY_READ_BIT,
-                                        VK_IMAGE_LAYOUT_UNDEFINED,
-                                        image_layout,
-                                        VK_QUEUE_FAMILY_IGNORED,
-                                        VK_QUEUE_FAMILY_IGNORED,
-                                        image,
-                                        {aspect, 0, 1, 0, 1}};
-
-    vk::CmdPipelineBarrier(cmd_buf.handle(), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr,
-                           0, nullptr, 1, &layout_barrier);
-    cmd_buf.end();
-
-    cmd_buf.QueueCommandBuffer();
 }
 
 void print_android(const char *c) {

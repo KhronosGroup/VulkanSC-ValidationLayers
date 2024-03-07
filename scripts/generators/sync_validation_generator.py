@@ -1,7 +1,7 @@
 #!/usr/bin/python3 -i
 #
-# Copyright (c) 2023 The Khronos Group Inc.
-# Copyright (c) 2023 LunarG, Inc.
+# Copyright (c) 2023-2024 The Khronos Group Inc.
+# Copyright (c) 2023-2024 LunarG, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -80,8 +80,8 @@ class SyncValidationOutputGenerator(BaseGenerator):
 
             /***************************************************************************
             *
-            * Copyright (c) 2015-2023 Valve Corporation
-            * Copyright (c) 2015-2023 LunarG, Inc.
+            * Copyright (c) 2015-2024 Valve Corporation
+            * Copyright (c) 2015-2024 LunarG, Inc.
             *
             * Licensed under the Apache License, Version 2.0 (the "License");
             * you may not use this file except in compliance with the License.
@@ -156,6 +156,15 @@ class SyncValidationOutputGenerator(BaseGenerator):
             #include "containers/custom_containers.h"
             ''')
         out.append('// clang-format off\n')
+
+        shader_read_access = next((a for a in self.vk.syncAccess if a.flag.name == 'VK_ACCESS_2_SHADER_READ_BIT'), None)
+        shader_read_expansion = [e.name for e in shader_read_access.equivalent.accesses]
+        out.append(f'static constexpr VkAccessFlags2 kShaderReadExpandBits = {"|".join(shader_read_expansion)};\n')
+
+        shader_write_access = next((a for a in self.vk.syncAccess if a.flag.name == 'VK_ACCESS_2_SHADER_WRITE_BIT'), None)
+        shader_write_expansion = [e.name for e in shader_write_access.equivalent.accesses]
+        out.append(f'static constexpr VkAccessFlags2 kShaderWriteExpandBits = {"|".join(shader_write_expansion)};\n')
+
         out.append(f'''
 // Fake stages and accesses for acquire present support
 static const VkPipelineStageFlagBits2 VK_PIPELINE_STAGE_2_PRESENT_ENGINE_BIT_SYNCVAL = 0x{(1 << self.pipelineStagePresentEngine.value):016X}ULL;
@@ -488,6 +497,9 @@ const std::map<VkPipelineStageFlags2, VkPipelineStageFlags2>& syncLogicallyLater
         # how ACCELERATION_STRUCTURE_BUILD should work with sub-components of SHADER_READ:
         # https://gitlab.khronos.org/vulkan/vulkan/-/issues/3640#note_434212
         stageToAccessMap['VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR'].append('VK_ACCESS_2_SHADER_STORAGE_READ_BIT')
+        # Micro map, like AS Build, is a non *_STAGE_BIT that can have SHADER_READ
+        if 'VK_PIPELINE_STAGE_2_MICROMAP_BUILD_BIT_EXT' in stageToAccessMap:
+            stageToAccessMap['VK_PIPELINE_STAGE_2_MICROMAP_BUILD_BIT_EXT'].append('VK_ACCESS_2_SHADER_STORAGE_READ_BIT')
 
         for stage in [x for x in self.stages if x in stageToAccessMap]:
             mini_stage = stage.lstrip()

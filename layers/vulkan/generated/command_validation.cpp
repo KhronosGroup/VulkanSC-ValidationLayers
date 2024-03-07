@@ -3,8 +3,8 @@
 
 /***************************************************************************
  *
- * Copyright (c) 2021-2023 Valve Corporation
- * Copyright (c) 2021-2023 LunarG, Inc.
+ * Copyright (c) 2021-2024 Valve Corporation
+ * Copyright (c) 2021-2024 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -708,6 +708,20 @@ static const vvl::unordered_map<Func, CommandValidationInfo> kCommandValidationT
     CMD_SCOPE_BOTH, "kVUIDUndefined",
     CMD_SCOPE_OUTSIDE, "VUID-vkCmdSetFragmentShadingRateKHR-videocoding",
 }},
+{Func::vkCmdSetRenderingAttachmentLocationsKHR, {
+    "VUID-vkCmdSetRenderingAttachmentLocationsKHR-commandBuffer-recording",
+    nullptr,
+    VK_QUEUE_GRAPHICS_BIT, "VUID-vkCmdSetRenderingAttachmentLocationsKHR-commandBuffer-cmdpool",
+    CMD_SCOPE_INSIDE, "VUID-vkCmdSetRenderingAttachmentLocationsKHR-renderpass",
+    CMD_SCOPE_OUTSIDE, "VUID-vkCmdSetRenderingAttachmentLocationsKHR-videocoding",
+}},
+{Func::vkCmdSetRenderingInputAttachmentIndicesKHR, {
+    "VUID-vkCmdSetRenderingInputAttachmentIndicesKHR-commandBuffer-recording",
+    nullptr,
+    VK_QUEUE_GRAPHICS_BIT, "VUID-vkCmdSetRenderingInputAttachmentIndicesKHR-commandBuffer-cmdpool",
+    CMD_SCOPE_INSIDE, "VUID-vkCmdSetRenderingInputAttachmentIndicesKHR-renderpass",
+    CMD_SCOPE_OUTSIDE, "VUID-vkCmdSetRenderingInputAttachmentIndicesKHR-videocoding",
+}},
 {Func::vkCmdEncodeVideoKHR, {
     "VUID-vkCmdEncodeVideoKHR-commandBuffer-recording",
     "VUID-vkCmdEncodeVideoKHR-bufferlevel",
@@ -812,6 +826,55 @@ static const vvl::unordered_map<Func, CommandValidationInfo> kCommandValidationT
     VK_QUEUE_GRAPHICS_BIT, "VUID-vkCmdBindIndexBuffer2KHR-commandBuffer-cmdpool",
     CMD_SCOPE_BOTH, "kVUIDUndefined",
     CMD_SCOPE_OUTSIDE, "VUID-vkCmdBindIndexBuffer2KHR-videocoding",
+}},
+{Func::vkCmdSetLineStippleKHR, {
+    "VUID-vkCmdSetLineStippleKHR-commandBuffer-recording",
+    nullptr,
+    VK_QUEUE_GRAPHICS_BIT, "VUID-vkCmdSetLineStippleKHR-commandBuffer-cmdpool",
+    CMD_SCOPE_BOTH, "kVUIDUndefined",
+    CMD_SCOPE_OUTSIDE, "VUID-vkCmdSetLineStippleKHR-videocoding",
+}},
+{Func::vkCmdBindDescriptorSets2KHR, {
+    "VUID-vkCmdBindDescriptorSets2KHR-commandBuffer-recording",
+    nullptr,
+    VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT, "VUID-vkCmdBindDescriptorSets2KHR-commandBuffer-cmdpool",
+    CMD_SCOPE_BOTH, "kVUIDUndefined",
+    CMD_SCOPE_OUTSIDE, "VUID-vkCmdBindDescriptorSets2KHR-videocoding",
+}},
+{Func::vkCmdPushConstants2KHR, {
+    "VUID-vkCmdPushConstants2KHR-commandBuffer-recording",
+    nullptr,
+    VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT, "VUID-vkCmdPushConstants2KHR-commandBuffer-cmdpool",
+    CMD_SCOPE_BOTH, "kVUIDUndefined",
+    CMD_SCOPE_OUTSIDE, "VUID-vkCmdPushConstants2KHR-videocoding",
+}},
+{Func::vkCmdPushDescriptorSet2KHR, {
+    "VUID-vkCmdPushDescriptorSet2KHR-commandBuffer-recording",
+    nullptr,
+    VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT, "VUID-vkCmdPushDescriptorSet2KHR-commandBuffer-cmdpool",
+    CMD_SCOPE_BOTH, "kVUIDUndefined",
+    CMD_SCOPE_OUTSIDE, "VUID-vkCmdPushDescriptorSet2KHR-videocoding",
+}},
+{Func::vkCmdPushDescriptorSetWithTemplate2KHR, {
+    "VUID-vkCmdPushDescriptorSetWithTemplate2KHR-commandBuffer-recording",
+    nullptr,
+    VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT, "VUID-vkCmdPushDescriptorSetWithTemplate2KHR-commandBuffer-cmdpool",
+    CMD_SCOPE_BOTH, "kVUIDUndefined",
+    CMD_SCOPE_OUTSIDE, "VUID-vkCmdPushDescriptorSetWithTemplate2KHR-videocoding",
+}},
+{Func::vkCmdSetDescriptorBufferOffsets2EXT, {
+    "VUID-vkCmdSetDescriptorBufferOffsets2EXT-commandBuffer-recording",
+    nullptr,
+    VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT, "VUID-vkCmdSetDescriptorBufferOffsets2EXT-commandBuffer-cmdpool",
+    CMD_SCOPE_BOTH, "kVUIDUndefined",
+    CMD_SCOPE_OUTSIDE, "VUID-vkCmdSetDescriptorBufferOffsets2EXT-videocoding",
+}},
+{Func::vkCmdBindDescriptorBufferEmbeddedSamplers2EXT, {
+    "VUID-vkCmdBindDescriptorBufferEmbeddedSamplers2EXT-commandBuffer-recording",
+    nullptr,
+    VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT, "VUID-vkCmdBindDescriptorBufferEmbeddedSamplers2EXT-commandBuffer-cmdpool",
+    CMD_SCOPE_BOTH, "kVUIDUndefined",
+    CMD_SCOPE_OUTSIDE, "VUID-vkCmdBindDescriptorBufferEmbeddedSamplers2EXT-videocoding",
 }},
 {Func::vkCmdDebugMarkerBeginEXT, {
     "VUID-vkCmdDebugMarkerBeginEXT-commandBuffer-recording",
@@ -1115,11 +1178,11 @@ static const vvl::unordered_map<Func, CommandValidationInfo> kCommandValidationT
     CMD_SCOPE_OUTSIDE, "VUID-vkCmdSetPerformanceOverrideINTEL-videocoding",
 }},
 {Func::vkCmdSetLineStippleEXT, {
-    "VUID-vkCmdSetLineStippleEXT-commandBuffer-recording",
+    "VUID-vkCmdSetLineStippleKHR-commandBuffer-recording",
     nullptr,
-    VK_QUEUE_GRAPHICS_BIT, "VUID-vkCmdSetLineStippleEXT-commandBuffer-cmdpool",
+    VK_QUEUE_GRAPHICS_BIT, "VUID-vkCmdSetLineStippleKHR-commandBuffer-cmdpool",
     CMD_SCOPE_BOTH, "kVUIDUndefined",
-    CMD_SCOPE_OUTSIDE, "VUID-vkCmdSetLineStippleEXT-videocoding",
+    CMD_SCOPE_OUTSIDE, "VUID-vkCmdSetLineStippleKHR-videocoding",
 }},
 {Func::vkCmdSetCullModeEXT, {
     "VUID-vkCmdSetCullMode-commandBuffer-recording",
@@ -1429,13 +1492,6 @@ static const vvl::unordered_map<Func, CommandValidationInfo> kCommandValidationT
     CMD_SCOPE_OUTSIDE, "VUID-vkCmdUpdatePipelineIndirectBufferNV-renderpass",
     CMD_SCOPE_OUTSIDE, "VUID-vkCmdUpdatePipelineIndirectBufferNV-videocoding",
 }},
-{Func::vkCmdSetTessellationDomainOriginEXT, {
-    "VUID-vkCmdSetTessellationDomainOriginEXT-commandBuffer-recording",
-    nullptr,
-    VK_QUEUE_GRAPHICS_BIT, "VUID-vkCmdSetTessellationDomainOriginEXT-commandBuffer-cmdpool",
-    CMD_SCOPE_BOTH, "kVUIDUndefined",
-    CMD_SCOPE_OUTSIDE, "VUID-vkCmdSetTessellationDomainOriginEXT-videocoding",
-}},
 {Func::vkCmdSetDepthClampEnableEXT, {
     "VUID-vkCmdSetDepthClampEnableEXT-commandBuffer-recording",
     nullptr,
@@ -1505,6 +1561,13 @@ static const vvl::unordered_map<Func, CommandValidationInfo> kCommandValidationT
     VK_QUEUE_GRAPHICS_BIT, "VUID-vkCmdSetColorWriteMaskEXT-commandBuffer-cmdpool",
     CMD_SCOPE_BOTH, "kVUIDUndefined",
     CMD_SCOPE_OUTSIDE, "VUID-vkCmdSetColorWriteMaskEXT-videocoding",
+}},
+{Func::vkCmdSetTessellationDomainOriginEXT, {
+    "VUID-vkCmdSetTessellationDomainOriginEXT-commandBuffer-recording",
+    nullptr,
+    VK_QUEUE_GRAPHICS_BIT, "VUID-vkCmdSetTessellationDomainOriginEXT-commandBuffer-cmdpool",
+    CMD_SCOPE_BOTH, "kVUIDUndefined",
+    CMD_SCOPE_OUTSIDE, "VUID-vkCmdSetTessellationDomainOriginEXT-videocoding",
 }},
 {Func::vkCmdSetRasterizationStreamEXT, {
     "VUID-vkCmdSetRasterizationStreamEXT-commandBuffer-recording",
@@ -1780,7 +1843,7 @@ bool CoreChecks::ValidateCmd(const vvl::CommandBuffer& cb_state, const Location&
 
         default:
             assert(loc.function != Func::Empty);
-            skip |= LogError(info.recording_vuid, cb_state.commandBuffer(), loc, "was called before vkBeginCommandBuffer().");
+            skip |= LogError(info.recording_vuid, cb_state.Handle(), loc, "was called before vkBeginCommandBuffer().");
     }
 
     // Validate the command pool from which the command buffer is from that the command is allowed for queue type

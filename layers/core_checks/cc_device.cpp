@@ -1,7 +1,7 @@
-/* Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (C) 2015-2023 Google Inc.
+/* Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (C) 2015-2024 Google Inc.
  * Modifications Copyright (C) 2020-2022 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -30,6 +30,8 @@
 #include "generated/chassis.h"
 #include "core_validation.h"
 #include "utils/shader_utils.h"
+#include "state_tracker/image_state.h"
+#include "state_tracker/device_state.h"
 
 bool CoreChecks::ValidateDeviceQueueFamily(uint32_t queue_family, const Location &loc, const char *vuid,
                                            bool optional = false) const {
@@ -150,9 +152,9 @@ bool CoreChecks::ValidateDeviceMaskToRenderPass(const vvl::CommandBuffer &cb_sta
                                                 const char *vuid) const {
     bool skip = false;
     if ((deviceMask & cb_state.active_render_pass_device_mask) != deviceMask) {
-        skip |= LogError(vuid, cb_state.commandBuffer(), loc, "(0x%" PRIx32 ") is not a subset of %s device mask (0x%" PRIx32 ").",
-                         deviceMask, FormatHandle(cb_state.activeRenderPass->renderPass()).c_str(),
-                         cb_state.active_render_pass_device_mask);
+        skip |=
+            LogError(vuid, cb_state.Handle(), loc, "(0x%" PRIx32 ") is not a subset of %s device mask (0x%" PRIx32 ").", deviceMask,
+                     FormatHandle(cb_state.activeRenderPass->Handle()).c_str(), cb_state.active_render_pass_device_mask);
     }
     return skip;
 }
@@ -461,7 +463,7 @@ void CoreChecks::CreateDevice(const VkDeviceCreateInfo *pCreateInfo) {
             read_file.close();
         } else {
             Location loc(Func::vkCreateDevice);
-            LogInfo("UNASSIGNED-cache-file-error", device, loc,
+            LogInfo("WARNING-cache-file-error", device, loc,
                     "Cannot open shader validation cache at %s for reading (it may not exist yet)", validation_cache_path.c_str());
         }
 
@@ -488,7 +490,7 @@ void CoreChecks::PreCallRecordDestroyDevice(VkDevice device, const VkAllocationC
 
         validation_cache_data = (char *)malloc(sizeof(char) * validation_cache_size);
         if (!validation_cache_data) {
-            LogInfo("UNASSIGNED-cache-memory-error", device, loc, "Validation Cache Memory Error");
+            LogInfo("WARNING-cache-memory-error", device, loc, "Validation Cache Memory Error");
             return;
         }
 
@@ -496,7 +498,7 @@ void CoreChecks::PreCallRecordDestroyDevice(VkDevice device, const VkAllocationC
             CoreLayerGetValidationCacheDataEXT(device, core_validation_cache, &validation_cache_size, validation_cache_data);
 
         if (result != VK_SUCCESS) {
-            LogInfo("UNASSIGNED-cache-retrieval-error", device, loc, "Validation Cache Retrieval Error");
+            LogInfo("WARNING-cache-retrieval-error", device, loc, "Validation Cache Retrieval Error");
             free(validation_cache_data);
             return;
         }
@@ -507,7 +509,7 @@ void CoreChecks::PreCallRecordDestroyDevice(VkDevice device, const VkAllocationC
                 write_file.write(static_cast<char *>(validation_cache_data), validation_cache_size);
                 write_file.close();
             } else {
-                LogInfo("UNASSIGNED-cache-write-error", device, loc, "Cannot open shader validation cache at %s for writing",
+                LogInfo("WARNING-cache-write-error", device, loc, "Cannot open shader validation cache at %s for writing",
                         validation_cache_path.c_str());
             }
         }
@@ -620,7 +622,8 @@ bool CoreChecks::PreCallValidateGetPhysicalDeviceImageFormatProperties2(VkPhysic
                                                                         VkImageFormatProperties2 *pImageFormatProperties,
                                                                         const ErrorObject &error_obj) const {
     // Can't wrap AHB-specific validation in a device extension check here, but no harm
-    bool skip = ValidateGetPhysicalDeviceImageFormatProperties2ANDROID(pImageFormatInfo, pImageFormatProperties, error_obj);
+    bool skip = false;
+    skip |= ValidateGetPhysicalDeviceImageFormatProperties2ANDROID(pImageFormatInfo, pImageFormatProperties, error_obj);
     skip |= ValidateGetPhysicalDeviceImageFormatProperties2(pImageFormatInfo, pImageFormatProperties, error_obj);
     return skip;
 }
@@ -786,7 +789,7 @@ bool CoreChecks::PreCallValidateResetCommandPool(VkDevice device, VkCommandPool 
 }
 
 // For given obj node, if it is use, flag a validation error and return callback result, else return false
-bool CoreChecks::ValidateObjectNotInUse(const BASE_NODE *obj_node, const Location &loc, const char *error_code) const {
+bool CoreChecks::ValidateObjectNotInUse(const vvl::StateObject *obj_node, const Location &loc, const char *error_code) const {
     if (disabled[object_in_use]) return false;
     auto obj_struct = obj_node->Handle();
     bool skip = false;
@@ -803,27 +806,38 @@ bool CoreChecks::PreCallValidateGetCalibratedTimestampsEXT(VkDevice device, uint
                                                            const VkCalibratedTimestampInfoEXT *pTimestampInfos,
                                                            uint64_t *pTimestamps, uint64_t *pMaxDeviation,
                                                            const ErrorObject &error_obj) const {
+    return PreCallValidateGetCalibratedTimestampsKHR(device, timestampCount, pTimestampInfos, pTimestamps, pMaxDeviation,
+                                                     error_obj);
+}
+
+bool CoreChecks::PreCallValidateGetCalibratedTimestampsKHR(VkDevice device, uint32_t timestampCount,
+                                                           const VkCalibratedTimestampInfoKHR *pTimestampInfos,
+                                                           uint64_t *pTimestamps, uint64_t *pMaxDeviation,
+                                                           const ErrorObject &error_obj) const {
     bool skip = false;
 
+    auto query_function = (error_obj.location.function == Func::vkGetPhysicalDeviceCalibrateableTimeDomainsKHR)
+                              ? DispatchGetPhysicalDeviceCalibrateableTimeDomainsKHR
+                              : DispatchGetPhysicalDeviceCalibrateableTimeDomainsEXT;
     uint32_t count = 0;
-    DispatchGetPhysicalDeviceCalibrateableTimeDomainsEXT(physical_device, &count, nullptr);
-    std::vector<VkTimeDomainEXT> valid_time_domains(count);
-    DispatchGetPhysicalDeviceCalibrateableTimeDomainsEXT(physical_device, &count, valid_time_domains.data());
+    query_function(physical_device, &count, nullptr);
+    std::vector<VkTimeDomainKHR> valid_time_domains(count);
+    query_function(physical_device, &count, valid_time_domains.data());
 
-    vvl::unordered_map<VkTimeDomainEXT, uint32_t> time_domain_map;
+    vvl::unordered_map<VkTimeDomainKHR, uint32_t> time_domain_map;
     for (uint32_t i = 0; i < timestampCount; i++) {
-        const VkTimeDomainEXT time_domain = pTimestampInfos[i].timeDomain;
+        const VkTimeDomainKHR time_domain = pTimestampInfos[i].timeDomain;
         auto it = time_domain_map.find(time_domain);
         if (it != time_domain_map.end()) {
             skip |= LogError("VUID-vkGetCalibratedTimestampsEXT-timeDomain-09246", device,
                              error_obj.location.dot(Field::pTimestampInfos, i).dot(Field::timeDomain),
                              "and pTimestampInfos[%" PRIu32 "].timeDomain are both %s.", it->second,
-                             string_VkTimeDomainEXT(time_domain));
+                             string_VkTimeDomainKHR(time_domain));
             break;  // no reason to check after finding 1 duplicate
         } else if (!IsValueIn(time_domain, valid_time_domains)) {
             skip |= LogError("VUID-VkCalibratedTimestampInfoEXT-timeDomain-02354", device,
                              error_obj.location.dot(Field::pTimestampInfos, i).dot(Field::timeDomain), "is %s.",
-                             string_VkTimeDomainEXT(time_domain));
+                             string_VkTimeDomainKHR(time_domain));
         }
         time_domain_map[time_domain] = i;
     }

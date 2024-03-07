@@ -1,6 +1,6 @@
-/* Copyright (c) 2015-2017, 2019-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2017, 2019-2023 Valve Corporation
- * Copyright (c) 2015-2017, 2019-2023 LunarG, Inc.
+/* Copyright (c) 2015-2017, 2019-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2017, 2019-2024 Valve Corporation
+ * Copyright (c) 2015-2017, 2019-2024 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -118,7 +118,7 @@ using insert_iterator = std::insert_iterator<T>;
 //       MoveAssignable and MoveConstructable
 // NOTE: Unlike std::vector, iterators are invalidated by move assignment between small_vector objects effectively the
 //       "small string" allocation functions as an incompatible allocator.
-template <typename T, size_t N, typename SizeType = uint8_t>
+template <typename T, size_t N, typename SizeType = uint32_t>
 class small_vector {
   public:
     using value_type = T;
@@ -875,8 +875,8 @@ class enumeration {
     iterator end() { return data_ + count_; }
     const_iterator end() const { return data_ + count_; }
 
-    T &operator[](int i) { return data_[i]; }
-    const T &operator[](int i) const { return data_[i]; }
+    T &operator[](size_t i) { return data_[i]; }
+    const T &operator[](size_t i) const { return data_[i]; }
 
     T &front() { return *data_; }
     const T &front() const { return *data_; }
@@ -952,6 +952,14 @@ enumeration<T, IndexedIterator<T, IndexType>> enumerate(T *begin, IndexType coun
 template <typename T>
 enumeration<T, IndexedIterator<T>> enumerate(T *begin, T *end) {
     return enumeration<T, IndexedIterator<T>>(begin, end);
+}
+
+template <typename Container>
+enumeration<typename Container::value_type, IndexedIterator<typename Container::value_type, typename Container::size_type>>
+enumerate(Container &container) {
+    return enumeration<typename Container::value_type,
+                       IndexedIterator<typename Container::value_type, typename Container::size_type>>(container.data(),
+                                                                                                       container.size());
 }
 
 template <typename BaseType>

@@ -24,10 +24,8 @@
 TEST_F(PositiveSubpass, SubpassImageBarrier) {
     TEST_DESCRIPTION("Subpass with image barrier (self-dependency)");
     SetTargetApiVersion(VK_API_VERSION_1_3);
-    RETURN_IF_SKIP(InitFramework());
-    VkPhysicalDeviceSynchronization2Features sync2_features = vku::InitStructHelper();
-    GetPhysicalDeviceFeatures2(sync2_features);
-    RETURN_IF_SKIP(InitState(nullptr, &sync2_features));
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    RETURN_IF_SKIP(Init());
 
     const VkAttachmentDescription attachment = {0,
                                                 VK_FORMAT_R8G8B8A8_UNORM,
@@ -59,22 +57,9 @@ TEST_F(PositiveSubpass, SubpassImageBarrier) {
 
     VkImageObj image(m_device);
     image.InitNoLayout(32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM,
-                       VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_IMAGE_TILING_OPTIMAL);
+                       VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     vkt::ImageView image_view = image.CreateView();
-
-    VkFramebufferCreateInfo fbci = vku::InitStructHelper();
-    fbci.renderPass = render_pass;
-    fbci.attachmentCount = 1;
-    fbci.pAttachments = &image_view.handle();
-    fbci.width = 32;
-    fbci.height = 32;
-    fbci.layers = 1;
-    vkt::Framebuffer framebuffer(*m_device, fbci);
-
-    VkRenderPassBeginInfo render_pass_begin = vku::InitStructHelper();
-    render_pass_begin.renderPass = render_pass;
-    render_pass_begin.framebuffer = framebuffer;
-    render_pass_begin.renderArea = VkRect2D{{0, 0}, {32, 32}};
+    vkt::Framebuffer framebuffer(*m_device, render_pass, 1, &image_view.handle());
 
     // VkImageMemoryBarrier
     VkImageMemoryBarrier barrier = vku::InitStructHelper();
@@ -101,7 +86,7 @@ TEST_F(PositiveSubpass, SubpassImageBarrier) {
 
     // Test vkCmdPipelineBarrier subpass barrier
     m_commandBuffer->begin();
-    vk::CmdBeginRenderPass(*m_commandBuffer, &render_pass_begin, VK_SUBPASS_CONTENTS_INLINE);
+    m_commandBuffer->BeginRenderPass(render_pass, framebuffer, 32, 32);
     vk::CmdPipelineBarrier(*m_commandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1,
                            &barrier);
@@ -110,7 +95,7 @@ TEST_F(PositiveSubpass, SubpassImageBarrier) {
 
     // Test vkCmdPipelineBarrier2 subpass barrier
     m_commandBuffer->begin();
-    vk::CmdBeginRenderPass(*m_commandBuffer, &render_pass_begin, VK_SUBPASS_CONTENTS_INLINE);
+    m_commandBuffer->BeginRenderPass(render_pass, framebuffer, 32, 32);
     vk::CmdPipelineBarrier2(*m_commandBuffer, &dependency_info);
     vk::CmdEndRenderPass(*m_commandBuffer);
     m_commandBuffer->end();
@@ -119,10 +104,8 @@ TEST_F(PositiveSubpass, SubpassImageBarrier) {
 TEST_F(PositiveSubpass, SubpassWithEventWait) {
     TEST_DESCRIPTION("Subpass waits for the event set outside of this subpass");
     SetTargetApiVersion(VK_API_VERSION_1_3);
-    RETURN_IF_SKIP(InitFramework());
-    VkPhysicalDeviceSynchronization2Features sync2_features = vku::InitStructHelper();
-    GetPhysicalDeviceFeatures2(sync2_features);
-    RETURN_IF_SKIP(InitState(nullptr, &sync2_features));
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    RETURN_IF_SKIP(Init());
 
     const VkAttachmentDescription attachment = {0,
                                                 VK_FORMAT_R8G8B8A8_UNORM,
@@ -154,22 +137,9 @@ TEST_F(PositiveSubpass, SubpassWithEventWait) {
 
     VkImageObj image(m_device);
     image.InitNoLayout(32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM,
-                       VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_IMAGE_TILING_OPTIMAL);
+                       VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     vkt::ImageView image_view = image.CreateView();
-
-    VkFramebufferCreateInfo fbci = vku::InitStructHelper();
-    fbci.renderPass = render_pass;
-    fbci.attachmentCount = 1;
-    fbci.pAttachments = &image_view.handle();
-    fbci.width = 32;
-    fbci.height = 32;
-    fbci.layers = 1;
-    vkt::Framebuffer framebuffer(*m_device, fbci);
-
-    VkRenderPassBeginInfo render_pass_begin = vku::InitStructHelper();
-    render_pass_begin.renderPass = render_pass;
-    render_pass_begin.framebuffer = framebuffer;
-    render_pass_begin.renderArea = VkRect2D{{0, 0}, {32, 32}};
+    vkt::Framebuffer framebuffer(*m_device, render_pass, 1, &image_view.handle());
 
     // VkImageMemoryBarrier
     VkImageMemoryBarrier barrier = vku::InitStructHelper();
@@ -199,7 +169,7 @@ TEST_F(PositiveSubpass, SubpassWithEventWait) {
         vkt::Event event(*m_device);
         m_commandBuffer->begin();
         vk::CmdSetEvent(*m_commandBuffer, event, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
-        vk::CmdBeginRenderPass(*m_commandBuffer, &render_pass_begin, VK_SUBPASS_CONTENTS_INLINE);
+        m_commandBuffer->BeginRenderPass(render_pass, framebuffer, 32, 32);
         vk::CmdWaitEvents(*m_commandBuffer, 1, &event.handle(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                           VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, nullptr, 0, nullptr, 1, &barrier);
         vk::CmdEndRenderPass(*m_commandBuffer);
@@ -212,7 +182,7 @@ TEST_F(PositiveSubpass, SubpassWithEventWait) {
         vkt::Event event2(*m_device);
         m_commandBuffer->begin();
         vk::CmdSetEvent2(*m_commandBuffer, event2, &dependency_info);
-        vk::CmdBeginRenderPass(*m_commandBuffer, &render_pass_begin, VK_SUBPASS_CONTENTS_INLINE);
+        m_commandBuffer->BeginRenderPass(render_pass, framebuffer, 32, 32);
         vk::CmdWaitEvents2(*m_commandBuffer, 1, &event2.handle(), &dependency_info);
         vk::CmdEndRenderPass(*m_commandBuffer);
         m_commandBuffer->end();

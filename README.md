@@ -57,6 +57,8 @@ Updates to this repository which correspond to a new Vulkan specification releas
 
 This scheme was adopted following the `1.3.266` Vulkan specification release.
 
+Weekly automated (and untested) tags are generated with the following format: `snapshot-<year>wk<week-number>`, eg. `snapshot-2024wk06`.
+
 For Vulkan SC, updates to a new API version will be tagged using the following format `vksc<`_`version`_`>.<`_`patch`_`>` (e.g., `vksc1.0.12`).
 
 ## License

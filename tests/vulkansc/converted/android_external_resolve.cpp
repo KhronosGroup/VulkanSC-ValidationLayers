@@ -16,6 +16,7 @@
 #include "../framework/layer_validation_tests.h"
 #include "../framework/android_hardware_buffer.h"
 #include "../framework/pipeline_helper.h"
+#include "../framework/render_pass_helper.h"
 
 #if defined(VK_USE_PLATFORM_ANDROID_KHR)
 
@@ -36,44 +37,18 @@ TEST_F(NegativeAndroidExternalResolve, SubpassDescriptionSample) {
     external_format.externalFormat = ahb.GetExternalFormat(*m_device);
 
     // index 0 = color | index 1 = resolve
-    VkAttachmentDescription2 attachment_desc[2];
-    attachment_desc[0] = vku::InitStructHelper(&external_format);
-    attachment_desc[0].format = VK_FORMAT_UNDEFINED;
-    attachment_desc[0].samples = VK_SAMPLE_COUNT_2_BIT; // bad
-    attachment_desc[0].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    attachment_desc[0].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachment_desc[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    attachment_desc[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachment_desc[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    attachment_desc[0].finalLayout = VK_IMAGE_LAYOUT_GENERAL;
-
-    attachment_desc[1] = attachment_desc[0];
-    attachment_desc[1].samples = VK_SAMPLE_COUNT_1_BIT;
-
-    VkAttachmentReference2 color_attachment_ref = vku::InitStructHelper();
-    color_attachment_ref.layout = VK_IMAGE_LAYOUT_GENERAL;
-    color_attachment_ref.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    color_attachment_ref.attachment = 0;
-
-    VkAttachmentReference2 resolve_attachment_ref = vku::InitStructHelper();
-    resolve_attachment_ref.layout = VK_IMAGE_LAYOUT_GENERAL;
-    resolve_attachment_ref.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    resolve_attachment_ref.attachment = 1;
-
-    VkSubpassDescription2 subpass = vku::InitStructHelper();
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &color_attachment_ref;
-    subpass.pResolveAttachments = &resolve_attachment_ref;
-
-    VkRenderPassCreateInfo2 render_pass_ci = vku::InitStructHelper();
-    render_pass_ci.attachmentCount = 2;
-    render_pass_ci.pAttachments = attachment_desc;
-    render_pass_ci.subpassCount = 1;
-    render_pass_ci.pSubpasses = &subpass;
+    RenderPass2SingleSubpass rp(*this);
+    rp.AddAttachmentDescription(VK_FORMAT_UNDEFINED, VK_SAMPLE_COUNT_2_BIT);  // 2_bit is invalid
+    rp.AddAttachmentDescription(VK_FORMAT_UNDEFINED);
+    rp.SetAttachmentDescriptionPNext(0, &external_format);
+    rp.SetAttachmentDescriptionPNext(1, &external_format);
+    rp.AddAttachmentReference(0, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_PLANE_0_BIT);
+    rp.AddAttachmentReference(1, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT);
+    rp.AddColorAttachment(0);
+    rp.AddResolveAttachment(1);
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSubpassDescription2-externalFormatResolve-09345");
-    vkt::RenderPass render_pass(*m_device, render_pass_ci);
+    rp.CreateRenderPass();
     m_errorMonitor->VerifyFound();
 }
 
@@ -97,44 +72,18 @@ TEST_F(NegativeAndroidExternalResolve, AttachmentDescriptionZeroExternalFormat) 
     external_format.externalFormat = 0;  // bad
 
     // index 0 = color | index 1 = resolve
-    VkAttachmentDescription2 attachment_desc[2];
-    attachment_desc[0] = vku::InitStructHelper(&external_format);
-    attachment_desc[0].format = format_resolve_prop.colorAttachmentFormat;
-    attachment_desc[0].samples = VK_SAMPLE_COUNT_1_BIT;
-    attachment_desc[0].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    attachment_desc[0].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachment_desc[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    attachment_desc[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachment_desc[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    attachment_desc[0].finalLayout = VK_IMAGE_LAYOUT_GENERAL;
-
-    attachment_desc[1] = attachment_desc[0];
-    attachment_desc[1].format = VK_FORMAT_UNDEFINED;
-
-    VkAttachmentReference2 color_attachment_ref = vku::InitStructHelper();
-    color_attachment_ref.layout = VK_IMAGE_LAYOUT_GENERAL;
-    color_attachment_ref.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    color_attachment_ref.attachment = 0;
-
-    VkAttachmentReference2 resolve_attachment_ref = vku::InitStructHelper();
-    resolve_attachment_ref.layout = VK_IMAGE_LAYOUT_GENERAL;
-    resolve_attachment_ref.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    resolve_attachment_ref.attachment = 1;
-
-    VkSubpassDescription2 subpass = vku::InitStructHelper();
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &color_attachment_ref;
-    subpass.pResolveAttachments = &resolve_attachment_ref;
-
-    VkRenderPassCreateInfo2 render_pass_ci = vku::InitStructHelper();
-    render_pass_ci.attachmentCount = 2;
-    render_pass_ci.pAttachments = attachment_desc;
-    render_pass_ci.subpassCount = 1;
-    render_pass_ci.pSubpasses = &subpass;
+    RenderPass2SingleSubpass rp(*this);
+    rp.AddAttachmentDescription(format_resolve_prop.colorAttachmentFormat);
+    rp.AddAttachmentDescription(VK_FORMAT_UNDEFINED);
+    rp.SetAttachmentDescriptionPNext(0, &external_format);
+    rp.SetAttachmentDescriptionPNext(1, &external_format);
+    rp.AddAttachmentReference(0, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_PLANE_0_BIT);
+    rp.AddAttachmentReference(1, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT);
+    rp.AddColorAttachment(0);
+    rp.AddResolveAttachment(1);
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkAttachmentDescription2-format-09334");
-    vkt::RenderPass render_pass(*m_device, render_pass_ci);
+    rp.CreateRenderPass();
     m_errorMonitor->VerifyFound();
 }
 
@@ -155,44 +104,19 @@ TEST_F(NegativeAndroidExternalResolve, SubpassDescriptionViewMask) {
     external_format.externalFormat = ahb.GetExternalFormat(*m_device);
 
     // index 0 = color | index 1 = resolve
-    VkAttachmentDescription2 attachment_desc[2];
-    attachment_desc[0] = vku::InitStructHelper(&external_format);
-    attachment_desc[0].format = VK_FORMAT_UNDEFINED;
-    attachment_desc[0].samples = VK_SAMPLE_COUNT_1_BIT;
-    attachment_desc[0].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    attachment_desc[0].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachment_desc[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    attachment_desc[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachment_desc[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    attachment_desc[0].finalLayout = VK_IMAGE_LAYOUT_GENERAL;
-
-    attachment_desc[1] = attachment_desc[0];
-
-    VkAttachmentReference2 color_attachment_ref = vku::InitStructHelper();
-    color_attachment_ref.layout = VK_IMAGE_LAYOUT_GENERAL;
-    color_attachment_ref.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    color_attachment_ref.attachment = 0;
-
-    VkAttachmentReference2 resolve_attachment_ref = vku::InitStructHelper();
-    resolve_attachment_ref.layout = VK_IMAGE_LAYOUT_GENERAL;
-    resolve_attachment_ref.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    resolve_attachment_ref.attachment = 1;
-
-    VkSubpassDescription2 subpass = vku::InitStructHelper();
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &color_attachment_ref;
-    subpass.pResolveAttachments = &resolve_attachment_ref;
-    subpass.viewMask = 1; // bad
-
-    VkRenderPassCreateInfo2 render_pass_ci = vku::InitStructHelper();
-    render_pass_ci.attachmentCount = 2;
-    render_pass_ci.pAttachments = attachment_desc;
-    render_pass_ci.subpassCount = 1;
-    render_pass_ci.pSubpasses = &subpass;
+    RenderPass2SingleSubpass rp(*this);
+    rp.AddAttachmentDescription(VK_FORMAT_UNDEFINED);
+    rp.AddAttachmentDescription(VK_FORMAT_UNDEFINED);
+    rp.SetAttachmentDescriptionPNext(0, &external_format);
+    rp.SetAttachmentDescriptionPNext(1, &external_format);
+    rp.AddAttachmentReference(0, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT);
+    rp.AddAttachmentReference(1, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT);
+    rp.AddColorAttachment(0);
+    rp.AddResolveAttachment(1);
+    rp.SetViewMask(1);  // bad
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSubpassDescription2-externalFormatResolve-09346");
-    vkt::RenderPass render_pass(*m_device, render_pass_ci);
+    rp.CreateRenderPass();
     m_errorMonitor->VerifyFound();
 }
 
@@ -272,45 +196,19 @@ TEST_F(NegativeAndroidExternalResolve, SubpassDescriptionMultiPlaneInput) {
     external_format.externalFormat = ahb.GetExternalFormat(*m_device);
 
     // index 0 = color | index 1 = resolve
-    VkAttachmentDescription2 attachment_desc[2];
-    attachment_desc[0] = vku::InitStructHelper(&external_format);
-    attachment_desc[0].format = VK_FORMAT_UNDEFINED;
-    attachment_desc[0].samples = VK_SAMPLE_COUNT_1_BIT;
-    attachment_desc[0].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    attachment_desc[0].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachment_desc[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    attachment_desc[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachment_desc[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    attachment_desc[0].finalLayout = VK_IMAGE_LAYOUT_GENERAL;
-
-    attachment_desc[1] = attachment_desc[0];
-
-    VkAttachmentReference2 color_attachment_ref = vku::InitStructHelper();
-    color_attachment_ref.layout = VK_IMAGE_LAYOUT_GENERAL;
-    color_attachment_ref.aspectMask = VK_IMAGE_ASPECT_PLANE_0_BIT;
-    color_attachment_ref.attachment = 0;
-
-    VkAttachmentReference2 resolve_attachment_ref = vku::InitStructHelper();
-    resolve_attachment_ref.layout = VK_IMAGE_LAYOUT_GENERAL;
-    resolve_attachment_ref.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    resolve_attachment_ref.attachment = 1;
-
-    VkSubpassDescription2 subpass = vku::InitStructHelper();
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &color_attachment_ref;
-    subpass.pResolveAttachments = &resolve_attachment_ref;
-    subpass.inputAttachmentCount = 1;
-    subpass.pInputAttachments = &color_attachment_ref;
-
-    VkRenderPassCreateInfo2 render_pass_ci = vku::InitStructHelper();
-    render_pass_ci.attachmentCount = 2;
-    render_pass_ci.pAttachments = attachment_desc;
-    render_pass_ci.subpassCount = 1;
-    render_pass_ci.pSubpasses = &subpass;
+    RenderPass2SingleSubpass rp(*this);
+    rp.AddAttachmentDescription(VK_FORMAT_UNDEFINED);
+    rp.AddAttachmentDescription(VK_FORMAT_UNDEFINED);
+    rp.SetAttachmentDescriptionPNext(0, &external_format);
+    rp.SetAttachmentDescriptionPNext(1, &external_format);
+    rp.AddAttachmentReference(0, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_PLANE_0_BIT);
+    rp.AddAttachmentReference(1, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT);
+    rp.AddColorAttachment(0);
+    rp.AddResolveAttachment(1);
+    rp.AddInputAttachment(0);
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSubpassDescription2-externalFormatResolve-09348");
-    vkt::RenderPass render_pass(*m_device, render_pass_ci);
+    rp.CreateRenderPass();
     m_errorMonitor->VerifyFound();
 }
 
@@ -391,50 +289,21 @@ TEST_F(NegativeAndroidExternalResolve, Framebuffer) {
     external_format.externalFormat = ahb.GetExternalFormat(*m_device, &format_resolve_prop);
 
     // index 0 = color | index 1 = resolve
-    VkAttachmentDescription2 attachment_desc[2];
-    attachment_desc[0] = vku::InitStructHelper(&external_format);
-    attachment_desc[0].format = format_resolve_prop.colorAttachmentFormat;
-    attachment_desc[0].samples = VK_SAMPLE_COUNT_1_BIT;
-    attachment_desc[0].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    attachment_desc[0].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachment_desc[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    attachment_desc[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachment_desc[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    attachment_desc[0].finalLayout = VK_IMAGE_LAYOUT_GENERAL;
-
-    attachment_desc[1] = attachment_desc[0];
-    attachment_desc[1].format = VK_FORMAT_UNDEFINED;
-
-    VkAttachmentReference2 color_attachment_ref = vku::InitStructHelper();
-    color_attachment_ref.layout = VK_IMAGE_LAYOUT_GENERAL;
-    color_attachment_ref.aspectMask = VK_IMAGE_ASPECT_PLANE_0_BIT;
-    color_attachment_ref.attachment = 0;
-
-    VkAttachmentReference2 resolve_attachment_ref = vku::InitStructHelper();
-    resolve_attachment_ref.layout = VK_IMAGE_LAYOUT_GENERAL;
-    resolve_attachment_ref.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    resolve_attachment_ref.attachment = 1;
-
-    VkSubpassDescription2 subpass = vku::InitStructHelper();
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &color_attachment_ref;
-    subpass.pResolveAttachments = &resolve_attachment_ref;
-
-    VkRenderPassCreateInfo2 render_pass_ci = vku::InitStructHelper();
-    render_pass_ci.attachmentCount = 2;
-    render_pass_ci.pAttachments = attachment_desc;
-    render_pass_ci.subpassCount = 1;
-    render_pass_ci.pSubpasses = &subpass;
-
-    vkt::RenderPass render_pass(*m_device, render_pass_ci);
+    RenderPass2SingleSubpass rp(*this);
+    rp.AddAttachmentDescription(format_resolve_prop.colorAttachmentFormat);
+    rp.AddAttachmentDescription(VK_FORMAT_UNDEFINED);
+    rp.SetAttachmentDescriptionPNext(0, &external_format);
+    rp.SetAttachmentDescriptionPNext(1, &external_format);
+    rp.AddAttachmentReference(0, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT);
+    rp.AddAttachmentReference(1, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT);
+    rp.AddColorAttachment(0);
+    rp.AddResolveAttachment(1);
+    rp.CreateRenderPass();
 
     VkImageCreateInfo image_ci = vku::InitStructHelper();
     image_ci.imageType = VK_IMAGE_TYPE_2D;
     image_ci.format = format_resolve_prop.colorAttachmentFormat;
-    image_ci.extent.width = 32;
-    image_ci.extent.height = 32;
-    image_ci.extent.depth = 1;
+    image_ci.extent = {32, 32, 1};
     image_ci.mipLevels = 1;
     image_ci.arrayLayers = 1;
     image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -475,21 +344,15 @@ TEST_F(NegativeAndroidExternalResolve, Framebuffer) {
     attachments[0] = color_view.handle();
     attachments[1] = resolve_view.handle();
 
-    VkFramebufferCreateInfo fb_ci = vku::InitStructHelper();
-    fb_ci.width = 32;
-    fb_ci.height = 32;
-    fb_ci.layers = 1;
-    fb_ci.renderPass = render_pass.handle();
-    fb_ci.attachmentCount = 2;
-    fb_ci.pAttachments = attachments;
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkFramebufferCreateInfo-pAttachments-09350");
-    vkt::Framebuffer framebuffer(*m_device, fb_ci);
+    vkt::Framebuffer framebuffer(*m_device, rp.Handle(), 2, attachments);
     m_errorMonitor->VerifyFound();
 }
 
 TEST_F(NegativeAndroidExternalResolve, ImagelessFramebuffer) {
-    VkPhysicalDeviceImagelessFramebufferFeatures imageless_framebuffer = vku::InitStructHelper();
-    RETURN_IF_SKIP(InitBasicAndroidExternalResolve(&imageless_framebuffer));
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredFeature(vkt::Feature::imagelessFramebuffer);
+    RETURN_IF_SKIP(InitBasicAndroidExternalResolve());
 
     if (nullColorAttachmentWithExternalFormatResolve) {
         GTEST_SKIP() << "nullColorAttachmentWithExternalFormatResolve enabled";
@@ -506,50 +369,21 @@ TEST_F(NegativeAndroidExternalResolve, ImagelessFramebuffer) {
     external_format.externalFormat = ahb.GetExternalFormat(*m_device, &format_resolve_prop);
 
     // index 0 = color | index 1 = resolve
-    VkAttachmentDescription2 attachment_desc[2];
-    attachment_desc[0] = vku::InitStructHelper(&external_format);
-    attachment_desc[0].format = format_resolve_prop.colorAttachmentFormat;
-    attachment_desc[0].samples = VK_SAMPLE_COUNT_1_BIT;
-    attachment_desc[0].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    attachment_desc[0].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachment_desc[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    attachment_desc[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachment_desc[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    attachment_desc[0].finalLayout = VK_IMAGE_LAYOUT_GENERAL;
-
-    attachment_desc[1] = attachment_desc[0];
-    attachment_desc[1].format = VK_FORMAT_UNDEFINED;
-
-    VkAttachmentReference2 color_attachment_ref = vku::InitStructHelper();
-    color_attachment_ref.layout = VK_IMAGE_LAYOUT_GENERAL;
-    color_attachment_ref.aspectMask = VK_IMAGE_ASPECT_PLANE_0_BIT;
-    color_attachment_ref.attachment = 0;
-
-    VkAttachmentReference2 resolve_attachment_ref = vku::InitStructHelper();
-    resolve_attachment_ref.layout = VK_IMAGE_LAYOUT_GENERAL;
-    resolve_attachment_ref.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    resolve_attachment_ref.attachment = 1;
-
-    VkSubpassDescription2 subpass = vku::InitStructHelper();
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &color_attachment_ref;
-    subpass.pResolveAttachments = &resolve_attachment_ref;
-
-    VkRenderPassCreateInfo2 render_pass_ci = vku::InitStructHelper();
-    render_pass_ci.attachmentCount = 2;
-    render_pass_ci.pAttachments = attachment_desc;
-    render_pass_ci.subpassCount = 1;
-    render_pass_ci.pSubpasses = &subpass;
-
-    vkt::RenderPass render_pass(*m_device, render_pass_ci);
+    RenderPass2SingleSubpass rp(*this);
+    rp.AddAttachmentDescription(format_resolve_prop.colorAttachmentFormat);
+    rp.AddAttachmentDescription(VK_FORMAT_UNDEFINED);
+    rp.SetAttachmentDescriptionPNext(0, &external_format);
+    rp.SetAttachmentDescriptionPNext(1, &external_format);
+    rp.AddAttachmentReference(0, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_PLANE_0_BIT);
+    rp.AddAttachmentReference(1, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT);
+    rp.AddColorAttachment(0);
+    rp.AddResolveAttachment(1);
+    rp.CreateRenderPass();
 
     VkImageCreateInfo image_ci = vku::InitStructHelper();
     image_ci.imageType = VK_IMAGE_TYPE_2D;
     image_ci.format = format_resolve_prop.colorAttachmentFormat;
-    image_ci.extent.width = 32;
-    image_ci.extent.height = 32;
-    image_ci.extent.depth = 1;
+    image_ci.extent = {32, 32, 1};
     image_ci.mipLevels = 1;
     image_ci.arrayLayers = 1;
     image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -613,7 +447,7 @@ TEST_F(NegativeAndroidExternalResolve, ImagelessFramebuffer) {
     fb_ci.height = 32;
     fb_ci.layers = 1;
     fb_ci.attachmentCount = 2;
-    fb_ci.renderPass = render_pass.handle();
+    fb_ci.renderPass = rp.Handle();
     m_errorMonitor->SetAllowedFailureMsg("VUID-VkFramebufferCreateInfo-flags-03201");
     vkt::Framebuffer framebuffer(*m_device, fb_ci);
 
@@ -625,7 +459,7 @@ TEST_F(NegativeAndroidExternalResolve, ImagelessFramebuffer) {
     render_pass_attachment_bi.pAttachments = attachments;
 
     VkRenderPassBeginInfo render_pass_bi = vku::InitStructHelper(&render_pass_attachment_bi);
-    render_pass_bi.renderPass = render_pass.handle();
+    render_pass_bi.renderPass = rp.Handle();
     render_pass_bi.framebuffer = framebuffer.handle();
     render_pass_bi.renderArea.extent = {1, 1};
     render_pass_bi.clearValueCount = 1;
@@ -638,10 +472,135 @@ TEST_F(NegativeAndroidExternalResolve, ImagelessFramebuffer) {
     m_commandBuffer->end();
 }
 
+TEST_F(NegativeAndroidExternalResolve, ImagelessFramebufferFormat) {
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredFeature(vkt::Feature::imagelessFramebuffer);
+    RETURN_IF_SKIP(InitBasicAndroidExternalResolve());
+
+    if (nullColorAttachmentWithExternalFormatResolve) {
+        GTEST_SKIP() << "nullColorAttachmentWithExternalFormatResolve enabled";
+    }
+
+    vkt::AHB ahb(AHARDWAREBUFFER_FORMAT_Y8Cb8Cr8_420, AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE, 64, 64);
+    if (!ahb.handle()) {
+        GTEST_SKIP() << "could not allocate AHARDWAREBUFFER_FORMAT_Y8Cb8Cr8_420";
+    }
+
+    VkAndroidHardwareBufferFormatResolvePropertiesANDROID format_resolve_prop = vku::InitStructHelper();
+    const VkFormat color_format = VK_FORMAT_R8G8B8A8_UINT;
+    if (format_resolve_prop.colorAttachmentFormat == color_format) {
+        GTEST_SKIP() << "assuming colorAttachmentFormat is not VK_FORMAT_R8G8B8A8_UINT";
+    }
+
+    VkExternalFormatANDROID external_format = vku::InitStructHelper();
+    external_format.externalFormat = ahb.GetExternalFormat(*m_device, &format_resolve_prop);
+
+    // index 0 = color | index 1 = resolve
+    RenderPass2SingleSubpass rp(*this);
+    rp.AddAttachmentDescription(color_format);
+    rp.AddAttachmentDescription(VK_FORMAT_UNDEFINED);
+    rp.SetAttachmentDescriptionPNext(0, &external_format);
+    rp.SetAttachmentDescriptionPNext(1, &external_format);
+    rp.AddAttachmentReference(0, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_PLANE_0_BIT);
+    rp.AddAttachmentReference(1, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT);
+    rp.AddColorAttachment(0);
+    rp.AddResolveAttachment(1);
+    rp.CreateRenderPass();
+
+    VkImageCreateInfo image_ci = vku::InitStructHelper();
+    image_ci.imageType = VK_IMAGE_TYPE_2D;
+    image_ci.format = color_format;
+    image_ci.extent = {32, 32, 1};
+    image_ci.mipLevels = 1;
+    image_ci.arrayLayers = 1;
+    image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_ci.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+    VkImageObj color_image(m_device);
+    color_image.Init(image_ci);
+    vkt::ImageView color_view = color_image.CreateView();
+
+    image_ci.pNext = &external_format;
+    image_ci.format = VK_FORMAT_UNDEFINED;
+    image_ci.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
+    VkImageObj resolve_image(m_device);
+    resolve_image.Init(image_ci);
+
+    VkSamplerYcbcrConversionCreateInfo sycci = vku::InitStructHelper(&external_format);
+    sycci.format = VK_FORMAT_UNDEFINED;
+    sycci.ycbcrModel = VK_SAMPLER_YCBCR_MODEL_CONVERSION_YCBCR_709;
+    sycci.ycbcrRange = VK_SAMPLER_YCBCR_RANGE_ITU_NARROW;
+    sycci.components = {VK_COMPONENT_SWIZZLE_ZERO, VK_COMPONENT_SWIZZLE_ZERO, VK_COMPONENT_SWIZZLE_ZERO, VK_COMPONENT_SWIZZLE_ZERO};
+    m_errorMonitor->SetAllowedFailureMsg("VUID-VkSamplerYcbcrConversionCreateInfo-format-01650");
+    vkt::SamplerYcbcrConversion ycbcr_conv(*m_device, sycci);
+
+    VkSamplerYcbcrConversionInfo syci = vku::InitStructHelper();
+    syci.conversion = ycbcr_conv.handle();
+
+    VkImageViewCreateInfo ivci = vku::InitStructHelper(&syci);
+    ivci.image = resolve_image.handle();
+    ivci.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    ivci.format = VK_FORMAT_UNDEFINED;
+    ivci.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    const vkt::ImageView resolve_view(*m_device, ivci);
+
+    VkImageView attachments[2];
+    attachments[0] = color_view.handle();
+    attachments[1] = resolve_view.handle();
+
+    VkFramebufferAttachmentImageInfo framebuffer_attachment_image_info[2];
+    framebuffer_attachment_image_info[0] = vku::InitStructHelper();
+    framebuffer_attachment_image_info[0].usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    framebuffer_attachment_image_info[0].width = 32;
+    framebuffer_attachment_image_info[0].height = 32;
+    framebuffer_attachment_image_info[0].layerCount = 1;
+    framebuffer_attachment_image_info[0].viewFormatCount = 1;
+    framebuffer_attachment_image_info[0].pViewFormats = &color_format;
+
+    framebuffer_attachment_image_info[1] = framebuffer_attachment_image_info[0];
+    framebuffer_attachment_image_info[1].usage = VK_IMAGE_USAGE_SAMPLED_BIT;
+    framebuffer_attachment_image_info[1].pViewFormats = &ivci.format;
+
+    VkFramebufferAttachmentsCreateInfo framebuffer_attachments = vku::InitStructHelper();
+    framebuffer_attachments.attachmentImageInfoCount = 2;
+    framebuffer_attachments.pAttachmentImageInfos = framebuffer_attachment_image_info;
+
+    VkFramebufferCreateInfo fb_ci = vku::InitStructHelper(&framebuffer_attachments);
+    fb_ci.flags = VK_FRAMEBUFFER_CREATE_IMAGELESS_BIT;
+    fb_ci.width = 32;
+    fb_ci.height = 32;
+    fb_ci.layers = 1;
+    fb_ci.attachmentCount = 2;
+    fb_ci.renderPass = rp.Handle();
+    m_errorMonitor->SetAllowedFailureMsg("VUID-VkFramebufferCreateInfo-flags-03201");
+    vkt::Framebuffer framebuffer(*m_device, fb_ci);
+
+    VkClearValue clear_value = {};
+    clear_value.color = {{0u, 0u, 0u, 0u}};
+
+    VkRenderPassAttachmentBeginInfo render_pass_attachment_bi = vku::InitStructHelper();
+    render_pass_attachment_bi.attachmentCount = 2;
+    render_pass_attachment_bi.pAttachments = attachments;
+
+    VkRenderPassBeginInfo render_pass_bi = vku::InitStructHelper(&render_pass_attachment_bi);
+    render_pass_bi.renderPass = rp.Handle();
+    render_pass_bi.framebuffer = framebuffer.handle();
+    render_pass_bi.renderArea.extent = {1, 1};
+    render_pass_bi.clearValueCount = 1;
+    render_pass_bi.pClearValues = &clear_value;
+
+    m_commandBuffer->begin();
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkRenderPassBeginInfo-framebuffer-09353");
+    m_commandBuffer->BeginRenderPass(render_pass_bi);
+    m_errorMonitor->VerifyFound();
+    m_commandBuffer->end();
+}
+
 TEST_F(NegativeAndroidExternalResolve, DynamicRendering) {
     SetTargetApiVersion(VK_API_VERSION_1_3);
-    VkPhysicalDeviceDynamicRenderingFeaturesKHR dynamic_rendering_features = vku::InitStructHelper();
-    RETURN_IF_SKIP(InitBasicAndroidExternalResolve(&dynamic_rendering_features));
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    RETURN_IF_SKIP(InitBasicAndroidExternalResolve());
 
     if (nullColorAttachmentWithExternalFormatResolve) {
         GTEST_SKIP() << "nullColorAttachmentWithExternalFormatResolve enabled";
@@ -660,9 +619,7 @@ TEST_F(NegativeAndroidExternalResolve, DynamicRendering) {
     VkImageCreateInfo image_ci = vku::InitStructHelper();
     image_ci.imageType = VK_IMAGE_TYPE_2D;
     image_ci.format = format_resolve_prop.colorAttachmentFormat;
-    image_ci.extent.width = 32;
-    image_ci.extent.height = 32;
-    image_ci.extent.depth = 1;
+    image_ci.extent = {32, 32, 1};
     image_ci.mipLevels = 1;
     image_ci.arrayLayers = 1;
     image_ci.samples = VK_SAMPLE_COUNT_4_BIT;
@@ -739,8 +696,8 @@ TEST_F(NegativeAndroidExternalResolve, DynamicRendering) {
 
 TEST_F(NegativeAndroidExternalResolve, DynamicRenderingResolveModeNonNullColor) {
     SetTargetApiVersion(VK_API_VERSION_1_3);
-    VkPhysicalDeviceDynamicRenderingFeaturesKHR dynamic_rendering_features = vku::InitStructHelper();
-    RETURN_IF_SKIP(InitBasicAndroidExternalResolve(&dynamic_rendering_features));
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    RETURN_IF_SKIP(InitBasicAndroidExternalResolve());
 
     if (nullColorAttachmentWithExternalFormatResolve) {
         GTEST_SKIP() << "nullColorAttachmentWithExternalFormatResolve enabled";
@@ -759,9 +716,7 @@ TEST_F(NegativeAndroidExternalResolve, DynamicRenderingResolveModeNonNullColor) 
     VkImageCreateInfo image_ci = vku::InitStructHelper();
     image_ci.imageType = VK_IMAGE_TYPE_2D;
     image_ci.format = format_resolve_prop.colorAttachmentFormat;
-    image_ci.extent.width = 32;
-    image_ci.extent.height = 32;
-    image_ci.extent.depth = 1;
+    image_ci.extent = {32, 32, 1};
     image_ci.mipLevels = 1;
     image_ci.arrayLayers = 1;
     image_ci.samples = VK_SAMPLE_COUNT_4_BIT;
@@ -779,7 +734,7 @@ TEST_F(NegativeAndroidExternalResolve, DynamicRenderingResolveModeNonNullColor) 
 
     image_ci.pNext = &external_format;
     image_ci.format = VK_FORMAT_UNDEFINED;
-    image_ci.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
+    image_ci.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     VkImageObj resolve_image(m_device);
     resolve_image.Init(image_ci);
 
@@ -849,49 +804,22 @@ TEST_F(NegativeAndroidExternalResolve, PipelineRasterizationSamples) {
     external_format.externalFormat = ahb.GetExternalFormat(*m_device, &format_resolve_prop);
 
     // index 0 = color | index 1 = resolve
-    VkAttachmentDescription2 attachment_desc[2];
-    attachment_desc[0] = vku::InitStructHelper(&external_format);
-    attachment_desc[0].format = format_resolve_prop.colorAttachmentFormat;
-    attachment_desc[0].samples = VK_SAMPLE_COUNT_1_BIT;
-    attachment_desc[0].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    attachment_desc[0].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachment_desc[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    attachment_desc[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachment_desc[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    attachment_desc[0].finalLayout = VK_IMAGE_LAYOUT_GENERAL;
-
-    attachment_desc[1] = attachment_desc[0];
-    attachment_desc[1].format = VK_FORMAT_UNDEFINED;
-
-    VkAttachmentReference2 color_attachment_ref = vku::InitStructHelper();
-    color_attachment_ref.layout = VK_IMAGE_LAYOUT_GENERAL;
-    color_attachment_ref.aspectMask = VK_IMAGE_ASPECT_PLANE_0_BIT;
-    color_attachment_ref.attachment = 0;
-
-    VkAttachmentReference2 resolve_attachment_ref = vku::InitStructHelper();
-    resolve_attachment_ref.layout = VK_IMAGE_LAYOUT_GENERAL;
-    resolve_attachment_ref.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    resolve_attachment_ref.attachment = 1;
-
-    VkSubpassDescription2 subpass = vku::InitStructHelper();
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &color_attachment_ref;
-    subpass.pResolveAttachments = &resolve_attachment_ref;
-
-    VkRenderPassCreateInfo2 render_pass_ci = vku::InitStructHelper();
-    render_pass_ci.attachmentCount = 2;
-    render_pass_ci.pAttachments = attachment_desc;
-    render_pass_ci.subpassCount = 1;
-    render_pass_ci.pSubpasses = &subpass;
-
-    vkt::RenderPass render_pass(*m_device, render_pass_ci);
+    RenderPass2SingleSubpass rp(*this);
+    rp.AddAttachmentDescription(format_resolve_prop.colorAttachmentFormat);
+    rp.AddAttachmentDescription(VK_FORMAT_UNDEFINED);
+    rp.SetAttachmentDescriptionPNext(0, &external_format);
+    rp.SetAttachmentDescriptionPNext(1, &external_format);
+    rp.AddAttachmentReference(0, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_PLANE_0_BIT);
+    rp.AddAttachmentReference(1, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT);
+    rp.AddColorAttachment(0);
+    rp.AddResolveAttachment(1);
+    rp.CreateRenderPass();
 
     CreatePipelineHelper pipe(*this);
     pipe.InitState();
     pipe.gp_ci_.pNext = &external_format;
     pipe.pipe_ms_state_ci_.rasterizationSamples = VK_SAMPLE_COUNT_2_BIT;
-    pipe.gp_ci_.renderPass = render_pass.handle();
+    pipe.gp_ci_.renderPass = rp.Handle();
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-multisampledRenderToSingleSampled-06853");
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-externalFormatResolve-09313");
     pipe.CreateGraphicsPipeline();
@@ -900,8 +828,8 @@ TEST_F(NegativeAndroidExternalResolve, PipelineRasterizationSamples) {
 
 TEST_F(NegativeAndroidExternalResolve, PipelineRasterizationSamplesDynamicRendering) {
     SetTargetApiVersion(VK_API_VERSION_1_3);
-    VkPhysicalDeviceDynamicRenderingFeaturesKHR dynamic_rendering_features = vku::InitStructHelper();
-    RETURN_IF_SKIP(InitBasicAndroidExternalResolve(&dynamic_rendering_features));
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    RETURN_IF_SKIP(InitBasicAndroidExternalResolve());
 
     if (nullColorAttachmentWithExternalFormatResolve) {
         GTEST_SKIP() << "nullColorAttachmentWithExternalFormatResolve enabled";
@@ -932,10 +860,10 @@ TEST_F(NegativeAndroidExternalResolve, PipelineRasterizationSamplesDynamicRender
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeAndroidExternalResolve, ClearAttachment) {
+TEST_F(NegativeAndroidExternalResolve, MissingImageUsage) {
     SetTargetApiVersion(VK_API_VERSION_1_3);
-    VkPhysicalDeviceDynamicRenderingFeaturesKHR dynamic_rendering_features = vku::InitStructHelper();
-    RETURN_IF_SKIP(InitBasicAndroidExternalResolve(&dynamic_rendering_features));
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    RETURN_IF_SKIP(InitBasicAndroidExternalResolve());
 
     if (nullColorAttachmentWithExternalFormatResolve) {
         GTEST_SKIP() << "nullColorAttachmentWithExternalFormatResolve enabled";
@@ -954,9 +882,7 @@ TEST_F(NegativeAndroidExternalResolve, ClearAttachment) {
     VkImageCreateInfo image_ci = vku::InitStructHelper();
     image_ci.imageType = VK_IMAGE_TYPE_2D;
     image_ci.format = format_resolve_prop.colorAttachmentFormat;
-    image_ci.extent.width = 32;
-    image_ci.extent.height = 32;
-    image_ci.extent.depth = 1;
+    image_ci.extent = {32, 32, 1};
     image_ci.mipLevels = 1;
     image_ci.arrayLayers = 1;
     image_ci.samples = VK_SAMPLE_COUNT_4_BIT;
@@ -970,7 +896,86 @@ TEST_F(NegativeAndroidExternalResolve, ClearAttachment) {
     image_ci.pNext = &external_format;
     image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
     image_ci.format = VK_FORMAT_UNDEFINED;
-    image_ci.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
+    image_ci.usage = VK_IMAGE_USAGE_SAMPLED_BIT; // missing VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT
+    VkImageObj resolve_image(m_device);
+    resolve_image.Init(image_ci);
+
+    VkSamplerYcbcrConversionCreateInfo sycci = vku::InitStructHelper(&external_format);
+    sycci.format = VK_FORMAT_UNDEFINED;
+    sycci.ycbcrModel = VK_SAMPLER_YCBCR_MODEL_CONVERSION_YCBCR_709;
+    sycci.ycbcrRange = VK_SAMPLER_YCBCR_RANGE_ITU_NARROW;
+    sycci.components = {VK_COMPONENT_SWIZZLE_ZERO, VK_COMPONENT_SWIZZLE_ZERO, VK_COMPONENT_SWIZZLE_ZERO, VK_COMPONENT_SWIZZLE_ZERO};
+    m_errorMonitor->SetAllowedFailureMsg("VUID-VkSamplerYcbcrConversionCreateInfo-format-01650");
+    vkt::SamplerYcbcrConversion ycbcr_conv(*m_device, sycci);
+
+    VkSamplerYcbcrConversionInfo syci = vku::InitStructHelper();
+    syci.conversion = ycbcr_conv.handle();
+
+    VkImageViewCreateInfo ivci = vku::InitStructHelper(&syci);
+    ivci.image = resolve_image.handle();
+    ivci.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    ivci.format = VK_FORMAT_UNDEFINED;
+    ivci.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    const vkt::ImageView resolve_view(*m_device, ivci);
+
+    VkRenderingAttachmentInfoKHR color_attachment = vku::InitStructHelper();
+    color_attachment.imageView = color_view.handle();
+    color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    color_attachment.resolveMode = VK_RESOLVE_MODE_EXTERNAL_FORMAT_DOWNSAMPLE_ANDROID;
+    color_attachment.resolveImageView = resolve_view.handle();
+    color_attachment.resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkRenderingInfoKHR begin_rendering_info = vku::InitStructHelper();
+    begin_rendering_info.layerCount = 1;
+    begin_rendering_info.renderArea = {{0, 0}, {32, 32}};
+    begin_rendering_info.colorAttachmentCount = 1;
+    begin_rendering_info.pColorAttachments = &color_attachment;
+
+    m_commandBuffer->begin();
+    m_errorMonitor->SetAllowedFailureMsg("VUID-VkRenderingAttachmentInfo-imageView-06865");
+    m_errorMonitor->SetAllowedFailureMsg("VUID-VkRenderingAttachmentInfo-imageView-06129");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkRenderingInfo-colorAttachmentCount-09476");
+    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeAndroidExternalResolve, ClearAttachment) {
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    RETURN_IF_SKIP(InitBasicAndroidExternalResolve());
+
+    if (nullColorAttachmentWithExternalFormatResolve) {
+        GTEST_SKIP() << "nullColorAttachmentWithExternalFormatResolve enabled";
+    }
+
+    vkt::AHB ahb(AHARDWAREBUFFER_FORMAT_Y8Cb8Cr8_420, AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE, 64, 64);
+    if (!ahb.handle()) {
+        GTEST_SKIP() << "could not allocate AHARDWAREBUFFER_FORMAT_Y8Cb8Cr8_420";
+    }
+
+    VkAndroidHardwareBufferFormatResolvePropertiesANDROID format_resolve_prop = vku::InitStructHelper();
+
+    VkExternalFormatANDROID external_format = vku::InitStructHelper();
+    external_format.externalFormat = ahb.GetExternalFormat(*m_device, &format_resolve_prop);
+
+    VkImageCreateInfo image_ci = vku::InitStructHelper();
+    image_ci.imageType = VK_IMAGE_TYPE_2D;
+    image_ci.format = format_resolve_prop.colorAttachmentFormat;
+    image_ci.extent = {32, 32, 1};
+    image_ci.mipLevels = 1;
+    image_ci.arrayLayers = 1;
+    image_ci.samples = VK_SAMPLE_COUNT_4_BIT;
+    image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_ci.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+    VkImageObj color_image(m_device);
+    color_image.Init(image_ci);
+    vkt::ImageView color_view = color_image.CreateView();
+
+    image_ci.pNext = &external_format;
+    image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_ci.format = VK_FORMAT_UNDEFINED;
+    image_ci.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     VkImageObj resolve_image(m_device);
     resolve_image.Init(image_ci);
 
@@ -1025,13 +1030,10 @@ TEST_F(NegativeAndroidExternalResolve, ClearAttachment) {
 TEST_F(NegativeAndroidExternalResolve, DrawDynamicRasterizationSamples) {
     SetTargetApiVersion(VK_API_VERSION_1_3);
     AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
-    VkPhysicalDeviceExtendedDynamicState3FeaturesEXT extended_dynamic_state3_features = vku::InitStructHelper();
-    VkPhysicalDeviceDynamicRenderingFeaturesKHR dynamic_rendering_features = vku::InitStructHelper(&extended_dynamic_state3_features);
-    RETURN_IF_SKIP(InitBasicAndroidExternalResolve(&dynamic_rendering_features));
+    AddRequiredFeature(vkt::Feature::extendedDynamicState3RasterizationSamples);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    RETURN_IF_SKIP(InitBasicAndroidExternalResolve());
 
-    if (!extended_dynamic_state3_features.extendedDynamicState3RasterizationSamples) {
-        GTEST_SKIP() << "extendedDynamicState3RasterizationSamples not supported";
-    }
     if (nullColorAttachmentWithExternalFormatResolve) {
         GTEST_SKIP() << "nullColorAttachmentWithExternalFormatResolve enabled";
     }
@@ -1049,9 +1051,7 @@ TEST_F(NegativeAndroidExternalResolve, DrawDynamicRasterizationSamples) {
     VkImageCreateInfo image_ci = vku::InitStructHelper();
     image_ci.imageType = VK_IMAGE_TYPE_2D;
     image_ci.format = format_resolve_prop.colorAttachmentFormat;
-    image_ci.extent.width = 32;
-    image_ci.extent.height = 32;
-    image_ci.extent.depth = 1;
+    image_ci.extent = {32, 32, 1};
     image_ci.mipLevels = 1;
     image_ci.arrayLayers = 1;
     image_ci.samples = VK_SAMPLE_COUNT_4_BIT;
@@ -1065,7 +1065,7 @@ TEST_F(NegativeAndroidExternalResolve, DrawDynamicRasterizationSamples) {
     image_ci.pNext = &external_format;
     image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
     image_ci.format = VK_FORMAT_UNDEFINED;
-    image_ci.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
+    image_ci.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     VkImageObj resolve_image(m_device);
     resolve_image.Init(image_ci);
 
@@ -1132,8 +1132,8 @@ TEST_F(NegativeAndroidExternalResolve, DrawDynamicRasterizationSamples) {
 
 TEST_F(NegativeAndroidExternalResolve, PipelineBarrier) {
     AddRequiredExtensions(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
-    VkPhysicalDeviceSynchronization2FeaturesKHR synchronization2 = vku::InitStructHelper();
-    RETURN_IF_SKIP(InitBasicAndroidExternalResolve(&synchronization2));
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    RETURN_IF_SKIP(InitBasicAndroidExternalResolve());
 
     if (nullColorAttachmentWithExternalFormatResolve) {
         GTEST_SKIP() << "nullColorAttachmentWithExternalFormatResolve enabled";
@@ -1150,61 +1150,22 @@ TEST_F(NegativeAndroidExternalResolve, PipelineBarrier) {
     external_format.externalFormat = ahb.GetExternalFormat(*m_device, &format_resolve_prop);
 
     // index 0 = color | index 1 = resolve
-    VkAttachmentDescription2 attachment_desc[2];
-    attachment_desc[0] = vku::InitStructHelper();
-    attachment_desc[0].format = format_resolve_prop.colorAttachmentFormat;
-    attachment_desc[0].samples = VK_SAMPLE_COUNT_1_BIT;
-    attachment_desc[0].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    attachment_desc[0].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachment_desc[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    attachment_desc[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachment_desc[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    attachment_desc[0].finalLayout = VK_IMAGE_LAYOUT_GENERAL;
-    attachment_desc[1] = attachment_desc[0];
-
-    VkAttachmentReference2 color_attachment_ref = vku::InitStructHelper();
-    color_attachment_ref.layout = VK_IMAGE_LAYOUT_GENERAL;
-    color_attachment_ref.aspectMask = VK_IMAGE_ASPECT_PLANE_0_BIT;
-    color_attachment_ref.attachment = 0;
-
-    VkAttachmentReference2 resolve_attachment_ref = vku::InitStructHelper();
-    resolve_attachment_ref.layout = VK_IMAGE_LAYOUT_GENERAL;
-    resolve_attachment_ref.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    resolve_attachment_ref.attachment = 1;
-
-    VkSubpassDescription2 subpass = vku::InitStructHelper();
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &color_attachment_ref;
-    subpass.pResolveAttachments = &resolve_attachment_ref;
-
-    auto subpass_dep = vku::InitStruct<VkSubpassDependency2>(
-                                       nullptr,
-                                       0,
-                                       0,
-                                       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                                       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                                       VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-                                       VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-                                       VK_DEPENDENCY_BY_REGION_BIT);
-
-
-    VkRenderPassCreateInfo2 render_pass_ci = vku::InitStructHelper();
-    render_pass_ci.attachmentCount = 2;
-    render_pass_ci.pAttachments = attachment_desc;
-    render_pass_ci.subpassCount = 1;
-    render_pass_ci.pSubpasses = &subpass;
-    render_pass_ci.dependencyCount = 1;
-    render_pass_ci.pDependencies = &subpass_dep;
-
-    vkt::RenderPass render_pass(*m_device, render_pass_ci);
+    RenderPass2SingleSubpass rp(*this);
+    rp.AddAttachmentDescription(format_resolve_prop.colorAttachmentFormat);
+    rp.AddAttachmentDescription(format_resolve_prop.colorAttachmentFormat);
+    rp.SetAttachmentDescriptionPNext(0, &external_format);
+    rp.SetAttachmentDescriptionPNext(1, &external_format);
+    rp.AddAttachmentReference(0, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_PLANE_0_BIT);
+    rp.AddAttachmentReference(1, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT);
+    rp.AddColorAttachment(0);
+    rp.AddResolveAttachment(1);
+    rp.AddSubpassDependency();
+    rp.CreateRenderPass();
 
     VkImageCreateInfo image_ci = vku::InitStructHelper();
     image_ci.imageType = VK_IMAGE_TYPE_2D;
     image_ci.format = format_resolve_prop.colorAttachmentFormat;
-    image_ci.extent.width = 32;
-    image_ci.extent.height = 32;
-    image_ci.extent.depth = 1;
+    image_ci.extent = {32, 32, 1};
     image_ci.mipLevels = 1;
     image_ci.arrayLayers = 1;
     image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -1231,22 +1192,12 @@ TEST_F(NegativeAndroidExternalResolve, PipelineBarrier) {
     attachments[0] = color_view.handle();
     attachments[1] = resolve_view.handle();
 
-    VkFramebufferCreateInfo fb_ci = vku::InitStructHelper();
-    fb_ci.width = 32;
-    fb_ci.height = 32;
-    fb_ci.layers = 1;
-    fb_ci.renderPass = render_pass.handle();
-    fb_ci.attachmentCount = 2;
-    fb_ci.pAttachments = attachments;
-    vkt::Framebuffer framebuffer(*m_device, fb_ci);
+    vkt::Framebuffer framebuffer(*m_device, rp.Handle(), 2, attachments);
 
     CreatePipelineHelper pipe(*this);
     pipe.InitState();
-    pipe.gp_ci_.renderPass = render_pass.handle();
+    pipe.gp_ci_.renderPass = rp.Handle();
     pipe.CreateGraphicsPipeline();
-
-    auto rp_begin =
-        vku::InitStruct<VkRenderPassBeginInfo>(nullptr, render_pass.handle(), framebuffer.handle(), VkRect2D{{0, 0}, {32u, 32u}}, 0u, nullptr);
 
     m_commandBuffer->begin();
 
@@ -1260,11 +1211,7 @@ TEST_F(NegativeAndroidExternalResolve, PipelineBarrier) {
     barrier.image = resolve_image.handle();
     barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    barrier.subresourceRange.baseArrayLayer = 0;
-    barrier.subresourceRange.baseMipLevel = 0;
-    barrier.subresourceRange.layerCount = 1;
-    barrier.subresourceRange.levelCount = 1;
+    barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
     VkDependencyInfo dependency_info = vku::InitStructHelper();
     dependency_info.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
@@ -1273,7 +1220,7 @@ TEST_F(NegativeAndroidExternalResolve, PipelineBarrier) {
     // Valid because outside renderpass
     vk::CmdPipelineBarrier2KHR(*m_commandBuffer, &dependency_info);
 
-    m_commandBuffer->BeginRenderPass(rp_begin);
+    m_commandBuffer->BeginRenderPass(rp.Handle(), framebuffer.handle(), 32, 32);
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdPipelineBarrier2-image-09374");
     barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
@@ -1284,5 +1231,187 @@ TEST_F(NegativeAndroidExternalResolve, PipelineBarrier) {
     m_commandBuffer->end();
 }
 
+TEST_F(NegativeAndroidExternalResolve, PipelineBarrierUnused) {
+    RETURN_IF_SKIP(InitBasicAndroidExternalResolve());
+
+    if (nullColorAttachmentWithExternalFormatResolve) {
+        GTEST_SKIP() << "nullColorAttachmentWithExternalFormatResolve enabled";
+    }
+
+    vkt::AHB ahb(AHARDWAREBUFFER_FORMAT_Y8Cb8Cr8_420, AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE, 64, 64);
+    if (!ahb.handle()) {
+        GTEST_SKIP() << "could not allocate AHARDWAREBUFFER_FORMAT_Y8Cb8Cr8_420";
+    }
+
+    VkAndroidHardwareBufferFormatResolvePropertiesANDROID format_resolve_prop = vku::InitStructHelper();
+
+    VkExternalFormatANDROID external_format = vku::InitStructHelper();
+    external_format.externalFormat = ahb.GetExternalFormat(*m_device, &format_resolve_prop);
+
+    // index 0 = color | index 1 = resolve
+    RenderPass2SingleSubpass rp(*this);
+    rp.AddAttachmentDescription(format_resolve_prop.colorAttachmentFormat);
+    rp.AddAttachmentDescription(VK_FORMAT_UNDEFINED);
+    rp.SetAttachmentDescriptionPNext(0, &external_format);
+    rp.SetAttachmentDescriptionPNext(1, &external_format);
+    rp.AddAttachmentReference(0, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_PLANE_0_BIT);
+    rp.AddAttachmentReference(1, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT);
+    rp.AddColorAttachment(0);
+    rp.AddResolveAttachment(1);
+    rp.AddSubpassDependency();
+    rp.CreateRenderPass();
+
+    VkImageCreateInfo image_ci = vku::InitStructHelper();
+    image_ci.imageType = VK_IMAGE_TYPE_2D;
+    image_ci.format = format_resolve_prop.colorAttachmentFormat;
+    image_ci.extent = {32, 32, 1};
+    image_ci.mipLevels = 1;
+    image_ci.arrayLayers = 1;
+    image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_ci.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+    VkImageObj color_image(m_device);
+    color_image.Init(image_ci);
+    vkt::ImageView color_view = color_image.CreateView();
+
+    image_ci.pNext = &external_format;
+    image_ci.format = VK_FORMAT_UNDEFINED;
+    image_ci.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
+    VkImageObj resolve_image(m_device);
+    resolve_image.Init(image_ci);
+
+    VkSamplerYcbcrConversionCreateInfo sycci = vku::InitStructHelper(&external_format);
+    sycci.format = VK_FORMAT_UNDEFINED;
+    sycci.ycbcrModel = VK_SAMPLER_YCBCR_MODEL_CONVERSION_YCBCR_709;
+    sycci.ycbcrRange = VK_SAMPLER_YCBCR_RANGE_ITU_NARROW;
+    sycci.components = {VK_COMPONENT_SWIZZLE_ZERO, VK_COMPONENT_SWIZZLE_ZERO, VK_COMPONENT_SWIZZLE_ZERO, VK_COMPONENT_SWIZZLE_ZERO};
+    m_errorMonitor->SetAllowedFailureMsg("VUID-VkSamplerYcbcrConversionCreateInfo-format-01650");
+    vkt::SamplerYcbcrConversion ycbcr_conv(*m_device, sycci);
+
+    VkSamplerYcbcrConversionInfo syci = vku::InitStructHelper();
+    syci.conversion = ycbcr_conv.handle();
+
+    VkImageViewCreateInfo ivci = vku::InitStructHelper(&syci);
+    ivci.image = resolve_image.handle();
+    ivci.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    ivci.format = VK_FORMAT_UNDEFINED;
+    ivci.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    const vkt::ImageView resolve_view(*m_device, ivci);
+
+    VkImageView attachments[2];
+    attachments[0] = color_view.handle();
+    attachments[1] = resolve_view.handle();
+
+    vkt::Framebuffer framebuffer(*m_device, rp.Handle(), 2, attachments);
+
+    CreatePipelineHelper pipe(*this);
+    pipe.InitState();
+    pipe.gp_ci_.pNext = &external_format;
+    pipe.gp_ci_.renderPass = rp.Handle();
+    pipe.CreateGraphicsPipeline();
+
+    m_commandBuffer->begin();
+    m_commandBuffer->BeginRenderPass(rp.Handle(), framebuffer.handle());
+
+    VkImageMemoryBarrier image_barrier = vku::InitStructHelper();
+    image_barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    image_barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    image_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    image_barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+    image_barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    image_barrier.image = resolve_image.handle();
+    image_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    image_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdPipelineBarrier-image-09373");
+    vk::CmdPipelineBarrier(m_commandBuffer->handle(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                           VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1,
+                           &image_barrier);
+    m_errorMonitor->VerifyFound();
+
+    m_commandBuffer->EndRenderPass();
+    m_commandBuffer->end();
+}
+
+TEST_F(NegativeAndroidExternalResolve, RenderPassAndFramebuffer) {
+    RETURN_IF_SKIP(InitBasicAndroidExternalResolve());
+
+    if (nullColorAttachmentWithExternalFormatResolve) {
+        GTEST_SKIP() << "nullColorAttachmentWithExternalFormatResolve enabled";
+    }
+
+    vkt::AHB ahb(AHARDWAREBUFFER_FORMAT_Y8Cb8Cr8_420, AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE, 64, 64);
+    if (!ahb.handle()) {
+        GTEST_SKIP() << "could not allocate AHARDWAREBUFFER_FORMAT_Y8Cb8Cr8_420";
+    }
+
+    VkAndroidHardwareBufferFormatResolvePropertiesANDROID format_resolve_prop = vku::InitStructHelper();
+    if (format_resolve_prop.colorAttachmentFormat == VK_FORMAT_R8G8B8A8_UINT) {
+        GTEST_SKIP() << "assuming colorAttachmentFormat is not VK_FORMAT_R8G8B8A8_UINT";
+    }
+
+    VkExternalFormatANDROID external_format = vku::InitStructHelper();
+    external_format.externalFormat = ahb.GetExternalFormat(*m_device, &format_resolve_prop);
+
+    // index 0 = color | index 1 = resolve
+    RenderPass2SingleSubpass rp(*this);
+    rp.AddAttachmentDescription(VK_FORMAT_R8G8B8A8_UINT);
+    rp.AddAttachmentDescription(VK_FORMAT_UNDEFINED);
+    rp.SetAttachmentDescriptionPNext(0, &external_format);
+    rp.SetAttachmentDescriptionPNext(1, &external_format);
+    rp.AddAttachmentReference(0, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_PLANE_0_BIT);
+    rp.AddAttachmentReference(1, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_ASPECT_COLOR_BIT);
+    rp.AddColorAttachment(0);
+    rp.AddResolveAttachment(1);
+    rp.CreateRenderPass();
+
+    VkImageCreateInfo image_ci = vku::InitStructHelper();
+    image_ci.imageType = VK_IMAGE_TYPE_2D;
+    image_ci.format = VK_FORMAT_R8G8B8A8_UINT;
+    image_ci.extent = {32, 32, 1};
+    image_ci.mipLevels = 1;
+    image_ci.arrayLayers = 1;
+    image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_ci.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+    VkImageObj color_image(m_device);
+    color_image.Init(image_ci);
+    vkt::ImageView color_view = color_image.CreateView();
+
+    image_ci.pNext = &external_format;
+    image_ci.format = VK_FORMAT_UNDEFINED;
+    image_ci.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
+    VkImageObj resolve_image(m_device);
+    resolve_image.Init(image_ci);
+
+    VkSamplerYcbcrConversionCreateInfo sycci = vku::InitStructHelper(&external_format);
+    sycci.format = VK_FORMAT_UNDEFINED;
+    sycci.ycbcrModel = VK_SAMPLER_YCBCR_MODEL_CONVERSION_YCBCR_709;
+    sycci.ycbcrRange = VK_SAMPLER_YCBCR_RANGE_ITU_NARROW;
+    sycci.components = {VK_COMPONENT_SWIZZLE_ZERO, VK_COMPONENT_SWIZZLE_ZERO, VK_COMPONENT_SWIZZLE_ZERO, VK_COMPONENT_SWIZZLE_ZERO};
+    m_errorMonitor->SetAllowedFailureMsg("VUID-VkSamplerYcbcrConversionCreateInfo-format-01650");
+    vkt::SamplerYcbcrConversion ycbcr_conv(*m_device, sycci);
+
+    VkSamplerYcbcrConversionInfo syci = vku::InitStructHelper();
+    syci.conversion = ycbcr_conv.handle();
+
+    VkImageViewCreateInfo ivci = vku::InitStructHelper(&syci);
+    ivci.image = resolve_image.handle();
+    ivci.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    ivci.format = VK_FORMAT_UNDEFINED;
+    ivci.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    const vkt::ImageView resolve_view(*m_device, ivci);
+
+    VkImageView attachments[2];
+    attachments[0] = color_view.handle();
+    attachments[1] = resolve_view.handle();
+
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit,
+                                         "UID-VkFramebufferCreateInfo-nullColorAttachmentWithExternalFormatResolve-09349");
+    vkt::Framebuffer framebuffer(*m_device, rp.Handle(), 2, attachments);
+    m_errorMonitor->VerifyFound();
+}
 
 #endif

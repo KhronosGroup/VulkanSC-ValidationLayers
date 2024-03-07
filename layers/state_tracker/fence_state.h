@@ -1,7 +1,7 @@
-/* Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (C) 2015-2023 Google Inc.
+/* Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (C) 2015-2024 Google Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "state_tracker/base_node.h"
+#include "state_tracker/state_object.h"
 #include <future>
 #include <mutex>
 
@@ -28,8 +28,26 @@ class ValidationStateTracker;
 namespace vvl {
 
 class Queue;
+class Swapchain;
 
-class Fence : public REFCOUNTED_NODE {
+// References a specific submission on the given queue.
+struct SubmissionLocator {
+    Queue *queue = nullptr;
+    uint64_t seq = kU64Max;
+};
+
+// present-based sync is when a fence from AcquireNextImage is used to synchronize
+// with submissions presented in one of the previous frames.
+// More common scheme is to use QueueSubmit fence for frame synchronization.
+struct PresentSync {
+    // Queue submissions that will be notified when WaitForFences is called.
+    small_vector<SubmissionLocator, 2, uint32_t> submissions;
+
+    // Swapchain associated with this PresentSync.
+    std::shared_ptr<vvl::Swapchain> swapchain;
+};
+
+class Fence : public RefcountedStateObject {
   public:
     enum State { kUnsignaled, kInflight, kRetired };
     enum Scope {
@@ -39,7 +57,7 @@ class Fence : public REFCOUNTED_NODE {
     };
     // Default constructor
     Fence(ValidationStateTracker &dev, VkFence f, const VkFenceCreateInfo *pCreateInfo)
-        : REFCOUNTED_NODE(f, kVulkanObjectTypeFence),
+        : RefcountedStateObject(f, kVulkanObjectTypeFence),
           flags(pCreateInfo->flags),
           exportHandleTypes(GetExportHandleTypes(pCreateInfo)),
           state_((pCreateInfo->flags & VK_FENCE_CREATE_SIGNALED_BIT) ? kRetired : kUnsignaled),
@@ -50,6 +68,9 @@ class Fence : public REFCOUNTED_NODE {
     VkFence VkHandle() const { return handle_.Cast<VkFence>(); }
 
     bool EnqueueSignal(Queue *queue_state, uint64_t next_seq);
+
+    void SetPresentSync(const PresentSync &present_sync);
+    bool IsPresentSyncSwapchainChanged(const std::shared_ptr<vvl::Swapchain> &current_swapchain) const;
 
     // Notify the queue that the fence has signalled and then wait for the queue
     // to update state.
@@ -67,8 +88,14 @@ class Fence : public REFCOUNTED_NODE {
     const VkFenceCreateFlags flags;
     const VkExternalFenceHandleTypeFlags exportHandleTypes;
 
-    enum Scope Scope() const { return scope_; }
     enum State State() const { return state_; }
+    enum Scope Scope() const { return scope_; }
+
+    VkExternalFenceHandleTypeFlagBits ImportedHandleType() const {
+        auto guard = ReadLock();
+        assert(imported_handle_type_.has_value());
+        return imported_handle_type_.value();
+    }
 
   private:
     static VkExternalFenceHandleTypeFlags GetExportHandleTypes(const VkFenceCreateInfo *info) {
@@ -82,9 +109,11 @@ class Fence : public REFCOUNTED_NODE {
     uint64_t seq_{0};
     enum State state_;
     enum Scope scope_{kInternal};
+    std::optional<VkExternalFenceHandleTypeFlagBits> imported_handle_type_;  // has value when scope is not kInternal
     mutable std::shared_mutex lock_;
     std::promise<void> completed_;
     std::shared_future<void> waiter_;
+    PresentSync present_sync_;
     ValidationStateTracker &dev_data_;
 };
 

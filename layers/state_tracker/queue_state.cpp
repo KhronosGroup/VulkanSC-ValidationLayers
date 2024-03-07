@@ -1,7 +1,7 @@
-/* Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (C) 2015-2023 Google Inc.
+/* Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (C) 2015-2024 Google Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -111,10 +111,11 @@ void vvl::Queue::NotifyAndWait(const Location &loc, uint64_t until_seq) {
     auto waiter = Wait(until_seq);
     auto result = waiter.wait_until(GetCondWaitTimeout());
     if (result != std::future_status::ready) {
-        dev_data_.LogError("UNASSIGNED-VkQueue-state-timeout", Handle(), loc,
-                           "Timeout waiting for queue state to update. This is most likely a validation bug."
-                           " seq=%" PRIu64 " until=%" PRIu64,
-                           seq_.load(), until_seq);
+        dev_data_.LogError(
+            "INTERNAL-ERROR-VkQueue-state-timeout", Handle(), loc,
+            "The Validation Layers hit a timeout waiting for queue state to update (this is most likely a validation bug)."
+            " seq=%" PRIu64 " until=%" PRIu64,
+            seq_.load(), until_seq);
     }
 }
 
@@ -142,7 +143,7 @@ void vvl::Queue::Destroy() {
         dead_thread->join();
         dead_thread.reset();
     }
-    BASE_NODE::Destroy();
+    StateObject::Destroy();
 }
 
 vvl::QueueSubmission *vvl::Queue::NextSubmission() {

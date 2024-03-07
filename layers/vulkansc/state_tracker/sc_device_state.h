@@ -16,7 +16,6 @@
  * Author: Daniel Rakos <daniel.rakos@rastergrid.com>
  */
 #pragma once
-#include "state_tracker/base_node.h"
 #include "generated/layer_chassis_dispatch.h"
 
 struct SCDeviceFeatures {

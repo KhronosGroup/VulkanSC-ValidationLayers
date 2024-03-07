@@ -1,7 +1,7 @@
-/* Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (C) 2015-2023 Google Inc.
+/* Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (C) 2015-2024 Google Inc.
  * Modifications Copyright (C) 2020-2022 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,6 +20,7 @@
 #include "utils/vk_layer_utils.h"
 #include <vulkan/vk_enum_string_helper.h>
 #include "core_validation.h"
+#include "state_tracker/image_state.h"
 
 #if defined(VK_USE_PLATFORM_ANDROID_KHR)
 // Android-specific validation that uses types defined only on Android and only for NDK versions
@@ -153,7 +154,7 @@ bool CoreChecks::PreCallValidateGetMemoryAndroidHardwareBufferANDROID(VkDevice d
     const VkImage dedicated_image = mem_info->GetDedicatedImage();
     if (dedicated_image != VK_NULL_HANDLE) {
         auto image_state = Get<vvl::Image>(dedicated_image);
-        if ((nullptr == image_state) || (0 == (image_state->CountDeviceMemory(mem_info->deviceMemory())))) {
+        if ((nullptr == image_state) || (0 == (image_state->CountDeviceMemory(mem_info->VkHandle())))) {
             const LogObjectList objlist(device, pInfo->memory, dedicated_image);
             skip |= LogError("VUID-VkMemoryGetAndroidHardwareBufferInfoANDROID-pNext-01883", objlist,
                              error_obj.location.dot(Field::pInfo).dot(Field::memory),
@@ -488,15 +489,20 @@ bool CoreChecks::ValidateCreateImageANDROID(const VkImageCreateInfo *create_info
                              string_VkImageCreateFlags(create_info->flags).c_str());
         }
 
-        // only SAMPLED is allowed, but format_resolve allowed INPUT as well
-        if (0 != (~VK_IMAGE_USAGE_SAMPLED_BIT & create_info->usage)) {
-            if (((VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT & create_info->usage) == VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT) ||
-                !enabled_features.externalFormatResolve) {
-                skip |= LogError("VUID-VkImageCreateInfo-pNext-02397", device,
-                                 create_info_loc.pNext(Struct::VkExternalFormatANDROID, Field::externalFormat),
-                                 "(%" PRIu64 ") is non-zero, but usage is %s.", ext_fmt_android->externalFormat,
-                                 string_VkImageUsageFlags(create_info->usage).c_str());
-            }
+        if (0 != (~(VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT) &
+                  create_info->usage)) {
+            skip |= LogError("VUID-VkImageCreateInfo-pNext-02397", device,
+                             create_info_loc.pNext(Struct::VkExternalFormatANDROID, Field::externalFormat),
+                             "(%" PRIu64 ") is non-zero, but usage is %s.", ext_fmt_android->externalFormat,
+                             string_VkImageUsageFlags(create_info->usage).c_str());
+        } else if (!enabled_features.externalFormatResolve &&
+                   ((VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT) & create_info->usage)) {
+            skip |= LogError(
+                "VUID-VkImageCreateInfo-pNext-09457", device,
+                create_info_loc.pNext(Struct::VkExternalFormatANDROID, Field::externalFormat),
+                "(%" PRIu64
+                ") is non-zero, but usage is %s (without externalFormatResolve, only VK_IMAGE_USAGE_SAMPLED_BIT is allowed).",
+                ext_fmt_android->externalFormat, string_VkImageUsageFlags(create_info->usage).c_str());
         }
 
         if (VK_IMAGE_TILING_OPTIMAL != create_info->tiling) {

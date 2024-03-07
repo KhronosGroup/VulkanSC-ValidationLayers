@@ -46,14 +46,8 @@ target_sources(vksc_layer_validation_tests PRIVATE
     ../framework/binding.cpp
     ../framework/test_framework.h
     ../framework/test_framework.cpp
-    ../framework/descriptor_helper.h
-    ../framework/descriptor_helper.cpp
     ../framework/shader_helper.h
     ../framework/shader_helper.cpp
-    ../framework/thread_timeout_helper.h
-    ../framework/thread_timeout_helper.cpp
-    ../framework/barrier_queue_family.h
-    ../framework/barrier_queue_family.cpp
     ../framework/pipeline_helper.h
     ../framework/pipeline_helper.cpp
     ../framework/ray_tracing_helper_nv.h
@@ -62,6 +56,18 @@ target_sources(vksc_layer_validation_tests PRIVATE
     ../framework/ray_tracing_objects.cpp
     ../framework/external_memory_sync.h
     ../framework/external_memory_sync.cpp
+    ../framework/barrier_queue_family.h
+    ../framework/barrier_queue_family.cpp
+    ../framework/descriptor_helper.h
+    ../framework/descriptor_helper.cpp
+    ../framework/thread_helper.h
+    ../framework/thread_helper.cpp
+    ../framework/render_pass_helper.h
+    ../framework/render_pass_helper.cpp
+    ../framework/feature_requirements.h
+    ../framework/feature_requirements.cpp
+    ../framework/queue_submit_context.h
+    ../framework/queue_submit_context.cpp
     negative/command.cpp
     negative/device_create.cpp
     negative/implicit.cpp

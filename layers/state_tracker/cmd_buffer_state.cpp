@@ -1,7 +1,7 @@
-/* Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (C) 2015-2023 Google Inc.
+/* Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (C) 2015-2024 Google Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  * Modifications Copyright (C) 2022 RasterGrid Kft.
  *
@@ -18,12 +18,32 @@
  * limitations under the License.
  */
 #include "state_tracker/cmd_buffer_state.h"
+#include "state_tracker/descriptor_sets.h"
+#include "state_tracker/render_pass_state.h"
+#include "state_tracker/pipeline_state.h"
+#include "state_tracker/buffer_state.h"
+#include "state_tracker/image_state.h"
+
+static ShaderObjectStage inline ConvertToShaderObjectStage(VkShaderStageFlagBits stage) {
+    if (stage == VK_SHADER_STAGE_VERTEX_BIT) return ShaderObjectStage::VERTEX;
+    if (stage == VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT) return ShaderObjectStage::TESSELLATION_CONTROL;
+    if (stage == VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT) return ShaderObjectStage::TESSELLATION_EVALUATION;
+    if (stage == VK_SHADER_STAGE_GEOMETRY_BIT) return ShaderObjectStage::GEOMETRY;
+    if (stage == VK_SHADER_STAGE_FRAGMENT_BIT) return ShaderObjectStage::FRAGMENT;
+    if (stage == VK_SHADER_STAGE_COMPUTE_BIT) return ShaderObjectStage::COMPUTE;
+    if (stage == VK_SHADER_STAGE_TASK_BIT_EXT) return ShaderObjectStage::TASK;
+    if (stage == VK_SHADER_STAGE_MESH_BIT_EXT) return ShaderObjectStage::MESH;
+
+    assert(false);
+
+    return ShaderObjectStage::LAST;
+}
 
 namespace vvl {
 
 CommandPool::CommandPool(ValidationStateTracker *dev, VkCommandPool cp, const VkCommandPoolCreateInfo *pCreateInfo,
                          VkQueueFlags flags)
-    : BASE_NODE(cp, kVulkanObjectTypeCommandPool),
+    : StateObject(cp, kVulkanObjectTypeCommandPool),
       dev_data(dev),
       createFlags(pCreateInfo->flags),
       queueFamilyIndex(pCreateInfo->queueFamilyIndex),
@@ -60,7 +80,7 @@ void CommandPool::Destroy() {
         dev_data->Destroy<CommandBuffer>(entry.first);
     }
     commandBuffers.clear();
-    BASE_NODE::Destroy();
+    StateObject::Destroy();
 }
 
 void CommandBuffer::SetActiveSubpass(uint32_t subpass) {
@@ -71,7 +91,7 @@ void CommandBuffer::SetActiveSubpass(uint32_t subpass) {
 
 CommandBuffer::CommandBuffer(ValidationStateTracker *dev, VkCommandBuffer cb, const VkCommandBufferAllocateInfo *pCreateInfo,
                              const vvl::CommandPool *pool)
-    : REFCOUNTED_NODE(cb, kVulkanObjectTypeCommandBuffer),
+    : RefcountedStateObject(cb, kVulkanObjectTypeCommandBuffer),
       createInfo(*pCreateInfo),
       command_pool(pool),
       dev_data(dev),
@@ -94,14 +114,14 @@ const vvl::ImageView *CommandBuffer::GetActiveAttachmentImageViewState(uint32_t 
     return active_attachments->at(index);
 }
 
-void CommandBuffer::AddChild(std::shared_ptr<BASE_NODE> &child_node) {
+void CommandBuffer::AddChild(std::shared_ptr<StateObject> &child_node) {
     assert(child_node);
     if (child_node->AddParent(this)) {
         object_bindings.insert(child_node);
     }
 }
 
-void CommandBuffer::RemoveChild(std::shared_ptr<BASE_NODE> &child_node) {
+void CommandBuffer::RemoveChild(std::shared_ptr<StateObject> &child_node) {
     assert(child_node);
     child_node->RemoveParent(this);
     object_bindings.erase(child_node);
@@ -148,6 +168,7 @@ void CommandBuffer::ResetCBState() {
     trashedScissorCount = false;
     usedDynamicViewportCount = false;
     usedDynamicScissorCount = false;
+    dirtyStaticState = false;
 
     active_render_pass_begin_info = safe_VkRenderPassBeginInfo();
     activeRenderPass = nullptr;
@@ -162,6 +183,7 @@ void CommandBuffer::ResetCBState() {
     writeEventsBeforeWait.clear();
     activeQueries.clear();
     startedQueries.clear();
+    renderPassQueries.clear();
     image_layout_map.clear();
     aliased_image_layout_map.clear();
     current_vertex_buffer_binding_info.vertex_buffer_bindings.clear();
@@ -187,10 +209,13 @@ void CommandBuffer::ResetCBState() {
     bound_video_session = nullptr;
     bound_video_session_parameters = nullptr;
     bound_video_picture_resources.clear();
+    video_encode_quality_level.reset();
     video_session_updates.clear();
 
     // Clean up the label data
     debug_label.Reset();
+    label_stack_depth_ = 0;
+    label_commands_.clear();
 
     // Best practices info
     small_indexed_draw_call_count = 0;
@@ -198,7 +223,7 @@ void CommandBuffer::ResetCBState() {
     transform_feedback_active = false;
 
     // Clean up the label data
-    ResetCmdDebugUtilsLabel(dev_data->report_data, commandBuffer());
+    ResetCmdDebugUtilsLabel(dev_data->report_data, VkHandle());
 }
 
 void CommandBuffer::Reset() {
@@ -247,15 +272,15 @@ void CommandBuffer::ResetPushConstantDataIfIncompatible(const vvl::PipelineLayou
 
 void CommandBuffer::Destroy() {
     // Remove the cb debug labels
-    EraseCmdDebugUtilsLabel(dev_data->report_data, commandBuffer());
+    EraseCmdDebugUtilsLabel(dev_data->report_data, VkHandle());
     {
         auto guard = WriteLock();
         ResetCBState();
     }
-    BASE_NODE::Destroy();
+    StateObject::Destroy();
 }
 
-void CommandBuffer::NotifyInvalidate(const BASE_NODE::NodeList &invalid_nodes, bool unlink) {
+void CommandBuffer::NotifyInvalidate(const StateObject::NodeList &invalid_nodes, bool unlink) {
     {
         auto guard = WriteLock();
         assert(!invalid_nodes.empty());
@@ -269,7 +294,7 @@ void CommandBuffer::NotifyInvalidate(const BASE_NODE::NodeList &invalid_nodes, b
         for (auto &obj : invalid_nodes) {
             // Only record a broken binding if one of the nodes in the invalid chain is still
             // being tracked by the command buffer. This is to try to avoid race conditions
-            // caused by separate CommandBuffer and BASE_NODE::parent_nodes locking.
+            // caused by separate CommandBuffer and StateObject::parent_nodes locking.
             if (object_bindings.erase(obj)) {
                 obj->RemoveParent(this);
                 found_invalid = true;
@@ -282,7 +307,7 @@ void CommandBuffer::NotifyInvalidate(const BASE_NODE::NodeList &invalid_nodes, b
                     break;
                 case kVulkanObjectTypeImage:
                     if (unlink) {
-                        image_layout_map.erase(static_cast<vvl::Image *>(obj.get()));
+                        image_layout_map.erase(obj->Handle().Cast<VkImage>());
                     }
                     break;
                 default:
@@ -298,14 +323,14 @@ void CommandBuffer::NotifyInvalidate(const BASE_NODE::NodeList &invalid_nodes, b
             broken_bindings.emplace(invalid_nodes[0]->Handle(), log_list);
         }
     }
-    BASE_NODE::NotifyInvalidate(invalid_nodes, unlink);
+    StateObject::NotifyInvalidate(invalid_nodes, unlink);
 }
 
 const CommandBufferImageLayoutMap &CommandBuffer::GetImageSubresourceLayoutMap() const { return image_layout_map; }
 
 // The const variant only need the image as it is the key for the map
-const ImageSubresourceLayoutMap *CommandBuffer::GetImageSubresourceLayoutMap(const vvl::Image &image_state) const {
-    auto it = image_layout_map.find(&image_state);
+const ImageSubresourceLayoutMap *CommandBuffer::GetImageSubresourceLayoutMap(VkImage image) const {
+    auto it = image_layout_map.find(image);
     if (it == image_layout_map.cend()) {
         return nullptr;
     }
@@ -314,7 +339,7 @@ const ImageSubresourceLayoutMap *CommandBuffer::GetImageSubresourceLayoutMap(con
 
 // The non-const variant only needs the image state, as the factory requires it to construct a new entry
 ImageSubresourceLayoutMap *CommandBuffer::GetImageSubresourceLayoutMap(const vvl::Image &image_state) {
-    auto &layout_map = image_layout_map[&image_state];
+    auto &layout_map = image_layout_map[image_state.VkHandle()];
     if (!layout_map) {
         // Make sure we don't create a nullptr keyed entry for a zombie Image
         if (image_state.Destroyed() || !image_state.layout_range_map) {
@@ -359,6 +384,9 @@ void CommandBuffer::BeginQuery(const QueryObject &query_obj) {
         return false;
     });
     updatedQueries.insert(query_obj);
+    if (query_obj.inside_render_pass) {
+        renderPassQueries.insert(query_obj);
+    }
 }
 
 void CommandBuffer::EndQuery(const QueryObject &query_obj) {
@@ -368,6 +396,9 @@ void CommandBuffer::EndQuery(const QueryObject &query_obj) {
         return SetQueryState(QueryObject(query_obj, perfQueryPass), QUERYSTATE_ENDED, localQueryToStateMap);
     });
     updatedQueries.insert(query_obj);
+    if (query_obj.inside_render_pass) {
+        renderPassQueries.erase(query_obj);
+    }
 }
 
 bool CommandBuffer::UpdatesQuery(const QueryObject &query_obj) const {
@@ -408,7 +439,6 @@ void CommandBuffer::EndQueries(VkQueryPool queryPool, uint32_t firstQuery, uint3
 void CommandBuffer::ResetQueryPool(VkQueryPool queryPool, uint32_t firstQuery, uint32_t queryCount) {
     for (uint32_t slot = firstQuery; slot < (firstQuery + queryCount); slot++) {
         QueryObject query_obj = {queryPool, slot};
-        resetQueries.insert(query_obj);
         updatedQueries.insert(query_obj);
     }
 
@@ -487,6 +517,7 @@ void CommandBuffer::BeginRenderPass(Func command, const VkRenderPassBeginInfo *p
     active_render_pass_begin_info = safe_VkRenderPassBeginInfo(pRenderPassBegin);
     SetActiveSubpass(0);
     activeSubpassContents = contents;
+    renderPassQueries.clear();
 
     // Connect this RP to cmdBuffer
     if (!dev_data->disabled[command_buffer_state]) {
@@ -558,6 +589,7 @@ void CommandBuffer::EndRenderPass(Func command) {
 void CommandBuffer::BeginRendering(Func command, const VkRenderingInfo *pRenderingInfo) {
     RecordCmd(command);
     activeRenderPass = std::make_shared<vvl::RenderPass>(pRenderingInfo, true);
+    renderPassQueries.clear();
 
     auto chained_device_group_struct = vku::FindStructInPNextChain<VkDeviceGroupRenderPassBeginInfo>(pRenderingInfo->pNext);
     if (chained_device_group_struct) {
@@ -578,6 +610,9 @@ void CommandBuffer::BeginRendering(Func command, const VkRenderingInfo *pRenderi
     hasRenderPassInstance = true;
 
     active_attachments = nullptr;
+    // add 2 for the Depth and Stencil
+    // multiple by 2 because every attachment might have a resolve
+    // Currently reserve the maximum possible size for |active_attachments| so when looping, we NEED to check for null
     uint32_t attachment_count = (pRenderingInfo->colorAttachmentCount + 2) * 2;
 
     // Set cb_state->active_attachments & cb_state->attachments_view_states
@@ -639,8 +674,8 @@ void CommandBuffer::EndRendering(Func command) {
 
 void CommandBuffer::BeginVideoCoding(const VkVideoBeginCodingInfoKHR *pBeginInfo) {
     RecordCmd(Func::vkCmdBeginVideoCodingKHR);
-    bound_video_session = dev_data->Get<VIDEO_SESSION_STATE>(pBeginInfo->videoSession);
-    bound_video_session_parameters = dev_data->Get<VIDEO_SESSION_PARAMETERS_STATE>(pBeginInfo->videoSessionParameters);
+    bound_video_session = dev_data->Get<vvl::VideoSession>(pBeginInfo->videoSession);
+    bound_video_session_parameters = dev_data->Get<vvl::VideoSessionParameters>(pBeginInfo->videoSessionParameters);
 
     if (bound_video_session) {
         // Connect this video session to cmdBuffer
@@ -656,56 +691,46 @@ void CommandBuffer::BeginVideoCoding(const VkVideoBeginCodingInfoKHR *pBeginInfo
         }
     }
 
-    if (pBeginInfo && pBeginInfo->pReferenceSlots) {
-        std::vector<VideoReferenceSlot> expected_slots{};
-        expected_slots.reserve(pBeginInfo->referenceSlotCount);
+    if (bound_video_session->IsEncode()) {
+        video_encode_rate_control_state = VideoEncodeRateControlState(bound_video_session->GetCodecOp(), pBeginInfo);
+        video_encode_quality_level.reset();
+    }
+
+    if (pBeginInfo->referenceSlotCount > 0) {
+        size_t deactivated_slot_count = 0;
 
         for (uint32_t i = 0; i < pBeginInfo->referenceSlotCount; ++i) {
             // Initialize the set of bound video picture resources
             if (pBeginInfo->pReferenceSlots[i].pPictureResource != nullptr) {
                 int32_t slot_index = pBeginInfo->pReferenceSlots[i].slotIndex;
-                VideoPictureResource res(dev_data, *pBeginInfo->pReferenceSlots[i].pPictureResource);
+                vvl::VideoPictureResource res(dev_data, *pBeginInfo->pReferenceSlots[i].pPictureResource);
                 bound_video_picture_resources.emplace(std::make_pair(res, slot_index));
             }
 
-            if (pBeginInfo->pReferenceSlots[i].slotIndex >= 0) {
-                expected_slots.emplace_back(dev_data, *bound_video_session->profile, pBeginInfo->pReferenceSlots[i], false);
+            if (pBeginInfo->pReferenceSlots[i].slotIndex >= 0 && pBeginInfo->pReferenceSlots[i].pPictureResource == nullptr) {
+                deactivated_slot_count++;
             }
         }
 
-        // Enqueue submission time validation
-        video_session_updates[bound_video_session->videoSession()].emplace_back(
-            [expected_slots](const ValidationStateTracker *dev_data, const VIDEO_SESSION_STATE *vs_state,
-                             VideoSessionDeviceState &dev_state, bool do_validate) {
-                bool skip = false;
-
-                if (do_validate) {
-                    for (const auto &slot : expected_slots) {
-                        if (!dev_state.IsSlotActive(slot.index)) {
-                            skip |= dev_data->LogError(vs_state->Handle(), "VUID-vkCmdBeginVideoCodingKHR-slotIndex-07239",
-                                                       "DPB slot index %d is not active in %s", slot.index,
-                                                       dev_data->FormatHandle(*vs_state).c_str());
-                        } else if (slot.resource && !dev_state.IsSlotPicture(slot.index, slot.resource)) {
-                            skip |= dev_data->LogError(vs_state->Handle(), "VUID-vkCmdBeginVideoCodingKHR-pPictureResource-07265",
-                                                       "DPB slot index %d of %s is not currently associated with the specified "
-                                                       "video picture resource: %s, layer %u, offset (%u,%u), extent (%u,%u)",
-                                                       slot.index, dev_data->FormatHandle(*vs_state).c_str(),
-                                                       dev_data->FormatHandle(slot.resource.image_state->Handle()).c_str(),
-                                                       slot.resource.range.baseArrayLayer, slot.resource.coded_offset.x,
-                                                       slot.resource.coded_offset.y, slot.resource.coded_extent.width,
-                                                       slot.resource.coded_extent.height);
-                        }
-                    }
+        if (deactivated_slot_count > 0) {
+            std::vector<int32_t> deactivated_slots{};
+            deactivated_slots.reserve(deactivated_slot_count);
+            for (uint32_t i = 0; i < pBeginInfo->referenceSlotCount; ++i) {
+                if (pBeginInfo->pReferenceSlots[i].slotIndex >= 0 && pBeginInfo->pReferenceSlots[i].pPictureResource == nullptr) {
+                    deactivated_slots.emplace_back(pBeginInfo->pReferenceSlots[i].slotIndex);
                 }
+            }
 
-                for (const auto &slot : expected_slots) {
-                    if (!slot.resource) {
-                        dev_state.Deactivate(slot.index);
+            // Enqueue submission time DPB slot deactivation
+            video_session_updates[bound_video_session->VkHandle()].emplace_back(
+                [deactivated_slots](const ValidationStateTracker *dev_data, const vvl::VideoSession *vs_state,
+                                    vvl::VideoSessionDeviceState &dev_state, bool do_validate) {
+                    for (const auto &slot_index : deactivated_slots) {
+                        dev_state.Deactivate(slot_index);
                     }
-                }
-
-                return skip;
-            });
+                    return false;
+                });
+        }
     }
 }
 
@@ -714,42 +739,71 @@ void CommandBuffer::EndVideoCoding(const VkVideoEndCodingInfoKHR *pEndCodingInfo
     bound_video_session = nullptr;
     bound_video_session_parameters = nullptr;
     bound_video_picture_resources.clear();
+    video_encode_quality_level.reset();
 }
 
 void CommandBuffer::ControlVideoCoding(const VkVideoCodingControlInfoKHR *pControlInfo) {
     RecordCmd(Func::vkCmdControlVideoCodingKHR);
 
     if (pControlInfo && bound_video_session) {
-        auto control_flags = pControlInfo->flags;
-
-        if (control_flags & VK_VIDEO_CODING_CONTROL_RESET_BIT_KHR) {
+        if (pControlInfo->flags & VK_VIDEO_CODING_CONTROL_RESET_BIT_KHR) {
             // Remove DPB slot index association for bound video picture resources
             for (auto &binding : bound_video_picture_resources) {
                 binding.second = -1;
             }
+
+            // Enqueue submission time video session state reset/initialization
+            video_session_updates[bound_video_session->VkHandle()].emplace_back(
+                [](const ValidationStateTracker *dev_data, const vvl::VideoSession *vs_state,
+                   vvl::VideoSessionDeviceState &dev_state, bool do_validate) {
+                    dev_state.Reset();
+                    return false;
+                });
         }
 
-        // Enqueue submission time validation and device state changes
-        video_session_updates[bound_video_session->videoSession()].emplace_back(
-            [control_flags](const ValidationStateTracker *dev_data, const VIDEO_SESSION_STATE *vs_state,
-                            VideoSessionDeviceState &dev_state, bool do_validate) {
-                bool skip = false;
-                bool reset_session = control_flags & VK_VIDEO_CODING_CONTROL_RESET_BIT_KHR;
-                if (do_validate) {
-                    if (!reset_session && !dev_state.IsInitialized()) {
-                        skip |= dev_data->LogError(vs_state->Handle(), "VUID-vkCmdControlVideoCodingKHR-flags-07017",
-                                                   "Bound video session %s is uninitialized",
-                                                   dev_data->FormatHandle(*vs_state).c_str());
-                    }
-                }
+        if (bound_video_session->IsEncode() && pControlInfo->flags & VK_VIDEO_CODING_CONTROL_ENCODE_RATE_CONTROL_BIT_KHR) {
+            auto state = VideoEncodeRateControlState(bound_video_session->GetCodecOp(), pControlInfo);
+            if (state) {
+                video_encode_rate_control_state = state;
 
-                // Reset video session at submission time, if requested
-                if (reset_session) {
-                    dev_state.Reset();
-                }
+                // Enqueue rate control specific device state changes
+                video_session_updates[bound_video_session->VkHandle()].emplace_back(
+                    [state](const ValidationStateTracker *dev_data, const vvl::VideoSession *vs_state,
+                            vvl::VideoSessionDeviceState &dev_state, bool do_validate) {
+                        dev_state.SetRateControlState(state);
+                        return false;
+                    });
+            }
+        }
 
-                return skip;
-            });
+        if (bound_video_session->IsEncode() && pControlInfo->flags & VK_VIDEO_CODING_CONTROL_ENCODE_QUALITY_LEVEL_BIT_KHR) {
+            auto quality_level_info = vku::FindStructInPNextChain<VkVideoEncodeQualityLevelInfoKHR>(pControlInfo->pNext);
+            if (quality_level_info != nullptr) {
+                uint32_t quality_level = quality_level_info->qualityLevel;
+                video_encode_quality_level = quality_level;
+
+                // Enqueue encode quality level device state change
+                video_session_updates[bound_video_session->VkHandle()].emplace_back(
+                    [quality_level](const ValidationStateTracker *dev_data, const vvl::VideoSession *vs_state,
+                                    vvl::VideoSessionDeviceState &dev_state, bool do_validate) {
+                        dev_state.SetEncodeQualityLevel(quality_level);
+                        return false;
+                    });
+            }
+        }
+    }
+}
+
+void vvl::CommandBuffer::EnqueueUpdateVideoInlineQueries(const VkVideoInlineQueryInfoKHR &query_info) {
+    queryUpdates.emplace_back([query_info](vvl::CommandBuffer &cb_state_arg, bool do_validate, VkQueryPool &firstPerfQueryPool,
+                                           uint32_t perfQueryPass, QueryMap *localQueryToStateMap) {
+        for (uint32_t i = 0; i < query_info.queryCount; i++) {
+            SetQueryState(QueryObject(query_info.queryPool, query_info.firstQuery + i), QUERYSTATE_ENDED, localQueryToStateMap);
+        }
+        return false;
+    });
+    for (uint32_t i = 0; i < query_info.queryCount; i++) {
+        updatedQueries.insert(QueryObject(query_info.queryPool, query_info.firstQuery + i));
     }
 }
 
@@ -757,76 +811,78 @@ void CommandBuffer::DecodeVideo(const VkVideoDecodeInfoKHR *pDecodeInfo) {
     RecordCmd(Func::vkCmdDecodeVideoKHR);
 
     if (bound_video_session && pDecodeInfo) {
-        VideoReferenceSlot setup_slot{};
         if (pDecodeInfo->pSetupReferenceSlot && pDecodeInfo->pSetupReferenceSlot->pPictureResource) {
-            setup_slot = VideoReferenceSlot(dev_data, *bound_video_session->profile, *pDecodeInfo->pSetupReferenceSlot);
+            vvl::VideoReferenceSlot setup_slot(dev_data, *bound_video_session->profile, *pDecodeInfo->pSetupReferenceSlot);
+
             // Update bound video picture resource DPB slot index association
             bound_video_picture_resources[setup_slot.resource] = setup_slot.index;
-        }
 
-        // Need to also validate the picture kind (frame, top field, bottom field) for H.264
-        bool need_reference_slot_validation = (bound_video_session->GetCodecOp() == VK_VIDEO_CODEC_OPERATION_DECODE_H264_BIT_KHR);
-
-        std::vector<VideoReferenceSlot> reference_slots{};
-        if (need_reference_slot_validation) {
-            reference_slots.reserve(pDecodeInfo->referenceSlotCount);
-
-            for (uint32_t i = 0; i < pDecodeInfo->referenceSlotCount; ++i) {
-                reference_slots.emplace_back(dev_data, *bound_video_session->profile, pDecodeInfo->pReferenceSlots[i]);
-            }
-        }
-
-        // Enqueue submission time validation and device state changes
-        video_session_updates[bound_video_session->videoSession()].emplace_back(
-            [setup_slot, reference_slots](const ValidationStateTracker *dev_data, const VIDEO_SESSION_STATE *vs_state,
-                                          VideoSessionDeviceState &dev_state, bool do_validate) {
-                bool skip = false;
-                if (do_validate) {
-                    if (!dev_state.IsInitialized()) {
-                        skip |= dev_data->LogError(vs_state->Handle(), "VUID-vkCmdDecodeVideoKHR-None-07011", "%s is uninitialized",
-                                                   dev_data->FormatHandle(*vs_state).c_str());
+            // Enqueue submission time reference slot setup or invalidation
+            bool reference_setup_requested = bound_video_session->ReferenceSetupRequested(*pDecodeInfo);
+            video_session_updates[bound_video_session->VkHandle()].emplace_back(
+                [setup_slot, reference_setup_requested](const ValidationStateTracker *dev_data, const vvl::VideoSession *vs_state,
+                                                        vvl::VideoSessionDeviceState &dev_state, bool do_validate) {
+                    if (reference_setup_requested) {
+                        dev_state.Activate(setup_slot.index, setup_slot.picture_id, setup_slot.resource);
+                    } else {
+                        dev_state.Invalidate(setup_slot.index, setup_slot.picture_id);
                     }
-
-                    const auto log_picture_kind_error = [&](const VideoReferenceSlot &slot, const char *vuid,
-                                                            const char *picture_kind) -> bool {
-                        return dev_data->LogError(vs_state->Handle(), vuid,
-                                                  "DPB slot index %d of %s does not currently contain a %s with the specified "
-                                                  "video picture resource: %s, layer %u, offset (%u,%u), extent (%u,%u)",
-                                                  slot.index, dev_data->FormatHandle(*vs_state).c_str(), picture_kind,
-                                                  dev_data->FormatHandle(slot.resource.image_state->Handle()).c_str(),
-                                                  slot.resource.range.baseArrayLayer, slot.resource.coded_offset.x,
-                                                  slot.resource.coded_offset.y, slot.resource.coded_extent.width,
-                                                  slot.resource.coded_extent.height);
-                    };
-
-                    for (const auto &slot : reference_slots) {
-                        if (slot.picture_id.IsFrame() &&
-                            !dev_state.IsSlotPicture(slot.index, VideoPictureID::Frame(), slot.resource)) {
-                            skip |= log_picture_kind_error(slot, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07266", "frame");
-                        }
-                        if (slot.picture_id.ContainsTopField() &&
-                            !dev_state.IsSlotPicture(slot.index, VideoPictureID::TopField(), slot.resource)) {
-                            skip |= log_picture_kind_error(slot, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07267", "top field");
-                        }
-                        if (slot.picture_id.ContainsBottomField() &&
-                            !dev_state.IsSlotPicture(slot.index, VideoPictureID::BottomField(), slot.resource)) {
-                            skip |= log_picture_kind_error(slot, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07268", "bottom field");
-                        }
-                    }
-                }
-
-                // Set up reference slot at submission time, if requested
-                if (setup_slot) {
-                    dev_state.Activate(setup_slot.index, setup_slot.picture_id, setup_slot.resource);
-                }
-
-                return skip;
-            });
+                    return false;
+                });
+        }
 
         // Update active query indices
         for (auto &query : activeQueries) {
             uint32_t op_count = bound_video_session->GetVideoDecodeOperationCount(pDecodeInfo);
             query.active_query_index += op_count;
+        }
+
+        // Update inline queries
+        if (bound_video_session->create_info.flags & VK_VIDEO_SESSION_CREATE_INLINE_QUERIES_BIT_KHR) {
+            const auto inline_query_info = vku::FindStructInPNextChain<VkVideoInlineQueryInfoKHR>(pDecodeInfo->pNext);
+            if (inline_query_info != nullptr && inline_query_info->queryPool != VK_NULL_HANDLE) {
+                EnqueueUpdateVideoInlineQueries(*inline_query_info);
+            }
+        }
+    }
+}
+
+void vvl::CommandBuffer::EncodeVideo(const VkVideoEncodeInfoKHR *pEncodeInfo) {
+    RecordCmd(Func::vkCmdEncodeVideoKHR);
+
+    if (bound_video_session && pEncodeInfo) {
+        if (pEncodeInfo->pSetupReferenceSlot && pEncodeInfo->pSetupReferenceSlot->pPictureResource) {
+            vvl::VideoReferenceSlot setup_slot(dev_data, *bound_video_session->profile, *pEncodeInfo->pSetupReferenceSlot);
+
+            // Update bound video picture resource DPB slot index association
+            bound_video_picture_resources[setup_slot.resource] = setup_slot.index;
+
+            // Enqueue submission time reference slot setup or invalidation
+            bool reference_setup_requested = bound_video_session->ReferenceSetupRequested(*pEncodeInfo);
+            video_session_updates[bound_video_session->VkHandle()].emplace_back(
+                [setup_slot, reference_setup_requested](const ValidationStateTracker *dev_data, const vvl::VideoSession *vs_state,
+                                                        vvl::VideoSessionDeviceState &dev_state, bool do_validate) {
+                    if (reference_setup_requested) {
+                        dev_state.Activate(setup_slot.index, setup_slot.picture_id, setup_slot.resource);
+                    } else {
+                        dev_state.Invalidate(setup_slot.index, setup_slot.picture_id);
+                    }
+                    return false;
+                });
+        }
+
+        // Update active query indices
+        for (auto &query : activeQueries) {
+            uint32_t op_count = bound_video_session->GetVideoEncodeOperationCount(pEncodeInfo);
+            query.active_query_index += op_count;
+        }
+
+        // Update inline queries
+        if (bound_video_session->create_info.flags & VK_VIDEO_SESSION_CREATE_INLINE_QUERIES_BIT_KHR) {
+            const auto inline_query_info = vku::FindStructInPNextChain<VkVideoInlineQueryInfoKHR>(pEncodeInfo->pNext);
+            if (inline_query_info != nullptr && inline_query_info->queryPool != VK_NULL_HANDLE) {
+                EnqueueUpdateVideoInlineQueries(*inline_query_info);
+            }
         }
     }
 }
@@ -925,8 +981,10 @@ void CommandBuffer::ExecuteCommands(vvl::span<const VkCommandBuffer> secondary_c
         // ValidationStateTracker these maps will be empty, so leaving the propagation in the the state tracker should be a no-op
         // for those other classes.
         for (const auto &sub_layout_map_entry : sub_cb_state->image_layout_map) {
-            const auto *image_state = sub_layout_map_entry.first;
-
+            const auto image_state = dev_data->Get<vvl::Image>(sub_layout_map_entry.first);
+            if (!image_state || image_state->Destroyed()) {
+                continue;
+            }
             auto *cb_subres_map = GetImageSubresourceLayoutMap(*image_state);
             if (cb_subres_map) {
                 const auto &sub_cb_subres_map = sub_layout_map_entry.second;
@@ -934,7 +992,7 @@ void CommandBuffer::ExecuteCommands(vvl::span<const VkCommandBuffer> secondary_c
             }
         }
 
-        sub_cb_state->primaryCommandBuffer = commandBuffer();
+        sub_cb_state->primaryCommandBuffer = VkHandle();
         linkedCommandBuffers.insert(sub_cb_state.get());
         AddChild(sub_cb_state);
         // Add a query update that runs all the query updates that happen in the sub command buffer.
@@ -981,6 +1039,9 @@ void CommandBuffer::ExecuteCommands(vvl::span<const VkCommandBuffer> secondary_c
             suspendsRenderPassInstance = sub_cb_state->suspendsRenderPassInstance;
             hasRenderPassInstance |= sub_cb_state->hasRenderPassInstance;
         }
+
+        label_stack_depth_ += sub_cb_state->label_stack_depth_;
+        label_commands_.insert(label_commands_.end(), sub_cb_state->label_commands_.begin(), sub_cb_state->label_commands_.end());
     }
 }
 
@@ -1004,7 +1065,7 @@ void CommandBuffer::PushDescriptorSetState(VkPipelineBindPoint pipelineBindPoint
     }
 
     UpdateLastBoundDescriptorSets(pipelineBindPoint, pipeline_layout, set, 1, nullptr, push_descriptor_set, 0, nullptr);
-    last_bound.pipeline_layout = pipeline_layout.layout();
+    last_bound.pipeline_layout = pipeline_layout.VkHandle();
 
     // Now that we have either the new or extant push_descriptor set ... do the write updates against it
     push_descriptor_set->PerformPushDescriptorsUpdate(descriptorWriteCount, pDescriptorWrites);
@@ -1124,7 +1185,7 @@ void CommandBuffer::UpdateLastBoundDescriptorSets(VkPipelineBindPoint pipeline_b
     // Some useful shorthand
     const auto lv_bind_point = ConvertToLvlBindPoint(pipeline_bind_point);
     auto &last_bound = lastBound[lv_bind_point];
-    last_bound.pipeline_layout = pipeline_layout.layout();
+    last_bound.pipeline_layout = pipeline_layout.VkHandle();
     auto &pipe_compat_ids = pipeline_layout.set_compat_ids;
     // Resize binding arrays
     if (last_binding_index >= last_bound.per_set.size()) {
@@ -1205,7 +1266,7 @@ void CommandBuffer::UpdateLastBoundDescriptorBuffers(VkPipelineBindPoint pipelin
     // Some useful shorthand
     const auto lv_bind_point = ConvertToLvlBindPoint(pipeline_bind_point);
     auto &last_bound = lastBound[lv_bind_point];
-    last_bound.pipeline_layout = pipeline_layout.layout();
+    last_bound.pipeline_layout = pipeline_layout.VkHandle();
     auto &pipe_compat_ids = pipeline_layout.set_compat_ids;
     // Resize binding arrays
     if (last_binding_index >= last_bound.per_set.size()) {
@@ -1266,7 +1327,7 @@ void CommandBuffer::SetImageViewInitialLayout(const vvl::ImageView &view_state, 
         return;
     }
     vvl::Image *image_state = view_state.image_state.get();
-    auto *subresource_map = GetImageSubresourceLayoutMap(*image_state);
+    auto *subresource_map = image_state ? GetImageSubresourceLayoutMap(*image_state) : nullptr;
     if (subresource_map) {
         subresource_map->SetSubresourceRangeInitialLayout(*this, layout, view_state);
     }
@@ -1323,6 +1384,10 @@ void CommandBuffer::RecordStateCmd(Func command, CBDynamicState state) {
     CBDynamicFlags state_bits;
     state_bits.set(state);
     RecordStateCmd(command, state_bits);
+    vvl::Pipeline *pipeline = GetCurrentPipeline(VK_PIPELINE_BIND_POINT_GRAPHICS);
+    if (pipeline && !pipeline->IsDynamic(ConvertToDynamicState(state))) {
+        dirtyStaticState = true;
+    }
 }
 
 void CommandBuffer::RecordStateCmd(Func command, CBDynamicFlags const &state_bits) {
@@ -1331,7 +1396,7 @@ void CommandBuffer::RecordStateCmd(Func command, CBDynamicFlags const &state_bit
     dynamic_state_status.pipeline |= state_bits;
 }
 
-void CommandBuffer::RecordTransferCmd(Func command, std::shared_ptr<BINDABLE> &&buf1, std::shared_ptr<BINDABLE> &&buf2) {
+void CommandBuffer::RecordTransferCmd(Func command, std::shared_ptr<Bindable> &&buf1, std::shared_ptr<Bindable> &&buf2) {
     RecordCmd(command);
     if (buf1) {
         AddChild(buf1);
@@ -1482,7 +1547,7 @@ void CommandBuffer::Submit(VkQueue queue, uint32_t perf_submit_pass, const Locat
     }
 
     for (const auto &it : video_session_updates) {
-        auto video_session_state = dev_data->Get<VIDEO_SESSION_STATE>(it.first);
+        auto video_session_state = dev_data->Get<vvl::VideoSession>(it.first);
         auto device_state = video_session_state->DeviceStateWrite();
         for (const auto &function : it.second) {
             function(nullptr, video_session_state.get(), *device_state, /*do_validate*/ false);
@@ -1515,6 +1580,72 @@ void CommandBuffer::Retire(uint32_t perf_submit_pass, const std::function<bool(c
     }
 }
 
+uint32_t CommandBuffer::GetDynamicColorAttachmentCount() const {
+    if (activeRenderPass) {
+        if (activeRenderPass->use_dynamic_rendering_inherited) {
+            return activeRenderPass->inheritance_rendering_info.colorAttachmentCount;
+        }
+        if (activeRenderPass->use_dynamic_rendering) {
+            return activeRenderPass->dynamic_rendering_begin_rendering_info.colorAttachmentCount;
+        }
+    }
+    return 0;
+}
+
+bool CommandBuffer::HasValidDynamicDepthAttachment() const {
+    if (activeRenderPass) {
+        if (activeRenderPass->use_dynamic_rendering_inherited) {
+            return activeRenderPass->inheritance_rendering_info.depthAttachmentFormat != VK_FORMAT_UNDEFINED;
+        }
+        if (activeRenderPass->use_dynamic_rendering) {
+            return activeRenderPass->dynamic_rendering_begin_rendering_info.pDepthAttachment != nullptr;
+        }
+    }
+    return false;
+}
+bool CommandBuffer::HasValidDynamicStencilAttachment() const {
+    if (activeRenderPass) {
+        if (activeRenderPass->use_dynamic_rendering_inherited) {
+            return activeRenderPass->inheritance_rendering_info.stencilAttachmentFormat != VK_FORMAT_UNDEFINED;
+        }
+        if (activeRenderPass->use_dynamic_rendering) {
+            return activeRenderPass->dynamic_rendering_begin_rendering_info.pStencilAttachment != nullptr;
+        }
+    }
+    return false;
+}
+bool CommandBuffer::HasExternalFormatResolveAttachment() const {
+    if (activeRenderPass && activeRenderPass->use_dynamic_rendering &&
+        activeRenderPass->dynamic_rendering_begin_rendering_info.colorAttachmentCount > 0) {
+        return activeRenderPass->dynamic_rendering_begin_rendering_info.pColorAttachments->resolveMode ==
+               VK_RESOLVE_MODE_EXTERNAL_FORMAT_DOWNSAMPLE_ANDROID;
+    }
+    return false;
+}
+bool CommandBuffer::HasDynamicDualSourceBlend(uint32_t attachmentCount) const {
+    if (dynamic_state_value.color_blend_enabled.any()) {
+        if (dynamic_state_status.cb[CB_DYNAMIC_STATE_COLOR_BLEND_EQUATION_EXT]) {
+            for (uint32_t i = 0; i < dynamic_state_value.color_blend_equations.size() && i < attachmentCount; ++i) {
+                const auto &color_blend_equation = dynamic_state_value.color_blend_equations[i];
+                if (IsSecondaryColorInputBlendFactor(color_blend_equation.srcColorBlendFactor) ||
+                    IsSecondaryColorInputBlendFactor(color_blend_equation.dstColorBlendFactor) ||
+                    IsSecondaryColorInputBlendFactor(color_blend_equation.srcAlphaBlendFactor) ||
+                    IsSecondaryColorInputBlendFactor(color_blend_equation.dstAlphaBlendFactor)) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+void CommandBuffer::BindShader(VkShaderStageFlagBits shader_stage, vvl::ShaderObject *shader_object_state) {
+    auto &lastBoundState = lastBound[ConvertToPipelineBindPoint(shader_stage)];
+    const auto stage_index = static_cast<uint32_t>(ConvertToShaderObjectStage(shader_stage));
+    lastBoundState.shader_object_bound[stage_index] = true;
+    lastBoundState.shader_object_states[stage_index] = shader_object_state;
+}
+
 void CommandBuffer::UnbindResources() {
     // Vertex and index buffers
     index_buffer_binding.reset();
@@ -1541,7 +1672,7 @@ LogObjectList CommandBuffer::GetObjectList(VkShaderStageFlagBits stage) const {
     const auto *pipeline_state = last_bound.pipeline_state;
 
     if (pipeline_state) {
-        objlist.add(pipeline_state->pipeline());
+        objlist.add(pipeline_state->Handle());
     } else if (VkShaderEXT shader = last_bound.GetShader(ConvertToShaderObjectStage(stage))) {
         objlist.add(shader);
     }
@@ -1555,7 +1686,7 @@ LogObjectList CommandBuffer::GetObjectList(VkPipelineBindPoint pipeline_bind_poi
     const auto *pipeline_state = last_bound.pipeline_state;
 
     if (pipeline_state) {
-        objlist.add(pipeline_state->pipeline());
+        objlist.add(pipeline_state->Handle());
     } else if (pipeline_bind_point == VK_PIPELINE_BIND_POINT_COMPUTE) {
         if (VkShaderEXT shader = last_bound.GetShader(ShaderObjectStage::COMPUTE)) {
             objlist.add(shader);
@@ -1601,6 +1732,49 @@ void CommandBuffer::GetCurrentPipelineAndDesriptorSets(VkPipelineBindPoint pipel
     }
     *rtn_pipe = last_bound.pipeline_state;
     *rtn_sets = &(last_bound.per_set);
+}
+
+void CommandBuffer::BeginLabel(const char *label_name) {
+    ++label_stack_depth_;
+    label_commands_.push_back(LabelCommand{true, label_name});
+}
+
+void CommandBuffer::EndLabel() {
+    --label_stack_depth_;
+    label_commands_.push_back(LabelCommand{false, std::string()});
+}
+
+void CommandBuffer::ReplayLabelCommands(const vvl::span<const LabelCommand> &label_commands,
+                                        std::vector<std::string> &label_stack) {
+    for (const LabelCommand &command : label_commands) {
+        if (command.begin) {
+            label_stack.push_back(command.label_name.empty() ? "(empty label)" : command.label_name);
+        } else if (!label_stack.empty()) {
+            // The above condition is needed for several reasons. On the primary command buffer level
+            // the labels are not necessary balanced. And if the empty stack is detected in the context
+            // where it is an error, then it will be reported by the core validation, but we still need
+            // a safety check.
+            label_stack.pop_back();
+        }
+    }
+}
+
+std::string CommandBuffer::GetDebugRegionName(const std::vector<LabelCommand> &label_commands, uint32_t label_command_index,
+                                              const std::vector<std::string> &initial_label_stack) {
+    assert(label_command_index < label_commands.size());
+
+    auto commands_to_replay = vvl::make_span(label_commands.data(), label_command_index + 1);
+    auto label_stack = initial_label_stack;
+    vvl::CommandBuffer::ReplayLabelCommands(commands_to_replay, label_stack);
+
+    std::string debug_region;
+    for (const std::string &label_name : label_stack) {
+        if (!debug_region.empty()) {
+            debug_region += "::";
+        }
+        debug_region += label_name;
+    }
+    return debug_region;
 }
 
 }  // namespace vvl

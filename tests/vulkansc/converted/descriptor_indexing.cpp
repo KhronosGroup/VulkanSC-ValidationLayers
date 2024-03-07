@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (c) 2015-2023 Google, Inc.
+ * Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (c) 2015-2024 Google, Inc.
  * Modifications Copyright (C) 2020-2022 Advanced Micro Devices, Inc. All rights reserved.
  * Modifications Copyright (C) 2021 ARM, Inc. All rights reserved.
  *
@@ -24,25 +24,10 @@ TEST_F(NegativeDescriptorIndexing, DISABLED_UpdateAfterBind) {
 
     AddRequiredExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_MAINTENANCE_3_EXTENSION_NAME);
-
-    RETURN_IF_SKIP(InitFramework());
-
-    // Create a device that enables all supported indexing features except descriptorBindingUniformBufferUpdateAfterBind
-    descriptor_indexing_features = vku::InitStructHelper();
-    auto features2 = GetPhysicalDeviceFeatures2(descriptor_indexing_features);
-
-    descriptor_indexing_features.descriptorBindingUniformBufferUpdateAfterBind = VK_FALSE;
-
-    if (!descriptor_indexing_features.descriptorBindingStorageBufferUpdateAfterBind) {
-        GTEST_SKIP() << "Test requires (unsupported) descriptorBindingStorageBufferUpdateAfterBind";
-    }
-
-    RETURN_IF_SKIP(InitState(nullptr, &features2));
+    AddRequiredFeature(vkt::Feature::fragmentStoresAndAtomics);
+    AddRequiredFeature(vkt::Feature::descriptorBindingStorageBufferUpdateAfterBind);
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
-
-    if (!m_device->phy().features().fragmentStoresAndAtomics) {
-        GTEST_SKIP() << "Test requires (unsupported) fragmentStoresAndAtomics";
-    }
 
     VkDescriptorBindingFlagsEXT flags[3] = {0, VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT_EXT,
                                             VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT_EXT};
@@ -147,16 +132,8 @@ TEST_F(NegativeDescriptorIndexing, SetNonIdenticalWrite) {
     TEST_DESCRIPTION("VkWriteDescriptorSet must have identical VkDescriptorBindingFlagBits");
 
     AddRequiredExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-
-    descriptor_indexing_features = vku::InitStructHelper();
-    GetPhysicalDeviceFeatures2(descriptor_indexing_features);
-
-    if (!descriptor_indexing_features.descriptorBindingStorageBufferUpdateAfterBind) {
-        GTEST_SKIP() << "Test requires (unsupported) descriptorBindingStorageBufferUpdateAfterBind";
-    }
-
-    RETURN_IF_SKIP(InitState(nullptr, &descriptor_indexing_features));
+    AddRequiredFeature(vkt::Feature::descriptorBindingStorageBufferUpdateAfterBind);
+    RETURN_IF_SKIP(Init());
 
     // not all identical VkDescriptorBindingFlags flags
     VkDescriptorBindingFlags flags[3] = {VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT, 0,
@@ -226,7 +203,7 @@ TEST_F(NegativeDescriptorIndexing, DISABLED_SetLayoutWithoutExtension) {
 
     VkDescriptorSetLayout ds_layout = VK_NULL_HANDLE;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-CoreValidation-DrawState-ExtensionNotEnabled");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDescriptorSetLayoutCreateInfo-flags-parameter");
     vk::CreateDescriptorSetLayout(m_device->handle(), &ds_layout_ci, nullptr, &ds_layout);
     m_errorMonitor->VerifyFound();
 }
@@ -235,15 +212,9 @@ TEST_F(NegativeDescriptorIndexing, SetLayout) {
     TEST_DESCRIPTION("Exercise various create/allocate-time errors related to VK_EXT_descriptor_indexing.");
 
     AddRequiredExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-
-    // Create a device that enables all supported indexing features except descriptorBindingUniformBufferUpdateAfterBind
-    descriptor_indexing_features = vku::InitStructHelper();
-    GetPhysicalDeviceFeatures2(descriptor_indexing_features);
-
-    descriptor_indexing_features.descriptorBindingUniformBufferUpdateAfterBind = VK_FALSE;
-
-    RETURN_IF_SKIP(InitState(nullptr, &descriptor_indexing_features));
+    AddRequiredFeature(vkt::Feature::descriptorBindingVariableDescriptorCount);
+    AddDisabledFeature(vkt::Feature::descriptorBindingUniformBufferUpdateAfterBind);
+    RETURN_IF_SKIP(Init());
 
     std::array<VkDescriptorBindingFlagsEXT, 2> flags = {
         {VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT_EXT, VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT_EXT}};
@@ -309,7 +280,8 @@ TEST_F(NegativeDescriptorIndexing, SetLayout) {
         m_errorMonitor->VerifyFound();
     }
 
-    if (descriptor_indexing_features.descriptorBindingVariableDescriptorCount) {
+    // test descriptorBindingVariableDescriptorCount
+    {
         VkDescriptorPoolSize pool_size = {binding.descriptorType, 3};
         VkDescriptorPoolCreateInfo dspci = vku::InitStructHelper();
         dspci.poolSizeCount = 1;
@@ -336,7 +308,7 @@ TEST_F(NegativeDescriptorIndexing, SetLayout) {
 
             VkDescriptorSet ds = VK_NULL_HANDLE;
             m_errorMonitor->SetDesiredFailureMsg(kErrorBit,
-                                                 "VUID-VkDescriptorSetVariableDescriptorCountAllocateInfo-pSetLayouts-03046");
+                                                 "VUID-VkDescriptorSetAllocateInfo-pSetLayouts-09380");
             vk::AllocateDescriptorSets(m_device->handle(), &ds_alloc_info, &ds);
             m_errorMonitor->VerifyFound();
         }
@@ -382,11 +354,9 @@ TEST_F(NegativeDescriptorIndexing, SetLayout) {
 
 TEST_F(NegativeDescriptorIndexing, SetLayoutBindings) {
     TEST_DESCRIPTION("Create descriptor set layout with incompatible bindings.");
-    RETURN_IF_SKIP(InitBasicDescriptorIndexing());
-
-    if (!descriptor_indexing_features.descriptorBindingUniformBufferUpdateAfterBind) {
-        GTEST_SKIP() << "Test requires (unsupported) descriptorBindingStorageBufferUpdateAfterBind";
-    }
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::descriptorBindingUniformBufferUpdateAfterBind);
+    RETURN_IF_SKIP(Init());
 
     VkDescriptorSetLayoutBinding update_binding = {};
     update_binding.binding = 0;

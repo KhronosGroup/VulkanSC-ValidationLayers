@@ -1,6 +1,6 @@
-/* Copyright (c) 2015-2017, 2019-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2017, 2019-2023 Valve Corporation
- * Copyright (c) 2015-2017, 2019-2023 LunarG, Inc.
+/* Copyright (c) 2015-2017, 2019-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2017, 2019-2024 Valve Corporation
+ * Copyright (c) 2015-2017, 2019-2024 LunarG, Inc.
  * Modifications Copyright (C) 2022 RasterGrid Kft.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -347,7 +347,7 @@ static inline uint32_t GetIndexAlignment(VkIndexType indexType) {
             return 2;
         case VK_INDEX_TYPE_UINT32:
             return 4;
-        case VK_INDEX_TYPE_UINT8_EXT:
+        case VK_INDEX_TYPE_UINT8_KHR:
             return 1;
         case VK_INDEX_TYPE_NONE_KHR:  // alias VK_INDEX_TYPE_NONE_NV
             return 0;
@@ -389,6 +389,23 @@ static inline bool IsAnyPlaneAspect(VkImageAspectFlags aspect_mask) {
     constexpr VkImageAspectFlags valid_planes =
         VK_IMAGE_ASPECT_PLANE_0_BIT | VK_IMAGE_ASPECT_PLANE_1_BIT | VK_IMAGE_ASPECT_PLANE_2_BIT;
     return (aspect_mask & valid_planes) != 0;
+}
+
+static bool inline IsStageInPipelineBindPoint(VkShaderStageFlags stages, VkPipelineBindPoint bind_point) {
+    switch (bind_point) {
+        case VK_PIPELINE_BIND_POINT_GRAPHICS:
+            return (stages & (VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT |
+                              VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT | VK_SHADER_STAGE_GEOMETRY_BIT |
+                              VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_MESH_BIT_EXT)) != 0;
+        case VK_PIPELINE_BIND_POINT_COMPUTE:
+            return (stages & VK_SHADER_STAGE_COMPUTE_BIT) != 0;
+        case VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR:
+            return (stages &
+                    (VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
+                     VK_SHADER_STAGE_MISS_BIT_KHR | VK_SHADER_STAGE_INTERSECTION_BIT_KHR | VK_SHADER_STAGE_CALLABLE_BIT_KHR)) != 0;
+        default:
+            return false;
+    }
 }
 
 // all "advanced blend operation" found in spec
@@ -564,7 +581,6 @@ typedef VkFlags VkStringErrorFlags;
 void layer_debug_messenger_actions(debug_report_data *report_data, const char *layer_identifier);
 
 VkStringErrorFlags vk_string_validate(const int max_length, const char *char_array);
-bool white_list(const char *item, const std::set<std::string> &whitelist);
 std::string GetTempFilePath();
 
 // Aliases to avoid excessive typing. We can't easily auto these away because

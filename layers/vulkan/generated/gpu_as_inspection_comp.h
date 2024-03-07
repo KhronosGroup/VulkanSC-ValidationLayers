@@ -6,9 +6,9 @@
 
 /***************************************************************************
 *
-* Copyright (c) 2021-2022 The Khronos Group Inc.
-* Copyright (c) 2021-2023 Valve Corporation
-* Copyright (c) 2021-2023 LunarG, Inc.
+* Copyright (c) 2021-2024 The Khronos Group Inc.
+* Copyright (c) 2021-2024 Valve Corporation
+* Copyright (c) 2021-2024 LunarG, Inc.
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.

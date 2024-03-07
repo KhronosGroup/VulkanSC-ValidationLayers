@@ -1,8 +1,8 @@
 #!/usr/bin/python3 -i
 #
-# Copyright (c) 2015-2023 The Khronos Group Inc.
-# Copyright (c) 2015-2023 Valve Corporation
-# Copyright (c) 2015-2023 LunarG, Inc.
+# Copyright (c) 2015-2024 The Khronos Group Inc.
+# Copyright (c) 2015-2024 Valve Corporation
+# Copyright (c) 2015-2024 LunarG, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -78,9 +78,9 @@ class BestPracticesOutputGenerator(BaseGenerator):
 
             /***************************************************************************
             *
-            * Copyright (c) 2015-2023 The Khronos Group Inc.
-            * Copyright (c) 2015-2023 Valve Corporation
-            * Copyright (c) 2015-2023 LunarG, Inc.
+            * Copyright (c) 2015-2024 The Khronos Group Inc.
+            * Copyright (c) 2015-2024 Valve Corporation
+            * Copyright (c) 2015-2024 LunarG, Inc.
             *
             * Licensed under the Apache License, Version 2.0 (the "License");
             * you may not use this file except in compliance with the License.
@@ -116,12 +116,6 @@ class BestPracticesOutputGenerator(BaseGenerator):
 
     def generateHeader(self):
         out = []
-        out.append('''
-            #pragma once
-            #include <vulkan/vulkan_core.h>
-            #include "containers/custom_containers.h"
-            #include "error_message/record_object.h"
-            ''')
         guard_helper = PlatformGuardHelper()
         # List all Function declarations
         for command in [x for x in self.vk.commands.values() if x.name not in self.no_autogen_list]:
@@ -134,31 +128,6 @@ class BestPracticesOutputGenerator(BaseGenerator):
                 prototype = prototype.replace(')', ', void* state_data)')
             out.append(prototype)
         out.extend(guard_helper.add_guard(None))
-
-        # Create deprecated extension map
-        out.append('const vvl::unordered_map<std::string, DeprecationData>  deprecated_extensions = {\n')
-        for extension in self.vk.extensions.values():
-            target = None
-            reason = None
-            if extension.promotedTo is not None:
-                reason = 'kExtPromoted'
-                target = extension.promotedTo
-            elif extension.obsoletedBy is not None:
-                reason = 'kExtObsoleted'
-                target = extension.obsoletedBy
-            elif extension.deprecatedBy is not None:
-                reason = 'kExtDeprecated'
-                target = extension.deprecatedBy
-            else:
-                continue
-            out.append(f'    {{"{extension.name}", {{{reason}, "{target}"}}}},\n')
-        out.append('};\n')
-
-        out.append('const vvl::unordered_map<std::string, std::string> special_use_extensions = {\n')
-        for extension in self.vk.extensions.values():
-            if extension.specialUse is not None:
-                out.append(f'    {{"{extension.name}", "{", ".join(extension.specialUse)}"}},\n')
-        out.append('};\n')
         self.write("".join(out))
 
     def generateSource(self):
@@ -167,7 +136,53 @@ class BestPracticesOutputGenerator(BaseGenerator):
         out.append('''
             #include "chassis.h"
             #include "best_practices/best_practices_validation.h"
+
+            DeprecationData GetDeprecatedData(vvl::Extension extension_name) {
+                static const DeprecationData empty_deprecated_data{DeprecationReason::Empty, vvl::Extension::Empty};
+                static const vvl::unordered_map<vvl::Extension, DeprecationData> deprecated_extensions = {
             ''')
+        for extension in self.vk.extensions.values():
+            target = None
+            reason = None
+            if extension.promotedTo is not None:
+                reason = 'DeprecationReason::Promoted'
+                target = extension.promotedTo
+            elif extension.obsoletedBy is not None:
+                reason = 'DeprecationReason::Obsoleted'
+                target = extension.obsoletedBy
+            elif extension.deprecatedBy is not None:
+                reason = 'DeprecationReason::Deprecated'
+                target = extension.deprecatedBy
+            else:
+                continue
+
+            if len(target) == 0:
+                target = 'vvl::Extension::Empty'
+            elif 'VERSION' in target:
+                target = f'vvl::Version::_{target}'
+            else:
+                target = f'vvl::Extension::_{target}'
+
+            out.append(f'    {{vvl::Extension::_{extension.name}, {{{reason}, {{{target}}}}}}},\n')
+        out.append('''    };
+
+                auto it = deprecated_extensions.find(extension_name);
+                return (it == deprecated_extensions.end()) ? empty_deprecated_data : it->second;
+            }
+
+            std::string GetSpecialUse(vvl::Extension extension_name) {
+                const vvl::unordered_map<vvl::Extension, std::string> special_use_extensions = {
+            ''')
+        for extension in self.vk.extensions.values():
+            if extension.specialUse is not None:
+                out.append(f'    {{vvl::Extension::_{extension.name}, "{", ".join(extension.specialUse)}"}},\n')
+        out.append('''    };
+
+                auto it = special_use_extensions.find(extension_name);
+                return (it == special_use_extensions.end()) ? "" : it->second;
+            }
+            ''')
+
         for command in [x for x in self.vk.commands.values() if x.name not in self.no_autogen_list]:
             paramList = [param.name for param in command.params]
             paramList.append('record_obj')

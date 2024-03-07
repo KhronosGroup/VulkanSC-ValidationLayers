@@ -1,7 +1,7 @@
-/* Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (C) 2015-2023 Google Inc.
+/* Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (C) 2015-2024 Google Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 #pragma once
-#include "state_tracker/base_node.h"
+#include "state_tracker/state_object.h"
 #include "state_tracker/fence_state.h"
 #include "state_tracker/semaphore_state.h"
 #include <condition_variable>
@@ -75,11 +75,11 @@ static inline std::chrono::time_point<std::chrono::steady_clock> GetCondWaitTime
     return std::chrono::steady_clock::now() + std::chrono::seconds(10);
 }
 
-class Queue: public BASE_NODE {
+class Queue: public StateObject {
   public:
     Queue(ValidationStateTracker &dev_data, VkQueue q, uint32_t index, VkDeviceQueueCreateFlags flags,
                 const VkQueueFamilyProperties &queueFamilyProperties)
-        : BASE_NODE(q, kVulkanObjectTypeQueue),
+        : StateObject(q, kVulkanObjectTypeQueue),
           queueFamilyIndex(index),
           flags(flags),
           queueFamilyProperties(queueFamilyProperties),
@@ -103,6 +103,18 @@ class Queue: public BASE_NODE {
     const uint32_t queueFamilyIndex;
     const VkDeviceQueueCreateFlags flags;
     const VkQueueFamilyProperties queueFamilyProperties;
+
+    // Track command buffer label stack accross all command buffers submitted to this queue.
+    // Access to this variable relies on external queue synchronization.
+    std::vector<std::string> cmdbuf_label_stack;
+
+    // Track the last closed label. It is used in the error messages to help locate unbalanced vkCmdEndDebugUtilsLabelEXT command.
+    // Access to this variable relies on external queue synchronization.
+    std::string last_closed_cmdbuf_label;
+
+    // Stop per-queue label tracking after the first label mismatch error.
+    // Access to this variable relies on external queue synchronization.
+    bool found_unbalanced_cmdbuf_label = false;
 
   private:
     using LockGuard = std::unique_lock<std::mutex>;

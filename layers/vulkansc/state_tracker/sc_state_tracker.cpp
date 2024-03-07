@@ -24,6 +24,8 @@
 #include "utils/vk_layer_utils.h"
 
 #include "generated/chassis.h"
+#include "state_tracker/device_state.h"
+#include "state_tracker/image_state.h"
 #include "vulkansc/state_tracker/sc_state_tracker.h"
 #include "core_checks/core_validation.h"
 
@@ -189,16 +191,19 @@ std::shared_ptr<vvl::PipelineCache> SCValidationStateTracker<BASE>::CreatePipeli
 
 template <typename BASE>
 std::shared_ptr<vvl::Pipeline> SCValidationStateTracker<BASE>::CreateGraphicsPipelineState(
-    const VkGraphicsPipelineCreateInfo *pCreateInfo, std::shared_ptr<const vvl::RenderPass> &&render_pass,
-    std::shared_ptr<const vvl::PipelineLayout> &&layout, CreateShaderModuleStates *csm_states) const {
-    return std::static_pointer_cast<vvl::Pipeline>(
-        std::make_shared<vvl::sc::Pipeline>(this, pCreateInfo, std::move(render_pass), std::move(layout), csm_states));
+    const VkGraphicsPipelineCreateInfo *pCreateInfo, std::shared_ptr<const vvl::PipelineCache> pipeline_cache,
+    std::shared_ptr<const vvl::RenderPass> &&render_pass, std::shared_ptr<const vvl::PipelineLayout> &&layout,
+    CreateShaderModuleStates *csm_states) const {
+    return std::static_pointer_cast<vvl::Pipeline>(std::make_shared<vvl::sc::Pipeline>(
+        this, pCreateInfo, std::move(pipeline_cache), std::move(render_pass), std::move(layout), csm_states));
 }
 
 template <typename BASE>
 std::shared_ptr<vvl::Pipeline> SCValidationStateTracker<BASE>::CreateComputePipelineState(
-    const VkComputePipelineCreateInfo *pCreateInfo, std::shared_ptr<const vvl::PipelineLayout> &&layout) const {
-    return std::static_pointer_cast<vvl::Pipeline>(std::make_shared<vvl::sc::Pipeline>(this, pCreateInfo, std::move(layout)));
+    const VkComputePipelineCreateInfo *pCreateInfo, std::shared_ptr<const vvl::PipelineCache> pipeline_cache,
+    std::shared_ptr<const vvl::PipelineLayout> &&layout) const {
+    return std::static_pointer_cast<vvl::Pipeline>(
+        std::make_shared<vvl::sc::Pipeline>(this, pCreateInfo, std::move(pipeline_cache), std::move(layout)));
 }
 
 template <typename BASE>
@@ -384,7 +389,7 @@ void SCValidationStateTracker<BASE>::PostCallRecordBeginCommandBuffer(VkCommandB
 
     auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
     if (cb_state) {
-        auto cp_state = Get<vvl::sc::CommandPool>(cb_state->command_pool->commandPool());
+        auto cp_state = Get<vvl::sc::CommandPool>(cb_state->command_pool->VkHandle());
         cp_state->command_buffers_recording++;
     }
 }
@@ -393,7 +398,7 @@ template <typename BASE>
 void SCValidationStateTracker<BASE>::PreCallRecordEndCommandBuffer(VkCommandBuffer commandBuffer, const RecordObject &record_obj) {
     auto cb_state = Get<vvl::CommandBuffer>(commandBuffer);
     if (cb_state) {
-        auto cp_state = Get<vvl::sc::CommandPool>(cb_state->command_pool->commandPool());
+        auto cp_state = Get<vvl::sc::CommandPool>(cb_state->command_pool->VkHandle());
         cp_state->command_buffers_recording--;
     }
 

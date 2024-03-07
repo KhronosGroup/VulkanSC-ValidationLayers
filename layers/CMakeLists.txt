@@ -1,7 +1,7 @@
 # ~~~
-# Copyright (c) 2014-2023 Valve Corporation
-# Copyright (c) 2014-2023 LunarG, Inc.
-# Copyright (c) 2023-2023 RasterGrid Kft.
+# Copyright (c) 2014-2024 Valve Corporation
+# Copyright (c) 2014-2024 LunarG, Inc.
+# Copyright (c) 2023-2024 RasterGrid Kft.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -32,10 +32,13 @@ target_sources(VkLayer_utils PRIVATE
     error_message/logging.cpp
     error_message/error_location.cpp
     error_message/error_location.h
+    error_message/error_strings.h
     error_message/record_object.h
     external/xxhash.h
     ${API_TYPE}/generated/error_location_helper.cpp
     ${API_TYPE}/generated/error_location_helper.h
+    ${API_TYPE}/generated/feature_requirements_helper.cpp
+    ${API_TYPE}/generated/feature_requirements_helper.h
     ${API_TYPE}/generated/pnext_chain_extraction.cpp
     ${API_TYPE}/generated/pnext_chain_extraction.h
     ${API_TYPE}/generated/vk_function_pointers.cpp
@@ -43,6 +46,7 @@ target_sources(VkLayer_utils PRIVATE
     ${API_TYPE}/generated/vk_validation_error_messages.h
     ${API_TYPE}/generated/vk_layer_dispatch_table.h
     ${API_TYPE}/generated/vk_dispatch_table_helper.h
+    ${API_TYPE}/generated/vk_dispatch_table_helper.cpp
     ${API_TYPE}/generated/vk_safe_struct.h
     ${API_TYPE}/generated/vk_safe_struct_utils.cpp
     ${API_TYPE}/generated/vk_safe_struct_core.cpp
@@ -50,8 +54,10 @@ target_sources(VkLayer_utils PRIVATE
     ${API_TYPE}/generated/vk_safe_struct_ext.cpp
     ${API_TYPE}/generated/vk_safe_struct_vendor.cpp
     ${API_TYPE}/generated/vk_object_types.h
+    ${API_TYPE}/generated/vk_object_types.cpp
     ${API_TYPE}/generated/vk_api_version.h
     ${API_TYPE}/generated/vk_extension_helper.h
+    ${API_TYPE}/generated/vk_extension_helper.cpp
     utils/cast_utils.h
     utils/convert_utils.cpp
     utils/convert_utils.h
@@ -113,6 +119,8 @@ elseif(MSVC)
     )
 endif()
 
+add_subdirectory(gpu_validation/spirv)
+
 add_library(vvl MODULE)
 
 target_sources(vvl PRIVATE
@@ -120,6 +128,7 @@ target_sources(vvl PRIVATE
     best_practices/best_practices_utils.cpp
     best_practices/bp_buffer.cpp
     best_practices/bp_cmd_buffer.cpp
+    best_practices/bp_cmd_buffer_nv.cpp
     best_practices/bp_copy_blit_resolve.cpp
     best_practices/bp_descriptor.cpp
     best_practices/bp_device_memory.cpp
@@ -130,6 +139,7 @@ target_sources(vvl PRIVATE
     best_practices/bp_pipeline.cpp
     best_practices/bp_ray_tracing.cpp
     best_practices/bp_render_pass.cpp
+    best_practices/bp_state.h
     best_practices/bp_synchronization.cpp
     best_practices/bp_video.cpp
     best_practices/bp_wsi.cpp
@@ -170,7 +180,6 @@ target_sources(vvl PRIVATE
     core_checks/cc_ycbcr.cpp
     drawdispatch/descriptor_validator.cpp
     drawdispatch/drawdispatch_vuids.cpp
-    error_message/validation_error_enums.h
     external/vma/vma.h
     external/vma/vma.cpp
     ${API_TYPE}/generated/best_practices.cpp
@@ -178,6 +187,7 @@ target_sources(vvl PRIVATE
     ${API_TYPE}/generated/chassis.cpp
     ${API_TYPE}/generated/valid_enum_values.cpp
     ${API_TYPE}/generated/valid_enum_values.h
+    ${API_TYPE}/generated/valid_flag_values.cpp
     ${API_TYPE}/generated/command_validation.cpp
     ${API_TYPE}/generated/dynamic_state_helper.cpp
     ${API_TYPE}/generated/dynamic_state_helper.h
@@ -216,6 +226,8 @@ target_sources(vvl PRIVATE
     gpu_validation/gpu_subclasses.cpp
     gpu_validation/gpu_subclasses.h
     gpu_validation/gpu_record.cpp
+    gpu_validation/gpu_resources.h
+    gpu_validation/gpu_settings.h
     gpu_validation/gpu_setup.cpp
     gpu_validation/gpu_validation.cpp
     gpu_validation/gpu_validation.h
@@ -224,8 +236,6 @@ target_sources(vvl PRIVATE
     gpu_shaders/gpu_shaders_constants.h
     object_tracker/object_lifetime_validation.h
     object_tracker/object_tracker_utils.cpp
-    state_tracker/base_node.cpp
-    state_tracker/base_node.h
     state_tracker/buffer_state.cpp
     state_tracker/buffer_state.h
     state_tracker/cmd_buffer_state.cpp
@@ -250,6 +260,8 @@ target_sources(vvl PRIVATE
     state_tracker/query_state.h
     state_tracker/semaphore_state.cpp
     state_tracker/semaphore_state.h
+    state_tracker/state_object.cpp
+    state_tracker/state_object.h
     state_tracker/queue_state.cpp
     state_tracker/queue_state.h
     state_tracker/ray_tracing_state.h
@@ -264,6 +276,8 @@ target_sources(vvl PRIVATE
     state_tracker/shader_object_state.h
     state_tracker/state_tracker.cpp
     state_tracker/state_tracker.h
+    state_tracker/vertex_index_buffer_state.cpp
+    state_tracker/vertex_index_buffer_state.h
     state_tracker/video_session_state.cpp
     state_tracker/video_session_state.h
     stateless/sl_buffer.cpp
@@ -291,6 +305,7 @@ target_sources(vvl PRIVATE
     sync/sync_commandbuffer.h
     sync/sync_common.cpp
     sync/sync_common.h
+    sync/sync_image.h
     sync/sync_op.cpp
     sync/sync_op.h
     sync/sync_renderpass.cpp
@@ -322,7 +337,6 @@ if(VULKANSC)
 
     target_sources(vvl PRIVATE
         vulkansc/sc_vuid_enums.h
-        vulkansc/sc_chassis_helper.cpp
         vulkansc/core_checks/sc_core_validation.cpp
         vulkansc/core_checks/sc_core_validation.h
         vulkansc/core_checks/sc_removed_command_validation.cpp
@@ -342,6 +356,7 @@ if(MSVC)
 elseif(MINGW)
     target_sources(vvl PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/${LAYER_NAME}.def)
     target_compile_options(vvl PRIVATE -Wa,-mbig-obj)
+    set_target_properties(vvl PROPERTIES PREFIX "") # remove the prefix "lib" so the manifest json "library_path" matches
 elseif(APPLE)
     set_target_properties(vvl PROPERTIES SUFFIX ".dylib")
     target_link_options(vvl PRIVATE -exported_symbols_list ${CMAKE_CURRENT_SOURCE_DIR}/${LAYER_NAME}.exp)
@@ -374,6 +389,7 @@ target_link_libraries(vvl PRIVATE
     SPIRV-Headers::SPIRV-Headers
     SPIRV-Tools-opt
     SPIRV-Tools-link
+    gpu_av_spirv
     VkLayer_utils
 )
 
@@ -389,6 +405,9 @@ if (ANDROID)
 
     # Required for __android_log_print. Marking as PUBLIC since the tests use __android_log_print as well.
     target_link_libraries(VkLayer_utils PUBLIC log)
+
+    # Required for AHardwareBuffer_describe. Marking as PUBLIC since the tests use AHardwareBuffer_describe as well.
+    target_link_libraries(VkLayer_utils PUBLIC android)
 
     install(TARGETS vvl DESTINATION ${CMAKE_INSTALL_LIBDIR})
 

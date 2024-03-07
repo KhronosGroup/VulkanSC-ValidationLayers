@@ -97,19 +97,16 @@ def BuildVVL(config, cmake_args, build_tests):
 
 #
 # Prepare Loader for executing Layer Validation Tests
-def BuildLoader():
-    LOADER_DIR = RepoRelative(os.path.join("%s/VulkanSC-Loader" % EXTERNAL_DIR_NAME))
-    # Clone Loader repo
-    if not os.path.exists(LOADER_DIR):
-        print("Clone Loader Source Code")
-        clone_loader_cmd = 'git clone https://github.com/KhronosGroup/VulkanSC-Loader.git'
-        RunShellCmd(clone_loader_cmd, EXTERNAL_DIR_NAME)
+def BuildLoader(config):
+    SRC_DIR = RepoRelative(os.path.join(externalDir(config), 'Vulkan-Loader'))
+    BUILD_DIR = os.path.join(SRC_DIR, 'build')
+
+    if not os.path.exists(SRC_DIR):
+        print("Unable to find VulkanSC-Loader")
+        sys.exit(1)
 
     print("Run CMake for Loader")
-    LOADER_BUILD_DIR = RepoRelative("%s/VulkanSC-Loader/%s" % (EXTERNAL_DIR_NAME, BUILD_DIR_NAME))
-
-    print("Run CMake for Loader")
-    cmake_cmd = f'cmake -S {LOADER_DIR} -B {LOADER_BUILD_DIR} '
+    cmake_cmd = f'cmake -S {SRC_DIR} -B {BUILD_DIR} '
     cmake_cmd += '-D UPDATE_DEPS=ON -D BUILD_TESTS=OFF -D CMAKE_BUILD_TYPE=Release'
     cmake_cmd += ' -D VULKANSC=ON'
     # This enables better stack traces from leak sanitizer by using the loader feature which prevents unloading of libraries at shutdown.
@@ -118,40 +115,35 @@ def BuildLoader():
     RunShellCmd(cmake_cmd)
 
     print("Build Loader")
-    build_cmd = f'cmake --build {LOADER_BUILD_DIR}'
+    build_cmd = f'cmake --build {BUILD_DIR}'
     RunShellCmd(build_cmd)
 
     print("Install Loader")
-    install_cmd = f'cmake --install {LOADER_BUILD_DIR} --prefix {TEST_INSTALL_DIR}'
+    install_cmd = f'cmake --install {BUILD_DIR} --prefix {TEST_INSTALL_DIR}'
     RunShellCmd(install_cmd)
 
 #
-# Prepare Mock ICD for use with Layer Validation Tests
-def BuildMockICD():
-    VT_DIR = RepoRelative("%s/VulkanSC-Tools" % EXTERNAL_DIR_NAME)
-    if not os.path.exists(VT_DIR):
-        print("Clone VulkanSC-Tools Repository")
-        clone_tools_cmd = 'git clone https://github.com/KhronosGroup/VulkanSC-Tools.git'
-        RunShellCmd(clone_tools_cmd, EXTERNAL_DIR_NAME)
+# Prepare Mock ICD and device simulation layer for use with Layer Validation Tests
+def BuildTools(config):
+    SRC_DIR = RepoRelative(os.path.join(externalDir(config), 'Vulkan-Tools'))
+    BUILD_DIR = os.path.join(SRC_DIR, 'build')
 
-    ICD_BUILD_DIR = RepoRelative("%s/VulkanSC-Tools/%s" % (EXTERNAL_DIR_NAME,BUILD_DIR_NAME))
+    if not os.path.exists(SRC_DIR):
+        print("Unable to find VulkanSC-Tools")
+        sys.exit(1)
 
-    print("Running update_deps.py for ICD")
-    RunShellCmd(f'python3 scripts/update_deps.py --api vulkansc --dir {EXTERNAL_DIR_NAME} --config release', VT_DIR)
-
-    print("Run CMake for ICD")
-    cmake_cmd = f'cmake -S {VT_DIR} -B {ICD_BUILD_DIR} -D CMAKE_BUILD_TYPE=Release '
-    cmake_cmd += '-DBUILD_CUBE=NO -DBUILD_VULKANINFO=NO -D INSTALL_ICD=ON '
-    cmake_cmd += f'-C {VT_DIR}/{EXTERNAL_DIR_NAME}/helper.cmake'
+    print("Run CMake for Tools")
+    cmake_cmd = f'cmake -S {SRC_DIR} -B {BUILD_DIR} -D CMAKE_BUILD_TYPE=Release '
+    cmake_cmd += '-DBUILD_CUBE=NO -DBUILD_VULKANINFO=NO -D INSTALL_ICD=ON -D UPDATE_DEPS=ON'
     cmake_cmd += f' -D VULKANSC=ON -D BUILD_VKSC_DEVSIM=ON'
     RunShellCmd(cmake_cmd)
 
-    print("Build Mock ICD")
-    build_cmd = f'cmake --build {ICD_BUILD_DIR}'
+    print("Build Tools")
+    build_cmd = f'cmake --build {BUILD_DIR}'
     RunShellCmd(build_cmd)
 
-    print("Install Mock ICD")
-    install_cmd = f'cmake --install {ICD_BUILD_DIR} --prefix {TEST_INSTALL_DIR}'
+    print("Install Tools")
+    install_cmd = f'cmake --install {BUILD_DIR} --prefix {TEST_INSTALL_DIR}'
     RunShellCmd(install_cmd)
 
 #
@@ -201,9 +193,9 @@ def Build(args):
 
 def Test(args):
     try:
-        BuildLoader()
-        BuildMockICD()
-        RunVVLTests(config = args.config)
+        BuildLoader(args.config)
+        BuildTools(args.config)
+        RunVVLTests(args.config)
 
     except subprocess.CalledProcessError as proc_error:
         print('Command "%s" failed with return code %s' % (' '.join(proc_error.cmd), proc_error.returncode))

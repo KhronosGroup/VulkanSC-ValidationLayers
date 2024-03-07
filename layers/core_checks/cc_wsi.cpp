@@ -1,7 +1,7 @@
-/* Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (C) 2015-2023 Google Inc.
+/* Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (C) 2015-2024 Google Inc.
  * Modifications Copyright (C) 2020-2022 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,6 +25,9 @@
 #include <vulkan/vk_enum_string_helper.h>
 #include "generated/chassis.h"
 #include "core_validation.h"
+#include "error_message/error_strings.h"
+#include "state_tracker/image_state.h"
+#include "state_tracker/device_state.h"
 
 static bool IsExtentInsideBounds(VkExtent2D extent, VkExtent2D min, VkExtent2D max) {
     if ((extent.width < min.width) || (extent.width > max.width) || (extent.height < min.height) || (extent.height > max.height)) {
@@ -129,15 +132,12 @@ bool CoreChecks::ValidateSwapchainPresentScalingCreateInfo(VkPresentModeKHR pres
     auto pres_scale_ci = vku::FindStructInPNextChain<VkSwapchainPresentScalingCreateInfoEXT>(create_info->pNext);
     if ((!pres_scale_ci) || (pres_scale_ci && (pres_scale_ci->scalingBehavior == 0))) {
         if (!IsExtentInsideBounds(create_info->imageExtent, capabilities->minImageExtent, capabilities->maxImageExtent)) {
-            skip |= LogError("VUID-VkSwapchainCreateInfoKHR-pNext-07781", device, create_info_loc.dot(Field::imageExtent),
-                             "(%" PRIu32 ",%" PRIu32
-                             "), which is outside the bounds returned by "
-                             "vkGetPhysicalDeviceSurfaceCapabilitiesKHR(): currentExtent = (%" PRIu32 ",%" PRIu32
-                             "), minImageExtent = (%" PRIu32 ",%" PRIu32 "), maxImageExtent = (%" PRIu32 ",%" PRIu32 ").",
-                             create_info->imageExtent.width, create_info->imageExtent.height, capabilities->currentExtent.width,
-                             capabilities->currentExtent.height, capabilities->minImageExtent.width,
-                             capabilities->minImageExtent.height, capabilities->maxImageExtent.width,
-                             capabilities->maxImageExtent.height);
+            skip |= LogError(
+                "VUID-VkSwapchainCreateInfoKHR-pNext-07781", device, create_info_loc.dot(Field::imageExtent),
+                "(%s), which is outside the bounds returned by "
+                "vkGetPhysicalDeviceSurfaceCapabilitiesKHR(): currentExtent = (%s), minImageExtent = (%s), maxImageExtent = (%s).",
+                string_VkExtent2D(create_info->imageExtent).c_str(), string_VkExtent2D(capabilities->currentExtent).c_str(),
+                string_VkExtent2D(capabilities->minImageExtent).c_str(), string_VkExtent2D(capabilities->maxImageExtent).c_str());
         }
     }
 
@@ -231,12 +231,12 @@ bool CoreChecks::ValidateSwapchainPresentScalingCreateInfo(VkPresentModeKHR pres
             (!IsExtentInsideBounds(create_info->imageExtent, scaling_caps.minScaledImageExtent,
                                    scaling_caps.maxScaledImageExtent))) {
             if (LogError("VUID-VkSwapchainCreateInfoKHR-pNext-07782", device, create_info_loc.dot(Field::imageExtent),
-                         "(%" PRIu32 ",%" PRIu32 "), which is outside the bounds returned in "
-                         "VkSurfacePresentScalingCapabilitiesEXT minScaledImageExtent = (%" PRIu32 ",%" PRIu32 "), "
-                         "maxScaledImageExtent = (%" PRIu32 ",%" PRIu32 ").",
-                         create_info->imageExtent.width, create_info->imageExtent.height, scaling_caps.minScaledImageExtent.width,
-                         scaling_caps.minScaledImageExtent.height, scaling_caps.maxScaledImageExtent.width,
-                         scaling_caps.maxScaledImageExtent.height)) {
+                         "(%s), which is outside the bounds returned in "
+                         "VkSurfacePresentScalingCapabilitiesEXT minScaledImageExtent = (%s), "
+                         "maxScaledImageExtent = (%s).",
+                         string_VkExtent2D(create_info->imageExtent).c_str(),
+                         string_VkExtent2D(scaling_caps.minScaledImageExtent).c_str(),
+                         string_VkExtent2D(scaling_caps.maxScaledImageExtent).c_str())) {
                 skip |= true;
             }
         }
@@ -298,7 +298,7 @@ bool CoreChecks::ValidateCreateSwapchain(VkSwapchainCreateInfoKHR const *pCreate
                                          const vvl::Swapchain *old_swapchain_state, const Location &create_info_loc) const {
     // All physical devices and queue families are required to be able to present to any native window on Android; require the
     // application to have established support on any other platform.
-    if (!instance_extensions.vk_khr_android_surface) {
+    if (!IsExtEnabled(instance_extensions.vk_khr_android_surface)) {
         // restrict search only to queue families of VkDeviceQueueCreateInfos, not the whole physical device
         const bool is_supported = AnyOf<vvl::Queue>([this, surface_state](const vvl::Queue &queue_state) {
             return surface_state->GetQueueSupport(physical_device, queue_state.queueFamilyIndex);
@@ -330,7 +330,7 @@ bool CoreChecks::ValidateCreateSwapchain(VkSwapchainCreateInfoKHR const *pCreate
 
     if ((pCreateInfo->imageExtent.width == 0) || (pCreateInfo->imageExtent.height == 0)) {
         if (LogError("VUID-VkSwapchainCreateInfoKHR-imageExtent-01689", device, create_info_loc.dot(Field::imageExtent),
-                     "width (%d) and height (%d) is invalid.", pCreateInfo->imageExtent.width, pCreateInfo->imageExtent.height)) {
+                     "(%s) is invalid.", string_VkExtent2D(pCreateInfo->imageExtent).c_str())) {
             return true;
         }
     }
@@ -372,12 +372,12 @@ bool CoreChecks::ValidateCreateSwapchain(VkSwapchainCreateInfoKHR const *pCreate
 
     const auto surface_caps2 =
         surface_state->GetCapabilities(IsExtEnabled(instance_extensions.vk_khr_get_surface_capabilities2),
-                                       physical_device_state->PhysDev(), surface_caps_query_pnext, create_info_loc, this);
+                                       physical_device_state->VkHandle(), surface_caps_query_pnext, create_info_loc, this);
 
     bool skip = false;
     VkSurfaceTransformFlagBitsKHR current_transform = surface_caps2.surfaceCapabilities.currentTransform;
     if ((pCreateInfo->preTransform & current_transform) != pCreateInfo->preTransform) {
-        skip |= LogPerformanceWarning(kVUID_Core_Swapchain_PreTransform, physical_device, create_info_loc.dot(Field::preTransform),
+        skip |= LogPerformanceWarning("WARNING-Swapchain-PreTransform", physical_device, create_info_loc.dot(Field::preTransform),
                                       "(%s) doesn't match the currentTransform (%s) returned by "
                                       "vkGetPhysicalDeviceSurfaceCapabilitiesKHR, the presentation engine will transform the image "
                                       "content as part of the presentation operation.",
@@ -470,7 +470,7 @@ bool CoreChecks::ValidateCreateSwapchain(VkSwapchainCreateInfoKHR const *pCreate
             VkSurfaceProtectedCapabilitiesKHR surface_protected_capabilities = vku::InitStructHelper();
             VkSurfaceCapabilities2KHR surface_capabilities =
                 vku::InitStructHelper(&surface_protected_capabilities);
-            const VkResult result = DispatchGetPhysicalDeviceSurfaceCapabilities2KHR(physical_device_state->PhysDev(),
+            const VkResult result = DispatchGetPhysicalDeviceSurfaceCapabilities2KHR(physical_device_state->VkHandle(),
                                                                                      &surface_info, &surface_capabilities);
 
             log_error = (result == VK_SUCCESS) && !surface_protected_capabilities.supportsProtected;
@@ -495,7 +495,7 @@ bool CoreChecks::ValidateCreateSwapchain(VkSwapchainCreateInfoKHR const *pCreate
         vvl::span<const safe_VkSurfaceFormat2KHR> formats{};
         if (surface_state) {
             formats = surface_state->GetFormats(IsExtEnabled(instance_extensions.vk_khr_get_surface_capabilities2),
-                                                physical_device_state->PhysDev(), surface_caps_query_pnext, create_info_loc, this);
+                                                physical_device_state->VkHandle(), surface_caps_query_pnext, create_info_loc, this);
         } else if (IsExtEnabled(instance_extensions.vk_google_surfaceless_query)) {
             formats = physical_device_state->surfaceless_query_state.formats;
         }
@@ -536,7 +536,7 @@ bool CoreChecks::ValidateCreateSwapchain(VkSwapchainCreateInfoKHR const *pCreate
             safe_VkSurfaceCapabilities2KHR cached_capabilities{};
             if (surface_state) {
                 cached_capabilities = surface_state->GetCapabilities(
-                    IsExtEnabled(instance_extensions.vk_khr_get_surface_capabilities2), physical_device_state->PhysDev(),
+                    IsExtEnabled(instance_extensions.vk_khr_get_surface_capabilities2), physical_device_state->VkHandle(),
                     surface_caps_query_pnext, create_info_loc, this);
             } else if (IsExtEnabled(instance_extensions.vk_google_surfaceless_query)) {
                 cached_capabilities = physical_device_state->surfaceless_query_state.capabilities;
@@ -544,17 +544,14 @@ bool CoreChecks::ValidateCreateSwapchain(VkSwapchainCreateInfoKHR const *pCreate
             if (!IsExtentInsideBounds(pCreateInfo->imageExtent, cached_capabilities.surfaceCapabilities.minImageExtent,
                                       cached_capabilities.surfaceCapabilities.maxImageExtent)) {
                 // TODO - Combine VUs with other same VUID
-                skip |= LogError(
-                    "VUID-VkSwapchainCreateInfoKHR-pNext-07781", device, create_info_loc.dot(Field::imageExtent),
-                    "(%" PRIu32 ", %" PRIu32
-                    "), which is outside the bounds returned by "
-                    "vkGetPhysicalDeviceSurfaceCapabilitiesKHR(): currentExtent = (%" PRIu32 ",%" PRIu32
-                    "), minImageExtent = (%" PRIu32 ",%" PRIu32 "), maxImageExtent = (%" PRIu32 ",%" PRIu32 ").",
-                    pCreateInfo->imageExtent.width, pCreateInfo->imageExtent.height,
-                    surface_caps2.surfaceCapabilities.currentExtent.width, surface_caps2.surfaceCapabilities.currentExtent.height,
-                    surface_caps2.surfaceCapabilities.minImageExtent.width, surface_caps2.surfaceCapabilities.minImageExtent.height,
-                    surface_caps2.surfaceCapabilities.maxImageExtent.width,
-                    surface_caps2.surfaceCapabilities.maxImageExtent.height);
+                skip |= LogError("VUID-VkSwapchainCreateInfoKHR-pNext-07781", device, create_info_loc.dot(Field::imageExtent),
+                                 "(%s), which is outside the bounds returned by "
+                                 "vkGetPhysicalDeviceSurfaceCapabilitiesKHR(): currentExtent = (%s), minImageExtent = (%s), "
+                                 "maxImageExtent = (%s).",
+                                 string_VkExtent2D(pCreateInfo->imageExtent).c_str(),
+                                 string_VkExtent2D(surface_caps2.surfaceCapabilities.currentExtent).c_str(),
+                                 string_VkExtent2D(surface_caps2.surfaceCapabilities.minImageExtent).c_str(),
+                                 string_VkExtent2D(surface_caps2.surfaceCapabilities.maxImageExtent).c_str());
             }
         }
     } else {
@@ -564,14 +561,7 @@ bool CoreChecks::ValidateCreateSwapchain(VkSwapchainCreateInfoKHR const *pCreate
     }
     // Validate state for shared presentable case
     if (shared_present_mode) {
-        if (!IsExtEnabled(device_extensions.vk_khr_shared_presentable_image)) {
-            if (LogError(kVUID_Core_DrawState_ExtensionNotEnabled, device, create_info_loc,
-                         "called with presentMode %s which requires the VK_KHR_shared_presentable_image extension, which has not "
-                         "been enabled.",
-                         string_VkPresentModeKHR(present_mode))) {
-                return true;
-            }
-        } else if (pCreateInfo->minImageCount != 1) {
+        if (pCreateInfo->minImageCount != 1) {
             if (LogError("VUID-VkSwapchainCreateInfoKHR-minImageCount-01383", device, create_info_loc,
                          "called with presentMode %s, but minImageCount value is %d. For shared presentable image, minImageCount "
                          "must be 1.",
@@ -584,7 +574,7 @@ bool CoreChecks::ValidateCreateSwapchain(VkSwapchainCreateInfoKHR const *pCreate
         VkSurfaceCapabilities2KHR capabilities2 = vku::InitStructHelper(&shared_present_capabilities);
         VkPhysicalDeviceSurfaceInfo2KHR surface_info = vku::InitStructHelper();
         surface_info.surface = pCreateInfo->surface;
-        DispatchGetPhysicalDeviceSurfaceCapabilities2KHR(physical_device_state->PhysDev(), &surface_info, &capabilities2);
+        DispatchGetPhysicalDeviceSurfaceCapabilities2KHR(physical_device_state->VkHandle(), &surface_info, &capabilities2);
 
         if (image_usage != (image_usage & shared_present_capabilities.sharedPresentSupportedUsageFlags)) {
             if (LogError("VUID-VkSwapchainCreateInfoKHR-imageUsage-01384", device, create_info_loc.dot(Field::imageUsage),
@@ -688,11 +678,11 @@ bool CoreChecks::ValidateCreateSwapchain(VkSwapchainCreateInfoKHR const *pCreate
     if ((pCreateInfo->imageExtent.width > image_properties.maxExtent.width) ||
         (pCreateInfo->imageExtent.height > image_properties.maxExtent.height)) {
         if (LogError("VUID-VkSwapchainCreateInfoKHR-imageFormat-01778", device, create_info_loc.dot(Field::imageExtent),
-                     "(%d,%d), which is bigger than max extent (%d,%d)"
+                     "(%s), which is bigger than max extent (%s)"
                      "returned by vkGetPhysicalDeviceImageFormatProperties(): "
                      "for imageFormat %s with tiling VK_IMAGE_TILING_OPTIMAL.",
-                     pCreateInfo->imageExtent.width, pCreateInfo->imageExtent.height, image_properties.maxExtent.width,
-                     image_properties.maxExtent.height, string_VkFormat(pCreateInfo->imageFormat))) {
+                     string_VkExtent2D(pCreateInfo->imageExtent).c_str(), string_VkExtent3D(image_properties.maxExtent).c_str(),
+                     string_VkFormat(pCreateInfo->imageFormat))) {
             return true;
         }
     }
@@ -734,7 +724,7 @@ void CoreChecks::PreCallRecordDestroySwapchainKHR(VkDevice device, VkSwapchainKH
         if (swapchain_data) {
             for (const auto &swapchain_image : swapchain_data->images) {
                 if (!swapchain_image.image_state) continue;
-                qfo_release_image_barrier_map.erase(swapchain_image.image_state->image());
+                qfo_release_image_barrier_map.erase(swapchain_image.image_state->VkHandle());
             }
         }
     }
@@ -814,18 +804,18 @@ bool CoreChecks::ValidateImageAcquireWait(const vvl::SwapchainImage &swapchain_i
 
         const Location image_index_loc = present_info_loc.dot(Field::pImageIndices, image_index);
         if (semaphore && fence) {
-            const LogObjectList objlist(swapchain_image.image_state->image(), semaphore->Handle(), fence->Handle());
+            const LogObjectList objlist(swapchain_image.image_state->VkHandle(), semaphore->Handle(), fence->Handle());
             skip |= LogError(missing_acquire_wait_vuid, objlist, image_index_loc,
                              "was acquired with a semaphore %s and fence %s and neither of them have since been waited on",
                              FormatHandle(semaphore->Handle()).c_str(), FormatHandle(fence->Handle()).c_str());
         } else if (semaphore) {
-            const LogObjectList objlist(swapchain_image.image_state->image(), semaphore->Handle());
+            const LogObjectList objlist(swapchain_image.image_state->VkHandle(), semaphore->Handle());
             skip |= LogError(missing_acquire_wait_vuid, objlist, image_index_loc,
                              "was acquired with a semaphore %s that has not since been waited on",
                              FormatHandle(semaphore->Handle()).c_str());
         } else {
             assert(fence != nullptr);  // if both fence and semaphore are not provided we have an early exit
-            const LogObjectList objlist(swapchain_image.image_state->image(), fence->Handle());
+            const LogObjectList objlist(swapchain_image.image_state->VkHandle(), fence->Handle());
             skip |=
                 LogError(missing_acquire_wait_vuid, objlist, image_index_loc,
                          "was acquired with a fence %s that has not since been waited on", FormatHandle(fence->Handle()).c_str());
@@ -893,14 +883,11 @@ bool CoreChecks::PreCallValidateQueuePresentKHR(VkQueue queue, const VkPresentIn
                             image_state->createInfo.extent.width ||
                         display_present_info->srcRect.offset.y + display_present_info->srcRect.extent.height >
                             image_state->createInfo.extent.height) {
-                        skip |= LogError("VUID-VkDisplayPresentInfoKHR-srcRect-01257", queue, swapchain_loc,
-                                         "vkQueuePresentKHR(): VkDisplayPresentInfoKHR::srcRect (offset (%" PRIu32 ", %" PRIu32
-                                         "), extent (%" PRIu32 ", %" PRIu32
-                                         ")) in the pNext chain of VkPresentInfoKHR is not a subset of the image begin presented "
-                                         "(extent (%" PRIu32 ", %" PRIu32 ")).",
-                                         display_present_info->srcRect.offset.x, display_present_info->srcRect.offset.y,
-                                         display_present_info->srcRect.extent.width, display_present_info->srcRect.extent.height,
-                                         image_state->createInfo.extent.width, image_state->createInfo.extent.height);
+                        skip |= LogError("VUID-VkDisplayPresentInfoKHR-srcRect-01257", queue,
+                                         present_info_loc.pNext(Struct::VkDisplayPresentInfoKHR, Field::srcRect),
+                                         "(%s) is not a subset of the image begin presented extent (%s).",
+                                         string_VkRect2D(display_present_info->srcRect).c_str(),
+                                         string_VkExtent3D(image_state->createInfo.extent).c_str());
                     }
                 }
 
@@ -910,7 +897,7 @@ bool CoreChecks::PreCallValidateQueuePresentKHR(VkQueue queue, const VkPresentIn
             }
 
             // All physical devices and queue families are required to be able to present to any native window on Android
-            if (!instance_extensions.vk_khr_android_surface) {
+            if (!IsExtEnabled(instance_extensions.vk_khr_android_surface)) {
                 auto surface_state = Get<vvl::Surface>(swapchain_data->createInfo.surface);
                 if (!surface_state->GetQueueSupport(physical_device, queue_state->queueFamilyIndex)) {
                     skip |= LogError("VUID-vkQueuePresentKHR-pSwapchains-01292", pPresentInfo->pSwapchains[i], swapchain_loc,
@@ -1135,6 +1122,11 @@ bool CoreChecks::ValidateAcquireNextImage(VkDevice device, VkSwapchainKHR swapch
                 const char *vuid =
                     version_2 ? "VUID-VkAcquireNextImageInfoKHR-semaphore-01288" : "VUID-vkAcquireNextImageKHR-semaphore-01286";
                 skip |= LogError(vuid, semaphore, loc, "Semaphore must not be currently signaled.");
+            }
+            if (semaphore_state->InUse()) {
+                const char *vuid =
+                    version_2 ? "VUID-VkAcquireNextImageInfoKHR-semaphore-01781" : "VUID-vkAcquireNextImageKHR-semaphore-01779";
+                skip |= LogError(vuid, semaphore, loc, "Semaphore must not have any pending operations.");
             }
         }
     }

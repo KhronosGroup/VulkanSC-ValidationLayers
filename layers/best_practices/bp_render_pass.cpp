@@ -1,6 +1,6 @@
-/* Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
+/* Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  * Modifications Copyright (C) 2022 RasterGrid Kft.
  *
@@ -19,6 +19,8 @@
 
 #include "best_practices/best_practices_validation.h"
 #include "best_practices/best_practices_error_enums.h"
+#include "error_message/error_strings.h"
+#include "best_practices/bp_state.h"
 
 static inline bool RenderPassUsesAttachmentAsResolve(const safe_VkRenderPassCreateInfo2& createInfo, uint32_t attachment) {
     for (uint32_t subpass = 0; subpass < createInfo.subpassCount; subpass++) {
@@ -176,7 +178,7 @@ bool BestPractices::ValidateCmdBeginRenderPass(VkCommandBuffer commandBuffer, co
         if (rp_state->createInfo.flags & VK_FRAMEBUFFER_CREATE_IMAGELESS_BIT) {
             const VkRenderPassAttachmentBeginInfo* rpabi = vku::FindStructInPNextChain<VkRenderPassAttachmentBeginInfo>(pRenderPassBegin->pNext);
             if (rpabi) {
-                skip = ValidateAttachments(rp_state->createInfo.ptr(), rpabi->attachmentCount, rpabi->pAttachments, loc);
+                skip |= ValidateAttachments(rp_state->createInfo.ptr(), rpabi->attachmentCount, rpabi->pAttachments, loc);
             }
         }
         // Check if any attachments have LOAD operation on them
@@ -206,11 +208,10 @@ bool BestPractices::ValidateCmdBeginRenderPass(VkCommandBuffer commandBuffer, co
                                           "%s %s: Attachment #%u in render pass has begun with VK_ATTACHMENT_LOAD_OP_LOAD.\n"
                                           "Submitting this renderpass will cause the driver to inject a readback of the attachment "
                                           "which will copy in total %u pixels (renderArea = "
-                                          "{ %" PRId32 ", %" PRId32 ", %" PRIu32 ", %" PRIu32 " }) to the tile buffer.",
+                                          "{ %s }) to the tile buffer.",
                                           VendorSpecificTag(kBPVendorArm), VendorSpecificTag(kBPVendorIMG), att,
                                           pRenderPassBegin->renderArea.extent.width * pRenderPassBegin->renderArea.extent.height,
-                                          pRenderPassBegin->renderArea.offset.x, pRenderPassBegin->renderArea.offset.y,
-                                          pRenderPassBegin->renderArea.extent.width, pRenderPassBegin->renderArea.extent.height);
+                                          string_VkRect2D(pRenderPassBegin->renderArea).c_str());
             }
         }
 
@@ -266,16 +267,32 @@ bool BestPractices::ValidateCmdBeginRenderPass(VkCommandBuffer commandBuffer, co
 bool BestPractices::ValidateCmdBeginRendering(VkCommandBuffer commandBuffer, const VkRenderingInfo* pRenderingInfo,
                                               const Location& loc) const {
     bool skip = false;
+    const Location rendering_info = loc.dot(Field::pRenderingInfo);
 
-    auto cmd_state = Get<bp_state::CommandBuffer>(commandBuffer);
-    assert(cmd_state);
+    for (uint32_t i = 0; i < pRenderingInfo->colorAttachmentCount; ++i) {
+        const auto& color_attachment = pRenderingInfo->pColorAttachments[i];
+        const Location color_attachment_info = rendering_info.dot(Field::pColorAttachments, i);
 
-    if (VendorCheckEnabled(kBPVendorNVIDIA)) {
-        for (uint32_t i = 0; i < pRenderingInfo->colorAttachmentCount; ++i) {
-            const auto& color_attachment = pRenderingInfo->pColorAttachments[i];
+        auto image_view_state = Get<vvl::ImageView>(color_attachment.imageView);
+        if (VendorCheckEnabled(kBPVendorNVIDIA)) {
             if (color_attachment.loadOp == VK_ATTACHMENT_LOAD_OP_CLEAR) {
-                const VkFormat format = Get<vvl::ImageView>(color_attachment.imageView)->create_info.format;
-                skip |= ValidateClearColor(commandBuffer, format, color_attachment.clearValue.color, loc);
+                const VkFormat format = image_view_state->create_info.format;
+                skip |= ValidateClearColor(commandBuffer, format, color_attachment.clearValue.color, color_attachment_info);
+            }
+        }
+
+        // Check if accidently set resolve mode to none since everything else looks like it should be resolving
+        if (color_attachment.resolveMode == VK_RESOLVE_MODE_NONE && color_attachment.resolveImageView != VK_NULL_HANDLE) {
+            auto resolve_image_view_state = Get<vvl::ImageView>(color_attachment.resolveImageView);
+            if (resolve_image_view_state && resolve_image_view_state->image_state->createInfo.samples == VK_SAMPLE_COUNT_1_BIT &&
+                image_view_state->image_state->createInfo.samples != VK_SAMPLE_COUNT_1_BIT) {
+                const LogObjectList objlist(commandBuffer, resolve_image_view_state->Handle(), image_view_state->Handle());
+                skip |= LogWarning(kVUID_BestPractices_RenderingInfo_ResolveModeNone, commandBuffer,
+                                   color_attachment_info.dot(Field::resolveMode),
+                                   "is VK_RESOLVE_MODE_NONE but resolveImageView is pointed to a valid VkImageView with "
+                                   "VK_SAMPLE_COUNT_1_BIT and imageView is pointed to a VkImageView with %s. If "
+                                   "VK_RESOLVE_MODE_NONE is set, the resolveImageView value is ignored.",
+                                   string_VkSampleCountFlagBits(image_view_state->image_state->createInfo.samples));
             }
         }
     }
@@ -287,9 +304,13 @@ void BestPractices::PreCallRecordCmdEndRenderPass(VkCommandBuffer commandBuffer,
     RecordCmdEndRenderingCommon(commandBuffer);
 
     ValidationStateTracker::PreCallRecordCmdEndRenderPass(commandBuffer, record_obj);
-    auto cb_node = GetWrite<bp_state::CommandBuffer>(commandBuffer);
-    if (cb_node) {
-        AddDeferredQueueOperations(*cb_node);
+    auto cb_state = GetWrite<bp_state::CommandBuffer>(commandBuffer);
+    if (cb_state) {
+        // Add Deferred Queue
+        cb_state->queue_submit_functions.insert(cb_state->queue_submit_functions.end(),
+                                                cb_state->queue_submit_functions_after_render_pass.begin(),
+                                                cb_state->queue_submit_functions_after_render_pass.end());
+        cb_state->queue_submit_functions_after_render_pass.clear();
     }
 }
 
@@ -298,9 +319,13 @@ void BestPractices::PreCallRecordCmdEndRenderPass2(VkCommandBuffer commandBuffer
     RecordCmdEndRenderingCommon(commandBuffer);
 
     ValidationStateTracker::PreCallRecordCmdEndRenderPass2(commandBuffer, pSubpassInfo, record_obj);
-    auto cb_node = GetWrite<bp_state::CommandBuffer>(commandBuffer);
-    if (cb_node) {
-        AddDeferredQueueOperations(*cb_node);
+    auto cb_state = GetWrite<bp_state::CommandBuffer>(commandBuffer);
+    if (cb_state) {
+        // Add Deferred Queue
+        cb_state->queue_submit_functions.insert(cb_state->queue_submit_functions.end(),
+                                                cb_state->queue_submit_functions_after_render_pass.begin(),
+                                                cb_state->queue_submit_functions_after_render_pass.end());
+        cb_state->queue_submit_functions_after_render_pass.clear();
     }
 }
 
@@ -356,26 +381,26 @@ void BestPractices::PostCallRecordCmdNextSubpass(VkCommandBuffer commandBuffer, 
     ValidationStateTracker::PostCallRecordCmdNextSubpass(commandBuffer, contents, record_obj);
     RecordCmdNextSubpass(commandBuffer);
 
-    auto cmd_state = GetWrite<bp_state::CommandBuffer>(commandBuffer);
-    auto rp = cmd_state->activeRenderPass.get();
+    auto cb_state = GetWrite<bp_state::CommandBuffer>(commandBuffer);
+    auto rp = cb_state->activeRenderPass.get();
     assert(rp);
 
     if (VendorCheckEnabled(kBPVendorNVIDIA)) {
         vvl::ImageView* depth_image_view = nullptr;
 
-        const auto depth_attachment = rp->createInfo.pSubpasses[cmd_state->GetActiveSubpass()].pDepthStencilAttachment;
+        const auto depth_attachment = rp->createInfo.pSubpasses[cb_state->GetActiveSubpass()].pDepthStencilAttachment;
         if (depth_attachment) {
             const uint32_t attachment_index = depth_attachment->attachment;
             if (attachment_index != VK_ATTACHMENT_UNUSED) {
-                depth_image_view = (*cmd_state->active_attachments)[attachment_index];
+                depth_image_view = (*cb_state->active_attachments)[attachment_index];
             }
         }
         if (depth_image_view && (depth_image_view->create_info.subresourceRange.aspectMask & VK_IMAGE_ASPECT_DEPTH_BIT) != 0U) {
-            const VkImage depth_image = depth_image_view->image_state->image();
+            const VkImage depth_image = depth_image_view->image_state->VkHandle();
             const VkImageSubresourceRange& subresource_range = depth_image_view->create_info.subresourceRange;
-            RecordBindZcullScope(*cmd_state, depth_image, subresource_range);
+            RecordBindZcullScope(*cb_state, depth_image, subresource_range);
         } else {
-            RecordUnbindZcullScope(*cmd_state);
+            RecordUnbindZcullScope(*cb_state);
         }
     }
 }
@@ -399,8 +424,8 @@ void BestPractices::RecordCmdBeginRenderPass(VkCommandBuffer commandBuffer, cons
             }
 
             // If renderpass doesn't load attachment, no need to validate image in queue
-            if ((!vkuFormatIsStencilOnly(attachment.format) && attachment.loadOp == VK_ATTACHMENT_LOAD_OP_NONE_EXT) ||
-                (vkuFormatHasStencil(attachment.format) && attachment.stencilLoadOp == VK_ATTACHMENT_LOAD_OP_NONE_EXT)) {
+            if ((!vkuFormatIsStencilOnly(attachment.format) && attachment.loadOp == VK_ATTACHMENT_LOAD_OP_NONE_KHR) ||
+                (vkuFormatHasStencil(attachment.format) && attachment.stencilLoadOp == VK_ATTACHMENT_LOAD_OP_NONE_KHR)) {
                 continue;
             }
 
@@ -472,10 +497,10 @@ void BestPractices::RecordCmdBeginRenderPass(VkCommandBuffer commandBuffer, cons
 }
 
 void BestPractices::RecordCmdBeginRenderingCommon(VkCommandBuffer commandBuffer) {
-    auto cmd_state = GetWrite<bp_state::CommandBuffer>(commandBuffer);
-    assert(cmd_state);
+    auto cb_state = GetWrite<bp_state::CommandBuffer>(commandBuffer);
+    assert(cb_state);
 
-    auto rp = cmd_state->activeRenderPass.get();
+    auto rp = cb_state->activeRenderPass.get();
     assert(rp);
 
     if (VendorCheckEnabled(kBPVendorNVIDIA)) {
@@ -507,45 +532,45 @@ void BestPractices::RecordCmdBeginRenderingCommon(VkCommandBuffer commandBuffer)
                         const uint32_t attachment_index = depth_attachment->attachment;
                         if (attachment_index != VK_ATTACHMENT_UNUSED) {
                             load_op.emplace(rp->createInfo.pAttachments[attachment_index].loadOp);
-                            depth_image_view = (*cmd_state->active_attachments)[attachment_index];
+                            depth_image_view = (*cb_state->active_attachments)[attachment_index];
                         }
                     }
                 }
-                for (uint32_t i = 0; i < cmd_state->active_render_pass_begin_info.clearValueCount; ++i) {
+                for (uint32_t i = 0; i < cb_state->active_render_pass_begin_info.clearValueCount; ++i) {
                     const auto& attachment = rp->createInfo.pAttachments[i];
                     if (attachment.loadOp == VK_ATTACHMENT_LOAD_OP_CLEAR) {
-                        const auto& clear_color = cmd_state->active_render_pass_begin_info.pClearValues[i].color;
+                        const auto& clear_color = cb_state->active_render_pass_begin_info.pClearValues[i].color;
                         RecordClearColor(attachment.format, clear_color);
                     }
                 }
             }
         }
         if (depth_image_view && (depth_image_view->create_info.subresourceRange.aspectMask & VK_IMAGE_ASPECT_DEPTH_BIT) != 0U) {
-            const VkImage depth_image = depth_image_view->image_state->image();
+            const VkImage depth_image = depth_image_view->image_state->VkHandle();
             const VkImageSubresourceRange& subresource_range = depth_image_view->create_info.subresourceRange;
-            RecordBindZcullScope(*cmd_state, depth_image, subresource_range);
+            RecordBindZcullScope(*cb_state, depth_image, subresource_range);
         } else {
-            RecordUnbindZcullScope(*cmd_state);
+            RecordUnbindZcullScope(*cb_state);
         }
         if (load_op) {
             if (*load_op == VK_ATTACHMENT_LOAD_OP_CLEAR || *load_op == VK_ATTACHMENT_LOAD_OP_DONT_CARE) {
-                RecordResetScopeZcullDirection(*cmd_state);
+                RecordResetScopeZcullDirection(*cb_state);
             }
         }
     }
-    if (cmd_state->activeRenderPass) {
+    if (cb_state->activeRenderPass) {
         // Spec states that after BeginRenderPass all resources should be rebound
-        if (cmd_state->activeRenderPass->has_multiview_enabled) {
-            cmd_state->UnbindResources();
+        if (cb_state->activeRenderPass->has_multiview_enabled) {
+            cb_state->UnbindResources();
         }
     }
 }
 
 void BestPractices::RecordCmdEndRenderingCommon(VkCommandBuffer commandBuffer) {
-    auto cmd_state = GetWrite<bp_state::CommandBuffer>(commandBuffer);
-    assert(cmd_state);
+    auto cb_state = GetWrite<bp_state::CommandBuffer>(commandBuffer);
+    assert(cb_state);
 
-    auto rp = cmd_state->activeRenderPass.get();
+    auto rp = cb_state->activeRenderPass.get();
     assert(rp);
 
     if (VendorCheckEnabled(kBPVendorNVIDIA)) {
@@ -571,11 +596,11 @@ void BestPractices::RecordCmdEndRenderingCommon(VkCommandBuffer commandBuffer) {
 
         if (store_op) {
             if (*store_op == VK_ATTACHMENT_STORE_OP_DONT_CARE || *store_op == VK_ATTACHMENT_STORE_OP_NONE) {
-                RecordResetScopeZcullDirection(*cmd_state);
+                RecordResetScopeZcullDirection(*cb_state);
             }
         }
 
-        RecordUnbindZcullScope(*cmd_state);
+        RecordUnbindZcullScope(*cb_state);
     }
 }
 
@@ -626,14 +651,26 @@ void BestPractices::PostCallRecordCmdNextSubpass2(VkCommandBuffer commandBuffer,
 }
 
 void BestPractices::RecordCmdNextSubpass(VkCommandBuffer commandBuffer) {
-    auto cb = GetWrite<bp_state::CommandBuffer>(commandBuffer);
-    if (cb) {
-        if (cb->activeRenderPass) {
+    auto cb_state = GetWrite<bp_state::CommandBuffer>(commandBuffer);
+    if (cb_state) {
+        if (cb_state->activeRenderPass) {
             // Spec states that after NextSubpass all resources should be rebound
-            if (cb->activeRenderPass->has_multiview_enabled) {
-                cb->UnbindResources();
+            if (cb_state->activeRenderPass->has_multiview_enabled) {
+                cb_state->UnbindResources();
             }
         }
+    }
+}
+
+void BestPractices::RecordCmdPushConstants(VkCommandBuffer commandBuffer, uint32_t offset, uint32_t size) {
+    auto cb_state = GetWrite<bp_state::CommandBuffer>(commandBuffer);
+    if (cb_state->push_constant_data_ranges && !cb_state->push_constant_data_ranges->empty()) {
+        // only reset if a found the push constant have been disturbed
+        if (cb_state->push_constant_data.size() != cb_state->push_constant_data_set.size()) {
+            cb_state->push_constant_data_set.resize(cb_state->push_constant_data.size(), 0);
+        }
+        std::fill(cb_state->push_constant_data_set.begin() + offset, cb_state->push_constant_data_set.begin() + offset + size,
+                    1);
     }
 }
 
@@ -641,34 +678,23 @@ void BestPractices::PostCallRecordCmdPushConstants(VkCommandBuffer commandBuffer
                                                    VkShaderStageFlags stageFlags, uint32_t offset, uint32_t size,
                                                    const void* pValues, const RecordObject& record_obj) {
     StateTracker::PostCallRecordCmdPushConstants(commandBuffer, layout, stageFlags, offset, size, pValues, record_obj);
-    auto cb_state = GetWrite<bp_state::CommandBuffer>(commandBuffer);
-    if (cb_state) {
-        if (cb_state->push_constant_data_ranges && !cb_state->push_constant_data_ranges->empty()) {
-            uint32_t start = cb_state->push_constant_data_ranges->at(0).offset;
-            uint32_t end = cb_state->push_constant_data_ranges->at(0).offset + cb_state->push_constant_data_ranges->at(0).size;
-            for (const auto& push_constant_range : *cb_state->push_constant_data_ranges) {
-                if (push_constant_range.offset < start) {
-                    start = push_constant_range.offset;
-                }
-                if (push_constant_range.offset + push_constant_range.size > end) {
-                    end = push_constant_range.offset + push_constant_range.size;
-                }
-            }
-            cb_state->push_constant_data_set.resize(start, 1);
-            cb_state->push_constant_data_set.resize(end, 0);
-            std::fill(cb_state->push_constant_data_set.begin() + offset, cb_state->push_constant_data_set.begin() + offset + size,
-                      1);
-        }
-    }
+    RecordCmdPushConstants(commandBuffer, offset, size);
+}
+
+void BestPractices::PostCallRecordCmdPushConstants2KHR(VkCommandBuffer commandBuffer,
+                                                       const VkPushConstantsInfoKHR* pPushConstantsInfo,
+                                                       const RecordObject& record_obj) {
+    StateTracker::PostCallRecordCmdPushConstants2KHR(commandBuffer, pPushConstantsInfo, record_obj);
+    RecordCmdPushConstants(commandBuffer, pPushConstantsInfo->offset, pPushConstantsInfo->size);
 }
 
 void BestPractices::PostRecordCmdBeginRenderPass(VkCommandBuffer commandBuffer, const VkRenderPassBeginInfo* pRenderPassBegin) {
     // Reset the renderpass state
-    auto cb = GetWrite<bp_state::CommandBuffer>(commandBuffer);
+    auto cb_state = GetWrite<bp_state::CommandBuffer>(commandBuffer);
     // TODO - move this logic to the Render Pass state as cb->has_draw_cmd should stay true for lifetime of command buffer
-    cb->has_draw_cmd = false;
-    assert(cb);
-    auto& render_pass_state = cb->render_pass_state;
+    cb_state->has_draw_cmd = false;
+    assert(cb_state);
+    auto& render_pass_state = cb_state->render_pass_state;
     render_pass_state.touchesAttachments.clear();
     render_pass_state.earlyClearAttachments.clear();
     render_pass_state.numDrawCallsDepthOnly = 0;
@@ -679,7 +705,7 @@ void BestPractices::PostRecordCmdBeginRenderPass(VkCommandBuffer commandBuffer, 
     // Don't reset state related to pipeline state.
 
     // Reset NV state
-    cb->nv = {};
+    cb_state->nv = {};
 
     auto rp_state = Get<vvl::RenderPass>(pRenderPassBegin->renderPass);
     if (rp_state) {
@@ -690,10 +716,10 @@ void BestPractices::PostRecordCmdBeginRenderPass(VkCommandBuffer commandBuffer, 
 
             if (rp_state->createInfo.pSubpasses[i].colorAttachmentCount > 0) render_pass_state.colorAttachment = true;
         }
-        if (cb->activeRenderPass) {
+        if (cb_state->activeRenderPass) {
             // Spec states that after BeginRenderPass all resources should be rebound
-            if (cb->activeRenderPass->has_multiview_enabled) {
-                cb->UnbindResources();
+            if (cb_state->activeRenderPass->has_multiview_enabled) {
+                cb_state->UnbindResources();
             }
         }
     }
@@ -724,9 +750,9 @@ bool BestPractices::PreCallValidateCmdEndRenderPass2(VkCommandBuffer commandBuff
     skip |= StateTracker::PreCallValidateCmdEndRenderPass2(commandBuffer, pSubpassEndInfo, error_obj);
     skip |= ValidateCmdEndRenderPass(commandBuffer, error_obj.location);
     if (VendorCheckEnabled(kBPVendorNVIDIA)) {
-        const auto cmd_state = GetRead<bp_state::CommandBuffer>(commandBuffer);
-        assert(cmd_state);
-        skip |= ValidateZcullScope(*cmd_state, error_obj.location);
+        const auto cb_state = GetRead<bp_state::CommandBuffer>(commandBuffer);
+        assert(cb_state);
+        skip |= ValidateZcullScope(*cb_state, error_obj.location);
     }
     return skip;
 }
@@ -741,9 +767,9 @@ bool BestPractices::PreCallValidateCmdEndRenderPass(VkCommandBuffer commandBuffe
     skip |= StateTracker::PreCallValidateCmdEndRenderPass(commandBuffer, error_obj);
     skip |= ValidateCmdEndRenderPass(commandBuffer, error_obj.location);
     if (VendorCheckEnabled(kBPVendorNVIDIA)) {
-        const auto cmd_state = GetRead<bp_state::CommandBuffer>(commandBuffer);
-        assert(cmd_state);
-        skip |= ValidateZcullScope(*cmd_state, error_obj.location);
+        const auto cb_state = GetRead<bp_state::CommandBuffer>(commandBuffer);
+        assert(cb_state);
+        skip |= ValidateZcullScope(*cb_state, error_obj.location);
     }
     return skip;
 }
@@ -752,9 +778,9 @@ bool BestPractices::PreCallValidateCmdEndRendering(VkCommandBuffer commandBuffer
     bool skip = false;
     skip |= StateTracker::PreCallValidateCmdEndRendering(commandBuffer, error_obj);
     if (VendorCheckEnabled(kBPVendorNVIDIA)) {
-        const auto cmd_state = GetRead<bp_state::CommandBuffer>(commandBuffer);
-        assert(cmd_state);
-        skip |= ValidateZcullScope(*cmd_state, error_obj.location);
+        const auto cb_state = GetRead<bp_state::CommandBuffer>(commandBuffer);
+        assert(cb_state);
+        skip |= ValidateZcullScope(*cb_state, error_obj.location);
     }
     return skip;
 }
@@ -851,4 +877,48 @@ bool BestPractices::ValidateCmdEndRenderPass(VkCommandBuffer commandBuffer, cons
     }
 
     return skip;
+}
+
+void BestPractices::RecordAttachmentAccess(bp_state::CommandBuffer& cb_state, uint32_t fb_attachment, VkImageAspectFlags aspects) {
+    auto& rp_state = cb_state.render_pass_state;
+    // Called when we have a partial clear attachment, or a normal draw call which accesses an attachment.
+    auto itr =
+        std::find_if(rp_state.touchesAttachments.begin(), rp_state.touchesAttachments.end(),
+                     [fb_attachment](const bp_state::AttachmentInfo& info) { return info.framebufferAttachment == fb_attachment; });
+
+    if (itr != rp_state.touchesAttachments.end()) {
+        itr->aspects |= aspects;
+    } else {
+        rp_state.touchesAttachments.push_back({fb_attachment, aspects});
+    }
+}
+
+void BestPractices::RecordAttachmentClearAttachments(bp_state::CommandBuffer& cmd_state, uint32_t fb_attachment,
+                                                     uint32_t color_attachment, VkImageAspectFlags aspects, uint32_t rectCount,
+                                                     const VkClearRect* pRects) {
+    auto& rp_state = cmd_state.render_pass_state;
+    // If we observe a full clear before any other access to a frame buffer attachment,
+    // we have candidate for redundant clear attachments.
+    auto itr =
+        std::find_if(rp_state.touchesAttachments.begin(), rp_state.touchesAttachments.end(),
+                     [fb_attachment](const bp_state::AttachmentInfo& info) { return info.framebufferAttachment == fb_attachment; });
+
+    uint32_t new_aspects = aspects;
+    if (itr != rp_state.touchesAttachments.end()) {
+        new_aspects = aspects & ~itr->aspects;
+        itr->aspects |= aspects;
+    } else {
+        rp_state.touchesAttachments.push_back({fb_attachment, aspects});
+    }
+
+    if (new_aspects == 0) {
+        return;
+    }
+
+    if (cmd_state.createInfo.level == VK_COMMAND_BUFFER_LEVEL_SECONDARY) {
+        // The first command might be a clear, but might not be the first in the render pass, defer any checks until
+        // CmdExecuteCommands.
+        rp_state.earlyClearAttachments.push_back(
+            {fb_attachment, color_attachment, new_aspects, std::vector<VkClearRect>{pRects, pRects + rectCount}});
+    }
 }

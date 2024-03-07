@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (c) 2015-2023 Google, Inc.
+ * Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (c) 2015-2024 Google, Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -78,19 +78,10 @@ TEST_F(NegativeSparseImage, BindingImageBufferCreate) {
 TEST_F(NegativeSparseImage, ResidencyImageCreateUnsupportedTypes) {
     TEST_DESCRIPTION("Create images with sparse residency with unsupported types");
 
-    // Determine which device feature are available
-    VkPhysicalDeviceFeatures device_features = {};
-    RETURN_IF_SKIP(InitFramework());
-    GetPhysicalDeviceFeatures(&device_features);
-
-    // Mask out device features we don't want and initialize device state
-    device_features.sparseResidencyImage2D = VK_FALSE;
-    device_features.sparseResidencyImage3D = VK_FALSE;
-    RETURN_IF_SKIP(InitState(&device_features));
-
-    if (!m_device->phy().features().sparseBinding) {
-        GTEST_SKIP() << "Test requires unsupported sparseBinding feature";
-    }
+    AddRequiredFeature(vkt::Feature::sparseBinding);
+    AddDisabledFeature(vkt::Feature::sparseResidencyImage2D);
+    AddDisabledFeature(vkt::Feature::sparseResidencyImage3D);
+    RETURN_IF_SKIP(Init());
 
     VkImageCreateInfo image_create_info = vku::InitStructHelper();
     image_create_info.imageType = VK_IMAGE_TYPE_1D;
@@ -125,23 +116,12 @@ TEST_F(NegativeSparseImage, ResidencyImageCreateUnsupportedTypes) {
 
 TEST_F(NegativeSparseImage, ResidencyImageCreateUnsupportedSamples) {
     TEST_DESCRIPTION("Create images with sparse residency with unsupported tiling or sample counts");
-
-    // Determine which device feature are available
-    VkPhysicalDeviceFeatures device_features = {};
-    RETURN_IF_SKIP(InitFramework());
-    GetPhysicalDeviceFeatures(&device_features);
-
-    // These tests require that the device support sparse residency for 2D images
-    if (VK_TRUE != device_features.sparseResidencyImage2D) {
-        GTEST_SKIP() << "Test requires unsupported SparseResidencyImage2D feature";
-    }
-
-    // Mask out device features we don't want and initialize device state
-    device_features.sparseResidency2Samples = VK_FALSE;
-    device_features.sparseResidency4Samples = VK_FALSE;
-    device_features.sparseResidency8Samples = VK_FALSE;
-    device_features.sparseResidency16Samples = VK_FALSE;
-    RETURN_IF_SKIP(InitState(&device_features));
+    AddRequiredFeature(vkt::Feature::sparseResidencyImage2D);
+    AddDisabledFeature(vkt::Feature::sparseResidency2Samples);
+    AddDisabledFeature(vkt::Feature::sparseResidency4Samples);
+    AddDisabledFeature(vkt::Feature::sparseResidency8Samples);
+    AddDisabledFeature(vkt::Feature::sparseResidency16Samples);
+    RETURN_IF_SKIP(Init());
 
     VkImageCreateInfo image_create_info = vku::InitStructHelper();
     image_create_info.imageType = VK_IMAGE_TYPE_2D;
@@ -181,15 +161,11 @@ TEST_F(NegativeSparseImage, ResidencyImageCreateUnsupportedSamples) {
 TEST_F(NegativeSparseImage, ResidencyFlag) {
     TEST_DESCRIPTION("Try to use VkSparseImageMemoryBindInfo without sparse residency flag");
 
+    AddRequiredFeature(vkt::Feature::sparseResidencyImage2D);
     RETURN_IF_SKIP(Init());
 
-    const std::optional<uint32_t> sparse_index = m_device->QueueFamilyMatching(VK_QUEUE_SPARSE_BINDING_BIT, 0u);
-    if (!sparse_index) {
-        GTEST_SKIP() << "Required queue families not present";
-    }
-
-    if (!m_device->phy().features().sparseResidencyImage2D) {
-        GTEST_SKIP() << "Test requires unsupported SparseResidencyImage2D feature";
+    if (m_device->sparse_queues().empty()) {
+        GTEST_SKIP() << "Required SPARSE_BINDING queue families not present";
     }
 
     VkImageCreateInfo image_create_info = vku::InitStructHelper();
@@ -226,21 +202,15 @@ TEST_F(NegativeSparseImage, ResidencyFlag) {
     bind_info.pImageBinds = &image_memory_bind_info;
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSparseImageMemoryBindInfo-image-02901");
-    vk::QueueBindSparse(m_device->graphics_queues()[*sparse_index]->handle(), 1, &bind_info, VK_NULL_HANDLE);
+    vk::QueueBindSparse(m_device->sparse_queues()[0]->handle(), 1, &bind_info, VK_NULL_HANDLE);
     m_errorMonitor->VerifyFound();
 }
 
 TEST_F(NegativeSparseImage, ImageUsageBits) {
     TEST_DESCRIPTION("Try to use VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT with sparse image");
 
+    AddRequiredFeature(vkt::Feature::sparseBinding);
     RETURN_IF_SKIP(Init());
-
-    VkPhysicalDeviceFeatures device_features = {};
-    GetPhysicalDeviceFeatures(&device_features);
-
-    if (!device_features.sparseBinding) {
-        GTEST_SKIP() << "No sparseBinding feature";
-    }
 
     VkImageCreateInfo image_create_info = vku::InitStructHelper();
     image_create_info.flags = VK_IMAGE_CREATE_SPARSE_BINDING_BIT;
@@ -266,9 +236,8 @@ TEST_F(NegativeSparseImage, MemoryBindOffset) {
 
     RETURN_IF_SKIP(Init());
 
-    const std::optional<uint32_t> sparse_index = m_device->QueueFamilyMatching(VK_QUEUE_SPARSE_BINDING_BIT, 0u);
-    if (!sparse_index) {
-        GTEST_SKIP() << "Required queue families not present";
+    if (m_device->sparse_queues().empty()) {
+        GTEST_SKIP() << "Required SPARSE_BINDING queue families not present";
     }
 
     VkBufferCreateInfo buffer_create_info = vku::InitStructHelper();
@@ -307,8 +276,7 @@ TEST_F(NegativeSparseImage, MemoryBindOffset) {
         GTEST_SKIP() << "Test requires unsupported sparseResidencyImage2D feature";
     }
 
-    vkt::Buffer buffer;
-    buffer.init_no_mem(*m_device, buffer_create_info);
+    vkt::Buffer buffer(*m_device, buffer_create_info, vkt::no_mem);
     VkMemoryRequirements buffer_mem_reqs;
     vk::GetBufferMemoryRequirements(device(), buffer, &buffer_mem_reqs);
     VkMemoryAllocateInfo buffer_mem_alloc =
@@ -371,24 +339,19 @@ TEST_F(NegativeSparseImage, MemoryBindOffset) {
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSparseMemoryBind-memoryOffset-01101");
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSparseMemoryBind-size-01102");
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSparseMemoryBind-size-01102");
-    vk::QueueBindSparse(m_device->graphics_queues()[*sparse_index]->handle(), 1, &bind_info, VK_NULL_HANDLE);
+    vk::QueueBindSparse(m_device->sparse_queues()[0]->handle(), 1, &bind_info, VK_NULL_HANDLE);
     m_errorMonitor->VerifyFound();
 }
 
 TEST_F(NegativeSparseImage, QueueBindSparseMemoryType) {
     TEST_DESCRIPTION("Test QueueBindSparse with memory of a wrong type");
 
+    AddRequiredFeature(vkt::Feature::sparseResidencyBuffer);
+    AddRequiredFeature(vkt::Feature::sparseResidencyImage2D);
     RETURN_IF_SKIP(Init());
 
-    if (!m_device->phy().features().sparseResidencyBuffer) {
-        GTEST_SKIP() << "Test requires unsupported sparseResidencyBuffer feature";
-    } else if (!m_device->phy().features().sparseResidencyImage2D) {
-        GTEST_SKIP() << "Test requires unsupported sparseResidencyImage2D feature";
-    }
-
-    const std::optional<uint32_t> sparse_index = m_device->QueueFamilyMatching(VK_QUEUE_SPARSE_BINDING_BIT, 0u);
-    if (!sparse_index) {
-        GTEST_SKIP() << "Required queue families not present";
+    if (m_device->sparse_queues().empty()) {
+        GTEST_SKIP() << "Required SPARSE_BINDING queue families not present";
     }
 
     const uint32_t mem_types_mask = (1u << m_device->phy().memory_properties_.memoryTypeCount) - 1;
@@ -514,7 +477,7 @@ TEST_F(NegativeSparseImage, QueueBindSparseMemoryType) {
         if (buffer_mem_lazy) {
             m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSparseMemoryBind-memory-01097");
         }
-        vk::QueueBindSparse(m_device->graphics_queues()[*sparse_index]->handle(), 1, &bind_info, VK_NULL_HANDLE);
+        vk::QueueBindSparse(m_device->sparse_queues()[0]->handle(), 1, &bind_info, VK_NULL_HANDLE);
         m_errorMonitor->VerifyFound();
     } else {
         printf("Could not find an invalid memory type for buffer, skipping part of test.\n");
@@ -528,7 +491,7 @@ TEST_F(NegativeSparseImage, QueueBindSparseMemoryType) {
         if (image_mem_lazy) {
             m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSparseMemoryBind-memory-01097");
         }
-        vk::QueueBindSparse(m_device->graphics_queues()[*sparse_index]->handle(), 1, &bind_info, VK_NULL_HANDLE);
+        vk::QueueBindSparse(m_device->sparse_queues()[0]->handle(), 1, &bind_info, VK_NULL_HANDLE);
         m_errorMonitor->VerifyFound();
     } else {
         printf("Could not find an invalid memory type for image, skipping part of test.\n");
@@ -550,7 +513,7 @@ TEST_F(NegativeSparseImage, QueueBindSparseMemoryType) {
         if (image_mem_lazy) {
             m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSparseMemoryBind-memory-01097");
         }
-        vk::QueueBindSparse(m_device->graphics_queues()[*sparse_index]->handle(), 1, &bind_info, VK_NULL_HANDLE);
+        vk::QueueBindSparse(m_device->sparse_queues()[0]->handle(), 1, &bind_info, VK_NULL_HANDLE);
         m_errorMonitor->VerifyFound();
     }
 }
@@ -558,17 +521,12 @@ TEST_F(NegativeSparseImage, QueueBindSparseMemoryType) {
 TEST_F(NegativeSparseImage, QueueBindSparseMemoryType2) {
     TEST_DESCRIPTION("Test QueueBindSparse with lazily allocated memory");
 
+    AddRequiredFeature(vkt::Feature::sparseResidencyBuffer);
+    AddRequiredFeature(vkt::Feature::sparseResidencyImage2D);
     RETURN_IF_SKIP(Init());
 
-    if (!m_device->phy().features().sparseResidencyBuffer) {
-        GTEST_SKIP() << "Test requires unsupported sparseResidencyBuffer feature";
-    } else if (!m_device->phy().features().sparseResidencyImage2D) {
-        GTEST_SKIP() << "Test requires unsupported sparseResidencyImage2D feature";
-    }
-
-    const std::optional<uint32_t> sparse_index = m_device->QueueFamilyMatching(VK_QUEUE_SPARSE_BINDING_BIT, 0u);
-    if (!sparse_index) {
-        GTEST_SKIP() << "Required queue families not present";
+    if (m_device->sparse_queues().empty()) {
+        GTEST_SKIP() << "Required SPARSE_BINDING queue families not present";
     }
 
     uint32_t lazily_allocated_index = m_device->phy().memory_properties_.memoryTypeCount;  // Set to an invalid value just in case
@@ -652,7 +610,7 @@ TEST_F(NegativeSparseImage, QueueBindSparseMemoryType2) {
         if (!((1u << buffer_mem_alloc.memoryTypeIndex) & buffer_mem_reqs.memoryTypeBits)) {
             m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSparseMemoryBind-memory-01096");
         }
-        vk::QueueBindSparse(m_device->graphics_queues()[*sparse_index]->handle(), 1, &bind_info, VK_NULL_HANDLE);
+        vk::QueueBindSparse(m_device->sparse_queues()[0]->handle(), 1, &bind_info, VK_NULL_HANDLE);
         m_errorMonitor->VerifyFound();
     }
 
@@ -664,7 +622,7 @@ TEST_F(NegativeSparseImage, QueueBindSparseMemoryType2) {
         if (!((1u << image_mem_alloc.memoryTypeIndex) & image_mem_reqs.memoryTypeBits)) {
             m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSparseMemoryBind-memory-01096");
         }
-        vk::QueueBindSparse(m_device->graphics_queues()[*sparse_index]->handle(), 1, &bind_info, VK_NULL_HANDLE);
+        vk::QueueBindSparse(m_device->sparse_queues()[0]->handle(), 1, &bind_info, VK_NULL_HANDLE);
         m_errorMonitor->VerifyFound();
     }
 
@@ -680,7 +638,7 @@ TEST_F(NegativeSparseImage, QueueBindSparseMemoryType2) {
         if (!((1u << image_mem_alloc.memoryTypeIndex) & image_mem_reqs.memoryTypeBits)) {
             m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSparseMemoryBind-memory-01096");
         }
-        vk::QueueBindSparse(m_device->graphics_queues()[*sparse_index]->handle(), 1, &bind_info, VK_NULL_HANDLE);
+        vk::QueueBindSparse(m_device->sparse_queues()[0]->handle(), 1, &bind_info, VK_NULL_HANDLE);
         m_errorMonitor->VerifyFound();
     }
 }
@@ -690,17 +648,13 @@ TEST_F(NegativeSparseImage, QueueBindSparseMemoryType3) {
         "Test QueueBindSparse with memory having export external handle types that do not match those of the resource");
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredFeature(vkt::Feature::sparseResidencyBuffer);
+    AddRequiredFeature(vkt::Feature::sparseResidencyImage2D);
     RETURN_IF_SKIP(Init());
+    IgnoreHandleTypeError(m_errorMonitor);
 
-    if (!m_device->phy().features().sparseResidencyBuffer) {
-        GTEST_SKIP() << "Test requires unsupported sparseResidencyBuffer feature";
-    } else if (!m_device->phy().features().sparseResidencyImage2D) {
-        GTEST_SKIP() << "Test requires unsupported sparseResidencyImage2D feature";
-    }
-
-    const std::optional<uint32_t> sparse_index = m_device->QueueFamilyMatching(VK_QUEUE_SPARSE_BINDING_BIT, 0u);
-    if (!sparse_index) {
-        GTEST_SKIP() << "Required queue families not present";
+    if (m_device->sparse_queues().empty()) {
+        GTEST_SKIP() << "Required SPARSE_BINDING queue families not present";
     }
 
     /// Allocate buffer and buffer memory with an external handle type
@@ -709,7 +663,6 @@ TEST_F(NegativeSparseImage, QueueBindSparseMemoryType3) {
     buffer_create_info.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
     buffer_create_info.size = 1024;
     vkt::Buffer buffer(*m_device, buffer_create_info, vkt::no_mem);
-
     const auto buffer_exportable_types =
         FindSupportedExternalMemoryHandleTypes(gpu(), buffer_create_info, VK_EXTERNAL_MEMORY_FEATURE_EXPORTABLE_BIT);
     if (!buffer_exportable_types) {
@@ -795,7 +748,7 @@ TEST_F(NegativeSparseImage, QueueBindSparseMemoryType3) {
         bind_info.bufferBindCount = 1;
         bind_info.imageOpaqueBindCount = 0;
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSparseMemoryBind-memory-02730");
-        vk::QueueBindSparse(m_device->graphics_queues()[*sparse_index]->handle(), 1, &bind_info, VK_NULL_HANDLE);
+        vk::QueueBindSparse(m_device->sparse_queues()[0]->handle(), 1, &bind_info, VK_NULL_HANDLE);
         m_errorMonitor->VerifyFound();
     }
 
@@ -804,7 +757,7 @@ TEST_F(NegativeSparseImage, QueueBindSparseMemoryType3) {
         bind_info.bufferBindCount = 0;
         bind_info.imageOpaqueBindCount = 1;
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSparseMemoryBind-memory-02730");
-        vk::QueueBindSparse(m_device->graphics_queues()[*sparse_index]->handle(), 1, &bind_info, VK_NULL_HANDLE);
+        vk::QueueBindSparse(m_device->sparse_queues()[0]->handle(), 1, &bind_info, VK_NULL_HANDLE);
         m_errorMonitor->VerifyFound();
     }
 
@@ -814,7 +767,7 @@ TEST_F(NegativeSparseImage, QueueBindSparseMemoryType3) {
         bind_info.imageOpaqueBindCount = 1;
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSparseMemoryBind-memory-02730");
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSparseMemoryBind-memory-02730");
-        vk::QueueBindSparse(m_device->graphics_queues()[*sparse_index]->handle(), 1, &bind_info, VK_NULL_HANDLE);
+        vk::QueueBindSparse(m_device->sparse_queues()[0]->handle(), 1, &bind_info, VK_NULL_HANDLE);
         m_errorMonitor->VerifyFound();
     }
 
@@ -824,7 +777,7 @@ TEST_F(NegativeSparseImage, QueueBindSparseMemoryType3) {
         bind_info.imageOpaqueBindCount = 0;
         bind_info.imageBindCount = 1;
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSparseImageMemoryBind-memory-02732");
-        vk::QueueBindSparse(m_device->graphics_queues()[*sparse_index]->handle(), 1, &bind_info, VK_NULL_HANDLE);
+        vk::QueueBindSparse(m_device->sparse_queues()[0]->handle(), 1, &bind_info, VK_NULL_HANDLE);
         m_errorMonitor->VerifyFound();
     }
 }
@@ -847,16 +800,11 @@ TEST_F(NegativeSparseImage, DISABLED_QueueBindSparseMemoryType4) {
     AddRequiredExtensions(VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME);
     AddRequiredExtensions(ext_mem_extension_name);
+    AddRequiredFeature(vkt::Feature::sparseResidencyBuffer);
+    AddRequiredFeature(vkt::Feature::sparseResidencyImage2D);
     RETURN_IF_SKIP(Init());
     if (IsPlatformMockICD()) {
         GTEST_SKIP() << "External tests are not supported by MockICD, skipping tests";
-    }
-
-    if (!m_device->phy().features().sparseResidencyBuffer) {
-        GTEST_SKIP() << "Test requires unsupported sparseResidencyBuffer feature";
-    }
-    if (!m_device->phy().features().sparseResidencyImage2D) {
-        GTEST_SKIP() << "Test requires unsupported sparseResidencyImage2D feature";
     }
 
     // Check for import/export capability
@@ -871,9 +819,8 @@ TEST_F(NegativeSparseImage, DISABLED_QueueBindSparseMemoryType4) {
         GTEST_SKIP() << "External buffer does not support importing and exporting";
     }
 
-    const std::optional<uint32_t> sparse_index = m_device->QueueFamilyMatching(VK_QUEUE_SPARSE_BINDING_BIT, 0u);
-    if (!sparse_index) {
-        GTEST_SKIP() << "Required queue families not present";
+    if (m_device->sparse_queues().empty()) {
+        GTEST_SKIP() << "Required SPARSE_BINDING queue families not present";
     }
 
     // Check if dedicated allocation is required
@@ -995,7 +942,7 @@ TEST_F(NegativeSparseImage, DISABLED_QueueBindSparseMemoryType4) {
         bind_info.bufferBindCount = 1;
         bind_info.imageOpaqueBindCount = 0;
         // m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSparseMemoryBind-memory-02731");
-        vk::QueueBindSparse(m_device->graphics_queues()[*sparse_index]->handle(), 1, &bind_info, VK_NULL_HANDLE);
+        vk::QueueBindSparse(m_device->sparse_queues()[0]->handle(), 1, &bind_info, VK_NULL_HANDLE);
         // m_errorMonitor->VerifyFound();
     }
 
@@ -1004,7 +951,7 @@ TEST_F(NegativeSparseImage, DISABLED_QueueBindSparseMemoryType4) {
         bind_info.bufferBindCount = 0;
         bind_info.imageOpaqueBindCount = 1;
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSparseMemoryBind-memory-02731");
-        vk::QueueBindSparse(m_device->graphics_queues()[*sparse_index]->handle(), 1, &bind_info, VK_NULL_HANDLE);
+        vk::QueueBindSparse(m_device->sparse_queues()[0]->handle(), 1, &bind_info, VK_NULL_HANDLE);
         m_errorMonitor->VerifyFound();
     }
 
@@ -1014,7 +961,7 @@ TEST_F(NegativeSparseImage, DISABLED_QueueBindSparseMemoryType4) {
         bind_info.imageOpaqueBindCount = 1;
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSparseMemoryBind-memory-02731");
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSparseMemoryBind-memory-02731");
-        vk::QueueBindSparse(m_device->graphics_queues()[*sparse_index]->handle(), 1, &bind_info, VK_NULL_HANDLE);
+        vk::QueueBindSparse(m_device->sparse_queues()[0]->handle(), 1, &bind_info, VK_NULL_HANDLE);
         m_errorMonitor->VerifyFound();
     }
 
@@ -1024,7 +971,7 @@ TEST_F(NegativeSparseImage, DISABLED_QueueBindSparseMemoryType4) {
         bind_info.imageOpaqueBindCount = 0;
         bind_info.imageBindCount = 1;
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSparseImageMemoryBind-memory-02733");
-        vk::QueueBindSparse(m_device->graphics_queues()[*sparse_index]->handle(), 1, &bind_info, VK_NULL_HANDLE);
+        vk::QueueBindSparse(m_device->sparse_queues()[0]->handle(), 1, &bind_info, VK_NULL_HANDLE);
         m_errorMonitor->VerifyFound();
     }
 }
@@ -1032,15 +979,12 @@ TEST_F(NegativeSparseImage, DISABLED_QueueBindSparseMemoryType4) {
 TEST_F(NegativeSparseImage, ImageMemoryBind) {
     TEST_DESCRIPTION("Try to bind sparse resident image with invalid VkSparseImageMemoryBind");
 
+    AddRequiredFeature(vkt::Feature::sparseBinding);
+    AddRequiredFeature(vkt::Feature::sparseResidencyImage3D);
     RETURN_IF_SKIP(Init());
 
-    if (!m_device->phy().features().sparseBinding || !m_device->phy().features().sparseResidencyImage3D) {
-        GTEST_SKIP() << "sparseBinding && sparseResidencyImage3D features are required.";
-    }
-
-    const std::optional<uint32_t> sparse_index = m_device->QueueFamilyMatching(VK_QUEUE_SPARSE_BINDING_BIT, 0u);
-    if (!sparse_index) {
-        GTEST_SKIP() << "Required queue families not present";
+    if (m_device->sparse_queues().empty()) {
+        GTEST_SKIP() << "Required SPARSE_BINDING queue families not present";
     }
 
     VkImageCreateInfo create_info = vkt::Image::create_info();
@@ -1089,7 +1033,7 @@ TEST_F(NegativeSparseImage, ImageMemoryBind) {
     bind_info.imageBindCount = 1u;
     bind_info.pImageBinds = &image_bind_info;
 
-    VkQueue sparse_queue = m_device->graphics_queues()[sparse_index.value()]->handle();
+    VkQueue sparse_queue = m_device->sparse_queues()[0]->handle();
 
     // Force offset.x to invalid value
     image_bind.offset.x = granularity.width - 1;
@@ -1135,14 +1079,14 @@ TEST_F(NegativeSparseImage, ImageMemoryBind) {
 
     // Force greater mip level
     image_bind.subresource.mipLevel = VK_REMAINING_MIP_LEVELS;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSparseImageMemoryBind-subresource-01106");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSparseImageMemoryBindInfo-subresource-01722");
     vk::QueueBindSparse(sparse_queue, 1, &bind_info, VK_NULL_HANDLE);
     m_errorMonitor->VerifyFound();
     image_bind.subresource.mipLevel = 0;
 
     // Force greater array layer
     image_bind.subresource.arrayLayer = VK_REMAINING_ARRAY_LAYERS;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSparseImageMemoryBind-subresource-01106");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSparseImageMemoryBindInfo-subresource-01723");
     vk::QueueBindSparse(sparse_queue, 1, &bind_info, VK_NULL_HANDLE);
     m_errorMonitor->VerifyFound();
     image_bind.subresource.arrayLayer = 0;
@@ -1158,15 +1102,12 @@ TEST_F(NegativeSparseImage, ImageMemoryBind) {
 TEST_F(NegativeSparseImage, ImageMemoryBindInvalidExtent) {
     TEST_DESCRIPTION("Try to bind sparse resident image with an extent having a null size on one of its dimension");
 
+    AddRequiredFeature(vkt::Feature::sparseBinding);
+    AddRequiredFeature(vkt::Feature::sparseResidencyImage3D);
     RETURN_IF_SKIP(Init());
 
-    if (!m_device->phy().features().sparseBinding || !m_device->phy().features().sparseResidencyImage3D) {
-        GTEST_SKIP() << "sparseBinding && sparseResidencyImage3D features are required.";
-    }
-
-    const std::optional<uint32_t> sparse_index = m_device->QueueFamilyMatching(VK_QUEUE_SPARSE_BINDING_BIT, 0u);
-    if (!sparse_index) {
-        GTEST_SKIP() << "Required queue families not present";
+    if (m_device->sparse_queues().empty()) {
+        GTEST_SKIP() << "Required SPARSE_BINDING queue families not present";
     }
 
     VkImageCreateInfo create_info = vkt::Image::create_info();
@@ -1215,7 +1156,7 @@ TEST_F(NegativeSparseImage, ImageMemoryBindInvalidExtent) {
     bind_info.imageBindCount = 1u;
     bind_info.pImageBinds = &image_bind_info;
 
-    VkQueue sparse_queue = m_device->graphics_queues()[sparse_index.value()]->handle();
+    VkQueue sparse_queue = m_device->sparse_queues()[0]->handle();
 
     image_bind.extent.width = 0;
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSparseImageMemoryBind-extent-09388");

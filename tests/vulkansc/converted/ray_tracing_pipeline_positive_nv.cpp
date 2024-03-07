@@ -20,7 +20,7 @@
 
 TEST_F(PositiveRayTracingPipelineNV, BasicUsage) {
     TEST_DESCRIPTION("Test VK_NV_ray_tracing.");
-    RETURN_IF_SKIP(InitFrameworkForRayTracingTest(false));
+    RETURN_IF_SKIP(NvInitFrameworkForRayTracingTest());
 
     VkPhysicalDeviceRayTracingPropertiesNV rtnv_props = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(rtnv_props);
@@ -30,6 +30,6 @@ TEST_F(PositiveRayTracingPipelineNV, BasicUsage) {
 
     RETURN_IF_SKIP(InitState());
 
-    auto ignore_update = [](RayTracingPipelineHelper &helper) {};
-    RayTracingPipelineHelper::OneshotPositiveTest(*this, ignore_update);
+    auto ignore_update = [](nv::rt::RayTracingPipelineHelper &helper) {};
+    nv::rt::RayTracingPipelineHelper::OneshotPositiveTest(*this, ignore_update);
 }

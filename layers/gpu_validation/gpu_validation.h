@@ -1,6 +1,6 @@
-/* Copyright (c) 2018-2023 The Khronos Group Inc.
- * Copyright (c) 2018-2023 Valve Corporation
- * Copyright (c) 2018-2023 LunarG, Inc.
+/* Copyright (c) 2018-2024 The Khronos Group Inc.
+ * Copyright (c) 2018-2024 Valve Corporation
+ * Copyright (c) 2018-2024 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,15 +20,33 @@
 #include "gpu_validation/gpu_state_tracker.h"
 #include "gpu_validation/gpu_error_message.h"
 #include "gpu_validation/gpu_descriptor_set.h"
-#include "gpu_validation/gpu_subclasses.h"
+#include "gpu_validation/gpu_resources.h"
 #include "state_tracker/pipeline_state.h"
+
+#include <typeinfo>
+#include <unordered_map>
+#include <memory>
 
 typedef vvl::unordered_map<const vvl::Image*, std::optional<GlobalImageLayoutRangeMap>> GlobalImageLayoutMap;
 
 namespace gpuav {
+class AccelerationStructureNV;
+class AccelerationStructureKHR;
+class Buffer;
+class BufferView;
+class CommandBuffer;
+class ImageView;
+class Sampler;
+
+class DescriptorSet;
+struct DescSetState;
+struct CmdIndirectState;
+struct AccelerationStructureBuildValidationInfo;
+
 struct GpuVuid {
     const char* uniform_access_oob = kVUIDUndefined;
     const char* storage_access_oob = kVUIDUndefined;
+    const char* invalid_descriptor = kVUIDUndefined;
     const char* count_exceeds_bufsize_1 = kVUIDUndefined;
     const char* count_exceeds_bufsize = kVUIDUndefined;
     const char* count_exceeds_device_limit = kVUIDUndefined;
@@ -94,9 +112,13 @@ class Validator : public gpu_tracker::Validator {
 
     void UpdateBoundDescriptors(VkCommandBuffer commandBuffer, VkPipelineBindPoint pipelineBindPoint);
 
-    // Allocate per command validation resources
-    [[nodiscard]] CommandResources AllocateCommandResources(const VkCommandBuffer cmd_buffer, const VkPipelineBindPoint bind_point,
-                                                            Func command, const CmdIndirectState* indirect_state = nullptr);
+    // Allocate per action (draw, dispatch, trace rays) command validation resources. Should only be used by action commands
+    [[nodiscard]] CommandResources AllocateActionCommandResources(const VkCommandBuffer cmd_buffer,
+                                                                  const VkPipelineBindPoint bind_point, Func command,
+                                                                  const CmdIndirectState* indirect_state = nullptr);
+    // Allocate memory for the output block that the gpu will use to return any error information
+    [[nodiscard]] bool AllocateOutputMem(DeviceMemoryBlock& output_mem);
+
     [[nodiscard]] std::unique_ptr<CommandResources> AllocatePreDrawIndirectValidationResources(
         vvl::Func command, VkCommandBuffer cmd_buffer, VkBuffer indirect_buffer, VkDeviceSize indirect_offset, uint32_t draw_count,
         VkBuffer count_buffer, VkDeviceSize count_buffer_offset, uint32_t stride);
@@ -107,12 +129,26 @@ class Validator : public gpu_tracker::Validator {
     [[nodiscard]] std::unique_ptr<CommandResources> AllocatePreTraceRaysValidationResources(vvl::Func command,
                                                                                             VkCommandBuffer cmd_buffer,
                                                                                             VkDeviceAddress indirect_data_address);
+    [[nodiscard]] std::unique_ptr<CommandResources> AllocatePreCopyBufferToImageValidationResources(
+        vvl::Func cmd, VkCommandBuffer cmd_buffer, const VkCopyBufferToImageInfo2* copy_buffer_to_img_info);
 
   private:
-    void AllocateSharedTraceRaysValidationResources();
-    void AllocateSharedDrawIndirectValidationResources(bool use_shader_objects);
-    void AllocateSharedDispatchIndirectValidationResources(bool use_shader_objects);
+    VkPipeline GetDrawValidationPipeline(PreDrawResources::SharedResources& shared_draw_resources, VkRenderPass render_pass);
+    PreDrawResources::SharedResources* GetSharedDrawIndirectValidationResources(bool use_shader_objects);
+    PreDispatchResources::SharedResources* GetSharedDispatchIndirectValidationResources(bool use_shader_objects);
+    PreTraceRaysResources::SharedResources* GetSharedTraceRaysValidationResources();
+    PreCopyBufferToImageResources::SharedResources* GetSharedCopyBufferToImageValidationResources();
+
     void StoreCommandResources(const VkCommandBuffer cmd_buffer, std::unique_ptr<CommandResources> command_resources);
+
+    using TypeInfoRef = std::reference_wrapper<const std::type_info>;
+    struct Hasher {
+        std::size_t operator()(TypeInfoRef code) const { return code.get().hash_code(); }
+    };
+    struct EqualTo {
+        bool operator()(TypeInfoRef lhs, TypeInfoRef rhs) const { return lhs.get() == rhs.get(); }
+    };
+    std::unordered_map<TypeInfoRef, std::unique_ptr<SharedValidationResources>, Hasher, EqualTo> shared_validation_resources_map;
 
     // gpu_error_message.cpp
     // ---------------------
@@ -141,7 +177,7 @@ class Validator : public gpu_tracker::Validator {
         VkAccelerationStructureNV as, const VkAccelerationStructureCreateInfoNV* pCreateInfo) final;
     std::shared_ptr<vvl::AccelerationStructureKHR> CreateAccelerationStructureState(
         VkAccelerationStructureKHR as, const VkAccelerationStructureCreateInfoKHR* pCreateInfo,
-        std::shared_ptr<vvl::Buffer>&& buf_state, VkDeviceAddress address) final;
+        std::shared_ptr<vvl::Buffer>&& buf_state) final;
     std::shared_ptr<vvl::Sampler> CreateSamplerState(VkSampler s, const VkSamplerCreateInfo* ci) final;
     std::shared_ptr<vvl::CommandBuffer> CreateCmdBufferState(VkCommandBuffer cb, const VkCommandBufferAllocateInfo* create_info,
                                                              const vvl::CommandPool* pool) final;
@@ -204,6 +240,9 @@ class Validator : public gpu_tracker::Validator {
     void PostCallRecordCmdEndRenderPass2(VkCommandBuffer commandBuffer, const VkSubpassEndInfo* pSubpassEndInfo,
                                          const RecordObject& record_obj) override;
 
+    void PostCallRecordCmdBindDescriptorSets2KHR(VkCommandBuffer commandBuffer,
+                                                 const VkBindDescriptorSetsInfoKHR* pBindDescriptorSetsInfo,
+                                                 const RecordObject& record_obj) override;
     void PostCallRecordCmdBindDescriptorSets(VkCommandBuffer commandBuffer, VkPipelineBindPoint pipelineBindPoint,
                                              VkPipelineLayout layout, uint32_t firstSet, uint32_t descriptorSetCount,
                                              const VkDescriptorSet* pDescriptorSets, uint32_t dynamicOffsetCount,
@@ -211,6 +250,9 @@ class Validator : public gpu_tracker::Validator {
     void PreCallRecordCmdPushDescriptorSetKHR(VkCommandBuffer commandBuffer, VkPipelineBindPoint pipelineBindPoint,
                                               VkPipelineLayout layout, uint32_t set, uint32_t descriptorWriteCount,
                                               const VkWriteDescriptorSet* pDescriptorWrites, const RecordObject&) override;
+    void PreCallRecordCmdPushDescriptorSet2KHR(VkCommandBuffer commandBuffer,
+                                               const VkPushDescriptorSetInfoKHR* pPushDescriptorSetInfo,
+                                               const RecordObject& record_obj) override;
     void PreCallRecordQueueSubmit(VkQueue queue, uint32_t submitCount, const VkSubmitInfo* pSubmits, VkFence fence,
                                   const RecordObject&) override;
     void PostCallRecordQueueSubmit(VkQueue queue, uint32_t submitCount, const VkSubmitInfo* pSubmits, VkFence fence,
@@ -229,6 +271,10 @@ class Validator : public gpu_tracker::Validator {
     void PreCallRecordCmdBindDescriptorBufferEmbeddedSamplersEXT(VkCommandBuffer commandBuffer,
                                                                  VkPipelineBindPoint pipelineBindPoint, VkPipelineLayout layout,
                                                                  uint32_t set, const RecordObject& record_obj) override;
+    void PreCallRecordCmdBindDescriptorBufferEmbeddedSamplers2EXT(
+        VkCommandBuffer commandBuffer,
+        const VkBindDescriptorBufferEmbeddedSamplersInfoEXT* pBindDescriptorBufferEmbeddedSamplersInfo,
+        const RecordObject& record_obj) override;
     void PreCallRecordCmdDraw(VkCommandBuffer commandBuffer, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
                               uint32_t firstInstance, const RecordObject& record_obj) override;
     void PreCallRecordCmdDrawMultiEXT(VkCommandBuffer commandBuffer, uint32_t drawCount, const VkMultiDrawInfoEXT* pVertexInfo,
@@ -443,12 +489,8 @@ class Validator : public gpu_tracker::Validator {
                                 const char* mismatch_layout_vuid, bool* error) const;
 
     VkBool32 shaderInt64 = false;
-    bool validate_instrumented_shaders = false;
     std::string instrumented_shader_cache_path{};
     AccelerationStructureBuildValidationState acceleration_structure_validation_state{};
-    CommonDrawResources common_draw_resources{};
-    CommonDispatchResources common_dispatch_resources{};
-    CommonTraceRaysResources common_trace_rays_resources{};
     DeviceMemoryBlock app_buffer_device_addresses{};
     size_t app_bda_buffer_size{};
     uint32_t gpuav_bda_buffer_version = 0;

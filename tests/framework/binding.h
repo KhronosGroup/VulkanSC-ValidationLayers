@@ -1,7 +1,7 @@
 /*
- * Copyright (c) 2015-2016, 2020-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2016, 2020-2023 Valve Corporation
- * Copyright (c) 2015-2016, 2020-2023 LunarG, Inc.
+ * Copyright (c) 2015-2016, 2020-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2016, 2020-2024 Valve Corporation
+ * Copyright (c) 2015-2016, 2020-2024 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -60,6 +60,7 @@ class BufferView;
 class Image;
 class ImageView;
 class DepthStencilView;
+class PipelineCache;
 class Pipeline;
 class PipelineDelta;
 class Sampler;
@@ -224,6 +225,7 @@ class Device : public internal::Handle<VkDevice> {
     const std::vector<Queue *> &graphics_queues() const { return queues_[GRAPHICS]; }
     const std::vector<Queue *> &compute_queues() { return queues_[COMPUTE]; }
     const std::vector<Queue *> &dma_queues() { return queues_[DMA]; }
+    const std::vector<Queue *> &sparse_queues() { return queues_[SPARSE]; }
 
     typedef std::vector<std::unique_ptr<Queue>> QueueFamilyQueues;
     typedef std::vector<QueueFamilyQueues> QueueFamilies;
@@ -250,7 +252,7 @@ class Device : public internal::Handle<VkDevice> {
     const std::vector<Format> &formats() const { return formats_; }
 
     // vkDeviceWaitIdle()
-    void wait();
+    void wait() const;
 
     // vkWaitForFences()
     VkResult wait(const std::vector<const Fence *> &fences, bool wait_all, uint64_t timeout);
@@ -283,10 +285,11 @@ class Device : public internal::Handle<VkDevice> {
 
   private:
     enum QueueIndex {
-        GRAPHICS,
-        COMPUTE,
-        DMA,
-        QUEUE_COUNT,
+        GRAPHICS = 0,
+        COMPUTE = 1,
+        DMA = 2,
+        SPARSE = 3,
+        QUEUE_COUNT = 4,
     };
 
     void init_queues(const VkDeviceCreateInfo &info);
@@ -384,6 +387,7 @@ class Semaphore : public internal::NonDispHandle<VkSemaphore> {
     Semaphore() = default;
     Semaphore(const Device &dev) { init(dev, vku::InitStruct<VkSemaphoreCreateInfo>()); }
     Semaphore(const Device &dev, const VkSemaphoreCreateInfo &info) { init(dev, info); }
+    Semaphore(Semaphore &&rhs) noexcept : NonDispHandle(std::move(rhs)) {}
     ~Semaphore() noexcept;
     void destroy() noexcept;
 
@@ -431,6 +435,10 @@ class QueryPool : public internal::NonDispHandle<VkQueryPool> {
   public:
     QueryPool() = default;
     QueryPool(const Device &dev, const VkQueryPoolCreateInfo &info) { init(dev, info); }
+    QueryPool(const Device &dev, VkQueryType query_type, uint32_t query_count) {
+        VkQueryPoolCreateInfo info = create_info(query_type, query_count);
+        init(dev, info);
+    }
     ~QueryPool() noexcept;
     void destroy() noexcept;
 
@@ -583,6 +591,8 @@ class Image : public internal::NonDispHandle<VkImage> {
     void init(const Device &dev, const VkImageCreateInfo &info) { init(dev, info, 0); }
     void init_no_mem(const Device &dev, const VkImageCreateInfo &info);
 
+    VkImage image() const { return handle(); }
+
     // get the internal memory
     const DeviceMemory &memory() const { return internal_mem_; }
     DeviceMemory &memory() { return internal_mem_; }
@@ -601,18 +611,15 @@ class Image : public internal::NonDispHandle<VkImage> {
     VkSubresourceLayout subresource_layout(const VkImageSubresource &subres) const;
     VkSubresourceLayout subresource_layout(const VkImageSubresourceLayers &subres) const;
 
-    bool transparent() const;
-    bool copyable() const { return (format_features_ & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT); }
-
-    VkImageAspectFlags aspect_mask() const { return aspect_mask(create_info_.format); }
-
-    VkImageSubresourceRange subresource_range() const { return subresource_range(create_info_, aspect_mask()); }
     VkImageSubresourceRange subresource_range(VkImageAspectFlags aspect) const { return subresource_range(create_info_, aspect); }
 
     VkExtent3D extent() const { return create_info_.extent; }
+    uint32_t width() const { return create_info_.extent.width; }
+    uint32_t height() const { return create_info_.extent.height; }
     VkFormat format() const { return create_info_.format; }
+    uint32_t mip_levels() const { return create_info_.mipLevels; }
+    uint32_t array_layers() const { return create_info_.arrayLayers; }
     VkImageUsageFlags usage() const { return create_info_.usage; }
-    VkSharingMode sharing_mode() const { return create_info_.sharingMode; }
     VkImageMemoryBarrier image_memory_barrier(VkFlags output_mask, VkFlags input_mask, VkImageLayout old_layout,
                                               VkImageLayout new_layout, const VkImageSubresourceRange &range,
                                               uint32_t srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
@@ -700,12 +707,12 @@ class ImageView : public internal::NonDispHandle<VkImageView> {
     void init(const Device &dev, const VkImageViewCreateInfo &info);
 };
 
-class AccelerationStructure : public internal::NonDispHandle<VkAccelerationStructureNV> {
+class AccelerationStructureNV : public internal::NonDispHandle<VkAccelerationStructureNV> {
   public:
-    explicit AccelerationStructure(const Device &dev, const VkAccelerationStructureCreateInfoNV &info, bool init_memory = true) {
+    explicit AccelerationStructureNV(const Device &dev, const VkAccelerationStructureCreateInfoNV &info, bool init_memory = true) {
         init(dev, info, init_memory);
     }
-    ~AccelerationStructure() noexcept;
+    ~AccelerationStructureNV() noexcept;
     void destroy() noexcept;
 
     // vkCreateAccelerationStructureNV
@@ -731,6 +738,8 @@ class AccelerationStructure : public internal::NonDispHandle<VkAccelerationStruc
 
 class ShaderModule : public internal::NonDispHandle<VkShaderModule> {
   public:
+    ShaderModule() = default;
+    ShaderModule(const Device &dev, const VkShaderModuleCreateInfo &info) { init(dev, info); }
     ~ShaderModule() noexcept;
     void destroy() noexcept;
 
@@ -758,6 +767,16 @@ class Shader : public internal::NonDispHandle<VkShaderEXT> {
     VkResult init_try(const Device &dev, const VkShaderCreateInfoEXT &info);
 };
 
+class PipelineCache : public internal::NonDispHandle<VkPipelineCache> {
+  public:
+    PipelineCache() = default;
+    PipelineCache(const Device &dev, const VkPipelineCacheCreateInfo &info) { init(dev, info); }
+    ~PipelineCache() noexcept;
+    void destroy() noexcept;
+
+    void init(const Device &dev, const VkPipelineCacheCreateInfo &info);
+};
+
 class Pipeline : public internal::NonDispHandle<VkPipeline> {
   public:
     Pipeline() = default;
@@ -766,6 +785,7 @@ class Pipeline : public internal::NonDispHandle<VkPipeline> {
         init(dev, info, basePipeline);
     }
     Pipeline(const Device &dev, const VkComputePipelineCreateInfo &info) { init(dev, info); }
+    Pipeline(const Device &dev, const VkRayTracingPipelineCreateInfoKHR &info) { init(dev, info); }
     ~Pipeline() noexcept;
     void destroy() noexcept;
 
@@ -775,6 +795,8 @@ class Pipeline : public internal::NonDispHandle<VkPipeline> {
     void init(const Device &dev, const VkGraphicsPipelineCreateInfo &info, const VkPipeline basePipeline);
     // vkCreateComputePipeline()
     void init(const Device &dev, const VkComputePipelineCreateInfo &info);
+    // vkCreateRayTracingPipelinesKHR
+    void init(const Device &dev, const VkRayTracingPipelineCreateInfoKHR &info);
     // vkLoadPipeline()
     void init(const Device &dev, size_t size, const void *data);
     // vkLoadPipelineDerivative()
@@ -954,6 +976,14 @@ class CommandBuffer : public internal::Handle<VkCommandBuffer> {
                            Queue *queue = nullptr) {
         Init(device, pool, level, queue);
     }
+    CommandBuffer(CommandBuffer &&rhs) noexcept : Handle(std::move(rhs)) {
+        dev_handle_ = rhs.dev_handle_;
+        rhs.dev_handle_ = VK_NULL_HANDLE;
+        cmd_pool_ = rhs.cmd_pool_;
+        rhs.cmd_pool_ = VK_NULL_HANDLE;
+        m_queue = rhs.m_queue;
+        rhs.m_queue = nullptr;
+    }
 
     // vkAllocateCommandBuffers()
     void init(const Device &dev, const VkCommandBufferAllocateInfo &info);
@@ -962,7 +992,8 @@ class CommandBuffer : public internal::Handle<VkCommandBuffer> {
 
     // vkBeginCommandBuffer()
     void begin(const VkCommandBufferBeginInfo *info);
-    void begin();
+    void begin(VkCommandBufferUsageFlags flags);
+    void begin() { begin(0u); }
 
     // vkEndCommandBuffer()
     // vkResetCommandBuffer()
@@ -973,6 +1004,8 @@ class CommandBuffer : public internal::Handle<VkCommandBuffer> {
     static VkCommandBufferAllocateInfo create_info(VkCommandPool const &pool);
 
     void BeginRenderPass(const VkRenderPassBeginInfo &info, VkSubpassContents contents = VK_SUBPASS_CONTENTS_INLINE);
+    void BeginRenderPass(VkRenderPass rp, VkFramebuffer fb, uint32_t render_area_width = 1, uint32_t render_area_height = 1,
+                         uint32_t clear_count = 0, VkClearValue *clear_values = nullptr);
     void NextSubpass(VkSubpassContents contents = VK_SUBPASS_CONTENTS_INLINE);
     void EndRenderPass();
     void BeginRendering(const VkRenderingInfoKHR &renderingInfo);
@@ -982,6 +1015,7 @@ class CommandBuffer : public internal::Handle<VkCommandBuffer> {
     void BeginVideoCoding(const VkVideoBeginCodingInfoKHR &beginInfo);
     void ControlVideoCoding(const VkVideoCodingControlInfoKHR &controlInfo);
     void DecodeVideo(const VkVideoDecodeInfoKHR &decodeInfo);
+    void EncodeVideo(const VkVideoEncodeInfoKHR &encodeInfo);
     void EndVideoCoding(const VkVideoEndCodingInfoKHR &endInfo);
 
     void QueueCommandBuffer(bool check_success = true);
@@ -1024,6 +1058,18 @@ class Framebuffer : public internal::NonDispHandle<VkFramebuffer> {
   public:
     Framebuffer() = default;
     Framebuffer(const Device &dev, const VkFramebufferCreateInfo &info) { init(dev, info); }
+    // The most common case, anything outside of this should create there own VkFramebufferCreateInfo
+    Framebuffer(const Device &dev, VkRenderPass rp, uint32_t attchment_count, const VkImageView *attchments, uint32_t width = 32,
+                uint32_t height = 32) {
+        VkFramebufferCreateInfo info = vku::InitStructHelper();
+        info.renderPass = rp;
+        info.attachmentCount = attchment_count;
+        info.pAttachments = attchments;
+        info.width = width;
+        info.height = height;
+        info.layers = 1;
+        init(dev, info);
+    }
     ~Framebuffer() noexcept;
     void destroy() noexcept;
 

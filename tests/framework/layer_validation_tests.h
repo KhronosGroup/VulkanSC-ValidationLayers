@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (c) 2015-2023 Google, Inc.
+ * Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (c) 2015-2024 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -53,6 +53,16 @@ using std::vector;
 #endif
 #elif defined(__SANITIZE_ADDRESS__)
 #define VVL_ENABLE_ASAN 1
+#endif
+
+// GCC defines __SANITIZE_THREAD__ when compiling with address sanitization
+// However, clang doesn't. Instead you have to use __has_feature to check.
+#if defined(__clang__)
+#if __has_feature(thread_sanitizer)
+#define VVL_ENABLE_TSAN 1
+#endif
+#elif defined(__SANITIZE_THREAD__)
+#define VVL_ENABLE_TSAN 1
 #endif
 
 #if defined(VVL_ENABLE_ASAN)
@@ -245,18 +255,45 @@ class VkArmBestPracticesLayerTest : public VkBestPracticesLayerTest {
 };
 class VkNvidiaBestPracticesLayerTest : public VkBestPracticesLayerTest {};
 
-class VkGpuAssistedLayerTest : public virtual VkLayerTest {
+class GpuAVTest : public virtual VkLayerTest {
   public:
     void InitGpuAvFramework(void *p_next = nullptr);
 
     VkValidationFeaturesEXT GetGpuAvValidationFeatures();
-    void ShaderBufferSizeTest(VkDeviceSize buffer_size, VkDeviceSize binding_offset, VkDeviceSize binding_range,
-                              VkDescriptorType descriptor_type, const char *fragment_shader, const char *expected_error, bool shader_objects = false);
-
-  protected:
 };
 
-class PositiveGpuAssistedLayer : public VkGpuAssistedLayerTest {};
+class NegativeGpuAV : public GpuAVTest {};
+class PositiveGpuAV : public GpuAVTest {};
+
+class GpuAVBufferDeviceAddressTest : public GpuAVTest {
+  public:
+    void InitGpuVUBufferDeviceAddress(void *p_next = nullptr);
+};
+class NegativeGpuAVBufferDeviceAddress : public GpuAVBufferDeviceAddressTest {};
+class PositiveGpuAVBufferDeviceAddress : public GpuAVBufferDeviceAddressTest {};
+
+class GpuAVDescriptorIndexingTest : public GpuAVTest {
+  public:
+    void InitGpuVUDescriptorIndexing();
+};
+class NegativeGpuAVDescriptorIndexing : public GpuAVDescriptorIndexingTest {};
+class PositiveGpuAVDescriptorIndexing : public GpuAVDescriptorIndexingTest {};
+
+class GpuAVSpirvTest : public GpuAVTest {};
+class NegativeGpuAVSpirv : public GpuAVSpirvTest {};
+class PositiveGpuAVSpirv : public GpuAVSpirvTest {};
+
+class NegativeGpuAVIndirectBuffer : public GpuAVTest {};
+
+class GpuAVOOBTest : public GpuAVTest {};
+class NegativeGpuAVOOB : public GpuAVOOBTest {
+  public:
+    void ShaderBufferSizeTest(VkDeviceSize buffer_size, VkDeviceSize binding_offset, VkDeviceSize binding_range,
+                              VkDescriptorType descriptor_type, const char *fragment_shader, const char *expected_error,
+                              bool shader_objects = false);
+    void ComputeStorageBufferTest(const char *expected_error, const char *shader, VkDeviceSize buffer_size);
+};
+class PositiveGpuAVOOB : public GpuAVOOBTest {};
 
 class NegativeDebugPrintf : public VkLayerTest {
   public:
@@ -267,7 +304,7 @@ class NegativeDebugPrintf : public VkLayerTest {
 
 class VkSyncValTest : public VkLayerTest {
   public:
-    void InitSyncValFramework(bool enable_queue_submit_validation = false);
+    void InitSyncValFramework(bool disable_queue_submit_validation = false);
 
   protected:
     const VkValidationFeatureEnableEXT enables_[1] = {VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT};
@@ -283,7 +320,7 @@ class PositiveAndroidHardwareBuffer : public AndroidHardwareBufferTest {};
 
 class AndroidExternalResolveTest : public VkLayerTest {
   public:
-    void InitBasicAndroidExternalResolve(void *pNextFeatures = nullptr);
+    void InitBasicAndroidExternalResolve();
     bool nullColorAttachmentWithExternalFormatResolve;
 };
 class NegativeAndroidExternalResolve : public AndroidExternalResolveTest {};
@@ -309,6 +346,10 @@ class PushDescriptorTest : public VkLayerTest {};
 class NegativePushDescriptor : public PushDescriptorTest {};
 class PositivePushDescriptor : public PushDescriptorTest {};
 
+class DebugExtensionsTest : public VkLayerTest {};
+class NegativeDebugExtensions : public DebugExtensionsTest {};
+class PositiveDebugExtensions : public DebugExtensionsTest {};
+
 class DescriptorBufferTest : public VkLayerTest {
   public:
     void InitBasicDescriptorBuffer(void *pNextFeatures = nullptr);
@@ -318,8 +359,6 @@ class PositiveDescriptorBuffer : public DescriptorBufferTest {};
 
 class DescriptorIndexingTest : public VkLayerTest {
   public:
-    void InitBasicDescriptorIndexing(void *pNextFeatures = nullptr);
-    VkPhysicalDeviceDescriptorIndexingFeatures descriptor_indexing_features;
     void ComputePipelineShaderTest(const char *shader, std::vector<VkDescriptorSetLayoutBinding> &bindings);
 };
 class NegativeDescriptorIndexing : public DescriptorIndexingTest {};
@@ -329,7 +368,7 @@ class NegativeDeviceQueue : public VkLayerTest {};
 
 class DynamicRenderingTest : public VkLayerTest {
   public:
-    void InitBasicDynamicRendering(void *pNextFeatures = nullptr);
+    void InitBasicDynamicRendering();
 };
 class NegativeDynamicRendering : public DynamicRenderingTest {};
 class PositiveDynamicRendering : public DynamicRenderingTest {};
@@ -337,7 +376,6 @@ class PositiveDynamicRendering : public DynamicRenderingTest {};
 class DynamicStateTest : public VkLayerTest {
   public:
     void InitBasicExtendedDynamicState();  // enables VK_EXT_extended_dynamic_state
-    void InitBasicExtendedDynamicState3(VkPhysicalDeviceExtendedDynamicState3FeaturesEXT &features);
 };
 class NegativeDynamicState : public DynamicStateTest {
     // helper functions for tests in this file
@@ -371,7 +409,7 @@ class PositiveGeometryTessellation : public VkLayerTest {};
 
 class GraphicsLibraryTest : public VkLayerTest {
   public:
-    void InitBasicGraphicsLibrary(void *pNextFeatures = nullptr);
+    void InitBasicGraphicsLibrary();
 };
 class NegativeGraphicsLibrary : public GraphicsLibraryTest {};
 class PositiveGraphicsLibrary : public GraphicsLibraryTest {};
@@ -398,7 +436,7 @@ class PositiveImage : public ImageTest {};
 
 class ImageDrmTest : public VkLayerTest {
   public:
-    void InitBasicImageDrm(void *pNextFeatures = nullptr);
+    void InitBasicImageDrm();
     std::vector<uint64_t> GetFormatModifier(VkFormat format, VkFormatFeatureFlags2 features, uint32_t plane_count = 1);
 };
 class NegativeImageDrm : public ImageDrmTest {};
@@ -422,7 +460,9 @@ class PositiveMesh : public MeshTest {};
 
 class NegativeMultiview : public VkLayerTest {};
 
-class NegativeObjectLifetime : public VkLayerTest {};
+class ObjectLifetimeTest : public VkLayerTest {};
+class NegativeObjectLifetime : public ObjectLifetimeTest {};
+class PositiveObjectLifetime : public ObjectLifetimeTest {};
 
 class NegativePipelineAdvancedBlend : public VkLayerTest {};
 
@@ -453,15 +493,18 @@ class PositiveQuery : public QueryTest {};
 
 class RayTracingTest : public virtual VkLayerTest {
   public:
-    void InitFrameworkForRayTracingTest(bool is_khr, VkPhysicalDeviceFeatures2KHR *features2 = nullptr,
-                                        VkValidationFeaturesEXT *enabled_features = nullptr);
+    void InitFrameworkForRayTracingTest(VkValidationFeaturesEXT *enabled_features = nullptr);
 
-    void OOBRayTracingShadersTestBody(bool gpu_assisted);
+    void NvInitFrameworkForRayTracingTest(VkPhysicalDeviceFeatures2KHR *features2 = nullptr,
+                                          VkValidationFeaturesEXT *enabled_features = nullptr);
 };
 class NegativeRayTracing : public RayTracingTest {};
 class PositiveRayTracing : public RayTracingTest {};
-class NegativeRayTracingNV : public NegativeRayTracing {};
-class PositiveRayTracingNV : public PositiveRayTracing {};
+
+class NegativeRayTracingNV : public RayTracingTest {
+  public:
+    void OOBRayTracingShadersTestBodyNV(bool gpu_assisted);
+};
 
 class RayTracingPipelineTest : public RayTracingTest {};
 class NegativeRayTracingPipeline : public RayTracingPipelineTest {};
@@ -469,9 +512,9 @@ class PositiveRayTracingPipeline : public RayTracingPipelineTest {};
 class NegativeRayTracingPipelineNV : public NegativeRayTracingPipeline {};
 class PositiveRayTracingPipelineNV : public PositiveRayTracingPipeline {};
 
-class GpuAssistedRayTracingTest : public VkGpuAssistedLayerTest, public RayTracingTest {};
-class NegativeGpuAssistedRayTracing : public GpuAssistedRayTracingTest {};
-class NegativeGpuAssistedRayTracingNV : public NegativeGpuAssistedRayTracing {};
+class GpuAVRayTracingTest : public GpuAVTest, public RayTracingTest {};
+class NegativeGpuAVRayTracing : public GpuAVRayTracingTest {};
+class NegativeGpuAVRayTracingNV : public NegativeGpuAVRayTracing {};
 
 class RenderPassTest : public VkLayerTest {};
 class NegativeRenderPass : public RenderPassTest {};
@@ -493,8 +536,7 @@ class ShaderObjectTest : public virtual VkLayerTest {
     vkt::Buffer vertexBuffer;
 
   public:
-    void InitBasicShaderObject(void *pNextFeatures = nullptr, APIVersion targetApiVersion = VK_API_VERSION_1_1,
-                               bool coreFeatures = true);
+    void InitBasicShaderObject();
     void InitBasicMeshShaderObject(void *pNextFeatures = nullptr, APIVersion targetApiVersion = VK_API_VERSION_1_1,
                                    bool taskShader = true, bool meshShader = true);
     void BindVertFragShader(const vkt::Shader &vertShader, const vkt::Shader &fragShader);
@@ -559,10 +601,12 @@ class PositiveSyncObject : public SyncObjectTest {};
 
 class NegativeTransformFeedback : public VkLayerTest {
   public:
-    void InitBasicTransformFeedback(void *pNextFeatures = nullptr);
+    void InitBasicTransformFeedback();
 };
 
-class PositiveTooling : public VkLayerTest {};
+class ToolingTest : public VkLayerTest {};
+class NegativeTooling : public ToolingTest {};
+class PositiveTooling : public ToolingTest {};
 
 class VertexInputTest : public VkLayerTest {};
 class NegativeVertexInput : public VertexInputTest {};
@@ -570,7 +614,11 @@ class PositiveVertexInput : public VertexInputTest {};
 
 class NegativeViewportInheritance : public VkLayerTest {};
 
-class WsiTest : public VkLayerTest {};
+class WsiTest : public VkLayerTest {
+  public:
+    // most tests need images in VK_IMAGE_LAYOUT_PRESENT_SRC_KHR layout
+    void SetImageLayoutPresentSrc(VkImage image);
+};
 class NegativeWsi : public WsiTest {};
 class PositiveWsi : public WsiTest {};
 
@@ -614,23 +662,6 @@ VKAPI_ATTR VkBool32 VKAPI_CALL DebugUtilsCallback(VkDebugUtilsMessageSeverityFla
                                                   VkDebugUtilsMessageTypeFlagsEXT messageTypes,
                                                   const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData, void *pUserData);
 
-#if GTEST_IS_THREADSAFE
-struct ThreadTestData {
-    VkCommandBuffer commandBuffer;
-    VkDevice device;
-    VkEvent event;
-    VkDescriptorSet descriptorSet;
-    VkBuffer buffer;
-    uint32_t binding;
-    std::atomic<bool> *bailout;
-};
-
-void AddToCommandBuffer(ThreadTestData *);
-void UpdateDescriptor(ThreadTestData *);
-#endif  // GTEST_IS_THREADSAFE
-
-void ReleaseNullFence(ThreadTestData *);
-
 void TestRenderPassCreate(ErrorMonitor *error_monitor, const vkt::Device &device, const VkRenderPassCreateInfo &create_info,
                           bool rp2_supported, const char *rp1_vuid, const char *rp2_vuid);
 void PositiveTestRenderPassCreate(ErrorMonitor *error_monitor, const vkt::Device &device, const VkRenderPassCreateInfo &create_info,
@@ -641,34 +672,12 @@ void TestRenderPass2KHRCreate(ErrorMonitor &error_monitor, const vkt::Device &de
 void TestRenderPassBegin(ErrorMonitor *error_monitor, const VkDevice device, const VkCommandBuffer command_buffer,
                          const VkRenderPassBeginInfo *begin_info, bool rp2Supported, const char *rp1_vuid, const char *rp2_vuid);
 
-// Helpers for the tests below
-void ValidOwnershipTransferOp(ErrorMonitor *monitor, vkt::CommandBuffer *cb, VkPipelineStageFlags src_stages,
-                              VkPipelineStageFlags dst_stages, const VkBufferMemoryBarrier *buf_barrier,
-                              const VkImageMemoryBarrier *img_barrier);
-
-void ValidOwnershipTransferOp(ErrorMonitor *monitor, vkt::CommandBuffer *cb, const VkBufferMemoryBarrier2KHR *buf_barrier,
-                              const VkImageMemoryBarrier2KHR *img_barrier);
-
-void ValidOwnershipTransfer(ErrorMonitor *monitor, vkt::CommandBuffer *cb_from, vkt::CommandBuffer *cb_to,
-                            VkPipelineStageFlags src_stages, VkPipelineStageFlags dst_stages,
-                            const VkBufferMemoryBarrier *buf_barrier, const VkImageMemoryBarrier *img_barrier);
-
-void ValidOwnershipTransfer(ErrorMonitor *monitor, vkt::CommandBuffer *cb_from, vkt::CommandBuffer *cb_to,
-                            const VkBufferMemoryBarrier2KHR *buf_barrier, const VkImageMemoryBarrier2KHR *img_barrier);
-
 VkResult GPDIFPHelper(VkPhysicalDevice dev, const VkImageCreateInfo *ci, VkImageFormatProperties *limits = nullptr);
 
 VkFormat FindFormatWithoutFeatures(VkPhysicalDevice gpu, VkImageTiling tiling,
                                    VkFormatFeatureFlags undesired_features = vvl::kU32Max);
 
 VkFormat FindFormatWithoutFeatures2(VkPhysicalDevice gpu, VkImageTiling tiling, VkFormatFeatureFlags2 undesired_features);
-
-bool SemaphoreExportImportSupported(VkPhysicalDevice gpu, VkExternalSemaphoreHandleTypeFlagBits handle_type);
-
-void SetImageLayout(vkt::Device *device, VkImageAspectFlags aspect, VkImage image, VkImageLayout image_layout);
-
-void AllocateDisjointMemory(vkt::Device *device, PFN_vkGetImageMemoryRequirements2KHR fp, VkImage mp_image,
-                            VkDeviceMemory *mp_image_mem, VkImageAspectFlagBits plane);
 
 void CreateSamplerTest(VkLayerTest &test, const VkSamplerCreateInfo *pCreateInfo, const std::string &code = "");
 

@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2019-2023 Valve Corporation
- * Copyright (c) 2019-2023 LunarG, Inc.
+ * Copyright (c) 2019-2024 Valve Corporation
+ * Copyright (c) 2019-2024 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,19 +17,24 @@
 
 #pragma once
 
-#include "state_tracker/render_pass_state.h"
 #include "sync/sync_common.h"
 #include "sync/sync_access_state.h"
 
+struct SubpassDependencyGraphNode;
+
 namespace vvl {
 class Buffer;
+class VideoSession;
+class VideoPictureResource;
+class Bindable;
+class Event;
 }  // namespace vvl
 
 namespace syncval_state {
 class ImageState;
 class ImageViewState;
 }  // namespace syncval_state
-bool SimpleBinding(const BINDABLE &bindable);
+bool SimpleBinding(const vvl::Bindable &bindable);
 VkDeviceSize ResourceBaseAddress(const vvl::Buffer &buffer);
 
 // ForEachEntryInRangesUntil -- Execute Action for each map entry in the generated ranges until it returns true
@@ -239,31 +244,6 @@ class AttachmentViewGen {
 
 using AttachmentViewGenVector = std::vector<AttachmentViewGen>;
 
-struct SyncImageMemoryBarrier {
-    using ImageState = syncval_state::ImageState;
-    using Image = std::shared_ptr<const ImageState>;
-
-    Image image;
-    uint32_t index;
-    SyncBarrier barrier;
-    VkImageLayout old_layout;
-    VkImageLayout new_layout;
-    VkImageSubresourceRange range;
-
-    bool IsLayoutTransition() const { return old_layout != new_layout; }
-    const VkImageSubresourceRange &Range() const { return range; };
-    const ImageState *GetState() const { return image.get(); }
-    SyncImageMemoryBarrier(const Image &image_, uint32_t index_, const SyncBarrier &barrier_, VkImageLayout old_layout_,
-                           VkImageLayout new_layout_, const VkImageSubresourceRange &subresource_range_)
-        : image(image_),
-          index(index_),
-          barrier(barrier_),
-          old_layout(old_layout_),
-          new_layout(new_layout_),
-          range(subresource_range_) {}
-    SyncImageMemoryBarrier() = default;
-};
-
 class AccessContext {
   public:
     using ImageState = syncval_state::ImageState;
@@ -287,6 +267,8 @@ class AccessContext {
                               SyncStageAccessIndex current_usage, SyncOrdering ordering_rule) const;
     HazardResult DetectHazard(const AttachmentViewGen &view_gen, AttachmentViewGen::Gen gen_type,
                               SyncStageAccessIndex current_usage, SyncOrdering ordering_rule) const;
+    HazardResult DetectHazard(const vvl::VideoSession &vs_state, const vvl::VideoPictureResource &resource,
+                              SyncStageAccessIndex current_usage) const;
     HazardResult DetectHazard(const ImageState &image, const VkImageSubresourceRange &subresource_range, const VkOffset3D &offset,
                               const VkExtent3D &extent, bool is_depth_sliced, SyncStageAccessIndex current_usage,
                               SyncOrdering ordering_rule = SyncOrdering::kOrderingNone) const;
@@ -300,7 +282,6 @@ class AccessContext {
     HazardResult DetectImageBarrierHazard(const ImageState &image, VkPipelineStageFlags2KHR src_exec_scope,
                                           const SyncStageAccessFlags &src_access_scope,
                                           const VkImageSubresourceRange &subresource_range, DetectOptions options) const;
-    HazardResult DetectImageBarrierHazard(const SyncImageMemoryBarrier &image_barrier) const;
     HazardResult DetectSubpassTransitionHazard(const TrackBack &track_back, const AttachmentViewGen &attach_view) const;
 
     HazardResult DetectFirstUseHazard(QueueId queue_id, const ResourceUsageRange &tag_range,
@@ -344,6 +325,8 @@ class AccessContext {
                            ResourceUsageTag tag);
     void UpdateAccessState(ImageRangeGen &range_gen, SyncStageAccessIndex current_usage, SyncOrdering ordering_rule,
                            ResourceUsageTag tag);
+    void UpdateAccessState(const vvl::VideoSession &vs_state, const vvl::VideoPictureResource &resource,
+                           SyncStageAccessIndex current_usage, ResourceUsageTag tag);
     void ResolveChildContexts(const std::vector<AccessContext> &contexts);
 
     void ImportAsyncContexts(const AccessContext &from);

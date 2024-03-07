@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2023 The Khronos Group Inc.
- * Copyright (c) 2023 Valve Corporation
- * Copyright (c) 2023 LunarG, Inc.
- * Copyright (c) 2023 Collabora, Inc.
+ * Copyright (c) 2024 The Khronos Group Inc.
+ * Copyright (c) 2024 Valve Corporation
+ * Copyright (c) 2024 LunarG, Inc.
+ * Copyright (c) 2024 Collabora, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,16 +18,11 @@
 
 TEST_F(PositiveSparseBuffer, DISABLED_NonOverlappingBufferCopy) {
     TEST_DESCRIPTION("Test correct non overlapping sparse buffers' copy");
-
+    AddRequiredFeature(vkt::Feature::sparseBinding);
     RETURN_IF_SKIP(Init());
 
-    if (!m_device->phy().features().sparseBinding) {
-        GTEST_SKIP() << "Requires unsupported sparseBinding feature.";
-    }
-
-    const std::optional<uint32_t> sparse_index = m_device->QueueFamilyMatching(VK_QUEUE_SPARSE_BINDING_BIT, 0u);
-    if (!sparse_index) {
-        GTEST_SKIP() << "Required queue families not present";
+    if (m_device->sparse_queues().empty()) {
+        GTEST_SKIP() << "Required SPARSE_BINDING queue families not present";
     }
 
     // 2 semaphores needed since we need to bind twice before copying
@@ -42,10 +37,8 @@ TEST_F(PositiveSparseBuffer, DISABLED_NonOverlappingBufferCopy) {
     VkBufferCreateInfo b_info =
         vkt::Buffer::create_info(copy_info.size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, nullptr);
     b_info.flags = VK_BUFFER_CREATE_SPARSE_BINDING_BIT;
-    vkt::Buffer buffer_sparse;
-    buffer_sparse.init_no_mem(*m_device, b_info);
-    vkt::Buffer buffer_sparse2;
-    buffer_sparse2.init_no_mem(*m_device, b_info);
+    vkt::Buffer buffer_sparse(*m_device, b_info, vkt::no_mem);
+    vkt::Buffer buffer_sparse2(*m_device, b_info, vkt::no_mem);
 
     VkMemoryRequirements buffer_mem_reqs;
     vk::GetBufferMemoryRequirements(device(), buffer_sparse.handle(), &buffer_mem_reqs);
@@ -75,9 +68,9 @@ TEST_F(PositiveSparseBuffer, DISABLED_NonOverlappingBufferCopy) {
     bind_info.signalSemaphoreCount = 1;
     bind_info.pSignalSemaphores = &semaphore.handle();
 
-    VkQueue sparse_queue = m_device->graphics_queues()[sparse_index.value()]->handle();
-
-    vk::QueueBindSparse(sparse_queue, 1, &bind_info, VK_NULL_HANDLE);
+    vkt::Queue* sparse_queue = m_device->sparse_queues()[0];
+    vk::QueueBindSparse(sparse_queue->handle(), 1, &bind_info, VK_NULL_HANDLE);
+    sparse_queue->wait();
     // Set up complete
 
     m_commandBuffer->begin();
@@ -92,7 +85,8 @@ TEST_F(PositiveSparseBuffer, DISABLED_NonOverlappingBufferCopy) {
     bind_info.waitSemaphoreCount = 1;
     bind_info.pWaitSemaphores = &semaphore.handle();
     bind_info.pSignalSemaphores = &semaphore2.handle();
-    vk::QueueBindSparse(sparse_queue, 1, &bind_info, VK_NULL_HANDLE);
+    vk::QueueBindSparse(sparse_queue->handle(), 1, &bind_info, VK_NULL_HANDLE);
+    sparse_queue->wait();
 
     // Submitting copy command with non overlapping device memory regions
     VkPipelineStageFlags mask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
@@ -102,24 +96,19 @@ TEST_F(PositiveSparseBuffer, DISABLED_NonOverlappingBufferCopy) {
     submit_info.pWaitDstStageMask = &mask;
     submit_info.commandBufferCount = 1;
     submit_info.pCommandBuffers = &m_commandBuffer->handle();
-    vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
+    vk::QueueSubmit(m_default_queue->handle(), 1, &submit_info, VK_NULL_HANDLE);
 
     // Wait for operations to finish before destroying anything
-    vk::QueueWaitIdle(m_default_queue);
+    m_default_queue->wait();
 }
 
 TEST_F(PositiveSparseBuffer, DISABLED_NonOverlappingBufferCopy2) {
     TEST_DESCRIPTION("Non overlapping ranges copies should not trigger errors");
-
+    AddRequiredFeature(vkt::Feature::sparseBinding);
     RETURN_IF_SKIP(Init());
 
-    if (!m_device->phy().features().sparseBinding) {
-        GTEST_SKIP() << "Requires unsupported sparseBinding feature.";
-    }
-
-    const std::optional<uint32_t> sparse_index = m_device->QueueFamilyMatching(VK_QUEUE_SPARSE_BINDING_BIT, 0u);
-    if (!sparse_index) {
-        GTEST_SKIP() << "Required queue families not present";
+    if (m_device->sparse_queues().empty()) {
+        GTEST_SKIP() << "Required SPARSE_BINDING queue families not present";
     }
 
     vkt::Semaphore semaphore(*m_device);
@@ -142,8 +131,7 @@ TEST_F(PositiveSparseBuffer, DISABLED_NonOverlappingBufferCopy2) {
     VkBufferCreateInfo b_info =
         vkt::Buffer::create_info(256, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, nullptr);
     b_info.flags = VK_BUFFER_CREATE_SPARSE_BINDING_BIT;
-    vkt::Buffer buffer_sparse;
-    buffer_sparse.init_no_mem(*m_device, b_info);
+    vkt::Buffer buffer_sparse(*m_device, b_info, vkt::no_mem);
 
     VkMemoryRequirements buffer_mem_reqs;
     vk::GetBufferMemoryRequirements(device(), buffer_sparse.handle(), &buffer_mem_reqs);
@@ -167,7 +155,7 @@ TEST_F(PositiveSparseBuffer, DISABLED_NonOverlappingBufferCopy2) {
     bind_info.signalSemaphoreCount = 1;
     bind_info.pSignalSemaphores = &semaphore.handle();
 
-    VkQueue sparse_queue = m_device->graphics_queues()[sparse_index.value()]->handle();
+    VkQueue sparse_queue = m_device->sparse_queues()[0]->handle();
     vkt::Fence sparse_queue_fence(*m_device);
     vk::QueueBindSparse(sparse_queue, 1, &bind_info, sparse_queue_fence);
     ASSERT_EQ(VK_SUCCESS, sparse_queue_fence.wait(kWaitTimeout));
@@ -187,24 +175,19 @@ TEST_F(PositiveSparseBuffer, DISABLED_NonOverlappingBufferCopy2) {
     submit_info.commandBufferCount = 1;
     submit_info.pCommandBuffers = &m_commandBuffer->handle();
 
-    vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
+    vk::QueueSubmit(m_default_queue->handle(), 1, &submit_info, VK_NULL_HANDLE);
 
     // Wait for operations to finish before destroying anything
-    vk::QueueWaitIdle(m_default_queue);
+    m_default_queue->wait();
 }
 
 TEST_F(PositiveSparseBuffer, DISABLED_NonOverlappingBufferCopy3) {
     TEST_DESCRIPTION("Test that overlaps are computed in buffer space, not memory space");
-
+    AddRequiredFeature(vkt::Feature::sparseBinding);
     RETURN_IF_SKIP(Init());
 
-    if (!m_device->phy().features().sparseBinding) {
-        GTEST_SKIP() << "Requires unsupported sparseBinding feature.";
-    }
-
-    const std::optional<uint32_t> sparse_index = m_device->QueueFamilyMatching(VK_QUEUE_SPARSE_BINDING_BIT, 0u);
-    if (!sparse_index) {
-        GTEST_SKIP() << "Required queue families not present";
+    if (m_device->sparse_queues().empty()) {
+        GTEST_SKIP() << "Required SPARSE_BINDING queue families not present";
     }
 
     vkt::Semaphore semaphore(*m_device);
@@ -212,8 +195,7 @@ TEST_F(PositiveSparseBuffer, DISABLED_NonOverlappingBufferCopy3) {
     VkBufferCreateInfo buffer_ci =
         vkt::Buffer::create_info(4096 * 32, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, nullptr);
     buffer_ci.flags = VK_BUFFER_CREATE_SPARSE_BINDING_BIT;
-    vkt::Buffer buffer_sparse;
-    buffer_sparse.init_no_mem(*m_device, buffer_ci);
+    vkt::Buffer buffer_sparse(*m_device, buffer_ci, vkt::no_mem);
 
     VkMemoryRequirements buffer_mem_reqs;
     vk::GetBufferMemoryRequirements(device(), buffer_sparse.handle(), &buffer_mem_reqs);
@@ -250,9 +232,9 @@ TEST_F(PositiveSparseBuffer, DISABLED_NonOverlappingBufferCopy3) {
     bind_info.signalSemaphoreCount = 1;
     bind_info.pSignalSemaphores = &semaphore.handle();
 
-    VkQueue sparse_queue = m_device->graphics_queues()[sparse_index.value()]->handle();
+    vkt::Queue* sparse_queue = m_device->sparse_queues()[0];
     vkt::Fence sparse_queue_fence(*m_device);
-    vk::QueueBindSparse(sparse_queue, 1, &bind_info, sparse_queue_fence);
+    vk::QueueBindSparse(sparse_queue->handle(), 1, &bind_info, sparse_queue_fence);
     ASSERT_EQ(VK_SUCCESS, sparse_queue_fence.wait(kWaitTimeout));
     // Set up complete
 
@@ -269,25 +251,20 @@ TEST_F(PositiveSparseBuffer, DISABLED_NonOverlappingBufferCopy3) {
     submit_info.commandBufferCount = 1;
     submit_info.pCommandBuffers = &m_commandBuffer->handle();
 
-    vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
+    vk::QueueSubmit(m_default_queue->handle(), 1, &submit_info, VK_NULL_HANDLE);
 
     // Wait for operations to finish before destroying anything
-    vk::QueueWaitIdle(m_default_queue);
-    vk::QueueWaitIdle(sparse_queue);
+    m_default_queue->wait();
+    sparse_queue->wait();
 }
 
 TEST_F(PositiveSparseBuffer, DISABLED_NonOverlappingBufferCopy4) {
-    TEST_DESCRIPTION("Test coyping from a range that spans two different memory chunks");
-
+    TEST_DESCRIPTION("Test copying from a range that spans two different memory chunks");
+    AddRequiredFeature(vkt::Feature::sparseBinding);
     RETURN_IF_SKIP(Init());
 
-    if (!m_device->phy().features().sparseBinding) {
-        GTEST_SKIP() << "Requires unsupported sparseBinding feature.";
-    }
-
-    const std::optional<uint32_t> sparse_index = m_device->QueueFamilyMatching(VK_QUEUE_SPARSE_BINDING_BIT, 0u);
-    if (!sparse_index) {
-        GTEST_SKIP() << "Required queue families not present";
+    if (m_device->sparse_queues().empty()) {
+        GTEST_SKIP() << "Required SPARSE_BINDING queue families not present";
     }
 
     vkt::Semaphore semaphore(*m_device);
@@ -295,8 +272,7 @@ TEST_F(PositiveSparseBuffer, DISABLED_NonOverlappingBufferCopy4) {
     VkBufferCreateInfo buffer_ci =
         vkt::Buffer::create_info(4096 * 32, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, nullptr);
     buffer_ci.flags = VK_BUFFER_CREATE_SPARSE_BINDING_BIT;
-    vkt::Buffer buffer_sparse;
-    buffer_sparse.init_no_mem(*m_device, buffer_ci);
+    vkt::Buffer buffer_sparse(*m_device, buffer_ci, vkt::no_mem);
 
     VkMemoryRequirements buffer_mem_reqs;
     vk::GetBufferMemoryRequirements(device(), buffer_sparse.handle(), &buffer_mem_reqs);
@@ -330,9 +306,9 @@ TEST_F(PositiveSparseBuffer, DISABLED_NonOverlappingBufferCopy4) {
     bind_info.signalSemaphoreCount = 1;
     bind_info.pSignalSemaphores = &semaphore.handle();
 
-    VkQueue sparse_queue = m_device->graphics_queues()[sparse_index.value()]->handle();
+    vkt::Queue* sparse_queue = m_device->sparse_queues()[0];
     vkt::Fence sparse_queue_fence(*m_device);
-    vk::QueueBindSparse(sparse_queue, 1, &bind_info, sparse_queue_fence);
+    vk::QueueBindSparse(sparse_queue->handle(), 1, &bind_info, sparse_queue_fence);
     ASSERT_EQ(VK_SUCCESS, sparse_queue_fence.wait(kWaitTimeout));
     // Set up complete
 
@@ -354,9 +330,23 @@ TEST_F(PositiveSparseBuffer, DISABLED_NonOverlappingBufferCopy4) {
     submit_info.commandBufferCount = 1;
     submit_info.pCommandBuffers = &m_commandBuffer->handle();
 
-    vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
+    vk::QueueSubmit(m_default_queue->handle(), 1, &submit_info, VK_NULL_HANDLE);
 
     // Wait for operations to finish before destroying anything
-    vk::QueueWaitIdle(m_default_queue);
-    vk::QueueWaitIdle(sparse_queue);
+    m_default_queue->wait();
+    sparse_queue->wait();
+}
+
+TEST_F(PositiveSparseBuffer, DISABLED_BindSparseEmpty) {
+    TEST_DESCRIPTION("Test submitting empty queue bind sparse");
+    AddRequiredFeature(vkt::Feature::sparseBinding);
+    RETURN_IF_SKIP(Init());
+
+    if (m_device->sparse_queues().empty()) {
+        GTEST_SKIP() << "Required SPARSE_BINDING queue families not present";
+    }
+
+    vkt::Queue* sparse_queue = m_device->sparse_queues()[0];
+    vk::QueueBindSparse(sparse_queue->handle(), 0u, nullptr, VK_NULL_HANDLE);
+    sparse_queue->wait();
 }

@@ -1,10 +1,10 @@
 #!/usr/bin/python3 -i
 #
-# Copyright (c) 2015-2023 The Khronos Group Inc.
-# Copyright (c) 2015-2023 Valve Corporation
-# Copyright (c) 2015-2023 LunarG, Inc.
-# Copyright (c) 2015-2023 Google Inc.
-# Copyright (c) 2023-2023 RasterGrid Kft.
+# Copyright (c) 2015-2024 The Khronos Group Inc.
+# Copyright (c) 2015-2024 Valve Corporation
+# Copyright (c) 2015-2024 LunarG, Inc.
+# Copyright (c) 2015-2024 Google Inc.
+# Copyright (c) 2023-2024 RasterGrid Kft.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -106,6 +106,7 @@ class ObjectTrackerOutputGenerator(BaseGenerator):
             'vkDestroySwapchainKHR',
             'vkGetSwapchainImagesKHR',
             'vkCmdPushDescriptorSetKHR',
+            'vkCmdPushDescriptorSet2KHR',
             'vkDestroyDevice',
             'vkResetDescriptorPool',
             'vkGetPhysicalDeviceDisplayPropertiesKHR',
@@ -113,6 +114,8 @@ class ObjectTrackerOutputGenerator(BaseGenerator):
             'vkGetDisplayModePropertiesKHR',
             'vkGetDisplayModeProperties2KHR',
             'vkCreateFramebuffer',
+            'vkDebugMarkerSetObjectNameEXT',
+            'vkDebugMarkerSetObjectTagEXT',
             'vkSetDebugUtilsObjectNameEXT',
             'vkSetDebugUtilsObjectTagEXT',
             'vkCreateDescriptorUpdateTemplate',
@@ -123,6 +126,8 @@ class ObjectTrackerOutputGenerator(BaseGenerator):
             'vkCreateRayTracingPipelinesKHR',
             'vkExportMetalObjectsEXT',
             'vkGetDescriptorEXT',
+            'vkGetPrivateData',
+            'vkSetPrivateData',
             ]
         # These VUIDS are not implicit, but are best handled in this layer. Codegen for vkDestroy calls will generate a key
         # which is translated here into a good VU.  Saves ~40 checks.
@@ -334,11 +339,11 @@ class ObjectTrackerOutputGenerator(BaseGenerator):
 
             /***************************************************************************
             *
-            * Copyright (c) 2015-2023 The Khronos Group Inc.
-            * Copyright (c) 2015-2023 Valve Corporation
-            * Copyright (c) 2015-2023 LunarG, Inc.
-            * Copyright (c) 2015-2023 Google Inc.
-            * Copyright (c) 2015-2023 RasterGrid Kft.
+            * Copyright (c) 2015-2024 The Khronos Group Inc.
+            * Copyright (c) 2015-2024 Valve Corporation
+            * Copyright (c) 2015-2024 LunarG, Inc.
+            * Copyright (c) 2015-2024 Google Inc.
+            * Copyright (c) 2015-2024 RasterGrid Kft.
             *
             * Licensed under the Apache License, Version 2.0 (the "License");
             * you may not use this file except in compliance with the License.
@@ -559,6 +564,13 @@ bool ObjectLifetimes::ReportUndestroyedDeviceObjects(VkDevice device, const Loca
 
 
     def getParamVUID(self, member: Member, parentName: str) -> str:
+        # Exceptions
+        if (member.name == 'pCounterBuffers'):
+            if parentName == 'vkCmdBeginTransformFeedbackEXT':
+                return '"VUID-vkCmdBeginTransformFeedbackEXT-counterBufferCount-02607"'
+            if parentName == 'vkCmdEndTransformFeedbackEXT':
+                return '"VUID-vkCmdEndTransformFeedbackEXT-counterBufferCount-02608"'
+
         # Replace with alias if one
         alias = self.vk.commands[parentName].alias if parentName in self.vk.commands else None
         parent = alias if alias else parentName
@@ -740,6 +752,12 @@ bool ObjectLifetimes::ReportUndestroyedDeviceObjects(VkDevice device, const Loca
                     pre_call_validate += f'// Checked by chassis: {member.name}: {param_vuid}\n'
                     if chassis_parent_vuid != 'kVUIDUndefined':
                         pre_call_validate += f'// Checked by chassis: {member.name}: {chassis_parent_vuid}\n'
+                elif param_vuid == 'kVUIDUndefined':
+                    # These cases are 'commonparent' VUs for "non-ignored parameters"
+                    if parent_vuid == 'kVUIDUndefined':
+                        location = f'{errorLoc}.dot(Field::{member.name})'
+                        pre_call_validate += '// There should be an explicit VU (if not that is a spec bug)\n'
+                        pre_call_validate += f'skip |= ValidateObject({prefix}{member.name}, kVulkanObjectType{member.type[2:]}, {nullAllowed}, {param_vuid}, {parent_vuid}, {location}{parent_object_type});\n'
                 else:
                     location = f'{errorLoc}.dot(Field::{member.name})'
                     if self.vk.commands[topCommand].device and self.vk.handles[member.type].instance:
@@ -795,8 +813,8 @@ bool ObjectLifetimes::ReportUndestroyedDeviceObjects(VkDevice device, const Loca
                             continue
                         contains_pNext = True
                         nested_struct.extend(guard_helper.add_guard(extended_struct.protect))
-                        nested_struct.append(f'if (auto pNext = vku::FindStructInPNextChain<{extendedBy}>({new_prefix}pNext)) {{\n')
-                        nested_struct.append(f'    const Location pNext_loc = {new_error_loc}.pNext(Struct::{extendedBy});\n')
+                        nested_struct.append(f'if ([[maybe_unused]] auto pNext = vku::FindStructInPNextChain<{extendedBy}>({new_prefix}pNext)) {{\n')
+                        nested_struct.append(f'    [[maybe_unused]] const Location pNext_loc = {new_error_loc}.pNext(Struct::{extendedBy});\n')
                         nested_struct.append(self.validateObjects(extended_members, 'pNext->', arrayIndex + 1, extendedBy, topCommand, 'pNext_loc'))
                         nested_struct.append('}\n')
                     nested_struct.extend(guard_helper.add_guard(None))

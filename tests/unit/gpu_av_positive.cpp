@@ -1,6 +1,6 @@
-/* Copyright (c) 2023 The Khronos Group Inc.
- * Copyright (c) 2023 Valve Corporation
- * Copyright (c) 2023 LunarG, Inc.
+/* Copyright (c) 2023-2024 The Khronos Group Inc.
+ * Copyright (c) 2023-2024 Valve Corporation
+ * Copyright (c) 2023-2024 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,9 +26,9 @@ static const std::array gpu_av_enables = {VK_VALIDATION_FEATURE_ENABLE_GPU_ASSIS
 static const std::array gpu_av_disables = {VK_VALIDATION_FEATURE_DISABLE_THREAD_SAFETY_EXT,
                                            VK_VALIDATION_FEATURE_DISABLE_CORE_CHECKS_EXT};
 
-// All VkGpuAssistedLayerTest should use this for setup as a single access point to more easily toggle which validation features are
+// All GpuAVTest should use this for setup as a single access point to more easily toggle which validation features are
 // enabled/disabled
-VkValidationFeaturesEXT VkGpuAssistedLayerTest::GetGpuAvValidationFeatures() {
+VkValidationFeaturesEXT GpuAVTest::GetGpuAvValidationFeatures() {
     AddRequiredExtensions(VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME);
     VkValidationFeaturesEXT features = vku::InitStructHelper();
     features.enabledValidationFeatureCount = size32(gpu_av_enables);
@@ -40,7 +40,18 @@ VkValidationFeaturesEXT VkGpuAssistedLayerTest::GetGpuAvValidationFeatures() {
     return features;
 }
 
-TEST_F(PositiveGpuAssistedLayer, SetSSBOBindDescriptor) {
+// This checks any requirements needed for GPU-AV are met otherwise devices not meeting them will "fail" the tests
+void GpuAVTest::InitGpuAvFramework(void *p_next) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
+    validation_features.pNext = p_next;
+    RETURN_IF_SKIP(InitFramework(&validation_features));
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    }
+}
+
+TEST_F(PositiveGpuAV, SetSSBOBindDescriptor) {
     TEST_DESCRIPTION("Makes sure we can use vkCmdBindDescriptorSets()");
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
@@ -74,66 +85,35 @@ TEST_F(PositiveGpuAssistedLayer, SetSSBOBindDescriptor) {
 
     VkShaderObj cs(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
 
-    OneOffDescriptorSet descriptor_set_0(m_device,
-                                         {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
-                                          {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}});
-    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set_0.layout_});
-    ASSERT_TRUE(pipeline_layout.initialized());
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cs_ = std::make_unique<VkShaderObj>(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+                          {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}};
+    pipe.InitState();
+    pipe.CreateComputePipeline();
 
-    VkComputePipelineCreateInfo pipeline_info = vku::InitStructHelper();
-    pipeline_info.flags = 0;
-    pipeline_info.layout = pipeline_layout.handle();
-    pipeline_info.basePipelineHandle = VK_NULL_HANDLE;
-    pipeline_info.basePipelineIndex = -1;
-    pipeline_info.stage = cs.GetStageCreateInfo();
+    VkBufferUsageFlags buffer_usage =
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+    uint32_t buffer_size = 262144;
+    vkt::Buffer buffer_0(*m_device, buffer_size, buffer_usage);
+    vkt::Buffer buffer_1(*m_device, buffer_size, buffer_usage);
 
-    VkPipeline pipeline;
-    vk::CreateComputePipelines(device(), VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &pipeline);
-
-    vkt::Buffer buffer_0;
-    VkBufferCreateInfo buffer_ci = vku::InitStructHelper();
-    buffer_ci.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-    buffer_ci.size = 262144;
-    buffer_0.init(*m_device, buffer_ci);
-    vkt::Buffer buffer_1;
-    buffer_1.init(*m_device, buffer_ci);
-
-    VkWriteDescriptorSet descriptor_writes[2];
-    descriptor_writes[0] = vku::InitStructHelper();
-    descriptor_writes[0].dstSet = descriptor_set_0.set_;
-    descriptor_writes[0].dstBinding = 0;
-    descriptor_writes[0].dstArrayElement = 0;
-    descriptor_writes[0].descriptorCount = 1;
-    descriptor_writes[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    VkDescriptorBufferInfo buffer_info_0 = {buffer_0.handle(), 0, 1024};
-    descriptor_writes[0].pBufferInfo = &buffer_info_0;
-
-    descriptor_writes[1] = descriptor_writes[0];
-    descriptor_writes[1].dstBinding = 1;
-    VkDescriptorBufferInfo buffer_info_1 = {buffer_1.handle(), 0, 1024};
-    descriptor_writes[1].pBufferInfo = &buffer_info_1;
-
-    vk::UpdateDescriptorSets(device(), 2, descriptor_writes, 0, nullptr);
+    pipe.descriptor_set_->WriteDescriptorBufferInfo(0, buffer_0.handle(), 0, 1024, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    pipe.descriptor_set_->WriteDescriptorBufferInfo(1, buffer_1.handle(), 0, 1024, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    pipe.descriptor_set_->UpdateDescriptorSets();
 
     m_commandBuffer->begin();
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout.handle(), 0, 1,
-                              &descriptor_set_0.set_, 0, nullptr);
-
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_);
+    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0, 1,
+                              &pipe.descriptor_set_->set_, 0, nullptr);
     vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
     m_commandBuffer->end();
 
-    VkSubmitInfo submit_info = vku::InitStructHelper();
-    submit_info.commandBufferCount = 1;
-    submit_info.pCommandBuffers = &m_commandBuffer->handle();
-
-    vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
-    vk::QueueWaitIdle(m_default_queue);
-
-    vk::DestroyPipeline(m_device->device(), pipeline, nullptr);
+    m_default_queue->submit(*m_commandBuffer);
+    m_default_queue->wait();
 }
 
-TEST_F(PositiveGpuAssistedLayer, SetSSBOPushDescriptor) {
+TEST_F(PositiveGpuAV, SetSSBOPushDescriptor) {
     TEST_DESCRIPTION("Makes sure we can use vkCmdPushDescriptorSetKHR instead of vkUpdateDescriptorSets");
     AddRequiredExtensions(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
     RETURN_IF_SKIP(InitGpuAvFramework());
@@ -173,7 +153,6 @@ TEST_F(PositiveGpuAssistedLayer, SetSSBOPushDescriptor) {
                                           {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}},
                                          VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR);
     const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set_0.layout_});
-    ASSERT_TRUE(pipeline_layout.initialized());
 
     VkComputePipelineCreateInfo pipeline_info = vku::InitStructHelper();
     pipeline_info.flags = 0;
@@ -181,17 +160,13 @@ TEST_F(PositiveGpuAssistedLayer, SetSSBOPushDescriptor) {
     pipeline_info.basePipelineHandle = VK_NULL_HANDLE;
     pipeline_info.basePipelineIndex = -1;
     pipeline_info.stage = cs.GetStageCreateInfo();
+    vkt::Pipeline pipeline(*m_device, pipeline_info);
 
-    VkPipeline pipeline;
-    vk::CreateComputePipelines(device(), VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &pipeline);
-
-    vkt::Buffer buffer_0;
     VkBufferCreateInfo buffer_ci = vku::InitStructHelper();
     buffer_ci.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
     buffer_ci.size = 262144;
-    buffer_0.init(*m_device, buffer_ci);
-    vkt::Buffer buffer_1;
-    buffer_1.init(*m_device, buffer_ci);
+    vkt::Buffer buffer_0(*m_device, buffer_ci);
+    vkt::Buffer buffer_1(*m_device, buffer_ci);
 
     VkWriteDescriptorSet descriptor_writes[2];
     descriptor_writes[0] = vku::InitStructHelper();
@@ -216,131 +191,19 @@ TEST_F(PositiveGpuAssistedLayer, SetSSBOPushDescriptor) {
     vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
     m_commandBuffer->end();
 
-    VkSubmitInfo submit_info = vku::InitStructHelper();
-    submit_info.commandBufferCount = 1;
-    submit_info.pCommandBuffers = &m_commandBuffer->handle();
-
-    vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
-    vk::QueueWaitIdle(m_default_queue);
-
-    vk::DestroyPipeline(m_device->device(), pipeline, nullptr);
-}
-
-TEST_F(PositiveGpuAssistedLayer, GpuBufferDeviceAddress) {
-    TEST_DESCRIPTION("Makes sure that writing to a buffer that was created after command buffer record doesn't get OOB error");
-    SetTargetApiVersion(VK_API_VERSION_1_2);
-    AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitGpuAvFramework());
-    VkPhysicalDeviceBufferDeviceAddressFeaturesKHR bda_features = vku::InitStructHelper();
-    VkPhysicalDeviceFeatures2KHR features2 = GetPhysicalDeviceFeatures2(bda_features);
-    if (!features2.features.shaderInt64) {
-        GTEST_SKIP() << "shaderInt64 is not supported";
-    }
-    features2.features.robustBufferAccess = VK_FALSE;
-
-    RETURN_IF_SKIP(InitState(nullptr, &features2));
-    InitRenderTarget();
-
-    // Make a uniform buffer to be passed to the shader that contains the pointer and write count
-    uint32_t qfi = 0;
-    VkBufferCreateInfo bci = vku::InitStructHelper();
-    bci.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-    bci.size = 12;  // 64 bit pointer + int
-    bci.queueFamilyIndexCount = 1;
-    bci.pQueueFamilyIndices = &qfi;
-    vkt::Buffer buffer0;
-    VkMemoryPropertyFlags mem_props = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-    buffer0.init(*m_device, bci, mem_props);
-
-    VkSubmitInfo submit_info = vku::InitStructHelper();
-    submit_info.commandBufferCount = 1;
-    submit_info.pCommandBuffers = &m_commandBuffer->handle();
-
-    VkCommandBufferBeginInfo begin_info = vku::InitStructHelper();
-    VkCommandBufferInheritanceInfo hinfo = vku::InitStructHelper();
-    begin_info.pInheritanceInfo = &hinfo;
-
-    OneOffDescriptorSet descriptor_set(m_device, {{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}});
-
-    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
-    VkDescriptorBufferInfo buffer_test_buffer_info = {};
-    buffer_test_buffer_info.buffer = buffer0.handle();
-    buffer_test_buffer_info.offset = 0;
-    buffer_test_buffer_info.range = sizeof(uint32_t);
-
-    VkWriteDescriptorSet descriptor_write = vku::InitStructHelper();
-    descriptor_write.dstSet = descriptor_set.set_;
-    descriptor_write.dstBinding = 0;
-    descriptor_write.descriptorCount = 1;
-    descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    descriptor_write.pBufferInfo = &buffer_test_buffer_info;
-    vk::UpdateDescriptorSets(m_device->device(), 1, &descriptor_write, 0, NULL);
-
-    char const *shader_source = R"glsl(
-        #version 450
-        #extension GL_EXT_buffer_reference : enable
-        layout(buffer_reference, buffer_reference_align = 16) buffer bufStruct;
-        layout(set = 0, binding = 0) uniform ufoo {
-            bufStruct data;
-            int nWrites;
-        } u_info;
-        layout(buffer_reference, std140) buffer bufStruct {
-            int a[4];
-        };
-        void main() {
-            for (int i=0; i < u_info.nWrites; ++i) {
-                u_info.data.a[i] = 0xdeadca71;
-            }
-        }
-    )glsl";
-    VkShaderObj vs(this, shader_source, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL, nullptr, "main", true);
-
-    CreatePipelineHelper pipe(*this);
-    pipe.InitState();
-    pipe.shader_stages_ = {vs.GetStageCreateInfo()};
-    pipe.rs_state_ci_.rasterizerDiscardEnable = VK_TRUE;
-    pipe.gp_ci_.layout = pipeline_layout.handle();
-    pipe.CreateGraphicsPipeline();
-
-    m_commandBuffer->begin(&begin_info);
-    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1,
-                              &descriptor_set.set_, 0, nullptr);
-    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
-    m_commandBuffer->EndRenderPass();
-    m_commandBuffer->end();
-
-    // Make another buffer to write to
-    bci.usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT_KHR;
-    bci.size = 64;  // Buffer should be 16*4 = 64 bytes
-    VkMemoryAllocateFlagsInfo allocate_flag_info = vku::InitStructHelper();
-    allocate_flag_info.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
-    vkt::Buffer buffer1(*m_device, bci, mem_props, &allocate_flag_info);
-
-    // Get device address of buffer to write to
-    auto pBuffer = buffer1.address();
-
-    auto *data = static_cast<VkDeviceAddress *>(buffer0.memory().map());
-    data[0] = pBuffer;
-    data[1] = 4;
-    buffer0.memory().unmap();
-
-    vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
-    vk::QueueWaitIdle(m_default_queue);
+    m_default_queue->submit(*m_commandBuffer);
+    m_default_queue->wait();
 }
 
 // Regression test for semaphore timeout with GPU-AV enabled:
 // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/4968
-TEST_F(PositiveGpuAssistedLayer, GetCounterFromSignaledSemaphoreAfterSubmit) {
+TEST_F(PositiveGpuAV, GetCounterFromSignaledSemaphoreAfterSubmit) {
     TEST_DESCRIPTION("Get counter value from the semaphore signaled by queue submit");
     SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredFeature(vkt::Feature::timelineSemaphore);
+    AddRequiredFeature(vkt::Feature::synchronization2);
     RETURN_IF_SKIP(InitGpuAvFramework());
-
-    VkPhysicalDeviceSynchronization2Features sync2_features = vku::InitStructHelper();
-    VkPhysicalDeviceTimelineSemaphoreFeatures timeline_semaphore_features = vku::InitStructHelper(&sync2_features);
-    GetPhysicalDeviceFeatures2(timeline_semaphore_features);
-    RETURN_IF_SKIP(InitState(nullptr, &timeline_semaphore_features));
+    RETURN_IF_SKIP(InitState());
 
     VkSemaphoreTypeCreateInfo semaphore_type_info = vku::InitStructHelper();
     semaphore_type_info.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
@@ -355,20 +218,18 @@ TEST_F(PositiveGpuAssistedLayer, GetCounterFromSignaledSemaphoreAfterSubmit) {
     VkSubmitInfo2 submit_info = vku::InitStructHelper();
     submit_info.signalSemaphoreInfoCount = 1;
     submit_info.pSignalSemaphoreInfos = &signal_info;
-    ASSERT_EQ(VK_SUCCESS, vk::QueueSubmit2(m_default_queue, 1, &submit_info, VK_NULL_HANDLE));
+    ASSERT_EQ(VK_SUCCESS, vk::QueueSubmit2(m_default_queue->handle(), 1, &submit_info, VK_NULL_HANDLE));
 
     std::uint64_t counter = 0;
     ASSERT_EQ(VK_SUCCESS, vk::GetSemaphoreCounterValue(*m_device, semaphore, &counter));
 }
 
-TEST_F(PositiveGpuAssistedLayer, MutableBuffer) {
+TEST_F(PositiveGpuAV, MutableBuffer) {
     TEST_DESCRIPTION("Makes sure we can use vkCmdBindDescriptorSets()");
     AddRequiredExtensions(VK_EXT_MUTABLE_DESCRIPTOR_TYPE_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::mutableDescriptorType);
     RETURN_IF_SKIP(InitGpuAvFramework());
-
-    VkPhysicalDeviceMutableDescriptorTypeFeaturesEXT mutable_descriptor_type_features = vku::InitStructHelper();
-    GetPhysicalDeviceFeatures2(mutable_descriptor_type_features);
-    RETURN_IF_SKIP(InitState(nullptr, &mutable_descriptor_type_features));
+    RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
     VkPhysicalDeviceProperties properties = {};
@@ -419,7 +280,6 @@ TEST_F(PositiveGpuAssistedLayer, MutableBuffer) {
                                          0, &mdtci);
 
     const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set_0.layout_});
-    ASSERT_TRUE(pipeline_layout.initialized());
 
     VkComputePipelineCreateInfo pipeline_info = vku::InitStructHelper();
     pipeline_info.flags = 0;
@@ -427,17 +287,13 @@ TEST_F(PositiveGpuAssistedLayer, MutableBuffer) {
     pipeline_info.basePipelineHandle = VK_NULL_HANDLE;
     pipeline_info.basePipelineIndex = -1;
     pipeline_info.stage = cs.GetStageCreateInfo();
+    vkt::Pipeline pipeline(*m_device, pipeline_info);
 
-    VkPipeline pipeline;
-    vk::CreateComputePipelines(device(), VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &pipeline);
-
-    vkt::Buffer buffer_0;
-    VkBufferCreateInfo buffer_ci = vku::InitStructHelper();
-    buffer_ci.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-    buffer_ci.size = 262144;
-    buffer_0.init(*m_device, buffer_ci);
-    vkt::Buffer buffer_1;
-    buffer_1.init(*m_device, buffer_ci);
+    VkBufferUsageFlags buffer_usage =
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+    uint32_t buffer_size = 262144;
+    vkt::Buffer buffer_0(*m_device, buffer_size, buffer_usage);
+    vkt::Buffer buffer_1(*m_device, buffer_size, buffer_usage);
 
     VkWriteDescriptorSet descriptor_write = vku::InitStructHelper();
     descriptor_write.dstSet = descriptor_set_0.set_;
@@ -475,17 +331,11 @@ TEST_F(PositiveGpuAssistedLayer, MutableBuffer) {
     vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
     m_commandBuffer->end();
 
-    VkSubmitInfo submit_info = vku::InitStructHelper();
-    submit_info.commandBufferCount = 1;
-    submit_info.pCommandBuffers = &m_commandBuffer->handle();
-
-    vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
-    vk::QueueWaitIdle(m_default_queue);
-
-    vk::DestroyPipeline(m_device->device(), pipeline, nullptr);
+    m_default_queue->submit(*m_commandBuffer);
+    m_default_queue->wait();
 }
 
-TEST_F(PositiveGpuAssistedLayer, MaxDescriptorsClamp) {
+TEST_F(PositiveGpuAV, MaxDescriptorsClamp) {
     TEST_DESCRIPTION("Make sure maxUpdateAfterBindDescriptorsInAllPools is clamped");
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
@@ -498,7 +348,7 @@ TEST_F(PositiveGpuAssistedLayer, MaxDescriptorsClamp) {
     ASSERT_GE(gpuav::glsl::kDebugInputBindlessMaxDescriptors, desc_indexing_props.maxUpdateAfterBindDescriptorsInAllPools);
 }
 
-TEST_F(PositiveGpuAssistedLayer, MaxDescriptorsClamp13) {
+TEST_F(PositiveGpuAV, MaxDescriptorsClamp13) {
     TEST_DESCRIPTION("Make sure maxUpdateAfterBindDescriptorsInAllPools is clamped");
     SetTargetApiVersion(VK_API_VERSION_1_3);
     RETURN_IF_SKIP(InitGpuAvFramework());
@@ -512,187 +362,9 @@ TEST_F(PositiveGpuAssistedLayer, MaxDescriptorsClamp13) {
     ASSERT_GE(gpuav::glsl::kDebugInputBindlessMaxDescriptors, vk12_props.maxUpdateAfterBindDescriptorsInAllPools);
 }
 
-TEST_F(PositiveGpuAssistedLayer, GpuValidationUnInitImage) {
-    TEST_DESCRIPTION("Make sure there's not a crash if the sampler of a combined image sampler is initialized by the image isn't.");
-
-    AddRequiredExtensions(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
-    AddRequiredExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitGpuAvFramework());
-
-    auto maintenance4_features = vku::InitStruct<VkPhysicalDeviceMaintenance4Features>();
-    maintenance4_features.maintenance4 = true;
-    auto features2 = vku::InitStruct<VkPhysicalDeviceFeatures2KHR>(&maintenance4_features);
-    auto indexing_features = vku::InitStruct<VkPhysicalDeviceDescriptorIndexingFeaturesEXT>();
-    maintenance4_features.pNext = &indexing_features;
-    GetPhysicalDeviceFeatures2(features2);
-
-    if (!indexing_features.runtimeDescriptorArray || !indexing_features.descriptorBindingSampledImageUpdateAfterBind ||
-        !indexing_features.descriptorBindingPartiallyBound || !indexing_features.descriptorBindingVariableDescriptorCount ||
-        !indexing_features.shaderSampledImageArrayNonUniformIndexing ||
-        !indexing_features.shaderStorageBufferArrayNonUniformIndexing) {
-        GTEST_SKIP() << "Not all descriptor indexing features supported, skipping descriptor indexing tests";
-    }
-
-    RETURN_IF_SKIP(InitState(nullptr, &features2));
-    InitRenderTarget();
-
-    // Make a uniform buffer to be passed to the shader that contains the invalid array index.
-    uint32_t qfi = 0;
-    VkBufferCreateInfo bci = vku::InitStruct<VkBufferCreateInfo>();
-    bci.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-    bci.size = 1024;
-    bci.queueFamilyIndexCount = 1;
-    bci.pQueueFamilyIndices = &qfi;
-    vkt::Buffer buffer0;
-    VkMemoryPropertyFlags mem_props = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-    buffer0.init(*m_device, bci, mem_props);
-
-    bci.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-    // Make another buffer to populate the buffer array to be indexed
-    vkt::Buffer buffer1;
-    buffer1.init(*m_device, bci, mem_props);
-
-    void *layout_pnext = nullptr;
-    void *allocate_pnext = nullptr;
-    auto pool_create_flags = 0;
-    auto layout_create_flags = 0;
-    VkDescriptorBindingFlagsEXT ds_binding_flags[3] = {};
-    VkDescriptorSetLayoutBindingFlagsCreateInfoEXT layout_createinfo_binding_flags[1] = {};
-    ds_binding_flags[0] = 0;
-    ds_binding_flags[1] = 0;
-    ds_binding_flags[2] = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT_EXT;
-
-    layout_createinfo_binding_flags[0] = vku::InitStruct<VkDescriptorSetLayoutBindingFlagsCreateInfo>();
-    layout_createinfo_binding_flags[0].bindingCount = 3;
-    layout_createinfo_binding_flags[0].pBindingFlags = ds_binding_flags;
-    layout_create_flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT_EXT;
-    pool_create_flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT_EXT;
-    layout_pnext = layout_createinfo_binding_flags;
-
-    layout_create_flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
-    pool_create_flags = VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
-    ds_binding_flags[1] = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT;
-    vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
-
-    const VkSampler samplers[2] = {sampler.handle(), sampler.handle()};
-
-    OneOffDescriptorSet descriptor_set_variable(m_device,
-                                                {
-                                                {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
-                                                {1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 5, VK_SHADER_STAGE_ALL, nullptr},
-                                                {2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2, VK_SHADER_STAGE_ALL, samplers},
-                                                },
-                                                layout_create_flags, layout_pnext, pool_create_flags, allocate_pnext);
-
-    const vkt::PipelineLayout pipeline_layout_variable(*m_device, {&descriptor_set_variable.layout_});
-    VkImageObj image(m_device);
-    image.Init(16, 16, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
-    vkt::ImageView image_view = image.CreateView();
-
-    VkDescriptorBufferInfo buffer_info[1] = {};
-    buffer_info[0].buffer = buffer0.handle();
-    buffer_info[0].offset = 0;
-    buffer_info[0].range = sizeof(uint32_t);
-
-    VkDescriptorImageInfo image_info[1] = {};
-    image_info[0] = {VK_NULL_HANDLE, image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
-
-    VkWriteDescriptorSet descriptor_writes[2] = {};
-    descriptor_writes[0] = vku::InitStruct<VkWriteDescriptorSet>();
-    descriptor_writes[0].dstSet = descriptor_set_variable.set_;
-    descriptor_writes[0].dstBinding = 0;
-    descriptor_writes[0].descriptorCount = 1;
-    descriptor_writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    descriptor_writes[0].pBufferInfo = buffer_info;
-    descriptor_writes[1] = vku::InitStruct<VkWriteDescriptorSet>();
-    descriptor_writes[1].dstSet = descriptor_set_variable.set_;
-    descriptor_writes[1].dstBinding = 2;
-    descriptor_writes[1].dstArrayElement = 1;
-    descriptor_writes[1].descriptorCount = 1;
-    descriptor_writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    descriptor_writes[1].pImageInfo = image_info;
-    vk::UpdateDescriptorSets(m_device->device(), 2, descriptor_writes, 0, NULL);
-
-    ds_binding_flags[0] = 0;
-    ds_binding_flags[1] = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT;
-
-    // - The vertex shader fetches the invalid index from the uniform buffer and passes it to the fragment shader.
-    // - The fragment shader makes the invalid array access.
-    char const *vsSource_frag = R"glsl(
-        #version 450
-
-        layout(std140, binding = 0) uniform foo { uint tex_index[1]; } uniform_index_buffer;
-        layout(location = 0) out flat uint index;
-        vec2 vertices[3];
-        void main(){
-              vertices[0] = vec2(-1.0, -1.0);
-              vertices[1] = vec2( 1.0, -1.0);
-              vertices[2] = vec2( 0.0,  1.0);
-           gl_Position = vec4(vertices[gl_VertexIndex % 3], 0.0, 1.0);
-           index = uniform_index_buffer.tex_index[0];
-        }
-    )glsl";
-    char const *fsSource_frag_runtime = R"glsl(
-        #version 450
-        #extension GL_EXT_nonuniform_qualifier : enable
-
-        layout(set = 0, binding = 2) uniform sampler2D tex[];
-        layout(location = 0) out vec4 uFragColor;
-        layout(location = 0) in flat uint index;
-        void main(){
-           uFragColor = texture(tex[index], vec2(0, 0));
-        }
-    )glsl";
-    struct TestCase {
-        char const *vertex_source;
-        char const *fragment_source;
-        bool debug;
-        const vkt::PipelineLayout *pipeline_layout;
-        const OneOffDescriptorSet *descriptor_set;
-        uint32_t index;
-    };
-
-    std::vector<TestCase> tests;
-
-    tests.push_back({vsSource_frag, fsSource_frag_runtime, false, &pipeline_layout_variable,
-                    &descriptor_set_variable, 1});
-
-    VkSubmitInfo submit_info = vku::InitStruct<VkSubmitInfo>();
-    submit_info.commandBufferCount = 1;
-    submit_info.pCommandBuffers = &m_commandBuffer->handle();
-
-    for (const auto &iter : tests) {
-        VkShaderObj vs(this, iter.vertex_source, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL, nullptr, "main",
-                       iter.debug);
-        VkShaderObj fs(this, iter.fragment_source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL, nullptr,
-                       "main", iter.debug);
-        CreatePipelineHelper pipe(*this);
-        pipe.InitState();
-        pipe.shader_stages_.clear();
-        pipe.shader_stages_.push_back(vs.GetStageCreateInfo());
-        pipe.shader_stages_.push_back(fs.GetStageCreateInfo());
-        pipe.gp_ci_.layout = iter.pipeline_layout->handle();
-        pipe.CreateGraphicsPipeline();
-        m_commandBuffer->begin();
-        m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-        vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-        vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, iter.pipeline_layout->handle(), 0, 1,
-                                  &iter.descriptor_set->set_, 0, nullptr);
-        vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
-        vk::CmdEndRenderPass(m_commandBuffer->handle());
-        m_commandBuffer->end();
-        uint32_t *data = (uint32_t *)buffer0.memory().map();
-        data[0] = iter.index;
-        buffer0.memory().unmap();
-
-        vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
-        vk::QueueWaitIdle(m_default_queue);
-    }
-    return;
-}
-
-TEST_F(PositiveGpuAssistedLayer, SelectInstrumentedShaders) {
+TEST_F(PositiveGpuAV, SelectInstrumentedShaders) {
     TEST_DESCRIPTION("Use a bad vertex shader, but don't select it for validation and make sure we don't get a buffer oob warning");
+    AddRequiredExtensions(VK_EXT_LAYER_SETTINGS_EXTENSION_NAME);
     SetTargetApiVersion(VK_API_VERSION_1_2);
     const VkBool32 value = true;
     const VkLayerSettingEXT setting = {OBJECT_LAYER_NAME, "select_instrumented_shaders", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1,
@@ -731,8 +403,7 @@ TEST_F(PositiveGpuAssistedLayer, SelectInstrumentedShaders) {
     VkValidationFeaturesEXT features = vku::InitStructHelper();
     features.enabledValidationFeatureCount = 1;
     features.pEnabledValidationFeatures = enabled;
-    VkShaderObj fs(this, vertshader, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL, nullptr, "main", false,
-                   &features);
+    VkShaderObj fs(this, vertshader, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL, nullptr, "main", &features);
     CreatePipelineHelper pipe(*this);
     pipe.InitState();
     pipe.shader_stages_.clear();
@@ -741,8 +412,7 @@ TEST_F(PositiveGpuAssistedLayer, SelectInstrumentedShaders) {
     pipe.gp_ci_.layout = pipeline_layout.handle();
     pipe.CreateGraphicsPipeline();
 
-    VkCommandBufferBeginInfo begin_info = vku::InitStructHelper();
-    m_commandBuffer->begin(&begin_info);
+    m_commandBuffer->begin();
     vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
     vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1,
@@ -753,10 +423,10 @@ TEST_F(PositiveGpuAssistedLayer, SelectInstrumentedShaders) {
     // Should not get a warning since buggy vertex shader wasn't instrumented
     m_errorMonitor->ExpectSuccess(kWarningBit | kErrorBit);
     m_commandBuffer->QueueCommandBuffer();
-    vk::QueueWaitIdle(m_default_queue);
+    m_default_queue->wait();
 }
 
-TEST_F(PositiveGpuAssistedLayer, BindingPartiallyBound) {
+TEST_F(PositiveGpuAV, BindingPartiallyBound) {
     TEST_DESCRIPTION("Ensure that no validation errors for invalid descriptors if binding is PARTIALLY_BOUND");
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
@@ -792,38 +462,17 @@ TEST_F(PositiveGpuAssistedLayer, BindingPartiallyBound) {
                                        },
                                        0, &layout_createinfo_binding_flags, 0);
     const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
-    uint32_t qfi = 0;
-    VkBufferCreateInfo buffer_create_info = vku::InitStructHelper();
-    buffer_create_info.size = 32;
-    buffer_create_info.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-    buffer_create_info.queueFamilyIndexCount = 1;
-    buffer_create_info.pQueueFamilyIndices = &qfi;
 
-    VkMemoryPropertyFlags mem_props = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
-    vkt::Buffer buffer(*m_device, buffer_create_info, mem_props);
+    vkt::Buffer buffer(*m_device, 32, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
     uint32_t *data = (uint32_t*)buffer.memory().map();
     data[0] = 0;
     buffer.memory().unmap();
 
-    VkDescriptorBufferInfo buffer_info[2] = {};
-    buffer_info[0].buffer = buffer.handle();
-    buffer_info[0].offset = 0;
-    buffer_info[0].range = sizeof(uint32_t);
-
-    VkBufferCreateInfo index_buffer_create_info = vku::InitStructHelper();
-    index_buffer_create_info.size = sizeof(uint32_t);
-    index_buffer_create_info.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-    vkt::Buffer index_buffer(*m_device, index_buffer_create_info);
+    vkt::Buffer index_buffer(*m_device, sizeof(uint32_t), VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
 
     // Only update binding 0
-    VkWriteDescriptorSet descriptor_writes[2] = {};
-    descriptor_writes[0] = vku::InitStructHelper();
-    descriptor_writes[0].dstSet = descriptor_set.set_;
-    descriptor_writes[0].dstBinding = 0;
-    descriptor_writes[0].descriptorCount = 1;
-    descriptor_writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    descriptor_writes[0].pBufferInfo = buffer_info;
-    vk::UpdateDescriptorSets(m_device->device(), 1, descriptor_writes, 0, NULL);
+    descriptor_set.WriteDescriptorBufferInfo(0, buffer.handle(), 0, sizeof(uint32_t));
+    descriptor_set.UpdateDescriptorSets();
 
     char const *shader_source = R"glsl(
         #version 450
@@ -844,8 +493,7 @@ TEST_F(PositiveGpuAssistedLayer, BindingPartiallyBound) {
     pipe.gp_ci_.layout = pipeline_layout.handle();
     pipe.CreateGraphicsPipeline();
 
-    VkCommandBufferBeginInfo begin_info = vku::InitStructHelper();
-    m_commandBuffer->begin(&begin_info);
+    m_commandBuffer->begin();
     vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
     vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1,
@@ -855,4 +503,286 @@ TEST_F(PositiveGpuAssistedLayer, BindingPartiallyBound) {
     m_commandBuffer->EndRenderPass();
     m_commandBuffer->end();
     m_commandBuffer->QueueCommandBuffer();
+}
+
+TEST_F(PositiveGpuAV, DrawingWithUnboundUnusedSet) {
+    TEST_DESCRIPTION(
+        "Test issuing draw command with pipeline layout that has 2 descriptor sets with first descriptor set begin unused and "
+        "unbound.");
+    AddRequiredExtensions(VK_KHR_DRAW_INDIRECT_COUNT_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitGpuAvFramework());
+
+    RETURN_IF_SKIP(InitState());
+    InitRenderTarget();
+    if (DeviceValidationVersion() != VK_API_VERSION_1_1) {
+        GTEST_SKIP() << "Tests requires Vulkan 1.1 exactly";
+    }
+
+    char const *fs_source = R"glsl(
+        #version 450
+        layout (set = 1, binding = 0) uniform sampler2D samplerColor;
+        layout(location = 0) out vec4 color;
+        void main() {
+           color = texture(samplerColor, gl_FragCoord.xy);
+           color += texture(samplerColor, gl_FragCoord.wz);
+        }
+    )glsl";
+    VkShaderObj fs(this, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    VkImageObj image(m_device);
+    image.Init(32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    vkt::ImageView imageView = image.CreateView();
+
+    vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
+
+    OneOffDescriptorSet descriptor_set(m_device,
+                                       {
+                                           {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
+                                       });
+    descriptor_set.WriteDescriptorImageInfo(0, imageView, sampler.handle());
+    descriptor_set.UpdateDescriptorSets();
+
+    vkt::Buffer indirect_buffer(*m_device, sizeof(VkDrawIndirectCommand), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+                                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+    vkt::Buffer indexed_indirect_buffer(*m_device, sizeof(VkDrawIndexedIndirectCommand), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+                                        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+    vkt::Buffer count_buffer(*m_device, sizeof(uint32_t), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+    vkt::Buffer index_buffer(*m_device, sizeof(uint32_t), VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+    CreatePipelineHelper pipe(*this);
+    pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
+    pipe.InitState();
+    pipe.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&descriptor_set.layout_, &descriptor_set.layout_});
+    pipe.CreateGraphicsPipeline();
+
+    m_commandBuffer->begin();
+    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_layout_.handle(), 1, 1,
+                              &descriptor_set.set_, 0, nullptr);
+    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_);
+    vk::CmdBindIndexBuffer(m_commandBuffer->handle(), index_buffer.handle(), 0, VK_INDEX_TYPE_UINT32);
+    vk::CmdDrawIndexedIndirectCountKHR(m_commandBuffer->handle(), indexed_indirect_buffer.handle(), 0, count_buffer.handle(), 0, 1,
+                                       sizeof(VkDrawIndexedIndirectCommand));
+    m_commandBuffer->EndRenderPass();
+    m_commandBuffer->end();
+}
+
+TEST_F(PositiveGpuAV, FirstInstance) {
+    TEST_DESCRIPTION("Validate illegal firstInstance values");
+    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::drawIndirectFirstInstance);
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
+    InitRenderTarget();
+
+    vkt::Buffer draw_buffer(*m_device, 4 * sizeof(VkDrawIndirectCommand), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    VkDrawIndirectCommand *draw_ptr = static_cast<VkDrawIndirectCommand *>(draw_buffer.memory().map());
+    for (uint32_t i = 0; i < 4; i++) {
+        draw_ptr->vertexCount = 3;
+        draw_ptr->instanceCount = 1;
+        draw_ptr->firstVertex = 0;
+        draw_ptr->firstInstance = (i == 3) ? 1 : 0;
+        draw_ptr++;
+    }
+    draw_buffer.memory().unmap();
+
+    CreatePipelineHelper pipe(*this);
+    pipe.InitState();
+    pipe.CreateGraphicsPipeline();
+
+    VkCommandBufferBeginInfo begin_info = vku::InitStructHelper();
+    m_commandBuffer->begin(&begin_info);
+    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdDrawIndirect(m_commandBuffer->handle(), draw_buffer.handle(), 0, 4, sizeof(VkDrawIndirectCommand));
+    m_commandBuffer->EndRenderPass();
+    m_commandBuffer->end();
+    m_commandBuffer->QueueCommandBuffer();
+    m_default_queue->wait();
+
+    // Now with an offset and indexed draw
+    vkt::Buffer indexed_draw_buffer(*m_device, 4 * sizeof(VkDrawIndexedIndirectCommand), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
+                                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    VkDrawIndexedIndirectCommand *indexed_draw_ptr = (VkDrawIndexedIndirectCommand *)indexed_draw_buffer.memory().map();
+    for (uint32_t i = 0; i < 4; i++) {
+        indexed_draw_ptr->indexCount = 3;
+        indexed_draw_ptr->instanceCount = 1;
+        indexed_draw_ptr->firstIndex = 0;
+        indexed_draw_ptr->vertexOffset = 0;
+        indexed_draw_ptr->firstInstance = (i == 3) ? 1 : 0;
+        indexed_draw_ptr++;
+    }
+    indexed_draw_buffer.memory().unmap();
+
+    m_commandBuffer->begin(&begin_info);
+    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vkt::Buffer index_buffer(*m_device, 3 * sizeof(uint32_t), VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+    vk::CmdBindIndexBuffer(m_commandBuffer->handle(), index_buffer.handle(), 0, VK_INDEX_TYPE_UINT32);
+    vk::CmdDrawIndexedIndirect(m_commandBuffer->handle(), indexed_draw_buffer.handle(), sizeof(VkDrawIndexedIndirectCommand), 3,
+                               sizeof(VkDrawIndexedIndirectCommand));
+    m_commandBuffer->EndRenderPass();
+    m_commandBuffer->end();
+    m_commandBuffer->QueueCommandBuffer();
+    m_default_queue->wait();
+}
+
+TEST_F(PositiveGpuAV, CopyBufferToImageD32) {
+    TEST_DESCRIPTION(
+        "Copy depth buffer to image with all depth values in the [0, 1] legal range. Depth image has format "
+        "VK_FORMAT_D32_SFLOAT.");
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
+
+    vkt::Buffer copy_src_buffer(*m_device, sizeof(float) * 64 * 64,
+                                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+    float *ptr = static_cast<float *>(copy_src_buffer.memory().map());
+    for (size_t i = 0; i < 64 * 64; ++i) {
+        if (i % 2) {
+            ptr[i] = 1.0f;
+        } else {
+            ptr[i] = 0.0f;
+        }
+    }
+    copy_src_buffer.memory().unmap();
+
+    VkImageCreateInfo image_ci = vku::InitStructHelper();
+    image_ci.imageType = VK_IMAGE_TYPE_2D;
+    image_ci.format = VK_FORMAT_D32_SFLOAT;
+    image_ci.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    image_ci.extent = {64, 64, 1};
+    image_ci.mipLevels = 1;
+    image_ci.arrayLayers = 1;
+    image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    VkImageObj copy_dst_image(m_device);
+    copy_dst_image.Init(image_ci);
+
+    copy_dst_image.SetLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+    m_commandBuffer->begin();
+
+    VkBufferImageCopy buffer_image_copy_1;
+    buffer_image_copy_1.bufferOffset = 0;
+    buffer_image_copy_1.bufferRowLength = 0;
+    buffer_image_copy_1.bufferImageHeight = 0;
+    buffer_image_copy_1.imageSubresource.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    buffer_image_copy_1.imageSubresource.mipLevel = 0;
+    buffer_image_copy_1.imageSubresource.baseArrayLayer = 0;
+    buffer_image_copy_1.imageSubresource.layerCount = 1;
+    buffer_image_copy_1.imageOffset = {0, 0, 0};
+    buffer_image_copy_1.imageExtent = {64, 64, 1};
+
+    vk::CmdCopyBufferToImage(*m_commandBuffer, copy_src_buffer, copy_dst_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
+                             &buffer_image_copy_1);
+
+    VkBufferImageCopy buffer_image_copy_2 = buffer_image_copy_1;
+    buffer_image_copy_2.imageOffset = {32, 32, 0};
+    buffer_image_copy_2.imageExtent = {32, 32, 1};
+
+    vk::CmdCopyBufferToImage(*m_commandBuffer, copy_src_buffer, copy_dst_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
+                             &buffer_image_copy_2);
+
+    m_commandBuffer->end();
+    m_commandBuffer->QueueCommandBuffer();
+    vk::DeviceWaitIdle(*m_device);
+}
+
+TEST_F(PositiveGpuAV, CopyBufferToImageD32U8) {
+    TEST_DESCRIPTION(
+        "Copy depth buffer to image with all depth values in the [0, 1] legal range. Depth image has format "
+        "VK_FORMAT_D32_SFLOAT_S8_UINT.");
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
+
+    vkt::Buffer copy_src_buffer(*m_device, 5 * 64 * 64, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+    auto ptr = static_cast<uint8_t *>(copy_src_buffer.memory().map());
+    std::memset(ptr, 0, static_cast<size_t>(copy_src_buffer.create_info().size));
+    for (size_t i = 0; i < 64 * 64; ++i) {
+        auto ptr_float = reinterpret_cast<float *>(ptr + 5 * i);
+        if (i % 2) {
+            *ptr_float = 1.0f;
+        } else {
+            *ptr_float = 0.0f;
+        }
+    }
+
+    copy_src_buffer.memory().unmap();
+
+    VkImageCreateInfo image_ci = vku::InitStructHelper();
+    image_ci.imageType = VK_IMAGE_TYPE_2D;
+    image_ci.format = VK_FORMAT_D32_SFLOAT_S8_UINT;
+    image_ci.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    image_ci.extent = {64, 64, 1};
+    image_ci.mipLevels = 1;
+    image_ci.arrayLayers = 1;
+    image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    VkImageObj copy_dst_image(m_device);
+    copy_dst_image.Init(image_ci);
+
+    copy_dst_image.SetLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+    m_commandBuffer->begin();
+
+    VkBufferImageCopy buffer_image_copy;
+    buffer_image_copy.bufferOffset = 0;
+    buffer_image_copy.bufferRowLength = 0;
+    buffer_image_copy.bufferImageHeight = 0;
+    buffer_image_copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    buffer_image_copy.imageSubresource.mipLevel = 0;
+    buffer_image_copy.imageSubresource.baseArrayLayer = 0;
+    buffer_image_copy.imageSubresource.layerCount = 1;
+    buffer_image_copy.imageOffset = {33, 33, 0};
+    buffer_image_copy.imageExtent = {31, 31, 1};
+
+    vk::CmdCopyBufferToImage(*m_commandBuffer, copy_src_buffer, copy_dst_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
+                             &buffer_image_copy);
+
+    m_commandBuffer->end();
+    m_commandBuffer->QueueCommandBuffer();
+    vk::DeviceWaitIdle(*m_device);
+}
+
+TEST_F(PositiveGpuAV, CopyBufferToImageTwoSubmit) {
+    TEST_DESCRIPTION("Make sure resources are managed correctly afer a CopyBufferToImage call.");
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
+
+    vkt::CommandBuffer cb_0(m_device, m_commandPool);
+    vkt::CommandBuffer cb_1(m_device, m_commandPool);
+
+    auto image_ci = VkImageObj::ImageCreateInfo2D(32, 32, 1, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+    VkImageObj image(m_device);
+    image.init(&image_ci);
+
+    vkt::Buffer buffer(*m_device, 4096, VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+
+    VkBufferImageCopy region = {};
+    region.bufferRowLength = 0;
+    region.bufferImageHeight = 0;
+    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    region.imageSubresource.layerCount = 1;
+    region.imageOffset = {0, 0, 0};
+    region.imageExtent = {32, 32, 1};
+    region.bufferOffset = 0;
+
+    cb_0.begin();
+    vk::CmdCopyBufferToImage(cb_0.handle(), buffer.handle(), image.handle(), VK_IMAGE_LAYOUT_GENERAL, 1, &region);
+    cb_0.end();
+    m_default_queue->submit(cb_0);
+    m_default_queue->wait();
+
+    cb_1.begin();
+    cb_1.end();
+    m_default_queue->submit(cb_1);
+    m_default_queue->wait();
 }

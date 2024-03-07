@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 #
-# Copyright (c) 2016-2023 Valve Corporation
-# Copyright (c) 2016-2023 LunarG, Inc.
-# Copyright (c) 2016-2022 Google Inc.
+# Copyright (c) 2016-2024 Valve Corporation
+# Copyright (c) 2016-2024 LunarG, Inc.
+# Copyright (c) 2016-2024 Google Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import subprocess
 import struct
 import re
 import argparse
+import hashlib
 import common_ci
 
 SPIRV_MAGIC = 0x07230203
@@ -44,18 +45,18 @@ def compile(filename, glslang_validator, spirv_opt, target_env):
         args = [glslang_validator]
 
         if not target_env:
-            requires_vulkan_1_2 = ['rgen']
+            requires_vulkan_1_2 = ['rgen', 'rint', 'rahit', 'rchit', 'rmiss', 'rcall']
             if filename.split(".")[-1] in requires_vulkan_1_2:
                 target_env = "vulkan1.2"
+            elif tmpfile.startswith("inst_"):
+                target_env = "vulkan1.1" # Otherwise glslang might create BufferBlocks
+            else:
+                target_env = "vulkan1.0"
         if target_env:
             args += ["--target-env", target_env]
         # functions called by the SPIRV-Tools instrumentation require special options
         if tmpfile.startswith("inst_"):
-            args += ["--no-link", "--target-env"]
-            if filename.endswith(".rgen"):
-                args += ["vulkan1.2"]
-            else:
-                args += ["vulkan1.0"]
+            args += ["--no-link"]
         else:
             args += ["-V"]
         args += ["-o", tmpfile, filename]
@@ -114,9 +115,9 @@ def write(words, filename, apiname, outdir = None):
 
 /***************************************************************************
 *
-* Copyright (c) 2021-2022 The Khronos Group Inc.
-* Copyright (c) 2021-2023 Valve Corporation
-* Copyright (c) 2021-2023 LunarG, Inc.
+* Copyright (c) 2021-2024 The Khronos Group Inc.
+* Copyright (c) 2021-2024 Valve Corporation
+* Copyright (c) 2021-2024 LunarG, Inc.
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -147,17 +148,22 @@ static const uint32_t %s[%d] = {
     with open(out_file, "w") as f:
         print(header, end="", file=f)
 
-def write_inst_hash(outdir=None):
-    shader_file = common_ci.RepoRelative('layers/gpu_shaders/inst_functions.comp')
-    result = subprocess.run(["git", "hash-object", shader_file], capture_output=True, text=True)
-    git_hash = result.stdout.rstrip('\n')
+def write_inst_hash(generate_shaders, outdir=None):
+    # Build a hash of the git hash for all instrumentation shaders
+    hash_string = ''
+    for shader in generate_shaders:
+        if not os.path.basename(shader).startswith('inst_'):
+            continue
+        result = subprocess.run(["git", "hash-object", shader], capture_output=True, text=True)
+        git_hash = result.stdout.rstrip('\n')
 
-    try:
-        int(git_hash, 16)
-    except ValueError:
-        raise ValueError(f'value for INST_SHADER_GIT_HASH ({git_hash}) must be a SHA1 hash.')
-    if len(git_hash) != 40:
-        raise ValueError(f'value for INST_SHADER_GIT_HASH ({git_hash}) must be a SHA1 hash.')
+        try:
+            int(git_hash, 16)
+        except ValueError:
+            raise ValueError(f'value for INST_SHADER_GIT_HASH ({git_hash}) must be a SHA1 hash.')
+        if len(git_hash) != 40:
+            raise ValueError(f'value for INST_SHADER_GIT_HASH ({git_hash}) must be a SHA1 hash.')
+        hash_string += git_hash
 
     out = []
     out.append(f'''
@@ -166,10 +172,10 @@ def write_inst_hash(outdir=None):
 
 /***************************************************************************
  *
- * Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (c) 2015-2023 Google Inc.
+ * Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (c) 2015-2024 Google Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -188,7 +194,7 @@ def write_inst_hash(outdir=None):
 
 ''')
 
-    out.append(f'#define INST_SHADER_GIT_HASH "{git_hash}"\n')
+    out.append(f'#define INST_SHADER_GIT_HASH "{hashlib.sha1(hash_string.encode("utf-8")).hexdigest()}"\n')
 
     if outdir:
       out_file = os.path.join(outdir, 'layers/vulkan/generated')
@@ -205,25 +211,20 @@ def main():
                         default='vulkan',
                         choices=['vulkan', 'vulkansc'],
                         help='Specify API name to generate')
-    parser.add_argument('--shader', action='store', type=str, help='Input Filename')
+    parser.add_argument('--shader', action='store', type=str, help='Input filename to generate a single shader')
     parser.add_argument('--glslang', action='store', type=str, help='Path to glslangValidator to use')
-    parser.add_argument('--spirv-opt', action='store', dest='spirv_opt', type=str, help='Path to glslangValidator to use')
+    parser.add_argument('--spirv-opt', action='store', dest='spirv_opt', type=str, help='Path to spirv-opt to use')
     parser.add_argument('--outdir', action='store', type=str, help='Optional path to output directory')
     parser.add_argument('--targetenv', action='store', type=str, help='Optional --target-env argument passed down to glslangValidator')
     args = parser.parse_args()
 
     generate_shaders = []
-    if args.shader:
-        if not os.path.isfile(args.shader):
-            sys.exit("Cannot find infilename " + args.shader)
-        generate_shaders.append(args.shader)
-    else:
-        # Get all shaders in gpu_shaders folder
-        shader_type = ['vert', 'tesc', 'tese', 'geom', 'frag', 'comp', 'mesh', 'task', 'rgen', 'rint', 'rahit', 'rchit', 'rmiss', 'rcall']
-        gpu_shaders = common_ci.RepoRelative('layers/gpu_shaders')
-        for filename in os.listdir(gpu_shaders):
-            if (filename.split(".")[-1] in shader_type):
-                generate_shaders.append(os.path.join(gpu_shaders, filename))
+    # Get all shaders in gpu_shaders folder
+    shader_type = ['vert', 'tesc', 'tese', 'geom', 'frag', 'comp', 'mesh', 'task', 'rgen', 'rint', 'rahit', 'rchit', 'rmiss', 'rcall']
+    gpu_shaders = common_ci.RepoRelative('layers/gpu_shaders')
+    for filename in os.listdir(gpu_shaders):
+        if (filename.split(".")[-1] in shader_type):
+            generate_shaders.append(os.path.join(gpu_shaders, filename))
 
     # default glslangValidator path
     glslang_validator =  common_ci.RepoRelative('external/glslang/build/install/bin/glslangValidator')
@@ -239,10 +240,18 @@ def main():
     if not os.path.isfile(spirv_opt):
         sys.exit("Cannot find spirv-opt " + spirv_opt)
 
+    if args.shader:
+        if not os.path.isfile(args.shader):
+            sys.exit("Cannot find infilename " + args.shader)
+        generate_shaders = [args.shader]
+
     for shader in generate_shaders:
         words = compile(shader, glslang_validator, spirv_opt, args.targetenv)
         write(words, shader, args.api, args.outdir)
-    write_inst_hash(args.outdir)
+
+    # Don't want to hash if just generating a single shader for testings
+    if (len(generate_shaders) > 1):
+        write_inst_hash(generate_shaders, args.outdir)
 
 if __name__ == '__main__':
   main()

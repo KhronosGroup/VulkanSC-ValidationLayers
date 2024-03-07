@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2019-2023 Valve Corporation
- * Copyright (c) 2019-2023 LunarG, Inc.
+ * Copyright (c) 2019-2024 Valve Corporation
+ * Copyright (c) 2019-2024 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,15 +16,19 @@
  */
 #pragma once
 
-#include "state_tracker/buffer_state.h"
-#include "state_tracker/cmd_buffer_state.h"
-
 #include "sync/sync_access_context.h"
+#include "generated/vk_safe_struct.h"
 
 class CommandBufferAccessContext;
 class CommandExecutionContext;
 class RenderPassAccessContext;
 class ReplayState;
+
+namespace vvl {
+class ImageView;
+class RenderPass;
+class CommandBuffer;
+}  // namespace vvl
 
 using SyncMemoryBarrier = SyncBarrier;
 
@@ -54,10 +58,7 @@ struct SyncEventState {
     SyncEventState(const SyncEventState &) = default;
     SyncEventState(SyncEventState &&) = default;
 
-    SyncEventState(const SyncEventState::EventPointer &event_state) : SyncEventState() {
-        event = event_state;
-        destroyed = (event.get() == nullptr) || event_state->Destroyed();
-    }
+    SyncEventState(const SyncEventState::EventPointer &event_state);
 
     void ResetFirstScope();
     const AccessContext::ScopeMap &FirstScope() const { return first_scope->GetAccessStateMap(); }
@@ -124,6 +125,31 @@ struct SyncBufferMemoryBarrier {
     SyncBufferMemoryBarrier(const Buffer &buffer_, const SyncBarrier &barrier_, const ResourceAccessRange &range_)
         : buffer(buffer_), barrier(barrier_), range(range_) {}
     SyncBufferMemoryBarrier() = default;
+};
+
+struct SyncImageMemoryBarrier {
+    using ImageState = syncval_state::ImageState;
+    using Image = std::shared_ptr<const ImageState>;
+
+    Image image;
+    uint32_t index;
+    SyncBarrier barrier;
+    VkImageLayout old_layout;
+    VkImageLayout new_layout;
+    VkImageSubresourceRange range;
+
+    bool IsLayoutTransition() const { return old_layout != new_layout; }
+    const VkImageSubresourceRange &Range() const { return range; };
+    const ImageState *GetState() const { return image.get(); }
+    SyncImageMemoryBarrier(const Image &image_, uint32_t index_, const SyncBarrier &barrier_, VkImageLayout old_layout_,
+                           VkImageLayout new_layout_, const VkImageSubresourceRange &subresource_range_)
+        : image(image_),
+          index(index_),
+          barrier(barrier_),
+          old_layout(old_layout_),
+          new_layout(new_layout_),
+          range(subresource_range_) {}
+    SyncImageMemoryBarrier() = default;
 };
 
 class SyncOpBase {

@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2023 The Khronos Group Inc.
- * Copyright (c) 2023 Valve Corporation
- * Copyright (c) 2023 LunarG, Inc.
- * Copyright (c) 2023 Collabora, Inc.
+ * Copyright (c) 2023-2024 The Khronos Group Inc.
+ * Copyright (c) 2023-2024 Valve Corporation
+ * Copyright (c) 2023-2024 LunarG, Inc.
+ * Copyright (c) 2023-2024 Collabora, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,14 +18,12 @@
 TEST_F(PositiveSparseImage, MultipleBinds) {
     TEST_DESCRIPTION("Bind 2 memory ranges to one image using vkQueueBindSparse, destroy the image and then free the memory");
 
+    AddRequiredFeature(vkt::Feature::sparseBinding);
     RETURN_IF_SKIP(Init());
 
     auto index = m_device->graphics_queue_node_index_;
     if (!(m_device->phy().queue_properties_[index].queueFlags & VK_QUEUE_SPARSE_BINDING_BIT)) {
         GTEST_SKIP() << "Graphics queue does not have sparse binding bit";
-    }
-    if (!m_device->phy().features().sparseBinding) {
-        GTEST_SKIP() << "Device does not support sparse bindings";
     }
 
     VkImageObj image(m_device);
@@ -84,23 +82,21 @@ TEST_F(PositiveSparseImage, MultipleBinds) {
     bindSparseInfo.imageOpaqueBindCount = 1;
     bindSparseInfo.pImageOpaqueBinds = &opaqueBindInfo;
 
-    vk::QueueBindSparse(m_default_queue, 1, &bindSparseInfo, VK_NULL_HANDLE);
+    vk::QueueBindSparse(m_default_queue->handle(), 1, &bindSparseInfo, VK_NULL_HANDLE);
 
     // Wait for operations to finish before destroying anything
-    vk::QueueWaitIdle(m_default_queue);
+    m_default_queue->wait();
 }
 
 TEST_F(PositiveSparseImage, BindFreeMemory) {
     TEST_DESCRIPTION("Test using a sparse image after freeing memory that was bound to it.");
 
+    AddRequiredFeature(vkt::Feature::sparseResidencyImage2D);
     RETURN_IF_SKIP(Init());
 
     auto index = m_device->graphics_queue_node_index_;
     if (!(m_device->phy().queue_properties_[index].queueFlags & VK_QUEUE_SPARSE_BINDING_BIT)) {
         GTEST_SKIP() << "Graphics queue does not have sparse binding bit";
-    }
-    if (!m_device->phy().features().sparseResidencyImage2D) {
-        GTEST_SKIP() << "Device does not support sparseResidencyImage2D";
     }
 
     VkImageObj image(m_device);
@@ -145,13 +141,13 @@ TEST_F(PositiveSparseImage, BindFreeMemory) {
     bindSparseInfo.pImageOpaqueBinds = &opaqueBindInfo;
 
     // Bind to the memory
-    vk::QueueBindSparse(m_default_queue, 1, &bindSparseInfo, VK_NULL_HANDLE);
+    vk::QueueBindSparse(m_default_queue->handle(), 1, &bindSparseInfo, VK_NULL_HANDLE);
 
     // Bind back to NULL
     bind.memory = VK_NULL_HANDLE;
-    vk::QueueBindSparse(m_default_queue, 1, &bindSparseInfo, VK_NULL_HANDLE);
+    vk::QueueBindSparse(m_default_queue->handle(), 1, &bindSparseInfo, VK_NULL_HANDLE);
 
-    vk::QueueWaitIdle(m_default_queue);
+    m_default_queue->wait();
 
     // Free the memory, then use the image in a new command buffer
     memory.destroy();
@@ -176,27 +172,20 @@ TEST_F(PositiveSparseImage, BindFreeMemory) {
     VkImageSubresourceRange range = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
     vk::CmdClearColorImage(m_commandBuffer->handle(), image, VK_IMAGE_LAYOUT_GENERAL, &clear_color, 1, &range);
     m_commandBuffer->end();
-
-    VkSubmitInfo submit_info = vku::InitStructHelper();
-    submit_info.commandBufferCount = 1;
-    submit_info.pCommandBuffers = &m_commandBuffer->handle();
-    vk::QueueSubmit(m_default_queue, 1, &submit_info, VK_NULL_HANDLE);
-
+    m_default_queue->submit(*m_commandBuffer);
     // Wait for operations to finish before destroying anything
-    vk::QueueWaitIdle(m_default_queue);
+    m_default_queue->wait();
 }
 
 TEST_F(PositiveSparseImage, BindMetadata) {
     TEST_DESCRIPTION("Bind memory for the metadata aspect of a sparse image");
 
+    AddRequiredFeature(vkt::Feature::sparseResidencyImage2D);
     RETURN_IF_SKIP(Init());
 
     auto index = m_device->graphics_queue_node_index_;
     if (!(m_device->phy().queue_properties_[index].queueFlags & VK_QUEUE_SPARSE_BINDING_BIT)) {
         GTEST_SKIP() << "Graphics queue does not have sparse binding bit";
-    }
-    if (!m_device->phy().features().sparseResidencyImage2D) {
-        GTEST_SKIP() << "Device does not support sparse residency for images";
     }
 
     // Create a sparse image
@@ -260,26 +249,22 @@ TEST_F(PositiveSparseImage, BindMetadata) {
     bind_info.imageOpaqueBindCount = 1;
     bind_info.pImageOpaqueBinds = &opaque_bind_info;
 
-    vk::QueueBindSparse(m_default_queue, 1, &bind_info, VK_NULL_HANDLE);
+    vk::QueueBindSparse(m_default_queue->handle(), 1, &bind_info, VK_NULL_HANDLE);
 
     // Wait for operations to finish before destroying anything
-    vk::QueueWaitIdle(m_default_queue);
+    m_default_queue->wait();
 }
 
 TEST_F(PositiveSparseImage, OpImageSparse) {
     TEST_DESCRIPTION("Use OpImageSparse* operations at draw time");
 
+    AddRequiredFeature(vkt::Feature::sparseResidencyImage2D);
+    AddRequiredFeature(vkt::Feature::shaderResourceResidency);
     RETURN_IF_SKIP(Init());
 
     auto index = m_device->graphics_queue_node_index_;
     if (!(m_device->phy().queue_properties_[index].queueFlags & VK_QUEUE_SPARSE_BINDING_BIT)) {
         GTEST_SKIP() << "Graphics queue does not have sparse binding bit";
-    }
-    if (!m_device->phy().features().sparseResidencyImage2D) {
-        GTEST_SKIP() << "Device does not support sparse residency for images";
-    }
-    if (!m_device->phy().features().shaderResourceResidency) {
-        GTEST_SKIP() << "Device does not support OpCapability SparseResidency";
     }
     InitRenderTarget();
 
@@ -345,4 +330,44 @@ TEST_F(PositiveSparseImage, OpImageSparse) {
     vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
     m_commandBuffer->EndRenderPass();
     m_commandBuffer->end();
+}
+
+TEST_F(PositiveSparseImage, BindImage) {
+    AddRequiredFeature(vkt::Feature::sparseResidencyImage2D);
+    RETURN_IF_SKIP(Init());
+
+    if (m_device->sparse_queues().empty()) {
+        GTEST_SKIP() << "Required SPARSE_BINDING queue families not present";
+    }
+
+    VkImageCreateInfo image_create_info = vku::InitStructHelper();
+    image_create_info.flags = VK_IMAGE_CREATE_SPARSE_BINDING_BIT | VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT;
+    image_create_info.imageType = VK_IMAGE_TYPE_2D;
+    image_create_info.format = VK_FORMAT_R8G8B8A8_UNORM;
+    image_create_info.extent = {512, 64, 1};
+    image_create_info.mipLevels = 1;
+    image_create_info.arrayLayers = 1;
+    image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_create_info.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
+    image_create_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    VkImageObj image(m_device);
+    image.init_no_mem(*m_device, image_create_info);
+
+    VkSparseImageMemoryBind image_memory_bind = {};
+    image_memory_bind.subresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    image_memory_bind.extent = image_create_info.extent;
+
+    VkSparseImageMemoryBindInfo image_memory_bind_info = {};
+    image_memory_bind_info.image = image.handle();
+    image_memory_bind_info.bindCount = 1;
+    image_memory_bind_info.pBinds = &image_memory_bind;
+
+    VkBindSparseInfo bind_info = vku::InitStructHelper();
+    bind_info.imageBindCount = 1;
+    bind_info.pImageBinds = &image_memory_bind_info;
+
+    vkt::Queue *sparse_queue = m_device->sparse_queues()[0];
+    vk::QueueBindSparse(sparse_queue->handle(), 1, &bind_info, VK_NULL_HANDLE);
+    sparse_queue->wait();
 }

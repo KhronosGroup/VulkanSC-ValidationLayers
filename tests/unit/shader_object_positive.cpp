@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2023 Nintendo
- * Copyright (c) 2023 LunarG, Inc.
+ * Copyright (c) 2023-2024 Nintendo
+ * Copyright (c) 2023-2024 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,23 +13,13 @@
 #include "../framework/descriptor_helper.h"
 #include "../framework/gpu_av_helper.h"
 
-void ShaderObjectTest::InitBasicShaderObject(void *pNextFeatures, APIVersion targetApiVersion, bool coreFeatures) {
-    SetTargetApiVersion(targetApiVersion);
+void ShaderObjectTest::InitBasicShaderObject() {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-
-    VkPhysicalDeviceDynamicRenderingFeatures dynamic_rendering_features = vku::InitStructHelper(pNextFeatures);
-    VkPhysicalDeviceShaderObjectFeaturesEXT shader_object_features = vku::InitStructHelper(&dynamic_rendering_features);
-    auto features2 = GetPhysicalDeviceFeatures2(shader_object_features);
-    if (!coreFeatures) {
-        features2 = vku::InitStructHelper(&shader_object_features);
-    }
-    if (!shader_object_features.shaderObject) {
-        GTEST_SKIP() << "Test requires (unsupported) shaderObject , skipping.";
-    }
-
-    RETURN_IF_SKIP(InitState(nullptr, &features2));
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    AddRequiredFeature(vkt::Feature::shaderObject);
+    RETURN_IF_SKIP(Init());
 }
 
 void ShaderObjectTest::InitBasicMeshShaderObject(void *pNextFeatures, APIVersion targetApiVersion, bool taskShader,
@@ -476,13 +466,8 @@ TEST_F(PositiveShaderObject, VertFragShaderDraw) {
     vk::CmdCopyImageToBuffer(m_commandBuffer->handle(), image.handle(), VK_IMAGE_LAYOUT_GENERAL, buffer.handle(), 1u, &copyRegion);
 
     m_commandBuffer->end();
-
-    VkCommandBuffer commandBufferHandle = m_commandBuffer->handle();
-    VkSubmitInfo submitInfo = vku::InitStructHelper();
-    submitInfo.commandBufferCount = 1u;
-    submitInfo.pCommandBuffers = &commandBufferHandle;
-    vk::QueueSubmit(m_default_queue, 1, &submitInfo, VK_NULL_HANDLE);
-    vk::QueueWaitIdle(m_default_queue);
+    m_default_queue->submit(*m_commandBuffer);
+    m_default_queue->wait();
 }
 
 TEST_F(PositiveShaderObject, DrawWithAllGraphicsShaderStagesUsed) {
@@ -643,13 +628,8 @@ TEST_F(PositiveShaderObject, DrawWithAllGraphicsShaderStagesUsed) {
     vk::CmdEndRenderingKHR(m_commandBuffer->handle());
 
     m_commandBuffer->end();
-
-    VkCommandBuffer commandBufferHandle = m_commandBuffer->handle();
-    VkSubmitInfo submitInfo = vku::InitStructHelper();
-    submitInfo.commandBufferCount = 1u;
-    submitInfo.pCommandBuffers = &commandBufferHandle;
-    vk::QueueSubmit(m_default_queue, 1, &submitInfo, VK_NULL_HANDLE);
-    vk::QueueWaitIdle(m_default_queue);
+    m_default_queue->submit(*m_commandBuffer);
+    m_default_queue->wait();
 }
 
 TEST_F(PositiveShaderObject, ComputeShader) {
@@ -730,13 +710,8 @@ TEST_F(PositiveShaderObject, ComputeShader) {
     vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
 
     m_commandBuffer->end();
-
-    VkCommandBuffer commandBufferHandle = m_commandBuffer->handle();
-    VkSubmitInfo submitInfo = vku::InitStructHelper();
-    submitInfo.commandBufferCount = 1u;
-    submitInfo.pCommandBuffers = &commandBufferHandle;
-    vk::QueueSubmit(m_default_queue, 1, &submitInfo, VK_NULL_HANDLE);
-    vk::QueueWaitIdle(m_default_queue);
+    m_default_queue->submit(*m_commandBuffer);
+    m_default_queue->wait();
 }
 
 TEST_F(PositiveShaderObject, TaskMeshShadersDraw) {
@@ -783,10 +758,8 @@ TEST_F(PositiveShaderObject, TaskMeshShadersDraw) {
     VkShaderStageFlagBits shaderStages[] = {VK_SHADER_STAGE_TASK_BIT_EXT, VK_SHADER_STAGE_MESH_BIT_EXT,
                                             VK_SHADER_STAGE_FRAGMENT_BIT};
 
-    const vkt::Shader taskShader(*m_device, shaderStages[0],
-                                 GLSLToSPV(shaderStages[0], task_src, "main", nullptr, SPV_ENV_VULKAN_1_3));
-    const vkt::Shader meshShader(*m_device, shaderStages[1],
-                                 GLSLToSPV(shaderStages[1], mesh_src, "main", nullptr, SPV_ENV_VULKAN_1_3));
+    const vkt::Shader taskShader(*m_device, shaderStages[0], GLSLToSPV(shaderStages[0], task_src, SPV_ENV_VULKAN_1_3));
+    const vkt::Shader meshShader(*m_device, shaderStages[1], GLSLToSPV(shaderStages[1], mesh_src, SPV_ENV_VULKAN_1_3));
     const vkt::Shader fragShader(*m_device, shaderStages[2], GLSLToSPV(shaderStages[2], frag_src));
 
     VkShaderEXT shaders[3] = {taskShader.handle(), meshShader.handle(), fragShader.handle()};
@@ -864,13 +837,8 @@ TEST_F(PositiveShaderObject, TaskMeshShadersDraw) {
     vk::CmdEndRenderingKHR(m_commandBuffer->handle());
 
     m_commandBuffer->end();
-
-    VkCommandBuffer commandBufferHandle = m_commandBuffer->handle();
-    VkSubmitInfo submitInfo = vku::InitStructHelper();
-    submitInfo.commandBufferCount = 1u;
-    submitInfo.pCommandBuffers = &commandBufferHandle;
-    vk::QueueSubmit(m_default_queue, 1, &submitInfo, VK_NULL_HANDLE);
-    vk::QueueWaitIdle(m_default_queue);
+    m_default_queue->submit(*m_commandBuffer);
+    m_default_queue->wait();
 }
 
 TEST_F(PositiveShaderObject, FailCreateShaders) {
@@ -999,7 +967,10 @@ TEST_F(PositiveShaderObject, FailCreateShaders) {
 TEST_F(PositiveShaderObject, DrawMinimalDynamicStates) {
     TEST_DESCRIPTION("Draw with only required dynamic states set.");
 
-    RETURN_IF_SKIP(InitBasicShaderObject(nullptr, VK_API_VERSION_1_1, false));
+    AddDisabledFeature(vkt::Feature::alphaToOne);
+    AddDisabledFeature(vkt::Feature::depthClamp);
+    AddDisabledFeature(vkt::Feature::logicOp);
+    RETURN_IF_SKIP(InitBasicShaderObject());
 
     InitDynamicRenderTarget();
 
@@ -1049,7 +1020,7 @@ TEST_F(PositiveShaderObject, DrawMinimalDynamicStates) {
 TEST_F(PositiveShaderObject, DrawMinimalDynamicStatesRasterizationDisabled) {
     TEST_DESCRIPTION("Draw with only required dynamic states set.");
 
-    RETURN_IF_SKIP(InitBasicShaderObject(nullptr, VK_API_VERSION_1_1, false));
+    RETURN_IF_SKIP(InitBasicShaderObject());
 
     InitDynamicRenderTarget();
 
@@ -1146,8 +1117,7 @@ TEST_F(PositiveShaderObject, ShadersDescriptorSets) {
     vert_descriptor_set.WriteDescriptorBufferInfo(0, buffer.handle(), 0, 32, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     vert_descriptor_set.UpdateDescriptorSets();
 
-    auto image_ci =
-        VkImageObj::ImageCreateInfo2D(64, 64, 1, 2, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_TILING_OPTIMAL);
+    auto image_ci = VkImageObj::ImageCreateInfo2D(64, 64, 1, 2, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
     VkImageObj image(m_device);
     image.Init(image_ci);
     vkt::ImageView view = image.CreateView(VK_IMAGE_VIEW_TYPE_2D, 0, 1, 1, 1);
@@ -1171,12 +1141,63 @@ TEST_F(PositiveShaderObject, ShadersDescriptorSets) {
     m_commandBuffer->end();
 }
 
-class PositiveGpuAssistedShaderObject : public PositiveShaderObject, public PositiveGpuAssistedLayer {};
-
-TEST_F(PositiveGpuAssistedShaderObject, SelectInstrumentedShaders) {
-    TEST_DESCRIPTION("GPU validation: Validate selection of which shaders get instrumented for GPU-AV");
-
+TEST_F(PositiveShaderObject, DescriptorBuffer) {
+    TEST_DESCRIPTION("use VK_EXT_descriptor_buffer and do a basic draw.");
     SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::descriptorBuffer);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    AddRequiredFeature(vkt::Feature::shaderObject);
+    RETURN_IF_SKIP(Init());
+    InitDynamicRenderTarget();
+
+    VkBufferCreateInfo buffer_ci = vku::InitStructHelper();
+    buffer_ci.size = 4096;
+    buffer_ci.usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT;
+    VkMemoryAllocateFlagsInfo allocate_flag_info = vku::InitStructHelper();
+    allocate_flag_info.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
+    vkt::Buffer buffer(*m_device, buffer_ci, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &allocate_flag_info);
+
+    VkDescriptorBufferBindingInfoEXT buffer_binding_info = vku::InitStructHelper();
+    buffer_binding_info.address = buffer.address();
+    buffer_binding_info.usage = VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT;
+
+    const VkDescriptorSetLayoutBinding binding = {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
+    const vkt::DescriptorSetLayout set_layout(*m_device, {binding}, VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT);
+
+    const char frag_spv[] = R"glsl(
+        #version 460
+        layout(location = 0) out vec4 uFragColor;
+        layout(set=0, binding=0) uniform foo { vec4 x; } bar;
+        void main(){
+            uFragColor = bar.x;
+        }
+    )glsl";
+
+    const vkt::Shader vertShader(*m_device, VK_SHADER_STAGE_VERTEX_BIT, GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, kVertexMinimalGlsl),
+                                 &set_layout.handle());
+
+    const vkt::Shader fragShader(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT, GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, frag_spv),
+                                 &set_layout.handle());
+
+    m_commandBuffer->begin();
+    m_commandBuffer->BeginRenderingColor(GetDynamicRenderTarget());
+    SetDefaultDynamicStates();
+    BindVertFragShader(vertShader, fragShader);
+    vk::CmdBindDescriptorBuffersEXT(m_commandBuffer->handle(), 1, &buffer_binding_info);
+    vk::CmdDraw(m_commandBuffer->handle(), 4, 1, 0, 0);
+    m_commandBuffer->EndRendering();
+    m_commandBuffer->end();
+}
+
+class PositiveGpuAVShaderObject : public PositiveShaderObject, public PositiveGpuAV {};
+
+TEST_F(PositiveGpuAVShaderObject, SelectInstrumentedShaders) {
+    TEST_DESCRIPTION("GPU validation: Validate selection of which shaders get instrumented for GPU-AV");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_EXT_LAYER_SETTINGS_EXTENSION_NAME);
     const VkBool32 value = true;
     const VkLayerSettingEXT setting = {OBJECT_LAYER_NAME, "select_instrumented_shaders", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1,
                                        &value};
@@ -1268,7 +1289,7 @@ TEST_F(PositiveGpuAssistedShaderObject, SelectInstrumentedShaders) {
     // Should get a warning since shader was instrumented
     m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "VUID-vkCmdDraw-None-08613");
     m_commandBuffer->QueueCommandBuffer();
-    vk::QueueWaitIdle(m_default_queue);
+    m_default_queue->wait();
     m_errorMonitor->VerifyFound();
 
     vert_create_info.pNext = nullptr;
@@ -1286,7 +1307,7 @@ TEST_F(PositiveGpuAssistedShaderObject, SelectInstrumentedShaders) {
     // Should not get a warning since shader was not instrumented
     m_errorMonitor->ExpectSuccess(kWarningBit | kErrorBit);
     m_commandBuffer->QueueCommandBuffer();
-    vk::QueueWaitIdle(m_default_queue);
+    m_default_queue->wait();
 }
 
 TEST_F(PositiveShaderObject, MultiplePushConstants) {
@@ -1596,12 +1617,10 @@ TEST_F(PositiveShaderObject, OutputToMultipleAttachments) {
 
     VkImageObj img1(m_device);
     img1.Init(m_width, m_height, 1, m_render_target_fmt,
-              VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-              VK_IMAGE_TILING_OPTIMAL);
+              VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
     VkImageObj img2(m_device);
     img2.Init(m_width, m_height, 1, m_render_target_fmt,
-              VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-              VK_IMAGE_TILING_OPTIMAL);
+              VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
 
     vkt::ImageView view1 = img1.CreateView();
     vkt::ImageView view2 = img2.CreateView();
@@ -1666,7 +1685,8 @@ TEST_F(PositiveShaderObject, DrawWithNonBlendableFormat) {
 TEST_F(PositiveShaderObject, DrawInSecondaryCommandBuffersWithRenderPassContinue) {
     TEST_DESCRIPTION("Draw in secondary command buffers with render pass continue flag.");
 
-    RETURN_IF_SKIP(InitBasicShaderObject(nullptr, VK_API_VERSION_1_3));
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    RETURN_IF_SKIP(InitBasicShaderObject());
 
     InitDynamicRenderTarget();
 
@@ -1720,7 +1740,8 @@ TEST_F(PositiveShaderObject, DrawInSecondaryCommandBuffersWithRenderPassContinue
 TEST_F(PositiveShaderObject, DrawRebindingShaders) {
     TEST_DESCRIPTION("Draw after rebinding only some shaders.");
 
-    RETURN_IF_SKIP(InitBasicShaderObject(nullptr, VK_API_VERSION_1_3));
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    RETURN_IF_SKIP(InitBasicShaderObject());
 
     InitDynamicRenderTarget();
 
@@ -1761,55 +1782,6 @@ TEST_F(PositiveShaderObject, DrawRebindingShaders) {
     vk::CmdBindShadersEXT(m_commandBuffer->handle(), 1u, &fragStage, &nullShader);
     vk::CmdDraw(m_commandBuffer->handle(), 4u, 1u, 0u, 0u);
 
-    m_commandBuffer->EndRendering();
-    m_commandBuffer->end();
-}
-
-TEST_F(PositiveShaderObject, TestVertexAttributeMatching) {
-    TEST_DESCRIPTION("Test vertex inputs.");
-
-    VkPhysicalDeviceVulkanMemoryModelFeatures vulkanMemoryModelFeatures = vku::InitStructHelper();
-    RETURN_IF_SKIP(InitBasicShaderObject(&vulkanMemoryModelFeatures));
-    if (!vulkanMemoryModelFeatures.vulkanMemoryModel || !vulkanMemoryModelFeatures.vulkanMemoryModelDeviceScope) {
-        GTEST_SKIP() << "vulkanMemoryModel or vulkanMemoryModelDeviceScope not supported.";
-    }
-    InitDynamicRenderTarget();
-
-    static const char vert_src[] = R"glsl(
-        #version 460
-        #extension GL_EXT_shader_explicit_arithmetic_types : enable
-        layout(location = 0) in int pos;
-        layout(location = 0) out int64_t pos1;
-        void main() {
-            gl_Position = vec4(pos);
-            pos1 = 0;
-        }
-    )glsl";
-
-    VkShaderStageFlagBits stages[] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT};
-    const vkt::Shader vertShader(*m_device, stages[0], GLSLToSPV(stages[0], vert_src));
-    const vkt::Shader fragShader(*m_device, stages[1], GLSLToSPV(stages[1], kFragmentMinimalGlsl));
-
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRenderingColor(GetDynamicRenderTarget());
-    SetDefaultDynamicStates();
-    BindVertFragShader(vertShader, fragShader);
-
-    VkVertexInputBindingDescription2EXT vertexBindingDescription = vku::InitStructHelper();
-    vertexBindingDescription.binding = 0u;
-    vertexBindingDescription.stride = 16u;
-    vertexBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-    vertexBindingDescription.divisor = 1u;
-
-    VkVertexInputAttributeDescription2EXT vertexAttributeDescription = vku::InitStructHelper();
-    vertexAttributeDescription.location = 0u;
-    vertexAttributeDescription.binding = 0u;
-    vertexAttributeDescription.format = VK_FORMAT_R32G32B32A32_UINT;
-    vertexAttributeDescription.offset = 0u;
-
-    vk::CmdSetVertexInputEXT(m_commandBuffer->handle(), 1u, &vertexBindingDescription, 1u, &vertexAttributeDescription);
-
-    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
     m_commandBuffer->EndRendering();
     m_commandBuffer->end();
 }
@@ -1901,8 +1873,8 @@ TEST_F(PositiveShaderObject, NotSettingDepthBounds) {
 TEST_F(PositiveShaderObject, CreateAndDrawLinkedAndUnlinkedShaders) {
     TEST_DESCRIPTION("Create and draw with some linked and some unlinked shaders.");
 
-    RETURN_IF_SKIP(InitBasicShaderObject(nullptr, VK_API_VERSION_1_3));
-
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    RETURN_IF_SKIP(InitBasicShaderObject());
     InitDynamicRenderTarget();
 
     const VkShaderStageFlagBits stages[] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT,

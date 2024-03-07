@@ -1,9 +1,9 @@
 // *** THIS FILE IS GENERATED - DO NOT EDIT ***
 // See vksc_convert_tests.py for modifications
 
-/* Copyright (c) 2020-2023 The Khronos Group Inc.
- * Copyright (c) 2020-2023 Valve Corporation
- * Copyright (c) 2020-2023 LunarG, Inc.
+/* Copyright (c) 2020-2024 The Khronos Group Inc.
+ * Copyright (c) 2020-2024 Valve Corporation
+ * Copyright (c) 2020-2024 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,6 +48,30 @@ TEST_F(NegativeInstanceless, InstanceExtensionDependencies) {
 
     Monitor().SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateInstance-ppEnabledExtensionNames-01388");
     m_instance_extension_names.push_back(VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME);
+    const auto ici = GetInstanceCreateInfo();
+    vk::CreateInstance(&ici, nullptr, &dummy_instance);
+    Monitor().VerifyFound();
+}
+
+TEST_F(NegativeInstanceless, ExtensionNestedDependency) {
+    TEST_DESCRIPTION("Make sure nested dependency extension logic is being checked");
+    // VkSwapchainPresentModesCreateInfoEXT is part of VK_EXT_swapchain_maintenance1
+    // VK_EXT_swapchain_maintenance1 requires VK_EXT_surface_maintenance1
+    // VK_EXT_surface_maintenance1 requires VK_KHR_get_surface_capabilities2
+    //
+    // Don't enable VK_KHR_get_surface_capabilities2
+    SetTargetApiVersion(VK_API_VERSION_1_0);
+    if (!InstanceExtensionSupported(VK_KHR_SURFACE_EXTENSION_NAME) ||
+        !InstanceExtensionSupported(VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION_NAME) ||
+        !InstanceExtensionSupported(VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME) ||
+        !InstanceExtensionSupported(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME)) {
+        GTEST_SKIP() << "Did not find the required instance extensions";
+    }
+    m_instance_extension_names.push_back(VK_KHR_SURFACE_EXTENSION_NAME);
+    m_instance_extension_names.push_back(VK_EXT_SURFACE_MAINTENANCE_1_EXTENSION_NAME);
+    m_instance_extension_names.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+
+    Monitor().SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateInstance-ppEnabledExtensionNames-01388");
     const auto ici = GetInstanceCreateInfo();
     vk::CreateInstance(&ici, nullptr, &dummy_instance);
     Monitor().VerifyFound();
@@ -124,8 +148,7 @@ TEST_F(NegativeInstanceless, InstanceValidationFeaturesBadFlags) {
         validation_features.pEnabledValidationFeatures = &bad_enable;
         ici.pNext = &validation_features;
 
-        // VUID-VkValidationFeaturesEXT-pEnabledValidationFeatures-parameter
-        Monitor().SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-GeneralParameterError-UnrecognizedValue");
+        Monitor().SetDesiredFailureMsg(kErrorBit, "VUID-VkValidationFeaturesEXT-pEnabledValidationFeatures-parameter");
         vk::CreateInstance(&ici, nullptr, &dummy_instance);
         Monitor().VerifyFound();
     }
@@ -137,8 +160,7 @@ TEST_F(NegativeInstanceless, InstanceValidationFeaturesBadFlags) {
         validation_features.pDisabledValidationFeatures = &bad_disable;
         ici.pNext = &validation_features;
 
-        // VUID-VkValidationFeaturesEXT-pEnabledValidationFeatures-parameter
-        Monitor().SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-GeneralParameterError-UnrecognizedValue");
+        Monitor().SetDesiredFailureMsg(kErrorBit, "VUID-VkValidationFeaturesEXT-pDisabledValidationFeatures-parameter");
         vk::CreateInstance(&ici, nullptr, &dummy_instance);
         Monitor().VerifyFound();
     }
@@ -171,8 +193,7 @@ TEST_F(NegativeInstanceless, InstanceValidationFlags) {
         validation_flags.pDisabledValidationChecks = &bad_disable;
         ici.pNext = &validation_flags;
 
-        // VUID-VkValidationFlagsEXT-pDisabledValidationChecks-parameter
-        Monitor().SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-GeneralParameterError-UnrecognizedValue");
+        Monitor().SetDesiredFailureMsg(kErrorBit, "VUID-VkValidationFlagsEXT-pDisabledValidationChecks-parameter");
         vk::CreateInstance(&ici, nullptr, &dummy_instance);
         Monitor().VerifyFound();
     }
@@ -182,9 +203,7 @@ TEST_F(NegativeInstanceless, InstanceValidationFlags) {
         validation_flags.disabledValidationCheckCount = 0;
         ici.pNext = &validation_flags;
 
-        // TODO - Currently returns VUID_Undefined
-        // VUID-VkValidationFlagsEXT-disabledValidationCheckCount-arraylength
-        Monitor().SetDesiredFailureMsg(kErrorBit, "disabledValidationCheckCount must be greater than 0");
+        Monitor().SetDesiredFailureMsg(kErrorBit, "VUID-VkValidationFlagsEXT-disabledValidationCheckCount-arraylength");
         vk::CreateInstance(&ici, nullptr, &dummy_instance);
         Monitor().VerifyFound();
     }
@@ -265,8 +284,7 @@ TEST_F(NegativeInstanceless, DISABLED_DestroyInstanceHandleLeak) {
     VkDevice leaked_device;
     ASSERT_EQ(VK_SUCCESS, vk::CreateDevice(physical_device, &dci, nullptr, &leaked_device));
 
-    // VUID-vkDestroyInstance-instance-00629
-    Monitor().SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-ObjectTracker-ObjectLeak");
+    Monitor().SetDesiredFailureMsg(kErrorBit, "VUID-vkDestroyInstance-instance-00629");
     vk::DestroyInstance(instance, nullptr);
     Monitor().VerifyFound();
 }

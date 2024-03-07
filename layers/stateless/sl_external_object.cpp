@@ -1,7 +1,7 @@
-/* Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (C) 2015-2023 Google Inc.
+/* Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (C) 2015-2024 Google Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@
 
 #include "stateless/stateless_validation.h"
 #include "generated/enum_flag_bits.h"
+#include "generated/layer_chassis_dispatch.h"
 
 bool StatelessValidation::manual_PreCallValidateGetMemoryFdKHR(VkDevice device, const VkMemoryGetFdInfoKHR *pGetFdInfo, int *pFd,
                                                                const ErrorObject &error_obj) const {
@@ -154,6 +155,23 @@ bool StatelessValidation::manual_PreCallValidateGetMemoryHostPointerPropertiesEX
 }
 
 #ifdef VK_USE_PLATFORM_WIN32_KHR
+bool StatelessValidation::manual_PreCallValidateGetMemoryWin32HandleKHR(VkDevice device,
+                                                                        const VkMemoryGetWin32HandleInfoKHR *pGetWin32HandleInfo,
+                                                                        HANDLE *pHandle, const ErrorObject &error_obj) const {
+    constexpr VkExternalMemoryHandleTypeFlags nt_handles =
+        VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT | VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D11_TEXTURE_BIT |
+        VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D12_HEAP_BIT | VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D12_RESOURCE_BIT;
+    constexpr VkExternalMemoryHandleTypeFlags global_share_handles =
+        VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_KMT_BIT | VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D11_TEXTURE_KMT_BIT;
+    bool skip = false;
+    if ((pGetWin32HandleInfo->handleType & (nt_handles | global_share_handles)) == 0) {
+        skip |= LogError("VUID-VkMemoryGetWin32HandleInfoKHR-handleType-00664", pGetWin32HandleInfo->memory, error_obj.location,
+                         "handle type %s is not one of the supported handle types.",
+                         string_VkExternalMemoryHandleTypeFlagBits(pGetWin32HandleInfo->handleType));
+    }
+    return skip;
+}
+
 bool StatelessValidation::manual_PreCallValidateGetMemoryWin32HandlePropertiesKHR(
     VkDevice device, VkExternalMemoryHandleTypeFlagBits handleType, HANDLE handle,
     VkMemoryWin32HandlePropertiesKHR *pMemoryWin32HandleProperties, const ErrorObject &error_obj) const {
@@ -276,7 +294,7 @@ bool StatelessValidation::manual_PreCallValidateExportMetalObjectsEXT(VkDevice d
     skip |=
         ValidateStructPnext(error_obj.location.dot(Field::pMetalObjectsInfo), pMetalObjectsInfo->pNext, allowed_structs.size(),
                             allowed_structs.data(), GeneratedVulkanHeaderVersion, "VUID-VkExportMetalObjectsInfoEXT-pNext-pNext",
-                            "VUID-VkExportMetalObjectsInfoEXT-sType-unique", false, true);
+                            "VUID-VkExportMetalObjectsInfoEXT-sType-unique", VK_NULL_HANDLE, true);
     return skip;
 }
 #endif  // VK_USE_PLATFORM_METAL_EXT
@@ -470,10 +488,11 @@ bool StatelessValidation::ValidateAllocateMemoryExternal(VkDevice device, const 
             DispatchGetMemoryHostPointerPropertiesEXT(device, ext.import_info_host_pointer->handleType,
                                                       ext.import_info_host_pointer->pHostPointer, &host_pointer_props);
             if (((1 << pAllocateInfo->memoryTypeIndex) & host_pointer_props.memoryTypeBits) == 0) {
-                skip |= LogError("VUID-VkMemoryAllocateInfo-memoryTypeIndex-01744", device,
-                                 allocate_info_loc.dot(Field::memoryTypeIndex),
-                                 "is %" PRIu32 " but VkMemoryHostPointerPropertiesEXT::memoryTypeBits is 0x%" PRIx32 ".",
-                                 pAllocateInfo->memoryTypeIndex, host_pointer_props.memoryTypeBits);
+                skip |= LogError(
+                    "VUID-VkMemoryAllocateInfo-memoryTypeIndex-01744", device, allocate_info_loc.dot(Field::memoryTypeIndex),
+                    "is %" PRIu32 " but VkMemoryHostPointerPropertiesEXT::memoryTypeBits is 0x%" PRIx32 " with handleType %s.",
+                    pAllocateInfo->memoryTypeIndex, host_pointer_props.memoryTypeBits,
+                    string_VkExternalMemoryHandleTypeFlagBits(ext.import_info_host_pointer->handleType));
             }
         }
 

@@ -1,6 +1,6 @@
 <!-- markdownlint-disable MD041 -->
-<!-- Copyright 2015-2023 LunarG, Inc. -->
-<!-- Copyright 2015-2023 Valve Corporation -->
+<!-- Copyright 2015-2024 LunarG, Inc. -->
+<!-- Copyright 2015-2024 Valve Corporation -->
 [![Khronos Vulkan][1]][2]
 
 [1]: https://vulkan.lunarg.com/img/Vulkan_100px_Dec16.png "https://www.khronos.org/vulkan/"
@@ -57,7 +57,7 @@ also provides the line of shader source code that provoked the error as part of 
 The initial release (Jan 2019) of GPU-Assisted Validation includes checking for out-of-bounds descriptor array indexing
 for image/texel descriptor types.
 
-The second release (Apr 2019) adds validation for out-of-bounds descriptor array indexing and use of unwritten descriptors when the 
+The second release (Apr 2019) adds validation for out-of-bounds descriptor array indexing and use of unwritten descriptors when the
 VK_EXT_descriptor_indexing extension is enabled.  Also added (June 2019) was validation for buffer descriptors.
 
 A third update (Aug 2019) adds validation of building top level acceleration structure for ray tracing when the
@@ -96,7 +96,7 @@ The VK_EXT_descriptor_indexing extension allows a shader to declare a descriptor
 ```glsl
 layout(set = 0, binding = 1) uniform sampler2D tex[];
 ```
-In this case, the layer needs to tell the optimization code how big the descriptor array is so the code can determine what is out of 
+In this case, the layer needs to tell the optimization code how big the descriptor array is so the code can determine what is out of
 bounds and what is not.
 
 The extension also allows descriptor set bindings to be partially bound, meaning that as long as the shader doesn't use certain
@@ -104,7 +104,7 @@ array elements, those elements are not required to have been written.
 The instrumentation code needs to know which elements of a descriptor array have been written, so that it can tell if one is used
 that has not been written.
 
-Note that currently, VK_DESCRIPTOR_TYPE_INLINE_UNIFORM_BLOCK_EXT validation is not working and all accesses are reported as valid.
+Note that currently, `VK_DESCRIPTOR_TYPE_INLINE_UNIFORM_BLOCK_EXT` validation is not working and all accesses are reported as valid.
 
 ### Buffer device address checking
 The vkGetBufferDeviceAddressEXT routine can be used to get a GPU address that a shader can use to directly address a particular buffer.
@@ -115,7 +115,7 @@ Note: The mapping between a `VkBuffer` and a GPU address is not necessarily one 
 
 ### Selective Shader Instrumentation
 With the khronos_validation.select_instrumented_shaders feature, an application can control which shaders are instrumented and thus, will return GPU-AV errors.
-After enabling the feature, the application will need to include a VkValidationFeaturesEXT structure with VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT in the pEnabledFeatures list 
+After enabling the feature, the application will need to include a `VkValidationFeaturesEXT` structure with `VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT` in the pEnabledFeatures list
 in the pNext chain of the VkShaderModuleCreateInfo used to create the shader. Otherwise, the shader will not be instrumented.
 
 ## GPU-Assisted Validation Limitations
@@ -171,7 +171,7 @@ impossible for the application to account for them.
 
 Note that if descriptor indexing is enabled, the input buffer size will be equal to
 (1 + (number_of_sets * 2) + (binding_count * 2) + descriptor_count) words of memory where
-binding_count is the binding number of the largest binding in the set.  
+binding_count is the binding number of the largest binding in the set.
 This means that sparsely populated sets and sets with a very large binding will cause
 the input buffer to be much larger than it could be with more densely packed binding numbers.
 As a best practice, when using GPU-Assisted Validation with descriptor indexing enabled,
@@ -256,13 +256,8 @@ In general, the implementation does:
     Usually, it is `VkPhysicalDeviceLimits::maxBoundDescriptorSets` minus one.
     For devices that have a very high or no limit on this bound, pick an index that isn't too high, but above most other device
     maxima such as 32.
-* When creating a ShaderModule, pass the SPIR-V bytecode to the SPIR-V optimizer to perform the instrumentation pass.
-    Update the desired descriptor set binding index to the optimizer via SwitchDescriptorSet pass so that the the instrumented
-    code knows which descriptor to use for writing error report data to the memory block.
-    If descriptor indexing is enabled, turn on OOB and write state checking in the instrumentation pass.
-    If the buffer_device_address extension is enabled, apply a pass to add instrumentation checking for out of bounds buffer references.
-    Link the instrumentation helper functions in layers/gpu_shaders/inst_functions.comp to the instrumented bytecode.
-    Use the instrumented bytecode to create the ShaderModule.
+* When creating a VkShaderModule/VkShaderEXT, the SPIR-V bytecode has various instrumentation pass ran on it.
+    Details found in [GPU-AV Shader Instrumentation](./gpu_av_shader_instrumentation.md)
 * For all pipeline layouts, add our descriptor set to the layout, at the binding index determined earlier.
     Fill any gaps with empty descriptor sets.
 
@@ -285,9 +280,9 @@ More detail is found in the discussion of the individual hooked functions below.
 
 ### Initialization
 
-When the validation layer loads, it examines the user options from both the layer settings file and the
-`VK_EXT_validation_features` extension.
-Note that it also processes the subsumed `VK_EXT_validation_flags` extension for simple backwards compatibility.
+When the validation layer loads, it examines the user settings from the layer settings file, the environment variables and the
+`VK_EXT_layer_settings` extension as described by [Layers Overview and Configuration](https://vulkan.lunarg.com/doc/sdk/latest/windows/layer_configuration.html) document.
+Note that it also processes the subsumed `VK_EXT_validation_features` and `VK_EXT_validation_flags` extensions for simple backwards compatibility.
 From these options, the layer sets instance-scope flags in the validation layer tracking data to indicate if
 GPU-Assisted Validation has been requested, along with any other associated options.
 

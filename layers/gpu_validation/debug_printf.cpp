@@ -1,6 +1,6 @@
-/* Copyright (c) 2020-2023 The Khronos Group Inc.
- * Copyright (c) 2020-2023 Valve Corporation
- * Copyright (c) 2020-2023 LunarG, Inc.
+/* Copyright (c) 2020-2024 The Khronos Group Inc.
+ * Copyright (c) 2020-2024 Valve Corporation
+ * Copyright (c) 2020-2024 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -290,13 +290,9 @@ void debug_printf::Validator::AnalyzeAndGenerateMessages(VkCommandBuffer command
     //    1         Size of output record, including this word
     //    2         Shader ID
     //    3         Instruction Position
-    //    4         Stage Ordinal
-    //    5         Stage - specific Info Word 0
-    //    6         Stage - specific Info Word 1
-    //    7         Stage - specific Info Word 2
-    //    8         Printf Format String Id
-    //    9         Printf Values Word 0 (optional)
-    //    10         Printf Values Word 1 (optional)
+    //    4         Printf Format String Id
+    //    5         Printf Values Word 0 (optional)
+    //    6         Printf Values Word 1 (optional)
     uint32_t expect = debug_output_buffer[1];
     if (!expect) return;
 
@@ -387,19 +383,17 @@ void debug_printf::Validator::AnalyzeAndGenerateMessages(VkCommandBuffer command
         }
 
         if (verbose) {
-            std::string stage_message;
             std::string common_message;
             std::string filename_message;
             std::string source_message;
-            UtilGenerateStageMessage(&debug_output_buffer[index], stage_message);
             UtilGenerateCommonMessage(report_data, command_buffer, &debug_output_buffer[index], shader_module_handle,
                                       pipeline_handle, shader_object_handle, buffer_info.pipeline_bind_point, operation_index, common_message);
             UtilGenerateSourceMessages(pgm, &debug_output_buffer[index], true, filename_message, source_message);
             if (use_stdout) {
-                std::cout << "UNASSIGNED-DEBUG-PRINTF " << common_message.c_str() << " " << stage_message.c_str() << " "
+                std::cout << "WARNING-DEBUG-PRINTF " << common_message.c_str() << " "
                           << shader_message.str().c_str() << " " << filename_message.c_str() << " " << source_message.c_str();
             } else {
-                LogInfo("UNASSIGNED-DEBUG-PRINTF", queue, loc, "%s %s %s %s%s", common_message.c_str(), stage_message.c_str(),
+                LogInfo("WARNING-DEBUG-PRINTF", queue, loc, "%s %s %s%s", common_message.c_str(),
                         shader_message.str().c_str(), filename_message.c_str(), source_message.c_str());
             }
         } else {
@@ -407,13 +401,13 @@ void debug_printf::Validator::AnalyzeAndGenerateMessages(VkCommandBuffer command
                 std::cout << shader_message.str();
             } else {
                 // Don't let LogInfo process any '%'s in the string
-                LogInfo("UNASSIGNED-DEBUG-PRINTF", device, loc, "%s", shader_message.str().c_str());
+                LogInfo("WARNING-DEBUG-PRINTF", device, loc, "%s", shader_message.str().c_str());
             }
         }
         index += debug_record->size;
     }
     if ((index - spvtools::kDebugOutputDataOffset) != expect) {
-        LogWarning("UNASSIGNED-DEBUG-PRINTF", device, loc,
+        LogWarning("WARNING-DEBUG-PRINTF", device, loc,
                    "WARNING - Debug Printf message was truncated, likely due to a buffer size that was too small for the message");
     }
     memset(debug_output_buffer, 0, 4 * (debug_output_buffer[spvtools::kDebugOutputSizeOffset] + spvtools::kDebugOutputDataOffset));
@@ -447,7 +441,7 @@ void debug_printf::CommandBuffer::Process(VkQueue queue, const Location &loc) {
 
             VkResult result = vmaMapMemory(device_state->vmaAllocator, buffer_info.output_mem_block.allocation, (void **)&data);
             if (result == VK_SUCCESS) {
-                device_state->AnalyzeAndGenerateMessages(commandBuffer(), queue, buffer_info, operation_index, (uint32_t *)data);
+                device_state->AnalyzeAndGenerateMessages(VkHandle(), queue, buffer_info, operation_index, (uint32_t *)data);
                 vmaUnmapMemory(device_state->vmaAllocator, buffer_info.output_mem_block.allocation);
             }
         }
@@ -467,9 +461,7 @@ void debug_printf::Validator::PreCallRecordCmdDrawMultiEXT(VkCommandBuffer comma
                                                            const VkMultiDrawInfoEXT *pVertexInfo, uint32_t instanceCount,
                                                            uint32_t firstInstance, uint32_t stride,
                                                            const RecordObject &record_obj) {
-    for (uint32_t i = 0; i < drawCount; i++) {
-        AllocateDebugPrintfResources(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS);
-    }
+    AllocateDebugPrintfResources(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS);
 }
 
 void debug_printf::Validator::PreCallRecordCmdDrawIndexed(VkCommandBuffer commandBuffer, uint32_t indexCount,
@@ -482,9 +474,7 @@ void debug_printf::Validator::PreCallRecordCmdDrawMultiIndexedEXT(VkCommandBuffe
                                                                   const VkMultiDrawIndexedInfoEXT *pIndexInfo,
                                                                   uint32_t instanceCount, uint32_t firstInstance, uint32_t stride,
                                                                   const int32_t *pVertexOffset, const RecordObject &record_obj) {
-    for (uint32_t i = 0; i < drawCount; i++) {
-        AllocateDebugPrintfResources(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS);
-    }
+    AllocateDebugPrintfResources(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS);
 }
 
 void debug_printf::Validator::PreCallRecordCmdDrawIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
@@ -727,7 +717,7 @@ void debug_printf::Validator::AllocateDebugPrintfResources(const VkCommandBuffer
         // may be a "pseudo layout" used to represent the union of pre-raster and fragment shader layouts, and therefore have a
         // null handle.
         const auto pipeline_layout_handle =
-            (last_bound.pipeline_layout) ? last_bound.pipeline_layout : pipeline_state->PreRasterPipelineLayoutState()->layout();
+            (last_bound.pipeline_layout) ? last_bound.pipeline_layout : pipeline_state->PreRasterPipelineLayoutState()->VkHandle();
         if (pipeline_layout->set_layouts.size() <= desc_set_bind_index) {
             DispatchCmdBindDescriptorSets(cmd_buffer, bind_point, pipeline_layout_handle, desc_set_bind_index, 1, desc_sets.data(),
                                           0, nullptr);

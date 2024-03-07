@@ -1,6 +1,6 @@
-/* Copyright (c) 2020-2023 The Khronos Group Inc.
- * Copyright (c) 2020-2023 Valve Corporation
- * Copyright (c) 2020-2023 LunarG, Inc.
+/* Copyright (c) 2020-2024 The Khronos Group Inc.
+ * Copyright (c) 2020-2024 Valve Corporation
+ * Copyright (c) 2020-2024 LunarG, Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -33,7 +33,6 @@ const char *SETTING_VALIDATE_BEST_PRACTICES_AMD = "validate_best_practices_amd";
 const char *SETTING_VALIDATE_BEST_PRACTICES_IMG = "validate_best_practices_img";
 const char *SETTING_VALIDATE_BEST_PRACTICES_NVIDIA = "validate_best_practices_nvidia";
 const char *SETTING_VALIDATE_SYNC = "validate_sync";
-const char *SETTING_VALIDATE_SYNC_QUEUE_SUBMIT = "sync_queue_submit";
 const char *SETTING_VALIDATE_GPU_BASED = "validate_gpu_based";
 const char *SETTING_RESERVE_BINDING_SLOT = "reserve_binding_slot";
 
@@ -49,6 +48,7 @@ const char *SETTING_UNIQUE_HANDLES = "unique_handles";
 const char *SETTING_OBJECT_LIFETIME = "object_lifetime";
 const char *SETTING_CHECK_SHADERS = "check_shaders";
 const char *SETTING_CHECK_SHADERS_CACHING = "check_shaders_caching";
+const char *SETTING_VALIDATE_SYNC_QUEUE_SUBMIT = "sync_queue_submit";
 
 const char *SETTING_MESSAGE_ID_FILTER = "message_id_filter";
 const char *SETTING_CUSTOM_STYPE_LIST = "custom_stype_list";
@@ -62,6 +62,8 @@ const char *SETTING_GPUAV_WARN_ON_ROBUST_OOB = "warn_on_robust_oob";
 const char *SETTING_GPUAV_USE_INSTRUMENTED_SHADER_CACHE = "use_instrumented_shader_cache";
 const char *SETTING_GPUAV_SELECT_INSTRUMENTED_SHADERS = "select_instrumented_shaders";
 const char *SETTING_GPUAV_MAX_BUFFER_DEVICE_ADDRESS_BUFFERS = "gpuav_max_buffer_device_addresses";
+const char *SETTING_GPUAV_DEBUG_VALIDATE_INSTRUMENTED_SHADERS = "gpuav_debug_validate_instrumented_shaders";
+const char *SETTING_GPUAV_DEBUG_DUMP_INSTRUMENTED_SHADERS = "gpuav_debug_dump_instrumented_shaders";
 
 // Set the local disable flag for the appropriate VALIDATION_CHECK_DISABLE enum
 void SetValidationDisable(CHECK_DISABLED &disable_data, const ValidationCheckDisables disable_id) {
@@ -77,6 +79,9 @@ void SetValidationDisable(CHECK_DISABLED &disable_data, const ValidationCheckDis
             break;
         case VALIDATION_CHECK_DISABLE_IMAGE_LAYOUT_VALIDATION:
             disable_data[image_layout_validation] = true;
+            break;
+        case VALIDATION_CHECK_DISABLE_SYNCHRONIZATION_VALIDATION_QUEUE_SUBMIT:
+            disable_data[sync_validation_queue_submit] = true;
             break;
         default:
             assert(true);
@@ -136,9 +141,6 @@ void SetValidationEnable(CHECK_ENABLED &enable_data, const ValidationCheckEnable
             enable_data[vendor_specific_amd] = true;
             enable_data[vendor_specific_img] = true;
             enable_data[vendor_specific_nvidia] = true;
-            break;
-        case VALIDATION_CHECK_ENABLE_SYNCHRONIZATION_VALIDATION_QUEUE_SUBMIT:
-            enable_data[sync_validation_queue_submit] = true;
             break;
         default:
             assert(true);
@@ -393,39 +395,51 @@ void ProcessConfigAndEnvSettings(ConfigAndEnvSettings *settings_data) {
         vkuGetLayerSettingValues(layer_setting_set, SETTING_CUSTOM_STYPE_LIST, custom_stype_info);
     }
 
+    GpuAVSettings &gpuav_settings = *settings_data->gpuav_settings;
     if (vkuHasLayerSetting(layer_setting_set, SETTING_GPUAV_VALIDATE_DESCRIPTORS)) {
-        vkuGetLayerSettingValue(layer_setting_set, SETTING_GPUAV_VALIDATE_DESCRIPTORS,
-                                settings_data->gpuav_settings->validate_descriptors);
+        vkuGetLayerSettingValue(layer_setting_set, SETTING_GPUAV_VALIDATE_DESCRIPTORS, gpuav_settings.validate_descriptors);
     }
 
     if (vkuHasLayerSetting(layer_setting_set, SETTING_GPUAV_VALIDATE_INDIRECT_BUFFER)) {
-        vkuGetLayerSettingValue(layer_setting_set, SETTING_GPUAV_VALIDATE_INDIRECT_BUFFER,
-                                settings_data->gpuav_settings->validate_indirect_buffer);
+        vkuGetLayerSettingValue(layer_setting_set, SETTING_GPUAV_VALIDATE_INDIRECT_BUFFER, gpuav_settings.validate_indirect_buffer);
     }
 
     if (vkuHasLayerSetting(layer_setting_set, SETTING_GPUAV_VMA_LINEAR_OUTPUT)) {
-        vkuGetLayerSettingValue(layer_setting_set, SETTING_GPUAV_VMA_LINEAR_OUTPUT,
-                                settings_data->gpuav_settings->vma_linear_output);
+        vkuGetLayerSettingValue(layer_setting_set, SETTING_GPUAV_VMA_LINEAR_OUTPUT, gpuav_settings.vma_linear_output);
     }
 
     if (vkuHasLayerSetting(layer_setting_set, SETTING_GPUAV_WARN_ON_ROBUST_OOB)) {
-        vkuGetLayerSettingValue(layer_setting_set, SETTING_GPUAV_WARN_ON_ROBUST_OOB,
-                                settings_data->gpuav_settings->warn_on_robust_oob);
+        vkuGetLayerSettingValue(layer_setting_set, SETTING_GPUAV_WARN_ON_ROBUST_OOB, gpuav_settings.warn_on_robust_oob);
     }
 
     if (vkuHasLayerSetting(layer_setting_set, SETTING_GPUAV_USE_INSTRUMENTED_SHADER_CACHE)) {
         vkuGetLayerSettingValue(layer_setting_set, SETTING_GPUAV_USE_INSTRUMENTED_SHADER_CACHE,
-                                settings_data->gpuav_settings->cache_instrumented_shaders);
+                                gpuav_settings.cache_instrumented_shaders);
     }
 
     if (vkuHasLayerSetting(layer_setting_set, SETTING_GPUAV_SELECT_INSTRUMENTED_SHADERS)) {
         vkuGetLayerSettingValue(layer_setting_set, SETTING_GPUAV_SELECT_INSTRUMENTED_SHADERS,
-                                settings_data->gpuav_settings->select_instrumented_shaders);
+                                gpuav_settings.select_instrumented_shaders);
     }
 
     if (vkuHasLayerSetting(layer_setting_set, SETTING_GPUAV_MAX_BUFFER_DEVICE_ADDRESS_BUFFERS)) {
         vkuGetLayerSettingValue(layer_setting_set, SETTING_GPUAV_MAX_BUFFER_DEVICE_ADDRESS_BUFFERS,
-                                settings_data->gpuav_settings->gpuav_max_buffer_device_addresses);
+                                gpuav_settings.gpuav_max_buffer_device_addresses);
+    }
+
+    if (vkuHasLayerSetting(layer_setting_set, SETTING_GPUAV_DEBUG_VALIDATE_INSTRUMENTED_SHADERS)) {
+        vkuGetLayerSettingValue(layer_setting_set, SETTING_GPUAV_DEBUG_VALIDATE_INSTRUMENTED_SHADERS,
+                                gpuav_settings.gpuav_debug_validate_instrumented_shaders);
+    }
+
+    if (vkuHasLayerSetting(layer_setting_set, SETTING_GPUAV_DEBUG_DUMP_INSTRUMENTED_SHADERS)) {
+        vkuGetLayerSettingValue(layer_setting_set, SETTING_GPUAV_DEBUG_DUMP_INSTRUMENTED_SHADERS,
+                                gpuav_settings.gpuav_debug_dump_instrumented_shaders);
+    }
+
+    if (gpuav_settings.gpuav_debug_validate_instrumented_shaders || gpuav_settings.gpuav_debug_dump_instrumented_shaders) {
+        // When debugging instrumented shaders, if it is cached, it will never get to the InstrumentShader() call
+        gpuav_settings.cache_instrumented_shaders = false;
     }
 
     const auto *validation_features_ext = vku::FindStructInPNextChain<VkValidationFeaturesEXT>(settings_data->create_info);
@@ -449,8 +463,6 @@ void ProcessConfigAndEnvSettings(ConfigAndEnvSettings *settings_data) {
         SetValidationSetting(layer_setting_set, settings_data->enables, vendor_specific_nvidia,
                              SETTING_VALIDATE_BEST_PRACTICES_NVIDIA);
         SetValidationSetting(layer_setting_set, settings_data->enables, sync_validation, SETTING_VALIDATE_SYNC);
-        SetValidationSetting(layer_setting_set, settings_data->enables, sync_validation_queue_submit,
-                             SETTING_VALIDATE_SYNC_QUEUE_SUBMIT);
 
         if (vkuHasLayerSetting(layer_setting_set, SETTING_VALIDATE_GPU_BASED)) {
             std::string setting_value;
@@ -477,6 +489,8 @@ void ProcessConfigAndEnvSettings(ConfigAndEnvSettings *settings_data) {
         SetValidationSetting(layer_setting_set, settings_data->disables, object_tracking, SETTING_OBJECT_LIFETIME);
         SetValidationSetting(layer_setting_set, settings_data->disables, shader_validation, SETTING_CHECK_SHADERS);
         SetValidationSetting(layer_setting_set, settings_data->disables, shader_validation_caching, SETTING_CHECK_SHADERS_CACHING);
+        SetValidationSetting(layer_setting_set, settings_data->disables, sync_validation_queue_submit,
+                             SETTING_VALIDATE_SYNC_QUEUE_SUBMIT);
     }
 
     vkuDestroyLayerSettingSet(layer_setting_set, nullptr);

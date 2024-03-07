@@ -18,7 +18,6 @@
 
 #pragma once
 #include "generated/chassis.h"
-#include "error_message/validation_error_enums.h"
 #include "state_tracker/state_tracker.h"
 #include "vulkansc/state_tracker/sc_device_state.h"
 #include "vulkansc/state_tracker/sc_pipeline_state.h"
@@ -83,10 +82,12 @@ class SCValidationStateTracker : public BASE {
                                                                  const VkPipelineCacheCreateInfo* pCreateInfo) const override;
 
     std::shared_ptr<vvl::Pipeline> CreateGraphicsPipelineState(const VkGraphicsPipelineCreateInfo* pCreateInfo,
+                                                               std::shared_ptr<const vvl::PipelineCache> pipeline_cache,
                                                                std::shared_ptr<const vvl::RenderPass>&& render_pass,
                                                                std::shared_ptr<const vvl::PipelineLayout>&& layout,
                                                                CreateShaderModuleStates* csm_states) const override;
     std::shared_ptr<vvl::Pipeline> CreateComputePipelineState(const VkComputePipelineCreateInfo* pCreateInfo,
+                                                              std::shared_ptr<const vvl::PipelineCache> pipeline_cache,
                                                               std::shared_ptr<const vvl::PipelineLayout>&& layout) const override;
     void PostCallRecordCreateGraphicsPipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t count,
                                                const VkGraphicsPipelineCreateInfo* pCreateInfos,

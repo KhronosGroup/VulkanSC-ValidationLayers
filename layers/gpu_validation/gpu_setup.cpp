@@ -1,6 +1,6 @@
-/* Copyright (c) 2018-2023 The Khronos Group Inc.
- * Copyright (c) 2018-2023 Valve Corporation
- * Copyright (c) 2018-2023 LunarG, Inc.
+/* Copyright (c) 2018-2024 The Khronos Group Inc.
+ * Copyright (c) 2018-2024 Valve Corporation
+ * Copyright (c) 2018-2024 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,8 @@
 #include "utils/shader_utils.h"
 #include "utils/hash_util.h"
 #include "gpu_validation/gpu_validation.h"
+#include "gpu_validation/gpu_subclasses.h"
+#include "state_tracker/device_state.h"
 #include "spirv-tools/instrument.hpp"
 #include "spirv-tools/linker.hpp"
 #include "generated/layer_chassis_dispatch.h"
@@ -34,7 +36,6 @@
 #include "generated/gpu_pre_dispatch_comp.h"
 #include "generated/gpu_pre_trace_rays_rgen.h"
 #include "generated/gpu_as_inspection_comp.h"
-#include "generated/inst_functions_comp.h"
 #include "generated/gpu_inst_shader_hash.h"
 
 std::shared_ptr<vvl::Buffer> gpuav::Validator::CreateBufferState(VkBuffer buf, const VkBufferCreateInfo *pCreateInfo) {
@@ -59,9 +60,8 @@ std::shared_ptr<vvl::AccelerationStructureNV> gpuav::Validator::CreateAccelerati
 }
 
 std::shared_ptr<vvl::AccelerationStructureKHR> gpuav::Validator::CreateAccelerationStructureState(
-    VkAccelerationStructureKHR as, const VkAccelerationStructureCreateInfoKHR *ci, std::shared_ptr<vvl::Buffer> &&buf_state,
-    VkDeviceAddress address) {
-    return std::make_shared<AccelerationStructureKHR>(as, ci, std::move(buf_state), address, *desc_heap);
+    VkAccelerationStructureKHR as, const VkAccelerationStructureCreateInfoKHR *ci, std::shared_ptr<vvl::Buffer> &&buf_state) {
+    return std::make_shared<AccelerationStructureKHR>(as, ci, std::move(buf_state), *desc_heap);
 }
 
 std::shared_ptr<vvl::Sampler> gpuav::Validator::CreateSamplerState(VkSampler s, const VkSamplerCreateInfo *ci) {
@@ -106,8 +106,6 @@ void gpuav::Validator::CreateDevice(const VkDeviceCreateInfo *pCreateInfo) {
     BaseClass::CreateDevice(pCreateInfo);
     Location loc(vvl::Func::vkCreateDevice);
 
-    validate_instrumented_shaders = (GetEnvironment("VK_LAYER_GPUAV_VALIDATE_INSTRUMENTED_SHADERS").size() > 0);
-
     if (api_version < VK_API_VERSION_1_1) {
         ReportSetupProblem(device, "GPU-Assisted validation requires Vulkan 1.1 or later.  GPU-Assisted Validation disabled.");
         aborted = true;
@@ -127,7 +125,7 @@ void gpuav::Validator::CreateDevice(const VkDeviceCreateInfo *pCreateInfo) {
     if ((IsExtEnabled(device_extensions.vk_ext_buffer_device_address) ||
          IsExtEnabled(device_extensions.vk_khr_buffer_device_address)) &&
         !shaderInt64) {
-        LogWarning("UNASSIGNED-GPU-Assisted Validation Warning", device, loc,
+        LogWarning("WARNING-GPU-Assisted-Validation", device, loc,
                    "shaderInt64 feature is not available.  No buffer device address checking will be attempted");
     }
     buffer_device_address_enabled = ((IsExtEnabled(device_extensions.vk_ext_buffer_device_address) ||
@@ -158,7 +156,7 @@ void gpuav::Validator::CreateDevice(const VkDeviceCreateInfo *pCreateInfo) {
     }
 
     if (IsExtEnabled(device_extensions.vk_ext_descriptor_buffer)) {
-        LogWarning("UNASSIGNED-GPU-Assisted Validation Warning", device, loc,
+        LogWarning("WARNING-GPU-Assisted-Validation", device, loc,
                    "VK_EXT_descriptor_buffer is enabled, but GPU-AV does not currently support validation of descriptor buffers. "
                    "Use of descriptor buffers will result in no descriptor checking");
     }
@@ -167,13 +165,13 @@ void gpuav::Validator::CreateDevice(const VkDeviceCreateInfo *pCreateInfo) {
 
     if (gpuav_settings.validate_descriptors && !force_buffer_device_address) {
         gpuav_settings.validate_descriptors = false;
-        LogWarning("UNASSIGNED-GPU-Assisted Validation Warning", device, loc,
+        LogWarning("WARNING-GPU-Assisted-Validation", device, loc,
                    "Buffer Device Address + feature is not available.  No descriptor checking will be attempted");
     }
 
     if (gpuav_settings.validate_indirect_buffer && (phys_dev_props.limits.maxPushConstantsSize < 4 * sizeof(uint32_t))) {
         gpuav_settings.validate_indirect_buffer = false;
-        LogWarning("UNASSIGNED-GPU-Assisted Validation Warning", device, loc,
+        LogWarning("WARNING-GPU-Assisted-Validation", device, loc,
                    "Device does not support the minimum range of push constants (32 bytes).  No indirect buffer checking will be "
                    "attempted");
     }
@@ -271,7 +269,7 @@ void gpuav::Validator::CreateAccelerationStructureBuildValidationState(const VkD
         }
     }
     if (!graphics_queue_exists) {
-        LogWarning("UNASSIGNED-GPU-Assisted Validation Warning", device, loc, "No queue that supports graphics, GPU-AV aborted.");
+        LogWarning("WARNING-GPU-Assisted-Validation", device, loc, "No queue that supports graphics, GPU-AV aborted.");
         aborted = true;
         return;
     }
@@ -575,7 +573,7 @@ void gpuav::Validator::CreateAccelerationStructureBuildValidationState(const VkD
 
     if (result == VK_SUCCESS) {
         as_validation_state.initialized = true;
-        LogInfo("UNASSIGNED-GPU-Assisted Validation.", device, loc, "Acceleration Structure Building GPU Validation Enabled.");
+        LogInfo("WARNING-GPU-Assisted-Validation", device, loc, "Acceleration Structure Building GPU Validation Enabled.");
     } else {
         aborted = true;
     }
@@ -589,84 +587,91 @@ void gpuav::Validator::Destroy(AccelerationStructureBuildValidationInfo &as_vali
     }
 }
 
-void gpuav::CommonDrawResources::Destroy(VkDevice device) {
+void gpuav::PreDrawResources::SharedResources::Destroy(gpuav::Validator &validator) {
     if (shader_module != VK_NULL_HANDLE) {
-        DispatchDestroyShaderModule(device, shader_module, nullptr);
+        DispatchDestroyShaderModule(validator.device, shader_module, nullptr);
         shader_module = VK_NULL_HANDLE;
     }
     if (ds_layout != VK_NULL_HANDLE) {
-        DispatchDestroyDescriptorSetLayout(device, ds_layout, nullptr);
+        DispatchDestroyDescriptorSetLayout(validator.device, ds_layout, nullptr);
         ds_layout = VK_NULL_HANDLE;
     }
     if (pipeline_layout != VK_NULL_HANDLE) {
-        DispatchDestroyPipelineLayout(device, pipeline_layout, nullptr);
+        DispatchDestroyPipelineLayout(validator.device, pipeline_layout, nullptr);
         pipeline_layout = VK_NULL_HANDLE;
     }
     auto to_destroy = renderpass_to_pipeline.snapshot();
     for (auto &entry : to_destroy) {
-        DispatchDestroyPipeline(device, entry.second, nullptr);
+        DispatchDestroyPipeline(validator.device, entry.second, nullptr);
         renderpass_to_pipeline.erase(entry.first);
     }
     if (shader_object != VK_NULL_HANDLE) {
-        DispatchDestroyShaderEXT(device, shader_object, nullptr);
+        DispatchDestroyShaderEXT(validator.device, shader_object, nullptr);
         shader_object = VK_NULL_HANDLE;
     }
-    initialized = false;
 }
 
-void gpuav::CommonDispatchResources::Destroy(VkDevice device) {
-    if (shader_module != VK_NULL_HANDLE) {
-        DispatchDestroyShaderModule(device, shader_module, nullptr);
-        shader_module = VK_NULL_HANDLE;
-    }
+void gpuav::PreDispatchResources::SharedResources::Destroy(gpuav::Validator &validator) {
     if (ds_layout != VK_NULL_HANDLE) {
-        DispatchDestroyDescriptorSetLayout(device, ds_layout, nullptr);
+        DispatchDestroyDescriptorSetLayout(validator.device, ds_layout, nullptr);
         ds_layout = VK_NULL_HANDLE;
     }
     if (pipeline_layout != VK_NULL_HANDLE) {
-        DispatchDestroyPipelineLayout(device, pipeline_layout, nullptr);
+        DispatchDestroyPipelineLayout(validator.device, pipeline_layout, nullptr);
         pipeline_layout = VK_NULL_HANDLE;
     }
     if (pipeline != VK_NULL_HANDLE) {
-        DispatchDestroyPipeline(device, pipeline, nullptr);
+        DispatchDestroyPipeline(validator.device, pipeline, nullptr);
         pipeline = VK_NULL_HANDLE;
     }
     if (shader_object != VK_NULL_HANDLE) {
-        DispatchDestroyShaderEXT(device, shader_object, nullptr);
+        DispatchDestroyShaderEXT(validator.device, shader_object, nullptr);
         shader_object = VK_NULL_HANDLE;
     }
-    initialized = false;
 }
 
-void gpuav::CommonTraceRaysResources::Destroy(VkDevice device, VmaAllocator &vmaAllocator) {
-    if (shader_module != VK_NULL_HANDLE) {
-        DispatchDestroyShaderModule(device, shader_module, nullptr);
-        shader_module = VK_NULL_HANDLE;
-    }
+void gpuav::PreTraceRaysResources::SharedResources::Destroy(gpuav::Validator &validator) {
     if (ds_layout != VK_NULL_HANDLE) {
-        DispatchDestroyDescriptorSetLayout(device, ds_layout, nullptr);
+        DispatchDestroyDescriptorSetLayout(validator.device, ds_layout, nullptr);
         ds_layout = VK_NULL_HANDLE;
     }
     if (pipeline_layout != VK_NULL_HANDLE) {
-        DispatchDestroyPipelineLayout(device, pipeline_layout, nullptr);
+        DispatchDestroyPipelineLayout(validator.device, pipeline_layout, nullptr);
         pipeline_layout = VK_NULL_HANDLE;
     }
     if (pipeline != VK_NULL_HANDLE) {
-        DispatchDestroyPipeline(device, pipeline, nullptr);
+        DispatchDestroyPipeline(validator.device, pipeline, nullptr);
         pipeline = VK_NULL_HANDLE;
     }
     if (sbt_buffer != VK_NULL_HANDLE) {
-        vmaDestroyBuffer(vmaAllocator, sbt_buffer, sbt_allocation);
+        vmaDestroyBuffer(validator.vmaAllocator, sbt_buffer, sbt_allocation);
         sbt_buffer = VK_NULL_HANDLE;
         sbt_allocation = VK_NULL_HANDLE;
         sbt_address = 0;
     }
     if (sbt_pool) {
-        vmaDestroyPool(vmaAllocator, sbt_pool);
+        vmaDestroyPool(validator.vmaAllocator, sbt_pool);
         sbt_pool = VK_NULL_HANDLE;
     }
+}
 
-    initialized = false;
+void gpuav::PreCopyBufferToImageResources::SharedResources::Destroy(gpuav::Validator &validator) {
+    if (ds_layout != VK_NULL_HANDLE) {
+        DispatchDestroyDescriptorSetLayout(validator.device, ds_layout, nullptr);
+        ds_layout = VK_NULL_HANDLE;
+    }
+    if (pipeline_layout != VK_NULL_HANDLE) {
+        DispatchDestroyPipelineLayout(validator.device, pipeline_layout, nullptr);
+        pipeline_layout = VK_NULL_HANDLE;
+    }
+    if (pipeline != VK_NULL_HANDLE) {
+        DispatchDestroyPipeline(validator.device, pipeline, nullptr);
+        pipeline = VK_NULL_HANDLE;
+    }
+    if (copy_regions_pool != VK_NULL_HANDLE) {
+        vmaDestroyPool(validator.vmaAllocator, copy_regions_pool);
+        copy_regions_pool = VK_NULL_HANDLE;
+    }
 }
 
 void gpuav::AccelerationStructureBuildValidationState::Destroy(VkDevice device, VmaAllocator &vmaAllocator) {
@@ -695,7 +700,7 @@ void gpuav::RestorablePipelineState::Create(vvl::CommandBuffer *cb_state, VkPipe
 
     LastBound &last_bound = cb_state->lastBound[lv_bind_point];
     if (last_bound.pipeline_state) {
-        pipeline = last_bound.pipeline_state->pipeline();
+        pipeline = last_bound.pipeline_state->VkHandle();
         pipeline_layout = last_bound.pipeline_layout;
         descriptor_sets.reserve(last_bound.per_set.size());
         for (std::size_t i = 0; i < last_bound.per_set.size(); i++) {
@@ -785,6 +790,22 @@ void gpuav::PreTraceRaysResources::Destroy(gpuav::Validator &validator) {
         validator.desc_set_manager->PutBackDescriptorSet(desc_pool, desc_set);
         desc_set = VK_NULL_HANDLE;
         desc_pool = VK_NULL_HANDLE;
+    }
+
+    CommandResources::Destroy(validator);
+}
+
+void gpuav::PreCopyBufferToImageResources::Destroy(gpuav::Validator &validator) {
+    if (desc_set != VK_NULL_HANDLE) {
+        validator.desc_set_manager->PutBackDescriptorSet(desc_pool, desc_set);
+        desc_set = VK_NULL_HANDLE;
+        desc_pool = VK_NULL_HANDLE;
+    }
+
+    if (copy_src_regions_buffer != VK_NULL_HANDLE) {
+        vmaDestroyBuffer(validator.vmaAllocator, copy_src_regions_buffer, copy_src_regions_allocation);
+        copy_src_regions_buffer = VK_NULL_HANDLE;
+        copy_src_regions_allocation = VK_NULL_HANDLE;
     }
 
     CommandResources::Destroy(validator);

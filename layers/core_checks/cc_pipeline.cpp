@@ -1,7 +1,7 @@
-/* Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (C) 2015-2023 Google Inc.
+/* Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (C) 2015-2024 Google Inc.
  * Modifications Copyright (C) 2020-2022 Advanced Micro Devices, Inc. All rights reserved.
  * Modifications Copyright (C) 2022 RasterGrid Kft.
  *
@@ -24,6 +24,21 @@
 #include <vulkan/vk_enum_string_helper.h>
 #include "generated/chassis.h"
 #include "core_validation.h"
+#include "state_tracker/device_state.h"
+
+bool CoreChecks::IsBeforeCtsVersion(uint32_t major, uint32_t minor, uint32_t subminor) const {
+    // If VK_KHR_driver_properties is not enabled then conformance version will not be set
+    if (phys_dev_props_core12.conformanceVersion.major == 0) {
+        return false;
+    }
+    if (phys_dev_props_core12.conformanceVersion.major != major) {
+        return phys_dev_props_core12.conformanceVersion.major < major;
+    }
+    if (phys_dev_props_core12.conformanceVersion.minor != minor) {
+        return phys_dev_props_core12.conformanceVersion.minor < minor;
+    }
+    return phys_dev_props_core12.conformanceVersion.subminor < subminor;
+}
 
 bool CoreChecks::ValidatePipelineCacheControlFlags(VkPipelineCreateFlags2KHR flags, const Location &loc, const char *vuid) const {
     bool skip = false;
@@ -229,17 +244,17 @@ bool CoreChecks::PreCallValidateCmdBindPipeline(VkCommandBuffer commandBuffer, V
 
     if (pipelineBindPoint != pipeline_state.pipeline_type) {
         if (pipelineBindPoint == VK_PIPELINE_BIND_POINT_GRAPHICS) {
-            const LogObjectList objlist(cb_state->commandBuffer(), pipeline);
+            const LogObjectList objlist(cb_state->Handle(), pipeline);
             skip |= LogError("VUID-vkCmdBindPipeline-pipelineBindPoint-00779", objlist, error_obj.location,
                              "Cannot bind a pipeline of type %s to the graphics pipeline bind point",
                              string_VkPipelineBindPoint(pipeline_state.pipeline_type));
         } else if (pipelineBindPoint == VK_PIPELINE_BIND_POINT_COMPUTE) {
-            const LogObjectList objlist(cb_state->commandBuffer(), pipeline);
+            const LogObjectList objlist(cb_state->Handle(), pipeline);
             skip |= LogError("VUID-vkCmdBindPipeline-pipelineBindPoint-00780", objlist, error_obj.location,
                              "Cannot bind a pipeline of type %s to the compute pipeline bind point",
                              string_VkPipelineBindPoint(pipeline_state.pipeline_type));
         } else if (pipelineBindPoint == VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR) {
-            const LogObjectList objlist(cb_state->commandBuffer(), pipeline);
+            const LogObjectList objlist(cb_state->Handle(), pipeline);
             skip |= LogError("VUID-vkCmdBindPipeline-pipelineBindPoint-02392", objlist, error_obj.location,
                              "Cannot bind a pipeline of type %s to the ray-tracing pipeline bind point",
                              string_VkPipelineBindPoint(pipeline_state.pipeline_type));
@@ -262,31 +277,31 @@ bool CoreChecks::PreCallValidateCmdBindPipeline(VkCommandBuffer commandBuffer, V
                             pipeline_state.RasterizationState()->pNext);
 
                     if (last_bound_provoking_vertex_state_ci && !current_provoking_vertex_state_ci) {
-                        const LogObjectList objlist(cb_state->commandBuffer(), pipeline);
+                        const LogObjectList objlist(cb_state->Handle(), pipeline);
                         skip |= LogError("VUID-vkCmdBindPipeline-pipelineBindPoint-04881", objlist, error_obj.location,
                                          "Previous %s's provokingVertexMode is %s, but %s doesn't chain "
                                          "VkPipelineRasterizationProvokingVertexStateCreateInfoEXT.",
-                                         FormatHandle(last_bound.pipeline_state->pipeline()).c_str(),
+                                         FormatHandle(last_bound.pipeline_state->Handle()).c_str(),
                                          string_VkProvokingVertexModeEXT(last_bound_provoking_vertex_state_ci->provokingVertexMode),
                                          FormatHandle(pipeline).c_str());
                     } else if (!last_bound_provoking_vertex_state_ci && current_provoking_vertex_state_ci) {
-                        const LogObjectList objlist(cb_state->commandBuffer(), pipeline);
+                        const LogObjectList objlist(cb_state->Handle(), pipeline);
                         skip |= LogError("VUID-vkCmdBindPipeline-pipelineBindPoint-04881", objlist, error_obj.location,
                                          "%s's provokingVertexMode is %s, but previous %s doesn't chain "
                                          "VkPipelineRasterizationProvokingVertexStateCreateInfoEXT.",
                                          FormatHandle(pipeline).c_str(),
                                          string_VkProvokingVertexModeEXT(current_provoking_vertex_state_ci->provokingVertexMode),
-                                         FormatHandle(last_bound.pipeline_state->pipeline()).c_str());
+                                         FormatHandle(last_bound.pipeline_state->Handle()).c_str());
                     } else if (last_bound_provoking_vertex_state_ci && current_provoking_vertex_state_ci &&
                                last_bound_provoking_vertex_state_ci->provokingVertexMode !=
                                    current_provoking_vertex_state_ci->provokingVertexMode) {
-                        const LogObjectList objlist(cb_state->commandBuffer(), pipeline);
+                        const LogObjectList objlist(cb_state->Handle(), pipeline);
                         skip |=
                             LogError("VUID-vkCmdBindPipeline-pipelineBindPoint-04881", objlist, error_obj.location,
                                      "%s's provokingVertexMode is %s, but previous %s's provokingVertexMode is %s.",
                                      FormatHandle(pipeline).c_str(),
                                      string_VkProvokingVertexModeEXT(current_provoking_vertex_state_ci->provokingVertexMode),
-                                     FormatHandle(last_bound.pipeline_state->pipeline()).c_str(),
+                                     FormatHandle(last_bound.pipeline_state->Handle()).c_str(),
                                      string_VkProvokingVertexModeEXT(last_bound_provoking_vertex_state_ci->provokingVertexMode));
                     }
                 }
@@ -313,7 +328,7 @@ bool CoreChecks::PreCallValidateCmdBindPipeline(VkCommandBuffer commandBuffer, V
                         }
                     }
                     if (!found) {
-                        const LogObjectList objlist(cb_state->commandBuffer(), pipeline, cb_state->activeRenderPass->Handle());
+                        const LogObjectList objlist(cb_state->Handle(), pipeline, cb_state->activeRenderPass->Handle());
                         skip |= LogError("VUID-vkCmdBindPipeline-variableSampleLocations-01525", objlist, error_obj.location,
                                          "the current render pass was not begun with any element of "
                                          "pPostSubpassSampleLocations subpassIndex "
@@ -330,8 +345,7 @@ bool CoreChecks::PreCallValidateCmdBindPipeline(VkCommandBuffer commandBuffer, V
                         const uint32_t subpass = cb_state->GetActiveSubpass();
                         // if render pass uses no attachment, verify that all bound pipelines referencing this subpass have the same
                         // pMultisampleState->rasterizationSamples.
-                        if (!render_pass->UsesDynamicRendering() && !render_pass->UsesColorAttachment(subpass) &&
-                            !render_pass->UsesDepthStencilAttachment(subpass)) {
+                        if (render_pass->UsesNoAttachment(subpass)) {
                             // If execution ends up here, GetActiveSubpassRasterizationSampleCount() can still be empty if this is
                             // the first bound pipeline with the previous conditions holding. Rasterization samples count for the
                             // subpass will be updated in PostCallRecordCmdBindPipeline, if it is empty.
@@ -341,7 +355,7 @@ bool CoreChecks::PreCallValidateCmdBindPipeline(VkCommandBuffer commandBuffer, V
                                 *subpass_rasterization_samples != multisample_state->rasterizationSamples) {
                                 const LogObjectList objlist(device, render_pass->Handle(), pipeline_state.Handle());
                                 skip |= LogError(
-                                    "VUID-VkGraphicsPipelineCreateInfo-subpass-00758", objlist, error_obj.location,
+                                    "VUID-vkCmdBindPipeline-pipeline-00781", objlist, error_obj.location,
                                     "variableMultisampleRate is VK_FALSE "
                                     "and "
                                     "pipeline has pMultisampleState->rasterizationSamples equal to %s, while a previously bound "
@@ -355,32 +369,47 @@ bool CoreChecks::PreCallValidateCmdBindPipeline(VkCommandBuffer commandBuffer, V
                     }
                 }
             }
+
+            if (pipelineBindPoint == VK_PIPELINE_BIND_POINT_GRAPHICS && cb_state->GetCurrentPipeline(pipelineBindPoint) &&
+                pipeline == cb_state->GetCurrentPipeline(pipelineBindPoint)->VkHandle() && cb_state->dirtyStaticState &&
+                IsBeforeCtsVersion(1, 3, 8)) {
+                const LogObjectList objlist(commandBuffer, pipeline);
+                // This catches a bug in some drivers with conformance version lower than 1.3.8
+                // https://gitlab.khronos.org/vulkan/vulkan/-/issues/3675
+                // https://gitlab.khronos.org/Tracker/vk-gl-cts/-/issues/4642
+                skip |= LogError(
+                    "UNASSIGNED-vkCmdBindPipeline-Pipeline-Rebind", objlist, error_obj.location,
+                    "The pipeline being bound (%s) is the same as the currently bound pipeline and between the calls, a "
+                    "dynamic state was set which is static in this pipeline. This might not work correctly on drivers with "
+                    "conformance version lower than 1.3.8.0.",
+                    FormatHandle(pipeline).c_str());
+            }
         } else if (pipelineBindPoint == VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR) {
             if (!cb_state->unprotected) {
-                const LogObjectList objlist(cb_state->commandBuffer(), pipeline);
+                const LogObjectList objlist(cb_state->Handle(), pipeline);
                 skip |= LogError("VUID-vkCmdBindPipeline-pipelineBindPoint-06721", objlist, error_obj.location,
                                  "Binding pipeline to VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR in a protected command buffer.");
             }
         }
         if (pipeline_state.create_flags & VK_PIPELINE_CREATE_LIBRARY_BIT_KHR) {
-            const LogObjectList objlist(cb_state->commandBuffer(), pipeline);
+            const LogObjectList objlist(cb_state->Handle(), pipeline);
             skip |= LogError("VUID-vkCmdBindPipeline-pipeline-03382", objlist, error_obj.location,
                              "Cannot bind a pipeline that was created with the VK_PIPELINE_CREATE_LIBRARY_BIT_KHR flag.");
         }
         if (cb_state->transform_feedback_active) {
-            const LogObjectList objlist(cb_state->commandBuffer(), pipeline);
+            const LogObjectList objlist(cb_state->Handle(), pipeline);
             skip |= LogError("VUID-vkCmdBindPipeline-None-02323", objlist, error_obj.location, "transform feedback is active.");
         }
         if (enabled_features.pipelineProtectedAccess) {
             if (cb_state->unprotected) {
-                const LogObjectList objlist(cb_state->commandBuffer(), pipeline);
+                const LogObjectList objlist(cb_state->Handle(), pipeline);
                 if (pipeline_state.create_flags & VK_PIPELINE_CREATE_PROTECTED_ACCESS_ONLY_BIT_EXT) {
                     skip |= LogError("VUID-vkCmdBindPipeline-pipelineProtectedAccess-07409", objlist, error_obj.location,
                                      "Binding pipeline created with "
                                      "VK_PIPELINE_CREATE_PROTECTED_ACCESS_ONLY_BIT_EXT in an unprotected command buffer.");
                 }
             } else {
-                const LogObjectList objlist(cb_state->commandBuffer(), pipeline);
+                const LogObjectList objlist(cb_state->Handle(), pipeline);
                 if (pipeline_state.create_flags & VK_PIPELINE_CREATE_NO_PROTECTED_ACCESS_BIT_EXT) {
                     skip |= LogError("VUID-vkCmdBindPipeline-pipelineProtectedAccess-07408", objlist, error_obj.location,
                                      "Binding pipeline created with "
@@ -409,23 +438,38 @@ bool CoreChecks::ValidatePipelineBindPoint(const vvl::CommandBuffer *cb_state, V
 
         const auto &qfp = physical_device_state->queue_family_properties[pool->queueFamilyIndex];
         if (0 == (qfp.queueFlags & required_mask)) {
-            const LogObjectList objlist(cb_state->commandBuffer(), cb_state->createInfo.commandPool);
+            const LogObjectList objlist(cb_state->Handle(), cb_state->createInfo.commandPool);
             const char *vuid = kVUIDUndefined;
             switch (loc.function) {
                 case Func::vkCmdBindDescriptorSets:
                     vuid = "VUID-vkCmdBindDescriptorSets-pipelineBindPoint-00361";
                     break;
+                case Func::vkCmdBindDescriptorSets2KHR:
+                    vuid = "VUID-vkCmdBindDescriptorSets2KHR-pBindDescriptorSetsInfo-09467";
+                    break;
                 case Func::vkCmdSetDescriptorBufferOffsetsEXT:
                     vuid = "VUID-vkCmdSetDescriptorBufferOffsetsEXT-pipelineBindPoint-08067";
+                    break;
+                case Func::vkCmdSetDescriptorBufferOffsets2EXT:
+                    vuid = "VUID-vkCmdSetDescriptorBufferOffsets2EXT-pSetDescriptorBufferOffsetsInfo-09471";
                     break;
                 case Func::vkCmdBindDescriptorBufferEmbeddedSamplersEXT:
                     vuid = "VUID-vkCmdBindDescriptorBufferEmbeddedSamplersEXT-pipelineBindPoint-08069";
                     break;
+                case Func::vkCmdBindDescriptorBufferEmbeddedSamplers2EXT:
+                    vuid = "VUID-vkCmdBindDescriptorBufferEmbeddedSamplers2EXT-pBindDescriptorBufferEmbeddedSamplersInfo-09473";
+                    break;
                 case Func::vkCmdPushDescriptorSetKHR:
                     vuid = "VUID-vkCmdPushDescriptorSetKHR-pipelineBindPoint-00363";
                     break;
+                case Func::vkCmdPushDescriptorSet2KHR:
+                    vuid = "VUID-vkCmdPushDescriptorSet2KHR-pPushDescriptorSetInfo-09468";
+                    break;
                 case Func::vkCmdPushDescriptorSetWithTemplateKHR:
                     vuid = "VUID-vkCmdPushDescriptorSetWithTemplateKHR-commandBuffer-00366";
+                    break;
+                case Func::vkCmdPushDescriptorSetWithTemplate2KHR:
+                    vuid = "VUID-VkPushDescriptorSetWithTemplateInfoKHR-commandBuffer-00366";
                     break;
                 case Func::vkCmdBindPipeline:
                     if (VK_PIPELINE_BIND_POINT_GRAPHICS == bind_point) {
@@ -440,8 +484,8 @@ bool CoreChecks::ValidatePipelineBindPoint(const vvl::CommandBuffer *cb_state, V
                     break;
             }
             skip |= LogError(vuid, objlist, loc, "%s was allocated from %s that does not support bindpoint %s.",
-                             FormatHandle(cb_state->commandBuffer()).c_str(),
-                             FormatHandle(cb_state->createInfo.commandPool).c_str(), string_VkPipelineBindPoint(bind_point));
+                             FormatHandle(cb_state->Handle()).c_str(), FormatHandle(cb_state->createInfo.commandPool).c_str(),
+                             string_VkPipelineBindPoint(bind_point));
         }
     }
     return skip;

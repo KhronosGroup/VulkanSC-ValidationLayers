@@ -32,6 +32,8 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/buffer_positive.cpp
     converted/command.cpp
     converted/command_positive.cpp
+    converted/debug_extensions.cpp
+    converted/debug_extensions_positive.cpp
     converted/debug_printf.cpp
     converted/descriptor_buffer.cpp
     converted/descriptor_buffer_positive.cpp
@@ -51,7 +53,16 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/geometry_tessellation.cpp
     converted/geometry_tessellation_positive.cpp
     converted/gpu_av.cpp
+    converted/gpu_av_buffer_device_address.cpp
+    converted/gpu_av_buffer_device_address_positive.cpp
+    converted/gpu_av_descriptor_indexing.cpp
+    converted/gpu_av_descriptor_indexing_positive.cpp
+    converted/gpu_av_indirect_buffer.cpp
+    converted/gpu_av_oob.cpp
+    converted/gpu_av_oob_positive.cpp
     converted/gpu_av_positive.cpp
+    converted/gpu_av_spirv.cpp
+    converted/gpu_av_spirv_positive.cpp
     converted/graphics_library.cpp
     converted/graphics_library_positive.cpp
     converted/host_image_copy.cpp
@@ -72,6 +83,7 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/multiview.cpp
     converted/nvidia_best_practices.cpp
     converted/object_lifetime.cpp
+    converted/object_lifetime_positive.cpp
     converted/other_positive.cpp
     converted/others.cpp
     converted/parent.cpp
@@ -99,8 +111,8 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/ray_tracing_pipeline_positive.cpp
     converted/ray_tracing_pipeline_positive_nv.cpp
     converted/ray_tracing_positive.cpp
+    converted/render_pass.cpp
     converted/render_pass_positive.cpp
-    converted/renderpass.cpp
     converted/robustness.cpp
     converted/robustness_positive.cpp
     converted/sampler.cpp
@@ -139,6 +151,7 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/sync_val_positive.cpp
     converted/threading.cpp
     converted/threading_positive.cpp
+    converted/tooling.cpp
     converted/tooling_positive.cpp
     converted/transform_feedback.cpp
     converted/vertex_input.cpp

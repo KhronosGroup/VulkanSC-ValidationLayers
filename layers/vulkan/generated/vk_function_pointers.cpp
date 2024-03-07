@@ -3,9 +3,9 @@
 
 /***************************************************************************
  *
- * Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
+ * Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -415,6 +415,8 @@ PFN_vkWaitSemaphoresKHR WaitSemaphoresKHR;
 PFN_vkSignalSemaphoreKHR SignalSemaphoreKHR;
 PFN_vkGetPhysicalDeviceFragmentShadingRatesKHR GetPhysicalDeviceFragmentShadingRatesKHR;
 PFN_vkCmdSetFragmentShadingRateKHR CmdSetFragmentShadingRateKHR;
+PFN_vkCmdSetRenderingAttachmentLocationsKHR CmdSetRenderingAttachmentLocationsKHR;
+PFN_vkCmdSetRenderingInputAttachmentIndicesKHR CmdSetRenderingInputAttachmentIndicesKHR;
 PFN_vkWaitForPresentKHR WaitForPresentKHR;
 PFN_vkGetBufferDeviceAddressKHR GetBufferDeviceAddressKHR;
 PFN_vkGetBufferOpaqueCaptureAddressKHR GetBufferOpaqueCaptureAddressKHR;
@@ -429,11 +431,9 @@ PFN_vkGetPipelineExecutableStatisticsKHR GetPipelineExecutableStatisticsKHR;
 PFN_vkGetPipelineExecutableInternalRepresentationsKHR GetPipelineExecutableInternalRepresentationsKHR;
 PFN_vkMapMemory2KHR MapMemory2KHR;
 PFN_vkUnmapMemory2KHR UnmapMemory2KHR;
-#ifdef VK_ENABLE_BETA_EXTENSIONS
 PFN_vkGetPhysicalDeviceVideoEncodeQualityLevelPropertiesKHR GetPhysicalDeviceVideoEncodeQualityLevelPropertiesKHR;
 PFN_vkGetEncodedVideoSessionParametersKHR GetEncodedVideoSessionParametersKHR;
 PFN_vkCmdEncodeVideoKHR CmdEncodeVideoKHR;
-#endif  // VK_ENABLE_BETA_EXTENSIONS
 PFN_vkCmdSetEvent2KHR CmdSetEvent2KHR;
 PFN_vkCmdResetEvent2KHR CmdResetEvent2KHR;
 PFN_vkCmdWaitEvents2KHR CmdWaitEvents2KHR;
@@ -457,6 +457,15 @@ PFN_vkGetRenderingAreaGranularityKHR GetRenderingAreaGranularityKHR;
 PFN_vkGetDeviceImageSubresourceLayoutKHR GetDeviceImageSubresourceLayoutKHR;
 PFN_vkGetImageSubresourceLayout2KHR GetImageSubresourceLayout2KHR;
 PFN_vkGetPhysicalDeviceCooperativeMatrixPropertiesKHR GetPhysicalDeviceCooperativeMatrixPropertiesKHR;
+PFN_vkCmdSetLineStippleKHR CmdSetLineStippleKHR;
+PFN_vkGetPhysicalDeviceCalibrateableTimeDomainsKHR GetPhysicalDeviceCalibrateableTimeDomainsKHR;
+PFN_vkGetCalibratedTimestampsKHR GetCalibratedTimestampsKHR;
+PFN_vkCmdBindDescriptorSets2KHR CmdBindDescriptorSets2KHR;
+PFN_vkCmdPushConstants2KHR CmdPushConstants2KHR;
+PFN_vkCmdPushDescriptorSet2KHR CmdPushDescriptorSet2KHR;
+PFN_vkCmdPushDescriptorSetWithTemplate2KHR CmdPushDescriptorSetWithTemplate2KHR;
+PFN_vkCmdSetDescriptorBufferOffsets2EXT CmdSetDescriptorBufferOffsets2EXT;
+PFN_vkCmdBindDescriptorBufferEmbeddedSamplers2EXT CmdBindDescriptorBufferEmbeddedSamplers2EXT;
 PFN_vkCreateDebugReportCallbackEXT CreateDebugReportCallbackEXT;
 PFN_vkDestroyDebugReportCallbackEXT DestroyDebugReportCallbackEXT;
 PFN_vkDebugReportMessageEXT DebugReportMessageEXT;
@@ -719,7 +728,6 @@ PFN_vkCmdDecompressMemoryIndirectCountNV CmdDecompressMemoryIndirectCountNV;
 PFN_vkGetPipelineIndirectMemoryRequirementsNV GetPipelineIndirectMemoryRequirementsNV;
 PFN_vkCmdUpdatePipelineIndirectBufferNV CmdUpdatePipelineIndirectBufferNV;
 PFN_vkGetPipelineIndirectDeviceAddressNV GetPipelineIndirectDeviceAddressNV;
-PFN_vkCmdSetTessellationDomainOriginEXT CmdSetTessellationDomainOriginEXT;
 PFN_vkCmdSetDepthClampEnableEXT CmdSetDepthClampEnableEXT;
 PFN_vkCmdSetPolygonModeEXT CmdSetPolygonModeEXT;
 PFN_vkCmdSetRasterizationSamplesEXT CmdSetRasterizationSamplesEXT;
@@ -730,6 +738,7 @@ PFN_vkCmdSetLogicOpEnableEXT CmdSetLogicOpEnableEXT;
 PFN_vkCmdSetColorBlendEnableEXT CmdSetColorBlendEnableEXT;
 PFN_vkCmdSetColorBlendEquationEXT CmdSetColorBlendEquationEXT;
 PFN_vkCmdSetColorWriteMaskEXT CmdSetColorWriteMaskEXT;
+PFN_vkCmdSetTessellationDomainOriginEXT CmdSetTessellationDomainOriginEXT;
 PFN_vkCmdSetRasterizationStreamEXT CmdSetRasterizationStreamEXT;
 PFN_vkCmdSetConservativeRasterizationModeEXT CmdSetConservativeRasterizationModeEXT;
 PFN_vkCmdSetExtraPrimitiveOverestimationSizeEXT CmdSetExtraPrimitiveOverestimationSizeEXT;
@@ -1183,8 +1192,16 @@ void InitExtensionFromCore(const char* extension_name) {
             }
         },
         {
+            "VK_EXT_calibrated_timestamps", []() {
+            }
+        },
+        {
             "VK_EXT_tooling_info", []() {
                 GetPhysicalDeviceToolPropertiesEXT = GetPhysicalDeviceToolProperties;
+            }
+        },
+        {
+            "VK_EXT_line_rasterization", []() {
             }
         },
         {
@@ -1642,6 +1659,12 @@ void InitDeviceExtension(VkInstance instance, VkDevice device, const char* exten
             }
         },
         {
+            "VK_KHR_dynamic_rendering_local_read", [](VkInstance , VkDevice device) {
+                CmdSetRenderingAttachmentLocationsKHR = reinterpret_cast<PFN_vkCmdSetRenderingAttachmentLocationsKHR>(GetDeviceProcAddr(device, "vkCmdSetRenderingAttachmentLocationsKHR"));
+                CmdSetRenderingInputAttachmentIndicesKHR = reinterpret_cast<PFN_vkCmdSetRenderingInputAttachmentIndicesKHR>(GetDeviceProcAddr(device, "vkCmdSetRenderingInputAttachmentIndicesKHR"));
+            }
+        },
+        {
             "VK_KHR_present_wait", [](VkInstance , VkDevice device) {
                 WaitForPresentKHR = reinterpret_cast<PFN_vkWaitForPresentKHR>(GetDeviceProcAddr(device, "vkWaitForPresentKHR"));
             }
@@ -1675,7 +1698,6 @@ void InitDeviceExtension(VkInstance instance, VkDevice device, const char* exten
                 UnmapMemory2KHR = reinterpret_cast<PFN_vkUnmapMemory2KHR>(GetDeviceProcAddr(device, "vkUnmapMemory2KHR"));
             }
         },
-#ifdef VK_ENABLE_BETA_EXTENSIONS
         {
             "VK_KHR_video_encode_queue", [](VkInstance instance, VkDevice device) {
                 GetEncodedVideoSessionParametersKHR = reinterpret_cast<PFN_vkGetEncodedVideoSessionParametersKHR>(GetDeviceProcAddr(device, "vkGetEncodedVideoSessionParametersKHR"));
@@ -1683,7 +1705,6 @@ void InitDeviceExtension(VkInstance instance, VkDevice device, const char* exten
                 GetPhysicalDeviceVideoEncodeQualityLevelPropertiesKHR = reinterpret_cast<PFN_vkGetPhysicalDeviceVideoEncodeQualityLevelPropertiesKHR>(GetInstanceProcAddr(instance, "vkGetPhysicalDeviceVideoEncodeQualityLevelPropertiesKHR"));
             }
         },
-#endif  // VK_ENABLE_BETA_EXTENSIONS
         {
             "VK_KHR_synchronization2", [](VkInstance , VkDevice device) {
                 CmdSetEvent2KHR = reinterpret_cast<PFN_vkCmdSetEvent2KHR>(GetDeviceProcAddr(device, "vkCmdSetEvent2KHR"));
@@ -1729,6 +1750,27 @@ void InitDeviceExtension(VkInstance instance, VkDevice device, const char* exten
         {
             "VK_KHR_cooperative_matrix", [](VkInstance instance, VkDevice ) {
                 GetPhysicalDeviceCooperativeMatrixPropertiesKHR = reinterpret_cast<PFN_vkGetPhysicalDeviceCooperativeMatrixPropertiesKHR>(GetInstanceProcAddr(instance, "vkGetPhysicalDeviceCooperativeMatrixPropertiesKHR"));
+            }
+        },
+        {
+            "VK_KHR_line_rasterization", [](VkInstance , VkDevice device) {
+                CmdSetLineStippleKHR = reinterpret_cast<PFN_vkCmdSetLineStippleKHR>(GetDeviceProcAddr(device, "vkCmdSetLineStippleKHR"));
+            }
+        },
+        {
+            "VK_KHR_calibrated_timestamps", [](VkInstance instance, VkDevice device) {
+                GetCalibratedTimestampsKHR = reinterpret_cast<PFN_vkGetCalibratedTimestampsKHR>(GetDeviceProcAddr(device, "vkGetCalibratedTimestampsKHR"));
+                GetPhysicalDeviceCalibrateableTimeDomainsKHR = reinterpret_cast<PFN_vkGetPhysicalDeviceCalibrateableTimeDomainsKHR>(GetInstanceProcAddr(instance, "vkGetPhysicalDeviceCalibrateableTimeDomainsKHR"));
+            }
+        },
+        {
+            "VK_KHR_maintenance6", [](VkInstance , VkDevice device) {
+                CmdBindDescriptorSets2KHR = reinterpret_cast<PFN_vkCmdBindDescriptorSets2KHR>(GetDeviceProcAddr(device, "vkCmdBindDescriptorSets2KHR"));
+                CmdPushConstants2KHR = reinterpret_cast<PFN_vkCmdPushConstants2KHR>(GetDeviceProcAddr(device, "vkCmdPushConstants2KHR"));
+                CmdPushDescriptorSet2KHR = reinterpret_cast<PFN_vkCmdPushDescriptorSet2KHR>(GetDeviceProcAddr(device, "vkCmdPushDescriptorSet2KHR"));
+                CmdPushDescriptorSetWithTemplate2KHR = reinterpret_cast<PFN_vkCmdPushDescriptorSetWithTemplate2KHR>(GetDeviceProcAddr(device, "vkCmdPushDescriptorSetWithTemplate2KHR"));
+                CmdSetDescriptorBufferOffsets2EXT = reinterpret_cast<PFN_vkCmdSetDescriptorBufferOffsets2EXT>(GetDeviceProcAddr(device, "vkCmdSetDescriptorBufferOffsets2EXT"));
+                CmdBindDescriptorBufferEmbeddedSamplers2EXT = reinterpret_cast<PFN_vkCmdBindDescriptorBufferEmbeddedSamplers2EXT>(GetDeviceProcAddr(device, "vkCmdBindDescriptorBufferEmbeddedSamplers2EXT"));
             }
         },
         {
@@ -2209,7 +2251,6 @@ void InitDeviceExtension(VkInstance instance, VkDevice device, const char* exten
         },
         {
             "VK_EXT_extended_dynamic_state3", [](VkInstance , VkDevice device) {
-                CmdSetTessellationDomainOriginEXT = reinterpret_cast<PFN_vkCmdSetTessellationDomainOriginEXT>(GetDeviceProcAddr(device, "vkCmdSetTessellationDomainOriginEXT"));
                 CmdSetDepthClampEnableEXT = reinterpret_cast<PFN_vkCmdSetDepthClampEnableEXT>(GetDeviceProcAddr(device, "vkCmdSetDepthClampEnableEXT"));
                 CmdSetPolygonModeEXT = reinterpret_cast<PFN_vkCmdSetPolygonModeEXT>(GetDeviceProcAddr(device, "vkCmdSetPolygonModeEXT"));
                 CmdSetRasterizationSamplesEXT = reinterpret_cast<PFN_vkCmdSetRasterizationSamplesEXT>(GetDeviceProcAddr(device, "vkCmdSetRasterizationSamplesEXT"));
@@ -2220,6 +2261,7 @@ void InitDeviceExtension(VkInstance instance, VkDevice device, const char* exten
                 CmdSetColorBlendEnableEXT = reinterpret_cast<PFN_vkCmdSetColorBlendEnableEXT>(GetDeviceProcAddr(device, "vkCmdSetColorBlendEnableEXT"));
                 CmdSetColorBlendEquationEXT = reinterpret_cast<PFN_vkCmdSetColorBlendEquationEXT>(GetDeviceProcAddr(device, "vkCmdSetColorBlendEquationEXT"));
                 CmdSetColorWriteMaskEXT = reinterpret_cast<PFN_vkCmdSetColorWriteMaskEXT>(GetDeviceProcAddr(device, "vkCmdSetColorWriteMaskEXT"));
+                CmdSetTessellationDomainOriginEXT = reinterpret_cast<PFN_vkCmdSetTessellationDomainOriginEXT>(GetDeviceProcAddr(device, "vkCmdSetTessellationDomainOriginEXT"));
                 CmdSetRasterizationStreamEXT = reinterpret_cast<PFN_vkCmdSetRasterizationStreamEXT>(GetDeviceProcAddr(device, "vkCmdSetRasterizationStreamEXT"));
                 CmdSetConservativeRasterizationModeEXT = reinterpret_cast<PFN_vkCmdSetConservativeRasterizationModeEXT>(GetDeviceProcAddr(device, "vkCmdSetConservativeRasterizationModeEXT"));
                 CmdSetExtraPrimitiveOverestimationSizeEXT = reinterpret_cast<PFN_vkCmdSetExtraPrimitiveOverestimationSizeEXT>(GetDeviceProcAddr(device, "vkCmdSetExtraPrimitiveOverestimationSizeEXT"));
@@ -2510,6 +2552,8 @@ void ResetAllExtensions() {
     SignalSemaphoreKHR = nullptr;
     GetPhysicalDeviceFragmentShadingRatesKHR = nullptr;
     CmdSetFragmentShadingRateKHR = nullptr;
+    CmdSetRenderingAttachmentLocationsKHR = nullptr;
+    CmdSetRenderingInputAttachmentIndicesKHR = nullptr;
     WaitForPresentKHR = nullptr;
     GetBufferDeviceAddressKHR = nullptr;
     GetBufferOpaqueCaptureAddressKHR = nullptr;
@@ -2524,11 +2568,9 @@ void ResetAllExtensions() {
     GetPipelineExecutableInternalRepresentationsKHR = nullptr;
     MapMemory2KHR = nullptr;
     UnmapMemory2KHR = nullptr;
-#ifdef VK_ENABLE_BETA_EXTENSIONS
     GetPhysicalDeviceVideoEncodeQualityLevelPropertiesKHR = nullptr;
     GetEncodedVideoSessionParametersKHR = nullptr;
     CmdEncodeVideoKHR = nullptr;
-#endif  // VK_ENABLE_BETA_EXTENSIONS
     CmdSetEvent2KHR = nullptr;
     CmdResetEvent2KHR = nullptr;
     CmdWaitEvents2KHR = nullptr;
@@ -2552,6 +2594,15 @@ void ResetAllExtensions() {
     GetDeviceImageSubresourceLayoutKHR = nullptr;
     GetImageSubresourceLayout2KHR = nullptr;
     GetPhysicalDeviceCooperativeMatrixPropertiesKHR = nullptr;
+    CmdSetLineStippleKHR = nullptr;
+    GetPhysicalDeviceCalibrateableTimeDomainsKHR = nullptr;
+    GetCalibratedTimestampsKHR = nullptr;
+    CmdBindDescriptorSets2KHR = nullptr;
+    CmdPushConstants2KHR = nullptr;
+    CmdPushDescriptorSet2KHR = nullptr;
+    CmdPushDescriptorSetWithTemplate2KHR = nullptr;
+    CmdSetDescriptorBufferOffsets2EXT = nullptr;
+    CmdBindDescriptorBufferEmbeddedSamplers2EXT = nullptr;
     CreateDebugReportCallbackEXT = nullptr;
     DestroyDebugReportCallbackEXT = nullptr;
     DebugReportMessageEXT = nullptr;
@@ -2814,7 +2865,6 @@ void ResetAllExtensions() {
     GetPipelineIndirectMemoryRequirementsNV = nullptr;
     CmdUpdatePipelineIndirectBufferNV = nullptr;
     GetPipelineIndirectDeviceAddressNV = nullptr;
-    CmdSetTessellationDomainOriginEXT = nullptr;
     CmdSetDepthClampEnableEXT = nullptr;
     CmdSetPolygonModeEXT = nullptr;
     CmdSetRasterizationSamplesEXT = nullptr;
@@ -2825,6 +2875,7 @@ void ResetAllExtensions() {
     CmdSetColorBlendEnableEXT = nullptr;
     CmdSetColorBlendEquationEXT = nullptr;
     CmdSetColorWriteMaskEXT = nullptr;
+    CmdSetTessellationDomainOriginEXT = nullptr;
     CmdSetRasterizationStreamEXT = nullptr;
     CmdSetConservativeRasterizationModeEXT = nullptr;
     CmdSetExtraPrimitiveOverestimationSizeEXT = nullptr;

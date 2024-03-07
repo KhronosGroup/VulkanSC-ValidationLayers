@@ -1,7 +1,7 @@
-/* Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (C) 2015-2023 Google Inc.
+/* Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (C) 2015-2024 Google Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -270,7 +270,7 @@ static void InitRenderPassState(vvl::RenderPass *render_pass) {
 namespace vvl {
 
 RenderPass::RenderPass(VkRenderPass rp, VkRenderPassCreateInfo2 const *pCreateInfo)
-    : BASE_NODE(rp, kVulkanObjectTypeRenderPass),
+    : StateObject(rp, kVulkanObjectTypeRenderPass),
       use_dynamic_rendering(false),
       use_dynamic_rendering_inherited(false),
       has_multiview_enabled(false),
@@ -284,7 +284,7 @@ static safe_VkRenderPassCreateInfo2 ConvertCreateInfo(const VkRenderPassCreateIn
 }
 
 RenderPass::RenderPass(VkRenderPass rp, VkRenderPassCreateInfo const *pCreateInfo)
-    : BASE_NODE(rp, kVulkanObjectTypeRenderPass),
+    : StateObject(rp, kVulkanObjectTypeRenderPass),
       use_dynamic_rendering(false),
       use_dynamic_rendering_inherited(false),
       has_multiview_enabled(false),
@@ -296,7 +296,7 @@ const VkPipelineRenderingCreateInfo VkPipelineRenderingCreateInfo_default = {
     VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO, nullptr, 0, 0, nullptr, VK_FORMAT_UNDEFINED, VK_FORMAT_UNDEFINED};
 
 RenderPass::RenderPass(VkPipelineRenderingCreateInfo const *pPipelineRenderingCreateInfo, bool rasterization_enabled)
-    : BASE_NODE(static_cast<VkRenderPass>(VK_NULL_HANDLE), kVulkanObjectTypeRenderPass),
+    : StateObject(static_cast<VkRenderPass>(VK_NULL_HANDLE), kVulkanObjectTypeRenderPass),
       use_dynamic_rendering(true),
       use_dynamic_rendering_inherited(false),
       has_multiview_enabled(false),
@@ -345,6 +345,12 @@ bool RenderPass::UsesDepthStencilAttachment(uint32_t subpass_num) const {
     return result;
 }
 
+// vkspec.html#renderpass-noattachments
+bool RenderPass::UsesNoAttachment(uint32_t subpass) const {
+    // If using dynamic rendering, there is no subpass, so return 'false'
+    return !UsesColorAttachment(subpass) && !UsesDepthStencilAttachment(subpass) && !UsesDynamicRendering();
+}
+
 uint32_t RenderPass::GetDynamicRenderingColorAttachmentCount() const {
     if (use_dynamic_rendering_inherited) {
         return inheritance_rendering_info.colorAttachmentCount;
@@ -386,7 +392,7 @@ const VkMultisampledRenderToSingleSampledInfoEXT *RenderPass::GetMSRTSSInfo(uint
 }
 
 RenderPass::RenderPass(VkRenderingInfo const *pRenderingInfo, bool rasterization_enabled)
-    : BASE_NODE(static_cast<VkRenderPass>(VK_NULL_HANDLE), kVulkanObjectTypeRenderPass),
+    : StateObject(static_cast<VkRenderPass>(VK_NULL_HANDLE), kVulkanObjectTypeRenderPass),
       use_dynamic_rendering(true),
       use_dynamic_rendering_inherited(false),
       has_multiview_enabled(false),
@@ -394,7 +400,7 @@ RenderPass::RenderPass(VkRenderingInfo const *pRenderingInfo, bool rasterization
       dynamic_rendering_begin_rendering_info((pRenderingInfo && rasterization_enabled) ? pRenderingInfo : nullptr) {}
 
 RenderPass::RenderPass(VkCommandBufferInheritanceRenderingInfo const *pInheritanceRenderingInfo)
-    : BASE_NODE(static_cast<VkRenderPass>(VK_NULL_HANDLE), kVulkanObjectTypeRenderPass),
+    : StateObject(static_cast<VkRenderPass>(VK_NULL_HANDLE), kVulkanObjectTypeRenderPass),
       use_dynamic_rendering(false),
       use_dynamic_rendering_inherited(true),
       has_multiview_enabled(false),
@@ -402,7 +408,7 @@ RenderPass::RenderPass(VkCommandBufferInheritanceRenderingInfo const *pInheritan
 
 Framebuffer::Framebuffer(VkFramebuffer fb, const VkFramebufferCreateInfo *pCreateInfo, std::shared_ptr<RenderPass> &&rpstate,
                          std::vector<std::shared_ptr<vvl::ImageView>> &&attachments)
-    : BASE_NODE(fb, kVulkanObjectTypeFramebuffer),
+    : StateObject(fb, kVulkanObjectTypeFramebuffer),
       createInfo(pCreateInfo),
       rp_state(rpstate),
       attachments_view_state(std::move(attachments)) {}
@@ -419,7 +425,7 @@ void Framebuffer::Destroy() {
         view->RemoveParent(this);
     }
     attachments_view_state.clear();
-    BASE_NODE::Destroy();
+    StateObject::Destroy();
 }
 
 }  // namespace vvl

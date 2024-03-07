@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (c) 2015-2023 Google, Inc.
+ * Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (c) 2015-2024 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,9 @@
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
 #include "../framework/descriptor_helper.h"
+#include "../framework/render_pass_helper.h"
 
-TEST_F(VkPositiveLayerTest, TestShaderInputAndOutputComponents) {
+TEST_F(PositiveShaderInterface, InputAndOutputComponents) {
     TEST_DESCRIPTION("Test shader layout in and out with different components.");
 
     RETURN_IF_SKIP(Init());
@@ -122,7 +123,7 @@ TEST_F(VkPositiveLayerTest, TestShaderInputAndOutputComponents) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
 }
 
-TEST_F(VkPositiveLayerTest, TestShaderInputAndOutputStructComponents) {
+TEST_F(PositiveShaderInterface, InputAndOutputStructComponents) {
     TEST_DESCRIPTION("Test shader interface with structs.");
 
     RETURN_IF_SKIP(Init());
@@ -174,8 +175,7 @@ TEST_F(PositiveShaderInterface, RelaxedBlockLayout) {
     TEST_DESCRIPTION("Create a shader that requires relaxed block layout.");
 
     AddRequiredExtensions(VK_KHR_RELAXED_BLOCK_LAYOUT_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-    RETURN_IF_SKIP(InitState());
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     // Vertex shader requiring relaxed layout.
@@ -334,10 +334,9 @@ TEST_F(PositiveShaderInterface, RelaxedTypeMatch) {
 
     SetTargetApiVersion(VK_API_VERSION_1_1); // At least 1.1 is required for maintenance4
     AddRequiredExtensions(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-    VkPhysicalDeviceMaintenance4FeaturesKHR maintenance_4_features = vku::InitStructHelper();
-    GetPhysicalDeviceFeatures2(maintenance_4_features);
-    RETURN_IF_SKIP(InitState(nullptr, &maintenance_4_features));
+    AddRequiredFeature(vkt::Feature::maintenance4);
+    RETURN_IF_SKIP(Init());
+
     InitRenderTarget();
 
     char const *vsSource = R"glsl(
@@ -373,12 +372,9 @@ TEST_F(PositiveShaderInterface, RelaxedTypeMatch) {
 TEST_F(PositiveShaderInterface, TessPerVertex) {
     TEST_DESCRIPTION("Test that pipeline validation accepts per-vertex variables passed between the TCS and TES stages");
 
+    AddRequiredFeature(vkt::Feature::tessellationShader);
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
-
-    if (!m_device->phy().features().tessellationShader) {
-        GTEST_SKIP() << "Device does not support tessellation shaders";
-    }
 
     char const *tcsSource = R"glsl(
         #version 450
@@ -423,12 +419,9 @@ TEST_F(PositiveShaderInterface, GeometryInputBlockPositive) {
         "Test that pipeline validation accepts a user-defined interface block passed into the geometry shader. This is interesting "
         "because the 'extra' array level is not present on the member type, but on the block instance.");
 
+    AddRequiredFeature(vkt::Feature::geometryShader);
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
-
-    if (!m_device->phy().features().geometryShader) {
-        GTEST_SKIP() << "Device does not support geometry shaders";
-    }
 
     char const *vsSource = R"glsl(
         #version 450
@@ -481,32 +474,21 @@ TEST_F(PositiveShaderInterface, InputAttachment) {
     const vkt::DescriptorSetLayout dsl(*m_device, {dslb});
     const vkt::PipelineLayout pl(*m_device, {&dsl});
 
-    VkAttachmentDescription descs[2] = {
-        {0, VK_FORMAT_R8G8B8A8_UNORM, VK_SAMPLE_COUNT_1_BIT, VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_STORE,
-         VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_STORE, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL},
-        {0, VK_FORMAT_R8G8B8A8_UNORM, VK_SAMPLE_COUNT_1_BIT, VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_STORE,
-         VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_STORE, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL},
-    };
-    VkAttachmentReference color = {
-        0,
-        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-    };
-    VkAttachmentReference input = {
-        1,
-        VK_IMAGE_LAYOUT_GENERAL,
-    };
-
-    VkSubpassDescription sd = {0, VK_PIPELINE_BIND_POINT_GRAPHICS, 1, &input, 1, &color, nullptr, nullptr, 0, nullptr};
-
-    VkRenderPassCreateInfo rpci = {VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO, nullptr, 0, 2, descs, 1, &sd, 0, nullptr};
-    vkt::RenderPass rp(*m_device, rpci);
+    RenderPassSingleSubpass rp(*this);
+    rp.AddAttachmentDescription(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    rp.AddAttachmentDescription(VK_FORMAT_R8G8B8A8_UNORM);
+    rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL});
+    rp.AddAttachmentReference({1, VK_IMAGE_LAYOUT_GENERAL});
+    rp.AddColorAttachment(0);
+    rp.AddInputAttachment(1);
+    rp.CreateRenderPass();
 
     CreatePipelineHelper pipe(*this);
     pipe.InitState();
     pipe.shader_stages_[1] = fs.GetStageCreateInfo();
     pipe.gp_ci_.layout = pl.handle();
-    pipe.gp_ci_.renderPass = rp.handle();
+    pipe.gp_ci_.renderPass = rp.Handle();
     pipe.CreateGraphicsPipeline();
 }
 
@@ -571,42 +553,21 @@ TEST_F(PositiveShaderInterface, InputAttachmentArray) {
     GetPhysicalDeviceFeatures2(features12);
     RETURN_IF_SKIP(InitState(nullptr, &features12));
 
-    const VkAttachmentDescription inputAttachmentDescription = {0,
-                                                                m_render_target_fmt,
-                                                                VK_SAMPLE_COUNT_1_BIT,
-                                                                VK_ATTACHMENT_LOAD_OP_LOAD,
-                                                                VK_ATTACHMENT_STORE_OP_STORE,
-                                                                VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-                                                                VK_ATTACHMENT_STORE_OP_DONT_CARE,
-                                                                VK_IMAGE_LAYOUT_GENERAL,
-                                                                VK_IMAGE_LAYOUT_GENERAL};
-
+    RenderPassSingleSubpass rp(*this);
+    rp.AddAttachmentDescription(m_render_target_fmt);
     // index 0 is unused
+    rp.AddAttachmentReference({VK_ATTACHMENT_UNUSED, VK_IMAGE_LAYOUT_GENERAL});
     // index 1 is is valid (for both color and input)
+    rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_GENERAL});
     // index 2 and 3 point to same image as index 1
-    const VkAttachmentReference inputAttachmentReferences[4] = {{VK_ATTACHMENT_UNUSED, VK_IMAGE_LAYOUT_GENERAL},
-                                                                {0, VK_IMAGE_LAYOUT_GENERAL},
-                                                                {0, VK_IMAGE_LAYOUT_GENERAL},
-                                                                {0, VK_IMAGE_LAYOUT_GENERAL}};
-
-    const VkSubpassDescription subpassDescription = {(VkSubpassDescriptionFlags)0,
-                                                     VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                                     4,
-                                                     inputAttachmentReferences,
-                                                     1,
-                                                     &inputAttachmentReferences[1],
-                                                     nullptr,
-                                                     nullptr,
-                                                     0,
-                                                     nullptr};
-
-    VkRenderPassCreateInfo renderPassInfo = vku::InitStructHelper();
-    renderPassInfo.attachmentCount = 1;
-    renderPassInfo.pAttachments = &inputAttachmentDescription;
-    renderPassInfo.subpassCount = 1;
-    renderPassInfo.pSubpasses = &subpassDescription;
-
-    vkt::RenderPass renderPass(*m_device, renderPassInfo);
+    rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_GENERAL});
+    rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_GENERAL});
+    rp.AddInputAttachment(0);
+    rp.AddInputAttachment(1);
+    rp.AddInputAttachment(2);
+    rp.AddInputAttachment(3);
+    rp.AddColorAttachment(1);
+    rp.CreateRenderPass();
 
     // use static array of 2 and index into element 1 to read
     {
@@ -623,7 +584,7 @@ TEST_F(PositiveShaderInterface, InputAttachmentArray) {
         const auto set_info = [&](CreatePipelineHelper &helper) {
             helper.shader_stages_ = {helper.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
             helper.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 2, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}};
-            helper.gp_ci_.renderPass = renderPass.handle();
+            helper.gp_ci_.renderPass = rp.Handle();
         };
         CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
     }
@@ -643,7 +604,7 @@ TEST_F(PositiveShaderInterface, InputAttachmentArray) {
         const auto set_info = [&](CreatePipelineHelper &helper) {
             helper.shader_stages_ = {helper.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
             helper.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 2, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}};
-            helper.gp_ci_.renderPass = renderPass.handle();
+            helper.gp_ci_.renderPass = rp.Handle();
         };
         CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
     }
@@ -667,7 +628,7 @@ TEST_F(PositiveShaderInterface, InputAttachmentArray) {
             helper.shader_stages_ = {helper.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
             helper.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 2, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
                                     {3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}};
-            helper.gp_ci_.renderPass = renderPass.handle();
+            helper.gp_ci_.renderPass = rp.Handle();
         };
         CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
     }
@@ -688,7 +649,7 @@ TEST_F(PositiveShaderInterface, InputAttachmentArray) {
         const auto set_info = [&](CreatePipelineHelper &helper) {
             helper.shader_stages_ = {helper.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
             helper.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 2, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}};
-            helper.gp_ci_.renderPass = renderPass.handle();
+            helper.gp_ci_.renderPass = rp.Handle();
         };
         CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
     }
@@ -708,7 +669,7 @@ TEST_F(PositiveShaderInterface, InputAttachmentArray) {
         const auto set_info = [&](CreatePipelineHelper &helper) {
             helper.shader_stages_ = {helper.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
             helper.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 2, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}};
-            helper.gp_ci_.renderPass = renderPass.handle();
+            helper.gp_ci_.renderPass = rp.Handle();
         };
         CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
     }
@@ -725,34 +686,18 @@ TEST_F(PositiveShaderInterface, InputAttachmentDepthStencil) {
 
     const VkFormat ds_format = FindSupportedDepthStencilFormat(gpu());
 
-    const VkAttachmentDescription inputAttachmentDescriptions[2] = {
-        {0, m_render_target_fmt, VK_SAMPLE_COUNT_1_BIT, VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_STORE,
-         VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL},
-        {0, ds_format, VK_SAMPLE_COUNT_1_BIT, VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_STORE,
-         VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL}};
-
+    RenderPassSingleSubpass rp(*this);
+    rp.AddAttachmentDescription(m_render_target_fmt);
+    rp.AddAttachmentDescription(ds_format);
     // index 0 = color | index 1 = depth | index 2 = stencil
-    const VkAttachmentReference inputAttachmentReferences[3] = {
-        {0, VK_IMAGE_LAYOUT_GENERAL}, {1, VK_IMAGE_LAYOUT_GENERAL}, {1, VK_IMAGE_LAYOUT_GENERAL}};
-
-    const VkSubpassDescription subpassDescription = {(VkSubpassDescriptionFlags)0,
-                                                     VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                                     3,
-                                                     inputAttachmentReferences,
-                                                     1,
-                                                     &inputAttachmentReferences[0],
-                                                     nullptr,
-                                                     nullptr,
-                                                     0,
-                                                     nullptr};
-
-    VkRenderPassCreateInfo renderPassInfo = vku::InitStructHelper();
-    renderPassInfo.attachmentCount = 2;
-    renderPassInfo.pAttachments = inputAttachmentDescriptions;
-    renderPassInfo.subpassCount = 1;
-    renderPassInfo.pSubpasses = &subpassDescription;
-
-    vkt::RenderPass renderPass(*m_device, renderPassInfo);
+    rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_GENERAL});
+    rp.AddAttachmentReference({1, VK_IMAGE_LAYOUT_GENERAL});
+    rp.AddAttachmentReference({1, VK_IMAGE_LAYOUT_GENERAL});
+    rp.AddInputAttachment(0);
+    rp.AddInputAttachment(1);
+    rp.AddInputAttachment(2);
+    rp.AddColorAttachment(0);
+    rp.CreateRenderPass();
 
     // Depth and Stencil use same index, but valid because differnet image aspect masks
     const char *fs_source = R"(
@@ -776,12 +721,12 @@ TEST_F(PositiveShaderInterface, InputAttachmentDepthStencil) {
         helper.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
                                 {1, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
                                 {2, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}};
-        helper.gp_ci_.renderPass = renderPass.handle();
+        helper.gp_ci_.renderPass = rp.Handle();
     };
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
 }
 
-TEST_F(VkPositiveLayerTest, FragmentOutputNotConsumedButAlphaToCoverageEnabled) {
+TEST_F(PositiveShaderInterface, FragmentOutputNotConsumedButAlphaToCoverageEnabled) {
     TEST_DESCRIPTION(
         "Test that no warning is produced when writing to non-existing color attachment if alpha to coverage is enabled.");
 
@@ -836,7 +781,7 @@ TEST_F(PositiveShaderInterface, DISABLED_InputOutputMatch2) {
     pipe.CreateGraphicsPipeline();
 }
 
-TEST_F(VkPositiveLayerTest, TestShaderInputOutputMatch) {
+TEST_F(PositiveShaderInterface, InputOutputMatch) {
     TEST_DESCRIPTION("Test matching vertex shader output with fragment shader input.");
 
     RETURN_IF_SKIP(Init());
@@ -1335,11 +1280,9 @@ TEST_F(PositiveShaderInterface, MultidimensionalArrayDims2) {
 TEST_F(PositiveShaderInterface, MultidimensionalArray64bit) {
     TEST_DESCRIPTION("Make sure multidimensional arrays are handled for 64bits");
 
+    AddRequiredFeature(vkt::Feature::shaderFloat64);
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
-    if (!m_device->phy().features().shaderFloat64) {
-        GTEST_SKIP() << "Device does not support 64bit floats";
-    }
 
     char const *vsSource = R"glsl(
         #version 450
@@ -1388,135 +1331,6 @@ TEST_F(PositiveShaderInterface, PackingInsideArray) {
         layout(location = 1, component = 2) flat in int z;
         layout(location=0) out float color;
         void main(){}
-    )glsl";
-
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
-
-    const auto set_info = [&](CreatePipelineHelper &helper) {
-        helper.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
-    };
-    CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
-}
-
-TEST_F(PositiveShaderInterface, PhysicalStorageBufferGlslang3) {
-    TEST_DESCRIPTION("Taken from glslang spv.bufferhandle3.frag test");
-    SetTargetApiVersion(VK_API_VERSION_1_2);
-    AddRequiredExtensions(VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-
-    VkPhysicalDeviceVulkan12Features features12 = vku::InitStructHelper();
-    GetPhysicalDeviceFeatures2(features12);
-    if (VK_TRUE != features12.bufferDeviceAddress) {
-        GTEST_SKIP() << "bufferDeviceAddress not supported and is required";
-    }
-
-    RETURN_IF_SKIP(InitState(nullptr, &features12));
-
-    char const *fsSource = R"glsl(
-        #version 450
-        #extension GL_EXT_buffer_reference : enable
-
-        layout(buffer_reference, std430) buffer t3 {
-            int h;
-        };
-
-        layout(set = 1, binding = 2, buffer_reference, std430) buffer t4 {
-            layout(offset = 0)  int j;
-            t3 k;
-        } x;
-
-        layout(set = 0, binding = 0, std430) buffer t5 {
-            t4 m;
-        } s5;
-
-        layout(location = 0) flat in t4 k;
-
-        t4 foo(t4 y) { return y; }
-        void main() {}
-    )glsl";
-
-    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
-}
-
-TEST_F(PositiveShaderInterface, PhysicalStorageBufferGlslang6) {
-    TEST_DESCRIPTION("Taken from glslang spv.bufferhandle6.frag test");
-    SetTargetApiVersion(VK_API_VERSION_1_2);
-    AddRequiredExtensions(VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-
-    VkPhysicalDeviceVulkan12Features features12 = vku::InitStructHelper();
-    GetPhysicalDeviceFeatures2(features12);
-    if (VK_TRUE != features12.bufferDeviceAddress) {
-        GTEST_SKIP() << "bufferDeviceAddress not supported and is required";
-    }
-
-    RETURN_IF_SKIP(InitState(nullptr, &features12));
-
-    char const *fsSource = R"glsl(
-        #version 450 core
-        #extension GL_EXT_buffer_reference : enable
-        layout (push_constant, std430) uniform Block { int identity[32]; } pc;
-        layout(r32ui, set = 3, binding = 0) uniform uimage2D image0_0;
-        layout(buffer_reference) buffer T1;
-        layout(set = 3, binding = 1, buffer_reference) buffer T1 {
-        layout(offset = 0) int a[2]; // stride = 4 for std430, 16 for std140
-        layout(offset = 32) int b;
-        layout(offset = 48) T1  c[2]; // stride = 8 for std430, 16 for std140
-        layout(offset = 80) T1  d;
-        } x;
-        void main() {}
-    )glsl";
-
-    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
-}
-
-TEST_F(PositiveShaderInterface, PhysicalStorageBuffer) {
-    TEST_DESCRIPTION("Regression shaders from https://github.com/KhronosGroup/Vulkan-ValidationLayers/pull/5349");
-    SetTargetApiVersion(VK_API_VERSION_1_2);
-    AddRequiredExtensions(VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-
-    VkPhysicalDeviceVulkan12Features features12 = vku::InitStructHelper();
-    GetPhysicalDeviceFeatures2(features12);
-    if (VK_TRUE != features12.bufferDeviceAddress) {
-        GTEST_SKIP() << "bufferDeviceAddress not supported and is required";
-    }
-
-    RETURN_IF_SKIP(InitState(nullptr, &features12));
-
-    InitRenderTarget();
-
-    char const *vsSource = R"glsl(
-        #version 450
-        #extension GL_EXT_buffer_reference_uvec2 : enable
-
-        layout(set=0, binding=0) layout(buffer_reference, std430) buffer dataBuffer {
-            highp int value1;
-            highp int value2;
-        };
-
-        layout(location=0) out dataBuffer outgoingPtr;
-        void main() {
-            outgoingPtr = dataBuffer(uvec2(2.0));
-        }
-    )glsl";
-
-    char const *fsSource = R"glsl(
-        #version 450
-        #extension GL_EXT_buffer_reference_uvec2 : enable
-
-        layout(set=0, binding=0) layout(buffer_reference, std430) buffer dataBuffer {
-            highp int value1;
-            highp int value2;
-        };
-
-        layout(location=0) in dataBuffer incomingPtr;
-        layout(location=0) out highp vec4 fragColor;
-        void main() {
-            highp ivec2 v = ivec2(incomingPtr.value1, incomingPtr.value2);
-            fragColor = vec4(float(v.x)/255.0,float(v.y)/255.0, float(v.x+v.y)/255.0,1.0);
-        }
     )glsl";
 
     VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);

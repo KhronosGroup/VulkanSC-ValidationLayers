@@ -3,11 +3,11 @@
 
 /***************************************************************************
  *
- * Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (c) 2015-2023 Google Inc.
- * Copyright (c) 2023-2023 RasterGrid Kft.
+ * Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (c) 2015-2024 Google Inc.
+ * Copyright (c) 2023-2024 RasterGrid Kft.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -163,13 +163,14 @@ extern const vvl::unordered_map<std::string, function_data> name_to_funcptr_map;
 static void InstanceExtensionWhitelist(ValidationObject* layer_data, const VkInstanceCreateInfo* pCreateInfo, VkInstance instance) {
     for (uint32_t i = 0; i < pCreateInfo->enabledExtensionCount; i++) {
         // Check for recognized instance extensions
-        if (!white_list(pCreateInfo->ppEnabledExtensionNames[i], kInstanceExtensionNames)) {
+        vvl::Extension extension = GetExtension(pCreateInfo->ppEnabledExtensionNames[i]);
+        if (!IsInstanceExtension(extension)) {
             Location loc(vvl::Func::vkCreateInstance);
             layer_data->LogWarning(kVUIDUndefined, layer_data->instance,
                                    loc.dot(vvl::Field::pCreateInfo).dot(vvl::Field::ppEnabledExtensionNames, i),
                                    "%s is not supported by this layer.  Using this extension may adversely affect validation "
                                    "results and/or produce undefined behavior.",
-                                   pCreateInfo->ppEnabledExtensionNames[i]);
+                                   String(extension));
         }
     }
 }
@@ -178,13 +179,14 @@ static void InstanceExtensionWhitelist(ValidationObject* layer_data, const VkIns
 static void DeviceExtensionWhitelist(ValidationObject* layer_data, const VkDeviceCreateInfo* pCreateInfo, VkDevice device) {
     for (uint32_t i = 0; i < pCreateInfo->enabledExtensionCount; i++) {
         // Check for recognized device extensions
-        if (!white_list(pCreateInfo->ppEnabledExtensionNames[i], kDeviceExtensionNames)) {
+        vvl::Extension extension = GetExtension(pCreateInfo->ppEnabledExtensionNames[i]);
+        if (!IsDeviceExtension(extension)) {
             Location loc(vvl::Func::vkCreateDevice);
             layer_data->LogWarning(kVUIDUndefined, layer_data->device,
                                    loc.dot(vvl::Field::pCreateInfo).dot(vvl::Field::ppEnabledExtensionNames, i),
                                    "%s is not supported by this layer.  Using this extension may adversely affect validation "
                                    "results and/or produce undefined behavior.",
-                                   pCreateInfo->ppEnabledExtensionNames[i]);
+                                   String(extension));
         }
     }
 }
@@ -238,19 +240,18 @@ void OutputLayerStatusInfo(ValidationObject* context) {
     Location loc(vvl::Func::vkCreateInstance);
     // Output layer status information message
     context->LogInfo(
-        "UNASSIGNED-CreateInstance-status-message", context->instance, loc,
+        "WARNING-CreateInstance-status-message", context->instance, loc,
         "Khronos Validation Layer Active:\n    Settings File: %s\n    Current Enables: %s.\n    Current Disables: %s.\n",
         settings_status.c_str(), list_of_enables.c_str(), list_of_disables.c_str());
 
     // Create warning message if user is running debug layers.
 #ifndef NDEBUG
-    context->LogPerformanceWarning(
-        "UNASSIGNED-CreateInstance-debug-warning", context->instance, loc,
-        "VALIDATION LAYERS WARNING: Using debug builds of the validation layers *will* adversely affect performance.");
+    context->LogPerformanceWarning("WARNING-CreateInstance-debug-warning", context->instance, loc,
+                                   "Using debug builds of the validation layers *will* adversely affect performance.");
 #endif
     if (!context->fine_grained_locking) {
         context->LogPerformanceWarning(
-            "UNASSIGNED-CreateInstance-locking-warning", context->instance, loc,
+            "WARNING-CreateInstance-locking-warning", context->instance, loc,
             "Fine-grained locking is disabled, this will adversely affect performance of multithreaded applications.");
     }
 }
@@ -353,8 +354,7 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateInstance(const VkInstanceCreateInfo* pCreat
     CHECK_ENABLED local_enables{};
     CHECK_DISABLED local_disables{};
     bool lock_setting;
-    // select_instrumented_shaders is the only gpu-av setting that is off by default
-    GpuAVSettings local_gpuav_settings = {true, true, true, true, true, false, 10000};
+    GpuAVSettings local_gpuav_settings = {};
     ConfigAndEnvSettings config_and_env_settings_data{OBJECT_LAYER_DESCRIPTION,
                                                       pCreateInfo,
                                                       local_enables,
@@ -961,6 +961,15 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateBuffer(VkDevice device, const VkBufferCreat
 }
 
 // Handle tooling queries manually as this is a request for layer information
+static const VkPhysicalDeviceToolPropertiesEXT khronos_layer_tool_props = {
+    VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TOOL_PROPERTIES_EXT,
+    nullptr,
+    "Khronos Validation Layer",
+    STRINGIFY(VK_HEADER_VERSION),
+    VK_TOOL_PURPOSE_VALIDATION_BIT_EXT | VK_TOOL_PURPOSE_ADDITIONAL_FEATURES_BIT_EXT | VK_TOOL_PURPOSE_DEBUG_REPORTING_BIT_EXT |
+        VK_TOOL_PURPOSE_DEBUG_MARKERS_BIT_EXT,
+    "Khronos Validation Layer",
+    OBJECT_LAYER_NAME};
 
 VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceToolPropertiesEXT(VkPhysicalDevice physicalDevice, uint32_t* pToolCount,
                                                                   VkPhysicalDeviceToolPropertiesEXT* pToolProperties) {
@@ -969,19 +978,9 @@ VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceToolPropertiesEXT(VkPhysicalDevi
     ErrorObject error_obj(vvl::Func::vkGetPhysicalDeviceToolPropertiesEXT,
                           VulkanTypedHandle(physicalDevice, kVulkanObjectTypePhysicalDevice));
 
-    static const VkPhysicalDeviceToolPropertiesEXT khronos_layer_tool_props = {
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TOOL_PROPERTIES_EXT,
-        nullptr,
-        "Khronos Validation Layer",
-        STRINGIFY(VK_HEADER_VERSION),
-        VK_TOOL_PURPOSE_VALIDATION_BIT_EXT | VK_TOOL_PURPOSE_ADDITIONAL_FEATURES_BIT_EXT | VK_TOOL_PURPOSE_DEBUG_REPORTING_BIT_EXT |
-            VK_TOOL_PURPOSE_DEBUG_MARKERS_BIT_EXT,
-        "Khronos Validation Layer",
-        OBJECT_LAYER_NAME};
-
     auto original_pToolProperties = pToolProperties;
 
-    if (pToolProperties != nullptr) {
+    if (pToolProperties != nullptr && *pToolCount > 0) {
         *pToolProperties = khronos_layer_tool_props;
         pToolProperties = ((*pToolCount > 1) ? &pToolProperties[1] : nullptr);
         (*pToolCount)--;
@@ -1006,11 +1005,55 @@ VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceToolPropertiesEXT(VkPhysicalDevi
     if (original_pToolProperties != nullptr) {
         pToolProperties = original_pToolProperties;
     }
+    assert(*pToolCount != std::numeric_limits<uint32_t>::max());
     (*pToolCount)++;
 
     for (ValidationObject* intercept : layer_data->object_dispatch) {
         auto lock = intercept->WriteLock();
         intercept->PostCallRecordGetPhysicalDeviceToolPropertiesEXT(physicalDevice, pToolCount, pToolProperties, record_obj);
+    }
+    return result;
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceToolProperties(VkPhysicalDevice physicalDevice, uint32_t* pToolCount,
+                                                               VkPhysicalDeviceToolProperties* pToolProperties) {
+    auto layer_data = GetLayerDataPtr(get_dispatch_key(physicalDevice), layer_data_map);
+    bool skip = false;
+    ErrorObject error_obj(vvl::Func::vkGetPhysicalDeviceToolProperties,
+                          VulkanTypedHandle(physicalDevice, kVulkanObjectTypePhysicalDevice));
+
+    auto original_pToolProperties = pToolProperties;
+
+    if (pToolProperties != nullptr && *pToolCount > 0) {
+        *pToolProperties = khronos_layer_tool_props;
+        pToolProperties = ((*pToolCount > 1) ? &pToolProperties[1] : nullptr);
+        (*pToolCount)--;
+    }
+
+    for (const ValidationObject* intercept : layer_data->object_dispatch) {
+        auto lock = intercept->ReadLock();
+        skip |= intercept->PreCallValidateGetPhysicalDeviceToolProperties(physicalDevice, pToolCount, pToolProperties, error_obj);
+        if (skip) return VK_ERROR_VALIDATION_FAILED_EXT;
+    }
+
+    RecordObject record_obj(vvl::Func::vkGetPhysicalDeviceToolProperties);
+    for (ValidationObject* intercept : layer_data->object_dispatch) {
+        auto lock = intercept->WriteLock();
+        intercept->PreCallRecordGetPhysicalDeviceToolProperties(physicalDevice, pToolCount, pToolProperties, record_obj);
+    }
+
+    VkResult result = DispatchGetPhysicalDeviceToolProperties(physicalDevice, pToolCount, pToolProperties);
+    record_obj.result = result;
+
+    if (original_pToolProperties != nullptr) {
+        pToolProperties = original_pToolProperties;
+    }
+    assert(*pToolCount != std::numeric_limits<uint32_t>::max());
+    (*pToolCount)++;
+
+    for (ValidationObject* intercept : layer_data->object_dispatch) {
+        auto lock = intercept->WriteLock();
+        intercept->PostCallRecordGetPhysicalDeviceToolProperties(physicalDevice, pToolCount, pToolProperties, record_obj);
     }
     return result;
 }
@@ -4442,31 +4485,6 @@ VKAPI_ATTR uint64_t VKAPI_CALL GetDeviceMemoryOpaqueCaptureAddress(VkDevice devi
     return result;
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceToolProperties(VkPhysicalDevice physicalDevice, uint32_t* pToolCount,
-                                                               VkPhysicalDeviceToolProperties* pToolProperties) {
-    auto layer_data = GetLayerDataPtr(get_dispatch_key(physicalDevice), layer_data_map);
-    bool skip = false;
-    ErrorObject error_obj(vvl::Func::vkGetPhysicalDeviceToolProperties,
-                          VulkanTypedHandle(physicalDevice, kVulkanObjectTypePhysicalDevice));
-    for (const ValidationObject* intercept : layer_data->object_dispatch) {
-        auto lock = intercept->ReadLock();
-        skip |= intercept->PreCallValidateGetPhysicalDeviceToolProperties(physicalDevice, pToolCount, pToolProperties, error_obj);
-        if (skip) return VK_ERROR_VALIDATION_FAILED_EXT;
-    }
-    RecordObject record_obj(vvl::Func::vkGetPhysicalDeviceToolProperties);
-    for (ValidationObject* intercept : layer_data->object_dispatch) {
-        auto lock = intercept->WriteLock();
-        intercept->PreCallRecordGetPhysicalDeviceToolProperties(physicalDevice, pToolCount, pToolProperties, record_obj);
-    }
-    VkResult result = DispatchGetPhysicalDeviceToolProperties(physicalDevice, pToolCount, pToolProperties);
-    record_obj.result = result;
-    for (ValidationObject* intercept : layer_data->object_dispatch) {
-        auto lock = intercept->WriteLock();
-        intercept->PostCallRecordGetPhysicalDeviceToolProperties(physicalDevice, pToolCount, pToolProperties, record_obj);
-    }
-    return result;
-}
-
 VKAPI_ATTR VkResult VKAPI_CALL CreatePrivateDataSlot(VkDevice device, const VkPrivateDataSlotCreateInfo* pCreateInfo,
                                                      const VkAllocationCallbacks* pAllocator, VkPrivateDataSlot* pPrivateDataSlot) {
     auto layer_data = GetLayerDataPtr(get_dispatch_key(device), layer_data_map);
@@ -7294,7 +7312,7 @@ VKAPI_ATTR VkResult VKAPI_CALL GetMemoryHostPointerPropertiesEXT(VkDevice device
 
 VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceCalibrateableTimeDomainsEXT(VkPhysicalDevice physicalDevice,
                                                                             uint32_t* pTimeDomainCount,
-                                                                            VkTimeDomainEXT* pTimeDomains) {
+                                                                            VkTimeDomainKHR* pTimeDomains) {
     auto layer_data = GetLayerDataPtr(get_dispatch_key(physicalDevice), layer_data_map);
     bool skip = false;
     ErrorObject error_obj(vvl::Func::vkGetPhysicalDeviceCalibrateableTimeDomainsEXT,
@@ -7322,7 +7340,7 @@ VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceCalibrateableTimeDomainsEXT(VkPh
 }
 
 VKAPI_ATTR VkResult VKAPI_CALL GetCalibratedTimestampsEXT(VkDevice device, uint32_t timestampCount,
-                                                          const VkCalibratedTimestampInfoEXT* pTimestampInfos,
+                                                          const VkCalibratedTimestampInfoKHR* pTimestampInfos,
                                                           uint64_t* pTimestamps, uint64_t* pMaxDeviation) {
     auto layer_data = GetLayerDataPtr(get_dispatch_key(device), layer_data_map);
     bool skip = false;

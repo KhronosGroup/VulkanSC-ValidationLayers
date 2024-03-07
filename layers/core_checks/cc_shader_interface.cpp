@@ -1,7 +1,7 @@
-/* Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (C) 2015-2023 Google Inc.
+/* Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (C) 2015-2024 Google Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -94,12 +94,12 @@ bool CoreChecks::ValidateInterfaceVertexInput(const vvl::Pipeline &pipeline, con
     }
 
     for (const auto &location_it : location_map) {
-        const auto location = location_it.first;
+        const uint32_t location = location_it.first;
         const auto attribute_input = location_it.second.attribute_input;
         const auto shader_input = location_it.second.shader_input;
 
         if (attribute_input && !shader_input) {
-            skip |= LogPerformanceWarning(kVUID_Core_Shader_OutputNotConsumed, module_state.handle(), vi_loc,
+            skip |= LogPerformanceWarning("WARNING-Shader-OutputNotConsumed", module_state.handle(), vi_loc,
                                           "Vertex attribute at location %" PRIu32 " not consumed by vertex shader.", location);
         } else if (!attribute_input && shader_input) {
             skip |= LogError("VUID-VkGraphicsPipelineCreateInfo-Input-07904", module_state.handle(),
@@ -108,48 +108,44 @@ bool CoreChecks::ValidateInterfaceVertexInput(const vvl::Pipeline &pipeline, con
                              location);
         } else if (attribute_input && shader_input) {
             const VkFormat attribute_format = *attribute_input;
-            const auto attribute_type = spirv::GetFormatType(attribute_format);
+            const uint32_t attribute_type = spirv::GetFormatType(attribute_format);
             const uint32_t var_base_type_id = shader_input->ResultId();
-            const auto var_numeric_type = module_state.GetNumericType(var_base_type_id);
+            const uint32_t var_numeric_type = module_state.GetNumericType(var_base_type_id);
+
+            const bool attribute64 = vkuFormatIs64bit(attribute_format);
+            const bool shader64 = module_state.GetBaseTypeInstruction(var_base_type_id)->GetBitWidth() == 64;
 
             // Type checking
-            if (!(attribute_type & var_numeric_type)) {
+            if ((attribute_type & var_numeric_type) == 0) {
                 skip |=
                     LogError("VUID-VkGraphicsPipelineCreateInfo-Input-08733", module_state.handle(),
                              vi_loc.dot(Field::pVertexAttributeDescriptions, location_it.second.attribute_index).dot(Field::format),
                              "(%s) at Location %" PRIu32 " does not match vertex shader input type (%s).",
                              string_VkFormat(attribute_format), location, module_state.DescribeType(var_base_type_id).c_str());
-            } else {
-                // 64-bit can't be used if both the Vertex Attribute AND Shader Input Variable are both not 64-bit.
-                const bool attribute64 = vkuFormatIs64bit(attribute_format);
-                const bool shader64 = module_state.GetBaseTypeInstruction(var_base_type_id)->GetBitWidth() == 64;
-                if (attribute64 && !shader64) {
+            } else if (attribute64 && !shader64) {
+                skip |=
+                    LogError("VUID-VkGraphicsPipelineCreateInfo-pVertexInputState-08929", module_state.handle(),
+                             vi_loc.dot(Field::pVertexAttributeDescriptions, location_it.second.attribute_index).dot(Field::format),
+                             "(%s) is a 64-bit format, but at Location %" PRIu32 " the vertex shader input is 32-bit type (%s).",
+                             string_VkFormat(attribute_format), location, module_state.DescribeType(var_base_type_id).c_str());
+            } else if (!attribute64 && shader64) {
+                skip |=
+                    LogError("VUID-VkGraphicsPipelineCreateInfo-pVertexInputState-08930", module_state.handle(),
+                             vi_loc.dot(Field::pVertexAttributeDescriptions, location_it.second.attribute_index).dot(Field::format),
+                             "(%s) is a 64-bit format, but at Location %" PRIu32 " the vertex shader input is 64-bit type (%s).",
+                             string_VkFormat(attribute_format), location, module_state.DescribeType(var_base_type_id).c_str());
+            } else if (attribute64 && shader64) {
+                const uint32_t attribute_components = vkuFormatComponentCount(attribute_format);
+                const uint32_t input_components = module_state.GetNumComponentsInBaseType(shader_input);
+                if (attribute_components < input_components) {
                     skip |= LogError(
-                        "VUID-VkGraphicsPipelineCreateInfo-pVertexInputState-08929", module_state.handle(),
+                        "VUID-VkGraphicsPipelineCreateInfo-pVertexInputState-09198", module_state.handle(),
                         vi_loc.dot(Field::pVertexAttributeDescriptions, location_it.second.attribute_index).dot(Field::format),
-                        "(%s) is a 64-bit format, but at Location %" PRIu32 " the vertex shader input is 32-bit type (%s).",
-                        string_VkFormat(attribute_format), location, module_state.DescribeType(var_base_type_id).c_str());
-                } else if (!attribute64 && shader64) {
-                    skip |= LogError(
-                        "VUID-VkGraphicsPipelineCreateInfo-pVertexInputState-08930", module_state.handle(),
-                        vi_loc.dot(Field::pVertexAttributeDescriptions, location_it.second.attribute_index).dot(Field::format),
-                        "(%s) is a 64-bit format, but at Location %" PRIu32 " the vertex shader input is 64-bit type (%s).",
-                        string_VkFormat(attribute_format), location, module_state.DescribeType(var_base_type_id).c_str());
-                } else if (attribute64 && shader64) {
-                    // Unlike 32-bit, the components for 64-bit inputs have to match exactly
-                    const uint32_t attribute_components = vkuFormatComponentCount(attribute_format);
-                    const uint32_t input_components = module_state.GetNumComponentsInBaseType(shader_input);
-                    if (attribute_components < input_components) {
-                        skip |= LogError(
-                            "VUID-VkGraphicsPipelineCreateInfo-pVertexInputState-09198", module_state.handle(),
-                            vi_loc.dot(Field::pVertexAttributeDescriptions, location_it.second.attribute_index).dot(Field::format),
-                            "(%s) is a %" PRIu32 "-wide 64-bit format, but at location %" PRIu32
-                            " the vertex shader input is %" PRIu32
-                            "-wide 64-bit type (%s). (64-bit vertex input don't have default values and require "
-                            "components to match what is used in the shader)",
-                            string_VkFormat(attribute_format), attribute_components, location, input_components,
-                            module_state.DescribeType(var_base_type_id).c_str());
-                    }
+                        "(%s) is a %" PRIu32 "-wide 64-bit format, but at location %" PRIu32 " the vertex shader input is %" PRIu32
+                        "-wide 64-bit type (%s). (64-bit vertex input don't have default values and require "
+                        "components to match what is used in the shader)",
+                        string_VkFormat(attribute_format), attribute_components, location, input_components,
+                        module_state.DescribeType(var_base_type_id).c_str());
                 }
             }
         } else {            // !attrib && !input
@@ -552,7 +548,7 @@ bool CoreChecks::ValidateInterfaceBetweenStages(const spirv::Module &producer, c
                 // Don't give any warning if maintenance4 with vectors
                 if (!enabled_features.maintenance4 && (output_var->base_type.Opcode() != spv::OpTypeVector)) {
                     const LogObjectList objlist(producer.handle(), consumer.handle());
-                    skip |= LogPerformanceWarning(kVUID_Core_Shader_OutputNotConsumed, objlist, create_info_loc,
+                    skip |= LogPerformanceWarning("WARNING-Shader-OutputNotConsumed", objlist, create_info_loc,
                                                   "(SPIR-V Interface) %s declared to output location %" PRIu32 " Component %" PRIu32
                                                   " but is not an Input declared by %s.",
                                                   string_VkShaderStageFlagBits(producer_stage), location, component,
@@ -683,7 +679,7 @@ bool CoreChecks::ValidateFsOutputsAgainstRenderPass(const spirv::Module &module_
                 continue;
             }
 
-            const auto location = location_it.first;
+            const uint32_t location = location_it.first;
             const auto attachment = location_it.second.attachment;
             const auto output = location_it.second.output;
             if (attachment && !output) {
@@ -701,11 +697,11 @@ bool CoreChecks::ValidateFsOutputsAgainstRenderPass(const spirv::Module &module_
                                               location);
                 }
             } else if (attachment && output) {
-                const auto attachment_type = spirv::GetFormatType(attachment->format);
-                const auto output_type = module_state.GetNumericType(output->type_id);
+                const uint32_t attachment_type = spirv::GetFormatType(attachment->format);
+                const uint32_t output_type = module_state.GetNumericType(output->type_id);
 
                 // Type checking
-                if (!(output_type & attachment_type)) {
+                if ((output_type & attachment_type) == 0) {
                     skip |= LogUndefinedValue(
                         "Undefined-Value-ShaderFragmentOutputMismatch", module_state.handle(), create_info_loc,
                         "Attachment %" PRIu32
@@ -753,12 +749,12 @@ bool CoreChecks::ValidateFsOutputsAgainstDynamicRenderingRenderPass(const spirv:
                 "Attachment %" PRIu32 " not written by fragment shader; undefined values will be written to attachment", location);
         } else if (pipeline.fragment_output_state && output &&
                    (location < rp_state->dynamic_rendering_pipeline_create_info.colorAttachmentCount)) {
-            auto format = rp_state->dynamic_rendering_pipeline_create_info.pColorAttachmentFormats[location];
-            const auto attachment_type = spirv::GetFormatType(format);
-            const auto output_type = module_state.GetNumericType(output->type_id);
+            const VkFormat format = rp_state->dynamic_rendering_pipeline_create_info.pColorAttachmentFormats[location];
+            const uint32_t attachment_type = spirv::GetFormatType(format);
+            const uint32_t output_type = module_state.GetNumericType(output->type_id);
 
             // Type checking
-            if (!(output_type & attachment_type)) {
+            if ((output_type & attachment_type) == 0) {
                 skip |= LogUndefinedValue(
                     "Undefined-Value-ShaderFragmentOutputMismatch", module_state.handle(), create_info_loc,
                     "Attachment %" PRIu32
