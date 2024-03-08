@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2023-2023 The Khronos Group Inc.
- * Copyright (c) 2023-2023 RasterGrid Kft.
+ * Copyright (c) 2023-2024 The Khronos Group Inc.
+ * Copyright (c) 2023-2024 RasterGrid Kft.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 TEST_F(VkSCLayerTest, CreateCommandPoolMissingMemoryReservationInfo) {
     TEST_DESCRIPTION("vkCreateCommandPool - missing VkCommandPoolMemoryReservationCreateInfo");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     auto create_info = vku::InitStruct<VkCommandPoolCreateInfo>();
     VkCommandPool cmd_pool = VK_NULL_HANDLE;
@@ -27,7 +27,7 @@ TEST_F(VkSCLayerTest, CreateCommandPoolMissingMemoryReservationInfo) {
 TEST_F(VkSCLayerTest, CreateCommandPoolInvalidReservedSize) {
     TEST_DESCRIPTION("vkCreateCommandPool - commandPoolReservedSize is zero");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     auto mem_reservation_info = vku::InitStruct<VkCommandPoolMemoryReservationCreateInfo>();
     mem_reservation_info.commandPoolReservedSize = 0;
@@ -44,7 +44,7 @@ TEST_F(VkSCLayerTest, CreateCommandPoolInvalidReservedSize) {
 TEST_F(VkSCLayerTest, CreateCommandPoolInvalidMaxCommandBuffers) {
     TEST_DESCRIPTION("vkCreateCommandPool - commandPoolMaxCommandBuffers is zero or greater than maxCommandPoolCommandBuffers");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     auto mem_reservation_info = vku::InitStruct<VkCommandPoolMemoryReservationCreateInfo>();
     mem_reservation_info.commandPoolReservedSize = 16 * 1024 * 1024;
@@ -70,7 +70,7 @@ TEST_F(VkSCLayerTest, CreateCommandPoolInvalidMaxCommandBuffers) {
 TEST_F(VkSCLayerTest, AllocateCommandBuffersExceededMaxCommandBuffers) {
     TEST_DESCRIPTION("vkAllocateCommandBuffers - cannot allocate more command buffers from pool than commandPoolMaxCommandBuffers");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     const uint32_t max_cmd_buffers = 13;
 
@@ -131,7 +131,7 @@ TEST_F(VkSCLayerTest, AllocateCommandBuffersExceededMaxCommandBuffers) {
 TEST_F(VkSCLayerTest, ResetCommandBufferNotSupported) {
     TEST_DESCRIPTION("vkReset/BeginCommandBuffer - commandPoolResetCommandBuffer not supported");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     if (GetVulkanSC10Properties(gpu()).commandPoolResetCommandBuffer) {
         GTEST_SKIP() << "Only applicable if commandPoolResetCommandBuffer is not supported";
@@ -165,7 +165,7 @@ TEST_F(VkSCLayerTest, ResetCommandBufferNotSupported) {
 TEST_F(VkSCLayerTest, CommandPoolMultipleRecordingNotSupported) {
     TEST_DESCRIPTION("vkBeginCommandBuffer - commandPoolMultipleCommandBuffersRecording not supported");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     if (GetVulkanSC10Properties(gpu()).commandPoolMultipleCommandBuffersRecording) {
         GTEST_SKIP() << "Only applicable if commandPoolMultipleCommandBuffersRecording is not supported";
@@ -204,7 +204,7 @@ TEST_F(VkSCLayerTest, CommandPoolMultipleRecordingNotSupported) {
 TEST_F(VkSCLayerTest, SimulatenousUseNotSupported) {
     TEST_DESCRIPTION("vkBeginCommandBuffer - commandBufferSimultaneousUse not supported");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     if (GetVulkanSC10Properties(gpu()).commandBufferSimultaneousUse) {
         GTEST_SKIP() << "Only applicable if commandBufferSimultaneousUse is not supported";

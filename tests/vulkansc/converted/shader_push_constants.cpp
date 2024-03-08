@@ -18,7 +18,7 @@
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
 
-TEST_F(NegativeShaderPushConstants, DISABLED_NotDeclared) {
+TEST_F(NegativeShaderPushConstants, NotDeclared) {
     TEST_DESCRIPTION(
         "Create a graphics pipeline in which a push constant range containing a push constant block member is not declared in the "
         "layout.");
@@ -125,7 +125,7 @@ TEST_F(NegativeShaderPushConstants, PipelineRange) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeShaderPushConstants, DISABLED_NotInLayout) {
+TEST_F(NegativeShaderPushConstants, NotInLayout) {
     TEST_DESCRIPTION(
         "Test that an error is produced for a shader consuming push constants which are not provided in the pipeline layout");
 
@@ -233,7 +233,7 @@ TEST_F(NegativeShaderPushConstants, Range) {
     m_commandBuffer->end();
 }
 
-TEST_F(NegativeShaderPushConstants, DISABLED_DrawWithoutUpdate) {
+TEST_F(NegativeShaderPushConstants, DrawWithoutUpdate) {
     TEST_DESCRIPTION("Not every bytes in used push constant ranges has been set before Draw ");
 
     RETURN_IF_SKIP(Init());
@@ -350,7 +350,7 @@ TEST_F(NegativeShaderPushConstants, DISABLED_DrawWithoutUpdate) {
     m_commandBuffer->end();
 }
 
-TEST_F(NegativeShaderPushConstants, DISABLED_MultipleEntryPoint) {
+TEST_F(NegativeShaderPushConstants, MultipleEntryPoint) {
     TEST_DESCRIPTION("Test push-constant detect the write entrypoint with the push constants.");
 
     RETURN_IF_SKIP(Init());

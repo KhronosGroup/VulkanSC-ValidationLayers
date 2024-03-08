@@ -541,7 +541,7 @@ TEST_F(NegativeSubpass, ImageBarrierSubpassConflict) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeSubpass, DISABLED_SubpassInputNotBoundDescriptorSet) {
+TEST_F(NegativeSubpass, SubpassInputNotBoundDescriptorSet) {
     TEST_DESCRIPTION("Validate subpass input isn't bound to fragment shader or descriptor set");
 
     RETURN_IF_SKIP(Init());
@@ -989,7 +989,7 @@ TEST_F(NegativeSubpass, InputAttachmentLayout) {
     vkt::RenderPass render_pass(*m_device, rpci);
 }
 
-TEST_F(NegativeSubpass, DISABLED_InputAttachmentMissing) {
+TEST_F(NegativeSubpass, InputAttachmentMissing) {
     TEST_DESCRIPTION(
         "Test that an error is produced for a shader consuming an input attachment which is not included in the subpass "
         "description");
@@ -1015,7 +1015,7 @@ TEST_F(NegativeSubpass, DISABLED_InputAttachmentMissing) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-renderPass-06038");
 }
 
-TEST_F(NegativeSubpass, DISABLED_InputAttachmentMissingArray) {
+TEST_F(NegativeSubpass, InputAttachmentMissingArray) {
     TEST_DESCRIPTION(
         "Test that an error is produced for a shader consuming an input attachment which is not included in the subpass "
         "description -- array case");
@@ -1069,7 +1069,7 @@ TEST_F(NegativeSubpass, DISABLED_InputAttachmentMissingSpecConstant) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-layout-07991");
 }
 
-TEST_F(NegativeSubpass, DISABLED_InputAttachmentSharingVariable) {
+TEST_F(NegativeSubpass, InputAttachmentSharingVariable) {
     TEST_DESCRIPTION("Make sure if 2 loads use same variable, both are tracked");
 
     RETURN_IF_SKIP(Init());
@@ -1129,7 +1129,7 @@ TEST_F(NegativeSubpass, DISABLED_InputAttachmentSharingVariable) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-renderPass-06038");
 }
 
-TEST_F(NegativeSubpass, DISABLED_SubpassInputWithoutFormat) {
+TEST_F(NegativeSubpass, SubpassInputWithoutFormat) {
     TEST_DESCRIPTION("Non-InputAttachment shader input with unknown image format");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);

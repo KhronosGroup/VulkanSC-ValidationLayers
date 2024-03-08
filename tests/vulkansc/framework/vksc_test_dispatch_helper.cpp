@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2023-2023 The Khronos Group Inc.
- * Copyright (c) 2023-2023 RasterGrid Kft.
+ * Copyright (c) 2023-2024 The Khronos Group Inc.
+ * Copyright (c) 2023-2024 RasterGrid Kft.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -236,18 +236,30 @@ static VKAPI_ATTR void VKAPI_CALL DestroySwapchainKHR(VkDevice device, VkSwapcha
 
 static VKAPI_ATTR VkResult VKAPI_CALL CreateShaderModule(VkDevice device, const VkShaderModuleCreateInfo* pCreateInfo,
                                                          const VkAllocationCallbacks* pAllocator, VkShaderModule* pShaderModule) {
-    // Vulkan SC removed shader modules, but as some of the Vulkan validation layer test framework
-    // relies on calling this, we simply "emulate" it by always returning a null handle but
-    // success. This seems sufficient to run the upstream tests against MockICD.
-    *pShaderModule = VK_NULL_HANDLE;
+    // Attempt to create a pipeline cache from the SPIR-V data in order to trigger VUs that
+    // would otherwise be triggered in case of Vulkan
+    if (pCreateInfo->pCode && (pCreateInfo->codeSize % sizeof(uint32_t) == 0)) {
+        vksc::PipelineCacheBuilder builder{};
+        auto header = builder.AddDefaultHeaderVersionSCOne();
+        auto entry = builder.AddPipelineEntry(header, "1265a236-e369-11ed-b5ea-0242ac120002", 4000);
+        std::vector<uint32_t> spirv{};
+        spirv.assign(pCreateInfo->pCode, pCreateInfo->pCode + pCreateInfo->codeSize / sizeof(uint32_t));
+        builder.AddStageValidation(entry, nullptr, {spirv});
+        RenderFramework().CreateOnDemandPipelineCache(device, builder.MakeCreateInfo());
+    }
+
+    // Vulkan SC removed shader modules, but we emulate it by storing the shader module
+    // SPIR-V data with a VkShaderModule handle key so that we can use this information at
+    // pipeline creation time to construct pipeline caches using this data.
+    *pShaderModule = RenderFramework().CreateShaderModuleData(*pCreateInfo);
     return VK_SUCCESS;
 }
 
 static VKAPI_ATTR void VKAPI_CALL DestroyShaderModule(VkDevice device, VkShaderModule shaderModule,
                                                       const VkAllocationCallbacks* pAllocator) {
-    // Vulkan SC removed shader modules, but we add a placeholder no-op implementation for
-    // Vulkan validation layer test compatibility. Only VK_NULL_HANDLE is expected here.
-    assert(shaderModule == VK_NULL_HANDLE);
+    // Vulkan SC removed shader modules, but we have to remove the stored shader module
+    // SPIR-V data we set up at creation time.
+    RenderFramework().DestroyShaderModuleData(shaderModule);
 }
 
 static VKAPI_ATTR VkResult VKAPI_CALL CreateInstance(const VkInstanceCreateInfo* pCreateInfo,
@@ -260,11 +272,7 @@ static VKAPI_ATTR VkResult VKAPI_CALL CreateInstance(const VkInstanceCreateInfo*
     }
     create_info.pApplicationInfo = &app_info;
     if (VK_API_VERSION_VARIANT(app_info.apiVersion) != VKSC_API_VARIANT) {
-        if (app_info.apiVersion < VK_API_VERSION_1_3) {
-            app_info.apiVersion = VKSC_API_VERSION_1_0;
-        } else {
-            DispatchHelper()->SkipUnsupportedTest("Test case was written against Vulkan 1.3");
-        }
+        app_info.apiVersion = VKSC_API_VERSION_1_0;
     }
     VkResult result = vksc::CreateInstance(&create_info, pAllocator, pInstance);
     if (result == VK_SUCCESS && DispatchHelper() != nullptr) {
@@ -305,6 +313,8 @@ static VKAPI_ATTR VkResult VKAPI_CALL CreateDevice(VkPhysicalDevice physicalDevi
     if (!vku::FindStructInPNextChain<VkPhysicalDeviceVulkanSC10Features>(create_info.pNext)) {
         sc_10_features = vku::InitStruct<VkPhysicalDeviceVulkanSC10Features>();
         sc_10_features.pNext = (void*)create_info.pNext;
+        // Enable shader atomic instructions by default for Vulkan compatibility
+        sc_10_features.shaderAtomicInstructions = VK_TRUE;
         create_info.pNext = &sc_10_features;
     }
 
@@ -327,65 +337,133 @@ static VKAPI_ATTR VkResult VKAPI_CALL CreatePipelineCache(VkDevice device, const
     return vksc::CreatePipelineCache(device, &create_info, pAllocator, pPipelineCache);
 }
 
-template <typename CREATE_INFO, typename CREATE_FUNC>
-static VkResult CreatePipelines(VkDevice device, VkPipelineCache pipeline_cache, uint32_t create_info_count,
-                                const CREATE_INFO* create_infos, VkPipeline* pipelines, CREATE_FUNC create_func) {
-    // If the application did not provide a pipeline cache, let's use a default one
-    if (pipeline_cache == VK_NULL_HANDLE) {
-        pipeline_cache = RenderFramework().GetDefaultPipelineCache();
-    }
-
-    // When running Vulkan validation layer tests against the Vulkan SC validation layers
-    // we need to manually inject the default offline pipeline creation info, if not present.
-    bool need_to_chain_offline_info = false;
-    for (uint32_t i = 0; i < create_info_count; ++i) {
-        if (!vku::FindStructInPNextChain<VkPipelineOfflineCreateInfo>(create_infos[i].pNext)) {
-            need_to_chain_offline_info = true;
-        }
-    }
-    if (need_to_chain_offline_info) {
-        if (create_info_count == 1) {
-            auto offline_info = vksc::GetDefaultPipelineOfflineCreateInfo();
-            auto create_info = create_infos[0];
-            offline_info.pNext = create_info.pNext;
-            create_info.pNext = &offline_info;
-
-            // Make sure basePipelineIndex is not -1, as in Vulkan that's the "default" value
-            create_info.basePipelineIndex = 0;
-
-            return create_func(device, pipeline_cache, 1, &create_info, nullptr, pipelines);
-        } else {
-            std::vector<VkPipelineOfflineCreateInfo> offline_info(create_info_count, vksc::GetDefaultPipelineOfflineCreateInfo());
-            std::vector<CREATE_INFO> create_info_vec(create_info_count);
-            for (uint32_t i = 0; i < create_info_count; ++i) {
-                create_info_vec[i] = create_infos[i];
-                offline_info[i].pNext = create_info_vec[i].pNext;
-                create_info_vec[i].pNext = &offline_info[i];
-
-                // Make sure basePipelineIndex is not -1, as in Vulkan that's the "default" value
-                create_info_vec[i].basePipelineIndex = 0;
-            }
-            return create_func(device, pipeline_cache, create_info_count, create_info_vec.data(), nullptr, pipelines);
-        }
-    } else {
-        return create_func(device, pipeline_cache, create_info_count, create_infos, nullptr, pipelines);
-    }
-}
-
 static VKAPI_ATTR VkResult VKAPI_CALL CreateComputePipelines(VkDevice device, VkPipelineCache pipelineCache,
                                                              uint32_t createInfoCount,
                                                              const VkComputePipelineCreateInfo* pCreateInfos,
                                                              const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines) {
-    // Handle any Vulkan SC specific patching needed for pipeline creation
-    return CreatePipelines(device, pipelineCache, createInfoCount, pCreateInfos, pPipelines, vksc::CreateComputePipelines);
+    // Copy create infos to be able to patch pipeline cache information
+    std::vector<VkPipelineOfflineCreateInfo> offline_info(createInfoCount, vku::InitStruct<VkPipelineOfflineCreateInfo>());
+    std::vector<VkComputePipelineCreateInfo> create_info(createInfoCount);
+    create_info.assign(pCreateInfos, pCreateInfos + createInfoCount);
+
+    // Construct pipeline cache
+    vksc::PipelineCacheBuilder builder{};
+    auto header = builder.AddDefaultHeaderVersionSCOne();
+    char pipeline_id[37];
+    std::vector<vksc::PipelineCacheBuilder::SCIndexEntry<>> entries{};
+    entries.reserve(createInfoCount);
+    for (uint32_t i = 0; i < createInfoCount; ++i) {
+        // Add pipeline entries
+        sprintf(pipeline_id, "1265a236-e369-11ed-b5ea-cf24%08x", i);
+        entries.emplace_back(builder.AddPipelineEntry(header, pipeline_id, 4000));
+
+        // Setup offline info
+        offline_info[i].pNext = create_info[i].pNext;
+        vksc::ParseUUID(pipeline_id, offline_info[i].pipelineIdentifier);
+        offline_info[i].poolEntrySize = vksc::GetDefaultPipelinePoolSize().poolEntrySize;
+        create_info[i].pNext = &offline_info[i];
+    }
+    for (uint32_t i = 0; i < createInfoCount; ++i) {
+        // Add SPIR-V validation data (it is added in a separate loop because it must follow all pipelines)
+        auto spirv = RenderFramework().GetShaderModuleData(create_info[i].stage.module);
+        if (spirv) {
+            builder.AddStageValidation(entries[i], nullptr, {*spirv});
+        }
+
+        // Remove shader module reference
+        create_info[i].stage.module = VK_NULL_HANDLE;
+
+        // Make sure basePipelineIndex is not -1, as in Vulkan that's the "default" value
+        create_info[i].basePipelineIndex = 0;
+    }
+    auto cache_ptr = RenderFramework().CreateOnDemandPipelineCache(device, builder.MakeCreateInfo());
+
+    // Create pipelines
+    auto result =
+        vksc::CreateComputePipelines(device, cache_ptr->handle(), createInfoCount, create_info.data(), nullptr, pPipelines);
+
+    // Register on-demand pipeline caches with the created pipelines
+    for (uint32_t i = 0; i < createInfoCount; ++i) {
+        if (pPipelines[i] != VK_NULL_HANDLE) {
+            RenderFramework().RegisterPipelineWithOnDemandCache(pPipelines[i], cache_ptr);
+        }
+    }
+
+    return result;
 }
 
 static VKAPI_ATTR VkResult VKAPI_CALL CreateGraphicsPipelines(VkDevice device, VkPipelineCache pipelineCache,
                                                               uint32_t createInfoCount,
                                                               const VkGraphicsPipelineCreateInfo* pCreateInfos,
                                                               const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines) {
-    // Handle any Vulkan SC specific patching needed for pipeline creation
-    return CreatePipelines(device, pipelineCache, createInfoCount, pCreateInfos, pPipelines, vksc::CreateGraphicsPipelines);
+    // Copy create infos to be able to patch pipeline cache information
+    std::vector<VkPipelineOfflineCreateInfo> offline_info(createInfoCount, vku::InitStruct<VkPipelineOfflineCreateInfo>());
+    std::vector<VkGraphicsPipelineCreateInfo> create_info(createInfoCount);
+    create_info.assign(pCreateInfos, pCreateInfos + createInfoCount);
+    std::vector<std::vector<VkPipelineShaderStageCreateInfo>> stage_info(createInfoCount);
+    for (uint32_t i = 0; i < createInfoCount; ++i) {
+        stage_info[i].assign(create_info[i].pStages, create_info[i].pStages + create_info[i].stageCount);
+        create_info[i].pStages = stage_info[i].data();
+    }
+
+    // Construct pipeline cache
+    vksc::PipelineCacheBuilder builder{};
+    auto header = builder.AddDefaultHeaderVersionSCOne();
+    char pipeline_id[37];
+    std::vector<vksc::PipelineCacheBuilder::SCIndexEntry<>> entries{};
+    entries.reserve(createInfoCount);
+    for (uint32_t i = 0; i < createInfoCount; ++i) {
+        // Add pipeline entries
+        sprintf(pipeline_id, "1265a236-e369-11ed-b5ea-9f24%08x", i);
+        entries.emplace_back(builder.AddPipelineEntry(header, pipeline_id, 4000));
+
+        // Setup offline info
+        offline_info[i].pNext = create_info[i].pNext;
+        vksc::ParseUUID(pipeline_id, offline_info[i].pipelineIdentifier);
+        offline_info[i].poolEntrySize = vksc::GetDefaultPipelinePoolSize().poolEntrySize;
+        create_info[i].pNext = &offline_info[i];
+    }
+    for (uint32_t i = 0; i < createInfoCount; ++i) {
+        // Add SPIR-V validation data (it is added in a separate loop because it must follow all pipelines)
+        bool has_spirv = false;
+        std::vector<std::vector<uint32_t>> spirv_arr(create_info[i].stageCount);
+        for (uint32_t stage_idx = 0; stage_idx < create_info[i].stageCount; ++stage_idx) {
+            auto spirv = RenderFramework().GetShaderModuleData(stage_info[i][stage_idx].module);
+            if (spirv) {
+                has_spirv = true;
+                spirv_arr[stage_idx] = *spirv;
+            }
+
+            // Remove shader module reference
+            stage_info[i][stage_idx].module = VK_NULL_HANDLE;
+        }
+        if (has_spirv) {
+            builder.AddStageValidation(entries[i], nullptr, spirv_arr);
+        }
+
+        // Make sure basePipelineIndex is not -1, as in Vulkan that's the "default" value
+        create_info[i].basePipelineIndex = 0;
+    }
+    auto cache_ptr = RenderFramework().CreateOnDemandPipelineCache(device, builder.MakeCreateInfo());
+
+    // Create pipelines
+    auto result =
+        vksc::CreateGraphicsPipelines(device, cache_ptr->handle(), createInfoCount, create_info.data(), nullptr, pPipelines);
+
+    // Register on-demand pipeline caches with the created pipelines
+    for (uint32_t i = 0; i < createInfoCount; ++i) {
+        if (pPipelines[i] != VK_NULL_HANDLE) {
+            RenderFramework().RegisterPipelineWithOnDemandCache(pPipelines[i], cache_ptr);
+        }
+    }
+
+    return result;
+}
+
+static VKAPI_ATTR void VKAPI_CALL DestroyPipeline(VkDevice device, VkPipeline pipeline, const VkAllocationCallbacks* pAllocator) {
+    // As we create on-demand pipeline caches for pipelines, we have to make sure we unregister them
+    RenderFramework().UnregisterPipelineWithOnDemandCache(pipeline);
+    vksc::DestroyPipeline(device, pipeline, pAllocator);
 }
 
 static VKAPI_ATTR VkResult VKAPI_CALL CreateCommandPool(VkDevice device, const VkCommandPoolCreateInfo* pCreateInfo,
@@ -552,6 +630,7 @@ PFN_vkCreateDevice CreateDevice = nullptr;
 PFN_vkCreatePipelineCache CreatePipelineCache = nullptr;
 PFN_vkCreateComputePipelines CreateComputePipelines = nullptr;
 PFN_vkCreateGraphicsPipelines CreateGraphicsPipelines = nullptr;
+PFN_vkDestroyPipeline DestroyPipeline = nullptr;
 PFN_vkCreateCommandPool CreateCommandPool = nullptr;
 PFN_vkBeginCommandBuffer BeginCommandBuffer = nullptr;
 PFN_vkResetCommandBuffer ResetCommandBuffer = nullptr;
@@ -588,6 +667,7 @@ void TestDispatchHelper::PatchDispatchTable() {
     VKSC__SWAP_COMPAT_EP(CreatePipelineCache);
     VKSC__SWAP_COMPAT_EP(CreateComputePipelines);
     VKSC__SWAP_COMPAT_EP(CreateGraphicsPipelines);
+    VKSC__SWAP_COMPAT_EP(DestroyPipeline);
     VKSC__SWAP_COMPAT_EP(CreateCommandPool);
     VKSC__SWAP_COMPAT_EP(BeginCommandBuffer);
     VKSC__SWAP_COMPAT_EP(ResetCommandBuffer);

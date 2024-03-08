@@ -1,5 +1,5 @@
-/* Copyright (c) 2023-2023 The Khronos Group Inc.
- * Copyright (c) 2023-2023 RasterGrid Kft.
+/* Copyright (c) 2023-2024 The Khronos Group Inc.
+ * Copyright (c) 2023-2024 RasterGrid Kft.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -79,8 +79,9 @@ void SCValidationStateTracker<BASE>::CreateDevice(const VkDeviceCreateInfo *pCre
     while (object_reservation_info != nullptr) {
         for (uint32_t i = 0; i < object_reservation_info->pipelineCacheCreateInfoCount; ++i) {
             const auto &create_info = object_reservation_info->pPipelineCacheCreateInfos[i];
+            const bool copy_data = true;  // Copy pipeline cache data to be able to verify contents later
             sc_pipeline_cache_map_.emplace(
-                std::make_pair(create_info.pInitialData, std::make_unique<vvl::sc::PipelineCacheData>(create_info)));
+                std::make_pair(create_info.pInitialData, std::make_unique<vvl::sc::PipelineCacheData>(create_info, copy_data)));
         }
 
         for (uint32_t i = 0; i < object_reservation_info->pipelinePoolSizeCount; ++i) {
@@ -183,10 +184,8 @@ void SCValidationStateTracker<BASE>::PostCallRecordCreateCommandPool(VkDevice de
 template <typename BASE>
 std::shared_ptr<vvl::PipelineCache> SCValidationStateTracker<BASE>::CreatePipelineCacheState(
     VkPipelineCache pipeline_cache, const VkPipelineCacheCreateInfo *pCreateInfo) const {
-    auto it = sc_pipeline_cache_map_.find(pCreateInfo->pInitialData);
-    auto data = (it != sc_pipeline_cache_map_.end()) ? it->second.get() : nullptr;
     return std::static_pointer_cast<vvl::PipelineCache>(
-        std::make_shared<vvl::sc::PipelineCache>(pipeline_cache, pCreateInfo, data));
+        std::make_shared<vvl::sc::PipelineCache>(this, pipeline_cache, pCreateInfo));
 }
 
 template <typename BASE>

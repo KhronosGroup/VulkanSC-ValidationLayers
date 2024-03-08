@@ -1,5 +1,5 @@
-/* Copyright (c) 2023-2023 The Khronos Group Inc.
- * Copyright (c) 2023-2023 RasterGrid Kft.
+/* Copyright (c) 2023-2024 The Khronos Group Inc.
+ * Copyright (c) 2023-2024 RasterGrid Kft.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,10 @@
 
 #include "core_checks/core_validation.h"
 #include "vulkansc/state_tracker/sc_state_tracker.h"
+
+namespace vvl::sc {
+class PipelineCacheData;
+}
 
 class SCCoreChecks : public SCValidationStateTracker<CoreChecks> {
   protected:
@@ -230,5 +234,14 @@ class SCCoreChecks : public SCValidationStateTracker<CoreChecks> {
                                            const ErrorObject& error_obj) const override;
     bool PreCallValidateGetFaultData(VkDevice device, VkFaultQueryBehavior faultQueryBehavior, VkBool32* pUnrecordedFaults,
                                      uint32_t* pFaultCount, VkFaultData* pFaults, const ErrorObject& error_obj) const override;
+
+    // SPIR-V validation related utilities
+    bool ValidatePipelineCacheSpirv(VkPhysicalDevice physical_device, const vvl::sc::PipelineCacheData& data,
+                                    uint32_t pipeline_index, uint32_t stage_index, const Location& loc) const;
+    bool ValidatePipelineStageInfo(uint32_t stage_index, const VkPipelineShaderStageCreateInfo& stage_info,
+                                   const vvl::sc::PipelineCache* pipeline_cache_state,
+                                   const VkPipelineOfflineCreateInfo* offline_info, const Location& loc) const;
+    bool ValidatePipelineShaderStage(const StageCreateInfo& stage_create_info, const PipelineStageState& stage_state,
+                                     const Location& loc) const override;
 
 };  // Class SCCoreChecks

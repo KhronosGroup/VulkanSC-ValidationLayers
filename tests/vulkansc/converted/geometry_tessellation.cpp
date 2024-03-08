@@ -69,7 +69,7 @@ TEST_F(NegativeGeometryTessellation, StageMaskGsTsEnabled) {
     vk::DestroyCommandPool(test_device.handle(), command_pool, NULL);
 }
 
-TEST_F(NegativeGeometryTessellation, DISABLED_GeometryShaderEnabled) {
+TEST_F(NegativeGeometryTessellation, GeometryShaderEnabled) {
     TEST_DESCRIPTION("Validate geometry shader feature is enabled if geometry shader stage is used");
 
     VkPhysicalDeviceFeatures deviceFeatures = {};
@@ -94,7 +94,7 @@ TEST_F(NegativeGeometryTessellation, DISABLED_GeometryShaderEnabled) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, vuids);
 }
 
-TEST_F(NegativeGeometryTessellation, DISABLED_TessellationShaderEnabled) {
+TEST_F(NegativeGeometryTessellation, TessellationShaderEnabled) {
     TEST_DESCRIPTION(
         "Validate tessellation shader feature is enabled if tessellation control or tessellation evaluation shader stage is used");
 
@@ -149,7 +149,7 @@ TEST_F(NegativeGeometryTessellation, DISABLED_TessellationShaderEnabled) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, vuids);
 }
 
-TEST_F(NegativeGeometryTessellation, DISABLED_PointSizeGeomShaderDontWrite) {
+TEST_F(NegativeGeometryTessellation, PointSizeGeomShaderDontWrite) {
     TEST_DESCRIPTION(
         "Create a pipeline using TOPOLOGY_POINT_LIST, set PointSize vertex shader, but not in the final geometry stage.");
 
@@ -182,7 +182,7 @@ TEST_F(NegativeGeometryTessellation, DISABLED_PointSizeGeomShaderDontWrite) {
                                       "VUID-VkGraphicsPipelineCreateInfo-shaderTessellationAndGeometryPointSize-08776");
 }
 
-TEST_F(NegativeGeometryTessellation, DISABLED_PointSizeGeomShaderWrite) {
+TEST_F(NegativeGeometryTessellation, PointSizeGeomShaderWrite) {
     TEST_DESCRIPTION(
         "Create a pipeline using TOPOLOGY_POINT_LIST, set PointSize vertex shader, but not in the final geometry stage.");
 
@@ -260,7 +260,7 @@ TEST_F(NegativeGeometryTessellation, DISABLED_PointSizeGeomShaderWrite) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-Geometry-07726");
 }
 
-TEST_F(NegativeGeometryTessellation, DISABLED_BuiltinBlockOrderMismatchVsGs) {
+TEST_F(NegativeGeometryTessellation, BuiltinBlockOrderMismatchVsGs) {
     TEST_DESCRIPTION("Use different order of gl_Position and gl_PointSize in builtin block interface between VS and GS.");
 
     AddRequiredFeature(vkt::Feature::geometryShader);
@@ -348,7 +348,7 @@ TEST_F(NegativeGeometryTessellation, DISABLED_BuiltinBlockOrderMismatchVsGs) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-OpVariable-08746");
 }
 
-TEST_F(NegativeGeometryTessellation, DISABLED_BuiltinBlockSizeMismatchVsGs) {
+TEST_F(NegativeGeometryTessellation, BuiltinBlockSizeMismatchVsGs) {
     TEST_DESCRIPTION("Use different number of elements in builtin block interface between VS and GS.");
 
     AddRequiredFeature(vkt::Feature::geometryShader);
@@ -385,7 +385,7 @@ TEST_F(NegativeGeometryTessellation, DISABLED_BuiltinBlockSizeMismatchVsGs) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-OpVariable-08746");
 }
 
-TEST_F(NegativeGeometryTessellation, DISABLED_MaxTessellationControlInputOutputComponents) {
+TEST_F(NegativeGeometryTessellation, MaxTessellationControlInputOutputComponents) {
     TEST_DESCRIPTION(
         "Test that errors are produced when the number of per-vertex input and/or output components to the tessellation control "
         "stage exceeds the device limit");
@@ -504,7 +504,7 @@ TEST_F(NegativeGeometryTessellation, DISABLED_MaxTessellationControlInputOutputC
     }
 }
 
-TEST_F(NegativeGeometryTessellation, DISABLED_MaxTessellationEvaluationInputOutputComponents) {
+TEST_F(NegativeGeometryTessellation, MaxTessellationEvaluationInputOutputComponents) {
     TEST_DESCRIPTION(
         "Test that errors are produced when the number of input and/or output components to the tessellation evaluation stage "
         "exceeds the device limit");
@@ -625,7 +625,7 @@ TEST_F(NegativeGeometryTessellation, DISABLED_MaxTessellationEvaluationInputOutp
     }
 }
 
-TEST_F(NegativeGeometryTessellation, DISABLED_MaxGeometryInputOutputComponents) {
+TEST_F(NegativeGeometryTessellation, MaxGeometryInputOutputComponents) {
     TEST_DESCRIPTION(
         "Test that errors are produced when the number of input and/or output components to the geometry stage exceeds the device "
         "limit");
@@ -734,7 +734,7 @@ TEST_F(NegativeGeometryTessellation, DISABLED_MaxGeometryInputOutputComponents) 
     }
 }
 
-TEST_F(NegativeGeometryTessellation, DISABLED_MaxGeometryInstanceVertexCount) {
+TEST_F(NegativeGeometryTessellation, MaxGeometryInstanceVertexCount) {
     TEST_DESCRIPTION(
         "Test that errors are produced when the number of output vertices/instances in the geometry stage exceeds the device "
         "limit");
@@ -794,7 +794,7 @@ TEST_F(NegativeGeometryTessellation, DISABLED_MaxGeometryInstanceVertexCount) {
     }
 }
 
-TEST_F(NegativeGeometryTessellation, DISABLED_TessellationPatchDecorationMismatch) {
+TEST_F(NegativeGeometryTessellation, TessellationPatchDecorationMismatch) {
     TEST_DESCRIPTION(
         "Test that an error is produced for a variable output from the TCS without the patch decoration, but consumed in the TES "
         "with the decoration.");
@@ -1049,7 +1049,7 @@ VK_DESCRIPTOR_SET_USAGE_NON_FREE, 1, &ds_layout.handle(), &descriptorSet);
 }
 */
 
-TEST_F(NegativeGeometryTessellation, DISABLED_IncompatiblePrimitiveTopology) {
+TEST_F(NegativeGeometryTessellation, IncompatiblePrimitiveTopology) {
     TEST_DESCRIPTION("Create pipeline with primitive topology incompatible with shaders.");
 
     AddRequiredFeature(vkt::Feature::geometryShader);
@@ -1085,7 +1085,7 @@ TEST_F(NegativeGeometryTessellation, DISABLED_IncompatiblePrimitiveTopology) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-pStages-00738");
 }
 
-TEST_F(NegativeGeometryTessellation, DISABLED_IncompatibleTessGeomPrimitiveTopology) {
+TEST_F(NegativeGeometryTessellation, IncompatibleTessGeomPrimitiveTopology) {
     TEST_DESCRIPTION("Create pipeline with incompatible topology between tess and geom shaders.");
 
     AddRequiredFeature(vkt::Feature::geometryShader);
@@ -1148,7 +1148,7 @@ TEST_F(NegativeGeometryTessellation, DISABLED_IncompatibleTessGeomPrimitiveTopol
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-pStages-00739");
 }
 
-TEST_F(NegativeGeometryTessellation, DISABLED_PipelineTessellationMissingPointSize) {
+TEST_F(NegativeGeometryTessellation, PipelineTessellationMissingPointSize) {
     TEST_DESCRIPTION("Create pipeline with tessellation shader with missing point size");
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
@@ -1197,7 +1197,7 @@ TEST_F(NegativeGeometryTessellation, DISABLED_PipelineTessellationMissingPointSi
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeGeometryTessellation, DISABLED_PipelineTessellationPointSize) {
+TEST_F(NegativeGeometryTessellation, PipelineTessellationPointSize) {
     TEST_DESCRIPTION("Create pipeline with tessellation shader with missing point size");
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
@@ -1355,7 +1355,7 @@ TEST_F(NegativeGeometryTessellation, GeometryStreamsCapability) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeGeometryTessellation, DISABLED_MismatchedTessellationExecutionModes) {
+TEST_F(NegativeGeometryTessellation, MismatchedTessellationExecutionModes) {
     TEST_DESCRIPTION("Test mismatched tessellation shaders execution modes");
 
     RETURN_IF_SKIP(InitFramework());

@@ -811,7 +811,7 @@ TEST_F(NegativeSampler, DISABLED_CustomBorderColor) {
     }
 }
 
-TEST_F(NegativeSampler, DISABLED_CustomBorderColorFormatUndefined) {
+TEST_F(NegativeSampler, CustomBorderColorFormatUndefined) {
     TEST_DESCRIPTION("Tests for VUID-VkSamplerCustomBorderColorCreateInfoEXT-format-04015");
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_CUSTOM_BORDER_COLOR_EXTENSION_NAME);
@@ -886,7 +886,7 @@ TEST_F(NegativeSampler, DISABLED_CustomBorderColorFormatUndefined) {
     m_commandBuffer->end();
 }
 
-TEST_F(NegativeSampler, DISABLED_UnnormalizedCoordinatesCombinedSampler) {
+TEST_F(NegativeSampler, UnnormalizedCoordinatesCombinedSampler) {
     TEST_DESCRIPTION(
         "If a samper is unnormalizedCoordinates, the imageview has to be some specific types. Uses COMBINED_IMAGE_SAMPLER");
 
@@ -985,7 +985,7 @@ TEST_F(NegativeSampler, DISABLED_UnnormalizedCoordinatesCombinedSampler) {
     m_commandBuffer->end();
 }
 
-TEST_F(NegativeSampler, DISABLED_UnnormalizedCoordinatesSeparateSampler) {
+TEST_F(NegativeSampler, UnnormalizedCoordinatesSeparateSampler) {
     TEST_DESCRIPTION(
         "If a samper is unnormalizedCoordinates, the imageview has to be some specific types. Doesn't use COMBINED_IMAGE_SAMPLER");
     SetTargetApiVersion(VK_API_VERSION_1_1);
@@ -1097,7 +1097,7 @@ TEST_F(NegativeSampler, DISABLED_UnnormalizedCoordinatesSeparateSampler) {
     m_commandBuffer->end();
 }
 
-TEST_F(NegativeSampler, DISABLED_UnnormalizedCoordinatesSeparateSamplerSharedImage) {
+TEST_F(NegativeSampler, UnnormalizedCoordinatesSeparateSamplerSharedImage) {
     TEST_DESCRIPTION("Doesn't use COMBINED_IMAGE_SAMPLER, but multiple OpLoad share Image OpVariable");
 
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
@@ -1166,7 +1166,7 @@ TEST_F(NegativeSampler, DISABLED_UnnormalizedCoordinatesSeparateSamplerSharedIma
     m_commandBuffer->end();
 }
 
-TEST_F(NegativeSampler, DISABLED_UnnormalizedCoordinatesSeparateSamplerSharedSampler) {
+TEST_F(NegativeSampler, UnnormalizedCoordinatesSeparateSamplerSharedSampler) {
     TEST_DESCRIPTION("Doesn't use COMBINED_IMAGE_SAMPLER, but multiple OpLoad share Sampler OpVariable");
 
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
@@ -1240,7 +1240,7 @@ TEST_F(NegativeSampler, DISABLED_UnnormalizedCoordinatesSeparateSamplerSharedSam
     m_commandBuffer->end();
 }
 
-TEST_F(NegativeSampler, DISABLED_UnnormalizedCoordinatesInBoundsAccess) {
+TEST_F(NegativeSampler, UnnormalizedCoordinatesInBoundsAccess) {
     TEST_DESCRIPTION("If a samper is unnormalizedCoordinates, but using OpInBoundsAccessChain");
 
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
@@ -1339,7 +1339,7 @@ TEST_F(NegativeSampler, DISABLED_UnnormalizedCoordinatesInBoundsAccess) {
     m_commandBuffer->end();
 }
 
-TEST_F(NegativeSampler, DISABLED_UnnormalizedCoordinatesCopyObject) {
+TEST_F(NegativeSampler, UnnormalizedCoordinatesCopyObject) {
     TEST_DESCRIPTION("If a samper is unnormalizedCoordinates, but using OpCopyObject");
 
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);

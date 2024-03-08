@@ -15,7 +15,7 @@
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
 
-TEST_F(NegativeShaderImageAccess, DISABLED_FunctionOpImage) {
+TEST_F(NegativeShaderImageAccess, FunctionOpImage) {
     TEST_DESCRIPTION("Use Component Format mismatch to test image access edge cases");
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
@@ -105,7 +105,7 @@ TEST_F(NegativeShaderImageAccess, DISABLED_FunctionOpImage) {
     m_commandBuffer->end();
 }
 
-TEST_F(NegativeShaderImageAccess, DISABLED_ComponentTypeMismatchFunctionTwoArgs) {
+TEST_F(NegativeShaderImageAccess, ComponentTypeMismatchFunctionTwoArgs) {
     TEST_DESCRIPTION("Pass a signed and unsinged sampler, and use the incorrect one.");
 
     RETURN_IF_SKIP(Init());
@@ -162,7 +162,7 @@ TEST_F(NegativeShaderImageAccess, DISABLED_ComponentTypeMismatchFunctionTwoArgs)
     m_commandBuffer->end();
 }
 
-TEST_F(NegativeShaderImageAccess, DISABLED_UnnormalizedCoordinatesFunction) {
+TEST_F(NegativeShaderImageAccess, UnnormalizedCoordinatesFunction) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
@@ -215,7 +215,7 @@ TEST_F(NegativeShaderImageAccess, DISABLED_UnnormalizedCoordinatesFunction) {
     m_commandBuffer->end();
 }
 
-TEST_F(NegativeShaderImageAccess, DISABLED_MultisampleMismatchWithPipeline) {
+TEST_F(NegativeShaderImageAccess, MultisampleMismatchWithPipeline) {
     TEST_DESCRIPTION("Shader uses Multisample, but image view isn't.");
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
@@ -264,7 +264,7 @@ TEST_F(NegativeShaderImageAccess, DISABLED_MultisampleMismatchWithPipeline) {
     m_commandBuffer->end();
 }
 
-TEST_F(NegativeShaderImageAccess, DISABLED_NonMultisampleMismatchWithPipeline) {
+TEST_F(NegativeShaderImageAccess, NonMultisampleMismatchWithPipeline) {
     TEST_DESCRIPTION("Shader uses non-Multisample, but image view is.");
     RETURN_IF_SKIP(Init());
     InitRenderTarget();

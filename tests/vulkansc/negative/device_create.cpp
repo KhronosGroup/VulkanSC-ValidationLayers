@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2023-2023 The Khronos Group Inc.
- * Copyright (c) 2023-2023 RasterGrid Kft.
+ * Copyright (c) 2023-2024 The Khronos Group Inc.
+ * Copyright (c) 2023-2024 RasterGrid Kft.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -10,35 +10,6 @@
  */
 
 #include "../framework/vksc_layer_validation_tests.h"
-
-class VkSCDeviceCreateLayerTest : public VkSCLayerTest {
-  public:
-    VkPhysicalDeviceProperties phys_dev_props;
-
-    void InitFramework() {
-        VkSCLayerTest::InitFramework();
-
-        vksc::GetPhysicalDeviceProperties(gpu(), &phys_dev_props);
-    }
-
-    void TestCreateDevice(void* pNext) {
-        float queue_priority = 1.f;
-        auto queue_info = vku::InitStruct<VkDeviceQueueCreateInfo>();
-        queue_info.queueCount = 1;
-        queue_info.pQueuePriorities = &queue_priority;
-
-        auto create_info = vku::InitStruct<VkDeviceCreateInfo>(pNext);
-        create_info.queueCreateInfoCount = 1;
-        create_info.pQueueCreateInfos = &queue_info;
-
-        VkDevice device = VK_NULL_HANDLE;
-
-        vksc::CreateDevice(gpu(), &create_info, nullptr, &device);
-        m_errorMonitor->VerifyFound();
-
-        vksc::DestroyDevice(device, nullptr);
-    }
-};
 
 TEST_F(VkSCDeviceCreateLayerTest, MissingVulkanSC10Features) {
     TEST_DESCRIPTION("vkCreateDevice with missing VkPhysicalDeviceVulkanSC10Features.");
@@ -211,7 +182,7 @@ TEST_F(VkSCDeviceCreateLayerTest, PipelineCacheCreateMissingRequiredFlags) {
     object_reservation_info.pipelineCacheCreateInfoCount = 1;
     object_reservation_info.pPipelineCacheCreateInfos = &create_info;
 
-    vksc::PipelineCacheDataBuilder builder{};
+    vksc::PipelineCacheBuilder builder{};
     auto header = builder.AddDefaultHeaderVersionSCOne();
     builder.AddPipelineEntry(header, "1265a236-e369-11ed-b5ea-0242ac120002", 4000);
 
@@ -223,22 +194,6 @@ TEST_F(VkSCDeviceCreateLayerTest, PipelineCacheCreateMissingRequiredFlags) {
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPipelineCacheCreateInfo-flags-05044");
     TestCreateDevice(&object_reservation_info);
 }
-
-class VkSCPipelineCacheDataLayerTest : public VkSCDeviceCreateLayerTest {
-  public:
-    VkPipelineCacheCreateInfo create_info{};
-
-    void TestPipelineCacheData(const std::vector<VkPipelineCacheCreateInfo> create_infos) {
-        auto sc_10_features = vku::InitStruct<VkPhysicalDeviceVulkanSC10Features>();
-        auto object_reservation_info = vku::InitStruct<VkDeviceObjectReservationCreateInfo>(&sc_10_features);
-        object_reservation_info.pipelineCacheCreateInfoCount = static_cast<uint32_t>(create_infos.size());
-        object_reservation_info.pPipelineCacheCreateInfos = create_infos.data();
-
-        TestCreateDevice(&object_reservation_info);
-    }
-
-    vksc::PipelineCacheDataBuilder builder{};
-};
 
 TEST_F(VkSCPipelineCacheDataLayerTest, HeaderTooSmall) {
     TEST_DESCRIPTION("Test when pipeline cache data smaller than expected");
@@ -367,7 +322,7 @@ TEST_F(VkSCPipelineCacheDataLayerTest, InvalidPipelineIndexEntryValues) {
     RETURN_IF_SKIP(InitFramework());
 
     auto header = builder.AddDefaultHeaderVersionSCOne();
-    std::vector<vksc::PipelineCacheDataBuilder::SCIndexEntry<>> entries = {
+    std::vector<vksc::PipelineCacheBuilder::SCIndexEntry<>> entries = {
         builder.AddPipelineEntry(header, "3ddda923-b6fc-433e-803c-822c1bccbc05", 4000),
         builder.AddPipelineEntry(header, "1265a236-e369-11ed-b5ea-0242ac120002", 6000),
         builder.AddPipelineEntry(header, "b23d0e5c-70a0-4d67-8781-99ec3798ed31", 5000)};
@@ -411,8 +366,8 @@ TEST_F(VkSCPipelineCacheDataLayerTest, JsonDataOutOfBounds) {
     builder.AddPipelineEntry(header, "1de725b8-e36d-11ed-b5ea-0242ac120002", 4000);
     auto entry = builder.AddPipelineEntry(header, "1265a236-e369-11ed-b5ea-0242ac120002", 4000);
 
-    builder.AddStageValidation(entry, builder.sample_graphics_pipeline_json, SPV_ENV_VULKAN_1_2,
-                               {builder.sample_vertex_shader_spv, builder.sample_fragment_shader_spv});
+    builder.AddStageValidation(entry, kSampleGraphicsPipelineJson, SPV_ENV_VULKAN_1_2,
+                               {kSampleVertexShaderSpv, kSampleFragmentShaderSpv});
 
     entry->jsonOffset = builder.GetData().size() - 4;
 
@@ -430,8 +385,8 @@ TEST_F(VkSCPipelineCacheDataLayerTest, InvalidStageIndexStride) {
     auto entry = builder.AddPipelineEntry(header, "1265a236-e369-11ed-b5ea-0242ac120002", 4000);
 
     using PrivData = uint64_t;
-    builder.AddStageValidation<PrivData>(entry, builder.sample_graphics_pipeline_json, SPV_ENV_VULKAN_1_2,
-                                         {builder.sample_vertex_shader_spv, builder.sample_fragment_shader_spv});
+    builder.AddStageValidation<PrivData>(entry, kSampleGraphicsPipelineJson, SPV_ENV_VULKAN_1_2,
+                                         {kSampleVertexShaderSpv, kSampleFragmentShaderSpv});
 
     // Should succeed even with a stride larger than 16
     create_info = builder.MakeCreateInfo();
@@ -452,8 +407,8 @@ TEST_F(VkSCPipelineCacheDataLayerTest, StageIndexOutOfBounds) {
     builder.AddPipelineEntry(header, "1de725b8-e36d-11ed-b5ea-0242ac120002", 4000);
     auto entry = builder.AddPipelineEntry(header, "1265a236-e369-11ed-b5ea-0242ac120002", 4000);
 
-    builder.AddStageValidation(entry, builder.sample_graphics_pipeline_json, SPV_ENV_VULKAN_1_2,
-                               {builder.sample_vertex_shader_spv, builder.sample_fragment_shader_spv});
+    builder.AddStageValidation(entry, kSampleGraphicsPipelineJson, SPV_ENV_VULKAN_1_2,
+                               {kSampleVertexShaderSpv, kSampleFragmentShaderSpv});
 
     create_info = builder.MakeCreateInfo();
     create_info.initialDataSize = static_cast<size_t>(entry->stageIndexOffset + entry->stageIndexStride + 12);
@@ -467,15 +422,14 @@ TEST_F(VkSCPipelineCacheDataLayerTest, InvalidStageIndexEntryValues) {
     RETURN_IF_SKIP(InitFramework());
 
     auto header = builder.AddDefaultHeaderVersionSCOne();
-    std::vector<vksc::PipelineCacheDataBuilder::SCIndexEntry<>> entries = {
+    std::vector<vksc::PipelineCacheBuilder::SCIndexEntry<>> entries = {
         builder.AddPipelineEntry(header, "3ddda923-b6fc-433e-803c-822c1bccbc05", 4000),
         builder.AddPipelineEntry(header, "1265a236-e369-11ed-b5ea-0242ac120002", 6000),
         builder.AddPipelineEntry(header, "b23d0e5c-70a0-4d67-8781-99ec3798ed31", 5000)};
 
-    builder.AddStageValidation(entries[1], builder.sample_graphics_pipeline_json, SPV_ENV_VULKAN_1_2,
-                               {builder.sample_vertex_shader_spv, builder.sample_fragment_shader_spv});
-    builder.AddStageValidation(entries[2], builder.sample_compute_pipeline_json, SPV_ENV_VULKAN_1_2,
-                               {builder.sample_compute_shader_spv});
+    builder.AddStageValidation(entries[1], kSampleGraphicsPipelineJson, SPV_ENV_VULKAN_1_2,
+                               {kSampleVertexShaderSpv, kSampleFragmentShaderSpv});
+    builder.AddStageValidation(entries[2], kSampleComputePipelineJson, SPV_ENV_VULKAN_1_2, {kSampleComputeShaderSpv});
 
     // codeSize cannot be zero
     auto stage_1_1 = builder.GetStageValidation(entries[1], 1);
@@ -503,8 +457,8 @@ TEST_F(VkSCPipelineCacheDataLayerTest, StageCodeDataOutOfBounds) {
     builder.AddPipelineEntry(header, "1de725b8-e36d-11ed-b5ea-0242ac120002", 4000);
     auto entry = builder.AddPipelineEntry(header, "1265a236-e369-11ed-b5ea-0242ac120002", 4000);
 
-    builder.AddStageValidation(entry, builder.sample_graphics_pipeline_json, SPV_ENV_VULKAN_1_2,
-                               {builder.sample_vertex_shader_spv, builder.sample_fragment_shader_spv});
+    builder.AddStageValidation(entry, kSampleGraphicsPipelineJson, SPV_ENV_VULKAN_1_2,
+                               {kSampleVertexShaderSpv, kSampleFragmentShaderSpv});
 
     builder.GetStageValidation(entry, 1)->codeOffset = builder.GetData().size() - 4;
 
@@ -556,10 +510,9 @@ TEST_F(VkSCPipelineCacheDataLayerTest, MultipleProblems) {
         builder.AddPipelineEntry(header, "81101016-a2e3-482c-98c4-5b8de6296538", 8000);
         auto entry3 = builder.AddPipelineEntry(header, "1b7fd11d-f4f8-406e-b58b-871918d4b2e3", 8000);
 
-        builder.AddStageValidation(entry1, builder.sample_graphics_pipeline_json, SPV_ENV_VULKAN_1_2,
-                                   {builder.sample_vertex_shader_spv, builder.sample_fragment_shader_spv});
-        builder.AddStageValidation(entry3, builder.sample_compute_pipeline_json, SPV_ENV_VULKAN_1_2,
-                                   {builder.sample_compute_shader_spv});
+        builder.AddStageValidation(entry1, kSampleGraphicsPipelineJson, SPV_ENV_VULKAN_1_2,
+                                   {kSampleVertexShaderSpv, kSampleFragmentShaderSpv});
+        builder.AddStageValidation(entry3, kSampleComputePipelineJson, SPV_ENV_VULKAN_1_2, {kSampleComputeShaderSpv});
 
         pipeline_caches.push_back(builder.GetData());
         builder.Clear();
@@ -599,5 +552,35 @@ TEST_F(VkSCPipelineCacheDataLayerTest, MultipleProblems) {
                                          "VUID-VkPipelineCacheHeaderVersionSafetyCriticalOne-pipelineIndexStride-05078");
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPipelineCacheCreateInfo-pInitialData-05139");
     TestPipelineCacheData(create_infos);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(VkSCPipelineCacheDataLayerTest, InvalidSpirvHeaderSize) {
+    TEST_DESCRIPTION("Test that an error is produced for a SPIR-V module with bad header");
+
+    RETURN_IF_SKIP(InitFramework());
+
+    std::vector<uint32_t> header_too_small = {0x07230203};
+    auto header = builder.AddDefaultHeaderVersionSCOne();
+    auto entry = builder.AddPipelineEntry(header, "1de725b8-e36d-11ed-b5ea-0242ac120001", 4000);
+    builder.AddStageValidation(entry, kSampleComputePipelineJson, {header_too_small});
+
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "Invalid SPIR-V header");
+    TestPipelineCacheData({builder.MakeCreateInfo()});
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(VkSCPipelineCacheDataLayerTest, InvalidSpirvMagic) {
+    TEST_DESCRIPTION("Test that an error is produced for a SPIR-V module with bad header");
+
+    RETURN_IF_SKIP(InitFramework());
+
+    std::vector<uint32_t> header_bad_magic = {0xBAADF00D, 99, 0};
+    auto header = builder.AddDefaultHeaderVersionSCOne();
+    auto entry = builder.AddPipelineEntry(header, "1de725b8-e36d-11ed-b5ea-0242ac120002", 4000);
+    builder.AddStageValidation(entry, kSampleComputePipelineJson, {header_bad_magic});
+
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "Invalid SPIR-V magic number");
+    TestPipelineCacheData({builder.MakeCreateInfo()});
     m_errorMonitor->VerifyFound();
 }

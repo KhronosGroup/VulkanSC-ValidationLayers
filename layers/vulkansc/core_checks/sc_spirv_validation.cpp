@@ -1,0 +1,184 @@
+/* Copyright (c) 2023-2024 The Khronos Group Inc.
+ * Copyright (c) 2023-2024 RasterGrid Kft.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Author: Daniel Rakos <daniel.rakos@rastergrid.com>
+ */
+
+#include <algorithm>
+#include <array>
+#include <assert.h>
+#include <fstream>
+#include <iostream>
+#include <list>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <set>
+#include <sstream>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/stat.h>
+#include <string.h>
+#include <string>
+#include <valarray>
+
+#include "vulkan/vk_enum_string_helper.h"
+#include "generated/chassis.h"
+#include "vulkansc/sc_vuid_enums.h"
+#include "vulkansc/core_checks/sc_core_validation.h"
+#include "vulkansc/state_tracker/sc_pipeline_state.h"
+#include "utils/vk_layer_utils.h"
+#include "generated/enum_flag_bits.h"
+
+bool SCCoreChecks::ValidatePipelineCacheSpirv(VkPhysicalDevice physical_device, const vvl::sc::PipelineCacheData& data,
+                                              uint32_t pipeline_index, uint32_t stage_index, const Location& loc) const {
+    bool skip = false;
+    spv_result_t spv_valid = SPV_SUCCESS;
+
+    auto entry = data.PipelineIndexEntry(pipeline_index);
+    assert(entry);
+    auto id = entry.PipelineID();
+    auto stage_info = entry.StageIndexEntry(stage_index);
+    assert(stage_info);
+
+    if (disabled[shader_validation]) {
+        return false;
+    }
+
+    if (stage_info->codeSize % 4 != 0) {
+        skip |= LogError(kVUID_SC_PipelineCacheData_CodeSizeNotMultipleOfFour, physical_device, loc.dot(Field::pInitialData),
+                         "contains pipeline identifier {%s} with invalid SPIR-V module data for stage "
+                         "index entry #%u that cannot be validated as its codeSize (%" PRIu64 ") is not a multiple of 4.",
+                         id.toString().c_str(), stage_index, stage_info->codeSize);
+    } else if (stage_info->codeSize == 0) {
+        skip |= LogError(kVUID_SC_PipelineCacheData_CodeSizeZero, physical_device, loc.dot(Field::pInitialData),
+                         "contains pipeline identifier {%s} with invalid SPIR-V module data for stage "
+                         "index entry #%u that cannot be validated as its codeSize is zero.",
+                         id.toString().c_str(), stage_index);
+    } else if (stage_info->codeOffset + stage_info->codeSize > data.create_info.initialDataSize) {
+        skip |= LogError(kVUID_SC_PipelineCacheData_CodeDataOutOfBounds, physical_device, loc.dot(Field::initialDataSize),
+                         "is too small (%zu bytes) to fit the SPIR-V module data for "
+                         "stage index entry #%u for pipeline identifier {%s} stored at "
+                         "codeOffset (%" PRIu64 ") with codeSize (%" PRIu64
+                         ") and thus "
+                         "it cannot be validated.",
+                         data.create_info.initialDataSize, stage_index, id.toString().c_str(), stage_info->codeOffset,
+                         stage_info->codeSize);
+    } else {
+        auto code = entry.StageSPIRV(stage_index);
+
+        uint32_t hash = 0;
+        auto cache = CastFromHandle<ValidationCache*>(core_validation_cache);
+        if (cache) {
+            hash = hash_util::ShaderHash(code.data(), code.size() * sizeof(uint32_t));
+            if (cache->Contains(hash)) {
+                return false;
+            }
+        }
+
+        // Use SPIRV-Tools validator to try and catch any issues with the module itself. If specialization constants are present,
+        // the default values will be used during validation.
+        spv_target_env spirv_environment = PickSpirvEnv(api_version, IsExtEnabled(device_extensions.vk_khr_spirv_1_4));
+        spv_context ctx = spvContextCreate(spirv_environment);
+        spv_const_binary_t binary{code.data(), code.size()};
+        spv_diagnostic diag = nullptr;
+        spvtools::ValidatorOptions options;
+        AdjustValidatorOptions(device_extensions, enabled_features, options);
+        spv_valid = spvValidateWithOptions(ctx, options, &binary, &diag);
+        if (spv_valid != SPV_SUCCESS) {
+            if (spv_valid == SPV_WARNING) {
+                skip |= LogWarning("VUID-VkShaderModuleCreateInfo-pCode-08737", physical_device, loc.dot(Field::pInitialData),
+                                   "contains pipeline identifier {%s} with SPIR-V module data for stage "
+                                   "index entry #%u that produced spirv-val warning:\n%s",
+                                   id.toString().c_str(), stage_index, diag && diag->error ? diag->error : "(no error text)");
+            } else {
+                skip |= LogError("VUID-VkShaderModuleCreateInfo-pCode-08737", physical_device, loc.dot(Field::pInitialData),
+                                 "contains pipeline identifier {%s} with SPIR-V module data for stage "
+                                 "index entry #%u that produced spirv-val error:\n%s",
+                                 id.toString().c_str(), stage_index, diag && diag->error ? diag->error : "(no error text)");
+            }
+        } else {
+            if (cache) {
+                cache->Insert(hash);
+            }
+        }
+
+        spvDiagnosticDestroy(diag);
+        spvContextDestroy(ctx);
+    }
+
+    return skip;
+}
+
+bool SCCoreChecks::ValidatePipelineStageInfo(uint32_t stage_index, const VkPipelineShaderStageCreateInfo& stage_info,
+                                             const vvl::sc::PipelineCache* pipeline_cache_state,
+                                             const VkPipelineOfflineCreateInfo* offline_info, const Location& loc) const {
+    bool skip = false;
+
+    if (!pipeline_cache_state || !offline_info) return skip;
+
+    auto pipeline_entry = pipeline_cache_state->GetPipeline(offline_info);
+    if (!pipeline_entry) return skip;
+
+    std::shared_ptr<vvl::ShaderModule> module_state = pipeline_entry->GetShaderModule(stage_index);
+    if (!module_state) return skip;
+
+    if (stage_info.pName != nullptr) {
+        auto entrypoint = module_state->spirv->FindEntrypoint(stage_info.pName, stage_info.stage);
+        if (!entrypoint) {
+            skip |= LogError("VUID-VkPipelineShaderStageCreateInfo-pName-05027", device, loc.dot(Field::pName),
+                             "(`%s`) does not match any of the entry points in the SPIR-V module data "
+                             "for stage index entry #%u (stage %s) of the pipeline with identifier {%s}.",
+                             stage_info.pName, stage_index, string_VkShaderStageFlagBits(stage_info.stage),
+                             pipeline_entry->PipelineID().toString().c_str());
+        }
+    } else {
+        skip |= LogWarning(kVUID_SC_PipelineCacheData_SpirvDepValMissingInfo, device, loc.dot(Field::pName),
+                           "is NULL thus available SPIR-V module data for stage index entry #%u (stage %s) "
+                           "of the pipeline with identifier {%s} cannot be used for SPIR-V dependent validation.",
+                           stage_index, string_VkShaderStageFlagBits(stage_info.stage),
+                           pipeline_entry->PipelineID().toString().c_str());
+    }
+
+    if (module_state->spirv->static_data_.has_specialization_constants && stage_info.pSpecializationInfo == nullptr) {
+        skip |= LogWarning(kVUID_SC_PipelineCacheData_SpirvDepValMissingInfo, device, loc.dot(Field::pSpecializationInfo),
+                           "is NULL but SPIR-V module data has specialization constants for stage index "
+                           "entry #%u (stage %s) of the pipeline with identifier {%s} and thus cannot be "
+                           "used for SPIR-V dependent validation.",
+                           stage_index, string_VkShaderStageFlagBits(stage_info.stage),
+                           pipeline_entry->PipelineID().toString().c_str());
+    }
+
+    return skip;
+}
+
+bool SCCoreChecks::ValidatePipelineShaderStage(const StageCreateInfo& stage_create_info, const PipelineStageState& stage_state,
+                                               const Location& loc) const {
+    bool skip = BASE::ValidatePipelineShaderStage(stage_create_info, stage_state, loc);
+
+    if (!stage_state.spirv_state || !stage_state.entrypoint) {
+        // From here on we only do SPIR-V validation, so without SPIR-V data we stop here
+        return skip;
+    }
+
+    const spirv::Module& module_state = *stage_state.spirv_state.get();
+
+    if (!module_state.static_data_.atomic_inst.empty() && (enabled_features.shaderAtomicInstructions == VK_FALSE)) {
+        skip |= LogError("VUID-RuntimeSpirv-OpAtomic-05091", module_state.handle(), loc,
+                         "SPIR-V is using atomic instructions, but shaderAtomicInstructions was not enabled.");
+    }
+
+    return skip;
+}

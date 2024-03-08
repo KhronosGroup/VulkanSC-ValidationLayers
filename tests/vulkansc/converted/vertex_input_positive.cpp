@@ -259,7 +259,7 @@ TEST_F(PositiveVertexInput, AttributeStructTypeSecondLocation) {
     pipe.CreateGraphicsPipeline();
 }
 
-TEST_F(PositiveVertexInput, DISABLED_AttributeStructTypeBlockLocation) {
+TEST_F(PositiveVertexInput, AttributeStructTypeBlockLocation) {
     TEST_DESCRIPTION("Input is OpTypeStruct where the Block has the Location");
 
     RETURN_IF_SKIP(Init());

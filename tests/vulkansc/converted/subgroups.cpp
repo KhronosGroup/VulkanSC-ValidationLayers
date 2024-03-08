@@ -19,7 +19,7 @@
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
 
-TEST_F(NegativeSubgroup, DISABLED_Properties) {
+TEST_F(NegativeSubgroup, Properties) {
     TEST_DESCRIPTION(
         "Test shader validation support for subgroup VkPhysicalDeviceSubgroupProperties such as supportedStages, and "
         "supportedOperations, quadOperationsInAllStages.");

@@ -5990,7 +5990,7 @@ TEST_F(NegativeImage, CubeCompatibleMustBeImageType2D) {
     CreateImageTest(*this, &ci, "VUID-VkImageCreateInfo-flags-00949");
 }
 
-TEST_F(NegativeImage, DISABLED_ComputeImageLayout) {
+TEST_F(NegativeImage, ComputeImageLayout) {
     TEST_DESCRIPTION("Attempt to use an image with an invalid layout in a compute shader");
 
     AddRequiredExtensions(VK_KHR_DEVICE_GROUP_EXTENSION_NAME);
@@ -6051,7 +6051,7 @@ TEST_F(NegativeImage, DISABLED_ComputeImageLayout) {
     }
 }
 
-TEST_F(NegativeImage, DISABLED_ComputeImageLayout11) {
+TEST_F(NegativeImage, ComputeImageLayout11) {
     TEST_DESCRIPTION("Attempt to use an image with an invalid layout in a compute shader using vkCmdDispatchBase");
 
     SetTargetApiVersion(VK_API_VERSION_1_1);

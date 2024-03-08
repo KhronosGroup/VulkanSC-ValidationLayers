@@ -235,7 +235,10 @@ TEST_F(NegativePipeline, BadPipelineObject) {
         GTEST_SKIP() << VK_KHR_DRAW_INDIRECT_COUNT_EXTENSION_NAME << " is enabled, but the drawIndirectCount is not supported.";
     }
 
-    RETURN_IF_SKIP(InitState(nullptr, &features12));
+    if (features12.drawIndirectCount) {
+        AddRequiredFeature(vkt::Feature::drawIndirectCount);
+    }
+    RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
     // Attempt to bind an invalid Pipeline to a valid Command Buffer
@@ -1588,7 +1591,7 @@ TEST_F(NegativePipeline, LineRasterization) {
     vk::CmdSetLineStippleEXT(m_commandBuffer->handle(), 1, 1);
 }
 
-TEST_F(NegativePipeline, DISABLED_NotCompatibleForSet) {
+TEST_F(NegativePipeline, NotCompatibleForSet) {
     TEST_DESCRIPTION("Check that validation path catches pipeline layout inconsistencies for bind vs. dispatch");
     RETURN_IF_SKIP(Init());
 
@@ -2064,7 +2067,7 @@ TEST_F(NegativePipeline, DISABLED_ShaderDrawParametersNotEnabled10) {
     }
 }
 
-TEST_F(NegativePipeline, DISABLED_ShaderDrawParametersNotEnabled11) {
+TEST_F(NegativePipeline, ShaderDrawParametersNotEnabled11) {
     TEST_DESCRIPTION("Validation using DrawParameters for Vulkan 1.1 without the shaderDrawParameters feature enabled.");
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
