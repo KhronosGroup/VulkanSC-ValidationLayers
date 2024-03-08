@@ -228,7 +228,7 @@ TEST_F(NegativeFragmentShadingRate, CombinerOpsLimit) {
     m_commandBuffer->end();
 }
 
-TEST_F(NegativeFragmentShadingRate, DISABLED_PrimitiveFragmentShadingRateWriteMultiViewportLimitDynamic) {
+TEST_F(NegativeFragmentShadingRate, PrimitiveFragmentShadingRateWriteMultiViewportLimitDynamic) {
     TEST_DESCRIPTION("Test dynamic validation of the primitiveFragmentShadingRateWithMultipleViewports limit");
 
     // Enable KHR_fragment_shading_rate and all of its required extensions
@@ -1476,7 +1476,7 @@ TEST_F(NegativeFragmentShadingRate, PipelineCombinerOpsLimit) {
     }
 }
 
-TEST_F(NegativeFragmentShadingRate, DISABLED_PrimitiveWriteMultiViewportLimit) {
+TEST_F(NegativeFragmentShadingRate, PrimitiveWriteMultiViewportLimit) {
     TEST_DESCRIPTION("Test static validation of the primitiveFragmentShadingRateWithMultipleViewports limit");
 
     // Enable KHR_fragment_shading_rate and all of its required extensions

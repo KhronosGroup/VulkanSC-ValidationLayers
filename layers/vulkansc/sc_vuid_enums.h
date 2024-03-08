@@ -1,5 +1,5 @@
-/* Copyright (c) 2023-2023 The Khronos Group Inc.
- * Copyright (c) 2023-2023 RasterGrid Kft.
+/* Copyright (c) 2023-2024 The Khronos Group Inc.
+ * Copyright (c) 2023-2024 RasterGrid Kft.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -57,5 +57,10 @@
     "UNASSIGNED-VkDeviceCreateInfo-pNext-VkPhysicalDeviceVulkanSC10Features";
 [[maybe_unused]] static const char *kVUID_SC_CreateDevice_MissingObjectReservationInfo =
     "UNASSIGNED-VkDeviceCreateInfo-pNext-VkDeviceObjectReservationCreateInfo";
+
+// SPIR-V related validation errors/warnings for cases
+// where the Vulkan SC spec does not have explicit VUs
+[[maybe_unused]] static const char *kVUID_SC_PipelineCacheData_SpirvDepValMissingInfo =
+    "UNASSIGNED-VkPipelineShaderStageCreateInfo-pName-SpirvDepValMissingInfo";
 
 // clang-format on

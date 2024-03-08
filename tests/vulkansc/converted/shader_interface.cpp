@@ -164,7 +164,7 @@ TEST_F(NegativeShaderInterface, MaxFragmentComponentsWithBuiltins) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-Location-06272");
 }
 
-TEST_F(NegativeShaderInterface, DISABLED_MaxVertexOutputComponents) {
+TEST_F(NegativeShaderInterface, MaxVertexOutputComponents) {
     TEST_DESCRIPTION(
         "Test that an error is produced when the number of output components from the vertex stage exceeds the device limit");
 
@@ -238,7 +238,7 @@ TEST_F(NegativeShaderInterface, DISABLED_MaxVertexOutputComponents) {
     }
 }
 
-TEST_F(NegativeShaderInterface, DISABLED_MaxComponentsBlocks) {
+TEST_F(NegativeShaderInterface, MaxComponentsBlocks) {
     TEST_DESCRIPTION("Test if the max componenets checks are done properly when in a single block");
 
     RETURN_IF_SKIP(Init());
@@ -295,7 +295,7 @@ TEST_F(NegativeShaderInterface, DISABLED_MaxComponentsBlocks) {
                                       vector<string>{"VUID-RuntimeSpirv-Location-06272", "VUID-RuntimeSpirv-Location-06272"});
 }
 
-TEST_F(NegativeShaderInterface, DISABLED_MaxFragmentInputComponents) {
+TEST_F(NegativeShaderInterface, MaxFragmentInputComponents) {
     TEST_DESCRIPTION(
         "Test that an error is produced when the number of input components from the fragment stage exceeds the device limit");
 
@@ -361,7 +361,7 @@ TEST_F(NegativeShaderInterface, DISABLED_MaxFragmentInputComponents) {
     }
 }
 
-TEST_F(NegativeShaderInterface, DISABLED_FragmentInputNotProvided) {
+TEST_F(NegativeShaderInterface, FragmentInputNotProvided) {
     TEST_DESCRIPTION(
         "Test that an error is produced for a fragment shader input which is not present in the outputs of the previous stage");
 
@@ -384,7 +384,7 @@ TEST_F(NegativeShaderInterface, DISABLED_FragmentInputNotProvided) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-OpEntryPoint-08743");
 }
 
-TEST_F(NegativeShaderInterface, DISABLED_FragmentInputNotProvidedInBlock) {
+TEST_F(NegativeShaderInterface, FragmentInputNotProvidedInBlock) {
     TEST_DESCRIPTION(
         "Test that an error is produced for a fragment shader input within an interace block, which is not present in the outputs "
         "of the previous stage.");
@@ -409,7 +409,7 @@ TEST_F(NegativeShaderInterface, DISABLED_FragmentInputNotProvidedInBlock) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-OpEntryPoint-08743");
 }
 
-TEST_F(NegativeShaderInterface, DISABLED_VsFsTypeMismatch) {
+TEST_F(NegativeShaderInterface, VsFsTypeMismatch) {
     TEST_DESCRIPTION("Test that an error is produced for mismatched types across the vertex->fragment shader interface");
 
     RETURN_IF_SKIP(Init());
@@ -441,7 +441,7 @@ TEST_F(NegativeShaderInterface, DISABLED_VsFsTypeMismatch) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-OpEntryPoint-07754");
 }
 
-TEST_F(NegativeShaderInterface, DISABLED_VsFsTypeMismatchInBlock) {
+TEST_F(NegativeShaderInterface, VsFsTypeMismatchInBlock) {
     TEST_DESCRIPTION(
         "Test that an error is produced for mismatched types across the vertex->fragment shader interface, when the variable is "
         "contained within an interface block");
@@ -475,7 +475,7 @@ TEST_F(NegativeShaderInterface, DISABLED_VsFsTypeMismatchInBlock) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-OpEntryPoint-07754");
 }
 
-TEST_F(NegativeShaderInterface, DISABLED_VsFsTypeMismatchVectorSize) {
+TEST_F(NegativeShaderInterface, VsFsTypeMismatchVectorSize) {
     TEST_DESCRIPTION("OpTypeVector has larger output than input");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddOptionalExtensions(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
@@ -507,7 +507,7 @@ TEST_F(NegativeShaderInterface, DISABLED_VsFsTypeMismatchVectorSize) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-maintenance4-06817");
 }
 
-TEST_F(NegativeShaderInterface, DISABLED_VsFsTypeMismatchBlockStruct) {
+TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockStruct) {
     TEST_DESCRIPTION("Have a struct inside a block between shaders");
 
     RETURN_IF_SKIP(Init());
@@ -562,7 +562,7 @@ TEST_F(NegativeShaderInterface, DISABLED_VsFsTypeMismatchBlockStruct) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-OpEntryPoint-07754");
 }
 
-TEST_F(NegativeShaderInterface, DISABLED_VsFsTypeMismatchBlockStruct64bit) {
+TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockStruct64bit) {
     TEST_DESCRIPTION("Have a struct inside a block between shaders");
 
     AddRequiredFeature(vkt::Feature::shaderFloat64);
@@ -616,7 +616,7 @@ TEST_F(NegativeShaderInterface, DISABLED_VsFsTypeMismatchBlockStruct64bit) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-OpEntryPoint-07754");
 }
 
-TEST_F(NegativeShaderInterface, DISABLED_VsFsTypeMismatchBlockArrayOfStruct) {
+TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockArrayOfStruct) {
     TEST_DESCRIPTION("Have an array of struct inside a block between shaders");
 
     RETURN_IF_SKIP(Init());
@@ -671,7 +671,7 @@ TEST_F(NegativeShaderInterface, DISABLED_VsFsTypeMismatchBlockArrayOfStruct) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-OpEntryPoint-07754");
 }
 
-TEST_F(NegativeShaderInterface, DISABLED_VsFsTypeMismatchBlockStructInnerArraySize) {
+TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockStructInnerArraySize) {
     TEST_DESCRIPTION("Have an struct inside a block between shaders, array size is difference");
 
     RETURN_IF_SKIP(Init());
@@ -731,7 +731,7 @@ TEST_F(NegativeShaderInterface, DISABLED_VsFsTypeMismatchBlockStructInnerArraySi
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-OpEntryPoint-08743");
 }
 
-TEST_F(NegativeShaderInterface, DISABLED_VsFsTypeMismatchBlockStructOuterArraySize) {
+TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockStructOuterArraySize) {
     TEST_DESCRIPTION("Have an struct inside a block between shaders, array size is difference");
 
     RETURN_IF_SKIP(Init());
@@ -789,7 +789,7 @@ TEST_F(NegativeShaderInterface, DISABLED_VsFsTypeMismatchBlockStructOuterArraySi
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-OpEntryPoint-08743");
 }
 
-TEST_F(NegativeShaderInterface, DISABLED_VsFsTypeMismatchBlockStructArraySizeVertex) {
+TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockStructArraySizeVertex) {
     TEST_DESCRIPTION(
         "Have an struct inside a block between shaders, array size is difference, but from the vertex shader being too large");
 
@@ -850,7 +850,7 @@ TEST_F(NegativeShaderInterface, DISABLED_VsFsTypeMismatchBlockStructArraySizeVer
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-OpEntryPoint-07754");
 }
 
-TEST_F(NegativeShaderInterface, DISABLED_VsFsTypeMismatchBlockStructOuter2DArraySize) {
+TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockStructOuter2DArraySize) {
     TEST_DESCRIPTION("Have an struct inside a block between shaders, array size is difference");
 
     RETURN_IF_SKIP(Init());
@@ -901,7 +901,7 @@ TEST_F(NegativeShaderInterface, DISABLED_VsFsTypeMismatchBlockStructOuter2DArray
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-OpEntryPoint-08743");
 }
 
-TEST_F(NegativeShaderInterface, DISABLED_VsFsTypeMismatchBlockNestedStructType64bit) {
+TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockNestedStructType64bit) {
     TEST_DESCRIPTION("Have nested struct inside a block between shaders");
 
     AddRequiredFeature(vkt::Feature::shaderFloat64);
@@ -966,7 +966,7 @@ TEST_F(NegativeShaderInterface, DISABLED_VsFsTypeMismatchBlockNestedStructType64
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-OpEntryPoint-07754");
 }
 
-TEST_F(NegativeShaderInterface, DISABLED_VsFsTypeMismatchBlockNestedStructArray) {
+TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockNestedStructArray) {
     TEST_DESCRIPTION("Have nested struct inside a block between shaders");
 
     RETURN_IF_SKIP(Init());
@@ -1028,7 +1028,7 @@ TEST_F(NegativeShaderInterface, DISABLED_VsFsTypeMismatchBlockNestedStructArray)
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-OpEntryPoint-08743");
 }
 
-TEST_F(NegativeShaderInterface, DISABLED_VsFsMismatchByLocation) {
+TEST_F(NegativeShaderInterface, VsFsMismatchByLocation) {
     TEST_DESCRIPTION(
         "Test that an error is produced for location mismatches across the vertex->fragment shader interface; This should manifest "
         "as a not-written/not-consumed pair, but flushes out broken walking of the interfaces");
@@ -1062,7 +1062,7 @@ TEST_F(NegativeShaderInterface, DISABLED_VsFsMismatchByLocation) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-OpEntryPoint-08743");
 }
 
-TEST_F(NegativeShaderInterface, DISABLED_VsFsMismatchByComponent) {
+TEST_F(NegativeShaderInterface, VsFsMismatchByComponent) {
     TEST_DESCRIPTION(
         "Test that an error is produced for component mismatches across the vertex->fragment shader interface. It's not enough to "
         "have the same set of locations in use; matching is defined in terms of spirv variables.");
@@ -1096,7 +1096,7 @@ TEST_F(NegativeShaderInterface, DISABLED_VsFsMismatchByComponent) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-OpEntryPoint-08743");
 }
 
-TEST_F(NegativeShaderInterface, DISABLED_InputOutputMismatch) {
+TEST_F(NegativeShaderInterface, InputOutputMismatch) {
     TEST_DESCRIPTION("Test mismatch between vertex shader output and fragment shader input.");
 
     RETURN_IF_SKIP(Init());
@@ -1130,7 +1130,7 @@ TEST_F(NegativeShaderInterface, DISABLED_InputOutputMismatch) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeShaderInterface, DISABLED_VertexOutputNotConsumed) {
+TEST_F(NegativeShaderInterface, VertexOutputNotConsumed) {
     TEST_DESCRIPTION("Test that a warning is produced for a vertex output that is not consumed by the fragment stage");
 
     SetTargetApiVersion(VK_API_VERSION_1_0);
@@ -1323,7 +1323,7 @@ TEST_F(NegativeShaderInterface, DISABLED_InputAndOutputComponents) {
     }
 }
 
-TEST_F(NegativeShaderInterface, DISABLED_AlphaToCoverageOutputLocation0) {
+TEST_F(NegativeShaderInterface, AlphaToCoverageOutputLocation0) {
     TEST_DESCRIPTION("Test that an error is produced when alpha to coverage is enabled but no output at location 0 is declared.");
 
     RETURN_IF_SKIP(Init());
@@ -1342,7 +1342,7 @@ TEST_F(NegativeShaderInterface, DISABLED_AlphaToCoverageOutputLocation0) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-alphaToCoverageEnable-08891");
 }
 
-TEST_F(NegativeShaderInterface, DISABLED_AlphaToCoverageOutputNoAlpha) {
+TEST_F(NegativeShaderInterface, AlphaToCoverageOutputNoAlpha) {
     TEST_DESCRIPTION(
         "Test that an error is produced when alpha to coverage is enabled but output at location 0 doesn't have alpha component.");
 
@@ -1369,7 +1369,7 @@ TEST_F(NegativeShaderInterface, DISABLED_AlphaToCoverageOutputNoAlpha) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-alphaToCoverageEnable-08891");
 }
 
-TEST_F(NegativeShaderInterface, DISABLED_AlphaToCoverageArrayIndex) {
+TEST_F(NegativeShaderInterface, AlphaToCoverageArrayIndex) {
     TEST_DESCRIPTION("Have array out outputs, but start at index 1");
 
     RETURN_IF_SKIP(Init());
@@ -1395,7 +1395,7 @@ TEST_F(NegativeShaderInterface, DISABLED_AlphaToCoverageArrayIndex) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-alphaToCoverageEnable-08891");
 }
 
-TEST_F(NegativeShaderInterface, DISABLED_AlphaToCoverageArrayVec3) {
+TEST_F(NegativeShaderInterface, AlphaToCoverageArrayVec3) {
     TEST_DESCRIPTION("Have array out outputs, but not contain the alpha component");
 
     RETURN_IF_SKIP(Init());
@@ -1421,7 +1421,7 @@ TEST_F(NegativeShaderInterface, DISABLED_AlphaToCoverageArrayVec3) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-alphaToCoverageEnable-08891");
 }
 
-TEST_F(NegativeShaderInterface, DISABLED_MultidimensionalArray) {
+TEST_F(NegativeShaderInterface, MultidimensionalArray) {
     TEST_DESCRIPTION("Make sure multidimensional arrays are handled");
 
     RETURN_IF_SKIP(Init());
@@ -1452,7 +1452,7 @@ TEST_F(NegativeShaderInterface, DISABLED_MultidimensionalArray) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-OpEntryPoint-08743");
 }
 
-TEST_F(NegativeShaderInterface, DISABLED_MultidimensionalArrayDim) {
+TEST_F(NegativeShaderInterface, MultidimensionalArrayDim) {
     TEST_DESCRIPTION("Make sure multidimensional arrays are handled");
 
     RETURN_IF_SKIP(Init());
@@ -1483,7 +1483,7 @@ TEST_F(NegativeShaderInterface, DISABLED_MultidimensionalArrayDim) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-OpEntryPoint-08743");
 }
 
-TEST_F(NegativeShaderInterface, DISABLED_MultidimensionalArray64bit) {
+TEST_F(NegativeShaderInterface, MultidimensionalArray64bit) {
     TEST_DESCRIPTION("Make sure multidimensional arrays are handled for 64bits");
 
     AddRequiredFeature(vkt::Feature::shaderFloat64);
@@ -1515,7 +1515,7 @@ TEST_F(NegativeShaderInterface, DISABLED_MultidimensionalArray64bit) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-OpEntryPoint-08743");
 }
 
-TEST_F(NegativeShaderInterface, DISABLED_PackingInsideArray) {
+TEST_F(NegativeShaderInterface, PackingInsideArray) {
     TEST_DESCRIPTION("From https://gitlab.khronos.org/vulkan/vulkan/-/issues/3558");
 
     RETURN_IF_SKIP(Init());
@@ -1544,7 +1544,7 @@ TEST_F(NegativeShaderInterface, DISABLED_PackingInsideArray) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-OpEntryPoint-08743");
 }
 
-TEST_F(NegativeShaderInterface, DISABLED_CreatePipelineFragmentOutputNotWritten) {
+TEST_F(NegativeShaderInterface, CreatePipelineFragmentOutputNotWritten) {
     TEST_DESCRIPTION(
         "Test that an error is produced for a fragment shader which does not provide an output for one of the pipeline's color "
         "attachments");
@@ -1561,7 +1561,7 @@ TEST_F(NegativeShaderInterface, DISABLED_CreatePipelineFragmentOutputNotWritten)
     CreatePipelineHelper::OneshotTest(*this, set_info, kWarningBit, "Undefined-Value-ShaderInputNotProduced");
 }
 
-TEST_F(NegativeShaderInterface, DISABLED_CreatePipelineFragmentOutputTypeMismatch) {
+TEST_F(NegativeShaderInterface, CreatePipelineFragmentOutputTypeMismatch) {
     TEST_DESCRIPTION(
         "Test that an error is produced for a mismatch between the fundamental type of an fragment shader output variable, and the "
         "format of the corresponding attachment");
@@ -1585,7 +1585,7 @@ TEST_F(NegativeShaderInterface, DISABLED_CreatePipelineFragmentOutputTypeMismatc
     CreatePipelineHelper::OneshotTest(*this, set_info, kWarningBit, "Undefined-Value-ShaderFragmentOutputMismatch");
 }
 
-TEST_F(NegativeShaderInterface, DISABLED_CreatePipelineFragmentOutputNotConsumed) {
+TEST_F(NegativeShaderInterface, CreatePipelineFragmentOutputNotConsumed) {
     TEST_DESCRIPTION(
         "Test that a warning is produced for a fragment shader which provides a spurious output with no matching attachment");
 
@@ -1609,7 +1609,7 @@ TEST_F(NegativeShaderInterface, DISABLED_CreatePipelineFragmentOutputNotConsumed
     CreatePipelineHelper::OneshotTest(*this, set_info, kWarningBit, "Undefined-Value-ShaderOutputNotConsumed");
 }
 
-TEST_F(NegativeShaderInterface, DISABLED_InvalidStaticSpirv) {
+TEST_F(NegativeShaderInterface, InvalidStaticSpirv) {
     TEST_DESCRIPTION(
         "Test that a warning is produced for a fragment shader which provides a spurious output with no matching attachment");
 
@@ -1646,19 +1646,13 @@ TEST_F(NegativeShaderInterface, DISABLED_InvalidStaticSpirv) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeShaderInterface, DISABLED_PhysicalStorageBufferGlslang3) {
+TEST_F(NegativeShaderInterface, PhysicalStorageBufferGlslang3) {
     TEST_DESCRIPTION("Taken from glslang spv.bufferhandle3.frag test");
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
 
-    VkPhysicalDeviceVulkan12Features features12 = vku::InitStructHelper();
-    GetPhysicalDeviceFeatures2(features12);
-    if (VK_TRUE != features12.bufferDeviceAddress) {
-        GTEST_SKIP() << "bufferDeviceAddress not supported and is required";
-    }
-
-    RETURN_IF_SKIP(InitState(nullptr, &features12));
+    RETURN_IF_SKIP(Init());
 
     char const *fsSource = R"glsl(
         #version 450
@@ -1688,20 +1682,13 @@ TEST_F(NegativeShaderInterface, DISABLED_PhysicalStorageBufferGlslang3) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeShaderInterface, DISABLED_PhysicalStorageBuffer) {
+TEST_F(NegativeShaderInterface, PhysicalStorageBuffer) {
     TEST_DESCRIPTION("Regression shaders from https://github.com/KhronosGroup/Vulkan-ValidationLayers/pull/5349");
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
 
-    VkPhysicalDeviceVulkan12Features features12 = vku::InitStructHelper();
-    GetPhysicalDeviceFeatures2(features12);
-    if (VK_TRUE != features12.bufferDeviceAddress) {
-        GTEST_SKIP() << "bufferDeviceAddress not supported and is required";
-    }
-
-    RETURN_IF_SKIP(InitState(nullptr, &features12));
-
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     char const *vsSource = R"glsl(

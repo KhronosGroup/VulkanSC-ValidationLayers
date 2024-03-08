@@ -19,7 +19,7 @@
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
 
-TEST_F(NegativeDescriptorIndexing, DISABLED_UpdateAfterBind) {
+TEST_F(NegativeDescriptorIndexing, UpdateAfterBind) {
     TEST_DESCRIPTION("Exercise errors for updating a descriptor set after it is bound.");
 
     AddRequiredExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);

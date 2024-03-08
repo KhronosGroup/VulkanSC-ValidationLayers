@@ -1,5 +1,5 @@
-/* Copyright (c) 2023-2023 The Khronos Group Inc.
- * Copyright (c) 2023-2023 RasterGrid Kft.
+/* Copyright (c) 2023-2024 The Khronos Group Inc.
+ * Copyright (c) 2023-2024 RasterGrid Kft.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@
 #include "utils/hash_util.h"
 #include "state_tracker/pipeline_state.h"
 #include "generated/layer_chassis_dispatch.h"
+#include <memory>
 #include <vector>
 #include <unordered_map>
 
@@ -31,7 +32,7 @@ class PipelineCacheData {
       public:
         class ID {
           public:
-            ID(const uint8_t* id) : id_(id) {}
+            ID(const uint8_t id[VK_UUID_SIZE]) : id_() { std::memcpy(&id_[0], id, VK_UUID_SIZE); }
 
             std::string toString() const {
                 char str[37];
@@ -54,123 +55,170 @@ class PipelineCacheData {
             };
 
           private:
-            const uint8_t* id_;
+            uint8_t id_[VK_UUID_SIZE];
         };
 
-        Entry(const std::vector<uint8_t>& pipeline_cache_data, const VkPipelineCacheSafetyCriticalIndexEntry* entry)
-            : pipeline_cache_data_(pipeline_cache_data), entry_(entry) {}
+        Entry(const uint8_t* data, const size_t data_size, const std::optional<VkPipelineCacheSafetyCriticalIndexEntry> entry)
+            : data_(data), data_size_(data_size), entry_(entry) {}
 
         ID PipelineID() const { return ID(entry_->pipelineIdentifier); }
 
-        operator bool() const { return entry_ != nullptr; }
+        operator bool() const { return entry_.has_value(); }
 
-        const VkPipelineCacheSafetyCriticalIndexEntry* operator->() const { return entry_; }
+        const VkPipelineCacheSafetyCriticalIndexEntry* operator->() const { return &entry_.value(); }
 
-        uint64_t JSONDataSize() const { return (entry_ != nullptr) ? entry_->jsonSize : 0; }
+        uint64_t JSONDataSize() const { return entry_.has_value() ? entry_->jsonSize : 0; }
 
-        const char* JSONData() const { return (entry_ != nullptr) ? DataAt<char>(entry_->jsonOffset) : nullptr; }
+        const char* JSONData() const {
+            return entry_.has_value() ? reinterpret_cast<const char*>(data_ + entry_->jsonOffset) : nullptr;
+        }
 
-        bool HasSPIRVDebugInfo() const { return (entry_ != nullptr) ? entry_->stageIndexCount != 0 : false; }
+        bool HasSPIRVDebugInfo() const { return entry_.has_value() ? entry_->stageIndexCount != 0 : false; }
 
-        uint32_t StageIndexCount() const { return (entry_ != nullptr) ? entry_->stageIndexCount : 0; }
+        uint32_t StageIndexCount() const { return entry_.has_value() ? entry_->stageIndexCount : 0; }
 
-        const VkPipelineCacheStageValidationIndexEntry* StageIndexEntry(uint32_t index) const {
+        const std::optional<VkPipelineCacheStageValidationIndexEntry> StageIndexEntry(uint32_t index) const {
             if (index < StageIndexCount()) {
                 uint64_t offset = entry_->stageIndexOffset + index * entry_->stageIndexStride;
-                return DataAt<VkPipelineCacheStageValidationIndexEntry>(offset);
+                return CopyDataFrom<VkPipelineCacheStageValidationIndexEntry>(offset);
             } else {
-                return nullptr;
+                return std::optional<VkPipelineCacheStageValidationIndexEntry>();
             }
         }
 
-        vvl::span<const uint32_t> StageSPIRV(uint32_t index) const {
+        std::vector<uint32_t> StageSPIRV(uint32_t index) const {
             auto stage_info = StageIndexEntry(index);
-            if (stage_info != nullptr) {
-                return vvl::span<const uint32_t>(DataAt<uint32_t>(stage_info->codeOffset),
-                                                 static_cast<size_t>(stage_info->codeSize / sizeof(uint32_t)));
+            if (stage_info.has_value()) {
+                std::vector<uint32_t> spirv(static_cast<std::size_t>(stage_info->codeSize / sizeof(uint32_t)));
+                std::memcpy(spirv.data(), data_ + stage_info->codeOffset, static_cast<std::size_t>(stage_info->codeSize));
+                return spirv;
             } else {
-                return vvl::span<const uint32_t>();
+                return std::vector<uint32_t>();
             }
         }
 
       private:
-        const std::vector<uint8_t>& pipeline_cache_data_;
-        const VkPipelineCacheSafetyCriticalIndexEntry* entry_;
+        const uint8_t* data_;
+        const size_t data_size_;
+        const std::optional<VkPipelineCacheSafetyCriticalIndexEntry> entry_;
 
         template <typename T>
-        const T* DataAt(uint64_t offset) const {
-            if (offset + sizeof(T) <= pipeline_cache_data_.size()) {
-                return reinterpret_cast<const T*>(pipeline_cache_data_.data() + offset);
+        std::optional<T> CopyDataFrom(uint64_t offset) const {
+            if (offset + sizeof(T) <= data_size_) {
+                T data;
+                std::memcpy(&data, data_ + offset, sizeof(T));
+                return std::optional<T>(std::move(data));
             } else {
-                return nullptr;
+                return std::optional<T>();
             }
         }
     };
 
-    using EntryMap = vvl::unordered_map<Entry::ID, Entry, Entry::ID::hash>;
-
+  public:
     const VkPipelineCacheCreateInfo create_info;
-    const std::vector<uint8_t> raw_data;
-    const EntryMap entries;
+    const std::optional<VkPipelineCacheHeaderVersionSafetyCriticalOne> header;
+    const std::vector<uint8_t> original_data;
 
-    PipelineCacheData(const VkPipelineCacheCreateInfo& in_create_info)
-        : create_info(in_create_info), raw_data(GetRawData()), entries(ParseEntries()) {
-        ParseEntries();
+    PipelineCacheData(const VkPipelineCacheCreateInfo& in_create_info, bool copy_original_data = false)
+        : create_info(in_create_info),
+          header(CopyDataFrom<VkPipelineCacheHeaderVersionSafetyCriticalOne>(0)),
+          original_data(copy_original_data ? CopyOriginalData() : std::vector<uint8_t>{}) {}
+
+    const std::optional<VkPipelineCacheHeaderVersionOne> GetBaseHeader() const {
+        return CopyDataFrom<VkPipelineCacheHeaderVersionOne>(0);
     }
 
-    const VkPipelineCacheHeaderVersionOne* HeaderBase() const { return DataAt<VkPipelineCacheHeaderVersionOne>(0); }
-
-    const VkPipelineCacheHeaderVersionSafetyCriticalOne* Header() const {
-        return DataAt<VkPipelineCacheHeaderVersionSafetyCriticalOne>(0);
-    }
-
-    uint32_t PipelineIndexCount() const { return (Header() != nullptr) ? Header()->pipelineIndexCount : 0; }
+    uint32_t PipelineIndexCount() const { return header.has_value() ? header->pipelineIndexCount : 0; }
 
     Entry PipelineIndexEntry(uint32_t index) const {
         if (index < PipelineIndexCount()) {
-            uint64_t offset = Header()->pipelineIndexOffset + index * Header()->pipelineIndexStride;
-            return Entry(raw_data, DataAt<VkPipelineCacheSafetyCriticalIndexEntry>(offset));
+            uint64_t offset = header->pipelineIndexOffset + index * header->pipelineIndexStride;
+            return Entry(Data(), DataSize(), CopyDataFrom<VkPipelineCacheSafetyCriticalIndexEntry>(offset));
         } else {
-            return Entry(raw_data, nullptr);
+            return Entry(Data(), DataSize(), std::optional<VkPipelineCacheSafetyCriticalIndexEntry>());
         }
     }
 
   private:
+    const uint8_t* Data() const { return reinterpret_cast<const uint8_t*>(create_info.pInitialData); }
+    size_t DataSize() const { return create_info.initialDataSize; }
+
     template <typename T>
-    const T* DataAt(uint64_t offset) const {
-        if (offset + sizeof(T) <= raw_data.size()) {
-            return reinterpret_cast<const T*>(raw_data.data() + offset);
+    std::optional<T> CopyDataFrom(uint64_t offset) const {
+        if (offset + sizeof(T) <= DataSize()) {
+            T data;
+            std::memcpy(&data, Data() + offset, sizeof(T));
+            return std::optional<T>(std::move(data));
         } else {
-            return nullptr;
+            return std::optional<T>();
         }
     }
 
-    std::vector<uint8_t> GetRawData() const {
-        std::vector<uint8_t> raw_data{};
-        auto* data_ptr = reinterpret_cast<const uint8_t*>(create_info.pInitialData);
-        size_t data_size = create_info.initialDataSize;
-        raw_data.assign(data_ptr, data_ptr + data_size);
-        return raw_data;
-    }
-
-    EntryMap ParseEntries() const {
-        EntryMap entries;
-        for (uint32_t i = 0; i < PipelineIndexCount(); ++i) {
-            auto entry = PipelineIndexEntry(i);
-            if (entry) {
-                entries.emplace(std::make_pair(entry.PipelineID(), entry));
-            }
-        }
-        return entries;
+    const std::vector<uint8_t> CopyOriginalData() const {
+        std::vector<uint8_t> data{};
+        data.assign(Data(), Data() + DataSize());
+        return data;
     }
 };
 
 class PipelineCache : public vvl::PipelineCache {
   public:
-    const PipelineCacheData* contents;
+    class Entry {
+      public:
+        using ID = PipelineCacheData::Entry::ID;
+        using StageModules = std::vector<std::shared_ptr<vvl::ShaderModule>>;
 
-    PipelineCache(VkPipelineCache pipeline_cache, const VkPipelineCacheCreateInfo* pCreateInfo, const PipelineCacheData* cache_data)
-        : vvl::PipelineCache(pipeline_cache, pCreateInfo), contents(cache_data) {}
+        Entry(const ValidationStateTracker* dev_data, const PipelineCacheData::Entry& cache_entry)
+            : id_(cache_entry.PipelineID()), shader_modules_(InitShaderModules(dev_data, cache_entry)) {}
+
+        ID PipelineID() const { return id_; }
+
+        std::shared_ptr<vvl::ShaderModule> GetShaderModule(size_t stage_index) const {
+            if (stage_index < shader_modules_.size()) {
+                return shader_modules_[stage_index];
+            } else {
+                return nullptr;
+            }
+        }
+
+      private:
+        StageModules InitShaderModules(const ValidationStateTracker* dev_data, const PipelineCacheData::Entry& cache_entry);
+
+        ID id_;
+        const StageModules shader_modules_;
+    };
+
+    PipelineCache(const ValidationStateTracker* dev_data, VkPipelineCache pipeline_cache,
+                  const VkPipelineCacheCreateInfo* pCreateInfo);
+
+    const Entry* GetPipeline(const VkPipelineOfflineCreateInfo* offline_info) const {
+        if (offline_info) {
+            auto it = pipelines_.find(Entry::ID(offline_info->pipelineIdentifier));
+            if (it != pipelines_.end()) {
+                return &it->second;
+            }
+        }
+        return nullptr;
+    }
+
+    std::shared_ptr<const vvl::ShaderModule> GetStageModule(const vvl::Pipeline& pipe_state, size_t stage_index) const override {
+        // If the application did not specify the SPIR-V module entry point,
+        // then we cannot use the SPIR-V module for validation
+        if (pipe_state.shader_stages_ci[stage_index].pName == nullptr) {
+            return nullptr;
+        }
+
+        auto offline_info = vku::FindStructInPNextChain<VkPipelineOfflineCreateInfo>(pipe_state.PNext());
+        auto pipeline_entry = GetPipeline(offline_info);
+        if (pipeline_entry) {
+            return pipeline_entry->GetShaderModule(stage_index);
+        } else {
+            return nullptr;
+        }
+    }
+
+  private:
+    vvl::unordered_map<Entry::ID, Entry, Entry::ID::hash> pipelines_;
 };
 
 class Pipeline : public vvl::Pipeline {

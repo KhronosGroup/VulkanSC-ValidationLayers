@@ -290,7 +290,7 @@ TEST_F(NegativeObjectLifetime, DISABLED_Sync2CmdBarrierImageDestroyed) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeObjectLifetime, DISABLED_CmdBufferBufferViewDestroyed) {
+TEST_F(NegativeObjectLifetime, CmdBufferBufferViewDestroyed) {
     TEST_DESCRIPTION("Delete bufferView bound to cmd buffer, then attempt to submit cmd buffer.");
 
     RETURN_IF_SKIP(Init());
@@ -854,7 +854,7 @@ TEST_F(NegativeObjectLifetime, PipelineInUseDestroyedSignaled) {
     vk::DestroyPipeline(m_device->handle(), delete_this_pipeline, nullptr);
 }
 
-TEST_F(NegativeObjectLifetime, DISABLED_ImageViewInUseDestroyedSignaled) {
+TEST_F(NegativeObjectLifetime, ImageViewInUseDestroyedSignaled) {
     TEST_DESCRIPTION("Delete in-use imageView.");
 
     RETURN_IF_SKIP(Init());
@@ -912,7 +912,7 @@ TEST_F(NegativeObjectLifetime, DISABLED_ImageViewInUseDestroyedSignaled) {
     vk::DestroySampler(m_device->device(), sampler, nullptr);
 }
 
-TEST_F(NegativeObjectLifetime, DISABLED_BufferViewInUseDestroyedSignaled) {
+TEST_F(NegativeObjectLifetime, BufferViewInUseDestroyedSignaled) {
     TEST_DESCRIPTION("Delete in-use bufferView.");
 
     RETURN_IF_SKIP(Init());
@@ -983,7 +983,7 @@ TEST_F(NegativeObjectLifetime, DISABLED_BufferViewInUseDestroyedSignaled) {
     vk::DestroyBufferView(m_device->device(), view, NULL);
 }
 
-TEST_F(NegativeObjectLifetime, DISABLED_SamplerInUseDestroyedSignaled) {
+TEST_F(NegativeObjectLifetime, SamplerInUseDestroyedSignaled) {
     TEST_DESCRIPTION("Delete in-use sampler.");
 
     RETURN_IF_SKIP(Init());

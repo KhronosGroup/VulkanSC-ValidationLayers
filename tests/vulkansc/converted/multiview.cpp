@@ -129,7 +129,7 @@ TEST_F(NegativeMultiview, ClearColorAttachments) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeMultiview, DISABLED_UnboundResourcesAfterBeginRenderPassAndNextSubpass) {
+TEST_F(NegativeMultiview, UnboundResourcesAfterBeginRenderPassAndNextSubpass) {
     TEST_DESCRIPTION(
         "Validate all required resources are bound if multiview is enabled after vkCmdBeginRenderPass and vkCmdNextSubpass");
 

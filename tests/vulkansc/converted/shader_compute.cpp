@@ -18,7 +18,7 @@
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
 
-TEST_F(NegativeShaderCompute, DISABLED_SharedMemoryOverLimit) {
+TEST_F(NegativeShaderCompute, SharedMemoryOverLimit) {
     TEST_DESCRIPTION("Validate compute shader shared memory does not exceed maxComputeSharedMemorySize");
 
     RETURN_IF_SKIP(Init());
@@ -45,7 +45,7 @@ TEST_F(NegativeShaderCompute, DISABLED_SharedMemoryOverLimit) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeShaderCompute, DISABLED_SharedMemoryBooleanOverLimit) {
+TEST_F(NegativeShaderCompute, SharedMemoryBooleanOverLimit) {
     TEST_DESCRIPTION("Validate compute shader shared memory does not exceed maxComputeSharedMemorySize with booleans");
 
     RETURN_IF_SKIP(Init());
@@ -124,7 +124,7 @@ TEST_F(NegativeShaderCompute, SharedMemoryOverLimitWorkgroupMemoryExplicitLayout
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeShaderCompute, DISABLED_SharedMemorySpecConstantDefault) {
+TEST_F(NegativeShaderCompute, SharedMemorySpecConstantDefault) {
     TEST_DESCRIPTION("Validate shared memory exceed maxComputeSharedMemorySize limit with spec constants default");
 
     RETURN_IF_SKIP(Init());
@@ -151,7 +151,7 @@ TEST_F(NegativeShaderCompute, DISABLED_SharedMemorySpecConstantDefault) {
     CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-Workgroup-06530");
 }
 
-TEST_F(NegativeShaderCompute, DISABLED_SharedMemorySpecConstantSet) {
+TEST_F(NegativeShaderCompute, SharedMemorySpecConstantSet) {
     TEST_DESCRIPTION("Validate shared memory exceed maxComputeSharedMemorySize limit with spec constants set");
 
     RETURN_IF_SKIP(Init());
@@ -192,7 +192,7 @@ TEST_F(NegativeShaderCompute, DISABLED_SharedMemorySpecConstantSet) {
     CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-Workgroup-06530");
 }
 
-TEST_F(NegativeShaderCompute, DISABLED_WorkGroupSizeSpecConstant) {
+TEST_F(NegativeShaderCompute, WorkGroupSizeSpecConstant) {
     TEST_DESCRIPTION("Validate compute shader shared memory does not exceed maxComputeWorkGroupSize");
 
     RETURN_IF_SKIP(Init());
@@ -243,7 +243,7 @@ TEST_F(NegativeShaderCompute, DISABLED_WorkGroupSizeSpecConstant) {
     }
 }
 
-TEST_F(NegativeShaderCompute, DISABLED_WorkGroupSizeConstantDefault) {
+TEST_F(NegativeShaderCompute, WorkGroupSizeConstantDefault) {
     TEST_DESCRIPTION("Make sure constant are applied for maxComputeWorkGroupSize using WorkgroupSize");
 
     RETURN_IF_SKIP(Init());
@@ -282,7 +282,7 @@ TEST_F(NegativeShaderCompute, DISABLED_WorkGroupSizeConstantDefault) {
     CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-x-06429");
 }
 
-TEST_F(NegativeShaderCompute, DISABLED_WorkGroupSizeSpecConstantDefault) {
+TEST_F(NegativeShaderCompute, WorkGroupSizeSpecConstantDefault) {
     TEST_DESCRIPTION("Make sure spec constant are applied for maxComputeWorkGroupSize using WorkgroupSize");
 
     RETURN_IF_SKIP(Init());
@@ -466,7 +466,7 @@ TEST_F(NegativeShaderCompute, WorkGroupSizeLocalSizeIdSpecConstantSet) {
     CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-x-06429");
 }
 
-TEST_F(NegativeShaderCompute, DISABLED_WorkgroupMemoryExplicitLayout) {
+TEST_F(NegativeShaderCompute, WorkgroupMemoryExplicitLayout) {
     TEST_DESCRIPTION("Test VK_KHR_workgroup_memory_explicit_layout");
     SetTargetApiVersion(VK_API_VERSION_1_2);
 
@@ -640,7 +640,7 @@ TEST_F(NegativeShaderCompute, DISABLED_WorkgroupMemoryExplicitLayout) {
     }
 }
 
-TEST_F(NegativeShaderCompute, DISABLED_ZeroInitializeWorkgroupMemory) {
+TEST_F(NegativeShaderCompute, ZeroInitializeWorkgroupMemory) {
     TEST_DESCRIPTION("Test initializing workgroup memory in compute shader");
 
     AddRequiredExtensions(VK_KHR_ZERO_INITIALIZE_WORKGROUP_MEMORY_EXTENSION_NAME);
@@ -714,7 +714,7 @@ TEST_F(NegativeShaderCompute, LocalSizeIdExecutionMode) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeShaderCompute, DISABLED_CmdDispatchExceedLimits) {
+TEST_F(NegativeShaderCompute, CmdDispatchExceedLimits) {
     TEST_DESCRIPTION("Compute dispatch with dimensions that exceed device limits");
 
     AddRequiredExtensions(VK_KHR_DEVICE_GROUP_CREATION_EXTENSION_NAME);

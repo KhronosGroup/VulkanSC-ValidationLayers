@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2023-2023 The Khronos Group Inc.
- * Copyright (c) 2023-2023 RasterGrid Kft.
+ * Copyright (c) 2023-2024 The Khronos Group Inc.
+ * Copyright (c) 2023-2024 RasterGrid Kft.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -103,7 +103,7 @@ TEST_F(VkSCWSITest, CreateSwapchainSplitInstanceBindRegionsNotAllowed) {
 
     SetupForWSI();
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     if (!WSISurface() || !DeviceExtensionSupported(VK_KHR_SWAPCHAIN_EXTENSION_NAME)) {
         GTEST_SKIP() << "Test requires WSI support";
@@ -123,7 +123,7 @@ TEST_F(VkSCWSITest, CreateSwapchainOldSwapchainNotNull) {
 
     SetupForWSI();
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     if (!WSISurface() || !DeviceExtensionSupported(VK_KHR_SWAPCHAIN_EXTENSION_NAME)) {
         GTEST_SKIP() << "Test requires WSI support";

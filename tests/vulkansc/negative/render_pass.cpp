@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2023-2023 The Khronos Group Inc.
- * Copyright (c) 2023-2023 RasterGrid Kft.
+ * Copyright (c) 2023-2024 The Khronos Group Inc.
+ * Copyright (c) 2023-2024 RasterGrid Kft.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -187,7 +187,7 @@ TEST_F(VkSCLayerTest, CreateRenderPassMaxFramebufferAttachmentsExceeded) {
 TEST_F(VkSCLayerTest, CreateRenderPassMaxSubpassInputAttachmentsExceeded) {
     TEST_DESCRIPTION("vkCreateRenderPass - inputAttachmentCount exceeds maxSubpassInputAttachments");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     const auto subpass_count = std::min(GetVulkanSC10Properties(gpu()).maxRenderPassSubpasses, 2u);
     const auto input_attachment_count = GetVulkanSC10Properties(gpu()).maxSubpassInputAttachments + 1;
@@ -269,7 +269,7 @@ TEST_F(VkSCLayerTest, CreateRenderPassMaxSubpassInputAttachmentsExceeded) {
 TEST_F(VkSCLayerTest, CreateRenderPassMaxSubpassPreserveAttachmentsExceeded) {
     TEST_DESCRIPTION("vkCreateRenderPass - preserveAttachmentCount exceeds maxSubpassPreserveAttachments");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     const auto subpass_count = std::min(GetVulkanSC10Properties(gpu()).maxRenderPassSubpasses, 2u);
     const auto preserve_attachment_count = GetVulkanSC10Properties(gpu()).maxSubpassPreserveAttachments + 1;

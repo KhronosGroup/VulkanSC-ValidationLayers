@@ -147,12 +147,15 @@ class VkSCTestEnvironment : public ::testing::Environment {
 void VkSCTestEnvironment::SetUp() {
     CheckEnvironmentVariables();
 
+    // Initialize GLSL to SPV compiler utility
+    glslang::InitializeProcess();
+
     vk::InitCore("vulkansc");
 
     vksc::TestDispatchHelper::PatchDispatchTable();
 }
 
-void VkSCTestEnvironment::TearDown() {}
+void VkSCTestEnvironment::TearDown() { glslang::FinalizeProcess(); }
 
 int main(int argc, char **argv) {
     int result;

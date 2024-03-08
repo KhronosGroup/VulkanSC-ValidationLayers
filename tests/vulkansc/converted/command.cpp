@@ -1013,7 +1013,7 @@ TEST_F(NegativeCommand, SimultaneousUseOneShot) {
     m_default_queue->wait();
 }
 
-TEST_F(NegativeCommand, DISABLED_DrawTimeImageViewTypeMismatchWithPipeline) {
+TEST_F(NegativeCommand, DrawTimeImageViewTypeMismatchWithPipeline) {
     TEST_DESCRIPTION(
         "Test that an error is produced when an image view type does not match the dimensionality declared in the shader");
 
@@ -1065,7 +1065,7 @@ TEST_F(NegativeCommand, DISABLED_DrawTimeImageViewTypeMismatchWithPipeline) {
     m_commandBuffer->end();
 }
 
-TEST_F(NegativeCommand, DISABLED_DrawTimeImageViewTypeMismatchWithPipelineFunction) {
+TEST_F(NegativeCommand, DrawTimeImageViewTypeMismatchWithPipelineFunction) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
@@ -1119,7 +1119,7 @@ TEST_F(NegativeCommand, DISABLED_DrawTimeImageViewTypeMismatchWithPipelineFuncti
     m_commandBuffer->end();
 }
 
-TEST_F(NegativeCommand, DISABLED_DrawTimeImageComponentTypeMismatchWithPipeline) {
+TEST_F(NegativeCommand, DrawTimeImageComponentTypeMismatchWithPipeline) {
     TEST_DESCRIPTION(
         "Test that an error is produced when the component type of an imageview disagrees with the type in the shader.");
 
@@ -5466,7 +5466,7 @@ TEST_F(NegativeCommand, ViewportWScalingNV) {
     m_commandBuffer->end();
 }
 
-TEST_F(NegativeCommand, DISABLED_FilterCubicSamplerInCmdDraw) {
+TEST_F(NegativeCommand, FilterCubicSamplerInCmdDraw) {
     TEST_DESCRIPTION("Verify if sampler is filter cubic, image view needs to support it.");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_EXT_FILTER_CUBIC_EXTENSION_NAME);

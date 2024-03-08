@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2023-2023 The Khronos Group Inc.
- * Copyright (c) 2023-2023 RasterGrid Kft.
+ * Copyright (c) 2023-2024 The Khronos Group Inc.
+ * Copyright (c) 2023-2024 RasterGrid Kft.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 #include "../framework/vksc_layer_validation_tests.h"
 
 TEST_F(VkSCPositiveLayerTest, ValidationInstanceExtensions) {
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     std::string layer_name = "VK_LAYER_KHRONOS_validation";
     std::vector<std::string> extensions = {VK_EXT_DEBUG_UTILS_EXTENSION_NAME,

@@ -90,7 +90,7 @@ TEST_F(NegativeShaderLimits, MaxSampleMaskWords) {
                                       "VUID-VkPipelineShaderStageCreateInfo-maxSampleMaskWords-00711");
 }
 
-TEST_F(NegativeShaderLimits, DISABLED_MinAndMaxTexelGatherOffset) {
+TEST_F(NegativeShaderLimits, MinAndMaxTexelGatherOffset) {
     TEST_DESCRIPTION("Test shader with offset less than minTexelGatherOffset and greather than maxTexelGatherOffset");
 
     RETURN_IF_SKIP(Init());
@@ -172,7 +172,7 @@ TEST_F(NegativeShaderLimits, DISABLED_MinAndMaxTexelGatherOffset) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeShaderLimits, DISABLED_MinAndMaxTexelOffset) {
+TEST_F(NegativeShaderLimits, MinAndMaxTexelOffset) {
     TEST_DESCRIPTION("Test shader with offset less than minTexelOffset and greather than maxTexelOffset");
 
     RETURN_IF_SKIP(Init());

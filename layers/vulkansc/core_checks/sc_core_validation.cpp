@@ -1,5 +1,5 @@
-/* Copyright (c) 2023-2023 The Khronos Group Inc.
- * Copyright (c) 2023-2023 RasterGrid Kft.
+/* Copyright (c) 2023-2024 The Khronos Group Inc.
+ * Copyright (c) 2023-2024 RasterGrid Kft.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -94,6 +94,7 @@ void SCCoreChecks::InitFilters() {
         "VUID-VkSwapchainCreateInfoKHR-physicalDeviceCount-01429",
 
         // Filter VUIDs replaced by Vulkan SC specific ones
+        "VUID-VkPipelineShaderStageCreateInfo-pName-00707",
         "VUID-VkCommandBufferBeginInfo-flags-00055",
         "VUID-VkSwapchainCreateInfoKHR-oldSwapchain-01933",
 
@@ -225,7 +226,7 @@ bool SCCoreChecks::ValidatePipelineCacheData(VkPhysicalDevice physicalDevice, co
         return false;
     }
 
-    if (create_info.initialDataSize < sizeof(uint32_t) + sizeof(VkPipelineCacheHeaderVersion)) {
+    if (create_info.initialDataSize < sizeof(VkPipelineCacheHeaderVersionOne)) {
         skip |= LogWarning(kVUID_SC_PipelineCacheData_TooSmall, physicalDevice, loc.dot(Field::initialDataSize),
                            "(%zu) is too small to verify pipeline cache header.", create_info.initialDataSize);
         // Return early here as we cannot validate anything else if the header is too small.
@@ -233,21 +234,24 @@ bool SCCoreChecks::ValidatePipelineCacheData(VkPhysicalDevice physicalDevice, co
     }
 
     const uint32_t sc_header_size = sizeof(VkPipelineCacheHeaderVersionSafetyCriticalOne);
-    auto header = reinterpret_cast<const VkPipelineCacheHeaderVersionSafetyCriticalOne*>(create_info.pInitialData);
-    if (header->headerVersionOne.headerSize != sc_header_size) {
+
+    vvl::sc::PipelineCacheData data(create_info);
+    auto baseHeader = data.GetBaseHeader();
+    assert(baseHeader.has_value());
+
+    if (baseHeader->headerSize != sc_header_size) {
         skip |= LogWarning(kVUID_SC_PipelineCacheData_InvalidHeaderSize, physicalDevice, loc.dot(Field::pInitialData),
                            "has an invalid headerSize (%u) that does not match the header size of a Vulkan "
                            "SC pipeline cache VkPipelineCacheHeaderVersionSafetyCriticalOne (%u bytes).",
-                           header->headerVersionOne.headerSize, sc_header_size);
+                           baseHeader->headerSize, sc_header_size);
         header_valid = false;
     }
 
-    if (header->headerVersionOne.headerVersion != VK_PIPELINE_CACHE_HEADER_VERSION_SAFETY_CRITICAL_ONE) {
+    if (baseHeader->headerVersion != VK_PIPELINE_CACHE_HEADER_VERSION_SAFETY_CRITICAL_ONE) {
         skip |= LogWarning(kVUID_SC_PipelineCacheData_UnrecognizedHeaderVersion, physicalDevice, loc.dot(Field::pInitialData),
                            "has an invalid headerVersion %s (%u) that does not match the header version of "
                            "a Vulkan SC pipeline cache (VK_PIPELINE_CACHE_HEADER_VERSION_SAFETY_CRITICAL_ONE).",
-                           string_VkPipelineCacheHeaderVersion(header->headerVersionOne.headerVersion),
-                           header->headerVersionOne.headerVersion);
+                           string_VkPipelineCacheHeaderVersion(baseHeader->headerVersion), baseHeader->headerVersion);
         header_valid = false;
     }
 
@@ -260,29 +264,30 @@ bool SCCoreChecks::ValidatePipelineCacheData(VkPhysicalDevice physicalDevice, co
         return skip;
     }
 
-    if (header->validationVersion != VK_PIPELINE_CACHE_VALIDATION_VERSION_SAFETY_CRITICAL_ONE) {
+    if (data.header->validationVersion != VK_PIPELINE_CACHE_VALIDATION_VERSION_SAFETY_CRITICAL_ONE) {
         skip |= LogWarning(kVUID_SC_PipelineCacheData_UnrecognizedValidationVersion, physicalDevice, loc.dot(Field::pInitialData),
                            "has an invalid validationVersion %s (%u) that does not match the validation version of "
                            "a Vulkan SC pipeline cache (VK_PIPELINE_CACHE_VALIDATION_VERSION_SAFETY_CRITICAL_ONE).",
-                           string_VkPipelineCacheValidationVersion(header->validationVersion), header->validationVersion);
+                           string_VkPipelineCacheValidationVersion(data.header->validationVersion), data.header->validationVersion);
         header_valid = false;
     }
 
     const uint32_t sc_index_entry_size = sizeof(VkPipelineCacheSafetyCriticalIndexEntry);
     assert(sc_index_entry_size == 56);
-    if (header->pipelineIndexStride < sc_index_entry_size) {
+    if (data.header->pipelineIndexStride < sc_index_entry_size) {
         skip |= LogWarning(kVUID_SC_PipelineCacheData_PipelineIndexStrideTooSmall, physicalDevice, loc.dot(Field::pInitialData),
-                           "has an invalid pipelineIndexStride (%u) which needs to be at least %u.", header->pipelineIndexStride,
-                           sc_index_entry_size);
+                           "has an invalid pipelineIndexStride (%u) which needs to be at least %u.",
+                           data.header->pipelineIndexStride, sc_index_entry_size);
         header_valid = false;
     }
 
-    if (header->pipelineIndexOffset + header->pipelineIndexCount * header->pipelineIndexStride > create_info.initialDataSize) {
+    if (data.header->pipelineIndexOffset + data.header->pipelineIndexCount * data.header->pipelineIndexStride >
+        create_info.initialDataSize) {
         skip |= LogWarning(kVUID_SC_PipelineCacheData_PipelineIndexOutOfBounds, physicalDevice, loc.dot(Field::initialDataSize),
                            "is too small (%zu bytes) to fit pipelineIndexCount (%u) pipelines stored with "
                            "pipelineIndexStride (%u) starting from pipelineIndexOffset (%" PRIu64 ").",
-                           create_info.initialDataSize, header->pipelineIndexCount, header->pipelineIndexStride,
-                           header->pipelineIndexOffset);
+                           create_info.initialDataSize, data.header->pipelineIndexCount, data.header->pipelineIndexStride,
+                           data.header->pipelineIndexOffset);
         header_valid = false;
     }
 
@@ -291,7 +296,6 @@ bool SCCoreChecks::ValidatePipelineCacheData(VkPhysicalDevice physicalDevice, co
         return skip;
     }
 
-    vvl::sc::PipelineCacheData data(create_info);
     vvl::unordered_set<vvl::sc::PipelineCacheData::Entry::ID, vvl::sc::PipelineCacheData::Entry::ID::hash> pipeline_ids{};
     for (uint32_t pipeline_index = 0; pipeline_index < data.PipelineIndexCount(); ++pipeline_index) {
         bool stage_info_valid = true;
@@ -369,6 +373,10 @@ bool SCCoreChecks::ValidatePipelineCacheData(VkPhysicalDevice physicalDevice, co
             for (uint32_t stage_index = 0; stage_index < entry.StageIndexCount(); ++stage_index) {
                 auto stage_info = entry.StageIndexEntry(stage_index);
                 if (!stage_info) continue;
+
+                skip |= ValidatePipelineCacheSpirv(physicalDevice, data, pipeline_index, stage_index, loc);
+                // SPIR-V validation, if used, will already report errors for the warnings below
+                if (skip) continue;
 
                 if (stage_info->codeSize == 0) {
                     skip |= LogWarning(kVUID_SC_PipelineCacheData_CodeSizeZero, physicalDevice, loc.dot(Field::pInitialData),
@@ -766,6 +774,8 @@ bool SCCoreChecks::PreCallValidateCreateComputePipelines(VkDevice device, VkPipe
     bool skip = BASE::PreCallValidateCreateComputePipelines(device, pipelineCache, count, pCreateInfos, pAllocator, pPipelines,
                                                             error_obj, ccpl_state_data);
 
+    auto pipeline_cache_state = Get<vvl::sc::PipelineCache>(pipelineCache);
+
     skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateComputePipelines-device-05068",
                                        "compute pipelines", sc_reserved_objects_.compute_pipelines.load(), "computePipeline",
                                        sc_object_limits_.computePipelineRequestCount, "createInfoCount", count);
@@ -785,6 +795,10 @@ bool SCCoreChecks::PreCallValidateCreateComputePipelines(VkDevice device, VkPipe
                                  create_info_loc.dot(Field::basePipelineIndex), "(%u) is not zero.",
                                  pCreateInfos[i].basePipelineIndex);
             }
+
+            auto offline_create_info = vku::FindStructInPNextChain<VkPipelineOfflineCreateInfo>(pCreateInfos[i].pNext);
+            skip |= ValidatePipelineStageInfo(0, pCreateInfos[i].stage, pipeline_cache_state.get(), offline_create_info,
+                                              error_obj.location.dot(Field::pCreateInfos, i).dot(Field::stage));
         }
     }
 
@@ -797,6 +811,8 @@ bool SCCoreChecks::PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPip
                                                           const ErrorObject& error_obj, void* cgpl_state_data) const {
     bool skip = BASE::PreCallValidateCreateGraphicsPipelines(device, pipelineCache, count, pCreateInfos, pAllocator, pPipelines,
                                                              error_obj, cgpl_state_data);
+
+    auto pipeline_cache_state = Get<vvl::sc::PipelineCache>(pipelineCache);
 
     skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateGraphicsPipelines-device-05068",
                                        "graphics pipelines", sc_reserved_objects_.graphics_pipelines.load(), "graphicsPipeline",
@@ -816,6 +832,13 @@ bool SCCoreChecks::PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPip
                 skip |= LogError("VUID-VkGraphicsPipelineCreateInfo-basePipelineIndex-05025", device,
                                  create_info_loc.dot(Field::basePipelineIndex), "(%u) is not zero.",
                                  pCreateInfos[i].basePipelineIndex);
+            }
+
+            auto offline_create_info = vku::FindStructInPNextChain<VkPipelineOfflineCreateInfo>(pCreateInfos[i].pNext);
+            for (uint32_t stage_index = 0; stage_index < pCreateInfos[i].stageCount; ++stage_index) {
+                skip |= ValidatePipelineStageInfo(stage_index, pCreateInfos[i].pStages[stage_index], pipeline_cache_state.get(),
+                                                  offline_create_info,
+                                                  error_obj.location.dot(Field::pCreateInfos, i).dot(Field::pStages, stage_index));
             }
         }
     }
@@ -837,16 +860,24 @@ bool SCCoreChecks::PreCallValidateCreatePipelineCache(VkDevice device, const VkP
 
         skip |= ValidatePipelineCacheCreateInfo(device, create_info_loc, *pCreateInfo);
 
+        // By default we do not re-validate the pipeline cache data as it was already validated at device creation time,
+        // but we do so if the passed pipeline cache create information is one that was not specified at that time.
+        bool validate_pipeline_cache_data = false;
         auto it = sc_pipeline_cache_map_.find(pCreateInfo->pInitialData);
         if (it == sc_pipeline_cache_map_.end() || it->second->create_info.flags != pCreateInfo->flags ||
             it->second->create_info.initialDataSize != pCreateInfo->initialDataSize) {
             skip |= LogError("VUID-vkCreatePipelineCache-pCreateInfo-05045", device, create_info_loc,
                              "does not match any of the VkPipelineCacheCreateInfo structures specified in "
                              "VkDeviceObjectReservationCreateInfo::pPipelineCacheCreateInfos at device creation time.");
-        } else if (memcmp(it->second->raw_data.data(), pCreateInfo->pInitialData, pCreateInfo->initialDataSize) != 0) {
+            validate_pipeline_cache_data = true;
+        } else if (memcmp(it->second->original_data.data(), pCreateInfo->pInitialData, pCreateInfo->initialDataSize) != 0) {
             skip |= LogError("VUID-vkCreatePipelineCache-pCreateInfo-05045", device, create_info_loc,
                              "the data pointed to by pCreateInfo->pInitialData does not match the data specified in "
                              "VkDeviceObjectReservationCreateInfo::pPipelineCacheCreateInfos at device creation time.");
+            validate_pipeline_cache_data = true;
+        }
+        if (validate_pipeline_cache_data) {
+            skip |= ValidatePipelineCacheData(physical_device, *pCreateInfo, error_obj.location.dot(Field::pCreateInfo));
         }
     }
 

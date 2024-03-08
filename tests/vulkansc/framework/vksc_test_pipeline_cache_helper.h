@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2023-2023 The Khronos Group Inc.
- * Copyright (c) 2023-2023 RasterGrid Kft.
+ * Copyright (c) 2023-2024 The Khronos Group Inc.
+ * Copyright (c) 2023-2024 RasterGrid Kft.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@
 
 #include <vulkan/utility/vk_struct_helper.hpp>
 #include "spirv-tools/libspirv.h"
+#include "../../framework/binding.h"
 
 #include <assert.h>
 #include <vector>
@@ -36,7 +37,14 @@ std::vector<uint32_t> CompileSPV(const spv_target_env target_env, const char* sp
 
 void ParseUUID(const char* str, uint8_t* uuid);
 
-class PipelineCacheDataBuilder {
+class PipelineCache : public vkt::PipelineCache {
+  public:
+    PipelineCache() = default;
+    PipelineCache(VkDevice device, VkPipelineCache handle) { NonDispHandle::init(device, handle); }
+};
+
+// Helper class for building pipeline cache data
+class PipelineCacheBuilder {
   public:
     template <typename T>
     static size_t AlignedSize() {
@@ -76,7 +84,10 @@ class PipelineCacheDataBuilder {
     template <typename BaseData>
     class Block<BaseData, void> {
       public:
-        Block(std::vector<uint8_t>& data, size_t offset) : data_(data), offset_(offset) {}
+        Block(std::vector<uint8_t>& data, size_t offset) : data_(data), offset_(offset) {
+            // We currently always build aligned pipeline cache data
+            assert(reinterpret_cast<uintptr_t>(data_.data() + offset_) % alignof(BaseData) == 0);
+        }
 
         static size_t Alignment() { return std::alignment_of_v<BaseData>; }
 
@@ -154,14 +165,18 @@ class PipelineCacheDataBuilder {
         return StageValIndexEntry<PrivateData>(
             data_, static_cast<size_t>(pipeline->stageIndexOffset) + index * pipeline->stageIndexStride);
     }
-
     template <typename PrivateData = void, typename PipelinePrivateData = void>
-    void AddStageValidation(SCIndexEntry<PipelinePrivateData>& pipeline, const char* json, const spv_target_env target_env,
-                            const std::vector<const char*> stage_spv) {
-        pipeline->jsonSize = strlen(json);
-        pipeline->jsonOffset = AddBlob(static_cast<size_t>(pipeline->jsonSize));
-        strncpy(reinterpret_cast<char*>(&data_[static_cast<size_t>(pipeline->jsonOffset)]), json,
-                static_cast<size_t>(pipeline->jsonSize));
+    void AddStageValidation(SCIndexEntry<PipelinePrivateData>& pipeline, const char* json,
+                            const std::vector<std::vector<uint32_t>> stage_spv) {
+        if (json != nullptr) {
+            pipeline->jsonSize = strlen(json);
+            pipeline->jsonOffset = AddBlob(static_cast<size_t>(pipeline->jsonSize));
+            strncpy(reinterpret_cast<char*>(&data_[static_cast<size_t>(pipeline->jsonOffset)]), json,
+                    static_cast<size_t>(pipeline->jsonSize));
+        } else {
+            pipeline->jsonSize = 0;
+            pipeline->jsonOffset = 0;
+        }
 
         for (std::size_t i = 0; i < stage_spv.size(); ++i) {
             auto block = AddBlock<StageValIndexEntry<PrivateData>>();
@@ -175,7 +190,7 @@ class PipelineCacheDataBuilder {
         }
 
         for (std::size_t i = 0; i < stage_spv.size(); ++i) {
-            auto spv = CompileSPV(target_env, stage_spv[i]);
+            auto& spv = stage_spv[i];
             assert(spv.size() != 0);
             size_t size = spv.size() * 4;
             size_t offset = AddBlob(size, 4);
@@ -184,6 +199,16 @@ class PipelineCacheDataBuilder {
             entry->codeOffset = offset;
             entry->codeSize = size;
         }
+    }
+
+    template <typename PrivateData = void, typename PipelinePrivateData = void>
+    void AddStageValidation(SCIndexEntry<PipelinePrivateData>& pipeline, const char* json, const spv_target_env target_env,
+                            const std::vector<const char*> stage_spv) {
+        std::vector<std::vector<uint32_t>> compiled_spv;
+        for (std::size_t i = 0; i < stage_spv.size(); ++i) {
+            compiled_spv.emplace_back(CompileSPV(target_env, stage_spv[i]));
+        }
+        AddStageValidation(pipeline, json, compiled_spv);
     }
 
     VkPipelineCacheCreateInfo MakeCreateInfo(
@@ -196,14 +221,10 @@ class PipelineCacheDataBuilder {
         return create_info;
     }
 
+    vkt::PipelineCache CreatePipelineCache(const vkt::Device& device) const { return vkt::PipelineCache(device, MakeCreateInfo()); }
+
     std::vector<uint8_t> GetData() { return data_; }
     void Clear() { data_.clear(); }
-
-    static const char* sample_compute_pipeline_json;
-    static const char* sample_compute_shader_spv;
-    static const char* sample_graphics_pipeline_json;
-    static const char* sample_vertex_shader_spv;
-    static const char* sample_fragment_shader_spv;
 
   private:
     std::vector<uint8_t> data_{};

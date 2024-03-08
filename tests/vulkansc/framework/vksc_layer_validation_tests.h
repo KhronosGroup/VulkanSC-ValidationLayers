@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2023-2023 The Khronos Group Inc.
- * Copyright (c) 2023-2023 RasterGrid Kft.
+ * Copyright (c) 2023-2024 The Khronos Group Inc.
+ * Copyright (c) 2023-2024 RasterGrid Kft.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,6 +12,8 @@
 
 #include "vksc_test_dispatch_helper.h"
 #include "vksc_test_pipeline_cache_helper.h"
+#include "vksc_shader_templates.h"
+#include "vksc_pipeline_templates.h"
 
 #include "../../framework/layer_validation_tests.h"
 
@@ -21,3 +23,62 @@ class VkSCLayerTest : public VkLayerTest {
 };
 
 class VkSCPositiveLayerTest : public VkSCLayerTest {};
+
+class VkSCDeviceCreateLayerTest : public VkSCLayerTest {
+  public:
+    VkPhysicalDeviceProperties phys_dev_props;
+
+    void InitFramework() {
+        VkSCLayerTest::InitFramework();
+
+        vksc::GetPhysicalDeviceProperties(gpu(), &phys_dev_props);
+    }
+
+    void TestCreateDevice(void* pNext) {
+        float queue_priority = 1.f;
+        auto queue_info = vku::InitStruct<VkDeviceQueueCreateInfo>();
+        queue_info.queueCount = 1;
+        queue_info.pQueuePriorities = &queue_priority;
+
+        auto create_info = vku::InitStruct<VkDeviceCreateInfo>(pNext);
+        create_info.queueCreateInfoCount = 1;
+        create_info.pQueueCreateInfos = &queue_info;
+
+        VkDevice device = VK_NULL_HANDLE;
+
+        vksc::CreateDevice(gpu(), &create_info, nullptr, &device);
+        m_errorMonitor->VerifyFound();
+
+        vksc::DestroyDevice(device, nullptr);
+    }
+};
+
+class VkSCPipelineCacheDataLayerTest : public VkSCDeviceCreateLayerTest {
+  public:
+    VkPipelineCacheCreateInfo create_info{};
+
+    void TestPipelineCacheData(const std::vector<VkPipelineCacheCreateInfo> create_infos) {
+        auto sc_10_features = vku::InitStruct<VkPhysicalDeviceVulkanSC10Features>();
+        auto object_reservation_info = vku::InitStruct<VkDeviceObjectReservationCreateInfo>(&sc_10_features);
+        object_reservation_info.pipelineCacheCreateInfoCount = static_cast<uint32_t>(create_infos.size());
+        object_reservation_info.pPipelineCacheCreateInfos = create_infos.data();
+
+        TestCreateDevice(&object_reservation_info);
+    }
+
+    void InitStateWithPipelineCacheData(const std::vector<VkPipelineCacheCreateInfo> create_infos, const void* pNext = nullptr) {
+        auto object_reservation_info = vksc::GetDefaultObjectReservationCreateInfo();
+        object_reservation_info.pipelineCacheCreateInfoCount = static_cast<uint32_t>(create_infos.size());
+        object_reservation_info.pPipelineCacheCreateInfos = create_infos.data();
+        object_reservation_info.pNext = pNext;
+
+        InitState(nullptr, &object_reservation_info);
+    }
+
+    vksc::PipelineCacheBuilder builder{};
+};
+
+class VkSCPositivePipelineCacheDataLayerTest : public VkSCPipelineCacheDataLayerTest {};
+
+class VkSCShaderSpirvTest : public VkSCLayerTest {};
+class VkSCPositiveShaderSpirvTest : public VkSCShaderSpirvTest {};

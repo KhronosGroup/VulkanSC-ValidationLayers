@@ -19,7 +19,7 @@
 #include "../framework/pipeline_helper.h"
 #include "../framework/descriptor_helper.h"
 
-TEST_F(NegativeShaderStorageTexel, DISABLED_WriteLessComponent) {
+TEST_F(NegativeShaderStorageTexel, WriteLessComponent) {
     TEST_DESCRIPTION("Test writing to texel buffer with less components.");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);

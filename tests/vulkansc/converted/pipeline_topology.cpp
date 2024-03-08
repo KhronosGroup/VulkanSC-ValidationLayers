@@ -68,7 +68,7 @@ static const char *NoPointSizeVertShader = R"glsl(
     }
 )glsl";
 
-TEST_F(NegativePipelineTopology, DISABLED_PointSize) {
+TEST_F(NegativePipelineTopology, PointSize) {
     TEST_DESCRIPTION("Create a pipeline using TOPOLOGY_POINT_LIST but do not set PointSize in vertex shader.");
 
     RETURN_IF_SKIP(Init());

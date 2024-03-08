@@ -785,7 +785,7 @@ TEST_F(NegativePipelineLayout, ExcessDescriptorsOverall) {
     vk::DestroyDescriptorSetLayout(m_device->device(), ds_layout, NULL);
 }
 
-TEST_F(NegativePipelineLayout, DISABLED_DescriptorTypeMismatch) {
+TEST_F(NegativePipelineLayout, DescriptorTypeMismatch) {
     TEST_DESCRIPTION("Challenge core_validation with shader validation issues related to vkCreateGraphicsPipelines.");
 
     RETURN_IF_SKIP(Init());
@@ -817,7 +817,7 @@ TEST_F(NegativePipelineLayout, DISABLED_DescriptorTypeMismatch) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativePipelineLayout, DISABLED_DescriptorTypeMismatchCompute) {
+TEST_F(NegativePipelineLayout, DescriptorTypeMismatchCompute) {
     TEST_DESCRIPTION("Test that an error is produced for a pipeline consuming a descriptor-backed resource of a mismatched type");
 
     RETURN_IF_SKIP(Init());
@@ -838,7 +838,7 @@ TEST_F(NegativePipelineLayout, DISABLED_DescriptorTypeMismatchCompute) {
     CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-VkComputePipelineCreateInfo-layout-07990");
 }
 
-TEST_F(NegativePipelineLayout, DISABLED_DescriptorTypeMismatchNonCombinedImageSampler) {
+TEST_F(NegativePipelineLayout, DescriptorTypeMismatchNonCombinedImageSampler) {
     TEST_DESCRIPTION(
         "HLSL will sometimes produce a SAMPLED_IMAGE / SAMPLER on the same slot that is same as COMBINED_IMAGE_SAMPLER");
 
@@ -896,7 +896,7 @@ TEST_F(NegativePipelineLayout, DISABLED_DescriptorTypeMismatchNonCombinedImageSa
     CreatePipelineHelper::OneshotTest(*this, set_sampler, kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-layout-07990");
 }
 
-TEST_F(NegativePipelineLayout, DISABLED_DescriptorNotAccessible) {
+TEST_F(NegativePipelineLayout, DescriptorNotAccessible) {
     TEST_DESCRIPTION(
         "Create a pipeline in which a descriptor used by a shader stage does not include that stage in its stageFlags.");
 
@@ -929,7 +929,7 @@ TEST_F(NegativePipelineLayout, DISABLED_DescriptorNotAccessible) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativePipelineLayout, DISABLED_UniformBlockNotProvided) {
+TEST_F(NegativePipelineLayout, UniformBlockNotProvided) {
     TEST_DESCRIPTION(
         "Test that an error is produced for a shader consuming a uniform block which has no corresponding binding in the pipeline "
         "layout");
@@ -952,7 +952,7 @@ TEST_F(NegativePipelineLayout, DISABLED_UniformBlockNotProvided) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativePipelineLayout, DISABLED_MissingDescriptor) {
+TEST_F(NegativePipelineLayout, MissingDescriptor) {
     TEST_DESCRIPTION(
         "Test that an error is produced for a compute pipeline consuming a descriptor which is not provided in the pipeline "
         "layout");

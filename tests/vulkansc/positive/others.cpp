@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2023-2023 The Khronos Group Inc.
- * Copyright (c) 2023-2023 RasterGrid Kft.
+ * Copyright (c) 2023-2024 The Khronos Group Inc.
+ * Copyright (c) 2023-2024 RasterGrid Kft.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 TEST_F(VkSCPositiveLayerTest, SetNegativeViewport) {
     TEST_DESCRIPTION("vkCmdSetViewport - test that the removed VUID 07917 is not triggered in Vulkan SC");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     m_commandBuffer->begin();
 
@@ -36,7 +36,7 @@ TEST_F(VkSCPositiveLayerTest, SetNegativeViewport) {
 TEST_F(VkSCPositiveLayerTest, CopyBetween2DAnd3DImage) {
     TEST_DESCRIPTION("vkCmdCopyImage - test that the removed VUIDs 07922, 07923, and 07941 are not triggered in Vulkan SC");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     auto create_info = vku::InitStruct<VkImageCreateInfo>();
     create_info.format = VK_FORMAT_R8G8B8A8_UNORM;
@@ -85,7 +85,7 @@ TEST_F(VkSCPositiveLayerTest, CopyBetween2DAnd3DImage) {
 TEST_F(VkSCPositiveLayerTest, CopyImagePlane) {
     TEST_DESCRIPTION("vkCmdCopyImage - test that the removed VUID 07940 is not triggered in Vulkan SC");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     if (!FormatIsSupported(gpu(), VK_FORMAT_G8_B8R8_2PLANE_420_UNORM)) {
         GTEST_SKIP() << "VK_FORMAT_G8_B8R8_2PLANE_420_UNORM is unsupported";
@@ -151,7 +151,7 @@ TEST_F(VkSCPositiveLayerTest, CopyImagePlane) {
 TEST_F(VkSCPositiveLayerTest, AllocateDescriptorSetsExceedsCapacity) {
     TEST_DESCRIPTION("vkAllocateDescriptorSets - test that the removed VUIDs 07895 and 07896 are not triggered in Vulkan SC");
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     VkDescriptorPoolSize pool_size = {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 8};
     auto desc_pool_ci = vku::InitStruct<VkDescriptorPoolCreateInfo>();

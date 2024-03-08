@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2023-2023 The Khronos Group Inc.
- * Copyright (c) 2023-2023 RasterGrid Kft.
+ * Copyright (c) 2023-2024 The Khronos Group Inc.
+ * Copyright (c) 2023-2024 RasterGrid Kft.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ class VkSCPortedNegativeMemory : public NegativeMemory {};
 
 TEST_F(VkSCPortedLayerTest, SpecLinks) {
     TEST_DESCRIPTION("Test that spec links in a typical error message are well-formed");
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "registry/VulkanSC/specs");
     vksc::GetPhysicalDeviceFeatures(gpu(), NULL);
