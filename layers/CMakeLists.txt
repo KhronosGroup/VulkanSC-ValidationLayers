@@ -347,6 +347,8 @@ if(VULKANSC)
         vulkansc/state_tracker/sc_pipeline_state.h
         vulkansc/state_tracker/sc_state_tracker.cpp
         vulkansc/state_tracker/sc_state_tracker.h
+        vulkansc/sync/sc_sync_validation.h
+        vulkansc/sync/sc_sync_validation.cpp
     )
 endif()
 

@@ -1687,8 +1687,7 @@ TEST_F(NegativeSyncVal, DynamicRenderingAttachmentStoreHazard) {
     m_errorMonitor->VerifyFound();
 }
 
-// Sync hazard mismatches
-TEST_F(NegativeSyncVal, DISABLED_CmdDispatchDrawHazards) {
+TEST_F(NegativeSyncVal, CmdDispatchDrawHazards) {
     SetTargetApiVersion(VK_API_VERSION_1_2);
 
     // Enable VK_KHR_draw_indirect_count for KHR variants
@@ -3167,8 +3166,7 @@ TEST_F(NegativeSyncVal, SubpassMultiDep) {
     m_errorMonitor->VerifyFound();
 }
 
-// Sync hazard mismatches
-TEST_F(NegativeSyncVal, DISABLED_RenderPassAsyncHazard) {
+TEST_F(NegativeSyncVal, RenderPassAsyncHazard) {
     RETURN_IF_SKIP(InitSyncValFramework());
     RETURN_IF_SKIP(InitState());
 
@@ -4380,8 +4378,7 @@ TEST_F(NegativeSyncVal, TestCopyingToCompressedImage) {
     }
 }
 
-// Sync hazard mismatches
-TEST_F(NegativeSyncVal, DISABLED_StageAccessExpansion) {
+TEST_F(NegativeSyncVal, StageAccessExpansion) {
     SetTargetApiVersion(VK_API_VERSION_1_2);
 
     RETURN_IF_SKIP(InitSyncValFramework());
@@ -5526,8 +5523,7 @@ TEST_F(NegativeSyncVal, TestMessageReportingWithManyBarriers) {
 
 // The original issue was that writeonly buffer accesss can be detected as READ:
 // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/7093
-// Sync hazard mismatches
-TEST_F(NegativeSyncVal, DISABLED_WriteOnlyBufferWriteHazard) {
+TEST_F(NegativeSyncVal, WriteOnlyBufferWriteHazard) {
     TEST_DESCRIPTION("Test that writeonly buffer access is reported as WRITE access");
     RETURN_IF_SKIP(InitSyncValFramework());
     RETURN_IF_SKIP(InitState());
@@ -5575,8 +5571,7 @@ TEST_F(NegativeSyncVal, DISABLED_WriteOnlyBufferWriteHazard) {
     m_commandBuffer->end();
 }
 
-// Sync hazard mismatches
-TEST_F(NegativeSyncVal, DISABLED_WriteOnlyImageWriteHazard) {
+TEST_F(NegativeSyncVal, WriteOnlyImageWriteHazard) {
     TEST_DESCRIPTION("Test that writeonly image access is reported as WRITE access");
     RETURN_IF_SKIP(InitSyncValFramework());
     RETURN_IF_SKIP(InitState());
