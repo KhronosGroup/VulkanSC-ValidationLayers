@@ -1744,7 +1744,7 @@ void ValidationObject::InitObjectDispatchVectors() {
 #define BUILD_DISPATCH_VECTOR(name)                                                                                              \
     init_object_dispatch_vector(InterceptId##name, typeid(&ValidationObject::name), typeid(&ThreadSafety::name),                 \
                                 typeid(&StatelessValidation::name), typeid(&ObjectLifetimes::name), typeid(&SCCoreChecks::name), \
-                                typeid(&SyncValidator::name));
+                                typeid(&SCSyncValidator::name));
 
     auto init_object_dispatch_vector = [this](InterceptId id, const std::type_info& vo_typeid, const std::type_info& tt_typeid,
                                               const std::type_info& tpv_typeid, const std::type_info& tot_typeid,

@@ -28,8 +28,10 @@
 #include "state_tracker/image_state.h"
 #include "vulkansc/state_tracker/sc_state_tracker.h"
 #include "core_checks/core_validation.h"
+#include "sync/sync_validation.h"
 
 template class SCValidationStateTracker<CoreChecks>;
+template class SCValidationStateTracker<SyncValidator>;
 
 template <typename BASE>
 template <typename CreateInfo>

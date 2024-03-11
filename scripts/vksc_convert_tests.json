@@ -217,17 +217,6 @@
             ]
         },
         {
-            "reason": "Sync hazard mismatches",
-            "cases": [
-                "@TODO: Vulkan SC - These tests fail to generate the appropriate sync hazard error or report additional hazards than expected",
-                "NegativeSyncVal.CmdDispatchDrawHazards",
-                "NegativeSyncVal.StageAccessExpansion",
-                "NegativeSyncVal.RenderPassAsyncHazard",
-                "NegativeSyncVal.WriteOnlyBufferWriteHazard",
-                "NegativeSyncVal.WriteOnlyImageWriteHazard"
-            ]
-        },
-        {
             "reason": "Uses too many objects",
             "cases": [
                 "@Note: This test case assumes 10000 descriptor sets can be created from a single pool",

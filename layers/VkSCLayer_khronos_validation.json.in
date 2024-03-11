@@ -39,14 +39,52 @@
                     "status": "STABLE",
                     "settings": [
                         {
-                            "key": "enables",
-                            "value": []
+                            "key": "validate_core",
+                            "value": true
                         },
                         {
-                            "key": "disables",
-                            "value": [
-                                "VK_VALIDATION_FEATURE_DISABLE_THREAD_SAFETY_EXT"
-                            ]
+                            "key": "check_image_layout",
+                            "value": true
+                        },
+                        {
+                            "key": "check_command_buffer",
+                            "value": true
+                        },
+                        {
+                            "key": "check_object_in_use",
+                            "value": true
+                        },
+                        {
+                            "key": "check_query",
+                            "value": true
+                        },
+                        {
+                            "key": "check_shaders",
+                            "value": true
+                        },
+                        {
+                            "key": "check_shaders_caching",
+                            "value": true
+                        },
+                        {
+                            "key": "unique_handles",
+                            "value": true
+                        },
+                        {
+                            "key": "object_lifetime",
+                            "value": true
+                        },
+                        {
+                            "key": "stateless_param",
+                            "value": true
+                        },
+                        {
+                            "key": "thread_safety",
+                            "value": false
+                        },
+                        {
+                            "key": "validate_sync",
+                            "value": false
                         }
                     ]
                 },
@@ -59,51 +97,54 @@
                         "MACOS"
                     ],
                     "status": "STABLE",
-                    "editor_state": "01110111111111111111111001111111111110",
                     "settings": [
                         {
-                            "key": "enables",
-                            "value": []
+                            "key": "validate_core",
+                            "value": true
                         },
                         {
-                            "key": "disables",
-                            "value": [
-                                "VK_VALIDATION_FEATURE_DISABLE_THREAD_SAFETY_EXT",
-                                "VK_VALIDATION_FEATURE_DISABLE_UNIQUE_HANDLES_EXT",
-                                "VALIDATION_CHECK_DISABLE_IMAGE_LAYOUT_VALIDATION",
-                                "VALIDATION_CHECK_DISABLE_COMMAND_BUFFER_STATE",
-                                "VALIDATION_CHECK_DISABLE_OBJECT_IN_USE",
-                                "VALIDATION_CHECK_DISABLE_QUERY_VALIDATION"
-                            ]
-                        }
-                    ]
-                },
-                {
-                    "label": "Best Practices",
-                    "description": "Provides warnings on valid API usage that is potential API misuse.",
-                    "platforms": [
-                        "WINDOWS",
-                        "LINUX",
-                        "MACOS",
-                        "ANDROID"
-                    ],
-                    "status": "STABLE",
-                    "settings": [
-                        {
-                            "key": "enables",
-                            "value": [
-                                "VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT"
-                            ]
+                            "key": "check_image_layout",
+                            "value": false
                         },
                         {
-                            "key": "disables",
-                            "value": [
-                                "VK_VALIDATION_FEATURE_DISABLE_THREAD_SAFETY_EXT",
-                                "VK_VALIDATION_FEATURE_DISABLE_UNIQUE_HANDLES_EXT",
-                                "VK_VALIDATION_FEATURE_DISABLE_OBJECT_LIFETIMES_EXT",
-                                "VK_VALIDATION_FEATURE_DISABLE_API_PARAMETERS_EXT",
-                                "VK_VALIDATION_FEATURE_DISABLE_CORE_CHECKS_EXT"
-                            ]
+                            "key": "check_command_buffer",
+                            "value": false
+                        },
+                        {
+                            "key": "check_object_in_use",
+                            "value": false
+                        },
+                        {
+                            "key": "check_query",
+                            "value": false
+                        },
+                        {
+                            "key": "check_shaders",
+                            "value": true
+                        },
+                        {
+                            "key": "check_shaders_caching",
+                            "value": true
+                        },
+                        {
+                            "key": "unique_handles",
+                            "value": false
+                        },
+                        {
+                            "key": "object_lifetime",
+                            "value": true
+                        },
+                        {
+                            "key": "stateless_param",
+                            "value": true
+                        },
+                        {
+                            "key": "thread_safety",
+                            "value": false
+                        },
+                        {
+                            "key": "validate_sync",
+                            "value": false
                         }
                     ]
                 },
@@ -119,83 +160,283 @@
                     "status": "STABLE",
                     "settings": [
                         {
-                            "key": "enables",
-                            "value": [
-                                "VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT"
-                            ]
-                        },
-                        {
-                            "key": "disables",
-                            "value": [
-                                "VK_VALIDATION_FEATURE_DISABLE_UNIQUE_HANDLES_EXT",
-                                "VK_VALIDATION_FEATURE_DISABLE_OBJECT_LIFETIMES_EXT",
-                                "VK_VALIDATION_FEATURE_DISABLE_API_PARAMETERS_EXT",
-                                "VK_VALIDATION_FEATURE_DISABLE_CORE_CHECKS_EXT"
-                            ]
-                        }
-                    ]
-                },
-                {
-                    "label": "GPU-Assisted",
-                    "description": "Check for API usage errors at shader execution time.",
-                    "platforms": [
-                        "WINDOWS",
-                        "LINUX"
-                    ],
-                    "status": "STABLE",
-                    "settings": [
-                        {
-                            "key": "enables",
-                            "value": [
-                                "VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT",
-                                "VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_RESERVE_BINDING_SLOT_EXT"
-                            ]
-                        },
-                        {
-                            "key": "disables",
-                            "value": [
-                                "VK_VALIDATION_FEATURE_DISABLE_THREAD_SAFETY_EXT",
-                                "VK_VALIDATION_FEATURE_DISABLE_UNIQUE_HANDLES_EXT",
-                                "VK_VALIDATION_FEATURE_DISABLE_OBJECT_LIFETIMES_EXT",
-                                "VK_VALIDATION_FEATURE_DISABLE_API_PARAMETERS_EXT",
-                                "VK_VALIDATION_FEATURE_DISABLE_CORE_CHECKS_EXT"
-                            ]
-                        }
-                    ]
-                },
-                {
-                    "label": "Debug Printf",
-                    "description": "Debug shader code by \"printing\" any values of interest to the debug callback or stdout.",
-                    "platforms": [
-                        "WINDOWS",
-                        "LINUX"
-                    ],
-                    "status": "STABLE",
-                    "settings": [
-                        {
-                            "key": "enables",
-                            "value": [
-                                "VK_VALIDATION_FEATURE_ENABLE_DEBUG_PRINTF_EXT"
-                            ]
-                        },
-                        {
-                            "key": "disables",
-                            "value": [
-                                "VK_VALIDATION_FEATURE_DISABLE_THREAD_SAFETY_EXT",
-                                "VK_VALIDATION_FEATURE_DISABLE_UNIQUE_HANDLES_EXT",
-                                "VK_VALIDATION_FEATURE_DISABLE_OBJECT_LIFETIMES_EXT",
-                                "VK_VALIDATION_FEATURE_DISABLE_API_PARAMETERS_EXT",
-                                "VK_VALIDATION_FEATURE_DISABLE_CORE_CHECKS_EXT"
-                            ]
-                        },
-                        {
-                            "key": "enable_message_limit",
+                            "key": "validate_core",
                             "value": false
+                        },
+                        {
+                            "key": "check_image_layout",
+                            "value": false
+                        },
+                        {
+                            "key": "check_command_buffer",
+                            "value": false
+                        },
+                        {
+                            "key": "check_object_in_use",
+                            "value": false
+                        },
+                        {
+                            "key": "check_query",
+                            "value": false
+                        },
+                        {
+                            "key": "check_shaders",
+                            "value": false
+                        },
+                        {
+                            "key": "check_shaders_caching",
+                            "value": false
+                        },
+                        {
+                            "key": "unique_handles",
+                            "value": true
+                        },
+                        {
+                            "key": "object_lifetime",
+                            "value": false
+                        },
+                        {
+                            "key": "stateless_param",
+                            "value": false
+                        },
+                        {
+                            "key": "thread_safety",
+                            "value": true
+                        },
+                        {
+                            "key": "validate_sync",
+                            "value": true
                         }
                     ]
                 }
             ],
             "settings": [
+                {
+                    "key": "validation_control",
+                    "label": "Validation Areas",
+                    "description": "Control of the Validation layer validation",
+                    "type": "GROUP",
+                    "expanded": true,
+                    "settings": [
+                        {
+                            "key": "fine_grained_locking",
+                            "env": "VK_LAYER_FINE_GRAINED_LOCKING",
+                            "label": "Fine Grained Locking",
+                            "description": "Enable fine grained locking for Core Validation, which should improve performance in multithreaded applications. This setting allows the optimization to be disabled for debugging.",
+                            "type": "BOOL",
+                            "default": true,
+                            "platforms": [
+                                "WINDOWS",
+                                "LINUX",
+                                "MACOS",
+                                "ANDROID"
+                            ]
+                        },
+                        {
+                            "key": "validate_core",
+                            "label": "Core",
+                            "description": "The main, heavy-duty validation checks. This may be valuable early in the development cycle to reduce validation output while correcting parameter/object usage errors.",
+                            "type": "BOOL",
+                            "default": true,
+                            "settings": [
+                                {
+                                    "key": "check_image_layout",
+                                    "label": "Image Layout",
+                                    "description": "Check that the layout of each image subresource is correct whenever it is used by a command buffer. These checks are very CPU intensive for some applications.",
+                                    "type": "BOOL",
+                                    "default": true,
+                                    "dependence": {
+                                        "mode": "ALL",
+                                        "settings": [
+                                            {
+                                                "key": "validate_core",
+                                                "value": true
+                                            }
+                                        ]
+                                    }
+                                },
+                                {
+                                    "key": "check_command_buffer",
+                                    "label": "Command Buffer State",
+                                    "description": "Check that all Vulkan SC objects used by a command buffer have not been destroyed. These checks can be CPU intensive for some applications.",
+                                    "type": "BOOL",
+                                    "default": true,
+                                    "dependence": {
+                                        "mode": "ALL",
+                                        "settings": [
+                                            {
+                                                "key": "validate_core",
+                                                "value": true
+                                            }
+                                        ]
+                                    }
+                                },
+                                {
+                                    "key": "check_object_in_use",
+                                    "label": "Object in Use",
+                                    "description": "Check that Vulkan SC objects are not in use by a command buffer when they are destroyed.",
+                                    "type": "BOOL",
+                                    "default": true,
+                                    "dependence": {
+                                        "mode": "ALL",
+                                        "settings": [
+                                            {
+                                                "key": "validate_core",
+                                                "value": true
+                                            }
+                                        ]
+                                    }
+                                },
+                                {
+                                    "key": "check_query",
+                                    "label": "Query",
+                                    "description": "Checks for commands that use VkQueryPool objects.",
+                                    "type": "BOOL",
+                                    "default": true,
+                                    "dependence": {
+                                        "mode": "ALL",
+                                        "settings": [
+                                            {
+                                                "key": "validate_core",
+                                                "value": true
+                                            }
+                                        ]
+                                    }
+                                },
+                                {
+                                    "key": "check_shaders",
+                                    "label": "Shader",
+                                    "description": "Shader checks. These checks can be CPU intensive during application start up, especially if Shader Validation Caching is also disabled.",
+                                    "type": "BOOL",
+                                    "default": true,
+                                    "expanded": true,
+                                    "dependence": {
+                                        "mode": "ALL",
+                                        "settings": [
+                                            {
+                                                "key": "validate_core",
+                                                "value": true
+                                            }
+                                        ]
+                                    },
+                                    "settings": [
+                                        {
+                                            "key": "check_shaders_caching",
+                                            "label": "Caching",
+                                            "description": "Enable caching of shader validation results.",
+                                            "type": "BOOL",
+                                            "default": true,
+                                            "dependence": {
+                                                "mode": "ALL",
+                                                "settings": [
+                                                    {
+                                                        "key": "validate_core",
+                                                        "value": true
+                                                    },
+                                                    {
+                                                        "key": "check_shaders",
+                                                        "value": true
+                                                    }
+                                                ]
+                                            }
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "key": "unique_handles",
+                            "label": "Handle Wrapping",
+                            "description": "Handle wrapping checks. Disable this feature if you are exerience crashes when creating new extensions or developing new Vulkan SC objects/structures.",
+                            "type": "BOOL",
+                            "default": true,
+                            "status": "STABLE",
+                            "platforms": [
+                                "WINDOWS",
+                                "LINUX",
+                                "MACOS",
+                                "ANDROID"
+                            ]
+                        },
+                        {
+                            "key": "object_lifetime",
+                            "label": "Object Lifetime",
+                            "description": "Object tracking checks. This may not always be necessary late in a development cycle.",
+                            "type": "BOOL",
+                            "default": true,
+                            "status": "STABLE",
+                            "platforms": [
+                                "WINDOWS",
+                                "LINUX",
+                                "MACOS",
+                                "ANDROID"
+                            ]
+                        },
+                        {
+                            "key": "stateless_param",
+                            "label": "Stateless Parameter",
+                            "description": "Stateless parameter checks. This may not always be necessary late in a development cycle.",
+                            "type": "BOOL",
+                            "default": true,
+                            "status": "STABLE",
+                            "platforms": [
+                                "WINDOWS",
+                                "LINUX",
+                                "MACOS",
+                                "ANDROID"
+                            ]
+                        },
+                        {
+                            "key": "thread_safety",
+                            "label": "Thread Safety",
+                            "description": "Thread checks. In order to not degrade performance, it might be best to run your program with thread-checking disabled most of the time, enabling it occasionally for a quick sanity check or when debugging difficult application behaviors.",
+                            "type": "BOOL",
+                            "default": true,
+                            "status": "STABLE",
+                            "platforms": [
+                                "WINDOWS",
+                                "LINUX",
+                                "MACOS",
+                                "ANDROID"
+                            ]
+                        },
+                        {
+                            "key": "validate_sync",
+                            "label": "Synchronization",
+                            "description": "Enable synchronization validation during command buffers recording. This feature reports resource access conflicts due to missing or incorrect synchronization operations between actions (Draw, Copy, Dispatch, Blit) reading or writing the same regions of memory.",
+                            "url": "${LUNARG_SDK}/synchronization_usage.html",
+                            "type": "BOOL",
+                            "default": false,
+                            "expanded": true,
+                            "status": "STABLE",
+                            "platforms": [
+                                "WINDOWS",
+                                "LINUX",
+                                "MACOS",
+                                "ANDROID"
+                            ],
+                            "settings": [
+                                {
+                                    "key": "sync_queue_submit",
+                                    "label": "QueueSubmit Synchronization Validation",
+                                    "description": "Enable synchronization validation between submitted command buffers when Synchronization Validation is enabled. This option will increase the synchronization performance cost.",
+                                    "type": "BOOL",
+                                    "default": true,
+                                    "status": "STABLE",
+                                    "dependence": {
+                                        "mode": "ALL",
+                                        "settings": [
+                                            {
+                                                "key": "validate_sync",
+                                                "value": true
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
                 {
                     "key": "debug_action",
                     "label": "Debug Action",
@@ -384,7 +625,13 @@
                         {
                             "key": "VALIDATION_CHECK_DISABLE_OBJECT_IN_USE",
                             "label": "Object in Use",
-                            "description": "Check that Vulkan SC objects are not in use by a command buffer when they are destroyed.",
+                            "description": "Check that Vulkan objects are not in use by a command buffer when they are destroyed.",
+                            "view": "ADVANCED"
+                        },
+                        {
+                            "key": "VALIDATION_CHECK_DISABLE_SYNCHRONIZATION_VALIDATION_QUEUE_SUBMIT",
+                            "label": "QueueSubmit Synchronization Validation",
+                            "description": "Check synchronization validation between submitted command buffers when Synchronization Validation is enabled.",
                             "view": "ADVANCED"
                         },
                         {
@@ -417,30 +664,9 @@
                                 "MACOS",
                                 "ANDROID"
                             ]
-                        },
-                        {
-                            "key": "VALIDATION_CHECK_ENABLE_SYNCHRONIZATION_VALIDATION_QUEUE_SUBMIT",
-                            "label": "QueueSubmit Synchronization Validation",
-                            "description": "Enable synchronization validation between submitted command buffers when Synchronization Validation is enabled.",
-                            "status": "ALPHA"
                         }
                     ],
                     "default": []
-                },
-                {
-                    "key": "fine_grained_locking",
-                    "env": "VK_LAYER_FINE_GRAINED_LOCKING",
-                    "label": "Fine Grained Locking",
-                    "description": "Enable fine grained locking for Core Validation, which should improve performance in multithreaded applications. This setting allows the optimization to be disabled for debugging.",
-                    "status": "STABLE",
-                    "type": "BOOL",
-                    "default": true,
-                    "platforms": [
-                        "WINDOWS",
-                        "LINUX",
-                        "MACOS",
-                        "ANDROID"
-                    ]
                 }
             ]
         }

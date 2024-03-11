@@ -44,31 +44,26 @@ class APISpecific:
                     {
                         'include': 'thread_tracker/thread_safety_validation.h',
                         'class': 'ThreadSafety',
-                        'variable': 'thread_checker_obj',
                         'enabled': '!disables[thread_safety]'
                     },
                     {
                         'include': 'stateless/stateless_validation.h',
                         'class': 'StatelessValidation',
-                        'variable': 'parameter_validation_obj',
                         'enabled': '!disables[stateless_checks]'
                     },
                     {
                         'include': 'object_tracker/object_lifetime_validation.h',
                         'class': 'ObjectLifetimes',
-                        'variable': 'object_tracker_obj',
                         'enabled': '!disables[object_tracking]'
                     },
                     {
                         'include': 'vulkansc/core_checks/sc_core_validation.h',
                         'class': 'SCCoreChecks',
-                        'variable': 'sc_core_checks_obj',
                         'enabled': '!disables[core_checks]'
                     },
                     {
-                        'include': 'sync/sync_validation.h',
-                        'class': 'SyncValidator',
-                        'variable': 'sync_validation_obj',
+                        'include': 'vulkansc/sync/sc_sync_validation.h',
+                        'class': 'SCSyncValidator',
                         'enabled': 'enables[sync_validation]'
                     }
                 ]
@@ -179,7 +174,7 @@ void ValidationObject::InitObjectDispatchVectors() {
                                 typeid(&StatelessValidation::name), \\
                                 typeid(&ObjectLifetimes::name), \\
                                 typeid(&SCCoreChecks::name), \\
-                                typeid(&SyncValidator::name));
+                                typeid(&SCSyncValidator::name));
 
     auto init_object_dispatch_vector = [this](InterceptId id,
                                               const std::type_info& vo_typeid,
