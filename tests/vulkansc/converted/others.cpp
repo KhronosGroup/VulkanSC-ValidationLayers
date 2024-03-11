@@ -61,6 +61,7 @@ TEST_F(VkLayerTest, VersionCheckPromotedAPIs) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: assumes availability of pre-Vulkan 1.2 functionality
 TEST_F(VkLayerTest, DISABLED_UnsupportedPnextApiVersion) {
     TEST_DESCRIPTION("Validate that newer pnext structs are not valid for old Vulkan versions.");
     SetTargetApiVersion(VK_API_VERSION_1_1);
@@ -81,6 +82,7 @@ TEST_F(VkLayerTest, DISABLED_UnsupportedPnextApiVersion) {
     }
 }
 
+// Not supported in Vulkan SC: VK_EXT_layer_settings
 TEST_F(VkLayerTest, DISABLED_CustomStypeStructString) {
     TEST_DESCRIPTION("Positive Test for ability to specify custom pNext structs using a list (string)");
 
@@ -101,7 +103,8 @@ TEST_F(VkLayerTest, DISABLED_CustomStypeStructString) {
     const char *id[] = {"3000300000", "24"};
     const VkLayerSettingEXT setting = {OBJECT_LAYER_NAME, "custom_stype_list", VK_LAYER_SETTING_TYPE_STRING_EXT,
                                        static_cast<uint32_t>(std::size(id)), &id};
-    VkLayerSettingsCreateInfoEXT layer_setting_create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1, &setting};
+    VkLayerSettingsCreateInfoEXT layer_setting_create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1,
+                                                              &setting};
 
     RETURN_IF_SKIP(InitFramework(&layer_setting_create_info));
     RETURN_IF_SKIP(InitState());
@@ -120,6 +123,7 @@ TEST_F(VkLayerTest, DISABLED_CustomStypeStructString) {
     vkt::BufferView buffer_view(*m_device, bvci);
 }
 
+// Not supported in Vulkan SC: VK_EXT_layer_settings
 TEST_F(VkLayerTest, DISABLED_CustomStypeStructStringArray) {
     TEST_DESCRIPTION("Positive Test for ability to specify custom pNext structs using a vector of strings");
 
@@ -148,14 +152,13 @@ TEST_F(VkLayerTest, DISABLED_CustomStypeStructStringArray) {
     const std::string sizeof_struct = format("%d", sizeof(CustomStruct));
 
     const char *ids[] = {
-        string_stype_a.c_str(), sizeof_struct.c_str(),
-        string_stype_b.c_str(), sizeof_struct.c_str(),
-        string_stype_a.c_str(), sizeof_struct.c_str(),
+        string_stype_a.c_str(), sizeof_struct.c_str(),  string_stype_b.c_str(),
+        sizeof_struct.c_str(),  string_stype_a.c_str(), sizeof_struct.c_str(),
     };
-    const VkLayerSettingEXT setting = {
-        OBJECT_LAYER_NAME, "custom_stype_list", VK_LAYER_SETTING_TYPE_STRING_EXT, static_cast<uint32_t>(std::size(ids)), &ids};
-    VkLayerSettingsCreateInfoEXT layer_setting_create_info = {
-        VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1, &setting};
+    const VkLayerSettingEXT setting = {OBJECT_LAYER_NAME, "custom_stype_list", VK_LAYER_SETTING_TYPE_STRING_EXT,
+                                       static_cast<uint32_t>(std::size(ids)), &ids};
+    VkLayerSettingsCreateInfoEXT layer_setting_create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1,
+                                                              &setting};
 
     RETURN_IF_SKIP(InitFramework(&layer_setting_create_info));
     RETURN_IF_SKIP(InitState());
@@ -175,6 +178,7 @@ TEST_F(VkLayerTest, DISABLED_CustomStypeStructStringArray) {
     vkt::BufferView buffer_view(*m_device, bvci);
 }
 
+// Not supported in Vulkan SC: VK_EXT_layer_settings
 TEST_F(VkLayerTest, DISABLED_CustomStypeStructIntegerArray) {
     TEST_DESCRIPTION("Positive Test for ability to specify custom pNext structs using a vector of integers");
 
@@ -198,16 +202,13 @@ TEST_F(VkLayerTest, DISABLED_CustomStypeStructIntegerArray) {
     custom_struct_b.custom_data = 88;
 
     // Communicate list of structinfo pairs to layers, including a duplicate which should get filtered out
-    const uint32_t ids[] = {
-        custom_stype_a, sizeof(CustomStruct),
-        custom_stype_b, sizeof(CustomStruct),
-        custom_stype_a, sizeof(CustomStruct)
-    };
+    const uint32_t ids[] = {custom_stype_a,       sizeof(CustomStruct), custom_stype_b,
+                            sizeof(CustomStruct), custom_stype_a,       sizeof(CustomStruct)};
 
     const VkLayerSettingEXT setting[] = {
-        {OBJECT_LAYER_NAME, "custom_stype_list", VK_LAYER_SETTING_TYPE_UINT32_EXT, static_cast<uint32_t>(std::size(ids)), ids}
-    };
-    VkLayerSettingsCreateInfoEXT layer_setting_create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1, setting};
+        {OBJECT_LAYER_NAME, "custom_stype_list", VK_LAYER_SETTING_TYPE_UINT32_EXT, static_cast<uint32_t>(std::size(ids)), ids}};
+    VkLayerSettingsCreateInfoEXT layer_setting_create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1,
+                                                              setting};
 
     RETURN_IF_SKIP(InitFramework(&layer_setting_create_info));
     RETURN_IF_SKIP(InitState());
@@ -226,6 +227,7 @@ TEST_F(VkLayerTest, DISABLED_CustomStypeStructIntegerArray) {
     vkt::BufferView buffer_view(*m_device, bvci);
 }
 
+// Not supported in Vulkan SC: VK_EXT_layer_settings
 TEST_F(VkLayerTest, DISABLED_DuplicateMessageLimit) {
     TEST_DESCRIPTION("Use the duplicate_message_id setting and verify correct operation");
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
@@ -281,6 +283,7 @@ TEST_F(VkLayerTest, VuidHashStability) {
     ASSERT_TRUE(hash_util::VuidHash("VUID-RuntimeSpirv-SubgroupUniformControlFlowKHR-06379") == 0x2f574188);
 }
 
+// Not supported in Vulkan SC: VK_EXT_layer_settings
 TEST_F(VkLayerTest, DISABLED_VuidIdFilterString) {
     TEST_DESCRIPTION("Validate that message id string filtering is working");
 
@@ -290,7 +293,8 @@ TEST_F(VkLayerTest, DISABLED_VuidIdFilterString) {
 
     const char *ids[] = {"VUID-VkRenderPassCreateInfo-pNext-01963"};
     const VkLayerSettingEXT setting = {OBJECT_LAYER_NAME, "message_id_filter", VK_LAYER_SETTING_TYPE_STRING_EXT, 1, ids};
-    VkLayerSettingsCreateInfoEXT layer_settings_create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1, &setting};
+    VkLayerSettingsCreateInfoEXT layer_settings_create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1,
+                                                               &setting};
 
     RETURN_IF_SKIP(InitFramework(&layer_settings_create_info));
 
@@ -314,6 +318,7 @@ TEST_F(VkLayerTest, DISABLED_VuidIdFilterString) {
     TestRenderPassCreate(m_errorMonitor, *m_device, rpci, false, "VUID-VkInputAttachmentAspectReference-aspectMask-01964", nullptr);
 }
 
+// Not supported in Vulkan SC: VK_EXT_layer_settings
 TEST_F(VkLayerTest, DISABLED_VuidFilterHexInt) {
     TEST_DESCRIPTION("Validate that message id hex int filtering is working");
 
@@ -323,7 +328,8 @@ TEST_F(VkLayerTest, DISABLED_VuidFilterHexInt) {
 
     const char *ids[] = {"0xa19880e3"};
     const VkLayerSettingEXT setting = {OBJECT_LAYER_NAME, "message_id_filter", VK_LAYER_SETTING_TYPE_STRING_EXT, 1, ids};
-    VkLayerSettingsCreateInfoEXT layer_settings_create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1, &setting};
+    VkLayerSettingsCreateInfoEXT layer_settings_create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1,
+                                                               &setting};
 
     RETURN_IF_SKIP(InitFramework(&layer_settings_create_info));
 
@@ -347,6 +353,7 @@ TEST_F(VkLayerTest, DISABLED_VuidFilterHexInt) {
     TestRenderPassCreate(m_errorMonitor, *m_device, rpci, false, "VUID-VkInputAttachmentAspectReference-aspectMask-01964", nullptr);
 }
 
+// Not supported in Vulkan SC: VK_EXT_layer_settings
 TEST_F(VkLayerTest, DISABLED_VuidFilterInt) {
     TEST_DESCRIPTION("Validate that message id decimal int filtering is working");
 
@@ -356,7 +363,8 @@ TEST_F(VkLayerTest, DISABLED_VuidFilterInt) {
 
     const char *ids[] = {"2711126243"};
     const VkLayerSettingEXT setting = {OBJECT_LAYER_NAME, "message_id_filter", VK_LAYER_SETTING_TYPE_STRING_EXT, 1, ids};
-    VkLayerSettingsCreateInfoEXT layer_settings_create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1, &setting};
+    VkLayerSettingsCreateInfoEXT layer_settings_create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1,
+                                                               &setting};
 
     RETURN_IF_SKIP(InitFramework(&layer_settings_create_info));
     RETURN_IF_SKIP(InitState());
@@ -480,6 +488,7 @@ TEST_F(VkLayerTest, RequiredParameter) {
     m_errorMonitor->VerifyFound();
 }
 
+// This test case are replaced with Vulkan SC specific ones
 TEST_F(VkLayerTest, DISABLED_SpecLinks) {
     TEST_DESCRIPTION("Test that spec links in a typical error message are well-formed");
     AddOptionalExtensions(VK_KHR_MAINTENANCE_2_EXTENSION_NAME);
@@ -563,11 +572,12 @@ TEST_F(VkLayerTest, DISABLED_DeviceIDPropertiesExtensions) {
         GTEST_SKIP() << "Tests for 1.0 only";
     }
 
-    VkPhysicalDeviceIDProperties id_props =  vku::InitStructHelper();
+    VkPhysicalDeviceIDProperties id_props = vku::InitStructHelper();
     VkPhysicalDeviceFeatures2 features2 = vku::InitStructHelper(&id_props);
     vk::GetPhysicalDeviceFeatures2KHR(gpu(), &features2);
 }
 
+// Not supported in Vulkan SC: assumes availability of pre-Vulkan 1.2 functionality
 TEST_F(VkLayerTest, DISABLED_UsePnextOnlyStructWithoutExtensionEnabled) {
     TEST_DESCRIPTION(
         "Validate that using VkPipelineTessellationDomainOriginStateCreateInfo in VkPipelineTessellationStateCreateInfo.pNext "
@@ -819,6 +829,7 @@ TEST_F(VkLayerTest, UseObjectWithWrongDevice) {
     vk::DestroyDevice(second_device, NULL);
 }
 
+// Not supported in Vulkan SC: allocation callbacks
 TEST_F(VkLayerTest, DISABLED_InvalidAllocationCallbacks) {
     TEST_DESCRIPTION("Test with invalid VkAllocationCallbacks");
 
@@ -877,6 +888,7 @@ TEST_F(VkLayerTest, DISABLED_InvalidAllocationCallbacks) {
     }
 }
 
+// Not supported in Vulkan SC: assumes availability of pre-Vulkan 1.2 functionality
 TEST_F(VkLayerTest, DISABLED_DeviceFeature2AndVertexAttributeDivisorExtensionUnenabled) {
     TEST_DESCRIPTION(
         "Test unenabled VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME & "
@@ -956,6 +968,7 @@ TEST_F(VkLayerTest, Features12Features13AndpNext) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: assumes availability of pre-Vulkan 1.2 functionality
 TEST_F(VkLayerTest, DISABLED_RequiredPromotedFeaturesExtensions) {
     TEST_DESCRIPTION("Checks that features are enabled if extension is passed in for promoted extensions with requirement.");
 
@@ -1080,6 +1093,7 @@ TEST_F(VkLayerTest, FeaturesVariablePointer) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: VK_EXT_validation_cache
 TEST_F(VkLayerTest, DISABLED_ValidationCacheTestBadMerge) {
     AddRequiredExtensions(VK_EXT_VALIDATION_CACHE_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
@@ -1326,20 +1340,17 @@ TEST_F(VkLayerTest, InvalidCombinationOfDeviceFeatures) {
 
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 
-    VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT shader_image_atomic_int64_feature =
-        vku::InitStructHelper();
+    VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT shader_image_atomic_int64_feature = vku::InitStructHelper();
     shader_image_atomic_int64_feature.sparseImageInt64Atomics = VK_TRUE;
     shader_image_atomic_int64_feature.shaderImageInt64Atomics = VK_FALSE;
 
-    VkPhysicalDeviceShaderAtomicFloatFeaturesEXT shader_atomic_float_feature =
-        vku::InitStructHelper();
+    VkPhysicalDeviceShaderAtomicFloatFeaturesEXT shader_atomic_float_feature = vku::InitStructHelper();
     shader_atomic_float_feature.sparseImageFloat32Atomics = VK_TRUE;
     shader_atomic_float_feature.shaderImageFloat32Atomics = VK_FALSE;
     shader_atomic_float_feature.sparseImageFloat32AtomicAdd = VK_TRUE;
     shader_atomic_float_feature.shaderImageFloat32AtomicAdd = VK_FALSE;
 
-    VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT shader_atomic_float_feature2 =
-        vku::InitStructHelper();
+    VkPhysicalDeviceShaderAtomicFloat2FeaturesEXT shader_atomic_float_feature2 = vku::InitStructHelper();
     shader_atomic_float_feature2.sparseImageFloat32AtomicMinMax = VK_TRUE;
     shader_atomic_float_feature2.shaderImageFloat32AtomicMinMax = VK_FALSE;
 
@@ -1375,6 +1386,7 @@ TEST_F(VkLayerTest, InvalidCombinationOfDeviceFeatures) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: split-instance bind regions
 TEST_F(VkLayerTest, DISABLED_InvalidImageCreateFlagWithPhysicalDeviceCount) {
     TEST_DESCRIPTION("Test for invalid imageCreate flags bit with physicalDeviceCount.");
     SetTargetApiVersion(VK_API_VERSION_1_1);
@@ -1510,16 +1522,13 @@ TEST_F(VkLayerTest, DuplicateValidPNextStructures) {
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPhysicalDeviceProperties2-sType-unique");
     // in VkPhysicalDeviceProperties2 create a chain of pNext of type A -> B -> A
     // Also using different instance of struct to not trip the cycle checkings
-    VkPhysicalDeviceProtectedMemoryProperties protected_memory_properties_0 =
-        vku::InitStructHelper();
+    VkPhysicalDeviceProtectedMemoryProperties protected_memory_properties_0 = vku::InitStructHelper();
 
     VkPhysicalDeviceIDProperties id_properties = vku::InitStructHelper(&protected_memory_properties_0);
 
-    VkPhysicalDeviceProtectedMemoryProperties protected_memory_properties_1 =
-        vku::InitStructHelper(&id_properties);
+    VkPhysicalDeviceProtectedMemoryProperties protected_memory_properties_1 = vku::InitStructHelper(&id_properties);
 
-    VkPhysicalDeviceProperties2 physical_device_properties2 =
-        vku::InitStructHelper(&protected_memory_properties_1);
+    VkPhysicalDeviceProperties2 physical_device_properties2 = vku::InitStructHelper(&protected_memory_properties_1);
 
     vk::GetPhysicalDeviceProperties2(gpu(), &physical_device_properties2);
     m_errorMonitor->VerifyFound();
@@ -1814,6 +1823,7 @@ TEST_F(VkLayerTest, ExtensionXmlDependsLogic2) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: assumes availability of pre-Vulkan 1.2 functionality
 TEST_F(VkLayerTest, DISABLED_ExtensionXmlDependsLogic3) {
     // VK_KHR_shared_presentable_image requires
     // VK_KHR_swapchain
@@ -1860,6 +1870,7 @@ TEST_F(VkLayerTest, DISABLED_ExtensionXmlDependsLogic3) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: assumes availability of pre-Vulkan 1.2 functionality
 TEST_F(VkLayerTest, DISABLED_MissingExtensionPhysicalDeviceProperties) {
     TEST_DESCRIPTION("Don't enable instance extension needed");
 

@@ -186,4 +186,3 @@ TEST_F(PositiveShaderLimits, TaskSharedMemoryAtLimit) {
     };
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
 }
-

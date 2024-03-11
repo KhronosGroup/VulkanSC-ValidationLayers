@@ -17,6 +17,7 @@
 #include "../framework/layer_validation_tests.h"
 #include "generated/vk_extension_helper.h"
 
+// Not supported in Vulkan SC: assumes availability of pre-Vulkan 1.2 functionality
 TEST_F(PositiveSampler, DISABLED_SamplerMirrorClampToEdgeWithoutFeature) {
     TEST_DESCRIPTION("Use VK_KHR_sampler_mirror_clamp_to_edge in 1.1 before samplerMirrorClampToEdge feature was added");
 
@@ -33,6 +34,7 @@ TEST_F(PositiveSampler, DISABLED_SamplerMirrorClampToEdgeWithoutFeature) {
     vkt::Sampler sampler(*m_device, sampler_info);
 }
 
+// Not supported in Vulkan SC: assumes availability of pre-Vulkan 1.2 functionality
 TEST_F(PositiveSampler, DISABLED_SamplerMirrorClampToEdgeWithoutFeature12) {
     TEST_DESCRIPTION("Use VK_KHR_sampler_mirror_clamp_to_edge in 1.2 using the extension");
 

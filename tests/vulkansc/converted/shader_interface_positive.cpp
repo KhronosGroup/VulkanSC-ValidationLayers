@@ -331,7 +331,7 @@ TEST_F(PositiveShaderInterface, RelaxedTypeMatch) {
         "1.3) device extension:"
         "fundamental type must match, and producer side must have at least as many components");
 
-    SetTargetApiVersion(VK_API_VERSION_1_1); // At least 1.1 is required for maintenance4
+    SetTargetApiVersion(VK_API_VERSION_1_1);  // At least 1.1 is required for maintenance4
     AddRequiredExtensions(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::maintenance4);
     RETURN_IF_SKIP(Init());

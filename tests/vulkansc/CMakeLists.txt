@@ -25,6 +25,7 @@ target_compile_definitions(vksc_layer_validation_tests PRIVATE VVL_TESTS_USE_CUS
 target_sources(vksc_layer_validation_tests PRIVATE
     ${VKSC_CONVERTED_TEST_FILES}
     framework/custom_test_framework.h
+    framework/vksc_test_environment.h
     framework/vksc_test_environment.cpp
     framework/vksc_test_dispatch_helper.h
     framework/vksc_test_dispatch_helper.cpp

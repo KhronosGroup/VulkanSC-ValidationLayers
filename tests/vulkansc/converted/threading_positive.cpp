@@ -137,6 +137,7 @@ TEST_F(PositiveThreading, NullFenceCollision) {
     m_errorMonitor->SetBailout(NULL);
 }
 
+// Uses too many objects
 TEST_F(PositiveThreading, DISABLED_DebugObjectNames) {
     AddRequiredExtensions(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());

@@ -118,6 +118,13 @@ class VkSCCompatibilityRenderFramework : public VkSCRenderFramework {
     // Unregister destroyed pipeline with an on-demand pipeline cache
     void UnregisterPipelineWithOnDemandCache(VkPipeline pipeline) { on_demand_pipeline_caches_.erase(pipeline); }
 
+    // Skip on QNX
+    void SkipOnQNX() {
+#if defined(__QNX__)
+        dispatch_helper_.SkipUnsupportedTest("Test case not compatible with QNX");
+#endif
+    }
+
   private:
     vksc::TestDispatchHelper dispatch_helper_;
 

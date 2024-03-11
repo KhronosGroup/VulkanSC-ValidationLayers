@@ -40,7 +40,7 @@ TEST_F(PositiveDebugExtensions, SetDebugUtilsObjectBuffer) {
     vk::CreateDebugUtilsMessengerEXT(instance(), &callback_create_info, nullptr, &my_messenger);
 
     vkt::Buffer buffer(*m_device, 64);
-    const char* object_name = "buffer_object";
+    const char *object_name = "buffer_object";
 
     VkDebugUtilsObjectNameInfoEXT name_info = vku::InitStructHelper();
     name_info.objectType = VK_OBJECT_TYPE_BUFFER;
@@ -76,7 +76,7 @@ TEST_F(PositiveDebugExtensions, SetDebugUtilsObjectDevice) {
     VkDebugUtilsMessengerEXT my_messenger = VK_NULL_HANDLE;
     vk::CreateDebugUtilsMessengerEXT(instance(), &callback_create_info, nullptr, &my_messenger);
 
-    const char* object_name = "device_object";
+    const char *object_name = "device_object";
 
     VkDebugUtilsObjectNameInfoEXT name_info = vku::InitStructHelper();
     name_info.objectType = VK_OBJECT_TYPE_DEVICE;

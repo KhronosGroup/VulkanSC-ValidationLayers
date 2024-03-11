@@ -40,6 +40,7 @@ void NegativeDebugPrintf::InitDebugPrintfFramework() {
     }
 }
 
+// Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_BasicCompute) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
@@ -74,6 +75,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_BasicCompute) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_BasicUsage) {
     TEST_DESCRIPTION("Verify that calls to debugPrintfEXT are received in debug stream");
     SetTargetApiVersion(VK_API_VERSION_1_1);
@@ -320,6 +322,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_BasicUsage) {
     }
 }
 
+// Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MeshTaskShaders) {
     TEST_DESCRIPTION("Test debug printf in mesh and task shaders.");
 
@@ -389,6 +392,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_MeshTaskShaders) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_GPL) {
     TEST_DESCRIPTION("Verify that calls to debugPrintfEXT are received in debug stream");
     SetTargetApiVersion(VK_API_VERSION_1_1);
@@ -685,6 +689,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_GPL) {
     }
 }
 
+// Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_GPLFragment) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
@@ -820,6 +825,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_GPLFragment) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_GPLFragmentIndependentSets) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
@@ -960,6 +966,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_GPLFragmentIndependentSets) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_BasicUsageShaderObjects) {
     TEST_DESCRIPTION("Verify that calls to debugPrintfEXT are received in debug stream");
     SetTargetApiVersion(VK_API_VERSION_1_1);
@@ -1227,6 +1234,7 @@ TEST_F(NegativeDebugPrintf, DISABLED_BasicUsageShaderObjects) {
     }
 }
 
+// Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeDebugPrintf, DISABLED_MeshTaskShaderObjects) {
     TEST_DESCRIPTION("Test debug printf in mesh and task shader objects.");
 

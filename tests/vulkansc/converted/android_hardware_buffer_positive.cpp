@@ -100,8 +100,7 @@ TEST_F(PositiveAndroidHardwareBuffer, DepthStencil) {
     memory_dedicated_info.image = ds_image.handle();
     memory_dedicated_info.buffer = VK_NULL_HANDLE;
 
-    VkImportAndroidHardwareBufferInfoANDROID import_ahb_Info =
-        vku::InitStructHelper(&memory_dedicated_info);
+    VkImportAndroidHardwareBufferInfoANDROID import_ahb_Info = vku::InitStructHelper(&memory_dedicated_info);
     import_ahb_Info.buffer = ahb.handle();
 
     VkMemoryAllocateInfo memory_allocate_info = vku::InitStructHelper(&import_ahb_Info);
@@ -310,8 +309,7 @@ TEST_F(PositiveAndroidHardwareBuffer, ExternalImage) {
     memory_dedicated_info.image = image.handle();
     memory_dedicated_info.buffer = VK_NULL_HANDLE;
 
-    VkImportAndroidHardwareBufferInfoANDROID import_ahb_Info =
-        vku::InitStructHelper(&memory_dedicated_info);
+    VkImportAndroidHardwareBufferInfoANDROID import_ahb_Info = vku::InitStructHelper(&memory_dedicated_info);
     import_ahb_Info.buffer = ahb.handle();
 
     VkMemoryAllocateInfo memory_allocate_info = vku::InitStructHelper(&import_ahb_Info);
@@ -380,8 +378,7 @@ TEST_F(PositiveAndroidHardwareBuffer, ExternalCameraFormat) {
     memory_dedicated_info.image = image.handle();
     memory_dedicated_info.buffer = VK_NULL_HANDLE;
 
-    VkImportAndroidHardwareBufferInfoANDROID import_ahb_Info =
-        vku::InitStructHelper(&memory_dedicated_info);
+    VkImportAndroidHardwareBufferInfoANDROID import_ahb_Info = vku::InitStructHelper(&memory_dedicated_info);
     import_ahb_Info.buffer = ahb.handle();
 
     VkMemoryAllocateInfo memory_allocate_info = vku::InitStructHelper(&import_ahb_Info);

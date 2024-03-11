@@ -664,8 +664,7 @@ TEST_F(NegativeTransformFeedback, RuntimeSpirv) {
     AddRequiredExtensions(VK_EXT_TRANSFORM_FEEDBACK_EXTENSION_NAME);
     RETURN_IF_SKIP(InitFramework());
 
-    VkPhysicalDeviceTransformFeedbackFeaturesEXT transform_feedback_features =
-        vku::InitStructHelper();
+    VkPhysicalDeviceTransformFeedbackFeaturesEXT transform_feedback_features = vku::InitStructHelper();
     transform_feedback_features.transformFeedback = VK_TRUE;
     transform_feedback_features.geometryStreams = VK_TRUE;
     VkPhysicalDeviceVulkan12Features features12 = vku::InitStructHelper(&transform_feedback_features);

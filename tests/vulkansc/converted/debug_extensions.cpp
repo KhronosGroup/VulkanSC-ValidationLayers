@@ -17,6 +17,7 @@
 
 #include "../framework/layer_validation_tests.h"
 
+// Not supported in Vulkan SC: VK_EXT_debug_marker
 TEST_F(NegativeDebugExtensions, DISABLED_DebugMarkerName) {
     TEST_DESCRIPTION("Ensure debug marker object names are printed in debug report output");
     AddRequiredExtensions(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
@@ -93,6 +94,7 @@ TEST_F(NegativeDebugExtensions, DISABLED_DebugMarkerName) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: VK_EXT_debug_marker
 TEST_F(NegativeDebugExtensions, DISABLED_DebugMarkerSetObject) {
     AddRequiredExtensions(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_DEBUG_MARKER_EXTENSION_NAME);
@@ -267,6 +269,7 @@ TEST_F(NegativeDebugExtensions, DebugUtilsName) {
     vk::DestroyDebugUtilsMessengerEXT(instance(), my_messenger, nullptr);
 }
 
+// Not supported in Vulkan SC: VK_EXT_debug_marker
 TEST_F(NegativeDebugExtensions, DISABLED_DebugMarkerSetUtils) {
     AddRequiredExtensions(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_DEBUG_MARKER_EXTENSION_NAME);

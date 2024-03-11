@@ -226,6 +226,7 @@ TEST_F(PositiveShaderSpirv, CapabilityExtension2of2) {
     pipe.CreateGraphicsPipeline();
 }
 
+// Not supported in Vulkan SC: assumes availability of pre-Vulkan 1.2 functionality
 TEST_F(PositiveShaderSpirv, DISABLED_ShaderDrawParametersWithoutFeature) {
     TEST_DESCRIPTION("Use VK_KHR_shader_draw_parameters in 1.0 before shaderDrawParameters feature was added");
 

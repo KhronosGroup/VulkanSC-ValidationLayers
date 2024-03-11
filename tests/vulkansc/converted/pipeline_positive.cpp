@@ -962,8 +962,7 @@ TEST_F(PositivePipeline, PervertexNVShaderAttributes) {
     AddRequiredExtensions(VK_NV_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME);
     RETURN_IF_SKIP(InitFramework());
 
-    VkPhysicalDeviceFragmentShaderBarycentricFeaturesNV fragment_shader_barycentric_features =
-        vku::InitStructHelper();
+    VkPhysicalDeviceFragmentShaderBarycentricFeaturesNV fragment_shader_barycentric_features = vku::InitStructHelper();
     fragment_shader_barycentric_features.fragmentShaderBarycentric = VK_TRUE;
     VkPhysicalDeviceFeatures2KHR features2 = vku::InitStructHelper(&fragment_shader_barycentric_features);
     RETURN_IF_SKIP(InitState(nullptr, &features2));

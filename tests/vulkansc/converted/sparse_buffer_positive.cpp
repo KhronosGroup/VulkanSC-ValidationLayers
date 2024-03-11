@@ -16,6 +16,7 @@
 
 #include "../framework/layer_validation_tests.h"
 
+// Not supported in Vulkan SC: sparse resources
 TEST_F(PositiveSparseBuffer, DISABLED_NonOverlappingBufferCopy) {
     TEST_DESCRIPTION("Test correct non overlapping sparse buffers' copy");
     AddRequiredFeature(vkt::Feature::sparseBinding);
@@ -102,6 +103,7 @@ TEST_F(PositiveSparseBuffer, DISABLED_NonOverlappingBufferCopy) {
     m_default_queue->wait();
 }
 
+// Not supported in Vulkan SC: sparse resources
 TEST_F(PositiveSparseBuffer, DISABLED_NonOverlappingBufferCopy2) {
     TEST_DESCRIPTION("Non overlapping ranges copies should not trigger errors");
     AddRequiredFeature(vkt::Feature::sparseBinding);
@@ -181,6 +183,7 @@ TEST_F(PositiveSparseBuffer, DISABLED_NonOverlappingBufferCopy2) {
     m_default_queue->wait();
 }
 
+// Not supported in Vulkan SC: sparse resources
 TEST_F(PositiveSparseBuffer, DISABLED_NonOverlappingBufferCopy3) {
     TEST_DESCRIPTION("Test that overlaps are computed in buffer space, not memory space");
     AddRequiredFeature(vkt::Feature::sparseBinding);
@@ -258,6 +261,7 @@ TEST_F(PositiveSparseBuffer, DISABLED_NonOverlappingBufferCopy3) {
     sparse_queue->wait();
 }
 
+// Not supported in Vulkan SC: sparse resources
 TEST_F(PositiveSparseBuffer, DISABLED_NonOverlappingBufferCopy4) {
     TEST_DESCRIPTION("Test copying from a range that spans two different memory chunks");
     AddRequiredFeature(vkt::Feature::sparseBinding);
@@ -337,6 +341,7 @@ TEST_F(PositiveSparseBuffer, DISABLED_NonOverlappingBufferCopy4) {
     sparse_queue->wait();
 }
 
+// Not supported in Vulkan SC: sparse resources
 TEST_F(PositiveSparseBuffer, DISABLED_BindSparseEmpty) {
     TEST_DESCRIPTION("Test submitting empty queue bind sparse");
     AddRequiredFeature(vkt::Feature::sparseBinding);

@@ -20,6 +20,7 @@
 
 class VkPositiveBestPracticesLayerTest : public VkBestPracticesLayerTest {};
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_TestDestroyFreeNullHandles) {
     VkResult err;
 
@@ -103,6 +104,7 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_TestDestroyFreeNullHandles) {
     vk::FreeMemory(m_device->device(), VK_NULL_HANDLE, NULL);
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_DrawingWithUnboundUnusedSet) {
     TEST_DESCRIPTION(
         "Test issuing draw command with pipeline layout that has 2 descriptor sets with first descriptor set begin unused and "
@@ -139,6 +141,7 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_DrawingWithUnboundUnusedSet) {
     m_commandBuffer->end();
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_DynStateIgnoreAttachments) {
     TEST_DESCRIPTION("Make sure pAttachments is ignored if dynamic state is enabled");
 
@@ -177,6 +180,7 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_DynStateIgnoreAttachments) {
     m_commandBuffer->end();
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_ImageInputAttachmentLayout) {
     TEST_DESCRIPTION("Test transitioning image layout to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL for input attachment");
 
@@ -202,6 +206,7 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_ImageInputAttachmentLayout) {
     m_commandBuffer->end();
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_PipelineLibraryNoRendering) {
     TEST_DESCRIPTION("Create a pipeline library without a render pass or rendering info");
 
@@ -222,6 +227,7 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_PipelineLibraryNoRendering) {
     pre_raster_lib.CreateGraphicsPipeline();
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_PushConstantSet) {
     RETURN_IF_SKIP(InitBestPracticesFramework());
     RETURN_IF_SKIP(InitState());

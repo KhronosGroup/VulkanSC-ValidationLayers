@@ -447,6 +447,7 @@ TEST_F(NegativePipeline, DISABLED_SamplePNextDisabled) {
     CreatePipelineHelper::OneshotTest(*this, bad_chain, kErrorBit, "VUID-VkPipelineMultisampleStateCreateInfo-pNext-pNext");
 }
 
+// Not supported in Vulkan SC: VK_QCOM_render_pass_shader_resolve
 TEST_F(NegativePipeline, DISABLED_SubpassRasterizationSamples) {
     TEST_DESCRIPTION("Test creating two pipelines referring to the same subpass but with different rasterization samples count");
 
@@ -682,6 +683,7 @@ TEST_F(NegativePipeline, RasterizerDiscardWithFragmentShader) {
     vk::DestroyPipelineLayout(m_device->handle(), pipeline_layout, nullptr);
 }
 
+// Not supported in Vulkan SC: derivative pipelines
 TEST_F(NegativePipeline, DISABLED_CreateGraphicsPipelineWithBadBasePointer) {
     TEST_DESCRIPTION("Create Graphics Pipeline with pointers that must be ignored by layers");
 
@@ -950,6 +952,7 @@ TEST_F(NegativePipeline, DuplicateStage) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-stage-06897");
 }
 
+// This test case are replaced with Vulkan SC specific ones
 TEST_F(NegativePipeline, DISABLED_MissingEntrypoint) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
@@ -1014,6 +1017,7 @@ TEST_F(NegativePipeline, DepthStencilRequired) {
     m_errorMonitor->VerifyFound();
 }
 
+// This test case are replaced with Vulkan SC specific ones
 TEST_F(NegativePipeline, DISABLED_NullStagepName) {
     TEST_DESCRIPTION("Test that an error is produced for a stage with a null pName pointer");
 
@@ -1784,8 +1788,7 @@ TEST_F(NegativePipeline, PipelineExecutablePropertiesFeature) {
     AddRequiredExtensions(VK_KHR_PIPELINE_EXECUTABLE_PROPERTIES_EXTENSION_NAME);
     RETURN_IF_SKIP(InitFramework());
 
-    VkPhysicalDevicePipelineExecutablePropertiesFeaturesKHR pipeline_exe_features =
-        vku::InitStructHelper();
+    VkPhysicalDevicePipelineExecutablePropertiesFeaturesKHR pipeline_exe_features = vku::InitStructHelper();
     pipeline_exe_features.pipelineExecutableInfo = VK_FALSE;  // Starting with it off
 
     VkPhysicalDeviceFeatures2 features2 = vku::InitStructHelper(&pipeline_exe_features);
@@ -2039,6 +2042,7 @@ TEST_F(NegativePipeline, SampledInvalidImageViews) {
     }
 }
 
+// Not supported in Vulkan SC: assumes availability of pre-Vulkan 1.2 functionality
 TEST_F(NegativePipeline, DISABLED_ShaderDrawParametersNotEnabled10) {
     TEST_DESCRIPTION("Validation using DrawParameters for Vulkan 1.0 without the shaderDrawParameters feature enabled.");
 
@@ -2091,6 +2095,7 @@ TEST_F(NegativePipeline, ShaderDrawParametersNotEnabled11) {
     }
 }
 
+// Not supported in Vulkan SC: miscellaneous Vulkan-only extensions
 TEST_F(NegativePipeline, DISABLED_CreateFlags) {
     TEST_DESCRIPTION("Create a graphics pipeline with invalid VkPipelineCreateFlags.");
     SetTargetApiVersion(VK_API_VERSION_1_1);
@@ -2134,6 +2139,7 @@ TEST_F(NegativePipeline, DISABLED_CreateFlags) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-None-09497");
 }
 
+// Not supported in Vulkan SC: miscellaneous Vulkan-only extensions
 TEST_F(NegativePipeline, DISABLED_CreateFlagsCompute) {
     TEST_DESCRIPTION("Create a compute pipeline with invalid VkPipelineCreateFlags.");
 
@@ -2176,6 +2182,7 @@ TEST_F(NegativePipeline, DISABLED_CreateFlagsCompute) {
     CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-VkComputePipelineCreateInfo-None-09497");
 }
 
+// Not supported in Vulkan SC: vkMergePipelineCaches
 TEST_F(NegativePipeline, DISABLED_MergePipelineCachesInvalidDst) {
     TEST_DESCRIPTION("Test mergeing pipeline caches with dst cache in src list");
 
@@ -2198,6 +2205,7 @@ TEST_F(NegativePipeline, DISABLED_MergePipelineCachesInvalidDst) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: derivative pipelines
 TEST_F(NegativePipeline, DISABLED_CreateComputesPipelineWithBadBasePointer) {
     TEST_DESCRIPTION("Create Compute Pipeline with bad base pointer");
 
@@ -2241,6 +2249,7 @@ TEST_F(NegativePipeline, DISABLED_CreateComputesPipelineWithBadBasePointer) {
     }
 }
 
+// Not supported in Vulkan SC: derivative pipelines
 TEST_F(NegativePipeline, DISABLED_GraphicsPipelineWithBadBasePointer) {
     TEST_DESCRIPTION("Create Graphics Pipeline with bad base pointer");
 
@@ -2288,8 +2297,7 @@ TEST_F(NegativePipeline, DiscardRectangle) {
     uint32_t count = discard_rectangle_properties.maxDiscardRectangles + 1;
     std::vector<VkRect2D> discard_rectangles(count);
 
-    VkPipelineDiscardRectangleStateCreateInfoEXT discard_rectangle_state =
-        vku::InitStructHelper();
+    VkPipelineDiscardRectangleStateCreateInfoEXT discard_rectangle_state = vku::InitStructHelper();
     discard_rectangle_state.discardRectangleCount = count;
     discard_rectangle_state.pDiscardRectangles = discard_rectangles.data();
 
@@ -2424,8 +2432,7 @@ TEST_F(NegativePipeline, VariableSampleLocations) {
     sample_locations_info.sampleLocationsCount = valid_count;
     sample_locations_info.pSampleLocations = sample_location.data();
 
-    VkPipelineSampleLocationsStateCreateInfoEXT sample_locations_state =
-        vku::InitStructHelper();
+    VkPipelineSampleLocationsStateCreateInfoEXT sample_locations_state = vku::InitStructHelper();
     sample_locations_state.sampleLocationsEnable = VK_TRUE;
     sample_locations_state.sampleLocationsInfo = sample_locations_info;
 
@@ -2508,8 +2515,7 @@ TEST_F(NegativePipeline, RasterizationConservativeStateCreateInfo) {
     VkPhysicalDeviceConservativeRasterizationPropertiesEXT conservative_rasterization_props = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(conservative_rasterization_props);
 
-    VkPipelineRasterizationConservativeStateCreateInfoEXT conservative_state =
-        vku::InitStructHelper();
+    VkPipelineRasterizationConservativeStateCreateInfoEXT conservative_state = vku::InitStructHelper();
     conservative_state.extraPrimitiveOverestimationSize = -1.0f;
 
     CreatePipelineHelper pipe(*this);

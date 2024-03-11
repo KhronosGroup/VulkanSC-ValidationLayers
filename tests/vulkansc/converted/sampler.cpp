@@ -21,6 +21,7 @@
 #include "../framework/pipeline_helper.h"
 #include "../framework/descriptor_helper.h"
 
+// Not supported in Vulkan SC: assumes availability of pre-Vulkan 1.2 functionality
 TEST_F(NegativeSampler, DISABLED_MirrorClampToEdgeNotEnabled) {
     TEST_DESCRIPTION("Validation should catch using CLAMP_TO_EDGE addressing mode if the extension is not enabled.");
 
@@ -748,7 +749,9 @@ TEST_F(NegativeSampler, FilterMinmax) {
     vk::DestroySamplerYcbcrConversionKHR(m_device->handle(), conversion, nullptr);
 }
 
-TEST_F(NegativeSampler, DISABLED_CustomBorderColor) {
+// This test case uses too much stack space to be compatible with QNX
+TEST_F(NegativeSampler, CustomBorderColor) {
+    SkipOnQNX();
     TEST_DESCRIPTION("Tests for VUs for VK_EXT_custom_border_color");
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_CUSTOM_BORDER_COLOR_EXTENSION_NAME);
@@ -1479,8 +1482,7 @@ TEST_F(NegativeSampler, BorderColorSwizzle) {
     AddRequiredExtensions(VK_EXT_BORDER_COLOR_SWIZZLE_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
 
-    VkSamplerBorderColorComponentMappingCreateInfoEXT border_color_component_mapping =
-        vku::InitStructHelper();
+    VkSamplerBorderColorComponentMappingCreateInfoEXT border_color_component_mapping = vku::InitStructHelper();
     border_color_component_mapping.components = {VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
                                                  VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY};
 
