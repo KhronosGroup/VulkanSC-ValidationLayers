@@ -18,6 +18,7 @@
 #include "../framework/pipeline_helper.h"
 #include "../framework/descriptor_helper.h"
 
+// Not supported in Vulkan SC: sparse resources
 TEST_F(PositiveSparseImage, DISABLED_MultipleBinds) {
     TEST_DESCRIPTION("Bind 2 memory ranges to one image using vkQueueBindSparse, destroy the image and then free the memory");
 
@@ -91,6 +92,7 @@ TEST_F(PositiveSparseImage, DISABLED_MultipleBinds) {
     m_default_queue->wait();
 }
 
+// Not supported in Vulkan SC: sparse resources
 TEST_F(PositiveSparseImage, DISABLED_BindFreeMemory) {
     TEST_DESCRIPTION("Test using a sparse image after freeing memory that was bound to it.");
 
@@ -180,6 +182,7 @@ TEST_F(PositiveSparseImage, DISABLED_BindFreeMemory) {
     m_default_queue->wait();
 }
 
+// Not supported in Vulkan SC: sparse resources
 TEST_F(PositiveSparseImage, DISABLED_BindMetadata) {
     TEST_DESCRIPTION("Bind memory for the metadata aspect of a sparse image");
 
@@ -258,6 +261,7 @@ TEST_F(PositiveSparseImage, DISABLED_BindMetadata) {
     m_default_queue->wait();
 }
 
+// Not supported in Vulkan SC: sparse resources
 TEST_F(PositiveSparseImage, DISABLED_OpImageSparse) {
     TEST_DESCRIPTION("Use OpImageSparse* operations at draw time");
 
@@ -335,6 +339,7 @@ TEST_F(PositiveSparseImage, DISABLED_OpImageSparse) {
     m_commandBuffer->end();
 }
 
+// Not supported in Vulkan SC: sparse resources
 TEST_F(PositiveSparseImage, DISABLED_BindImage) {
     AddRequiredFeature(vkt::Feature::sparseResidencyImage2D);
     RETURN_IF_SKIP(Init());

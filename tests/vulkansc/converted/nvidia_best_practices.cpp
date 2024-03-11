@@ -27,6 +27,7 @@ const char *kEnableNVIDIAValidation = "VALIDATION_CHECK_ENABLE_VENDOR_SPECIFIC_N
 
 static constexpr float defaultQueuePriority = 0.0f;
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_PageableDeviceLocalMemory) {
     AddRequiredExtensions(VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_EXTENSION_NAME);
     RETURN_IF_SKIP(InitBestPracticesFramework(kEnableNVIDIAValidation));
@@ -66,6 +67,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_PageableDeviceLocalMemory) {
     }
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_TilingLinear) {
     RETURN_IF_SKIP(InitBestPracticesFramework(kEnableNVIDIAValidation));
     InitState();
@@ -73,7 +75,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_TilingLinear) {
     VkImageCreateInfo image_ci = vku::InitStructHelper();
     image_ci.imageType = VK_IMAGE_TYPE_2D;
     image_ci.format = VK_FORMAT_A8B8G8R8_UNORM_PACK32;
-    image_ci.extent = { 512, 512, 1 };
+    image_ci.extent = {512, 512, 1};
     image_ci.mipLevels = 1;
     image_ci.arrayLayers = 1;
     image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -95,6 +97,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_TilingLinear) {
     }
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_Depth32Format) {
     RETURN_IF_SKIP(InitBestPracticesFramework(kEnableNVIDIAValidation));
     InitState();
@@ -103,7 +106,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_Depth32Format) {
     image_ci.imageType = VK_IMAGE_TYPE_2D;
     // This should be VK_FORMAT_D24_UNORM_S8_UINT, but that's not a required format.
     image_ci.format = VK_FORMAT_A8B8G8R8_UNORM_PACK32;
-    image_ci.extent = { 512, 512, 1 };
+    image_ci.extent = {512, 512, 1};
     image_ci.mipLevels = 1;
     image_ci.arrayLayers = 1;
     image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -117,7 +120,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_Depth32Format) {
         m_errorMonitor->Finish();
     }
 
-    VkFormat formats[] = { VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT };
+    VkFormat formats[] = {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT};
 
     for (VkFormat format : formats) {
         image_ci.format = format;
@@ -129,6 +132,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_Depth32Format) {
     }
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_QueueBindSparse_NotAsync) {
     RETURN_IF_SKIP(InitBestPracticesFramework(kEnableNVIDIAValidation));
     InitState();
@@ -241,6 +245,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_QueueBindSparse_NotAsync) {
     }
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_AccelerationStructure_NotAsync) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
@@ -298,6 +303,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_AccelerationStructure_NotAsync) 
     }
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_AllocateMemory_SetPriority) {
     RETURN_IF_SKIP(InitBestPracticesFramework(kEnableNVIDIAValidation));
     InitState();
@@ -325,6 +331,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_AllocateMemory_SetPriority) {
     }
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_AllocateMemory_ReuseAllocations) {
     RETURN_IF_SKIP(InitBestPracticesFramework(kEnableNVIDIAValidation));
     InitState();
@@ -355,6 +362,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_AllocateMemory_ReuseAllocations)
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_BindMemory_NoPriority) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_EXTENSION_NAME);
@@ -436,6 +444,7 @@ static VkDescriptorSetLayoutBinding CreateSingleDescriptorBinding(VkDescriptorTy
     return layout_binding;
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_CreatePipelineLayout_SeparateSampler) {
     RETURN_IF_SKIP(InitBestPracticesFramework(kEnableNVIDIAValidation));
     InitState();
@@ -481,16 +490,17 @@ TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_CreatePipelineLayout_SeparateSam
     }
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_CreatePipelineLayout_LargePipelineLayout) {
     RETURN_IF_SKIP(InitBestPracticesFramework(kEnableNVIDIAValidation));
     InitState();
 
     VkDescriptorSetLayoutBinding large_bindings[] = {
-        { 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 16, VK_SHADER_STAGE_VERTEX_BIT, nullptr },
-        { 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_VERTEX_BIT, nullptr },
+        {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 16, VK_SHADER_STAGE_VERTEX_BIT, nullptr},
+        {1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_VERTEX_BIT, nullptr},
     };
     VkDescriptorSetLayoutBinding small_bindings[] = {
-        { 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 16, VK_SHADER_STAGE_VERTEX_BIT, nullptr },
+        {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 16, VK_SHADER_STAGE_VERTEX_BIT, nullptr},
     };
 
     VkDescriptorSetLayoutCreateInfo large_set_layout_ci = vku::InitStructHelper();
@@ -526,8 +536,8 @@ TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_CreatePipelineLayout_LargePipeli
     }
 }
 
-TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_BindPipeline_SwitchTessGeometryMesh)
-{
+// Not supported in Vulkan SC: best practices layers
+TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_BindPipeline_SwitchTessGeometryMesh) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
 
     AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
@@ -596,8 +606,8 @@ TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_BindPipeline_SwitchTessGeometryM
     }
 }
 
-TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_BindPipeline_ZcullDirection)
-{
+// Not supported in Vulkan SC: best practices layers
+TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_BindPipeline_ZcullDirection) {
     SetTargetApiVersion(VK_API_VERSION_1_3);
 
     RETURN_IF_SKIP(InitBestPracticesFramework(kEnableNVIDIAValidation));
@@ -880,7 +890,8 @@ TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_BindPipeline_ZcullDirection)
         vk::CmdEndRendering(cmd);
 
         VkClearDepthStencilValue ds_value{};
-        vk::CmdClearDepthStencilImage(cmd, image.handle(), VK_IMAGE_LAYOUT_GENERAL, &ds_value, 1, &discard_barrier.subresourceRange);
+        vk::CmdClearDepthStencilImage(cmd, image.handle(), VK_IMAGE_LAYOUT_GENERAL, &ds_value, 1,
+                                      &discard_barrier.subresourceRange);
 
         vk::CmdBeginRendering(cmd, &begin_rendering_info);
 
@@ -907,7 +918,8 @@ TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_BindPipeline_ZcullDirection)
 
         set_desired_failure_msg();
         VkClearDepthStencilValue ds_value{};
-        vk::CmdClearDepthStencilImage(cmd, image.handle(), VK_IMAGE_LAYOUT_GENERAL, &ds_value, 1, &discard_barrier.subresourceRange);
+        vk::CmdClearDepthStencilImage(cmd, image.handle(), VK_IMAGE_LAYOUT_GENERAL, &ds_value, 1,
+                                      &discard_barrier.subresourceRange);
         m_errorMonitor->VerifyFound();
     }
 
@@ -966,8 +978,8 @@ TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_BindPipeline_ZcullDirection)
     m_commandBuffer->end();
 }
 
-TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_ClearColor_NotCompressed)
-{
+// Not supported in Vulkan SC: best practices layers
+TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_ClearColor_NotCompressed) {
     SetTargetApiVersion(VK_API_VERSION_1_3);
 
     RETURN_IF_SKIP(InitBestPracticesFramework(kEnableNVIDIAValidation));
@@ -1019,7 +1031,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_ClearColor_NotCompressed)
     clear.clearValue.color.float32[3] = 0.0f;
     clear.colorAttachment = 0;
 
-    auto set_clear_color = [&clear](const std::array<float, 4>& color) {
+    auto set_clear_color = [&clear](const std::array<float, 4> &color) {
         for (size_t i = 0; i < 4; ++i) {
             clear.clearValue.color.float32[i] = color[i];
         }
@@ -1078,6 +1090,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_ClearColor_NotCompressed)
     m_commandBuffer->end();
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkNvidiaBestPracticesLayerTest, DISABLED_BeginCommandBuffer_OneTimeSubmit) {
     RETURN_IF_SKIP(InitBestPracticesFramework(kEnableNVIDIAValidation));
     InitState();

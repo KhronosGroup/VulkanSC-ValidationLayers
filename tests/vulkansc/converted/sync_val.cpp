@@ -1687,6 +1687,7 @@ TEST_F(NegativeSyncVal, DynamicRenderingAttachmentStoreHazard) {
     m_errorMonitor->VerifyFound();
 }
 
+// Sync hazard mismatches
 TEST_F(NegativeSyncVal, DISABLED_CmdDispatchDrawHazards) {
     SetTargetApiVersion(VK_API_VERSION_1_2);
 
@@ -1752,12 +1753,13 @@ TEST_F(NegativeSyncVal, DISABLED_CmdDispatchDrawHazards) {
     descriptor_set.WriteDescriptorBufferInfo(0, buffer_a.handle(), 0, 2048);
     descriptor_set.WriteDescriptorImageInfo(1, imageview_c, sampler_c.handle(), VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                                             VK_IMAGE_LAYOUT_GENERAL);
-    descriptor_set.WriteDescriptorImageInfo(2, imageview_s, sampler_s.handle(), VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_IMAGE_LAYOUT_GENERAL);
+    descriptor_set.WriteDescriptorImageInfo(2, imageview_s, sampler_s.handle(), VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+                                            VK_IMAGE_LAYOUT_GENERAL);
     descriptor_set.WriteDescriptorBufferView(3, bufferview.handle());
     descriptor_set.UpdateDescriptorSets();
 
     // Dispatch
-    const char *csSource = R"glsl(
+    const char* csSource = R"glsl(
         #version 450
         layout(set=0, binding=0) uniform foo { float x; } ub0;
         layout(set=0, binding=1) uniform sampler2D cis1;
@@ -2611,7 +2613,7 @@ TEST_F(NegativeSyncVal, RenderPassWithWrongDepthStencilInitialLayout) {
 
     m_commandBuffer->begin();
     VkClearValue clear = {};
-    std::array<VkClearValue, 2> clear_values = { {clear, clear} };
+    std::array<VkClearValue, 2> clear_values = {{clear, clear}};
     m_renderPassBeginInfo.pClearValues = clear_values.data();
     m_renderPassBeginInfo.clearValueCount = clear_values.size();
     m_renderPassBeginInfo.renderArea = {{0, 0}, {32, 32}};
@@ -2874,9 +2876,7 @@ struct CreateRenderPassHelper {
         framebuffer->init(*dev, fbci);
     }
 
-    void InitState() {
-        InitImageAndView();
-    }
+    void InitState() { InitImageAndView(); }
 
     void InitBeginInfo() {
         render_pass_begin = vku::InitStructHelper();
@@ -3167,6 +3167,7 @@ TEST_F(NegativeSyncVal, SubpassMultiDep) {
     m_errorMonitor->VerifyFound();
 }
 
+// Sync hazard mismatches
 TEST_F(NegativeSyncVal, DISABLED_RenderPassAsyncHazard) {
     RETURN_IF_SKIP(InitSyncValFramework());
     RETURN_IF_SKIP(InitState());
@@ -3330,7 +3331,8 @@ TEST_F(NegativeSyncVal, DISABLED_RenderPassAsyncHazard) {
             g_pipes[i].init(*m_device, g_pipe_12.gp_ci_);
         }
 
-        g_pipe_12.descriptor_set_->WriteDescriptorImageInfo(0, attachments[0], sampler.handle(), VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT);
+        g_pipe_12.descriptor_set_->WriteDescriptorImageInfo(0, attachments[0], sampler.handle(),
+                                                            VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT);
         g_pipe_12.descriptor_set_->UpdateDescriptorSets();
 
         m_commandBuffer->begin();
@@ -3413,7 +3415,8 @@ TEST_F(NegativeSyncVal, DISABLED_RenderPassAsyncHazard) {
             g_pipes[i].init(*m_device, g_pipe_12.gp_ci_);
         }
 
-        g_pipe_12.descriptor_set_->WriteDescriptorImageInfo(0, attachments[0], sampler.handle(), VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT);
+        g_pipe_12.descriptor_set_->WriteDescriptorImageInfo(0, attachments[0], sampler.handle(),
+                                                            VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT);
         g_pipe_12.descriptor_set_->UpdateDescriptorSets();
 
         m_commandBuffer->begin();
@@ -3503,7 +3506,8 @@ TEST_F(NegativeSyncVal, DISABLED_RenderPassAsyncHazard) {
             g_pipes[i].init(*m_device, g_pipe_12.gp_ci_);
         }
 
-        g_pipe_12.descriptor_set_->WriteDescriptorImageInfo(0, attachments[0], sampler.handle(), VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT);
+        g_pipe_12.descriptor_set_->WriteDescriptorImageInfo(0, attachments[0], sampler.handle(),
+                                                            VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT);
         g_pipe_12.descriptor_set_->UpdateDescriptorSets();
 
         m_commandBuffer->begin();
@@ -3670,7 +3674,7 @@ TEST_F(NegativeSyncVal, EventsCopyImageHazards) {
     VkImageCopy region_0_q3toq3 = {layers_0, half_offset, layers_0, half_offset, half_extent};
 
     auto cb = m_commandBuffer->handle();
-    auto copy_general = [cb](const VkImageObj &from, const VkImageObj &to, const VkImageCopy &region) {
+    auto copy_general = [cb](const VkImageObj& from, const VkImageObj& to, const VkImageCopy& region) {
         vk::CmdCopyImage(cb, from.handle(), VK_IMAGE_LAYOUT_GENERAL, to.handle(), VK_IMAGE_LAYOUT_GENERAL, 1, &region);
     };
 
@@ -3972,12 +3976,11 @@ TEST_F(NegativeSyncVal, DestroyedUnusedDescriptors) {
 
     InitRenderTarget();
 
-    VkDescriptorSetLayoutBindingFlagsCreateInfoEXT layout_createinfo_binding_flags =
-        vku::InitStructHelper();
+    VkDescriptorSetLayoutBindingFlagsCreateInfoEXT layout_createinfo_binding_flags = vku::InitStructHelper();
     constexpr size_t kNumDescriptors = 6;
 
     std::array<VkDescriptorBindingFlagsEXT, kNumDescriptors> ds_binding_flags;
-    for (auto &elem : ds_binding_flags) {
+    for (auto& elem : ds_binding_flags) {
         elem = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT | VK_DESCRIPTOR_BINDING_UPDATE_UNUSED_WHILE_PENDING_BIT_EXT;
     }
 
@@ -4109,7 +4112,7 @@ TEST_F(NegativeSyncVal, DestroyedUnusedDescriptors) {
     vk::UpdateDescriptorSets(m_device->device(), descriptor_writes.size(), descriptor_writes.data(), 0, NULL);
 
     // only descriptor 0 is used, the rest are going to get destroyed
-    char const *shader_source = R"glsl(
+    char const* shader_source = R"glsl(
         #version 450
         layout(set = 0, binding = 0) uniform foo_0 { int val; } doit;
         layout(set = 0, binding = 1) uniform foo_1 { int val; } readit;
@@ -4377,6 +4380,7 @@ TEST_F(NegativeSyncVal, TestCopyingToCompressedImage) {
     }
 }
 
+// Sync hazard mismatches
 TEST_F(NegativeSyncVal, DISABLED_StageAccessExpansion) {
     SetTargetApiVersion(VK_API_VERSION_1_2);
 
@@ -5092,9 +5096,7 @@ TEST_F(NegativeSyncVal, QSRenderPass) {
     {                                                                   \
         const VkResult result_ = (result_arg_);                         \
         if (result_ != VK_SUCCESS) {                                    \
-            {                                                           \
-                clean_;                                                 \
-            }                                                           \
+            { clean_; }                                                 \
             if (bool(label_)) {                                         \
                 FAIL() << string_VkResult(result_) << ": " << (label_); \
             } else {                                                    \
@@ -5296,7 +5298,7 @@ TEST_F(NegativeSyncVal, PresentDoesNotWaitForSubmit2) {
 
     uint32_t image_index = 0;
     ASSERT_EQ(VK_SUCCESS,
-        vk::AcquireNextImageKHR(device(), m_swapchain, kWaitTimeout, acquire_semaphore, VK_NULL_HANDLE, &image_index));
+              vk::AcquireNextImageKHR(device(), m_swapchain, kWaitTimeout, acquire_semaphore, VK_NULL_HANDLE, &image_index));
 
     VkImageMemoryBarrier2 layout_transition = vku::InitStructHelper();
     layout_transition.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
@@ -5365,7 +5367,7 @@ TEST_F(NegativeSyncVal, PresentDoesNotWaitForSubmit) {
 
     uint32_t image_index = 0;
     ASSERT_EQ(VK_SUCCESS,
-        vk::AcquireNextImageKHR(device(), m_swapchain, kWaitTimeout, acquire_semaphore, VK_NULL_HANDLE, &image_index));
+              vk::AcquireNextImageKHR(device(), m_swapchain, kWaitTimeout, acquire_semaphore, VK_NULL_HANDLE, &image_index));
 
     VkImageMemoryBarrier layout_transition = vku::InitStructHelper();
     layout_transition.srcAccessMask = 0;
@@ -5524,6 +5526,7 @@ TEST_F(NegativeSyncVal, TestMessageReportingWithManyBarriers) {
 
 // The original issue was that writeonly buffer accesss can be detected as READ:
 // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/7093
+// Sync hazard mismatches
 TEST_F(NegativeSyncVal, DISABLED_WriteOnlyBufferWriteHazard) {
     TEST_DESCRIPTION("Test that writeonly buffer access is reported as WRITE access");
     RETURN_IF_SKIP(InitSyncValFramework());
@@ -5572,6 +5575,7 @@ TEST_F(NegativeSyncVal, DISABLED_WriteOnlyBufferWriteHazard) {
     m_commandBuffer->end();
 }
 
+// Sync hazard mismatches
 TEST_F(NegativeSyncVal, DISABLED_WriteOnlyImageWriteHazard) {
     TEST_DESCRIPTION("Test that writeonly image access is reported as WRITE access");
     RETURN_IF_SKIP(InitSyncValFramework());

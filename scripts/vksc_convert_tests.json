@@ -1,303 +1,259 @@
 {
-    "VkLayerTest": {
-        "*": "VkLayerTest",
+    "disable": [
+        {
+            "reason": "This test case are replaced with Vulkan SC specific ones",
+            "cases": [
+                "VkLayerTest.SpecLinks",
+                "NegativeImage.ImageMisc",
+                "PositiveInstance.ValidationInstanceExtensions",
+                "NegativeMemory.BindMemory",
+                "NegativeObjectLifetime.LeakAnObject",
+                "NegativePipeline.MissingEntrypoint",
+                "NegativePipeline.NullStagepName",
+                "NegativeRenderPass.IncompatibleFramebuffer",
+                "NegativeRenderPass.FramebufferIncompatibleNoHandle",
+                "NegativeShaderSpirv.CodeSize",
+                "NegativeShaderSpirv.Magic"
+            ]
+        },
+        {
+            "reason": "This test case are not relevant for Vulkan SC",
+            "cases": [
+                "VkPositiveLayerTest.ExtensionsInCreateInstance",
+                "NegativeImage.GetPhysicalDeviceImageFormatProperties"
+            ]
+        },
+        {
+            "reason": "Not supported in Vulkan SC: assumes availability of pre-Vulkan 1.2 functionality",
+            "cases": [
+                "VkLayerTest.UnsupportedPnextApiVersion",
+                "VkLayerTest.DeviceFeature2AndVertexAttributeDivisorExtensionUnenabled",
+                "VkLayerTest.UsePnextOnlyStructWithoutExtensionEnabled",
+                "VkLayerTest.RequiredPromotedFeaturesExtensions",
+                "VkLayerTest.MissingExtensionPhysicalDeviceProperties",
+                "VkLayerTest.ExtensionXmlDependsLogic3",
+                "VkPositiveLayerTest.Vulkan12FeaturesBufferDeviceAddress",
+                "VkPositiveLayerTest.UseInteractionApi2",
+                "NegativeDescriptorIndexing.SetLayoutWithoutExtension",
+                "NegativePipeline.ShaderDrawParametersNotEnabled10",
+                "NegativeSampler.MirrorClampToEdgeNotEnabled",
+                "PositiveSampler.SamplerMirrorClampToEdgeWithoutFeature",
+                "PositiveSampler.SamplerMirrorClampToEdgeWithoutFeature12",
+                "NegativeShaderSpirv.NoScalarBlockLayout10",
+                "NegativeShaderSpirv.NoUniformBufferStandardLayout10",
+                "PositiveShaderSpirv.ShaderDrawParametersWithoutFeature"
+            ]
+        },
+        {
+            "reason": "Not supported in Vulkan SC: allocation callbacks",
+            "cases": [
+                "VkLayerTest.InvalidAllocationCallbacks",
+                "NegativeInstanceless.DestroyInstanceAllocationCallbacksCompatibility"
+            ]
+        },
+        {
+            "reason": "Not supported in Vulkan SC: best practices layers",
+            "cases": [
+                "VkBestPracticesLayerTest.*",
+                "VkPositiveBestPracticesLayerTest.*",
+                "VkAmdBestPracticesLayerTest.*",
+                "VkArmBestPracticesLayerTest.*",
+                "VkNvidiaBestPracticesLayerTest.*"
+            ]
+        },
+        {
+            "reason": "Not supported in Vulkan SC: derivative pipelines",
+            "cases": [
+                "NegativePipeline.CreateComputesPipelineWithBadBasePointer",
+                "NegativePipeline.CreateGraphicsPipelineWithBadBasePointer",
+                "NegativePipeline.GraphicsPipelineWithBadBasePointer"
+            ]
+        },
+        {
+            "reason": "Not supported in Vulkan SC: GPU AV",
+            "cases": [
+                "NegativeGpuAV.*",
+                "PositiveGpuAV.*",
+                "PositiveGpuAVShaderObject.*",
+                "NegativeDebugPrintf.*"
+            ]
+        },
+        {
+            "reason": "Not supported in Vulkan SC: portability subset",
+            "cases": [
+                "VkPortabilitySubsetTest.*"
+            ]
+        },
+        {
+            "reason": "Not supported in Vulkan SC: split-instance bind regions",
+            "cases": [
+                "VkLayerTest.InvalidImageCreateFlagWithPhysicalDeviceCount",
+                "NegativeImage.ImageSplitInstanceBindRegionCount"
+            ]
+        },
+        {
+            "reason": "Not supported in Vulkan SC: sparse resources",
+            "cases": [
+                "NegativeImage.SparseResidencyAliased",
+                "NegativeSparseBuffer.*",
+                "PositiveSparseBuffer.*",
+                "NegativeSparseImage.*",
+                "PositiveSparseImage.*"
+            ]
+        },
+        {
+            "reason": "Not supported in Vulkan SC: vkFreeMemory",
+            "cases": [
+                "NegativeDescriptors.DescriptorImageUpdateNoMemoryBound",
+                "PositiveMemory.BindImageMemoryMultiThreaded",
+                "NegativeObjectLifetime.CmdBarrierBufferDestroyed",
+                "NegativeObjectLifetime.CmdBarrierImageDestroyed",
+                "NegativeObjectLifetime.Sync2CmdBarrierBufferDestroyed",
+                "NegativeObjectLifetime.Sync2CmdBarrierImageDestroyed",
+                "NegativeObjectLifetime.FramebufferAttachmentMemoryFreed",
 
-        "@disabled-depends-AllocationCallbacks": "Not supported in Vulkan SC: allocation callbacks",
-        "InvalidAllocationCallbacks": false,
-
-        "@disabled-depends-splitInstanceBindRegions": "Not supported in Vulkan SC: split-instance bind regions",
-        "InvalidImageCreateFlagWithPhysicalDeviceCount": false,
-
-        "@disabled-replaced": "These test cases are replaced with Vulkan SC specific ones",
-        "SpecLinks": false,
-
-        "@disabled-assumes-preVulkan12": "Not supported in Vulkan SC: assumes availability of pre-Vulkan 1.2 functionality",
-        "UnsupportedPnextApiVersion": false,
-        "DeviceFeature2AndVertexAttributeDivisorExtensionUnenabled": false,
-        "UsePnextOnlyStructWithoutExtensionEnabled": false,
-        "RequiredPromotedFeaturesExtensions": false,
-        "MissingExtensionPhysicalDeviceProperties": false,
-        "ExtensionXmlDependsLogic3": false,
-
-        "@disabled-depends-VK_EXT_validation_cache": "Not supported in Vulkan SC: VK_EXT_validation_cache",
-        "ValidationCacheTestBadMerge": false,
-
-        "@disabled-depends-VK_EXT_layer_settings": "Not supported in Vulkan SC: VK_EXT_layer_settings",
-        "CustomStypeStructIntegerArray": false,
-        "CustomStypeStructString": false,
-        "CustomStypeStructStringArray": false,
-        "DuplicateMessageLimit": false,
-        "VuidFilterHexInt": false,
-        "VuidFilterInt": false,
-        "VuidIdFilterString": false
-    },
-    "VkPositiveLayerTest": {
-        "*": "VkPositiveLayerTest",
-
-        "@disabled-depends-vkTrimCommandBuffer": "Not supported in Vulkan SC: vkTrimCommandBuffer",
-        "GetDevProcAddrExtensions": false,
-
-        "@disabled-assumes-preVulkan12": "Not supported in Vulkan SC: assumes availability of pre-Vulkan 1.2 functionality",
-        "Vulkan12FeaturesBufferDeviceAddress": false,
-        "UseInteractionApi2": false,
-
-        "@disabled-not-relevant": "Not relevant for Vulkan SC",
-        "ExtensionsInCreateInstance": false
-    },
-    "RenderPassCreatePotentialFormatFeaturesTest": {
-        "*": "RenderPassCreatePotentialFormatFeaturesTest"
-    },
-    "DynamicRenderingCommandBufferInheritanceRenderingInfoTest": {
-        "*": "DynamicRenderingCommandBufferInheritanceRenderingInfoTest"
-    },
-    "NegativeDebugExtensions": {
-        "@disabled-depends-VK_EXT_debug_marker": "Not supported in Vulkan SC: VK_EXT_debug_marker",
-        "DebugMarkerName": false,
-        "DebugMarkerSetObject": false,
-        "DebugMarkerSetUtils": false
-    },
-    "NegativeDescriptorIndexing": {
-        "@disabled-assumes-preVulkan12": "Not supported in Vulkan SC: assumes availability of pre-Vulkan 1.2 functionality",
-        "SetLayoutWithoutExtension": false
-    },
-    "NegativeDescriptors": {
-        "@disabled-depends-vkFreeMemory": "Not supported in Vulkan SC: vkFreeMemory",
-        "DescriptorImageUpdateNoMemoryBound": false
-    },
-    "NegativeFragmentShadingRate": {
-        "@disabled-depends-VK_QCOM_render_pass_transform": "Not supported in Vulkan SC: VK_QCOM_render_pass_transform",
-        "@Attachments": "TODO: Vulkan SC - only a small subset of the subtests are dependent on the QCOM extension",
-        "Attachments": false
-    },
-    "NegativeGraphicsLibrary": {
-        "@disabled-depends-VK_EXT_graphics_pipeline_library": "Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library",
-        "*": false
-    },
-    "PositiveGraphicsLibrary": {
-        "@disabled-depends-VK_EXT_graphics_pipeline_library": "Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library",
-        "*": false
-    },
-    "NegativeImage": {
-        "@disabled-replaced": "These test cases are replaced with Vulkan SC specific ones",
-        "ImageMisc": false,
-
-        "@disabled-depends-sparse": "Not supported in Vulkan SC: space resources",
-        "SparseResidencyAliased": false,
-
-        "@disabled-depends-splitInstanceBindRegions": "Not supported in Vulkan SC: split-instance bind regions",
-        "ImageSplitInstanceBindRegionCount": false,
-
-        "@disabled-not-relevant": "Relies on a Vulkan MockICD specific hack",
-        "GetPhysicalDeviceImageFormatProperties": false
-    },
-    "PositiveInstance": {
-        "@disabled-replaced": "These test cases are replaced with Vulkan SC specific ones",
-        "ValidationInstanceExtensions": false
-    },
-    "NegativeInstanceless": {
-        "@disabled-depends-AllocationCallbacks": "Not supported in Vulkan SC: allocation callbacks",
-        "DestroyInstanceAllocationCallbacksCompatibility": false,
-
-        "@disabled-depends-Vulkan-only-exts": "Not supported in Vulkan SC: miscellaneous Vulkan-only extensions",
-        "ExtensionStructsWithoutExtensions": false
-    },
-    "NegativeMemory": {
-        "@disabled-replaced": "These test cases are replaced with Vulkan SC specific ones",
-        "BindMemory": false,
-
-        "@disabled-depends-VK_NV_dedicated_allocation": "Not supported in Vulkan SC: VK_NV_dedicated_allocation",
-        "MemoryAllocatepNextChain": false
-    },
-    "PositiveMemory": {
-        "@disabled-depends-vkFreeMemory": "Not supported in Vulkan SC: vkFreeMemory",
-        "BindImageMemoryMultiThreaded": false
-    },
-    "NegativeObjectLifetime": {
-        "@disabled-replaced": "These test cases are replaced with Vulkan SC specific ones",
-        "LeakAnObject": false,
-
-        "@disabled-depends-vkFreeMemory": "Not supported in Vulkan SC: vkFreeMemory",
-        "CmdBarrierBufferDestroyed": false,
-        "CmdBarrierImageDestroyed": false,
-        "Sync2CmdBarrierBufferDestroyed": false,
-        "Sync2CmdBarrierImageDestroyed": false,
-        "FramebufferAttachmentMemoryFreed": false,
-
-        "@disabled-depends-vkDestroyQueryPool": "Not supported in Vulkan SC: vkDestroyQueryPool",
-        "DescriptorPoolInUseDestroyedSignaled": false
-    },
-    "NegativeParent": {
-        "@disabled-depends-VK_EXT_debug_report": "Not supported in Vulkan SC: VK_EXT_debug_report",
-        "Instance_DebugReportCallback": false
-    },
-    "NegativePipeline": {
-        "@disabled-depends-vkMergePipelineCaches": "Not supported in Vulkan SC: vkMergePipelineCaches",
-        "MergePipelineCachesInvalidDst": false,
-
-        "@disabled-depends-derivativePipelines": "Not supported in Vulkan SC: derivative pipelines",
-        "CreateComputesPipelineWithBadBasePointer": false,
-        "CreateGraphicsPipelineWithBadBasePointer": false,
-        "GraphicsPipelineWithBadBasePointer": false,
-
-        "@disabled-depends-Vulkan-behavior": "Depends on Vulkan behavior that is changed for Vulkan SC",
-        "NullStagepName": false,
-
-        "@disabled-replaced": "These test cases are replaced with Vulkan SC specific ones",
-        "MissingEntrypoint": false,
-
-        "@disabled-assumes-preVulkan12": "Not supported in Vulkan SC: assumes availability of pre-Vulkan 1.2 functionality",
-        "ShaderDrawParametersNotEnabled10": false,
-
-        "@disabled-depends-VK_QCOM_render_pass_shader_resolve": "Not supported in Vulkan SC: VK_QCOM_render_pass_shader_resolve",
-        "SubpassRasterizationSamples": false,
-
-        "@disabled-depends-on-misc-unsupported-extensions": "Not supported in Vulkan SC: miscellaneous Vulkan-only features",
-        "CreateFlags": false,
-        "CreateFlagsCompute": false
-    },
-    "NegativePushDescriptor": {
-        "@disabled-depends-VK_KHR_push_descriptor": "Not supported in Vulkan SC: VK_KHR_push_descriptor",
-        "SetLayoutWithoutExtension": false
-    },
-    "NegativeQuery": {
-        "@disabled-depends-vkDestroyQueryPool": "Not supported in Vulkan SC: vkDestroyQueryPool",
-        "CmdBufferQueryPoolDestroyed": false,
-        "PoolInUseDestroyedSignaled": false,
-        "DestroyActiveQueryPool": false,
-        "DestroyWithoutQueryPool": false,
-        "HostResetQueryPool": false
-    },
-    "PositiveRayTracing": {
-        "@disabled-depends-ray-tracing": "Not supported in Vulkan SC: ray tracing",
-        "BarrierSync1NoCrash": false
-    },
-    "NegativeRenderPass": {
-        "@disabled-replaced": "These test cases are replaced with Vulkan SC specific ones",
-        "IncompatibleFramebuffer": false,
-        "FramebufferIncompatibleNoHandle": false
-    },
-    "NegativeSampler": {
-        "@disabled-assumes-preVulkan12": "Not supported in Vulkan SC: assumes availability of pre-Vulkan 1.2 functionality",
-        "MirrorClampToEdgeNotEnabled": false,
-
-        "@disabled-temporary-QNX-stack-size": [
-            "This test case uses too much stack space for QNX systems and hence it's currently disabled",
-            "The test itself is skipped on Vulkan SC anyway, thus this does not limit test coverage"
-        ],
-        "CustomBorderColor": false
-    },
-    "PositiveSampler": {
-        "@disabled-assumes-preVulkan12": "Not supported in Vulkan SC: assumes availability of pre-Vulkan 1.2 functionality",
-        "SamplerMirrorClampToEdgeWithoutFeature": false,
-        "SamplerMirrorClampToEdgeWithoutFeature12": false
-    },
-    "NegativeShaderSpirv": {
-        "@disabled-assumes-preVulkan12": "Not supported in Vulkan SC: assumes availability of pre-Vulkan 1.2 functionality",
-        "NoScalarBlockLayout10": false,
-        "NoUniformBufferStandardLayout10": false,
-
-        "@disabled-replaced": "These test cases are replaced with Vulkan SC specific ones",
-        "CodeSize": false,
-        "Magic": false
-    },
-    "PositiveShaderSpirv": {
-        "@disabled-assumes-preVulkan12": "Not supported in Vulkan SC: assumes availability of pre-Vulkan 1.2 functionality",
-        "ShaderDrawParametersWithoutFeature": false
-    },
-    "NegativeSparseBuffer": {
-        "@disabled": "Not supported in Vulkan SC: space resources",
-        "*": false
-    },
-    "PositiveSparseBuffer": {
-        "@disabled": "Not supported in Vulkan SC: space resources",
-        "*": false
-    },
-    "NegativeSparseImage": {
-        "@disabled": "Not supported in Vulkan SC: space resources",
-        "*": false
-    },
-    "PositiveSparseImage": {
-        "@disabled": "Not supported in Vulkan SC: space resources",
-        "*": false
-    },
-    "PositiveSyncObject": {
-        "@disabled-depends-vkFreeMemory": "Not supported in Vulkan SC: vkFreeMemory",
-        "@WaitTimelineSemThreadRace": "Allocates 10000 transient device memory objects unnecessarily",
-        "WaitTimelineSemThreadRace": false
-    },
-    "NegativeSyncVal": {
-        "@StageAccessExpansion-comment": [
-            "TODO: Vulkan SC - This test fails to generate the appropriate sync hazard error",
-            "or report additional hazards than expected",
-            "Most likely a dependency on the SPIR-V code to be able to detect the right hazards"
-        ],
-        "CmdDispatchDrawHazards": false,
-        "StageAccessExpansion": false,
-        "RenderPassAsyncHazard": false,
-        "WriteOnlyBufferWriteHazard": false,
-        "WriteOnlyImageWriteHazard": false
-    },
-    "PositiveThreading": {
-        "@disabled-excessive-objects": [
-            "This test case uses too much stack space that could cause issues on QNX and creates ",
-            " 10000 descriptor sets which are well beyond the number of objects we reserve for ",
-            "upstream test cases by default"
-        ],
-        "DebugObjectNames": false
-    },
-    "PositiveTooling": {
-        "@disabled-depends-VK_EXT_tooling_info": "Not supported in Vulkan SC: VK_EXT_tooling_info",
-        "InfoExt": false
-    },
-    "NegativeWsi": {
-        "@disabled-depends-WSI": [
-            "The test cases below are disabled because they depend on WSI functionalities",
-            "without actually verifying support for them"
-        ],
-        "CreatingWin32Surface": false
-    },
-    "PositiveWsi": {
-        "@rename-dead-code": "This test need renaming due to the limitations of gtest_add_tests",
-        "ProtectedSwapchainImageColorAttachment": "InvalidTestGroup"
-    },
-    "VkPortabilitySubsetTest": {
-        "@disabled-depends-portability": "Not supported in Vulkan SC: portability subset",
-        "*": false
-    },
-    "VkBestPracticesLayerTest": {
-        "@disabled": "We disable all best practices tests because Vulkan SC does not currently have best practices layers enabled",
-        "*": false
-    },
-    "VkPositiveBestPracticesLayerTest": {
-        "@disabled": "We disable all best practices tests because Vulkan SC does not currently have best practices layers enabled",
-        "*": false
-    },
-    "VkAmdBestPracticesLayerTest": {
-        "@disabled": "We disable all best practices tests because Vulkan SC does not currently have best practices layers enabled",
-        "*": false
-    },
-    "VkArmBestPracticesLayerTest": {
-        "@disabled": "We disable all best practices tests because Vulkan SC does not currently have best practices layers enabled",
-        "*": false
-    },
-    "VkNvidiaBestPracticesLayerTest": {
-        "@disabled": "We disable all best practices tests because Vulkan SC does not currently have best practices layers enabled",
-        "*": false
-    },
-    "NegativeGpuAV": {
-        "@disabled": "We disable all GPU assisted validation test cases as they are not applicable to Vulkan SC",
-        "*": false
-    },
-    "PositiveGpuAV": {
-        "@disabled": "We disable all GPU assisted validation test cases as they are not applicable to Vulkan SC",
-        "*": false
-    },
-    "PositiveGpuAVShaderObject": {
-        "@disabled": "We disable all GPU assisted validation test cases as they are not applicable to Vulkan SC",
-        "*": false
-    },
-    "NegativeDebugPrintf": {
-        "@disabled": "We disable all debug printf validation test cases as they are not applicable to Vulkan SC",
-        "*": false
-    }
+                "@Note: Allocates 10000 transient device memory objects unnecessarily",
+                "PositiveSyncObject.WaitTimelineSemThreadRace"
+            ]
+        },
+        {
+            "reason": "Not supported in Vulkan SC: vkDestroyQueryPool",
+            "cases": [
+                "NegativeObjectLifetime.DescriptorPoolInUseDestroyedSignaled",
+                "NegativeQuery.CmdBufferQueryPoolDestroyed",
+                "NegativeQuery.PoolInUseDestroyedSignaled",
+                "NegativeQuery.DestroyActiveQueryPool",
+                "NegativeQuery.DestroyWithoutQueryPool",
+                "NegativeQuery.HostResetQueryPool"
+            ]
+        },
+        {
+            "reason": "Not supported in Vulkan SC: vkMergePipelineCaches",
+            "cases": [
+                "NegativePipeline.MergePipelineCachesInvalidDst"
+            ]
+        },
+        {
+            "reason": "Not supported in Vulkan SC: vkTrimCommandBuffer",
+            "cases": [
+                "VkPositiveLayerTest.GetDevProcAddrExtensions"
+            ]
+        },
+        {
+            "reason": "Not supported in Vulkan SC: VK_KHR_push_descriptor",
+            "cases": [
+                "NegativePushDescriptor.SetLayoutWithoutExtension"
+            ]
+        },
+        {
+            "reason": "Not supported in Vulkan SC: VK_KHR_win32_surface",
+            "cases": [
+                "NegativeWsi.CreatingWin32Surface"
+            ]
+        },
+        {
+            "reason": "Not supported in Vulkan SC: VK_EXT_debug_marker",
+            "cases": [
+                "NegativeDebugExtensions.DebugMarkerName",
+                "NegativeDebugExtensions.DebugMarkerSetObject",
+                "NegativeDebugExtensions.DebugMarkerSetUtils"
+            ]
+        },
+        {
+            "reason": "Not supported in Vulkan SC: VK_EXT_debug_report",
+            "cases": [
+                "NegativeParent.Instance_DebugReportCallback"
+            ]
+        },
+        {
+            "reason": "Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library",
+            "cases": [
+                "NegativeGraphicsLibrary.*",
+                "PositiveGraphicsLibrary.*"
+            ]
+        },
+        {
+            "reason": "Not supported in Vulkan SC: VK_EXT_layer_settings",
+            "cases": [
+                "VkLayerTest.CustomStypeStructIntegerArray",
+                "VkLayerTest.CustomStypeStructString",
+                "VkLayerTest.CustomStypeStructStringArray",
+                "VkLayerTest.DuplicateMessageLimit",
+                "VkLayerTest.VuidFilterHexInt",
+                "VkLayerTest.VuidFilterInt",
+                "VkLayerTest.VuidIdFilterString"
+            ]
+        },
+        {
+            "reason": "Not supported in Vulkan SC: VK_EXT_tooling_info",
+            "cases": [
+                "PositiveTooling.InfoExt"
+            ]
+        },
+        {
+            "reason": "Not supported in Vulkan SC: VK_EXT_validation_cache",
+            "cases": [
+                "VkLayerTest.ValidationCacheTestBadMerge"
+            ]
+        },
+        {
+            "reason": "Not supported in Vulkan SC: VK_NV_dedicated_allocation",
+            "cases": [
+                "NegativeMemory.MemoryAllocatepNextChain"
+            ]
+        },
+        {
+            "reason": "Not supported in Vulkan SC: VK_QCOM_render_pass_shader_resolve",
+            "cases": [
+                "NegativePipeline.SubpassRasterizationSamples"
+            ]
+        },
+        {
+            "reason": "Not supported in Vulkan SC: miscellaneous Vulkan-only extensions",
+            "cases": [
+                "NegativeInstanceless.ExtensionStructsWithoutExtensions",
+                "NegativePipeline.CreateFlags",
+                "NegativePipeline.CreateFlagsCompute"
+            ]
+        },
+        {
+            "reason": "Sync hazard mismatches",
+            "cases": [
+                "@TODO: Vulkan SC - These tests fail to generate the appropriate sync hazard error or report additional hazards than expected",
+                "NegativeSyncVal.CmdDispatchDrawHazards",
+                "NegativeSyncVal.StageAccessExpansion",
+                "NegativeSyncVal.RenderPassAsyncHazard",
+                "NegativeSyncVal.WriteOnlyBufferWriteHazard",
+                "NegativeSyncVal.WriteOnlyImageWriteHazard"
+            ]
+        },
+        {
+            "reason": "Uses too many objects",
+            "cases": [
+                "@Note: This test case assumes 10000 descriptor sets can be created from a single pool",
+                "PositiveThreading.DebugObjectNames"
+            ]
+        }
+    ],
+    "modify": [
+        {
+            "reason": "This test case uses too much stack space to be compatible with QNX",
+            "cases": [
+                "NegativeSampler.CustomBorderColor"
+            ],
+            "patch": [
+                "SkipOnQNX()"
+            ]
+        },
+        {
+            "reason":
+                "This test case triggers an unexpected VUID due to reliance on the VK_QCOM_render_pass_transform extension that is not available in Vulkan SC",
+            "cases": [
+                "NegativeFragmentShadingRate.Attachments"
+            ],
+            "patch": [
+                "m_errorMonitor->SetAllowedFailureMsg(\"VUID-VkRenderPassCreateInfo2-flags-zerobitmask\")"
+            ]
+        }
+    ]
 }

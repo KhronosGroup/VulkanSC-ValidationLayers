@@ -79,7 +79,8 @@ TEST_F(NegativePushDescriptor, DSBufferInfo) {
     update_template_ci.descriptorSetLayout = descriptor_set.layout_.handle();
 
     VkDescriptorUpdateTemplate update_template = VK_NULL_HANDLE;
-    ASSERT_EQ(VK_SUCCESS, vk::CreateDescriptorUpdateTemplateKHR(m_device->device(), &update_template_ci, nullptr, &update_template));
+    ASSERT_EQ(VK_SUCCESS,
+              vk::CreateDescriptorUpdateTemplateKHR(m_device->device(), &update_template_ci, nullptr, &update_template));
 
     std::unique_ptr<vkt::DescriptorSetLayout> push_dsl = nullptr;
     std::unique_ptr<vkt::PipelineLayout> pipeline_layout = nullptr;
@@ -333,6 +334,7 @@ TEST_F(NegativePushDescriptor, ImageLayout) {
     }
 }
 
+// Not supported in Vulkan SC: VK_KHR_push_descriptor
 TEST_F(NegativePushDescriptor, DISABLED_SetLayoutWithoutExtension) {
     TEST_DESCRIPTION("Create a push descriptor set layout without loading the needed extension.");
     RETURN_IF_SKIP(Init());

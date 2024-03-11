@@ -1114,6 +1114,7 @@ TEST_F(NegativeDescriptors, DescriptorPoolInUseResetSignaled) {
     m_default_queue->wait();
 }
 
+// Not supported in Vulkan SC: vkFreeMemory
 TEST_F(NegativeDescriptors, DISABLED_DescriptorImageUpdateNoMemoryBound) {
     TEST_DESCRIPTION("Attempt an image descriptor set update where image's bound memory has been freed.");
     RETURN_IF_SKIP(Init());
@@ -2314,9 +2315,9 @@ TEST_F(NegativeDescriptors, Maint1BindingSliceOf3DImage) {
 
     auto ivci =
         vku::InitStruct<VkImageViewCreateInfo>(nullptr, 0u, image.handle(), VK_IMAGE_VIEW_TYPE_2D, VK_FORMAT_R8G8B8A8_UNORM,
-                                             VkComponentMapping{VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
-                                                                VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY},
-                                             VkImageSubresourceRange{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1});
+                                               VkComponentMapping{VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
+                                                                  VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY},
+                                               VkImageSubresourceRange{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1});
     vkt::ImageView view(*m_device, ivci);
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit,
@@ -2325,7 +2326,7 @@ TEST_F(NegativeDescriptors, Maint1BindingSliceOf3DImage) {
 
     VkDescriptorImageInfo dii = {VK_NULL_HANDLE, view.handle(), VK_IMAGE_LAYOUT_GENERAL};
     auto write = vku::InitStruct<VkWriteDescriptorSet>(nullptr, descriptor_set.set_, 0u, 0u, 1u, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
-                                                     &dii, nullptr, nullptr);
+                                                       &dii, nullptr, nullptr);
     vk::UpdateDescriptorSets(m_device->device(), 1, &write, 0, nullptr);
 
     m_errorMonitor->VerifyFound();

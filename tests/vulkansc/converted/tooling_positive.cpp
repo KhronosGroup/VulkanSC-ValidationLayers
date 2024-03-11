@@ -17,6 +17,7 @@
 #include "../framework/layer_validation_tests.h"
 #include "generated/vk_extension_helper.h"
 
+// Not supported in Vulkan SC: VK_EXT_tooling_info
 TEST_F(PositiveTooling, DISABLED_InfoExt) {
     TEST_DESCRIPTION("Basic usage calling Tooling Extension and verify layer results.");
     AddRequiredExtensions(VK_EXT_TOOLING_INFO_EXTENSION_NAME);

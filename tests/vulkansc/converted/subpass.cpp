@@ -584,7 +584,7 @@ TEST_F(NegativeSubpass, SubpassInputNotBoundDescriptorSet) {
     const std::vector<VkSubpassDescription> subpasses(1u, subpass);
 
     const auto rpci = vku::InitStruct<VkRenderPassCreateInfo>(nullptr, 0u, size32(attachmentDescs), attachmentDescs.data(),
-                                                            size32(subpasses), subpasses.data(), 0u, nullptr);
+                                                              size32(subpasses), subpasses.data(), 0u, nullptr);
     vkt::RenderPass rp(*m_device, rpci);
     vkt::Framebuffer fb(*m_device, rp.handle(), 1, &view_input.handle(), 64, 64);
 
@@ -981,7 +981,7 @@ TEST_F(NegativeSubpass, InputAttachmentLayout) {
     std::vector<VkSubpassDependency> deps = {dep0, dep1, dep2};
 
     auto rpci = vku::InitStruct<VkRenderPassCreateInfo>(nullptr, 0u, size32(attachs), attachs.data(), size32(subpasses),
-                                                      subpasses.data(), size32(deps), deps.data());
+                                                        subpasses.data(), size32(deps), deps.data());
 
     // Current setup should be OK -- no attachment is both input and output in same subpass
     PositiveTestRenderPassCreate(m_errorMonitor, *m_device, rpci, rp2_supported);

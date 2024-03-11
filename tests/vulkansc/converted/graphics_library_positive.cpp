@@ -25,6 +25,7 @@ void GraphicsLibraryTest::InitBasicGraphicsLibrary() {
     RETURN_IF_SKIP(Init());
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(PositiveGraphicsLibrary, DISABLED_VertexInput) {
     TEST_DESCRIPTION("Create a vertex input graphics library");
 
@@ -37,6 +38,7 @@ TEST_F(PositiveGraphicsLibrary, DISABLED_VertexInput) {
     pipe.CreateGraphicsPipeline(false);
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(PositiveGraphicsLibrary, DISABLED_PreRaster) {
     TEST_DESCRIPTION("Create a pre-raster graphics library");
 
@@ -54,6 +56,7 @@ TEST_F(PositiveGraphicsLibrary, DISABLED_PreRaster) {
     pipe.CreateGraphicsPipeline();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(PositiveGraphicsLibrary, DISABLED_FragmentShader) {
     TEST_DESCRIPTION("Create a fragment shader graphics library");
 
@@ -69,6 +72,7 @@ TEST_F(PositiveGraphicsLibrary, DISABLED_FragmentShader) {
     pipe.CreateGraphicsPipeline();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(PositiveGraphicsLibrary, DISABLED_FragmentOutput) {
     TEST_DESCRIPTION("Create a fragment output graphics library");
 
@@ -82,6 +86,7 @@ TEST_F(PositiveGraphicsLibrary, DISABLED_FragmentOutput) {
     pipe.CreateGraphicsPipeline(false);
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(PositiveGraphicsLibrary, DISABLED_FragmentMixedAttachmentSamplesAMD) {
     TEST_DESCRIPTION("Create a fragment graphics library with mixed attachement sample support");
 
@@ -104,6 +109,7 @@ TEST_F(PositiveGraphicsLibrary, DISABLED_FragmentMixedAttachmentSamplesAMD) {
     pipe.CreateGraphicsPipeline(false);
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(PositiveGraphicsLibrary, DISABLED_ExeLibrary) {
     TEST_DESCRIPTION("Create an executable library by linking one or more graphics libraries");
 
@@ -160,6 +166,7 @@ TEST_F(PositiveGraphicsLibrary, DISABLED_ExeLibrary) {
     ASSERT_TRUE(exe_pipe.initialized());
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(PositiveGraphicsLibrary, DISABLED_DrawWithNullDSLs) {
     TEST_DESCRIPTION("Make a draw with a pipeline layout derived from null DSLs");
 
@@ -254,6 +261,7 @@ TEST_F(PositiveGraphicsLibrary, DISABLED_DrawWithNullDSLs) {
     m_commandBuffer->end();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(PositiveGraphicsLibrary, DISABLED_VertexInputAttributeDescriptionOffset) {
     TEST_DESCRIPTION("Test VUID-VkVertexInputAttributeDescription-offset-00622: is not trigged with graphics library");
     RETURN_IF_SKIP(InitBasicGraphicsLibrary());
@@ -292,6 +300,7 @@ TEST_F(PositiveGraphicsLibrary, DISABLED_VertexInputAttributeDescriptionOffset) 
     frag_shader_lib.CreateGraphicsPipeline();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(PositiveGraphicsLibrary, DISABLED_VertexAttributeDivisorInstanceRateZero) {
     TEST_DESCRIPTION("VK_EXT_vertex_attribute_divisor is not checked with VK_EXT_graphics_pipeline_library");
 
@@ -329,6 +338,7 @@ TEST_F(PositiveGraphicsLibrary, DISABLED_VertexAttributeDivisorInstanceRateZero)
     frag_shader_lib.CreateGraphicsPipeline();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(PositiveGraphicsLibrary, DISABLED_NotAttachmentDynamicBlendEnable) {
     TEST_DESCRIPTION("make sure using an empty pAttachments doesn't crash a GPL pipeline");
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -353,6 +363,7 @@ TEST_F(PositiveGraphicsLibrary, DISABLED_NotAttachmentDynamicBlendEnable) {
     pipe.CreateGraphicsPipeline(false);
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(PositiveGraphicsLibrary, DISABLED_DynamicPrimitiveTopolgyAllState) {
     TEST_DESCRIPTION("VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY works when GPL sets it in every state");
     SetTargetApiVersion(VK_API_VERSION_1_3);
@@ -439,6 +450,7 @@ TEST_F(PositiveGraphicsLibrary, DISABLED_DynamicPrimitiveTopolgyAllState) {
     m_commandBuffer->end();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(PositiveGraphicsLibrary, DISABLED_DynamicPrimitiveTopolgyVertexStateAndLinked) {
     TEST_DESCRIPTION("set VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY in Vertex State only and at Link time");
     SetTargetApiVersion(VK_API_VERSION_1_3);
@@ -528,6 +540,7 @@ TEST_F(PositiveGraphicsLibrary, DISABLED_DynamicPrimitiveTopolgyVertexStateAndLi
     m_commandBuffer->end();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(PositiveGraphicsLibrary, DISABLED_DynamicPrimitiveTopolgyVertexStateOnly) {
     TEST_DESCRIPTION("set VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY in Vertex State only, but not at Link time");
     SetTargetApiVersion(VK_API_VERSION_1_3);
@@ -611,6 +624,7 @@ TEST_F(PositiveGraphicsLibrary, DISABLED_DynamicPrimitiveTopolgyVertexStateOnly)
     m_commandBuffer->end();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(PositiveGraphicsLibrary, DISABLED_DynamicAlphaToOneEnableFragmentOutput) {
     TEST_DESCRIPTION("set VK_DYNAMIC_STATE_ALPHA_TO_ONE_ENABLE_EXT in Fragment Output");
     SetTargetApiVersion(VK_API_VERSION_1_3);
@@ -686,6 +700,7 @@ TEST_F(PositiveGraphicsLibrary, DISABLED_DynamicAlphaToOneEnableFragmentOutput) 
     m_commandBuffer->end();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(PositiveGraphicsLibrary, DISABLED_DynamicAlphaToOneEnableFragmentShader) {
     TEST_DESCRIPTION("set VK_DYNAMIC_STATE_ALPHA_TO_ONE_ENABLE_EXT in Fragment Shader");
     SetTargetApiVersion(VK_API_VERSION_1_3);
@@ -761,6 +776,7 @@ TEST_F(PositiveGraphicsLibrary, DISABLED_DynamicAlphaToOneEnableFragmentShader) 
     m_commandBuffer->end();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(PositiveGraphicsLibrary, DISABLED_FragmentShaderNoStageCount) {
     TEST_DESCRIPTION("Don't need a stageCount if only have fragment shader library");
     RETURN_IF_SKIP(InitBasicGraphicsLibrary());
@@ -775,6 +791,7 @@ TEST_F(PositiveGraphicsLibrary, DISABLED_FragmentShaderNoStageCount) {
     frag_shader_lib.CreateGraphicsPipeline(false);
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(PositiveGraphicsLibrary, DISABLED_LinkingInputAttachment) {
     TEST_DESCRIPTION("Make sure OpCapability InputAttachment is not detected at linking time");
     SetTargetApiVersion(VK_API_VERSION_1_3);
@@ -851,6 +868,7 @@ TEST_F(PositiveGraphicsLibrary, DISABLED_LinkingInputAttachment) {
     ASSERT_TRUE(exe_pipe.initialized());
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(PositiveGraphicsLibrary, DISABLED_TessellationWithoutPreRasterization) {
     TEST_DESCRIPTION("have Tessellation stages with null pTessellationState but not Pre-Rasterization");
 
@@ -887,6 +905,7 @@ TEST_F(PositiveGraphicsLibrary, DISABLED_TessellationWithoutPreRasterization) {
     pipe.CreateGraphicsPipeline(false);
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(PositiveGraphicsLibrary, DISABLED_FSIgnoredPointerGPLDynamicRendering) {
     TEST_DESCRIPTION("Check ignored pointers with dynamics rendering and GPL");
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -961,6 +980,7 @@ TEST_F(PositiveGraphicsLibrary, DISABLED_FSIgnoredPointerGPLDynamicRendering) {
     ASSERT_TRUE(exe_pipe.initialized());
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(PositiveGraphicsLibrary, DISABLED_GPLDynamicRenderingWithDepthDraw) {
     TEST_DESCRIPTION("Check ignored pointers with dynamics rendering and GPL");
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -1066,6 +1086,7 @@ TEST_F(PositiveGraphicsLibrary, DISABLED_GPLDynamicRenderingWithDepthDraw) {
     m_commandBuffer->end();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(PositiveGraphicsLibrary, DISABLED_DepthState) {
     TEST_DESCRIPTION("Create a GPL with depth state");
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -1174,6 +1195,7 @@ TEST_F(PositiveGraphicsLibrary, DISABLED_DepthState) {
     ASSERT_TRUE(exe_pipe.initialized());
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(PositiveGraphicsLibrary, DISABLED_FOIgnoredDynamicRendering) {
     TEST_DESCRIPTION("Check ignored pointers with dynamics rendering and no fragment output state");
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -1236,6 +1258,7 @@ TEST_F(PositiveGraphicsLibrary, DISABLED_FOIgnoredDynamicRendering) {
     lib.CreateGraphicsPipeline();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(PositiveGraphicsLibrary, DISABLED_ShaderModuleIdentifier) {
     TEST_DESCRIPTION("Create pipeline sub-state that references shader module identifiers");
     AddRequiredExtensions(VK_EXT_SHADER_MODULE_IDENTIFIER_EXTENSION_NAME);
@@ -1330,6 +1353,7 @@ TEST_F(PositiveGraphicsLibrary, DISABLED_ShaderModuleIdentifier) {
     vkt::Pipeline exe_pipe(*m_device, pipe_ci);
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(PositiveGraphicsLibrary, DISABLED_DepthStencilStateIgnored) {
     TEST_DESCRIPTION("Create a library with fragment shader state, but no fragment output state, and no DS state, but ignored");
 
@@ -1360,6 +1384,7 @@ TEST_F(PositiveGraphicsLibrary, DISABLED_DepthStencilStateIgnored) {
     frag_shader_lib.CreateGraphicsPipeline();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(PositiveGraphicsLibrary, DISABLED_ColorBlendStateIgnored) {
     TEST_DESCRIPTION("Create a library with fragment output state and invalid ColorBlendState state");
 
@@ -1416,6 +1441,7 @@ TEST_F(PositiveGraphicsLibrary, DISABLED_ColorBlendStateIgnored) {
     }
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(PositiveGraphicsLibrary, DISABLED_PipelineLibraryNoRendering) {
     TEST_DESCRIPTION("Create a pipeline library without a render pass or rendering info");
 
@@ -1471,6 +1497,7 @@ TEST_F(PositiveGraphicsLibrary, DISABLED_PipelineLibraryNoRendering) {
     ASSERT_TRUE(exe_pipe.initialized());
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(PositiveGraphicsLibrary, DISABLED_IgnoredTessellationState) {
     TEST_DESCRIPTION("Create a pipeline library with tessellation shader but no tessellation state");
 
@@ -1558,6 +1585,7 @@ TEST_F(PositiveGraphicsLibrary, DISABLED_IgnoredTessellationState) {
     ASSERT_TRUE(exe_pipe.initialized());
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(PositiveGraphicsLibrary, DISABLED_PushConstant) {
     RETURN_IF_SKIP(InitBasicGraphicsLibrary());
     InitRenderTarget();
@@ -1600,6 +1628,7 @@ TEST_F(PositiveGraphicsLibrary, DISABLED_PushConstant) {
     vkt::Pipeline lib(*m_device, lib_ci);
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(PositiveGraphicsLibrary, DISABLED_PushConstantOneLibrary) {
     RETURN_IF_SKIP(InitBasicGraphicsLibrary());
     InitRenderTarget();
@@ -1640,6 +1669,7 @@ TEST_F(PositiveGraphicsLibrary, DISABLED_PushConstantOneLibrary) {
     vkt::Pipeline lib(*m_device, lib_ci);
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(PositiveGraphicsLibrary, DISABLED_SetLayoutCount) {
     TEST_DESCRIPTION("Have setLayoutCount not be the same between pipeline layouts");
     RETURN_IF_SKIP(InitBasicGraphicsLibrary());
@@ -1684,6 +1714,7 @@ TEST_F(PositiveGraphicsLibrary, DISABLED_SetLayoutCount) {
     }
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(PositiveGraphicsLibrary, DISABLED_MultisampleStateFragShaderNull) {
     TEST_DESCRIPTION(
         "you're allowed to have the fragment shader subset have a multisample state of NULL and the fragment output subset have a "
@@ -1713,6 +1744,7 @@ TEST_F(PositiveGraphicsLibrary, DISABLED_MultisampleStateFragShaderNull) {
     frag_shader_lib.CreateGraphicsPipeline(false);
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(PositiveGraphicsLibrary, DISABLED_BadRenderPassVertexInput) {
     TEST_DESCRIPTION("Create a vertex input graphics library with a bogus VkRenderPass");
 
@@ -1728,6 +1760,7 @@ TEST_F(PositiveGraphicsLibrary, DISABLED_BadRenderPassVertexInput) {
     pipe.CreateGraphicsPipeline(false);
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(PositiveGraphicsLibrary, DISABLED_LinkWithNoLayout) {
     TEST_DESCRIPTION("You don't need a layout if fragment shader / pre-rasterization not required");
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -1754,6 +1787,7 @@ TEST_F(PositiveGraphicsLibrary, DISABLED_LinkWithNoLayout) {
     vertex_input_lib.CreateGraphicsPipeline(false);
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(PositiveGraphicsLibrary, DISABLED_LinkWithNoRenderPass) {
     TEST_DESCRIPTION("You don't need a Renderpass if only using vertex input");
     SetTargetApiVersion(VK_API_VERSION_1_2);

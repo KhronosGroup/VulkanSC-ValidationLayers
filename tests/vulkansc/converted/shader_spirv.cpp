@@ -25,6 +25,7 @@ struct icd_spv_header {
     uint32_t gen_magic = 0;  // Generator's magic number
 };
 
+// This test case are replaced with Vulkan SC specific ones
 TEST_F(NegativeShaderSpirv, DISABLED_CodeSize) {
     TEST_DESCRIPTION("Test that errors are produced for a spirv modules with invalid code sizes");
 
@@ -71,6 +72,7 @@ TEST_F(NegativeShaderSpirv, DISABLED_CodeSize) {
     }
 }
 
+// This test case are replaced with Vulkan SC specific ones
 TEST_F(NegativeShaderSpirv, DISABLED_Magic) {
     TEST_DESCRIPTION("Test that an error is produced for a spirv module with a bad magic number");
     RETURN_IF_SKIP(Init());
@@ -1979,6 +1981,7 @@ TEST_F(NegativeShaderSpirv, DemoteToHelperInvocation) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: assumes availability of pre-Vulkan 1.2 functionality
 TEST_F(NegativeShaderSpirv, DISABLED_NoUniformBufferStandardLayout10) {
     TEST_DESCRIPTION("Don't enable uniformBufferStandardLayout in Vulkan 1.0 and have spirv-val catch invalid shader");
     SetTargetApiVersion(VK_API_VERSION_1_0);
@@ -2063,6 +2066,7 @@ TEST_F(NegativeShaderSpirv, NoUniformBufferStandardLayout12) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: assumes availability of pre-Vulkan 1.2 functionality
 TEST_F(NegativeShaderSpirv, DISABLED_NoScalarBlockLayout10) {
     TEST_DESCRIPTION("Don't enable scalarBlockLayout in Vulkan 1.0 and have spirv-val catch invalid shader");
     SetTargetApiVersion(VK_API_VERSION_1_0);

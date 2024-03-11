@@ -370,7 +370,7 @@ TEST_F(PositiveRayTracing, BarrierAccessMaskAccelerationStructureRayQueryEnabled
     m_commandBuffer->end();
 }
 
-TEST_F(PositiveRayTracing, DISABLED_BarrierSync1NoCrash) {
+TEST_F(PositiveRayTracing, BarrierSync1NoCrash) {
     TEST_DESCRIPTION("Regression test for nullptr crash when Sync1 barrier API is used for acceleration structure accesses");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);

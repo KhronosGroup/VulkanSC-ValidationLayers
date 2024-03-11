@@ -245,7 +245,7 @@ TEST_F(NegativePipelineTopology, PrimitiveTopologyListRestart) {
     auto set_info = [&](CreatePipelineHelper &helper) {
         helper.ia_ci_.topology = topology;
         helper.ia_ci_.primitiveRestartEnable = VK_TRUE;
-        helper.shader_stages_ = { vs.GetStageCreateInfo(), helper.fs_->GetStageCreateInfo() };
+        helper.shader_stages_ = {vs.GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
     };
 
     topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;

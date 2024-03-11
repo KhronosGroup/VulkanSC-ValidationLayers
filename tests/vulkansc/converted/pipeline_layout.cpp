@@ -145,8 +145,7 @@ TEST_F(NegativePipelineLayout, ExcessPerStageDescriptors) {
     uint32_t sum_samplers = m_device->phy().limits_.maxDescriptorSetSamplers;
     uint32_t sum_input_attachments = m_device->phy().limits_.maxDescriptorSetInputAttachments;
 
-    VkPhysicalDeviceDescriptorIndexingProperties descriptor_indexing_properties =
-        vku::InitStructHelper();
+    VkPhysicalDeviceDescriptorIndexingProperties descriptor_indexing_properties = vku::InitStructHelper();
     if (descriptor_indexing) {
         GetPhysicalDeviceProperties2(descriptor_indexing_properties);
     }
@@ -450,8 +449,7 @@ TEST_F(NegativePipelineLayout, ExcessDescriptorsOverall) {
     uint32_t sum_samplers = m_device->phy().limits_.maxDescriptorSetSamplers;
     uint32_t sum_input_attachments = m_device->phy().limits_.maxDescriptorSetInputAttachments;
 
-    VkPhysicalDeviceDescriptorIndexingProperties descriptor_indexing_properties =
-        vku::InitStructHelper();
+    VkPhysicalDeviceDescriptorIndexingProperties descriptor_indexing_properties = vku::InitStructHelper();
     if (descriptor_indexing) {
         GetPhysicalDeviceProperties2(descriptor_indexing_properties);
     }

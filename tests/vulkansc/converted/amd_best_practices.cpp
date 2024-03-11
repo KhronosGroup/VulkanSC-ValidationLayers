@@ -19,12 +19,12 @@
 #include "../framework/pipeline_helper.h"
 
 // Tests for AMD-specific best practices
-const char *kEnableAMDValidation = "VALIDATION_CHECK_ENABLE_VENDOR_SPECIFIC_AMD";
-
+const char* kEnableAMDValidation = "VALIDATION_CHECK_ENABLE_VENDOR_SPECIFIC_AMD";
 
 // this is a very long test (~10 minutes)
 // disabled for now
 #ifdef AMD_LONG_RUNNING_TEST
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkAmdBestPracticesLayerTest, DISABLED_TooManyPipelines) {
     RETURN_IF_SKIP(InitBestPracticesFramework(kEnableAMDValidation));
     RETURN_IF_SKIP(InitState());
@@ -58,6 +58,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_TooManyPipelines) {
 }
 #endif
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkAmdBestPracticesLayerTest, DISABLED_UseMutableRT) {
     RETURN_IF_SKIP(InitBestPracticesFramework(kEnableAMDValidation));
     RETURN_IF_SKIP(InitState());
@@ -68,20 +69,20 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_UseMutableRT) {
 
     // create a colot attachment image with mutable bit set
     VkImageCreateInfo img_info = {VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-                                 nullptr,
-                                 VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT,
-                                 VK_IMAGE_TYPE_1D,
-                                 VK_FORMAT_R8G8B8A8_UNORM,
-                                 {1, 1, 1},
-                                 1,
-                                 1,
-                                 VK_SAMPLE_COUNT_1_BIT,
-                                 VK_IMAGE_TILING_OPTIMAL,
-                                 VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-                                 VK_SHARING_MODE_EXCLUSIVE,
-                                 0,
-                                 nullptr,
-                                 VK_IMAGE_LAYOUT_UNDEFINED};
+                                  nullptr,
+                                  VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT,
+                                  VK_IMAGE_TYPE_1D,
+                                  VK_FORMAT_R8G8B8A8_UNORM,
+                                  {1, 1, 1},
+                                  1,
+                                  1,
+                                  VK_SAMPLE_COUNT_1_BIT,
+                                  VK_IMAGE_TILING_OPTIMAL,
+                                  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+                                  VK_SHARING_MODE_EXCLUSIVE,
+                                  0,
+                                  nullptr,
+                                  VK_IMAGE_LAYOUT_UNDEFINED};
     VkImage test_image = VK_NULL_HANDLE;
     vk::CreateImage(m_device->handle(), &img_info, nullptr, &test_image);
     m_errorMonitor->VerifyFound();
@@ -110,25 +111,26 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_UseMutableRT) {
     m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-vkImage-DontUseMutableRenderTargets");
     // create a storage image with mutable bit set
     img_info = {VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-               nullptr,
-               VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT,
-               VK_IMAGE_TYPE_1D,
-               VK_FORMAT_R8G8B8A8_UNORM,
-               {1, 1, 1},
-               1,
-               1,
-               VK_SAMPLE_COUNT_1_BIT,
-               VK_IMAGE_TILING_OPTIMAL,
-               VK_IMAGE_USAGE_STORAGE_BIT,
-               VK_SHARING_MODE_EXCLUSIVE,
-               0,
-               nullptr,
-               VK_IMAGE_LAYOUT_UNDEFINED};
+                nullptr,
+                VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT,
+                VK_IMAGE_TYPE_1D,
+                VK_FORMAT_R8G8B8A8_UNORM,
+                {1, 1, 1},
+                1,
+                1,
+                VK_SAMPLE_COUNT_1_BIT,
+                VK_IMAGE_TILING_OPTIMAL,
+                VK_IMAGE_USAGE_STORAGE_BIT,
+                VK_SHARING_MODE_EXCLUSIVE,
+                0,
+                nullptr,
+                VK_IMAGE_LAYOUT_UNDEFINED};
     test_image = VK_NULL_HANDLE;
     vk::CreateImage(m_device->handle(), &img_info, nullptr, &test_image);
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkAmdBestPracticesLayerTest, DISABLED_UsageConcurentRT) {
     RETURN_IF_SKIP(InitBestPracticesFramework(kEnableAMDValidation));
     RETURN_IF_SKIP(InitState());
@@ -188,6 +190,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_UsageConcurentRT) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkAmdBestPracticesLayerTest, DISABLED_UsageStorageRT) {
     RETURN_IF_SKIP(InitBestPracticesFramework(kEnableAMDValidation));
     RETURN_IF_SKIP(InitState());
@@ -198,25 +201,26 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_UsageStorageRT) {
 
     // create a render target image with mutable bit set
     VkImageCreateInfo img_info = {VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-                                 nullptr,
-                                 0,
-                                 VK_IMAGE_TYPE_1D,
-                                 VK_FORMAT_R8G8B8A8_UNORM,
-                                 {1, 1, 1},
-                                 1,
-                                 1,
-                                 VK_SAMPLE_COUNT_1_BIT,
-                                 VK_IMAGE_TILING_OPTIMAL,
-                                 VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
-                                 VK_SHARING_MODE_EXCLUSIVE,
-                                 0,
-                                 nullptr,
-                                 VK_IMAGE_LAYOUT_UNDEFINED};
+                                  nullptr,
+                                  0,
+                                  VK_IMAGE_TYPE_1D,
+                                  VK_FORMAT_R8G8B8A8_UNORM,
+                                  {1, 1, 1},
+                                  1,
+                                  1,
+                                  VK_SAMPLE_COUNT_1_BIT,
+                                  VK_IMAGE_TILING_OPTIMAL,
+                                  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
+                                  VK_SHARING_MODE_EXCLUSIVE,
+                                  0,
+                                  nullptr,
+                                  VK_IMAGE_LAYOUT_UNDEFINED};
     VkImage test_image = VK_NULL_HANDLE;
     vk::CreateImage(m_device->handle(), &img_info, nullptr, &test_image);
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkAmdBestPracticesLayerTest, DISABLED_PrimitiveRestart) {
     RETURN_IF_SKIP(InitBestPracticesFramework(kEnableAMDValidation));
     RETURN_IF_SKIP(InitState());
@@ -233,6 +237,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_PrimitiveRestart) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkAmdBestPracticesLayerTest, DISABLED_NumDynamicStates) {
     RETURN_IF_SKIP(InitBestPracticesFramework(kEnableAMDValidation));
     RETURN_IF_SKIP(InitState());
@@ -261,6 +266,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_NumDynamicStates) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkAmdBestPracticesLayerTest, DISABLED_KeepLayoutSmall) {
     // TODO: add dynamic buffer check as well
     RETURN_IF_SKIP(InitBestPracticesFramework(kEnableAMDValidation));
@@ -305,6 +311,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_KeepLayoutSmall) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkAmdBestPracticesLayerTest, DISABLED_CopyingDescriptors) {
     // TODO: add dynamic buffer check as well
     RETURN_IF_SKIP(InitBestPracticesFramework(kEnableAMDValidation));
@@ -361,6 +368,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_CopyingDescriptors) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkAmdBestPracticesLayerTest, DISABLED_ClearImage) {
     TEST_DESCRIPTION("Test for validating usage of vkCmdClearAttachments");
 
@@ -448,6 +456,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_ClearImage) {
     }
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkAmdBestPracticesLayerTest, DISABLED_ImageToImageCopy) {
     RETURN_IF_SKIP(InitBestPracticesFramework(kEnableAMDValidation));
     RETURN_IF_SKIP(InitState());
@@ -497,26 +506,27 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_ImageToImageCopy) {
     m_commandBuffer->end();
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkAmdBestPracticesLayerTest, DISABLED_GeneralLayout) {
     RETURN_IF_SKIP(InitBestPracticesFramework(kEnableAMDValidation));
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
     VkImageCreateInfo img_info = {VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-                                 nullptr,
-                                 0,
-                                 VK_IMAGE_TYPE_2D,
-                                 VK_FORMAT_R8G8B8A8_UNORM,
-                                 {1024, 1024, 1},
-                                 1,
-                                 1,
-                                 VK_SAMPLE_COUNT_1_BIT,
-                                 VK_IMAGE_TILING_OPTIMAL,
-                                 VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-                                 VK_SHARING_MODE_EXCLUSIVE,
-                                 0,
-                                 nullptr,
-                                 VK_IMAGE_LAYOUT_UNDEFINED};
+                                  nullptr,
+                                  0,
+                                  VK_IMAGE_TYPE_2D,
+                                  VK_FORMAT_R8G8B8A8_UNORM,
+                                  {1024, 1024, 1},
+                                  1,
+                                  1,
+                                  VK_SAMPLE_COUNT_1_BIT,
+                                  VK_IMAGE_TILING_OPTIMAL,
+                                  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+                                  VK_SHARING_MODE_EXCLUSIVE,
+                                  0,
+                                  nullptr,
+                                  VK_IMAGE_LAYOUT_UNDEFINED};
     VkImageObj image_1D(m_device);
 
     m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-vkImage-AvoidGeneral");
@@ -528,6 +538,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_GeneralLayout) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkAmdBestPracticesLayerTest, DISABLED_RobustAccessOn) {
     RETURN_IF_SKIP(InitBestPracticesFramework(kEnableAMDValidation));
     RETURN_IF_SKIP(InitState());
@@ -555,6 +566,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_RobustAccessOn) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkAmdBestPracticesLayerTest, DISABLED_Barriers) {
     RETURN_IF_SKIP(InitBestPracticesFramework(kEnableAMDValidation));
     RETURN_IF_SKIP(InitState());
@@ -606,6 +618,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_Barriers) {
     m_commandBuffer->end();
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkAmdBestPracticesLayerTest, DISABLED_NumberOfSubmissions) {
     AddSurfaceExtension();
 
@@ -616,20 +629,20 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_NumberOfSubmissions) {
     InitRenderTarget();
 
     VkImageCreateInfo img_info = {VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-                                 nullptr,
-                                 VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT,
-                                 VK_IMAGE_TYPE_1D,
-                                 VK_FORMAT_R8G8B8A8_UNORM,
-                                 {1, 1, 1},
-                                 1,
-                                 1,
-                                 VK_SAMPLE_COUNT_1_BIT,
-                                 VK_IMAGE_TILING_OPTIMAL,
-                                 VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-                                 VK_SHARING_MODE_EXCLUSIVE,
-                                 0,
-                                 nullptr,
-                                 VK_IMAGE_LAYOUT_UNDEFINED};
+                                  nullptr,
+                                  VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT,
+                                  VK_IMAGE_TYPE_1D,
+                                  VK_FORMAT_R8G8B8A8_UNORM,
+                                  {1, 1, 1},
+                                  1,
+                                  1,
+                                  VK_SAMPLE_COUNT_1_BIT,
+                                  VK_IMAGE_TILING_OPTIMAL,
+                                  VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+                                  VK_SHARING_MODE_EXCLUSIVE,
+                                  0,
+                                  nullptr,
+                                  VK_IMAGE_LAYOUT_UNDEFINED};
     VkImageObj image_1D(m_device);
     image_1D.init(&img_info);
     ASSERT_TRUE(image_1D.initialized());
@@ -663,6 +676,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_NumberOfSubmissions) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkAmdBestPracticesLayerTest, DISABLED_NumSyncPrimitives) {
     RETURN_IF_SKIP(InitBestPracticesFramework(kEnableAMDValidation));
     RETURN_IF_SKIP(InitState());
@@ -689,6 +703,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_NumSyncPrimitives) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkAmdBestPracticesLayerTest, DISABLED_SecondaryCmdBuffer) {
     RETURN_IF_SKIP(InitBestPracticesFramework(kEnableAMDValidation));
     RETURN_IF_SKIP(InitState());
@@ -753,6 +768,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_SecondaryCmdBuffer) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkAmdBestPracticesLayerTest, DISABLED_ComputeWorkgroupSize) {
     TEST_DESCRIPTION("On AMD make the workgroup size a multiple of 64 to obtain best performance across all GPU generations.");
 
