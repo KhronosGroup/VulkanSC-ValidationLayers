@@ -20,6 +20,8 @@
 #include "../framework/descriptor_helper.h"
 
 TEST_F(NegativeShaderStorageTexel, WriteLessComponent) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Test writing to texel buffer with less components.");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -71,6 +73,8 @@ TEST_F(NegativeShaderStorageTexel, WriteLessComponent) {
 }
 
 TEST_F(NegativeShaderStorageTexel, UnknownWriteLessComponent) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Test writing to texel buffer unknown format with less components.");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -168,6 +172,8 @@ TEST_F(NegativeShaderStorageTexel, UnknownWriteLessComponent) {
 }
 
 TEST_F(NegativeShaderStorageTexel, MissingFormatWriteForFormat) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Create a shader writing a storage texel buffer without an image format");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME);

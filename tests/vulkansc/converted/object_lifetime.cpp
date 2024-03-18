@@ -295,6 +295,8 @@ TEST_F(NegativeObjectLifetime, DISABLED_Sync2CmdBarrierImageDestroyed) {
 }
 
 TEST_F(NegativeObjectLifetime, CmdBufferBufferViewDestroyed) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Delete bufferView bound to cmd buffer, then attempt to submit cmd buffer.");
 
     RETURN_IF_SKIP(Init());
@@ -861,6 +863,8 @@ TEST_F(NegativeObjectLifetime, PipelineInUseDestroyedSignaled) {
 }
 
 TEST_F(NegativeObjectLifetime, ImageViewInUseDestroyedSignaled) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Delete in-use imageView.");
 
     RETURN_IF_SKIP(Init());
@@ -919,6 +923,8 @@ TEST_F(NegativeObjectLifetime, ImageViewInUseDestroyedSignaled) {
 }
 
 TEST_F(NegativeObjectLifetime, BufferViewInUseDestroyedSignaled) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Delete in-use bufferView.");
 
     RETURN_IF_SKIP(Init());
@@ -990,6 +996,8 @@ TEST_F(NegativeObjectLifetime, BufferViewInUseDestroyedSignaled) {
 }
 
 TEST_F(NegativeObjectLifetime, SamplerInUseDestroyedSignaled) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Delete in-use sampler.");
 
     RETURN_IF_SKIP(Init());

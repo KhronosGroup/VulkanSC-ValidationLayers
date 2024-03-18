@@ -18,6 +18,7 @@
 #include "vksc_test_dispatch_helper.h"
 #include "vksc_test_pipeline_cache_helper.h"
 #include "vksc_render_framework.h"
+#include "vksc_test_environment.h"
 
 #include "gtest/gtest.h"
 
@@ -238,7 +239,7 @@ static VKAPI_ATTR VkResult VKAPI_CALL CreateShaderModule(VkDevice device, const 
                                                          const VkAllocationCallbacks* pAllocator, VkShaderModule* pShaderModule) {
     // Attempt to create a pipeline cache from the SPIR-V data in order to trigger VUs that
     // would otherwise be triggered in case of Vulkan
-    if (pCreateInfo->pCode && (pCreateInfo->codeSize % sizeof(uint32_t) == 0)) {
+    if (VkSCTestEnvironment::IsSpvDebugInfoEnabled() && pCreateInfo->pCode && (pCreateInfo->codeSize % sizeof(uint32_t) == 0)) {
         vksc::PipelineCacheBuilder builder{};
         auto header = builder.AddDefaultHeaderVersionSCOne();
         auto entry = builder.AddPipelineEntry(header, "1265a236-e369-11ed-b5ea-0242ac120002", 4000);
@@ -365,9 +366,11 @@ static VKAPI_ATTR VkResult VKAPI_CALL CreateComputePipelines(VkDevice device, Vk
     }
     for (uint32_t i = 0; i < createInfoCount; ++i) {
         // Add SPIR-V validation data (it is added in a separate loop because it must follow all pipelines)
-        auto spirv = RenderFramework().GetShaderModuleData(create_info[i].stage.module);
-        if (spirv) {
-            builder.AddStageValidation(entries[i], nullptr, {*spirv});
+        if (VkSCTestEnvironment::IsSpvDebugInfoEnabled()) {
+            auto spirv = RenderFramework().GetShaderModuleData(create_info[i].stage.module);
+            if (spirv) {
+                builder.AddStageValidation(entries[i], nullptr, {*spirv});
+            }
         }
 
         // Remove shader module reference
@@ -428,10 +431,12 @@ static VKAPI_ATTR VkResult VKAPI_CALL CreateGraphicsPipelines(VkDevice device, V
         bool has_spirv = false;
         std::vector<std::vector<uint32_t>> spirv_arr(create_info[i].stageCount);
         for (uint32_t stage_idx = 0; stage_idx < create_info[i].stageCount; ++stage_idx) {
-            auto spirv = RenderFramework().GetShaderModuleData(stage_info[i][stage_idx].module);
-            if (spirv) {
-                has_spirv = true;
-                spirv_arr[stage_idx] = *spirv;
+            if (VkSCTestEnvironment::IsSpvDebugInfoEnabled()) {
+                auto spirv = RenderFramework().GetShaderModuleData(stage_info[i][stage_idx].module);
+                if (spirv) {
+                    has_spirv = true;
+                    spirv_arr[stage_idx] = *spirv;
+                }
             }
 
             // Remove shader module reference

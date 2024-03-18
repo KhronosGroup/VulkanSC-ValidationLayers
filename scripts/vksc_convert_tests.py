@@ -148,8 +148,8 @@ def convert_test_file(args, filename, data, converted_cases):
                     output.write(f"// {case_data['reason']}\n")
                     output.write(line.replace(test_case, f"DISABLED_{test_case}"))
                 else:
-                    output.write(f"    // {case_data['reason']}\n")
                     output.write(line)
+                    output.write(f"    // {case_data['reason']}\n")
                     for patch in case_data['patch']:
                         output.write(f'    {patch};\n')
 

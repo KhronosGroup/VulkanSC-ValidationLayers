@@ -702,6 +702,8 @@ TEST_F(NegativeProtectedMemory, UnprotectedCommands) {
 }
 
 TEST_F(NegativeProtectedMemory, MixingProtectedResources) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Test where there is mixing of protectedMemory backed resource in command buffers");
 
     SetTargetApiVersion(VK_API_VERSION_1_1);

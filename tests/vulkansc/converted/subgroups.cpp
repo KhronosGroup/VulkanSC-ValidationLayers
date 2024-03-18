@@ -326,6 +326,8 @@ TEST_F(NegativeSubgroup, ExtendedTypesEnabled) {
 }
 
 TEST_F(NegativeSubgroup, ExtendedTypesDisabled) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Test VK_KHR_shader_subgroup_extended_types.");
     SetTargetApiVersion(VK_API_VERSION_1_1);
 

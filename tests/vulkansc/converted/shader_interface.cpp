@@ -19,6 +19,8 @@
 #include "../framework/pipeline_helper.h"
 
 TEST_F(NegativeShaderInterface, MaxVertexComponentsWithBuiltins) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Test if the max componenets checks are being checked from OpMemberDecorate built-ins");
 
     RETURN_IF_SKIP(InitFramework());
@@ -98,6 +100,8 @@ TEST_F(NegativeShaderInterface, MaxVertexComponentsWithBuiltins) {
 }
 
 TEST_F(NegativeShaderInterface, MaxFragmentComponentsWithBuiltins) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Test if the max componenets checks are being checked from OpDecorate built-ins");
 
     RETURN_IF_SKIP(InitFramework());
@@ -165,6 +169,8 @@ TEST_F(NegativeShaderInterface, MaxFragmentComponentsWithBuiltins) {
 }
 
 TEST_F(NegativeShaderInterface, MaxVertexOutputComponents) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
         "Test that an error is produced when the number of output components from the vertex stage exceeds the device limit");
 
@@ -239,6 +245,8 @@ TEST_F(NegativeShaderInterface, MaxVertexOutputComponents) {
 }
 
 TEST_F(NegativeShaderInterface, MaxComponentsBlocks) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Test if the max componenets checks are done properly when in a single block");
 
     RETURN_IF_SKIP(Init());
@@ -296,6 +304,8 @@ TEST_F(NegativeShaderInterface, MaxComponentsBlocks) {
 }
 
 TEST_F(NegativeShaderInterface, MaxFragmentInputComponents) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
         "Test that an error is produced when the number of input components from the fragment stage exceeds the device limit");
 
@@ -362,6 +372,8 @@ TEST_F(NegativeShaderInterface, MaxFragmentInputComponents) {
 }
 
 TEST_F(NegativeShaderInterface, FragmentInputNotProvided) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
         "Test that an error is produced for a fragment shader input which is not present in the outputs of the previous stage");
 
@@ -385,6 +397,8 @@ TEST_F(NegativeShaderInterface, FragmentInputNotProvided) {
 }
 
 TEST_F(NegativeShaderInterface, FragmentInputNotProvidedInBlock) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
         "Test that an error is produced for a fragment shader input within an interace block, which is not present in the outputs "
         "of the previous stage.");
@@ -410,6 +424,8 @@ TEST_F(NegativeShaderInterface, FragmentInputNotProvidedInBlock) {
 }
 
 TEST_F(NegativeShaderInterface, VsFsTypeMismatch) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Test that an error is produced for mismatched types across the vertex->fragment shader interface");
 
     RETURN_IF_SKIP(Init());
@@ -442,6 +458,8 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatch) {
 }
 
 TEST_F(NegativeShaderInterface, VsFsTypeMismatchInBlock) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
         "Test that an error is produced for mismatched types across the vertex->fragment shader interface, when the variable is "
         "contained within an interface block");
@@ -476,6 +494,8 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchInBlock) {
 }
 
 TEST_F(NegativeShaderInterface, VsFsTypeMismatchVectorSize) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("OpTypeVector has larger output than input");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddOptionalExtensions(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
@@ -508,6 +528,8 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchVectorSize) {
 }
 
 TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockStruct) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Have a struct inside a block between shaders");
 
     RETURN_IF_SKIP(Init());
@@ -563,6 +585,8 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockStruct) {
 }
 
 TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockStruct64bit) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Have a struct inside a block between shaders");
 
     AddRequiredFeature(vkt::Feature::shaderFloat64);
@@ -617,6 +641,8 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockStruct64bit) {
 }
 
 TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockArrayOfStruct) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Have an array of struct inside a block between shaders");
 
     RETURN_IF_SKIP(Init());
@@ -672,6 +698,8 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockArrayOfStruct) {
 }
 
 TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockStructInnerArraySize) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Have an struct inside a block between shaders, array size is difference");
 
     RETURN_IF_SKIP(Init());
@@ -732,6 +760,8 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockStructInnerArraySize) {
 }
 
 TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockStructOuterArraySize) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Have an struct inside a block between shaders, array size is difference");
 
     RETURN_IF_SKIP(Init());
@@ -790,6 +820,8 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockStructOuterArraySize) {
 }
 
 TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockStructArraySizeVertex) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
         "Have an struct inside a block between shaders, array size is difference, but from the vertex shader being too large");
 
@@ -851,6 +883,8 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockStructArraySizeVertex) {
 }
 
 TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockStructOuter2DArraySize) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Have an struct inside a block between shaders, array size is difference");
 
     RETURN_IF_SKIP(Init());
@@ -902,6 +936,8 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockStructOuter2DArraySize) {
 }
 
 TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockNestedStructType64bit) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Have nested struct inside a block between shaders");
 
     AddRequiredFeature(vkt::Feature::shaderFloat64);
@@ -967,6 +1003,8 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockNestedStructType64bit) {
 }
 
 TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockNestedStructArray) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Have nested struct inside a block between shaders");
 
     RETURN_IF_SKIP(Init());
@@ -1029,6 +1067,8 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockNestedStructArray) {
 }
 
 TEST_F(NegativeShaderInterface, VsFsMismatchByLocation) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
         "Test that an error is produced for location mismatches across the vertex->fragment shader interface; This should manifest "
         "as a not-written/not-consumed pair, but flushes out broken walking of the interfaces");
@@ -1063,6 +1103,8 @@ TEST_F(NegativeShaderInterface, VsFsMismatchByLocation) {
 }
 
 TEST_F(NegativeShaderInterface, VsFsMismatchByComponent) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
         "Test that an error is produced for component mismatches across the vertex->fragment shader interface. It's not enough to "
         "have the same set of locations in use; matching is defined in terms of spirv variables.");
@@ -1097,6 +1139,8 @@ TEST_F(NegativeShaderInterface, VsFsMismatchByComponent) {
 }
 
 TEST_F(NegativeShaderInterface, InputOutputMismatch) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Test mismatch between vertex shader output and fragment shader input.");
 
     RETURN_IF_SKIP(Init());
@@ -1131,6 +1175,8 @@ TEST_F(NegativeShaderInterface, InputOutputMismatch) {
 }
 
 TEST_F(NegativeShaderInterface, VertexOutputNotConsumed) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Test that a warning is produced for a vertex output that is not consumed by the fragment stage");
 
     SetTargetApiVersion(VK_API_VERSION_1_0);
@@ -1157,6 +1203,8 @@ TEST_F(NegativeShaderInterface, VertexOutputNotConsumed) {
 // Spec doesn't clarify if this is valid or not
 // https://gitlab.khronos.org/vulkan/vulkan/-/issues/3293
 TEST_F(NegativeShaderInterface, DISABLED_InputAndOutputComponents) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Test invalid shader layout in and out with different components.");
 
     RETURN_IF_SKIP(Init());
@@ -1324,6 +1372,8 @@ TEST_F(NegativeShaderInterface, DISABLED_InputAndOutputComponents) {
 }
 
 TEST_F(NegativeShaderInterface, AlphaToCoverageOutputLocation0) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Test that an error is produced when alpha to coverage is enabled but no output at location 0 is declared.");
 
     RETURN_IF_SKIP(Init());
@@ -1343,6 +1393,8 @@ TEST_F(NegativeShaderInterface, AlphaToCoverageOutputLocation0) {
 }
 
 TEST_F(NegativeShaderInterface, AlphaToCoverageOutputNoAlpha) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
         "Test that an error is produced when alpha to coverage is enabled but output at location 0 doesn't have alpha component.");
 
@@ -1370,6 +1422,8 @@ TEST_F(NegativeShaderInterface, AlphaToCoverageOutputNoAlpha) {
 }
 
 TEST_F(NegativeShaderInterface, AlphaToCoverageArrayIndex) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Have array out outputs, but start at index 1");
 
     RETURN_IF_SKIP(Init());
@@ -1396,6 +1450,8 @@ TEST_F(NegativeShaderInterface, AlphaToCoverageArrayIndex) {
 }
 
 TEST_F(NegativeShaderInterface, AlphaToCoverageArrayVec3) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Have array out outputs, but not contain the alpha component");
 
     RETURN_IF_SKIP(Init());
@@ -1422,6 +1478,8 @@ TEST_F(NegativeShaderInterface, AlphaToCoverageArrayVec3) {
 }
 
 TEST_F(NegativeShaderInterface, MultidimensionalArray) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Make sure multidimensional arrays are handled");
 
     RETURN_IF_SKIP(Init());
@@ -1453,6 +1511,8 @@ TEST_F(NegativeShaderInterface, MultidimensionalArray) {
 }
 
 TEST_F(NegativeShaderInterface, MultidimensionalArrayDim) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Make sure multidimensional arrays are handled");
 
     RETURN_IF_SKIP(Init());
@@ -1484,6 +1544,8 @@ TEST_F(NegativeShaderInterface, MultidimensionalArrayDim) {
 }
 
 TEST_F(NegativeShaderInterface, MultidimensionalArray64bit) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Make sure multidimensional arrays are handled for 64bits");
 
     AddRequiredFeature(vkt::Feature::shaderFloat64);
@@ -1516,6 +1578,8 @@ TEST_F(NegativeShaderInterface, MultidimensionalArray64bit) {
 }
 
 TEST_F(NegativeShaderInterface, PackingInsideArray) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("From https://gitlab.khronos.org/vulkan/vulkan/-/issues/3558");
 
     RETURN_IF_SKIP(Init());
@@ -1545,6 +1609,8 @@ TEST_F(NegativeShaderInterface, PackingInsideArray) {
 }
 
 TEST_F(NegativeShaderInterface, CreatePipelineFragmentOutputNotWritten) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
         "Test that an error is produced for a fragment shader which does not provide an output for one of the pipeline's color "
         "attachments");
@@ -1562,6 +1628,8 @@ TEST_F(NegativeShaderInterface, CreatePipelineFragmentOutputNotWritten) {
 }
 
 TEST_F(NegativeShaderInterface, CreatePipelineFragmentOutputTypeMismatch) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
         "Test that an error is produced for a mismatch between the fundamental type of an fragment shader output variable, and the "
         "format of the corresponding attachment");
@@ -1586,6 +1654,8 @@ TEST_F(NegativeShaderInterface, CreatePipelineFragmentOutputTypeMismatch) {
 }
 
 TEST_F(NegativeShaderInterface, CreatePipelineFragmentOutputNotConsumed) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
         "Test that a warning is produced for a fragment shader which provides a spurious output with no matching attachment");
 
@@ -1610,6 +1680,8 @@ TEST_F(NegativeShaderInterface, CreatePipelineFragmentOutputNotConsumed) {
 }
 
 TEST_F(NegativeShaderInterface, InvalidStaticSpirv) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
         "Test that a warning is produced for a fragment shader which provides a spurious output with no matching attachment");
 
@@ -1647,6 +1719,8 @@ TEST_F(NegativeShaderInterface, InvalidStaticSpirv) {
 }
 
 TEST_F(NegativeShaderInterface, PhysicalStorageBufferGlslang3) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Taken from glslang spv.bufferhandle3.frag test");
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME);
@@ -1683,6 +1757,8 @@ TEST_F(NegativeShaderInterface, PhysicalStorageBufferGlslang3) {
 }
 
 TEST_F(NegativeShaderInterface, PhysicalStorageBuffer) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Regression shaders from https://github.com/KhronosGroup/Vulkan-ValidationLayers/pull/5349");
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME);
