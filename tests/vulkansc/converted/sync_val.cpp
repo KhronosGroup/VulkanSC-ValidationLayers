@@ -1688,6 +1688,8 @@ TEST_F(NegativeSyncVal, DynamicRenderingAttachmentStoreHazard) {
 }
 
 TEST_F(NegativeSyncVal, CmdDispatchDrawHazards) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     SetTargetApiVersion(VK_API_VERSION_1_2);
 
     // Enable VK_KHR_draw_indirect_count for KHR variants
@@ -3167,6 +3169,8 @@ TEST_F(NegativeSyncVal, SubpassMultiDep) {
 }
 
 TEST_F(NegativeSyncVal, RenderPassAsyncHazard) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     RETURN_IF_SKIP(InitSyncValFramework());
     RETURN_IF_SKIP(InitState());
 
@@ -4379,6 +4383,8 @@ TEST_F(NegativeSyncVal, TestCopyingToCompressedImage) {
 }
 
 TEST_F(NegativeSyncVal, StageAccessExpansion) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     SetTargetApiVersion(VK_API_VERSION_1_2);
 
     RETURN_IF_SKIP(InitSyncValFramework());
@@ -5524,6 +5530,8 @@ TEST_F(NegativeSyncVal, TestMessageReportingWithManyBarriers) {
 // The original issue was that writeonly buffer accesss can be detected as READ:
 // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/7093
 TEST_F(NegativeSyncVal, WriteOnlyBufferWriteHazard) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Test that writeonly buffer access is reported as WRITE access");
     RETURN_IF_SKIP(InitSyncValFramework());
     RETURN_IF_SKIP(InitState());
@@ -5572,6 +5580,8 @@ TEST_F(NegativeSyncVal, WriteOnlyBufferWriteHazard) {
 }
 
 TEST_F(NegativeSyncVal, WriteOnlyImageWriteHazard) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Test that writeonly image access is reported as WRITE access");
     RETURN_IF_SKIP(InitSyncValFramework());
     RETURN_IF_SKIP(InitState());

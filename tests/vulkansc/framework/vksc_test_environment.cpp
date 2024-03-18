@@ -19,6 +19,8 @@
 #include "vksc_test_environment.h"
 #include "vksc_test_dispatch_helper.h"
 
+#include "utils/vk_layer_utils.h"
+
 #include <vector>
 #include <filesystem>
 #include <fstream>
@@ -165,6 +167,43 @@ class ThrowListener : public testing::EmptyTestEventListener {
     }
 };
 
+static bool GetCLIFlag(int *argc, char *argv[], const char *flag, bool remove = true) {
+    for (int i = 0; i < *argc; ++i) {
+        if (strcmp(argv[i], flag) == 0) {
+            if (remove) {
+                *argc -= 1;
+                for (int j = i; j < *argc; ++j) {
+                    argv[j] = argv[j + 1];
+                }
+            }
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool GetEnvironmentFlag(const char *name) {
+    auto value = GetEnvironment(name);
+    vvl::ToLower(value);
+    return !(value == "false" || value == "0" || value == "");
+}
+
+void VkSCTestEnvironment::InitArgs(int *argc, char *argv[]) {
+    if (GetCLIFlag(argc, argv, "--help", false)) {
+        printf("\nVulkan SC specific options:\n");
+        printf(
+            "\t--no-spv-debug-info\n"
+            "\t\tRun tests without including SPIR-V debug information in the\n"
+            "\t\tpipeline caches for converted Vulkan validation layer tests.\n"
+            "\t\tNote: This execution mode can also be enabled through the\n"
+            "\t\tVKSC_LAYER_TESTS_NO_SPV_DEBUG_INFO environment variable.\n");
+        return;
+    }
+    if (GetCLIFlag(argc, argv, "--no-spv-debug-info") || GetEnvironmentFlag("VKSC_LAYER_TESTS_NO_SPV_DEBUG_INFO")) {
+        no_spv_debug_info = true;
+    }
+}
+
 int main(int argc, char **argv) {
     int result;
 
@@ -181,6 +220,7 @@ int main(int argc, char **argv) {
 #endif
 
     ::testing::InitGoogleTest(&argc, argv);
+    VkSCTestEnvironment::InitArgs(&argc, argv);
     VkTestFramework::InitArgs(&argc, argv);
 
     ::testing::AddGlobalTestEnvironment(new VkSCTestEnvironment);

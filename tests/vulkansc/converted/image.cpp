@@ -5993,6 +5993,8 @@ TEST_F(NegativeImage, CubeCompatibleMustBeImageType2D) {
 }
 
 TEST_F(NegativeImage, ComputeImageLayout) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Attempt to use an image with an invalid layout in a compute shader");
 
     AddRequiredExtensions(VK_KHR_DEVICE_GROUP_EXTENSION_NAME);
@@ -6054,6 +6056,8 @@ TEST_F(NegativeImage, ComputeImageLayout) {
 }
 
 TEST_F(NegativeImage, ComputeImageLayout11) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Attempt to use an image with an invalid layout in a compute shader using vkCmdDispatchBase");
 
     SetTargetApiVersion(VK_API_VERSION_1_1);

@@ -16,6 +16,8 @@
 #include "../framework/pipeline_helper.h"
 
 TEST_F(NegativeShaderImageAccess, FunctionOpImage) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Use Component Format mismatch to test image access edge cases");
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
@@ -106,6 +108,8 @@ TEST_F(NegativeShaderImageAccess, FunctionOpImage) {
 }
 
 TEST_F(NegativeShaderImageAccess, ComponentTypeMismatchFunctionTwoArgs) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Pass a signed and unsinged sampler, and use the incorrect one.");
 
     RETURN_IF_SKIP(Init());
@@ -163,6 +167,8 @@ TEST_F(NegativeShaderImageAccess, ComponentTypeMismatchFunctionTwoArgs) {
 }
 
 TEST_F(NegativeShaderImageAccess, UnnormalizedCoordinatesFunction) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
@@ -216,6 +222,8 @@ TEST_F(NegativeShaderImageAccess, UnnormalizedCoordinatesFunction) {
 }
 
 TEST_F(NegativeShaderImageAccess, MultisampleMismatchWithPipeline) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Shader uses Multisample, but image view isn't.");
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
@@ -265,6 +273,8 @@ TEST_F(NegativeShaderImageAccess, MultisampleMismatchWithPipeline) {
 }
 
 TEST_F(NegativeShaderImageAccess, NonMultisampleMismatchWithPipeline) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Shader uses non-Multisample, but image view is.");
     RETURN_IF_SKIP(Init());
     InitRenderTarget();

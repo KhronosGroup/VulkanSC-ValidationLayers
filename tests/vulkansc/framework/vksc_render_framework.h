@@ -11,6 +11,7 @@
 #pragma once
 
 #include "../../framework/render.h"
+#include "vksc_test_environment.h"
 #include "vksc_test_dispatch_helper.h"
 #include "vksc_test_pipeline_cache_helper.h"
 
@@ -123,6 +124,13 @@ class VkSCCompatibilityRenderFramework : public VkSCRenderFramework {
 #if defined(__QNX__)
         dispatch_helper_.SkipUnsupportedTest("Test case not compatible with QNX");
 #endif
+    }
+
+    // Skip if SPIR-V debug information is not enabled
+    void RequiresSpvDebugInfo() {
+        if (!VkSCTestEnvironment::IsSpvDebugInfoEnabled()) {
+            dispatch_helper_.SkipUnsupportedTest("Test case requires SPIR-V debug information");
+        }
     }
 
   private:

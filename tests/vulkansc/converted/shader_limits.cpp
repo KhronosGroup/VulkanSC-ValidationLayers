@@ -91,6 +91,8 @@ TEST_F(NegativeShaderLimits, MaxSampleMaskWords) {
 }
 
 TEST_F(NegativeShaderLimits, MinAndMaxTexelGatherOffset) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Test shader with offset less than minTexelGatherOffset and greather than maxTexelGatherOffset");
 
     RETURN_IF_SKIP(Init());
@@ -173,6 +175,8 @@ TEST_F(NegativeShaderLimits, MinAndMaxTexelGatherOffset) {
 }
 
 TEST_F(NegativeShaderLimits, MinAndMaxTexelOffset) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Test shader with offset less than minTexelOffset and greather than maxTexelOffset");
 
     RETURN_IF_SKIP(Init());

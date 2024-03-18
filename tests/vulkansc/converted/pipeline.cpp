@@ -1596,6 +1596,8 @@ TEST_F(NegativePipeline, LineRasterization) {
 }
 
 TEST_F(NegativePipeline, NotCompatibleForSet) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Check that validation path catches pipeline layout inconsistencies for bind vs. dispatch");
     RETURN_IF_SKIP(Init());
 
@@ -2072,6 +2074,8 @@ TEST_F(NegativePipeline, DISABLED_ShaderDrawParametersNotEnabled10) {
 }
 
 TEST_F(NegativePipeline, ShaderDrawParametersNotEnabled11) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Validation using DrawParameters for Vulkan 1.1 without the shaderDrawParameters feature enabled.");
 
     SetTargetApiVersion(VK_API_VERSION_1_1);

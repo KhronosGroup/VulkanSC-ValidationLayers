@@ -19,6 +19,8 @@
 #include "../framework/pipeline_helper.h"
 
 TEST_F(NegativeShaderCompute, SharedMemoryOverLimit) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Validate compute shader shared memory does not exceed maxComputeSharedMemorySize");
 
     RETURN_IF_SKIP(Init());
@@ -46,6 +48,8 @@ TEST_F(NegativeShaderCompute, SharedMemoryOverLimit) {
 }
 
 TEST_F(NegativeShaderCompute, SharedMemoryBooleanOverLimit) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Validate compute shader shared memory does not exceed maxComputeSharedMemorySize with booleans");
 
     RETURN_IF_SKIP(Init());
@@ -125,6 +129,8 @@ TEST_F(NegativeShaderCompute, SharedMemoryOverLimitWorkgroupMemoryExplicitLayout
 }
 
 TEST_F(NegativeShaderCompute, SharedMemorySpecConstantDefault) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Validate shared memory exceed maxComputeSharedMemorySize limit with spec constants default");
 
     RETURN_IF_SKIP(Init());
@@ -152,6 +158,8 @@ TEST_F(NegativeShaderCompute, SharedMemorySpecConstantDefault) {
 }
 
 TEST_F(NegativeShaderCompute, SharedMemorySpecConstantSet) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Validate shared memory exceed maxComputeSharedMemorySize limit with spec constants set");
 
     RETURN_IF_SKIP(Init());
@@ -193,6 +201,8 @@ TEST_F(NegativeShaderCompute, SharedMemorySpecConstantSet) {
 }
 
 TEST_F(NegativeShaderCompute, WorkGroupSizeSpecConstant) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Validate compute shader shared memory does not exceed maxComputeWorkGroupSize");
 
     RETURN_IF_SKIP(Init());
@@ -244,6 +254,8 @@ TEST_F(NegativeShaderCompute, WorkGroupSizeSpecConstant) {
 }
 
 TEST_F(NegativeShaderCompute, WorkGroupSizeConstantDefault) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Make sure constant are applied for maxComputeWorkGroupSize using WorkgroupSize");
 
     RETURN_IF_SKIP(Init());
@@ -283,6 +295,8 @@ TEST_F(NegativeShaderCompute, WorkGroupSizeConstantDefault) {
 }
 
 TEST_F(NegativeShaderCompute, WorkGroupSizeSpecConstantDefault) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Make sure spec constant are applied for maxComputeWorkGroupSize using WorkgroupSize");
 
     RETURN_IF_SKIP(Init());
@@ -467,6 +481,8 @@ TEST_F(NegativeShaderCompute, WorkGroupSizeLocalSizeIdSpecConstantSet) {
 }
 
 TEST_F(NegativeShaderCompute, WorkgroupMemoryExplicitLayout) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Test VK_KHR_workgroup_memory_explicit_layout");
     SetTargetApiVersion(VK_API_VERSION_1_2);
 
@@ -715,6 +731,8 @@ TEST_F(NegativeShaderCompute, LocalSizeIdExecutionMode) {
 }
 
 TEST_F(NegativeShaderCompute, CmdDispatchExceedLimits) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Compute dispatch with dimensions that exceed device limits");
 
     AddRequiredExtensions(VK_KHR_DEVICE_GROUP_CREATION_EXTENSION_NAME);

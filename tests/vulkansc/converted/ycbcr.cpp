@@ -1657,6 +1657,8 @@ TEST_F(NegativeYcbcr, DisjointImageWithDrmFormatModifier) {
 }
 
 TEST_F(NegativeYcbcr, DrawFetch) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Do OpImageFetch on a Ycbcr COMBINED_IMAGE_SAMPLER.");
     SetTargetApiVersion(VK_API_VERSION_1_2);
     RETURN_IF_SKIP(InitBasicYcbcr());
@@ -1735,6 +1737,8 @@ TEST_F(NegativeYcbcr, DrawFetch) {
 }
 
 TEST_F(NegativeYcbcr, DrawConstOffset) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     SetTargetApiVersion(VK_API_VERSION_1_2);
     RETURN_IF_SKIP(InitBasicYcbcr());
     InitRenderTarget();

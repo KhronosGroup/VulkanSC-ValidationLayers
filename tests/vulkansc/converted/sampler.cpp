@@ -749,8 +749,8 @@ TEST_F(NegativeSampler, FilterMinmax) {
     vk::DestroySamplerYcbcrConversionKHR(m_device->handle(), conversion, nullptr);
 }
 
-// This test case uses too much stack space to be compatible with QNX
 TEST_F(NegativeSampler, CustomBorderColor) {
+    // This test case uses too much stack space to be compatible with QNX
     SkipOnQNX();
     TEST_DESCRIPTION("Tests for VUs for VK_EXT_custom_border_color");
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
@@ -815,6 +815,8 @@ TEST_F(NegativeSampler, CustomBorderColor) {
 }
 
 TEST_F(NegativeSampler, CustomBorderColorFormatUndefined) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Tests for VUID-VkSamplerCustomBorderColorCreateInfoEXT-format-04015");
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_CUSTOM_BORDER_COLOR_EXTENSION_NAME);
@@ -890,6 +892,8 @@ TEST_F(NegativeSampler, CustomBorderColorFormatUndefined) {
 }
 
 TEST_F(NegativeSampler, UnnormalizedCoordinatesCombinedSampler) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
         "If a samper is unnormalizedCoordinates, the imageview has to be some specific types. Uses COMBINED_IMAGE_SAMPLER");
 
@@ -989,6 +993,8 @@ TEST_F(NegativeSampler, UnnormalizedCoordinatesCombinedSampler) {
 }
 
 TEST_F(NegativeSampler, UnnormalizedCoordinatesSeparateSampler) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
         "If a samper is unnormalizedCoordinates, the imageview has to be some specific types. Doesn't use COMBINED_IMAGE_SAMPLER");
     SetTargetApiVersion(VK_API_VERSION_1_1);
@@ -1101,6 +1107,8 @@ TEST_F(NegativeSampler, UnnormalizedCoordinatesSeparateSampler) {
 }
 
 TEST_F(NegativeSampler, UnnormalizedCoordinatesSeparateSamplerSharedImage) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Doesn't use COMBINED_IMAGE_SAMPLER, but multiple OpLoad share Image OpVariable");
 
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
@@ -1170,6 +1178,8 @@ TEST_F(NegativeSampler, UnnormalizedCoordinatesSeparateSamplerSharedImage) {
 }
 
 TEST_F(NegativeSampler, UnnormalizedCoordinatesSeparateSamplerSharedSampler) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Doesn't use COMBINED_IMAGE_SAMPLER, but multiple OpLoad share Sampler OpVariable");
 
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
@@ -1244,6 +1254,8 @@ TEST_F(NegativeSampler, UnnormalizedCoordinatesSeparateSamplerSharedSampler) {
 }
 
 TEST_F(NegativeSampler, UnnormalizedCoordinatesInBoundsAccess) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("If a samper is unnormalizedCoordinates, but using OpInBoundsAccessChain");
 
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
@@ -1343,6 +1355,8 @@ TEST_F(NegativeSampler, UnnormalizedCoordinatesInBoundsAccess) {
 }
 
 TEST_F(NegativeSampler, UnnormalizedCoordinatesCopyObject) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("If a samper is unnormalizedCoordinates, but using OpCopyObject");
 
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);

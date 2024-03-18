@@ -241,6 +241,8 @@ TEST_F(NegativeShaderSpirv, ShaderFloatControl) {
 }
 
 TEST_F(NegativeShaderSpirv, Storage8and16bitCapability) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Test VK_KHR_8bit_storage and VK_KHR_16bit_storage not having feature bits required for SPIR-V capability");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -608,6 +610,8 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitCapability) {
 }
 
 TEST_F(NegativeShaderSpirv, Storage8and16bitFeatures) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
         "Test VK_KHR_8bit_storage and VK_KHR_16bit_storage where the Int8/Int16 capability are only used and since they are "
         "superset of a capabilty");
@@ -1106,6 +1110,8 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitFeatures) {
 }
 
 TEST_F(NegativeShaderSpirv, ReadShaderClock) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Test VK_KHR_shader_clock");
 
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
@@ -1148,6 +1154,8 @@ TEST_F(NegativeShaderSpirv, ReadShaderClock) {
 }
 
 TEST_F(NegativeShaderSpirv, SpecializationApplied) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
         "Make sure specialization constants get applied during shader validation by using a value that breaks compilation.");
 
@@ -1330,6 +1338,8 @@ TEST_F(NegativeShaderSpirv, SpecializationSizeOutOfBounds) {
 }
 
 TEST_F(NegativeShaderSpirv, SpecializationSizeZero) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Make sure an error is logged when a specialization map entry's size is 0");
 
     RETURN_IF_SKIP(Init());
@@ -1373,6 +1383,8 @@ TEST_F(NegativeShaderSpirv, SpecializationSizeZero) {
 }
 
 TEST_F(NegativeShaderSpirv, SpecializationSizeMismatch) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Make sure an error is logged when a specialization map entry's size is not correct with type");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -1650,6 +1662,8 @@ TEST_F(NegativeShaderSpirv, DuplicatedSpecializationConstantID) {
 }
 
 TEST_F(NegativeShaderSpirv, ShaderModuleCheckCapability) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Create a shader in which a capability declared by the shader is not supported.");
     // Note that this failure message comes from spirv-tools, specifically the validator.
 
@@ -1670,6 +1684,8 @@ TEST_F(NegativeShaderSpirv, ShaderModuleCheckCapability) {
 }
 
 TEST_F(NegativeShaderSpirv, ShaderNotEnabled) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
         "Create a graphics pipeline in which a capability declared by the shader requires a feature not enabled on the device.");
 
@@ -1889,6 +1905,8 @@ TEST_F(NegativeShaderSpirv, ComputeShaderDerivativesEnabled) {
 }
 
 TEST_F(NegativeShaderSpirv, FragmentShaderInterlockEnabled) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Create a pipeline requiring the fragment shader interlock feature which has not enabled on the device.");
 
     RETURN_IF_SKIP(Init());
@@ -1936,6 +1954,8 @@ TEST_F(NegativeShaderSpirv, FragmentShaderInterlockEnabled) {
 }
 
 TEST_F(NegativeShaderSpirv, DemoteToHelperInvocation) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Create a pipeline requiring the demote to helper invocation feature which has not enabled on the device.");
 
     AddRequiredExtensions(VK_EXT_SHADER_DEMOTE_TO_HELPER_INVOCATION_EXTENSION_NAME);
@@ -2026,6 +2046,8 @@ TEST_F(NegativeShaderSpirv, DISABLED_NoUniformBufferStandardLayout10) {
 }
 
 TEST_F(NegativeShaderSpirv, NoUniformBufferStandardLayout12) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
         "Don't enable uniformBufferStandardLayout in Vulkan1.2 when VK_KHR_uniform_buffer_standard_layout was promoted");
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -2111,6 +2133,8 @@ TEST_F(NegativeShaderSpirv, DISABLED_NoScalarBlockLayout10) {
 }
 
 TEST_F(NegativeShaderSpirv, NoScalarBlockLayout12) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Don't enable scalarBlockLayout in Vulkan1.2 when VK_EXT_scalar_block_layout was promoted");
     SetTargetApiVersion(VK_API_VERSION_1_2);
     RETURN_IF_SKIP(Init());
@@ -2151,6 +2175,8 @@ TEST_F(NegativeShaderSpirv, NoScalarBlockLayout12) {
 }
 
 TEST_F(NegativeShaderSpirv, DeviceMemoryScope) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Validate using Device memory scope in spirv.");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -2180,6 +2206,8 @@ TEST_F(NegativeShaderSpirv, DeviceMemoryScope) {
 }
 
 TEST_F(NegativeShaderSpirv, QueueFamilyMemoryScope) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Validate using QueueFamily memory scope in spirv.");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -2211,6 +2239,8 @@ TEST_F(NegativeShaderSpirv, QueueFamilyMemoryScope) {
 }
 
 TEST_F(NegativeShaderSpirv, ConservativeRasterizationPostDepthCoverage) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Make sure conservativeRasterizationPostDepthCoverage is set if needed.");
 
     AddRequiredExtensions(VK_EXT_CONSERVATIVE_RASTERIZATION_EXTENSION_NAME);
@@ -2257,6 +2287,8 @@ TEST_F(NegativeShaderSpirv, ConservativeRasterizationPostDepthCoverage) {
 }
 
 TEST_F(NegativeShaderSpirv, DynamicUniformIndex) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Check for the array dynamic array index features when the SPIR-V capabilities are requested.");
 
     VkPhysicalDeviceFeatures features{};
@@ -2426,6 +2458,8 @@ TEST_F(NegativeShaderSpirv, DISABLED_SpecConstantTextureIndex) {
 }
 
 TEST_F(NegativeShaderSpirv, DescriptorCountConstant) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
@@ -2476,6 +2510,8 @@ TEST_F(NegativeShaderSpirv, DISABLED_DescriptorCountSpecConstant) {
 }
 
 TEST_F(NegativeShaderSpirv, InvalidExtension) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Use an invalid SPIR-V extension in OpExtension.");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);

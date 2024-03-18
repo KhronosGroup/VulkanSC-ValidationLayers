@@ -1014,6 +1014,8 @@ TEST_F(NegativeCommand, SimultaneousUseOneShot) {
 }
 
 TEST_F(NegativeCommand, DrawTimeImageViewTypeMismatchWithPipeline) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
         "Test that an error is produced when an image view type does not match the dimensionality declared in the shader");
 
@@ -1066,6 +1068,8 @@ TEST_F(NegativeCommand, DrawTimeImageViewTypeMismatchWithPipeline) {
 }
 
 TEST_F(NegativeCommand, DrawTimeImageViewTypeMismatchWithPipelineFunction) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
@@ -1120,6 +1124,8 @@ TEST_F(NegativeCommand, DrawTimeImageViewTypeMismatchWithPipelineFunction) {
 }
 
 TEST_F(NegativeCommand, DrawTimeImageComponentTypeMismatchWithPipeline) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
         "Test that an error is produced when the component type of an imageview disagrees with the type in the shader.");
 
@@ -5466,6 +5472,8 @@ TEST_F(NegativeCommand, ViewportWScalingNV) {
 }
 
 TEST_F(NegativeCommand, FilterCubicSamplerInCmdDraw) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Verify if sampler is filter cubic, image view needs to support it.");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_EXT_FILTER_CUBIC_EXTENSION_NAME);

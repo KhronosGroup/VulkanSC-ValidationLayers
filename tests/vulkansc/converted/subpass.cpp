@@ -542,6 +542,8 @@ TEST_F(NegativeSubpass, ImageBarrierSubpassConflict) {
 }
 
 TEST_F(NegativeSubpass, SubpassInputNotBoundDescriptorSet) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Validate subpass input isn't bound to fragment shader or descriptor set");
 
     RETURN_IF_SKIP(Init());
@@ -990,6 +992,8 @@ TEST_F(NegativeSubpass, InputAttachmentLayout) {
 }
 
 TEST_F(NegativeSubpass, InputAttachmentMissing) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
         "Test that an error is produced for a shader consuming an input attachment which is not included in the subpass "
         "description");
@@ -1016,6 +1020,8 @@ TEST_F(NegativeSubpass, InputAttachmentMissing) {
 }
 
 TEST_F(NegativeSubpass, InputAttachmentMissingArray) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
         "Test that an error is produced for a shader consuming an input attachment which is not included in the subpass "
         "description -- array case");
@@ -1070,6 +1076,8 @@ TEST_F(NegativeSubpass, DISABLED_InputAttachmentMissingSpecConstant) {
 }
 
 TEST_F(NegativeSubpass, InputAttachmentSharingVariable) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Make sure if 2 loads use same variable, both are tracked");
 
     RETURN_IF_SKIP(Init());
@@ -1130,6 +1138,8 @@ TEST_F(NegativeSubpass, InputAttachmentSharingVariable) {
 }
 
 TEST_F(NegativeSubpass, SubpassInputWithoutFormat) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Non-InputAttachment shader input with unknown image format");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);

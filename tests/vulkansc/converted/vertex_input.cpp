@@ -797,6 +797,8 @@ TEST_F(NegativeVertexInput, BindVertexOffset) {
 }
 
 TEST_F(NegativeVertexInput, AttributeNotConsumed) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Test that a warning is produced for a vertex attribute which is not consumed by the vertex shader");
 
     RETURN_IF_SKIP(Init());
@@ -818,6 +820,8 @@ TEST_F(NegativeVertexInput, AttributeNotConsumed) {
 }
 
 TEST_F(NegativeVertexInput, AttributeLocationMismatch) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
         "Test that a warning is produced for a location mismatch on vertex attributes. This flushes out bad behavior in the "
         "interface walker");
@@ -842,6 +846,8 @@ TEST_F(NegativeVertexInput, AttributeLocationMismatch) {
 }
 
 TEST_F(NegativeVertexInput, AttributeNotProvided) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Test that an error is produced for a vertex shader input which is not provided by a vertex attribute");
 
     RETURN_IF_SKIP(Init());
@@ -863,6 +869,8 @@ TEST_F(NegativeVertexInput, AttributeNotProvided) {
 }
 
 TEST_F(NegativeVertexInput, AttributeTypeMismatch) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
         "Test that an error is produced for a mismatch between the fundamental type (float/int/uint) of an attribute and the "
         "vertex shader input that consumes it");
@@ -896,6 +904,8 @@ TEST_F(NegativeVertexInput, AttributeTypeMismatch) {
 }
 
 TEST_F(NegativeVertexInput, AttributeStructTypeFirstLocation) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Input is OpTypeStruct but doesn't match");
 
     RETURN_IF_SKIP(Init());
@@ -951,6 +961,8 @@ TEST_F(NegativeVertexInput, AttributeStructTypeFirstLocation) {
 }
 
 TEST_F(NegativeVertexInput, AttributeStructTypeSecondLocation) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Input is OpTypeStruct but doesn't match for location given");
 
     RETURN_IF_SKIP(Init());
@@ -1006,6 +1018,8 @@ TEST_F(NegativeVertexInput, AttributeStructTypeSecondLocation) {
 }
 
 TEST_F(NegativeVertexInput, AttributeStructTypeBlockLocation) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Input is OpTypeStruct where the Block has the Location");
 
     RETURN_IF_SKIP(Init());
@@ -1059,6 +1073,8 @@ TEST_F(NegativeVertexInput, AttributeStructTypeBlockLocation) {
 }
 
 TEST_F(NegativeVertexInput, AttributeTypeMismatchDynamic) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
         "Test that an error is produced for a mismatch between the fundamental type (float/int/uint) of an attribute and the "
         "vertex shader input that consumes it");
@@ -1144,6 +1160,8 @@ TEST_F(NegativeVertexInput, AttributeBindingConflict) {
 }
 
 TEST_F(NegativeVertexInput, Attribute64bitInputAttribute) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("InputAttribute has 64-bit, but shader reads 32-bit");
 
     AddRequiredFeature(vkt::Feature::shaderFloat64);
@@ -1180,6 +1198,8 @@ TEST_F(NegativeVertexInput, Attribute64bitInputAttribute) {
 }
 
 TEST_F(NegativeVertexInput, Attribute64bitShaderInput) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("InputAttribute has 32-bit, but shader reads 64-bit");
 
     AddRequiredFeature(vkt::Feature::shaderFloat64);
@@ -1217,6 +1237,8 @@ TEST_F(NegativeVertexInput, Attribute64bitShaderInput) {
 }
 
 TEST_F(NegativeVertexInput, Attribute64bitUnusedComponent) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Shader uses f64vec2, but only provides first component with R64");
 
     AddRequiredFeature(vkt::Feature::shaderFloat64);
@@ -1254,6 +1276,8 @@ TEST_F(NegativeVertexInput, Attribute64bitUnusedComponent) {
 }
 
 TEST_F(NegativeVertexInput, AttributeStructTypeBlockLocation64bit) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Input is OpTypeStruct where the Block has the Location with 64-bit Vertex format");
 
     AddRequiredFeature(vkt::Feature::shaderFloat64);

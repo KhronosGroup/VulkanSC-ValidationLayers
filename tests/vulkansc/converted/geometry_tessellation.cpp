@@ -70,6 +70,8 @@ TEST_F(NegativeGeometryTessellation, StageMaskGsTsEnabled) {
 }
 
 TEST_F(NegativeGeometryTessellation, GeometryShaderEnabled) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Validate geometry shader feature is enabled if geometry shader stage is used");
 
     VkPhysicalDeviceFeatures deviceFeatures = {};
@@ -95,6 +97,8 @@ TEST_F(NegativeGeometryTessellation, GeometryShaderEnabled) {
 }
 
 TEST_F(NegativeGeometryTessellation, TessellationShaderEnabled) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
         "Validate tessellation shader feature is enabled if tessellation control or tessellation evaluation shader stage is used");
 
@@ -150,6 +154,8 @@ TEST_F(NegativeGeometryTessellation, TessellationShaderEnabled) {
 }
 
 TEST_F(NegativeGeometryTessellation, PointSizeGeomShaderDontWrite) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
         "Create a pipeline using TOPOLOGY_POINT_LIST, set PointSize vertex shader, but not in the final geometry stage.");
 
@@ -183,6 +189,8 @@ TEST_F(NegativeGeometryTessellation, PointSizeGeomShaderDontWrite) {
 }
 
 TEST_F(NegativeGeometryTessellation, PointSizeGeomShaderWrite) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
         "Create a pipeline using TOPOLOGY_POINT_LIST, set PointSize vertex shader, but not in the final geometry stage.");
 
@@ -261,6 +269,8 @@ TEST_F(NegativeGeometryTessellation, PointSizeGeomShaderWrite) {
 }
 
 TEST_F(NegativeGeometryTessellation, BuiltinBlockOrderMismatchVsGs) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Use different order of gl_Position and gl_PointSize in builtin block interface between VS and GS.");
 
     AddRequiredFeature(vkt::Feature::geometryShader);
@@ -349,6 +359,8 @@ TEST_F(NegativeGeometryTessellation, BuiltinBlockOrderMismatchVsGs) {
 }
 
 TEST_F(NegativeGeometryTessellation, BuiltinBlockSizeMismatchVsGs) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Use different number of elements in builtin block interface between VS and GS.");
 
     AddRequiredFeature(vkt::Feature::geometryShader);
@@ -386,6 +398,8 @@ TEST_F(NegativeGeometryTessellation, BuiltinBlockSizeMismatchVsGs) {
 }
 
 TEST_F(NegativeGeometryTessellation, MaxTessellationControlInputOutputComponents) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
         "Test that errors are produced when the number of per-vertex input and/or output components to the tessellation control "
         "stage exceeds the device limit");
@@ -505,6 +519,8 @@ TEST_F(NegativeGeometryTessellation, MaxTessellationControlInputOutputComponents
 }
 
 TEST_F(NegativeGeometryTessellation, MaxTessellationEvaluationInputOutputComponents) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
         "Test that errors are produced when the number of input and/or output components to the tessellation evaluation stage "
         "exceeds the device limit");
@@ -626,6 +642,8 @@ TEST_F(NegativeGeometryTessellation, MaxTessellationEvaluationInputOutputCompone
 }
 
 TEST_F(NegativeGeometryTessellation, MaxGeometryInputOutputComponents) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
         "Test that errors are produced when the number of input and/or output components to the geometry stage exceeds the device "
         "limit");
@@ -735,6 +753,8 @@ TEST_F(NegativeGeometryTessellation, MaxGeometryInputOutputComponents) {
 }
 
 TEST_F(NegativeGeometryTessellation, MaxGeometryInstanceVertexCount) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
         "Test that errors are produced when the number of output vertices/instances in the geometry stage exceeds the device "
         "limit");
@@ -795,6 +815,8 @@ TEST_F(NegativeGeometryTessellation, MaxGeometryInstanceVertexCount) {
 }
 
 TEST_F(NegativeGeometryTessellation, TessellationPatchDecorationMismatch) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
         "Test that an error is produced for a variable output from the TCS without the patch decoration, but consumed in the TES "
         "with the decoration.");
@@ -1050,6 +1072,8 @@ VK_DESCRIPTOR_SET_USAGE_NON_FREE, 1, &ds_layout.handle(), &descriptorSet);
 */
 
 TEST_F(NegativeGeometryTessellation, IncompatiblePrimitiveTopology) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Create pipeline with primitive topology incompatible with shaders.");
 
     AddRequiredFeature(vkt::Feature::geometryShader);
@@ -1086,6 +1110,8 @@ TEST_F(NegativeGeometryTessellation, IncompatiblePrimitiveTopology) {
 }
 
 TEST_F(NegativeGeometryTessellation, IncompatibleTessGeomPrimitiveTopology) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Create pipeline with incompatible topology between tess and geom shaders.");
 
     AddRequiredFeature(vkt::Feature::geometryShader);
@@ -1149,6 +1175,8 @@ TEST_F(NegativeGeometryTessellation, IncompatibleTessGeomPrimitiveTopology) {
 }
 
 TEST_F(NegativeGeometryTessellation, PipelineTessellationMissingPointSize) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Create pipeline with tessellation shader with missing point size");
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
@@ -1198,6 +1226,8 @@ TEST_F(NegativeGeometryTessellation, PipelineTessellationMissingPointSize) {
 }
 
 TEST_F(NegativeGeometryTessellation, PipelineTessellationPointSize) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Create pipeline with tessellation shader with missing point size");
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
@@ -1356,6 +1386,8 @@ TEST_F(NegativeGeometryTessellation, GeometryStreamsCapability) {
 }
 
 TEST_F(NegativeGeometryTessellation, MismatchedTessellationExecutionModes) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Test mismatched tessellation shaders execution modes");
 
     RETURN_IF_SKIP(InitFramework());

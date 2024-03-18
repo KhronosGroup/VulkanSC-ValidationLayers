@@ -229,6 +229,8 @@ TEST_F(NegativeFragmentShadingRate, CombinerOpsLimit) {
 }
 
 TEST_F(NegativeFragmentShadingRate, PrimitiveFragmentShadingRateWriteMultiViewportLimitDynamic) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Test dynamic validation of the primitiveFragmentShadingRateWithMultipleViewports limit");
 
     // Enable KHR_fragment_shading_rate and all of its required extensions
@@ -982,9 +984,9 @@ TEST_F(NegativeFragmentShadingRate, FramebufferDimensionsMultiview) {
     m_errorMonitor->VerifyFound();
 }
 
-// This test case triggers an unexpected VUID due to reliance on the VK_QCOM_render_pass_transform extension that is not available
-// in Vulkan SC
 TEST_F(NegativeFragmentShadingRate, Attachments) {
+    // This test case triggers an unexpected VUID due to reliance on the VK_QCOM_render_pass_transform extension that is not
+    // available in Vulkan SC
     m_errorMonitor->SetAllowedFailureMsg("VUID-VkRenderPassCreateInfo2-flags-zerobitmask");
     TEST_DESCRIPTION("Specify a fragment shading rate attachment with too small dimensions");
 
@@ -1476,6 +1478,8 @@ TEST_F(NegativeFragmentShadingRate, PipelineCombinerOpsLimit) {
 }
 
 TEST_F(NegativeFragmentShadingRate, PrimitiveWriteMultiViewportLimit) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Test static validation of the primitiveFragmentShadingRateWithMultipleViewports limit");
 
     // Enable KHR_fragment_shading_rate and all of its required extensions
