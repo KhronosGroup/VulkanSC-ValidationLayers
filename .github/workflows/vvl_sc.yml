@@ -68,6 +68,9 @@ jobs:
         run: echo "/usr/lib/ccache" >> $GITHUB_PATH
       - name: Set PYTHONPATH
         run: echo "PYTHONPATH=$GITHUB_WORKSPACE/external/${{ matrix.config }}/Vulkan-Headers/registry:$PYTHONPATH" >> $GITHUB_ENV
+      # This is to combat a bug when using 6.6 linux kernels with thread/address sanitizer
+      # https://github.com/google/sanitizers/issues/1716
+      - run: sudo sysctl vm.mmap_rnd_bits=28
       - name: Build VulkanSC-ValidationLayers
         run: |
           echo "PYTHONPATH = $PYTHONPATH"
