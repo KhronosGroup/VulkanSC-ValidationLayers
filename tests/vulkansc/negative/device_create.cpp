@@ -278,6 +278,7 @@ TEST_F(VkSCPipelineCacheDataLayerTest, InvalidPipelineIndexStride) {
 
     // But fail with a smaller one
     header->pipelineIndexStride = 52;
+    m_errorMonitor->SetAllowedFailureMsg("does not contain SPIR-V module data");
     m_errorMonitor->SetDesiredFailureMsg(kWarningBit,
                                          "VUID-VkPipelineCacheHeaderVersionSafetyCriticalOne-pipelineIndexStride-05078");
     TestPipelineCacheData({create_info});
@@ -329,6 +330,7 @@ TEST_F(VkSCPipelineCacheDataLayerTest, InvalidPipelineIndexEntryValues) {
 
     // jsonOffset must be zero if jsonSize is zero
     entries[1]->jsonOffset = 42;
+    m_errorMonitor->SetAllowedFailureMsg("does not contain SPIR-V module data");
     m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "VUID-VkPipelineCacheSafetyCriticalIndexEntry-jsonSize-05080");
     TestPipelineCacheData({builder.MakeCreateInfo()});
     entries[1]->jsonOffset = 0;
@@ -337,6 +339,7 @@ TEST_F(VkSCPipelineCacheDataLayerTest, InvalidPipelineIndexEntryValues) {
     entries[2]->stageIndexCount = 1;
     entries[2]->stageIndexStride = 16;
     entries[2]->stageIndexOffset = builder.GetData().size();
+    m_errorMonitor->SetAllowedFailureMsg("does not contain SPIR-V module data");
     m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "VUID-VkPipelineCacheSafetyCriticalIndexEntry-jsonSize-05081");
     m_errorMonitor->SetAllowedFailureMsg("VUID-VkPipelineCacheSafetyCriticalIndexEntry-stageIndexCount-05084");
     TestPipelineCacheData({builder.MakeCreateInfo()});
@@ -346,12 +349,14 @@ TEST_F(VkSCPipelineCacheDataLayerTest, InvalidPipelineIndexEntryValues) {
 
     // stageIndexOffset must be zero if stageIndexCount is zero
     entries[0]->stageIndexOffset = 42;
+    m_errorMonitor->SetAllowedFailureMsg("does not contain SPIR-V module data");
     m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "VUID-VkPipelineCacheSafetyCriticalIndexEntry-stageIndexCount-05082");
     TestPipelineCacheData({builder.MakeCreateInfo()});
     entries[0]->stageIndexOffset = 0;
 
     // stageIndexStride must be zero if stageIndexCount is zero
     entries[1]->stageIndexStride = 42;
+    m_errorMonitor->SetAllowedFailureMsg("does not contain SPIR-V module data");
     m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "VUID-VkPipelineCacheSafetyCriticalIndexEntry-stageIndexCount-05082");
     TestPipelineCacheData({builder.MakeCreateInfo()});
     entries[1]->stageIndexStride = 0;
@@ -371,6 +376,7 @@ TEST_F(VkSCPipelineCacheDataLayerTest, JsonDataOutOfBounds) {
 
     entry->jsonOffset = builder.GetData().size() - 4;
 
+    m_errorMonitor->SetAllowedFailureMsg("does not contain SPIR-V module data");
     m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "VUID-VkPipelineCacheSafetyCriticalIndexEntry-jsonSize-08991");
     TestPipelineCacheData({builder.MakeCreateInfo()});
 }
@@ -394,6 +400,7 @@ TEST_F(VkSCPipelineCacheDataLayerTest, InvalidStageIndexStride) {
 
     // But fail with a smaller one
     entry->stageIndexStride = 12;
+    m_errorMonitor->SetAllowedFailureMsg("does not contain SPIR-V module data");
     m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "VUID-VkPipelineCacheSafetyCriticalIndexEntry-stageIndexCount-05083");
     TestPipelineCacheData({create_info});
 }
@@ -412,6 +419,7 @@ TEST_F(VkSCPipelineCacheDataLayerTest, StageIndexOutOfBounds) {
 
     create_info = builder.MakeCreateInfo();
     create_info.initialDataSize = static_cast<size_t>(entry->stageIndexOffset + entry->stageIndexStride + 12);
+    m_errorMonitor->SetAllowedFailureMsg("does not contain SPIR-V module data");
     m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "VUID-VkPipelineCacheSafetyCriticalIndexEntry-stageIndexCount-05084");
     TestPipelineCacheData({create_info});
 }
@@ -435,6 +443,7 @@ TEST_F(VkSCPipelineCacheDataLayerTest, InvalidStageIndexEntryValues) {
     auto stage_1_1 = builder.GetStageValidation(entries[1], 1);
     auto orig_code_size_1_1 = stage_1_1->codeSize;
     stage_1_1->codeSize = 0;
+    m_errorMonitor->SetAllowedFailureMsg("does not contain SPIR-V module data");
     m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "VUID-VkPipelineCacheStageValidationIndexEntry-codeSize-05085");
     TestPipelineCacheData({builder.MakeCreateInfo()});
     stage_1_1->codeSize = orig_code_size_1_1;
@@ -443,6 +452,7 @@ TEST_F(VkSCPipelineCacheDataLayerTest, InvalidStageIndexEntryValues) {
     auto stage_2_0 = builder.GetStageValidation(entries[2], 0);
     auto orig_code_size_2_0 = stage_2_0->codeSize;
     stage_2_0->codeSize -= 1;
+    m_errorMonitor->SetAllowedFailureMsg("does not contain SPIR-V module data");
     m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "VUID-VkPipelineCacheStageValidationIndexEntry-codeSize-05086");
     TestPipelineCacheData({builder.MakeCreateInfo()});
     stage_2_0->codeSize = orig_code_size_2_0;
@@ -462,6 +472,7 @@ TEST_F(VkSCPipelineCacheDataLayerTest, StageCodeDataOutOfBounds) {
 
     builder.GetStageValidation(entry, 1)->codeOffset = builder.GetData().size() - 4;
 
+    m_errorMonitor->SetAllowedFailureMsg("does not contain SPIR-V module data");
     m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "VUID-VkPipelineCacheStageValidationIndexEntry-codeOffset-05087");
     TestPipelineCacheData({builder.MakeCreateInfo()});
 }
@@ -545,6 +556,7 @@ TEST_F(VkSCPipelineCacheDataLayerTest, MultipleProblems) {
         create_infos[i].pInitialData = pipeline_caches[i].data();
     }
 
+    m_errorMonitor->SetAllowedFailureMsg("does not contain SPIR-V module data");
     m_errorMonitor->SetDesiredFailureMsg(kWarningBit,
                                          "VUID-VkPipelineCacheHeaderVersionSafetyCriticalOne-pipelineIndexOffset-05079");
     m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "VUID-VkPipelineCacheHeaderVersionOne-headerVersion-05076");
@@ -552,7 +564,6 @@ TEST_F(VkSCPipelineCacheDataLayerTest, MultipleProblems) {
                                          "VUID-VkPipelineCacheHeaderVersionSafetyCriticalOne-pipelineIndexStride-05078");
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPipelineCacheCreateInfo-pInitialData-05139");
     TestPipelineCacheData(create_infos);
-    m_errorMonitor->VerifyFound();
 }
 
 TEST_F(VkSCPipelineCacheDataLayerTest, InvalidSpirvHeaderSize) {
@@ -567,7 +578,6 @@ TEST_F(VkSCPipelineCacheDataLayerTest, InvalidSpirvHeaderSize) {
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "Invalid SPIR-V header");
     TestPipelineCacheData({builder.MakeCreateInfo()});
-    m_errorMonitor->VerifyFound();
 }
 
 TEST_F(VkSCPipelineCacheDataLayerTest, InvalidSpirvMagic) {
@@ -582,5 +592,33 @@ TEST_F(VkSCPipelineCacheDataLayerTest, InvalidSpirvMagic) {
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "Invalid SPIR-V magic number");
     TestPipelineCacheData({builder.MakeCreateInfo()});
-    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(VkSCPipelineCacheDataLayerTest, AllPipelinesMissingSpirvDebugInfo) {
+    TEST_DESCRIPTION("A warning is issued if all pipelines in the pipeline cache data are missing SPIR-V debug info.");
+
+    RETURN_IF_SKIP(InitFramework());
+    auto header = builder.AddDefaultHeaderVersionSCOne();
+    builder.AddPipelineEntry(header, "3ddda923-b6fc-433e-803c-822c1bccbc05", 4000);
+    builder.AddPipelineEntry(header, "1265a236-e369-11ed-b5ea-0242ac120002", 4000);
+    builder.AddPipelineEntry(header, "73ada7f2-9cc6-48ed-a193-24d0091f4f95", 4000);
+
+    m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "does not contain SPIR-V module data for any pipelines");
+    TestPipelineCacheData({builder.MakeCreateInfo()});
+}
+
+TEST_F(VkSCPipelineCacheDataLayerTest, SomePipelinesMissingSpirvDebugInfo) {
+    TEST_DESCRIPTION("A warning is issued if some pipelines in the pipeline cache data are missing SPIR-V debug info.");
+
+    RETURN_IF_SKIP(InitFramework());
+    auto header = builder.AddDefaultHeaderVersionSCOne();
+    std::vector<vksc::PipelineCacheBuilder::SCIndexEntry<>> entries = {
+        builder.AddPipelineEntry(header, "3ddda923-b6fc-433e-803c-822c1bccbc05", 4000),
+        builder.AddPipelineEntry(header, "1265a236-e369-11ed-b5ea-0242ac120002", 4000),
+        builder.AddPipelineEntry(header, "73ada7f2-9cc6-48ed-a193-24d0091f4f95", 4000)};
+    builder.AddStageValidation(entries[0], kSampleComputePipelineJson, SPV_ENV_VULKAN_1_2, {kSampleComputeShaderSpv});
+    builder.AddStageValidation(entries[2], kSampleComputePipelineJson, SPV_ENV_VULKAN_1_2, {kSampleComputeShaderSpv});
+
+    m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "does not contain SPIR-V module data for some pipelines");
+    TestPipelineCacheData({builder.MakeCreateInfo()});
 }

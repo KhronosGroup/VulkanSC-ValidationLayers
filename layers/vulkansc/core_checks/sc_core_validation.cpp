@@ -296,6 +296,10 @@ bool SCCoreChecks::ValidatePipelineCacheData(VkPhysicalDevice physicalDevice, co
         return skip;
     }
 
+    // Count the number of pipelines that do not have a complete and valid SPIR-V debug information
+    // so that we can issue an appropriate warning
+    uint32_t pipelines_without_spirv_data = 0;
+
     vvl::unordered_set<vvl::sc::PipelineCacheData::Entry::ID, vvl::sc::PipelineCacheData::Entry::ID::hash> pipeline_ids{};
     for (uint32_t pipeline_index = 0; pipeline_index < data.PipelineIndexCount(); ++pipeline_index) {
         bool stage_info_valid = true;
@@ -372,17 +376,24 @@ bool SCCoreChecks::ValidatePipelineCacheData(VkPhysicalDevice physicalDevice, co
         if (stage_info_valid) {
             for (uint32_t stage_index = 0; stage_index < entry.StageIndexCount(); ++stage_index) {
                 auto stage_info = entry.StageIndexEntry(stage_index);
-                if (!stage_info) continue;
+                if (!stage_info) {
+                    stage_info_valid = false;
+                    continue;
+                }
 
                 skip |= ValidatePipelineCacheSpirv(physicalDevice, data, pipeline_index, stage_index, loc);
                 // SPIR-V validation, if used, will already report errors for the warnings below
-                if (skip) continue;
+                if (skip) {
+                    stage_info_valid = false;
+                    continue;
+                }
 
                 if (stage_info->codeSize == 0) {
                     skip |= LogWarning(kVUID_SC_PipelineCacheData_CodeSizeZero, physicalDevice, loc.dot(Field::pInitialData),
                                        "contains pipeline identifier {%s} for which codeSize "
                                        "for stage index entry #%u is zero.",
                                        id.toString().c_str(), stage_index);
+                    stage_info_valid = false;
                 }
 
                 if (stage_info->codeSize % 4 != 0) {
@@ -391,6 +402,7 @@ bool SCCoreChecks::ValidatePipelineCacheData(VkPhysicalDevice physicalDevice, co
                                        "contains pipeline identifier {%s} for which codeSize (%" PRIu64
                                        ") for stage index entry #%u is not a multiple of 4.",
                                        id.toString().c_str(), stage_info->codeSize, stage_index);
+                    stage_info_valid = false;
                 }
 
                 if (stage_info->codeOffset + stage_info->codeSize > create_info.initialDataSize) {
@@ -401,9 +413,24 @@ bool SCCoreChecks::ValidatePipelineCacheData(VkPhysicalDevice physicalDevice, co
                                    "codeOffset (%" PRIu64 ") with codeSize (%" PRIu64 ").",
                                    create_info.initialDataSize, stage_index, id.toString().c_str(), stage_info->codeOffset,
                                    stage_info->codeSize);
+                    stage_info_valid = false;
                 }
             }
         }
+
+        if (!stage_info_valid || entry->stageIndexCount == 0) {
+            pipelines_without_spirv_data++;
+        }
+    }
+
+    if (pipelines_without_spirv_data == data.PipelineIndexCount()) {
+        skip |= LogWarning(kVUID_SC_PipelineCacheData_SpirvDepValMissingInfo, device, loc.dot(Field::pInitialData),
+                           "does not contain SPIR-V module data for any pipelines thus SPIR-V dependent validation "
+                           "will not be available for any pipeline created from this pipeline cache data.");
+    } else if (pipelines_without_spirv_data > 0) {
+        skip |= LogWarning(kVUID_SC_PipelineCacheData_SpirvDepValMissingInfo, device, loc.dot(Field::pInitialData),
+                           "does not contain SPIR-V module data for some pipelines thus SPIR-V dependent validation "
+                           "will not be available for those pipelines.");
     }
 
     return skip;
