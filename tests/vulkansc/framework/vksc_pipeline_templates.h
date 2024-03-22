@@ -119,7 +119,7 @@
                     "primitiveRestartEnable": "VK_FALSE"
                 },
                 "pTessellationState": "NULL",
-                "pViewportState": "{
+                "pViewportState": {
                     "sType": "VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO",
                     "pNext": "NULL",
                     "flags": 0,
@@ -127,7 +127,7 @@
                     "pViewports": "NULL",
                     "scissorCount": 1,
                     "pScissors": "NULL"
-                }",
+                },
                 "pRasterizationState": {
                     "sType": "VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO",
                     "pNext":"NULL",
@@ -165,8 +165,7 @@
                     "pAttachments": "NULL",
                     "blendConstants": [ 0, 0, 0, 0 ]
                 },
-                "pDynamicState": 
-                {
+                "pDynamicState": {
                     "sType": "VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO",
                     "pNext": "NULL",
                     "flags": 0,
@@ -179,6 +178,51 @@
                 "layout": "",
                 "renderPass": "",
                 "subpass": 0,
+                "basePipelineHandle": "",
+                "basePipelineIndex": 0
+            }
+        }
+    }
+)json";
+
+[[maybe_unused]] static char const kSampleComputePipelineWithSpecializationConstantJson[] = R"json(
+    {
+        "ComputePipelineState": {
+            "YcbcrSamplers": [],
+            "ImmutableSamplers": [],
+            "DescriptorSetLayouts": [],
+            "PipelineLayout": {
+                "sType": "VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO",
+                "pNext": "NULL",
+                "flags": 0,
+                "setLayoutCount": 0,
+                "pSetLayouts": "NULL",
+                "pushConstantRangeCount": 0,
+                "pPushConstantRanges": "NULL"
+            },
+            "ComputePipeline": {
+                "sType": "VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO",
+                "pNext": "NULL",
+                "flags": "0",
+                "stage": {
+                    "sType": "VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO",
+                    "pNext": "NULL",
+                    "flags": "0",
+                    "stage": "VK_SHADER_STAGE_COMPUTE_BIT",
+                    "module": "",
+                    "pName": "main",
+                    "pSpecializationInfo": {
+                        "mapEntryCount": 1,
+                        "pMapEntries": {
+                            "constantID": 0,
+                            "offset": 0,
+                            "size": 4
+                        },
+                        "dataSize": 4,
+                        "pData": [ 0, 0, 0, 0 ]
+                    }
+                },
+                "layout": "",
                 "basePipelineHandle": "",
                 "basePipelineIndex": 0
             }

@@ -145,20 +145,40 @@ bool SCCoreChecks::ValidatePipelineStageInfo(uint32_t stage_index, const VkPipel
                              pipeline_entry->PipelineID().toString().c_str());
         }
     } else {
-        skip |= LogWarning(kVUID_SC_PipelineCacheData_SpirvDepValMissingInfo, device, loc.dot(Field::pName),
-                           "is NULL thus available SPIR-V module data for stage index entry #%u (stage %s) "
-                           "of the pipeline with identifier {%s} cannot be used for SPIR-V dependent validation.",
-                           stage_index, string_VkShaderStageFlagBits(stage_info.stage),
-                           pipeline_entry->PipelineID().toString().c_str());
+        // Try to check if we have entry point information in the pipeline JSON info
+        auto json_entrypoint_name = pipeline_entry->GetJsonEntryPointName(stage_index);
+        if (json_entrypoint_name) {
+            auto entrypoint = module_state->spirv->FindEntrypoint(json_entrypoint_name, stage_info.stage);
+            if (!entrypoint) {
+                skip |= LogError("VUID-VkPipelineShaderStageCreateInfo-pName-05027", device, loc.dot(Field::pName),
+                                 "is NULL and the entry point name in the pipeline JSON data does not match any of the "
+                                 "entry points in the SPIR-V module data for stage index entry #%u (stage %s) of the "
+                                 "pipeline with identifier {%s}.",
+                                 stage_index, string_VkShaderStageFlagBits(stage_info.stage),
+                                 pipeline_entry->PipelineID().toString().c_str());
+            }
+        } else {
+            skip |= LogWarning(kVUID_SC_PipelineCacheData_SpirvDepValMissingInfo, device, loc.dot(Field::pName),
+                               "is NULL and pipeline JSON data does not contain the entry point name thus available "
+                               "SPIR-V module data for stage index entry #%u (stage %s) of the pipeline with identifier "
+                               "{%s} cannot be used for SPIR-V dependent validation.",
+                               stage_index, string_VkShaderStageFlagBits(stage_info.stage),
+                               pipeline_entry->PipelineID().toString().c_str());
+        }
     }
 
     if (module_state->spirv->static_data_.has_specialization_constants && stage_info.pSpecializationInfo == nullptr) {
-        skip |= LogWarning(kVUID_SC_PipelineCacheData_SpirvDepValMissingInfo, device, loc.dot(Field::pSpecializationInfo),
-                           "is NULL but SPIR-V module data has specialization constants for stage index "
-                           "entry #%u (stage %s) of the pipeline with identifier {%s} and thus cannot be "
-                           "used for SPIR-V dependent validation.",
-                           stage_index, string_VkShaderStageFlagBits(stage_info.stage),
-                           pipeline_entry->PipelineID().toString().c_str());
+        // Try to check if we have specialization information in the pipeline JSON info
+        auto json_spec_info = pipeline_entry->GetJsonSpecializationInfo(stage_index);
+        if (!json_spec_info) {
+            skip |= LogWarning(kVUID_SC_PipelineCacheData_SpirvDepValMissingInfo, device, loc.dot(Field::pSpecializationInfo),
+                               "is NULL and pipeline JSON data does not contain specialization info but SPIR-V "
+                               "module data has specialization constants for stage index entry #%u (stage %s) "
+                               "of the pipeline with identifier {%s} and thus cannot be used for SPIR-V "
+                               "dependent validation.",
+                               stage_index, string_VkShaderStageFlagBits(stage_info.stage),
+                               pipeline_entry->PipelineID().toString().c_str());
+        }
     }
 
     return skip;

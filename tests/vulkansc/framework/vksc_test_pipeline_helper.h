@@ -105,6 +105,7 @@ class PipelineBuilder {
         dsl_bindings_.emplace_back(VkDescriptorSetLayoutBinding{binding, desc_type, count, stage_flags, nullptr});
     }
 
+    void SetPipelineJsonData(const std::string data) { pipeline_json_data_ = data; }
     virtual void AddStage(const Shader& shader);
     virtual void BuildCacheData();
     void TestDeviceCreateFail();
@@ -120,7 +121,7 @@ class PipelineBuilder {
     vkt::Device& device_;
     PipelineCacheBuilder* cache_builder_;
     vkt::PipelineCache pipeline_cache_;
-    const char* pipeline_json_data_;
+    std::string pipeline_json_data_;
     std::vector<std::vector<uint32_t>> spirv_data_;
 
     std::vector<VkDescriptorSetLayoutBinding> dsl_bindings_;

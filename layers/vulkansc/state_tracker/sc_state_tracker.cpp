@@ -195,6 +195,45 @@ std::shared_ptr<vvl::Pipeline> SCValidationStateTracker<BASE>::CreateGraphicsPip
     const VkGraphicsPipelineCreateInfo *pCreateInfo, std::shared_ptr<const vvl::PipelineCache> pipeline_cache,
     std::shared_ptr<const vvl::RenderPass> &&render_pass, std::shared_ptr<const vvl::PipelineLayout> &&layout,
     CreateShaderModuleStates *csm_states) const {
+    // If any of the VkPipelineShaderStageCreateInfo entries are missing:
+    //  * the entry point name (pName == NULL)
+    //  * specialization info (pSpecializationInfo == NULL), if necessary
+    // Then if those are available in the pipeline JSON debug information, we should patch the info passed
+    // to the pipeline state object in order for those to be available for SPIR-V dependent validation.
+    bool patch_with_pipeline_json_data = false;
+    auto offline_info = vku::FindStructInPNextChain<VkPipelineOfflineCreateInfo>(pCreateInfo->pNext);
+    auto pipeline_entry = std::static_pointer_cast<const vvl::sc::PipelineCache>(pipeline_cache)->GetPipeline(offline_info);
+    if (pipeline_entry) {
+        for (uint32_t stage_index = 0; stage_index < pCreateInfo->stageCount; ++stage_index) {
+            // Only consider stages that actually have SPIR-V debug information
+            if (pipeline_entry->GetShaderModule(stage_index) != nullptr) {
+                if (pCreateInfo->pStages[stage_index].pName == nullptr &&
+                    pipeline_entry->GetJsonEntryPointName(stage_index) != nullptr) {
+                    // We can patch missing entry point name
+                    patch_with_pipeline_json_data = true;
+                }
+                if (pCreateInfo->pStages[stage_index].pSpecializationInfo == nullptr &&
+                    pipeline_entry->GetJsonSpecializationInfo(stage_index) != nullptr) {
+                    // We can patch missing specialization info
+                    patch_with_pipeline_json_data = true;
+                }
+            }
+        }
+    }
+    VkGraphicsPipelineCreateInfo create_info{};
+    std::vector<VkPipelineShaderStageCreateInfo> stages_ci{};
+    if (patch_with_pipeline_json_data) {
+        stages_ci.resize(pCreateInfo->stageCount);
+        for (uint32_t stage_index = 0; stage_index < pCreateInfo->stageCount; ++stage_index) {
+            stages_ci[stage_index] = pCreateInfo->pStages[stage_index];
+            stages_ci[stage_index].pName = pipeline_entry->GetJsonEntryPointName(stage_index);
+            stages_ci[stage_index].pSpecializationInfo = pipeline_entry->GetJsonSpecializationInfo(stage_index);
+        }
+        create_info = *pCreateInfo;
+        create_info.pStages = stages_ci.data();
+        pCreateInfo = &create_info;
+    }
+
     return std::static_pointer_cast<vvl::Pipeline>(std::make_shared<vvl::sc::Pipeline>(
         this, pCreateInfo, std::move(pipeline_cache), std::move(render_pass), std::move(layout), csm_states));
 }
@@ -203,6 +242,35 @@ template <typename BASE>
 std::shared_ptr<vvl::Pipeline> SCValidationStateTracker<BASE>::CreateComputePipelineState(
     const VkComputePipelineCreateInfo *pCreateInfo, std::shared_ptr<const vvl::PipelineCache> pipeline_cache,
     std::shared_ptr<const vvl::PipelineLayout> &&layout) const {
+    // If the VkPipelineShaderStageCreateInfo entries is missing:
+    //  * the entry point name (pName == NULL)
+    //  * specialization info (pSpecializationInfo == NULL), if necessary
+    // Then if those are available in the pipeline JSON debug information, we should patch the info passed
+    // to the pipeline state object in order for those to be available for SPIR-V dependent validation.
+    bool patch_with_pipeline_json_data = false;
+    auto offline_info = vku::FindStructInPNextChain<VkPipelineOfflineCreateInfo>(pCreateInfo->pNext);
+    auto pipeline_entry = std::static_pointer_cast<const vvl::sc::PipelineCache>(pipeline_cache)->GetPipeline(offline_info);
+    if (pipeline_entry) {
+        // Only consider if stage has SPIR-V debug information
+        if (pipeline_entry->GetShaderModule(0) != nullptr) {
+            if (pCreateInfo->stage.pName == nullptr && pipeline_entry->GetJsonEntryPointName(0) != nullptr) {
+                // We can patch missing entry point name
+                patch_with_pipeline_json_data = true;
+            }
+            if (pCreateInfo->stage.pSpecializationInfo == nullptr && pipeline_entry->GetJsonSpecializationInfo(0) != nullptr) {
+                // We can patch missing specialization info
+                patch_with_pipeline_json_data = true;
+            }
+        }
+    }
+    VkComputePipelineCreateInfo create_info{};
+    if (patch_with_pipeline_json_data) {
+        create_info = *pCreateInfo;
+        create_info.stage.pName = pipeline_entry->GetJsonEntryPointName(0);
+        create_info.stage.pSpecializationInfo = pipeline_entry->GetJsonSpecializationInfo(0);
+        pCreateInfo = &create_info;
+    }
+
     return std::static_pointer_cast<vvl::Pipeline>(
         std::make_shared<vvl::sc::Pipeline>(this, pCreateInfo, std::move(pipeline_cache), std::move(layout)));
 }

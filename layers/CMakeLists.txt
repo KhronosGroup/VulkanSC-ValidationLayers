@@ -350,6 +350,12 @@ if(VULKANSC)
         vulkansc/sync/sc_sync_validation.h
         vulkansc/sync/sc_sync_validation.cpp
     )
+
+    find_package(jsoncpp REQUIRED CONFIG)
+
+    target_link_libraries(vvl PRIVATE
+        jsoncpp_static
+    )
 endif()
 
 set_target_properties(vvl PROPERTIES OUTPUT_NAME ${LAYER_NAME})
