@@ -57,7 +57,7 @@ TEST_F(VkSCShaderSpirvTest, ComputeEntryPointNameNull) {
 
     RETURN_IF_SKIP(Init());
 
-    m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "UNASSIGNED-VkPipelineShaderStageCreateInfo-pName-SpirvDepValMissingInfo");
+    m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "UNASSIGNED-PipelineCacheData-SpirvDepValMissingInfo");
     builder.CreatePipeline(*m_device);
     m_errorMonitor->VerifyFound();
 }
@@ -73,13 +73,13 @@ TEST_F(VkSCShaderSpirvTest, GraphicsEntryPointNameNull) {
 
     builder.stage_ci[0].pName = "main";
     builder.stage_ci[1].pName = nullptr;
-    m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "UNASSIGNED-VkPipelineShaderStageCreateInfo-pName-SpirvDepValMissingInfo");
+    m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "UNASSIGNED-PipelineCacheData-SpirvDepValMissingInfo");
     builder.CreatePipeline(*m_device);
     m_errorMonitor->VerifyFound();
 
     builder.stage_ci[0].pName = nullptr;
     builder.stage_ci[1].pName = "main";
-    m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "UNASSIGNED-VkPipelineShaderStageCreateInfo-pName-SpirvDepValMissingInfo");
+    m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "UNASSIGNED-PipelineCacheData-SpirvDepValMissingInfo");
     builder.CreatePipeline(*m_device);
     m_errorMonitor->VerifyFound();
 }
@@ -93,7 +93,7 @@ TEST_F(VkSCShaderSpirvTest, MissingSpecializationInfo) {
 
     RETURN_IF_SKIP(Init());
 
-    m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "UNASSIGNED-VkPipelineShaderStageCreateInfo-pName-SpirvDepValMissingInfo");
+    m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "UNASSIGNED-PipelineCacheData-SpirvDepValMissingInfo");
     builder.CreatePipeline(*m_device);
     m_errorMonitor->VerifyFound();
 }

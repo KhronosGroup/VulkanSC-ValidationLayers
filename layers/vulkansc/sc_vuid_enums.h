@@ -60,7 +60,9 @@
 
 // SPIR-V related validation errors/warnings for cases
 // where the Vulkan SC spec does not have explicit VUs
+[[maybe_unused]] static const char *kVUID_SC_PipelineCacheData_PipelineJsonInvalid =
+    "UNASSIGNED-PipelineCacheData-PipelineJsonInvalid";
 [[maybe_unused]] static const char *kVUID_SC_PipelineCacheData_SpirvDepValMissingInfo =
-    "UNASSIGNED-VkPipelineShaderStageCreateInfo-pName-SpirvDepValMissingInfo";
+    "UNASSIGNED-PipelineCacheData-SpirvDepValMissingInfo";
 
 // clang-format on

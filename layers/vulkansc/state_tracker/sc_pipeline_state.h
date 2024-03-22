@@ -23,6 +23,7 @@
 #include <memory>
 #include <vector>
 #include <unordered_map>
+#include <json/json.h>
 
 namespace vvl::sc {
 
@@ -169,7 +170,9 @@ class PipelineCache : public vvl::PipelineCache {
         using StageModules = std::vector<std::shared_ptr<vvl::ShaderModule>>;
 
         Entry(const ValidationStateTracker* dev_data, const PipelineCacheData::Entry& cache_entry)
-            : id_(cache_entry.PipelineID()), shader_modules_(InitShaderModules(dev_data, cache_entry)) {}
+            : id_(cache_entry.PipelineID()),
+              shader_modules_(InitShaderModules(dev_data, cache_entry)),
+              json_data_(ParseJsonData(cache_entry)) {}
 
         ID PipelineID() const { return id_; }
 
@@ -181,11 +184,35 @@ class PipelineCache : public vvl::PipelineCache {
             }
         }
 
+        const char* GetJsonEntryPointName(size_t stage_index) const {
+            if (stage_index < json_data_.entrypoint_name.size() && json_data_.entrypoint_name[stage_index].size() > 0) {
+                return json_data_.entrypoint_name[stage_index].c_str();
+            } else {
+                return nullptr;
+            }
+        }
+
+        const VkSpecializationInfo* GetJsonSpecializationInfo(size_t stage_index) const {
+            if (stage_index < json_data_.specialization_info.size()) {
+                return json_data_.specialization_info[stage_index]->ptr();
+            } else {
+                return nullptr;
+            }
+        }
+
       private:
+        struct JsonData {
+            Json::Value json{};
+            std::vector<std::string> entrypoint_name{};
+            std::vector<std::unique_ptr<safe_VkSpecializationInfo>> specialization_info{};
+        };
+
         StageModules InitShaderModules(const ValidationStateTracker* dev_data, const PipelineCacheData::Entry& cache_entry);
+        JsonData ParseJsonData(const PipelineCacheData::Entry& cache_entry);
 
         ID id_;
         const StageModules shader_modules_;
+        JsonData json_data_;
     };
 
     PipelineCache(const ValidationStateTracker* dev_data, VkPipelineCache pipeline_cache,

@@ -18,6 +18,9 @@
 
 #include "sc_pipeline_state.h"
 #include "state_tracker/state_tracker.h"
+#include "vulkansc/sc_vuid_enums.h"
+
+#include <sstream>
 
 namespace vvl::sc {
 
@@ -68,6 +71,75 @@ PipelineCache::Entry::StageModules PipelineCache::Entry::InitShaderModules(const
         }
     }
     return stage_modules;
+}
+
+PipelineCache::Entry::JsonData PipelineCache::Entry::ParseJsonData(const PipelineCacheData::Entry& cache_entry) {
+    PipelineCache::Entry::JsonData data{};
+
+    auto parse_entrypoint_name = [](const Json::Value& entrypoint_name) -> std::string {
+        if (entrypoint_name.isString()) {
+            auto result = entrypoint_name.asString();
+            if (result != "" && result != "NULL") {
+                return result;
+            }
+        }
+        return std::string();
+    };
+
+    auto parse_spec_info = [](const Json::Value& spec_info) -> std::unique_ptr<safe_VkSpecializationInfo> {
+        if (spec_info.isObject()) {
+            auto result = std::make_unique<safe_VkSpecializationInfo>();
+            result->mapEntryCount = spec_info["mapEntryCount"].asUInt();
+            auto map_entries = new VkSpecializationMapEntry[result->mapEntryCount];
+            auto map_entries_json = spec_info["pMapEntries"];
+            for (uint32_t i = 0; i < result->mapEntryCount; ++i) {
+                map_entries[i].constantID = map_entries_json["constantID"].asUInt();
+                map_entries[i].offset = map_entries_json["offset"].asUInt();
+                map_entries[i].size = map_entries_json["size"].asUInt();
+            }
+            result->pMapEntries = map_entries;
+            result->dataSize = spec_info["dataSize"].asUInt();
+            auto data = new std::byte[result->dataSize];
+            auto data_json = spec_info["pData"];
+            for (size_t i = 0; i < result->dataSize; ++i) {
+                data[i] = static_cast<std::byte>(data_json[static_cast<uint32_t>(i)].asUInt());
+            }
+            result->pData = data;
+            return result;
+        }
+        return nullptr;
+    };
+
+    if (cache_entry.JSONDataSize() > 0) {
+        std::string json_string(cache_entry.JSONData(), static_cast<std::size_t>(cache_entry.JSONDataSize()));
+        std::istringstream json_stream(json_string);
+        std::string json_errors{};
+        Json::CharReaderBuilder builder{};
+        bool parse_ok = Json::parseFromStream(builder, json_stream, &data.json, &json_errors);
+        if (parse_ok) {
+            auto graphics_pipe_state = data.json["GraphicsPipelineState"];
+            if (graphics_pipe_state != Json::nullValue) {
+                auto stages = graphics_pipe_state["GraphicsPipeline"]["pStages"];
+                uint32_t stage_count = graphics_pipe_state["GraphicsPipeline"]["stageCount"].asUInt();
+                data.entrypoint_name.reserve(stage_count);
+                data.specialization_info.reserve(stage_count);
+                for (uint32_t stage_index = 0; stage_index < stage_count; ++stage_index) {
+                    auto stage = stages[stage_index];
+                    data.entrypoint_name.push_back(parse_entrypoint_name(stage["pName"]));
+                    data.specialization_info.push_back(parse_spec_info(stage["pSpecializationInfo"]));
+                }
+            }
+
+            auto compute_pipe_state = data.json["ComputePipelineState"];
+            if (compute_pipe_state != Json::nullValue) {
+                auto stage = compute_pipe_state["ComputePipeline"]["stage"];
+                data.entrypoint_name.push_back(parse_entrypoint_name(stage["pName"]));
+                data.specialization_info.push_back(parse_spec_info(stage["pSpecializationInfo"]));
+            }
+        }
+    }
+
+    return data;
 }
 
 }  // namespace vvl::sc

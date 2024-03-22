@@ -27,7 +27,7 @@ PipelineBuilder::PipelineBuilder(VkSCRenderFramework* framework)
       device_(*(framework->DeviceObj())),
       cache_builder_(framework->AddPipelineCacheBuilder()),
       pipeline_cache_(),
-      pipeline_json_data_(nullptr),
+      pipeline_json_data_(),
       spirv_data_(),
       dsl_bindings_(),
       descriptor_set_(),
@@ -62,7 +62,7 @@ void PipelineBuilder::BuildCacheData() {
         auto pool_entry_size = vksc::GetDefaultPipelinePoolSize().poolEntrySize;
         auto header = cache_builder_->AddDefaultHeaderVersionSCOne();
         auto entry = cache_builder_->AddPipelineEntry(header, kPipelineId, pool_entry_size);
-        cache_builder_->AddStageValidation(entry, pipeline_json_data_, std::move(spirv_data_));
+        cache_builder_->AddStageValidation(entry, pipeline_json_data_.c_str(), std::move(spirv_data_));
         offline_ci.poolEntrySize = pool_entry_size;
         ParseUUID(kPipelineId, &offline_ci.pipelineIdentifier[0]);
     }
