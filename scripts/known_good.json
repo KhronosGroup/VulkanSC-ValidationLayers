@@ -20,7 +20,7 @@
                 "-DVULKANSC=ON",
                 "-DGEN_VULKANSC_COMBINED=ON"
             ],
-            "commit": "downstream-1.3.278"
+            "commit": "be40e89611cbbd4a48e4a566ddac468da5eb1cef"
         },
         {
             "name": "Vulkan-Utility-Libraries",
@@ -44,7 +44,7 @@
             "sub_dir": "Vulkan-Utility-Libraries",
             "build_dir": "Vulkan-Utility-Libraries/build",
             "install_dir": "Vulkan-Utility-Libraries/build/install",
-            "commit": "downstream-1.3.278",
+            "commit": "c0342cb387180f8bcbb0a38551603c365434581f",
             "cmake_options": [
                 "-DVULKANSC=ON"
             ],
@@ -159,7 +159,7 @@
                 "-DVULKANSC=ON",
                 "-DLOADER_USE_UNSAFE_FILE_SEARCH=ON"
             ],
-            "commit": "downstream-1.3.278",
+            "commit": "ef6ad6f4bc29d4006cf2a4d27ff8613c42ff545d",
             "build_step": "skip",
             "optional": [
                 "tests"
@@ -198,7 +198,7 @@
             "sub_dir": "Vulkan-Tools",
             "build_dir": "Vulkan-Tools/build",
             "install_dir": "Vulkan-Tools/build/install",
-            "commit": "downstream-1.3.278",
+            "commit": "3cb19d9e897ac0910e70f52a8f6368e88ca84b79",
             "build_step": "skip",
             "optional": [
                 "tests"
