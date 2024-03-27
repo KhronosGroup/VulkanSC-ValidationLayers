@@ -215,13 +215,6 @@
                 "NegativePipeline.CreateFlags",
                 "NegativePipeline.CreateFlagsCompute"
             ]
-        },
-        {
-            "reason": "Uses too many objects",
-            "cases": [
-                "@Note: This test case assumes 10000 descriptor sets can be created from a single pool",
-                "PositiveThreading.DebugObjectNames"
-            ]
         }
     ],
     "modify": [
@@ -386,6 +379,15 @@
             ],
             "patch": [
                 "m_errorMonitor->SetAllowedFailureMsg(\"VUID-VkRenderPassCreateInfo2-flags-zerobitmask\")"
+            ]
+        },
+        {
+            "reason": "This test case creates 10000 descriptor sets from a single pool",
+            "cases": [
+                "PositiveThreading.DebugObjectNames"
+            ],
+            "patch": [
+                "ObjectReservation().descriptorSetRequestCount = 10000"
             ]
         }
     ]

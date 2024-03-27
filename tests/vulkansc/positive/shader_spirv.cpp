@@ -12,24 +12,20 @@
 #include "../framework/vksc_layer_validation_tests.h"
 #include "../framework/vksc_test_pipeline_helper.h"
 
-TEST_F(VkSCPositiveShaderSpirvTest, Atomics) {
+TEST_F(VkSCPositiveShaderSpirv, Atomics) {
     TEST_DESCRIPTION("SPIR-V extension uses atomic instructions with shaderAtomicInstructions enabled.");
-
-    RETURN_IF_SKIP(InitFramework());
 
     vksc::ComputePipelineBuilder builder(this);
     builder.AddBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     builder.Init(vksc::Shader::Compute(kComputeShaderAtomicInstructionsSpv));
 
-    auto sc_10_features = vku::InitStruct<VkPhysicalDeviceVulkanSC10Features>();
-    sc_10_features.shaderAtomicInstructions = VK_TRUE;
-
-    RETURN_IF_SKIP(InitState(nullptr, &sc_10_features));
+    AddRequiredFeature(vkt::Feature::shaderAtomicInstructions);
+    RETURN_IF_SKIP(Init());
 
     builder.CreatePipeline(*m_device);
 }
 
-TEST_F(VkSCPositiveShaderSpirvTest, ComputeEntryPointNameNull) {
+TEST_F(VkSCPositiveShaderSpirv, ComputeEntryPointNameNull) {
     TEST_DESCRIPTION(
         "If entry point name is not specified, but pipeline JSON data has entry point name info,"
         " then SPIR-V dependent validation is not disabled.");
@@ -44,7 +40,7 @@ TEST_F(VkSCPositiveShaderSpirvTest, ComputeEntryPointNameNull) {
     builder.CreatePipeline(*m_device);
 }
 
-TEST_F(VkSCPositiveShaderSpirvTest, GraphicsEntryPointNameNull) {
+TEST_F(VkSCPositiveShaderSpirv, GraphicsEntryPointNameNull) {
     TEST_DESCRIPTION(
         "If entry point name is not specified, but pipeline JSON data has entry point name info,"
         " then SPIR-V dependent validation is not disabled.");
@@ -66,7 +62,7 @@ TEST_F(VkSCPositiveShaderSpirvTest, GraphicsEntryPointNameNull) {
     builder.CreatePipeline(*m_device);
 }
 
-TEST_F(VkSCPositiveShaderSpirvTest, MissingSpecializationInfo) {
+TEST_F(VkSCPositiveShaderSpirv, MissingSpecializationInfo) {
     TEST_DESCRIPTION(
         "If specialization info is missing, but pipeline JSON data has specialization info,"
         " then SPIR-V dependent validation is not disabled.");

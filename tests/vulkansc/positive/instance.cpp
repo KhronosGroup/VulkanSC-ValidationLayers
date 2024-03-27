@@ -11,7 +11,7 @@
 
 #include "../framework/vksc_layer_validation_tests.h"
 
-TEST_F(VkSCPositiveLayerTest, ValidationInstanceExtensions) {
+TEST_F(VkSCPositiveInstance, ValidationInstanceExtensions) {
     RETURN_IF_SKIP(Init());
 
     std::string layer_name = "VK_LAYER_KHRONOS_validation";

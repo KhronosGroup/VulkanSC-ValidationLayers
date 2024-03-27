@@ -109,12 +109,12 @@ static VkSCCompatibilityRenderFramework& RenderFramework() { return VkSCCompatib
 
 template <typename T>
 static T Features() {
-    return RenderFramework().GetVulkanFeatures<T>();
+    return RenderFramework().GetFeatures<T>();
 }
 
 template <typename T>
 static T Props() {
-    return RenderFramework().GetVulkanProperties<T>();
+    return RenderFramework().GetProperties<T>();
 }
 
 static const char* GetCompatibilityProcName(const char* pName) {

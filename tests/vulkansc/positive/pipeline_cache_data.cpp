@@ -11,7 +11,7 @@
 
 #include "../framework/vksc_layer_validation_tests.h"
 
-TEST_F(VkSCPositivePipelineCacheDataLayerTest, UnalignedPipelineCacheDataPointer) {
+TEST_F(VkSCPositivePipelineCacheData, UnalignedPipelineCacheDataPointer) {
     TEST_DESCRIPTION("Pipeline cache data - test with unaligned pipeline cache data pointer");
 
     RETURN_IF_SKIP(InitFramework());

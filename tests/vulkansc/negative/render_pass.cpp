@@ -11,18 +11,15 @@
 
 #include "../framework/vksc_layer_validation_tests.h"
 
-TEST_F(VkSCLayerTest, CreateRenderPassMaxRenderPassSubpassesExceeded) {
+TEST_F(VkSCNegativeRenderPass, CreateRenderPassMaxRenderPassSubpassesExceeded) {
     TEST_DESCRIPTION("vkCreateRenderPass - subpassCount exceeds maxRenderPassSubpasses");
 
     RETURN_IF_SKIP(InitFramework());
 
-    const auto subpass_count = GetVulkanSC10Properties(gpu()).maxRenderPassSubpasses + 1;
-    auto sc_10_features = vku::InitStruct<VkPhysicalDeviceVulkanSC10Features>();
-    auto object_reservation_info = vksc::GetDefaultObjectReservationCreateInfo();
-    object_reservation_info.pNext = &sc_10_features;
-    object_reservation_info.subpassDescriptionRequestCount = subpass_count;
+    const auto subpass_count = GetVulkanSC10Properties().maxRenderPassSubpasses + 1;
+    ObjectReservation().subpassDescriptionRequestCount = subpass_count;
 
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &object_reservation_info));
+    ASSERT_NO_FATAL_FAILURE(InitState());
 
     VkRenderPass render_pass{VK_NULL_HANDLE};
 
@@ -56,15 +53,12 @@ TEST_F(VkSCLayerTest, CreateRenderPassMaxRenderPassSubpassesExceeded) {
     }
 }
 
-TEST_F(VkSCLayerTest, CreateRenderPassMaxRenderPassDependenciesExceeded) {
+TEST_F(VkSCNegativeRenderPass, CreateRenderPassMaxRenderPassDependenciesExceeded) {
     TEST_DESCRIPTION("vkCreateRenderPass - dependencyCount exceeds maxRenderPassDependencies");
     RETURN_IF_SKIP(InitFramework());
 
-    const auto dependency_count = GetVulkanSC10Properties(gpu()).maxRenderPassDependencies + 1;
-    auto sc_10_features = vku::InitStruct<VkPhysicalDeviceVulkanSC10Features>();
-    auto object_reservation_info = vksc::GetDefaultObjectReservationCreateInfo();
-    object_reservation_info.pNext = &sc_10_features;
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &object_reservation_info));
+    const auto dependency_count = GetVulkanSC10Properties().maxRenderPassDependencies + 1;
+    ASSERT_NO_FATAL_FAILURE(InitState());
 
     VkRenderPass render_pass{VK_NULL_HANDLE};
 
@@ -120,17 +114,14 @@ TEST_F(VkSCLayerTest, CreateRenderPassMaxRenderPassDependenciesExceeded) {
     }
 }
 
-TEST_F(VkSCLayerTest, CreateRenderPassMaxFramebufferAttachmentsExceeded) {
+TEST_F(VkSCNegativeRenderPass, CreateRenderPassMaxFramebufferAttachmentsExceeded) {
     TEST_DESCRIPTION("vkCreateRenderPass - attachmentCount exceeds maxFramebufferAttachments");
 
     RETURN_IF_SKIP(InitFramework());
 
-    const auto attachments_count = GetVulkanSC10Properties(gpu()).maxFramebufferAttachments + 1;
-    auto sc_10_features = vku::InitStruct<VkPhysicalDeviceVulkanSC10Features>();
-    auto object_reservation_info = vksc::GetDefaultObjectReservationCreateInfo();
-    object_reservation_info.pNext = &sc_10_features;
-    object_reservation_info.attachmentDescriptionRequestCount = attachments_count;
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &object_reservation_info));
+    const auto attachments_count = GetVulkanSC10Properties().maxFramebufferAttachments + 1;
+    ObjectReservation().attachmentDescriptionRequestCount = attachments_count;
+    ASSERT_NO_FATAL_FAILURE(InitState());
 
     VkRenderPass render_pass{VK_NULL_HANDLE};
 
@@ -184,13 +175,13 @@ TEST_F(VkSCLayerTest, CreateRenderPassMaxFramebufferAttachmentsExceeded) {
     }
 }
 
-TEST_F(VkSCLayerTest, CreateRenderPassMaxSubpassInputAttachmentsExceeded) {
+TEST_F(VkSCNegativeRenderPass, CreateRenderPassMaxSubpassInputAttachmentsExceeded) {
     TEST_DESCRIPTION("vkCreateRenderPass - inputAttachmentCount exceeds maxSubpassInputAttachments");
 
     RETURN_IF_SKIP(Init());
 
-    const auto subpass_count = std::min(GetVulkanSC10Properties(gpu()).maxRenderPassSubpasses, 2u);
-    const auto input_attachment_count = GetVulkanSC10Properties(gpu()).maxSubpassInputAttachments + 1;
+    const auto subpass_count = std::min(GetVulkanSC10Properties().maxRenderPassSubpasses, 2u);
+    const auto input_attachment_count = GetVulkanSC10Properties().maxSubpassInputAttachments + 1;
 
     VkRenderPass render_pass{VK_NULL_HANDLE};
     {
@@ -266,13 +257,13 @@ TEST_F(VkSCLayerTest, CreateRenderPassMaxSubpassInputAttachmentsExceeded) {
     }
 }
 
-TEST_F(VkSCLayerTest, CreateRenderPassMaxSubpassPreserveAttachmentsExceeded) {
+TEST_F(VkSCNegativeRenderPass, CreateRenderPassMaxSubpassPreserveAttachmentsExceeded) {
     TEST_DESCRIPTION("vkCreateRenderPass - preserveAttachmentCount exceeds maxSubpassPreserveAttachments");
 
     RETURN_IF_SKIP(Init());
 
-    const auto subpass_count = std::min(GetVulkanSC10Properties(gpu()).maxRenderPassSubpasses, 2u);
-    const auto preserve_attachment_count = GetVulkanSC10Properties(gpu()).maxSubpassPreserveAttachments + 1;
+    const auto subpass_count = std::min(GetVulkanSC10Properties().maxRenderPassSubpasses, 2u);
+    const auto preserve_attachment_count = GetVulkanSC10Properties().maxSubpassPreserveAttachments + 1;
 
     VkRenderPass render_pass{VK_NULL_HANDLE};
 

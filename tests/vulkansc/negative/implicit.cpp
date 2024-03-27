@@ -16,7 +16,7 @@
 // they deserve their own test cases because these implicit VUs are different in Vulkan SC compared
 // to Vulkan.
 
-TEST_F(VkSCLayerTest, ResetCommandPoolReleaseResourcesNotAllowed) {
+TEST_F(VkSCNegativeImplicit, ResetCommandPoolReleaseResourcesNotAllowed) {
     TEST_DESCRIPTION("vkResetCommandPool - VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT not allowed");
 
     RETURN_IF_SKIP(Init());
@@ -29,7 +29,7 @@ TEST_F(VkSCLayerTest, ResetCommandPoolReleaseResourcesNotAllowed) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkSCLayerTest, CreatePipelinesDerivativeBitNotAllowed) {
+TEST_F(VkSCNegativeImplicit, CreatePipelinesDerivativeBitNotAllowed) {
     TEST_DESCRIPTION("vkCreate*Pipelines - Vk*PipelineCreateInfo::flags must not contain VK_PIPELINE_CREATE_DERIVATIVE_BIT");
     // NOTE: This test case implicitly tests the removed VUIDs:
     // 00695, 00696, 07984, 07985, 07986 for createComputePipeline
@@ -60,7 +60,7 @@ TEST_F(VkSCLayerTest, CreatePipelinesDerivativeBitNotAllowed) {
     }
 }
 
-TEST_F(VkSCLayerTest, CreatePipelinesMissingPipelineCache) {
+TEST_F(VkSCNegativeImplicit, CreatePipelinesMissingPipelineCache) {
     TEST_DESCRIPTION("vkCreate*Pipelines - pipelineCache must not be VK_NULL_HANDLE");
 
     RETURN_IF_SKIP(Init());
@@ -89,7 +89,7 @@ TEST_F(VkSCLayerTest, CreatePipelinesMissingPipelineCache) {
     }
 }
 
-TEST_F(VkSCLayerTest, PipelineCacheInitialDataSizeNotZero) {
+TEST_F(VkSCNegativeImplicit, PipelineCacheInitialDataSizeNotZero) {
     TEST_DESCRIPTION("VkPipelineCacheCreateInfo::initialDataSize must not be 0");
 
     auto create_info = vku::InitStruct<VkPipelineCacheCreateInfo>();

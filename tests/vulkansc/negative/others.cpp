@@ -178,7 +178,7 @@ TEST_F(VkSCLayerTest, CreateDescriptorSetLayoutExceededBindingCountLimit) {
 
     RETURN_IF_SKIP(InitFramework());
 
-    const uint32_t limit = GetVulkanSC10Properties(gpu()).maxDescriptorSetLayoutBindings;
+    const uint32_t limit = GetVulkanSC10Properties().maxDescriptorSetLayoutBindings;
 
     auto sc_10_features = vku::InitStruct<VkPhysicalDeviceVulkanSC10Features>();
     auto object_reservation_info = vksc::GetDefaultObjectReservationCreateInfo();
@@ -644,7 +644,7 @@ TEST_F(VkSCLayerTest, CreateFramebufferMaxFramebufferAttachmentsExceeded) {
 
     RETURN_IF_SKIP(Init());
 
-    const auto attachment_count = GetVulkanSC10Properties(gpu()).maxFramebufferAttachments + 1;
+    const auto attachment_count = GetVulkanSC10Properties().maxFramebufferAttachments + 1;
 
     const VkAttachmentDescription attachment{0,
                                              VK_FORMAT_R8G8B8A8_UNORM,
@@ -687,7 +687,7 @@ TEST_F(VkSCLayerTest, GetFaultDataExceedsMaxQueryFaultCount) {
 
     RETURN_IF_SKIP(Init());
 
-    auto fault_count = GetVulkanSC10Properties(gpu()).maxQueryFaultCount + 1;
+    auto fault_count = GetVulkanSC10Properties().maxQueryFaultCount + 1;
 
     VkBool32 unrecorded_faults = VK_FALSE;
 
@@ -703,7 +703,7 @@ TEST_F(VkSCLayerTest, FaultCallbackInfoFaultCount) {
 
     RETURN_IF_SKIP(InitFramework())
 
-    const auto max_callback_fault_count = GetVulkanSC10Properties(gpu()).maxCallbackFaultCount;
+    const auto max_callback_fault_count = GetVulkanSC10Properties().maxCallbackFaultCount;
 
     auto fault_callback_info = vku::InitStruct<VkFaultCallbackInfo>();
     fault_callback_info.faultCount = max_callback_fault_count == 1 ? 2 : 1;

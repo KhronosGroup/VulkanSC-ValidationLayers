@@ -12,7 +12,7 @@
 #include "../framework/vksc_layer_validation_tests.h"
 #include "../framework/vksc_test_pipeline_helper.h"
 
-TEST_F(VkSCShaderSpirvTest, ComputeEntryPointNameMismatch) {
+TEST_F(VkSCNegativeShaderSpirv, ComputeEntryPointNameMismatch) {
     TEST_DESCRIPTION("If entry point name is specified, then it must match the one in the SPIR-V module when available.");
 
     vksc::ComputePipelineBuilder builder(this);
@@ -25,7 +25,7 @@ TEST_F(VkSCShaderSpirvTest, ComputeEntryPointNameMismatch) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkSCShaderSpirvTest, GraphicsEntryPointNameMismatch) {
+TEST_F(VkSCNegativeShaderSpirv, GraphicsEntryPointNameMismatch) {
     TEST_DESCRIPTION("If entry point name is specified, then it must match the one in the SPIR-V module when available.");
 
     vksc::GraphicsPipelineBuilder builder(this);
@@ -49,7 +49,7 @@ TEST_F(VkSCShaderSpirvTest, GraphicsEntryPointNameMismatch) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkSCShaderSpirvTest, ComputeEntryPointNameNull) {
+TEST_F(VkSCNegativeShaderSpirv, ComputeEntryPointNameNull) {
     TEST_DESCRIPTION("If entry point name is not specified, then SPIR-V dependent validation is disabled.");
 
     vksc::ComputePipelineBuilder builder(this);
@@ -62,7 +62,7 @@ TEST_F(VkSCShaderSpirvTest, ComputeEntryPointNameNull) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkSCShaderSpirvTest, GraphicsEntryPointNameNull) {
+TEST_F(VkSCNegativeShaderSpirv, GraphicsEntryPointNameNull) {
     TEST_DESCRIPTION("If entry point name is not specified, then SPIR-V dependent validation is disabled.");
 
     vksc::GraphicsPipelineBuilder builder(this);
@@ -84,7 +84,7 @@ TEST_F(VkSCShaderSpirvTest, GraphicsEntryPointNameNull) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkSCShaderSpirvTest, MissingSpecializationInfo) {
+TEST_F(VkSCNegativeShaderSpirv, MissingSpecializationInfo) {
     TEST_DESCRIPTION("If specialization info is missing, then SPIR-V dependent validation is disabled.");
 
     vksc::ComputePipelineBuilder builder(this);
@@ -98,7 +98,7 @@ TEST_F(VkSCShaderSpirvTest, MissingSpecializationInfo) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkSCShaderSpirvTest, InvalidSpirv) {
+TEST_F(VkSCNegativeShaderSpirv, InvalidSpirv) {
     TEST_DESCRIPTION("Expect spirv-val reporting an error due to the use of an invalid SPIR-V extension in OpExtension.");
 
     RETURN_IF_SKIP(InitFramework());
@@ -129,7 +129,7 @@ TEST_F(VkSCShaderSpirvTest, InvalidSpirv) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkSCShaderSpirvTest, MissingShaderCapability) {
+TEST_F(VkSCNegativeShaderSpirv, MissingShaderCapability) {
     TEST_DESCRIPTION("Missing Shader capability in the SPIR-V code.");
 
     RETURN_IF_SKIP(InitFramework());
@@ -156,7 +156,7 @@ TEST_F(VkSCShaderSpirvTest, MissingShaderCapability) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkSCShaderSpirvTest, CapabilityNotSupported) {
+TEST_F(VkSCNegativeShaderSpirv, CapabilityNotSupported) {
     TEST_DESCRIPTION("SPIR-V capability is used that is not supported by the API.");
 
     const char* source = R"spirv(
@@ -194,7 +194,7 @@ TEST_F(VkSCShaderSpirvTest, CapabilityNotSupported) {
     builder.CreatePipeline(*m_device);
 }
 
-TEST_F(VkSCShaderSpirvTest, CapabilityRequirementNotMet) {
+TEST_F(VkSCNegativeShaderSpirv, CapabilityRequirementNotMet) {
     TEST_DESCRIPTION("SPIR-V capability is used without meeting its prerequisites.");
 
     const char* source = R"spirv(
@@ -230,7 +230,7 @@ TEST_F(VkSCShaderSpirvTest, CapabilityRequirementNotMet) {
     builder.CreatePipeline(*m_device);
 }
 
-TEST_F(VkSCShaderSpirvTest, ExtensionNotSupported) {
+TEST_F(VkSCNegativeShaderSpirv, ExtensionNotSupported) {
     TEST_DESCRIPTION("SPIR-V extension is used that is not supported by the API.");
 
     const char* source = R"spirv(
@@ -266,7 +266,7 @@ TEST_F(VkSCShaderSpirvTest, ExtensionNotSupported) {
     builder.CreatePipeline(*m_device);
 }
 
-TEST_F(VkSCShaderSpirvTest, ExtensionRequirementNotMet) {
+TEST_F(VkSCNegativeShaderSpirv, ExtensionRequirementNotMet) {
     TEST_DESCRIPTION("SPIR-V extension is used without meeting its prerequisites.");
 
     const char* source = R"spirv(
@@ -302,37 +302,29 @@ TEST_F(VkSCShaderSpirvTest, ExtensionRequirementNotMet) {
     builder.CreatePipeline(*m_device);
 }
 
-TEST_F(VkSCShaderSpirvTest, Atomics) {
+TEST_F(VkSCNegativeShaderSpirv, Atomics) {
     TEST_DESCRIPTION("SPIR-V extension uses atomic instructions without enabling shaderAtomicInstructions.");
-
-    RETURN_IF_SKIP(InitFramework());
 
     vksc::ComputePipelineBuilder builder(this);
     builder.AddBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     builder.Init(vksc::Shader::Compute(kComputeShaderAtomicInstructionsSpv));
 
-    auto sc_10_features = vku::InitStruct<VkPhysicalDeviceVulkanSC10Features>();
-    sc_10_features.shaderAtomicInstructions = VK_FALSE;
-
-    RETURN_IF_SKIP(InitState(nullptr, &sc_10_features));
+    AddDisabledFeature(vkt::Feature::shaderAtomicInstructions);
+    RETURN_IF_SKIP(Init());
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-RuntimeSpirv-OpAtomic-05091");
     builder.CreatePipeline(*m_device);
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkSCShaderSpirvTest, LayoutCrossValidation) {
+TEST_F(VkSCNegativeShaderSpirv, LayoutCrossValidation) {
     TEST_DESCRIPTION("Smoke test for cross-validation of SPIR-V code with pipeline layout.");
-
-    RETURN_IF_SKIP(InitFramework());
 
     vksc::ComputePipelineBuilder builder(this);
     builder.Init(vksc::Shader::Compute(kComputeShaderAtomicInstructionsSpv));
 
-    auto sc_10_features = vku::InitStruct<VkPhysicalDeviceVulkanSC10Features>();
-    sc_10_features.shaderAtomicInstructions = VK_TRUE;
-
-    RETURN_IF_SKIP(InitState(nullptr, &sc_10_features));
+    AddRequiredFeature(vkt::Feature::shaderAtomicInstructions);
+    RETURN_IF_SKIP(Init());
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkComputePipelineCreateInfo-layout-07988");
     builder.CreatePipeline(*m_device);

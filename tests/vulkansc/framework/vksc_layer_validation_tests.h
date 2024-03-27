@@ -24,7 +24,7 @@ class VkSCLayerTest : public VkLayerTest {
 
 class VkSCPositiveLayerTest : public VkSCLayerTest {};
 
-class VkSCDeviceCreateLayerTest : public VkSCLayerTest {
+class VkSCDeviceCreateTest : public VkSCLayerTest {
   public:
     VkPhysicalDeviceProperties phys_dev_props;
 
@@ -53,7 +53,7 @@ class VkSCDeviceCreateLayerTest : public VkSCLayerTest {
     }
 };
 
-class VkSCPipelineCacheDataLayerTest : public VkSCDeviceCreateLayerTest {
+class VkSCPipelineCacheDataTest : public VkSCDeviceCreateTest {
   public:
     VkPipelineCacheCreateInfo create_info{};
 
@@ -78,7 +78,24 @@ class VkSCPipelineCacheDataLayerTest : public VkSCDeviceCreateLayerTest {
     vksc::PipelineCacheBuilder builder{};
 };
 
-class VkSCPositivePipelineCacheDataLayerTest : public VkSCPipelineCacheDataLayerTest {};
+class VkSCNegativeDeviceCreate : public VkSCDeviceCreateTest {};
 
-class VkSCShaderSpirvTest : public VkSCLayerTest {};
-class VkSCPositiveShaderSpirvTest : public VkSCShaderSpirvTest {};
+class VkSCNegativePipelineCacheData : public VkSCPipelineCacheDataTest {};
+class VkSCPositivePipelineCacheData : public VkSCPipelineCacheDataTest {};
+
+class VkSCNegativeShaderSpirv : public VkSCLayerTest {};
+class VkSCPositiveShaderSpirv : public VkSCLayerTest {};
+
+class VkSCPositiveRemoved : public VkSCLayerTest {};
+
+class VkSCNegativeImplicit : public VkSCLayerTest {};
+class VkSCPositiveImplicit : public VkSCLayerTest {};
+
+class VkSCNegativeCommand : public VkSCLayerTest {};
+
+class VkSCPositiveInstance : public VkSCLayerTest {};
+
+class VkSCNegativePipeline : public VkSCLayerTest {};
+class VkSCPositivePipeline : public VkSCLayerTest {};
+
+class VkSCNegativeRenderPass : public VkSCLayerTest {};

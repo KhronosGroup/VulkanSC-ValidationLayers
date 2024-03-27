@@ -30,11 +30,10 @@ void VkSCRenderFramework::InitFramework(void *instance_pnext) {
 
 void VkSCRenderFramework::InitState(VkPhysicalDeviceFeatures *features, void *create_device_pnext,
                                     const VkCommandPoolCreateFlags flags) {
-    auto default_object_reservation_info = vksc::GetDefaultObjectReservationCreateInfo();
     if (!vku::FindStructInPNextChain<VkDeviceObjectReservationCreateInfo>(create_device_pnext)) {
         // If no object reservation was specified by the test case, then we add the default one
-        default_object_reservation_info.pNext = create_device_pnext;
-        create_device_pnext = &default_object_reservation_info;
+        object_reservation_info_.pNext = create_device_pnext;
+        create_device_pnext = &object_reservation_info_;
     }
 
     auto builder_object_reservation_info = vku::InitStruct<VkDeviceObjectReservationCreateInfo>();
@@ -61,20 +60,6 @@ VkPipelineCache VkSCRenderFramework::GetDefaultPipelineCache() {
                                   &default_pipeline_cache_);
     }
     return default_pipeline_cache_;
-}
-
-VkPhysicalDeviceVulkanSC10Features VkSCRenderFramework::GetVulkanSC10Features(VkPhysicalDevice phys_dev) {
-    auto sc_10_features = vku::InitStruct<VkPhysicalDeviceVulkanSC10Features>();
-    auto features2 = vku::InitStruct<VkPhysicalDeviceFeatures2>(&sc_10_features);
-    vksc::GetPhysicalDeviceFeatures2(phys_dev, &features2);
-    return sc_10_features;
-}
-
-VkPhysicalDeviceVulkanSC10Properties VkSCRenderFramework::GetVulkanSC10Properties(VkPhysicalDevice phys_dev) {
-    auto sc_10_props = vku::InitStruct<VkPhysicalDeviceVulkanSC10Properties>();
-    auto props2 = vku::InitStruct<VkPhysicalDeviceProperties2>(&sc_10_props);
-    vksc::GetPhysicalDeviceProperties2(phys_dev, &props2);
-    return sc_10_props;
 }
 
 VkSCCompatibilityRenderFramework::VkSCCompatibilityRenderFramework()

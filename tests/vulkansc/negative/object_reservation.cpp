@@ -14,7 +14,7 @@
 #include <algorithm>
 #include <functional>
 
-class VkSCObjectReservationLayerTest : public VkSCLayerTest {
+class VkSCNegativeObjectReservation : public VkSCLayerTest {
   public:
     using caps_func_t = std::function<bool(VkDeviceObjectReservationCreateInfo& object_reservation_info, uint32_t tested_limit)>;
     using setup_func_t = std::function<bool(vkt::Device& device)>;
@@ -223,7 +223,7 @@ class VkSCObjectReservationLayerTest : public VkSCLayerTest {
     }
 };
 
-TEST_F(VkSCObjectReservationLayerTest, CommandPoolRequestCount) {
+TEST_F(VkSCNegativeObjectReservation, CommandPoolRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::commandPoolRequestCount");
 
     RETURN_IF_SKIP(InitFramework());
@@ -275,7 +275,7 @@ TEST_F(VkSCObjectReservationLayerTest, CommandPoolRequestCount) {
         nullptr);
 }
 
-TEST_F(VkSCObjectReservationLayerTest, CommandBufferRequestCount) {
+TEST_F(VkSCNegativeObjectReservation, CommandBufferRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::commandBufferRequestCount");
 
     RETURN_IF_SKIP(InitFramework());
@@ -284,7 +284,7 @@ TEST_F(VkSCObjectReservationLayerTest, CommandBufferRequestCount) {
         std::vector<VkCommandPool> cmd_pools{};
     } data;
 
-    const uint32_t max_create_count = std::min(GetVulkanSC10Properties(gpu()).maxCommandPoolCommandBuffers, 16u);
+    const uint32_t max_create_count = std::min(GetVulkanSC10Properties().maxCommandPoolCommandBuffers, 16u);
     const bool can_destroy = false;
     const bool has_parent = true;
 
@@ -328,7 +328,7 @@ TEST_F(VkSCObjectReservationLayerTest, CommandBufferRequestCount) {
         nullptr);
 }
 
-TEST_F(VkSCObjectReservationLayerTest, DescriptorSetLayoutRequestCount) {
+TEST_F(VkSCNegativeObjectReservation, DescriptorSetLayoutRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::descriptorSetLayoutRequestCount");
 
     RETURN_IF_SKIP(InitFramework());
@@ -390,7 +390,7 @@ TEST_F(VkSCObjectReservationLayerTest, DescriptorSetLayoutRequestCount) {
         nullptr);
 }
 
-TEST_F(VkSCObjectReservationLayerTest, DescriptorSetLayoutBindingRequestCount) {
+TEST_F(VkSCNegativeObjectReservation, DescriptorSetLayoutBindingRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::descriptorSetLayoutBindingRequestCount");
 
     RETURN_IF_SKIP(InitFramework());
@@ -456,7 +456,7 @@ TEST_F(VkSCObjectReservationLayerTest, DescriptorSetLayoutBindingRequestCount) {
         nullptr);
 }
 
-TEST_F(VkSCObjectReservationLayerTest, PipelineLayoutRequestCount) {
+TEST_F(VkSCNegativeObjectReservation, PipelineLayoutRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::pipelineLayoutRequestCount");
 
     RETURN_IF_SKIP(InitFramework());
@@ -531,7 +531,7 @@ TEST_F(VkSCObjectReservationLayerTest, PipelineLayoutRequestCount) {
         [&](vkt::Device& device) { vksc::DestroyDescriptorSetLayout(device.handle(), data.descriptor_set_layout, nullptr); });
 }
 
-TEST_F(VkSCObjectReservationLayerTest, DescriptorPoolRequestCount) {
+TEST_F(VkSCNegativeObjectReservation, DescriptorPoolRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::descriptorPoolRequestCount");
 
     RETURN_IF_SKIP(InitFramework());
@@ -586,7 +586,7 @@ TEST_F(VkSCObjectReservationLayerTest, DescriptorPoolRequestCount) {
         nullptr);
 }
 
-TEST_F(VkSCObjectReservationLayerTest, DescriptorSetRequestCount) {
+TEST_F(VkSCNegativeObjectReservation, DescriptorSetRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::descriptorSetRequestCount");
 
     RETURN_IF_SKIP(InitFramework());
@@ -695,7 +695,7 @@ TEST_F(VkSCObjectReservationLayerTest, DescriptorSetRequestCount) {
         [&](vkt::Device& device) { vksc::DestroyDescriptorSetLayout(device.handle(), data.descriptor_set_layout, nullptr); });
 }
 
-TEST_F(VkSCObjectReservationLayerTest, DeviceMemoryRequestCount) {
+TEST_F(VkSCNegativeObjectReservation, DeviceMemoryRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::deviceMemoryRequestCount");
 
     RETURN_IF_SKIP(InitFramework());
@@ -744,7 +744,7 @@ TEST_F(VkSCObjectReservationLayerTest, DeviceMemoryRequestCount) {
         nullptr);
 }
 
-TEST_F(VkSCObjectReservationLayerTest, PipelineCacheRequestCount) {
+TEST_F(VkSCNegativeObjectReservation, PipelineCacheRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::pipelineCacheRequestCount");
 
     RETURN_IF_SKIP(InitFramework());
@@ -800,7 +800,7 @@ TEST_F(VkSCObjectReservationLayerTest, PipelineCacheRequestCount) {
         nullptr);
 }
 
-TEST_F(VkSCObjectReservationLayerTest, ComputePipelineRequestCount) {
+TEST_F(VkSCNegativeObjectReservation, ComputePipelineRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::computePipelineRequestCount");
 
     RETURN_IF_SKIP(InitFramework());
@@ -898,7 +898,7 @@ TEST_F(VkSCObjectReservationLayerTest, ComputePipelineRequestCount) {
         });
 }
 
-TEST_F(VkSCObjectReservationLayerTest, GraphicsPipelineRequestCount) {
+TEST_F(VkSCNegativeObjectReservation, GraphicsPipelineRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::graphicsPipelineRequestCount");
 
     RETURN_IF_SKIP(InitFramework());
@@ -1026,7 +1026,7 @@ TEST_F(VkSCObjectReservationLayerTest, GraphicsPipelineRequestCount) {
         });
 }
 
-TEST_F(VkSCObjectReservationLayerTest, QueryPoolRequestCount) {
+TEST_F(VkSCNegativeObjectReservation, QueryPoolRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::queryPoolRequestCount");
 
     RETURN_IF_SKIP(InitFramework());
@@ -1076,7 +1076,7 @@ TEST_F(VkSCObjectReservationLayerTest, QueryPoolRequestCount) {
         nullptr);
 }
 
-TEST_F(VkSCObjectReservationLayerTest, RenderPassRequestCount) {
+TEST_F(VkSCNegativeObjectReservation, RenderPassRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::renderPassRequestCount");
 
     RETURN_IF_SKIP(InitFramework());
@@ -1158,7 +1158,7 @@ TEST_F(VkSCObjectReservationLayerTest, RenderPassRequestCount) {
         nullptr);
 }
 
-TEST_F(VkSCObjectReservationLayerTest, SubpassDescriptionRequestCount) {
+TEST_F(VkSCNegativeObjectReservation, SubpassDescriptionRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::subpassDescriptionRequestCount");
 
     RETURN_IF_SKIP(InitFramework());
@@ -1168,7 +1168,7 @@ TEST_F(VkSCObjectReservationLayerTest, SubpassDescriptionRequestCount) {
         std::vector<VkRenderPass> render_passes{};
     } data;
 
-    const uint32_t max_create_count = std::min(GetVulkanSC10Properties(gpu()).maxRenderPassSubpasses, 4u);
+    const uint32_t max_create_count = std::min(GetVulkanSC10Properties().maxRenderPassSubpasses, 4u);
     const bool can_destroy = true;
     const bool has_parent = true;
 
@@ -1242,7 +1242,7 @@ TEST_F(VkSCObjectReservationLayerTest, SubpassDescriptionRequestCount) {
         nullptr);
 }
 
-TEST_F(VkSCObjectReservationLayerTest, AttachmentDescriptionRequestCount) {
+TEST_F(VkSCNegativeObjectReservation, AttachmentDescriptionRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::attachmentDescriptionRequestCount");
 
     RETURN_IF_SKIP(InitFramework());
@@ -1347,7 +1347,7 @@ TEST_F(VkSCObjectReservationLayerTest, AttachmentDescriptionRequestCount) {
         nullptr);
 }
 
-TEST_F(VkSCObjectReservationLayerTest, FramebufferRequestCount) {
+TEST_F(VkSCNegativeObjectReservation, FramebufferRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::framebufferRequestCount");
 
     RETURN_IF_SKIP(InitFramework());
@@ -1422,7 +1422,7 @@ TEST_F(VkSCObjectReservationLayerTest, FramebufferRequestCount) {
         [&](vkt::Device& device) { vksc::DestroyRenderPass(device.handle(), data.render_pass, nullptr); });
 }
 
-TEST_F(VkSCObjectReservationLayerTest, BufferRequestCount) {
+TEST_F(VkSCNegativeObjectReservation, BufferRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::bufferRequestCount");
 
     RETURN_IF_SKIP(InitFramework());
@@ -1477,7 +1477,7 @@ TEST_F(VkSCObjectReservationLayerTest, BufferRequestCount) {
         nullptr);
 }
 
-TEST_F(VkSCObjectReservationLayerTest, BufferViewRequestCount) {
+TEST_F(VkSCNegativeObjectReservation, BufferViewRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::bufferViewRequestCount");
 
     RETURN_IF_SKIP(InitFramework());
@@ -1545,7 +1545,7 @@ TEST_F(VkSCObjectReservationLayerTest, BufferViewRequestCount) {
         [&](vkt::Device& device) { data.buffer = nullptr; });
 }
 
-TEST_F(VkSCObjectReservationLayerTest, ImageRequestCount) {
+TEST_F(VkSCNegativeObjectReservation, ImageRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::imageRequestCount");
 
     RETURN_IF_SKIP(InitFramework());
@@ -1606,7 +1606,7 @@ TEST_F(VkSCObjectReservationLayerTest, ImageRequestCount) {
         nullptr);
 }
 
-TEST_F(VkSCObjectReservationLayerTest, ImageViewRequestCount) {
+TEST_F(VkSCNegativeObjectReservation, ImageViewRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::imageViewRequestCount");
 
     RETURN_IF_SKIP(InitFramework());
@@ -1683,7 +1683,7 @@ TEST_F(VkSCObjectReservationLayerTest, ImageViewRequestCount) {
         [&](vkt::Device& device) { data.image = nullptr; });
 }
 
-TEST_F(VkSCObjectReservationLayerTest, LayeredImageViewRequestCount) {
+TEST_F(VkSCNegativeObjectReservation, LayeredImageViewRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::layeredImageViewRequestCount");
 
     RETURN_IF_SKIP(InitFramework());
@@ -1788,7 +1788,7 @@ TEST_F(VkSCObjectReservationLayerTest, LayeredImageViewRequestCount) {
         });
 }
 
-TEST_F(VkSCObjectReservationLayerTest, SamplerRequestCount) {
+TEST_F(VkSCNegativeObjectReservation, SamplerRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::samplerRequestCount");
 
     RETURN_IF_SKIP(InitFramework());
@@ -1843,7 +1843,7 @@ TEST_F(VkSCObjectReservationLayerTest, SamplerRequestCount) {
         nullptr);
 }
 
-TEST_F(VkSCObjectReservationLayerTest, SamplerYcbcrConversionRequestCount) {
+TEST_F(VkSCNegativeObjectReservation, SamplerYcbcrConversionRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::samplerYcbcrConversionRequestCount");
 
     RETURN_IF_SKIP(InitFramework());
@@ -1918,7 +1918,7 @@ TEST_F(VkSCObjectReservationLayerTest, SamplerYcbcrConversionRequestCount) {
         nullptr);
 }
 
-TEST_F(VkSCObjectReservationLayerTest, FenceRequestCount) {
+TEST_F(VkSCNegativeObjectReservation, FenceRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::fenceRequestCount");
 
     RETURN_IF_SKIP(InitFramework());
@@ -1971,7 +1971,7 @@ TEST_F(VkSCObjectReservationLayerTest, FenceRequestCount) {
         nullptr);
 }
 
-TEST_F(VkSCObjectReservationLayerTest, SemaphoreRequestCount) {
+TEST_F(VkSCNegativeObjectReservation, SemaphoreRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::semaphoreRequestCount");
 
     RETURN_IF_SKIP(InitFramework());
@@ -2024,7 +2024,7 @@ TEST_F(VkSCObjectReservationLayerTest, SemaphoreRequestCount) {
         nullptr);
 }
 
-TEST_F(VkSCObjectReservationLayerTest, EventRequestCount) {
+TEST_F(VkSCNegativeObjectReservation, EventRequestCount) {
     TEST_DESCRIPTION("Test VkDeviceObjectReservationCreateInfo::eventRequestCount");
 
     RETURN_IF_SKIP(InitFramework());
@@ -2077,7 +2077,7 @@ TEST_F(VkSCObjectReservationLayerTest, EventRequestCount) {
         nullptr);
 }
 
-TEST_F(VkSCObjectReservationLayerTest, PrivateDataSlotRequestCount) {
+TEST_F(VkSCNegativeObjectReservation, PrivateDataSlotRequestCount) {
     TEST_DESCRIPTION("Test VkDevicePrivateDataCreateInfoEXT::privateDataSlotRequestCount");
 
     RETURN_IF_SKIP(InitFramework());
