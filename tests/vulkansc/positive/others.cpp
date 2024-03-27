@@ -11,18 +11,12 @@
 
 #include "../framework/vksc_layer_validation_tests.h"
 
-TEST_F(VkSCPositiveLayerTest, SetNegativeViewport) {
+TEST_F(VkSCPositiveRemoved, SetNegativeViewport) {
     TEST_DESCRIPTION("vkCmdSetViewport - test that the removed VUID 07917 is not triggered in Vulkan SC");
 
     RETURN_IF_SKIP(Init());
 
     m_commandBuffer->begin();
-
-    using std::vector;
-    struct TestCase {
-        VkViewport vp;
-        std::string veid;
-    };
 
     std::vector<VkViewport> test_cases = {{0.0, 0.0, 64.0, 0.0, 0.0, 1.0}, {0.0, 0.0, 64.0, -1.0, 0.0, 1.0}};
 
@@ -33,7 +27,7 @@ TEST_F(VkSCPositiveLayerTest, SetNegativeViewport) {
     m_commandBuffer->end();
 }
 
-TEST_F(VkSCPositiveLayerTest, CopyBetween2DAnd3DImage) {
+TEST_F(VkSCPositiveRemoved, CopyBetween2DAnd3DImage) {
     TEST_DESCRIPTION("vkCmdCopyImage - test that the removed VUIDs 07922, 07923, and 07941 are not triggered in Vulkan SC");
 
     RETURN_IF_SKIP(Init());
@@ -82,7 +76,7 @@ TEST_F(VkSCPositiveLayerTest, CopyBetween2DAnd3DImage) {
     m_commandBuffer->end();
 }
 
-TEST_F(VkSCPositiveLayerTest, CopyImagePlane) {
+TEST_F(VkSCPositiveRemoved, CopyImagePlane) {
     TEST_DESCRIPTION("vkCmdCopyImage - test that the removed VUID 07940 is not triggered in Vulkan SC");
 
     RETURN_IF_SKIP(Init());
@@ -148,7 +142,7 @@ TEST_F(VkSCPositiveLayerTest, CopyImagePlane) {
     m_commandBuffer->end();
 }
 
-TEST_F(VkSCPositiveLayerTest, AllocateDescriptorSetsExceedsCapacity) {
+TEST_F(VkSCPositiveRemoved, AllocateDescriptorSetsExceedsCapacity) {
     TEST_DESCRIPTION("vkAllocateDescriptorSets - test that the removed VUIDs 07895 and 07896 are not triggered in Vulkan SC");
 
     RETURN_IF_SKIP(Init());

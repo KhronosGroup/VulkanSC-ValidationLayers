@@ -79,15 +79,16 @@ target_sources(vksc_layer_validation_tests PRIVATE
     negative/object_reservation.cpp
     negative/others.cpp
     negative/pipeline.cpp
+    negative/pipeline_cache_data.cpp
     negative/ported.cpp
     negative/render_pass.cpp
     negative/shader_spirv.cpp
     negative/wsi.cpp
-    positive/device_create.cpp
     positive/implicit.cpp
     positive/instance.cpp
     positive/others.cpp
     positive/pipeline.cpp
+    positive/pipeline_cache_data.cpp
     positive/shader_spirv.cpp
 )
 

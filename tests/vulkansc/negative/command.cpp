@@ -11,7 +11,7 @@
 
 #include "../framework/vksc_layer_validation_tests.h"
 
-TEST_F(VkSCLayerTest, CreateCommandPoolMissingMemoryReservationInfo) {
+TEST_F(VkSCNegativeCommand, CreateCommandPoolMissingMemoryReservationInfo) {
     TEST_DESCRIPTION("vkCreateCommandPool - missing VkCommandPoolMemoryReservationCreateInfo");
 
     RETURN_IF_SKIP(Init());
@@ -24,7 +24,7 @@ TEST_F(VkSCLayerTest, CreateCommandPoolMissingMemoryReservationInfo) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkSCLayerTest, CreateCommandPoolInvalidReservedSize) {
+TEST_F(VkSCNegativeCommand, CreateCommandPoolInvalidReservedSize) {
     TEST_DESCRIPTION("vkCreateCommandPool - commandPoolReservedSize is zero");
 
     RETURN_IF_SKIP(Init());
@@ -41,7 +41,7 @@ TEST_F(VkSCLayerTest, CreateCommandPoolInvalidReservedSize) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkSCLayerTest, CreateCommandPoolInvalidMaxCommandBuffers) {
+TEST_F(VkSCNegativeCommand, CreateCommandPoolInvalidMaxCommandBuffers) {
     TEST_DESCRIPTION("vkCreateCommandPool - commandPoolMaxCommandBuffers is zero or greater than maxCommandPoolCommandBuffers");
 
     RETURN_IF_SKIP(Init());
@@ -62,12 +62,12 @@ TEST_F(VkSCLayerTest, CreateCommandPoolInvalidMaxCommandBuffers) {
     m_errorMonitor->SetAllowedFailureMsg("VUID-VkCommandPoolMemoryReservationCreateInfo-commandPoolMaxCommandBuffers-05074");
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit,
                                          "VUID-VkCommandPoolMemoryReservationCreateInfo-commandPoolMaxCommandBuffers-05090");
-    mem_reservation_info.commandPoolMaxCommandBuffers = GetVulkanSC10Properties(gpu()).maxCommandPoolCommandBuffers + 1;
+    mem_reservation_info.commandPoolMaxCommandBuffers = GetVulkanSC10Properties().maxCommandPoolCommandBuffers + 1;
     vksc::CreateCommandPool(m_device->device(), &create_info, nullptr, &cmd_pool);
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkSCLayerTest, AllocateCommandBuffersExceededMaxCommandBuffers) {
+TEST_F(VkSCNegativeCommand, AllocateCommandBuffersExceededMaxCommandBuffers) {
     TEST_DESCRIPTION("vkAllocateCommandBuffers - cannot allocate more command buffers from pool than commandPoolMaxCommandBuffers");
 
     RETURN_IF_SKIP(Init());
@@ -128,12 +128,12 @@ TEST_F(VkSCLayerTest, AllocateCommandBuffersExceededMaxCommandBuffers) {
     }
 }
 
-TEST_F(VkSCLayerTest, ResetCommandBufferNotSupported) {
+TEST_F(VkSCNegativeCommand, ResetCommandBufferNotSupported) {
     TEST_DESCRIPTION("vkReset/BeginCommandBuffer - commandPoolResetCommandBuffer not supported");
 
     RETURN_IF_SKIP(Init());
 
-    if (GetVulkanSC10Properties(gpu()).commandPoolResetCommandBuffer) {
+    if (GetVulkanSC10Properties().commandPoolResetCommandBuffer) {
         GTEST_SKIP() << "Only applicable if commandPoolResetCommandBuffer is not supported";
     }
 
@@ -162,12 +162,12 @@ TEST_F(VkSCLayerTest, ResetCommandBufferNotSupported) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkSCLayerTest, CommandPoolMultipleRecordingNotSupported) {
+TEST_F(VkSCNegativeCommand, CommandPoolMultipleRecordingNotSupported) {
     TEST_DESCRIPTION("vkBeginCommandBuffer - commandPoolMultipleCommandBuffersRecording not supported");
 
     RETURN_IF_SKIP(Init());
 
-    if (GetVulkanSC10Properties(gpu()).commandPoolMultipleCommandBuffersRecording) {
+    if (GetVulkanSC10Properties().commandPoolMultipleCommandBuffersRecording) {
         GTEST_SKIP() << "Only applicable if commandPoolMultipleCommandBuffersRecording is not supported";
     }
 
@@ -201,12 +201,12 @@ TEST_F(VkSCLayerTest, CommandPoolMultipleRecordingNotSupported) {
     cb_other_pool.end();
 }
 
-TEST_F(VkSCLayerTest, SimulatenousUseNotSupported) {
+TEST_F(VkSCNegativeCommand, SimulatenousUseNotSupported) {
     TEST_DESCRIPTION("vkBeginCommandBuffer - commandBufferSimultaneousUse not supported");
 
     RETURN_IF_SKIP(Init());
 
-    if (GetVulkanSC10Properties(gpu()).commandBufferSimultaneousUse) {
+    if (GetVulkanSC10Properties().commandBufferSimultaneousUse) {
         GTEST_SKIP() << "Only applicable if commandBufferSimultaneousUse is not supported";
     }
 
@@ -230,7 +230,7 @@ TEST_F(VkSCLayerTest, SimulatenousUseNotSupported) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkSCLayerTest, SecondaryCommandBufferNullOrImagelessFramebuffer) {
+TEST_F(VkSCNegativeCommand, SecondaryCommandBufferNullOrImagelessFramebuffer) {
     TEST_DESCRIPTION("vkBeginCommandBuffer - test effects of secondaryCommandBufferNullOrImagelessFramebuffer");
 
     RETURN_IF_SKIP(InitFramework());
@@ -313,7 +313,7 @@ TEST_F(VkSCLayerTest, SecondaryCommandBufferNullOrImagelessFramebuffer) {
     begin_info.flags = VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
     begin_info.pInheritanceInfo = &inherit_info;
 
-    const char *expected_vuid = GetVulkanSC10Properties(gpu()).secondaryCommandBufferNullOrImagelessFramebuffer
+    const char *expected_vuid = GetVulkanSC10Properties().secondaryCommandBufferNullOrImagelessFramebuffer
                                     ? "VUID-VkCommandBufferBeginInfo-flags-05009"
                                     : "VUID-VkCommandBufferBeginInfo-flags-05010";
 
@@ -322,7 +322,7 @@ TEST_F(VkSCLayerTest, SecondaryCommandBufferNullOrImagelessFramebuffer) {
     vksc::BeginCommandBuffer(cmd_buffer.handle(), &begin_info);
     m_errorMonitor->VerifyFound();
 
-    if (!GetVulkanSC10Properties(gpu()).secondaryCommandBufferNullOrImagelessFramebuffer) {
+    if (!GetVulkanSC10Properties().secondaryCommandBufferNullOrImagelessFramebuffer) {
         // Check with no framebuffer
         inherit_info.framebuffer = VK_NULL_HANDLE;
 

@@ -11,7 +11,7 @@
 
 #include "../framework/vksc_layer_validation_tests.h"
 
-TEST_F(VkSCPositiveLayerTest, PipelineCacheCreateInfo) {
+TEST_F(VkSCPositivePipeline, PipelineCacheCreateInfo) {
     TEST_DESCRIPTION("Test that we can create pipeline caches based on the infos specified at device create time");
 
     const uint32_t pc_create_info_count = 50;

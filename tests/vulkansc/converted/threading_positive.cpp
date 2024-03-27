@@ -137,8 +137,9 @@ TEST_F(PositiveThreading, NullFenceCollision) {
     m_errorMonitor->SetBailout(NULL);
 }
 
-// Uses too many objects
-TEST_F(PositiveThreading, DISABLED_DebugObjectNames) {
+TEST_F(PositiveThreading, DebugObjectNames) {
+    // This test case creates 10000 descriptor sets from a single pool
+    ObjectReservation().descriptorSetRequestCount = 10000;
     AddRequiredExtensions(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
 

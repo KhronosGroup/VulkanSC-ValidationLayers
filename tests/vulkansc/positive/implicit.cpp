@@ -16,7 +16,7 @@
 // they deserve their own test cases because these implicit VUs are different in Vulkan SC compared
 // to Vulkan.
 
-TEST_F(VkSCPositiveLayerTest, ResetCommandPoolAllowed) {
+TEST_F(VkSCPositiveImplicit, ResetCommandPoolAllowed) {
     TEST_DESCRIPTION("vkResetCommandPool - allowed if VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT is not specified");
 
     RETURN_IF_SKIP(Init());
@@ -27,7 +27,7 @@ TEST_F(VkSCPositiveLayerTest, ResetCommandPoolAllowed) {
     vksc::ResetCommandPool(m_device->handle(), cmd_pool.handle(), 0);
 }
 
-TEST_F(VkSCPositiveLayerTest, CreatePipelinesAllowNullStageName) {
+TEST_F(VkSCPositiveImplicit, CreatePipelinesAllowNullStageName) {
     TEST_DESCRIPTION("vkCreate*Pipelines - VkPipelineShaderStageCreateInfo::pName can be NULL in Vulkan SC");
 
     RETURN_IF_SKIP(Init());

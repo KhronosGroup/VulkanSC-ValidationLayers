@@ -12,7 +12,7 @@
 #include "../framework/vksc_layer_validation_tests.h"
 #include "../framework/vksc_test_pipeline_helper.h"
 
-TEST_F(VkSCLayerTest, CreatePipelinesShaderModuleNotNull) {
+TEST_F(VkSCNegativePipeline, CreatePipelinesShaderModuleNotNull) {
     TEST_DESCRIPTION("vkCreate*Pipelines - VkPipelineShaderStageCreateInfo::module must be VK_NULL_HANDLE");
 
     RETURN_IF_SKIP(Init());
@@ -42,7 +42,7 @@ TEST_F(VkSCLayerTest, CreatePipelinesShaderModuleNotNull) {
     }
 }
 
-TEST_F(VkSCLayerTest, CreatePipelinesWithBasePipeline) {
+TEST_F(VkSCNegativePipeline, CreatePipelinesWithBasePipeline) {
     TEST_DESCRIPTION("Test vkCreate*Pipelines usage with a basePipeline");
 
     RETURN_IF_SKIP(Init());
@@ -94,7 +94,7 @@ TEST_F(VkSCLayerTest, CreatePipelinesWithBasePipeline) {
     }
 }
 
-TEST_F(VkSCLayerTest, CreatePipelinePoolSize) {
+TEST_F(VkSCNegativePipeline, CreatePipelinePoolSize) {
     TEST_DESCRIPTION("Test pipeline pool size related VUs for pipeline create commands");
 
     RETURN_IF_SKIP(InitFramework());
@@ -197,7 +197,7 @@ TEST_F(VkSCLayerTest, CreatePipelinePoolSize) {
     const char* invalid_size_vuid = "VUID-VkPipelineOfflineCreateInfo-poolEntrySize-05028";
 
     // Determine which capacity VUID should be triggered based on recyclePipelineMemory support
-    const char* capacity_vuid = GetVulkanSC10Properties(gpu()).recyclePipelineMemory
+    const char* capacity_vuid = GetVulkanSC10Properties().recyclePipelineMemory
                                     ? "VUID-VkPipelineOfflineCreateInfo-recyclePipelineMemory-05029"
                                     : "VUID-VkPipelineOfflineCreateInfo-recyclePipelineMemory-05030";
 
@@ -226,7 +226,7 @@ TEST_F(VkSCLayerTest, CreatePipelinePoolSize) {
     const vkt::RenderPass render_pass(*m_device, rpci);
 
     // If recyclePipelineMemory is supported we should be able to do this multiple times
-    const uint32_t iter_count = GetVulkanSC10Properties(gpu()).recyclePipelineMemory ? 3 : 1;
+    const uint32_t iter_count = GetVulkanSC10Properties().recyclePipelineMemory ? 3 : 1;
     for (uint32_t iter = 0; iter < iter_count; ++iter) {
         std::vector<VkPipeline> pipelines{};
         std::vector<VkPipeline> created_pipelines{};
@@ -308,7 +308,7 @@ TEST_F(VkSCLayerTest, CreatePipelinePoolSize) {
     }
 }
 
-TEST_F(VkSCLayerTest, CreatePipelineCacheInvalidFlags) {
+TEST_F(VkSCNegativePipeline, CreatePipelineCacheInvalidFlags) {
     TEST_DESCRIPTION("vkCreatePipelineCache - missing required flags");
     // NOTE: This test case implicitly tests the removed VUIDs: 00768, 00769
 
@@ -330,7 +330,7 @@ TEST_F(VkSCLayerTest, CreatePipelineCacheInvalidFlags) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkSCLayerTest, CreatePipelineCacheNoMatch) {
+TEST_F(VkSCNegativePipeline, CreatePipelineCacheNoMatch) {
     TEST_DESCRIPTION(
         "vkCreatePipelineCache - pipeline cache create info does not match any of the "
         "pipeline cache create infos specified at device create time");

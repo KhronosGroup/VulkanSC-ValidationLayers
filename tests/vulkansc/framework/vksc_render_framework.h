@@ -22,6 +22,7 @@ class PipelineCache;
 // Render framework used by Vulkan SC tests
 class VkSCRenderFramework : public VkRenderFramework {
   public:
+    VkSCRenderFramework() : VkRenderFramework(), object_reservation_info_(vksc::GetDefaultObjectReservationCreateInfo()) {}
     virtual ~VkSCRenderFramework() override;
 
     void InitFramework(void *instance_pnext = NULL);
@@ -30,11 +31,34 @@ class VkSCRenderFramework : public VkRenderFramework {
 
     VkPipelineCache GetDefaultPipelineCache();
 
-    static VkPhysicalDeviceVulkanSC10Features GetVulkanSC10Features(VkPhysicalDevice phys_dev);
-    static VkPhysicalDeviceVulkanSC10Properties GetVulkanSC10Properties(VkPhysicalDevice phys_dev);
+    VkPhysicalDeviceVulkanSC10Features GetVulkanSC10Features() const {
+        auto sc_10_features = vku::InitStruct<VkPhysicalDeviceVulkanSC10Features>();
+        auto features2 = vku::InitStruct<VkPhysicalDeviceFeatures2>(&sc_10_features);
+        vksc::GetPhysicalDeviceFeatures2(gpu(), &features2);
+        return sc_10_features;
+    }
+
+    VkPhysicalDeviceVulkanSC10Properties GetVulkanSC10Properties() const {
+        auto sc_10_props = vku::InitStruct<VkPhysicalDeviceVulkanSC10Properties>();
+        auto props2 = vku::InitStruct<VkPhysicalDeviceProperties2>(&sc_10_props);
+        vksc::GetPhysicalDeviceProperties2(gpu(), &props2);
+        return sc_10_props;
+    }
+
+    VkPhysicalDeviceFeatures GetVulkanFeatures() const {
+        VkPhysicalDeviceFeatures features;
+        vksc::GetPhysicalDeviceFeatures(gpu(), &features);
+        return features;
+    }
+
+    VkPhysicalDeviceProperties GetVulkanProperties() const {
+        VkPhysicalDeviceProperties props;
+        vksc::GetPhysicalDeviceProperties(gpu(), &props);
+        return props;
+    }
 
     template <typename T>
-    T GetVulkanFeatures() const {
+    T GetFeatures() const {
         auto features = vku::InitStruct<T>();
         auto features2 = vku::InitStruct<VkPhysicalDeviceFeatures2>(&features);
         vksc::GetPhysicalDeviceFeatures2(gpu(), &features2);
@@ -42,7 +66,7 @@ class VkSCRenderFramework : public VkRenderFramework {
     }
 
     template <typename T>
-    T GetVulkanProperties() const {
+    T GetProperties() const {
         auto props = vku::InitStruct<T>();
         auto props2 = vku::InitStruct<VkPhysicalDeviceProperties2>(&props);
         vksc::GetPhysicalDeviceProperties2(gpu(), &props2);
@@ -54,9 +78,12 @@ class VkSCRenderFramework : public VkRenderFramework {
         return &pipeline_cache_builders_.back();
     }
 
+    VkDeviceObjectReservationCreateInfo &ObjectReservation() { return object_reservation_info_; }
+
   private:
     VkPipelineCache default_pipeline_cache_{VK_NULL_HANDLE};
-    std::vector<vksc::PipelineCacheBuilder> pipeline_cache_builders_;
+    std::vector<vksc::PipelineCacheBuilder> pipeline_cache_builders_{};
+    VkDeviceObjectReservationCreateInfo object_reservation_info_;
 };
 
 // Render framework used by compatible Vulkan tests
