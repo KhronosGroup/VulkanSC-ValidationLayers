@@ -452,6 +452,7 @@ TEST_F(NegativePortabilitySubset, ColorBlendAttachmentState) {
 }
 
 class VkPortabilitySubsetTest : public VkLayerTest {};
+// Not supported in Vulkan SC: portability subset
 TEST_F(VkPortabilitySubsetTest, DISABLED_UpdateDescriptorSets) {
     TEST_DESCRIPTION("Portability: UpdateDescriptorSets - VUID 04450");
     AddRequiredExtensions(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
@@ -496,6 +497,7 @@ TEST_F(VkPortabilitySubsetTest, DISABLED_UpdateDescriptorSets) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: portability subset
 TEST_F(VkPortabilitySubsetTest, DISABLED_ShaderValidation) {
     TEST_DESCRIPTION("Attempt to use shader features that are not supported via portability");
     AddRequiredExtensions(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
@@ -598,6 +600,7 @@ TEST_F(VkPortabilitySubsetTest, DISABLED_ShaderValidation) {
     }
 }
 
+// Not supported in Vulkan SC: portability subset
 TEST_F(VkPortabilitySubsetTest, DISABLED_PortabilitySubsetColorBlendFactor) {
     TEST_DESCRIPTION("Test invalid color blend factor with portability subset");
 
@@ -627,6 +630,7 @@ TEST_F(VkPortabilitySubsetTest, DISABLED_PortabilitySubsetColorBlendFactor) {
     m_commandBuffer->end();
 }
 
+// Not supported in Vulkan SC: portability subset
 TEST_F(VkPortabilitySubsetTest, DISABLED_InstanceCreateEnumerate) {
     TEST_DESCRIPTION("Validate creating instances with VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR.");
 
@@ -651,6 +655,7 @@ TEST_F(VkPortabilitySubsetTest, DISABLED_InstanceCreateEnumerate) {
     }
 }
 
+// Not supported in Vulkan SC: portability subset
 TEST_F(VkPortabilitySubsetTest, DISABLED_FeatureWithoutExtension) {
     TEST_DESCRIPTION("Make sure can't use portability without VK_KHR_portability_subset");
     SetTargetApiVersion(VK_API_VERSION_1_1);

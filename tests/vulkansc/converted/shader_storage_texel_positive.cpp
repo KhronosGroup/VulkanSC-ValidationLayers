@@ -99,4 +99,3 @@ TEST_F(PositiveShaderStorageTexel, BufferWriteMoreComponent) {
     vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
     m_commandBuffer->end();
 }
-

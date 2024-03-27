@@ -268,13 +268,9 @@ TEST_F(PositiveShaderInterface, ScalarBlockLayout) {
     TEST_DESCRIPTION("Create a shader that requires scalar block layout.");
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
+    AddRequiredFeature(vkt::Feature::scalarBlockLayout);
 
-    VkPhysicalDeviceScalarBlockLayoutFeaturesEXT scalar_block_features = vku::InitStructHelper(NULL);
-    GetPhysicalDeviceFeatures2(scalar_block_features);
-    VkPhysicalDeviceFeatures2 set_features2 = vku::InitStructHelper(&scalar_block_features);
-
-    RETURN_IF_SKIP(InitState(nullptr, &set_features2));
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     // Vertex shader requiring scalar layout.
@@ -335,7 +331,7 @@ TEST_F(PositiveShaderInterface, RelaxedTypeMatch) {
         "1.3) device extension:"
         "fundamental type must match, and producer side must have at least as many components");
 
-    SetTargetApiVersion(VK_API_VERSION_1_1); // At least 1.1 is required for maintenance4
+    SetTargetApiVersion(VK_API_VERSION_1_1);  // At least 1.1 is required for maintenance4
     AddRequiredExtensions(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::maintenance4);
     RETURN_IF_SKIP(Init());

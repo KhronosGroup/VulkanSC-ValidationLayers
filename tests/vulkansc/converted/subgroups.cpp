@@ -19,7 +19,7 @@
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
 
-TEST_F(NegativeSubgroup, DISABLED_Properties) {
+TEST_F(NegativeSubgroup, Properties) {
     TEST_DESCRIPTION(
         "Test shader validation support for subgroup VkPhysicalDeviceSubgroupProperties such as supportedStages, and "
         "supportedOperations, quadOperationsInAllStages.");
@@ -326,6 +326,8 @@ TEST_F(NegativeSubgroup, ExtendedTypesEnabled) {
 }
 
 TEST_F(NegativeSubgroup, ExtendedTypesDisabled) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Test VK_KHR_shader_subgroup_extended_types.");
     SetTargetApiVersion(VK_API_VERSION_1_1);
 

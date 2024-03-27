@@ -174,7 +174,8 @@ TEST_F(NegativeShaderCooperativeMatrix, KHRParametersMatchProperties) {
     )glsl";
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.cs_ = std::make_unique<VkShaderObj>(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL, nullptr);
+    pipe.cs_ =
+        std::make_unique<VkShaderObj>(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL, nullptr);
     pipe.InitState();
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-RuntimeSpirv-OpTypeCooperativeMatrixKHR-08974");
     pipe.CreateComputePipeline();
@@ -282,8 +283,8 @@ TEST_F(NegativeShaderCooperativeMatrix, KHRSameScope) {
     )glsl";
 
     const uint32_t specData[] = {
-        3, // gl_ScopeSubgroup
-        4, // gl_ScopeInvocation
+        3,  // gl_ScopeSubgroup
+        4,  // gl_ScopeInvocation
     };
     const VkSpecializationMapEntry entries[] = {
         {0, sizeof(uint32_t) * 0, sizeof(uint32_t)},
@@ -433,8 +434,8 @@ TEST_F(NegativeShaderCooperativeMatrix, DISABLED_MatchSizeWithProperties) {
         m_errorMonitor->SetAllowedFailureMsg("VUID-RuntimeSpirv-OpTypeCooperativeMatrixKHR-08974");
 
         CreateComputePipelineHelper pipe(*this);
-        pipe.cs_ = std::make_unique<VkShaderObj>(this, css.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0,
-                                                 SPV_SOURCE_ASM, nullptr);
+        pipe.cs_ = std::make_unique<VkShaderObj>(this, css.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM,
+                                                 nullptr);
         pipe.InitState();
         pipe.CreateComputePipeline();
         m_errorMonitor->VerifyFound();
@@ -520,7 +521,7 @@ TEST_F(NegativeShaderCooperativeMatrix, DISABLED_KHRSignedCheck) {
         {"|MatrixResultSignedComponents", "VUID-RuntimeSpirv-OpCooperativeMatrixMulAddKHR-08982"},
     };
 
-    for (const auto &x: subtests) {
+    for (const auto &x : subtests) {
         const std::string csSourceStr = remove_str(csSourceTemplate, std::string(x.remove));
         const char *css = csSourceStr.c_str();
         CreateComputePipelineHelper pipe(*this);

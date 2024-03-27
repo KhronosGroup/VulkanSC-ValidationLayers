@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2023-2023 The Khronos Group Inc.
- * Copyright (c) 2023-2023 RasterGrid Kft.
+ * Copyright (c) 2023-2024 The Khronos Group Inc.
+ * Copyright (c) 2023-2024 RasterGrid Kft.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -11,7 +11,7 @@
 
 #include "../framework/vksc_layer_validation_tests.h"
 
-class VkSCWSITest : public VkSCLayerTest {
+class VkSCNegativeWsi : public VkSCLayerTest {
   public:
     void SetupForWSI() {
         AddRequiredExtensions(VK_KHR_SURFACE_EXTENSION_NAME);
@@ -19,7 +19,7 @@ class VkSCWSITest : public VkSCLayerTest {
         AddOptionalExtensions(VK_EXT_HEADLESS_SURFACE_EXTENSION_NAME);
     }
 
-    ~VkSCWSITest() { vksc::DestroySurfaceKHR(instance(), surface_, nullptr); }
+    ~VkSCNegativeWsi() { vksc::DestroySurfaceKHR(instance(), surface_, nullptr); }
 
     VkSurfaceKHR WSISurface() {
         if (surface_ == VK_NULL_HANDLE) {
@@ -98,12 +98,12 @@ class VkSCWSITest : public VkSCLayerTest {
     VkSwapchainCreateInfoKHR swapchain_create_info_{};
 };
 
-TEST_F(VkSCWSITest, CreateSwapchainSplitInstanceBindRegionsNotAllowed) {
+TEST_F(VkSCNegativeWsi, CreateSwapchainSplitInstanceBindRegionsNotAllowed) {
     TEST_DESCRIPTION("vkCreateSwapchain - VK_SWAPCHAIN_CREATE_SPLIT_INSTANCE_BIND_REGIONS_BIT_KHR not allowed");
 
     SetupForWSI();
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     if (!WSISurface() || !DeviceExtensionSupported(VK_KHR_SWAPCHAIN_EXTENSION_NAME)) {
         GTEST_SKIP() << "Test requires WSI support";
@@ -118,12 +118,12 @@ TEST_F(VkSCWSITest, CreateSwapchainSplitInstanceBindRegionsNotAllowed) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(VkSCWSITest, CreateSwapchainOldSwapchainNotNull) {
+TEST_F(VkSCNegativeWsi, CreateSwapchainOldSwapchainNotNull) {
     TEST_DESCRIPTION("vkCreateSwapchain - oldSwapchain must be VK_NULL_HANDLE");
 
     SetupForWSI();
 
-    RETURN_IF_SKIP(Init())
+    RETURN_IF_SKIP(Init());
 
     if (!WSISurface() || !DeviceExtensionSupported(VK_KHR_SWAPCHAIN_EXTENSION_NAME)) {
         GTEST_SKIP() << "Test requires WSI support";

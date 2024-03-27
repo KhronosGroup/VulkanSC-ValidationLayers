@@ -3306,6 +3306,7 @@ TEST_F(NegativeImage, ImageViewLayerCount) {
     }
 }
 
+// This test case are replaced with Vulkan SC specific ones
 TEST_F(NegativeImage, DISABLED_ImageMisc) {
     TEST_DESCRIPTION("Misc leftover valid usage errors in VkImageCreateInfo struct");
 
@@ -3769,8 +3770,7 @@ TEST_F(NegativeImage, Stencil) {
 
     image_create_info.pNext = &image_stencil_create_info;
 
-    VkPhysicalDeviceImageFormatInfo2 image_format_info2 =
-        vku::InitStructHelper(&image_stencil_create_info);
+    VkPhysicalDeviceImageFormatInfo2 image_format_info2 = vku::InitStructHelper(&image_stencil_create_info);
     image_format_info2.format = image_create_info.format;
     image_format_info2.type = image_create_info.imageType;
     image_format_info2.tiling = image_create_info.tiling;
@@ -4224,6 +4224,7 @@ TEST_F(NegativeImage, BlockTextImageViewCompatibleFlag) {
     CreateImageTest(*this, &image_ci, "VUID-VkImageCreateInfo-flags-01573");
 }
 
+// Not supported in Vulkan SC: sparse resources
 TEST_F(NegativeImage, DISABLED_SparseResidencyAliased) {
     TEST_DESCRIPTION("use VK_IMAGE_CREATE_SPARSE_ALIASED_BIT without sparseResidencyAliased.");
     VkPhysicalDeviceFeatures deviceFeatures = {};
@@ -4258,6 +4259,7 @@ TEST_F(NegativeImage, DisjointWithoutAlias) {
     CreateImageTest(*this, &image_ci, "VUID-VkImageCreateInfo-format-01577");
 }
 
+// Not supported in Vulkan SC: split-instance bind regions
 TEST_F(NegativeImage, DISABLED_ImageSplitInstanceBindRegionCount) {
     TEST_DESCRIPTION("Bind image memory with VkBindImageMemoryDeviceGroupInfo but invalid flags");
 
@@ -5990,7 +5992,9 @@ TEST_F(NegativeImage, CubeCompatibleMustBeImageType2D) {
     CreateImageTest(*this, &ci, "VUID-VkImageCreateInfo-flags-00949");
 }
 
-TEST_F(NegativeImage, DISABLED_ComputeImageLayout) {
+TEST_F(NegativeImage, ComputeImageLayout) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Attempt to use an image with an invalid layout in a compute shader");
 
     AddRequiredExtensions(VK_KHR_DEVICE_GROUP_EXTENSION_NAME);
@@ -6051,7 +6055,9 @@ TEST_F(NegativeImage, DISABLED_ComputeImageLayout) {
     }
 }
 
-TEST_F(NegativeImage, DISABLED_ComputeImageLayout11) {
+TEST_F(NegativeImage, ComputeImageLayout11) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Attempt to use an image with an invalid layout in a compute shader using vkCmdDispatchBase");
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
@@ -6095,6 +6101,7 @@ TEST_F(NegativeImage, DISABLED_ComputeImageLayout11) {
     m_errorMonitor->VerifyFound();
 }
 
+// This test case are not relevant for Vulkan SC
 TEST_F(NegativeImage, DISABLED_GetPhysicalDeviceImageFormatProperties) {
     TEST_DESCRIPTION("fail a call to GetPhysicalDeviceImageFormatProperties");
     RETURN_IF_SKIP(Init());

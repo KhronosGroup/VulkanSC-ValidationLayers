@@ -2098,6 +2098,7 @@ struct WaitTimelineSemThreadData : public SemBufferRaceData {
     }
 };
 
+// Not supported in Vulkan SC: vkFreeMemory
 TEST_F(PositiveSyncObject, DISABLED_WaitTimelineSemThreadRace) {
 #if defined(VVL_ENABLE_TSAN)
     // NOTE: This test in particular has failed sporadically on CI when TSAN is enabled.

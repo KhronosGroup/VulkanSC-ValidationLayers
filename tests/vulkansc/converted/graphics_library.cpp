@@ -19,6 +19,7 @@
 #include "../framework/descriptor_helper.h"
 #include "generated/vk_extension_helper.h"
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_DSLs) {
     TEST_DESCRIPTION("Create a pipeline layout with invalid descriptor set layouts");
 
@@ -48,6 +49,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_DSLs) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_GPLDSLs) {
     TEST_DESCRIPTION("Create a pipeline layout with invalid descriptor set layouts with VK_EXT_grahpics_pipeline_library enabled");
 
@@ -78,6 +80,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_GPLDSLs) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_IndependentSetsLinkOnly) {
     TEST_DESCRIPTION("Link pre-raster and FS subsets with invalid VkPipelineLayout create flags");
     RETURN_IF_SKIP(InitBasicGraphicsLibrary());
@@ -118,6 +121,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_IndependentSetsLinkOnly) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_IndependentSetsLinkCreate) {
     TEST_DESCRIPTION("Create pre-raster subset while linking FS subset with invalid VkPipelineLayout create flags");
     RETURN_IF_SKIP(InitBasicGraphicsLibrary());
@@ -151,6 +155,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_IndependentSetsLinkCreate) {
     }
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_DescriptorSets) {
     TEST_DESCRIPTION(
         "Attempt to bind invalid descriptor sets with and without VK_EXT_graphics_pipeline_library and independent sets");
@@ -178,6 +183,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_DescriptorSets) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_DescriptorSetsGPL) {
     TEST_DESCRIPTION("Attempt to bind invalid descriptor sets with and with VK_EXT_graphics_pipeline_library");
 
@@ -207,6 +213,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_DescriptorSetsGPL) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_MissingDSState) {
     TEST_DESCRIPTION("Create a library with fragment shader state, but no fragment output state, and invalid DS state");
 
@@ -229,6 +236,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_MissingDSState) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_MissingDSStateWithFragOutputState) {
     TEST_DESCRIPTION("Create a library with both fragment shader state and fragment output state, and invalid DS state");
 
@@ -302,6 +310,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_MissingDSStateWithFragOutputState) {
     }
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_DepthStencilStateIgnored) {
     TEST_DESCRIPTION("Create a library with fragment shader state, but no fragment output state, and no DS state, but ignored");
 
@@ -335,6 +344,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_DepthStencilStateIgnored) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_MissingColorBlendState) {
     TEST_DESCRIPTION("Create a library with fragment output state and invalid ColorBlendState state");
 
@@ -381,6 +391,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_MissingColorBlendState) {
     }
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_ImplicitVUIDs) {
     TEST_DESCRIPTION("Test various VUIDs that were previously implicit, but now explicit due to VK_EXT_graphics_pipeline_library");
 
@@ -413,6 +424,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_ImplicitVUIDs) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_CreateStateGPL) {
     TEST_DESCRIPTION("Create invalid graphics pipeline state with VK_EXT_graphics_pipeline_library enabled");
 
@@ -459,6 +471,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_CreateStateGPL) {
     }
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_CreateLibraryFlag) {
     TEST_DESCRIPTION("Don't use VK_PIPELINE_CREATE_LIBRARY_BIT_KHR with normal pipeline");
 
@@ -477,6 +490,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_CreateLibraryFlag) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_LinkOptimization) {
     TEST_DESCRIPTION("Create graphics pipeline libraries with mismatching link-time optimization flags");
 
@@ -544,6 +558,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_LinkOptimization) {
     }
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_DSLShaderBindingsNullInCreate) {
     TEST_DESCRIPTION("Link pre-raster state while creating FS state with invalid null DSL + shader stage bindings");
     RETURN_IF_SKIP(InitBasicGraphicsLibrary());
@@ -592,6 +607,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_DSLShaderBindingsNullInCreate) {
     }
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_DSLShaderBindingsNullInLink) {
     TEST_DESCRIPTION("Link pre-raster state with invalid null DSL + shader stage bindings while creating FS state");
     RETURN_IF_SKIP(InitBasicGraphicsLibrary());
@@ -639,6 +655,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_DSLShaderBindingsNullInLink) {
     }
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_DSLShaderBindingsLinkOnly) {
     TEST_DESCRIPTION("Link pre-raster and FS subsets with invalid null DSL + shader stage bindings");
     RETURN_IF_SKIP(InitBasicGraphicsLibrary());
@@ -694,6 +711,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_DSLShaderBindingsLinkOnly) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_PreRasterStateNoLayout) {
     TEST_DESCRIPTION("Create a pre-raster graphics library");
 
@@ -713,6 +731,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_PreRasterStateNoLayout) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_ImmutableSamplersIncompatibleDSL) {
     TEST_DESCRIPTION("Link pipelines with DSLs that only differ by immutable samplers");
     RETURN_IF_SKIP(InitBasicGraphicsLibrary());
@@ -813,6 +832,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_ImmutableSamplersIncompatibleDSL) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_PreRasterWithFS) {
     TEST_DESCRIPTION("Create a library with no FS state, but an FS");
     RETURN_IF_SKIP(InitBasicGraphicsLibrary());
@@ -854,6 +874,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_PreRasterWithFS) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_FragmentStateWithPreRaster) {
     TEST_DESCRIPTION("Create a library with no pre-raster state, but that contains a pre-raster shader.");
     RETURN_IF_SKIP(InitBasicGraphicsLibrary());
@@ -894,6 +915,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_FragmentStateWithPreRaster) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_StageCount) {
     RETURN_IF_SKIP(InitBasicGraphicsLibrary());
     InitRenderTarget();
@@ -910,6 +932,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_StageCount) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_NullStages) {
     RETURN_IF_SKIP(InitBasicGraphicsLibrary());
     InitRenderTarget();
@@ -922,6 +945,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_NullStages) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_MissingShaderStages) {
     TEST_DESCRIPTION("Create a library with pre-raster state, but no pre-raster shader");
     RETURN_IF_SKIP(InitBasicGraphicsLibrary());
@@ -944,6 +968,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_MissingShaderStages) {
     }
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_BadRenderPassPreRaster) {
     TEST_DESCRIPTION("Create a pre-raster graphics library with a bogus VkRenderPass");
 
@@ -964,6 +989,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_BadRenderPassPreRaster) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_BadRenderPassFragmentShader) {
     TEST_DESCRIPTION("Create a fragment shader graphics library with a bogus VkRenderPass");
 
@@ -984,6 +1010,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_BadRenderPassFragmentShader) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_BadRenderPassFragmentOutput) {
     TEST_DESCRIPTION("Create a fragment output graphics library with a bogus VkRenderPass");
 
@@ -1001,6 +1028,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_BadRenderPassFragmentOutput) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_DescriptorBufferLibrary) {
     TEST_DESCRIPTION("Descriptor buffer and graphics library");
 
@@ -1062,6 +1090,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_DescriptorBufferLibrary) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_DSLShaderStageMask) {
     TEST_DESCRIPTION(
         "Attempt to bind invalid descriptor sets with and without VK_EXT_graphics_pipeline_library and independent sets");
@@ -1148,6 +1177,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_DSLShaderStageMask) {
     }
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_Tessellation) {
     TEST_DESCRIPTION("Test various errors when creating a graphics pipeline with tessellation stages active.");
     AddRequiredFeature(vkt::Feature::tessellationShader);
@@ -1347,6 +1377,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_Tessellation) {
     }
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_PipelineExecutableProperties) {
     TEST_DESCRIPTION("VK_KHR_pipeline_executable_properties with GPL");
     SetTargetApiVersion(VK_API_VERSION_1_3);
@@ -1421,6 +1452,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_PipelineExecutableProperties) {
     }
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_BindEmptyDS) {
     TEST_DESCRIPTION("Bind an empty descriptor set");
 
@@ -1431,9 +1463,10 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_BindEmptyDS) {
     OneOffDescriptorSet ds(m_device, {
                                          {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT, nullptr},
                                      });
-    OneOffDescriptorSet ds1(m_device, {
-                                         {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
-                                     });
+    OneOffDescriptorSet ds1(
+        m_device, {
+                      {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
+                  });
     OneOffDescriptorSet ds2(m_device, {
                                           {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
                                       });
@@ -1529,6 +1562,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_BindEmptyDS) {
     m_commandBuffer->end();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_BindLibraryPipeline) {
     TEST_DESCRIPTION("Test binding a pipeline that was created with library flag");
 
@@ -1549,6 +1583,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_BindLibraryPipeline) {
     m_commandBuffer->end();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_ShaderModuleIdentifier) {
     TEST_DESCRIPTION("Test for VK_EXT_shader_module_identifier extension.");
     TEST_DESCRIPTION("Create a pipeline using a shader module identifier");
@@ -1650,6 +1685,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_ShaderModuleIdentifier) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_ShaderModuleIdentifierFeatures) {
     TEST_DESCRIPTION("Test for VK_EXT_shader_module_identifier extension with missing features.");
     AddRequiredExtensions(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME);
@@ -1699,6 +1735,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_ShaderModuleIdentifierFeatures) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_IncompatibleLayouts) {
     TEST_DESCRIPTION("Link pre-raster state while creating FS state with invalid null DSL + shader stage bindings");
     RETURN_IF_SKIP(InitBasicGraphicsLibrary());
@@ -1770,6 +1807,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_IncompatibleLayouts) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_MissingLinkingLayout) {
     TEST_DESCRIPTION("Create an executable library with no layout at linking time");
 
@@ -1826,6 +1864,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_MissingLinkingLayout) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_NullLibrary) {
     TEST_DESCRIPTION("pLibraries has a null pipeline");
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -1866,6 +1905,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_NullLibrary) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_BadLibrary) {
     TEST_DESCRIPTION("pLibraries has a bad pipeline");
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -1907,6 +1947,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_BadLibrary) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_DynamicPrimitiveTopolgyIngoreState) {
     TEST_DESCRIPTION("set VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY in non-Vertex Input state so it is ignored");
     SetTargetApiVersion(VK_API_VERSION_1_3);
@@ -1981,6 +2022,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_DynamicPrimitiveTopolgyIngoreState) {
     m_commandBuffer->end();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_PushConstantStages) {
     RETURN_IF_SKIP(InitBasicGraphicsLibrary());
     InitRenderTarget();
@@ -2026,6 +2068,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_PushConstantStages) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_PushConstantSize) {
     RETURN_IF_SKIP(InitBasicGraphicsLibrary());
     InitRenderTarget();
@@ -2071,6 +2114,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_PushConstantSize) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_PushConstantMultiple) {
     RETURN_IF_SKIP(InitBasicGraphicsLibrary());
     InitRenderTarget();
@@ -2116,6 +2160,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_PushConstantMultiple) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_PushConstantDifferentCount) {
     RETURN_IF_SKIP(InitBasicGraphicsLibrary());
     InitRenderTarget();
@@ -2160,6 +2205,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_PushConstantDifferentCount) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_SetLayoutCount) {
     TEST_DESCRIPTION("Have setLayoutCount not be the same between pipeline layouts");
     RETURN_IF_SKIP(InitBasicGraphicsLibrary());
@@ -2204,6 +2250,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_SetLayoutCount) {
     }
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_SetLayoutCountLinking) {
     TEST_DESCRIPTION("Have setLayoutCount not be the same between pipeline layouts, but done when linking together");
     RETURN_IF_SKIP(InitBasicGraphicsLibrary());
@@ -2256,6 +2303,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_SetLayoutCountLinking) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_DescriptorSetLayoutCreateFlags) {
     TEST_DESCRIPTION("Differnet VkDescriptorSetLayoutCreateFlags between pipeline layouts");
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -2310,6 +2358,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_DescriptorSetLayoutCreateFlags) {
     }
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_BindingCount) {
     TEST_DESCRIPTION("Differnet bindingCount between pipeline layouts");
     RETURN_IF_SKIP(InitBasicGraphicsLibrary());
@@ -2355,6 +2404,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_BindingCount) {
     }
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_DescriptorSetLayoutBinding) {
     TEST_DESCRIPTION("Differnet VkDescriptorSetLayoutBinding between pipeline layouts");
     RETURN_IF_SKIP(InitBasicGraphicsLibrary());
@@ -2399,6 +2449,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_DescriptorSetLayoutBinding) {
     }
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_NullDSL) {
     TEST_DESCRIPTION("have two layouts with null DSLs at same index, linking together");
     RETURN_IF_SKIP(InitBasicGraphicsLibrary());
@@ -2445,6 +2496,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_NullDSL) {
     }
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_NullDSLLinking) {
     TEST_DESCRIPTION("have two layouts with null DSLs at same index, linking together");
     RETURN_IF_SKIP(InitBasicGraphicsLibrary());
@@ -2498,6 +2550,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_NullDSLLinking) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_NullLayoutPreRasterFragShader) {
     TEST_DESCRIPTION("Null set layout when GPL flags are both Pre-Raster and Frag-Shader");
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -2530,6 +2583,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_NullLayoutPreRasterFragShader) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_NullLayoutPreRasterDiscardEnable) {
     TEST_DESCRIPTION("Null set layout when GPL flags is both Pre-Raster and rasterizerDiscardEnable is true");
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -2555,6 +2609,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_NullLayoutPreRasterDiscardEnable) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_MultisampleStateFragOutputLibrary) {
     TEST_DESCRIPTION("different pMultisampleState, but from a fragment output library");
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -2585,6 +2640,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_MultisampleStateFragOutputLibrary) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_MultisampleStateFragShaderLibrary) {
     TEST_DESCRIPTION("different pMultisampleState, but from a fragment shader library");
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -2615,6 +2671,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_MultisampleStateFragShaderLibrary) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_MultisampleStateFragOutputNull) {
     TEST_DESCRIPTION("fragment output has null Multisample state while Fragment Shader has one");
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -2643,6 +2700,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_MultisampleStateFragOutputNull) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_MultisampleStateFragShaderNull) {
     TEST_DESCRIPTION("fragment output has null Multisample state while Fragment Shader has one");
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -2672,6 +2730,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_MultisampleStateFragShaderNull) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_MultisampleStateBothLibrary) {
     TEST_DESCRIPTION("different pMultisampleState, but from a Library");
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -2730,6 +2789,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_MultisampleStateBothLibrary) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_FragmentShadingRateStateFragShaderLibrary) {
     TEST_DESCRIPTION("different FragmentShadingRateState, but from a fragment shader library");
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -2768,6 +2828,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_FragmentShadingRateStateFragShaderLibra
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(NegativeGraphicsLibrary, DISABLED_FragmentShadingRateStateBothLibrary) {
     TEST_DESCRIPTION("different FragmentShadingRateState, but both from a Library");
     SetTargetApiVersion(VK_API_VERSION_1_2);

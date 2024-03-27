@@ -1697,6 +1697,7 @@ TEST_F(NegativeRenderPass, FramebufferIncompatible) {
     m_commandBuffer->end();
 }
 
+// This test case are replaced with Vulkan SC specific ones
 TEST_F(NegativeRenderPass, DISABLED_FramebufferIncompatibleNoHandle) {
     TEST_DESCRIPTION(
         "Bind a secondary command buffer with a framebuffer that does not match the framebuffer for the active renderpass.");
@@ -3875,6 +3876,7 @@ TEST_F(NegativeRenderPass, RenderPassBegin) {
     m_commandBuffer->end();
 }
 
+// This test case are replaced with Vulkan SC specific ones
 TEST_F(NegativeRenderPass, DISABLED_IncompatibleFramebuffer) {
     TEST_DESCRIPTION("Incompatible framebuffer in command buffer inheritance info");
     RETURN_IF_SKIP(Init());

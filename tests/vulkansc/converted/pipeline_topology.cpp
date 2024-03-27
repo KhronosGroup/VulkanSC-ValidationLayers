@@ -68,7 +68,9 @@ static const char *NoPointSizeVertShader = R"glsl(
     }
 )glsl";
 
-TEST_F(NegativePipelineTopology, DISABLED_PointSize) {
+TEST_F(NegativePipelineTopology, PointSize) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Create a pipeline using TOPOLOGY_POINT_LIST but do not set PointSize in vertex shader.");
 
     RETURN_IF_SKIP(Init());
@@ -245,7 +247,7 @@ TEST_F(NegativePipelineTopology, PrimitiveTopologyListRestart) {
     auto set_info = [&](CreatePipelineHelper &helper) {
         helper.ia_ci_.topology = topology;
         helper.ia_ci_.primitiveRestartEnable = VK_TRUE;
-        helper.shader_stages_ = { vs.GetStageCreateInfo(), helper.fs_->GetStageCreateInfo() };
+        helper.shader_stages_ = {vs.GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
     };
 
     topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;

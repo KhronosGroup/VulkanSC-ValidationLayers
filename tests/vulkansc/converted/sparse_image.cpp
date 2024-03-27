@@ -21,6 +21,7 @@
 #include "../framework/layer_validation_tests.h"
 #include "../framework/external_memory_sync.h"
 
+// Not supported in Vulkan SC: sparse resources
 TEST_F(NegativeSparseImage, DISABLED_BindingImageBufferCreate) {
     TEST_DESCRIPTION("Create buffer/image with sparse attributes but without the sparse_binding bit set");
 
@@ -78,6 +79,7 @@ TEST_F(NegativeSparseImage, DISABLED_BindingImageBufferCreate) {
     }
 }
 
+// Not supported in Vulkan SC: sparse resources
 TEST_F(NegativeSparseImage, DISABLED_ResidencyImageCreateUnsupportedTypes) {
     TEST_DESCRIPTION("Create images with sparse residency with unsupported types");
 
@@ -117,6 +119,7 @@ TEST_F(NegativeSparseImage, DISABLED_ResidencyImageCreateUnsupportedTypes) {
     CreateImageTest(*this, &image_create_info, "VUID-VkImageCreateInfo-imageType-00972");
 }
 
+// Not supported in Vulkan SC: sparse resources
 TEST_F(NegativeSparseImage, DISABLED_ResidencyImageCreateUnsupportedSamples) {
     TEST_DESCRIPTION("Create images with sparse residency with unsupported tiling or sample counts");
     AddRequiredFeature(vkt::Feature::sparseResidencyImage2D);
@@ -161,6 +164,7 @@ TEST_F(NegativeSparseImage, DISABLED_ResidencyImageCreateUnsupportedSamples) {
     CreateImageTest(*this, &image_create_info, "VUID-VkImageCreateInfo-imageType-00976");
 }
 
+// Not supported in Vulkan SC: sparse resources
 TEST_F(NegativeSparseImage, DISABLED_ResidencyFlag) {
     TEST_DESCRIPTION("Try to use VkSparseImageMemoryBindInfo without sparse residency flag");
 
@@ -209,6 +213,7 @@ TEST_F(NegativeSparseImage, DISABLED_ResidencyFlag) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: sparse resources
 TEST_F(NegativeSparseImage, DISABLED_ImageUsageBits) {
     TEST_DESCRIPTION("Try to use VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT with sparse image");
 
@@ -234,6 +239,7 @@ TEST_F(NegativeSparseImage, DISABLED_ImageUsageBits) {
     CreateImageTest(*this, &image_create_info, "VUID-VkImageCreateInfo-None-01925");
 }
 
+// Not supported in Vulkan SC: sparse resources
 TEST_F(NegativeSparseImage, DISABLED_MemoryBindOffset) {
     TEST_DESCRIPTION("Try to use VkSparseImageMemoryBind with offset not less than memory size");
 
@@ -346,6 +352,7 @@ TEST_F(NegativeSparseImage, DISABLED_MemoryBindOffset) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: sparse resources
 TEST_F(NegativeSparseImage, DISABLED_QueueBindSparseMemoryType) {
     TEST_DESCRIPTION("Test QueueBindSparse with memory of a wrong type");
 
@@ -521,6 +528,7 @@ TEST_F(NegativeSparseImage, DISABLED_QueueBindSparseMemoryType) {
     }
 }
 
+// Not supported in Vulkan SC: sparse resources
 TEST_F(NegativeSparseImage, DISABLED_QueueBindSparseMemoryType2) {
     TEST_DESCRIPTION("Test QueueBindSparse with lazily allocated memory");
 
@@ -646,6 +654,7 @@ TEST_F(NegativeSparseImage, DISABLED_QueueBindSparseMemoryType2) {
     }
 }
 
+// Not supported in Vulkan SC: sparse resources
 TEST_F(NegativeSparseImage, DISABLED_QueueBindSparseMemoryType3) {
     TEST_DESCRIPTION(
         "Test QueueBindSparse with memory having export external handle types that do not match those of the resource");
@@ -786,6 +795,7 @@ TEST_F(NegativeSparseImage, DISABLED_QueueBindSparseMemoryType3) {
 }
 
 // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/6808
+// Not supported in Vulkan SC: sparse resources
 TEST_F(NegativeSparseImage, DISABLED_DISABLED_QueueBindSparseMemoryType4) {
     TEST_DESCRIPTION(
         "Test QueueBindSparse with memory having import external handle types that do not match those of the resource");
@@ -979,6 +989,7 @@ TEST_F(NegativeSparseImage, DISABLED_DISABLED_QueueBindSparseMemoryType4) {
     }
 }
 
+// Not supported in Vulkan SC: sparse resources
 TEST_F(NegativeSparseImage, DISABLED_ImageMemoryBind) {
     TEST_DESCRIPTION("Try to bind sparse resident image with invalid VkSparseImageMemoryBind");
 
@@ -1102,6 +1113,7 @@ TEST_F(NegativeSparseImage, DISABLED_ImageMemoryBind) {
     image_bind.subresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 }
 
+// Not supported in Vulkan SC: sparse resources
 TEST_F(NegativeSparseImage, DISABLED_ImageMemoryBindInvalidExtent) {
     TEST_DESCRIPTION("Try to bind sparse resident image with an extent having a null size on one of its dimension");
 

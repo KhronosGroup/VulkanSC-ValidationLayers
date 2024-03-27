@@ -54,6 +54,7 @@ void GpuAVTest::InitGpuAvFramework(void *p_next) {
     }
 }
 
+// Not supported in Vulkan SC: GPU AV
 TEST_F(PositiveGpuAV, DISABLED_SetSSBOBindDescriptor) {
     TEST_DESCRIPTION("Makes sure we can use vkCmdBindDescriptorSets()");
     RETURN_IF_SKIP(InitGpuAvFramework());
@@ -116,6 +117,7 @@ TEST_F(PositiveGpuAV, DISABLED_SetSSBOBindDescriptor) {
     m_default_queue->wait();
 }
 
+// Not supported in Vulkan SC: GPU AV
 TEST_F(PositiveGpuAV, DISABLED_SetSSBOPushDescriptor) {
     TEST_DESCRIPTION("Makes sure we can use vkCmdPushDescriptorSetKHR instead of vkUpdateDescriptorSets");
     AddRequiredExtensions(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
@@ -200,6 +202,7 @@ TEST_F(PositiveGpuAV, DISABLED_SetSSBOPushDescriptor) {
 
 // Regression test for semaphore timeout with GPU-AV enabled:
 // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/4968
+// Not supported in Vulkan SC: GPU AV
 TEST_F(PositiveGpuAV, DISABLED_GetCounterFromSignaledSemaphoreAfterSubmit) {
     TEST_DESCRIPTION("Get counter value from the semaphore signaled by queue submit");
     SetTargetApiVersion(VK_API_VERSION_1_3);
@@ -227,6 +230,7 @@ TEST_F(PositiveGpuAV, DISABLED_GetCounterFromSignaledSemaphoreAfterSubmit) {
     ASSERT_EQ(VK_SUCCESS, vk::GetSemaphoreCounterValue(*m_device, semaphore, &counter));
 }
 
+// Not supported in Vulkan SC: GPU AV
 TEST_F(PositiveGpuAV, DISABLED_MutableBuffer) {
     TEST_DESCRIPTION("Makes sure we can use vkCmdBindDescriptorSets()");
     AddRequiredExtensions(VK_EXT_MUTABLE_DESCRIPTOR_TYPE_EXTENSION_NAME);
@@ -338,6 +342,7 @@ TEST_F(PositiveGpuAV, DISABLED_MutableBuffer) {
     m_default_queue->wait();
 }
 
+// Not supported in Vulkan SC: GPU AV
 TEST_F(PositiveGpuAV, DISABLED_MaxDescriptorsClamp) {
     TEST_DESCRIPTION("Make sure maxUpdateAfterBindDescriptorsInAllPools is clamped");
     RETURN_IF_SKIP(InitGpuAvFramework());
@@ -351,6 +356,7 @@ TEST_F(PositiveGpuAV, DISABLED_MaxDescriptorsClamp) {
     ASSERT_GE(gpuav::glsl::kDebugInputBindlessMaxDescriptors, desc_indexing_props.maxUpdateAfterBindDescriptorsInAllPools);
 }
 
+// Not supported in Vulkan SC: GPU AV
 TEST_F(PositiveGpuAV, DISABLED_MaxDescriptorsClamp13) {
     TEST_DESCRIPTION("Make sure maxUpdateAfterBindDescriptorsInAllPools is clamped");
     SetTargetApiVersion(VK_API_VERSION_1_3);
@@ -365,6 +371,7 @@ TEST_F(PositiveGpuAV, DISABLED_MaxDescriptorsClamp13) {
     ASSERT_GE(gpuav::glsl::kDebugInputBindlessMaxDescriptors, vk12_props.maxUpdateAfterBindDescriptorsInAllPools);
 }
 
+// Not supported in Vulkan SC: GPU AV
 TEST_F(PositiveGpuAV, DISABLED_SelectInstrumentedShaders) {
     TEST_DESCRIPTION("Use a bad vertex shader, but don't select it for validation and make sure we don't get a buffer oob warning");
     AddRequiredExtensions(VK_EXT_LAYER_SETTINGS_EXTENSION_NAME);
@@ -429,6 +436,7 @@ TEST_F(PositiveGpuAV, DISABLED_SelectInstrumentedShaders) {
     m_default_queue->wait();
 }
 
+// Not supported in Vulkan SC: GPU AV
 TEST_F(PositiveGpuAV, DISABLED_BindingPartiallyBound) {
     TEST_DESCRIPTION("Ensure that no validation errors for invalid descriptors if binding is PARTIALLY_BOUND");
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -467,7 +475,7 @@ TEST_F(PositiveGpuAV, DISABLED_BindingPartiallyBound) {
     const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
 
     vkt::Buffer buffer(*m_device, 32, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
-    uint32_t *data = (uint32_t*)buffer.memory().map();
+    uint32_t *data = (uint32_t *)buffer.memory().map();
     data[0] = 0;
     buffer.memory().unmap();
 
@@ -508,6 +516,7 @@ TEST_F(PositiveGpuAV, DISABLED_BindingPartiallyBound) {
     m_commandBuffer->QueueCommandBuffer();
 }
 
+// Not supported in Vulkan SC: GPU AV
 TEST_F(PositiveGpuAV, DISABLED_DrawingWithUnboundUnusedSet) {
     TEST_DESCRIPTION(
         "Test issuing draw command with pipeline layout that has 2 descriptor sets with first descriptor set begin unused and "
@@ -573,6 +582,7 @@ TEST_F(PositiveGpuAV, DISABLED_DrawingWithUnboundUnusedSet) {
     m_commandBuffer->end();
 }
 
+// Not supported in Vulkan SC: GPU AV
 TEST_F(PositiveGpuAV, DISABLED_FirstInstance) {
     TEST_DESCRIPTION("Validate illegal firstInstance values");
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
@@ -634,6 +644,7 @@ TEST_F(PositiveGpuAV, DISABLED_FirstInstance) {
     m_default_queue->wait();
 }
 
+// Not supported in Vulkan SC: GPU AV
 TEST_F(PositiveGpuAV, DISABLED_CopyBufferToImageD32) {
     TEST_DESCRIPTION(
         "Copy depth buffer to image with all depth values in the [0, 1] legal range. Depth image has format "
@@ -697,6 +708,7 @@ TEST_F(PositiveGpuAV, DISABLED_CopyBufferToImageD32) {
     vk::DeviceWaitIdle(*m_device);
 }
 
+// Not supported in Vulkan SC: GPU AV
 TEST_F(PositiveGpuAV, DISABLED_CopyBufferToImageD32U8) {
     TEST_DESCRIPTION(
         "Copy depth buffer to image with all depth values in the [0, 1] legal range. Depth image has format "
@@ -755,6 +767,7 @@ TEST_F(PositiveGpuAV, DISABLED_CopyBufferToImageD32U8) {
     vk::DeviceWaitIdle(*m_device);
 }
 
+// Not supported in Vulkan SC: GPU AV
 TEST_F(PositiveGpuAV, DISABLED_CopyBufferToImageTwoSubmit) {
     TEST_DESCRIPTION("Make sure resources are managed correctly afer a CopyBufferToImage call.");
     RETURN_IF_SKIP(InitGpuAvFramework());

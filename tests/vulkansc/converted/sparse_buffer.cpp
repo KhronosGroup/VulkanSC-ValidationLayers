@@ -19,6 +19,7 @@
 #include "generated/enum_flag_bits.h"
 #include "../framework/layer_validation_tests.h"
 
+// Not supported in Vulkan SC: sparse resources
 TEST_F(NegativeSparseBuffer, DISABLED_QueueBindSparseMemoryBindSize) {
     TEST_DESCRIPTION("Test QueueBindSparse with invalid sparse memory bind size");
     AddRequiredFeature(vkt::Feature::sparseBinding);
@@ -61,6 +62,7 @@ TEST_F(NegativeSparseBuffer, DISABLED_QueueBindSparseMemoryBindSize) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: sparse resources
 TEST_F(NegativeSparseBuffer, DISABLED_QueueBindSparseMemoryBindResourceOffset) {
     TEST_DESCRIPTION("Test QueueBindSparse with invalid sparse memory bind resource offset");
     AddRequiredFeature(vkt::Feature::sparseBinding);
@@ -105,6 +107,7 @@ TEST_F(NegativeSparseBuffer, DISABLED_QueueBindSparseMemoryBindResourceOffset) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: sparse resources
 TEST_F(NegativeSparseBuffer, DISABLED_QueueBindSparseMemoryBindSizeResourceOffset) {
     TEST_DESCRIPTION("Test QueueBindSparse with invalid sparse memory bind size due to resource offset");
     AddRequiredFeature(vkt::Feature::sparseBinding);
@@ -149,6 +152,7 @@ TEST_F(NegativeSparseBuffer, DISABLED_QueueBindSparseMemoryBindSizeResourceOffse
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: sparse resources
 TEST_F(NegativeSparseBuffer, DISABLED_QueueBindSparseMemoryBindSizeMemoryOffset) {
     TEST_DESCRIPTION("Test QueueBindSparse with invalid sparse memory bind size due to memory offset");
 
@@ -197,6 +201,7 @@ TEST_F(NegativeSparseBuffer, DISABLED_QueueBindSparseMemoryBindSizeMemoryOffset)
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: sparse resources
 TEST_F(NegativeSparseBuffer, DISABLED_OverlappingBufferCopy) {
     TEST_DESCRIPTION("Test overlapping sparse buffers' copy with overlapping device memory");
 
@@ -277,6 +282,7 @@ TEST_F(NegativeSparseBuffer, DISABLED_OverlappingBufferCopy) {
     m_default_queue->wait();
 }
 
+// Not supported in Vulkan SC: sparse resources
 TEST_F(NegativeSparseBuffer, DISABLED_OverlappingBufferCopy2) {
     TEST_DESCRIPTION("Test overlapping sparse buffers' copy with overlapping device memory");
 
@@ -365,6 +371,7 @@ TEST_F(NegativeSparseBuffer, DISABLED_OverlappingBufferCopy2) {
     m_default_queue->wait();
 }
 
+// Not supported in Vulkan SC: sparse resources
 TEST_F(NegativeSparseBuffer, DISABLED_OverlappingBufferCopy3) {
     TEST_DESCRIPTION("Test coyping from a range that spans two different memory chunks");
 
@@ -449,6 +456,7 @@ TEST_F(NegativeSparseBuffer, DISABLED_OverlappingBufferCopy3) {
     sparse_queue->wait();
 }
 
+// Not supported in Vulkan SC: sparse resources
 TEST_F(NegativeSparseBuffer, DISABLED_BufferFlagsFeature) {
     TEST_DESCRIPTION("Create buffers with Flags that require disabled sparse features");
 
@@ -476,6 +484,7 @@ TEST_F(NegativeSparseBuffer, DISABLED_BufferFlagsFeature) {
     CreateBufferTest(*this, &buffer_create_info, "VUID-VkBufferCreateInfo-flags-00918");
 }
 
+// Not supported in Vulkan SC: sparse resources
 TEST_F(NegativeSparseBuffer, DISABLED_VkSparseMemoryBindMemory) {
     TEST_DESCRIPTION("test VkSparseMemoryBind::memory is valid");
 
@@ -514,6 +523,7 @@ TEST_F(NegativeSparseBuffer, DISABLED_VkSparseMemoryBindMemory) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: sparse resources
 TEST_F(NegativeSparseBuffer, DISABLED_VkSparseMemoryBindFlags) {
     TEST_DESCRIPTION("test VkSparseMemoryBind::flags is valid");
 

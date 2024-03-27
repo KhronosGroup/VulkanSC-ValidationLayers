@@ -107,7 +107,7 @@ TEST_F(VkPositiveLayerTest, DeviceIDPropertiesExtensions) {
         GTEST_SKIP() << "Tests for 1.0 only";
     }
 
-    VkPhysicalDeviceIDProperties id_props =  vku::InitStructHelper();
+    VkPhysicalDeviceIDProperties id_props = vku::InitStructHelper();
     VkPhysicalDeviceFeatures2 features2 = vku::InitStructHelper(&id_props);
     vk::GetPhysicalDeviceFeatures2KHR(gpu(), &features2);
 }
@@ -234,6 +234,7 @@ TEST_F(VkPositiveLayerTest, GetDevProcAddrNullPtr) {
     }
 }
 
+// Not supported in Vulkan SC: vkTrimCommandBuffer
 TEST_F(VkPositiveLayerTest, DISABLED_GetDevProcAddrExtensions) {
     TEST_DESCRIPTION("Call GetDeviceProcAddr with and without extension enabled");
     SetTargetApiVersion(VK_API_VERSION_1_1);
@@ -265,6 +266,7 @@ TEST_F(VkPositiveLayerTest, DISABLED_GetDevProcAddrExtensions) {
 }
 #endif
 
+// Not supported in Vulkan SC: assumes availability of pre-Vulkan 1.2 functionality
 TEST_F(VkPositiveLayerTest, DISABLED_Vulkan12FeaturesBufferDeviceAddress) {
     TEST_DESCRIPTION("Enable bufferDeviceAddress feature via Vulkan12features struct");
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -296,8 +298,7 @@ TEST_F(VkPositiveLayerTest, EnumeratePhysicalDeviceGroups) {
     TEST_DESCRIPTION("Test using VkPhysicalDevice handles obtained with vkEnumeratePhysicalDeviceGroups");
 
 #ifdef __linux__
-    if (std::getenv("NODEVICE_SELECT") == nullptr)
-    {
+    if (std::getenv("NODEVICE_SELECT") == nullptr) {
         // Currently due to a bug in MESA this test will fail.
         // https://gitlab.freedesktop.org/mesa/mesa/-/commit/4588453815c58ec848b0ff6f18a08836e70f55df
         //
@@ -446,6 +447,7 @@ TEST_F(VkPositiveLayerTest, UseInteractionApi1) {
     vk::GetDeviceGroupPresentCapabilitiesKHR(m_device->device(), &device_group_present_caps);
 }
 
+// Not supported in Vulkan SC: assumes availability of pre-Vulkan 1.2 functionality
 TEST_F(VkPositiveLayerTest, DISABLED_UseInteractionApi2) {
     TEST_DESCRIPTION("Use an API that is provided by multiple extensions (part 2)");
     SetTargetApiVersion(VK_API_VERSION_1_0);
@@ -506,6 +508,7 @@ TEST_F(VkPositiveLayerTest, AllowedDuplicateStype) {
     ASSERT_NO_FATAL_FAILURE(vk::DestroyInstance(instance, nullptr));
 }
 
+// This test case are not relevant for Vulkan SC
 TEST_F(VkPositiveLayerTest, DISABLED_ExtensionsInCreateInstance) {
     TEST_DESCRIPTION("Test to see if instance extensions are called during CreateInstance.");
 

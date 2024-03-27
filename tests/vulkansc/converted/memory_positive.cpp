@@ -320,6 +320,7 @@ TEST_F(PositiveMemory, MappingWithMultiInstanceHeapFlag) {
     vk::FreeMemory(m_device->device(), memory, nullptr);
 }
 
+// Not supported in Vulkan SC: vkFreeMemory
 TEST_F(PositiveMemory, DISABLED_BindImageMemoryMultiThreaded) {
     RETURN_IF_SKIP(Init());
 

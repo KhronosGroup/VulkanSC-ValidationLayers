@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2023-2023 The Khronos Group Inc.
- * Copyright (c) 2023-2023 RasterGrid Kft.
+ * Copyright (c) 2023-2024 The Khronos Group Inc.
+ * Copyright (c) 2023-2024 RasterGrid Kft.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -11,7 +11,7 @@
 
 #include "../framework/vksc_layer_validation_tests.h"
 
-TEST_F(VkSCPositiveLayerTest, PipelineCacheCreateInfo) {
+TEST_F(VkSCPositivePipeline, PipelineCacheCreateInfo) {
     TEST_DESCRIPTION("Test that we can create pipeline caches based on the infos specified at device create time");
 
     const uint32_t pc_create_info_count = 50;
@@ -23,7 +23,7 @@ TEST_F(VkSCPositiveLayerTest, PipelineCacheCreateInfo) {
     object_reservation_infos.push_back(vksc::GetDefaultObjectReservationCreateInfo());
 
     std::vector<VkPipelineCacheCreateInfo> pc_create_infos{};
-    std::vector<vksc::PipelineCacheDataBuilder> builders(pc_create_info_count);
+    std::vector<vksc::PipelineCacheBuilder> builders(pc_create_info_count);
     for (uint32_t i = 0; i < pc_create_info_count; ++i) {
         auto header = builders[i].AddDefaultHeaderVersionSCOne();
         builders[i].AddPipelineEntry(header, "1265a236-e369-11ed-b5ea-0242ac120002", 4000);

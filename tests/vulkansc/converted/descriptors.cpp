@@ -396,7 +396,9 @@ TEST_F(NegativeDescriptors, WriteDescriptorSetIdentitySwizzle) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeDescriptors, DISABLED_WriteDescriptorSetConsecutiveUpdates) {
+TEST_F(NegativeDescriptors, WriteDescriptorSetConsecutiveUpdates) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
         "Verifies that updates rolling over to next descriptor work correctly by destroying buffer from consecutive update known "
         "to be used in descriptor set and verifying that error is flagged.");
@@ -469,7 +471,9 @@ TEST_F(NegativeDescriptors, DISABLED_WriteDescriptorSetConsecutiveUpdates) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeDescriptors, DISABLED_CmdBufferDescriptorSetBufferDestroyed) {
+TEST_F(NegativeDescriptors, CmdBufferDescriptorSetBufferDestroyed) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
         "Attempt to draw with a command buffer that is invalid due to a bound descriptor set with a buffer dependency being "
         "destroyed.");
@@ -520,7 +524,9 @@ TEST_F(NegativeDescriptors, DISABLED_CmdBufferDescriptorSetBufferDestroyed) {
 
 // This is similar to the CmdBufferDescriptorSetBufferDestroyed test above except that the buffer
 // is destroyed before recording the Draw cmd.
-TEST_F(NegativeDescriptors, DISABLED_DrawDescriptorSetBufferDestroyed) {
+TEST_F(NegativeDescriptors, DrawDescriptorSetBufferDestroyed) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Attempt to bind a descriptor set that is invalid at Draw time due to its buffer dependency being destroyed.");
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
@@ -563,7 +569,9 @@ TEST_F(NegativeDescriptors, DISABLED_DrawDescriptorSetBufferDestroyed) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeDescriptors, DISABLED_CmdBufferDescriptorSetImageSamplerDestroyed) {
+TEST_F(NegativeDescriptors, CmdBufferDescriptorSetImageSamplerDestroyed) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
         "Attempt to draw with a command buffer that is invalid due to a bound descriptor sets with a combined image sampler having "
         "their image, sampler, and descriptor set each respectively destroyed and then attempting to submit associated cmd "
@@ -824,7 +832,9 @@ TEST_F(NegativeDescriptors, DISABLED_CmdBufferDescriptorSetImageSamplerDestroyed
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeDescriptors, DISABLED_DescriptorSetSamplerDestroyed) {
+TEST_F(NegativeDescriptors, DescriptorSetSamplerDestroyed) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Attempt to draw with a bound descriptor sets with a combined image sampler where sampler has been deleted.");
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
@@ -916,7 +926,9 @@ TEST_F(NegativeDescriptors, DISABLED_DescriptorSetSamplerDestroyed) {
     m_commandBuffer->end();
 }
 
-TEST_F(NegativeDescriptors, DISABLED_ImageDescriptorLayoutMismatch) {
+TEST_F(NegativeDescriptors, ImageDescriptorLayoutMismatch) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Create an image sampler layout->image layout mismatch within/without a command buffer");
 
     AddOptionalExtensions(VK_KHR_MAINTENANCE_2_EXTENSION_NAME);
@@ -1063,7 +1075,9 @@ TEST_F(NegativeDescriptors, DISABLED_ImageDescriptorLayoutMismatch) {
     }
 }
 
-TEST_F(NegativeDescriptors, DISABLED_DescriptorPoolInUseResetSignaled) {
+TEST_F(NegativeDescriptors, DescriptorPoolInUseResetSignaled) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Reset a DescriptorPool with a DescriptorSet that is in use.");
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
@@ -1114,6 +1128,7 @@ TEST_F(NegativeDescriptors, DISABLED_DescriptorPoolInUseResetSignaled) {
     m_default_queue->wait();
 }
 
+// Not supported in Vulkan SC: vkFreeMemory
 TEST_F(NegativeDescriptors, DISABLED_DescriptorImageUpdateNoMemoryBound) {
     TEST_DESCRIPTION("Attempt an image descriptor set update where image's bound memory has been freed.");
     RETURN_IF_SKIP(Init());
@@ -1458,7 +1473,9 @@ TEST_F(NegativeDescriptors, DynamicDescriptorSet) {
     m_commandBuffer->end();
 }
 
-TEST_F(NegativeDescriptors, DISABLED_DynamicOffsetWithNullBuffer) {
+TEST_F(NegativeDescriptors, DynamicOffsetWithNullBuffer) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Create a descriptorSet w/ dynamic descriptors where 1 binding is inactive, but all have null buffers");
 
     RETURN_IF_SKIP(Init());
@@ -1552,7 +1569,9 @@ TEST_F(NegativeDescriptors, UpdateDescriptorSetMismatchType) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeDescriptors, DISABLED_DescriptorSetCompatibility) {
+TEST_F(NegativeDescriptors, DescriptorSetCompatibility) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     // Test various desriptorSet errors with bad binding combinations
     using std::vector;
     VkResult err;
@@ -2314,9 +2333,9 @@ TEST_F(NegativeDescriptors, Maint1BindingSliceOf3DImage) {
 
     auto ivci =
         vku::InitStruct<VkImageViewCreateInfo>(nullptr, 0u, image.handle(), VK_IMAGE_VIEW_TYPE_2D, VK_FORMAT_R8G8B8A8_UNORM,
-                                             VkComponentMapping{VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
-                                                                VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY},
-                                             VkImageSubresourceRange{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1});
+                                               VkComponentMapping{VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
+                                                                  VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY},
+                                               VkImageSubresourceRange{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1});
     vkt::ImageView view(*m_device, ivci);
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit,
@@ -2325,7 +2344,7 @@ TEST_F(NegativeDescriptors, Maint1BindingSliceOf3DImage) {
 
     VkDescriptorImageInfo dii = {VK_NULL_HANDLE, view.handle(), VK_IMAGE_LAYOUT_GENERAL};
     auto write = vku::InitStruct<VkWriteDescriptorSet>(nullptr, descriptor_set.set_, 0u, 0u, 1u, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
-                                                     &dii, nullptr, nullptr);
+                                                       &dii, nullptr, nullptr);
     vk::UpdateDescriptorSets(m_device->device(), 1, &write, 0, nullptr);
 
     m_errorMonitor->VerifyFound();
@@ -3021,7 +3040,9 @@ TEST_F(NegativeDescriptors, NullDescriptorsEnabled) {
     m_commandBuffer->end();
 }
 
-TEST_F(NegativeDescriptors, DISABLED_ImageSubresourceOverlapBetweenAttachmentsAndDescriptorSets) {
+TEST_F(NegativeDescriptors, ImageSubresourceOverlapBetweenAttachmentsAndDescriptorSets) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Validate if attachments and descriptor set use the same image subresources");
 
     RETURN_IF_SKIP(Init());
@@ -3695,7 +3716,9 @@ TEST_F(NegativeDescriptors, MutableDescriptorSetLayoutMissingFeature) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeDescriptors, DISABLED_ImageSubresourceOverlapBetweenRenderPassAndDescriptorSets) {
+TEST_F(NegativeDescriptors, ImageSubresourceOverlapBetweenRenderPassAndDescriptorSets) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Validate if attachments in render pass and descriptor set use the same image subresources");
 
     AddRequiredFeature(vkt::Feature::shaderStorageImageWriteWithoutFormat);
@@ -3803,7 +3826,9 @@ TEST_F(NegativeDescriptors, DISABLED_ImageSubresourceOverlapBetweenRenderPassAnd
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeDescriptors, DISABLED_DescriptorReadFromWriteAttachment) {
+TEST_F(NegativeDescriptors, DescriptorReadFromWriteAttachment) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Validate reading from a descriptor that uses same image view as framebuffer write attachment");
 
     RETURN_IF_SKIP(Init());
@@ -3909,7 +3934,9 @@ TEST_F(NegativeDescriptors, DISABLED_DescriptorReadFromWriteAttachment) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeDescriptors, DISABLED_DescriptorWriteFromReadAttachment) {
+TEST_F(NegativeDescriptors, DescriptorWriteFromReadAttachment) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Validate writting to a descriptor that uses same image view as framebuffer read attachment");
     AddRequiredFeature(vkt::Feature::fragmentStoresAndAtomics);
     RETURN_IF_SKIP(Init());
@@ -4573,7 +4600,9 @@ TEST_F(NegativeDescriptors, InvalidDescriptorSetLayoutInlineUniformBlockFlags) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeDescriptors, DISABLED_DispatchWithUnboundSet) {
+TEST_F(NegativeDescriptors, DispatchWithUnboundSet) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Dispatch with unbound descriptor set");
     RETURN_IF_SKIP(Init());
 
@@ -4926,6 +4955,14 @@ TEST_F(NegativeDescriptors, DescriptorIndexingMissingFeatures) {
     TEST_DESCRIPTION("Use partially bound descriptor flag without feature.");
 
     AddRequiredExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
+    AddDisabledFeature(vkt::Feature::descriptorBindingPartiallyBound);
+    AddDisabledFeature(vkt::Feature::descriptorBindingSampledImageUpdateAfterBind);
+    AddDisabledFeature(vkt::Feature::descriptorBindingStorageImageUpdateAfterBind);
+    AddDisabledFeature(vkt::Feature::descriptorBindingStorageBufferUpdateAfterBind);
+    AddDisabledFeature(vkt::Feature::descriptorBindingStorageTexelBufferUpdateAfterBind);
+    AddDisabledFeature(vkt::Feature::descriptorBindingUniformTexelBufferUpdateAfterBind);
+    AddDisabledFeature(vkt::Feature::descriptorBindingUpdateUnusedWhilePending);
+    AddDisabledFeature(vkt::Feature::descriptorBindingVariableDescriptorCount);
     RETURN_IF_SKIP(Init());
 
     VkDescriptorBindingFlagsEXT flag = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT;

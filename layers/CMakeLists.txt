@@ -340,11 +340,21 @@ if(VULKANSC)
         vulkansc/core_checks/sc_core_validation.cpp
         vulkansc/core_checks/sc_core_validation.h
         vulkansc/core_checks/sc_removed_command_validation.cpp
+        vulkansc/core_checks/sc_spirv_validation.cpp
         vulkansc/state_tracker/sc_device_state.h
         vulkansc/state_tracker/sc_cmd_buffer_state.h
+        vulkansc/state_tracker/sc_pipeline_state.cpp
         vulkansc/state_tracker/sc_pipeline_state.h
         vulkansc/state_tracker/sc_state_tracker.cpp
         vulkansc/state_tracker/sc_state_tracker.h
+        vulkansc/sync/sc_sync_validation.h
+        vulkansc/sync/sc_sync_validation.cpp
+    )
+
+    find_package(jsoncpp REQUIRED CONFIG)
+
+    target_link_libraries(vvl PRIVATE
+        jsoncpp_static
     )
 endif()
 

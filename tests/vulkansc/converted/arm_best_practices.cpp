@@ -98,6 +98,7 @@ VkRenderPass VkArmBestPracticesLayerTest::CreateRenderPass(VkFormat format, VkAt
 }
 // Tests for Arm-specific best practices
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkArmBestPracticesLayerTest, DISABLED_TooManySamples) {
     TEST_DESCRIPTION("Test for multisampled images with too many samples");
 
@@ -128,6 +129,7 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_TooManySamples) {
     }
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkArmBestPracticesLayerTest, DISABLED_NonTransientMSImage) {
     TEST_DESCRIPTION("Test for non-transient multisampled images");
 
@@ -154,6 +156,7 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_NonTransientMSImage) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkArmBestPracticesLayerTest, DISABLED_SamplerCreation) {
     TEST_DESCRIPTION("Test for various checks during sampler creation");
 
@@ -186,6 +189,7 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_SamplerCreation) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkArmBestPracticesLayerTest, DISABLED_MultisampledBlending) {
     TEST_DESCRIPTION("Test for multisampled blending");
 
@@ -243,6 +247,7 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_MultisampledBlending) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkArmBestPracticesLayerTest, DISABLED_AttachmentNeedsReadback) {
     TEST_DESCRIPTION("Test for attachments that need readback");
 
@@ -272,6 +277,7 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_AttachmentNeedsReadback) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkArmBestPracticesLayerTest, DISABLED_ManySmallIndexedDrawcalls) {
     RETURN_IF_SKIP(InitBestPracticesFramework(kEnableArmValidation));
     RETURN_IF_SKIP(InitState());
@@ -318,6 +324,7 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_ManySmallIndexedDrawcalls) {
     m_commandBuffer->end();
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkArmBestPracticesLayerTest, DISABLED_SuboptimalDescriptorReuseTest) {
     TEST_DESCRIPTION("Test for validation warnings of potentially suboptimal re-use of descriptor set allocations");
 
@@ -395,6 +402,7 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_SuboptimalDescriptorReuseTest) {
     // this should create no validation warnings
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkArmBestPracticesLayerTest, DISABLED_SparseIndexBufferTest) {
     TEST_DESCRIPTION(
         "Test for appropriate warnings to be thrown when recording an indexed draw call with sparse/non-sparse index buffers.");
@@ -502,6 +510,7 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_SparseIndexBufferTest) {
     test_pipelines(sparse_ibo, sparse_indices.size(), true);
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkArmBestPracticesLayerTest, DISABLED_PostTransformVertexCacheThrashingIndicesTest) {
     TEST_DESCRIPTION(
         "Test for appropriate warnings to be thrown when recording an indexed draw call where the indices thrash the "
@@ -566,6 +575,7 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_PostTransformVertexCacheThrashingIn
     best_ibo.memory().unmap();
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkArmBestPracticesLayerTest, DISABLED_PresentModeTest) {
     TEST_DESCRIPTION("Test for usage of Presentation Modes");
 
@@ -625,6 +635,7 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_PresentModeTest) {
     ASSERT_EQ(VK_SUCCESS, vk::CreateSwapchainKHR(device(), &swapchain_create_info, nullptr, &m_swapchain));
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkArmBestPracticesLayerTest, DISABLED_PipelineDepthBiasZeroTest) {
     TEST_DESCRIPTION("Test for unnecessary rasterization due to using 0 for depthBiasConstantFactor and depthBiasSlopeFactor");
 
@@ -649,6 +660,7 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_PipelineDepthBiasZeroTest) {
     pipe.CreateGraphicsPipeline();
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkArmBestPracticesLayerTest, DISABLED_RobustBufferAccessTest) {
     TEST_DESCRIPTION("Test for appropriate warnings to be thrown when robustBufferAccess is enabled.");
 
@@ -687,6 +699,7 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_RobustBufferAccessTest) {
     }
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkArmBestPracticesLayerTest, DISABLED_DepthPrePassUsage) {
     RETURN_IF_SKIP(InitBestPracticesFramework(kEnableArmValidation));
     RETURN_IF_SKIP(InitState());
@@ -773,6 +786,7 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_DepthPrePassUsage) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkArmBestPracticesLayerTest, DISABLED_ComputeShaderBadWorkGroupThreadAlignmentTest) {
     TEST_DESCRIPTION(
         "Testing for cases where compute shaders will be dispatched in an inefficient way, due to work group dispatch counts on "
@@ -827,6 +841,7 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_ComputeShaderBadWorkGroupThreadAlig
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkArmBestPracticesLayerTest, DISABLED_ComputeShaderBadWorkGroupThreadCountTest) {
     TEST_DESCRIPTION(
         "Testing for cases where the number of work groups spawned is greater than advised for Arm Mali architectures.");
@@ -880,6 +895,7 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_ComputeShaderBadWorkGroupThreadCoun
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkArmBestPracticesLayerTest, DISABLED_ComputeShaderBadSpatialLocalityTest) {
     TEST_DESCRIPTION(
         "Testing for cases where a compute shader's configuration makes poor use of spatial locality, on Arm Mali architectures, "
@@ -949,6 +965,7 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_ComputeShaderBadSpatialLocalityTest
     test_spatial_locality(pipe, compute_sampler_2d_64_1_1.GetStageCreateInfo(), false);
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkArmBestPracticesLayerTest, DISABLED_RedundantRenderPassStore) {
     TEST_DESCRIPTION("Test for appropriate warnings to be thrown when a redundant store is used.");
 
@@ -1057,6 +1074,7 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_RedundantRenderPassStore) {
     }
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkArmBestPracticesLayerTest, DISABLED_RedundantRenderPassClear) {
     TEST_DESCRIPTION("Test for appropriate warnings to be thrown when a redundant clear is used.");
 
@@ -1130,6 +1148,7 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_RedundantRenderPassClear) {
     }
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkArmBestPracticesLayerTest, DISABLED_InefficientRenderPassClear) {
     TEST_DESCRIPTION("Test for appropriate warnings to be thrown when a redundant clear is used on a LOAD_OP_LOAD attachment.");
 
@@ -1220,6 +1239,7 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_InefficientRenderPassClear) {
     vk::DestroyFramebuffer(device(), fb, nullptr);
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkArmBestPracticesLayerTest, DISABLED_DescriptorTracking) {
     TEST_DESCRIPTION("Tests that we track descriptors, which means we should not trigger warnings.");
 
@@ -1376,6 +1396,7 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_DescriptorTracking) {
     }
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkArmBestPracticesLayerTest, DISABLED_BlitImageLoadOpLoad) {
     TEST_DESCRIPTION("Test for vkBlitImage followed by a LoadOpLoad renderpass");
 
@@ -1487,6 +1508,7 @@ TEST_F(VkArmBestPracticesLayerTest, DISABLED_BlitImageLoadOpLoad) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: best practices layers
 TEST_F(VkArmBestPracticesLayerTest, DISABLED_RedundantAttachment) {
     TEST_DESCRIPTION("Test for redundant renderpasses which consume bandwidth");
 

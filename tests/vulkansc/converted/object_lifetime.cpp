@@ -87,6 +87,7 @@ TEST_F(NegativeObjectLifetime, CmdBufferBufferDestroyed) {
     vk::FreeMemory(m_device->handle(), mem, NULL);
 }
 
+// Not supported in Vulkan SC: vkFreeMemory
 TEST_F(NegativeObjectLifetime, DISABLED_CmdBarrierBufferDestroyed) {
     RETURN_IF_SKIP(Init());
 
@@ -129,6 +130,7 @@ TEST_F(NegativeObjectLifetime, DISABLED_CmdBarrierBufferDestroyed) {
     m_default_queue->wait();
 }
 
+// Not supported in Vulkan SC: vkFreeMemory
 TEST_F(NegativeObjectLifetime, DISABLED_CmdBarrierImageDestroyed) {
     RETURN_IF_SKIP(Init());
 
@@ -173,6 +175,7 @@ TEST_F(NegativeObjectLifetime, DISABLED_CmdBarrierImageDestroyed) {
     m_default_queue->wait();
 }
 
+// Not supported in Vulkan SC: vkFreeMemory
 TEST_F(NegativeObjectLifetime, DISABLED_Sync2CmdBarrierBufferDestroyed) {
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
@@ -234,6 +237,7 @@ TEST_F(NegativeObjectLifetime, DISABLED_Sync2CmdBarrierBufferDestroyed) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: vkFreeMemory
 TEST_F(NegativeObjectLifetime, DISABLED_Sync2CmdBarrierImageDestroyed) {
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
@@ -290,7 +294,9 @@ TEST_F(NegativeObjectLifetime, DISABLED_Sync2CmdBarrierImageDestroyed) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeObjectLifetime, DISABLED_CmdBufferBufferViewDestroyed) {
+TEST_F(NegativeObjectLifetime, CmdBufferBufferViewDestroyed) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Delete bufferView bound to cmd buffer, then attempt to submit cmd buffer.");
 
     RETURN_IF_SKIP(Init());
@@ -491,6 +497,7 @@ TEST_F(NegativeObjectLifetime, CmdBufferFramebufferImageDestroyed) {
     vk::DestroyImageView(m_device->device(), view, nullptr);
 }
 
+// Not supported in Vulkan SC: vkFreeMemory
 TEST_F(NegativeObjectLifetime, DISABLED_FramebufferAttachmentMemoryFreed) {
     TEST_DESCRIPTION("Attempt to create framebuffer with attachment which memory was freed.");
     RETURN_IF_SKIP(Init());
@@ -546,6 +553,7 @@ TEST_F(NegativeObjectLifetime, DISABLED_FramebufferAttachmentMemoryFreed) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: vkDestroyQueryPool
 TEST_F(NegativeObjectLifetime, DISABLED_DescriptorPoolInUseDestroyedSignaled) {
     TEST_DESCRIPTION("Delete a DescriptorPool with a DescriptorSet that is in use.");
     RETURN_IF_SKIP(Init());
@@ -854,7 +862,9 @@ TEST_F(NegativeObjectLifetime, PipelineInUseDestroyedSignaled) {
     vk::DestroyPipeline(m_device->handle(), delete_this_pipeline, nullptr);
 }
 
-TEST_F(NegativeObjectLifetime, DISABLED_ImageViewInUseDestroyedSignaled) {
+TEST_F(NegativeObjectLifetime, ImageViewInUseDestroyedSignaled) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Delete in-use imageView.");
 
     RETURN_IF_SKIP(Init());
@@ -912,7 +922,9 @@ TEST_F(NegativeObjectLifetime, DISABLED_ImageViewInUseDestroyedSignaled) {
     vk::DestroySampler(m_device->device(), sampler, nullptr);
 }
 
-TEST_F(NegativeObjectLifetime, DISABLED_BufferViewInUseDestroyedSignaled) {
+TEST_F(NegativeObjectLifetime, BufferViewInUseDestroyedSignaled) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Delete in-use bufferView.");
 
     RETURN_IF_SKIP(Init());
@@ -983,7 +995,9 @@ TEST_F(NegativeObjectLifetime, DISABLED_BufferViewInUseDestroyedSignaled) {
     vk::DestroyBufferView(m_device->device(), view, NULL);
 }
 
-TEST_F(NegativeObjectLifetime, DISABLED_SamplerInUseDestroyedSignaled) {
+TEST_F(NegativeObjectLifetime, SamplerInUseDestroyedSignaled) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Delete in-use sampler.");
 
     RETURN_IF_SKIP(Init());
@@ -1130,6 +1144,7 @@ TEST_F(NegativeObjectLifetime, ImportWin32SemaphoreInUse) {
 }
 #endif
 
+// This test case are replaced with Vulkan SC specific ones
 TEST_F(NegativeObjectLifetime, DISABLED_LeakAnObject) {
     TEST_DESCRIPTION("Create a fence and destroy its device without first destroying the fence.");
 

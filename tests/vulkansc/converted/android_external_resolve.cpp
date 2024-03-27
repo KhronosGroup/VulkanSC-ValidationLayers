@@ -261,10 +261,12 @@ TEST_F(NegativeAndroidExternalResolve, SubpassDescriptionNullColorProperty) {
 
     if (nullColorAttachmentWithExternalFormatResolve) {
         color_attachment_ref.attachment = 0;
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSubpassDescription2-nullColorAttachmentWithExternalFormatResolve-09337");
+        m_errorMonitor->SetDesiredFailureMsg(kErrorBit,
+                                             "VUID-VkSubpassDescription2-nullColorAttachmentWithExternalFormatResolve-09337");
     } else {
         color_attachment_ref.attachment = VK_ATTACHMENT_UNUSED;
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSubpassDescription2-nullColorAttachmentWithExternalFormatResolve-09336");
+        m_errorMonitor->SetDesiredFailureMsg(kErrorBit,
+                                             "VUID-VkSubpassDescription2-nullColorAttachmentWithExternalFormatResolve-09336");
     }
 
     vkt::RenderPass render_pass(*m_device, render_pass_ci);
@@ -896,7 +898,7 @@ TEST_F(NegativeAndroidExternalResolve, MissingImageUsage) {
     image_ci.pNext = &external_format;
     image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
     image_ci.format = VK_FORMAT_UNDEFINED;
-    image_ci.usage = VK_IMAGE_USAGE_SAMPLED_BIT; // missing VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT
+    image_ci.usage = VK_IMAGE_USAGE_SAMPLED_BIT;  // missing VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT
     VkImageObj resolve_image(m_device);
     resolve_image.Init(image_ci);
 

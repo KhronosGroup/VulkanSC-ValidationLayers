@@ -228,6 +228,9 @@
                 "VkPhysicalDeviceTimelineSemaphoreFeatures": {
                     "timelineSemaphore": false
                 },
+                "VkPhysicalDeviceScalarBlockLayoutFeatures": {
+                    "scalarBlockLayout": false
+                },
                 "VkPhysicalDeviceBufferDeviceAddressFeatures": {
                     "bufferDeviceAddress": true,
                     "bufferDeviceAddressCaptureReplay": false,
@@ -495,6 +498,17 @@
                     "filterMinmaxSingleComponentFormats": false,
                     "filterMinmaxImageComponentMapping": false,
                     "maxTimelineSemaphoreValueDifference": 0
+                },
+                "VkPhysicalDeviceSubgroupProperties": {
+                    "subgroupSize": 4,
+                    "supportedStages": [
+                        "VK_SHADER_STAGE_FRAGMENT_BIT",
+                        "VK_SHADER_STAGE_COMPUTE_BIT"
+                    ],
+                    "supportedOperations": [
+                        "VK_SUBGROUP_FEATURE_BASIC_BIT"
+                    ],
+                    "quadOperationsInAllStages": false
                 },
                 "VkPhysicalDevicePointClippingProperties": {},
                 "VkPhysicalDeviceMultiviewProperties": {

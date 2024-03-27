@@ -2623,6 +2623,7 @@ TEST_F(NegativeWsi, GetPhysicalDeviceSurfaceCapabilities2KHRWithFullScreenEXT) {
 }
 #endif
 
+// Not supported in Vulkan SC: VK_KHR_win32_surface
 TEST_F(NegativeWsi, DISABLED_CreatingWin32Surface) {
     TEST_DESCRIPTION("Test creating win32 surface with invalid hwnd");
 

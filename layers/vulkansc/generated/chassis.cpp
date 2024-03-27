@@ -51,7 +51,7 @@ bool wrap_handles = true;
 #include "stateless/stateless_validation.h"
 #include "object_tracker/object_lifetime_validation.h"
 #include "vulkansc/core_checks/sc_core_validation.h"
-#include "sync/sync_validation.h"
+#include "vulkansc/sync/sc_sync_validation.h"
 
 // This header file must be included after the above validation object class definitions
 #include "chassis_dispatch_helper.h"
@@ -85,7 +85,7 @@ static std::vector<ValidationObject*> CreateObjectDispatch(const CHECK_ENABLED& 
         object_dispatch.emplace_back(new SCCoreChecks);
     }
     if (enables[sync_validation]) {
-        object_dispatch.emplace_back(new SyncValidator);
+        object_dispatch.emplace_back(new SCSyncValidator);
     }
     return object_dispatch;
 }
@@ -110,7 +110,7 @@ static void InitDeviceObjectDispatch(ValidationObject* instance_interceptor, Val
         device_interceptor->object_dispatch.emplace_back(new SCCoreChecks);
     }
     if (enables[sync_validation]) {
-        device_interceptor->object_dispatch.emplace_back(new SyncValidator);
+        device_interceptor->object_dispatch.emplace_back(new SCSyncValidator);
     }
 }
 

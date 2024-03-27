@@ -903,6 +903,7 @@ TEST_F(NegativeQuery, HostResetBadRange) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: vkDestroyQueryPool
 TEST_F(NegativeQuery, DISABLED_HostResetQueryPool) {
     TEST_DESCRIPTION("Invalid queryPool in vkResetQueryPoolEXT");
 
@@ -955,6 +956,7 @@ TEST_F(NegativeQuery, HostResetDevice) {
     vk::DestroyDevice(second_device, nullptr);
 }
 
+// Not supported in Vulkan SC: vkDestroyQueryPool
 TEST_F(NegativeQuery, DISABLED_CmdBufferQueryPoolDestroyed) {
     TEST_DESCRIPTION("Attempt to draw with a command buffer that is invalid due to a query pool dependency being destroyed.");
     RETURN_IF_SKIP(Init());
@@ -1372,6 +1374,7 @@ TEST_F(NegativeQuery, PerformanceQueryIntel) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: vkDestroyQueryPool
 TEST_F(NegativeQuery, DISABLED_PoolInUseDestroyedSignaled) {
     TEST_DESCRIPTION("Delete in-use query pool.");
 
@@ -1590,6 +1593,7 @@ TEST_F(NegativeQuery, ResultStatusOnly) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: vkDestroyQueryPool
 TEST_F(NegativeQuery, DISABLED_DestroyActiveQueryPool) {
     TEST_DESCRIPTION("Destroy query pool after GetQueryPoolResults() without VK_QUERY_RESULT_PARTIAL_BIT returns VK_SUCCESS");
 
@@ -2219,6 +2223,7 @@ TEST_F(NegativeQuery, WriteTimestampWithoutQueryPool) {
     m_commandBuffer->end();
 }
 
+// Not supported in Vulkan SC: vkDestroyQueryPool
 TEST_F(NegativeQuery, DISABLED_DestroyWithoutQueryPool) {
     TEST_DESCRIPTION("call vkDestryQueryPool with queryPool being invalid.");
     RETURN_IF_SKIP(Init());

@@ -90,6 +90,11 @@ jobs:
         run: python3 scripts/vksc_github_ci.py --test --config ${{ matrix.config }}
         env:
           VKSC_DEVSIM_PROFILE_FILE: ${{ github.workspace }}/tests/vulkansc/device_profiles/max_profile.json
+      - name: Test VulkanSC-ValidationLayers - No SPIR-V Debug Info
+        run: python3 scripts/vksc_github_ci.py --test --config ${{ matrix.config }}
+        env:
+          VKSC_DEVSIM_PROFILE_FILE: ${{ github.workspace }}/tests/vulkansc/device_profiles/max_profile.json
+          VKSC_LAYER_TESTS_NO_SPV_DEBUG_INFO: TRUE
 
   windows:
     runs-on: ${{matrix.os}}

@@ -1197,6 +1197,7 @@ TEST_F(PositiveShaderObject, DescriptorBuffer) {
 
 class PositiveGpuAVShaderObject : public PositiveShaderObject, public PositiveGpuAV {};
 
+// Not supported in Vulkan SC: GPU AV
 TEST_F(PositiveGpuAVShaderObject, DISABLED_SelectInstrumentedShaders) {
     TEST_DESCRIPTION("GPU validation: Validate selection of which shaders get instrumented for GPU-AV");
     SetTargetApiVersion(VK_API_VERSION_1_2);

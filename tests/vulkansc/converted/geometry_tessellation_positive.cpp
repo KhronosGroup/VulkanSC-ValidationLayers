@@ -21,7 +21,8 @@
 
 TEST_F(PositiveGeometryTessellation, PointSizeGeomShaderDontWriteMaintenance5) {
     TEST_DESCRIPTION(
-        "Create a pipeline using TOPOLOGY_POINT_LIST, set PointSize vertex shader, but not in the final geometry stage, but have maintenance5.");
+        "Create a pipeline using TOPOLOGY_POINT_LIST, set PointSize vertex shader, but not in the final geometry stage, but have "
+        "maintenance5.");
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
@@ -55,7 +56,8 @@ TEST_F(PositiveGeometryTessellation, PointSizeGeomShaderDontWriteMaintenance5) {
 }
 
 TEST_F(PositiveGeometryTessellation, IncompatibleDynamicPrimitiveTopology) {
-    TEST_DESCRIPTION("Create pipeline with primitive topology incompatible with shaders, but use VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY.");
+    TEST_DESCRIPTION(
+        "Create pipeline with primitive topology incompatible with shaders, but use VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY.");
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);

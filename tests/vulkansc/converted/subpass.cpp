@@ -541,7 +541,9 @@ TEST_F(NegativeSubpass, ImageBarrierSubpassConflict) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeSubpass, DISABLED_SubpassInputNotBoundDescriptorSet) {
+TEST_F(NegativeSubpass, SubpassInputNotBoundDescriptorSet) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Validate subpass input isn't bound to fragment shader or descriptor set");
 
     RETURN_IF_SKIP(Init());
@@ -584,7 +586,7 @@ TEST_F(NegativeSubpass, DISABLED_SubpassInputNotBoundDescriptorSet) {
     const std::vector<VkSubpassDescription> subpasses(1u, subpass);
 
     const auto rpci = vku::InitStruct<VkRenderPassCreateInfo>(nullptr, 0u, size32(attachmentDescs), attachmentDescs.data(),
-                                                            size32(subpasses), subpasses.data(), 0u, nullptr);
+                                                              size32(subpasses), subpasses.data(), 0u, nullptr);
     vkt::RenderPass rp(*m_device, rpci);
     vkt::Framebuffer fb(*m_device, rp.handle(), 1, &view_input.handle(), 64, 64);
 
@@ -981,7 +983,7 @@ TEST_F(NegativeSubpass, InputAttachmentLayout) {
     std::vector<VkSubpassDependency> deps = {dep0, dep1, dep2};
 
     auto rpci = vku::InitStruct<VkRenderPassCreateInfo>(nullptr, 0u, size32(attachs), attachs.data(), size32(subpasses),
-                                                      subpasses.data(), size32(deps), deps.data());
+                                                        subpasses.data(), size32(deps), deps.data());
 
     // Current setup should be OK -- no attachment is both input and output in same subpass
     PositiveTestRenderPassCreate(m_errorMonitor, *m_device, rpci, rp2_supported);
@@ -989,7 +991,9 @@ TEST_F(NegativeSubpass, InputAttachmentLayout) {
     vkt::RenderPass render_pass(*m_device, rpci);
 }
 
-TEST_F(NegativeSubpass, DISABLED_InputAttachmentMissing) {
+TEST_F(NegativeSubpass, InputAttachmentMissing) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
         "Test that an error is produced for a shader consuming an input attachment which is not included in the subpass "
         "description");
@@ -1015,7 +1019,9 @@ TEST_F(NegativeSubpass, DISABLED_InputAttachmentMissing) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-renderPass-06038");
 }
 
-TEST_F(NegativeSubpass, DISABLED_InputAttachmentMissingArray) {
+TEST_F(NegativeSubpass, InputAttachmentMissingArray) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
         "Test that an error is produced for a shader consuming an input attachment which is not included in the subpass "
         "description -- array case");
@@ -1069,7 +1075,9 @@ TEST_F(NegativeSubpass, DISABLED_InputAttachmentMissingSpecConstant) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-layout-07991");
 }
 
-TEST_F(NegativeSubpass, DISABLED_InputAttachmentSharingVariable) {
+TEST_F(NegativeSubpass, InputAttachmentSharingVariable) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Make sure if 2 loads use same variable, both are tracked");
 
     RETURN_IF_SKIP(Init());
@@ -1129,7 +1137,9 @@ TEST_F(NegativeSubpass, DISABLED_InputAttachmentSharingVariable) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-renderPass-06038");
 }
 
-TEST_F(NegativeSubpass, DISABLED_SubpassInputWithoutFormat) {
+TEST_F(NegativeSubpass, SubpassInputWithoutFormat) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Non-InputAttachment shader input with unknown image format");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);

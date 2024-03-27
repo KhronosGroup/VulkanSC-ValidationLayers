@@ -19,6 +19,7 @@
 #include "../framework/descriptor_helper.h"
 #include "../framework/gpu_av_helper.h"
 
+// Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeGpuAV, DISABLED_ValidationInlineUniformBlockAndMiscGpu) {
     TEST_DESCRIPTION(
         "GPU validation: Make sure inline uniform blocks don't generate false validation errors, verify reserved descriptor slot "
@@ -151,8 +152,7 @@ TEST_F(NegativeGpuAV, DISABLED_ValidationInlineUniformBlockAndMiscGpu) {
     dsl_binding[1].descriptorCount = set_count;
     dsl_binding[1].stageFlags = VK_SHADER_STAGE_ALL;
     VkDescriptorSetLayout *layouts{new VkDescriptorSetLayout[set_count]{}};
-    VkDescriptorSetLayoutCreateInfo dsl_create_info =
-        vku::InitStructHelper(layout_createinfo_binding_flags);
+    VkDescriptorSetLayoutCreateInfo dsl_create_info = vku::InitStructHelper(layout_createinfo_binding_flags);
     dsl_create_info.pBindings = dsl_binding;
     dsl_create_info.bindingCount = 2;
     for (uint32_t i = 0; i < set_count; i++) {
@@ -231,6 +231,7 @@ TEST_F(NegativeGpuAV, DISABLED_ValidationInlineUniformBlockAndMiscGpu) {
     m_commandBuffer->end();
 }
 
+// Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeGpuAV, DISABLED_ValidationAbort) {
     TEST_DESCRIPTION("GPU validation: Verify that aborting GPU-AV is safe.");
     RETURN_IF_SKIP(InitGpuAvFramework());
@@ -253,6 +254,7 @@ TEST_F(NegativeGpuAV, DISABLED_ValidationAbort) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeGpuAV, DISABLED_ValidationFeatures) {
     TEST_DESCRIPTION("Validate Validation Features");
     SetTargetApiVersion(VK_API_VERSION_1_1);
@@ -278,6 +280,7 @@ TEST_F(NegativeGpuAV, DISABLED_ValidationFeatures) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeGpuAV, DISABLED_SelectInstrumentedShaders) {
     TEST_DESCRIPTION("GPU validation: Validate selection of which shaders get instrumented for GPU-AV");
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -363,6 +366,7 @@ TEST_F(NegativeGpuAV, DISABLED_SelectInstrumentedShaders) {
 
 // TODO the SPIRV-Tools instrumentation doesn't work for this shader
 // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/6944
+// Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeGpuAV, DISABLED_DISABLED_InvalidAtomicStorageOperation) {
     TEST_DESCRIPTION(
         "If storage view use atomic operation, the view's format MUST support VK_FORMAT_FEATURE_STORAGE_IMAGE_ATOMIC_BIT or "
@@ -476,6 +480,7 @@ TEST_F(NegativeGpuAV, DISABLED_DISABLED_InvalidAtomicStorageOperation) {
 
 // TODO: The SPIRV-Tools instrumentation doesn't work correctly for this shader
 // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/6944
+// Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeGpuAV, DISABLED_DISABLED_UnnormalizedCoordinatesInBoundsAccess) {
     TEST_DESCRIPTION("If a samper is unnormalizedCoordinates, but using OpInBoundsAccessChain");
 
@@ -485,10 +490,10 @@ TEST_F(NegativeGpuAV, DISABLED_DISABLED_UnnormalizedCoordinatesInBoundsAccess) {
     InitRenderTarget();
 
     //#version 450
-    //layout (set = 0, binding = 0) uniform sampler2D tex[2];
-    //layout(location=0) out vec4 color;
+    // layout (set = 0, binding = 0) uniform sampler2D tex[2];
+    // layout(location=0) out vec4 color;
     //
-    //void main() {
+    // void main() {
     //    color = textureLodOffset(tex[1], vec2(0), 0, ivec2(0));
     //}
     // but with OpInBoundsAccessChain instead of normal generated OpAccessChain
@@ -588,6 +593,7 @@ TEST_F(NegativeGpuAV, DISABLED_DISABLED_UnnormalizedCoordinatesInBoundsAccess) {
 
 // TODO: The SPIRV-Tools instrumentation doesn't work correctly for this shader
 // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/6944
+// Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeGpuAV, DISABLED_DISABLED_UnnormalizedCoordinatesCopyObject) {
     TEST_DESCRIPTION("If a samper is unnormalizedCoordinates, but using OpCopyObject");
 
@@ -689,6 +695,7 @@ TEST_F(NegativeGpuAV, DISABLED_DISABLED_UnnormalizedCoordinatesCopyObject) {
     m_commandBuffer->end();
 }
 
+// Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeGpuAV, DISABLED_UnnormalizedCoordinatesSeparateSamplerSharedSampler) {
     TEST_DESCRIPTION("Doesn't use COMBINED_IMAGE_SAMPLER, but multiple OpLoad share Sampler OpVariable");
 
@@ -773,6 +780,7 @@ TEST_F(NegativeGpuAV, DISABLED_UnnormalizedCoordinatesSeparateSamplerSharedSampl
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeGpuAV, DISABLED_ShareOpSampledImage) {
     TEST_DESCRIPTION(
         "Have two OpImageSampleImplicitLod share the same OpSampledImage. This needs to be in the same block post-shader "
@@ -881,6 +889,7 @@ TEST_F(NegativeGpuAV, DISABLED_ShareOpSampledImage) {
 }
 
 // TODO - Indexing is not being recognized by GPU-AV
+// Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeGpuAV, DISABLED_DISABLED_YcbcrDrawFetchIndexed) {
     TEST_DESCRIPTION("Do OpImageFetch on a Ycbcr COMBINED_IMAGE_SAMPLER.");
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -976,6 +985,7 @@ TEST_F(NegativeGpuAV, DISABLED_DISABLED_YcbcrDrawFetchIndexed) {
     m_commandBuffer->end();
 }
 
+// Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeGpuAV, DISABLED_CopyBufferToImageD32) {
     TEST_DESCRIPTION(
         "Copy depth buffer to image with some of its depth value being outside of the [0, 1] legal range. Depth image has format "
@@ -1039,6 +1049,7 @@ TEST_F(NegativeGpuAV, DISABLED_CopyBufferToImageD32) {
     vk::DeviceWaitIdle(*m_device);
 }
 
+// Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeGpuAV, DISABLED_CopyBufferToImageD32Vk13) {
     TEST_DESCRIPTION(
         "Copy depth buffer to image with some of its depth value being outside of the [0, 1] legal range. Depth image has format "
@@ -1111,6 +1122,7 @@ TEST_F(NegativeGpuAV, DISABLED_CopyBufferToImageD32Vk13) {
     vk::DeviceWaitIdle(*m_device);
 }
 
+// Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeGpuAV, DISABLED_CopyBufferToImageD32U8) {
     TEST_DESCRIPTION(
         "Copy depth buffer to image with some of its depth value being outside of the [0, 1] legal range. Depth image has format "
@@ -1171,6 +1183,7 @@ TEST_F(NegativeGpuAV, DISABLED_CopyBufferToImageD32U8) {
     vk::DeviceWaitIdle(*m_device);
 }
 
+// Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeGpuAV, DISABLED_CopyBufferToImageD32U8Vk13) {
     TEST_DESCRIPTION(
         "Copy depth buffer to image with some of its depth value being outside of the [0, 1] legal range. Depth image has format "

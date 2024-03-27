@@ -241,8 +241,7 @@ TEST_F(NegativeMemory, MapMemory2) {
     vk::MapMemory2KHR(m_device->device(), &map_info, (void **)&pData);
     m_errorMonitor->VerifyFound();
     // overstep allocation w/o VK_WHOLE_SIZE
-    map_info.offset = 1,
-    map_info.size = allocation_size;
+    map_info.offset = 1, map_info.size = allocation_size;
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkMemoryMapInfoKHR-size-07961");
     vk::MapMemory2KHR(m_device->device(), &map_info, (void **)&pData);
     m_errorMonitor->VerifyFound();
@@ -485,6 +484,7 @@ TEST_F(NegativeMemory, BindImageMemoryType) {
     m_errorMonitor->VerifyFound();
 }
 
+// This test case are replaced with Vulkan SC specific ones
 TEST_F(NegativeMemory, DISABLED_BindMemory) {
     RETURN_IF_SKIP(Init());
 
@@ -2075,6 +2075,7 @@ TEST_F(NegativeMemory, MemoryRequirements) {
     }
 }
 
+// Not supported in Vulkan SC: VK_NV_dedicated_allocation
 TEST_F(NegativeMemory, DISABLED_MemoryAllocatepNextChain) {
     AddRequiredExtensions(VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME);
     AddRequiredExtensions(VK_NV_EXTERNAL_MEMORY_EXTENSION_NAME);

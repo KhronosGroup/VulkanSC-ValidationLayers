@@ -43,6 +43,7 @@ TEST_F(PositiveInstance, TwoInstances) {
     ASSERT_NO_FATAL_FAILURE(vk::DestroyInstance(i1, nullptr));
 }
 
+// This test case are replaced with Vulkan SC specific ones
 TEST_F(PositiveInstance, DISABLED_ValidationInstanceExtensions) {
     std::string layer_name = "VK_LAYER_KHRONOS_validation";
     std::vector<std::string> extensions = {VK_EXT_DEBUG_UTILS_EXTENSION_NAME, VK_EXT_DEBUG_REPORT_EXTENSION_NAME,

@@ -701,7 +701,9 @@ TEST_F(NegativeProtectedMemory, UnprotectedCommands) {
     m_commandBuffer->end();
 }
 
-TEST_F(NegativeProtectedMemory, DISABLED_MixingProtectedResources) {
+TEST_F(NegativeProtectedMemory, MixingProtectedResources) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Test where there is mixing of protectedMemory backed resource in command buffers");
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
@@ -1090,19 +1092,10 @@ TEST_F(NegativeProtectedMemory, RayTracingPipeline) {
     AddRequiredExtensions(VK_KHR_SPIRV_1_4_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::protectedMemory);
+    AddRequiredFeature(vkt::Feature::rayTracingPipeline);
     RETURN_IF_SKIP(InitFramework());
-    VkPhysicalDeviceProtectedMemoryFeatures protected_memory_features = vku::InitStructHelper();
-    VkPhysicalDeviceRayTracingPipelineFeaturesKHR ray_tracing_features = vku::InitStructHelper(&protected_memory_features);
-    auto features2 = GetPhysicalDeviceFeatures2(ray_tracing_features);
-
-    if (!protected_memory_features.protectedMemory) {
-        GTEST_SKIP() << "protectedMemory feature not supported";
-    };
-    if (!ray_tracing_features.rayTracingPipeline) {
-        GTEST_SKIP() << "rayTracingPipeline feature not supported";
-    }
-
-    RETURN_IF_SKIP(InitState(nullptr, &features2, VK_COMMAND_POOL_CREATE_PROTECTED_BIT));
+    RETURN_IF_SKIP(InitState(nullptr, nullptr, VK_COMMAND_POOL_CREATE_PROTECTED_BIT));
 
     const vkt::PipelineLayout empty_pipeline_layout(*m_device, {});
     VkShaderObj rgen_shader(this, kRayTracingMinimalGlsl, VK_SHADER_STAGE_RAYGEN_BIT_KHR, SPV_ENV_VULKAN_1_2);
@@ -1196,7 +1189,7 @@ TEST_F(NegativeProtectedMemory, RayQuery) {
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
     vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_);
 
-    m_errorMonitor->SetUnexpectedError("VUID-vkCmdDraw-commandBuffer-02712");  // color attachment
+    m_errorMonitor->SetUnexpectedError("VUID-vkCmdDraw-commandBuffer-02712");               // color attachment
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDraw-commandBuffer-04617");  // rayQuery
     vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
     m_errorMonitor->VerifyFound();

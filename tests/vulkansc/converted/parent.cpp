@@ -191,7 +191,7 @@ TEST_F(NegativeParent, RenderPassFramebuffer) {
     TEST_DESCRIPTION("Test RenderPass and Framebuffer");
 
     RETURN_IF_SKIP(Init());
-    InitRenderTarget(); // Renderpass created on first device
+    InitRenderTarget();  // Renderpass created on first device
     auto features = m_device->phy().features();
     m_second_device = new vkt::Device(gpu_, m_device_extension_names, &features, nullptr);
 
@@ -452,6 +452,7 @@ TEST_F(NegativeParent, Instance_DebugUtilsMessenger) {
     vk::DestroyDebugUtilsMessengerEXT(instance2, messenger, nullptr);
 }
 
+// Not supported in Vulkan SC: VK_EXT_debug_report
 TEST_F(NegativeParent, DISABLED_Instance_DebugReportCallback) {
     TEST_DESCRIPTION("VkDebugReportCallbackEXT from a different instance in vkDestroyDebugReportCallbackEXT");
     AddRequiredExtensions(VK_EXT_DEBUG_MARKER_EXTENSION_NAME);

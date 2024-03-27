@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2023-2023 The Khronos Group Inc.
- * Copyright (c) 2023-2023 RasterGrid Kft.
+ * Copyright (c) 2023-2024 The Khronos Group Inc.
+ * Copyright (c) 2023-2024 RasterGrid Kft.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,6 +35,7 @@ extern PFN_vkCreateDevice CreateDevice;
 extern PFN_vkCreatePipelineCache CreatePipelineCache;
 extern PFN_vkCreateComputePipelines CreateComputePipelines;
 extern PFN_vkCreateGraphicsPipelines CreateGraphicsPipelines;
+extern PFN_vkDestroyPipeline DestroyPipeline;
 extern PFN_vkCreateCommandPool CreateCommandPool;
 extern PFN_vkBeginCommandBuffer BeginCommandBuffer;
 extern PFN_vkResetCommandBuffer ResetCommandBuffer;

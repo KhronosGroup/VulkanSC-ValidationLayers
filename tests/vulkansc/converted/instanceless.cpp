@@ -236,6 +236,7 @@ void* VKAPI_PTR DummyRealloc(void* pUserData, void* pOriginal, size_t size, size
 void VKAPI_PTR DummyInfoAlloc(void*, size_t, VkInternalAllocationType, VkSystemAllocationScope) {}
 void VKAPI_PTR DummyInfoFree(void*, size_t, VkInternalAllocationType, VkSystemAllocationScope) {}
 
+// Not supported in Vulkan SC: allocation callbacks
 TEST_F(NegativeInstanceless, DISABLED_DestroyInstanceAllocationCallbacksCompatibility) {
     TEST_DESCRIPTION("Test vkDestroyInstance with incompatible allocation callbacks.");
 
@@ -300,6 +301,7 @@ VKAPI_ATTR VkBool32 VKAPI_PTR utils_callback(VkDebugUtilsMessageSeverityFlagBits
 }
 
 #ifndef VK_USE_PLATFORM_ANDROID_KHR
+// Not supported in Vulkan SC: miscellaneous Vulkan-only extensions
 TEST_F(NegativeInstanceless, DISABLED_ExtensionStructsWithoutExtensions) {
     TEST_DESCRIPTION("Create instance with structures in pNext while not including required extensions");
 

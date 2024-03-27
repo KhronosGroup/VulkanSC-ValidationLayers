@@ -497,11 +497,9 @@ TEST_F(PositiveImage, ImagelessLayoutTracking) {
     SetTargetApiVersion(VK_API_VERSION_1_2);
     RETURN_IF_SKIP(InitFramework());
 
-    VkPhysicalDeviceImagelessFramebufferFeaturesKHR physicalDeviceImagelessFramebufferFeatures =
-        vku::InitStructHelper();
+    VkPhysicalDeviceImagelessFramebufferFeaturesKHR physicalDeviceImagelessFramebufferFeatures = vku::InitStructHelper();
     physicalDeviceImagelessFramebufferFeatures.imagelessFramebuffer = VK_TRUE;
-    VkPhysicalDeviceFeatures2 physicalDeviceFeatures2 =
-        vku::InitStructHelper(&physicalDeviceImagelessFramebufferFeatures);
+    VkPhysicalDeviceFeatures2 physicalDeviceFeatures2 = vku::InitStructHelper(&physicalDeviceImagelessFramebufferFeatures);
 
     uint32_t physical_device_group_count = 0;
     vk::EnumeratePhysicalDeviceGroups(instance(), &physical_device_group_count, nullptr);

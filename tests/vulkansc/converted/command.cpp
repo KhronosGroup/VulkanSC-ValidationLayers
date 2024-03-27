@@ -1013,7 +1013,9 @@ TEST_F(NegativeCommand, SimultaneousUseOneShot) {
     m_default_queue->wait();
 }
 
-TEST_F(NegativeCommand, DISABLED_DrawTimeImageViewTypeMismatchWithPipeline) {
+TEST_F(NegativeCommand, DrawTimeImageViewTypeMismatchWithPipeline) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
         "Test that an error is produced when an image view type does not match the dimensionality declared in the shader");
 
@@ -1065,7 +1067,9 @@ TEST_F(NegativeCommand, DISABLED_DrawTimeImageViewTypeMismatchWithPipeline) {
     m_commandBuffer->end();
 }
 
-TEST_F(NegativeCommand, DISABLED_DrawTimeImageViewTypeMismatchWithPipelineFunction) {
+TEST_F(NegativeCommand, DrawTimeImageViewTypeMismatchWithPipelineFunction) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
@@ -1119,7 +1123,9 @@ TEST_F(NegativeCommand, DISABLED_DrawTimeImageViewTypeMismatchWithPipelineFuncti
     m_commandBuffer->end();
 }
 
-TEST_F(NegativeCommand, DISABLED_DrawTimeImageComponentTypeMismatchWithPipeline) {
+TEST_F(NegativeCommand, DrawTimeImageComponentTypeMismatchWithPipeline) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
         "Test that an error is produced when the component type of an imageview disagrees with the type in the shader.");
 
@@ -2244,7 +2250,7 @@ TEST_F(NegativeCommand, CopyImageTypeExtentMismatch) {
     // 1D texture w/ offset.y > 0. Source = VU 09c00124, dest = 09c00130
     copy_region.srcOffset.y = 1;
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdCopyImage-srcImage-00146");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdCopyImage-srcOffset-00145");  // also y-dim overrun
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdCopyImage-srcOffset-00145");   // also y-dim overrun
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdCopyImage-apiVersion-07933");  // not same image type
     vk::CmdCopyImage(m_commandBuffer->handle(), image_1D.image(), VK_IMAGE_LAYOUT_GENERAL, image_2D.image(),
                      VK_IMAGE_LAYOUT_GENERAL, 1, &copy_region);
@@ -2268,7 +2274,7 @@ TEST_F(NegativeCommand, CopyImageTypeExtentMismatch) {
                                                       1,
                                                       &region2};
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkCopyImageInfo2-srcImage-00146");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkCopyImageInfo2-srcOffset-00145");  // also y-dim overrun
+        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkCopyImageInfo2-srcOffset-00145");   // also y-dim overrun
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkCopyImageInfo2-apiVersion-07933");  // not same image type
         vk::CmdCopyImage2KHR(m_commandBuffer->handle(), &copy_image_info2);
         m_errorMonitor->VerifyFound();
@@ -2277,7 +2283,7 @@ TEST_F(NegativeCommand, CopyImageTypeExtentMismatch) {
     copy_region.srcOffset.y = 0;
     copy_region.dstOffset.y = 1;
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdCopyImage-dstImage-00152");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdCopyImage-dstOffset-00151");  // also y-dim overrun
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdCopyImage-dstOffset-00151");   // also y-dim overrun
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdCopyImage-apiVersion-07933");  // not same image type
     vk::CmdCopyImage(m_commandBuffer->handle(), image_2D.image(), VK_IMAGE_LAYOUT_GENERAL, image_1D.image(),
                      VK_IMAGE_LAYOUT_GENERAL, 1, &copy_region);
@@ -2301,7 +2307,7 @@ TEST_F(NegativeCommand, CopyImageTypeExtentMismatch) {
                                                       1,
                                                       &region2};
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkCopyImageInfo2-dstImage-00152");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkCopyImageInfo2-dstOffset-00151");  // also y-dim overrun
+        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkCopyImageInfo2-dstOffset-00151");   // also y-dim overrun
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkCopyImageInfo2-apiVersion-07933");  // not same image type
         vk::CmdCopyImage2KHR(m_commandBuffer->handle(), &copy_image_info2);
         m_errorMonitor->VerifyFound();
@@ -2312,7 +2318,7 @@ TEST_F(NegativeCommand, CopyImageTypeExtentMismatch) {
     // 1D texture w/ extent.height > 1. Source = VU 09c00124, dest = 09c00130
     copy_region.extent.height = 2;
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdCopyImage-srcImage-00146");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdCopyImage-srcOffset-00145");  // also y-dim overrun
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdCopyImage-srcOffset-00145");   // also y-dim overrun
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdCopyImage-apiVersion-07933");  // not same image type
     vk::CmdCopyImage(m_commandBuffer->handle(), image_1D.image(), VK_IMAGE_LAYOUT_GENERAL, image_2D.image(),
                      VK_IMAGE_LAYOUT_GENERAL, 1, &copy_region);
@@ -2336,14 +2342,14 @@ TEST_F(NegativeCommand, CopyImageTypeExtentMismatch) {
                                                       1,
                                                       &region2};
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkCopyImageInfo2-srcImage-00146");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkCopyImageInfo2-srcOffset-00145");  // also y-dim overrun
+        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkCopyImageInfo2-srcOffset-00145");   // also y-dim overrun
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkCopyImageInfo2-apiVersion-07933");  // not same image type
         vk::CmdCopyImage2KHR(m_commandBuffer->handle(), &copy_image_info2);
         m_errorMonitor->VerifyFound();
     }
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdCopyImage-dstImage-00152");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdCopyImage-dstOffset-00151");  // also y-dim overrun
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdCopyImage-dstOffset-00151");   // also y-dim overrun
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdCopyImage-apiVersion-07933");  // not same image type
     vk::CmdCopyImage(m_commandBuffer->handle(), image_2D.image(), VK_IMAGE_LAYOUT_GENERAL, image_1D.image(),
                      VK_IMAGE_LAYOUT_GENERAL, 1, &copy_region);
@@ -2367,7 +2373,7 @@ TEST_F(NegativeCommand, CopyImageTypeExtentMismatch) {
                                                       1,
                                                       &region2};
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkCopyImageInfo2-dstImage-00152");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkCopyImageInfo2-dstOffset-00151");  // also y-dim overrun
+        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkCopyImageInfo2-dstOffset-00151");   // also y-dim overrun
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkCopyImageInfo2-apiVersion-07933");  // not same image type
         vk::CmdCopyImage2KHR(m_commandBuffer->handle(), &copy_image_info2);
         m_errorMonitor->VerifyFound();
@@ -2378,7 +2384,7 @@ TEST_F(NegativeCommand, CopyImageTypeExtentMismatch) {
     // 1D texture w/ offset.z > 0. Source = VU 09c00df2, dest = 09c00df4
     copy_region.srcOffset.z = 1;
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdCopyImage-srcImage-01785");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdCopyImage-srcOffset-00147");  // also z-dim overrun
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdCopyImage-srcOffset-00147");   // also z-dim overrun
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdCopyImage-apiVersion-07933");  // not same image type
     vk::CmdCopyImage(m_commandBuffer->handle(), image_1D.image(), VK_IMAGE_LAYOUT_GENERAL, image_2D.image(),
                      VK_IMAGE_LAYOUT_GENERAL, 1, &copy_region);
@@ -2386,7 +2392,7 @@ TEST_F(NegativeCommand, CopyImageTypeExtentMismatch) {
     copy_region.srcOffset.z = 0;
     copy_region.dstOffset.z = 1;
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdCopyImage-dstImage-01786");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdCopyImage-dstOffset-00153");  // also z-dim overrun
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdCopyImage-dstOffset-00153");   // also z-dim overrun
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdCopyImage-apiVersion-07933");  // not same image type
     vk::CmdCopyImage(m_commandBuffer->handle(), image_2D.image(), VK_IMAGE_LAYOUT_GENERAL, image_1D.image(),
                      VK_IMAGE_LAYOUT_GENERAL, 1, &copy_region);
@@ -2424,7 +2430,7 @@ TEST_F(NegativeCommand, CopyImageTypeExtentMismatch) {
     copy_region.srcOffset.z = 4;
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdCopyImage-srcImage-01787");
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit,
-                                         "VUID-vkCmdCopyImage-srcOffset-00147");  // also z-dim overrun (src)
+                                         "VUID-vkCmdCopyImage-srcOffset-00147");              // also z-dim overrun (src)
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdCopyImage-apiVersion-07933");  // not same image type
     vk::CmdCopyImage(m_commandBuffer->handle(), image_2D.image(), VK_IMAGE_LAYOUT_GENERAL, image_3D.image(),
                      VK_IMAGE_LAYOUT_GENERAL, 1, &copy_region);
@@ -2433,7 +2439,7 @@ TEST_F(NegativeCommand, CopyImageTypeExtentMismatch) {
     copy_region.dstOffset.z = 1;
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdCopyImage-dstImage-01788");
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit,
-                                         "VUID-vkCmdCopyImage-dstOffset-00153");  // also z-dim overrun (dst)
+                                         "VUID-vkCmdCopyImage-dstOffset-00153");              // also z-dim overrun (dst)
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdCopyImage-apiVersion-07933");  // not same image type
     vk::CmdCopyImage(m_commandBuffer->handle(), image_3D.image(), VK_IMAGE_LAYOUT_GENERAL, image_2D.image(),
                      VK_IMAGE_LAYOUT_GENERAL, 1, &copy_region);
@@ -4056,7 +4062,7 @@ TEST_F(NegativeCommand, ResolveImageImageType) {
     image_create_info.extent.height = 1;
     image_create_info.extent.depth = 1;
     image_create_info.mipLevels = 1;
-    image_create_info.arrayLayers = 4;  // more than 1 to not trip other validation
+    image_create_info.arrayLayers = 4;                  // more than 1 to not trip other validation
     image_create_info.samples = VK_SAMPLE_COUNT_4_BIT;  // guarantee support from sampledImageColorSampleCounts
     image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_create_info.usage =
@@ -5287,8 +5293,7 @@ TEST_F(NegativeCommand, ExclusiveScissorNV) {
         };
 
         for (const auto &test_case : test_cases) {
-            VkPipelineViewportExclusiveScissorStateCreateInfoNV exc =
-                vku::InitStructHelper();
+            VkPipelineViewportExclusiveScissorStateCreateInfoNV exc = vku::InitStructHelper();
 
             const auto break_vp = [&test_case, &exc](CreatePipelineHelper &helper) {
                 helper.vp_state_ci_.viewportCount = test_case.viewport_count;
@@ -5466,7 +5471,9 @@ TEST_F(NegativeCommand, ViewportWScalingNV) {
     m_commandBuffer->end();
 }
 
-TEST_F(NegativeCommand, DISABLED_FilterCubicSamplerInCmdDraw) {
+TEST_F(NegativeCommand, FilterCubicSamplerInCmdDraw) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Verify if sampler is filter cubic, image view needs to support it.");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_EXT_FILTER_CUBIC_EXTENSION_NAME);
@@ -5997,7 +6004,7 @@ TEST_F(NegativeCommand, ExecuteCommandsSubpassIndices) {
     secondary.end();
 
     const auto rp_bi = vku::InitStruct<VkRenderPassBeginInfo>(nullptr, render_pass.handle(), framebuffer.handle(),
-                                                                             VkRect2D{{0, 0}, {32u, 32u}}, 0u, nullptr);
+                                                              VkRect2D{{0, 0}, {32u, 32u}}, 0u, nullptr);
     m_commandBuffer->begin();
     m_commandBuffer->BeginRenderPass(rp_bi, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
 
@@ -6050,7 +6057,7 @@ TEST_F(NegativeCommand, IncompatibleRenderPassesInExecuteCommands) {
     secondary.end();
 
     const auto rp_bi = vku::InitStruct<VkRenderPassBeginInfo>(nullptr, render_pass_1.handle(), framebuffer.handle(),
-                                                                             VkRect2D{{0, 0}, {32u, 32u}}, 0u, nullptr);
+                                                              VkRect2D{{0, 0}, {32u, 32u}}, 0u, nullptr);
     m_commandBuffer->begin();
     m_commandBuffer->BeginRenderPass(rp_bi, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
 
@@ -7018,8 +7025,8 @@ TEST_F(NegativeCommand, CmdClearAttachmentTests) {
 
     VkImageFormatProperties image_format_properties{};
     ASSERT_EQ(VK_SUCCESS, vk::GetPhysicalDeviceImageFormatProperties(m_device->phy().handle(), m_renderTargets[0]->format(),
-                                                                 VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL,
-                                                                 m_renderTargets[0]->usage(), 0, &image_format_properties));
+                                                                     VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL,
+                                                                     m_renderTargets[0]->usage(), 0, &image_format_properties));
     if (image_format_properties.maxArrayLayers < 4) {
         GTEST_SKIP() << "Test needs to create image 2D array of 4 image view, but VkImageFormatProperties::maxArrayLayers is < 4. "
                         "Skipping test.";

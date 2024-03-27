@@ -4612,7 +4612,9 @@ TEST_F(NegativeDynamicState, ColorBlendStateIgnored) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeDynamicState, DISABLED_VertexInputLocationMissing) {
+TEST_F(NegativeDynamicState, VertexInputLocationMissing) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Shader uses a location not provided with dynamic vertex input");
 
     AddRequiredExtensions(VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME);

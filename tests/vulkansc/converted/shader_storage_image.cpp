@@ -19,7 +19,9 @@
 #include "../framework/pipeline_helper.h"
 #include "../framework/descriptor_helper.h"
 
-TEST_F(NegativeShaderStorageImage, DISABLED_MissingFormatRead) {
+TEST_F(NegativeShaderStorageImage, MissingFormatRead) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Create a shader reading a storage image without an image format");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -54,6 +56,7 @@ TEST_F(NegativeShaderStorageImage, DISABLED_MissingFormatRead) {
                OpDecorate %12 Binding 0
                OpDecorate %22 BuiltIn WorkgroupSize
                OpDecorate %12 NonReadable
+               OpDecorate %12 NonWritable
           %2 = OpTypeVoid
           %3 = OpTypeFunction %2
           %6 = OpTypeFloat 32
@@ -96,7 +99,9 @@ TEST_F(NegativeShaderStorageImage, DISABLED_MissingFormatRead) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeShaderStorageImage, DISABLED_MissingFormatWrite) {
+TEST_F(NegativeShaderStorageImage, MissingFormatWrite) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Create a shader writing a storage image without an image format");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -169,6 +174,8 @@ TEST_F(NegativeShaderStorageImage, DISABLED_MissingFormatWrite) {
 }
 
 TEST_F(NegativeShaderStorageImage, MissingFormatReadForFormat) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Create a shader reading a storage image without an image format");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME);
@@ -327,6 +334,8 @@ TEST_F(NegativeShaderStorageImage, MissingFormatReadForFormat) {
 }
 
 TEST_F(NegativeShaderStorageImage, MissingFormatWriteForFormat) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Create a shader writing a storage image without an image format");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME);
@@ -482,7 +491,9 @@ TEST_F(NegativeShaderStorageImage, MissingFormatWriteForFormat) {
     }
 }
 
-TEST_F(NegativeShaderStorageImage, DISABLED_MissingNonReadableDecorationFormatRead) {
+TEST_F(NegativeShaderStorageImage, MissingNonReadableDecorationFormatRead) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Create a shader with a storage image without an image format not marked as non readable");
 
     // We need to skip this test with VK_KHR_format_feature_flags2 supported,
@@ -514,6 +525,7 @@ TEST_F(NegativeShaderStorageImage, DISABLED_MissingNonReadableDecorationFormatRe
                OpDecorate %12 DescriptorSet 0
                OpDecorate %12 Binding 0
                OpDecorate %22 BuiltIn WorkgroupSize
+               OpDecorate %12 NonWritable
           %2 = OpTypeVoid
           %3 = OpTypeFunction %2
           %6 = OpTypeFloat 32
@@ -553,7 +565,9 @@ TEST_F(NegativeShaderStorageImage, DISABLED_MissingNonReadableDecorationFormatRe
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeShaderStorageImage, DISABLED_MissingNonWritableDecorationFormatWrite) {
+TEST_F(NegativeShaderStorageImage, MissingNonWritableDecorationFormatWrite) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Create a shader with a storage image without an image format but not marked a non writable");
 
     // We need to skip this test with VK_KHR_format_feature_flags2 supported,
@@ -619,7 +633,9 @@ TEST_F(NegativeShaderStorageImage, DISABLED_MissingNonWritableDecorationFormatWr
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeShaderStorageImage, DISABLED_WriteLessComponent) {
+TEST_F(NegativeShaderStorageImage, WriteLessComponent) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Test writing to image with less components.");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -669,7 +685,9 @@ TEST_F(NegativeShaderStorageImage, DISABLED_WriteLessComponent) {
     CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-OpImageWrite-07112");
 }
 
-TEST_F(NegativeShaderStorageImage, DISABLED_WriteLessComponentCopyObject) {
+TEST_F(NegativeShaderStorageImage, WriteLessComponentCopyObject) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Test writing to image with less components, but use OpCopyObject.");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -723,7 +741,9 @@ TEST_F(NegativeShaderStorageImage, DISABLED_WriteLessComponentCopyObject) {
     CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-OpImageWrite-07112");
 }
 
-TEST_F(NegativeShaderStorageImage, DISABLED_WriteSpecConstantLessComponent) {
+TEST_F(NegativeShaderStorageImage, WriteSpecConstantLessComponent) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Test writing to image with less components with Texel being a spec constant.");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -789,7 +809,9 @@ TEST_F(NegativeShaderStorageImage, DISABLED_WriteSpecConstantLessComponent) {
     CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-OpImageWrite-07112");
 }
 
-TEST_F(NegativeShaderStorageImage, DISABLED_UnknownWriteLessComponent) {
+TEST_F(NegativeShaderStorageImage, UnknownWriteLessComponent) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Test writing to image unknown format with less components.");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
@@ -878,6 +900,8 @@ TEST_F(NegativeShaderStorageImage, DISABLED_UnknownWriteLessComponent) {
 }
 
 TEST_F(NegativeShaderStorageImage, UnknownWriteComponentA8Unorm) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Test writing to image unknown format with VK_FORMAT_A8_UNORM_KHR.");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);

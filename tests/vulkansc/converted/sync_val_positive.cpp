@@ -410,7 +410,7 @@ TEST_F(PositiveSyncVal, PresentAfterSubmit2AutomaticVisibility) {
 
     uint32_t image_index = 0;
     ASSERT_EQ(VK_SUCCESS,
-        vk::AcquireNextImageKHR(device(), m_swapchain, kWaitTimeout, acquire_semaphore, VK_NULL_HANDLE, &image_index));
+              vk::AcquireNextImageKHR(device(), m_swapchain, kWaitTimeout, acquire_semaphore, VK_NULL_HANDLE, &image_index));
 
     VkImageMemoryBarrier2 layout_transition = vku::InitStructHelper();
     // this creates execution dependency with submit's wait semaphore, so layout
@@ -487,7 +487,7 @@ TEST_F(PositiveSyncVal, PresentAfterSubmitAutomaticVisibility) {
 
     uint32_t image_index = 0;
     ASSERT_EQ(VK_SUCCESS,
-        vk::AcquireNextImageKHR(device(), m_swapchain, kWaitTimeout, acquire_semaphore, VK_NULL_HANDLE, &image_index));
+              vk::AcquireNextImageKHR(device(), m_swapchain, kWaitTimeout, acquire_semaphore, VK_NULL_HANDLE, &image_index));
 
     VkImageMemoryBarrier layout_transition = vku::InitStructHelper();
     layout_transition.srcAccessMask = 0;

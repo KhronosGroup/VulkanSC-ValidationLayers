@@ -19,7 +19,7 @@
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
 
-TEST_F(NegativeDescriptorIndexing, DISABLED_UpdateAfterBind) {
+TEST_F(NegativeDescriptorIndexing, UpdateAfterBind) {
     TEST_DESCRIPTION("Exercise errors for updating a descriptor set after it is bound.");
 
     AddRequiredExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
@@ -194,6 +194,7 @@ TEST_F(NegativeDescriptorIndexing, SetNonIdenticalWrite) {
     m_errorMonitor->VerifyFound();
 }
 
+// Not supported in Vulkan SC: assumes availability of pre-Vulkan 1.2 functionality
 TEST_F(NegativeDescriptorIndexing, DISABLED_SetLayoutWithoutExtension) {
     TEST_DESCRIPTION("Create an update_after_bind set layout without loading the needed extension.");
     RETURN_IF_SKIP(Init());
@@ -307,8 +308,7 @@ TEST_F(NegativeDescriptorIndexing, SetLayout) {
             ds_alloc_info.pSetLayouts = &ds_layout.handle();
 
             VkDescriptorSet ds = VK_NULL_HANDLE;
-            m_errorMonitor->SetDesiredFailureMsg(kErrorBit,
-                                                 "VUID-VkDescriptorSetAllocateInfo-pSetLayouts-09380");
+            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDescriptorSetAllocateInfo-pSetLayouts-09380");
             vk::AllocateDescriptorSets(m_device->handle(), &ds_alloc_info, &ds);
             m_errorMonitor->VerifyFound();
         }

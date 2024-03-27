@@ -1,7 +1,6 @@
 // *** THIS FILE IS GENERATED - DO NOT EDIT ***
 // See vksc_convert_tests.py for modifications
 
-
 /*
  * Copyright (c) 2023 Valve Corporation
  * Copyright (c) 2023 LunarG, Inc.

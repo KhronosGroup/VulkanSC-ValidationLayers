@@ -1,5 +1,5 @@
 # ~~~
-# Copyright (c) 2023-2023 RasterGrid Kft.
+# Copyright (c) 2023-2024 RasterGrid Kft.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,15 +25,20 @@ target_compile_definitions(vksc_layer_validation_tests PRIVATE VVL_TESTS_USE_CUS
 target_sources(vksc_layer_validation_tests PRIVATE
     ${VKSC_CONVERTED_TEST_FILES}
     framework/custom_test_framework.h
+    framework/vksc_test_environment.h
     framework/vksc_test_environment.cpp
     framework/vksc_test_dispatch_helper.h
     framework/vksc_test_dispatch_helper.cpp
     framework/vksc_test_pipeline_cache_helper.h
     framework/vksc_test_pipeline_cache_helper.cpp
+    framework/vksc_test_pipeline_helper.h
+    framework/vksc_test_pipeline_helper.cpp
     framework/vksc_layer_validation_tests.h
     framework/vksc_layer_validation_tests.cpp
+    framework/vksc_pipeline_templates.h
     framework/vksc_render_framework.h
     framework/vksc_render_framework.cpp
+    framework/vksc_shader_templates.h
     ../framework/layer_validation_tests.h
     ../framework/layer_validation_tests.cpp
     ../framework/test_common.h
@@ -74,17 +79,18 @@ target_sources(vksc_layer_validation_tests PRIVATE
     negative/object_reservation.cpp
     negative/others.cpp
     negative/pipeline.cpp
+    negative/pipeline_cache_data.cpp
     negative/ported.cpp
     negative/render_pass.cpp
+    negative/shader_spirv.cpp
     negative/wsi.cpp
     positive/implicit.cpp
     positive/instance.cpp
     positive/others.cpp
     positive/pipeline.cpp
+    positive/pipeline_cache_data.cpp
+    positive/shader_spirv.cpp
 )
-
-# TODO: Remove once Android.mk is gone.
-target_compile_definitions(vksc_layer_validation_tests PRIVATE VVL_TESTS_USE_CMAKE)
 
 add_dependencies(vksc_layer_validation_tests vvl)
 target_include_directories(vksc_layer_validation_tests PRIVATE . ..)

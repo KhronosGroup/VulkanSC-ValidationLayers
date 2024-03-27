@@ -796,7 +796,9 @@ TEST_F(NegativeVertexInput, BindVertexOffset) {
     m_commandBuffer->end();
 }
 
-TEST_F(NegativeVertexInput, DISABLED_AttributeNotConsumed) {
+TEST_F(NegativeVertexInput, AttributeNotConsumed) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Test that a warning is produced for a vertex attribute which is not consumed by the vertex shader");
 
     RETURN_IF_SKIP(Init());
@@ -817,7 +819,9 @@ TEST_F(NegativeVertexInput, DISABLED_AttributeNotConsumed) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kPerformanceWarningBit, "WARNING-Shader-OutputNotConsumed");
 }
 
-TEST_F(NegativeVertexInput, DISABLED_AttributeLocationMismatch) {
+TEST_F(NegativeVertexInput, AttributeLocationMismatch) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
         "Test that a warning is produced for a location mismatch on vertex attributes. This flushes out bad behavior in the "
         "interface walker");
@@ -841,7 +845,9 @@ TEST_F(NegativeVertexInput, DISABLED_AttributeLocationMismatch) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kPerformanceWarningBit, "WARNING-Shader-OutputNotConsumed");
 }
 
-TEST_F(NegativeVertexInput, DISABLED_AttributeNotProvided) {
+TEST_F(NegativeVertexInput, AttributeNotProvided) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Test that an error is produced for a vertex shader input which is not provided by a vertex attribute");
 
     RETURN_IF_SKIP(Init());
@@ -862,7 +868,9 @@ TEST_F(NegativeVertexInput, DISABLED_AttributeNotProvided) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-Input-07904");
 }
 
-TEST_F(NegativeVertexInput, DISABLED_AttributeTypeMismatch) {
+TEST_F(NegativeVertexInput, AttributeTypeMismatch) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
         "Test that an error is produced for a mismatch between the fundamental type (float/int/uint) of an attribute and the "
         "vertex shader input that consumes it");
@@ -895,7 +903,9 @@ TEST_F(NegativeVertexInput, DISABLED_AttributeTypeMismatch) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-Input-08733");
 }
 
-TEST_F(NegativeVertexInput, DISABLED_AttributeStructTypeFirstLocation) {
+TEST_F(NegativeVertexInput, AttributeStructTypeFirstLocation) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Input is OpTypeStruct but doesn't match");
 
     RETURN_IF_SKIP(Init());
@@ -950,7 +960,9 @@ TEST_F(NegativeVertexInput, DISABLED_AttributeStructTypeFirstLocation) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeVertexInput, DISABLED_AttributeStructTypeSecondLocation) {
+TEST_F(NegativeVertexInput, AttributeStructTypeSecondLocation) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Input is OpTypeStruct but doesn't match for location given");
 
     RETURN_IF_SKIP(Init());
@@ -1005,7 +1017,9 @@ TEST_F(NegativeVertexInput, DISABLED_AttributeStructTypeSecondLocation) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeVertexInput, DISABLED_AttributeStructTypeBlockLocation) {
+TEST_F(NegativeVertexInput, AttributeStructTypeBlockLocation) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Input is OpTypeStruct where the Block has the Location");
 
     RETURN_IF_SKIP(Init());
@@ -1058,7 +1072,9 @@ TEST_F(NegativeVertexInput, DISABLED_AttributeStructTypeBlockLocation) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeVertexInput, DISABLED_AttributeTypeMismatchDynamic) {
+TEST_F(NegativeVertexInput, AttributeTypeMismatchDynamic) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION(
         "Test that an error is produced for a mismatch between the fundamental type (float/int/uint) of an attribute and the "
         "vertex shader input that consumes it");
@@ -1143,7 +1159,9 @@ TEST_F(NegativeVertexInput, AttributeBindingConflict) {
                                       "VUID-VkPipelineVertexInputStateCreateInfo-pVertexBindingDescriptions-00616");
 }
 
-TEST_F(NegativeVertexInput, DISABLED_Attribute64bitInputAttribute) {
+TEST_F(NegativeVertexInput, Attribute64bitInputAttribute) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("InputAttribute has 64-bit, but shader reads 32-bit");
 
     AddRequiredFeature(vkt::Feature::shaderFloat64);
@@ -1179,7 +1197,9 @@ TEST_F(NegativeVertexInput, DISABLED_Attribute64bitInputAttribute) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeVertexInput, DISABLED_Attribute64bitShaderInput) {
+TEST_F(NegativeVertexInput, Attribute64bitShaderInput) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("InputAttribute has 32-bit, but shader reads 64-bit");
 
     AddRequiredFeature(vkt::Feature::shaderFloat64);
@@ -1216,7 +1236,9 @@ TEST_F(NegativeVertexInput, DISABLED_Attribute64bitShaderInput) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeVertexInput, DISABLED_Attribute64bitUnusedComponent) {
+TEST_F(NegativeVertexInput, Attribute64bitUnusedComponent) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Shader uses f64vec2, but only provides first component with R64");
 
     AddRequiredFeature(vkt::Feature::shaderFloat64);
@@ -1253,7 +1275,9 @@ TEST_F(NegativeVertexInput, DISABLED_Attribute64bitUnusedComponent) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativeVertexInput, DISABLED_AttributeStructTypeBlockLocation64bit) {
+TEST_F(NegativeVertexInput, AttributeStructTypeBlockLocation64bit) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Input is OpTypeStruct where the Block has the Location with 64-bit Vertex format");
 
     AddRequiredFeature(vkt::Feature::shaderFloat64);
