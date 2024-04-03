@@ -9,7 +9,6 @@
 7. [MacOS build](#building-on-macos)
 8. [Android Build](#building-for-android)
 9. [Installed Files](#installed-files)
-10. [Vulkan SC build](#building-vulkan-sc-validation-layers)
 
 ## Requirements
 
@@ -29,7 +28,7 @@ The following will be enough for most people, for more detailed instructions, se
 git clone https://github.com/KhronosGroup/VulkanSC-ValidationLayers.git
 cd VulkanSC-ValidationLayers
 
-cmake -S . -B build -D UPDATE_DEPS=ON -D BUILD_WERROR=ON -D BUILD_TESTS=ON -D CMAKE_BUILD_TYPE=Debug -D VULKANSC=ON
+cmake -S . -B build -D UPDATE_DEPS=ON -D BUILD_WERROR=ON -D BUILD_TESTS=ON -D CMAKE_BUILD_TYPE=Debug
 cmake --build build --config Debug
 ```
 
@@ -316,10 +315,3 @@ CMake Docs:
 # NOTE: --config is only needed for multi-config generators (Visual Studio, Xcode, etc)
 cmake --install build/ --config Release --prefix build/install
 ```
-
-## Building Vulkan SC Validation Layers
-
-Commands for building the Vulkan SC version of the validation layers are similar to the instructions in the sections above with a few minor differences:
-
-1) When running `update_deps.py` and/or `generate_source.py`, the option `--api vulkansc` should be specified.
-2) When running `cmake -C helper.cmake ...`, the option `-DVULKANSC=ON` should be passed in. In addition, if SCI WSI support is needed, the option `-DBUILD_WSI_SCI_SUPPORT=ON` should also be specified.

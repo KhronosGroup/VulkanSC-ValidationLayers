@@ -19,7 +19,7 @@ cmake_minimum_required(VERSION 3.17.2)
 
 project(VVL LANGUAGES CXX)
 
-option(VULKANSC "Build Vulkan SC validation layers" OFF)
+option(VULKANSC "Build Vulkan SC validation layers" ON)
 option(BUILD_WSI_SCREEN_QNX_SUPPORT "Build QNX screen support" OFF)
 option(BUILD_WSI_SCI_SUPPORT "Build SCI WSI support" OFF)
 

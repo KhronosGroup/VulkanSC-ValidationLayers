@@ -425,7 +425,7 @@ def main(argv):
     parser = argparse.ArgumentParser()
     parser.add_argument('json_file', help="registry file 'validusage.json'")
     parser.add_argument('-api',
-                        default='vulkan',
+                        default='vulkansc',
                         choices=['vulkan','vulkansc'],
                         help='Specify API name to use')
     parser.add_argument('-c', action='store_true',

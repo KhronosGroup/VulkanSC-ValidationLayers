@@ -168,7 +168,7 @@ class PipelineCacheBuilder {
     template <typename PrivateData = void, typename PipelinePrivateData = void>
     void AddStageValidation(SCIndexEntry<PipelinePrivateData>& pipeline, const char* json,
                             const std::vector<std::vector<uint32_t>> stage_spv) {
-        if (json != nullptr) {
+        if (json != nullptr && *json != '\0') {
             pipeline->jsonSize = strlen(json);
             pipeline->jsonOffset = AddBlob(static_cast<size_t>(pipeline->jsonSize));
             strncpy(reinterpret_cast<char*>(&data_[static_cast<size_t>(pipeline->jsonOffset)]), json,
