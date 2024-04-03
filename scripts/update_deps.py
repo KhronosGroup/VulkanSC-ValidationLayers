@@ -705,7 +705,7 @@ def main():
     parser.add_argument(
         '--api',
         dest='api',
-        default='vulkan',
+        default='vulkansc',
         choices=['vulkan', 'vulkansc'],
         help="Target API")
     parser.add_argument(

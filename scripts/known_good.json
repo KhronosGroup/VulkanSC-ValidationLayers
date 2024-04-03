@@ -17,10 +17,9 @@
             "build_dir": "Vulkan-Headers/build",
             "install_dir": "Vulkan-Headers/build/install",
             "cmake_options": [
-                "-DVULKANSC=ON",
                 "-DGEN_VULKANSC_COMBINED=ON"
             ],
-            "commit": "be40e89611cbbd4a48e4a566ddac468da5eb1cef"
+            "commit": "fb874b731b9097af396411c0d19362419f798200"
         },
         {
             "name": "Vulkan-Utility-Libraries",
@@ -44,10 +43,7 @@
             "sub_dir": "Vulkan-Utility-Libraries",
             "build_dir": "Vulkan-Utility-Libraries/build",
             "install_dir": "Vulkan-Utility-Libraries/build/install",
-            "commit": "c0342cb387180f8bcbb0a38551603c365434581f",
-            "cmake_options": [
-                "-DVULKANSC=ON"
-            ],
+            "commit": "7dc142c45f5a37e2b0e60c202863579b33443052",
             "deps": [
                 {
                     "var_name": "VULKAN_HEADERS_INSTALL_DIR",
@@ -155,11 +151,7 @@
             "sub_dir": "Vulkan-Loader",
             "build_dir": "Vulkan-Loader/build",
             "install_dir": "Vulkan-Loader/build/install",
-            "cmake_options": [
-                "-DVULKANSC=ON",
-                "-DLOADER_USE_UNSAFE_FILE_SEARCH=ON"
-            ],
-            "commit": "ef6ad6f4bc29d4006cf2a4d27ff8613c42ff545d",
+            "commit": "86492711fec3dcc37fc38b14fbad2bcff3042ad6",
             "build_step": "skip",
             "optional": [
                 "tests"
@@ -198,7 +190,7 @@
             "sub_dir": "Vulkan-Tools",
             "build_dir": "Vulkan-Tools/build",
             "install_dir": "Vulkan-Tools/build/install",
-            "commit": "3cb19d9e897ac0910e70f52a8f6368e88ca84b79",
+            "commit": "5e1186f29d7ed8f3ece52187c8070b3013ddca7c",
             "build_step": "skip",
             "optional": [
                 "tests"

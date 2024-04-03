@@ -208,7 +208,7 @@ def write_inst_hash(generate_shaders, outdir=None):
 def main():
     parser = argparse.ArgumentParser(description='Generate spirv code for this repository, see layers/gpu_shaders/README.md for more deatils')
     parser.add_argument('--api',
-                        default='vulkan',
+                        default='vulkansc',
                         choices=['vulkan', 'vulkansc'],
                         help='Specify API name to generate')
     parser.add_argument('--shader', action='store', type=str, help='Input filename to generate a single shader')

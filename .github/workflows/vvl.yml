@@ -1,5 +1,6 @@
 # Copyright (c) 2021-2023 Valve Corporation
 # Copyright (c) 2021-2023 LunarG, Inc.
+# Copyright (c) 2023-2024 RasterGrid Kft.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,7 +27,6 @@ on:
     push:
     pull_request:
         branches:
-            - main
             - sc_main
 
 env:
@@ -84,7 +84,7 @@ jobs:
       # https://github.com/google/sanitizers/issues/1716
       - run: sudo sysctl vm.mmap_rnd_bits=28
       - run: sudo apt-get -qq update && sudo apt-get install -y libwayland-dev xorg-dev
-      - run: python scripts/tests.py --build --config ${{ matrix.config }} --cmake='-DUSE_ROBIN_HOOD_HASHING=${{matrix.robin_hood}}'
+      - run: python scripts/tests_vksc.py --build --config ${{ matrix.config }} --cmake='-DUSE_ROBIN_HOOD_HASHING=${{matrix.robin_hood}}'
         env:
           CFLAGS: -fsanitize=${{ matrix.sanitize }}
           CXXFLAGS: -fsanitize=${{ matrix.sanitize }}
@@ -92,17 +92,22 @@ jobs:
           CMAKE_C_COMPILER_LAUNCHER: ccache
           CMAKE_CXX_COMPILER_LAUNCHER: ccache
       - name: Test Max Profile
-        run: python scripts/tests.py --test
+        run: python scripts/tests_vksc.py --test
         env:
-          VK_KHRONOS_PROFILES_PROFILE_FILE: ${{ github.workspace }}/tests/device_profiles/max_profile.json
+          VKSC_DEVSIM_PROFILE_FILE: ${{ github.workspace }}/tests/vulkansc/device_profiles/max_profile.json
       - name: Test Max Core
-        run: python scripts/tests.py --test
+        run: python scripts/tests_vksc.py --test
         env:
-          VK_KHRONOS_PROFILES_PROFILE_FILE: ${{ github.workspace }}/tests/device_profiles/max_core.json
+          VKSC_DEVSIM_PROFILE_FILE: ${{ github.workspace }}/tests/vulkansc/device_profiles/max_core.json
       - name: Test Min Core
-        run: python scripts/tests.py --test
+        run: python scripts/tests_vksc.py --test
         env:
-          VK_KHRONOS_PROFILES_PROFILE_FILE: ${{ github.workspace }}/tests/device_profiles/min_core.json
+          VKSC_DEVSIM_PROFILE_FILE: ${{ github.workspace }}/tests/vulkansc/device_profiles/min_core.json
+      - name: Test No SPIR-V Debug Info
+        run: python scripts/tests_vksc.py --test
+        env:
+          VKSC_DEVSIM_PROFILE_FILE: ${{ github.workspace }}/tests/vulkansc/device_profiles/max_profile.json
+          VKSC_LAYER_TESTS_NO_SPV_DEBUG_INFO: TRUE
 
   windows:
     runs-on: windows-2022
@@ -132,9 +137,16 @@ jobs:
             build-ci/external/Vulkan-Utility-Libraries/build/install
           key: windows-dependencies-${{ matrix.arch }}-${{ hashfiles('scripts/known_good.json') }}
       - name: Build
-        run: python3 scripts/tests.py --build --config debug --cmake='-DUPDATE_DEPS_SKIP_EXISTING_INSTALL=ON'
+        run: python3 scripts/tests_vksc.py --build --config debug --cmake='-DUPDATE_DEPS_SKIP_EXISTING_INSTALL=ON'
       - name: Test Max Profile
-        run: python scripts/tests.py --test
+        run: python scripts/tests_vksc.py --test
+        env:
+          VKSC_DEVSIM_PROFILE_FILE: ${{ github.workspace }}/tests/vulkansc/device_profiles/max_profile.json
+      - name: Test No SPIR-V Debug Info
+        run: python scripts/tests_vksc.py --test
+        env:
+          VKSC_DEVSIM_PROFILE_FILE: ${{ github.workspace }}/tests/vulkansc/device_profiles/max_profile.json
+          VKSC_LAYER_TESTS_NO_SPV_DEBUG_INFO: TRUE
 
   mingw:
     runs-on: windows-latest
@@ -162,13 +174,6 @@ jobs:
           CMAKE_CXX_COMPILER_LAUNCHER: ccache
       - run: cmake --build build
       - run: cmake --install build --prefix /tmp
-
-  chromium:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: sudo apt-get -qq update && sudo apt-get install -y libwayland-dev xorg-dev
-      - run: python scripts/gn/gn.py
 
   check_vvl:
     runs-on: ubuntu-latest

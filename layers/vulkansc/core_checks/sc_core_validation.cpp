@@ -1360,7 +1360,7 @@ bool SCCoreChecks::PreCallValidateBeginCommandBuffer(VkCommandBuffer commandBuff
     auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
     if (!cb_state) return false;
 
-    auto cp_state = Get<vvl::sc::CommandPool>(cb_state->command_pool->VkHandle());
+    auto cp_state = static_cast<const vvl::sc::CommandPool*>(cb_state->command_pool);
 
     const Location begin_info_loc = error_obj.location.dot(Field::pBeginInfo);
 
