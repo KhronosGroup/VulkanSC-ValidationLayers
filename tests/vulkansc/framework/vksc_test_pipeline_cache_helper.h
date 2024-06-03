@@ -223,7 +223,7 @@ class PipelineCacheBuilder {
 
     vkt::PipelineCache CreatePipelineCache(const vkt::Device& device) const { return vkt::PipelineCache(device, MakeCreateInfo()); }
 
-    std::vector<uint8_t> GetData() { return data_; }
+    const std::vector<uint8_t>& GetData() const { return data_; }
     void Clear() { data_.clear(); }
 
   private:
