@@ -459,6 +459,8 @@ struct DeviceFeatures {
     bool image2DViewOf3D;
     // VkPhysicalDeviceImage2DViewOf3DFeaturesEXT
     bool sampler2DViewOf3D;
+    // VkPhysicalDeviceImageAlignmentControlFeaturesMESA
+    bool imageAlignmentControl;
     // VkPhysicalDeviceImageCompressionControlFeaturesEXT
     bool imageCompressionControl;
     // VkPhysicalDeviceImageCompressionControlSwapchainFeaturesEXT
@@ -491,6 +493,8 @@ struct DeviceFeatures {
     bool invocationMask;
     // VkPhysicalDeviceLegacyDitheringFeaturesEXT
     bool legacyDithering;
+    // VkPhysicalDeviceLegacyVertexAttributesFeaturesEXT
+    bool legacyVertexAttributes;
     // VkPhysicalDeviceLineRasterizationFeaturesKHR
     bool bresenhamLines;
     // VkPhysicalDeviceLineRasterizationFeaturesKHR
@@ -647,6 +651,8 @@ struct DeviceFeatures {
     bool rasterizationOrderDepthAttachmentAccess;
     // VkPhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT
     bool rasterizationOrderStencilAttachmentAccess;
+    // VkPhysicalDeviceRawAccessChainsFeaturesNV
+    bool shaderRawAccessChains;
     // VkPhysicalDeviceRayQueryFeaturesKHR
     bool rayQuery;
     // VkPhysicalDeviceRayTracingInvocationReorderFeaturesNV
@@ -671,6 +677,8 @@ struct DeviceFeatures {
     bool rayTraversalPrimitiveCulling;
     // VkPhysicalDeviceRayTracingPositionFetchFeaturesKHR
     bool rayTracingPositionFetch;
+    // VkPhysicalDeviceRayTracingValidationFeaturesNV
+    bool rayTracingValidation;
     // VkPhysicalDeviceRelaxedLineRasterizationFeaturesIMG
     bool relaxedLineRasterization;
     // VkPhysicalDeviceRenderPassStripedFeaturesARM
@@ -785,6 +793,8 @@ struct DeviceFeatures {
     bool shaderObject;
     // VkPhysicalDeviceShaderQuadControlFeaturesKHR
     bool shaderQuadControl;
+    // VkPhysicalDeviceShaderReplicatedCompositesFeaturesEXT
+    bool shaderReplicatedComposites;
     // VkPhysicalDeviceShaderSMBuiltinsFeaturesNV
     bool shaderSMBuiltins;
     // VkPhysicalDeviceShaderSubgroupExtendedTypesFeatures, VkPhysicalDeviceVulkan12Features

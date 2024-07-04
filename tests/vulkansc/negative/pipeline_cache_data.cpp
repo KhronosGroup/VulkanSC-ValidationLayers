@@ -392,7 +392,7 @@ TEST_F(VkSCNegativePipelineCacheData, InvalidSpirvHeaderSize) {
     auto entry = builder.AddPipelineEntry(header, "1de725b8-e36d-11ed-b5ea-0242ac120001", 4000);
     builder.AddStageValidation(entry, kSampleComputePipelineJson, {header_too_small});
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "Invalid SPIR-V header");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkShaderModuleCreateInfo-pCode-08736");
     TestPipelineCacheData({builder.MakeCreateInfo()});
 }
 
@@ -406,7 +406,7 @@ TEST_F(VkSCNegativePipelineCacheData, InvalidSpirvMagic) {
     auto entry = builder.AddPipelineEntry(header, "1de725b8-e36d-11ed-b5ea-0242ac120002", 4000);
     builder.AddStageValidation(entry, kSampleComputePipelineJson, {header_bad_magic});
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "Invalid SPIR-V magic number");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkShaderModuleCreateInfo-pCode-08736");
     TestPipelineCacheData({builder.MakeCreateInfo()});
 }
 

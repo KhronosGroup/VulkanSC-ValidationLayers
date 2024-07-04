@@ -66,12 +66,11 @@ TEST_F(NegativeTransformFeedback, FeatureEnabled) {
     InitRenderTarget();
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitState();
     pipe.CreateGraphicsPipeline();
 
     m_commandBuffer->begin();
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
 
     {
         VkBufferCreateInfo info = vku::InitStructHelper();
@@ -80,20 +79,21 @@ TEST_F(NegativeTransformFeedback, FeatureEnabled) {
         vkt::Buffer buffer(*m_device, info);
         VkDeviceSize offsets[1]{};
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBindTransformFeedbackBuffersEXT-transformFeedback-02355");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdBindTransformFeedbackBuffersEXT-transformFeedback-02355");
         vk::CmdBindTransformFeedbackBuffersEXT(m_commandBuffer->handle(), 0, 1, &buffer.handle(), offsets, nullptr);
         m_errorMonitor->VerifyFound();
     }
 
     {
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBeginTransformFeedbackEXT-None-04128");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBeginTransformFeedbackEXT-transformFeedback-02366");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdBeginTransformFeedbackEXT-firstCounterBuffer-09630");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdBeginTransformFeedbackEXT-None-04128");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdBeginTransformFeedbackEXT-transformFeedback-02366");
         vk::CmdBeginTransformFeedbackEXT(m_commandBuffer->handle(), 0, 1, nullptr, nullptr);
         m_errorMonitor->VerifyFound();
     }
 
     {
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEndTransformFeedbackEXT-transformFeedback-02374");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdEndTransformFeedbackEXT-transformFeedback-02374");
         m_errorMonitor->SetUnexpectedError("VUID-vkCmdEndTransformFeedbackEXT-None-02375");
         vk::CmdEndTransformFeedbackEXT(m_commandBuffer->handle(), 0, 1, nullptr, nullptr);
         m_errorMonitor->VerifyFound();
@@ -109,7 +109,8 @@ TEST_F(NegativeTransformFeedback, NoBoundPipeline) {
 
     m_commandBuffer->begin();
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBeginTransformFeedbackEXT-None-06233");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdBeginTransformFeedbackEXT-firstCounterBuffer-09630");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdBeginTransformFeedbackEXT-None-06233");
     vk::CmdBeginTransformFeedbackEXT(m_commandBuffer->handle(), 0, 1, nullptr, nullptr);
     m_errorMonitor->VerifyFound();
     m_commandBuffer->EndRenderPass();
@@ -123,14 +124,13 @@ TEST_F(NegativeTransformFeedback, CmdBindTransformFeedbackBuffersEXT) {
     InitRenderTarget();
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitState();
     auto vs = VkShaderObj::CreateFromASM(this, kXfbVsSource, VK_SHADER_STAGE_VERTEX_BIT);
     pipe.shader_stages_[0] = vs->GetStageCreateInfo();
     pipe.CreateGraphicsPipeline();
 
     m_commandBuffer->begin();
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
 
     {
         VkPhysicalDeviceTransformFeedbackPropertiesEXT tf_properties = vku::InitStructHelper();
@@ -146,7 +146,7 @@ TEST_F(NegativeTransformFeedback, CmdBindTransformFeedbackBuffersEXT) {
             auto const firstBinding = tf_properties.maxTransformFeedbackBuffers;
             VkDeviceSize const offsets[1]{};
 
-            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBindTransformFeedbackBuffersEXT-firstBinding-02356");
+            m_errorMonitor->SetDesiredError("VUID-vkCmdBindTransformFeedbackBuffersEXT-firstBinding-02356");
             m_errorMonitor->SetUnexpectedError("VUID-vkCmdBindTransformFeedbackBuffersEXT-firstBinding-02357");
             vk::CmdBindTransformFeedbackBuffersEXT(m_commandBuffer->handle(), firstBinding, 1, &buffer_obj.handle(), offsets,
                                                    nullptr);
@@ -160,7 +160,7 @@ TEST_F(NegativeTransformFeedback, CmdBindTransformFeedbackBuffersEXT) {
 
             std::vector<VkDeviceSize> offsets(bindingCount);
 
-            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBindTransformFeedbackBuffersEXT-firstBinding-02357");
+            m_errorMonitor->SetDesiredError("VUID-vkCmdBindTransformFeedbackBuffersEXT-firstBinding-02357");
             vk::CmdBindTransformFeedbackBuffersEXT(m_commandBuffer->handle(), 0, bindingCount, buffers.data(), offsets.data(),
                                                    nullptr);
             m_errorMonitor->VerifyFound();
@@ -171,7 +171,7 @@ TEST_F(NegativeTransformFeedback, CmdBindTransformFeedbackBuffersEXT) {
             VkDeviceSize const offsets[1]{};
             VkDeviceSize const sizes[1]{tf_properties.maxTransformFeedbackBufferSize + 1};
 
-            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBindTransformFeedbackBuffersEXT-pSize-02361");
+            m_errorMonitor->SetDesiredError("VUID-vkCmdBindTransformFeedbackBuffersEXT-pSize-02361");
             vk::CmdBindTransformFeedbackBuffersEXT(m_commandBuffer->handle(), 0, 1, &buffer_obj.handle(), offsets, sizes);
             m_errorMonitor->VerifyFound();
         }
@@ -187,7 +187,7 @@ TEST_F(NegativeTransformFeedback, CmdBindTransformFeedbackBuffersEXT) {
         {
             VkDeviceSize const offsets[1]{info.size + 4};
 
-            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBindTransformFeedbackBuffersEXT-pOffsets-02358");
+            m_errorMonitor->SetDesiredError("VUID-vkCmdBindTransformFeedbackBuffersEXT-pOffsets-02358");
             vk::CmdBindTransformFeedbackBuffersEXT(m_commandBuffer->handle(), 0, 1, &buffer_obj.handle(), offsets, nullptr);
             m_errorMonitor->VerifyFound();
         }
@@ -196,7 +196,7 @@ TEST_F(NegativeTransformFeedback, CmdBindTransformFeedbackBuffersEXT) {
         {
             VkDeviceSize const offsets[1]{1};
 
-            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBindTransformFeedbackBuffersEXT-pOffsets-02359");
+            m_errorMonitor->SetDesiredError("VUID-vkCmdBindTransformFeedbackBuffersEXT-pOffsets-02359");
             vk::CmdBindTransformFeedbackBuffersEXT(m_commandBuffer->handle(), 0, 1, &buffer_obj.handle(), offsets, nullptr);
             m_errorMonitor->VerifyFound();
         }
@@ -206,7 +206,7 @@ TEST_F(NegativeTransformFeedback, CmdBindTransformFeedbackBuffersEXT) {
             VkDeviceSize const offsets[1]{};
             VkDeviceSize const sizes[1]{info.size + 1};
 
-            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBindTransformFeedbackBuffersEXT-pSizes-02362");
+            m_errorMonitor->SetDesiredError("VUID-vkCmdBindTransformFeedbackBuffersEXT-pSizes-02362");
             vk::CmdBindTransformFeedbackBuffersEXT(m_commandBuffer->handle(), 0, 1, &buffer_obj.handle(), offsets, sizes);
             m_errorMonitor->VerifyFound();
         }
@@ -216,18 +216,19 @@ TEST_F(NegativeTransformFeedback, CmdBindTransformFeedbackBuffersEXT) {
             VkDeviceSize const offsets[1]{4};
             VkDeviceSize const sizes[1]{info.size - 3};
 
-            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBindTransformFeedbackBuffersEXT-pOffsets-02363");
+            m_errorMonitor->SetDesiredError("VUID-vkCmdBindTransformFeedbackBuffersEXT-pOffsets-02363");
             vk::CmdBindTransformFeedbackBuffersEXT(m_commandBuffer->handle(), 0, 1, &buffer_obj.handle(), offsets, sizes);
             m_errorMonitor->VerifyFound();
         }
 
         // Bind while transform feedback is active.
         {
+            VkDeviceSize const offsets[1]{0};
+            vk::CmdBindTransformFeedbackBuffersEXT(m_commandBuffer->handle(), 0, 1, &buffer_obj.handle(), offsets, nullptr);
+
             vk::CmdBeginTransformFeedbackEXT(m_commandBuffer->handle(), 0, 1, nullptr, nullptr);
 
-            VkDeviceSize const offsets[1]{};
-
-            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBindTransformFeedbackBuffersEXT-None-02365");
+            m_errorMonitor->SetDesiredError("VUID-vkCmdBindTransformFeedbackBuffersEXT-None-02365");
             vk::CmdBindTransformFeedbackBuffersEXT(m_commandBuffer->handle(), 0, 1, &buffer_obj.handle(), offsets, nullptr);
             m_errorMonitor->VerifyFound();
 
@@ -244,7 +245,7 @@ TEST_F(NegativeTransformFeedback, CmdBindTransformFeedbackBuffersEXT) {
 
         VkDeviceSize const offsets[1]{};
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBindTransformFeedbackBuffersEXT-pBuffers-02360");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdBindTransformFeedbackBuffersEXT-pBuffers-02360");
         vk::CmdBindTransformFeedbackBuffersEXT(m_commandBuffer->handle(), 0, 1, &buffer_obj.handle(), offsets, nullptr);
         m_errorMonitor->VerifyFound();
     }
@@ -258,7 +259,7 @@ TEST_F(NegativeTransformFeedback, CmdBindTransformFeedbackBuffersEXT) {
 
         VkDeviceSize const offsets[1]{};
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBindTransformFeedbackBuffersEXT-pBuffers-02364");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdBindTransformFeedbackBuffersEXT-pBuffers-02364");
         vk::CmdBindTransformFeedbackBuffersEXT(m_commandBuffer->handle(), 0, 1, &buffer.handle(), offsets, nullptr);
         m_errorMonitor->VerifyFound();
     }
@@ -271,14 +272,13 @@ TEST_F(NegativeTransformFeedback, CmdBeginTransformFeedbackEXT) {
     InitRenderTarget();
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitState();
     auto vs = VkShaderObj::CreateFromASM(this, kXfbVsSource, VK_SHADER_STAGE_VERTEX_BIT);
     pipe.shader_stages_[0] = vs->GetStageCreateInfo();
     pipe.CreateGraphicsPipeline();
 
     m_commandBuffer->begin();
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
 
     {
         VkPhysicalDeviceTransformFeedbackPropertiesEXT tf_properties = vku::InitStructHelper();
@@ -288,7 +288,7 @@ TEST_F(NegativeTransformFeedback, CmdBeginTransformFeedbackEXT) {
         {
             auto const firstCounterBuffer = tf_properties.maxTransformFeedbackBuffers;
 
-            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBeginTransformFeedbackEXT-firstCounterBuffer-02368");
+            m_errorMonitor->SetDesiredError("VUID-vkCmdBeginTransformFeedbackEXT-firstCounterBuffer-02368");
             m_errorMonitor->SetUnexpectedError("VUID-vkCmdBeginTransformFeedbackEXT-firstCounterBuffer-02369");
             vk::CmdBeginTransformFeedbackEXT(m_commandBuffer->handle(), firstCounterBuffer, 1, nullptr, nullptr);
             m_errorMonitor->VerifyFound();
@@ -298,11 +298,15 @@ TEST_F(NegativeTransformFeedback, CmdBeginTransformFeedbackEXT) {
         if (tf_properties.maxTransformFeedbackBuffers < std::numeric_limits<uint32_t>::max()) {
             auto const counterBufferCount = tf_properties.maxTransformFeedbackBuffers + 1;
 
-            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBeginTransformFeedbackEXT-firstCounterBuffer-02369");
+            m_errorMonitor->SetDesiredError("VUID-vkCmdBeginTransformFeedbackEXT-firstCounterBuffer-02369");
             vk::CmdBeginTransformFeedbackEXT(m_commandBuffer->handle(), 0, counterBufferCount, nullptr, nullptr);
             m_errorMonitor->VerifyFound();
         }
     }
+
+    vkt::Buffer buffer(*m_device, 16, VK_BUFFER_USAGE_TRANSFORM_FEEDBACK_BUFFER_BIT_EXT);
+    VkDeviceSize offset = 0;
+    vk::CmdBindTransformFeedbackBuffersEXT(m_commandBuffer->handle(), 0, 1, &buffer.handle(), &offset, nullptr);
 
     // Request an out-of-bounds location.
     {
@@ -313,7 +317,7 @@ TEST_F(NegativeTransformFeedback, CmdBeginTransformFeedbackEXT) {
 
         VkDeviceSize const offsets[1]{1};
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBeginTransformFeedbackEXT-pCounterBufferOffsets-02370");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdBeginTransformFeedbackEXT-pCounterBufferOffsets-02370");
         vk::CmdBeginTransformFeedbackEXT(m_commandBuffer->handle(), 0, 1, &buffer_obj.handle(), offsets);
         m_errorMonitor->VerifyFound();
     }
@@ -322,7 +326,7 @@ TEST_F(NegativeTransformFeedback, CmdBeginTransformFeedbackEXT) {
     {
         VkDeviceSize const offsets[1]{};
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBeginTransformFeedbackEXT-pCounterBuffer-02371");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdBeginTransformFeedbackEXT-pCounterBuffer-02371");
         vk::CmdBeginTransformFeedbackEXT(m_commandBuffer->handle(), 0, 1, nullptr, offsets);
         m_errorMonitor->VerifyFound();
     }
@@ -334,7 +338,7 @@ TEST_F(NegativeTransformFeedback, CmdBeginTransformFeedbackEXT) {
         info.size = 4;
         vkt::Buffer const buffer_obj(*m_device, info);
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBeginTransformFeedbackEXT-pCounterBuffers-02372");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdBeginTransformFeedbackEXT-pCounterBuffers-02372");
         vk::CmdBeginTransformFeedbackEXT(m_commandBuffer->handle(), 0, 1, &buffer_obj.handle(), nullptr);
         m_errorMonitor->VerifyFound();
     }
@@ -343,7 +347,7 @@ TEST_F(NegativeTransformFeedback, CmdBeginTransformFeedbackEXT) {
     {
         vk::CmdBeginTransformFeedbackEXT(m_commandBuffer->handle(), 0, 1, nullptr, nullptr);
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBeginTransformFeedbackEXT-None-02367");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdBeginTransformFeedbackEXT-None-02367");
         vk::CmdBeginTransformFeedbackEXT(m_commandBuffer->handle(), 0, 1, nullptr, nullptr);
         m_errorMonitor->VerifyFound();
 
@@ -358,14 +362,16 @@ TEST_F(NegativeTransformFeedback, CmdEndTransformFeedbackEXT) {
     InitRenderTarget();
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitState();
     auto vs = VkShaderObj::CreateFromASM(this, kXfbVsSource, VK_SHADER_STAGE_VERTEX_BIT);
     pipe.shader_stages_[0] = vs->GetStageCreateInfo();
     pipe.CreateGraphicsPipeline();
 
     m_commandBuffer->begin();
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vkt::Buffer buffer(*m_device, 16, VK_BUFFER_USAGE_TRANSFORM_FEEDBACK_BUFFER_BIT_EXT);
+    VkDeviceSize offset = 0;
+    vk::CmdBindTransformFeedbackBuffersEXT(m_commandBuffer->handle(), 0, 1, &buffer.handle(), &offset, nullptr);
 
     {
         // Activate transform feedback.
@@ -379,7 +385,7 @@ TEST_F(NegativeTransformFeedback, CmdEndTransformFeedbackEXT) {
             {
                 auto const firstCounterBuffer = tf_properties.maxTransformFeedbackBuffers;
 
-                m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEndTransformFeedbackEXT-firstCounterBuffer-02376");
+                m_errorMonitor->SetDesiredError("VUID-vkCmdEndTransformFeedbackEXT-firstCounterBuffer-02376");
                 m_errorMonitor->SetUnexpectedError("VUID-vkCmdEndTransformFeedbackEXT-firstCounterBuffer-02377");
                 vk::CmdEndTransformFeedbackEXT(m_commandBuffer->handle(), firstCounterBuffer, 1, nullptr, nullptr);
                 m_errorMonitor->VerifyFound();
@@ -389,7 +395,7 @@ TEST_F(NegativeTransformFeedback, CmdEndTransformFeedbackEXT) {
             if (tf_properties.maxTransformFeedbackBuffers < std::numeric_limits<uint32_t>::max()) {
                 auto const counterBufferCount = tf_properties.maxTransformFeedbackBuffers + 1;
 
-                m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEndTransformFeedbackEXT-firstCounterBuffer-02377");
+                m_errorMonitor->SetDesiredError("VUID-vkCmdEndTransformFeedbackEXT-firstCounterBuffer-02377");
                 vk::CmdEndTransformFeedbackEXT(m_commandBuffer->handle(), 0, counterBufferCount, nullptr, nullptr);
                 m_errorMonitor->VerifyFound();
             }
@@ -404,7 +410,7 @@ TEST_F(NegativeTransformFeedback, CmdEndTransformFeedbackEXT) {
 
             VkDeviceSize const offsets[1]{1};
 
-            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEndTransformFeedbackEXT-pCounterBufferOffsets-02378");
+            m_errorMonitor->SetDesiredError("VUID-vkCmdEndTransformFeedbackEXT-pCounterBufferOffsets-02378");
             vk::CmdEndTransformFeedbackEXT(m_commandBuffer->handle(), 0, 1, &buffer_obj.handle(), offsets);
             m_errorMonitor->VerifyFound();
         }
@@ -413,7 +419,7 @@ TEST_F(NegativeTransformFeedback, CmdEndTransformFeedbackEXT) {
         {
             VkDeviceSize const offsets[1]{};
 
-            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEndTransformFeedbackEXT-pCounterBuffer-02379");
+            m_errorMonitor->SetDesiredError("VUID-vkCmdEndTransformFeedbackEXT-pCounterBuffer-02379");
             vk::CmdEndTransformFeedbackEXT(m_commandBuffer->handle(), 0, 1, nullptr, offsets);
             m_errorMonitor->VerifyFound();
         }
@@ -425,7 +431,7 @@ TEST_F(NegativeTransformFeedback, CmdEndTransformFeedbackEXT) {
             info.size = 4;
             vkt::Buffer const buffer_obj(*m_device, info);
 
-            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEndTransformFeedbackEXT-pCounterBuffers-02380");
+            m_errorMonitor->SetDesiredError("VUID-vkCmdEndTransformFeedbackEXT-pCounterBuffers-02380");
             vk::CmdEndTransformFeedbackEXT(m_commandBuffer->handle(), 0, 1, &buffer_obj.handle(), nullptr);
             m_errorMonitor->VerifyFound();
         }
@@ -435,7 +441,7 @@ TEST_F(NegativeTransformFeedback, CmdEndTransformFeedbackEXT) {
     {
         vk::CmdEndTransformFeedbackEXT(m_commandBuffer->handle(), 0, 1, nullptr, nullptr);
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEndTransformFeedbackEXT-None-02375");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdEndTransformFeedbackEXT-None-02375");
         vk::CmdEndTransformFeedbackEXT(m_commandBuffer->handle(), 0, 1, nullptr, nullptr);
         m_errorMonitor->VerifyFound();
     }
@@ -450,7 +456,7 @@ TEST_F(NegativeTransformFeedback, ExecuteSecondaryCommandBuffers) {
 
     // A pool we can reset in.
     vkt::CommandPool pool(*m_device, m_device->graphics_queue_node_index_, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
-    vkt::CommandBuffer secondary(m_device, &pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+    vkt::CommandBuffer secondary(*m_device, pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
 
     VkCommandBufferBeginInfo info = vku::InitStructHelper();
     VkCommandBufferInheritanceInfo hinfo = vku::InitStructHelper();
@@ -467,17 +473,16 @@ TEST_F(NegativeTransformFeedback, ExecuteSecondaryCommandBuffers) {
     secondary.end();
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitState();
     pipe.CreateGraphicsPipeline();
 
     m_commandBuffer->begin();
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBeginTransformFeedbackEXT-commandBuffer-recording");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdBeginTransformFeedbackEXT-commandBuffer-recording");
     vk::CmdBeginTransformFeedbackEXT(m_commandBuffer->handle(), 0, 1, nullptr, nullptr);
     m_errorMonitor->VerifyFound();
     // TODO - When proper VU above is added, see if 02286 is still needed
-    // m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdExecuteCommands-None-02286");
+    // m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-None-02286");
     // vk::CmdExecuteCommands(m_commandBuffer->handle(), 1, &secondary.handle());
     // m_errorMonitor->VerifyFound();
 }
@@ -489,21 +494,23 @@ TEST_F(NegativeTransformFeedback, BindPipeline) {
     InitRenderTarget();
 
     CreatePipelineHelper pipe_one(*this);
-    pipe_one.InitState();
     auto vs = VkShaderObj::CreateFromASM(this, kXfbVsSource, VK_SHADER_STAGE_VERTEX_BIT);
     pipe_one.shader_stages_[0] = vs->GetStageCreateInfo();
     pipe_one.CreateGraphicsPipeline();
 
     CreatePipelineHelper pipe_two(*this);
-    pipe_two.InitState();
     pipe_two.CreateGraphicsPipeline();
 
     m_commandBuffer->begin();
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe_one.pipeline_);
+    vkt::Buffer buffer(*m_device, 16, VK_BUFFER_USAGE_TRANSFORM_FEEDBACK_BUFFER_BIT_EXT);
+    VkDeviceSize offset = 0;
+    vk::CmdBindTransformFeedbackBuffersEXT(m_commandBuffer->handle(), 0, 1, &buffer.handle(), &offset, nullptr);
+
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe_one.Handle());
     vk::CmdBeginTransformFeedbackEXT(m_commandBuffer->handle(), 0, 1, nullptr, nullptr);
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBindPipeline-None-02323");
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe_two.pipeline_);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdBindPipeline-None-02323");
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe_two.Handle());
     m_errorMonitor->VerifyFound();
     vk::CmdEndTransformFeedbackEXT(m_commandBuffer->handle(), 0, 1, nullptr, nullptr);
     m_commandBuffer->EndRenderPass();
@@ -518,16 +525,19 @@ TEST_F(NegativeTransformFeedback, EndRenderPass) {
     InitRenderTarget();
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitState();
     auto vs = VkShaderObj::CreateFromASM(this, kXfbVsSource, VK_SHADER_STAGE_VERTEX_BIT);
     pipe.shader_stages_[0] = vs->GetStageCreateInfo();
     pipe.CreateGraphicsPipeline();
 
     m_commandBuffer->begin();
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_);
+    vkt::Buffer buffer(*m_device, 16, VK_BUFFER_USAGE_TRANSFORM_FEEDBACK_BUFFER_BIT_EXT);
+    VkDeviceSize offset = 0;
+    vk::CmdBindTransformFeedbackBuffersEXT(m_commandBuffer->handle(), 0, 1, &buffer.handle(), &offset, nullptr);
+
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
     vk::CmdBeginTransformFeedbackEXT(m_commandBuffer->handle(), 0, 1, nullptr, nullptr);
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEndRenderPass-None-02351");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEndRenderPass-None-02351");
     m_commandBuffer->EndRenderPass();
     m_errorMonitor->VerifyFound();
     vk::CmdEndTransformFeedbackEXT(m_commandBuffer->handle(), 0, 1, nullptr, nullptr);
@@ -554,30 +564,29 @@ TEST_F(NegativeTransformFeedback, DrawIndirectByteCountEXT) {
 
     {
         CreatePipelineHelper pipeline(*this);
-        pipeline.InitState();
         pipeline.CreateGraphicsPipeline();
 
         m_commandBuffer->begin();
         m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-        vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.pipeline_);
+        vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.Handle());
 
         // if property is not multiple of 4
         m_errorMonitor->SetUnexpectedError("VUID-vkCmdDrawIndirectByteCountEXT-vertexStride-09475");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDrawIndirectByteCountEXT-vertexStride-02289");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDrawIndirectByteCountEXT-vertexStride-02289");
         vk::CmdDrawIndirectByteCountEXT(m_commandBuffer->handle(), 1, 0, counter_buffer.handle(), 0, 0,
                                         tf_properties.maxTransformFeedbackBufferDataStride + 4);
         m_errorMonitor->VerifyFound();
 
         // non-4 multiple stride
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDrawIndirectByteCountEXT-counterBufferOffset-04568");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDrawIndirectByteCountEXT-counterBufferOffset-04568");
         vk::CmdDrawIndirectByteCountEXT(m_commandBuffer->handle(), 1, 0, counter_buffer.handle(), 1, 0, 4);
         m_errorMonitor->VerifyFound();
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDrawIndirectByteCountEXT-counterOffset-09474");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDrawIndirectByteCountEXT-counterOffset-09474");
         vk::CmdDrawIndirectByteCountEXT(m_commandBuffer->handle(), 1, 0, counter_buffer.handle(), 0, 1, 4);
         m_errorMonitor->VerifyFound();
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDrawIndirectByteCountEXT-vertexStride-09475");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDrawIndirectByteCountEXT-vertexStride-09475");
         vk::CmdDrawIndirectByteCountEXT(m_commandBuffer->handle(), 1, 0, counter_buffer.handle(), 0, 0, 1);
         m_errorMonitor->VerifyFound();
 
@@ -589,7 +598,7 @@ TEST_F(NegativeTransformFeedback, DrawIndirectByteCountEXT) {
     device_extension_names.push_back(VK_EXT_TRANSFORM_FEEDBACK_EXTENSION_NAME);
     vkt::Device test_device(gpu(), device_extension_names);
     vkt::CommandPool commandPool(test_device, 0);
-    vkt::CommandBuffer commandBuffer(&test_device, &commandPool);
+    vkt::CommandBuffer commandBuffer(test_device, commandPool);
     vkt::Buffer counter_buffer2;
     counter_buffer2.init(test_device, buffer_create_info);
 
@@ -609,7 +618,6 @@ TEST_F(NegativeTransformFeedback, DrawIndirectByteCountEXT) {
 
     CreatePipelineHelper pipeline(*this);
     pipeline.device_ = &test_device;
-    pipeline.InitState();
     pipeline.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
     pipeline.gp_ci_.layout = pipelineLayout.handle();
     pipeline.gp_ci_.renderPass = renderpass.handle();
@@ -624,7 +632,7 @@ TEST_F(NegativeTransformFeedback, DrawIndirectByteCountEXT) {
     vk::CmdBindPipeline(commandBuffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.Handle());
     commandBuffer.BeginRenderPass(m_renderPassBeginInfo);
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDrawIndirectByteCountEXT-transformFeedback-02287");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDrawIndirectByteCountEXT-transformFeedback-02287");
     vk::CmdDrawIndirectByteCountEXT(commandBuffer.handle(), 1, 0, counter_buffer2.handle(), 0, 0, 4);
     m_errorMonitor->VerifyFound();
 }
@@ -646,10 +654,8 @@ TEST_F(NegativeTransformFeedback, UsingRasterizationStateStreamExtDisabled) {
     CreatePipelineHelper pipe(*this);
     VkPipelineRasterizationStateStreamCreateInfoEXT rasterization_state_stream_ci = vku::InitStructHelper();
     pipe.rs_state_ci_.pNext = &rasterization_state_stream_ci;
-    pipe.InitState();
 
-    m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_ERROR_BIT_EXT,
-                                         "VUID-VkPipelineRasterizationStateStreamCreateInfoEXT-geometryStreams-02324");
+    m_errorMonitor->SetDesiredError("VUID-VkPipelineRasterizationStateStreamCreateInfoEXT-geometryStreams-02324");
     pipe.CreateGraphicsPipeline();
     m_errorMonitor->VerifyFound();
 }
@@ -721,12 +727,9 @@ TEST_F(NegativeTransformFeedback, RuntimeSpirv) {
                OpFunctionEnd
         )asm";
 
-        auto vs = VkShaderObj::CreateFromASM(this, vsSource.str().c_str(), VK_SHADER_STAGE_VERTEX_BIT);
-
-        const auto set_info = [&](CreatePipelineHelper &helper) {
-            helper.shader_stages_ = {vs->GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
-        };
-        CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-XfbStride-06313");
+        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-XfbStride-06313");
+        VkShaderObj::CreateFromASM(this, vsSource.str().c_str(), VK_SHADER_STAGE_VERTEX_BIT);
+        m_errorMonitor->VerifyFound();
     }
 
     {
@@ -774,12 +777,9 @@ TEST_F(NegativeTransformFeedback, RuntimeSpirv) {
                OpFunctionEnd
         )asm";
 
-        auto gs = VkShaderObj::CreateFromASM(this, gsSource.str().c_str(), VK_SHADER_STAGE_GEOMETRY_BIT);
-
-        const auto set_info = [&](CreatePipelineHelper &helper) {
-            helper.shader_stages_ = {helper.vs_->GetStageCreateInfo(), gs->GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
-        };
-        CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-OpEmitStreamVertex-06310");
+        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-OpEmitStreamVertex-06310");
+        VkShaderObj::CreateFromASM(this, gsSource.str().c_str(), VK_SHADER_STAGE_GEOMETRY_BIT);
+        m_errorMonitor->VerifyFound();
     }
 
     if (transform_feedback_props.transformFeedbackStreamsLinesTriangles == VK_FALSE) {
@@ -834,13 +834,9 @@ TEST_F(NegativeTransformFeedback, RuntimeSpirv) {
                OpFunctionEnd
         )asm";
 
-        auto gs = VkShaderObj::CreateFromASM(this, gsSource, VK_SHADER_STAGE_GEOMETRY_BIT);
-
-        const auto set_info = [&](CreatePipelineHelper &helper) {
-            helper.shader_stages_ = {helper.vs_->GetStageCreateInfo(), gs->GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
-        };
-        CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit,
-                                          "VUID-RuntimeSpirv-transformFeedbackStreamsLinesTriangles-06311");
+        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-transformFeedbackStreamsLinesTriangles-06311");
+        VkShaderObj::CreateFromASM(this, gsSource, VK_SHADER_STAGE_GEOMETRY_BIT);
+        m_errorMonitor->VerifyFound();
     }
 
     {
@@ -889,17 +885,13 @@ TEST_F(NegativeTransformFeedback, RuntimeSpirv) {
                OpFunctionEnd
         )asm";
 
-        auto gs = VkShaderObj::CreateFromASM(this, gsSource.str().c_str(), VK_SHADER_STAGE_GEOMETRY_BIT);
-
-        const auto set_info = [&](CreatePipelineHelper &helper) {
-            helper.shader_stages_ = {helper.vs_->GetStageCreateInfo(), gs->GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
-        };
-        std::vector<std::string> vuids = {"VUID-RuntimeSpirv-Offset-06308"};
+        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-Offset-06308");
         if (transform_feedback_props.maxTransformFeedbackBufferDataSize + 4 >=
             transform_feedback_props.maxTransformFeedbackStreamDataSize) {
-            vuids.push_back("VUID-RuntimeSpirv-XfbBuffer-06309");
+            m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-XfbBuffer-06309");
         }
-        CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, vuids);
+        VkShaderObj::CreateFromASM(this, gsSource.str().c_str(), VK_SHADER_STAGE_GEOMETRY_BIT);
+        m_errorMonitor->VerifyFound();
     }
 
     {
@@ -948,12 +940,9 @@ TEST_F(NegativeTransformFeedback, RuntimeSpirv) {
                OpFunctionEnd
         )asm";
 
-        auto gs = VkShaderObj::CreateFromASM(this, gsSource.str().c_str(), VK_SHADER_STAGE_GEOMETRY_BIT);
-
-        const auto set_info = [&](CreatePipelineHelper &helper) {
-            helper.shader_stages_ = {helper.vs_->GetStageCreateInfo(), gs->GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
-        };
-        CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-Stream-06312");
+        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-Stream-06312");
+        VkShaderObj::CreateFromASM(this, gsSource.str().c_str(), VK_SHADER_STAGE_GEOMETRY_BIT);
+        m_errorMonitor->VerifyFound();
     }
 
     {
@@ -1019,13 +1008,9 @@ TEST_F(NegativeTransformFeedback, RuntimeSpirv) {
                OpFunctionEnd
         )asm";
 
-            auto gs = VkShaderObj::CreateFromASM(this, gsSource.str().c_str(), VK_SHADER_STAGE_GEOMETRY_BIT);
-
-            const auto set_info = [&](CreatePipelineHelper &helper) {
-                helper.shader_stages_ = {helper.vs_->GetStageCreateInfo(), gs->GetStageCreateInfo(),
-                                         helper.fs_->GetStageCreateInfo()};
-            };
-            CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-XfbBuffer-06309");
+            m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-XfbBuffer-06309");
+            VkShaderObj::CreateFromASM(this, gsSource.str().c_str(), VK_SHADER_STAGE_GEOMETRY_BIT);
+            m_errorMonitor->VerifyFound();
         }
     }
 }
@@ -1052,14 +1037,11 @@ TEST_F(NegativeTransformFeedback, PipelineRasterizationStateStreamCreateInfoEXT)
     VkPipelineRasterizationStateStreamCreateInfoEXT rasterization_state_stream_ci = vku::InitStructHelper();
     rasterization_state_stream_ci.rasterizationStream = transfer_feedback_props.maxTransformFeedbackStreams;
     pipe.rs_state_ci_.pNext = &rasterization_state_stream_ci;
-    pipe.InitState();
 
     if (transfer_feedback_props.transformFeedbackRasterizationStreamSelect) {
-        m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_ERROR_BIT_EXT,
-                                             "VUID-VkPipelineRasterizationStateStreamCreateInfoEXT-rasterizationStream-02325");
+        m_errorMonitor->SetDesiredError("VUID-VkPipelineRasterizationStateStreamCreateInfoEXT-rasterizationStream-02325");
     } else {
-        m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_ERROR_BIT_EXT,
-                                             "VUID-VkPipelineRasterizationStateStreamCreateInfoEXT-rasterizationStream-02326");
+        m_errorMonitor->SetDesiredError("VUID-VkPipelineRasterizationStateStreamCreateInfoEXT-rasterizationStream-02326");
     }
     pipe.CreateGraphicsPipeline();
     m_errorMonitor->VerifyFound();
@@ -1099,24 +1081,26 @@ TEST_F(NegativeTransformFeedback, CmdNextSubpass) {
 
     vkt::RenderPass rp(*m_device, rpci);
 
-    VkImageObj image(m_device);
-    image.InitNoLayout(32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    vkt::Image image(*m_device, 32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     vkt::ImageView imageView = image.CreateView();
     vkt::Framebuffer fb(*m_device, rp.handle(), 1, &imageView.handle());
 
     CreatePipelineHelper pipe(*this);
     pipe.gp_ci_.renderPass = rp.handle();
-    pipe.InitState();
     auto vs = VkShaderObj::CreateFromASM(this, kXfbVsSource, VK_SHADER_STAGE_VERTEX_BIT);
     pipe.shader_stages_[0] = vs->GetStageCreateInfo();
     pipe.CreateGraphicsPipeline();
 
     m_commandBuffer->begin();
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+
+    vkt::Buffer buffer(*m_device, 16, VK_BUFFER_USAGE_TRANSFORM_FEEDBACK_BUFFER_BIT_EXT);
+    VkDeviceSize offset = 0;
+    vk::CmdBindTransformFeedbackBuffersEXT(m_commandBuffer->handle(), 0, 1, &buffer.handle(), &offset, nullptr);
 
     m_commandBuffer->BeginRenderPass(rp.handle(), fb.handle(), 32, 32);
     vk::CmdBeginTransformFeedbackEXT(m_commandBuffer->handle(), 0, 1, nullptr, nullptr);
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdNextSubpass-None-02349");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdNextSubpass-None-02349");
     m_commandBuffer->NextSubpass();
     m_errorMonitor->VerifyFound();
 }
@@ -1127,11 +1111,10 @@ TEST_F(NegativeTransformFeedback, CmdBeginTransformFeedbackOutsideRenderPass) {
     InitRenderTarget();
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitState();
     pipe.CreateGraphicsPipeline();
 
     m_commandBuffer->begin();
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
 
     VkBufferCreateInfo info = vku::InitStructHelper();
     info.usage = VK_BUFFER_USAGE_TRANSFORM_FEEDBACK_COUNTER_BUFFER_BIT_EXT;
@@ -1139,7 +1122,7 @@ TEST_F(NegativeTransformFeedback, CmdBeginTransformFeedbackOutsideRenderPass) {
     vkt::Buffer const buffer_obj(*m_device, info);
     VkDeviceSize const offsets[1]{1};
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBeginTransformFeedbackEXT-renderpass");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdBeginTransformFeedbackEXT-renderpass");
     vk::CmdBeginTransformFeedbackEXT(m_commandBuffer->handle(), 0, 1, &buffer_obj.handle(), offsets);
     m_errorMonitor->VerifyFound();
 }
@@ -1152,13 +1135,15 @@ TEST_F(NegativeTransformFeedback, XfbExecutionModeCommand) {
 
     // default Vertex shader will not have Xfb
     CreatePipelineHelper pipe(*this);
-    pipe.InitState();
     pipe.CreateGraphicsPipeline();
 
     m_commandBuffer->begin();
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_);
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBeginTransformFeedbackEXT-None-04128");
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vkt::Buffer buffer(*m_device, 16, VK_BUFFER_USAGE_TRANSFORM_FEEDBACK_BUFFER_BIT_EXT);
+    VkDeviceSize offset = 0;
+    vk::CmdBindTransformFeedbackBuffersEXT(m_commandBuffer->handle(), 0, 1, &buffer.handle(), &offset, nullptr);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdBeginTransformFeedbackEXT-None-04128");
     vk::CmdBeginTransformFeedbackEXT(m_commandBuffer->handle(), 0, 1, nullptr, nullptr);
     m_errorMonitor->VerifyFound();
     m_commandBuffer->EndRenderPass();
@@ -1175,10 +1160,9 @@ TEST_F(NegativeTransformFeedback, XfbExecutionModePipeline) {
     VkShaderObj gs(this, kGeometryMinimalGlsl, VK_SHADER_STAGE_GEOMETRY_BIT);
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitState();
     pipe.shader_stages_ = {vs->GetStageCreateInfo(), gs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-pStages-02318");
+    m_errorMonitor->SetDesiredError("VUID-VkGraphicsPipelineCreateInfo-pStages-02318");
     pipe.CreateGraphicsPipeline();
     m_errorMonitor->VerifyFound();
 }

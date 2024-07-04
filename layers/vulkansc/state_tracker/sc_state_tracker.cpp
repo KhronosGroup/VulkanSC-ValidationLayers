@@ -26,6 +26,8 @@
 #include "generated/chassis.h"
 #include "state_tracker/device_state.h"
 #include "state_tracker/image_state.h"
+#include "state_tracker/descriptor_sets.h"
+#include "state_tracker/render_pass_state.h"
 #include "vulkansc/state_tracker/sc_state_tracker.h"
 #include "core_checks/core_validation.h"
 #include "sync/sync_validation.h"
@@ -69,8 +71,8 @@ void SCValidationStateTracker<BASE>::RecyclePipelinePoolEntry(const VkPipelineOf
 }
 
 template <typename BASE>
-void SCValidationStateTracker<BASE>::CreateDevice(const VkDeviceCreateInfo *pCreateInfo) {
-    BASE::CreateDevice(pCreateInfo);
+void SCValidationStateTracker<BASE>::CreateDevice(const VkDeviceCreateInfo *pCreateInfo, const Location& loc) {
+    BASE::CreateDevice(pCreateInfo, loc);
 
     const auto *sc_10_features = vku::FindStructInPNextChain<VkPhysicalDeviceVulkanSC10Features>(pCreateInfo->pNext);
     if (sc_10_features != nullptr) {
@@ -167,7 +169,7 @@ template <typename BASE>
 std::shared_ptr<vvl::CommandPool> SCValidationStateTracker<BASE>::CreateCommandPoolState(
     VkCommandPool command_pool, const VkCommandPoolCreateInfo *pCreateInfo) {
     auto queue_flags = BASE::physical_device_state->queue_family_properties[pCreateInfo->queueFamilyIndex].queueFlags;
-    return std::make_shared<vvl::sc::CommandPool>(this, command_pool, pCreateInfo, queue_flags);
+    return std::make_shared<vvl::sc::CommandPool>(*this, command_pool, pCreateInfo, queue_flags);
 }
 
 template <typename BASE>
@@ -187,14 +189,14 @@ template <typename BASE>
 std::shared_ptr<vvl::PipelineCache> SCValidationStateTracker<BASE>::CreatePipelineCacheState(
     VkPipelineCache pipeline_cache, const VkPipelineCacheCreateInfo *pCreateInfo) const {
     return std::static_pointer_cast<vvl::PipelineCache>(
-        std::make_shared<vvl::sc::PipelineCache>(this, pipeline_cache, pCreateInfo));
+        std::make_shared<vvl::sc::PipelineCache>(*this, pipeline_cache, pCreateInfo));
 }
 
 template <typename BASE>
 std::shared_ptr<vvl::Pipeline> SCValidationStateTracker<BASE>::CreateGraphicsPipelineState(
     const VkGraphicsPipelineCreateInfo *pCreateInfo, std::shared_ptr<const vvl::PipelineCache> pipeline_cache,
     std::shared_ptr<const vvl::RenderPass> &&render_pass, std::shared_ptr<const vvl::PipelineLayout> &&layout,
-    CreateShaderModuleStates *csm_states) const {
+    ShaderModuleUniqueIds *shader_unique_id_map) const {
     // If any of the VkPipelineShaderStageCreateInfo entries are missing:
     //  * the entry point name (pName == NULL)
     //  * specialization info (pSpecializationInfo == NULL), if necessary
@@ -235,7 +237,7 @@ std::shared_ptr<vvl::Pipeline> SCValidationStateTracker<BASE>::CreateGraphicsPip
     }
 
     return std::static_pointer_cast<vvl::Pipeline>(std::make_shared<vvl::sc::Pipeline>(
-        this, pCreateInfo, std::move(pipeline_cache), std::move(render_pass), std::move(layout), csm_states));
+        *this, pCreateInfo, std::move(pipeline_cache), std::move(render_pass), std::move(layout), shader_unique_id_map));
 }
 
 template <typename BASE>
@@ -272,15 +274,16 @@ std::shared_ptr<vvl::Pipeline> SCValidationStateTracker<BASE>::CreateComputePipe
     }
 
     return std::static_pointer_cast<vvl::Pipeline>(
-        std::make_shared<vvl::sc::Pipeline>(this, pCreateInfo, std::move(pipeline_cache), std::move(layout)));
+        std::make_shared<vvl::sc::Pipeline>(*this, pCreateInfo, std::move(pipeline_cache), std::move(layout)));
 }
 
 template <typename BASE>
 void SCValidationStateTracker<BASE>::PostCallRecordCreateGraphicsPipelines(
     VkDevice device, VkPipelineCache pipelineCache, uint32_t count, const VkGraphicsPipelineCreateInfo *pCreateInfos,
-    const VkAllocationCallbacks *pAllocator, VkPipeline *pPipelines, const RecordObject &record_obj, void *cgpl_state_data) {
+    const VkAllocationCallbacks *pAllocator, VkPipeline *pPipelines, const RecordObject &record_obj, PipelineStates& pipeline_states,
+                                               chassis::CreateGraphicsPipelines& chassis_state) {
     BASE::PostCallRecordCreateGraphicsPipelines(device, pipelineCache, count, pCreateInfos, pAllocator, pPipelines, record_obj,
-                                                cgpl_state_data);
+                                                pipeline_states, chassis_state);
 
     ReservePipelinePoolEntries(count, pCreateInfos);
 
@@ -297,9 +300,10 @@ void SCValidationStateTracker<BASE>::PostCallRecordCreateGraphicsPipelines(
 template <typename BASE>
 void SCValidationStateTracker<BASE>::PostCallRecordCreateComputePipelines(
     VkDevice device, VkPipelineCache pipelineCache, uint32_t count, const VkComputePipelineCreateInfo *pCreateInfos,
-    const VkAllocationCallbacks *pAllocator, VkPipeline *pPipelines, const RecordObject &record_obj, void *ccpl_state_data) {
+    const VkAllocationCallbacks *pAllocator, VkPipeline *pPipelines, const RecordObject &record_obj, PipelineStates& pipeline_states,
+                                               chassis::CreateComputePipelines& chassis_state) {
     BASE::PostCallRecordCreateComputePipelines(device, pipelineCache, count, pCreateInfos, pAllocator, pPipelines, record_obj,
-                                               ccpl_state_data);
+                                               pipeline_states, chassis_state);
 
     ReservePipelinePoolEntries(count, pCreateInfos);
 
@@ -419,8 +423,8 @@ void SCValidationStateTracker<BASE>::PreCallRecordDestroyRenderPass(VkDevice dev
                                                                     const RecordObject &record_obj) {
     auto rp_state = Get<vvl::RenderPass>(renderPass);
     if (rp_state) {
-        sc_reserved_objects_.subpass_descriptions.fetch_sub(rp_state->createInfo.subpassCount);
-        sc_reserved_objects_.attachment_descriptions.fetch_sub(rp_state->createInfo.attachmentCount);
+        sc_reserved_objects_.subpass_descriptions.fetch_sub(rp_state->create_info.subpassCount);
+        sc_reserved_objects_.attachment_descriptions.fetch_sub(rp_state->create_info.attachmentCount);
     }
 
     BASE::PreCallRecordDestroyRenderPass(device, renderPass, pAllocator, record_obj);

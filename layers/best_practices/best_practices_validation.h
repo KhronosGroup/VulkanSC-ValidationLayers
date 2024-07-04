@@ -23,6 +23,7 @@
 #include "state_tracker/state_tracker.h"
 #include "state_tracker/cmd_buffer_state.h"
 #include <string>
+#include <deque>
 #include <chrono>
 
 static const uint32_t kMemoryObjectWarningLimit = 250;
@@ -229,17 +230,17 @@ class BestPractices : public ValidationStateTracker {
     bool PreCallValidateCreateRenderPass(VkDevice device, const VkRenderPassCreateInfo* pCreateInfo,
                                          const VkAllocationCallbacks* pAllocator, VkRenderPass* pRenderPass,
                                          const ErrorObject& error_obj) const override;
-    bool ValidateAttachments(const VkRenderPassCreateInfo2* rpci, uint32_t attachmentCount, const VkImageView* image_views,
+    bool ValidateAttachments(const VkRenderPassCreateInfo2* rpci, uint32_t attachment_count, const VkImageView* attachments,
                              const Location& loc) const;
     bool PreCallValidateCreateFramebuffer(VkDevice device, const VkFramebufferCreateInfo* pCreateInfo,
                                           const VkAllocationCallbacks* pAllocator, VkFramebuffer* pFramebuffer,
                                           const ErrorObject& error_obj) const override;
     bool PreCallValidateAllocateDescriptorSets(VkDevice device, const VkDescriptorSetAllocateInfo* pAllocateInfo,
                                                VkDescriptorSet* pDescriptorSets, const ErrorObject& error_obj,
-                                               void* ads_state_data) const override;
+                                               vvl::AllocateDescriptorSetsData& ads_state_data) const override;
     void ManualPostCallRecordAllocateDescriptorSets(VkDevice device, const VkDescriptorSetAllocateInfo* pAllocateInfo,
                                                     VkDescriptorSet* pDescriptorSets, const RecordObject& record_obj,
-                                                    void* ads_state);
+                                                    vvl::AllocateDescriptorSetsData& ads_state);
     void PostCallRecordFreeDescriptorSets(VkDevice device, VkDescriptorPool descriptorPool, uint32_t descriptorSetCount,
                                           const VkDescriptorSet* pDescriptorSets, const RecordObject& record_obj) override;
     bool PreCallValidateAllocateMemory(VkDevice device, const VkMemoryAllocateInfo* pAllocateInfo,
@@ -284,25 +285,27 @@ class BestPractices : public ValidationStateTracker {
                                  const RecordObject& record_obj) override;
     bool PreCallValidateFreeMemory(VkDevice device, VkDeviceMemory memory, const VkAllocationCallbacks* pAllocator,
                                    const ErrorObject& error_obj) const override;
-    bool ValidateMultisampledBlendingArm(uint32_t createInfoCount, const VkGraphicsPipelineCreateInfo* pCreateInfos,
+    bool ValidateMultisampledBlendingArm(uint32_t create_info_count, const VkGraphicsPipelineCreateInfo* create_infos,
                                          const Location& create_info_loc) const;
 
     bool PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t createInfoCount,
                                                 const VkGraphicsPipelineCreateInfo* pCreateInfos,
                                                 const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,
-                                                const ErrorObject& error_obj, void* cgpl_state) const override;
+                                                const ErrorObject& error_obj, PipelineStates& pipeline_states,
+                                                chassis::CreateGraphicsPipelines& chassis_state) const override;
     bool PreCallValidateCreateComputePipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t createInfoCount,
                                                const VkComputePipelineCreateInfo* pCreateInfos,
                                                const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,
-                                               const ErrorObject& error_obj, void* pipe_state) const override;
+                                               const ErrorObject& error_obj, PipelineStates& pipeline_states,
+                                               chassis::CreateComputePipelines& chassis_state) const override;
 
-    bool ValidateCreateComputePipelineArm(const VkComputePipelineCreateInfo& createInfo, const Location& create_info_loc) const;
+    bool ValidateCreateComputePipelineArm(const VkComputePipelineCreateInfo& create_info, const Location& create_info_loc) const;
 
-    bool ValidateCreateComputePipelineAmd(const VkComputePipelineCreateInfo& createInfo, const Location& create_info_loc) const;
+    bool ValidateCreateComputePipelineAmd(const VkComputePipelineCreateInfo& create_info, const Location& create_info_loc) const;
 
-    bool CheckPipelineStageFlags(const Location& loc, VkPipelineStageFlags flags) const;
-    bool CheckPipelineStageFlags(const Location& loc, VkPipelineStageFlags2KHR flags) const;
-    bool CheckDependencyInfo(const Location& dep_loc, const VkDependencyInfoKHR& dep_info) const;
+    bool CheckPipelineStageFlags(const LogObjectList& objlist, const Location& loc, VkPipelineStageFlags flags) const;
+    bool CheckPipelineStageFlags(const LogObjectList& objlist, const Location& loc, VkPipelineStageFlags2KHR flags) const;
+    bool CheckDependencyInfo(const LogObjectList& objlist, const Location& dep_loc, const VkDependencyInfoKHR& dep_info) const;
     bool PreCallValidateQueueSubmit(VkQueue queue, uint32_t submitCount, const VkSubmitInfo* pSubmits, VkFence fence,
                                     const ErrorObject& error_obj) const override;
     bool PreCallValidateQueueSubmit2KHR(VkQueue queue, uint32_t submitCount, const VkSubmitInfo2KHR* pSubmits, VkFence fence,
@@ -551,6 +554,7 @@ class BestPractices : public ValidationStateTracker {
                                   const RecordObject& record_obj) override;
     void PreCallRecordCmdDispatchIndirect(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
                                           const RecordObject& record_obj) override;
+    bool PreCallValidateEndCommandBuffer(VkCommandBuffer commandBuffer, const ErrorObject& error_obj) const override;
     bool ValidateGetPhysicalDeviceDisplayPlanePropertiesKHRQuery(VkPhysicalDevice physicalDevice, const Location& loc) const;
     bool PreCallValidateGetDisplayPlaneSupportedDisplaysKHR(VkPhysicalDevice physicalDevice, uint32_t planeIndex,
                                                             uint32_t* pDisplayCount, VkDisplayKHR* pDisplays,
@@ -578,7 +582,7 @@ class BestPractices : public ValidationStateTracker {
     bool PreCallValidateGetPhysicalDeviceSurfaceFormatsKHR(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface,
                                                            uint32_t* pSurfaceFormatCount, VkSurfaceFormatKHR* pSurfaceFormats,
                                                            const ErrorObject& error_obj) const override;
-    bool ValidateCommonGetPhysicalDeviceQueueFamilyProperties(const vvl::PhysicalDevice* pd_state,
+    bool ValidateCommonGetPhysicalDeviceQueueFamilyProperties(const vvl::PhysicalDevice& pd_state,
                                                               uint32_t requested_queue_family_property_count,
                                                               const CALL_STATE call_state, const Location& loc) const;
     bool PreCallValidateBindAccelerationStructureMemoryNV(VkDevice device, uint32_t bindInfoCount,
@@ -657,7 +661,8 @@ class BestPractices : public ValidationStateTracker {
     void ManualPostCallRecordCreateGraphicsPipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t count,
                                                      const VkGraphicsPipelineCreateInfo* pCreateInfos,
                                                      const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,
-                                                     const RecordObject& record_obj, void* cgpl_state_data);
+                                                     const RecordObject& record_obj, PipelineStates& pipeline_states,
+                                                     chassis::CreateGraphicsPipelines& chassis_state);
 
     bool PreCallValidateAcquireNextImageKHR(VkDevice device, VkSwapchainKHR swapchain, uint64_t timeout, VkSemaphore semaphore,
                                             VkFence fence, uint32_t* pImageIndex, const ErrorObject& error_obj) const override;
@@ -727,7 +732,8 @@ class BestPractices : public ValidationStateTracker {
     void ManualPostCallRecordCreateComputePipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t createInfoCount,
                                                     const VkComputePipelineCreateInfo* pCreateInfos,
                                                     const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,
-                                                    const RecordObject& record_obj, void* state_data);
+                                                    const RecordObject& record_obj, PipelineStates& pipeline_states,
+                                                    chassis::CreateComputePipelines& chassis_state);
 
     void PostCallRecordCmdPipelineBarrier(VkCommandBuffer commandBuffer, VkPipelineStageFlags srcStageMask,
                                           VkPipelineStageFlags dstStageMask, VkDependencyFlags dependencyFlags,
@@ -745,7 +751,7 @@ class BestPractices : public ValidationStateTracker {
     void PreCallRecordCreateGraphicsPipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t createInfoCount,
                                               const VkGraphicsPipelineCreateInfo* pCreateInfos,
                                               const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,
-                                              const RecordObject& record_obj, void* cgpl_state) override;
+                                              const RecordObject& record_obj) override;
 
     bool PreCallValidateUpdateDescriptorSets(VkDevice device, uint32_t descriptorWriteCount,
                                              const VkWriteDescriptorSet* pDescriptorWrites, uint32_t descriptorCopyCount,
@@ -842,7 +848,7 @@ class BestPractices : public ValidationStateTracker {
                                                                std::shared_ptr<const vvl::PipelineCache> pipeline_cache,
                                                                std::shared_ptr<const vvl::RenderPass>&& render_pass,
                                                                std::shared_ptr<const vvl::PipelineLayout>&& layout,
-                                                               CreateShaderModuleStates* csm_states) const final;
+                                                               ShaderModuleUniqueIds* shader_unique_id_map) const final;
 
   private:
     // CacheEntry and PostTransformLRUCacheModel are used on the stack

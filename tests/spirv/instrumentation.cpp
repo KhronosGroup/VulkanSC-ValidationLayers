@@ -14,15 +14,18 @@
 #include <vector>
 #include <memory>
 #include <cstring>
+#include <chrono>
 
 #include "module.h"
 
 static constexpr uint32_t kDefaultShaderId = 23;
-static constexpr uint32_t kDefaultDescriptorSet = 3;
+static constexpr uint32_t kInstDefaultDescriptorSet = 3;
 
+static bool timer = false;
 static bool all_passes = false;
 static bool bindless_descriptor_pass = false;
 static bool buffer_device_address_pass = false;
+static bool ray_query_pass = false;
 
 void PrintUsage(const char* program) {
     printf(R"(
@@ -39,6 +42,10 @@ USAGE: %s <input> -o <output> <passes>
                Runs BindlessDescriptorPass
   --buffer-device-address
                Runs BufferDeviceAddressPass
+  --ray-query
+               Runs RayQueryPass
+  --timer
+               Prints time it takes to instrument entire module
   -h, --help
                Print this help)");
     printf("\n");
@@ -58,12 +65,16 @@ bool ParseFlags(int argc, char** argv, const char** out_file) {
                 PrintUsage(argv[0]);
                 return false;
             }
+        } else if (0 == strcmp(cur_arg, "--timer")) {
+            timer = true;
         } else if (0 == strcmp(cur_arg, "--all-passes")) {
             all_passes = true;
         } else if (0 == strcmp(cur_arg, "--bindless-descriptor")) {
             bindless_descriptor_pass = true;
         } else if (0 == strcmp(cur_arg, "--buffer-device-address")) {
             buffer_device_address_pass = true;
+        } else if (0 == strcmp(cur_arg, "--ray-query")) {
+            ray_query_pass = true;
         } else if (0 == strncmp(cur_arg, "--", 2)) {
             printf("Unknown pass %s\n", cur_arg);
             PrintUsage(argv[0]);
@@ -107,18 +118,32 @@ int main(int argc, char** argv) {
     }
     fclose(fp);
 
-    gpuav::spirv::Module module(spirv_data, kDefaultShaderId, kDefaultDescriptorSet);
+    std::chrono::time_point<std::chrono::high_resolution_clock> start_time;
+    if (timer) {
+        start_time = std::chrono::high_resolution_clock::now();
+    }
+
+    gpuav::spirv::Module module(spirv_data, kDefaultShaderId, kInstDefaultDescriptorSet);
     if (all_passes || bindless_descriptor_pass) {
-        module.RunPassBindlessDescriptorPass();
+        module.RunPassBindlessDescriptor();
     }
     if (all_passes || buffer_device_address_pass) {
         module.RunPassBufferDeviceAddress();
+    }
+    if (all_passes || ray_query_pass) {
+        module.RunPassRayQuery();
     }
 
     for (const auto info : module.link_info_) {
         module.LinkFunction(info);
     }
     module.ToBinary(spirv_data);
+
+    if (timer) {
+        auto end_time = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double, std::milli> duration = end_time - start_time;
+        std::cout << "Time = " << duration.count() << "ms\n";
+    }
 
     fp = fopen(out_file, "wb");
     if (!fp) {

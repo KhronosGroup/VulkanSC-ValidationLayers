@@ -15,6 +15,7 @@
 # limitations under the License.
 # ~~~
 if (VULKANSC)
+    add_subdirectory(icd)
     add_subdirectory(vulkansc)
     return() # Return early
 endif()
@@ -32,6 +33,8 @@ target_sources(vk_layer_validation_tests PRIVATE
     framework/pipeline_helper.cpp
     framework/shader_helper.h
     framework/shader_helper.cpp
+    framework/shader_object_helper.h
+    framework/shader_object_helper.cpp
     framework/test_common.h
     framework/shader_templates.h
     framework/error_monitor.cpp
@@ -75,6 +78,8 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/buffer_positive.cpp
     unit/command.cpp
     unit/command_positive.cpp
+    unit/copy_buffer_image.cpp
+    unit/copy_buffer_image_positive.cpp
     unit/debug_extensions.cpp
     unit/debug_extensions_positive.cpp
     unit/debug_printf.cpp
@@ -87,6 +92,8 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/device_queue.cpp
     unit/dynamic_rendering.cpp
     unit/dynamic_rendering_positive.cpp
+    unit/dynamic_rendering_local_read.cpp
+    unit/dynamic_rendering_local_read_positive.cpp
     unit/dynamic_state.cpp
     unit/dynamic_state_positive.cpp
     unit/external_memory_sync.cpp
@@ -104,8 +111,13 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/gpu_av_oob.cpp
     unit/gpu_av_oob_positive.cpp
     unit/gpu_av_positive.cpp
+    unit/gpu_av_shader_object_positive.cpp
     unit/gpu_av_spirv.cpp
     unit/gpu_av_spirv_positive.cpp
+    unit/gpu_av_ray_query.cpp
+    unit/gpu_av_ray_query_positive.cpp
+    unit/gpu_av_ray_tracing.cpp
+    unit/gpu_av_ray_tracing_positive.cpp
     unit/graphics_library.cpp
     unit/graphics_library_positive.cpp
     unit/host_image_copy.cpp
@@ -147,8 +159,6 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/query_positive.cpp
     unit/ray_tracing.cpp
     unit/ray_tracing_nv.cpp
-    unit/ray_tracing_gpu_nv.cpp
-    unit/ray_tracing_gpu.cpp
     unit/ray_tracing_pipeline.cpp
     unit/ray_tracing_pipeline_positive.cpp
     unit/ray_tracing_pipeline_nv.cpp
@@ -160,6 +170,8 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/robustness_positive.cpp
     unit/sampler.cpp
     unit/sampler_positive.cpp
+    unit/secondary_command_buffer.cpp
+    unit/secondary_command_buffer_positive.cpp
     unit/shader_compute.cpp
     unit/shader_compute_positive.cpp
     unit/shader_cooperative_matrix.cpp
@@ -243,8 +255,6 @@ elseif(MSVC)
         /wd4267 # Disable some signed/unsigned mismatch warnings.
     )
 
-    set_target_properties(vk_layer_validation_tests PROPERTIES VS_DEBUGGER_ENVIRONMENT "VK_LAYER_PATH=$<TARGET_FILE_DIR:vvl>")
-
     if (CMAKE_SIZEOF_VOID_P EQUAL 4)
         # Due to IHV driver issues, we need the extra 2GB of virtual address space for 32 bit testing
         target_link_options(vk_layer_validation_tests PRIVATE /LARGEADDRESSAWARE)
@@ -268,6 +278,15 @@ target_link_libraries(vk_layer_validation_tests PRIVATE
     $<TARGET_NAME_IF_EXISTS:PkgConfig::WAYlAND_CLIENT>
 )
 
+# setup framework/config.h using framework/config.h.in as a source
+file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/config_$<CONFIG>.h" INPUT "${CMAKE_CURRENT_SOURCE_DIR}/framework/config.h.in")
+
+# Since config_$<CONFIG>.h differs per build, set a compiler definition that files can use to include it
+target_compile_definitions(vk_layer_validation_tests PRIVATE CONFIG_HEADER_FILE="config_$<CONFIG>.h")
+
+target_sources(vk_layer_validation_tests PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/config_$<CONFIG>.h)
+target_include_directories(vk_layer_validation_tests PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+
 # More details in tests/android/mock/README.md
 option(VVL_MOCK_ANDROID "Enable building for Android on desktop for testing with MockICD setup")
 if(VVL_MOCK_ANDROID)
@@ -287,3 +306,4 @@ gtest_discover_tests(vk_layer_validation_tests DISCOVERY_TIMEOUT 100)
 
 add_subdirectory(spirv)
 add_subdirectory(layers)
+add_subdirectory(icd)

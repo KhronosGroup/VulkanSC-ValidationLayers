@@ -146,7 +146,7 @@ class SCCoreChecks : public SCValidationStateTracker<CoreChecks> {
     bool PreCallValidateCreateDevice(VkPhysicalDevice physicalDevice, const VkDeviceCreateInfo* pCreateInfo,
                                      const VkAllocationCallbacks* pAllocator, VkDevice* pDevice,
                                      const ErrorObject& error_obj) const override;
-    void CreateDevice(const VkDeviceCreateInfo* pCreateInfo) override;
+    void CreateDevice(const VkDeviceCreateInfo* pCreateInfo, const Location& loc) override;
 
     bool PreCallValidateCreateCommandPool(VkDevice device, const VkCommandPoolCreateInfo* pCreateInfo,
                                           const VkAllocationCallbacks* pAllocator, VkCommandPool* pCommandPool,
@@ -164,18 +164,20 @@ class SCCoreChecks : public SCValidationStateTracker<CoreChecks> {
                                              const ErrorObject& error_obj) const override;
     bool PreCallValidateAllocateDescriptorSets(VkDevice device, const VkDescriptorSetAllocateInfo* pAllocateInfo,
                                                VkDescriptorSet* pDescriptorSets, const ErrorObject& error_obj,
-                                               void* ads_state) const override;
+                                               vvl::AllocateDescriptorSetsData& ads_state_data) const override;
     bool PreCallValidateAllocateMemory(VkDevice device, const VkMemoryAllocateInfo* pAllocateInfo,
                                        const VkAllocationCallbacks* pAllocator, VkDeviceMemory* pMemory,
                                        const ErrorObject& error_obj) const override;
     bool PreCallValidateCreateComputePipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t count,
                                                const VkComputePipelineCreateInfo* pCreateInfos,
                                                const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,
-                                               const ErrorObject& error_obj, void* pipe_state) const override;
+                                               const ErrorObject& error_obj, PipelineStates& pipeline_states,
+                                               chassis::CreateComputePipelines& chassis_state) const override;
     bool PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t count,
                                                 const VkGraphicsPipelineCreateInfo* pCreateInfos,
                                                 const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,
-                                                const ErrorObject& error_obj, void* cgpl_state) const override;
+                                                const ErrorObject& error_obj, PipelineStates& pipeline_states,
+                                                chassis::CreateGraphicsPipelines& chassis_state) const override;
     bool PreCallValidateCreatePipelineCache(VkDevice device, const VkPipelineCacheCreateInfo* pCreateInfo,
                                             const VkAllocationCallbacks* pAllocator, VkPipelineCache* pPipelineCache,
                                             const ErrorObject& error_obj) const override;

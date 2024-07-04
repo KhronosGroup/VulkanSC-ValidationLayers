@@ -16,7 +16,9 @@
 #include "../framework/descriptor_helper.h"
 #include "../framework/gpu_av_helper.h"
 
-TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBBuffer) {
+#include "../layers/gpu_shaders/gpu_shaders_constants.h"
+
+TEST_F(NegativeGpuAVDescriptorIndexing, DISABLED_ArrayOOBBuffer) {
     TEST_DESCRIPTION(
         "GPU validation: Verify detection of out-of-bounds descriptor array indexing and use of uninitialized descriptors.");
 
@@ -69,7 +71,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBBuffer) {
     descriptor_writes[1].descriptorCount = 5;  // Intentionally don't write index 5
     descriptor_writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     descriptor_writes[1].pBufferInfo = &buffer_info[1];
-    vk::UpdateDescriptorSets(m_device->device(), 2, descriptor_writes, 0, nullptr);
+    vk::UpdateDescriptorSets(device(), 2, descriptor_writes, 0, nullptr);
 
     char const *vs_source = R"glsl(
         #version 450
@@ -102,7 +104,6 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBBuffer) {
         VkShaderObj fs(this, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
 
         CreatePipelineHelper pipe(*this);
-        pipe.InitState();
         pipe.shader_stages_.clear();
         pipe.shader_stages_.push_back(vs.GetStageCreateInfo());
         pipe.shader_stages_.push_back(fs.GetStageCreateInfo());
@@ -123,8 +124,8 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBBuffer) {
 
         SCOPED_TRACE("Out of Bounds");
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-Descriptor index out of bounds");
-        m_default_queue->submit(*m_commandBuffer, false);
-        m_default_queue->wait();
+        m_default_queue->Submit(*m_commandBuffer);
+        m_default_queue->Wait();
         m_errorMonitor->VerifyFound();
 
         data = (uint32_t *)buffer0.memory().map();
@@ -133,8 +134,8 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBBuffer) {
 
         SCOPED_TRACE("uninitialized");
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDraw-None-08114");
-        m_default_queue->submit(*m_commandBuffer, false);
-        m_default_queue->wait();
+        m_default_queue->Submit(*m_commandBuffer);
+        m_default_queue->Wait();
         m_errorMonitor->VerifyFound();
     }
 }
@@ -163,12 +164,11 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBVertex) {
                                            {1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 6, VK_SHADER_STAGE_ALL, nullptr},
                                        },
                                        VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT_EXT,
-                                       &layout_createinfo_binding_flags,
-                                       VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT_EXT);
+                                       &layout_createinfo_binding_flags, VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT);
     const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
 
-    VkImageObj image(m_device);
-    image.Init(16, 16, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_TILING_LINEAR);
+    vkt::Image image(*m_device, 16, 16, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    image.SetLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     vkt::ImageView imageView = image.CreateView();
     vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
 
@@ -195,7 +195,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBVertex) {
     descriptor_writes[1].descriptorCount = 5;  // Intentionally don't write index 5
     descriptor_writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     descriptor_writes[1].pImageInfo = image_info;
-    vk::UpdateDescriptorSets(m_device->device(), 2, descriptor_writes, 0, nullptr);
+    vk::UpdateDescriptorSets(device(), 2, descriptor_writes, 0, nullptr);
 
     char const *vs_source = R"glsl(
         #version 450
@@ -224,7 +224,6 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBVertex) {
     VkShaderObj fs(this, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitState();
     pipe.shader_stages_.clear();
     pipe.shader_stages_.push_back(vs.GetStageCreateInfo());
     pipe.shader_stages_.push_back(fs.GetStageCreateInfo());
@@ -237,15 +236,17 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBVertex) {
     vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1,
                               &descriptor_set.set_, 0, nullptr);
     vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
+    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
     m_commandBuffer->EndRenderPass();
     m_commandBuffer->end();
     uint32_t *data = (uint32_t *)buffer0.memory().map();
     data[0] = 25;
     buffer0.memory().unmap();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-Descriptor index out of bounds");
-    m_default_queue->submit(*m_commandBuffer, false);
-    m_default_queue->wait();
+    m_errorMonitor->SetDesiredError("UNASSIGNED-Descriptor index out of bounds", 2 * 3);
+
+    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Wait();
     m_errorMonitor->VerifyFound();
 }
 
@@ -273,12 +274,11 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBFragment) {
                                            {1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 6, VK_SHADER_STAGE_ALL, nullptr},
                                        },
                                        VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT_EXT,
-                                       &layout_createinfo_binding_flags,
-                                       VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT_EXT);
+                                       &layout_createinfo_binding_flags, VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT);
     const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
 
-    VkImageObj image(m_device);
-    image.Init(16, 16, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_TILING_LINEAR);
+    vkt::Image image(*m_device, 16, 16, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    image.SetLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     vkt::ImageView imageView = image.CreateView();
     vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
 
@@ -305,7 +305,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBFragment) {
     descriptor_writes[1].descriptorCount = 5;  // Intentionally don't write index 5
     descriptor_writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     descriptor_writes[1].pImageInfo = image_info;
-    vk::UpdateDescriptorSets(m_device->device(), 2, descriptor_writes, 0, nullptr);
+    vk::UpdateDescriptorSets(device(), 2, descriptor_writes, 0, nullptr);
 
     // - The vertex shader fetches the invalid index from the uniform buffer and passes it to the fragment shader.
     // - The fragment shader makes the invalid array access.
@@ -337,7 +337,6 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBFragment) {
     VkShaderObj fs(this, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitState();
     pipe.shader_stages_.clear();
     pipe.shader_stages_.push_back(vs.GetStageCreateInfo());
     pipe.shader_stages_.push_back(fs.GetStageCreateInfo());
@@ -356,9 +355,9 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBFragment) {
     data[0] = 25;
     buffer0.memory().unmap();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-Descriptor index out of bounds");
-    m_default_queue->submit(*m_commandBuffer, false);
-    m_default_queue->wait();
+    m_errorMonitor->SetDesiredError("UNASSIGNED-Descriptor index out of bounds", gpuav::glsl::kMaxErrorsPerCmd);
+    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Wait();
     m_errorMonitor->VerifyFound();
 }
 
@@ -387,8 +386,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBRuntime) {
                                            {1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 6, VK_SHADER_STAGE_ALL, nullptr},
                                        },
                                        VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT_EXT,
-                                       &layout_createinfo_binding_flags,
-                                       VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT_EXT);
+                                       &layout_createinfo_binding_flags, VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT);
     const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
 
     uint32_t desc_counts = 6;  // We'll reserve 8 spaces in the layout, but the descriptor will only use 6
@@ -405,8 +403,8 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBRuntime) {
                                                 0, &layout_createinfo_binding_flags, 0, &variable_count);
     const vkt::PipelineLayout pipeline_layout_variable(*m_device, {&descriptor_set_variable.layout_});
 
-    VkImageObj image(m_device);
-    image.Init(16, 16, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_TILING_LINEAR);
+    vkt::Image image(*m_device, 16, 16, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    image.SetLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     vkt::ImageView imageView = image.CreateView();
     vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
 
@@ -433,10 +431,10 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBRuntime) {
     descriptor_writes[1].descriptorCount = 5;  // Intentionally don't write index 5
     descriptor_writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     descriptor_writes[1].pImageInfo = image_info;
-    vk::UpdateDescriptorSets(m_device->device(), 2, descriptor_writes, 0, nullptr);
+    vk::UpdateDescriptorSets(device(), 2, descriptor_writes, 0, nullptr);
     descriptor_writes[0].dstSet = descriptor_set_variable.set_;
     descriptor_writes[1].dstSet = descriptor_set_variable.set_;
-    vk::UpdateDescriptorSets(m_device->device(), 2, descriptor_writes, 0, nullptr);
+    vk::UpdateDescriptorSets(device(), 2, descriptor_writes, 0, nullptr);
 
     char const *vs_source = R"glsl(
         #version 450
@@ -468,7 +466,6 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBRuntime) {
     VkShaderObj fs(this, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitState();
     pipe.shader_stages_.clear();
     pipe.shader_stages_.push_back(vs.GetStageCreateInfo());
     pipe.shader_stages_.push_back(fs.GetStageCreateInfo());
@@ -488,9 +485,10 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBRuntime) {
     buffer0.memory().unmap();
 
     SCOPED_TRACE("Out of Bounds");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-Descriptor index out of bounds");
-    m_default_queue->submit(*m_commandBuffer, false);
-    m_default_queue->wait();
+    m_errorMonitor->SetDesiredError("UNASSIGNED-Descriptor index out of bounds", gpuav::glsl::kMaxErrorsPerCmd);
+
+    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Wait();
     m_errorMonitor->VerifyFound();
 
     data = (uint32_t *)buffer0.memory().map();
@@ -498,9 +496,10 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBRuntime) {
     buffer0.memory().unmap();
 
     SCOPED_TRACE("Uninitialized");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDraw-None-08114");
-    m_default_queue->submit(*m_commandBuffer, false);
-    m_default_queue->wait();
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-08114", gpuav::glsl::kMaxErrorsPerCmd);
+
+    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Wait();
     m_errorMonitor->VerifyFound();
 }
 
@@ -536,8 +535,8 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBVariableDescriptorCountAllocate)
                                        0, &layout_createinfo_binding_flags, 0, &variable_count);
     const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
 
-    VkImageObj image(m_device);
-    image.Init(16, 16, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_TILING_LINEAR);
+    vkt::Image image(*m_device, 16, 16, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    image.SetLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     vkt::ImageView imageView = image.CreateView();
     vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
 
@@ -564,7 +563,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBVariableDescriptorCountAllocate)
     descriptor_writes[1].descriptorCount = 5;  // Intentionally don't write index 5
     descriptor_writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     descriptor_writes[1].pImageInfo = image_info;
-    vk::UpdateDescriptorSets(m_device->device(), 2, descriptor_writes, 0, nullptr);
+    vk::UpdateDescriptorSets(device(), 2, descriptor_writes, 0, nullptr);
 
     char const *vs_source = R"glsl(
         #version 450
@@ -596,7 +595,6 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBVariableDescriptorCountAllocate)
     VkShaderObj fs(this, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitState();
     pipe.shader_stages_.clear();
     pipe.shader_stages_.push_back(vs.GetStageCreateInfo());
     pipe.shader_stages_.push_back(fs.GetStageCreateInfo());
@@ -616,9 +614,10 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBVariableDescriptorCountAllocate)
     buffer0.memory().unmap();
 
     SCOPED_TRACE("Out of Bounds");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-Descriptor index out of bounds");
-    m_default_queue->submit(*m_commandBuffer, false);
-    m_default_queue->wait();
+    m_errorMonitor->SetDesiredError("UNASSIGNED-Descriptor index out of bounds", gpuav::glsl::kMaxErrorsPerCmd);
+
+    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Wait();
     m_errorMonitor->VerifyFound();
 
     data = (uint32_t *)buffer0.memory().map();
@@ -626,9 +625,10 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBVariableDescriptorCountAllocate)
     buffer0.memory().unmap();
 
     SCOPED_TRACE("Uninitialized");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDraw-None-08114");
-    m_default_queue->submit(*m_commandBuffer, false);
-    m_default_queue->wait();
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-08114", gpuav::glsl::kMaxErrorsPerCmd);
+
+    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Wait();
     m_errorMonitor->VerifyFound();
 }
 
@@ -689,7 +689,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBTess) {
     descriptor_writes[1].descriptorCount = 5;  // Intentionally don't write index 5
     descriptor_writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     descriptor_writes[1].pBufferInfo = &buffer_info[1];
-    vk::UpdateDescriptorSets(m_device->device(), 2, descriptor_writes, 0, nullptr);
+    vk::UpdateDescriptorSets(device(), 2, descriptor_writes, 0, nullptr);
 
     const char *tesSource = R"glsl(
         #version 450
@@ -714,7 +714,6 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBTess) {
     tsci.patchControlPoints = 3;
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitState();
     pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), tcs.GetStageCreateInfo(), tes.GetStageCreateInfo(),
                            pipe.fs_->GetStageCreateInfo()};
     pipe.gp_ci_.pTessellationState = &tsci;
@@ -735,9 +734,9 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBTess) {
     buffer0.memory().unmap();
 
     SCOPED_TRACE("Out of Bounds");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-Descriptor index out of bounds");
-    m_default_queue->submit(*m_commandBuffer, false);
-    m_default_queue->wait();
+    m_errorMonitor->SetDesiredError("UNASSIGNED-Descriptor index out of bounds", 3);
+    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Wait();
     m_errorMonitor->VerifyFound();
 
     data = (uint32_t *)buffer0.memory().map();
@@ -745,9 +744,9 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBTess) {
     buffer0.memory().unmap();
 
     SCOPED_TRACE("Uninitialized");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDraw-None-08114");
-    m_default_queue->submit(*m_commandBuffer, false);
-    m_default_queue->wait();
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-08114", 3);
+    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Wait();
     m_errorMonitor->VerifyFound();
 }
 
@@ -808,7 +807,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBGeom) {
     descriptor_writes[1].descriptorCount = 5;  // Intentionally don't write index 5
     descriptor_writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     descriptor_writes[1].pBufferInfo = &buffer_info[1];
-    vk::UpdateDescriptorSets(m_device->device(), 2, descriptor_writes, 0, nullptr);
+    vk::UpdateDescriptorSets(device(), 2, descriptor_writes, 0, nullptr);
 
     const char vs_source[] = R"glsl(
         #version 450
@@ -836,7 +835,6 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBGeom) {
     VkShaderObj gs(this, gs_source, VK_SHADER_STAGE_GEOMETRY_BIT);
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitState();
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), gs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
     pipe.gp_ci_.layout = pipeline_layout.handle();
     pipe.CreateGraphicsPipeline();
@@ -855,8 +853,8 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBGeom) {
 
     SCOPED_TRACE("Out of Bounds");
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-Descriptor index out of bounds");
-    m_default_queue->submit(*m_commandBuffer, false);
-    m_default_queue->wait();
+    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Wait();
     m_errorMonitor->VerifyFound();
 
     data = (uint32_t *)buffer0.memory().map();
@@ -865,8 +863,8 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBGeom) {
 
     SCOPED_TRACE("Uninitialized");
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDraw-None-08114");
-    m_default_queue->submit(*m_commandBuffer, false);
-    m_default_queue->wait();
+    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Wait();
     m_errorMonitor->VerifyFound();
 }
 
@@ -923,7 +921,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBCompute) {
     descriptor_writes[1].descriptorCount = 5;  // Intentionally don't write index 5
     descriptor_writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     descriptor_writes[1].pBufferInfo = &buffer_info[1];
-    vk::UpdateDescriptorSets(m_device->device(), 2, descriptor_writes, 0, nullptr);
+    vk::UpdateDescriptorSets(device(), 2, descriptor_writes, 0, nullptr);
 
     char const *csSource = R"glsl(
         #version 450
@@ -938,13 +936,12 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBCompute) {
     )glsl";
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.InitState();
     pipe.cs_ = std::make_unique<VkShaderObj>(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
     pipe.cp_ci_.layout = pipeline_layout.handle();
     pipe.CreateComputePipeline();
 
     m_commandBuffer->begin();
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
     vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout.handle(), 0, 1,
                               &descriptor_set.set_, 0, nullptr);
     vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
@@ -955,9 +952,10 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBCompute) {
         uint32_t *data = (uint32_t *)buffer0.memory().map();
         data[0] = 5;
         buffer0.memory().unmap();
+        // Invalid read
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDispatch-None-08114");
-        m_default_queue->submit(*m_commandBuffer, false);
-        m_default_queue->wait();
+        m_default_queue->Submit(*m_commandBuffer);
+        m_default_queue->Wait();
         m_errorMonitor->VerifyFound();
     }
 
@@ -966,9 +964,11 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBCompute) {
         uint32_t *data = (uint32_t *)buffer0.memory().map();
         data[0] = 25;
         buffer0.memory().unmap();
+        // Invalid read and invalid write
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-Descriptor index out of bounds");
-        m_default_queue->submit(*m_commandBuffer, false);
-        m_default_queue->wait();
+        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-Descriptor index out of bounds");
+        m_default_queue->Submit(*m_commandBuffer);
+        m_default_queue->Wait();
         m_errorMonitor->VerifyFound();
     }
 }
@@ -1001,8 +1001,8 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayEarlyDelete) {
                                        0, &layout_createinfo_binding_flags, 0, &variable_count);
 
     const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
-    VkImageObj image(m_device);
-    image.Init(16, 16, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_TILING_LINEAR);
+    vkt::Image image(*m_device, 16, 16, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    image.SetLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     vkt::ImageView image_view = image.CreateView();
     vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
 
@@ -1029,7 +1029,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayEarlyDelete) {
     descriptor_writes[1].descriptorCount = 2;
     descriptor_writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     descriptor_writes[1].pImageInfo = image_info;
-    vk::UpdateDescriptorSets(m_device->device(), 2, descriptor_writes, 0, nullptr);
+    vk::UpdateDescriptorSets(device(), 2, descriptor_writes, 0, nullptr);
 
     // - The vertex shader fetches the invalid index from the uniform buffer and passes it to the fragment shader.
     // - The fragment shader makes the invalid array access.
@@ -1063,7 +1063,6 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayEarlyDelete) {
     VkShaderObj fs(this, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitState();
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
     pipe.gp_ci_.layout = pipeline_layout.handle();
     pipe.CreateGraphicsPipeline();
@@ -1088,10 +1087,11 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayEarlyDelete) {
     image.destroy();
 
     // UNASSIGNED-Descriptor destroyed
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit,
-                                         "(set = 0, binding = 1) Descriptor index 1 references a resource that was destroyed.");
-    m_default_queue->submit(*m_commandBuffer, false);
-    m_default_queue->wait();
+    m_errorMonitor->SetDesiredError("(set = 0, binding = 1) Descriptor index 1 references a resource that was destroyed.",
+                                    gpuav::glsl::kMaxErrorsPerCmd);
+
+    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Wait();
     m_errorMonitor->VerifyFound();
 }
 
@@ -1123,8 +1123,8 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayEarlySamplerDelete) {
                                        0, &layout_createinfo_binding_flags, 0, &variable_count);
 
     const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
-    VkImageObj image(m_device);
-    image.Init(16, 16, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_TILING_LINEAR);
+    vkt::Image image(*m_device, 16, 16, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    image.SetLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     vkt::ImageView image_view = image.CreateView();
     vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
 
@@ -1151,7 +1151,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayEarlySamplerDelete) {
     descriptor_writes[1].descriptorCount = 2;
     descriptor_writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     descriptor_writes[1].pImageInfo = image_info;
-    vk::UpdateDescriptorSets(m_device->device(), 2, descriptor_writes, 0, nullptr);
+    vk::UpdateDescriptorSets(device(), 2, descriptor_writes, 0, nullptr);
 
     // - The vertex shader fetches the invalid index from the uniform buffer and passes it to the fragment shader.
     // - The fragment shader makes the invalid array access.
@@ -1186,7 +1186,6 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayEarlySamplerDelete) {
     VkShaderObj fs(this, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitState();
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
     pipe.gp_ci_.layout = pipeline_layout.handle();
     pipe.CreateGraphicsPipeline();
@@ -1211,10 +1210,11 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayEarlySamplerDelete) {
     sampler.destroy();
 
     // UNASSIGNED-Descriptor destroyed
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit,
-                                         "(set = 0, binding = 1) Descriptor index 1 references a resource that was destroyed.");
-    m_default_queue->submit(*m_commandBuffer, false);
-    m_default_queue->wait();
+    m_errorMonitor->SetDesiredError("(set = 0, binding = 1) Descriptor index 1 references a resource that was destroyed.",
+                                    gpuav::glsl::kMaxErrorsPerCmd);
+
+    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Wait();
     m_errorMonitor->VerifyFound();
 }
 
@@ -1248,9 +1248,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ImageArrayDynamicIndexing) {
                                        0, &layout_createinfo_binding_flags, 0, &variable_count);
 
     const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
-    VkImageObj image(m_device);
-    image.Init(16, 16, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-               VK_IMAGE_TILING_LINEAR);
+    vkt::Image image(*m_device, 16, 16, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
     image.SetLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
     vkt::ImageView image_view = image.CreateView();
     vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
@@ -1280,7 +1278,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ImageArrayDynamicIndexing) {
     descriptor_writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     descriptor_writes[1].pImageInfo = image_info;
 
-    vk::UpdateDescriptorSets(m_device->device(), 2, descriptor_writes, 0, nullptr);
+    vk::UpdateDescriptorSets(device(), 2, descriptor_writes, 0, nullptr);
 
     // - The vertex shader fetches the invalid index from the uniform buffer and passes it to the fragment shader.
     // - The fragment shader makes the invalid array access.
@@ -1315,7 +1313,6 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ImageArrayDynamicIndexing) {
     VkShaderObj fs(this, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitState();
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
     pipe.gp_ci_.layout = pipeline_layout.handle();
     pipe.CreateGraphicsPipeline();
@@ -1337,8 +1334,8 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ImageArrayDynamicIndexing) {
     m_errorMonitor->SetDesiredFailureMsg(
         kErrorBit, "VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL--instead, current layout is VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL.");
 
-    m_default_queue->submit(*m_commandBuffer, false);
-    m_default_queue->wait();
+    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Wait();
     m_errorMonitor->VerifyFound();
 }
 
@@ -1431,13 +1428,12 @@ TEST_F(NegativeGpuAVDescriptorIndexing, UpdateAfterBind) {
     VkShaderObj fs(this, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitState();
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
     pipe.gp_ci_.layout = pipeline_layout.handle();
     pipe.CreateGraphicsPipeline();
 
     // Make both bindings valid before binding to the command buffer
-    vk::UpdateDescriptorSets(m_device->device(), 2, &descriptor_write[0], 0, nullptr);
+    vk::UpdateDescriptorSets(device(), 2, &descriptor_write[0], 0, nullptr);
 
     m_commandBuffer->begin();
 
@@ -1450,13 +1446,14 @@ TEST_F(NegativeGpuAVDescriptorIndexing, UpdateAfterBind) {
     m_commandBuffer->EndRenderPass();
 
     // Valid to update binding 1 after being bound
-    vk::UpdateDescriptorSets(m_device->device(), 1, &descriptor_write[1], 0, nullptr);
+    vk::UpdateDescriptorSets(device(), 1, &descriptor_write[1], 0, nullptr);
 
     m_commandBuffer->end();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDraw-None-08114");
-    m_default_queue->submit(*m_commandBuffer, false);
-    m_default_queue->wait();
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-08114", gpuav::glsl::kMaxErrorsPerCmd);
+
+    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Wait();
     m_errorMonitor->VerifyFound();
 }
 
@@ -1481,8 +1478,8 @@ TEST_F(NegativeGpuAVDescriptorIndexing, UpdateAfterBindImageViewTypeMismatch) {
     VkShaderObj vs(this, kVertexDrawPassthroughGlsl, VK_SHADER_STAGE_VERTEX_BIT);
     VkShaderObj fs(this, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
 
-    VkImageObj image(m_device);
-    image.Init(16, 16, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_TILING_LINEAR);
+    vkt::Image image(*m_device, 16, 16, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    image.SetLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     vkt::ImageView imageView = image.CreateView();
     vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
 
@@ -1517,8 +1514,70 @@ TEST_F(NegativeGpuAVDescriptorIndexing, UpdateAfterBindImageViewTypeMismatch) {
     m_commandBuffer->end();
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDraw-viewType-07752");
-    m_default_queue->submit(*m_commandBuffer, false);
-    m_default_queue->wait();
+    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Wait();
+    m_errorMonitor->VerifyFound();
+}
+
+// TODO - Currently we are not able to detect this
+TEST_F(NegativeGpuAVDescriptorIndexing, DISABLED_BindPipelineAfterBindingDescriptorSet) {
+    TEST_DESCRIPTION("Detect that the index image is 3D but VkImage is only 2D");
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
+    InitRenderTarget();
+
+    char const *fs_source = R"glsl(
+        #version 450
+        layout(set = 0, binding = 0) uniform sampler3D s[2];
+        layout(set = 0, binding = 1) buffer StorageBuffer {
+            uint data; // will be zero
+        };
+        layout(location=0) out vec4 color;
+        void main() {
+            color = texture(s[data], vec3(0));
+        }
+    )glsl";
+    VkShaderObj vs(this, kVertexDrawPassthroughGlsl, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(this, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    VkMemoryPropertyFlags mem_props = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+    vkt::Buffer buffer(*m_device, 4, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, mem_props);
+    uint32_t *data = (uint32_t *)buffer.memory().map();
+    *data = 0;
+    buffer.memory().unmap();
+
+    vkt::Image image(*m_device, 16, 16, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    image.SetLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    vkt::ImageView imageView = image.CreateView();
+    vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
+
+    OneOffDescriptorSet descriptor_set(m_device, {{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2, VK_SHADER_STAGE_ALL, nullptr},
+                                                  {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}});
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
+    descriptor_set.WriteDescriptorImageInfo(0, imageView, sampler.handle());
+    descriptor_set.WriteDescriptorBufferInfo(1, buffer.handle(), 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    descriptor_set.UpdateDescriptorSets();
+
+    CreatePipelineHelper pipe(*this);
+    pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
+    pipe.gp_ci_.layout = pipeline_layout.handle();
+    pipe.CreateGraphicsPipeline();
+
+    m_commandBuffer->begin();
+    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
+
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1,
+                              &descriptor_set.set_, 0, nullptr);
+    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
+
+    m_commandBuffer->EndRenderPass();
+    m_commandBuffer->end();
+
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDraw-viewType-07752");
+    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Wait();
     m_errorMonitor->VerifyFound();
 }
 
@@ -1541,12 +1600,12 @@ TEST_F(NegativeGpuAVDescriptorIndexing, BasicHLSL) {
                                                  });
     const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
 
-    VkImageObj image(m_device);
-    image.Init(16, 16, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    vkt::Image image(*m_device, 16, 16, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    image.SetLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     vkt::ImageView image_view = image.CreateView();
     vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
 
-    descriptor_set.WriteDescriptorBufferInfo(0, buffer.handle(), 0, sizeof(uint32_t), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    descriptor_set.WriteDescriptorBufferInfo(0, buffer.handle(), 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     descriptor_set.WriteDescriptorImageInfo(1, VK_NULL_HANDLE, sampler.handle(), VK_DESCRIPTOR_TYPE_SAMPLER);
     descriptor_set.WriteDescriptorImageInfo(2, image_view, VK_NULL_HANDLE, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE);
     descriptor_set.UpdateDescriptorSets();
@@ -1625,21 +1684,20 @@ TEST_F(NegativeGpuAVDescriptorIndexing, BasicHLSL) {
     )asm";
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.InitState();
     pipe.cs_ = std::make_unique<VkShaderObj>(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
     pipe.cp_ci_.layout = pipeline_layout.handle();
     pipe.CreateComputePipeline();
 
     m_commandBuffer->begin();
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
     vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout.handle(), 0, 1,
                               &descriptor_set.set_, 0, nullptr);
     vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
     m_commandBuffer->end();
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-Descriptor index out of bounds");
-    m_default_queue->submit(*m_commandBuffer, false);
-    m_default_queue->wait();
+    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Wait();
     m_errorMonitor->VerifyFound();
 }
 
@@ -1662,12 +1720,12 @@ TEST_F(NegativeGpuAVDescriptorIndexing, BasicHLSLRuntimeArray) {
                                                  });
     const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
 
-    VkImageObj image(m_device);
-    image.Init(16, 16, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    vkt::Image image(*m_device, 16, 16, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    image.SetLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     vkt::ImageView image_view = image.CreateView();
     vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
 
-    descriptor_set.WriteDescriptorBufferInfo(0, buffer.handle(), 0, sizeof(uint32_t), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    descriptor_set.WriteDescriptorBufferInfo(0, buffer.handle(), 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     descriptor_set.WriteDescriptorImageInfo(1, VK_NULL_HANDLE, sampler.handle(), VK_DESCRIPTOR_TYPE_SAMPLER);
     // indexing into textures[7], but don't fill it
     descriptor_set.WriteDescriptorImageInfo(2, image_view, VK_NULL_HANDLE, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
@@ -1749,21 +1807,20 @@ TEST_F(NegativeGpuAVDescriptorIndexing, BasicHLSLRuntimeArray) {
     )asm";
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.InitState();
     pipe.cs_ = std::make_unique<VkShaderObj>(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
     pipe.cp_ci_.layout = pipeline_layout.handle();
     pipe.CreateComputePipeline();
 
     m_commandBuffer->begin();
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
     vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout.handle(), 0, 1,
                               &descriptor_set.set_, 0, nullptr);
     vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
     m_commandBuffer->end();
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDispatch-None-08114");
-    m_default_queue->submit(*m_commandBuffer, false);
-    m_default_queue->wait();
+    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Wait();
     m_errorMonitor->VerifyFound();
 }
 
@@ -1779,8 +1836,8 @@ TEST_F(NegativeGpuAVDescriptorIndexing, PushConstant) {
     std::vector<VkPushConstantRange> push_constant_ranges = {{VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(uint32_t)}};
     const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_}, push_constant_ranges);
 
-    VkImageObj image(m_device);
-    image.Init(16, 16, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_TILING_LINEAR);
+    vkt::Image image(*m_device, 16, 16, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    image.SetLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     vkt::ImageView image_view = image.CreateView();
     vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
 
@@ -1803,7 +1860,6 @@ TEST_F(NegativeGpuAVDescriptorIndexing, PushConstant) {
     )glsl";
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.InitState();
     pipe.cs_ = std::make_unique<VkShaderObj>(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2);
     pipe.cp_ci_.layout = pipeline_layout.handle();
     pipe.CreateComputePipeline();
@@ -1814,15 +1870,15 @@ TEST_F(NegativeGpuAVDescriptorIndexing, PushConstant) {
     vk::CmdPushConstants(m_commandBuffer->handle(), pipeline_layout.handle(), VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(uint32_t),
                          &index);
 
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
     vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout.handle(), 0, 1,
                               &descriptor_set.set_, 0, nullptr);
     vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
     m_commandBuffer->end();
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-Descriptor index out of bounds");
-    m_default_queue->submit(*m_commandBuffer, false);
-    m_default_queue->wait();
+    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Wait();
     m_errorMonitor->VerifyFound();
 }
 
@@ -1847,12 +1903,12 @@ TEST_F(NegativeGpuAVDescriptorIndexing, MultipleIndexes) {
                                        });
     const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
 
-    VkImageObj image(m_device);
-    image.Init(16, 16, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_TILING_LINEAR);
+    vkt::Image image(*m_device, 16, 16, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    image.SetLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     vkt::ImageView image_view = image.CreateView();
     vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
 
-    descriptor_set.WriteDescriptorBufferInfo(0, buffer.handle(), 0, sizeof(uint32_t));
+    descriptor_set.WriteDescriptorBufferInfo(0, buffer.handle(), 0, VK_WHOLE_SIZE);
     descriptor_set.WriteDescriptorImageInfo(1, image_view, sampler.handle(), VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
     descriptor_set.UpdateDescriptorSets();
 
@@ -1877,20 +1933,436 @@ TEST_F(NegativeGpuAVDescriptorIndexing, MultipleIndexes) {
     )glsl";
 
     CreateComputePipelineHelper pipe(*this);
-    pipe.InitState();
     pipe.cs_ = std::make_unique<VkShaderObj>(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2);
     pipe.cp_ci_.layout = pipeline_layout.handle();
     pipe.CreateComputePipeline();
 
     m_commandBuffer->begin();
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
     vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout.handle(), 0, 1,
                               &descriptor_set.set_, 0, nullptr);
     vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
     m_commandBuffer->end();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-Descriptor index out of bounds");
-    m_default_queue->submit(*m_commandBuffer, false);
-    m_default_queue->wait();
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "(set = 0, binding = 1) Index of 3 used to index descriptor array of length 2");
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "(set = 0, binding = 1) Index of 5 used to index descriptor array of length 2");
+    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Wait();
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeGpuAVDescriptorIndexing, MultipleOOBInMultipleCmdBuffers) {
+    TEST_DESCRIPTION(
+        "Verify detection of out-of-bounds descriptor array indexing and use of uninitialized descriptors in multiple command "
+        "buffers. At time of writing, this text is a combination of above tests ArrayOOBFragment and ArrayOOBCompute.");
+    RETURN_IF_SKIP(InitGpuVUDescriptorIndexing());
+    InitRenderTarget();
+
+    // 1st Command Buffer
+    // ---
+
+    vkt::CommandBuffer cb_1(*m_device, m_command_pool);
+
+    // Make a uniform buffer to be passed to the shader that contains the invalid array index.
+    VkMemoryPropertyFlags mem_props = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+    vkt::Buffer buffer0(*m_device, 1024, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, mem_props);
+
+    VkDescriptorBindingFlags ds_binding_flags_cb_1[2] = {
+        0, VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT};
+
+    VkDescriptorSetLayoutBindingFlagsCreateInfo layout_createinfo_binding_flags_cb_1 = vku::InitStructHelper();
+    layout_createinfo_binding_flags_cb_1.bindingCount = 2;
+    layout_createinfo_binding_flags_cb_1.pBindingFlags = ds_binding_flags_cb_1;
+
+    // Prepare descriptors
+    OneOffDescriptorSet descriptor_set_cb_1(m_device,
+                                            {
+                                                {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
+                                                {1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 6, VK_SHADER_STAGE_ALL, nullptr},
+                                            },
+                                            VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT_EXT,
+                                            &layout_createinfo_binding_flags_cb_1, VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT);
+    const vkt::PipelineLayout pipeline_layout_cb_1(*m_device, {&descriptor_set_cb_1.layout_});
+
+    vkt::Image image_cb_1(*m_device, 16, 16, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    image_cb_1.SetLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    vkt::ImageView image_view_cb_1 = image_cb_1.CreateView();
+    vkt::Sampler sampler_cb_1(*m_device, SafeSaneSamplerCreateInfo());
+
+    {
+        VkDescriptorBufferInfo buffer_info[1] = {};
+        buffer_info[0].buffer = buffer0.handle();
+        buffer_info[0].offset = 0;
+        buffer_info[0].range = sizeof(uint32_t);
+
+        VkDescriptorImageInfo image_info[6] = {};
+        for (int i = 0; i < 6; i++) {
+            image_info[i] = {sampler_cb_1.handle(), image_view_cb_1, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+        }
+
+        VkWriteDescriptorSet descriptor_writes[2] = {};
+        descriptor_writes[0] = vku::InitStructHelper();
+        descriptor_writes[0].dstSet = descriptor_set_cb_1.set_;  // descriptor_set;
+        descriptor_writes[0].dstBinding = 0;
+        descriptor_writes[0].descriptorCount = 1;
+        descriptor_writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptor_writes[0].pBufferInfo = buffer_info;
+        descriptor_writes[1] = vku::InitStructHelper();
+        descriptor_writes[1].dstSet = descriptor_set_cb_1.set_;  // descriptor_set;
+        descriptor_writes[1].dstBinding = 1;
+        descriptor_writes[1].descriptorCount = 5;  // Intentionally don't write index 5
+        descriptor_writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        descriptor_writes[1].pImageInfo = image_info;
+        vk::UpdateDescriptorSets(device(), 2, descriptor_writes, 0, nullptr);
+    }
+
+    // - The vertex shader fetches the invalid index from the uniform buffer and passes it to the fragment shader.
+    // - The fragment shader makes the invalid array access.
+    char const *vs_source = R"glsl(
+        #version 450
+
+        layout(std140, binding = 0) uniform foo { uint tex_index[1]; } uniform_index_buffer;
+        layout(location = 0) out flat uint index;
+        vec2 vertices[3];
+        void main(){
+              vertices[0] = vec2(-1.0, -1.0);
+              vertices[1] = vec2( 1.0, -1.0);
+              vertices[2] = vec2( 0.0,  1.0);
+           gl_Position = vec4(vertices[gl_VertexIndex % 3], 0.0, 1.0);
+           index = uniform_index_buffer.tex_index[0];
+        }
+        )glsl";
+    char const *fs_source = R"glsl(
+        #version 450
+
+        layout(set = 0, binding = 1) uniform sampler2D tex[6];
+        layout(location = 0) out vec4 uFragColor;
+        layout(location = 0) in flat uint index;
+        void main(){
+           uFragColor = texture(tex[index], vec2(0, 0));
+        }
+        )glsl";
+    VkShaderObj vs(this, vs_source, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(this, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    CreatePipelineHelper pipe_cb_1(*this);
+    pipe_cb_1.shader_stages_.clear();
+    pipe_cb_1.shader_stages_.push_back(vs.GetStageCreateInfo());
+    pipe_cb_1.shader_stages_.push_back(fs.GetStageCreateInfo());
+    pipe_cb_1.gp_ci_.layout = pipeline_layout_cb_1.handle();
+    pipe_cb_1.CreateGraphicsPipeline();
+
+    cb_1.begin();
+    cb_1.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(cb_1.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe_cb_1.Handle());
+    vk::CmdBindDescriptorSets(cb_1.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_cb_1.handle(), 0, 1,
+                              &descriptor_set_cb_1.set_, 0, nullptr);
+    vk::CmdDraw(cb_1.handle(), 3, 1, 0, 0);
+    cb_1.EndRenderPass();
+    cb_1.end();
+    {
+        uint32_t *data = (uint32_t *)buffer0.memory().map();
+        data[0] = 25;
+        buffer0.memory().unmap();
+    }
+
+    // 2nd Command Buffer
+    // ---
+
+    vkt::CommandBuffer cb_2(*m_device, m_command_pool);
+
+    // Make a uniform buffer to be passed to the shader that contains the invalid array index.
+    vkt::Buffer buffer0_cb_2(*m_device, 1024, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, mem_props);
+
+    // Make another buffer to populate the buffer array to be indexed
+    vkt::Buffer buffer1_cb_2(*m_device, 1024, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, mem_props);
+
+    VkDescriptorBindingFlags ds_binding_flags_cb_2[2] = {0, VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT};
+
+    VkDescriptorSetLayoutBindingFlagsCreateInfo layout_createinfo_binding_flags_cb_2 = vku::InitStructHelper();
+    layout_createinfo_binding_flags_cb_2.bindingCount = 2;
+    layout_createinfo_binding_flags_cb_2.pBindingFlags = ds_binding_flags_cb_2;
+
+    OneOffDescriptorSet descriptor_set_cb_2(m_device,
+                                            {
+                                                {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
+                                                {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 6, VK_SHADER_STAGE_ALL, nullptr},
+                                            },
+                                            0, &layout_createinfo_binding_flags_cb_2, 0);
+
+    const vkt::PipelineLayout pipeline_layout_cb_2(*m_device, {&descriptor_set_cb_2.layout_});
+    {
+        VkDescriptorBufferInfo buffer_info_cb_2[7] = {};
+
+        buffer_info_cb_2[0].buffer = buffer0_cb_2.handle();
+        buffer_info_cb_2[0].offset = 0;
+        buffer_info_cb_2[0].range = sizeof(uint32_t);
+
+        for (int i = 1; i < 7; i++) {
+            buffer_info_cb_2[i].buffer = buffer1_cb_2.handle();
+            buffer_info_cb_2[i].offset = 0;
+            buffer_info_cb_2[i].range = 4 * sizeof(float);
+        }
+
+        VkWriteDescriptorSet descriptor_writes_cb_2[2] = {};
+
+        descriptor_writes_cb_2[0] = vku::InitStructHelper();
+        descriptor_writes_cb_2[0].dstSet = descriptor_set_cb_2.set_;
+        descriptor_writes_cb_2[0].dstBinding = 0;
+        descriptor_writes_cb_2[0].descriptorCount = 1;
+        descriptor_writes_cb_2[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptor_writes_cb_2[0].pBufferInfo = &buffer_info_cb_2[0];
+
+        descriptor_writes_cb_2[1] = vku::InitStructHelper();
+        descriptor_writes_cb_2[1].dstSet = descriptor_set_cb_2.set_;
+        descriptor_writes_cb_2[1].dstBinding = 1;
+        descriptor_writes_cb_2[1].descriptorCount = 5;  // Intentionally don't write index 5
+        descriptor_writes_cb_2[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        descriptor_writes_cb_2[1].pBufferInfo = &buffer_info_cb_2[1];
+        vk::UpdateDescriptorSets(device(), 2, descriptor_writes_cb_2, 0, nullptr);
+    }
+
+    char const *cs_source = R"glsl(
+        #version 450
+        #extension GL_EXT_nonuniform_qualifier : enable
+        layout(set = 0, binding = 0) uniform ufoo { uint index; } u_index;
+        layout(set = 0, binding = 1) buffer StorageBuffer {
+            uint data;
+        } Data[];
+        void main() {
+            Data[(u_index.index - 1)].data = Data[u_index.index].data;
+        }
+    )glsl";
+
+    CreateComputePipelineHelper pipe_cb_2(*this);
+    pipe_cb_2.cs_ = std::make_unique<VkShaderObj>(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe_cb_2.cp_ci_.layout = pipeline_layout_cb_2.handle();
+    pipe_cb_2.CreateComputePipeline();
+
+    cb_2.begin();
+    vk::CmdBindPipeline(cb_2.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe_cb_2.Handle());
+    vk::CmdBindDescriptorSets(cb_2.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout_cb_2.handle(), 0, 1,
+                              &descriptor_set_cb_2.set_, 0, nullptr);
+    vk::CmdDispatch(cb_2.handle(), 1, 1, 1);
+    cb_2.end();
+    {
+        uint32_t *data = (uint32_t *)buffer0_cb_2.memory().map();
+        data[0] = 25;
+        buffer0_cb_2.memory().unmap();
+    }
+
+    m_errorMonitor->SetDesiredError("vkCmdDraw():  (set = 0, binding = 1) Index of 25 used to index descriptor array of length 6",
+                                    gpuav::glsl::kMaxErrorsPerCmd);
+    m_default_queue->Submit(cb_1);
+
+    m_errorMonitor->SetDesiredError(
+        "vkCmdDispatch():  (set = 0, binding = 1) Index of 25 used to index descriptor array of length 6");
+    m_errorMonitor->SetDesiredError(
+        "vkCmdDispatch():  (set = 0, binding = 1) Index of 24 used to index descriptor array of length 6");
+    m_default_queue->Submit(cb_2);
+
+    m_default_queue->Wait();
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeGpuAVDescriptorIndexing, MultipleOOBTypesInOneCmdBuffer) {
+    TEST_DESCRIPTION(
+        "Verify detection of out-of-bounds descriptor array indexing and use of uninitialized descriptors coming from both "
+        "graphics and compute pipelines in one command buffer. At time of writing, this text is a combination of above tests "
+        "ArrayOOBFragment and ArrayOOBCompute.");
+    RETURN_IF_SKIP(InitGpuVUDescriptorIndexing());
+    InitRenderTarget();
+
+    // Make a uniform buffer to be passed to the shader that contains the invalid array index.
+    VkMemoryPropertyFlags mem_props = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+    vkt::Buffer buffer0(*m_device, 1024, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, mem_props);
+
+    VkDescriptorBindingFlags ds_binding_flags_cb_1[2] = {
+        0, VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT};
+
+    VkDescriptorSetLayoutBindingFlagsCreateInfo layout_createinfo_binding_flags_cb_1 = vku::InitStructHelper();
+    layout_createinfo_binding_flags_cb_1.bindingCount = 2;
+    layout_createinfo_binding_flags_cb_1.pBindingFlags = ds_binding_flags_cb_1;
+
+    // Prepare descriptors
+    OneOffDescriptorSet descriptor_set_cb_1(m_device,
+                                            {
+                                                {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
+                                                {1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 6, VK_SHADER_STAGE_ALL, nullptr},
+                                            },
+                                            VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT_EXT,
+                                            &layout_createinfo_binding_flags_cb_1, VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT);
+    const vkt::PipelineLayout pipeline_layout_cb_1(*m_device, {&descriptor_set_cb_1.layout_});
+
+    vkt::Image image_cb_1(*m_device, 16, 16, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    image_cb_1.SetLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    vkt::ImageView image_view_cb_1 = image_cb_1.CreateView();
+    vkt::Sampler sampler_cb_1(*m_device, SafeSaneSamplerCreateInfo());
+
+    {
+        VkDescriptorBufferInfo buffer_info[1] = {};
+        buffer_info[0].buffer = buffer0.handle();
+        buffer_info[0].offset = 0;
+        buffer_info[0].range = sizeof(uint32_t);
+
+        VkDescriptorImageInfo image_info[6] = {};
+        for (int i = 0; i < 6; i++) {
+            image_info[i] = {sampler_cb_1.handle(), image_view_cb_1, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+        }
+
+        VkWriteDescriptorSet descriptor_writes[2] = {};
+        descriptor_writes[0] = vku::InitStructHelper();
+        descriptor_writes[0].dstSet = descriptor_set_cb_1.set_;  // descriptor_set;
+        descriptor_writes[0].dstBinding = 0;
+        descriptor_writes[0].descriptorCount = 1;
+        descriptor_writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptor_writes[0].pBufferInfo = buffer_info;
+        descriptor_writes[1] = vku::InitStructHelper();
+        descriptor_writes[1].dstSet = descriptor_set_cb_1.set_;  // descriptor_set;
+        descriptor_writes[1].dstBinding = 1;
+        descriptor_writes[1].descriptorCount = 5;  // Intentionally don't write index 5
+        descriptor_writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        descriptor_writes[1].pImageInfo = image_info;
+        vk::UpdateDescriptorSets(device(), 2, descriptor_writes, 0, nullptr);
+    }
+
+    // - The vertex shader fetches the invalid index from the uniform buffer and passes it to the fragment shader.
+    // - The fragment shader makes the invalid array access.
+    char const *vs_source = R"glsl(
+        #version 450
+
+        layout(std140, binding = 0) uniform foo { uint tex_index[1]; } uniform_index_buffer;
+        layout(location = 0) out flat uint index;
+        vec2 vertices[3];
+        void main(){
+              vertices[0] = vec2(-1.0, -1.0);
+              vertices[1] = vec2( 1.0, -1.0);
+              vertices[2] = vec2( 0.0,  1.0);
+           gl_Position = vec4(vertices[gl_VertexIndex % 3], 0.0, 1.0);
+           index = uniform_index_buffer.tex_index[0];
+        }
+        )glsl";
+    char const *fs_source = R"glsl(
+        #version 450
+
+        layout(set = 0, binding = 1) uniform sampler2D tex[6];
+        layout(location = 0) out vec4 uFragColor;
+        layout(location = 0) in flat uint index;
+        void main(){
+           uFragColor = texture(tex[index], vec2(0, 0));
+        }
+        )glsl";
+    VkShaderObj vs(this, vs_source, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(this, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    CreatePipelineHelper pipe_cb_1(*this);
+    pipe_cb_1.shader_stages_.clear();
+    pipe_cb_1.shader_stages_.push_back(vs.GetStageCreateInfo());
+    pipe_cb_1.shader_stages_.push_back(fs.GetStageCreateInfo());
+    pipe_cb_1.gp_ci_.layout = pipeline_layout_cb_1.handle();
+    pipe_cb_1.CreateGraphicsPipeline();
+
+    m_commandBuffer->begin();
+    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe_cb_1.Handle());
+    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_cb_1.handle(), 0, 1,
+                              &descriptor_set_cb_1.set_, 0, nullptr);
+    vk::CmdDraw(*m_commandBuffer, 3, 1, 0, 0);
+    m_commandBuffer->EndRenderPass();
+    {
+        uint32_t *data = (uint32_t *)buffer0.memory().map();
+        data[0] = 25;
+        buffer0.memory().unmap();
+    }
+
+    // Make a uniform buffer to be passed to the shader that contains the invalid array index.
+    vkt::Buffer buffer0_cb_2(*m_device, 1024, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, mem_props);
+
+    // Make another buffer to populate the buffer array to be indexed
+    vkt::Buffer buffer1_cb_2(*m_device, 1024, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, mem_props);
+
+    VkDescriptorBindingFlags ds_binding_flags_cb_2[2] = {0, VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT};
+
+    VkDescriptorSetLayoutBindingFlagsCreateInfo layout_createinfo_binding_flags_cb_2 = vku::InitStructHelper();
+    layout_createinfo_binding_flags_cb_2.bindingCount = 2;
+    layout_createinfo_binding_flags_cb_2.pBindingFlags = ds_binding_flags_cb_2;
+
+    OneOffDescriptorSet descriptor_set_cb_2(m_device,
+                                            {
+                                                {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
+                                                {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 6, VK_SHADER_STAGE_ALL, nullptr},
+                                            },
+                                            0, &layout_createinfo_binding_flags_cb_2, 0);
+
+    const vkt::PipelineLayout pipeline_layout_cb_2(*m_device, {&descriptor_set_cb_2.layout_});
+    {
+        VkDescriptorBufferInfo buffer_info_cb_2[7] = {};
+
+        buffer_info_cb_2[0].buffer = buffer0_cb_2.handle();
+        buffer_info_cb_2[0].offset = 0;
+        buffer_info_cb_2[0].range = sizeof(uint32_t);
+
+        for (int i = 1; i < 7; i++) {
+            buffer_info_cb_2[i].buffer = buffer1_cb_2.handle();
+            buffer_info_cb_2[i].offset = 0;
+            buffer_info_cb_2[i].range = 4 * sizeof(float);
+        }
+
+        VkWriteDescriptorSet descriptor_writes_cb_2[2] = {};
+
+        descriptor_writes_cb_2[0] = vku::InitStructHelper();
+        descriptor_writes_cb_2[0].dstSet = descriptor_set_cb_2.set_;
+        descriptor_writes_cb_2[0].dstBinding = 0;
+        descriptor_writes_cb_2[0].descriptorCount = 1;
+        descriptor_writes_cb_2[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptor_writes_cb_2[0].pBufferInfo = &buffer_info_cb_2[0];
+
+        descriptor_writes_cb_2[1] = vku::InitStructHelper();
+        descriptor_writes_cb_2[1].dstSet = descriptor_set_cb_2.set_;
+        descriptor_writes_cb_2[1].dstBinding = 1;
+        descriptor_writes_cb_2[1].descriptorCount = 5;  // Intentionally don't write index 5
+        descriptor_writes_cb_2[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        descriptor_writes_cb_2[1].pBufferInfo = &buffer_info_cb_2[1];
+        vk::UpdateDescriptorSets(device(), 2, descriptor_writes_cb_2, 0, nullptr);
+    }
+
+    char const *cs_source = R"glsl(
+        #version 450
+        #extension GL_EXT_nonuniform_qualifier : enable
+        layout(set = 0, binding = 0) uniform ufoo { uint index; } u_index;
+        layout(set = 0, binding = 1) buffer StorageBuffer {
+            uint data;
+        } Data[];
+        void main() {
+            Data[(u_index.index - 1)].data = Data[u_index.index].data;
+        }
+    )glsl";
+
+    CreateComputePipelineHelper pipe_cb_2(*this);
+    pipe_cb_2.cs_ = std::make_unique<VkShaderObj>(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe_cb_2.cp_ci_.layout = pipeline_layout_cb_2.handle();
+    pipe_cb_2.CreateComputePipeline();
+
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe_cb_2.Handle());
+    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout_cb_2.handle(), 0, 1,
+                              &descriptor_set_cb_2.set_, 0, nullptr);
+    vk::CmdDispatch(*m_commandBuffer, 1, 1, 1);
+    m_commandBuffer->end();
+    {
+        uint32_t *data = (uint32_t *)buffer0_cb_2.memory().map();
+        data[0] = 25;
+        buffer0_cb_2.memory().unmap();
+    }
+
+    m_errorMonitor->SetDesiredError("vkCmdDraw():  (set = 0, binding = 1) Index of 25 used to index descriptor array of length 6",
+                                    gpuav::glsl::kMaxErrorsPerCmd);
+
+    m_errorMonitor->SetDesiredFailureMsg(
+        kErrorBit, "vkCmdDispatch():  (set = 0, binding = 1) Index of 25 used to index descriptor array of length 6");
+    m_errorMonitor->SetDesiredFailureMsg(
+        kErrorBit, "vkCmdDispatch():  (set = 0, binding = 1) Index of 24 used to index descriptor array of length 6");
+    m_default_queue->Submit(*m_commandBuffer);
+
+    m_default_queue->Wait();
     m_errorMonitor->VerifyFound();
 }

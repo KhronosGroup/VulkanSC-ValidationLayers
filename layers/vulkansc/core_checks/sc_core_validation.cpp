@@ -36,6 +36,7 @@
 
 #include "vulkan/vk_enum_string_helper.h"
 #include "state_tracker/image_state.h"
+#include "state_tracker/render_pass_state.h"
 #include "generated/chassis.h"
 #include "vulkansc/sc_vuid_enums.h"
 #include "vulkansc/core_checks/sc_core_validation.h"
@@ -103,7 +104,7 @@ void SCCoreChecks::InitFilters() {
     };
 
     for (const auto& filtered_vuid : filtered_vuids) {
-        report_data->filter_message_ids.insert(hash_util::VuidHash(filtered_vuid));
+        debug_report->filter_message_ids.insert(hash_util::VuidHash(filtered_vuid));
     }
 }
 
@@ -384,7 +385,6 @@ bool SCCoreChecks::ValidatePipelineCacheData(VkPhysicalDevice physicalDevice, co
                 skip |= ValidatePipelineCacheSpirv(physicalDevice, data, pipeline_index, stage_index, loc);
                 // SPIR-V validation, if used, will already report errors for the warnings below
                 if (skip) {
-                    stage_info_valid = false;
                     continue;
                 }
 
@@ -423,14 +423,16 @@ bool SCCoreChecks::ValidatePipelineCacheData(VkPhysicalDevice physicalDevice, co
         }
     }
 
-    if (pipelines_without_spirv_data == data.PipelineIndexCount()) {
-        skip |= LogWarning(kVUID_SC_PipelineCacheData_SpirvDepValMissingInfo, device, loc.dot(Field::pInitialData),
-                           "does not contain SPIR-V module data for any pipelines thus SPIR-V dependent validation "
-                           "will not be available for any pipeline created from this pipeline cache data.");
-    } else if (pipelines_without_spirv_data > 0) {
-        skip |= LogWarning(kVUID_SC_PipelineCacheData_SpirvDepValMissingInfo, device, loc.dot(Field::pInitialData),
-                           "does not contain SPIR-V module data for some pipelines thus SPIR-V dependent validation "
-                           "will not be available for those pipelines.");
+    if (data.PipelineIndexCount() > 0) {
+        if (pipelines_without_spirv_data == data.PipelineIndexCount()) {
+            skip |= LogWarning(kVUID_SC_PipelineCacheData_SpirvDepValMissingInfo, device, loc.dot(Field::pInitialData),
+                            "does not contain SPIR-V module data for any pipelines thus SPIR-V dependent validation "
+                            "will not be available for any pipeline created from this pipeline cache data.");
+        } else if (pipelines_without_spirv_data > 0) {
+            skip |= LogWarning(kVUID_SC_PipelineCacheData_SpirvDepValMissingInfo, device, loc.dot(Field::pInitialData),
+                            "does not contain SPIR-V module data for some pipelines thus SPIR-V dependent validation "
+                            "will not be available for those pipelines.");
+        }
     }
 
     return skip;
@@ -617,9 +619,9 @@ bool SCCoreChecks::PreCallValidateCreateDevice(VkPhysicalDevice physicalDevice, 
     return skip;
 }
 
-void SCCoreChecks::CreateDevice(const VkDeviceCreateInfo* pCreateInfo) {
+void SCCoreChecks::CreateDevice(const VkDeviceCreateInfo* pCreateInfo, const Location& loc) {
     // The state tracker sets up the device state
-    BASE::CreateDevice(pCreateInfo);
+    BASE::CreateDevice(pCreateInfo, loc);
 }
 
 bool SCCoreChecks::PreCallValidateCreateCommandPool(VkDevice device, const VkCommandPoolCreateInfo* pCreateInfo,
@@ -761,7 +763,7 @@ bool SCCoreChecks::PreCallValidateAllocateCommandBuffers(VkDevice device, const 
                          "(%u) plus the number of command buffers currently allocated from %s (%zu) is greater than the "
                          "VkCommandPoolMemoryReservationCreateInfo::commandPoolMaxCommandBuffers (%u) "
                          "the command pool was created with.",
-                         pAllocateInfo->commandBufferCount, report_data->FormatHandle(pAllocateInfo->commandPool).c_str(),
+                         pAllocateInfo->commandBufferCount, FormatHandle(pAllocateInfo->commandPool).c_str(),
                          cp_state->commandBuffers.size(), cp_state->max_command_buffers);
     }
 
@@ -770,7 +772,7 @@ bool SCCoreChecks::PreCallValidateAllocateCommandBuffers(VkDevice device, const 
 
 bool SCCoreChecks::PreCallValidateAllocateDescriptorSets(VkDevice device, const VkDescriptorSetAllocateInfo* pAllocateInfo,
                                                          VkDescriptorSet* pDescriptorSets, const ErrorObject& error_obj,
-                                                         void* ads_state_data) const {
+                                                         vvl::AllocateDescriptorSetsData& ads_state_data) const {
     bool skip = BASE::PreCallValidateAllocateDescriptorSets(device, pAllocateInfo, pDescriptorSets, error_obj, ads_state_data);
 
     if (pAllocateInfo) {
@@ -797,9 +799,10 @@ bool SCCoreChecks::PreCallValidateAllocateMemory(VkDevice device, const VkMemory
 bool SCCoreChecks::PreCallValidateCreateComputePipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t count,
                                                          const VkComputePipelineCreateInfo* pCreateInfos,
                                                          const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,
-                                                         const ErrorObject& error_obj, void* ccpl_state_data) const {
+                                                         const ErrorObject& error_obj, PipelineStates& pipeline_states,
+                                                         chassis::CreateComputePipelines& chassis_state) const {
     bool skip = BASE::PreCallValidateCreateComputePipelines(device, pipelineCache, count, pCreateInfos, pAllocator, pPipelines,
-                                                            error_obj, ccpl_state_data);
+                                                            error_obj, pipeline_states, chassis_state);
 
     auto pipeline_cache_state = Get<vvl::sc::PipelineCache>(pipelineCache);
 
@@ -835,9 +838,10 @@ bool SCCoreChecks::PreCallValidateCreateComputePipelines(VkDevice device, VkPipe
 bool SCCoreChecks::PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t count,
                                                           const VkGraphicsPipelineCreateInfo* pCreateInfos,
                                                           const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,
-                                                          const ErrorObject& error_obj, void* cgpl_state_data) const {
+                                                          const ErrorObject& error_obj, PipelineStates& pipeline_states,
+                                                          chassis::CreateGraphicsPipelines& chassis_state) const {
     bool skip = BASE::PreCallValidateCreateGraphicsPipelines(device, pipelineCache, count, pCreateInfos, pAllocator, pPipelines,
-                                                             error_obj, cgpl_state_data);
+                                                             error_obj, pipeline_states, chassis_state);
 
     auto pipeline_cache_state = Get<vvl::sc::PipelineCache>(pipelineCache);
 
@@ -887,25 +891,24 @@ bool SCCoreChecks::PreCallValidateCreatePipelineCache(VkDevice device, const VkP
 
         skip |= ValidatePipelineCacheCreateInfo(device, create_info_loc, *pCreateInfo);
 
-        // By default we do not re-validate the pipeline cache data as it was already validated at device creation time,
-        // but we do so if the passed pipeline cache create information is one that was not specified at that time.
-        bool validate_pipeline_cache_data = false;
         auto it = sc_pipeline_cache_map_.find(pCreateInfo->pInitialData);
         if (it == sc_pipeline_cache_map_.end() || it->second->create_info.flags != pCreateInfo->flags ||
             it->second->create_info.initialDataSize != pCreateInfo->initialDataSize) {
             skip |= LogError("VUID-vkCreatePipelineCache-pCreateInfo-05045", device, create_info_loc,
                              "does not match any of the VkPipelineCacheCreateInfo structures specified in "
                              "VkDeviceObjectReservationCreateInfo::pPipelineCacheCreateInfos at device creation time.");
-            validate_pipeline_cache_data = true;
         } else if (memcmp(it->second->original_data.data(), pCreateInfo->pInitialData, pCreateInfo->initialDataSize) != 0) {
             skip |= LogError("VUID-vkCreatePipelineCache-pCreateInfo-05045", device, create_info_loc,
                              "the data pointed to by pCreateInfo->pInitialData does not match the data specified in "
                              "VkDeviceObjectReservationCreateInfo::pPipelineCacheCreateInfos at device creation time.");
-            validate_pipeline_cache_data = true;
         }
-        if (validate_pipeline_cache_data) {
-            skip |= ValidatePipelineCacheData(physical_device, *pCreateInfo, error_obj.location.dot(Field::pCreateInfo));
-        }
+        // We already validated the pipeline cache data at device creation time, but we could not perform
+        // "stateless" SPIR-V validation there, as that depends on the state only established after device
+        // creation, so we have to re-validate the pipeline cache data here in all cases. In the future we
+        // may be able to avoid re-validation and only do validation if it is a pipeline cache create info
+        // that was not specified at device creation time, but that requires upstream to make "stateless"
+        // SPIR-V validation trully stateless.
+        skip |= ValidatePipelineCacheData(physical_device, *pCreateInfo, error_obj.location.dot(Field::pCreateInfo));
     }
 
     return skip;
@@ -1178,8 +1181,8 @@ bool SCCoreChecks::PreCallValidateCreateImageView(VkDevice device, const VkImage
                                        Count<vvl::ImageView>(), "imageView", sc_object_limits_.imageViewRequestCount, 1);
 
     if (pCreateInfo) {
-        const uint32_t effective_mip_levels = ResolveRemainingLevels(image_state->createInfo, pCreateInfo->subresourceRange);
-        const uint32_t effective_array_layers = ResolveRemainingLayers(image_state->createInfo, pCreateInfo->subresourceRange);
+        const uint32_t effective_mip_levels = ResolveRemainingLevels(image_state->create_info, pCreateInfo->subresourceRange);
+        const uint32_t effective_array_layers = ResolveRemainingLayers(image_state->create_info, pCreateInfo->subresourceRange);
 
         if (effective_mip_levels > sc_object_limits_.maxImageViewMipLevels) {
             const char* vuid = pCreateInfo->subresourceRange.levelCount == VK_REMAINING_MIP_LEVELS
@@ -1368,7 +1371,7 @@ bool SCCoreChecks::PreCallValidateBeginCommandBuffer(VkCommandBuffer commandBuff
         skip |= LogError("VUID-vkBeginCommandBuffer-commandPoolResetCommandBuffer-05136", commandBuffer, error_obj.location,
                          "call attempts to implicitly reset %s but "
                          "VkPhysicalDeviceVulkanSC10Properties::commandPoolResetCommandBuffer is not supported.",
-                         report_data->FormatHandle(commandBuffer).c_str());
+                         FormatHandle(commandBuffer).c_str());
     }
 
     if (cp_state->command_buffers_recording.load() > 0 && !phys_dev_props_sc_10_.commandPoolMultipleCommandBuffersRecording) {
@@ -1376,7 +1379,7 @@ bool SCCoreChecks::PreCallValidateBeginCommandBuffer(VkCommandBuffer commandBuff
                          error_obj.location,
                          "%s %s was allocated from is already recording another command buffer but "
                          "VkPhysicalDeviceVulkanSC10Properties::commandPoolMultipleCommandBuffersRecording is not supported.",
-                         report_data->FormatHandle(cp_state->Handle()).c_str(), report_data->FormatHandle(commandBuffer).c_str());
+                         FormatHandle(cp_state->Handle()).c_str(), FormatHandle(commandBuffer).c_str());
     }
 
     if ((pBeginInfo->flags & VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT) && !phys_dev_props_sc_10_.commandBufferSimultaneousUse) {
@@ -1390,12 +1393,12 @@ bool SCCoreChecks::PreCallValidateBeginCommandBuffer(VkCommandBuffer commandBuff
     if (pBeginInfo->pInheritanceInfo != nullptr && pBeginInfo->flags & VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT) {
         auto framebuffer = Get<vvl::Framebuffer>(pBeginInfo->pInheritanceInfo->framebuffer);
         if (framebuffer) {
-            if (framebuffer->createInfo.renderPass != pBeginInfo->pInheritanceInfo->renderPass) {
+            if (framebuffer->create_info.renderPass != pBeginInfo->pInheritanceInfo->renderPass) {
                 const char* vuid = phys_dev_props_sc_10_.secondaryCommandBufferNullOrImagelessFramebuffer
                                        ? "VUID-VkCommandBufferBeginInfo-flags-05009"
                                        : "VUID-VkCommandBufferBeginInfo-flags-05010";
 
-                if ((framebuffer->createInfo.flags & VK_FRAMEBUFFER_CREATE_IMAGELESS_BIT) != 0 &&
+                if ((framebuffer->create_info.flags & VK_FRAMEBUFFER_CREATE_IMAGELESS_BIT) != 0 &&
                     !phys_dev_props_sc_10_.secondaryCommandBufferNullOrImagelessFramebuffer) {
                     skip |= LogError("VUID-VkCommandBufferBeginInfo-flags-05010", commandBuffer,
                                      begin_info_loc.dot(Field::flags),
@@ -1404,7 +1407,7 @@ bool SCCoreChecks::PreCallValidateBeginCommandBuffer(VkCommandBuffer commandBuff
                                      "with VK_FRAMEBUFFER_CREATE_IMAGELESS_BIT but "
                                      "VkPhysicalDeviceVulkanSC10Properties::secondaryCommandBufferNullOrImagelessFramebuffer "
                                      "is not supported.",
-                                     report_data->FormatHandle(framebuffer->Handle()).c_str());
+                                     FormatHandle(framebuffer->Handle()).c_str());
                 } else {
                     auto render_pass = Get<vvl::RenderPass>(pBeginInfo->pInheritanceInfo->renderPass);
                     // renderPass that framebuffer was created with must be compatible with local renderPass

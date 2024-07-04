@@ -41,15 +41,17 @@ class BestPracticesOutputGenerator(BaseGenerator):
         ]
 
         # Commands that require an extra parameter for state sharing between validate/record steps
-        self.extra_parameter_list = [
-            "vkCreateShaderModule",
-            "vkCreateShadersEXT",
-            "vkCreateGraphicsPipelines",
-            "vkCreateComputePipelines",
-            "vkAllocateDescriptorSets",
-            "vkCreateRayTracingPipelinesNV",
-            "vkCreateRayTracingPipelinesKHR",
-        ]
+        self.extra_parameter_map = {
+            'vkCreateShaderModule' : 'chassis::CreateShaderModule',
+            'vkCreateShadersEXT' : 'chassis::ShaderObject',
+            'vkAllocateDescriptorSets' : 'vvl::AllocateDescriptorSetsData',
+        }
+        self.pipeline_parameter_map = {
+            'vkCreateGraphicsPipelines' : 'chassis::CreateGraphicsPipelines',
+            'vkCreateComputePipelines' : 'chassis::CreateComputePipelines',
+            'vkCreateRayTracingPipelinesNV' : 'chassis::CreateRayTracingPipelinesNV',
+            'vkCreateRayTracingPipelinesKHR' : 'chassis::CreateRayTracingPipelinesKHR',
+        }
         # Commands that have a manually written post-call-record step which needs to be called from the autogen'd fcn
         self.manual_postcallrecord_list = [
             'vkAllocateDescriptorSets',
@@ -124,8 +126,10 @@ class BestPracticesOutputGenerator(BaseGenerator):
             prototype = f'void PostCallRecord{prototype[2:]}'
             prototype = prototype.replace(');', ', const RecordObject& record_obj) {\n')
             prototype = prototype.replace(') {', ') override;\n')
-            if command.name in self.extra_parameter_list:
-                prototype = prototype.replace(')', ', void* state_data)')
+            if command.name in self.extra_parameter_map:
+                prototype = prototype.replace(')', f', {self.extra_parameter_map[command.name]}& chassis_state)')
+            elif command.name in self.pipeline_parameter_map:
+                prototype = prototype.replace(')', f', PipelineStates& pipeline_states, {self.pipeline_parameter_map[command.name]}& chassis_state)')
             out.append(prototype)
         out.extend(guard_helper.add_guard(None))
         self.write("".join(out))
@@ -186,16 +190,21 @@ class BestPracticesOutputGenerator(BaseGenerator):
         for command in [x for x in self.vk.commands.values() if x.name not in self.no_autogen_list]:
             paramList = [param.name for param in command.params]
             paramList.append('record_obj')
-            if command.name in self.extra_parameter_list:
-                paramList.append('state_data')
+            if command.name in self.extra_parameter_map:
+                paramList.append('chassis_state')
+            elif command.name in self.pipeline_parameter_map:
+                paramList.append('pipeline_states')
+                paramList.append('chassis_state')
             params = ', '.join(paramList)
 
             out.extend(guard_helper.add_guard(command.protect, extra_newline=True))
             prototype = command.cPrototype.split("VKAPI_CALL ")[1]
             prototype = f'void BestPractices::PostCallRecord{prototype[2:]}'
             prototype = prototype.replace(');', ', const RecordObject& record_obj) {\n')
-            if command.name in self.extra_parameter_list:
-                prototype = prototype.replace(')', ', void* state_data)')
+            if command.name in self.extra_parameter_map:
+                prototype = prototype.replace(')', f', {self.extra_parameter_map[command.name]}& chassis_state)')
+            elif command.name in self.pipeline_parameter_map:
+                prototype = prototype.replace(')', f', PipelineStates& pipeline_states, {self.pipeline_parameter_map[command.name]}& chassis_state)')
             out.append(prototype)
 
             if command.alias:

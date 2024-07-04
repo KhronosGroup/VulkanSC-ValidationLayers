@@ -942,6 +942,8 @@ static const std::map<QueueError, std::vector<Entry>> kBarrierQueueErrors{
      {
          {Key(Struct::VkBufferMemoryBarrier2), "VUID-VkBufferMemoryBarrier2-srcStageMask-03851"},
          {Key(Struct::VkImageMemoryBarrier2), "VUID-VkImageMemoryBarrier2-srcStageMask-03854"},
+         {Key(Struct::VkBufferMemoryBarrier), "VUID-vkCmdPipelineBarrier-srcStageMask-09634"},
+         {Key(Struct::VkImageMemoryBarrier), "VUID-vkCmdPipelineBarrier-srcStageMask-09633"},
      }},
 };
 
@@ -1017,6 +1019,11 @@ static const std::map<VkImageLayout, std::array<Entry, 2>> kImageLayoutErrors{
      {{
          {Key(Struct::VkImageMemoryBarrier), "VUID-VkImageMemoryBarrier-srcQueueFamilyIndex-07006"},
          {Key(Struct::VkImageMemoryBarrier2), "VUID-VkImageMemoryBarrier2-srcQueueFamilyIndex-07006"},
+     }}},
+    {VK_IMAGE_LAYOUT_RENDERING_LOCAL_READ_KHR,
+     {{
+         {Key(Struct::VkImageMemoryBarrier), "VUID-VkImageMemoryBarrier-srcQueueFamilyIndex-09550"},
+         {Key(Struct::VkImageMemoryBarrier2), "VUID-VkImageMemoryBarrier2-srcQueueFamilyIndex-09550"},
      }}},
     {VK_IMAGE_LAYOUT_VIDEO_DECODE_SRC_KHR,
      {{
@@ -1184,6 +1191,21 @@ static const std::map<ImageError, std::vector<Entry>> kImageErrors{
          {Key(Func::vkCmdPipelineBarrier), "VUID-vkCmdPipelineBarrier-oldLayout-01181"},
          {Key(Func::vkCmdPipelineBarrier2), "VUID-vkCmdPipelineBarrier2-oldLayout-01181"},
      }},
+    {ImageError::kDynamicRenderingLocalReadNew,
+     {
+         {Key(Struct::VkImageMemoryBarrier), "VUID-VkImageMemoryBarrier-dynamicRenderingLocalRead-09552"},
+         {Key(Struct::VkImageMemoryBarrier2), "VUID-VkImageMemoryBarrier2-dynamicRenderingLocalRead-09552"},
+     }},
+    {ImageError::kDynamicRenderingLocalReadOld,
+     {
+         {Key(Struct::VkImageMemoryBarrier), "VUID-VkImageMemoryBarrier-dynamicRenderingLocalRead-09551"},
+         {Key(Struct::VkImageMemoryBarrier2), "VUID-VkImageMemoryBarrier2-dynamicRenderingLocalRead-09551"},
+     }},
+    {ImageError::kAspectMask,
+     {
+         {Key(Struct::VkImageMemoryBarrier), "VUID-VkImageMemoryBarrier-subresourceRange-09601"},
+         {Key(Struct::VkImageMemoryBarrier2), "VUID-VkImageMemoryBarrier2-subresourceRange-09601"},
+     }},
 };
 
 const std::string &GetImageBarrierVUID(const Location &loc, ImageError error) {
@@ -1194,22 +1216,6 @@ const std::string &GetImageBarrierVUID(const Location &loc, ImageError error) {
         return unhandled;
     }
     return result;
-}
-
-const SubresourceRangeErrorCodes &GetSubResourceVUIDs(const Location &loc) {
-    static const SubresourceRangeErrorCodes v1{
-        "VUID-VkImageMemoryBarrier-subresourceRange-01486",
-        "VUID-VkImageMemoryBarrier-subresourceRange-01724",
-        "VUID-VkImageMemoryBarrier-subresourceRange-01488",
-        "VUID-VkImageMemoryBarrier-subresourceRange-01725",
-    };
-    static const SubresourceRangeErrorCodes v2{
-        "VUID-VkImageMemoryBarrier2-subresourceRange-01486",
-        "VUID-VkImageMemoryBarrier2-subresourceRange-01724",
-        "VUID-VkImageMemoryBarrier2-subresourceRange-01488",
-        "VUID-VkImageMemoryBarrier2-subresourceRange-01725",
-    };
-    return (loc.structure == Struct::VkImageMemoryBarrier2) ? v2 : v1;
 }
 
 static const std::map<SubmitError, std::vector<Entry>> kSubmitErrors{
@@ -1240,8 +1246,8 @@ static const std::map<SubmitError, std::vector<Entry>> kSubmitErrors{
          {Key(Struct::VkSubmitInfo, Field::pWaitSemaphores), "VUID-VkSubmitInfo-pWaitSemaphores-03243"},
          {Key(Struct::VkSubmitInfo, Field::pSignalSemaphores), "VUID-VkSubmitInfo-pSignalSemaphores-03244"},
          {Key(Struct::VkSemaphoreSignalInfo), "VUID-VkSemaphoreSignalInfo-value-03260"},
-         {Key(Struct::VkSubmitInfo2, Field::pWaitSemaphoreInfos, true), "VUID-VkSubmitInfo2-semaphore-03883"},
-         {Key(Struct::VkSubmitInfo2, Field::pSignalSemaphoreInfos, true), "VUID-VkSubmitInfo2-semaphore-03884"},
+         {Key(Struct::VkSubmitInfo2, Field::pWaitSemaphoreInfos, true), "VUID-VkSubmitInfo2-semaphore-03884"},
+         {Key(Struct::VkSubmitInfo2, Field::pSignalSemaphoreInfos, true), "VUID-VkSubmitInfo2-semaphore-03883"},
      }},
     {SubmitError::kProtectedFeatureDisabled,
      {
@@ -1323,10 +1329,25 @@ const std::string &GetShaderTileImageVUID(const Location &loc, ShaderTileImageEr
              {Key(Func::vkCmdPipelineBarrier), "VUID-vkCmdPipelineBarrier-None-09553"},
              {Key(Func::vkCmdPipelineBarrier2), "VUID-vkCmdPipelineBarrier2-None-09553"},
          }},
-        {ShaderTileImageError::kShaderTileImageBarrierError,
+        {ShaderTileImageError::kShaderTileImageFramebufferSpace,
          {
-             {Key(Func::vkCmdPipelineBarrier), "VUID-vkCmdPipelineBarrier-None-08719"},
-             {Key(Func::vkCmdPipelineBarrier2), "VUID-vkCmdPipelineBarrier2-None-08719"},
+             {Key(Func::vkCmdPipelineBarrier), "VUID-vkCmdPipelineBarrier-srcStageMask-09556"},
+             {Key(Func::vkCmdPipelineBarrier2), "VUID-vkCmdPipelineBarrier2-srcStageMask-09556"},
+         }},
+        {ShaderTileImageError::kShaderTileImageNoBuffersOrImages,
+         {
+             {Key(Func::vkCmdPipelineBarrier), "VUID-vkCmdPipelineBarrier-None-09554"},
+             {Key(Func::vkCmdPipelineBarrier2), "VUID-vkCmdPipelineBarrier2-None-09554"},
+         }},
+        {ShaderTileImageError::kShaderTileImageLayout,
+         {
+             {Key(Func::vkCmdPipelineBarrier), "VUID-vkCmdPipelineBarrier-image-09555"},
+             {Key(Func::vkCmdPipelineBarrier2), "VUID-vkCmdPipelineBarrier2-image-09555"},
+         }},
+        {ShaderTileImageError::kShaderTileImageDependencyFlags,
+         {
+             {Key(Func::vkCmdPipelineBarrier), "VUID-vkCmdPipelineBarrier-dependencyFlags-07891"},
+             {Key(Func::vkCmdPipelineBarrier2), "VUID-vkCmdPipelineBarrier2-dependencyFlags-07891"},
          }},
     };
 

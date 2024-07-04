@@ -19,7 +19,6 @@
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
-#include <unordered_map>
 #include <vector>
 
 #include "state_tracker/state_object.h"
@@ -29,11 +28,13 @@
 namespace vvl {
 // Represents a VkShaderEXT (VK_EXT_shader_object) handle
 struct ShaderObject : public StateObject {
-    ShaderObject(ValidationStateTracker *dev_data, const VkShaderCreateInfoEXT &create_info, VkShaderEXT shader_object,
+    ShaderObject(ValidationStateTracker &dev_data, const VkShaderCreateInfoEXT &create_info, VkShaderEXT shader_object,
                  std::shared_ptr<spirv::Module> &spirv_module, uint32_t createInfoCount, VkShaderEXT *pShaders,
                  uint32_t unique_shader_id = 0);
 
-    const safe_VkShaderCreateInfoEXT create_info;
+    const vku::safe_VkShaderCreateInfoEXT safe_create_info;
+    const VkShaderCreateInfoEXT &create_info;
+
     std::shared_ptr<const spirv::Module> spirv;
     std::shared_ptr<const spirv::EntryPoint> entrypoint;
     std::vector<VkShaderEXT> linked_shaders;

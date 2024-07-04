@@ -1,7 +1,7 @@
 /*
- * Copyright (c) 2015-2022 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
+ * Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,8 +36,6 @@
 // Can be used by tests to record additional details / description of test
 #define TEST_DESCRIPTION(desc) RecordProperty("description", desc)
 
-class VkImageObj;
-
 class VkTestFramework : public ::testing::Test {
   public:
     static void InitArgs(int *argc, char *argv[]);
@@ -54,8 +52,8 @@ class VkTestFramework : public ::testing::Test {
     static inline bool m_strip_spv = false;
     static inline bool m_do_everything_spv = false;
     static inline bool m_print_vu = false;
-    static inline bool m_syncval_enable_core = false;
-    static inline bool m_gpuav_enable_core = false;
+    static inline bool m_syncval_disable_core = false;
+    static inline bool m_gpuav_disable_core = false;
     static inline int m_phys_device_index = -1;
 
 #if defined(VK_USE_PLATFORM_ANDROID_KHR)

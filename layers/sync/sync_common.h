@@ -23,9 +23,17 @@
 namespace vvl {
 class Buffer;
 class BufferView;
+struct VertexBufferBinding;
+struct IndexBufferBinding;
 }  // namespace vvl
 
-struct BufferBinding;
+namespace syncval_state {
+class CommandBuffer;
+class ImageState;
+class ImageViewState;
+class Swapchain;
+}  // namespace syncval_state
+
 class HazardResult;
 class SyncValidator;
 
@@ -53,8 +61,10 @@ ResourceAccessRange MakeRange(VkDeviceSize start, VkDeviceSize size);
 ResourceAccessRange MakeRange(const vvl::Buffer &buffer, VkDeviceSize offset, VkDeviceSize size);
 ResourceAccessRange MakeRange(const vvl::BufferView &buf_view_state);
 ResourceAccessRange MakeRange(VkDeviceSize offset, uint32_t first_index, uint32_t count, uint32_t stride);
-ResourceAccessRange MakeRange(const BufferBinding &binding, uint32_t first_index, const std::optional<uint32_t> &count,
+ResourceAccessRange MakeRange(const vvl::VertexBufferBinding &binding, uint32_t first_index, const std::optional<uint32_t> &count,
                               uint32_t stride);
+ResourceAccessRange MakeRange(const vvl::IndexBufferBinding &binding, uint32_t first_index, const std::optional<uint32_t> &count,
+                              uint32_t index_size);
 
 extern const ResourceAccessRange kFullRange;
 
@@ -157,34 +167,12 @@ class SingleRangeGenerator {
     const KeyType range_;
     KeyType current_;
 };
-namespace syncval_state {
-class CommandBuffer;
-class Swapchain;
-class ImageState;
-class ImageViewState;
 
-// Utilities to DRY up Get... calls
-template <typename Map, typename Key = typename Map::key_type, typename RetVal = std::optional<typename Map::mapped_type>>
-RetVal GetMappedOptional(const Map &map, const Key &key) {
-    RetVal ret_val;
+template <typename Map>
+typename Map::mapped_type GetMapped(const Map &map, const typename Map::key_type &key) {
     auto it = map.find(key);
     if (it != map.cend()) {
-        ret_val.emplace(it->second);
+        return it->second;
     }
-    return ret_val;
+    return typename Map::mapped_type{};
 }
-template <typename Map, typename Fn>
-typename Map::mapped_type GetMapped(const Map &map, const typename Map::key_type &key, Fn &&default_factory) {
-    auto value = GetMappedOptional(map, key);
-    return (value) ? *value : default_factory();
-}
-
-template <typename Map, typename Key = typename Map::key_type, typename Mapped = typename Map::mapped_type,
-          typename Value = typename Mapped::element_type>
-Value *GetMappedPlainFromShared(const Map &map, const Key &key) {
-    auto value = GetMappedOptional<Map, Key>(map, key);
-    if (value) return value->get();
-    return nullptr;
-}
-
-}  // namespace syncval_state

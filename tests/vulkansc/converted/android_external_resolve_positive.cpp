@@ -2,9 +2,9 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2023 The Khronos Group Inc.
- * Copyright (c) 2023 Valve Corporation
- * Copyright (c) 2023 LunarG, Inc.
+ * Copyright (c) 2023-2024 The Khronos Group Inc.
+ * Copyright (c) 2023-2024 Valve Corporation
+ * Copyright (c) 2023-2024 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,7 +38,6 @@ TEST_F(PositiveAndroidExternalResolve, NoResolve) {
     InitRenderTarget();
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitState();
     pipe.CreateGraphicsPipeline();
 }
 
@@ -81,15 +80,13 @@ TEST_F(PositiveAndroidExternalResolve, RenderPassAndFramebuffer) {
     image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_ci.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
-    VkImageObj color_image(m_device);
-    color_image.Init(image_ci);
+    vkt::Image color_image(*m_device, image_ci, vkt::set_layout);
     vkt::ImageView color_view = color_image.CreateView();
 
     image_ci.pNext = &external_format;
     image_ci.format = VK_FORMAT_UNDEFINED;
     image_ci.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
-    VkImageObj resolve_image(m_device);
-    resolve_image.Init(image_ci);
+    vkt::Image resolve_image(*m_device, image_ci, vkt::set_layout);
 
     VkSamplerYcbcrConversionCreateInfo sycci = vku::InitStructHelper(&external_format);
     sycci.format = VK_FORMAT_UNDEFINED;
@@ -115,9 +112,7 @@ TEST_F(PositiveAndroidExternalResolve, RenderPassAndFramebuffer) {
 
     vkt::Framebuffer framebuffer(*m_device, rp.Handle(), 2, attachments);
 
-    CreatePipelineHelper pipe(*this);
-    pipe.InitState();
-    pipe.gp_ci_.pNext = &external_format;
+    CreatePipelineHelper pipe(*this, &external_format);
     pipe.gp_ci_.renderPass = rp.Handle();
     pipe.CreateGraphicsPipeline();
 }
@@ -162,16 +157,13 @@ TEST_F(PositiveAndroidExternalResolve, ImagelessFramebuffer) {
     image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
     image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_ci.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-
-    VkImageObj color_image(m_device);
-    color_image.Init(image_ci);
+    vkt::Image color_image(*m_device, image_ci, vkt::set_layout);
     vkt::ImageView color_view = color_image.CreateView();
 
     image_ci.pNext = &external_format;
     image_ci.format = VK_FORMAT_UNDEFINED;
     image_ci.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    VkImageObj resolve_image(m_device);
-    resolve_image.Init(image_ci);
+    vkt::Image resolve_image(*m_device, image_ci, vkt::set_layout);
 
     VkSamplerYcbcrConversionCreateInfo sycci = vku::InitStructHelper(&external_format);
     sycci.format = VK_FORMAT_UNDEFINED;
@@ -270,17 +262,14 @@ TEST_F(PositiveAndroidExternalResolve, DynamicRendering) {
     image_ci.samples = VK_SAMPLE_COUNT_4_BIT;
     image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_ci.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-
-    VkImageObj color_image(m_device);
-    color_image.Init(image_ci);
+    vkt::Image color_image(*m_device, image_ci, vkt::set_layout);
     vkt::ImageView color_view = color_image.CreateView();
 
     image_ci.pNext = &external_format;
     image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
     image_ci.format = VK_FORMAT_UNDEFINED;
     image_ci.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    VkImageObj resolve_image(m_device);
-    resolve_image.Init(image_ci);
+    vkt::Image resolve_image(*m_device, image_ci, vkt::set_layout);
 
     VkSamplerYcbcrConversionCreateInfo sycci = vku::InitStructHelper(&external_format);
     sycci.format = VK_FORMAT_UNDEFINED;
@@ -361,16 +350,13 @@ TEST_F(PositiveAndroidExternalResolve, PipelineBarrier) {
     image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
     image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_ci.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-
-    VkImageObj color_image(m_device);
-    color_image.Init(image_ci);
+    vkt::Image color_image(*m_device, image_ci, vkt::set_layout);
     vkt::ImageView color_view = color_image.CreateView();
 
     image_ci.pNext = &external_format;
     image_ci.format = VK_FORMAT_UNDEFINED;
     image_ci.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
-    VkImageObj resolve_image(m_device);
-    resolve_image.Init(image_ci);
+    vkt::Image resolve_image(*m_device, image_ci, vkt::set_layout);
 
     VkSamplerYcbcrConversionCreateInfo sycci = vku::InitStructHelper(&external_format);
     sycci.format = VK_FORMAT_UNDEFINED;
@@ -396,9 +382,7 @@ TEST_F(PositiveAndroidExternalResolve, PipelineBarrier) {
 
     vkt::Framebuffer framebuffer(*m_device, rp.Handle(), 2, attachments);
 
-    CreatePipelineHelper pipe(*this);
-    pipe.InitState();
-    pipe.gp_ci_.pNext = &external_format;
+    CreatePipelineHelper pipe(*this, &external_format);
     pipe.gp_ci_.renderPass = rp.Handle();
     pipe.CreateGraphicsPipeline();
 

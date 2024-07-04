@@ -17,6 +17,7 @@
  */
 
 #include "sc_pipeline_state.h"
+#include "state_tracker/shader_module.h"
 #include "state_tracker/state_tracker.h"
 #include "vulkansc/sc_vuid_enums.h"
 
@@ -24,7 +25,7 @@
 
 namespace vvl::sc {
 
-PipelineCache::PipelineCache(const ValidationStateTracker* dev_data, VkPipelineCache pipeline_cache,
+PipelineCache::PipelineCache(const ValidationStateTracker& dev_data, VkPipelineCache pipeline_cache,
                              const VkPipelineCacheCreateInfo* pCreateInfo)
     : vvl::PipelineCache(pipeline_cache, pCreateInfo), pipelines_() {
     vvl::sc::PipelineCacheData pipeline_cache_data(*pCreateInfo);
@@ -37,7 +38,7 @@ PipelineCache::PipelineCache(const ValidationStateTracker* dev_data, VkPipelineC
     }
 }
 
-PipelineCache::Entry::StageModules PipelineCache::Entry::InitShaderModules(const ValidationStateTracker* dev_data,
+PipelineCache::Entry::StageModules PipelineCache::Entry::InitShaderModules(const ValidationStateTracker& dev_data,
                                                                            const PipelineCacheData::Entry& cache_entry) {
     Entry::StageModules stage_modules;
     stage_modules.reserve(cache_entry.StageIndexCount());
@@ -46,11 +47,12 @@ PipelineCache::Entry::StageModules PipelineCache::Entry::InitShaderModules(const
         auto code = cache_entry.StageSPIRV(stage_index);
 
         if (code.size() > 0) {
-            auto spirv_module = std::make_shared<spirv::Module>(code);
+            spirv::StatelessData stateless_data{};
+            auto spirv_module = std::make_shared<spirv::Module>(code.size() * sizeof(uint32_t), code.data(), &stateless_data);
 
-            if (spirv_module->static_data_.has_group_decoration) {
+            if (stateless_data.has_group_decoration) {
                 // Run optimizer to flatten group decorations
-                spv_target_env spirv_environment = PickSpirvEnv(dev_data->api_version, true);
+                spv_target_env spirv_environment = PickSpirvEnv(dev_data.api_version, true);
                 spvtools::Optimizer optimizer(spirv_environment);
                 optimizer.RegisterPass(spvtools::CreateFlattenDecorationPass());
                 std::vector<uint32_t> optimized_binary;
@@ -86,9 +88,9 @@ PipelineCache::Entry::JsonData PipelineCache::Entry::ParseJsonData(const Pipelin
         return std::string();
     };
 
-    auto parse_spec_info = [](const Json::Value& spec_info) -> std::unique_ptr<safe_VkSpecializationInfo> {
+    auto parse_spec_info = [](const Json::Value& spec_info) -> std::unique_ptr<vku::safe_VkSpecializationInfo> {
         if (spec_info.isObject()) {
-            auto result = std::make_unique<safe_VkSpecializationInfo>();
+            auto result = std::make_unique<vku::safe_VkSpecializationInfo>();
             result->mapEntryCount = spec_info["mapEntryCount"].asUInt();
             auto map_entries = new VkSpecializationMapEntry[result->mapEntryCount];
             auto map_entries_json = spec_info["pMapEntries"];

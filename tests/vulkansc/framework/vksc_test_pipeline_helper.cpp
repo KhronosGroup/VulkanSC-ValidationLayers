@@ -90,11 +90,20 @@ void PipelineBuilder::TestDeviceCreateFail() {
     vksc::DestroyDevice(device, nullptr);
 }
 
+vksc::PipelineCache PipelineBuilder::CreatePipelineCache(vkt::Device& device) {
+    VkPipelineCache pipeline_cache = VK_NULL_HANDLE;
+    auto create_info = cache_builder_->MakeCreateInfo();
+    framework_.Monitor().SetAllowedFailureMsg("VUID-VkPipelineCacheSafetyCriticalIndexEntry-jsonSize-05081");
+    vksc::CreatePipelineCache(device.handle(), &create_info, nullptr, &pipeline_cache);
+    return vksc::PipelineCache(device.handle(), pipeline_cache);
+}
+
 vksc::Pipeline PipelineBuilder::CreatePipeline(vkt::Device& device) {
     descriptor_set_.reset(new OneOffDescriptorSet(&device, dsl_bindings_));
     pipeline_layout_ = vkt::PipelineLayout(device, {&descriptor_set_->layout_}, {}, pipeline_layout_ci_.flags);
 
     if (spirv_data_.empty() && !pipeline_cache_) {
+        framework_.Monitor().SetAllowedFailureMsg("VUID-VkPipelineCacheSafetyCriticalIndexEntry-jsonSize-05081");
         pipeline_cache_.init(device, cache_builder_->MakeCreateInfo());
     }
 

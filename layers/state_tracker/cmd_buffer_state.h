@@ -22,16 +22,17 @@
 #include "state_tracker/state_object.h"
 #include "state_tracker/image_layout_map.h"
 #include "state_tracker/pipeline_state.h"
+#include "state_tracker/query_state.h"
 #include "state_tracker/vertex_index_buffer_state.h"
 #include "containers/qfo_transfer.h"
 #include "containers/custom_containers.h"
 #include "generated/dynamic_state_helper.h"
 
-struct SubpassInfo;
 class CoreChecks;
 class ValidationStateTracker;
 
 namespace vvl {
+class Bindable;
 class Buffer;
 class Framebuffer;
 class RenderPass;
@@ -54,6 +55,61 @@ static bool GetMetalExport(const VkEventCreateInfo *info) {
 }
 #endif  // VK_USE_PLATFORM_METAL_EXT
 
+// Only CoreChecks uses this, but the state tracker stores it.
+constexpr static auto kInvalidLayout = image_layout_map::kInvalidLayout;
+using ImageSubresourceLayoutMap = image_layout_map::ImageSubresourceLayoutMap;
+typedef vvl::unordered_map<VkEvent, VkPipelineStageFlags2KHR> EventToStageMap;
+
+enum class CbState {
+    New,                // Newly created CB w/o any cmds
+    Recording,          // BeginCB has been called on this CB
+    Recorded,           // EndCB has been called on this CB
+    InvalidComplete,    // had a complete recording, but was since invalidated
+    InvalidIncomplete,  // fouled before recording was completed
+};
+
+enum class AttachmentSource {
+    Empty = 0,
+    RenderPass,
+    DynamicRendering,
+    Inheritance,  // secondary command buffer VkCommandBufferInheritanceInfo
+};
+
+struct AttachmentInfo {
+    enum class Type {
+        Empty = 0,
+        Input,
+        Color,
+        ColorResolve,
+        DepthStencil,
+        // Dynamic rendering split DepthStencil up
+        Depth,
+        DepthResolve,
+        Stencil,
+        StencilResolve,
+    };
+
+    vvl::ImageView *image_view;
+    Type type;
+
+    AttachmentInfo() : image_view(nullptr), type(Type::Empty) {}
+
+    bool IsResolve() const { return type == Type::ColorResolve || type == Type::DepthResolve || type == Type::StencilResolve; }
+    bool IsInput() const { return type == Type::Input; }
+
+    std::string Describe(AttachmentSource source, uint32_t index) const;
+};
+
+struct SubpassInfo {
+    bool used;
+    VkImageUsageFlagBits usage;
+    VkImageLayout layout;
+    VkImageAspectFlags aspectMask;
+
+    SubpassInfo()
+        : used(false), usage(VkImageUsageFlagBits(0)), layout(VK_IMAGE_LAYOUT_UNDEFINED), aspectMask(VkImageAspectFlags(0)) {}
+};
+
 namespace vvl {
 
 class Event : public StateObject {
@@ -70,8 +126,8 @@ class Event : public StateObject {
     // Queue that signaled this event. It's null if event was signaled from the host
     VkQueue signaling_queue = VK_NULL_HANDLE;
 
-    Event(VkEvent event_, const VkEventCreateInfo *pCreateInfo)
-        : StateObject(event_, kVulkanObjectTypeEvent),
+    Event(VkEvent handle, const VkEventCreateInfo *pCreateInfo)
+        : StateObject(handle, kVulkanObjectTypeEvent),
           write_in_use(0),
 #ifdef VK_USE_PLATFORM_METAL_EXT
           metal_event_export(GetMetalExport(pCreateInfo)),
@@ -82,18 +138,10 @@ class Event : public StateObject {
     VkEvent VkHandle() const { return handle_.Cast<VkEvent>(); }
 };
 
-}  // namespace vvl
-
-// Only CoreChecks uses this, but the state tracker stores it.
-constexpr static auto kInvalidLayout = image_layout_map::kInvalidLayout;
-using ImageSubresourceLayoutMap = image_layout_map::ImageSubresourceLayoutMap;
-typedef vvl::unordered_map<VkEvent, VkPipelineStageFlags2KHR> EventToStageMap;
-
-namespace vvl {
 // Track command pools and their command buffers
 class CommandPool : public StateObject {
   public:
-    ValidationStateTracker *dev_data;
+    ValidationStateTracker &dev_data;
     const VkCommandPoolCreateFlags createFlags;
     const uint32_t queueFamilyIndex;
     const VkQueueFlags queue_flags;
@@ -101,7 +149,7 @@ class CommandPool : public StateObject {
     // Cmd buffers allocated from this pool
     vvl::unordered_map<VkCommandBuffer, CommandBuffer *> commandBuffers;
 
-    CommandPool(ValidationStateTracker *dev, VkCommandPool cp, const VkCommandPoolCreateInfo *pCreateInfo, VkQueueFlags flags);
+    CommandPool(ValidationStateTracker &dev, VkCommandPool handle, const VkCommandPoolCreateInfo *pCreateInfo, VkQueueFlags flags);
     virtual ~CommandPool() { Destroy(); }
 
     VkCommandPool VkHandle() const { return handle_.Cast<VkCommandPool>(); }
@@ -112,33 +160,23 @@ class CommandPool : public StateObject {
 
     void Destroy() override;
 };
-}  // namespace vvl
-
-enum class CbState {
-    New,                // Newly created CB w/o any cmds
-    Recording,          // BeginCB has been called on this CB
-    Recorded,           // EndCB has been called on this CB
-    InvalidComplete,    // had a complete recording, but was since invalidated
-    InvalidIncomplete,  // fouled before recording was completed
-};
-
-typedef vvl::unordered_map<VkImage, std::shared_ptr<ImageSubresourceLayoutMap>> CommandBufferImageLayoutMap;
-
-typedef vvl::unordered_map<const GlobalImageLayoutRangeMap *, std::shared_ptr<ImageSubresourceLayoutMap>>
-    CommandBufferAliasedLayoutMap;
-
-namespace vvl {
 
 class CommandBuffer : public RefcountedStateObject {
     using Func = vvl::Func;
-
   public:
-    VkCommandBufferAllocateInfo createInfo = {};
+    struct LayoutState {
+        StateObject::IdType id;
+        std::shared_ptr<ImageSubresourceLayoutMap> map;
+    };
+    using ImageLayoutMap = vvl::unordered_map<VkImage, LayoutState>;
+    using AliasedLayoutMap = vvl::unordered_map<const GlobalImageLayoutRangeMap *, std::shared_ptr<ImageSubresourceLayoutMap>>;
+
+    VkCommandBufferAllocateInfo allocate_info;
     VkCommandBufferBeginInfo beginInfo;
     VkCommandBufferInheritanceInfo inheritanceInfo;
     // since command buffers can only be destroyed by their command pool, this does not need to be a shared_ptr
     const vvl::CommandPool *command_pool;
-    ValidationStateTracker *dev_data;
+    ValidationStateTracker &dev_data;
     bool unprotected;  // can't be used for protected memory
     bool hasRenderPassInstance;
     bool suspendsRenderPassInstance;
@@ -226,6 +264,8 @@ class CommandBuffer : public RefcountedStateObject {
         bool logic_op_enable;
         // VK_DYNAMIC_STATE_FRAGMENT_SHADING_RATE_KHR
         VkExtent2D fragment_size;
+        // VK_DYNAMIC_STATE_PRIMITIVE_RESTART_ENABLE
+        bool primitive_restart_enable;
 
         uint32_t color_write_enable_attachment_count;
 
@@ -240,7 +280,7 @@ class CommandBuffer : public RefcountedStateObject {
         std::vector<VkColorComponentFlags> color_write_masks;        // VK_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT
 
         // VK_DYNAMIC_STATE_VERTEX_INPUT_EXT
-        std::vector<VkVertexInputBindingDescription2EXT> vertex_binding_descriptions;
+        std::vector<uint32_t> vertex_binding_descriptions_divisor;
         std::vector<VkVertexInputAttributeDescription2EXT> vertex_attribute_descriptions;
 
         // VK_DYNAMIC_STATE_CONSERVATIVE_RASTERIZATION_MODE_EXT
@@ -274,6 +314,7 @@ class CommandBuffer : public RefcountedStateObject {
         uint32_t exclusive_scissor_first;
         uint32_t exclusive_scissor_count;
         std::vector<VkRect2D> exclusive_scissors;
+
         // When the Command Buffer resets, the value most things in this struct don't matter because if they are read without
         // setting the state, it will fail in ValidateDynamicStateIsSet() for us. Some values (ex. the bitset) are tracking in
         // replacement for static_status/dynamic_status so this needs to reset along with those
@@ -287,12 +328,14 @@ class CommandBuffer : public RefcountedStateObject {
             viewports.clear();
             discard_rectangles.reset();
             color_blend_enable_attachments.reset();
+            color_blend_enabled.reset();
             color_blend_equation_attachments.reset();
             color_write_mask_attachments.reset();
             color_blend_advanced_attachments.reset();
+            color_write_enabled.reset();
             color_blend_equations.clear();
             color_write_masks.clear();
-            vertex_binding_descriptions.clear();
+            vertex_binding_descriptions_divisor.clear();
             vertex_attribute_descriptions.clear();
             viewport_w_scalings.clear();
             exclusive_scissor_enables.clear();
@@ -349,13 +392,15 @@ class CommandBuffer : public RefcountedStateObject {
     // The RenderPass created from vkCmdBeginRenderPass or vkCmdBeginRendering
     std::shared_ptr<vvl::RenderPass> activeRenderPass;
     // Used for both type of renderPass
+    AttachmentSource attachment_source;
+    std::vector<AttachmentInfo> active_attachments;
     vvl::unordered_set<uint32_t> active_color_attachments_index;
     uint32_t active_render_pass_device_mask;
+    bool has_render_pass_striped;
+    uint32_t striped_count;
     // only when not using dynamic rendering
-    safe_VkRenderPassBeginInfo active_render_pass_begin_info;
-    std::shared_ptr<std::vector<SubpassInfo>> active_subpasses;
-    std::shared_ptr<std::vector<vvl::ImageView *>> active_attachments;
-    std::set<std::shared_ptr<vvl::ImageView>> attachments_view_states;
+    vku::safe_VkRenderPassBeginInfo active_render_pass_begin_info;
+    std::vector<SubpassInfo> active_subpasses;
 
     VkSubpassContents activeSubpassContents;
     uint32_t GetActiveSubpass() const { return active_subpass_; }
@@ -373,6 +418,24 @@ class CommandBuffer : public RefcountedStateObject {
     QFOTransferBarrierSets<QFOBufferTransferBarrier> qfo_transfer_buffer_barriers;
     QFOTransferBarrierSets<QFOImageTransferBarrier> qfo_transfer_image_barriers;
 
+    // VK_KHR_dynamic_rendering_local_read works like dynamic state, but lives for the rendering lifetime only
+    struct RenderingAttachment {
+        // VkRenderingAttachmentLocationInfoKHR
+        bool set_color_locations = false;
+        std::vector<uint32_t> color_locations;
+        // VkRenderingInputAttachmentIndexInfoKHR
+        bool set_color_indexes = false;
+        std::vector<uint32_t> color_indexes;
+        const uint32_t *depth_index = nullptr;
+        const uint32_t *stencil_index = nullptr;
+        void Reset() {
+            color_locations.clear();
+            color_indexes.clear();
+            depth_index = nullptr;
+            stencil_index = nullptr;
+        }
+    } rendering_attachments;
+
     vvl::unordered_set<VkEvent> waitedEvents;
     std::vector<VkEvent> writeEventsBeforeWait;
     std::vector<VkEvent> events;
@@ -380,11 +443,12 @@ class CommandBuffer : public RefcountedStateObject {
     vvl::unordered_set<QueryObject> startedQueries;
     vvl::unordered_set<QueryObject> updatedQueries;
     vvl::unordered_set<QueryObject> renderPassQueries;
-    CommandBufferImageLayoutMap image_layout_map;
-    CommandBufferAliasedLayoutMap aliased_image_layout_map;  // storage for potentially aliased images
+    ImageLayoutMap image_layout_map;
+    AliasedLayoutMap aliased_image_layout_map;  // storage for potentially aliased images
 
-    CBVertexBufferBindingInfo current_vertex_buffer_binding_info;
-    bool vertex_buffer_used;  // Track for perf warning to make sure any bound vtx buffer used
+    vvl::unordered_map<uint32_t, vvl::VertexBufferBinding> current_vertex_buffer_binding_info;
+    vvl::IndexBufferBinding index_buffer_binding;
+
     VkCommandBuffer primaryCommandBuffer;
     // If primary, the secondary command buffers we will call.
     vvl::unordered_set<CommandBuffer *> linkedCommandBuffers;
@@ -406,7 +470,6 @@ class CommandBuffer : public RefcountedStateObject {
     std::vector<std::function<bool(CommandBuffer &cb_state, bool do_validate, VkQueryPool &firstPerfQueryPool,
                                    uint32_t perfQueryPass, QueryMap *localQueryToStateMap)>>
         queryUpdates;
-    IndexBufferBinding index_buffer_binding;
     bool performance_lock_acquired = false;
     bool performance_lock_released = false;
 
@@ -415,9 +478,6 @@ class CommandBuffer : public RefcountedStateObject {
 
     std::vector<uint8_t> push_constant_data;
     PushConstantRangesId push_constant_data_ranges;
-
-    // Used for Best Practices tracking
-    uint32_t small_indexed_draw_call_count;
 
     // Video coding related state tracking
     std::shared_ptr<vvl::VideoSession> bound_video_session;
@@ -428,6 +488,8 @@ class CommandBuffer : public RefcountedStateObject {
     VideoSessionUpdateMap video_session_updates;
 
     bool transform_feedback_active{false};
+    uint32_t transform_feedback_buffers_bound;
+
     bool conditional_rendering_active{false};
     bool conditional_rendering_inside_render_pass{false};
     uint32_t conditional_rendering_subpass{0};
@@ -437,7 +499,7 @@ class CommandBuffer : public RefcountedStateObject {
     ReadLockGuard ReadLock() const { return ReadLockGuard(lock); }
     WriteLockGuard WriteLock() { return WriteLockGuard(lock); }
 
-    CommandBuffer(ValidationStateTracker *, VkCommandBuffer cb, const VkCommandBufferAllocateInfo *pCreateInfo,
+    CommandBuffer(ValidationStateTracker &dev, VkCommandBuffer handle, const VkCommandBufferAllocateInfo *pAllocateInfo,
                   const vvl::CommandPool *cmd_pool);
 
     virtual ~CommandBuffer() { Destroy(); }
@@ -469,9 +531,9 @@ class CommandBuffer : public RefcountedStateObject {
 
     void ResetPushConstantDataIfIncompatible(const vvl::PipelineLayout *pipeline_layout_state);
 
-    const ImageSubresourceLayoutMap *GetImageSubresourceLayoutMap(VkImage image) const;
-    ImageSubresourceLayoutMap *GetImageSubresourceLayoutMap(const vvl::Image &image_state);
-    const CommandBufferImageLayoutMap &GetImageSubresourceLayoutMap() const;
+    std::shared_ptr<const ImageSubresourceLayoutMap> GetImageSubresourceLayoutMap(VkImage image) const;
+    std::shared_ptr<ImageSubresourceLayoutMap> GetImageSubresourceLayoutMap(const vvl::Image &image_state);
+    const ImageLayoutMap &GetImageSubresourceLayoutMap() const;
 
     const QFOTransferBarrierSets<QFOImageTransferBarrier> &GetQFOBarrierSets(const QFOImageTransferBarrier &type_tag) const {
         return qfo_transfer_image_barriers;
@@ -511,7 +573,7 @@ class CommandBuffer : public RefcountedStateObject {
 
     void BeginRenderPass(Func command, const VkRenderPassBeginInfo *pRenderPassBegin, VkSubpassContents contents);
     void NextSubpass(Func command, VkSubpassContents contents);
-    void UpdateSubpassAttachments(const safe_VkSubpassDescription2 &subpass, std::vector<SubpassInfo> &subpasses);
+    void UpdateSubpassAttachments();
     void EndRenderPass(Func command);
 
     void BeginRendering(Func command, const VkRenderingInfo *pRenderingInfo);
@@ -588,7 +650,8 @@ class CommandBuffer : public RefcountedStateObject {
     }
     void BindShader(VkShaderStageFlagBits shader_stage, vvl::ShaderObject *shader_object_state);
 
-    bool IsPrimary() const { return createInfo.level == VK_COMMAND_BUFFER_LEVEL_PRIMARY; }
+    bool IsPrimary() const { return allocate_info.level == VK_COMMAND_BUFFER_LEVEL_PRIMARY; }
+    bool IsSeconary() const { return allocate_info.level == VK_COMMAND_BUFFER_LEVEL_SECONDARY; }
     void BeginLabel(const char *label_name);
     void EndLabel();
     int LabelStackDepth() const { return label_stack_depth_; }

@@ -27,7 +27,7 @@ class CommandPool : public vvl::CommandPool {
     uint32_t max_command_buffers;
     std::atomic_uint32_t command_buffers_recording;
 
-    CommandPool(ValidationStateTracker *dev, VkCommandPool cp, const VkCommandPoolCreateInfo *pCreateInfo, VkQueueFlags flags)
+    CommandPool(ValidationStateTracker &dev, VkCommandPool cp, const VkCommandPoolCreateInfo *pCreateInfo, VkQueueFlags flags)
         : vvl::CommandPool(dev, cp, pCreateInfo, flags), max_command_buffers(0), command_buffers_recording(0) {
         const auto *mem_reservation_info =
             vku::FindStructInPNextChain<VkCommandPoolMemoryReservationCreateInfo>(pCreateInfo->pNext);

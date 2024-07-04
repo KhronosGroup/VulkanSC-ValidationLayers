@@ -40,8 +40,6 @@ using vkt::MakeVkHandles;
 static constexpr uint64_t kWaitTimeout{10000000000};  // 10 seconds in ns
 static constexpr VkDeviceSize kZeroDeviceSize{0};
 
-class VkImageObj;
-
 struct SurfaceContext {
 #if defined(VK_USE_PLATFORM_WIN32_KHR)
     HWND m_win32Window{};
@@ -70,12 +68,15 @@ struct SurfaceInformation {
 class VkRenderFramework : public VkTestFramework {
   public:
     VkInstance instance() const { return instance_; }
-    VkDevice device() const { return m_device->device(); }
+    VkDevice device() const { return m_device->handle(); }
     vkt::Device *DeviceObj() const { return m_device; }
     VkPhysicalDevice gpu() const;
     VkRenderPass renderPass() const { return m_renderPass; }
     VkFramebuffer framebuffer() const { return m_framebuffer->handle(); }
-    VkQueue DefaultQueue() const { return m_default_queue->handle(); }
+
+    vkt::Queue *DefaultQueue() const { return m_default_queue; }
+    vkt::Queue *SecondQueue() const { return m_second_queue; }
+
     ErrorMonitor &Monitor();
     const VkPhysicalDeviceProperties &physDevProps() const;
 
@@ -107,7 +108,13 @@ class VkRenderFramework : public VkTestFramework {
     void InitRenderTarget(uint32_t targets, const VkImageView *dsBinding);
     void InitDynamicRenderTarget(VkFormat format = VK_FORMAT_UNDEFINED);
     VkImageView GetDynamicRenderTarget() const;
+    VkRect2D GetRenderTargetArea() const;
     void DestroyRenderTarget();
+
+    // Used for VK_EXT_shader_object
+    void SetDefaultDynamicStatesExclude(const std::vector<VkDynamicState> &exclude = {}, bool tessellation = false,
+                                        VkCommandBuffer commandBuffer = VK_NULL_HANDLE);
+    void SetDefaultDynamicStatesAll(VkCommandBuffer cmdBuffer);
 
     static bool IgnoreDisableChecks();
     bool IsPlatformMockICD();
@@ -158,11 +165,11 @@ class VkRenderFramework : public VkTestFramework {
         return spv;
     }
 
-    void SetDesiredFailureMsg(const VkFlags msgFlags, const std::string &msg) {
-        m_errorMonitor->SetDesiredFailureMsg(msgFlags, msg);
+    void SetDesiredFailureMsg(const VkFlags msg_flags, const std::string &msg) {
+        m_errorMonitor->SetDesiredFailureMsg(msg_flags, msg);
     };
-    void SetDesiredFailureMsg(const VkFlags msgFlags, const char *const msgString) {
-        m_errorMonitor->SetDesiredFailureMsg(msgFlags, msgString);
+    void SetDesiredFailureMsg(const VkFlags msg_flags, const char *const msg_string) {
+        m_errorMonitor->SetDesiredFailureMsg(msg_flags, msg_string);
     };
     void VerifyFound() { m_errorMonitor->VerifyFound(); }
 
@@ -189,12 +196,16 @@ class VkRenderFramework : public VkTestFramework {
     VkPhysicalDevice gpu_ = VK_NULL_HANDLE;
     VkPhysicalDeviceProperties physDevProps_;
     vkt::FeatureRequirements feature_requirements_;
+    bool all_queue_count_ = false;
 
     uint32_t m_gpu_index;
     vkt::Device *m_device;
-    vkt::CommandPool *m_commandPool;
-    vkt::CommandBuffer *m_commandBuffer;
+    vkt::CommandPool m_command_pool;
+    vkt::CommandBuffer *m_commandBuffer;  // DEPRECATED: use m_command_buffer
+    vkt::CommandBuffer m_command_buffer;
     VkRenderPass m_renderPass = VK_NULL_HANDLE;
+
+    vkt::Buffer *m_vertex_buffer;
 
     // WSI items
     SurfaceContext m_surface_context{};
@@ -208,14 +219,22 @@ class VkRenderFramework : public VkTestFramework {
 
     std::vector<VkClearValue> m_renderPassClearValues;
     VkRenderPassBeginInfo m_renderPassBeginInfo;
-    std::vector<std::unique_ptr<VkImageObj>> m_renderTargets;
+    std::vector<std::unique_ptr<vkt::Image>> m_renderTargets;
     uint32_t m_width, m_height;
     VkFormat m_render_target_fmt;
     VkFormat m_depth_stencil_fmt;
     VkClearColorValue m_clear_color;
-    VkImageObj *m_depthStencil;
+    vkt::Image *m_depthStencil;
     // first graphics queue, used must often, don't overwrite, use Device class
-    vkt::Queue *m_default_queue;
+    vkt::Queue *m_default_queue = nullptr;
+
+    // A different queue than a default one. The queue with the most capabilities is selected (graphics > compute > transfer).
+    // It is null if implementation provides the only queue. Capabilities should be checked if necessary (m_second_queue_caps).
+    vkt::Queue *m_second_queue = nullptr;
+    VkQueueFlags m_second_queue_caps = 0;
+
+    vkt::CommandPool m_second_command_pool;  // associated with a queue family of the second command queue
+    vkt::CommandBuffer m_second_command_buffer;
 
     // Requested extensions to enable at device creation time
     std::vector<const char *> m_required_extensions;
@@ -263,77 +282,4 @@ class VkRenderFramework : public VkTestFramework {
     // This function also returns true if the device extension is implicitly supported by the API version supported
     // by the device, as queriable using DeviceValidationVersion().
     bool CanEnableDeviceExtension(const std::string &dev_ext_name) const;
-};
-
-class VkImageObj : public vkt::Image {
-  public:
-    VkImageObj(vkt::Device *dev);
-    bool IsCompatible(VkImageUsageFlags usages, VkFormatFeatureFlags2 features);
-
-  public:
-    static VkImageCreateInfo ImageCreateInfo2D(uint32_t const width, uint32_t const height, uint32_t const mipLevels,
-                                               uint32_t const layers, VkFormat const format, VkFlags const usage,
-                                               VkImageTiling const requested_tiling = VK_IMAGE_TILING_OPTIMAL,
-                                               const std::vector<uint32_t> *queue_families = nullptr);
-    void Init(uint32_t const width, uint32_t const height, uint32_t const mipLevels, VkFormat const format, VkFlags const usage,
-              VkImageTiling const tiling = VK_IMAGE_TILING_OPTIMAL, VkMemoryPropertyFlags const reqs = 0,
-              const std::vector<uint32_t> *queue_families = nullptr, bool memory = true);
-    void Init(const VkImageCreateInfo &create_info, VkMemoryPropertyFlags const reqs = 0, bool memory = true);
-
-    void init(const VkImageCreateInfo *create_info);
-    void init_no_mem(const vkt::Device &dev, const VkImageCreateInfo &info);
-
-    void InitNoLayout(uint32_t const width, uint32_t const height, uint32_t const mipLevels, VkFormat const format,
-                      VkFlags const usage, VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL, VkMemoryPropertyFlags reqs = 0,
-                      const std::vector<uint32_t> *queue_families = nullptr, bool memory = true);
-
-    void InitNoLayout(const VkImageCreateInfo &create_info, VkMemoryPropertyFlags reqs = 0, bool memory = true);
-
-    void Layout(VkImageLayout const layout) { m_descriptorImageInfo.imageLayout = layout; }
-
-    void ImageMemoryBarrier(vkt::CommandBuffer *cmd, VkImageAspectFlags aspect, VkFlags output_mask, VkFlags input_mask,
-                            VkImageLayout image_layout, VkPipelineStageFlags src_stages = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                            VkPipelineStageFlags dest_stages = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                            uint32_t srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                            uint32_t dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED);
-
-    VkImageViewCreateInfo BasicViewCreatInfo(VkImageAspectFlags aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT) const {
-        VkImageViewCreateInfo ci = vku::InitStructHelper();
-        ci.image = handle();
-        ci.format = format();
-        ci.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        ci.components.r = VK_COMPONENT_SWIZZLE_R;
-        ci.components.g = VK_COMPONENT_SWIZZLE_G;
-        ci.components.b = VK_COMPONENT_SWIZZLE_B;
-        ci.components.a = VK_COMPONENT_SWIZZLE_A;
-        ci.subresourceRange = {aspect_mask, 0, 1, 0, 1};
-        return ci;
-    }
-
-    vkt::ImageView CreateView(VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT) const {
-        VkImageViewCreateInfo ci = BasicViewCreatInfo(aspect);
-        ci.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
-        ci.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
-        return vkt::ImageView(*m_device, ci);
-    }
-
-    vkt::ImageView CreateView(VkImageViewType type, uint32_t baseMipLevel = 0, uint32_t levelCount = VK_REMAINING_MIP_LEVELS,
-                              uint32_t baseArrayLayer = 0, uint32_t layerCount = VK_REMAINING_ARRAY_LAYERS,
-                              VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT) const {
-        VkImageViewCreateInfo ci = BasicViewCreatInfo();
-        ci.viewType = type;
-        ci.subresourceRange = {aspect, baseMipLevel, levelCount, baseArrayLayer, layerCount};
-        return vkt::ImageView(*m_device, ci);
-    }
-
-    void SetLayout(vkt::CommandBuffer *cmd_buf, VkImageAspectFlags aspect, VkImageLayout image_layout);
-    void SetLayout(VkImageAspectFlags aspect, VkImageLayout image_layout);
-    void SetLayout(VkImageLayout image_layout) { SetLayout(aspect_mask(format()), image_layout); };
-
-    VkImageLayout Layout() const { return m_descriptorImageInfo.imageLayout; }
-    vkt::Device *device() const { return m_device; }
-
-  protected:
-    vkt::Device *m_device = nullptr;
-    VkDescriptorImageInfo m_descriptorImageInfo = {VK_NULL_HANDLE, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL};
 };

@@ -101,8 +101,6 @@ TEST_F(VkSCNegativeShaderSpirv, MissingSpecializationInfo) {
 TEST_F(VkSCNegativeShaderSpirv, InvalidSpirv) {
     TEST_DESCRIPTION("Expect spirv-val reporting an error due to the use of an invalid SPIR-V extension in OpExtension.");
 
-    RETURN_IF_SKIP(InitFramework());
-
     const char* vertex_source = R"spirv(
                OpCapability Shader
           %1 = OpExtInstImport "GLSL.std.450"
@@ -122,17 +120,15 @@ TEST_F(VkSCNegativeShaderSpirv, InvalidSpirv) {
     vksc::GraphicsPipelineBuilder builder(this);
     builder.InitVsFs(vksc::Shader::Vertex(vertex_source), vksc::Shader::Fragment(kSampleFragmentShaderSpv));
 
-    // TODO: Vulkan SC - the name of this VUID will likely have to change as it was derived from
-    // VUID "VUID-VkShaderModuleCreateInfo-pCode-08737"
+    RETURN_IF_SKIP(Init());
+
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkShaderModuleCreateInfo-pCode-08737");
-    builder.TestDeviceCreateFail();
+    builder.CreatePipelineCache(*m_device);
     m_errorMonitor->VerifyFound();
 }
 
 TEST_F(VkSCNegativeShaderSpirv, MissingShaderCapability) {
     TEST_DESCRIPTION("Missing Shader capability in the SPIR-V code.");
-
-    RETURN_IF_SKIP(InitFramework());
 
     const char* vertex_source = R"spirv(
             OpMemoryModel Logical GLSL450
@@ -149,10 +145,12 @@ TEST_F(VkSCNegativeShaderSpirv, MissingShaderCapability) {
     vksc::GraphicsPipelineBuilder builder(this);
     builder.InitVsFs(vksc::Shader::Vertex(vertex_source), vksc::Shader::Fragment(kSampleFragmentShaderSpv));
 
+    RETURN_IF_SKIP(Init());
+
     // TODO: Vulkan SC - this should be triggering VUID 08738, but actually triggers 08737
     // because VVL does not check for 08738 and relies on spirv-val to detect the error
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkShaderModuleCreateInfo-pCode-08737");
-    builder.TestDeviceCreateFail();
+    builder.CreatePipelineCache(*m_device);
     m_errorMonitor->VerifyFound();
 }
 
@@ -178,20 +176,11 @@ TEST_F(VkSCNegativeShaderSpirv, CapabilityNotSupported) {
     vksc::ComputePipelineBuilder builder(this);
     builder.Init(vksc::Shader::Compute(source));
 
-    // This error is also detected by spirv-val, so we have to ignore it here
-    m_errorMonitor->SetAllowedFailureMsg("VUID-VkShaderModuleCreateInfo-pCode-08737");
     RETURN_IF_SKIP(Init());
 
-    // If the entry point name is provided, a validation error will be triggered
-    // TODO: Vulkan SC - the name of this VUID will likely have to change
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkShaderModuleCreateInfo-pCode-08739");
-    builder.CreatePipeline(*m_device);
+    m_errorMonitor->SetAllowedFailureMsg("VUID-VkShaderModuleCreateInfo-pCode-08737");
+    builder.CreatePipelineCache(*m_device);
     m_errorMonitor->VerifyFound();
-
-    // However, if the entry point name is not provided, then no SPIR-V based validation can take place
-    // hence pipeline creation will succeed despite not conforming to valid usage expectations
-    builder.pipeline_ci.stage.pName = nullptr;
-    builder.CreatePipeline(*m_device);
 }
 
 TEST_F(VkSCNegativeShaderSpirv, CapabilityRequirementNotMet) {
@@ -218,16 +207,9 @@ TEST_F(VkSCNegativeShaderSpirv, CapabilityRequirementNotMet) {
 
     RETURN_IF_SKIP(Init());
 
-    // If the entry point name is provided, a validation error will be triggered
-    // TODO: Vulkan SC - the name of this VUID will likely have to change
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkShaderModuleCreateInfo-pCode-08740");
-    builder.CreatePipeline(*m_device);
+    builder.CreatePipelineCache(*m_device);
     m_errorMonitor->VerifyFound();
-
-    // However, if the entry point name is not provided, then no SPIR-V based validation can take place
-    // hence pipeline creation will succeed despite not conforming to valid usage expectations
-    builder.pipeline_ci.stage.pName = nullptr;
-    builder.CreatePipeline(*m_device);
 }
 
 TEST_F(VkSCNegativeShaderSpirv, ExtensionNotSupported) {
@@ -254,16 +236,9 @@ TEST_F(VkSCNegativeShaderSpirv, ExtensionNotSupported) {
 
     RETURN_IF_SKIP(Init());
 
-    // If the entry point name is provided, a validation error will be triggered
-    // TODO: Vulkan SC - the name of this VUID will likely have to change
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkShaderModuleCreateInfo-pCode-08741");
-    builder.CreatePipeline(*m_device);
+    builder.CreatePipelineCache(*m_device);
     m_errorMonitor->VerifyFound();
-
-    // However, if the entry point name is not provided, then no SPIR-V based validation can take place
-    // hence pipeline creation will succeed despite not conforming to valid usage expectations
-    builder.pipeline_ci.stage.pName = nullptr;
-    builder.CreatePipeline(*m_device);
 }
 
 TEST_F(VkSCNegativeShaderSpirv, ExtensionRequirementNotMet) {
@@ -290,16 +265,9 @@ TEST_F(VkSCNegativeShaderSpirv, ExtensionRequirementNotMet) {
 
     RETURN_IF_SKIP(Init());
 
-    // If the entry point name is provided, a validation error will be triggered
-    // TODO: Vulkan SC - the name of this VUID will likely have to change
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkShaderModuleCreateInfo-pCode-08742");
-    builder.CreatePipeline(*m_device);
+    builder.CreatePipelineCache(*m_device);
     m_errorMonitor->VerifyFound();
-
-    // However, if the entry point name is not provided, then no SPIR-V based validation can take place
-    // hence pipeline creation will succeed despite not conforming to valid usage expectations
-    builder.pipeline_ci.stage.pName = nullptr;
-    builder.CreatePipeline(*m_device);
 }
 
 TEST_F(VkSCNegativeShaderSpirv, Atomics) {

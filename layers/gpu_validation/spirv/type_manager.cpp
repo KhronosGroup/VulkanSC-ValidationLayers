@@ -357,7 +357,28 @@ uint32_t TypeManager::TypeLength(const Type& type) {
             const uint32_t count = element_type->inst_.Operand(0);
             return count * TypeLength(*element_type);
         }
-        case spv::OpTypeStruct:
+        case spv::OpTypeStruct: {
+            // Get the offset of the last member and then figure out it's size
+            // Note: the largest offset doesn't have to be the last element index of the struct
+            uint32_t last_offset = 0;
+            uint32_t last_offset_index = 0;
+            const uint32_t struct_id = type.inst_.ResultId();
+            for (const auto& annotation : module_.annotations_) {
+                if (annotation->Opcode() == spv::OpMemberDecorate && annotation->Word(1) == struct_id &&
+                    annotation->Word(3) == spv::DecorationOffset) {
+                    const uint32_t index = annotation->Word(2);
+                    const uint32_t offset = annotation->Word(4);
+                    if (offset > last_offset) {
+                        last_offset = offset;
+                        last_offset_index = index;
+                    }
+                }
+            }
+
+            const Type* last_element_type = FindTypeById(type.inst_.Operand(last_offset_index));
+            const uint32_t last_length = TypeLength(*last_element_type);
+            return last_offset + last_length;
+        }
         case spv::OpTypeRuntimeArray:
             assert(false && "unsupported type");
             break;
@@ -412,9 +433,9 @@ const Constant* TypeManager::FindConstantById(uint32_t id) const {
 
 const Constant& TypeManager::CreateConstantUInt32(uint32_t value) {
     const Type& type = GetTypeInt(32, 0);
-    const uint32_t type_id = module_.TakeNextId();
+    const uint32_t constant_id = module_.TakeNextId();
     auto new_inst = std::make_unique<Instruction>(4, spv::OpConstant);
-    new_inst->Fill({type.Id(), type_id, value});
+    new_inst->Fill({type.Id(), constant_id, value});
     return AddConstant(std::move(new_inst), type);
 }
 
@@ -434,13 +455,39 @@ const Constant& TypeManager::GetConstantUInt32(uint32_t value) {
 // It is common to use uint32_t(0) as a default, so having it cached is helpful
 const Constant& TypeManager::GetConstantZeroUint32() {
     if (!uint_32bit_zero_constants_) {
-        const Type& uint32_type = GetTypeInt(32, 0);
-        uint_32bit_zero_constants_ = FindConstantInt32(uint32_type.Id(), 0);
+        const Type& uint_32_type = GetTypeInt(32, 0);
+        uint_32bit_zero_constants_ = FindConstantInt32(uint_32_type.Id(), 0);
         if (!uint_32bit_zero_constants_) {
             uint_32bit_zero_constants_ = &CreateConstantUInt32(0);
         }
     }
     return *uint_32bit_zero_constants_;
+}
+
+// It is common to use float(0) as a default, so having it cached is helpful
+const Constant& TypeManager::GetConstantZeroFloat32() {
+    if (!float_32bit_zero_constants_) {
+        const Type& float_32_type = GetTypeFloat(32);
+        float_32bit_zero_constants_ = FindConstantFloat32(float_32_type.Id(), 0);
+        if (!float_32bit_zero_constants_) {
+            const uint32_t constant_id = module_.TakeNextId();
+            auto new_inst = std::make_unique<Instruction>(4, spv::OpConstant);
+            new_inst->Fill({float_32_type.Id(), constant_id, 0});
+            float_32bit_zero_constants_ = &AddConstant(std::move(new_inst), float_32_type);
+        }
+    }
+    return *float_32bit_zero_constants_;
+}
+
+const Constant& TypeManager::GetConstantZeroVec3() {
+    const Type& float_32_type = GetTypeFloat(32);
+    const Type& vec3_type = GetTypeVector(float_32_type, 3);
+    const uint32_t float32_0_id = module_.type_manager_.GetConstantZeroFloat32().Id();
+
+    const uint32_t constant_id = module_.TakeNextId();
+    auto new_inst = std::make_unique<Instruction>(6, spv::OpConstantComposite);
+    new_inst->Fill({vec3_type.Id(), constant_id, float32_0_id, float32_0_id, float32_0_id});
+    return AddConstant(std::move(new_inst), vec3_type);
 }
 
 const Constant& TypeManager::GetConstantNull(const Type& type) {

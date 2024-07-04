@@ -22,7 +22,7 @@ TEST_F(PositiveSparseBuffer, DISABLED_NonOverlappingBufferCopy) {
     AddRequiredFeature(vkt::Feature::sparseBinding);
     RETURN_IF_SKIP(Init());
 
-    if (m_device->sparse_queues().empty()) {
+    if (m_device->QueuesWithSparseCapability().empty()) {
         GTEST_SKIP() << "Required SPARSE_BINDING queue families not present";
     }
 
@@ -69,9 +69,9 @@ TEST_F(PositiveSparseBuffer, DISABLED_NonOverlappingBufferCopy) {
     bind_info.signalSemaphoreCount = 1;
     bind_info.pSignalSemaphores = &semaphore.handle();
 
-    vkt::Queue* sparse_queue = m_device->sparse_queues()[0];
+    vkt::Queue* sparse_queue = m_device->QueuesWithSparseCapability()[0];
     vk::QueueBindSparse(sparse_queue->handle(), 1, &bind_info, VK_NULL_HANDLE);
-    sparse_queue->wait();
+    sparse_queue->Wait();
     // Set up complete
 
     m_commandBuffer->begin();
@@ -87,7 +87,7 @@ TEST_F(PositiveSparseBuffer, DISABLED_NonOverlappingBufferCopy) {
     bind_info.pWaitSemaphores = &semaphore.handle();
     bind_info.pSignalSemaphores = &semaphore2.handle();
     vk::QueueBindSparse(sparse_queue->handle(), 1, &bind_info, VK_NULL_HANDLE);
-    sparse_queue->wait();
+    sparse_queue->Wait();
 
     // Submitting copy command with non overlapping device memory regions
     VkPipelineStageFlags mask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
@@ -100,7 +100,7 @@ TEST_F(PositiveSparseBuffer, DISABLED_NonOverlappingBufferCopy) {
     vk::QueueSubmit(m_default_queue->handle(), 1, &submit_info, VK_NULL_HANDLE);
 
     // Wait for operations to finish before destroying anything
-    m_default_queue->wait();
+    m_default_queue->Wait();
 }
 
 // Not supported in Vulkan SC: sparse resources
@@ -109,7 +109,7 @@ TEST_F(PositiveSparseBuffer, DISABLED_NonOverlappingBufferCopy2) {
     AddRequiredFeature(vkt::Feature::sparseBinding);
     RETURN_IF_SKIP(Init());
 
-    if (m_device->sparse_queues().empty()) {
+    if (m_device->QueuesWithSparseCapability().empty()) {
         GTEST_SKIP() << "Required SPARSE_BINDING queue families not present";
     }
 
@@ -157,7 +157,7 @@ TEST_F(PositiveSparseBuffer, DISABLED_NonOverlappingBufferCopy2) {
     bind_info.signalSemaphoreCount = 1;
     bind_info.pSignalSemaphores = &semaphore.handle();
 
-    VkQueue sparse_queue = m_device->sparse_queues()[0]->handle();
+    VkQueue sparse_queue = m_device->QueuesWithSparseCapability()[0]->handle();
     vkt::Fence sparse_queue_fence(*m_device);
     vk::QueueBindSparse(sparse_queue, 1, &bind_info, sparse_queue_fence);
     ASSERT_EQ(VK_SUCCESS, sparse_queue_fence.wait(kWaitTimeout));
@@ -180,7 +180,7 @@ TEST_F(PositiveSparseBuffer, DISABLED_NonOverlappingBufferCopy2) {
     vk::QueueSubmit(m_default_queue->handle(), 1, &submit_info, VK_NULL_HANDLE);
 
     // Wait for operations to finish before destroying anything
-    m_default_queue->wait();
+    m_default_queue->Wait();
 }
 
 // Not supported in Vulkan SC: sparse resources
@@ -189,7 +189,7 @@ TEST_F(PositiveSparseBuffer, DISABLED_NonOverlappingBufferCopy3) {
     AddRequiredFeature(vkt::Feature::sparseBinding);
     RETURN_IF_SKIP(Init());
 
-    if (m_device->sparse_queues().empty()) {
+    if (m_device->QueuesWithSparseCapability().empty()) {
         GTEST_SKIP() << "Required SPARSE_BINDING queue families not present";
     }
 
@@ -235,7 +235,7 @@ TEST_F(PositiveSparseBuffer, DISABLED_NonOverlappingBufferCopy3) {
     bind_info.signalSemaphoreCount = 1;
     bind_info.pSignalSemaphores = &semaphore.handle();
 
-    vkt::Queue* sparse_queue = m_device->sparse_queues()[0];
+    vkt::Queue* sparse_queue = m_device->QueuesWithSparseCapability()[0];
     vkt::Fence sparse_queue_fence(*m_device);
     vk::QueueBindSparse(sparse_queue->handle(), 1, &bind_info, sparse_queue_fence);
     ASSERT_EQ(VK_SUCCESS, sparse_queue_fence.wait(kWaitTimeout));
@@ -257,8 +257,8 @@ TEST_F(PositiveSparseBuffer, DISABLED_NonOverlappingBufferCopy3) {
     vk::QueueSubmit(m_default_queue->handle(), 1, &submit_info, VK_NULL_HANDLE);
 
     // Wait for operations to finish before destroying anything
-    m_default_queue->wait();
-    sparse_queue->wait();
+    m_default_queue->Wait();
+    sparse_queue->Wait();
 }
 
 // Not supported in Vulkan SC: sparse resources
@@ -267,7 +267,7 @@ TEST_F(PositiveSparseBuffer, DISABLED_NonOverlappingBufferCopy4) {
     AddRequiredFeature(vkt::Feature::sparseBinding);
     RETURN_IF_SKIP(Init());
 
-    if (m_device->sparse_queues().empty()) {
+    if (m_device->QueuesWithSparseCapability().empty()) {
         GTEST_SKIP() << "Required SPARSE_BINDING queue families not present";
     }
 
@@ -310,7 +310,7 @@ TEST_F(PositiveSparseBuffer, DISABLED_NonOverlappingBufferCopy4) {
     bind_info.signalSemaphoreCount = 1;
     bind_info.pSignalSemaphores = &semaphore.handle();
 
-    vkt::Queue* sparse_queue = m_device->sparse_queues()[0];
+    vkt::Queue* sparse_queue = m_device->QueuesWithSparseCapability()[0];
     vkt::Fence sparse_queue_fence(*m_device);
     vk::QueueBindSparse(sparse_queue->handle(), 1, &bind_info, sparse_queue_fence);
     ASSERT_EQ(VK_SUCCESS, sparse_queue_fence.wait(kWaitTimeout));
@@ -337,8 +337,8 @@ TEST_F(PositiveSparseBuffer, DISABLED_NonOverlappingBufferCopy4) {
     vk::QueueSubmit(m_default_queue->handle(), 1, &submit_info, VK_NULL_HANDLE);
 
     // Wait for operations to finish before destroying anything
-    m_default_queue->wait();
-    sparse_queue->wait();
+    m_default_queue->Wait();
+    sparse_queue->Wait();
 }
 
 // Not supported in Vulkan SC: sparse resources
@@ -347,11 +347,11 @@ TEST_F(PositiveSparseBuffer, DISABLED_BindSparseEmpty) {
     AddRequiredFeature(vkt::Feature::sparseBinding);
     RETURN_IF_SKIP(Init());
 
-    if (m_device->sparse_queues().empty()) {
+    if (m_device->QueuesWithSparseCapability().empty()) {
         GTEST_SKIP() << "Required SPARSE_BINDING queue families not present";
     }
 
-    vkt::Queue* sparse_queue = m_device->sparse_queues()[0];
+    vkt::Queue* sparse_queue = m_device->QueuesWithSparseCapability()[0];
     vk::QueueBindSparse(sparse_queue->handle(), 0u, nullptr, VK_NULL_HANDLE);
-    sparse_queue->wait();
+    sparse_queue->Wait();
 }

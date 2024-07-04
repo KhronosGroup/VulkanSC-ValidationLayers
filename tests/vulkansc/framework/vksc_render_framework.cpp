@@ -25,6 +25,9 @@ void VkSCRenderFramework::InitFramework(void *instance_pnext) {
         instance_layers_.push_back("VK_LAYER_KHRONOS_device_simulation");
     }
 
+    // Ignore currently unsupported VK_EXT_layer_settings configurations
+    m_errorMonitor->SetAllowedFailureMsg("VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT");
+
     VkRenderFramework::InitFramework(instance_pnext);
 }
 
@@ -101,6 +104,7 @@ void VkSCCompatibilityRenderFramework::InitFramework(void *instance_pnext) { VkS
 
 void VkSCCompatibilityRenderFramework::InitState(VkPhysicalDeviceFeatures *features, void *create_device_pnext,
                                                  const VkCommandPoolCreateFlags flags) {
+    m_errorMonitor->SetAllowedFailureMsg("UNASSIGNED-PipelineCacheData-SpirvDepValMissingInfo");
     VkSCRenderFramework::InitState(features, create_device_pnext, flags);
 }
 

@@ -22,11 +22,6 @@
 ReadLockGuard StatelessValidation::ReadLock() const { return ReadLockGuard(validation_object_mutex, std::defer_lock); }
 WriteLockGuard StatelessValidation::WriteLock() { return WriteLockGuard(validation_object_mutex, std::defer_lock); }
 
-static vvl::unordered_map<VkCommandBuffer, VkCommandPool> secondary_cb_map{};
-static std::shared_mutex secondary_cb_map_mutex;
-static ReadLockGuard CBReadLock() { return ReadLockGuard(secondary_cb_map_mutex); }
-static WriteLockGuard CBWriteLock() { return WriteLockGuard(secondary_cb_map_mutex); }
-
 bool StatelessValidation::manual_PreCallValidateCmdBindIndexBuffer(VkCommandBuffer commandBuffer, VkBuffer buffer,
                                                                    VkDeviceSize offset, VkIndexType indexType,
                                                                    const ErrorObject &error_obj) const {
@@ -84,6 +79,11 @@ bool StatelessValidation::manual_PreCallValidateCmdBindVertexBuffers(VkCommandBu
     }
 
     for (uint32_t i = 0; i < bindingCount; ++i) {
+        if (pBuffers == nullptr) {
+            skip |= LogError("VUID-vkCmdBindVertexBuffers-pBuffers-parameter", commandBuffer,
+                             error_obj.location.dot(Field::pBuffers), "is NULL.");
+            return skip;
+        }
         if (pBuffers[i] == VK_NULL_HANDLE) {
             const Location buffer_loc = error_obj.location.dot(Field::pBuffers, i);
             const auto *robustness2_features = vku::FindStructInPNextChain<VkPhysicalDeviceRobustness2FeaturesEXT>(device_createinfo_pnext);
@@ -243,6 +243,11 @@ bool StatelessValidation::manual_PreCallValidateCmdBindVertexBuffers2(VkCommandB
     }
 
     for (uint32_t i = 0; i < bindingCount; ++i) {
+        if (pBuffers == nullptr) {
+            skip |= LogError("VUID-vkCmdBindVertexBuffers2-pBuffers-parameter", commandBuffer,
+                             error_obj.location.dot(Field::pBuffers), "is NULL.");
+            return skip;
+        }
         if (pBuffers[i] == VK_NULL_HANDLE) {
             const Location buffer_loc = error_obj.location.dot(Field::pBuffers, i);
             const auto *robustness2_features = vku::FindStructInPNextChain<VkPhysicalDeviceRobustness2FeaturesEXT>(device_createinfo_pnext);
@@ -419,15 +424,18 @@ bool StatelessValidation::manual_PreCallValidateCmdUpdateBuffer(VkCommandBuffer 
     bool skip = false;
 
     if (dstOffset & 3) {
-        skip |= LogError("VUID-vkCmdUpdateBuffer-dstOffset-00036", commandBuffer, error_obj.location.dot(Field::dstOffset),
+        const LogObjectList objlist(commandBuffer, dstBuffer);
+        skip |= LogError("VUID-vkCmdUpdateBuffer-dstOffset-00036", objlist, error_obj.location.dot(Field::dstOffset),
                          "(%" PRIu64 "), is not a multiple of 4.", dstOffset);
     }
 
     if ((dataSize <= 0) || (dataSize > 65536)) {
-        skip |= LogError("VUID-vkCmdUpdateBuffer-dataSize-00037", commandBuffer, error_obj.location.dot(Field::dataSize),
+        const LogObjectList objlist(commandBuffer, dstBuffer);
+        skip |= LogError("VUID-vkCmdUpdateBuffer-dataSize-00037", objlist, error_obj.location.dot(Field::dataSize),
                          "(%" PRIu64 "), must be greater than zero and less than or equal to 65536.", dataSize);
     } else if (dataSize & 3) {
-        skip |= LogError("VUID-vkCmdUpdateBuffer-dataSize-00038", commandBuffer, error_obj.location.dot(Field::dataSize),
+        const LogObjectList objlist(commandBuffer, dstBuffer);
+        skip |= LogError("VUID-vkCmdUpdateBuffer-dataSize-00038", objlist, error_obj.location.dot(Field::dataSize),
                          "(%" PRIu64 "), is not a multiple of 4.", dataSize);
     }
     return skip;
@@ -439,16 +447,19 @@ bool StatelessValidation::manual_PreCallValidateCmdFillBuffer(VkCommandBuffer co
     bool skip = false;
 
     if (dstOffset & 3) {
-        skip |= LogError("VUID-vkCmdFillBuffer-dstOffset-00025", dstBuffer, error_obj.location.dot(Field::dstOffset),
+        const LogObjectList objlist(commandBuffer, dstBuffer);
+        skip |= LogError("VUID-vkCmdFillBuffer-dstOffset-00025", objlist, error_obj.location.dot(Field::dstOffset),
                          "(%" PRIu64 ") is not a multiple of 4.", dstOffset);
     }
 
     if (size != VK_WHOLE_SIZE) {
         if (size <= 0) {
-            skip |= LogError("VUID-vkCmdFillBuffer-size-00026", dstBuffer, error_obj.location.dot(Field::size),
+            const LogObjectList objlist(commandBuffer, dstBuffer);
+            skip |= LogError("VUID-vkCmdFillBuffer-size-00026", objlist, error_obj.location.dot(Field::size),
                              "(%" PRIu64 ") must be greater than zero.", size);
         } else if (size & 3) {
-            skip |= LogError("VUID-vkCmdFillBuffer-size-00028", dstBuffer, error_obj.location.dot(Field::size),
+            const LogObjectList objlist(commandBuffer, dstBuffer);
+            skip |= LogError("VUID-vkCmdFillBuffer-size-00028", objlist, error_obj.location.dot(Field::size),
                              "(%" PRIu64 ") is not a multiple of 4.", size);
         }
     }
@@ -657,13 +668,7 @@ bool StatelessValidation::manual_PreCallValidateBeginCommandBuffer(VkCommandBuff
     bool skip = false;
 
     // VkCommandBufferInheritanceInfo validation, due to a 'noautovalidity' of pBeginInfo->pInheritanceInfo in vkBeginCommandBuffer
-    bool cb_is_secondary;
-    {
-        auto lock = CBReadLock();
-        cb_is_secondary = (secondary_cb_map.find(commandBuffer) != secondary_cb_map.end());
-    }
-
-    if (!cb_is_secondary) {
+    if (!error_obj.handle_data->command_buffer.is_secondary) {
         return skip;
     }
     // Implicit VUs
@@ -681,7 +686,9 @@ bool StatelessValidation::manual_PreCallValidateBeginCommandBuffer(VkCommandBuff
         constexpr std::array allowed_structs = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_CONDITIONAL_RENDERING_INFO_EXT,
                                                 VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_RENDERING_INFO_KHR,
                                                 VK_STRUCTURE_TYPE_ATTACHMENT_SAMPLE_COUNT_INFO_AMD,
-                                                VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_VIEWPORT_SCISSOR_INFO_NV};
+                                                VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_VIEWPORT_SCISSOR_INFO_NV,
+                                                VK_STRUCTURE_TYPE_RENDERING_INPUT_ATTACHMENT_INDEX_INFO_KHR,
+                                                VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_LOCATION_INFO_KHR};
         skip |= ValidateStructPnext(inheritance_loc, info->pNext, allowed_structs.size(), allowed_structs.data(),
                                     GeneratedVulkanHeaderVersion, "VUID-VkCommandBufferInheritanceInfo-pNext-pNext",
                                     "VUID-VkCommandBufferInheritanceInfo-sType-unique");
@@ -739,35 +746,4 @@ bool StatelessValidation::manual_PreCallValidateBeginCommandBuffer(VkCommandBuff
         }
     }
     return skip;
-}
-
-void StatelessValidation::PostCallRecordAllocateCommandBuffers(VkDevice device, const VkCommandBufferAllocateInfo *pAllocateInfo,
-                                                               VkCommandBuffer *pCommandBuffers, const RecordObject &record_obj) {
-    if ((record_obj.result == VK_SUCCESS) && pAllocateInfo && (pAllocateInfo->level == VK_COMMAND_BUFFER_LEVEL_SECONDARY)) {
-        auto lock = CBWriteLock();
-        for (uint32_t cb_index = 0; cb_index < pAllocateInfo->commandBufferCount; cb_index++) {
-            secondary_cb_map.emplace(pCommandBuffers[cb_index], pAllocateInfo->commandPool);
-        }
-    }
-}
-
-void StatelessValidation::PostCallRecordFreeCommandBuffers(VkDevice device, VkCommandPool commandPool, uint32_t commandBufferCount,
-                                                           const VkCommandBuffer *pCommandBuffers, const RecordObject &record_obj) {
-    auto lock = CBWriteLock();
-    for (uint32_t cb_index = 0; cb_index < commandBufferCount; cb_index++) {
-        secondary_cb_map.erase(pCommandBuffers[cb_index]);
-    }
-}
-
-void StatelessValidation::PostCallRecordDestroyCommandPool(VkDevice device, VkCommandPool commandPool,
-                                                           const VkAllocationCallbacks *pAllocator,
-                                                           const RecordObject &record_obj) {
-    auto lock = CBWriteLock();
-    for (auto item = secondary_cb_map.begin(); item != secondary_cb_map.end();) {
-        if (item->second == commandPool) {
-            item = secondary_cb_map.erase(item);
-        } else {
-            ++item;
-        }
-    }
 }

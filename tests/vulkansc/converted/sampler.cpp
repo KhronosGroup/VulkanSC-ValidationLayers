@@ -52,7 +52,7 @@ TEST_F(NegativeSampler, AnisotropyFeatureDisabled) {
     AddDisabledFeature(vkt::Feature::samplerAnisotropy);
     RETURN_IF_SKIP(Init());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSamplerCreateInfo-anisotropyEnable-01070");
+    m_errorMonitor->SetDesiredError("VUID-VkSamplerCreateInfo-anisotropyEnable-01070");
     VkSamplerCreateInfo sampler_info = SafeSaneSamplerCreateInfo();
     // With the samplerAnisotropy disable, the sampler must not enable it.
     sampler_info.anisotropyEnable = VK_TRUE;
@@ -203,13 +203,13 @@ TEST_F(NegativeSampler, AllocationCount) {
         fpvkSetPhysicalDeviceLimitsEXT(gpu(), &props.limits);
     }
     RETURN_IF_SKIP(InitState());
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateSampler-maxSamplerAllocationCount-04110");
+    m_errorMonitor->SetDesiredError("VUID-vkCreateSampler-maxSamplerAllocationCount-04110");
 
     VkSamplerCreateInfo sampler_create_info = SafeSaneSamplerCreateInfo();
 
     int i;
     for (i = 0; i <= max_samplers; i++) {
-        err = vk::CreateSampler(m_device->device(), &sampler_create_info, NULL, &samplers[i]);
+        err = vk::CreateSampler(device(), &sampler_create_info, NULL, &samplers[i]);
         if (err != VK_SUCCESS) {
             break;
         }
@@ -217,7 +217,7 @@ TEST_F(NegativeSampler, AllocationCount) {
     m_errorMonitor->VerifyFound();
 
     for (int j = 0; j < i; j++) {
-        vk::DestroySampler(m_device->device(), samplers[j], NULL);
+        vk::DestroySampler(device(), samplers[j], NULL);
     }
 }
 
@@ -383,11 +383,9 @@ TEST_F(NegativeSampler, ImageViewFormatUnsupportedFilter) {
         }
 
         vkt::Sampler sampler(*m_device, sci);
-
-        VkImageObj mpimage(m_device);
-        mpimage.Init(128, 128, 1, test_struct.format, VK_IMAGE_USAGE_SAMPLED_BIT, test_struct.tiling);
-        ASSERT_TRUE(mpimage.initialized());
-
+        auto image_ci =
+            vkt::Image::ImageCreateInfo2D(128, 128, 1, 1, test_struct.format, VK_IMAGE_USAGE_SAMPLED_BIT, test_struct.tiling);
+        vkt::Image mpimage(*m_device, image_ci);
         vkt::ImageView view = mpimage.CreateView();
 
         CreatePipelineHelper pipe(*this);
@@ -405,7 +403,6 @@ TEST_F(NegativeSampler, ImageViewFormatUnsupportedFilter) {
         pipe.dsl_bindings_ = {
             {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_ALL, nullptr},
         };
-        pipe.InitState();
         ASSERT_EQ(VK_SUCCESS, pipe.CreateGraphicsPipeline());
 
         pipe.descriptor_set_->WriteDescriptorImageInfo(0, view, sampler.handle(), VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
@@ -414,11 +411,11 @@ TEST_F(NegativeSampler, ImageViewFormatUnsupportedFilter) {
         m_commandBuffer->begin();
         m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
 
-        vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_);
+        vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
         vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_layout_.handle(), 0, 1,
                                   &pipe.descriptor_set_->set_, 0, nullptr);
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, test_struct.err_msg.c_str());
+        m_errorMonitor->SetDesiredError(test_struct.err_msg.c_str());
         vk::CmdDraw(m_commandBuffer->handle(), 1, 0, 0, 0);
         m_errorMonitor->VerifyFound();
 
@@ -427,6 +424,71 @@ TEST_F(NegativeSampler, ImageViewFormatUnsupportedFilter) {
 
         delete fs;
     }
+}
+
+TEST_F(NegativeSampler, LinearReductionModeMinMax) {
+    AddRequiredExtensions(VK_EXT_SAMPLER_FILTER_MINMAX_EXTENSION_NAME);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    PFN_vkSetPhysicalDeviceFormatPropertiesEXT fpvkSetPhysicalDeviceFormatPropertiesEXT = nullptr;
+    PFN_vkGetOriginalPhysicalDeviceFormatPropertiesEXT fpvkGetOriginalPhysicalDeviceFormatPropertiesEXT = nullptr;
+    if (!LoadDeviceProfileLayer(fpvkSetPhysicalDeviceFormatPropertiesEXT, fpvkGetOriginalPhysicalDeviceFormatPropertiesEXT)) {
+        GTEST_SKIP() << "Failed to load device profile layer.";
+    }
+
+    const VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
+    VkFormatProperties formatProps;
+    fpvkGetOriginalPhysicalDeviceFormatPropertiesEXT(gpu(), format, &formatProps);
+    formatProps.optimalTilingFeatures = (formatProps.optimalTilingFeatures & ~VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_MINMAX_BIT);
+    formatProps.optimalTilingFeatures |= VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT;
+    fpvkSetPhysicalDeviceFormatPropertiesEXT(gpu(), format, formatProps);
+
+    vkt::Image image(*m_device, 128, 128, 1, format, VK_IMAGE_USAGE_SAMPLED_BIT);
+    vkt::ImageView image_view = image.CreateView();
+
+    VkSamplerReductionModeCreateInfo reduction_mode_ci = vku::InitStructHelper();
+    reduction_mode_ci.reductionMode = VK_SAMPLER_REDUCTION_MODE_MIN;
+
+    VkSamplerCreateInfo sampler_ci = SafeSaneSamplerCreateInfo();
+    sampler_ci.pNext = &reduction_mode_ci;
+    sampler_ci.minFilter = VK_FILTER_LINEAR;  // turned off feature bit for test
+    sampler_ci.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+    sampler_ci.compareEnable = VK_FALSE;
+    vkt::Sampler sampler(*m_device, sampler_ci);
+
+    char const *fs_source = R"glsl(
+        #version 450
+        layout (set=0, binding=0) uniform sampler2D bad;
+        layout(location=0) out vec4 color;
+        void main() {
+           color = texture(bad, gl_FragCoord.xy);
+        }
+    )glsl";
+    VkShaderObj fs(this, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    OneOffDescriptorSet descriptor_set(m_device,
+                                       {
+                                           {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_ALL, nullptr},
+                                       });
+    vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
+    descriptor_set.WriteDescriptorImageInfo(0, image_view, sampler.handle());
+    descriptor_set.UpdateDescriptorSets();
+
+    CreatePipelineHelper pipe(*this);
+    pipe.shader_stages_[1] = fs.GetStageCreateInfo();
+    pipe.gp_ci_.layout = pipeline_layout.handle();
+    pipe.CreateGraphicsPipeline();
+
+    m_commandBuffer->begin();
+    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1,
+                              &descriptor_set.set_, 0, nullptr);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-magFilter-09598");
+    vk::CmdDraw(m_commandBuffer->handle(), 1, 0, 0, 0);
+    m_errorMonitor->VerifyFound();
 }
 
 TEST_F(NegativeSampler, AddressModeWithCornerSampledNV) {
@@ -440,8 +502,7 @@ TEST_F(NegativeSampler, AddressModeWithCornerSampledNV) {
     RETURN_IF_SKIP(InitState(nullptr, nullptr, 0));
     InitRenderTarget();
 
-    VkImageObj test_image(m_device);
-    VkImageCreateInfo image_info = VkImageObj::create_info();
+    VkImageCreateInfo image_info = vkt::Image::create_info();
     image_info.flags = VK_IMAGE_CREATE_CORNER_SAMPLED_BIT_NV;
     image_info.format = VK_FORMAT_R8G8B8A8_UNORM;
     image_info.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
@@ -454,8 +515,7 @@ TEST_F(NegativeSampler, AddressModeWithCornerSampledNV) {
     image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-    test_image.init(&image_info);
-    ASSERT_TRUE(test_image.initialized());
+    vkt::Image test_image(*m_device, image_info, vkt::set_layout);
 
     VkSamplerCreateInfo sci = SafeSaneSamplerCreateInfo();
     sci.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
@@ -470,7 +530,6 @@ TEST_F(NegativeSampler, AddressModeWithCornerSampledNV) {
     pipe.dsl_bindings_ = {
         {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_ALL, nullptr},
     };
-    pipe.InitState();
     pipe.CreateGraphicsPipeline();
 
     pipe.descriptor_set_->WriteDescriptorImageInfo(0, view, sampler.handle(), VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
@@ -479,11 +538,11 @@ TEST_F(NegativeSampler, AddressModeWithCornerSampledNV) {
     m_commandBuffer->begin();
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
 
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
     vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_layout_.handle(), 0, 1,
                               &pipe.descriptor_set_->set_, 0, nullptr);
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDraw-flags-02696");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-flags-02696");
     vk::CmdDraw(m_commandBuffer->handle(), 1, 0, 0, 0);
     m_errorMonitor->VerifyFound();
 
@@ -564,7 +623,7 @@ TEST_F(NegativeSampler, MultiplaneImageSamplerConversionMismatch) {
 
     vkt::Sampler BadSampler;
     sci.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSamplerCreateInfo-addressModeU-01646");
+    m_errorMonitor->SetDesiredError("VUID-VkSamplerCreateInfo-addressModeU-01646");
     BadSampler.init(*m_device, sci);
     m_errorMonitor->VerifyFound();
 
@@ -572,21 +631,20 @@ TEST_F(NegativeSampler, MultiplaneImageSamplerConversionMismatch) {
     sci.unnormalizedCoordinates = VK_TRUE;
     sci.minLod = 0.0;
     sci.maxLod = 0.0;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSamplerCreateInfo-addressModeU-01646");
+    m_errorMonitor->SetDesiredError("VUID-VkSamplerCreateInfo-addressModeU-01646");
     BadSampler.init(*m_device, sci);
     m_errorMonitor->VerifyFound();
 
     if (features2.features.samplerAnisotropy == VK_TRUE) {
         sci.unnormalizedCoordinates = VK_FALSE;
         sci.anisotropyEnable = VK_TRUE;
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSamplerCreateInfo-addressModeU-01646");
+        m_errorMonitor->SetDesiredError("VUID-VkSamplerCreateInfo-addressModeU-01646");
         BadSampler.init(*m_device, sci);
         m_errorMonitor->VerifyFound();
     }
 
     // Create an image without a Ycbcr conversion
-    VkImageObj mpimage(m_device);
-    mpimage.init(&ci);
+    vkt::Image mpimage(*m_device, ci, vkt::set_layout);
 
     ycbcr_info.conversion = conversions[0].handle();  // Need two samplers with different conversions
     VkImageViewCreateInfo ivci = vku::InitStructHelper(&ycbcr_info);
@@ -627,8 +685,8 @@ TEST_F(NegativeSampler, MultiplaneImageSamplerConversionMismatch) {
     descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     descriptor_write.pImageInfo = image_infos;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkWriteDescriptorSet-descriptorType-01948");
-    vk::UpdateDescriptorSets(m_device->device(), 1, &descriptor_write, 0, NULL);
+    m_errorMonitor->SetDesiredError("VUID-VkWriteDescriptorSet-descriptorType-01948");
+    vk::UpdateDescriptorSets(device(), 1, &descriptor_write, 0, NULL);
     m_errorMonitor->VerifyFound();
 
     // pImmutableSamplers = nullptr causes an error , VUID-VkWriteDescriptorSet-descriptorType-02738.
@@ -640,8 +698,8 @@ TEST_F(NegativeSampler, MultiplaneImageSamplerConversionMismatch) {
     descriptor_write.dstSet = descriptor_set_1947.set_;
     descriptor_write.descriptorCount = 1;
     descriptor_write.pImageInfo = &image_infos[0];
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkWriteDescriptorSet-descriptorType-02738");
-    vk::UpdateDescriptorSets(m_device->device(), 1, &descriptor_write, 0, NULL);
+    m_errorMonitor->SetDesiredError("VUID-VkWriteDescriptorSet-descriptorType-02738");
+    vk::UpdateDescriptorSets(device(), 1, &descriptor_write, 0, NULL);
     m_errorMonitor->VerifyFound();
 }
 
@@ -690,7 +748,7 @@ TEST_F(NegativeSampler, ImageSamplerConversionNullImageView) {
     }
     descriptor_set.WriteDescriptorImageInfo(0, VK_NULL_HANDLE, sampler.handle());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkWriteDescriptorSet-descriptorType-09506");
+    m_errorMonitor->SetDesiredError("VUID-VkWriteDescriptorSet-descriptorType-09506");
     descriptor_set.UpdateDescriptorSets();
     m_errorMonitor->VerifyFound();
 }
@@ -789,8 +847,8 @@ TEST_F(NegativeSampler, CustomBorderColor) {
     VkDescriptorSetLayoutBinding dsl_binding = {0, VK_DESCRIPTOR_TYPE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, &sampler.handle()};
     VkDescriptorSetLayoutCreateInfo ds_layout_ci = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO, NULL, 0, 1, &dsl_binding};
     VkDescriptorSetLayout ds_layout;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDescriptorSetLayoutBinding-pImmutableSamplers-04009");
-    vk::CreateDescriptorSetLayout(m_device->device(), &ds_layout_ci, NULL, &ds_layout);
+    m_errorMonitor->SetDesiredError("VUID-VkDescriptorSetLayoutBinding-pImmutableSamplers-04009");
+    vk::CreateDescriptorSetLayout(device(), &ds_layout_ci, NULL, &ds_layout);
     m_errorMonitor->VerifyFound();
 
     VkPhysicalDeviceCustomBorderColorPropertiesEXT custom_properties = vku::InitStructHelper();
@@ -800,16 +858,16 @@ TEST_F(NegativeSampler, CustomBorderColor) {
         (prop2.properties.limits.maxSamplerAllocationCount >= custom_properties.maxCustomBorderColorSamplers)) {
         VkSampler samplers[0xFFFF];
         // Still have one custom border color sampler from above, so this should exceed max
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSamplerCreateInfo-None-04012");
+        m_errorMonitor->SetDesiredError("VUID-VkSamplerCreateInfo-None-04012");
         if (prop2.properties.limits.maxSamplerAllocationCount <= custom_properties.maxCustomBorderColorSamplers) {
-            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateSampler-maxSamplerAllocationCount-04110");
+            m_errorMonitor->SetDesiredError("VUID-vkCreateSampler-maxSamplerAllocationCount-04110");
         }
         for (uint32_t i = 0; i < custom_properties.maxCustomBorderColorSamplers; i++) {
-            vk::CreateSampler(m_device->device(), &sampler_info, NULL, &samplers[i]);
+            vk::CreateSampler(device(), &sampler_info, NULL, &samplers[i]);
         }
         m_errorMonitor->VerifyFound();
         for (uint32_t i = 0; i < custom_properties.maxCustomBorderColorSamplers - 1; i++) {
-            vk::DestroySampler(m_device->device(), samplers[i], nullptr);
+            vk::DestroySampler(device(), samplers[i], nullptr);
         }
     }
 }
@@ -838,8 +896,7 @@ TEST_F(NegativeSampler, CustomBorderColorFormatUndefined) {
     sampler_info.pNext = &custom_color_cinfo;
     vkt::Sampler sampler(*m_device, sampler_info);
 
-    VkImageObj image(m_device);
-    image.Init(32, 32, 1, VK_FORMAT_B4G4R4A4_UNORM_PACK16, VK_IMAGE_USAGE_SAMPLED_BIT);
+    vkt::Image image(*m_device, 32, 32, 1, VK_FORMAT_B4G4R4A4_UNORM_PACK16, VK_IMAGE_USAGE_SAMPLED_BIT);
     image.Layout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     OneOffDescriptorSet descriptor_set(m_device,
                                        {
@@ -862,7 +919,7 @@ TEST_F(NegativeSampler, CustomBorderColorFormatUndefined) {
     descriptor_writes[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     descriptor_writes[0].pImageInfo = &img_info;
 
-    vk::UpdateDescriptorSets(m_device->device(), 1, descriptor_writes, 0, NULL);
+    vk::UpdateDescriptorSets(device(), 1, descriptor_writes, 0, NULL);
     char const *fsSource = R"glsl(
         #version 450
         layout(set=0, binding=0) uniform sampler2D s;
@@ -874,7 +931,6 @@ TEST_F(NegativeSampler, CustomBorderColorFormatUndefined) {
     VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitState();
     pipe.shader_stages_[1] = fs.GetStageCreateInfo();
     pipe.gp_ci_.layout = pipeline_layout.handle();
     pipe.CreateGraphicsPipeline();
@@ -884,7 +940,7 @@ TEST_F(NegativeSampler, CustomBorderColorFormatUndefined) {
     vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
     vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1,
                               &descriptor_set.set_, 0, NULL);
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSamplerCustomBorderColorCreateInfoEXT-format-04015");
+    m_errorMonitor->SetDesiredError("VUID-VkSamplerCustomBorderColorCreateInfoEXT-format-04015");
     vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
     m_errorMonitor->VerifyFound();
     m_commandBuffer->EndRenderPass();
@@ -944,21 +1000,16 @@ TEST_F(NegativeSampler, UnnormalizedCoordinatesCombinedSampler) {
     g_pipe.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
                             {1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_ALL_GRAPHICS, nullptr},
                             {2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}};
-    g_pipe.InitState();
-    ASSERT_EQ(VK_SUCCESS, g_pipe.CreateGraphicsPipeline());
+    g_pipe.CreateGraphicsPipeline();
 
     VkImageUsageFlags usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
     VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
-    VkImageObj image(m_device);
-    auto image_ci = VkImageObj::ImageCreateInfo2D(128, 128, 1, 1, format, usage);
-    image.Init(image_ci);
-    ASSERT_TRUE(image.initialized());
+    auto image_ci = vkt::Image::ImageCreateInfo2D(128, 128, 1, 1, format, usage);
+    vkt::Image image(*m_device, image_ci, vkt::set_layout);
     vkt::ImageView view_pass = image.CreateView();
 
-    VkImageObj image_3d(m_device);
     image_ci.imageType = VK_IMAGE_TYPE_3D;
-    image_3d.Init(image_ci);
-    ASSERT_TRUE(image_3d.initialized());
+    vkt::Image image_3d(*m_device, image_ci, vkt::set_layout);
 
     // If the sampler is unnormalizedCoordinates, the imageview type shouldn't be 3D, CUBE, 1D_ARRAY, 2D_ARRAY, CUBE_ARRAY.
     // This causes DesiredFailure.
@@ -978,13 +1029,13 @@ TEST_F(NegativeSampler, UnnormalizedCoordinatesCombinedSampler) {
 
     m_commandBuffer->begin();
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe.pipeline_);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe.Handle());
     vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe.pipeline_layout_.handle(), 0, 1,
                               &g_pipe.descriptor_set_->set_, 0, nullptr);
 
-    m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_ERROR_BIT_EXT, "VUID-vkCmdDraw-None-08609");
-    m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_ERROR_BIT_EXT, "VUID-vkCmdDraw-None-08610");
-    m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_ERROR_BIT_EXT, "VUID-vkCmdDraw-None-08611");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-08609");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-08610");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-08611");
     vk::CmdDraw(m_commandBuffer->handle(), 1, 0, 0, 0);
     m_errorMonitor->VerifyFound();
 
@@ -1051,22 +1102,17 @@ TEST_F(NegativeSampler, UnnormalizedCoordinatesSeparateSampler) {
                             {2, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
                             {3, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
                             {4, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}};
-    g_pipe.InitState();
-    ASSERT_EQ(VK_SUCCESS, g_pipe.CreateGraphicsPipeline());
+    g_pipe.CreateGraphicsPipeline();
 
     VkImageUsageFlags usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
     VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
-    VkImageObj image(m_device);
-    auto image_ci = VkImageObj::ImageCreateInfo2D(128, 128, 1, 1, format, usage);
-    image.Init(image_ci);
-    ASSERT_TRUE(image.initialized());
+    auto image_ci = vkt::Image::ImageCreateInfo2D(128, 128, 1, 1, format, usage);
+    vkt::Image image(*m_device, image_ci, vkt::set_layout);
     vkt::ImageView view_pass_a = image.CreateView();
     vkt::ImageView view_pass_b = image.CreateView();
 
-    VkImageObj image_3d(m_device);
     image_ci.imageType = VK_IMAGE_TYPE_3D;
-    image_3d.Init(image_ci);
-    ASSERT_TRUE(image_3d.initialized());
+    vkt::Image image_3d(*m_device, image_ci, vkt::set_layout);
 
     // If the sampler is unnormalizedCoordinates, the imageview type shouldn't be 3D, CUBE, 1D_ARRAY, 2D_ARRAY, CUBE_ARRAY.
     // This causes DesiredFailure.
@@ -1092,13 +1138,13 @@ TEST_F(NegativeSampler, UnnormalizedCoordinatesSeparateSampler) {
 
     m_commandBuffer->begin();
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe.pipeline_);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe.Handle());
     vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe.pipeline_layout_.handle(), 0, 1,
                               &g_pipe.descriptor_set_->set_, 0, nullptr);
 
-    m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_ERROR_BIT_EXT, "VUID-vkCmdDraw-None-08609");
-    m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_ERROR_BIT_EXT, "VUID-vkCmdDraw-None-08610");
-    m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_ERROR_BIT_EXT, "VUID-vkCmdDraw-None-08611");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-08609");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-08610");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-08611");
     vk::CmdDraw(m_commandBuffer->handle(), 1, 0, 0, 0);
     m_errorMonitor->VerifyFound();
 
@@ -1138,15 +1184,12 @@ TEST_F(NegativeSampler, UnnormalizedCoordinatesSeparateSamplerSharedImage) {
     g_pipe.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
                             {1, VK_DESCRIPTOR_TYPE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
                             {2, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}};
-    g_pipe.InitState();
-    ASSERT_EQ(VK_SUCCESS, g_pipe.CreateGraphicsPipeline());
+    g_pipe.CreateGraphicsPipeline();
 
     const VkImageUsageFlags usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
     const VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
-    VkImageObj image(m_device);
-    auto image_ci = VkImageObj::ImageCreateInfo2D(128, 128, 1, 1, format, usage);
-    image.Init(image_ci);
-    ASSERT_TRUE(image.initialized());
+    auto image_ci = vkt::Image::ImageCreateInfo2D(128, 128, 1, 1, format, usage);
+    vkt::Image image(*m_device, image_ci, vkt::set_layout);
     vkt::ImageView image_view = image.CreateView();
 
     VkSamplerCreateInfo sampler_ci = SafeSaneSamplerCreateInfo();
@@ -1165,11 +1208,11 @@ TEST_F(NegativeSampler, UnnormalizedCoordinatesSeparateSamplerSharedImage) {
 
     m_commandBuffer->begin();
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe.pipeline_);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe.Handle());
     vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe.pipeline_layout_.handle(), 0, 1,
                               &g_pipe.descriptor_set_->set_, 0, nullptr);
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDraw-None-08610");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-08610");
     vk::CmdDraw(m_commandBuffer->handle(), 1, 0, 0, 0);
     m_errorMonitor->VerifyFound();
 
@@ -1209,21 +1252,16 @@ TEST_F(NegativeSampler, UnnormalizedCoordinatesSeparateSamplerSharedSampler) {
     g_pipe.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
                             {1, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
                             {2, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}};
-    g_pipe.InitState();
-    ASSERT_EQ(VK_SUCCESS, g_pipe.CreateGraphicsPipeline());
+    g_pipe.CreateGraphicsPipeline();
 
     const VkImageUsageFlags usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
     const VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
-    VkImageObj image(m_device);
-    auto image_ci = VkImageObj::ImageCreateInfo2D(128, 128, 1, 1, format, usage);
-    image.Init(image_ci);
-    ASSERT_TRUE(image.initialized());
+    auto image_ci = vkt::Image::ImageCreateInfo2D(128, 128, 1, 1, format, usage);
+    vkt::Image image(*m_device, image_ci, vkt::set_layout);
     vkt::ImageView image_view = image.CreateView();
 
-    VkImageObj image_3d(m_device);
     image_ci.imageType = VK_IMAGE_TYPE_3D;
-    image_3d.Init(image_ci);
-    ASSERT_TRUE(image_3d.initialized());
+    vkt::Image image_3d(*m_device, image_ci, vkt::set_layout);
     vkt::ImageView image_view_3d = image_3d.CreateView(VK_IMAGE_VIEW_TYPE_3D);
 
     VkSamplerCreateInfo sampler_ci = SafeSaneSamplerCreateInfo();
@@ -1240,12 +1278,12 @@ TEST_F(NegativeSampler, UnnormalizedCoordinatesSeparateSamplerSharedSampler) {
 
     m_commandBuffer->begin();
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe.pipeline_);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe.Handle());
     vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe.pipeline_layout_.handle(), 0, 1,
                               &g_pipe.descriptor_set_->set_, 0, nullptr);
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDraw-None-08609");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDraw-None-08610");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-08609");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-08610");
     vk::CmdDraw(m_commandBuffer->handle(), 1, 0, 0, 0);
     m_errorMonitor->VerifyFound();
 
@@ -1314,21 +1352,16 @@ TEST_F(NegativeSampler, UnnormalizedCoordinatesInBoundsAccess) {
     CreatePipelineHelper g_pipe(*this);
     g_pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
     g_pipe.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}};
-    g_pipe.InitState();
-    ASSERT_EQ(VK_SUCCESS, g_pipe.CreateGraphicsPipeline());
+    g_pipe.CreateGraphicsPipeline();
 
     VkImageUsageFlags usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
     VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
-    VkImageObj image(m_device);
-    auto image_ci = VkImageObj::ImageCreateInfo2D(128, 128, 1, 1, format, usage);
-    image.Init(image_ci);
-    ASSERT_TRUE(image.initialized());
+    auto image_ci = vkt::Image::ImageCreateInfo2D(128, 128, 1, 1, format, usage);
+    vkt::Image image(*m_device, image_ci, vkt::set_layout);
     vkt::ImageView view_pass = image.CreateView();
 
-    VkImageObj image_3d(m_device);
     image_ci.imageType = VK_IMAGE_TYPE_3D;
-    image_3d.Init(image_ci);
-    ASSERT_TRUE(image_3d.initialized());
+    vkt::Image image_3d(*m_device, image_ci, vkt::set_layout);
 
     VkSamplerCreateInfo sampler_ci = SafeSaneSamplerCreateInfo();
     sampler_ci.unnormalizedCoordinates = VK_TRUE;
@@ -1342,11 +1375,11 @@ TEST_F(NegativeSampler, UnnormalizedCoordinatesInBoundsAccess) {
 
     m_commandBuffer->begin();
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe.pipeline_);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe.Handle());
     vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe.pipeline_layout_.handle(), 0, 1,
                               &g_pipe.descriptor_set_->set_, 0, nullptr);
 
-    m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_ERROR_BIT_EXT, "VUID-vkCmdDraw-None-08611");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-08611");
     vk::CmdDraw(m_commandBuffer->handle(), 1, 0, 0, 0);
     m_errorMonitor->VerifyFound();
 
@@ -1412,15 +1445,12 @@ TEST_F(NegativeSampler, UnnormalizedCoordinatesCopyObject) {
     CreatePipelineHelper g_pipe(*this);
     g_pipe.shader_stages_ = {g_pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
     g_pipe.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}};
-    g_pipe.InitState();
-    ASSERT_EQ(VK_SUCCESS, g_pipe.CreateGraphicsPipeline());
+    g_pipe.CreateGraphicsPipeline();
 
     VkImageUsageFlags usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
     VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
-    VkImageObj image(m_device);
-    auto image_ci = VkImageObj::ImageCreateInfo2D(128, 128, 1, 1, format, usage);
-    image.Init(image_ci);
-    ASSERT_TRUE(image.initialized());
+    auto image_ci = vkt::Image::ImageCreateInfo2D(128, 128, 1, 1, format, usage);
+    vkt::Image image(*m_device, image_ci, vkt::set_layout);
     vkt::ImageView view_pass = image.CreateView();
 
     VkSamplerCreateInfo sampler_ci = SafeSaneSamplerCreateInfo();
@@ -1433,11 +1463,63 @@ TEST_F(NegativeSampler, UnnormalizedCoordinatesCopyObject) {
 
     m_commandBuffer->begin();
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe.pipeline_);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe.Handle());
     vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe.pipeline_layout_.handle(), 0, 1,
                               &g_pipe.descriptor_set_->set_, 0, nullptr);
 
-    m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_ERROR_BIT_EXT, "VUID-vkCmdDraw-None-08611");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-08611");
+    vk::CmdDraw(m_commandBuffer->handle(), 1, 0, 0, 0);
+    m_errorMonitor->VerifyFound();
+
+    m_commandBuffer->EndRenderPass();
+    m_commandBuffer->end();
+}
+
+TEST_F(NegativeSampler, UnnormalizedCoordinatesLevelCount) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
+    TEST_DESCRIPTION("If a samper is unnormalizedCoordinates, the imageview has to have a LevelCount of 1");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    const char fsSource[] = R"glsl(
+        #version 450
+        layout (set = 0, binding = 0) uniform sampler2D tex;
+        void main() {
+            vec4 color = texture(tex, vec2(0));
+        }
+    )glsl";
+    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    CreatePipelineHelper g_pipe(*this);
+    g_pipe.shader_stages_ = {g_pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
+    g_pipe.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}};
+    g_pipe.CreateGraphicsPipeline();
+
+    VkImageUsageFlags usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
+    auto image_ci = vkt::Image::ImageCreateInfo2D(128, 128, 1, 1, format, usage);
+    image_ci.mipLevels = 2;
+    vkt::Image image(*m_device, image_ci, vkt::set_layout);
+    vkt::ImageView image_view = image.CreateView();
+
+    VkSamplerCreateInfo sampler_ci = SafeSaneSamplerCreateInfo();
+    sampler_ci.unnormalizedCoordinates = VK_TRUE;
+    sampler_ci.maxLod = 0;
+    vkt::Sampler sampler(*m_device, sampler_ci);
+
+    g_pipe.descriptor_set_->WriteDescriptorImageInfo(0, image_view, sampler.handle(), VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                                     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0);
+    g_pipe.descriptor_set_->UpdateDescriptorSets();
+
+    m_commandBuffer->begin();
+    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe.Handle());
+    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe.pipeline_layout_.handle(), 0, 1,
+                              &g_pipe.descriptor_set_->set_, 0, nullptr);
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-unnormalizedCoordinates-09635");
     vk::CmdDraw(m_commandBuffer->handle(), 1, 0, 0, 0);
     m_errorMonitor->VerifyFound();
 
@@ -1470,7 +1552,7 @@ TEST_F(NegativeSampler, DISABLED_ReductionMode) {
     VkSamplerCreateInfo sampler_ci = vku::InitStructHelper(&sampler_reduction_mode_ci);
     sampler_ci.magFilter = VK_FILTER_CUBIC_EXT;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSamplerCreateInfo-magFilter-parameter");
+    m_errorMonitor->SetDesiredError("VUID-VkSamplerCreateInfo-magFilter-parameter");
     CreateSamplerTest(*this, &sampler_ci, "VUID-VkSamplerCreateInfo-magFilter-07911");
 }
 
@@ -1503,8 +1585,7 @@ TEST_F(NegativeSampler, BorderColorSwizzle) {
     VkSamplerCreateInfo sampler_create_info = SafeSaneSamplerCreateInfo();
     sampler_create_info.pNext = &border_color_component_mapping;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit,
-                                         "VUID-VkSamplerBorderColorComponentMappingCreateInfoEXT-borderColorSwizzle-06437");
+    m_errorMonitor->SetDesiredError("VUID-VkSamplerBorderColorComponentMappingCreateInfoEXT-borderColorSwizzle-06437");
     vkt::Sampler sampler(*m_device, sampler_create_info);
     m_errorMonitor->VerifyFound();
 }
@@ -1540,7 +1621,7 @@ TEST_F(NegativeSampler, CustomBorderColorsFeature) {
     custom_color_cinfo.format = VK_FORMAT_R32_SFLOAT;
     sampler_info.pNext = &custom_color_cinfo;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSamplerCreateInfo-customBorderColors-04085");
-    vk::CreateSampler(m_device->device(), &sampler_info, NULL, &sampler);
+    m_errorMonitor->SetDesiredError("VUID-VkSamplerCreateInfo-customBorderColors-04085");
+    vk::CreateSampler(device(), &sampler_info, NULL, &sampler);
     m_errorMonitor->VerifyFound();
 }

@@ -24,7 +24,6 @@
 #include "state_tracker/state_object.h"
 #include "utils/hash_util.h"
 #include "utils/hash_vk_types.h"
-#include "state_tracker/state_tracker.h"
 
 // Fwd declarations -- including descriptor_set.h creates an ugly include loop
 namespace vvl {
@@ -79,7 +78,7 @@ class PipelineLayout : public StateObject {
     const std::vector<PipelineLayoutCompatId> set_compat_ids;
     VkPipelineLayoutCreateFlags create_flags;
 
-    PipelineLayout(ValidationStateTracker *dev_data, VkPipelineLayout l, const VkPipelineLayoutCreateInfo *pCreateInfo);
+    PipelineLayout(ValidationStateTracker &dev_data, VkPipelineLayout handle, const VkPipelineLayoutCreateInfo *pCreateInfo);
     // Merge 2 or more non-overlapping layouts
     PipelineLayout(const vvl::span<const PipelineLayout *const> &layouts);
     template <typename Container>

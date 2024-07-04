@@ -18,30 +18,20 @@
  */
 #pragma once
 #include "state_tracker/state_object.h"
-#include "generated/vk_safe_struct.h"
+#include <vulkan/utility/vk_safe_struct.hpp>
 
 namespace vvl {
 class ImageView;
 }  // namespace vvl
 
-static inline uint32_t GetSubpassDepthStencilAttachmentIndex(const safe_VkPipelineDepthStencilStateCreateInfo *pipe_ds_ci,
-                                                             const safe_VkAttachmentReference2 *depth_stencil_ref) {
+static inline uint32_t GetSubpassDepthStencilAttachmentIndex(const vku::safe_VkPipelineDepthStencilStateCreateInfo *pipe_ds_ci,
+                                                             const vku::safe_VkAttachmentReference2 *depth_stencil_ref) {
     uint32_t depth_stencil_attachment = VK_ATTACHMENT_UNUSED;
     if (pipe_ds_ci && depth_stencil_ref) {
         depth_stencil_attachment = depth_stencil_ref->attachment;
     }
     return depth_stencil_attachment;
 }
-
-struct SubpassInfo {
-    bool used;
-    VkImageUsageFlagBits usage;
-    VkImageLayout layout;
-    VkImageAspectFlags aspectMask;
-
-    SubpassInfo()
-        : used(false), usage(VkImageUsageFlagBits(0)), layout(VK_IMAGE_LAYOUT_UNDEFINED), aspectMask(VkImageAspectFlags(0)) {}
-};
 
 // Store the DAG.
 struct DAGNode {
@@ -84,10 +74,10 @@ class RenderPass : public StateObject {
     const bool use_dynamic_rendering_inherited;
     const bool has_multiview_enabled;
     const bool rasterization_enabled{true};
-    const safe_VkRenderingInfo dynamic_rendering_begin_rendering_info;
-    const safe_VkPipelineRenderingCreateInfo dynamic_rendering_pipeline_create_info;
-    const safe_VkCommandBufferInheritanceRenderingInfo inheritance_rendering_info;
-    const safe_VkRenderPassCreateInfo2 createInfo;
+    const vku::safe_VkRenderingInfo dynamic_rendering_begin_rendering_info;
+    const vku::safe_VkPipelineRenderingCreateInfo dynamic_pipeline_rendering_create_info;
+    const vku::safe_VkCommandBufferInheritanceRenderingInfo inheritance_rendering_info;
+    const vku::safe_VkRenderPassCreateInfo2 create_info;
     using SubpassVec = std::vector<uint32_t>;
     using SelfDepVec = std::vector<SubpassVec>;
     const std::vector<SubpassVec> self_dependencies;
@@ -104,8 +94,8 @@ class RenderPass : public StateObject {
     using TransitionVec = std::vector<std::vector<AttachmentTransition>>;
     const TransitionVec subpass_transitions;
 
-    RenderPass(VkRenderPass rp, VkRenderPassCreateInfo2 const *pCreateInfo);
-    RenderPass(VkRenderPass rp, VkRenderPassCreateInfo const *pCreateInfo);
+    RenderPass(VkRenderPass handle, VkRenderPassCreateInfo2 const *pCreateInfo);
+    RenderPass(VkRenderPass handle, VkRenderPassCreateInfo const *pCreateInfo);
 
     RenderPass(VkPipelineRenderingCreateInfo const *pPipelineRenderingCreateInfo, bool rasterization_enabled);
     RenderPass(VkRenderingInfo const *pRenderingInfo, bool rasterization_enabled);
@@ -126,11 +116,12 @@ class RenderPass : public StateObject {
 
 class Framebuffer : public StateObject {
   public:
-    const safe_VkFramebufferCreateInfo createInfo;
+    const vku::safe_VkFramebufferCreateInfo safe_create_info;
+    const VkFramebufferCreateInfo &create_info;
     std::shared_ptr<const RenderPass> rp_state;
     std::vector<std::shared_ptr<vvl::ImageView>> attachments_view_state;
 
-    Framebuffer(VkFramebuffer fb, const VkFramebufferCreateInfo *pCreateInfo, std::shared_ptr<RenderPass> &&rpstate,
+    Framebuffer(VkFramebuffer handle, const VkFramebufferCreateInfo *pCreateInfo, std::shared_ptr<RenderPass> &&rpstate,
                 std::vector<std::shared_ptr<vvl::ImageView>> &&attachments);
     void LinkChildNodes() override;
 

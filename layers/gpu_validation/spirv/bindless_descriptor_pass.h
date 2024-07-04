@@ -16,14 +16,13 @@
 
 #include <stdint.h>
 #include "pass.h"
-#include "function_basic_block.h"
 
 namespace gpuav {
 namespace spirv {
 
 class Module;
-struct Intruction;
-struct Type;
+struct Function;
+struct BasicBlock;
 
 // Create a pass to instrument bindless descriptor checking
 // This pass instruments all bindless references to check that descriptor
@@ -36,9 +35,9 @@ class BindlessDescriptorPass : public Pass {
     BindlessDescriptorPass(Module& module) : Pass(module) {}
 
   private:
-    bool AnalyzeInstruction(const Function& function, const Instruction& inst) override;
-    uint32_t CreateFunctionCall(BasicBlock& block) override;
-    void Reset() override;
+    bool AnalyzeInstruction(const Function& function, const Instruction& inst) final;
+    uint32_t CreateFunctionCall(BasicBlock& block) final;
+    void Reset() final;
 
     uint32_t FindTypeByteSize(uint32_t type_id, uint32_t matrix_stride = 0, bool col_major = false, bool in_matrix = false);
     uint32_t GetLastByte(BasicBlock& block);

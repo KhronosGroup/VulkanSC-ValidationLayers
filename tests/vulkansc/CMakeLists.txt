@@ -53,6 +53,8 @@ target_sources(vksc_layer_validation_tests PRIVATE
     ../framework/test_framework.cpp
     ../framework/shader_helper.h
     ../framework/shader_helper.cpp
+    ../framework/shader_object_helper.h
+    ../framework/shader_object_helper.cpp
     ../framework/pipeline_helper.h
     ../framework/pipeline_helper.cpp
     ../framework/ray_tracing_helper_nv.h
@@ -137,6 +139,15 @@ target_link_libraries(vksc_layer_validation_tests PRIVATE
     $<TARGET_NAME_IF_EXISTS:PkgConfig::X11>
     $<TARGET_NAME_IF_EXISTS:PkgConfig::WAYlAND_CLIENT>
 )
+
+# setup upstream framework/config.h using framework/config.h.in as a source
+file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/config_$<CONFIG>.h" INPUT "${CMAKE_CURRENT_SOURCE_DIR}/../framework/config.h.in")
+
+# Since config_$<CONFIG>.h differs per build, set a compiler definition that files can use to include it
+target_compile_definitions(vksc_layer_validation_tests PRIVATE CONFIG_HEADER_FILE="config_$<CONFIG>.h")
+
+target_sources(vksc_layer_validation_tests PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/config_$<CONFIG>.h)
+target_include_directories(vksc_layer_validation_tests PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 
 find_package(SPIRV-Tools CONFIG QUIET)
 

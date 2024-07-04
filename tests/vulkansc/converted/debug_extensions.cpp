@@ -115,18 +115,18 @@ TEST_F(NegativeDebugExtensions, DISABLED_DebugMarkerSetObject) {
     name_info.object = (uint64_t)VK_NULL_HANDLE;
     name_info.objectType = VK_DEBUG_REPORT_OBJECT_TYPE_DEVICE_MEMORY_EXT;
     name_info.pObjectName = memory_name.c_str();
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDebugMarkerObjectNameInfoEXT-object-01491");
+    m_errorMonitor->SetDesiredError("VUID-VkDebugMarkerObjectNameInfoEXT-object-01491");
     vk::DebugMarkerSetObjectNameEXT(device(), &name_info);
     m_errorMonitor->VerifyFound();
 
     name_info.object = (uint64_t)memory.handle();
     name_info.objectType = VK_DEBUG_REPORT_OBJECT_TYPE_UNKNOWN_EXT;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDebugMarkerObjectNameInfoEXT-objectType-01490");
+    m_errorMonitor->SetDesiredError("VUID-VkDebugMarkerObjectNameInfoEXT-objectType-01490");
     vk::DebugMarkerSetObjectNameEXT(device(), &name_info);
     m_errorMonitor->VerifyFound();
 
     name_info.objectType = VK_DEBUG_REPORT_OBJECT_TYPE_QUEUE_EXT;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDebugMarkerObjectNameInfoEXT-object-01492");
+    m_errorMonitor->SetDesiredError("VUID-VkDebugMarkerObjectNameInfoEXT-object-01492");
     vk::DebugMarkerSetObjectNameEXT(device(), &name_info);
     m_errorMonitor->VerifyFound();
 }
@@ -179,19 +179,19 @@ TEST_F(NegativeDebugExtensions, DebugUtilsName) {
     name_info.pObjectName = memory_name.c_str();
 
     // Pass in bad handle make sure ObjectTracker catches it
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDebugUtilsObjectNameInfoEXT-objectType-02590");
+    m_errorMonitor->SetDesiredError("VUID-VkDebugUtilsObjectNameInfoEXT-objectType-02590");
     name_info.objectHandle = (uint64_t)0xcadecade;
     vk::SetDebugUtilsObjectNameEXT(device(), &name_info);
     m_errorMonitor->VerifyFound();
 
     // Pass in null handle
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkSetDebugUtilsObjectNameEXT-pNameInfo-02588");
+    m_errorMonitor->SetDesiredError("VUID-vkSetDebugUtilsObjectNameEXT-pNameInfo-02588");
     name_info.objectHandle = 0;
     vk::SetDebugUtilsObjectNameEXT(device(), &name_info);
     m_errorMonitor->VerifyFound();
 
     // Pass in 'unknown' object type and see if parameter validation catches it
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkSetDebugUtilsObjectNameEXT-pNameInfo-02587");
+    m_errorMonitor->SetDesiredError("VUID-vkSetDebugUtilsObjectNameEXT-pNameInfo-02587");
     name_info.objectHandle = (uint64_t)memory_2.handle();
     name_info.objectType = VK_OBJECT_TYPE_UNKNOWN;
     vk::SetDebugUtilsObjectNameEXT(device(), &name_info);
@@ -291,18 +291,18 @@ TEST_F(NegativeDebugExtensions, DISABLED_DebugMarkerSetUtils) {
     name_info.tagName = 1;
     name_info.tagSize = 4;
     name_info.pTag = tags;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDebugMarkerObjectTagInfoEXT-object-01494");
+    m_errorMonitor->SetDesiredError("VUID-VkDebugMarkerObjectTagInfoEXT-object-01494");
     vk::DebugMarkerSetObjectTagEXT(device(), &name_info);
     m_errorMonitor->VerifyFound();
 
     name_info.object = (uint64_t)memory.handle();
     name_info.objectType = VK_DEBUG_REPORT_OBJECT_TYPE_UNKNOWN_EXT;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDebugMarkerObjectTagInfoEXT-objectType-01493");
+    m_errorMonitor->SetDesiredError("VUID-VkDebugMarkerObjectTagInfoEXT-objectType-01493");
     vk::DebugMarkerSetObjectTagEXT(device(), &name_info);
     m_errorMonitor->VerifyFound();
 
     name_info.objectType = VK_DEBUG_REPORT_OBJECT_TYPE_QUEUE_EXT;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDebugMarkerObjectTagInfoEXT-object-01495");
+    m_errorMonitor->SetDesiredError("VUID-VkDebugMarkerObjectTagInfoEXT-object-01495");
     vk::DebugMarkerSetObjectTagEXT(device(), &name_info);
     m_errorMonitor->VerifyFound();
 }
@@ -324,7 +324,7 @@ TEST_F(NegativeDebugExtensions, DebugUtilsParameterFlags) {
     callback_create_info.pfnUserCallback = DebugUtilsCallback;
     callback_create_info.pUserData = &callback_data;
     VkDebugUtilsMessengerEXT my_messenger = VK_NULL_HANDLE;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDebugUtilsMessengerCreateInfoEXT-messageSeverity-requiredbitmask");
+    m_errorMonitor->SetDesiredError("VUID-VkDebugUtilsMessengerCreateInfoEXT-messageSeverity-requiredbitmask");
     vk::CreateDebugUtilsMessengerEXT(instance(), &callback_create_info, nullptr, &my_messenger);
     m_errorMonitor->VerifyFound();
 }
@@ -406,9 +406,9 @@ TEST_F(NegativeDebugExtensions, SetDebugUtilsObjectSecondDevice) {
 
     VkDebugUtilsObjectNameInfoEXT name_info = vku::InitStructHelper();
     name_info.objectType = VK_OBJECT_TYPE_DEVICE;
-    name_info.objectHandle = (uint64_t)second_device.device();
+    name_info.objectHandle = (uint64_t)second_device.handle();
     name_info.pObjectName = object_name;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkSetDebugUtilsObjectNameEXT-pNameInfo-07874");
+    m_errorMonitor->SetDesiredError("VUID-vkSetDebugUtilsObjectNameEXT-pNameInfo-07874");
     vk::SetDebugUtilsObjectNameEXT(device(), &name_info);
     m_errorMonitor->VerifyFound();
 
@@ -449,7 +449,7 @@ TEST_F(NegativeDebugExtensions, SetDebugUtilsObjectDestroyedHandle) {
     name_info.objectType = VK_OBJECT_TYPE_SAMPLER;
     name_info.objectHandle = bad_handle;
     name_info.pObjectName = object_name;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDebugUtilsObjectNameInfoEXT-objectType-02590");
+    m_errorMonitor->SetDesiredError("VUID-VkDebugUtilsObjectNameInfoEXT-objectType-02590");
     vk::SetDebugUtilsObjectNameEXT(device(), &name_info);
     m_errorMonitor->VerifyFound();
 
@@ -465,10 +465,10 @@ TEST_F(NegativeDebugExtensions, DebugLabelPrimaryCommandBuffer) {
     vk::CmdEndDebugUtilsLabelEXT(*m_commandBuffer);
     m_commandBuffer->end();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEndDebugUtilsLabelEXT-commandBuffer-01912");
-    m_default_queue->submit(*m_commandBuffer, false);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEndDebugUtilsLabelEXT-commandBuffer-01912");
+    m_default_queue->Submit(*m_commandBuffer);
     m_errorMonitor->VerifyFound();
-    m_default_queue->wait();
+    m_default_queue->Wait();
 }
 
 TEST_F(NegativeDebugExtensions, DebugLabelPrimaryCommandBuffer2) {
@@ -478,21 +478,21 @@ TEST_F(NegativeDebugExtensions, DebugLabelPrimaryCommandBuffer2) {
 
     VkDebugUtilsLabelEXT label = vku::InitStructHelper();
     label.pLabelName = "regionA";
-    vkt::CommandBuffer cb0(m_device, m_commandPool);
+    vkt::CommandBuffer cb0(*m_device, m_command_pool);
     cb0.begin();
     vk::CmdBeginDebugUtilsLabelEXT(cb0, &label);
     cb0.end();
-    m_default_queue->submit(cb0);
+    m_default_queue->Submit(cb0);
 
-    vkt::CommandBuffer cb1(m_device, m_commandPool);
+    vkt::CommandBuffer cb1(*m_device, m_command_pool);
     cb1.begin();
     vk::CmdEndDebugUtilsLabelEXT(cb1);
     vk::CmdEndDebugUtilsLabelEXT(cb1);
     cb1.end();
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEndDebugUtilsLabelEXT-commandBuffer-01912");
-    m_default_queue->submit(cb1, false);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEndDebugUtilsLabelEXT-commandBuffer-01912");
+    m_default_queue->Submit(cb1);
     m_errorMonitor->VerifyFound();
-    m_default_queue->wait();
+    m_default_queue->Wait();
 }
 
 TEST_F(NegativeDebugExtensions, DebugLabelPrimaryCommandBuffer3) {
@@ -502,23 +502,24 @@ TEST_F(NegativeDebugExtensions, DebugLabelPrimaryCommandBuffer3) {
 
     VkDebugUtilsLabelEXT label = vku::InitStructHelper();
     label.pLabelName = "regionA";
-    vkt::CommandBuffer cb0(m_device, m_commandPool);
+    vkt::CommandBuffer cb0(*m_device, m_command_pool);
     cb0.begin();
     vk::CmdBeginDebugUtilsLabelEXT(cb0, &label);
     vk::CmdEndDebugUtilsLabelEXT(cb0);
     cb0.end();
 
-    vkt::CommandBuffer cb1(m_device, m_commandPool);
+    vkt::CommandBuffer cb1(*m_device, m_command_pool);
     label.pLabelName = "regionB";
     cb1.begin();
     vk::CmdBeginDebugUtilsLabelEXT(cb1, &label);
     vk::CmdEndDebugUtilsLabelEXT(cb1);
     vk::CmdEndDebugUtilsLabelEXT(cb1);
     cb1.end();
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEndDebugUtilsLabelEXT-commandBuffer-01912");
-    m_default_queue->submit({&cb0, &cb1}, vkt::Fence{}, false);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEndDebugUtilsLabelEXT-commandBuffer-01912");
+    std::array cbs = {&cb0, &cb1};
+    m_default_queue->Submit(cbs);
     m_errorMonitor->VerifyFound();
-    m_default_queue->wait();
+    m_default_queue->Wait();
 }
 
 TEST_F(NegativeDebugExtensions, DebugLabelSecondaryCommandBuffer) {
@@ -526,10 +527,73 @@ TEST_F(NegativeDebugExtensions, DebugLabelSecondaryCommandBuffer) {
     AddRequiredExtensions(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
 
-    vkt::CommandBuffer cb(m_device, m_commandPool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+    vkt::CommandBuffer cb(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
     cb.begin();
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEndDebugUtilsLabelEXT-commandBuffer-01913");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEndDebugUtilsLabelEXT-commandBuffer-01913");
     vk::CmdEndDebugUtilsLabelEXT(cb);
     m_errorMonitor->VerifyFound();
     cb.end();
+}
+
+// Not supported in Vulkan SC: VK_EXT_debug_marker
+TEST_F(NegativeDebugExtensions, DISABLED_SwapchainImagesDebugMarker) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/7977");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_EXT_DEBUG_MARKER_EXTENSION_NAME);
+    AddSurfaceExtension();
+    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitSurface());
+
+    SurfaceInformation info = GetSwapchainInfo(m_surface);
+    InitSwapchainInfo();
+
+    VkSwapchainCreateInfoKHR swapchain_create_info = vku::InitStructHelper();
+    swapchain_create_info.surface = m_surface;
+    swapchain_create_info.minImageCount = info.surface_capabilities.minImageCount;
+    swapchain_create_info.imageFormat = info.surface_formats[0].format;
+    swapchain_create_info.imageColorSpace = info.surface_formats[0].colorSpace;
+    swapchain_create_info.imageExtent = {info.surface_capabilities.minImageExtent.width,
+                                         info.surface_capabilities.minImageExtent.height};
+    swapchain_create_info.imageArrayLayers = 1;
+    swapchain_create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    swapchain_create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    swapchain_create_info.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+    swapchain_create_info.compositeAlpha = info.surface_composite_alpha;
+    swapchain_create_info.presentMode = info.surface_non_shared_present_mode;
+    swapchain_create_info.clipped = VK_FALSE;
+    swapchain_create_info.oldSwapchain = VK_NULL_HANDLE;
+
+    VkSwapchainKHR swapchain;
+    vk::CreateSwapchainKHR(device(), &swapchain_create_info, nullptr, &swapchain);
+
+    uint32_t imageCount;
+    vk::GetSwapchainImagesKHR(device(), swapchain, &imageCount, nullptr);
+    std::vector<VkImage> images(imageCount);
+    vk::GetSwapchainImagesKHR(device(), swapchain, &imageCount, images.data());
+
+    {
+        VkDebugMarkerObjectNameInfoEXT name_info = vku::InitStructHelper();
+        name_info.object = (uint64_t)images[0];
+        name_info.objectType = VK_DEBUG_REPORT_OBJECT_TYPE_EVENT_EXT;
+        std::string image_name = "swapchain [0]";
+        name_info.pObjectName = image_name.c_str();
+        m_errorMonitor->SetDesiredError("VUID-VkDebugMarkerObjectNameInfoEXT-object-01492");
+        vk::DebugMarkerSetObjectNameEXT(device(), &name_info);
+        m_errorMonitor->VerifyFound();
+    }
+
+    {
+        int tags[2] = {1, 2};
+        VkDebugMarkerObjectTagInfoEXT name_info = vku::InitStructHelper();
+        name_info.object = (uint64_t)images[0];
+        name_info.objectType = VK_DEBUG_REPORT_OBJECT_TYPE_EVENT_EXT;
+        name_info.tagName = 1;
+        name_info.tagSize = 2;
+        name_info.pTag = tags;
+        m_errorMonitor->SetDesiredError("VUID-VkDebugMarkerObjectTagInfoEXT-object-01495");
+        vk::DebugMarkerSetObjectTagEXT(device(), &name_info);
+        m_errorMonitor->VerifyFound();
+    }
+
+    vk::DestroySwapchainKHR(device(), swapchain, nullptr);
 }

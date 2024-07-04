@@ -253,7 +253,7 @@ bool BestPractices::PreCallValidateAcquireNextImageKHR(VkDevice device, VkSwapch
                                                        const ErrorObject& error_obj) const {
     auto swapchain_data = Get<vvl::Swapchain>(swapchain);
     bool skip = false;
-    if (swapchain_data && swapchain_data->images.size() == 0) {
+    if (swapchain_data && swapchain_data->images.empty()) {
         skip |= LogWarning(kVUID_BestPractices_DrawState_SwapchainImagesNotFound, swapchain, error_obj.location,
                            "No images found to acquire from. Application probably did not call "
                            "vkGetSwapchainImagesKHR after swapchain creation.");
@@ -384,7 +384,7 @@ void BestPractices::ManualPostCallRecordGetSwapchainImagesKHR(VkDevice device, V
     }
 }
 
-std::shared_ptr<vvl::Swapchain> BestPractices::CreateSwapchainState(const VkSwapchainCreateInfoKHR* create_info,
-                                                                    VkSwapchainKHR swapchain) {
-    return std::static_pointer_cast<vvl::Swapchain>(std::make_shared<bp_state::Swapchain>(this, create_info, swapchain));
+std::shared_ptr<vvl::Swapchain> BestPractices::CreateSwapchainState(const VkSwapchainCreateInfoKHR* pCreateInfo,
+                                                                    VkSwapchainKHR handle) {
+    return std::static_pointer_cast<vvl::Swapchain>(std::make_shared<bp_state::Swapchain>(*this, pCreateInfo, handle));
 }

@@ -16,6 +16,10 @@
 
 #include "../framework/layer_validation_tests.h"
 
+#ifndef VK_USE_PLATFORM_WIN32_KHR
+#include <sys/mman.h>
+#endif
+
 TEST_F(PositiveMemory, MapMemory2) {
     TEST_DESCRIPTION("Validate vkMapMemory2 and vkUnmapMemory2");
 
@@ -35,9 +39,7 @@ TEST_F(PositiveMemory, MapMemory2) {
     bool pass = m_device->phy().set_memory_type(vvl::kU32Max, &memory_info, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
     ASSERT_TRUE(pass);
 
-    VkDeviceMemory memory;
-    VkResult err = vk::AllocateMemory(m_device->device(), &memory_info, NULL, &memory);
-    ASSERT_EQ(VK_SUCCESS, err);
+    vkt::DeviceMemory memory(*m_device, memory_info);
 
     VkMemoryMapInfoKHR map_info = vku::InitStructHelper();
     map_info.memory = memory;
@@ -47,26 +49,112 @@ TEST_F(PositiveMemory, MapMemory2) {
     VkMemoryUnmapInfoKHR unmap_info = vku::InitStructHelper();
     unmap_info.memory = memory;
 
-    uint32_t *pData = NULL;
-    err = vk::MapMemory2KHR(m_device->device(), &map_info, (void **)&pData);
+    uint32_t *pData = nullptr;
+    VkResult err = vk::MapMemory2KHR(device(), &map_info, (void **)&pData);
     ASSERT_EQ(VK_SUCCESS, err);
-    ASSERT_TRUE(pData != NULL);
+    ASSERT_TRUE(pData != nullptr);
 
-    err = vk::UnmapMemory2KHR(m_device->device(), &unmap_info);
+    err = vk::UnmapMemory2KHR(device(), &unmap_info);
     ASSERT_EQ(VK_SUCCESS, err);
 
     map_info.size = VK_WHOLE_SIZE;
 
-    pData = NULL;
-    err = vk::MapMemory2KHR(m_device->device(), &map_info, (void **)&pData);
+    pData = nullptr;
+    err = vk::MapMemory2KHR(device(), &map_info, (void **)&pData);
     ASSERT_EQ(VK_SUCCESS, err);
-    ASSERT_TRUE(pData != NULL);
+    ASSERT_TRUE(pData != nullptr);
 
-    err = vk::UnmapMemory2KHR(m_device->device(), &unmap_info);
+    err = vk::UnmapMemory2KHR(device(), &unmap_info);
     ASSERT_EQ(VK_SUCCESS, err);
-
-    vk::FreeMemory(m_device->device(), memory, NULL);
 }
+
+#ifndef VK_USE_PLATFORM_WIN32_KHR
+TEST_F(PositiveMemory, MapMemoryPlaced) {
+    TEST_DESCRIPTION("Validate placed memory maps");
+    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_MAP_MEMORY_2_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_MAP_MEMORY_PLACED_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::memoryMapPlaced);
+    AddRequiredFeature(vkt::Feature::memoryUnmapReserve);
+    RETURN_IF_SKIP(Init());
+
+    VkPhysicalDeviceMapMemoryPlacedPropertiesEXT map_placed_props = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(map_placed_props);
+
+    /* Vulkan doesn't have any requirements on what allocationSize can be
+     * other than that it must be non-zero.  Pick 64KB because that should
+     * work out to an even number of pages on basically any GPU.
+     */
+    const VkDeviceSize allocation_size = map_placed_props.minPlacedMemoryMapAlignment * 16;
+
+    VkMemoryAllocateInfo memory_info = vku::InitStructHelper();
+    memory_info.allocationSize = allocation_size;
+
+    bool pass = m_device->phy().set_memory_type(vvl::kU32Max, &memory_info, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+    ASSERT_TRUE(pass);
+
+    vkt::DeviceMemory memory(*m_device, memory_info);
+
+    /* Reserve one more page in case we need to deal with any alignment weirdness. */
+    size_t reservation_size = allocation_size + map_placed_props.minPlacedMemoryMapAlignment;
+    void *reservation = mmap(NULL, reservation_size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    ASSERT_TRUE(reservation != MAP_FAILED);
+
+    /* Align up to minPlacedMemoryMapAlignment */
+    uintptr_t align_1 = map_placed_props.minPlacedMemoryMapAlignment - 1;
+    void *addr = reinterpret_cast<void *>((reinterpret_cast<uintptr_t>(reservation) + align_1) & ~align_1);
+
+    VkMemoryMapInfoKHR map_info = vku::InitStructHelper();
+    map_info.memory = memory;
+    map_info.flags = VK_MEMORY_MAP_PLACED_BIT_EXT;
+    map_info.offset = 0;
+    map_info.size = VK_WHOLE_SIZE;
+
+    VkMemoryMapPlacedInfoEXT placed_info = vku::InitStructHelper();
+    placed_info.pPlacedAddress = addr;
+    map_info.pNext = &placed_info;
+
+    void *pData;
+    VkResult res = vk::MapMemory2KHR(device(), &map_info, &pData);
+    ASSERT_EQ(VK_SUCCESS, res);
+
+    if (IsPlatformMockICD()) {
+        return;  // currently can only validate the output with real driver
+    }
+
+    ASSERT_EQ(pData, addr);
+
+    /* Write some data and make sure we don't fault */
+    memset(pData, 0x5c, allocation_size);
+
+    VkMemoryUnmapInfoKHR unmap_info = vku::InitStructHelper();
+    unmap_info.memory = memory;
+    unmap_info.flags = VK_MEMORY_UNMAP_RESERVE_BIT_EXT;
+
+    res = vk::UnmapMemory2KHR(device(), &unmap_info);
+    ASSERT_EQ(VK_SUCCESS, res);
+
+    /* Test mapping with the whole size but not VK_WHOLE_SIZE */
+    map_info.size = allocation_size;
+    res = vk::MapMemory2KHR(device(), &map_info, &pData);
+    ASSERT_EQ(VK_SUCCESS, res);
+
+    res = vk::UnmapMemory2KHR(device(), &unmap_info);
+    ASSERT_EQ(VK_SUCCESS, res);
+
+    map_info.flags = 0;
+    vk::MapMemory2KHR(device(), &map_info, &pData);
+
+    /* We unmapped with RESERVE above so this should be different */
+    ASSERT_NE(pData, addr);
+
+    ASSERT_EQ(static_cast<uint8_t *>(pData)[0], 0x5c);
+
+    unmap_info.flags = 0;
+    res = vk::UnmapMemory2KHR(device(), &unmap_info);
+    ASSERT_EQ(VK_SUCCESS, res);
+}
+#endif
 
 TEST_F(PositiveMemory, GetMemoryRequirements2) {
     TEST_DESCRIPTION(
@@ -83,12 +171,12 @@ TEST_F(PositiveMemory, GetMemoryRequirements2) {
     VkBufferMemoryRequirementsInfo2KHR buffer_info = {VK_STRUCTURE_TYPE_BUFFER_MEMORY_REQUIREMENTS_INFO_2_KHR, nullptr,
                                                       buffer.handle()};
     VkMemoryRequirements2KHR buffer_reqs = {VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2_KHR};
-    vk::GetBufferMemoryRequirements2KHR(m_device->device(), &buffer_info, &buffer_reqs);
+    vk::GetBufferMemoryRequirements2KHR(device(), &buffer_info, &buffer_reqs);
 
     // Allocate and bind buffer memory
     vkt::DeviceMemory buffer_memory;
     buffer_memory.init(*m_device, vkt::DeviceMemory::get_resource_alloc_info(*m_device, buffer_reqs.memoryRequirements, 0));
-    vk::BindBufferMemory(m_device->device(), buffer.handle(), buffer_memory.handle(), 0);
+    vk::BindBufferMemory(device(), buffer.handle(), buffer_memory.handle(), 0);
 
     // Create a test image
     auto image_ci = vkt::Image::create_info();
@@ -98,19 +186,18 @@ TEST_F(PositiveMemory, GetMemoryRequirements2) {
     image_ci.format = VK_FORMAT_R8G8B8A8_UNORM;
     image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_ci.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-    vkt::Image image;
-    image.init_no_mem(*m_device, image_ci);
+    vkt::Image image(*m_device, image_ci, vkt::no_mem);
 
     // Use extension to get image memory requirements
     VkImageMemoryRequirementsInfo2KHR image_info = {VK_STRUCTURE_TYPE_IMAGE_MEMORY_REQUIREMENTS_INFO_2_KHR, nullptr,
                                                     image.handle()};
     VkMemoryRequirements2KHR image_reqs = {VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2_KHR};
-    vk::GetImageMemoryRequirements2KHR(m_device->device(), &image_info, &image_reqs);
+    vk::GetImageMemoryRequirements2KHR(device(), &image_info, &image_reqs);
 
     // Allocate and bind image memory
     vkt::DeviceMemory image_memory;
     image_memory.init(*m_device, vkt::DeviceMemory::get_resource_alloc_info(*m_device, image_reqs.memoryRequirements, 0));
-    vk::BindImageMemory(m_device->device(), image.handle(), image_memory.handle(), 0);
+    vk::BindImageMemory(device(), image.handle(), image_memory.handle(), 0);
 
     // Now execute arbitrary commands that use the test buffer and image
     m_commandBuffer->begin();
@@ -129,7 +216,8 @@ TEST_F(PositiveMemory, GetMemoryRequirements2) {
 
     // Submit and verify no validation errors
     m_commandBuffer->end();
-    m_commandBuffer->QueueCommandBuffer();
+    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Wait();
 }
 
 TEST_F(PositiveMemory, BindMemory2) {
@@ -149,7 +237,7 @@ TEST_F(PositiveMemory, BindMemory2) {
     // Bind buffer memory with extension
     VkBindBufferMemoryInfoKHR buffer_bind_info = {VK_STRUCTURE_TYPE_BIND_BUFFER_MEMORY_INFO_KHR, nullptr, buffer.handle(),
                                                   buffer_memory.handle(), 0};
-    vk::BindBufferMemory2KHR(m_device->device(), 1, &buffer_bind_info);
+    vk::BindBufferMemory2KHR(device(), 1, &buffer_bind_info);
 
     // Create a test image
     auto image_ci = vkt::Image::create_info();
@@ -159,8 +247,7 @@ TEST_F(PositiveMemory, BindMemory2) {
     image_ci.format = VK_FORMAT_R8G8B8A8_UNORM;
     image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_ci.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-    vkt::Image image;
-    image.init_no_mem(*m_device, image_ci);
+    vkt::Image image(*m_device, image_ci, vkt::no_mem);
 
     // Allocate image memory
     vkt::DeviceMemory image_memory;
@@ -169,7 +256,7 @@ TEST_F(PositiveMemory, BindMemory2) {
     // Bind image memory with extension
     VkBindImageMemoryInfoKHR image_bind_info = {VK_STRUCTURE_TYPE_BIND_IMAGE_MEMORY_INFO_KHR, nullptr, image.handle(),
                                                 image_memory.handle(), 0};
-    vk::BindImageMemory2KHR(m_device->device(), 1, &image_bind_info);
+    vk::BindImageMemory2KHR(device(), 1, &image_bind_info);
 
     // Now execute arbitrary commands that use the test buffer and image
     m_commandBuffer->begin();
@@ -188,7 +275,8 @@ TEST_F(PositiveMemory, BindMemory2) {
 
     // Submit and verify no validation errors
     m_commandBuffer->end();
-    m_commandBuffer->QueueCommandBuffer();
+    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Wait();
 }
 
 TEST_F(PositiveMemory, NonCoherentMapping) {
@@ -199,7 +287,6 @@ TEST_F(PositiveMemory, NonCoherentMapping) {
     uint8_t *pData;
     RETURN_IF_SKIP(Init());
 
-    VkDeviceMemory mem;
     VkMemoryRequirements mem_reqs;
     mem_reqs.memoryTypeBits = 0xFFFFFFFF;
     const VkDeviceSize atom_size = m_device->phy().limits_.nonCoherentAtomSize;
@@ -227,62 +314,59 @@ TEST_F(PositiveMemory, NonCoherentMapping) {
         }
     }
 
-    err = vk::AllocateMemory(m_device->device(), &alloc_info, NULL, &mem);
-    ASSERT_EQ(VK_SUCCESS, err);
+    vkt::DeviceMemory mem(*m_device, alloc_info);
 
     // Map/Flush/Invalidate using WHOLE_SIZE and zero offsets and entire mapped range
-    err = vk::MapMemory(m_device->device(), mem, 0, VK_WHOLE_SIZE, 0, (void **)&pData);
+    err = vk::MapMemory(device(), mem, 0, VK_WHOLE_SIZE, 0, (void **)&pData);
     ASSERT_EQ(VK_SUCCESS, err);
     VkMappedMemoryRange mmr = vku::InitStructHelper();
     mmr.memory = mem;
     mmr.offset = 0;
     mmr.size = VK_WHOLE_SIZE;
-    err = vk::FlushMappedMemoryRanges(m_device->device(), 1, &mmr);
+    err = vk::FlushMappedMemoryRanges(device(), 1, &mmr);
     ASSERT_EQ(VK_SUCCESS, err);
-    err = vk::InvalidateMappedMemoryRanges(m_device->device(), 1, &mmr);
+    err = vk::InvalidateMappedMemoryRanges(device(), 1, &mmr);
     ASSERT_EQ(VK_SUCCESS, err);
-    vk::UnmapMemory(m_device->device(), mem);
+    vk::UnmapMemory(device(), mem);
 
     // Map/Flush/Invalidate using WHOLE_SIZE and an offset and entire mapped range
-    err = vk::MapMemory(m_device->device(), mem, 5 * atom_size, VK_WHOLE_SIZE, 0, (void **)&pData);
+    err = vk::MapMemory(device(), mem, 5 * atom_size, VK_WHOLE_SIZE, 0, (void **)&pData);
     ASSERT_EQ(VK_SUCCESS, err);
     mmr.memory = mem;
     mmr.offset = 6 * atom_size;
     mmr.size = VK_WHOLE_SIZE;
-    err = vk::FlushMappedMemoryRanges(m_device->device(), 1, &mmr);
+    err = vk::FlushMappedMemoryRanges(device(), 1, &mmr);
     ASSERT_EQ(VK_SUCCESS, err);
-    err = vk::InvalidateMappedMemoryRanges(m_device->device(), 1, &mmr);
+    err = vk::InvalidateMappedMemoryRanges(device(), 1, &mmr);
     ASSERT_EQ(VK_SUCCESS, err);
-    vk::UnmapMemory(m_device->device(), mem);
+    vk::UnmapMemory(device(), mem);
 
     // Map with offset and size
     // Flush/Invalidate subrange of mapped area with offset and size
-    err = vk::MapMemory(m_device->device(), mem, 3 * atom_size, 9 * atom_size, 0, (void **)&pData);
+    err = vk::MapMemory(device(), mem, 3 * atom_size, 9 * atom_size, 0, (void **)&pData);
     ASSERT_EQ(VK_SUCCESS, err);
     mmr.memory = mem;
     mmr.offset = 4 * atom_size;
     mmr.size = 2 * atom_size;
-    err = vk::FlushMappedMemoryRanges(m_device->device(), 1, &mmr);
+    err = vk::FlushMappedMemoryRanges(device(), 1, &mmr);
     ASSERT_EQ(VK_SUCCESS, err);
-    err = vk::InvalidateMappedMemoryRanges(m_device->device(), 1, &mmr);
+    err = vk::InvalidateMappedMemoryRanges(device(), 1, &mmr);
     ASSERT_EQ(VK_SUCCESS, err);
-    vk::UnmapMemory(m_device->device(), mem);
+    vk::UnmapMemory(device(), mem);
 
     // Map without offset and flush WHOLE_SIZE with two separate offsets
-    err = vk::MapMemory(m_device->device(), mem, 0, VK_WHOLE_SIZE, 0, (void **)&pData);
+    err = vk::MapMemory(device(), mem, 0, VK_WHOLE_SIZE, 0, (void **)&pData);
     ASSERT_EQ(VK_SUCCESS, err);
     mmr.memory = mem;
     mmr.offset = allocation_size - (4 * atom_size);
     mmr.size = VK_WHOLE_SIZE;
-    err = vk::FlushMappedMemoryRanges(m_device->device(), 1, &mmr);
+    err = vk::FlushMappedMemoryRanges(device(), 1, &mmr);
     ASSERT_EQ(VK_SUCCESS, err);
     mmr.offset = allocation_size - (6 * atom_size);
     mmr.size = VK_WHOLE_SIZE;
-    err = vk::FlushMappedMemoryRanges(m_device->device(), 1, &mmr);
+    err = vk::FlushMappedMemoryRanges(device(), 1, &mmr);
     ASSERT_EQ(VK_SUCCESS, err);
-    vk::UnmapMemory(m_device->device(), mem);
-
-    vk::FreeMemory(m_device->device(), mem, NULL);
+    vk::UnmapMemory(device(), mem);
 }
 
 TEST_F(PositiveMemory, MappingWithMultiInstanceHeapFlag) {
@@ -311,13 +395,11 @@ TEST_F(PositiveMemory, MappingWithMultiInstanceHeapFlag) {
     mem_alloc.allocationSize = 64;
     mem_alloc.memoryTypeIndex = memory_index;
 
-    VkDeviceMemory memory;
-    vk::AllocateMemory(m_device->device(), &mem_alloc, nullptr, &memory);
+    vkt::DeviceMemory memory(*m_device, mem_alloc);
 
     uint32_t *pData;
     vk::MapMemory(device(), memory, 0, VK_WHOLE_SIZE, 0, (void **)&pData);
     vk::UnmapMemory(device(), memory);
-    vk::FreeMemory(m_device->device(), memory, nullptr);
 }
 
 // Not supported in Vulkan SC: vkFreeMemory
@@ -344,14 +426,10 @@ TEST_F(PositiveMemory, DISABLED_BindImageMemoryMultiThreaded) {
     // Create an image object, allocate memory, bind memory, and destroy the object
     auto worker_thread = [&]() {
         for (uint32_t i = 0; i < 1000; ++i) {
-            VkImage image;
-            VkDeviceMemory mem;
+            vkt::Image image(*m_device, image_create_info, vkt::no_mem);
+
             VkMemoryRequirements mem_reqs;
-
-            VkResult err = vk::CreateImage(m_device->device(), &image_create_info, nullptr, &image);
-            ASSERT_EQ(VK_SUCCESS, err);
-
-            vk::GetImageMemoryRequirements(m_device->device(), image, &mem_reqs);
+            vk::GetImageMemoryRequirements(device(), image, &mem_reqs);
 
             VkMemoryAllocateInfo mem_alloc = vku::InitStructHelper();
             mem_alloc.memoryTypeIndex = 0;
@@ -359,15 +437,9 @@ TEST_F(PositiveMemory, DISABLED_BindImageMemoryMultiThreaded) {
             const bool pass = m_device->phy().set_memory_type(mem_reqs.memoryTypeBits, &mem_alloc, 0);
             ASSERT_TRUE(pass);
 
-            err = vk::AllocateMemory(m_device->device(), &mem_alloc, nullptr, &mem);
-            ASSERT_EQ(VK_SUCCESS, err);
+            vkt::DeviceMemory mem(*m_device, mem_alloc);
 
-            err = vk::BindImageMemory(m_device->device(), image, mem, 0);
-            ASSERT_EQ(VK_SUCCESS, err);
-
-            vk::DestroyImage(m_device->device(), image, nullptr);
-
-            vk::FreeMemory(m_device->device(), mem, nullptr);
+            ASSERT_EQ(VK_SUCCESS, vk::BindImageMemory(device(), image, mem, 0));
         }
     };
 
@@ -397,7 +469,7 @@ TEST_F(PositiveMemory, DeviceBufferMemoryRequirements) {
     VkDeviceBufferMemoryRequirements info = vku::InitStructHelper();
     info.pCreateInfo = &buffer_create_info;
     VkMemoryRequirements2 memory_reqs2 = vku::InitStructHelper();
-    vk::GetDeviceBufferMemoryRequirements(m_device->device(), &info, &memory_reqs2);
+    vk::GetDeviceBufferMemoryRequirements(device(), &info, &memory_reqs2);
 
     VkMemoryAllocateInfo memory_info = vku::InitStructHelper();
     memory_info.allocationSize = memory_reqs2.memoryRequirements.size;
@@ -407,7 +479,7 @@ TEST_F(PositiveMemory, DeviceBufferMemoryRequirements) {
 
     vkt::DeviceMemory buffer_memory(*m_device, memory_info);
 
-    VkResult err = vk::BindBufferMemory(m_device->device(), buffer, buffer_memory, 0);
+    VkResult err = vk::BindBufferMemory(device(), buffer, buffer_memory, 0);
     ASSERT_EQ(VK_SUCCESS, err);
 }
 
@@ -430,15 +502,12 @@ TEST_F(PositiveMemory, DeviceImageMemoryRequirements) {
     image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_create_info.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
     image_create_info.flags = 0;
-
-    vkt::Image image;
-    image.init_no_mem(*m_device, image_create_info);
-    ASSERT_TRUE(image.initialized());
+    vkt::Image image(*m_device, image_create_info, vkt::no_mem);
 
     VkDeviceImageMemoryRequirements info = vku::InitStructHelper();
     info.pCreateInfo = &image_create_info;
     VkMemoryRequirements2 mem_reqs = vku::InitStructHelper();
-    vk::GetDeviceImageMemoryRequirements(m_device->device(), &info, &mem_reqs);
+    vk::GetDeviceImageMemoryRequirements(device(), &info, &mem_reqs);
 
     VkMemoryAllocateInfo mem_alloc = vku::InitStructHelper();
     mem_alloc.memoryTypeIndex = 0;
@@ -448,6 +517,66 @@ TEST_F(PositiveMemory, DeviceImageMemoryRequirements) {
 
     vkt::DeviceMemory mem(*m_device, mem_alloc);
 
-    VkResult err = vk::BindImageMemory(m_device->device(), image, mem, 0);
+    VkResult err = vk::BindImageMemory(device(), image, mem, 0);
     ASSERT_EQ(VK_SUCCESS, err);
 }
+
+#ifdef VK_USE_PLATFORM_WIN32_KHR
+TEST_F(PositiveMemory, BindMemoryDX11Handle) {
+    TEST_DESCRIPTION("Bind memory imported from DX11 resource. Allocation size should be ignored.");
+    AddRequiredExtensions(VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME);
+    RETURN_IF_SKIP(Init());
+    // Mock ICD allows to use fake DX11 handles instead of using DX11 API directly.
+    if (!IsPlatformMockICD()) {
+        GTEST_SKIP() << "This test only runs on the mock ICD";
+    }
+
+    VkExternalMemoryImageCreateInfo external_info = vku::InitStructHelper();
+    external_info.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D11_TEXTURE_BIT;
+    auto image_ci = vkt::Image::ImageCreateInfo2D(32, 32, 1, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    image_ci.pNext = &external_info;
+    vkt::Image image(*m_device, image_ci, vkt::no_mem);
+
+    VkMemoryRequirements mem_reqs{};
+    vk::GetImageMemoryRequirements(device(), image.handle(), &mem_reqs);
+
+    VkImportMemoryWin32HandleInfoKHR memory_import = vku::InitStructHelper();
+    memory_import.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D11_TEXTURE_BIT;
+    memory_import.handle = (HANDLE)0x12345678;  // Use arbitrary non-zero value as DX11 resource handle
+
+    VkMemoryAllocateInfo alloc_info = vku::InitStructHelper(&memory_import);  // Set zero allocation size
+    m_device->phy().set_memory_type(mem_reqs.memoryTypeBits, &alloc_info, 0);
+    vkt::DeviceMemory memory(*m_device, alloc_info);
+    // This should not trigger VUs that take into accout allocation size (e.g. 01049/01046)
+    vk::BindImageMemory(device(), image, memory, 0);
+}
+
+TEST_F(PositiveMemory, BindMemoryDX12Handle) {
+    TEST_DESCRIPTION("Bind memory imported from DX12 resource. Allocation size should be ignored.");
+    AddRequiredExtensions(VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME);
+    RETURN_IF_SKIP(Init());
+    // Mock ICD allows to use fake DX12 handles instead of using DX12 API directly.
+    if (!IsPlatformMockICD()) {
+        GTEST_SKIP() << "This test only runs on the mock ICD";
+    }
+
+    VkExternalMemoryImageCreateInfo external_info = vku::InitStructHelper();
+    external_info.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D12_RESOURCE_BIT;
+    auto image_ci = vkt::Image::ImageCreateInfo2D(32, 32, 1, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    image_ci.pNext = &external_info;
+    vkt::Image image(*m_device, image_ci, vkt::no_mem);
+
+    VkMemoryRequirements mem_reqs{};
+    vk::GetImageMemoryRequirements(device(), image.handle(), &mem_reqs);
+
+    VkImportMemoryWin32HandleInfoKHR memory_import = vku::InitStructHelper();
+    memory_import.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D12_RESOURCE_BIT;
+    memory_import.handle = (HANDLE)0x12345678;  // Use arbitrary non-zero value as DX12 resource handle
+
+    VkMemoryAllocateInfo alloc_info = vku::InitStructHelper(&memory_import);  // Set zero allocation size
+    m_device->phy().set_memory_type(mem_reqs.memoryTypeBits, &alloc_info, 0);
+    vkt::DeviceMemory memory(*m_device, alloc_info);
+    // This should not trigger VUs that take into accout allocation size (e.g. 01049/01046)
+    vk::BindImageMemory(device(), image, memory, 0);
+}
+#endif  // VK_USE_PLATFORM_WIN32_KHR

@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (c) 2015-2023 Google, Inc.
+ * Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (c) 2015-2024 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,26 +18,26 @@ QSTestContext::QSTestContext(vkt::Device* device, vkt::Queue* force_q0, vkt::Que
     : dev(device), q0(VK_NULL_HANDLE), q1(VK_NULL_HANDLE) {
     if (force_q0) {
         q0 = force_q0->handle();
-        q_fam = force_q0->get_family_index();
+        q_fam = force_q0->family_index;
         if (force_q1) {
             // The object has some assumptions that the queues are from the the same family, so enforce this here
-            if (force_q1->get_family_index() == q_fam) {
+            if (force_q1->family_index == q_fam) {
                 q1 = force_q1->handle();
             }
         } else {
             q1 = q0;  // Allow the two queues to be the same and valid if forced
         }
     } else {
-        const auto& queues = device->dma_queues();
+        const auto& queues = device->QueuesWithTransferCapability();
 
         const uint32_t q_count = static_cast<uint32_t>(queues.size());
         for (uint32_t q0_index = 0; q0_index < q_count; ++q0_index) {
             const auto* q0_entry = queues[q0_index];
             q0 = q0_entry->handle();
-            q_fam = q0_entry->get_family_index();
+            q_fam = q0_entry->family_index;
             for (uint32_t q1_index = (q0_index + 1); q1_index < q_count; ++q1_index) {
                 const auto* q1_entry = queues[q1_index];
-                if (q_fam == q1_entry->get_family_index()) {
+                if (q_fam == q1_entry->family_index) {
                     q1 = q1_entry->handle();
                     break;
                 }
@@ -64,7 +64,7 @@ QSTestContext::QSTestContext(vkt::Device* device, vkt::Queue* force_q0, vkt::Que
     first_to_second = {0, half_size, half_size};
     second_to_first = {half_size, 0, half_size};
 
-    pool.init(*device, vkt::CommandPool::create_info(q_fam, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT));
+    pool.Init(*device, q_fam, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
 
     h_cba = InitFromPool(cba);
     h_cbb = InitFromPool(cbb);
@@ -78,7 +78,7 @@ QSTestContext::QSTestContext(vkt::Device* device, vkt::Queue* force_q0, vkt::Que
 }
 
 VkCommandBuffer QSTestContext::InitFromPool(vkt::CommandBuffer& cb_obj) {
-    cb_obj.Init(dev, &pool);
+    cb_obj.Init(*dev, pool);
     return cb_obj.handle();
 }
 
@@ -101,7 +101,7 @@ void QSTestContext::Copy(vkt::Buffer& from, vkt::Buffer& to, const VkBufferCopy&
     vk::CmdCopyBuffer(current_cb->handle(), from.handle(), to.handle(), 1, &copy_region);
 }
 
-void QSTestContext::CopyGeneral(const VkImageObj& from, const VkImageObj& to, const VkImageCopy& region) {
+void QSTestContext::CopyGeneral(const vkt::Image& from, const vkt::Image& to, const VkImageCopy& region) {
     vk::CmdCopyImage(current_cb->handle(), from.handle(), VK_IMAGE_LAYOUT_GENERAL, to.handle(), VK_IMAGE_LAYOUT_GENERAL, 1,
                      &region);
 }

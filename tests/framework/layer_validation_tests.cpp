@@ -1,7 +1,7 @@
 /*
- * Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
+ * Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
  * Copyright (c) 2015-2023 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -94,30 +94,9 @@ bool ImageFormatIsSupported(const VkInstance inst, const VkPhysicalDevice phy, c
     if (VK_SUCCESS != err) {
         return false;
     }
-
-#if 0  // Convinced this chunk doesn't currently add any additional info, but leaving in place because it may be
-       // necessary with future extensions
-
-    // Verify again using version 2, if supported, which *can* return more property data than the original...
-    // (It's not clear that this is any more definitive than using the original version - but no harm)
-    PFN_vkGetPhysicalDeviceImageFormatProperties2KHR p_GetPDIFP2KHR =
-        (PFN_vkGetPhysicalDeviceImageFormatProperties2KHR)vk::GetInstanceProcAddr(inst,
-                                                                                "vkGetPhysicalDeviceImageFormatProperties2KHR");
-    if (NULL != p_GetPDIFP2KHR) {
-        VkPhysicalDeviceImageFormatInfo2KHR fmt_info = vku::InitStructHelper();
-        fmt_info.format = info.format;
-        fmt_info.type = info.imageType;
-        fmt_info.tiling = info.tiling;
-        fmt_info.usage = info.usage;
-        fmt_info.flags = info.flags;
-
-        VkImageFormatProperties2KHR fmt_props = vku::InitStructHelper();
-        err = p_GetPDIFP2KHR(phy, &fmt_info, &fmt_props);
-        if (VK_SUCCESS != err) {
-            return false;
-        }
+    if (info.arrayLayers > props.maxArrayLayers) {
+        return false;
     }
-#endif
 
     return true;
 }
@@ -166,7 +145,7 @@ void TestRenderPassCreate(ErrorMonitor *error_monitor, const vkt::Device &device
     }
 
     if (rp2_supported && rp2_vuid) {
-        safe_VkRenderPassCreateInfo2 create_info2 = ConvertVkRenderPassCreateInfoToV2KHR(create_info);
+        auto create_info2 = ConvertVkRenderPassCreateInfoToV2KHR(create_info);
         error_monitor->SetDesiredFailureMsg(kErrorBit, rp2_vuid);
         vkt::RenderPass rp2(device, *create_info2.ptr());
         error_monitor->VerifyFound();

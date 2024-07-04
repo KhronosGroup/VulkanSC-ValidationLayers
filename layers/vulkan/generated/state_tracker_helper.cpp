@@ -1415,6 +1415,12 @@ void GetEnabledDeviceFeatures(const VkDeviceCreateInfo *pCreateInfo, DeviceFeatu
                 features->extendedSparseAddressSpace |= enabled->extendedSparseAddressSpace == VK_TRUE;
                 break;
             }
+            case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_LEGACY_VERTEX_ATTRIBUTES_FEATURES_EXT: {
+                const VkPhysicalDeviceLegacyVertexAttributesFeaturesEXT *enabled =
+                    reinterpret_cast<const VkPhysicalDeviceLegacyVertexAttributesFeaturesEXT *>(pNext);
+                features->legacyVertexAttributes |= enabled->legacyVertexAttributes == VK_TRUE;
+                break;
+            }
             case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_CORE_BUILTINS_FEATURES_ARM: {
                 const VkPhysicalDeviceShaderCoreBuiltinsFeaturesARM *enabled =
                     reinterpret_cast<const VkPhysicalDeviceShaderCoreBuiltinsFeaturesARM *>(pNext);
@@ -1490,10 +1496,28 @@ void GetEnabledDeviceFeatures(const VkDeviceCreateInfo *pCreateInfo, DeviceFeatu
                 features->descriptorPoolOverallocation |= enabled->descriptorPoolOverallocation == VK_TRUE;
                 break;
             }
+            case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAW_ACCESS_CHAINS_FEATURES_NV: {
+                const VkPhysicalDeviceRawAccessChainsFeaturesNV *enabled =
+                    reinterpret_cast<const VkPhysicalDeviceRawAccessChainsFeaturesNV *>(pNext);
+                features->shaderRawAccessChains |= enabled->shaderRawAccessChains == VK_TRUE;
+                break;
+            }
             case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_FLOAT16_VECTOR_FEATURES_NV: {
                 const VkPhysicalDeviceShaderAtomicFloat16VectorFeaturesNV *enabled =
                     reinterpret_cast<const VkPhysicalDeviceShaderAtomicFloat16VectorFeaturesNV *>(pNext);
                 features->shaderFloat16VectorAtomics |= enabled->shaderFloat16VectorAtomics == VK_TRUE;
+                break;
+            }
+            case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_VALIDATION_FEATURES_NV: {
+                const VkPhysicalDeviceRayTracingValidationFeaturesNV *enabled =
+                    reinterpret_cast<const VkPhysicalDeviceRayTracingValidationFeaturesNV *>(pNext);
+                features->rayTracingValidation |= enabled->rayTracingValidation == VK_TRUE;
+                break;
+            }
+            case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_ALIGNMENT_CONTROL_FEATURES_MESA: {
+                const VkPhysicalDeviceImageAlignmentControlFeaturesMESA *enabled =
+                    reinterpret_cast<const VkPhysicalDeviceImageAlignmentControlFeaturesMESA *>(pNext);
+                features->imageAlignmentControl |= enabled->imageAlignmentControl == VK_TRUE;
                 break;
             }
             case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR: {

@@ -454,6 +454,8 @@ enum class Feature {
     image2DViewOf3D,
     // VkPhysicalDeviceImage2DViewOf3DFeaturesEXT
     sampler2DViewOf3D,
+    // VkPhysicalDeviceImageAlignmentControlFeaturesMESA
+    imageAlignmentControl,
     // VkPhysicalDeviceImageCompressionControlFeaturesEXT
     imageCompressionControl,
     // VkPhysicalDeviceImageCompressionControlSwapchainFeaturesEXT
@@ -486,6 +488,8 @@ enum class Feature {
     invocationMask,
     // VkPhysicalDeviceLegacyDitheringFeaturesEXT
     legacyDithering,
+    // VkPhysicalDeviceLegacyVertexAttributesFeaturesEXT
+    legacyVertexAttributes,
     // VkPhysicalDeviceLineRasterizationFeaturesKHR
     bresenhamLines,
     // VkPhysicalDeviceLineRasterizationFeaturesKHR
@@ -642,6 +646,8 @@ enum class Feature {
     rasterizationOrderDepthAttachmentAccess,
     // VkPhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT
     rasterizationOrderStencilAttachmentAccess,
+    // VkPhysicalDeviceRawAccessChainsFeaturesNV
+    shaderRawAccessChains,
     // VkPhysicalDeviceRayQueryFeaturesKHR
     rayQuery,
     // VkPhysicalDeviceRayTracingInvocationReorderFeaturesNV
@@ -666,6 +672,8 @@ enum class Feature {
     rayTraversalPrimitiveCulling,
     // VkPhysicalDeviceRayTracingPositionFetchFeaturesKHR
     rayTracingPositionFetch,
+    // VkPhysicalDeviceRayTracingValidationFeaturesNV
+    rayTracingValidation,
     // VkPhysicalDeviceRelaxedLineRasterizationFeaturesIMG
     relaxedLineRasterization,
     // VkPhysicalDeviceRenderPassStripedFeaturesARM
@@ -780,6 +788,8 @@ enum class Feature {
     shaderObject,
     // VkPhysicalDeviceShaderQuadControlFeaturesKHR
     shaderQuadControl,
+    // VkPhysicalDeviceShaderReplicatedCompositesFeaturesEXT
+    shaderReplicatedComposites,
     // VkPhysicalDeviceShaderSMBuiltinsFeaturesNV
     shaderSMBuiltins,
     // VkPhysicalDeviceShaderSubgroupExtendedTypesFeatures, VkPhysicalDeviceVulkan12Features

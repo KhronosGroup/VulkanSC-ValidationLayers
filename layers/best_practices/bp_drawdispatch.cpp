@@ -20,43 +20,28 @@
 #include "best_practices/best_practices_validation.h"
 #include "best_practices/best_practices_error_enums.h"
 #include "best_practices/bp_state.h"
+#include "state_tracker/buffer_state.h"
+#include "state_tracker/render_pass_state.h"
 #include <bitset>
 
 // Generic function to handle validation for all CmdDraw* type functions
 bool BestPractices::ValidateCmdDrawType(VkCommandBuffer cmd_buffer, const Location& loc) const {
     bool skip = false;
     const auto cb_state = GetRead<bp_state::CommandBuffer>(cmd_buffer);
-    if (cb_state) {
-        const auto lv_bind_point = ConvertToLvlBindPoint(VK_PIPELINE_BIND_POINT_GRAPHICS);
-        const auto* pipeline_state = cb_state->lastBound[lv_bind_point].pipeline_state;
-        const auto& current_vtx_bfr_binding_info = cb_state->current_vertex_buffer_binding_info.vertex_buffer_bindings;
-
-        // Verify vertex binding
-        if (pipeline_state && pipeline_state->vertex_input_state &&
-            pipeline_state->vertex_input_state->binding_descriptions.size() <= 0) {
-            if ((!current_vtx_bfr_binding_info.empty()) && (!cb_state->vertex_buffer_used)) {
-                skip |=
-                    LogPerformanceWarning(kVUID_BestPractices_DrawState_VtxIndexOutOfBounds, cb_state->Handle(), loc,
-                                          "Vertex buffers are bound to %s but no vertex buffers are attached to %s.",
-                                          FormatHandle(cb_state->Handle()).c_str(), FormatHandle(pipeline_state->Handle()).c_str());
-            }
-        }
-
-        const auto* pipe = cb_state->GetCurrentPipeline(VK_PIPELINE_BIND_POINT_GRAPHICS);
-        if (pipe) {
-            const auto& rp_state = pipe->RenderPassState();
-            if (rp_state) {
-                for (uint32_t i = 0; i < rp_state->createInfo.subpassCount; ++i) {
-                    const auto& subpass = rp_state->createInfo.pSubpasses[i];
-                    const auto* ds_state = pipe->DepthStencilState();
-                    const uint32_t depth_stencil_attachment =
-                        GetSubpassDepthStencilAttachmentIndex(ds_state, subpass.pDepthStencilAttachment);
-                    const auto* raster_state = pipe->RasterizationState();
-                    if ((depth_stencil_attachment == VK_ATTACHMENT_UNUSED) && raster_state &&
-                        raster_state->depthBiasEnable == VK_TRUE) {
-                        skip |= LogWarning(kVUID_BestPractices_DepthBiasNoAttachment, cb_state->Handle(), loc,
-                                           "depthBiasEnable == VK_TRUE without a depth-stencil attachment.");
-                    }
+    const auto* pipe = cb_state->GetCurrentPipeline(VK_PIPELINE_BIND_POINT_GRAPHICS);
+    if (pipe) {
+        const auto& rp_state = pipe->RenderPassState();
+        if (rp_state) {
+            for (uint32_t i = 0; i < rp_state->create_info.subpassCount; ++i) {
+                const auto& subpass = rp_state->create_info.pSubpasses[i];
+                const auto* ds_state = pipe->DepthStencilState();
+                const uint32_t depth_stencil_attachment =
+                    GetSubpassDepthStencilAttachmentIndex(ds_state, subpass.pDepthStencilAttachment);
+                const auto* raster_state = pipe->RasterizationState();
+                if ((depth_stencil_attachment == VK_ATTACHMENT_UNUSED) && raster_state &&
+                    raster_state->depthBiasEnable == VK_TRUE) {
+                    skip |= LogWarning(kVUID_BestPractices_DepthBiasNoAttachment, cb_state->Handle(), loc,
+                                       "depthBiasEnable == VK_TRUE without a depth-stencil attachment.");
                 }
             }
         }
@@ -98,6 +83,12 @@ void BestPractices::RecordCmdDrawType(VkCommandBuffer cmd_buffer, uint32_t draw_
         }
         // No need to touch the same attachments over and over.
         cb_state->render_pass_state.drawTouchAttachments = false;
+    }
+
+    const auto lv_bind_point = ConvertToLvlBindPoint(VK_PIPELINE_BIND_POINT_GRAPHICS);
+    const auto* pipeline_state = cb_state->lastBound[lv_bind_point].pipeline_state;
+    if (pipeline_state && pipeline_state->vertex_input_state && !pipeline_state->vertex_input_state->binding_descriptions.empty()) {
+        cb_state->uses_vertex_buffer = true;
     }
 }
 
@@ -205,13 +196,11 @@ bool BestPractices::ValidateIndexBufferArm(const bp_state::CommandBuffer& cmd_st
     bool skip = false;
 
     // check for sparse/underutilised index buffer, and post-transform cache thrashing
-
-    const auto* ib_state = cmd_state.index_buffer_binding.buffer_state.get();
-    if (ib_state == nullptr || cmd_state.index_buffer_binding.buffer_state->Destroyed()) return skip;
+    const auto ib_state = Get<vvl::Buffer>(cmd_state.index_buffer_binding.buffer);
+    if (!ib_state) return skip;
 
     const VkIndexType ib_type = cmd_state.index_buffer_binding.index_type;
     const auto& ib_mem_state = *ib_state->MemState();
-    const VkDeviceSize ib_mem_offset = ib_mem_state.mapped_range.offset;
     const void* ib_mem = ib_mem_state.p_driver_data;
     bool primitive_restart_enable = false;
 
@@ -219,7 +208,7 @@ bool BestPractices::ValidateIndexBufferArm(const bp_state::CommandBuffer& cmd_st
     const auto& last_bound = cmd_state.lastBound[lv_bind_point];
     const auto* pipeline_state = last_bound.pipeline_state;
 
-    const auto* ia_state = pipeline_state ? pipeline_state->InputAssemblyState() : nullptr;
+    const auto* ia_state = pipeline_state->InputAssemblyState();
     if (ia_state) {
         primitive_restart_enable = ia_state->primitiveRestartEnable == VK_TRUE;
     }
@@ -227,7 +216,7 @@ bool BestPractices::ValidateIndexBufferArm(const bp_state::CommandBuffer& cmd_st
     // no point checking index buffer if the memory is nonexistant/unmapped, or if there is no graphics pipeline bound to this CB
     if (ib_mem && last_bound.IsUsing()) {
         const uint32_t scan_stride = GetIndexAlignment(ib_type);
-        const uint8_t* scan_begin = static_cast<const uint8_t*>(ib_mem) + ib_mem_offset + firstIndex * scan_stride;
+        const uint8_t* scan_begin = static_cast<const uint8_t*>(ib_mem) + firstIndex * scan_stride;
         const uint8_t* scan_end = scan_begin + indexCount * scan_stride;
 
         // Min and max are important to track for some Mali architectures. In older Mali devices without IDVS, all
@@ -690,4 +679,16 @@ void BestPractices::PreCallRecordCmdDispatchIndirect(VkCommandBuffer commandBuff
                                                      const RecordObject& record_obj) {
     const auto cb_state = GetWrite<bp_state::CommandBuffer>(commandBuffer);
     ValidateBoundDescriptorSets(*cb_state, VK_PIPELINE_BIND_POINT_COMPUTE, record_obj.location.function);
+}
+
+bool BestPractices::PreCallValidateEndCommandBuffer(VkCommandBuffer commandBuffer, const ErrorObject& error_obj) const {
+    bool skip = false;
+    const auto cb_state = GetRead<bp_state::CommandBuffer>(commandBuffer);
+
+    if (!cb_state->current_vertex_buffer_binding_info.empty() && !cb_state->uses_vertex_buffer) {
+        skip |= LogPerformanceWarning(kVUID_BestPractices_DrawState_VtxIndexOutOfBounds, cb_state->Handle(), error_obj.location,
+                                      "Vertex buffers was bound to %s but no draws had a pipeline that used the vertex buffer.",
+                                      FormatHandle(cb_state->Handle()).c_str());
+    }
+    return skip;
 }

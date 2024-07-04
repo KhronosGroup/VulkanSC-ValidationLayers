@@ -19,7 +19,7 @@
 #include "../framework/pipeline_helper.h"
 
 // Tests for AMD-specific best practices
-const char* kEnableAMDValidation = "VALIDATION_CHECK_ENABLE_VENDOR_SPECIFIC_AMD";
+const char *kEnableAMDValidation = "VALIDATION_CHECK_ENABLE_VENDOR_SPECIFIC_AMD";
 
 // this is a very long test (~10 minutes)
 // disabled for now
@@ -44,9 +44,8 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_TooManyPipelines) {
                                                  "BestPractices-vkCreatePipelines-multiple-pipelines-caches");
         }
         CreatePipelineHelper pipe(*this);
-        pipe.InitState();
         pipe.CreateGraphicsPipeline();
-        pipeline_Array[i] = pipe.pipeline_;
+        pipeline_Array[i] = pipe.Handle();
         if (i == 1) {
             // change check to too many pipelines
             m_errorMonitor->VerifyFound();
@@ -230,7 +229,6 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_PrimitiveRestart) {
     m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-CreatePipelines-AvoidPrimitiveRestart");
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitState();
     pipe.ia_ci_.primitiveRestartEnable = true;
     pipe.CreateGraphicsPipeline();
 
@@ -259,7 +257,6 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_NumDynamicStates) {
     dynamic_state_info.pDynamicStates = dynamic_states_array;
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitState();
     pipe.dyn_state_ci_ = dynamic_state_info;
     pipe.CreateGraphicsPipeline();
 
@@ -350,8 +347,8 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_CopyingDescriptors) {
     alloc_info.descriptorSetCount = 1;
     alloc_info.descriptorPool = ds_pool.handle();
     alloc_info.pSetLayouts = &ds_layout.handle();
-    vk::AllocateDescriptorSets(m_device->device(), &alloc_info, &descriptor_sets[0]);
-    vk::AllocateDescriptorSets(m_device->device(), &alloc_info, &descriptor_sets[1]);
+    vk::AllocateDescriptorSets(device(), &alloc_info, &descriptor_sets[0]);
+    vk::AllocateDescriptorSets(device(), &alloc_info, &descriptor_sets[1]);
 
     VkCopyDescriptorSet copy_info = {};
     copy_info.sType = VK_STRUCTURE_TYPE_COPY_DESCRIPTOR_SET;
@@ -392,9 +389,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_ClearImage) {
                                       0,
                                       nullptr,
                                       VK_IMAGE_LAYOUT_UNDEFINED};
-        VkImageObj image_1D(m_device);
-        image_1D.init(&img_info);
-        ASSERT_TRUE(image_1D.initialized());
+        vkt::Image image_1D(*m_device, img_info, vkt::set_layout);
 
         m_commandBuffer->begin();
         image_1D.SetLayout(m_commandBuffer, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
@@ -414,7 +409,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_ClearImage) {
         m_commandBuffer->end();
     }
 
-    vk::ResetCommandPool(device(), m_commandPool->handle(), 0);
+    vk::ResetCommandPool(device(), m_command_pool.handle(), 0);
 
     {
         VkImageCreateInfo img_info = {VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
@@ -432,9 +427,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_ClearImage) {
                                       0,
                                       nullptr,
                                       VK_IMAGE_LAYOUT_UNDEFINED};
-        VkImageObj image_1D(m_device);
-        image_1D.init(&img_info);
-        ASSERT_TRUE(image_1D.initialized());
+        vkt::Image image_1D(*m_device, img_info, vkt::set_layout);
 
         m_commandBuffer->begin();
         image_1D.SetLayout(m_commandBuffer, VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT,
@@ -477,15 +470,12 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_ImageToImageCopy) {
                                   0,
                                   nullptr,
                                   VK_IMAGE_LAYOUT_UNDEFINED};
-    VkImageObj image1D_1(m_device);
-    image1D_1.init(&img_info);
-    ASSERT_TRUE(image1D_1.initialized());
+    vkt::Image image1D_1(*m_device, img_info, vkt::set_layout);
 
     img_info.tiling = VK_IMAGE_TILING_LINEAR;
-    img_info.usage = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-
-    VkImageObj image_1D_2(m_device);
-    image_1D_2.init(&img_info);
+    img_info.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    img_info.initialLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    vkt::Image image_1D_2(*m_device, img_info, vkt::set_layout);
     if (!image_1D_2.initialized()) {
         GTEST_SKIP() << "Could not initilize Linear image, skipping image to image copy test";
     }
@@ -527,13 +517,12 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_GeneralLayout) {
                                   0,
                                   nullptr,
                                   VK_IMAGE_LAYOUT_UNDEFINED};
-    VkImageObj image_1D(m_device);
-
     m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-vkImage-AvoidGeneral");
     m_errorMonitor->SetAllowedFailureMsg("BestPractices-VkCommandBuffer-AvoidTinyCmdBuffers");
 
     // the init function initializes to general layout
-    image_1D.init(&img_info);
+    vkt::Image image_1D(*m_device, img_info);
+    image_1D.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
 
     m_errorMonitor->VerifyFound();
 }
@@ -588,9 +577,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_Barriers) {
         0,
         nullptr,
         VK_IMAGE_LAYOUT_UNDEFINED};
-    VkImageObj image_1D(m_device);
-    image_1D.init(&img_info);
-    ASSERT_TRUE(image_1D.initialized());
+    vkt::Image image_1D(*m_device, img_info, vkt::set_layout);
 
     m_commandBuffer->begin();
     // check for read-to-read barrier
@@ -643,9 +630,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_NumberOfSubmissions) {
                                   0,
                                   nullptr,
                                   VK_IMAGE_LAYOUT_UNDEFINED};
-    VkImageObj image_1D(m_device);
-    image_1D.init(&img_info);
-    ASSERT_TRUE(image_1D.initialized());
+    vkt::Image image_1D(*m_device, img_info);
 
     uint32_t warn_limit = 11;
 
@@ -721,12 +706,11 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_SecondaryCmdBuffer) {
     vkt::Buffer vertex_buffer(*m_device, 64, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
     CreatePipelineHelper pipe(*this);
-    pipe.pipe_ms_state_ci_ = pipe_ms_state_ci;
-    pipe.InitState();
+    pipe.ms_ci_ = pipe_ms_state_ci;
     pipe.CreateGraphicsPipeline();
 
     vkt::CommandPool pool(*m_device, m_device->graphics_queue_node_index_);
-    vkt::CommandBuffer secondary_cmd_buf(m_device, &pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+    vkt::CommandBuffer secondary_cmd_buf(*m_device, pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
 
     VkCommandBufferInheritanceInfo iinfo = vku::InitStructHelper();
     iinfo.renderPass = m_renderPassBeginInfo.renderPass;
@@ -737,7 +721,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_SecondaryCmdBuffer) {
     // record a secondary command buffer
     secondary_cmd_buf.begin(&binfo);
 
-    vk::CmdBindPipeline(secondary_cmd_buf.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_);
+    vk::CmdBindPipeline(secondary_cmd_buf.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
     VkDeviceSize offset = 0;
     vk::CmdBindVertexBuffers(secondary_cmd_buf.handle(), 0, 1, &vertex_buffer.handle(), &offset);
     vk::CmdDraw(secondary_cmd_buf.handle(), 1, 0, 0, 0);
@@ -775,16 +759,6 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_ComputeWorkgroupSize) {
     RETURN_IF_SKIP(InitBestPracticesFramework(kEnableAMDValidation));
     RETURN_IF_SKIP(InitState());
 
-    CreateComputePipelineHelper pipe(*this);
-
-    auto make_pipeline_with_shader = [=](CreateComputePipelineHelper& pipe, const VkPipelineShaderStageCreateInfo& stage) {
-        pipe.InitState();
-        pipe.cp_ci_.stage = stage;
-        pipe.dsl_bindings_ = {};
-        pipe.cp_ci_.layout = pipe.pipeline_layout_.handle();
-        pipe.CreateComputePipeline(false);
-    };
-
     // workgroup size = 4
     {
         VkShaderObj compute_4_1_1(this,
@@ -793,9 +767,10 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_ComputeWorkgroupSize) {
                                   "layout(local_size_x = 4, local_size_y = 1, local_size_z = 1) in;\n\n"
                                   "void main() {}\n",
                                   VK_SHADER_STAGE_COMPUTE_BIT);
-        m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT,
-                                             "BestPractices-LocalWorkgroup-Multiple64");
-        make_pipeline_with_shader(pipe, compute_4_1_1.GetStageCreateInfo());
+        m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-LocalWorkgroup-Multiple64");
+        CreateComputePipelineHelper pipe(*this);
+        pipe.cp_ci_.stage = compute_4_1_1.GetStageCreateInfo();
+        pipe.CreateComputePipeline();
         m_errorMonitor->VerifyFound();
     }
 
@@ -807,7 +782,9 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_ComputeWorkgroupSize) {
                                   "layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;\n\n"
                                   "void main() {}\n",
                                   VK_SHADER_STAGE_COMPUTE_BIT);
-        make_pipeline_with_shader(pipe, compute_8_8_1.GetStageCreateInfo());
+        CreateComputePipelineHelper pipe(*this);
+        pipe.cp_ci_.stage = compute_8_8_1.GetStageCreateInfo();
+        pipe.CreateComputePipeline();
     }
 
     // workgroup size = 128
@@ -818,6 +795,8 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_ComputeWorkgroupSize) {
                                    "layout(local_size_x = 16, local_size_y = 8, local_size_z = 1) in;\n\n"
                                    "void main() {}\n",
                                    VK_SHADER_STAGE_COMPUTE_BIT);
-        make_pipeline_with_shader(pipe, compute_16_8_1.GetStageCreateInfo());
+        CreateComputePipelineHelper pipe(*this);
+        pipe.cp_ci_.stage = compute_16_8_1.GetStageCreateInfo();
+        pipe.CreateComputePipeline();
     }
 }

@@ -39,6 +39,7 @@
 #include "vulkansc/sc_vuid_enums.h"
 #include "vulkansc/core_checks/sc_core_validation.h"
 #include "vulkansc/state_tracker/sc_pipeline_state.h"
+#include "state_tracker/shader_module.h"
 #include "utils/vk_layer_utils.h"
 #include "generated/enum_flag_bits.h"
 
@@ -57,7 +58,7 @@ bool SCCoreChecks::ValidatePipelineCacheSpirv(VkPhysicalDevice physical_device, 
         return false;
     }
 
-    if (stage_info->codeSize % 4 != 0) {
+    if (SafeModulo(stage_info->codeSize, 4) != 0) {
         skip |= LogError(kVUID_SC_PipelineCacheData_CodeSizeNotMultipleOfFour, physical_device, loc.dot(Field::pInitialData),
                          "contains pipeline identifier {%s} with invalid SPIR-V module data for stage "
                          "index entry #%u that cannot be validated as its codeSize (%" PRIu64 ") is not a multiple of 4.",
@@ -79,44 +80,76 @@ bool SCCoreChecks::ValidatePipelineCacheSpirv(VkPhysicalDevice physical_device, 
     } else {
         auto code = entry.StageSPIRV(stage_index);
 
+        if (code.size() <= 1) {
+            skip |= LogError("VUID-VkShaderModuleCreateInfo-pCode-08736", device, loc.dot(Field::pInitialData),
+                            "contains pipeline identifier {%s} with SPIR-V module data for"
+                            "index entry #%u that contains an invalid header (too small).",
+                            id.toString().c_str(), stage_index);
+        }
+
+        if (code[0] != spv::MagicNumber) {
+            skip |= LogError("VUID-VkShaderModuleCreateInfo-pCode-08736", device, loc.dot(Field::pInitialData),
+                            "contains pipeline identifier {%s} with SPIR-V module data for"
+                            "index entry #%u that contains an invalid header (incorrect magic number).",
+                            id.toString().c_str(), stage_index);
+        }
+
+        // We cannot perform SPIR-V "stateless" validation during vkCreateDevice validation because the
+        // needed state (populated device feature and property information) is not yet available
+        if (loc.function == Func::vkCreateDevice) {
+            return skip;
+        }
+
         uint32_t hash = 0;
         auto cache = CastFromHandle<ValidationCache*>(core_validation_cache);
+        bool validate_spirv = true;
         if (cache) {
             hash = hash_util::ShaderHash(code.data(), code.size() * sizeof(uint32_t));
-            if (cache->Contains(hash)) {
-                return false;
+        if (cache->Contains(hash)) {
+                validate_spirv = false;
             }
         }
 
-        // Use SPIRV-Tools validator to try and catch any issues with the module itself. If specialization constants are present,
-        // the default values will be used during validation.
-        spv_target_env spirv_environment = PickSpirvEnv(api_version, IsExtEnabled(device_extensions.vk_khr_spirv_1_4));
-        spv_context ctx = spvContextCreate(spirv_environment);
-        spv_const_binary_t binary{code.data(), code.size()};
-        spv_diagnostic diag = nullptr;
-        spvtools::ValidatorOptions options;
-        AdjustValidatorOptions(device_extensions, enabled_features, options);
-        spv_valid = spvValidateWithOptions(ctx, options, &binary, &diag);
-        if (spv_valid != SPV_SUCCESS) {
-            if (spv_valid == SPV_WARNING) {
-                skip |= LogWarning("VUID-VkShaderModuleCreateInfo-pCode-08737", physical_device, loc.dot(Field::pInitialData),
-                                   "contains pipeline identifier {%s} with SPIR-V module data for stage "
-                                   "index entry #%u that produced spirv-val warning:\n%s",
-                                   id.toString().c_str(), stage_index, diag && diag->error ? diag->error : "(no error text)");
+        if (validate_spirv) {
+            // Use SPIRV-Tools validator to try and catch any issues with the module itself. If specialization constants are present,
+            // the default values will be used during validation.
+            spv_target_env spirv_environment = PickSpirvEnv(api_version, IsExtEnabled(device_extensions.vk_khr_spirv_1_4));
+            spv_context ctx = spvContextCreate(spirv_environment);
+            spv_const_binary_t binary{code.data(), code.size()};
+            spv_diagnostic diag = nullptr;
+            spvtools::ValidatorOptions options;
+            AdjustValidatorOptions(device_extensions, enabled_features, options);
+            spv_valid = spvValidateWithOptions(ctx, options, &binary, &diag);
+            if (spv_valid != SPV_SUCCESS) {
+                if (spv_valid == SPV_WARNING) {
+                    skip |= LogWarning("VUID-VkShaderModuleCreateInfo-pCode-08737", physical_device, loc.dot(Field::pInitialData),
+                                    "contains pipeline identifier {%s} with SPIR-V module data for stage "
+                                    "index entry #%u that produced spirv-val warning:\n%s",
+                                    id.toString().c_str(), stage_index, diag && diag->error ? diag->error : "(no error text)");
+                } else {
+                    skip |= LogError("VUID-VkShaderModuleCreateInfo-pCode-08737", physical_device, loc.dot(Field::pInitialData),
+                                    "contains pipeline identifier {%s} with SPIR-V module data for stage "
+                                    "index entry #%u that produced spirv-val error:\n%s",
+                                    id.toString().c_str(), stage_index, diag && diag->error ? diag->error : "(no error text)");
+                }
             } else {
-                skip |= LogError("VUID-VkShaderModuleCreateInfo-pCode-08737", physical_device, loc.dot(Field::pInitialData),
-                                 "contains pipeline identifier {%s} with SPIR-V module data for stage "
-                                 "index entry #%u that produced spirv-val error:\n%s",
-                                 id.toString().c_str(), stage_index, diag && diag->error ? diag->error : "(no error text)");
+                if (cache) {
+                    cache->Insert(hash);
+                }
             }
-        } else {
-            if (cache) {
-                cache->Insert(hash);
-            }
+
+            spvDiagnosticDestroy(diag);
+            spvContextDestroy(ctx);
         }
 
-        spvDiagnosticDestroy(diag);
-        spvContextDestroy(ctx);
+        if (spv_valid == SPV_SUCCESS || spv_valid == SPV_WARNING) {
+            spirv::StatelessData stateless_data{};
+            spirv::Module temp_module(code.size() * sizeof(uint32_t), code.data(), &stateless_data);
+
+            // We set the entry point name to vkCreateShaderModule here to trigger the vkCreateShaderModule
+            // VUIDs instead of the vkCreateShadersEXT VUIDs introduced by VK_EXT_shader_objects
+            skip |= ValidateSpirvStateless(temp_module, stateless_data, Location(Func::vkCreateShaderModule));
+        }
     }
 
     return skip;
@@ -195,7 +228,7 @@ bool SCCoreChecks::ValidatePipelineShaderStage(const StageCreateInfo& stage_crea
 
     const spirv::Module& module_state = *stage_state.spirv_state.get();
 
-    if (!module_state.static_data_.atomic_inst.empty() && (enabled_features.shaderAtomicInstructions == VK_FALSE)) {
+    if (!module_state.static_data_.atomic_pointer_ids.empty() && (enabled_features.shaderAtomicInstructions == VK_FALSE)) {
         skip |= LogError("VUID-RuntimeSpirv-OpAtomic-05091", module_state.handle(), loc,
                          "SPIR-V is using atomic instructions, but shaderAtomicInstructions was not enabled.");
     }

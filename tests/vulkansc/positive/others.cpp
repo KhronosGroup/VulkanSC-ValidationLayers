@@ -39,17 +39,15 @@ TEST_F(VkSCPositiveRemoved, CopyBetween2DAnd3DImage) {
     create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
     create_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
-    VkImageObj image2D(m_device);
     create_info.imageType = VK_IMAGE_TYPE_2D;
     create_info.extent = {64, 64, 1};
     create_info.arrayLayers = 10;
-    image2D.Init(create_info);
+    vkt::Image image2D(*m_device, create_info);
 
-    VkImageObj image3D(m_device);
     create_info.imageType = VK_IMAGE_TYPE_3D;
     create_info.extent = {16, 16, 16};
     create_info.arrayLayers = 1;
-    image3D.Init(create_info);
+    vkt::Image image3D(*m_device, create_info);
 
     VkImageCopy region{};
 
@@ -94,17 +92,14 @@ TEST_F(VkSCPositiveRemoved, CopyImagePlane) {
     create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
     create_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
-    VkImageObj imageR8(m_device);
     create_info.format = VK_FORMAT_R8_UNORM;
-    imageR8.Init(create_info);
+    vkt::Image imageR8(*m_device, create_info);
 
-    VkImageObj imageR8G8(m_device);
     create_info.format = VK_FORMAT_R8G8_UNORM;
-    imageR8G8.Init(create_info);
+    vkt::Image imageR8G8(*m_device, create_info);
 
-    VkImageObj imageNV12(m_device);
     create_info.format = VK_FORMAT_G8_B8R8_2PLANE_420_UNORM;
-    imageNV12.Init(create_info);
+    vkt::Image imageNV12(*m_device, create_info);
 
     VkImageCopy region{};
     region.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};

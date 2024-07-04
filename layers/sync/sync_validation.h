@@ -74,8 +74,6 @@ class SyncValidator : public ValidationStateTracker, public SyncStageAccess {
 
     void UpdateSyncImageMemoryBindState(uint32_t count, const VkBindImageMemoryInfo *infos);
 
-    const QueueSyncState *GetQueueSyncState(VkQueue queue) const;
-    QueueSyncState *GetQueueSyncState(VkQueue queue);
     std::shared_ptr<const QueueSyncState> GetQueueSyncStateShared(VkQueue queue) const;
     std::shared_ptr<QueueSyncState> GetQueueSyncStateShared(VkQueue queue);
     QueueId GetQueueIdLimit() const { return queue_id_limit_; }
@@ -112,7 +110,7 @@ class SyncValidator : public ValidationStateTracker, public SyncStageAccess {
     void RecordCmdEndRenderPass(VkCommandBuffer commandBuffer, const VkSubpassEndInfo *pSubpassEndInfo, Func command);
     bool SupressedBoundDescriptorWAW(const HazardResult &hazard) const;
 
-    void CreateDevice(const VkDeviceCreateInfo *pCreateInfo) override;
+    void CreateDevice(const VkDeviceCreateInfo *pCreateInfo, const Location &loc) override;
 
     bool ValidateBeginRenderPass(VkCommandBuffer commandBuffer, const VkRenderPassBeginInfo *pRenderPassBegin,
                                  const VkSubpassBeginInfo *pSubpassBeginInfo, const ErrorObject &error_obj) const;

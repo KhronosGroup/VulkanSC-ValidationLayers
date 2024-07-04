@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (c) 2015-2023 Google, Inc.
+ * Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (c) 2015-2024 Google, Inc.
  * Modifications Copyright (C) 2020 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,72 +19,123 @@
 #include "../framework/pipeline_helper.h"
 #include "../framework/descriptor_helper.h"
 
-TEST_F(NegativeShaderLimits, MaxSampleMaskWords) {
+TEST_F(NegativeShaderLimits, MaxSampleMaskWordsInput) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
     TEST_DESCRIPTION("Test limit of maxSampleMaskWords.");
-
-    RETURN_IF_SKIP(InitFramework());
-    PFN_vkSetPhysicalDeviceLimitsEXT fpvkSetPhysicalDeviceLimitsEXT = nullptr;
-    PFN_vkGetOriginalPhysicalDeviceLimitsEXT fpvkGetOriginalPhysicalDeviceLimitsEXT = nullptr;
-    if (!LoadDeviceProfileLayer(fpvkSetPhysicalDeviceLimitsEXT, fpvkGetOriginalPhysicalDeviceLimitsEXT)) {
-        GTEST_SKIP() << "Failed to load device profile layer.";
-    }
-
-    // Set limit to match with hardcoded values in shaders
-    VkPhysicalDeviceProperties props;
-    fpvkGetOriginalPhysicalDeviceLimitsEXT(gpu(), &props.limits);
-    props.limits.maxSampleMaskWords = 3;
-    fpvkSetPhysicalDeviceLimitsEXT(gpu(), &props.limits);
-
-    RETURN_IF_SKIP(InitState());
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    // Valid input of sample mask
-    char const *validSource = R"glsl(
-        #version 450
-        layout(location = 0) out vec4 uFragColor;
-        void main(){
-           int x = gl_SampleMaskIn[2];
-           int y = gl_SampleMaskIn[0];
-           uFragColor = vec4(0,1,0,1) * x * y;
-        }
-    )glsl";
-    VkShaderObj fsValid(this, validSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    if (m_device->phy().limits_.maxSampleMaskWords > 1) {
+        GTEST_SKIP() << "maxSampleMaskWords is greater than 1";
+    }
 
-    const auto validPipeline = [&](CreatePipelineHelper &helper) {
-        helper.shader_stages_ = {helper.vs_->GetStageCreateInfo(), fsValid.GetStageCreateInfo()};
-    };
-    CreatePipelineHelper::OneshotTest(*this, validPipeline, kErrorBit);
-
-    // Exceed sample mask input array size
-    char const *inputSource = R"glsl(
-        #version 450
-        layout(location = 0) out vec4 uFragColor;
-        void main(){
-           int x = gl_SampleMaskIn[3];
-           uFragColor = vec4(0,1,0,1) * x;
-        }
-    )glsl";
-    VkShaderObj fsInput(this, inputSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    // layout(location = 0) out vec4 uFragColor;
+    // void main(){
+    //     int x = gl_SampleMaskIn[3]; // Exceed sample mask input array size
+    //     uFragColor = vec4(0,1,0,1) * x;
+    // }
+    char const *source = R"(
+               OpCapability Shader
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %main "main" %gl_SampleMaskIn %uFragColor
+               OpExecutionMode %main OriginUpperLeft
+               OpDecorate %gl_SampleMaskIn Flat
+               OpDecorate %gl_SampleMaskIn BuiltIn SampleMask
+               OpDecorate %uFragColor Location 0
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+        %int = OpTypeInt 32 1
+%_ptr_Function_int = OpTypePointer Function %int
+       %uint = OpTypeInt 32 0
+     %uint_4 = OpConstant %uint 4
+%_arr_int_uint_4 = OpTypeArray %int %uint_4
+%_ptr_Input__arr_int_uint_4 = OpTypePointer Input %_arr_int_uint_4
+%gl_SampleMaskIn = OpVariable %_ptr_Input__arr_int_uint_4 Input
+      %int_3 = OpConstant %int 3
+%_ptr_Input_int = OpTypePointer Input %int
+      %float = OpTypeFloat 32
+    %v4float = OpTypeVector %float 4
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+ %uFragColor = OpVariable %_ptr_Output_v4float Output
+    %float_0 = OpConstant %float 0
+    %float_1 = OpConstant %float 1
+         %24 = OpConstantComposite %v4float %float_0 %float_1 %float_0 %float_1
+       %main = OpFunction %void None %3
+          %5 = OpLabel
+          %x = OpVariable %_ptr_Function_int Function
+         %16 = OpAccessChain %_ptr_Input_int %gl_SampleMaskIn %int_3
+         %17 = OpLoad %int %16
+               OpStore %x %17
+         %25 = OpLoad %int %x
+         %26 = OpConvertSToF %float %25
+         %27 = OpVectorTimesScalar %v4float %24 %26
+               OpStore %uFragColor %27
+               OpReturn
+               OpFunctionEnd
+    )";
+    VkShaderObj fs(this, source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
 
     const auto inputPipeline = [&](CreatePipelineHelper &helper) {
-        helper.shader_stages_ = {helper.vs_->GetStageCreateInfo(), fsInput.GetStageCreateInfo()};
+        helper.shader_stages_ = {helper.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
     };
     CreatePipelineHelper::OneshotTest(*this, inputPipeline, kErrorBit,
                                       "VUID-VkPipelineShaderStageCreateInfo-maxSampleMaskWords-00711");
+}
 
-    // Exceed sample mask output array size
-    char const *outputSource = R"glsl(
-        #version 450
-        layout(location = 0) out vec4 uFragColor;
-        void main(){
-           gl_SampleMask[3] = 1;
-           uFragColor = vec4(0,1,0,1);
-        }
-    )glsl";
-    VkShaderObj fsOutput(this, outputSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+TEST_F(NegativeShaderLimits, MaxSampleMaskWordsOutput) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
+    TEST_DESCRIPTION("Test limit of maxSampleMaskWords.");
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    if (m_device->phy().limits_.maxSampleMaskWords > 1) {
+        GTEST_SKIP() << "maxSampleMaskWords is greater than 1";
+    }
+
+    // layout(location = 0) out vec4 uFragColor;
+    // void main(){
+    //    gl_SampleMask[3] = 1; // Exceed sample mask output array size
+    //    uFragColor = vec4(0,1,0,1);
+    // }
+    char const *source = R"(
+               OpCapability Shader
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %main "main" %gl_SampleMask %uFragColor
+               OpExecutionMode %main OriginUpperLeft
+               OpDecorate %gl_SampleMask BuiltIn SampleMask
+               OpDecorate %uFragColor Location 0
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+        %int = OpTypeInt 32 1
+       %uint = OpTypeInt 32 0
+     %uint_4 = OpConstant %uint 4
+%_arr_int_uint_4 = OpTypeArray %int %uint_4
+%_ptr_Output__arr_int_uint_4 = OpTypePointer Output %_arr_int_uint_4
+%gl_SampleMask = OpVariable %_ptr_Output__arr_int_uint_4 Output
+      %int_3 = OpConstant %int 3
+      %int_1 = OpConstant %int 1
+%_ptr_Output_int = OpTypePointer Output %int
+      %float = OpTypeFloat 32
+    %v4float = OpTypeVector %float 4
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+ %uFragColor = OpVariable %_ptr_Output_v4float Output
+    %float_0 = OpConstant %float 0
+    %float_1 = OpConstant %float 1
+         %22 = OpConstantComposite %v4float %float_0 %float_1 %float_0 %float_1
+       %main = OpFunction %void None %3
+          %5 = OpLabel
+         %15 = OpAccessChain %_ptr_Output_int %gl_SampleMask %int_3
+               OpStore %15 %int_1
+               OpStore %uFragColor %22
+               OpReturn
+               OpFunctionEnd
+    )";
+    VkShaderObj fs(this, source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
 
     const auto outputPipeline = [&](CreatePipelineHelper &helper) {
-        helper.shader_stages_ = {helper.vs_->GetStageCreateInfo(), fsOutput.GetStageCreateInfo()};
+        helper.shader_stages_ = {helper.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
     };
     CreatePipelineHelper::OneshotTest(*this, outputPipeline, kErrorBit,
                                       "VUID-VkPipelineShaderStageCreateInfo-maxSampleMaskWords-00711");
@@ -153,24 +204,10 @@ TEST_F(NegativeShaderLimits, MinAndMaxTexelGatherOffset) {
                OpFunctionEnd
         )";
 
-    OneOffDescriptorSet descriptor_set(m_device,
-                                       {
-                                           {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
-                                       });
-
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-OpImage-06376");
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-OpImage-06377");
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-OpImage-06377");
     auto cs = VkShaderObj::CreateFromASM(this, spv_source, VK_SHADER_STAGE_COMPUTE_BIT);
-
-    CreateComputePipelineHelper cs_pipeline(*this);
-    cs_pipeline.cs_ = std::move(cs);
-    cs_pipeline.InitState();
-    cs_pipeline.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&descriptor_set.layout_});
-    cs_pipeline.LateBindPipelineInfo();
-    // as commented in SPIR-V should trigger the limits as following
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-RuntimeSpirv-OpImage-06376");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-RuntimeSpirv-OpImage-06377");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-RuntimeSpirv-OpImage-06377");
-    cs_pipeline.CreateComputePipeline(false);  // need false to prevent late binding
-
     m_errorMonitor->VerifyFound();
 }
 
@@ -235,29 +272,13 @@ TEST_F(NegativeShaderLimits, MinAndMaxTexelOffset) {
                OpFunctionEnd
         )";
 
-    OneOffDescriptorSet descriptor_set(m_device,
-                                       {
-                                           {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
-                                       });
-
-    VkShaderObj const fs(this, spv_source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
-
-    CreatePipelineHelper pipe(*this);
-    pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
-    pipe.InitState();
-    pipe.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&descriptor_set.layout_});
-    // as commented in SPIR-V should trigger the limits as following
-    //
     // OpImageSampleImplicitLod
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-RuntimeSpirv-OpImageSample-06435");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-RuntimeSpirv-OpImageSample-06436");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-RuntimeSpirv-OpImageSample-06436");
-    // // OpImageFetch
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-RuntimeSpirv-OpImageSample-06435");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-RuntimeSpirv-OpImageSample-06436");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-RuntimeSpirv-OpImageSample-06436");
-    pipe.CreateGraphicsPipeline();
-
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-OpImageSample-06435");
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-OpImageSample-06436", 2);
+    // OpImageFetch
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-OpImageSample-06435");
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-OpImageSample-06436", 2);
+    VkShaderObj const fs(this, spv_source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
     m_errorMonitor->VerifyFound();
 }
 
@@ -302,18 +323,17 @@ TEST_F(NegativeShaderLimits, DISABLED_MaxFragmentDualSrcAttachments) {
     cb_attachments.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
     cb_attachments.alphaBlendOp = VK_BLEND_OP_ADD;
 
-    CreatePipelineHelper pipe(*this, count);
-    pipe.cb_attachments_[0] = cb_attachments;
+    CreatePipelineHelper pipe(*this);
+    pipe.cb_ci_.pAttachments = &cb_attachments;
     pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
-    pipe.InitState();
     pipe.CreateGraphicsPipeline();
 
     m_commandBuffer->begin();
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
 
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-RuntimeSpirv-Fragment-06427");
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-Fragment-06427");
     vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
     m_errorMonitor->VerifyFound();
 
@@ -372,9 +392,8 @@ TEST_F(NegativeShaderLimits, OffsetMaxComputeSharedMemorySize) {
     CreateComputePipelineHelper pipe(*this);
     pipe.cs_ = std::make_unique<VkShaderObj>(this, csSource.str().c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2,
                                              SPV_SOURCE_ASM);
-    pipe.InitState();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-RuntimeSpirv-Workgroup-06530");
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-Workgroup-06530");
     pipe.CreateComputePipeline();
     m_errorMonitor->VerifyFound();
 }

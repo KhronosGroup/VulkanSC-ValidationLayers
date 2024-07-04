@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2023 Valve Corporation
- * Copyright (c) 2023 LunarG, Inc.
+ * Copyright (c) 2023-2024 Valve Corporation
+ * Copyright (c) 2023-2024 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,7 +34,6 @@ class RayTracingPipelineHelper {
     VkRayTracingPipelineCreateInfoKHR rp_ci_KHR_ = {};
     VkPipelineCacheCreateInfo pc_ci_ = {};
     std::optional<VkRayTracingPipelineInterfaceCreateInfoKHR> rp_i_ci_;
-    VkPipeline pipeline_ = VK_NULL_HANDLE;
     VkPipelineCache pipeline_cache_ = VK_NULL_HANDLE;
     std::vector<VkRayTracingShaderGroupCreateInfoNV> groups_;
     std::vector<VkRayTracingShaderGroupCreateInfoKHR> groups_KHR_;
@@ -47,6 +46,7 @@ class RayTracingPipelineHelper {
     RayTracingPipelineHelper(VkLayerTest& test);
     ~RayTracingPipelineHelper();
 
+    const VkPipeline& Handle() const { return pipeline_; }
     void InitShaderGroups();
     void InitDescriptorSetInfo();
     void InitDescriptorSetInfoKHR();
@@ -56,7 +56,6 @@ class RayTracingPipelineHelper {
     void AddLibrary(const RayTracingPipelineHelper& library);
     void InitPipelineCacheInfo();
     void InitInfo();
-    void InitState();
     void InitPipelineCache();
     void LateBindPipelineInfo(bool isKHR = false);
     VkResult CreateNVRayTracingPipeline(bool do_late_bind = true);
@@ -69,7 +68,6 @@ class RayTracingPipelineHelper {
                             const VkFlags flags = kErrorBit) {
         RayTracingPipelineHelper helper(test);
         info_override(helper);
-        helper.InitState();
 
         for (const auto& error : errors) test.Monitor().SetDesiredFailureMsg(flags, error);
         helper.CreateNVRayTracingPipeline();
@@ -85,10 +83,12 @@ class RayTracingPipelineHelper {
     static void OneshotPositiveTest(Test& test, const OverrideFunc& info_override, const VkFlags message_flag_mask = kErrorBit) {
         RayTracingPipelineHelper helper(test);
         info_override(helper);
-        helper.InitState();
 
         ASSERT_EQ(VK_SUCCESS, helper.CreateNVRayTracingPipeline());
     }
+
+  private:
+    VkPipeline pipeline_ = VK_NULL_HANDLE;
 };
 
 // DEPRECATED: This is part of the legacy ray tracing framework, now only used in the old nvidia ray tracing extension tests.

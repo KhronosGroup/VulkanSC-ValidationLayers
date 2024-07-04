@@ -2727,6 +2727,20 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
             return {&vk_struct->sampler2DViewOf3D, "VkPhysicalDeviceImage2DViewOf3DFeaturesEXT::sampler2DViewOf3D"};
         }
+        case Feature::imageAlignmentControl: {
+            auto vk_struct = const_cast<VkPhysicalDeviceImageAlignmentControlFeaturesMESA *>(
+                vku::FindStructInPNextChain<VkPhysicalDeviceImageAlignmentControlFeaturesMESA>(*inout_pnext_chain));
+            if (!vk_struct) {
+                vk_struct = new VkPhysicalDeviceImageAlignmentControlFeaturesMESA;
+                *vk_struct = vku::InitStructHelper();
+                if (*inout_pnext_chain) {
+                    vvl::PnextChainAdd(*inout_pnext_chain, vk_struct);
+                } else {
+                    *inout_pnext_chain = vk_struct;
+                }
+            }
+            return {&vk_struct->imageAlignmentControl, "VkPhysicalDeviceImageAlignmentControlFeaturesMESA::imageAlignmentControl"};
+        }
         case Feature::imageCompressionControl: {
             auto vk_struct = const_cast<VkPhysicalDeviceImageCompressionControlFeaturesEXT *>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceImageCompressionControlFeaturesEXT>(*inout_pnext_chain));
@@ -3014,6 +3028,21 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
                 }
             }
             return {&vk_struct->legacyDithering, "VkPhysicalDeviceLegacyDitheringFeaturesEXT::legacyDithering"};
+        }
+        case Feature::legacyVertexAttributes: {
+            auto vk_struct = const_cast<VkPhysicalDeviceLegacyVertexAttributesFeaturesEXT *>(
+                vku::FindStructInPNextChain<VkPhysicalDeviceLegacyVertexAttributesFeaturesEXT>(*inout_pnext_chain));
+            if (!vk_struct) {
+                vk_struct = new VkPhysicalDeviceLegacyVertexAttributesFeaturesEXT;
+                *vk_struct = vku::InitStructHelper();
+                if (*inout_pnext_chain) {
+                    vvl::PnextChainAdd(*inout_pnext_chain, vk_struct);
+                } else {
+                    *inout_pnext_chain = vk_struct;
+                }
+            }
+            return {&vk_struct->legacyVertexAttributes,
+                    "VkPhysicalDeviceLegacyVertexAttributesFeaturesEXT::legacyVertexAttributes"};
         }
         case Feature::bresenhamLines: {
             auto vk_struct = const_cast<VkPhysicalDeviceLineRasterizationFeaturesKHR *>(
@@ -4268,6 +4297,20 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             return {&vk_struct->rasterizationOrderStencilAttachmentAccess,
                     "VkPhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT::rasterizationOrderStencilAttachmentAccess"};
         }
+        case Feature::shaderRawAccessChains: {
+            auto vk_struct = const_cast<VkPhysicalDeviceRawAccessChainsFeaturesNV *>(
+                vku::FindStructInPNextChain<VkPhysicalDeviceRawAccessChainsFeaturesNV>(*inout_pnext_chain));
+            if (!vk_struct) {
+                vk_struct = new VkPhysicalDeviceRawAccessChainsFeaturesNV;
+                *vk_struct = vku::InitStructHelper();
+                if (*inout_pnext_chain) {
+                    vvl::PnextChainAdd(*inout_pnext_chain, vk_struct);
+                } else {
+                    *inout_pnext_chain = vk_struct;
+                }
+            }
+            return {&vk_struct->shaderRawAccessChains, "VkPhysicalDeviceRawAccessChainsFeaturesNV::shaderRawAccessChains"};
+        }
         case Feature::rayQuery: {
             auto vk_struct = const_cast<VkPhysicalDeviceRayQueryFeaturesKHR *>(
                 vku::FindStructInPNextChain<VkPhysicalDeviceRayQueryFeaturesKHR>(*inout_pnext_chain));
@@ -4444,6 +4487,20 @@ FeatureAndName AddFeature(APIVersion api_version, vkt::Feature feature, void **i
             }
             return {&vk_struct->rayTracingPositionFetch,
                     "VkPhysicalDeviceRayTracingPositionFetchFeaturesKHR::rayTracingPositionFetch"};
+        }
+        case Feature::rayTracingValidation: {
+            auto vk_struct = const_cast<VkPhysicalDeviceRayTracingValidationFeaturesNV *>(
+                vku::FindStructInPNextChain<VkPhysicalDeviceRayTracingValidationFeaturesNV>(*inout_pnext_chain));
+            if (!vk_struct) {
+                vk_struct = new VkPhysicalDeviceRayTracingValidationFeaturesNV;
+                *vk_struct = vku::InitStructHelper();
+                if (*inout_pnext_chain) {
+                    vvl::PnextChainAdd(*inout_pnext_chain, vk_struct);
+                } else {
+                    *inout_pnext_chain = vk_struct;
+                }
+            }
+            return {&vk_struct->rayTracingValidation, "VkPhysicalDeviceRayTracingValidationFeaturesNV::rayTracingValidation"};
         }
         case Feature::relaxedLineRasterization: {
             auto vk_struct = const_cast<VkPhysicalDeviceRelaxedLineRasterizationFeaturesIMG *>(

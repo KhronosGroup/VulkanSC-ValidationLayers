@@ -145,7 +145,7 @@ void ExecutionModeSet::Add(const Instruction& insn) {
             primitive_topology = VK_PRIMITIVE_TOPOLOGY_LINE_STRIP;
             break;
         case spv::ExecutionModeOutputLineStrip:
-        case spv::ExecutionModeOutputLinesNV:
+        case spv::ExecutionModeOutputLinesEXT:  // alias ExecutionModeOutputLinesNV
             primitive_topology = VK_PRIMITIVE_TOPOLOGY_LINE_STRIP;
             break;
         case spv::ExecutionModeTriangles:
@@ -163,7 +163,7 @@ void ExecutionModeSet::Add(const Instruction& insn) {
             tessellation_subdivision = spv::ExecutionModeQuads;
             break;
         case spv::ExecutionModeOutputTriangleStrip:
-        case spv::ExecutionModeOutputTrianglesNV:
+        case spv::ExecutionModeOutputTrianglesEXT:  // alias ExecutionModeOutputTrianglesNV
             primitive_topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
             break;
         case spv::ExecutionModeInputPoints:
@@ -245,6 +245,11 @@ void ExecutionModeSet::Add(const Instruction& insn) {
             } else if (value == 64) {
                 flags |= rounding_mode_rtz_width_64;
             }
+            break;
+        case spv::ExecutionModeFPFastMathDefault:  // VK_KHR_shader_float_controls2
+            // This is to indicate the mode was used
+            // Will look up the ID later as need the entire module parsed first
+            flags |= fp_fast_math_default;
             break;
         case spv::ExecutionModeEarlyFragmentTests:
             flags |= early_fragment_test_bit;
@@ -560,10 +565,6 @@ ImageAccess::ImageAccess(const Module& module_state, const Instruction& image_in
         case spv::OpImageSparseFetch:
         case spv::OpImageGather:
         case spv::OpImageSparseGather:
-        case spv::OpImageQuerySizeLod:
-        case spv::OpImageQuerySize:
-        case spv::OpImageQueryLevels:
-        case spv::OpImageQuerySamples:
         case spv::OpImageQueryLod:
             break;
 
@@ -604,7 +605,7 @@ ImageAccess::ImageAccess(const Module& module_state, const Instruction& image_in
 
     auto walk_to_variables = [this, &module_state, &sampler_insn_to_search](const Instruction* insn, bool sampler) {
         // Protect from loops
-        std::unordered_set<uint32_t> visited;
+        vvl::unordered_set<uint32_t> visited;
 
         // stack of function call sites to search through
         std::queue<const Instruction*> insn_to_search;
@@ -761,6 +762,9 @@ EntryPoint::EntryPoint(const Module& module_state, const Instruction& entrypoint
         if ((decoration_inst->GetBuiltIn() == spv::BuiltInPointSize) && module_state.IsBuiltInWritten(decoration_inst, *this)) {
             written_builtin_point_size = true;
         }
+        if ((decoration_inst->GetBuiltIn() == spv::BuiltInLayer) && module_state.IsBuiltInWritten(decoration_inst, *this)) {
+            written_builtin_layer = true;
+        }
         if ((decoration_inst->GetBuiltIn() == spv::BuiltInPrimitiveShadingRateKHR) &&
             module_state.IsBuiltInWritten(decoration_inst, *this)) {
             written_builtin_primitive_shading_rate_khr = true;
@@ -788,7 +792,7 @@ std::optional<VkPrimitiveTopology> Module::GetTopology(const EntryPoint& entrypo
     return result;
 }
 
-Module::StaticData::StaticData(const Module& module_state) {
+Module::StaticData::StaticData(const Module& module_state, StatelessData* stateless_data) {
     // Parse the words first so we have instruction class objects to use
     {
         std::vector<uint32_t>::const_iterator it = module_state.words_.cbegin();
@@ -799,12 +803,14 @@ Module::StaticData::StaticData(const Module& module_state) {
 
             // Check for opcodes that would require reparsing of the words
             if (opcode == spv::OpGroupDecorate || opcode == spv::OpDecorationGroup || opcode == spv::OpGroupMemberDecorate) {
-                assert(has_group_decoration == false);  // if assert, spirv-opt didn't flatten it
-                has_group_decoration = true;
-                return;  // no need to continue parsing
+                if (stateless_data) {
+                    assert(stateless_data->has_group_decoration == false);  // if assert, spirv-opt didn't flatten it
+                    stateless_data->has_group_decoration = true;
+                    return;  // no need to continue parsing
+                }
             }
 
-            instructions.push_back(insn);
+            instructions.emplace_back(insn);
             it += insn.Length();
         }
         instructions.shrink_to_fit();
@@ -820,7 +826,7 @@ Module::StaticData::StaticData(const Module& module_state) {
 
     uint32_t last_func_id = 0;
     // < Function ID, OpFunctionParameter Ids >
-    std::unordered_map<uint32_t, std::vector<uint32_t>> func_parameter_list;
+    vvl::unordered_map<uint32_t, std::vector<uint32_t>> func_parameter_list;
 
     // Loop through once and build up the static data
     // Also process the entry points
@@ -831,7 +837,8 @@ Module::StaticData::StaticData(const Module& module_state) {
             definitions[result_id] = &insn;
         }
 
-        switch (insn.Opcode()) {
+        const uint32_t opcode = insn.Opcode();
+        switch (opcode) {
             // Specialization constants
             case spv::OpSpecConstantTrue:
             case spv::OpSpecConstantFalse:
@@ -876,24 +883,29 @@ Module::StaticData::StaticData(const Module& module_state) {
 
             case spv::OpEmitStreamVertex:
             case spv::OpEndStreamPrimitive:
-                transform_feedback_stream_inst.push_back(&insn);
-                break;
-
-            case spv::OpString:
-                debug_string_inst.push_back(&insn);
+                if (stateless_data) {
+                    stateless_data->transform_feedback_stream_inst.push_back(&insn);
+                }
                 break;
 
             // Execution Mode
             case spv::OpExecutionMode:
             case spv::OpExecutionModeId: {
                 execution_modes[insn.Word(1)].Add(insn);
+
+                // Some OpExecutionModeId will have IDs after that need the entire module parsed first,
+                if (stateless_data && opcode == spv::OpExecutionModeId) {
+                    stateless_data->execution_mode_id_inst.push_back(&insn);
+                }
             } break;
             // Listed from vkspec.html#ray-tracing-repack
             case spv::OpTraceRayKHR:
             case spv::OpTraceRayMotionNV:
             case spv::OpReportIntersectionKHR:
             case spv::OpExecuteCallableKHR:
-                has_invocation_repack_instruction = true;
+                if (stateless_data) {
+                    stateless_data->has_invocation_repack_instruction = true;
+                }
                 break;
 
             // Entry points
@@ -936,16 +948,18 @@ Module::StaticData::StaticData(const Module& module_state) {
             case spv::OpImageSparseRead:
             case spv::OpImageFetch:
             case spv::OpImageGather:
-            case spv::OpImageQuerySizeLod:
-            case spv::OpImageQuerySize:
             case spv::OpImageQueryLod:
-            case spv::OpImageQueryLevels:
-            case spv::OpImageQuerySamples:
             case spv::OpImageSparseFetch:
             case spv::OpImageSparseGather: {
                 image_instructions.push_back(&insn);
                 break;
             }
+            case spv::OpImageQuerySizeLod:
+            case spv::OpImageQuerySize:
+            case spv::OpImageQueryLevels:
+            case spv::OpImageQuerySamples:
+                // from spec "return properties of the image descriptor that would be accessed. The image itself is not accessed."
+                break;
             case spv::OpStore: {
                 store_pointer_ids.emplace_back(insn.Word(1));  // object id or AccessChain id
                 break;
@@ -989,7 +1003,9 @@ Module::StaticData::StaticData(const Module& module_state) {
                 break;
             }
             case spv::OpReadClockKHR: {
-                read_clock_inst.push_back(&insn);
+                if (stateless_data) {
+                    stateless_data->read_clock_inst.push_back(&insn);
+                }
                 break;
             }
             case spv::OpTypeCooperativeMatrixNV:
@@ -1019,17 +1035,21 @@ Module::StaticData::StaticData(const Module& module_state) {
                 break;
 
             default:
-                if (AtomicOperation(insn.Opcode())) {
-                    atomic_inst.push_back(&insn);
-                    if (insn.Opcode() == spv::OpAtomicStore) {
+                if (AtomicOperation(opcode)) {
+                    if (stateless_data) {
+                        stateless_data->atomic_inst.push_back(&insn);
+                    }
+                    if (opcode == spv::OpAtomicStore) {
                         atomic_store_pointer_ids.emplace_back(insn.Word(1));
                         atomic_pointer_ids.emplace_back(insn.Word(1));
                     } else {
                         atomic_pointer_ids.emplace_back(insn.Word(3));
                     }
                 }
-                if (GroupOperation(insn.Opcode())) {
-                    group_inst.push_back(&insn);
+                if (GroupOperation(opcode)) {
+                    if (stateless_data) {
+                        stateless_data->group_inst.push_back(&insn);
+                    }
                 }
                 // We don't care about any other defs for now.
                 break;
@@ -1054,13 +1074,18 @@ Module::StaticData::StaticData(const Module& module_state) {
     }
 
     for (const Instruction* decoration_inst : builtin_decoration_inst) {
-        if (decoration_inst->GetBuiltIn() == spv::BuiltInLayer) {
+        const uint32_t built_in = decoration_inst->GetBuiltIn();
+        if (built_in == spv::BuiltInLayer) {
             has_builtin_layer = true;
-        } else if (decoration_inst->GetBuiltIn() == spv::BuiltInFullyCoveredEXT) {
-            has_builtin_fully_covered = true;
-        } else if (decoration_inst->GetBuiltIn() == spv::BuiltInWorkgroupSize) {
+        } else if (built_in == spv::BuiltInFullyCoveredEXT) {
+            if (stateless_data) {
+                stateless_data->has_builtin_fully_covered = true;
+            }
+        } else if (built_in == spv::BuiltInWorkgroupSize) {
             has_builtin_workgroup_size = true;
             builtin_workgroup_size_id = decoration_inst->Word(1);
+        } else if (built_in == spv::BuiltInDrawIndex) {
+            has_builtin_draw_index = true;
         }
     }
 
@@ -1089,11 +1114,48 @@ Module::StaticData::StaticData(const Module& module_state) {
     }
 }
 
+std::string Module::GetDecorations(uint32_t id) const {
+    std::ostringstream ss;
+    for (const spirv::Instruction& insn : GetInstructions()) {
+        if (insn.Opcode() == spv::OpFunction) {
+            break;  // decorations are found before first function block
+        } else if (insn.Opcode() == spv::OpDecorate && insn.Word(1) == id) {
+            ss << " " << string_SpvDecoration(insn.Word(2));
+        }
+    }
+    return ss.str();
+}
+
+std::string Module::GetName(uint32_t id) const {
+    for (const spirv::Instruction& insn : GetInstructions()) {
+        if (insn.Opcode() == spv::OpFunction) {
+            break;  // names are found before first function block
+        } else if (insn.Opcode() == spv::OpName && insn.Word(1) == id) {
+            return insn.GetAsString(2);
+        }
+    }
+    return "";
+}
+
+std::string Module::GetMemberName(uint32_t id, uint32_t member_index) const {
+    for (const spirv::Instruction& insn : GetInstructions()) {
+        if (insn.Opcode() == spv::OpFunction) {
+            break;  // names are found before first function block
+        } else if (insn.Opcode() == spv::OpMemberName && insn.Word(1) == id && insn.Word(2) == member_index) {
+            return insn.GetAsString(3);
+        }
+    }
+    return "";
+}
+
+// Used to pretty-print the OpType* for an error message
 void Module::DescribeTypeInner(std::ostringstream& ss, uint32_t type, uint32_t indent) const {
     const Instruction* insn = FindDef(type);
-    for (uint32_t i = 0; i < indent; i++) {
-        ss << "\t";
-    }
+    auto indent_by = [&ss](uint32_t i) {
+        for (uint32_t x = 0; x < i; x++) {
+            ss << "\t";
+        }
+    };
 
     switch (insn->Opcode()) {
         case spv::OpTypeBool:
@@ -1115,29 +1177,39 @@ void Module::DescribeTypeInner(std::ostringstream& ss, uint32_t type, uint32_t i
             break;
         case spv::OpTypeArray:
             ss << "array[" << GetConstantValueById(insn->Word(3)) << "] of ";
-            DescribeTypeInner(ss, insn->Word(2), 0);  // if struct, has pointer in between
+            DescribeTypeInner(ss, insn->Word(2), indent);
             break;
         case spv::OpTypeRuntimeArray:
             ss << "runtime array[] of ";
-            DescribeTypeInner(ss, insn->Word(2), 0);  // if struct, has pointer in between
+            DescribeTypeInner(ss, insn->Word(2), indent);
             break;
         case spv::OpTypePointer:
-            ss << "pointer to " << string_SpvStorageClass(insn->Word(2)) << " ->\n";
-            indent++;
+            ss << "pointer to " << string_SpvStorageClass(insn->Word(2)) << " -> ";
             DescribeTypeInner(ss, insn->Word(3), indent);
             break;
         case spv::OpTypeStruct: {
             ss << "struct of {\n";
             indent++;
             for (uint32_t i = 2; i < insn->Length(); i++) {
+                indent_by(indent);
+                ss << "- ";
                 DescribeTypeInner(ss, insn->Word(i), indent);
+
+                auto name = GetMemberName(type, i - 2);
+                if (!name.empty()) {
+                    ss << " \"" << name << "\"";
+                }
+
                 ss << "\n";
             }
             indent--;
-            for (uint32_t i = 0; i < indent; i++) {
-                ss << "\t";
-            }
+            indent_by(indent);
             ss << "}";
+
+            auto name = GetName(type);
+            if (!name.empty()) {
+                ss << " \"" << name << "\"";
+            }
             break;
         }
         case spv::OpTypeSampler:
@@ -1162,6 +1234,20 @@ void Module::DescribeTypeInner(std::ostringstream& ss, uint32_t type, uint32_t i
 std::string Module::DescribeType(uint32_t type) const {
     std::ostringstream ss;
     DescribeTypeInner(ss, type, 0);
+    return ss.str();
+}
+
+std::string Module::DescribeVariable(uint32_t id) const {
+    std::ostringstream ss;
+    auto name = GetName(id);
+    if (!name.empty()) {
+        ss << "Variable \"" << name << "\"";
+        auto decorations = GetDecorations(id);
+        if (!decorations.empty()) {
+            ss << " (Decorations:" << decorations << ")";
+        }
+        ss << "\n";
+    }
     return ss.str();
 }
 
@@ -1972,6 +2058,10 @@ ResourceInterfaceVariable::ResourceInterfaceVariable(const Module& module_state,
                 info.is_sampler_offset |= image_access.is_sampler_offset;
                 info.is_sign_extended |= image_access.is_sign_extended;
                 info.is_zero_extended |= image_access.is_zero_extended;
+
+                if (array_length > 1) {
+                    image_access_chain_indexes.insert(image_access.image_access_chain_index);
+                }
                 is_written_to |= image_access.is_written_to;
                 is_read_from |= image_access.is_read_from;
 
@@ -2296,6 +2386,12 @@ AtomicInstructionInfo Module::GetAtomicInfo(const Instruction& insn) const {
     info.storage_class = pointer->Word(2);
 
     const Instruction* data_type = FindDef(pointer->Word(3));
+
+    if (data_type->Opcode() == spv::OpTypeVector) {
+        info.vector_size = data_type->Word(3);
+        data_type = FindDef(data_type->Word(2));
+    }
+
     info.type = data_type->Opcode();
 
     info.bit_width = data_type->GetBitWidth();

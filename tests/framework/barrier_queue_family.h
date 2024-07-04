@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2023 Valve Corporation
- * Copyright (c) 2023 LunarG, Inc.
+ * Copyright (c) 2023-2024 Valve Corporation
+ * Copyright (c) 2023-2024 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ class BarrierQueueFamilyBase {
         void Reset();
     };
 
-    BarrierQueueFamilyBase(Context *context) : context_(context), image_(context->layer_test->DeviceObj()) {}
+    BarrierQueueFamilyBase(Context *context) : context_(context) {}
 
     QueueFamilyObjs *GetQueueFamilyInfo(Context *context, uint32_t qfi);
 
@@ -46,7 +46,7 @@ class BarrierQueueFamilyBase {
 
     static const uint32_t kInvalidQueueFamily = vvl::kU32Max;
     Context *context_;
-    VkImageObj image_;
+    vkt::Image image_;
     vkt::Buffer buffer_;
 };
 
@@ -89,16 +89,17 @@ class Barrier2QueueFamilyTestHelper : public BarrierQueueFamilyBase {
     VkBufferMemoryBarrier2KHR buffer_barrier_;
 };
 
-void ValidOwnershipTransferOp(ErrorMonitor *monitor, vkt::CommandBuffer *cb, VkPipelineStageFlags src_stages,
+void ValidOwnershipTransferOp(ErrorMonitor *monitor, vkt::Queue *queue, vkt::CommandBuffer *cb, VkPipelineStageFlags src_stages,
                               VkPipelineStageFlags dst_stages, const VkBufferMemoryBarrier *buf_barrier,
                               const VkImageMemoryBarrier *img_barrier);
 
-void ValidOwnershipTransferOp(ErrorMonitor *monitor, vkt::CommandBuffer *cb, const VkBufferMemoryBarrier2KHR *buf_barrier,
-                              const VkImageMemoryBarrier2KHR *img_barrier);
+void ValidOwnershipTransferOp(ErrorMonitor *monitor, vkt::Queue *queue, vkt::CommandBuffer *cb,
+                              const VkBufferMemoryBarrier2KHR *buf_barrier, const VkImageMemoryBarrier2KHR *img_barrier);
 
-void ValidOwnershipTransfer(ErrorMonitor *monitor, vkt::CommandBuffer *cb_from, vkt::CommandBuffer *cb_to,
-                            VkPipelineStageFlags src_stages, VkPipelineStageFlags dst_stages,
+void ValidOwnershipTransfer(ErrorMonitor *monitor, vkt::Queue *queue_from, vkt::CommandBuffer *cb_from, vkt::Queue *queue_to,
+                            vkt::CommandBuffer *cb_to, VkPipelineStageFlags src_stages, VkPipelineStageFlags dst_stages,
                             const VkBufferMemoryBarrier *buf_barrier, const VkImageMemoryBarrier *img_barrier);
 
-void ValidOwnershipTransfer(ErrorMonitor *monitor, vkt::CommandBuffer *cb_from, vkt::CommandBuffer *cb_to,
-                            const VkBufferMemoryBarrier2KHR *buf_barrier, const VkImageMemoryBarrier2KHR *img_barrier);
+void ValidOwnershipTransfer(ErrorMonitor *monitor, vkt::Queue *queue_from, vkt::CommandBuffer *cb_from, vkt::Queue *queue_to,
+                            vkt::CommandBuffer *cb_to, const VkBufferMemoryBarrier2KHR *buf_barrier,
+                            const VkImageMemoryBarrier2KHR *img_barrier);

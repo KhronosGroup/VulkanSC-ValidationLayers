@@ -36,7 +36,7 @@ VkValidationFeaturesEXT GpuAVTest::GetGpuAvValidationFeatures() {
     VkValidationFeaturesEXT features = vku::InitStructHelper();
     features.enabledValidationFeatureCount = size32(gpu_av_enables);
     features.pEnabledValidationFeatures = gpu_av_enables.data();
-    if (!m_gpuav_enable_core) {
+    if (m_gpuav_disable_core) {
         features.disabledValidationFeatureCount = size32(gpu_av_disables);
         features.pDisabledValidationFeatures = gpu_av_disables.data();
     }
@@ -51,6 +51,311 @@ void GpuAVTest::InitGpuAvFramework(void *p_next) {
     RETURN_IF_SKIP(InitFramework(&validation_features));
     if (!CanEnableGpuAV(*this)) {
         GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    }
+}
+
+// Not supported in Vulkan SC: GPU AV
+TEST_F(PositiveGpuAV, DISABLED_RobustBuffer) {
+    TEST_DESCRIPTION("OOB errors should not occur with robustness turned on");
+    AddRequiredFeature(vkt::Feature::robustBufferAccess);
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
+    InitRenderTarget();
+
+    VkMemoryPropertyFlags reqs = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+    vkt::Buffer offset_buffer(*m_device, 4, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, reqs);
+    vkt::Buffer write_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, reqs);
+
+    OneOffDescriptorSet descriptor_set(m_device, {{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
+                                                  {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}});
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
+    descriptor_set.WriteDescriptorBufferInfo(0, offset_buffer.handle(), 0, 4);
+    descriptor_set.WriteDescriptorBufferInfo(1, write_buffer.handle(), 0, 16, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    descriptor_set.UpdateDescriptorSets();
+
+    const char vs_source[] = R"glsl(
+        #version 450
+        layout(set = 0, binding = 0) uniform ufoo { uint index[]; } u_index;      // index[1]
+        layout(set = 0, binding = 1) buffer StorageBuffer { uint data[]; } Data;  // data[4]
+        void main() {
+            Data.data[u_index.index[0]] = 0xdeadca71;
+        }
+    )glsl";
+
+    VkShaderObj vs(this, vs_source, VK_SHADER_STAGE_VERTEX_BIT);
+    CreatePipelineHelper pipe(*this);
+    pipe.shader_stages_[0] = vs.GetStageCreateInfo();
+    pipe.gp_ci_.layout = pipeline_layout.handle();
+    pipe.CreateGraphicsPipeline();
+
+    m_commandBuffer->begin();
+    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1,
+                              &descriptor_set.set_, 0, nullptr);
+    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
+    m_commandBuffer->EndRenderPass();
+    m_commandBuffer->end();
+
+    uint32_t *data = (uint32_t *)offset_buffer.memory().map();
+    *data = 8;
+    offset_buffer.memory().unmap();
+
+    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Wait();
+}
+
+// Not supported in Vulkan SC: GPU AV
+TEST_F(PositiveGpuAV, DISABLED_ReserveBinding) {
+    TEST_DESCRIPTION(
+        "verify that VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_RESERVE_BINDING_SLOT_EXT is properly reserving a descriptor slot");
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_1_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_INLINE_UNIFORM_BLOCK_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::descriptorBindingPartiallyBound);
+    AddRequiredFeature(vkt::Feature::inlineUniformBlock);
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState(nullptr));
+
+    auto ici = GetInstanceCreateInfo();
+    VkInstance test_inst;
+    vk::CreateInstance(&ici, nullptr, &test_inst);
+    uint32_t gpu_count;
+    vk::EnumeratePhysicalDevices(test_inst, &gpu_count, nullptr);
+    std::vector<VkPhysicalDevice> phys_devices(gpu_count);
+    vk::EnumeratePhysicalDevices(test_inst, &gpu_count, phys_devices.data());
+
+    VkPhysicalDeviceProperties properties;
+    vk::GetPhysicalDeviceProperties(phys_devices[m_gpu_index], &properties);
+    if (m_device->phy().limits_.maxBoundDescriptorSets != properties.limits.maxBoundDescriptorSets - 1) {
+        m_errorMonitor->SetError("VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_RESERVE_BINDING_SLOT_EXT not functioning as expected");
+    }
+    vk::DestroyInstance(test_inst, nullptr);
+}
+
+// Not supported in Vulkan SC: GPU AV
+TEST_F(PositiveGpuAV, DISABLED_InlineUniformBlock) {
+    TEST_DESCRIPTION("Make sure inline uniform blocks don't generate false validation errors");
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_1_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_INLINE_UNIFORM_BLOCK_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::descriptorBindingPartiallyBound);
+    AddRequiredFeature(vkt::Feature::inlineUniformBlock);
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
+    InitRenderTarget();
+
+    VkMemoryPropertyFlags mem_props = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+    vkt::Buffer buffer(*m_device, 4, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, mem_props);
+
+    VkDescriptorBindingFlagsEXT ds_binding_flags[2] = {};
+    ds_binding_flags[1] = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT;
+    VkDescriptorSetLayoutBindingFlagsCreateInfoEXT layout_createinfo_binding_flags[1] = {};
+    layout_createinfo_binding_flags[0] = vku::InitStructHelper();
+    layout_createinfo_binding_flags[0].bindingCount = 2;
+    layout_createinfo_binding_flags[0].pBindingFlags = ds_binding_flags;
+
+    VkDescriptorPoolInlineUniformBlockCreateInfo pool_inline_info = vku::InitStructHelper();
+    pool_inline_info.maxInlineUniformBlockBindings = 32;
+
+    OneOffDescriptorSet descriptor_set(m_device,
+                                       {
+                                           {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
+                                           {1, VK_DESCRIPTOR_TYPE_INLINE_UNIFORM_BLOCK_EXT, 32, VK_SHADER_STAGE_ALL, nullptr},
+                                       },
+                                       0, layout_createinfo_binding_flags, 0, nullptr, &pool_inline_info);
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
+
+    VkDescriptorBufferInfo buffer_info[1] = {};
+    buffer_info[0].buffer = buffer.handle();
+    buffer_info[0].offset = 0;
+    buffer_info[0].range = sizeof(uint32_t);
+
+    const uint32_t test_data = 0xdeadca7;
+    VkWriteDescriptorSetInlineUniformBlockEXT write_inline_uniform = vku::InitStructHelper();
+    write_inline_uniform.dataSize = 4;
+    write_inline_uniform.pData = &test_data;
+
+    VkWriteDescriptorSet descriptor_writes[2] = {};
+    descriptor_writes[0] = vku::InitStructHelper();
+    descriptor_writes[0].dstSet = descriptor_set.set_;
+    descriptor_writes[0].dstBinding = 0;
+    descriptor_writes[0].descriptorCount = 1;
+    descriptor_writes[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    descriptor_writes[0].pBufferInfo = buffer_info;
+
+    descriptor_writes[1] = vku::InitStructHelper(&write_inline_uniform);
+    descriptor_writes[1].dstSet = descriptor_set.set_;
+    descriptor_writes[1].dstBinding = 1;
+    descriptor_writes[1].dstArrayElement = 16;  // Skip first 16 bytes (dummy)
+    descriptor_writes[1].descriptorCount = 4;   // Write 4 bytes to val
+    descriptor_writes[1].descriptorType = VK_DESCRIPTOR_TYPE_INLINE_UNIFORM_BLOCK_EXT;
+    vk::UpdateDescriptorSets(device(), 2, descriptor_writes, 0, NULL);
+
+    char const *csSource = R"glsl(
+        #version 450
+        #extension GL_EXT_nonuniform_qualifier : enable
+        layout(set = 0, binding = 0) buffer StorageBuffer { uint index; } u_index;
+        layout(set = 0, binding = 1) uniform inlineubodef { ivec4 dummy; int val; } inlineubo;
+
+        void main() {
+            u_index.index = inlineubo.val;
+        }
+        )glsl";
+
+    CreateComputePipelineHelper pipe1(*this);
+    pipe1.cs_ = std::make_unique<VkShaderObj>(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe1.cp_ci_.layout = pipeline_layout.handle();
+    pipe1.CreateComputePipeline();
+
+    m_commandBuffer->begin();
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe1.Handle());
+    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout.handle(), 0, 1,
+                              &descriptor_set.set_, 0, nullptr);
+    vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
+    m_commandBuffer->end();
+
+    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Wait();
+
+    uint32_t *data = (uint32_t *)buffer.memory().map();
+    ASSERT_TRUE(*data = test_data);
+    *data = 0;
+    buffer.memory().unmap();
+}
+
+// Not supported in Vulkan SC: GPU AV
+TEST_F(PositiveGpuAV, DISABLED_InlineUniformBlockAndRecovery) {
+    TEST_DESCRIPTION(
+        "GPU validation: Make sure inline uniform blocks don't generate false validation errors, verify reserved descriptor slot "
+        "and verify pipeline recovery");
+    AddRequiredExtensions(VK_EXT_INLINE_UNIFORM_BLOCK_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::descriptorBindingPartiallyBound);
+    AddRequiredFeature(vkt::Feature::inlineUniformBlock);
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
+    InitRenderTarget();
+
+    VkMemoryPropertyFlags mem_props = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+    vkt::Buffer buffer(*m_device, 4, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, mem_props);
+
+    VkDescriptorBindingFlagsEXT ds_binding_flags[2] = {};
+    ds_binding_flags[1] = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT;
+    VkDescriptorSetLayoutBindingFlagsCreateInfoEXT layout_createinfo_binding_flags[1] = {};
+    layout_createinfo_binding_flags[0] = vku::InitStructHelper();
+    layout_createinfo_binding_flags[0].bindingCount = 2;
+    layout_createinfo_binding_flags[0].pBindingFlags = ds_binding_flags;
+
+    VkDescriptorPoolInlineUniformBlockCreateInfo pool_inline_info = vku::InitStructHelper();
+    pool_inline_info.maxInlineUniformBlockBindings = 32;
+
+    OneOffDescriptorSet descriptor_set(m_device,
+                                       {
+                                           {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
+                                           {1, VK_DESCRIPTOR_TYPE_INLINE_UNIFORM_BLOCK_EXT, 32, VK_SHADER_STAGE_ALL, nullptr},
+                                       },
+                                       0, layout_createinfo_binding_flags, 0, nullptr, &pool_inline_info);
+
+    VkDescriptorBufferInfo buffer_info[1] = {};
+    buffer_info[0].buffer = buffer.handle();
+    buffer_info[0].offset = 0;
+    buffer_info[0].range = sizeof(uint32_t);
+
+    const uint32_t test_data = 0xdeadca7;
+    VkWriteDescriptorSetInlineUniformBlockEXT write_inline_uniform = vku::InitStructHelper();
+    write_inline_uniform.dataSize = 4;
+    write_inline_uniform.pData = &test_data;
+
+    VkWriteDescriptorSet descriptor_writes[2] = {};
+    descriptor_writes[0] = vku::InitStructHelper();
+    descriptor_writes[0].dstSet = descriptor_set.set_;
+    descriptor_writes[0].dstBinding = 0;
+    descriptor_writes[0].descriptorCount = 1;
+    descriptor_writes[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    descriptor_writes[0].pBufferInfo = buffer_info;
+
+    descriptor_writes[1] = vku::InitStructHelper(&write_inline_uniform);
+    descriptor_writes[1].dstSet = descriptor_set.set_;
+    descriptor_writes[1].dstBinding = 1;
+    descriptor_writes[1].dstArrayElement = 16;  // Skip first 16 bytes (dummy)
+    descriptor_writes[1].descriptorCount = 4;   // Write 4 bytes to val
+    descriptor_writes[1].descriptorType = VK_DESCRIPTOR_TYPE_INLINE_UNIFORM_BLOCK_EXT;
+    vk::UpdateDescriptorSets(device(), 2, descriptor_writes, 0, nullptr);
+
+    const uint32_t set_count = m_device->phy().limits_.maxBoundDescriptorSets + 1;  // account for reserved set
+    VkPhysicalDeviceInlineUniformBlockPropertiesEXT inline_uniform_props = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(inline_uniform_props);
+    if (inline_uniform_props.maxPerStageDescriptorInlineUniformBlocks < set_count) {
+        GTEST_SKIP() << "Max per stage inline uniform block limit too small - skipping recovery portion of this test";
+    }
+
+    // Now be sure that recovery from an unavailable descriptor set works and that uninstrumented shaders are used
+    std::vector<const vkt::DescriptorSetLayout *> layouts(set_count);
+    for (uint32_t i = 0; i < set_count; i++) {
+        layouts[i] = &descriptor_set.layout_;
+    }
+    // Expect error since GPU-AV cannot add debug descriptor to layout
+    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-GPU-Assisted-Validation");
+    vkt::PipelineLayout pl_layout(*m_device, layouts);
+    m_errorMonitor->VerifyFound();
+
+    char const *csSource = R"glsl(
+        #version 450
+        #extension GL_EXT_nonuniform_qualifier : enable
+        layout(set = 0, binding = 0) buffer StorageBuffer { uint index; } u_index;
+        layout(set = 0, binding = 1) uniform inlineubodef { ivec4 dummy; int val; } inlineubo;
+
+        void main() {
+            u_index.index = inlineubo.val;
+        }
+        )glsl";
+
+    {
+        CreateComputePipelineHelper pipe(*this);
+        pipe.cs_ = std::make_unique<VkShaderObj>(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
+        // We should still be able to use the layout and create a temporary uninstrumented shader module
+        pipe.cp_ci_.layout = pl_layout.handle();
+        pipe.CreateComputePipeline();
+
+        m_commandBuffer->begin();
+        vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+        vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pl_layout.handle(), 0, 1,
+                                  &descriptor_set.set_, 0, nullptr);
+        vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
+        m_commandBuffer->end();
+        m_default_queue->Submit(*m_commandBuffer);
+        m_default_queue->Wait();
+
+        pl_layout.destroy();
+
+        uint32_t *data = (uint32_t *)buffer.memory().map();
+        if (*data != test_data)
+            m_errorMonitor->SetError("Pipeline recovery when resources unavailable not functioning as expected");
+        *data = 0;
+        buffer.memory().unmap();
+    }
+
+    // Now make sure we can still use the shader with instrumentation
+    {
+        const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
+        CreateComputePipelineHelper pipe(*this);
+        pipe.cs_ = std::make_unique<VkShaderObj>(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
+        pipe.cp_ci_.layout = pipeline_layout.handle();
+        pipe.CreateComputePipeline();
+
+        m_commandBuffer->begin();
+        vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+        vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout.handle(), 0, 1,
+                                  &descriptor_set.set_, 0, nullptr);
+        vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
+        m_commandBuffer->end();
+        m_default_queue->Submit(*m_commandBuffer);
+        m_default_queue->Wait();
+        uint32_t *data = (uint32_t *)buffer.memory().map();
+        if (*data != test_data) m_errorMonitor->SetError("Using shader after pipeline recovery not functioning as expected");
+        *data = 0;
+        buffer.memory().unmap();
     }
 }
 
@@ -93,7 +398,6 @@ TEST_F(PositiveGpuAV, DISABLED_SetSSBOBindDescriptor) {
     pipe.cs_ = std::make_unique<VkShaderObj>(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
     pipe.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
                           {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr}};
-    pipe.InitState();
     pipe.CreateComputePipeline();
 
     VkBufferUsageFlags buffer_usage =
@@ -107,14 +411,14 @@ TEST_F(PositiveGpuAV, DISABLED_SetSSBOBindDescriptor) {
     pipe.descriptor_set_->UpdateDescriptorSets();
 
     m_commandBuffer->begin();
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
     vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0, 1,
                               &pipe.descriptor_set_->set_, 0, nullptr);
     vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
     m_commandBuffer->end();
 
-    m_default_queue->submit(*m_commandBuffer);
-    m_default_queue->wait();
+    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Wait();
 }
 
 // Not supported in Vulkan SC: GPU AV
@@ -196,8 +500,8 @@ TEST_F(PositiveGpuAV, DISABLED_SetSSBOPushDescriptor) {
     vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
     m_commandBuffer->end();
 
-    m_default_queue->submit(*m_commandBuffer);
-    m_default_queue->wait();
+    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Wait();
 }
 
 // Regression test for semaphore timeout with GPU-AV enabled:
@@ -228,6 +532,7 @@ TEST_F(PositiveGpuAV, DISABLED_GetCounterFromSignaledSemaphoreAfterSubmit) {
 
     std::uint64_t counter = 0;
     ASSERT_EQ(VK_SUCCESS, vk::GetSemaphoreCounterValue(*m_device, semaphore, &counter));
+    m_device->Wait();  // so vkDestroySemaphore doesn't call while semaphore is active
 }
 
 // Not supported in Vulkan SC: GPU AV
@@ -338,8 +643,8 @@ TEST_F(PositiveGpuAV, DISABLED_MutableBuffer) {
     vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
     m_commandBuffer->end();
 
-    m_default_queue->submit(*m_commandBuffer);
-    m_default_queue->wait();
+    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Wait();
 }
 
 // Not supported in Vulkan SC: GPU AV
@@ -374,10 +679,9 @@ TEST_F(PositiveGpuAV, DISABLED_MaxDescriptorsClamp13) {
 // Not supported in Vulkan SC: GPU AV
 TEST_F(PositiveGpuAV, DISABLED_SelectInstrumentedShaders) {
     TEST_DESCRIPTION("Use a bad vertex shader, but don't select it for validation and make sure we don't get a buffer oob warning");
-    AddRequiredExtensions(VK_EXT_LAYER_SETTINGS_EXTENSION_NAME);
     SetTargetApiVersion(VK_API_VERSION_1_2);
     const VkBool32 value = true;
-    const VkLayerSettingEXT setting = {OBJECT_LAYER_NAME, "select_instrumented_shaders", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1,
+    const VkLayerSettingEXT setting = {OBJECT_LAYER_NAME, "gpuav_select_instrumented_shaders", VK_LAYER_SETTING_TYPE_BOOL32_EXT, 1,
                                        &value};
     VkLayerSettingsCreateInfoEXT layer_settings_create_info = {VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT, nullptr, 1,
                                                                &setting};
@@ -415,7 +719,6 @@ TEST_F(PositiveGpuAV, DISABLED_SelectInstrumentedShaders) {
     features.pEnabledValidationFeatures = enabled;
     VkShaderObj fs(this, vertshader, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL, nullptr, "main", &features);
     CreatePipelineHelper pipe(*this);
-    pipe.InitState();
     pipe.shader_stages_.clear();
     pipe.shader_stages_.push_back(vs.GetStageCreateInfo());
     pipe.shader_stages_.push_back(fs.GetStageCreateInfo());
@@ -432,8 +735,8 @@ TEST_F(PositiveGpuAV, DISABLED_SelectInstrumentedShaders) {
     m_commandBuffer->end();
     // Should not get a warning since buggy vertex shader wasn't instrumented
     m_errorMonitor->ExpectSuccess(kWarningBit | kErrorBit);
-    m_commandBuffer->QueueCommandBuffer();
-    m_default_queue->wait();
+    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Wait();
 }
 
 // Not supported in Vulkan SC: GPU AV
@@ -441,17 +744,9 @@ TEST_F(PositiveGpuAV, DISABLED_BindingPartiallyBound) {
     TEST_DESCRIPTION("Ensure that no validation errors for invalid descriptors if binding is PARTIALLY_BOUND");
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::descriptorBindingPartiallyBound);
     RETURN_IF_SKIP(InitGpuAvFramework());
-
-    auto indexing_features = vku::InitStruct<VkPhysicalDeviceDescriptorIndexingFeaturesEXT>();
-    auto features2 = vku::InitStruct<VkPhysicalDeviceFeatures2KHR>(&indexing_features);
-    GetPhysicalDeviceFeatures2(features2);
-
-    if (!indexing_features.descriptorBindingPartiallyBound) {
-        GTEST_SKIP() << "Partially bound bindings not supported, skipping test";
-    }
-
-    RETURN_IF_SKIP(InitState(nullptr, &features2));
+    RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
     VkDescriptorBindingFlagsEXT ds_binding_flags[2] = {};
@@ -499,7 +794,6 @@ TEST_F(PositiveGpuAV, DISABLED_BindingPartiallyBound) {
     VkShaderObj vs(this, shader_source, VK_SHADER_STAGE_VERTEX_BIT);
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitState();
     pipe.shader_stages_[0] = vs.GetStageCreateInfo();
     pipe.gp_ci_.layout = pipeline_layout.handle();
     pipe.CreateGraphicsPipeline();
@@ -513,7 +807,8 @@ TEST_F(PositiveGpuAV, DISABLED_BindingPartiallyBound) {
     vk::CmdDrawIndexed(m_commandBuffer->handle(), 1, 1, 0, 0, 0);
     m_commandBuffer->EndRenderPass();
     m_commandBuffer->end();
-    m_commandBuffer->QueueCommandBuffer();
+    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Wait();
 }
 
 // Not supported in Vulkan SC: GPU AV
@@ -541,8 +836,8 @@ TEST_F(PositiveGpuAV, DISABLED_DrawingWithUnboundUnusedSet) {
     )glsl";
     VkShaderObj fs(this, fs_source, VK_SHADER_STAGE_FRAGMENT_BIT);
 
-    VkImageObj image(m_device);
-    image.Init(32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    vkt::Image image(*m_device, 32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
     vkt::ImageView imageView = image.CreateView();
 
     vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
@@ -566,7 +861,6 @@ TEST_F(PositiveGpuAV, DISABLED_DrawingWithUnboundUnusedSet) {
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
-    pipe.InitState();
     pipe.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&descriptor_set.layout_, &descriptor_set.layout_});
     pipe.CreateGraphicsPipeline();
 
@@ -574,7 +868,7 @@ TEST_F(PositiveGpuAV, DISABLED_DrawingWithUnboundUnusedSet) {
     vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_layout_.handle(), 1, 1,
                               &descriptor_set.set_, 0, nullptr);
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
     vk::CmdBindIndexBuffer(m_commandBuffer->handle(), index_buffer.handle(), 0, VK_INDEX_TYPE_UINT32);
     vk::CmdDrawIndexedIndirectCountKHR(m_commandBuffer->handle(), indexed_indirect_buffer.handle(), 0, count_buffer.handle(), 0, 1,
                                        sizeof(VkDrawIndexedIndirectCommand));
@@ -604,7 +898,6 @@ TEST_F(PositiveGpuAV, DISABLED_FirstInstance) {
     draw_buffer.memory().unmap();
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitState();
     pipe.CreateGraphicsPipeline();
 
     VkCommandBufferBeginInfo begin_info = vku::InitStructHelper();
@@ -614,8 +907,8 @@ TEST_F(PositiveGpuAV, DISABLED_FirstInstance) {
     vk::CmdDrawIndirect(m_commandBuffer->handle(), draw_buffer.handle(), 0, 4, sizeof(VkDrawIndirectCommand));
     m_commandBuffer->EndRenderPass();
     m_commandBuffer->end();
-    m_commandBuffer->QueueCommandBuffer();
-    m_default_queue->wait();
+    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Wait();
 
     // Now with an offset and indexed draw
     vkt::Buffer indexed_draw_buffer(*m_device, 4 * sizeof(VkDrawIndexedIndirectCommand), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
@@ -640,8 +933,8 @@ TEST_F(PositiveGpuAV, DISABLED_FirstInstance) {
                                sizeof(VkDrawIndexedIndirectCommand));
     m_commandBuffer->EndRenderPass();
     m_commandBuffer->end();
-    m_commandBuffer->QueueCommandBuffer();
-    m_default_queue->wait();
+    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Wait();
 }
 
 // Not supported in Vulkan SC: GPU AV
@@ -649,6 +942,8 @@ TEST_F(PositiveGpuAV, DISABLED_CopyBufferToImageD32) {
     TEST_DESCRIPTION(
         "Copy depth buffer to image with all depth values in the [0, 1] legal range. Depth image has format "
         "VK_FORMAT_D32_SFLOAT.");
+    AddRequiredExtensions(VK_KHR_8BIT_STORAGE_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::uniformAndStorageBuffer8BitAccess);
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
@@ -675,9 +970,7 @@ TEST_F(PositiveGpuAV, DISABLED_CopyBufferToImageD32) {
     image_ci.arrayLayers = 1;
     image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
     image_ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    VkImageObj copy_dst_image(m_device);
-    copy_dst_image.Init(image_ci);
-
+    vkt::Image copy_dst_image(*m_device, image_ci, vkt::set_layout);
     copy_dst_image.SetLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
     m_commandBuffer->begin();
@@ -704,7 +997,7 @@ TEST_F(PositiveGpuAV, DISABLED_CopyBufferToImageD32) {
                              &buffer_image_copy_2);
 
     m_commandBuffer->end();
-    m_commandBuffer->QueueCommandBuffer();
+    m_default_queue->Submit(*m_commandBuffer);
     vk::DeviceWaitIdle(*m_device);
 }
 
@@ -713,6 +1006,8 @@ TEST_F(PositiveGpuAV, DISABLED_CopyBufferToImageD32U8) {
     TEST_DESCRIPTION(
         "Copy depth buffer to image with all depth values in the [0, 1] legal range. Depth image has format "
         "VK_FORMAT_D32_SFLOAT_S8_UINT.");
+    AddRequiredExtensions(VK_KHR_8BIT_STORAGE_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::uniformAndStorageBuffer8BitAccess);
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
@@ -741,9 +1036,7 @@ TEST_F(PositiveGpuAV, DISABLED_CopyBufferToImageD32U8) {
     image_ci.arrayLayers = 1;
     image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
     image_ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    VkImageObj copy_dst_image(m_device);
-    copy_dst_image.Init(image_ci);
-
+    vkt::Image copy_dst_image(*m_device, image_ci, vkt::set_layout);
     copy_dst_image.SetLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
     m_commandBuffer->begin();
@@ -763,7 +1056,7 @@ TEST_F(PositiveGpuAV, DISABLED_CopyBufferToImageD32U8) {
                              &buffer_image_copy);
 
     m_commandBuffer->end();
-    m_commandBuffer->QueueCommandBuffer();
+    m_default_queue->Submit(*m_commandBuffer);
     vk::DeviceWaitIdle(*m_device);
 }
 
@@ -773,13 +1066,11 @@ TEST_F(PositiveGpuAV, DISABLED_CopyBufferToImageTwoSubmit) {
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
-    vkt::CommandBuffer cb_0(m_device, m_commandPool);
-    vkt::CommandBuffer cb_1(m_device, m_commandPool);
+    vkt::CommandBuffer cb_0(*m_device, m_command_pool);
+    vkt::CommandBuffer cb_1(*m_device, m_command_pool);
 
-    auto image_ci = VkImageObj::ImageCreateInfo2D(32, 32, 1, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
-    VkImageObj image(m_device);
-    image.init(&image_ci);
-
+    auto image_ci = vkt::Image::ImageCreateInfo2D(32, 32, 1, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+    vkt::Image image(*m_device, image_ci, vkt::set_layout);
     vkt::Buffer buffer(*m_device, 4096, VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
 
     VkBufferImageCopy region = {};
@@ -794,11 +1085,72 @@ TEST_F(PositiveGpuAV, DISABLED_CopyBufferToImageTwoSubmit) {
     cb_0.begin();
     vk::CmdCopyBufferToImage(cb_0.handle(), buffer.handle(), image.handle(), VK_IMAGE_LAYOUT_GENERAL, 1, &region);
     cb_0.end();
-    m_default_queue->submit(cb_0);
-    m_default_queue->wait();
+    m_default_queue->Submit(cb_0);
+    m_default_queue->Wait();
 
     cb_1.begin();
     cb_1.end();
-    m_default_queue->submit(cb_1);
-    m_default_queue->wait();
+    m_default_queue->Submit(cb_1);
+    m_default_queue->Wait();
+}
+
+// Not supported in Vulkan SC: GPU AV
+TEST_F(PositiveGpuAV, DISABLED_AliasImageBinding) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/7677");
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
+
+    char const *csSource = R"glsl(
+        #version 460
+        #extension GL_EXT_samplerless_texture_functions : require
+
+        layout(set = 0, binding = 0) uniform texture2D float_textures[2];
+        layout(set = 0, binding = 0) uniform utexture2D uint_textures[2];
+        layout(set = 0, binding = 1) buffer output_buffer {
+            uint index;
+            vec4 data;
+        };
+
+        void main() {
+            const vec4 value = texelFetch(float_textures[index], ivec2(0), 0);
+            const uint mask = texelFetch(uint_textures[index + 1], ivec2(0), 0).x;
+            data = mask > 0 ? value : vec4(0.0);
+        }
+    )glsl";
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 2, VK_SHADER_STAGE_ALL, nullptr},
+                          {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}};
+    pipe.cs_ = std::make_unique<VkShaderObj>(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.CreateComputePipeline();
+
+    auto image_ci = vkt::Image::ImageCreateInfo2D(64, 64, 1, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    vkt::Image float_image(*m_device, image_ci, vkt::set_layout);
+    vkt::ImageView float_image_view = float_image.CreateView();
+
+    image_ci.format = VK_FORMAT_R8G8B8A8_UINT;
+    vkt::Image uint_image(*m_device, image_ci, vkt::set_layout);
+    vkt::ImageView uint_image_view = uint_image.CreateView();
+
+    vkt::Buffer buffer(*m_device, 64, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    uint32_t *data = (uint32_t *)buffer.memory().map();
+    *data = 0;
+    buffer.memory().unmap();
+
+    pipe.descriptor_set_->WriteDescriptorImageInfo(0, float_image_view.handle(), VK_NULL_HANDLE, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+                                                   VK_IMAGE_LAYOUT_GENERAL, 0);
+    pipe.descriptor_set_->WriteDescriptorImageInfo(0, uint_image_view.handle(), VK_NULL_HANDLE, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+                                                   VK_IMAGE_LAYOUT_GENERAL, 1);
+    pipe.descriptor_set_->WriteDescriptorBufferInfo(1, buffer.handle(), 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    pipe.descriptor_set_->UpdateDescriptorSets();
+
+    m_commandBuffer->begin();
+    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0, 1,
+                              &pipe.descriptor_set_->set_, 0, nullptr);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
+    m_commandBuffer->end();
+    m_default_queue->Submit(*m_commandBuffer);
+    vk::DeviceWaitIdle(*m_device);
 }

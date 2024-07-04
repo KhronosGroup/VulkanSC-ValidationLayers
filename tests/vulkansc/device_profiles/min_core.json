@@ -3,7 +3,7 @@
     "profiles": {
         "MIN_CORE": {
             "version": 1,
-            "api-version": "1.0.14",
+            "api-version": "1.0.15",
             "label": "Min Vulkan SC Core",
             "description": "Min Vulkan SC Core profile",
             "contributors": {},

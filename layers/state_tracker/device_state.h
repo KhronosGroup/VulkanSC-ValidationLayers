@@ -19,7 +19,7 @@
 #pragma once
 #include "state_tracker/state_object.h"
 #include "generated/layer_chassis_dispatch.h"
-#include "generated/vk_safe_struct.h"
+#include <vulkan/utility/vk_safe_struct.hpp>
 #include <vector>
 
 class QueueFamilyPerfCounters {
@@ -29,9 +29,9 @@ class QueueFamilyPerfCounters {
 
 class SurfacelessQueryState {
   public:
-    std::vector<safe_VkSurfaceFormat2KHR> formats;
+    std::vector<vku::safe_VkSurfaceFormat2KHR> formats;
     std::vector<VkPresentModeKHR> present_modes;
-    safe_VkSurfaceCapabilities2KHR capabilities;
+    vku::safe_VkSurfaceCapabilities2KHR capabilities;
 };
 
 namespace vvl {
@@ -50,8 +50,8 @@ class PhysicalDevice : public StateObject {
     // Surfaceless Query extension needs 'global' surface_state data
     SurfacelessQueryState surfaceless_query_state{};
 
-    PhysicalDevice(VkPhysicalDevice phys_dev)
-        : StateObject(phys_dev, kVulkanObjectTypePhysicalDevice), queue_family_properties(GetQueueFamilyProps(phys_dev)) {}
+    PhysicalDevice(VkPhysicalDevice handle)
+        : StateObject(handle, kVulkanObjectTypePhysicalDevice), queue_family_properties(GetQueueFamilyProps(handle)) {}
 
     VkPhysicalDevice VkHandle() const { return handle_.Cast<VkPhysicalDevice>(); }
 
@@ -70,8 +70,8 @@ class DisplayMode : public StateObject {
   public:
     const VkPhysicalDevice physical_device;
 
-    DisplayMode(VkDisplayModeKHR dm, VkPhysicalDevice phys_dev)
-        : StateObject(dm, kVulkanObjectTypeDisplayModeKHR), physical_device(phys_dev) {}
+    DisplayMode(VkDisplayModeKHR handle, VkPhysicalDevice phys_dev)
+        : StateObject(handle, kVulkanObjectTypeDisplayModeKHR), physical_device(phys_dev) {}
 
     VkDisplayModeKHR VkHandle() const { return handle_.Cast<VkDisplayModeKHR>(); }
 };

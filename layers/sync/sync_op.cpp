@@ -23,6 +23,7 @@
 
 #include "state_tracker/buffer_state.h"
 #include "state_tracker/cmd_buffer_state.h"
+#include "state_tracker/render_pass_state.h"
 
 #include "sync/sync_validation.h"
 
@@ -451,7 +452,7 @@ void SyncOpBarriers::BarrierSet::MakeImageMemoryBarriers(const SyncValidator &sy
         const auto &barrier = barriers[index];
         auto image = sync_state.Get<ImageState>(barrier.image);
         if (image) {
-            auto subresource_range = NormalizeSubresourceRange(image->createInfo, barrier.subresourceRange);
+            auto subresource_range = NormalizeSubresourceRange(image->create_info, barrier.subresourceRange);
             const SyncBarrier sync_barrier(barrier, src, dst);
             image_memory_barriers.emplace_back(image, index, sync_barrier, barrier.oldLayout, barrier.newLayout, subresource_range);
         } else {
@@ -471,7 +472,7 @@ void SyncOpBarriers::BarrierSet::MakeImageMemoryBarriers(const SyncValidator &sy
         auto dst = SyncExecScope::MakeDst(queue_flags, barrier.dstStageMask);
         auto image = sync_state.Get<ImageState>(barrier.image);
         if (image) {
-            auto subresource_range = NormalizeSubresourceRange(image->createInfo, barrier.subresourceRange);
+            auto subresource_range = NormalizeSubresourceRange(image->create_info, barrier.subresourceRange);
             const SyncBarrier sync_barrier(barrier, src, dst);
             image_memory_barriers.emplace_back(image, index, sync_barrier, barrier.oldLayout, barrier.newLayout, subresource_range);
         } else {
@@ -897,7 +898,7 @@ SyncOpSetEvent::SyncOpSetEvent(vvl::Func command, const SyncValidator &sync_stat
       event_(sync_state.Get<vvl::Event>(event)),
       recorded_context_(),
       src_exec_scope_(SyncExecScope::MakeSrc(queue_flags, sync_utils::GetGlobalStageMasks(dep_info).src)),
-      dep_info_(new safe_VkDependencyInfo(&dep_info)) {
+      dep_info_(new vku::safe_VkDependencyInfo(&dep_info)) {
     if (access_context) {
         recorded_context_ = std::make_shared<const AccessContext>(*access_context);
     }
@@ -1037,7 +1038,7 @@ SyncOpBeginRenderPass::SyncOpBeginRenderPass(vvl::Func command, const SyncValida
     : SyncOpBase(command), rp_context_(nullptr) {
     if (pRenderPassBegin) {
         rp_state_ = sync_state.Get<vvl::RenderPass>(pRenderPassBegin->renderPass);
-        renderpass_begin_info_ = safe_VkRenderPassBeginInfo(pRenderPassBegin);
+        renderpass_begin_info_ = vku::safe_VkRenderPassBeginInfo(pRenderPassBegin);
         auto fb_state = sync_state.Get<vvl::Framebuffer>(pRenderPassBegin->framebuffer);
         if (fb_state) {
             shared_attachments_ = sync_state.GetAttachmentViews(*renderpass_begin_info_.ptr(), *fb_state);
@@ -1049,7 +1050,7 @@ SyncOpBeginRenderPass::SyncOpBeginRenderPass(vvl::Func command, const SyncValida
             }
         }
         if (pSubpassBeginInfo) {
-            subpass_begin_info_ = safe_VkSubpassBeginInfo(pSubpassBeginInfo);
+            subpass_begin_info_ = vku::safe_VkSubpassBeginInfo(pSubpassBeginInfo);
         }
     }
 }
@@ -1071,7 +1072,7 @@ bool SyncOpBeginRenderPass::Validate(const CommandBufferAccessContext &cb_contex
                                cb_context.GetCurrentAccessContext());
 
     // Validate attachment operations
-    if (attachments_.size() == 0) return skip;
+    if (attachments_.empty()) return skip;
     const auto &render_area = renderpass_begin_info_.renderArea;
 
     // Since the isn't a valid RenderPassAccessContext until Record, needs to create the view/generator list... we could limit this

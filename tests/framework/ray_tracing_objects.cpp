@@ -399,8 +399,11 @@ BuildGeometryInfoKHR &BuildGeometryInfoKHR::SetScratchBuffer(std::shared_ptr<vkt
     return *this;
 }
 
-BuildGeometryInfoKHR &BuildGeometryInfoKHR::SetHostScratchBuffer(std::unique_ptr<uint8_t[]> &&host_scratch) {
+BuildGeometryInfoKHR &BuildGeometryInfoKHR::SetHostScratchBuffer(std::shared_ptr<std::vector<uint8_t>> host_scratch) {
     host_scratch_ = std::move(host_scratch);
+    if (host_scratch_) {
+        vk_info_.scratchData.hostAddress = host_scratch_->data();
+    }
     return *this;
 }
 
@@ -552,9 +555,9 @@ void BuildGeometryInfoKHR::SetupBuild(bool is_on_device_build, bool use_ppGeomet
             host_scratch_ = nullptr;
             if (scratch_size > 0) {
                 assert(scratch_size < vvl::kU32Max);
-                host_scratch_ = std::make_unique<uint8_t[]>(static_cast<size_t>(scratch_size));
+                host_scratch_ = std::make_shared<std::vector<uint8_t>>(static_cast<size_t>(scratch_size), 0);
             }
-            vk_info_.scratchData.hostAddress = host_scratch_.get();
+            vk_info_.scratchData.hostAddress = host_scratch_->data();
         }
     }
 }
@@ -775,6 +778,62 @@ void BuildAccelerationStructuresKHR(VkCommandBuffer cmd_buffer, std::vector<Buil
 
     // Build list of acceleration structures
     vk::CmdBuildAccelerationStructuresKHR(cmd_buffer, static_cast<uint32_t>(vk_infos.size()), vk_infos.data(), pRange_infos.data());
+
+    // Clean
+    for (auto &build_info : infos) {
+        // pGeometries is going to be destroyed
+        build_info.vk_info_.geometryCount = 0;
+        build_info.vk_info_.ppGeometries = nullptr;
+    }
+}
+
+void BuildHostAccelerationStructuresKHR(VkDevice device, std::vector<BuildGeometryInfoKHR> &infos) {
+    size_t total_geomertry_count = 0;
+
+    for (auto &build_info : infos) {
+        total_geomertry_count += build_info.geometries_.size();
+    }
+
+    // Those vectors will be used to contiguously store the "raw vulkan data" for each element of `infos`
+    // To do that, total memory needed needs to be know upfront
+    std::vector<const VkAccelerationStructureGeometryKHR *> pGeometries(total_geomertry_count);
+    std::vector<VkAccelerationStructureBuildRangeInfoKHR> range_infos(total_geomertry_count);
+    std::vector<const VkAccelerationStructureBuildRangeInfoKHR *> pRange_infos(total_geomertry_count);
+
+    std::vector<VkAccelerationStructureBuildGeometryInfoKHR> vk_infos;
+    vk_infos.reserve(infos.size());
+
+    size_t pGeometries_offset = 0;
+    size_t range_infos_offset = 0;
+    size_t pRange_infos_offset = 0;
+
+    for (auto &build_info : infos) {
+        if (build_info.blas_) {
+            build_info.blas_->BuildHost();
+        }
+        build_info.SetupBuild(false);
+
+        // Fill current vk_info_ with geometry data in ppGeometries, and get build ranges
+        for (size_t i = 0; i < build_info.geometries_.size(); ++i) {
+            const auto &geometry = build_info.geometries_[i];
+            pGeometries[pGeometries_offset + i] = &geometry.GetVkObj();
+            range_infos[range_infos_offset + i] = geometry.GetFullBuildRange();
+            pRange_infos[pRange_infos_offset + i] = &range_infos[range_infos_offset + i];
+        }
+
+        build_info.vk_info_.geometryCount = static_cast<uint32_t>(build_info.geometries_.size());
+        build_info.vk_info_.ppGeometries = &pGeometries[pGeometries_offset];
+
+        vk_infos.emplace_back(build_info.vk_info_);
+
+        pGeometries_offset += build_info.geometries_.size();
+        range_infos_offset += build_info.geometries_.size();
+        pRange_infos_offset += build_info.geometries_.size();
+    }
+
+    // Build list of acceleration structures
+    vk::BuildAccelerationStructuresKHR(device, VK_NULL_HANDLE, static_cast<uint32_t>(vk_infos.size()), vk_infos.data(),
+                                       pRange_infos.data());
 
     // Clean
     for (auto &build_info : infos) {
@@ -1098,7 +1157,7 @@ BuildGeometryInfoKHR BuildGeometryInfoSimpleOnHostTopLevel(const vkt::Device &de
     return out_build_info;
 }
 
-BuildGeometryInfoKHR BuildOnDeviceTopLevel(const vkt::Device &device, vkt::CommandBuffer &cmd_buffer) {
+BuildGeometryInfoKHR BuildOnDeviceTopLevel(const vkt::Device &device, vkt::Queue &queue, vkt::CommandBuffer &cmd_buffer) {
     // Create acceleration structure
     cmd_buffer.begin();
     // Build Bottom Level Acceleration Structure
@@ -1107,8 +1166,8 @@ BuildGeometryInfoKHR BuildOnDeviceTopLevel(const vkt::Device &device, vkt::Comma
     bot_level_accel_struct->BuildCmdBuffer(cmd_buffer);
     cmd_buffer.end();
 
-    cmd_buffer.QueueCommandBuffer();
-    device.wait();
+    queue.Submit(cmd_buffer);
+    device.Wait();
 
     cmd_buffer.begin();
     // Build Top Level Acceleration Structure
@@ -1117,8 +1176,8 @@ BuildGeometryInfoKHR BuildOnDeviceTopLevel(const vkt::Device &device, vkt::Comma
     top_level_accel_struct.BuildCmdBuffer(cmd_buffer);
     cmd_buffer.end();
 
-    cmd_buffer.QueueCommandBuffer();
-    device.wait();
+    queue.Submit(cmd_buffer);
+    device.Wait();
 
     return top_level_accel_struct;
 }
@@ -1172,6 +1231,22 @@ void Pipeline::SetUniformBufferBinding(std::shared_ptr<vkt::Buffer> uniform_buff
     bindings_.emplace_back(uniform_buffer_binding);
 }
 
+void Pipeline::SetStorageBufferBinding(std::shared_ptr<vkt::Buffer> storage_buffer, uint32_t bind_point) {
+    if (storage_buffer_) {
+        // For now, no need to handle multiple calls to this function
+        assert(false);
+    }
+
+    storage_buffer_ = storage_buffer;
+
+    VkDescriptorSetLayoutBinding binding{};
+    binding.binding = bind_point;
+    binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    binding.descriptorCount = 1;
+    binding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR;
+    bindings_.emplace_back(binding);
+}
+
 void Pipeline::SetPushConstantRangeSize(uint32_t byte_size) { push_constant_range_size_ = byte_size; }
 
 void Pipeline::SetRayGenShader(const char *glsl) {
@@ -1208,10 +1283,13 @@ void Pipeline::BuildPipeline() {
 
     size_t top_level_accel_struct_i = 0;
     for (const auto &binding : bindings_) {
-        if (binding.descriptorType & VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR) {
+        if (binding.descriptorType == VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR) {
             desc_set_->WriteDescriptorAccelStruct(binding.binding, 1, &tlas_vec_[top_level_accel_struct_i++]->GetDstAS()->handle());
-        } else if (binding.descriptorType & VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER) {
+        } else if (binding.descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER) {
             desc_set_->WriteDescriptorBufferInfo(binding.binding, *uniform_buffer_, 0, uniform_buffer_->create_info().size);
+        } else if (binding.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER) {
+            desc_set_->WriteDescriptorBufferInfo(binding.binding, *storage_buffer_, 0, storage_buffer_->create_info().size,
+                                                 VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
         } else {
             assert(false);
         }

@@ -339,9 +339,9 @@ class ResourceAccessState : public SyncStageAccess {
     HazardResult DetectHazard(const SyncStageAccessInfoType &usage_info, const OrderingBarrier &ordering, QueueId queue_id) const;
     HazardResult DetectHazard(const ResourceAccessState &recorded_use, QueueId queue_id, const ResourceUsageRange &tag_range) const;
 
-    HazardResult DetectAsyncHazard(const SyncStageAccessInfoType &usage_info, ResourceUsageTag start_tag) const;
+    HazardResult DetectAsyncHazard(const SyncStageAccessInfoType &usage_info, ResourceUsageTag start_tag, QueueId queue_id) const;
     HazardResult DetectAsyncHazard(const ResourceAccessState &recorded_use, const ResourceUsageRange &tag_range,
-                                   ResourceUsageTag start_tag) const;
+                                   ResourceUsageTag start_tag, QueueId queue_id) const;
 
     HazardResult DetectBarrierHazard(const SyncStageAccessInfoType &usage_info, QueueId queue_id,
                                      VkPipelineStageFlags2KHR source_exec_scope,
@@ -622,7 +622,7 @@ bool ResourceAccessState::ApplyPredicatedWait(Predicate &predicate) {
         ClearRead();
     }
 
-    bool all_clear = last_reads.size() == 0;
+    bool all_clear = last_reads.empty();
     if (last_write.has_value()) {
         if (predicate(*this) || sync_reads) {
             // Clear any predicated write, or any the write from any any access with synchronized reads.

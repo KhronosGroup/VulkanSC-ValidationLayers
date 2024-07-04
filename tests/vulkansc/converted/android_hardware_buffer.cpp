@@ -40,7 +40,7 @@ TEST_F(NegativeAndroidHardwareBuffer, ImageCreate) {
     ici.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
 
     // undefined format
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageCreateInfo-pNext-01975");
+    m_errorMonitor->SetDesiredError("VUID-VkImageCreateInfo-pNext-01975");
     // Various extra errors for having VK_FORMAT_UNDEFINED without VkExternalFormatANDROID
     m_errorMonitor->SetUnexpectedError("VUID_Undefined");
     m_errorMonitor->SetUnexpectedError("VUID-VkImageCreateInfo-imageCreateMaxMipLevels-02251");
@@ -51,13 +51,13 @@ TEST_F(NegativeAndroidHardwareBuffer, ImageCreate) {
     VkExternalFormatANDROID efa = vku::InitStructHelper();
     efa.externalFormat = 0;
     ici.pNext = &efa;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageCreateInfo-pNext-01975");
+    m_errorMonitor->SetDesiredError("VUID-VkImageCreateInfo-pNext-01975");
     vk::CreateImage(device(), &ici, NULL, &img);
     m_errorMonitor->VerifyFound();
 
     // undefined format with an unknown external format
     efa.externalFormat = 0xBADC0DE;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkExternalFormatANDROID-externalFormat-01894");
+    m_errorMonitor->SetDesiredError("VUID-VkExternalFormatANDROID-externalFormat-01894");
     vk::CreateImage(device(), &ici, NULL, &img);
     m_errorMonitor->VerifyFound();
 
@@ -71,33 +71,33 @@ TEST_F(NegativeAndroidHardwareBuffer, ImageCreate) {
     // a defined image format with a non-zero external format
     ici.format = VK_FORMAT_R8G8B8A8_UNORM;
     efa.externalFormat = ahb_fmt_props.externalFormat;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageCreateInfo-pNext-01974");
+    m_errorMonitor->SetDesiredError("VUID-VkImageCreateInfo-pNext-01974");
     vk::CreateImage(device(), &ici, NULL, &img);
     m_errorMonitor->VerifyFound();
     ici.format = VK_FORMAT_UNDEFINED;
 
     // external format while MUTABLE
     ici.flags = VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageCreateInfo-pNext-02396");
+    m_errorMonitor->SetDesiredError("VUID-VkImageCreateInfo-pNext-02396");
     vk::CreateImage(device(), &ici, NULL, &img);
     m_errorMonitor->VerifyFound();
     ici.flags = 0;
 
     // external format while usage other than SAMPLED
     ici.usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageCreateInfo-pNext-02397");
+    m_errorMonitor->SetDesiredError("VUID-VkImageCreateInfo-pNext-02397");
     vk::CreateImage(device(), &ici, NULL, &img);
     m_errorMonitor->VerifyFound();
 
     ici.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageCreateInfo-pNext-09457");
+    m_errorMonitor->SetDesiredError("VUID-VkImageCreateInfo-pNext-09457");
     vk::CreateImage(device(), &ici, NULL, &img);
     m_errorMonitor->VerifyFound();
     ici.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
 
     // external format while tiline other than OPTIMAL
     ici.tiling = VK_IMAGE_TILING_LINEAR;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageCreateInfo-pNext-02398");
+    m_errorMonitor->SetDesiredError("VUID-VkImageCreateInfo-pNext-02398");
     vk::CreateImage(device(), &ici, NULL, &img);
     m_errorMonitor->VerifyFound();
     ici.tiling = VK_IMAGE_TILING_OPTIMAL;
@@ -110,7 +110,7 @@ TEST_F(NegativeAndroidHardwareBuffer, ImageCreate) {
     ici.imageType = VK_IMAGE_TYPE_3D;
     ici.extent = {64, 64, 64};
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageCreateInfo-pNext-02393");
+    m_errorMonitor->SetDesiredError("VUID-VkImageCreateInfo-pNext-02393");
     vk::CreateImage(device(), &ici, NULL, &img);
     m_errorMonitor->VerifyFound();
 
@@ -118,7 +118,7 @@ TEST_F(NegativeAndroidHardwareBuffer, ImageCreate) {
     ici.imageType = VK_IMAGE_TYPE_2D;
     ici.extent = {64, 64, 1};
     ici.mipLevels = 6;  // should be 7
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageCreateInfo-pNext-02394");
+    m_errorMonitor->SetDesiredError("VUID-VkImageCreateInfo-pNext-02394");
     vk::CreateImage(device(), &ici, NULL, &img);
     m_errorMonitor->VerifyFound();
 }
@@ -143,15 +143,13 @@ TEST_F(NegativeAndroidHardwareBuffer, FetchUnboundImageInfo) {
     ici.samples = VK_SAMPLE_COUNT_1_BIT;
     ici.tiling = VK_IMAGE_TILING_LINEAR;
     ici.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
-
-    VkImageObj image(m_device);
-    image.init_no_mem(*m_device, ici);
+    vkt::Image image(*m_device, ici, vkt::no_mem);
 
     // attempt to fetch layout from unbound image
     VkImageSubresource sub_rsrc = {};
     sub_rsrc.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     VkSubresourceLayout sub_layout = {};
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetImageSubresourceLayout-image-09432");
+    m_errorMonitor->SetDesiredError("VUID-vkGetImageSubresourceLayout-image-09432");
     vk::GetImageSubresourceLayout(device(), image.handle(), &sub_rsrc, &sub_layout);
     m_errorMonitor->VerifyFound();
 
@@ -159,7 +157,7 @@ TEST_F(NegativeAndroidHardwareBuffer, FetchUnboundImageInfo) {
     VkImageMemoryRequirementsInfo2 imri = vku::InitStructHelper();
     imri.image = image.handle();
     VkMemoryRequirements2 mem_reqs = vku::InitStructHelper();
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageMemoryRequirementsInfo2-image-01897");
+    m_errorMonitor->SetDesiredError("VUID-VkImageMemoryRequirementsInfo2-image-01897");
     vk::GetImageMemoryRequirements2(device(), &imri, &mem_reqs);
     m_errorMonitor->VerifyFound();
 }
@@ -177,7 +175,7 @@ TEST_F(NegativeAndroidHardwareBuffer, GpuDataBuffer) {
     import_ahb_Info.buffer = ahb.handle();
 
     VkAndroidHardwareBufferPropertiesANDROID ahb_props = vku::InitStructHelper();
-    vk::GetAndroidHardwareBufferPropertiesANDROID(m_device->device(), ahb.handle(), &ahb_props);
+    vk::GetAndroidHardwareBufferPropertiesANDROID(device(), ahb.handle(), &ahb_props);
 
     VkMemoryAllocateInfo memory_allocate_info = vku::InitStructHelper(&import_ahb_Info);
     if (!SetAllocationInfoImportAHB(m_device, ahb_props, memory_allocate_info)) {
@@ -185,7 +183,7 @@ TEST_F(NegativeAndroidHardwareBuffer, GpuDataBuffer) {
     }
 
     // Import requires format AHB_FMT_BLOB and usage AHB_USAGE_GPU_DATA_BUFFER
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkMemoryAllocateInfo-pNext-02384");
+    m_errorMonitor->SetDesiredError("VUID-VkMemoryAllocateInfo-pNext-02384");
     vkt::DeviceMemory memory(*m_device, memory_allocate_info);
     m_errorMonitor->VerifyFound();
 }
@@ -203,7 +201,7 @@ TEST_F(NegativeAndroidHardwareBuffer, AllocationSize) {
     import_ahb_Info.buffer = ahb.handle();
 
     VkAndroidHardwareBufferPropertiesANDROID ahb_props = vku::InitStructHelper();
-    vk::GetAndroidHardwareBufferPropertiesANDROID(m_device->device(), ahb.handle(), &ahb_props);
+    vk::GetAndroidHardwareBufferPropertiesANDROID(device(), ahb.handle(), &ahb_props);
 
     VkMemoryAllocateInfo memory_allocate_info = vku::InitStructHelper(&import_ahb_Info);
     if (!SetAllocationInfoImportAHB(m_device, ahb_props, memory_allocate_info)) {
@@ -213,7 +211,7 @@ TEST_F(NegativeAndroidHardwareBuffer, AllocationSize) {
     // Allocation size mismatch
     {
         memory_allocate_info.allocationSize = ahb_props.allocationSize + 1;
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkMemoryAllocateInfo-allocationSize-02383");
+        m_errorMonitor->SetDesiredError("VUID-VkMemoryAllocateInfo-allocationSize-02383");
         vkt::DeviceMemory memory(*m_device, memory_allocate_info);
         m_errorMonitor->VerifyFound();
     }
@@ -225,7 +223,7 @@ TEST_F(NegativeAndroidHardwareBuffer, AllocationSize) {
 #if defined(VVL_MOCK_ANDROID)
         m_errorMonitor->SetUnexpectedError("VUID-vkAllocateMemory-pAllocateInfo-01714");  // incase at last index
 #endif
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkMemoryAllocateInfo-memoryTypeIndex-02385");
+        m_errorMonitor->SetDesiredError("VUID-VkMemoryAllocateInfo-memoryTypeIndex-02385");
         vkt::DeviceMemory memory(*m_device, memory_allocate_info);
         m_errorMonitor->VerifyFound();
     }
@@ -242,7 +240,7 @@ TEST_F(NegativeAndroidHardwareBuffer, DedicatedUsageColor) {
 
     VkAndroidHardwareBufferFormatPropertiesANDROID ahb_fmt_props = vku::InitStructHelper();
     VkAndroidHardwareBufferPropertiesANDROID ahb_props = vku::InitStructHelper(&ahb_fmt_props);
-    vk::GetAndroidHardwareBufferPropertiesANDROID(m_device->device(), ahb.handle(), &ahb_props);
+    vk::GetAndroidHardwareBufferPropertiesANDROID(device(), ahb.handle(), &ahb_props);
 
     VkExternalFormatANDROID external_format = vku::InitStructHelper();
     external_format.externalFormat = ahb_fmt_props.externalFormat;
@@ -257,8 +255,7 @@ TEST_F(NegativeAndroidHardwareBuffer, DedicatedUsageColor) {
     ici.samples = VK_SAMPLE_COUNT_1_BIT;
     ici.tiling = VK_IMAGE_TILING_OPTIMAL;
     ici.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
-    VkImageObj image(m_device);
-    image.init_no_mem(*m_device, ici);
+    vkt::Image image(*m_device, ici, vkt::no_mem);
 
     VkMemoryDedicatedAllocateInfo dedicated_allocation_info = vku::InitStructHelper();
     dedicated_allocation_info.image = image.handle();
@@ -272,7 +269,7 @@ TEST_F(NegativeAndroidHardwareBuffer, DedicatedUsageColor) {
         GTEST_SKIP() << "No valid memory type index could be found";
     }
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkMemoryAllocateInfo-pNext-02390");
+    m_errorMonitor->SetDesiredError("VUID-VkMemoryAllocateInfo-pNext-02390");
     vkt::DeviceMemory memory(*m_device, memory_allocate_info);
     m_errorMonitor->VerifyFound();
 }
@@ -294,7 +291,7 @@ TEST_F(NegativeAndroidHardwareBuffer, DedicatedUsageDS) {
 
     VkAndroidHardwareBufferFormatPropertiesANDROID ahb_fmt_props = vku::InitStructHelper();
     VkAndroidHardwareBufferPropertiesANDROID ahb_props = vku::InitStructHelper(&ahb_fmt_props);
-    vk::GetAndroidHardwareBufferPropertiesANDROID(m_device->device(), ahb.handle(), &ahb_props);
+    vk::GetAndroidHardwareBufferPropertiesANDROID(device(), ahb.handle(), &ahb_props);
 
     if (ahb_fmt_props.format != VK_FORMAT_S8_UINT) {
         GTEST_SKIP() << "Driver bug: Didn't turn AHB format into VK_FORMAT_S8_UINT";
@@ -313,8 +310,7 @@ TEST_F(NegativeAndroidHardwareBuffer, DedicatedUsageDS) {
     ici.samples = VK_SAMPLE_COUNT_1_BIT;
     ici.tiling = VK_IMAGE_TILING_OPTIMAL;
     ici.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
-    VkImageObj image(m_device);
-    image.init_no_mem(*m_device, ici);
+    vkt::Image image(*m_device, ici, vkt::no_mem);
 
     VkMemoryDedicatedAllocateInfo dedicated_allocation_info = vku::InitStructHelper();
     dedicated_allocation_info.image = image.handle();
@@ -328,7 +324,7 @@ TEST_F(NegativeAndroidHardwareBuffer, DedicatedUsageDS) {
         GTEST_SKIP() << "No valid memory type index could be found";
     }
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkMemoryAllocateInfo-pNext-02390");
+    m_errorMonitor->SetDesiredError("VUID-VkMemoryAllocateInfo-pNext-02390");
     vkt::DeviceMemory memory(*m_device, memory_allocate_info);
     m_errorMonitor->VerifyFound();
 }
@@ -356,7 +352,7 @@ TEST_F(NegativeAndroidHardwareBuffer, MipmapChainComplete) {
 
     VkAndroidHardwareBufferFormatPropertiesANDROID ahb_fmt_props = vku::InitStructHelper();
     VkAndroidHardwareBufferPropertiesANDROID ahb_props = vku::InitStructHelper(&ahb_fmt_props);
-    vk::GetAndroidHardwareBufferPropertiesANDROID(m_device->device(), ahb.handle(), &ahb_props);
+    vk::GetAndroidHardwareBufferPropertiesANDROID(device(), ahb.handle(), &ahb_props);
 
     VkImageCreateInfo ici = vku::InitStructHelper();
     ici.imageType = VK_IMAGE_TYPE_2D;
@@ -368,8 +364,7 @@ TEST_F(NegativeAndroidHardwareBuffer, MipmapChainComplete) {
     ici.samples = VK_SAMPLE_COUNT_1_BIT;
     ici.tiling = VK_IMAGE_TILING_OPTIMAL;
     ici.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
-    VkImageObj image(m_device);
-    image.init_no_mem(*m_device, ici);
+    vkt::Image image(*m_device, ici, vkt::no_mem);
 
     VkMemoryDedicatedAllocateInfo dedicated_allocation_info = vku::InitStructHelper();
     dedicated_allocation_info.image = image.handle();
@@ -383,7 +378,7 @@ TEST_F(NegativeAndroidHardwareBuffer, MipmapChainComplete) {
         GTEST_SKIP() << "No valid memory type index could be found";
     }
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkMemoryAllocateInfo-pNext-02389");
+    m_errorMonitor->SetDesiredError("VUID-VkMemoryAllocateInfo-pNext-02389");
     vkt::DeviceMemory memory(*m_device, memory_allocate_info);
     m_errorMonitor->VerifyFound();
 }
@@ -406,7 +401,7 @@ TEST_F(NegativeAndroidHardwareBuffer, NoMipmapChain) {
 
     VkAndroidHardwareBufferFormatPropertiesANDROID ahb_fmt_props = vku::InitStructHelper();
     VkAndroidHardwareBufferPropertiesANDROID ahb_props = vku::InitStructHelper(&ahb_fmt_props);
-    vk::GetAndroidHardwareBufferPropertiesANDROID(m_device->device(), ahb.handle(), &ahb_props);
+    vk::GetAndroidHardwareBufferPropertiesANDROID(device(), ahb.handle(), &ahb_props);
 
     VkImageCreateInfo ici = vku::InitStructHelper();
     ici.imageType = VK_IMAGE_TYPE_2D;
@@ -418,8 +413,7 @@ TEST_F(NegativeAndroidHardwareBuffer, NoMipmapChain) {
     ici.samples = VK_SAMPLE_COUNT_1_BIT;
     ici.tiling = VK_IMAGE_TILING_OPTIMAL;
     ici.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
-    VkImageObj image(m_device);
-    image.init_no_mem(*m_device, ici);
+    vkt::Image image(*m_device, ici, vkt::no_mem);
 
     VkMemoryDedicatedAllocateInfo dedicated_allocation_info = vku::InitStructHelper();
     dedicated_allocation_info.image = image.handle();
@@ -433,7 +427,7 @@ TEST_F(NegativeAndroidHardwareBuffer, NoMipmapChain) {
         GTEST_SKIP() << "No valid memory type index could be found";
     }
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkMemoryAllocateInfo-pNext-02586");
+    m_errorMonitor->SetDesiredError("VUID-VkMemoryAllocateInfo-pNext-02586");
     vkt::DeviceMemory memory(*m_device, memory_allocate_info);
     m_errorMonitor->VerifyFound();
 }
@@ -456,7 +450,7 @@ TEST_F(NegativeAndroidHardwareBuffer, ImageDimensions) {
 
     VkAndroidHardwareBufferFormatPropertiesANDROID ahb_fmt_props = vku::InitStructHelper();
     VkAndroidHardwareBufferPropertiesANDROID ahb_props = vku::InitStructHelper(&ahb_fmt_props);
-    vk::GetAndroidHardwareBufferPropertiesANDROID(m_device->device(), ahb.handle(), &ahb_props);
+    vk::GetAndroidHardwareBufferPropertiesANDROID(device(), ahb.handle(), &ahb_props);
 
     VkExternalFormatANDROID external_format = vku::InitStructHelper();
     external_format.externalFormat = ahb_fmt_props.externalFormat;
@@ -471,8 +465,7 @@ TEST_F(NegativeAndroidHardwareBuffer, ImageDimensions) {
     ici.samples = VK_SAMPLE_COUNT_1_BIT;
     ici.tiling = VK_IMAGE_TILING_OPTIMAL;
     ici.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
-    VkImageObj image(m_device);
-    image.init_no_mem(*m_device, ici);
+    vkt::Image image(*m_device, ici, vkt::no_mem);
 
     VkMemoryDedicatedAllocateInfo dedicated_allocation_info = vku::InitStructHelper();
     dedicated_allocation_info.image = image.handle();
@@ -486,7 +479,7 @@ TEST_F(NegativeAndroidHardwareBuffer, ImageDimensions) {
         GTEST_SKIP() << "No valid memory type index could be found";
     }
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkMemoryAllocateInfo-pNext-02388");
+    m_errorMonitor->SetDesiredError("VUID-VkMemoryAllocateInfo-pNext-02388");
     vkt::DeviceMemory memory(*m_device, memory_allocate_info);
     m_errorMonitor->VerifyFound();
 }
@@ -502,7 +495,7 @@ TEST_F(NegativeAndroidHardwareBuffer, UnknownFormat) {
 
     VkAndroidHardwareBufferFormatPropertiesANDROID ahb_fmt_props = vku::InitStructHelper();
     VkAndroidHardwareBufferPropertiesANDROID ahb_props = vku::InitStructHelper(&ahb_fmt_props);
-    vk::GetAndroidHardwareBufferPropertiesANDROID(m_device->device(), ahb.handle(), &ahb_props);
+    vk::GetAndroidHardwareBufferPropertiesANDROID(device(), ahb.handle(), &ahb_props);
 
     VkImageCreateInfo ici = vku::InitStructHelper();
     ici.imageType = VK_IMAGE_TYPE_2D;
@@ -514,8 +507,7 @@ TEST_F(NegativeAndroidHardwareBuffer, UnknownFormat) {
     ici.samples = VK_SAMPLE_COUNT_1_BIT;
     ici.tiling = VK_IMAGE_TILING_OPTIMAL;
     ici.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
-    VkImageObj image(m_device);
-    image.init_no_mem(*m_device, ici);
+    vkt::Image image(*m_device, ici, vkt::no_mem);
 
     VkMemoryDedicatedAllocateInfo dedicated_allocation_info = vku::InitStructHelper();
     dedicated_allocation_info.image = image.handle();
@@ -529,7 +521,7 @@ TEST_F(NegativeAndroidHardwareBuffer, UnknownFormat) {
         GTEST_SKIP() << "No valid memory type index could be found";
     }
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkMemoryAllocateInfo-pNext-02387");
+    m_errorMonitor->SetDesiredError("VUID-VkMemoryAllocateInfo-pNext-02387");
     vkt::DeviceMemory memory(*m_device, memory_allocate_info);
     m_errorMonitor->VerifyFound();
 }
@@ -549,8 +541,8 @@ TEST_F(NegativeAndroidHardwareBuffer, GpuUsage) {
     // Everything from ahb_props is garbage and not usable
     VkAndroidHardwareBufferFormatPropertiesANDROID ahb_fmt_props = vku::InitStructHelper();
     VkAndroidHardwareBufferPropertiesANDROID ahb_props = vku::InitStructHelper(&ahb_fmt_props);
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetAndroidHardwareBufferPropertiesANDROID-buffer-01884");
-    vk::GetAndroidHardwareBufferPropertiesANDROID(m_device->device(), ahb.handle(), &ahb_props);
+    m_errorMonitor->SetDesiredError("VUID-vkGetAndroidHardwareBufferPropertiesANDROID-buffer-01884");
+    vk::GetAndroidHardwareBufferPropertiesANDROID(device(), ahb.handle(), &ahb_props);
     m_errorMonitor->VerifyFound();
 
     // Since we are creating a invalid AHB for the safe of getting the below AHB, there is a chance the driver will not be forgiving
@@ -576,8 +568,7 @@ TEST_F(NegativeAndroidHardwareBuffer, GpuUsage) {
     ici.samples = VK_SAMPLE_COUNT_1_BIT;
     ici.tiling = VK_IMAGE_TILING_OPTIMAL;
     ici.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
-    VkImageObj image(m_device);
-    image.init_no_mem(*m_device, ici);
+    vkt::Image image(*m_device, ici, vkt::no_mem);
 
     VkMemoryDedicatedAllocateInfo dedicated_allocation_info = vku::InitStructHelper();
     dedicated_allocation_info.image = image.handle();
@@ -595,7 +586,7 @@ TEST_F(NegativeAndroidHardwareBuffer, GpuUsage) {
     m_errorMonitor->SetUnexpectedError("VUID-VkMemoryAllocateInfo-pNext-02390");
     m_errorMonitor->SetUnexpectedError("VUID-VkMemoryAllocateInfo-memoryTypeIndex-02385");
     m_errorMonitor->SetUnexpectedError("VUID-VkMemoryAllocateInfo-allocationSize-02383");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkMemoryAllocateInfo-pNext-02386");
+    m_errorMonitor->SetDesiredError("VUID-VkMemoryAllocateInfo-pNext-02386");
     vkt::DeviceMemory memory(*m_device, memory_allocate_info);
     m_errorMonitor->VerifyFound();
 }
@@ -611,7 +602,7 @@ TEST_F(NegativeAndroidHardwareBuffer, ExportMemoryAllocateImage) {
 
     VkAndroidHardwareBufferFormatPropertiesANDROID ahb_fmt_props = vku::InitStructHelper();
     VkAndroidHardwareBufferPropertiesANDROID ahb_props = vku::InitStructHelper(&ahb_fmt_props);
-    vk::GetAndroidHardwareBufferPropertiesANDROID(m_device->device(), ahb.handle(), &ahb_props);
+    vk::GetAndroidHardwareBufferPropertiesANDROID(device(), ahb.handle(), &ahb_props);
 
     VkExternalFormatANDROID external_format = vku::InitStructHelper();
     external_format.externalFormat = ahb_fmt_props.externalFormat;
@@ -626,8 +617,7 @@ TEST_F(NegativeAndroidHardwareBuffer, ExportMemoryAllocateImage) {
     ici.samples = VK_SAMPLE_COUNT_1_BIT;
     ici.tiling = VK_IMAGE_TILING_OPTIMAL;
     ici.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
-    VkImageObj image(m_device);
-    image.init_no_mem(*m_device, ici);
+    vkt::Image image(*m_device, ici, vkt::no_mem);
 
     VkMemoryDedicatedAllocateInfo dedicated_allocation_info = vku::InitStructHelper();
     dedicated_allocation_info.image = image.handle();
@@ -642,7 +632,7 @@ TEST_F(NegativeAndroidHardwareBuffer, ExportMemoryAllocateImage) {
         GTEST_SKIP() << "No valid memory type index could be found";
     }
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkMemoryAllocateInfo-pNext-01874");
+    m_errorMonitor->SetDesiredError("VUID-VkMemoryAllocateInfo-pNext-01874");
     vkt::DeviceMemory memory(*m_device, memory_allocate_info);
     m_errorMonitor->VerifyFound();
 }
@@ -658,7 +648,7 @@ TEST_F(NegativeAndroidHardwareBuffer, ExportMemoryAllocateBuffer) {
 
     VkAndroidHardwareBufferFormatPropertiesANDROID ahb_fmt_props = vku::InitStructHelper();
     VkAndroidHardwareBufferPropertiesANDROID ahb_props = vku::InitStructHelper(&ahb_fmt_props);
-    vk::GetAndroidHardwareBufferPropertiesANDROID(m_device->device(), ahb.handle(), &ahb_props);
+    vk::GetAndroidHardwareBufferPropertiesANDROID(device(), ahb.handle(), &ahb_props);
 
     VkExternalMemoryBufferCreateInfo ext_buf_info = vku::InitStructHelper();
     ext_buf_info.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID;
@@ -683,7 +673,7 @@ TEST_F(NegativeAndroidHardwareBuffer, ExportMemoryAllocateBuffer) {
 
     memory_allocate_info.allocationSize = 0;
     m_errorMonitor->SetUnexpectedError("VUID-VkMemoryDedicatedAllocateInfo-buffer-02965");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkMemoryAllocateInfo-pNext-07901");
+    m_errorMonitor->SetDesiredError("VUID-VkMemoryAllocateInfo-pNext-07901");
     vkt::DeviceMemory memory(*m_device, memory_allocate_info);
     m_errorMonitor->VerifyFound();
 }
@@ -702,7 +692,7 @@ TEST_F(NegativeAndroidHardwareBuffer, CreateYCbCrSampler) {
     sycci.ycbcrModel = VK_SAMPLER_YCBCR_MODEL_CONVERSION_RGB_IDENTITY;
     sycci.ycbcrRange = VK_SAMPLER_YCBCR_RANGE_ITU_FULL;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSamplerYcbcrConversionCreateInfo-format-04061");
+    m_errorMonitor->SetDesiredError("VUID-VkSamplerYcbcrConversionCreateInfo-format-04061");
     m_errorMonitor->SetUnexpectedError("VUID-VkSamplerYcbcrConversionCreateInfo-xChromaOffset-01651");
     vk::CreateSamplerYcbcrConversion(device(), &sycci, NULL, &ycbcr_conv);
     m_errorMonitor->VerifyFound();
@@ -711,7 +701,7 @@ TEST_F(NegativeAndroidHardwareBuffer, CreateYCbCrSampler) {
     efa.externalFormat = AHARDWAREBUFFER_FORMAT_R8G8B8X8_UNORM;
     sycci.format = VK_FORMAT_R8G8B8A8_UNORM;
     sycci.pNext = &efa;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSamplerYcbcrConversionCreateInfo-format-01904");
+    m_errorMonitor->SetDesiredError("VUID-VkSamplerYcbcrConversionCreateInfo-format-01904");
     m_errorMonitor->SetUnexpectedError("VUID-VkSamplerYcbcrConversionCreateInfo-xChromaOffset-01651");
     vk::CreateSamplerYcbcrConversion(device(), &sycci, NULL, &ycbcr_conv);
     m_errorMonitor->VerifyFound();
@@ -744,7 +734,7 @@ TEST_F(NegativeAndroidHardwareBuffer, PhysDevImageFormatProp2) {
     ifp.pNext = &ahbu;
 
     // AHB_usage chained to input without a matching external image format struc chained to output
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetPhysicalDeviceImageFormatProperties2-pNext-01868");
+    m_errorMonitor->SetDesiredError("VUID-vkGetPhysicalDeviceImageFormatProperties2-pNext-01868");
     vk::GetPhysicalDeviceImageFormatProperties2(m_device->phy().handle(), &pdifi, &ifp);
     m_errorMonitor->VerifyFound();
 
@@ -752,7 +742,7 @@ TEST_F(NegativeAndroidHardwareBuffer, PhysDevImageFormatProp2) {
     VkPhysicalDeviceExternalImageFormatInfo pdeifi = vku::InitStructHelper();
     pdeifi.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT;
     pdifi.pNext = &pdeifi;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetPhysicalDeviceImageFormatProperties2-pNext-01868");
+    m_errorMonitor->SetDesiredError("VUID-vkGetPhysicalDeviceImageFormatProperties2-pNext-01868");
     vk::GetPhysicalDeviceImageFormatProperties2(m_device->phy().handle(), &pdifi, &ifp);
     m_errorMonitor->VerifyFound();
 }
@@ -831,7 +821,7 @@ TEST_F(NegativeAndroidHardwareBuffer, CreateImageView) {
     vk::AllocateMemory(device(), &mai, NULL, &img_mem);
 
     // It shouldn't use vk::GetImageMemoryRequirements for imported AndroidHardwareBuffer when memory isn't bound yet
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetImageMemoryRequirements-image-04004");
+    m_errorMonitor->SetDesiredError("VUID-vkGetImageMemoryRequirements-image-04004");
     VkMemoryRequirements img_mem_reqs = {};
     vk::GetImageMemoryRequirements(device(), img, &img_mem_reqs);
     m_errorMonitor->VerifyFound();
@@ -870,9 +860,9 @@ TEST_F(NegativeAndroidHardwareBuffer, CreateImageView) {
     // Up to this point, no errors expected
 
     // Chained ycbcr conversion has different (external) format than image
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageViewCreateInfo-image-02400");
+    m_errorMonitor->SetDesiredError("VUID-VkImageViewCreateInfo-image-02400");
     // Also causes "unsupported format" - should be removed in future spec update
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageViewCreateInfo-None-02273");
+    m_errorMonitor->SetDesiredError("VUID-VkImageViewCreateInfo-None-02273");
     vk::CreateImageView(device(), &ivci, NULL, &image_view);
     m_errorMonitor->VerifyFound();
 
@@ -885,9 +875,9 @@ TEST_F(NegativeAndroidHardwareBuffer, CreateImageView) {
     // View component swizzle not IDENTITY
     ivci.components.r = VK_COMPONENT_SWIZZLE_B;
     ivci.components.b = VK_COMPONENT_SWIZZLE_R;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageViewCreateInfo-image-02401");
+    m_errorMonitor->SetDesiredError("VUID-VkImageViewCreateInfo-image-02401");
     // Also causes "unsupported format" - should be removed in future spec update
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageViewCreateInfo-None-02273");
+    m_errorMonitor->SetDesiredError("VUID-VkImageViewCreateInfo-None-02273");
     vk::CreateImageView(device(), &ivci, NULL, &image_view);
     m_errorMonitor->VerifyFound();
 
@@ -897,9 +887,9 @@ TEST_F(NegativeAndroidHardwareBuffer, CreateImageView) {
 
     // View with external format, when format is not UNDEFINED
     ivci.format = VK_FORMAT_R5G6B5_UNORM_PACK16;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageViewCreateInfo-image-02399");
+    m_errorMonitor->SetDesiredError("VUID-VkImageViewCreateInfo-image-02399");
     // Also causes "view format different from image format"
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageViewCreateInfo-image-01762");
+    m_errorMonitor->SetDesiredError("VUID-VkImageViewCreateInfo-image-01762");
     vk::CreateImageView(device(), &ivci, NULL, &image_view);
     m_errorMonitor->VerifyFound();
 
@@ -938,9 +928,9 @@ TEST_F(NegativeAndroidHardwareBuffer, ImportBuffer) {
     }
 
     // Import as buffer requires usage AHB_USAGE_GPU_DATA_BUFFER
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImportAndroidHardwareBufferInfoANDROID-buffer-01881");
+    m_errorMonitor->SetDesiredError("VUID-VkImportAndroidHardwareBufferInfoANDROID-buffer-01881");
     // Also causes "non-dedicated allocation format/usage" error
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkMemoryAllocateInfo-pNext-02384");
+    m_errorMonitor->SetDesiredError("VUID-VkMemoryAllocateInfo-pNext-02384");
     vkt::DeviceMemory mem_handle(*m_device, memory_allocate_info);
     m_errorMonitor->VerifyFound();
 }
@@ -961,7 +951,7 @@ TEST_F(NegativeAndroidHardwareBuffer, ExportBufferHandleType) {
     VkMemoryGetAndroidHardwareBufferInfoANDROID mgahbi = vku::InitStructHelper();
     mgahbi.memory = memory;
     AHardwareBuffer *ahb = nullptr;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkMemoryGetAndroidHardwareBufferInfoANDROID-handleTypes-01882");
+    m_errorMonitor->SetDesiredError("VUID-VkMemoryGetAndroidHardwareBufferInfoANDROID-handleTypes-01882");
     vk::GetMemoryAndroidHardwareBufferANDROID(device(), &mgahbi, &ahb);
     m_errorMonitor->VerifyFound();
 }
@@ -994,7 +984,7 @@ TEST_F(NegativeAndroidHardwareBuffer, ExportBufferAllocationSize) {
         GTEST_SKIP() << "No valid memory type index could be found";
     }
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkMemoryAllocateInfo-pNext-07900");
+    m_errorMonitor->SetDesiredError("VUID-VkMemoryAllocateInfo-pNext-07900");
     vkt::DeviceMemory memory(*m_device, memory_info);
     m_errorMonitor->VerifyFound();
 }
@@ -1010,7 +1000,6 @@ TEST_F(NegativeAndroidHardwareBuffer, ExportImageNonBound) {
     VkExternalMemoryImageCreateInfo ext_image_info = vku::InitStructHelper();
     ext_image_info.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID;
 
-    VkImageObj image(m_device);
     VkImageCreateInfo image_create_info = vku::InitStructHelper(&ext_image_info);
     image_create_info.flags = 0;
     image_create_info.imageType = VK_IMAGE_TYPE_2D;
@@ -1023,7 +1012,7 @@ TEST_F(NegativeAndroidHardwareBuffer, ExportImageNonBound) {
     image_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     image_create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     image_create_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-    image.init_no_mem(*m_device, image_create_info);
+    vkt::Image image(*m_device, image_create_info, vkt::no_mem);
 
     VkMemoryDedicatedAllocateInfo memory_dedicated_info = vku::InitStructHelper();
     memory_dedicated_info.image = image.handle();
@@ -1048,7 +1037,7 @@ TEST_F(NegativeAndroidHardwareBuffer, ExportImageNonBound) {
     VkMemoryGetAndroidHardwareBufferInfoANDROID mgahbi = vku::InitStructHelper();
     mgahbi.memory = memory;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkMemoryGetAndroidHardwareBufferInfoANDROID-pNext-01883");
+    m_errorMonitor->SetDesiredError("VUID-VkMemoryGetAndroidHardwareBufferInfoANDROID-pNext-01883");
     AHardwareBuffer *ahb = nullptr;
     vk::GetMemoryAndroidHardwareBufferANDROID(device(), &mgahbi, &ahb);
     m_errorMonitor->VerifyFound();
@@ -1092,15 +1081,15 @@ TEST_F(NegativeAndroidHardwareBuffer, InvalidBindBufferMemory) {
     }
 
     if (mem_reqs.alignment > 1) {
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkBindBufferMemory-memoryOffset-01036");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkBindBufferMemory-size-01037");
+        m_errorMonitor->SetDesiredError("VUID-vkBindBufferMemory-memoryOffset-01036");
+        m_errorMonitor->SetDesiredError("VUID-vkBindBufferMemory-size-01037");
         vk::BindBufferMemory(device(), buffer.handle(), memory.handle(), 1);
         m_errorMonitor->VerifyFound();
     }
 
     VkDeviceSize buffer_offset = (mem_reqs.size - 1) & ~(mem_reqs.alignment - 1);
     if (buffer_offset > 0) {
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkBindBufferMemory-size-01037");
+        m_errorMonitor->SetDesiredError("VUID-vkBindBufferMemory-size-01037");
         vk::BindBufferMemory(device(), buffer.handle(), memory.handle(), buffer_offset);
         m_errorMonitor->VerifyFound();
     }
@@ -1139,7 +1128,7 @@ TEST_F(NegativeAndroidHardwareBuffer, ImportBufferHandleType) {
     buffer_create_info.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
     vkt::Buffer buffer(*m_device, buffer_create_info, vkt::no_mem);
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkBindBufferMemory-memory-02986");
+    m_errorMonitor->SetDesiredError("VUID-vkBindBufferMemory-memory-02986");
     m_errorMonitor->SetUnexpectedError("VUID-vkBindBufferMemory-memory-01035");
     vk::BindBufferMemory(device(), buffer.handle(), memory, 0);
     m_errorMonitor->VerifyFound();
@@ -1149,7 +1138,7 @@ TEST_F(NegativeAndroidHardwareBuffer, ImportBufferHandleType) {
     bind_buffer_info.memory = memory;
     bind_buffer_info.memoryOffset = 0;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkBindBufferMemoryInfo-memory-02986");
+    m_errorMonitor->SetDesiredError("VUID-VkBindBufferMemoryInfo-memory-02986");
     m_errorMonitor->SetUnexpectedError("VUID-VkBindBufferMemoryInfo-memory-01035");
     vk::BindBufferMemory2KHR(device(), 1, &bind_buffer_info);
     m_errorMonitor->VerifyFound();
@@ -1164,7 +1153,6 @@ TEST_F(NegativeAndroidHardwareBuffer, ImportImageHandleType) {
     vkt::AHB ahb(AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM, AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE, 64, 64);
 
     // Create buffer without VkExternalMemoryImageCreateInfo
-    VkImageObj image(m_device);
     VkImageCreateInfo image_create_info = vku::InitStructHelper();
     image_create_info.flags = 0;
     image_create_info.imageType = VK_IMAGE_TYPE_2D;
@@ -1177,7 +1165,7 @@ TEST_F(NegativeAndroidHardwareBuffer, ImportImageHandleType) {
     image_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     image_create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     image_create_info.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
-    image.init_no_mem(*m_device, image_create_info);
+    vkt::Image image(*m_device, image_create_info, vkt::no_mem);
 
     VkMemoryDedicatedAllocateInfo memory_dedicated_info = vku::InitStructHelper();
     memory_dedicated_info.image = image.handle();
@@ -1202,10 +1190,10 @@ TEST_F(NegativeAndroidHardwareBuffer, ImportImageHandleType) {
 
     vkt::DeviceMemory memory(*m_device, memory_allocate_info);
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkBindImageMemory-memory-02990");
+    m_errorMonitor->SetDesiredError("VUID-vkBindImageMemory-memory-02990");
     m_errorMonitor->SetUnexpectedError("VUID-vkBindImageMemory-memory-01047");
     m_errorMonitor->SetUnexpectedError("VUID-vkBindImageMemory-size-01049");
-    vk::BindImageMemory(m_device->device(), image.handle(), memory, 0);
+    vk::BindImageMemory(device(), image.handle(), memory, 0);
     m_errorMonitor->VerifyFound();
 
     VkBindImageMemoryInfo bind_image_info = vku::InitStructHelper();
@@ -1213,10 +1201,10 @@ TEST_F(NegativeAndroidHardwareBuffer, ImportImageHandleType) {
     bind_image_info.memory = memory;
     bind_image_info.memoryOffset = 0;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkBindImageMemoryInfo-memory-02990");
+    m_errorMonitor->SetDesiredError("VUID-VkBindImageMemoryInfo-memory-02990");
     m_errorMonitor->SetUnexpectedError("VUID-VkBindImageMemoryInfo-pNext-01617");
     m_errorMonitor->SetUnexpectedError("VUID-VkBindImageMemoryInfo-pNext-01615");
-    vk::BindImageMemory2KHR(m_device->device(), 1, &bind_image_info);
+    vk::BindImageMemory2KHR(device(), 1, &bind_image_info);
     m_errorMonitor->VerifyFound();
 }
 
@@ -1232,7 +1220,7 @@ TEST_F(NegativeAndroidHardwareBuffer, DeviceImageMemoryReq) {
 
     VkAndroidHardwareBufferFormatPropertiesANDROID ahb_fmt_props = vku::InitStructHelper();
     VkAndroidHardwareBufferPropertiesANDROID ahb_props = vku::InitStructHelper(&ahb_fmt_props);
-    vk::GetAndroidHardwareBufferPropertiesANDROID(m_device->device(), ahb.handle(), &ahb_props);
+    vk::GetAndroidHardwareBufferPropertiesANDROID(device(), ahb.handle(), &ahb_props);
 
     // The spec says the driver must not return zero, even if a VkFormat is returned with it, some older drivers do as a driver bug
     if (ahb_fmt_props.externalFormat == 0) {
@@ -1257,7 +1245,7 @@ TEST_F(NegativeAndroidHardwareBuffer, DeviceImageMemoryReq) {
     image_memory_req.pCreateInfo = &image_create_info;
     image_memory_req.planeAspect = VK_IMAGE_ASPECT_COLOR_BIT;
     VkMemoryRequirements2 out_memory_req = vku::InitStructHelper();
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDeviceImageMemoryRequirements-pNext-06996");
+    m_errorMonitor->SetDesiredError("VUID-VkDeviceImageMemoryRequirements-pNext-06996");
     vk::GetDeviceImageMemoryRequirementsKHR(device(), &image_memory_req, &out_memory_req);
     m_errorMonitor->VerifyFound();
 }
@@ -1271,11 +1259,11 @@ TEST_F(NegativeAndroidHardwareBuffer, NullAHBProperties) {
     vkt::AHB ahb(AHARDWAREBUFFER_FORMAT_BLOB, AHARDWAREBUFFER_USAGE_GPU_DATA_BUFFER, 64);
 
     VkAndroidHardwareBufferPropertiesANDROID ahb_props = vku::InitStructHelper();
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetAndroidHardwareBufferPropertiesANDROID-buffer-parameter");
-    vk::GetAndroidHardwareBufferPropertiesANDROID(m_device->device(), nullptr, &ahb_props);
+    m_errorMonitor->SetDesiredError("VUID-vkGetAndroidHardwareBufferPropertiesANDROID-buffer-parameter");
+    vk::GetAndroidHardwareBufferPropertiesANDROID(device(), nullptr, &ahb_props);
     m_errorMonitor->VerifyFound();
 
-    vk::GetAndroidHardwareBufferPropertiesANDROID(m_device->device(), ahb.handle(), &ahb_props);
+    vk::GetAndroidHardwareBufferPropertiesANDROID(device(), ahb.handle(), &ahb_props);
 }
 
 TEST_F(NegativeAndroidHardwareBuffer, NullAHBImport) {
@@ -1295,7 +1283,7 @@ TEST_F(NegativeAndroidHardwareBuffer, NullAHBImport) {
     vkt::Buffer buffer(*m_device, buffer_create_info, vkt::no_mem);
 
     VkAndroidHardwareBufferPropertiesANDROID ahb_props = vku::InitStructHelper();
-    vk::GetAndroidHardwareBufferPropertiesANDROID(m_device->device(), ahb.handle(), &ahb_props);
+    vk::GetAndroidHardwareBufferPropertiesANDROID(device(), ahb.handle(), &ahb_props);
 
     VkImportAndroidHardwareBufferInfoANDROID import_ahb_Info = vku::InitStructHelper();
     import_ahb_Info.buffer = nullptr;  // invalid
@@ -1319,7 +1307,7 @@ TEST_F(NegativeAndroidHardwareBuffer, NullAHBImport) {
         GTEST_SKIP() << "No valid memory type index could be found; skipped.\n";
     }
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImportAndroidHardwareBufferInfoANDROID-buffer-parameter");
+    m_errorMonitor->SetDesiredError("VUID-VkImportAndroidHardwareBufferInfoANDROID-buffer-parameter");
     vkt::DeviceMemory memory(*m_device, memory_allocate_info);
     m_errorMonitor->VerifyFound();
 }

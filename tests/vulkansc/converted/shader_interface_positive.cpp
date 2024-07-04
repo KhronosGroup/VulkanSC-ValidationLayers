@@ -320,7 +320,6 @@ TEST_F(PositiveShaderInterface, FragmentOutputNotWrittenButMasked) {
     VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitState();
     pipe.shader_stages_[1] = fs.GetStageCreateInfo();
     pipe.CreateGraphicsPipeline();
 }
@@ -364,7 +363,6 @@ TEST_F(PositiveShaderInterface, RelaxedTypeMatch) {
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
-    pipe.InitState();
     pipe.CreateGraphicsPipeline();
 }
 
@@ -409,7 +407,6 @@ TEST_F(PositiveShaderInterface, TessPerVertex) {
     pipe.gp_ci_.pTessellationState = &tsci;
     pipe.gp_ci_.pInputAssemblyState = &iasci;
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), tcs.GetStageCreateInfo(), tes.GetStageCreateInfo(), fs.GetStageCreateInfo()};
-    pipe.InitState();
     pipe.CreateGraphicsPipeline();
 }
 
@@ -449,7 +446,6 @@ TEST_F(PositiveShaderInterface, GeometryInputBlockPositive) {
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), gs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
-    pipe.InitState();
     pipe.CreateGraphicsPipeline();
 }
 
@@ -484,7 +480,6 @@ TEST_F(PositiveShaderInterface, InputAttachment) {
     rp.CreateRenderPass();
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitState();
     pipe.shader_stages_[1] = fs.GetStageCreateInfo();
     pipe.gp_ci_.layout = pl.handle();
     pipe.gp_ci_.renderPass = rp.Handle();
@@ -737,7 +732,7 @@ TEST_F(PositiveShaderInterface, FragmentOutputNotConsumedButAlphaToCoverageEnabl
     ms_state_ci.alphaToCoverageEnable = VK_TRUE;
 
     const auto set_info = [&](CreatePipelineHelper &helper) {
-        helper.pipe_ms_state_ci_ = ms_state_ci;
+        helper.ms_ci_ = ms_state_ci;
         helper.cb_ci_.attachmentCount = 0;
     };
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
@@ -776,7 +771,6 @@ TEST_F(PositiveShaderInterface, DISABLED_InputOutputMatch2) {
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
-    pipe.InitState();
     pipe.CreateGraphicsPipeline();
 }
 
@@ -857,7 +851,6 @@ TEST_F(PositiveShaderInterface, InputOutputMatch) {
     pipe.vi_ci_.pVertexBindingDescriptions = &vertex_input_binding_description;
     pipe.vi_ci_.vertexAttributeDescriptionCount = 4;
     pipe.vi_ci_.pVertexAttributeDescriptions = vertex_input_attribute_descriptions;
-    pipe.InitState();
     pipe.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&ds.layout_});
     pipe.CreateGraphicsPipeline();
 
@@ -881,7 +874,7 @@ TEST_F(PositiveShaderInterface, InputOutputMatch) {
     vk::CmdBindVertexBuffers(m_commandBuffer->handle(), 0, 1, &buffer_handle, &offset);
     vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_layout_.handle(), 0, 1,
                               &ds.set_, 0, nullptr);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
     vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
 
     m_commandBuffer->EndRenderPass();
@@ -924,7 +917,6 @@ TEST_F(PositiveShaderInterface, NestedStructs) {
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
-    pipe.InitState();
     pipe.CreateGraphicsPipeline();
 }
 
@@ -949,7 +941,7 @@ TEST_F(PositiveShaderInterface, AlphaToCoverageOffsetToAlpha) {
 
     const auto set_info = [&](CreatePipelineHelper &helper) {
         helper.shader_stages_ = {helper.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
-        helper.pipe_ms_state_ci_ = ms_state_ci;
+        helper.ms_ci_ = ms_state_ci;
     };
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
 }
@@ -975,7 +967,7 @@ TEST_F(PositiveShaderInterface, AlphaToCoverageArray) {
 
     const auto set_info = [&](CreatePipelineHelper &helper) {
         helper.shader_stages_ = {helper.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
-        helper.pipe_ms_state_ci_ = ms_state_ci;
+        helper.ms_ci_ = ms_state_ci;
     };
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
 }
@@ -1314,29 +1306,184 @@ TEST_F(PositiveShaderInterface, PackingInsideArray) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    char const *vsSource = R"glsl(
-        #version 450
-        layout(location = 0, component = 1) out float[2] x;
-        layout(location = 1, component = 0) out int y;
-        layout(location = 1, component = 2) out int z;
-        void main() {}
-    )glsl";
+    // GLSL use to allow alias location of different types
+    // https://github.com/KhronosGroup/glslang/pull/3438
+    //
+    // layout(location = 0, component = 1) out float[2] x;
+    // layout(location = 1, component = 0) out int y;
+    // layout(location = 1, component = 2) out int z;
+    char const *vsSource = R"(
+               OpCapability Shader
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Vertex %main "main" %x %y %z
+               OpDecorate %x Component 1
+               OpDecorate %x Location 0
+               OpDecorate %y Component 0
+               OpDecorate %y Location 1
+               OpDecorate %z Component 2
+               OpDecorate %z Location 1
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+       %uint = OpTypeInt 32 0
+     %uint_2 = OpConstant %uint 2
+%_arr_float_uint_2 = OpTypeArray %float %uint_2
+%_ptr_Output__arr_float_uint_2 = OpTypePointer Output %_arr_float_uint_2
+          %x = OpVariable %_ptr_Output__arr_float_uint_2 Output
+        %int = OpTypeInt 32 1
+%_ptr_Output_int = OpTypePointer Output %int
+          %y = OpVariable %_ptr_Output_int Output
+          %z = OpVariable %_ptr_Output_int Output
+       %main = OpFunction %void None %3
+          %5 = OpLabel
+               OpReturn
+               OpFunctionEnd
+    )";
 
-    char const *fsSource = R"glsl(
-        #version 450
-        layout(location = 0, component = 1) in float x1;
-        layout(location = 1, component = 0) flat in int y;
-        layout(location = 1, component = 1) in float x2;
-        layout(location = 1, component = 2) flat in int z;
-        layout(location=0) out float color;
-        void main(){}
-    )glsl";
+    // layout(location = 0, component = 1) in float x1;
+    // layout(location = 1, component = 0) flat in int y;
+    // layout(location = 1, component = 1) in float x2;
+    // layout(location = 1, component = 2) flat in int z;
+    // layout(location=0) out float color;
+    char const *fsSource = R"(
+               OpCapability Shader
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %main "main" %x1 %y %x2 %z %color
+               OpExecutionMode %main OriginUpperLeft
+               OpDecorate %x1 Component 1
+               OpDecorate %x1 Location 0
+               OpDecorate %y Flat
+               OpDecorate %y Component 0
+               OpDecorate %y Location 1
+               OpDecorate %x2 Component 1
+               OpDecorate %x2 Location 1
+               OpDecorate %z Flat
+               OpDecorate %z Component 2
+               OpDecorate %z Location 1
+               OpDecorate %color Location 0
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+%_ptr_Input_float = OpTypePointer Input %float
+         %x1 = OpVariable %_ptr_Input_float Input
+        %int = OpTypeInt 32 1
+%_ptr_Input_int = OpTypePointer Input %int
+          %y = OpVariable %_ptr_Input_int Input
+         %x2 = OpVariable %_ptr_Input_float Input
+          %z = OpVariable %_ptr_Input_int Input
+%_ptr_Output_float = OpTypePointer Output %float
+      %color = OpVariable %_ptr_Output_float Output
+       %main = OpFunction %void None %3
+          %5 = OpLabel
+               OpReturn
+               OpFunctionEnd
+    )";
 
-    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT);
-    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
+    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
 
     const auto set_info = [&](CreatePipelineHelper &helper) {
         helper.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
     };
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
+}
+
+TEST_F(PositiveShaderInterface, MultipleFragmentAttachment) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/7923");
+    RETURN_IF_SKIP(Init());
+    m_errorMonitor->ExpectSuccess(kWarningBit | kErrorBit);
+
+    char const *fsSource = R"glsl(
+        #version 450
+        layout(location=0) out vec4 color[2];
+        void main() {
+           color[0] = vec4(1.0);
+           color[1] = vec4(1.0);
+        }
+    )glsl";
+    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    RenderPassSingleSubpass rp(*this);
+    rp.AddAttachmentDescription(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    rp.AddAttachmentDescription(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL});
+    rp.AddAttachmentReference({1, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL});
+    rp.AddColorAttachment(0);
+    rp.AddColorAttachment(1);
+    rp.CreateRenderPass();
+
+    VkPipelineColorBlendAttachmentState cb_as[2] = {{VK_FALSE, VK_BLEND_FACTOR_ZERO, VK_BLEND_FACTOR_ZERO, VK_BLEND_OP_ADD,
+                                                     VK_BLEND_FACTOR_ZERO, VK_BLEND_FACTOR_ZERO, VK_BLEND_OP_ADD, 0xf},
+                                                    {VK_FALSE, VK_BLEND_FACTOR_ZERO, VK_BLEND_FACTOR_ZERO, VK_BLEND_OP_ADD,
+                                                     VK_BLEND_FACTOR_ZERO, VK_BLEND_FACTOR_ZERO, VK_BLEND_OP_ADD, 0xf}};
+
+    CreatePipelineHelper pipe(*this);
+    pipe.shader_stages_[1] = fs.GetStageCreateInfo();
+    pipe.cb_ci_.attachmentCount = 2;
+    pipe.cb_ci_.pAttachments = cb_as;
+    pipe.gp_ci_.renderPass = rp.Handle();
+    pipe.CreateGraphicsPipeline();
+}
+
+TEST_F(PositiveShaderInterface, MissingInputAttachmentIndex) {
+    TEST_DESCRIPTION("You don't need InputAttachmentIndexif using dynamicRenderingLocalRead");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    AddRequiredFeature(vkt::Feature::dynamicRenderingLocalRead);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    // layout(input_attachment_index=0, set=0, binding=0) uniform subpassInput xs[1];
+    // layout(location=0) out vec4 color;
+    // void main() {
+    //     color = subpassLoad(xs[0]);
+    // }
+    //
+    // missing OpDecorate %xs InputAttachmentIndex 0
+    const char *fsSource = R"(
+               OpCapability Shader
+               OpCapability InputAttachment
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %main "main" %color %xs
+               OpExecutionMode %main OriginUpperLeft
+               OpDecorate %color Location 0
+               OpDecorate %xs DescriptorSet 0
+               OpDecorate %xs Binding 0
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+    %v4float = OpTypeVector %float 4
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+      %color = OpVariable %_ptr_Output_v4float Output
+         %10 = OpTypeImage %float SubpassData 0 0 0 2 Unknown
+       %uint = OpTypeInt 32 0
+     %uint_1 = OpConstant %uint 1
+%_arr_10_uint_1 = OpTypeArray %10 %uint_1
+%_ptr_UniformConstant__arr_10_uint_1 = OpTypePointer UniformConstant %_arr_10_uint_1
+         %xs = OpVariable %_ptr_UniformConstant__arr_10_uint_1 UniformConstant
+        %int = OpTypeInt 32 1
+      %int_0 = OpConstant %int 0
+%_ptr_UniformConstant_10 = OpTypePointer UniformConstant %10
+      %v2int = OpTypeVector %int 2
+         %22 = OpConstantComposite %v2int %int_0 %int_0
+       %main = OpFunction %void None %3
+          %5 = OpLabel
+         %19 = OpAccessChain %_ptr_UniformConstant_10 %xs %int_0
+         %20 = OpLoad %10 %19
+         %23 = OpImageRead %v4float %20 %22
+               OpStore %color %23
+               OpReturn
+               OpFunctionEnd
+    )";
+
+    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
+
+    CreatePipelineHelper pipe(*this);
+    pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
+    pipe.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}};
+    pipe.CreateGraphicsPipeline();
 }

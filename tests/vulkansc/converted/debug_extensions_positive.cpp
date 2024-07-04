@@ -39,7 +39,7 @@ TEST_F(PositiveDebugExtensions, SetDebugUtilsObjectBuffer) {
     VkDebugUtilsMessengerEXT my_messenger = VK_NULL_HANDLE;
     vk::CreateDebugUtilsMessengerEXT(instance(), &callback_create_info, nullptr, &my_messenger);
 
-    vkt::Buffer buffer(*m_device, 64);
+    vkt::Buffer buffer(*m_device, 64, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
     const char *object_name = "buffer_object";
 
     VkDebugUtilsObjectNameInfoEXT name_info = vku::InitStructHelper();
@@ -80,7 +80,7 @@ TEST_F(PositiveDebugExtensions, SetDebugUtilsObjectDevice) {
 
     VkDebugUtilsObjectNameInfoEXT name_info = vku::InitStructHelper();
     name_info.objectType = VK_OBJECT_TYPE_DEVICE;
-    name_info.objectHandle = (uint64_t)m_device->device();
+    name_info.objectHandle = (uint64_t)device();
     name_info.pObjectName = object_name;
     vk::SetDebugUtilsObjectNameEXT(device(), &name_info);
 
@@ -99,8 +99,8 @@ TEST_F(PositiveDebugExtensions, DebugLabelPrimaryCommandBuffer) {
     vk::CmdEndDebugUtilsLabelEXT(*m_commandBuffer);
     m_commandBuffer->end();
 
-    m_default_queue->submit(*m_commandBuffer);
-    m_default_queue->wait();
+    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Wait();
 }
 
 TEST_F(PositiveDebugExtensions, DebugLabelPrimaryCommandBuffer2) {
@@ -110,19 +110,19 @@ TEST_F(PositiveDebugExtensions, DebugLabelPrimaryCommandBuffer2) {
 
     VkDebugUtilsLabelEXT label = vku::InitStructHelper();
     label.pLabelName = "test";
-    vkt::CommandBuffer cb0(m_device, m_commandPool);
+    vkt::CommandBuffer cb0(*m_device, m_command_pool);
     cb0.begin();
     vk::CmdBeginDebugUtilsLabelEXT(cb0, &label);
     cb0.end();
-    m_default_queue->submit(cb0);
+    m_default_queue->Submit(cb0);
 
-    vkt::CommandBuffer cb1(m_device, m_commandPool);
+    vkt::CommandBuffer cb1(*m_device, m_command_pool);
     cb1.begin();
     vk::CmdEndDebugUtilsLabelEXT(cb1);
     cb1.end();
-    m_default_queue->submit(cb1);
+    m_default_queue->Submit(cb1);
 
-    m_default_queue->wait();
+    m_default_queue->Wait();
 }
 
 TEST_F(PositiveDebugExtensions, DebugLabelPrimaryCommandBuffer3) {
@@ -132,24 +132,25 @@ TEST_F(PositiveDebugExtensions, DebugLabelPrimaryCommandBuffer3) {
 
     VkDebugUtilsLabelEXT label = vku::InitStructHelper();
     label.pLabelName = "test";
-    vkt::CommandBuffer cb0(m_device, m_commandPool);
+    vkt::CommandBuffer cb0(*m_device, m_command_pool);
     cb0.begin();
     vk::CmdBeginDebugUtilsLabelEXT(cb0, &label);
     cb0.end();
 
-    vkt::CommandBuffer cb1(m_device, m_commandPool);
+    vkt::CommandBuffer cb1(*m_device, m_command_pool);
     cb1.begin();
     vk::CmdEndDebugUtilsLabelEXT(cb1);
     cb1.end();
 
-    m_default_queue->submit({&cb0, &cb1}, vkt::Fence{});
-    m_default_queue->wait();
+    std::array cbs = {&cb0, &cb1};
+    m_default_queue->Submit(cbs);
+    m_default_queue->Wait();
 }
 
 TEST_F(PositiveDebugExtensions, DebugLabelSecondaryCommandBuffer) {
     AddRequiredExtensions(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
-    vkt::CommandBuffer cb(m_device, m_commandPool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+    vkt::CommandBuffer cb(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
     cb.begin();
     {
         VkDebugUtilsLabelEXT label = vku::InitStructHelper();
@@ -158,4 +159,63 @@ TEST_F(PositiveDebugExtensions, DebugLabelSecondaryCommandBuffer) {
         vk::CmdEndDebugUtilsLabelEXT(cb);
     }
     cb.end();
+}
+
+// Not supported in Vulkan SC: VK_EXT_debug_marker
+TEST_F(PositiveDebugExtensions, DISABLED_SwapchainImagesDebugMarker) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/7977");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_EXT_DEBUG_MARKER_EXTENSION_NAME);
+    AddSurfaceExtension();
+    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitSurface());
+
+    SurfaceInformation info = GetSwapchainInfo(m_surface);
+    InitSwapchainInfo();
+
+    VkSwapchainCreateInfoKHR swapchain_create_info = vku::InitStructHelper();
+    swapchain_create_info.surface = m_surface;
+    swapchain_create_info.minImageCount = info.surface_capabilities.minImageCount;
+    swapchain_create_info.imageFormat = info.surface_formats[0].format;
+    swapchain_create_info.imageColorSpace = info.surface_formats[0].colorSpace;
+    swapchain_create_info.imageExtent = {info.surface_capabilities.minImageExtent.width,
+                                         info.surface_capabilities.minImageExtent.height};
+    swapchain_create_info.imageArrayLayers = 1;
+    swapchain_create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    swapchain_create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    swapchain_create_info.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+    swapchain_create_info.compositeAlpha = info.surface_composite_alpha;
+    swapchain_create_info.presentMode = info.surface_non_shared_present_mode;
+    swapchain_create_info.clipped = VK_FALSE;
+    swapchain_create_info.oldSwapchain = VK_NULL_HANDLE;
+
+    VkSwapchainKHR swapchain;
+    vk::CreateSwapchainKHR(device(), &swapchain_create_info, nullptr, &swapchain);
+
+    uint32_t imageCount;
+    vk::GetSwapchainImagesKHR(device(), swapchain, &imageCount, nullptr);
+    std::vector<VkImage> images(imageCount);
+    vk::GetSwapchainImagesKHR(device(), swapchain, &imageCount, images.data());
+
+    {
+        VkDebugMarkerObjectNameInfoEXT name_info = vku::InitStructHelper();
+        name_info.object = (uint64_t)images[0];
+        name_info.objectType = VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT;
+        std::string image_name = "swapchain [0]";
+        name_info.pObjectName = image_name.c_str();
+        vk::DebugMarkerSetObjectNameEXT(device(), &name_info);
+    }
+
+    {
+        int tags[2] = {1, 2};
+        VkDebugMarkerObjectTagInfoEXT name_info = vku::InitStructHelper();
+        name_info.object = (uint64_t)images[0];
+        name_info.objectType = VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT;
+        name_info.tagName = 1;
+        name_info.tagSize = 2;
+        name_info.pTag = tags;
+        vk::DebugMarkerSetObjectTagEXT(device(), &name_info);
+    }
+
+    vk::DestroySwapchainKHR(device(), swapchain, nullptr);
 }

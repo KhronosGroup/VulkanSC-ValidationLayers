@@ -630,6 +630,14 @@ bool PreCallValidateCmdBlitImage2KHR(VkCommandBuffer commandBuffer, const VkBlit
                                      const ErrorObject& error_obj) const override;
 bool PreCallValidateCmdResolveImage2KHR(VkCommandBuffer commandBuffer, const VkResolveImageInfo2* pResolveImageInfo,
                                         const ErrorObject& error_obj) const override;
+bool PreCallValidateCmdSetLineStippleKHR(VkCommandBuffer commandBuffer, uint32_t lineStippleFactor, uint16_t lineStipplePattern,
+                                         const ErrorObject& error_obj) const override;
+bool PreCallValidateGetPhysicalDeviceCalibrateableTimeDomainsKHR(VkPhysicalDevice physicalDevice, uint32_t* pTimeDomainCount,
+                                                                 VkTimeDomainKHR* pTimeDomains,
+                                                                 const ErrorObject& error_obj) const override;
+bool PreCallValidateGetCalibratedTimestampsKHR(VkDevice device, uint32_t timestampCount,
+                                               const VkCalibratedTimestampInfoKHR* pTimestampInfos, uint64_t* pTimestamps,
+                                               uint64_t* pMaxDeviation, const ErrorObject& error_obj) const override;
 bool PreCallValidateReleaseDisplayEXT(VkPhysicalDevice physicalDevice, VkDisplayKHR display,
                                       const ErrorObject& error_obj) const override;
 bool PreCallValidateGetPhysicalDeviceSurfaceCapabilities2EXT(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface,
@@ -690,12 +698,6 @@ bool PreCallValidateGetMemoryHostPointerPropertiesEXT(VkDevice device, VkExterna
                                                       const void* pHostPointer,
                                                       VkMemoryHostPointerPropertiesEXT* pMemoryHostPointerProperties,
                                                       const ErrorObject& error_obj) const override;
-bool PreCallValidateGetPhysicalDeviceCalibrateableTimeDomainsEXT(VkPhysicalDevice physicalDevice, uint32_t* pTimeDomainCount,
-                                                                 VkTimeDomainKHR* pTimeDomains,
-                                                                 const ErrorObject& error_obj) const override;
-bool PreCallValidateGetCalibratedTimestampsEXT(VkDevice device, uint32_t timestampCount,
-                                               const VkCalibratedTimestampInfoKHR* pTimestampInfos, uint64_t* pTimestamps,
-                                               uint64_t* pMaxDeviation, const ErrorObject& error_obj) const override;
 bool PreCallValidateCreateHeadlessSurfaceEXT(VkInstance instance, const VkHeadlessSurfaceCreateInfoEXT* pCreateInfo,
                                              const VkAllocationCallbacks* pAllocator, VkSurfaceKHR* pSurface,
                                              const ErrorObject& error_obj) const override;
@@ -727,6 +729,12 @@ bool PreCallValidateCmdSetStencilTestEnableEXT(VkCommandBuffer commandBuffer, Vk
 bool PreCallValidateCmdSetStencilOpEXT(VkCommandBuffer commandBuffer, VkStencilFaceFlags faceMask, VkStencilOp failOp,
                                        VkStencilOp passOp, VkStencilOp depthFailOp, VkCompareOp compareOp,
                                        const ErrorObject& error_obj) const override;
+#ifdef VK_USE_PLATFORM_WIN32_KHR
+bool PreCallValidateAcquireWinrtDisplayNV(VkPhysicalDevice physicalDevice, VkDisplayKHR display,
+                                          const ErrorObject& error_obj) const override;
+bool PreCallValidateGetWinrtDisplayNV(VkPhysicalDevice physicalDevice, uint32_t deviceRelativeId, VkDisplayKHR* pDisplay,
+                                      const ErrorObject& error_obj) const override;
+#endif  // VK_USE_PLATFORM_WIN32_KHR
 bool PreCallValidateCmdSetVertexInputEXT(VkCommandBuffer commandBuffer, uint32_t vertexBindingDescriptionCount,
                                          const VkVertexInputBindingDescription2EXT* pVertexBindingDescriptions,
                                          uint32_t vertexAttributeDescriptionCount,

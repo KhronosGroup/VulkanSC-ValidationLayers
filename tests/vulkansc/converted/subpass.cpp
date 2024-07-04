@@ -317,7 +317,7 @@ TEST_F(NegativeSubpass, NextSubpassExcessive) {
     m_commandBuffer->begin();
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdNextSubpass-None-00909");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdNextSubpass-None-00909");
     m_commandBuffer->NextSubpass();
     m_errorMonitor->VerifyFound();
 
@@ -325,7 +325,7 @@ TEST_F(NegativeSubpass, NextSubpassExcessive) {
         auto subpassBeginInfo = vku::InitStruct<VkSubpassBeginInfoKHR>(nullptr, VK_SUBPASS_CONTENTS_INLINE);
         VkSubpassEndInfoKHR subpassEndInfo = vku::InitStructHelper();
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdNextSubpass2-None-03102");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdNextSubpass2-None-03102");
 
         vk::CmdNextSubpass2KHR(m_commandBuffer->handle(), &subpassBeginInfo, &subpassEndInfo);
         m_errorMonitor->VerifyFound();
@@ -354,7 +354,7 @@ TEST_F(NegativeSubpass, RenderPassEndBeforeFinalSubpass) {
     m_commandBuffer->begin();
     m_commandBuffer->BeginRenderPass(rp.handle(), fb.handle(), 16, 16);
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEndRenderPass-None-00910");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEndRenderPass-None-00910");
     m_commandBuffer->EndRenderPass();
     m_errorMonitor->VerifyFound();
 
@@ -365,7 +365,7 @@ TEST_F(NegativeSubpass, RenderPassEndBeforeFinalSubpass) {
         m_commandBuffer->begin();
         m_commandBuffer->BeginRenderPass(rp.handle(), fb.handle(), 16, 16);
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEndRenderPass2-None-03103");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdEndRenderPass2-None-03103");
         vk::CmdEndRenderPass2KHR(m_commandBuffer->handle(), &subpassEndInfo);
         m_errorMonitor->VerifyFound();
     }
@@ -404,17 +404,17 @@ TEST_F(NegativeSubpass, SubpassIndices) {
 
     VkRenderPass render_pass = VK_NULL_HANDLE;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkRenderPassCreateInfo-pDependencies-06866");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkRenderPassCreateInfo-pDependencies-06867");
-    vk::CreateRenderPass(m_device->device(), &rpci, nullptr, &render_pass);
+    m_errorMonitor->SetDesiredError("VUID-VkRenderPassCreateInfo-pDependencies-06866");
+    m_errorMonitor->SetDesiredError("VUID-VkRenderPassCreateInfo-pDependencies-06867");
+    vk::CreateRenderPass(device(), &rpci, nullptr, &render_pass);
     m_errorMonitor->VerifyFound();
 
     if (rp2_supported) {
-        safe_VkRenderPassCreateInfo2 create_info2 = ConvertVkRenderPassCreateInfoToV2KHR(rpci);
+        auto create_info2 = ConvertVkRenderPassCreateInfoToV2KHR(rpci);
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkRenderPassCreateInfo2-srcSubpass-02526");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkRenderPassCreateInfo2-dstSubpass-02527");
-        vk::CreateRenderPass2KHR(m_device->device(), create_info2.ptr(), nullptr, &render_pass);
+        m_errorMonitor->SetDesiredError("VUID-VkRenderPassCreateInfo2-srcSubpass-02526");
+        m_errorMonitor->SetDesiredError("VUID-VkRenderPassCreateInfo2-dstSubpass-02527");
+        vk::CreateRenderPass2KHR(device(), create_info2.ptr(), nullptr, &render_pass);
         m_errorMonitor->VerifyFound();
     }
 }
@@ -444,14 +444,11 @@ TEST_F(NegativeSubpass, DrawWithPipelineIncompatibleWithSubpass) {
                                VK_DEPENDENCY_BY_REGION_BIT};
     auto rpci = vku::InitStruct<VkRenderPassCreateInfo>(nullptr, 0u, 1u, attach, 2u, subpasses, 1u, &dep);
     vkt::RenderPass rp(*m_device, rpci);
-
-    VkImageObj image(m_device);
-    image.InitNoLayout(32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    vkt::Image image(*m_device, 32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     vkt::ImageView imageView = image.CreateView();
     vkt::Framebuffer fb(*m_device, rp.handle(), 1u, &imageView.handle());
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitState();
     pipe.gp_ci_.renderPass = rp.handle();
     pipe.CreateGraphicsPipeline();
 
@@ -460,7 +457,7 @@ TEST_F(NegativeSubpass, DrawWithPipelineIncompatibleWithSubpass) {
     // subtest 1: bind in the wrong subpass
     m_commandBuffer->BeginRenderPass(rp.handle(), fb.handle(), 32, 32);
     m_commandBuffer->NextSubpass();
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "built for subpass 0 but used in subpass 1");
+    m_errorMonitor->SetDesiredError("built for subpass 0 but used in subpass 1");
     vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
     vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
     m_errorMonitor->VerifyFound();
@@ -471,7 +468,7 @@ TEST_F(NegativeSubpass, DrawWithPipelineIncompatibleWithSubpass) {
     m_commandBuffer->BeginRenderPass(rp.handle(), fb.handle(), 32, 32);
     vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
     m_commandBuffer->NextSubpass();
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "built for subpass 0 but used in subpass 1");
+    m_errorMonitor->SetDesiredError("built for subpass 0 but used in subpass 1");
     vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
     m_errorMonitor->VerifyFound();
 
@@ -509,11 +506,9 @@ TEST_F(NegativeSubpass, ImageBarrierSubpassConflict) {
     auto rpci = vku::InitStruct<VkRenderPassCreateInfo>(nullptr, 0u, 2u, attach, 1u, subpasses, 1u, &dep);
     vkt::RenderPass rp(*m_device, rpci);
 
-    VkImageObj image(m_device);
-    image.InitNoLayout(32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    vkt::Image image(*m_device, 32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     vkt::ImageView imageView = image.CreateView();
-    VkImageObj image2(m_device);
-    image2.InitNoLayout(32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    vkt::Image image2(*m_device, 32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     vkt::ImageView imageView2 = image2.CreateView();
     // re-use imageView from start of test
     VkImageView iv_array[2] = {imageView, imageView2};
@@ -534,7 +529,7 @@ TEST_F(NegativeSubpass, ImageBarrierSubpassConflict) {
     img_barrier.subresourceRange.levelCount = 1;
     m_commandBuffer->begin();
     m_commandBuffer->BeginRenderPass(rp.handle(), fb.handle(), 32, 32);
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdPipelineBarrier-image-04073");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-image-04073");
     vk::CmdPipelineBarrier(m_commandBuffer->handle(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1,
                            &img_barrier);
@@ -552,9 +547,8 @@ TEST_F(NegativeSubpass, SubpassInputNotBoundDescriptorSet) {
     VkImageUsageFlags usage_input =
         VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
     VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
-    VkImageObj image_input(m_device);
-    auto image_ci = VkImageObj::ImageCreateInfo2D(64, 64, 1, 1, format, usage_input);
-    image_input.Init(image_ci);
+    auto image_ci = vkt::Image::ImageCreateInfo2D(64, 64, 1, 1, format, usage_input);
+    vkt::Image image_input(*m_device, image_ci, vkt::set_layout);
     image_input.SetLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     vkt::ImageView view_input = image_input.CreateView();
 
@@ -612,10 +606,8 @@ TEST_F(NegativeSubpass, SubpassInputNotBoundDescriptorSet) {
         g_pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs_fail.GetStageCreateInfo()};
         g_pipe.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}};
         g_pipe.gp_ci_.renderPass = rp.handle();
-        g_pipe.InitState();
-
-        m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_ERROR_BIT_EXT, "VUID-VkGraphicsPipelineCreateInfo-renderPass-06038");
-        m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_ERROR_BIT_EXT, "VUID-VkGraphicsPipelineCreateInfo-layout-07988");
+        m_errorMonitor->SetDesiredError("VUID-VkGraphicsPipelineCreateInfo-renderPass-06038");
+        m_errorMonitor->SetDesiredError("VUID-VkGraphicsPipelineCreateInfo-layout-07988");
         g_pipe.CreateGraphicsPipeline();
         m_errorMonitor->VerifyFound();
     }
@@ -634,8 +626,7 @@ TEST_F(NegativeSubpass, SubpassInputNotBoundDescriptorSet) {
         g_pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
         g_pipe.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}};
         g_pipe.gp_ci_.renderPass = rp.handle();
-        g_pipe.InitState();
-        ASSERT_EQ(VK_SUCCESS, g_pipe.CreateGraphicsPipeline());
+        g_pipe.CreateGraphicsPipeline();
 
         g_pipe.descriptor_set_->WriteDescriptorImageInfo(0, view_input, sampler.handle(), VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT);
         g_pipe.descriptor_set_->UpdateDescriptorSets();
@@ -649,7 +640,7 @@ TEST_F(NegativeSubpass, SubpassInputNotBoundDescriptorSet) {
         m_renderPassBeginInfo.framebuffer = fb.handle();
 
         m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-        vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe.pipeline_);
+        vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe.Handle());
         vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe.pipeline_layout_.handle(), 0,
                                   1, &g_pipe.descriptor_set_->set_, 0, nullptr);
 
@@ -704,7 +695,7 @@ TEST_F(NegativeSubpass, SubpassDescriptionViewMask) {
     render_pass_ci.pSubpasses = &subpass;
 
     VkRenderPass render_pass;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSubpassDescription2-viewMask-06706");
+    m_errorMonitor->SetDesiredError("VUID-VkSubpassDescription2-viewMask-06706");
     vk::CreateRenderPass2(device(), &render_pass_ci, nullptr, &render_pass);
     m_errorMonitor->VerifyFound();
 }
@@ -749,22 +740,18 @@ TEST_F(NegativeSubpass, PipelineSubpassIndex) {
     render_pass_ci.pAttachments = &attach_desc;
 
     vkt::RenderPass render_pass(*m_device, render_pass_ci);
-
-    VkImageObj image(m_device);
-    image.InitNoLayout(32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    vkt::Image image(*m_device, 32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     vkt::ImageView imageView = image.CreateView();
     vkt::Framebuffer framebuffer(*m_device, render_pass.handle(), 1, &imageView.handle());
 
     CreatePipelineHelper pipe1(*this);
     pipe1.gp_ci_.renderPass = render_pass.handle();
     pipe1.gp_ci_.subpass = 0;
-    pipe1.InitState();
     pipe1.CreateGraphicsPipeline();
 
     CreatePipelineHelper pipe2(*this);
     pipe2.gp_ci_.renderPass = render_pass.handle();
     pipe2.gp_ci_.subpass = 1;
-    pipe2.InitState();
     pipe2.CreateGraphicsPipeline();
 
     VkClearValue clear_value = {};
@@ -773,19 +760,19 @@ TEST_F(NegativeSubpass, PipelineSubpassIndex) {
     m_commandBuffer->begin();
     m_commandBuffer->BeginRenderPass(render_pass.handle(), framebuffer.handle(), 32, 32, 1, &clear_value);
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDraw-subpass-02685");
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe2.pipeline_);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-subpass-02685");
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe2.Handle());
     vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
     m_errorMonitor->VerifyFound();
 
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe1.pipeline_);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe1.Handle());
     vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
     m_commandBuffer->NextSubpass();
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe2.pipeline_);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe2.Handle());
     vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDraw-subpass-02685");
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe1.pipeline_);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-subpass-02685");
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe1.Handle());
     vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
     m_errorMonitor->VerifyFound();
 
@@ -846,7 +833,7 @@ TEST_F(NegativeSubpass, SubpassDependencyMasksSync2) {
     rpci.pDependencies = &dependency;
 
     {
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkSubpassDependency2-srcStageMask-parameter");
+        m_errorMonitor->SetDesiredError("VUID-VkSubpassDependency2-srcStageMask-parameter");
         vkt::RenderPass render_pass(*m_device, rpci);
         m_errorMonitor->VerifyFound();
     }
@@ -856,7 +843,7 @@ TEST_F(NegativeSubpass, SubpassDependencyMasksSync2) {
 
     mem_barrier.srcStageMask = 0x8000000000000000ULL;  // not real value
     {
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkMemoryBarrier2-srcStageMask-parameter");
+        m_errorMonitor->SetDesiredError("VUID-VkMemoryBarrier2-srcStageMask-parameter");
         vkt::RenderPass render_pass(*m_device, rpci);
         m_errorMonitor->VerifyFound();
     }
@@ -1197,47 +1184,8 @@ TEST_F(NegativeSubpass, SubpassInputWithoutFormat) {
                OpFunctionEnd
     )";
 
+    m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");
     VkShaderObj fs(this, fs_source.c_str(), VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
-
-    VkDescriptorSetLayoutBinding dslb = {0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
-    const vkt::DescriptorSetLayout dsl(*m_device, {dslb});
-    const vkt::PipelineLayout pl(*m_device, {&dsl});
-
-    VkAttachmentDescription descs[2] = {
-        {0, VK_FORMAT_R8G8B8A8_UNORM, VK_SAMPLE_COUNT_1_BIT, VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_STORE,
-         VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_STORE, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL},
-        {0, VK_FORMAT_R8G8B8A8_UNORM, VK_SAMPLE_COUNT_1_BIT, VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_STORE,
-         VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_STORE, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL},
-    };
-    VkAttachmentReference color = {
-        0,
-        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-    };
-    VkAttachmentReference input = {
-        1,
-        VK_IMAGE_LAYOUT_GENERAL,
-    };
-
-    VkSubpassDescription sd = {0, VK_PIPELINE_BIND_POINT_GRAPHICS, 1, &input, 1, &color, nullptr, nullptr, 0, nullptr};
-
-    VkRenderPassCreateInfo rpci = vku::InitStructHelper();
-    rpci.flags = 0;
-    rpci.attachmentCount = 2;
-    rpci.pAttachments = descs;
-    rpci.subpassCount = 1;
-    rpci.pSubpasses = &sd;
-    rpci.dependencyCount = 0;
-    vkt::RenderPass rp(*m_device, rpci);
-    ASSERT_TRUE(rp.initialized());
-
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkShaderModuleCreateInfo-pCode-08740");
-    CreatePipelineHelper pipe(*this);
-    pipe.InitState();
-    pipe.shader_stages_[1] = fs.GetStageCreateInfo();
-    pipe.gp_ci_.layout = pl.handle();
-    pipe.gp_ci_.renderPass = rp.handle();
-    pipe.CreateGraphicsPipeline();
     m_errorMonitor->VerifyFound();
 }
 
@@ -1247,14 +1195,14 @@ TEST_F(NegativeSubpass, NextSubpassNoRenderPass) {
     InitRenderTarget();
 
     m_commandBuffer->begin();
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdNextSubpass-renderpass");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdNextSubpass-renderpass");
     m_commandBuffer->NextSubpass();
     m_errorMonitor->VerifyFound();
 
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
     m_commandBuffer->EndRenderPass();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdNextSubpass-renderpass");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdNextSubpass-renderpass");
     m_commandBuffer->NextSubpass();
     m_errorMonitor->VerifyFound();
     m_commandBuffer->end();
@@ -1283,10 +1231,9 @@ TEST_F(NegativeSubpass, FramebufferNoAttachmentsSampleCounts) {
     ms_state.alphaToOneEnable = VK_FALSE;
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitState();
     pipe.gp_ci_.renderPass = rp.Handle();
-    pipe.pipe_ms_state_ci_ = ms_state;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkGraphicsPipelineCreateInfo-subpass-00758");
+    pipe.ms_ci_ = ms_state;
+    m_errorMonitor->SetDesiredError("VUID-VkGraphicsPipelineCreateInfo-subpass-00758");
     pipe.CreateGraphicsPipeline();
     m_errorMonitor->VerifyFound();
 }

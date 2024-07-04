@@ -270,11 +270,11 @@ class VideoConfig {
     bool is_decode_{false};
     bool is_encode_{false};
     bool use_profile_independent_resources_{false};
-    safe_VkVideoProfileInfoKHR profile_{};
-    safe_VkVideoCapabilitiesKHR caps_{};
-    safe_VkVideoEncodeQualityLevelPropertiesKHR encode_quality_level_props_{};
-    safe_VkVideoSessionCreateInfoKHR session_create_info_{};
-    safe_VkVideoSessionParametersCreateInfoKHR session_params_create_info_{};
+    vku::safe_VkVideoProfileInfoKHR profile_{};
+    vku::safe_VkVideoCapabilitiesKHR caps_{};
+    vku::safe_VkVideoEncodeQualityLevelPropertiesKHR encode_quality_level_props_{};
+    vku::safe_VkVideoSessionCreateInfoKHR session_create_info_{};
+    vku::safe_VkVideoSessionParametersCreateInfoKHR session_params_create_info_{};
     std::vector<VkVideoFormatPropertiesKHR> picture_format_props_{};
     std::vector<VkVideoFormatPropertiesKHR> dpb_format_props_{};
 };
@@ -338,20 +338,20 @@ class BitstreamBuffer {
             create_info.usage = usage;
             create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-            ASSERT_EQ(VK_SUCCESS, vk::CreateBuffer(device_->device(), &create_info, nullptr, &buffer_));
+            ASSERT_EQ(VK_SUCCESS, vk::CreateBuffer(device_->handle(), &create_info, nullptr, &buffer_));
         }
 
         {
             VkMemoryRequirements mem_req;
-            vk::GetBufferMemoryRequirements(device_->device(), buffer_, &mem_req);
+            vk::GetBufferMemoryRequirements(device_->handle(), buffer_, &mem_req);
 
             VkMemoryAllocateInfo alloc_info = vku::InitStructHelper();
             VkMemoryPropertyFlags mem_props = is_protected ? VK_MEMORY_PROPERTY_PROTECTED_BIT : 0;
             ASSERT_TRUE(device_->phy().set_memory_type(mem_req.memoryTypeBits, &alloc_info, mem_props));
             alloc_info.allocationSize = mem_req.size;
 
-            ASSERT_EQ(VK_SUCCESS, vk::AllocateMemory(device_->device(), &alloc_info, nullptr, &memory_));
-            ASSERT_EQ(VK_SUCCESS, vk::BindBufferMemory(device_->device(), buffer_, memory_, 0));
+            ASSERT_EQ(VK_SUCCESS, vk::AllocateMemory(device_->handle(), &alloc_info, nullptr, &memory_));
+            ASSERT_EQ(VK_SUCCESS, vk::BindBufferMemory(device_->handle(), buffer_, memory_, 0));
         }
 
         {
@@ -376,8 +376,8 @@ class BitstreamBuffer {
     }
 
     void Destroy() {
-        vk::DestroyBuffer(device_->device(), buffer_, nullptr);
-        vk::FreeMemory(device_->device(), memory_, nullptr);
+        vk::DestroyBuffer(device_->handle(), buffer_, nullptr);
+        vk::FreeMemory(device_->handle(), memory_, nullptr);
     }
 
     vkt::Device* device_{};
@@ -440,20 +440,20 @@ class VideoPictureResource {
             create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
             create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-            ASSERT_EQ(VK_SUCCESS, vk::CreateImage(device_->device(), &create_info, nullptr, &image_));
+            ASSERT_EQ(VK_SUCCESS, vk::CreateImage(device_->handle(), &create_info, nullptr, &image_));
         }
 
         {
             VkMemoryRequirements mem_req;
-            vk::GetImageMemoryRequirements(device_->device(), image_, &mem_req);
+            vk::GetImageMemoryRequirements(device_->handle(), image_, &mem_req);
 
             VkMemoryAllocateInfo alloc_info = vku::InitStructHelper();
             VkMemoryPropertyFlags mem_props = is_protected ? VK_MEMORY_PROPERTY_PROTECTED_BIT : 0;
             ASSERT_TRUE(device_->phy().set_memory_type(mem_req.memoryTypeBits, &alloc_info, mem_props));
             alloc_info.allocationSize = mem_req.size;
 
-            ASSERT_EQ(VK_SUCCESS, vk::AllocateMemory(device_->device(), &alloc_info, nullptr, &memory_));
-            ASSERT_EQ(VK_SUCCESS, vk::BindImageMemory(device_->device(), image_, memory_, 0));
+            ASSERT_EQ(VK_SUCCESS, vk::AllocateMemory(device_->handle(), &alloc_info, nullptr, &memory_));
+            ASSERT_EQ(VK_SUCCESS, vk::BindImageMemory(device_->handle(), image_, memory_, 0));
         }
 
         {
@@ -464,7 +464,7 @@ class VideoPictureResource {
             create_info.components = format_props.componentMapping;
             create_info.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, layers};
 
-            ASSERT_EQ(VK_SUCCESS, vk::CreateImageView(device_->device(), &create_info, nullptr, &image_view_));
+            ASSERT_EQ(VK_SUCCESS, vk::CreateImageView(device_->handle(), &create_info, nullptr, &image_view_));
         }
 
         {
@@ -499,9 +499,9 @@ class VideoPictureResource {
     }
 
     void Destroy() {
-        vk::DestroyImageView(device_->device(), image_view_, nullptr);
-        vk::DestroyImage(device_->device(), image_, nullptr);
-        vk::FreeMemory(device_->device(), memory_, nullptr);
+        vk::DestroyImageView(device_->handle(), image_view_, nullptr);
+        vk::DestroyImage(device_->handle(), image_, nullptr);
+        vk::FreeMemory(device_->handle(), memory_, nullptr);
     }
 
   private:
@@ -1925,9 +1925,9 @@ class VideoContext {
           device_(device),
           queue_(GetQueue(device, config)),
           cmd_pool_(
-              *device, queue_.get_family_index(),
+              *device, queue_.family_index,
               VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT | (protected_content ? VK_COMMAND_POOL_CREATE_PROTECTED_BIT : 0)),
-          cmd_buffer_(device, &cmd_pool_, VK_COMMAND_BUFFER_LEVEL_PRIMARY, &queue_),
+          cmd_buffer_(*device, cmd_pool_, VK_COMMAND_BUFFER_LEVEL_PRIMARY),
           session_(VK_NULL_HANDLE),
           session_memory_(),
           session_params_(VK_NULL_HANDLE),
@@ -1950,12 +1950,13 @@ class VideoContext {
         ASSERT_TRUE(session_ != VK_NULL_HANDLE);
 
         uint32_t mem_req_count = 0;
-        ASSERT_EQ(VK_SUCCESS, vk.GetVideoSessionMemoryRequirementsKHR(device_->device(), session_, &mem_req_count, nullptr));
+        ASSERT_EQ(VK_SUCCESS, vk.GetVideoSessionMemoryRequirementsKHR(device_->handle(), session_, &mem_req_count, nullptr));
         if (mem_req_count == 0) return;
 
         std::vector<VkVideoSessionMemoryRequirementsKHR> mem_reqs(mem_req_count,
                                                                   vku::InitStruct<VkVideoSessionMemoryRequirementsKHR>());
-        ASSERT_EQ(VK_SUCCESS, vk.GetVideoSessionMemoryRequirementsKHR(device_->device(), session_, &mem_req_count, mem_reqs.data()));
+        ASSERT_EQ(VK_SUCCESS,
+                  vk.GetVideoSessionMemoryRequirementsKHR(device_->handle(), session_, &mem_req_count, mem_reqs.data()));
 
         std::vector<VkBindVideoSessionMemoryInfoKHR> bind_info(mem_req_count, vku::InitStruct<VkBindVideoSessionMemoryInfoKHR>());
         for (uint32_t i = 0; i < mem_req_count; ++i) {
@@ -1965,7 +1966,7 @@ class VideoContext {
             alloc_info.allocationSize = mem_reqs[i].memoryRequirements.size;
 
             VkDeviceMemory memory = VK_NULL_HANDLE;
-            ASSERT_EQ(VK_SUCCESS, vk::AllocateMemory(device_->device(), &alloc_info, nullptr, &memory));
+            ASSERT_EQ(VK_SUCCESS, vk::AllocateMemory(device_->handle(), &alloc_info, nullptr, &memory));
             session_memory_.push_back(memory);
 
             bind_info[i].memoryBindIndex = mem_reqs[i].memoryBindIndex;
@@ -1974,7 +1975,8 @@ class VideoContext {
             bind_info[i].memorySize = mem_reqs[i].memoryRequirements.size;
         }
 
-        ASSERT_EQ(VK_SUCCESS, vk.BindVideoSessionMemoryKHR(device_->device(), session_, (uint32_t)bind_info.size(), bind_info.data()));
+        ASSERT_EQ(VK_SUCCESS,
+                  vk.BindVideoSessionMemoryKHR(device_->handle(), session_, (uint32_t)bind_info.size(), bind_info.data()));
     }
 
     void CreateResources(bool protected_bitstream = false, bool protected_dpb = false, bool protected_image = false) {
@@ -2010,7 +2012,7 @@ class VideoContext {
         create_info.queryType = VK_QUERY_TYPE_RESULT_STATUS_ONLY_KHR;
         create_info.queryCount = query_count;
 
-        ASSERT_EQ(VK_SUCCESS, vk::CreateQueryPool(device_->device(), &create_info, nullptr, &status_query_pool_));
+        ASSERT_EQ(VK_SUCCESS, vk::CreateQueryPool(device_->handle(), &create_info, nullptr, &status_query_pool_));
     }
 
     void CreateEncodeFeedbackQueryPool(uint32_t query_count = 1, VkVideoEncodeFeedbackFlagsKHR encode_feedback_flags =
@@ -2026,7 +2028,7 @@ class VideoContext {
         create_info.queryType = VK_QUERY_TYPE_VIDEO_ENCODE_FEEDBACK_KHR;
         create_info.queryCount = query_count;
 
-        ASSERT_EQ(VK_SUCCESS, vk::CreateQueryPool(device_->device(), &create_info, nullptr, &encode_feedback_query_pool_));
+        ASSERT_EQ(VK_SUCCESS, vk::CreateQueryPool(device_->handle(), &create_info, nullptr, &encode_feedback_query_pool_));
     }
 
     StdVideoH264SequenceParameterSet CreateH264SPS(uint8_t sps_id) const { return config_.CreateH264SPS(sps_id); }
@@ -2159,41 +2161,41 @@ class VideoContext {
     vkt::Queue GetQueue(vkt::Device* device, const VideoConfig& config) const {
         VkQueue queue = VK_NULL_HANDLE;
         assert(config.QueueFamilyIndex() != VK_QUEUE_FAMILY_IGNORED);
-        vk::GetDeviceQueue(device->device(), config.QueueFamilyIndex(), 0, &queue);
+        vk::GetDeviceQueue(device->handle(), config.QueueFamilyIndex(), 0, &queue);
         return vkt::Queue(queue, config.QueueFamilyIndex());
     }
 
     void Init(bool protected_content) {
         vk.GetVideoSessionMemoryRequirementsKHR = (PFN_vkGetVideoSessionMemoryRequirementsKHR)vk::GetDeviceProcAddr(
-            device_->device(), "vkGetVideoSessionMemoryRequirementsKHR");
+            device_->handle(), "vkGetVideoSessionMemoryRequirementsKHR");
         ASSERT_NE(vk.GetVideoSessionMemoryRequirementsKHR, nullptr);
 
         vk.BindVideoSessionMemoryKHR =
-            (PFN_vkBindVideoSessionMemoryKHR)vk::GetDeviceProcAddr(device_->device(), "vkBindVideoSessionMemoryKHR");
+            (PFN_vkBindVideoSessionMemoryKHR)vk::GetDeviceProcAddr(device_->handle(), "vkBindVideoSessionMemoryKHR");
         ASSERT_NE(vk.BindVideoSessionMemoryKHR, nullptr);
 
-        vk.CreateVideoSessionKHR = (PFN_vkCreateVideoSessionKHR)vk::GetDeviceProcAddr(device_->device(), "vkCreateVideoSessionKHR");
+        vk.CreateVideoSessionKHR = (PFN_vkCreateVideoSessionKHR)vk::GetDeviceProcAddr(device_->handle(), "vkCreateVideoSessionKHR");
         ASSERT_NE(vk.CreateVideoSessionKHR, nullptr);
 
         vk.DestroyVideoSessionKHR =
-            (PFN_vkDestroyVideoSessionKHR)vk::GetDeviceProcAddr(device_->device(), "vkDestroyVideoSessionKHR");
+            (PFN_vkDestroyVideoSessionKHR)vk::GetDeviceProcAddr(device_->handle(), "vkDestroyVideoSessionKHR");
         ASSERT_NE(vk.DestroyVideoSessionKHR, nullptr);
 
         vk.CreateVideoSessionParametersKHR =
-            (PFN_vkCreateVideoSessionParametersKHR)vk::GetDeviceProcAddr(device_->device(), "vkCreateVideoSessionParametersKHR");
+            (PFN_vkCreateVideoSessionParametersKHR)vk::GetDeviceProcAddr(device_->handle(), "vkCreateVideoSessionParametersKHR");
         ASSERT_NE(vk.CreateVideoSessionParametersKHR, nullptr);
 
         vk.UpdateVideoSessionParametersKHR =
-            (PFN_vkUpdateVideoSessionParametersKHR)vk::GetDeviceProcAddr(device_->device(), "vkUpdateVideoSessionParametersKHR");
+            (PFN_vkUpdateVideoSessionParametersKHR)vk::GetDeviceProcAddr(device_->handle(), "vkUpdateVideoSessionParametersKHR");
         ASSERT_NE(vk.UpdateVideoSessionParametersKHR, nullptr);
 
         vk.DestroyVideoSessionParametersKHR =
-            (PFN_vkDestroyVideoSessionParametersKHR)vk::GetDeviceProcAddr(device_->device(), "vkDestroyVideoSessionParametersKHR");
+            (PFN_vkDestroyVideoSessionParametersKHR)vk::GetDeviceProcAddr(device_->handle(), "vkDestroyVideoSessionParametersKHR");
         ASSERT_NE(vk.DestroyVideoSessionParametersKHR, nullptr);
 
         if (config_.IsEncode()) {
             vk.GetEncodedVideoSessionParametersKHR = (PFN_vkGetEncodedVideoSessionParametersKHR)vk::GetDeviceProcAddr(
-                device_->device(), "vkGetEncodedVideoSessionParametersKHR");
+                device_->handle(), "vkGetEncodedVideoSessionParametersKHR");
             ASSERT_NE(vk.GetEncodedVideoSessionParametersKHR, nullptr);
         }
 
@@ -2209,26 +2211,26 @@ class VideoContext {
             create_info.pVideoProfile = config_.Profile();
             create_info.pStdHeaderVersion = config_.StdVersion();
 
-            ASSERT_EQ(VK_SUCCESS, vk.CreateVideoSessionKHR(device_->device(), &create_info, nullptr, &session_));
+            ASSERT_EQ(VK_SUCCESS, vk.CreateVideoSessionKHR(device_->handle(), &create_info, nullptr, &session_));
         }
 
         if (config_.NeedsSessionParams()) {
             VkVideoSessionParametersCreateInfoKHR create_info = *config_.SessionParamsCreateInfo();
             create_info.videoSession = session_;
 
-            ASSERT_EQ(VK_SUCCESS, vk.CreateVideoSessionParametersKHR(device_->device(), &create_info, nullptr, &session_params_));
+            ASSERT_EQ(VK_SUCCESS, vk.CreateVideoSessionParametersKHR(device_->handle(), &create_info, nullptr, &session_params_));
         }
     }
 
     void Destroy() {
-        vk.DestroyVideoSessionParametersKHR(device_->device(), session_params_, nullptr);
-        vk.DestroyVideoSessionKHR(device_->device(), session_, nullptr);
+        vk.DestroyVideoSessionParametersKHR(device_->handle(), session_params_, nullptr);
+        vk.DestroyVideoSessionKHR(device_->handle(), session_, nullptr);
 
-        vk::DestroyQueryPool(device_->device(), status_query_pool_, nullptr);
-        vk::DestroyQueryPool(device_->device(), encode_feedback_query_pool_, nullptr);
+        vk::DestroyQueryPool(device_->handle(), status_query_pool_, nullptr);
+        vk::DestroyQueryPool(device_->handle(), encode_feedback_query_pool_, nullptr);
 
         for (auto session_memory : session_memory_) {
-            vk::FreeMemory(device_->device(), session_memory, nullptr);
+            vk::FreeMemory(device_->handle(), session_memory, nullptr);
         }
     }
 
@@ -2301,7 +2303,7 @@ class VideoEncodeRateControlTestUtils {
             for (auto allowed_vuid : allowed_vuids) {
                 test_->Monitor().SetAllowedFailureMsg(allowed_vuid);
             }
-            test_->Monitor().SetDesiredFailureMsg(kErrorBit, expected_vuid);
+            test_->Monitor().SetDesiredError(expected_vuid);
             cb.BeginVideoCoding(context_.Begin().RateControl(rc_info));
             test_->Monitor().VerifyFound();
             cb.BeginVideoCoding(context_.Begin());
@@ -2313,7 +2315,7 @@ class VideoEncodeRateControlTestUtils {
             for (auto allowed_vuid : allowed_vuids) {
                 test_->Monitor().SetAllowedFailureMsg(allowed_vuid);
             }
-            test_->Monitor().SetDesiredFailureMsg(kErrorBit, expected_vuid);
+            test_->Monitor().SetDesiredError(expected_vuid);
             cb.ControlVideoCoding(context_.Control().RateControl(rc_info));
             test_->Monitor().VerifyFound();
         } else {
@@ -2339,10 +2341,10 @@ class VideoEncodeRateControlTestUtils {
         cb.EndVideoCoding(context_.End());
         cb.end();
 
-        test_->Monitor().SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBeginVideoCodingKHR-pBeginInfo-08254");
-        context_.Queue().submit(cb, false);
+        test_->Monitor().SetDesiredError("VUID-vkCmdBeginVideoCodingKHR-pBeginInfo-08254");
+        context_.Queue().Submit(cb);
         test_->Monitor().VerifyFound();
-        test_->DeviceObj()->wait();
+        test_->DeviceObj()->Wait();
     }
 
   private:
@@ -2757,12 +2759,12 @@ class VkVideoLayerTest : public VkLayerTest {
 
             config.Profile()->videoCodecOperation = VK_VIDEO_CODEC_OPERATION_DECODE_H264_BIT_KHR;
 
-            auto codec_profile = new safe_VkVideoDecodeH264ProfileInfoKHR();
+            auto codec_profile = new vku::safe_VkVideoDecodeH264ProfileInfoKHR();
             codec_profile->pictureLayout = picture_layouts[i];
             config.SetCodecProfile(codec_profile);
 
-            auto decode_caps_h264 = new safe_VkVideoDecodeH264CapabilitiesKHR();
-            auto decode_caps = new safe_VkVideoDecodeCapabilitiesKHR();
+            auto decode_caps_h264 = new vku::safe_VkVideoDecodeH264CapabilitiesKHR();
+            auto decode_caps = new vku::safe_VkVideoDecodeCapabilitiesKHR();
             decode_caps->pNext = decode_caps_h264;
             config.SetCodecCapsChain(decode_caps);
 
@@ -2784,13 +2786,13 @@ class VkVideoLayerTest : public VkLayerTest {
                 auto pps = new StdVideoH264PictureParameterSet[1]();
                 *pps = added_config.CreateH264PPS(0, 0);
 
-                auto add_info = new safe_VkVideoDecodeH264SessionParametersAddInfoKHR();
+                auto add_info = new vku::safe_VkVideoDecodeH264SessionParametersAddInfoKHR();
                 add_info->stdSPSCount = 1;
                 add_info->pStdSPSs = sps;
                 add_info->stdPPSCount = 1;
                 add_info->pStdPPSs = pps;
 
-                auto params_info = new safe_VkVideoDecodeH264SessionParametersCreateInfoKHR();
+                auto params_info = new vku::safe_VkVideoDecodeH264SessionParametersCreateInfoKHR();
                 params_info->maxStdSPSCount = 1;
                 params_info->maxStdPPSCount = 1;
                 params_info->pParametersAddInfo = add_info;
@@ -2811,12 +2813,12 @@ class VkVideoLayerTest : public VkLayerTest {
 
         config.Profile()->videoCodecOperation = VK_VIDEO_CODEC_OPERATION_DECODE_H265_BIT_KHR;
 
-        auto codec_profile = new safe_VkVideoDecodeH265ProfileInfoKHR();
+        auto codec_profile = new vku::safe_VkVideoDecodeH265ProfileInfoKHR();
         codec_profile->stdProfileIdc = STD_VIDEO_H265_PROFILE_IDC_MAIN;
         config.SetCodecProfile(codec_profile);
 
-        auto decode_caps_h265 = new safe_VkVideoDecodeH265CapabilitiesKHR();
-        auto decode_caps = new safe_VkVideoDecodeCapabilitiesKHR();
+        auto decode_caps_h265 = new vku::safe_VkVideoDecodeH265CapabilitiesKHR();
+        auto decode_caps = new vku::safe_VkVideoDecodeCapabilitiesKHR();
         decode_caps->pNext = decode_caps_h265;
         config.SetCodecCapsChain(decode_caps);
 
@@ -2841,7 +2843,7 @@ class VkVideoLayerTest : public VkLayerTest {
             auto pps = new StdVideoH265PictureParameterSet[1]();
             *pps = added_config.CreateH265PPS(0, 0, 0);
 
-            auto add_info = new safe_VkVideoDecodeH265SessionParametersAddInfoKHR();
+            auto add_info = new vku::safe_VkVideoDecodeH265SessionParametersAddInfoKHR();
             add_info->stdVPSCount = 1;
             add_info->pStdVPSs = vps;
             add_info->stdSPSCount = 1;
@@ -2849,7 +2851,7 @@ class VkVideoLayerTest : public VkLayerTest {
             add_info->stdPPSCount = 1;
             add_info->pStdPPSs = pps;
 
-            auto params_info = new safe_VkVideoDecodeH265SessionParametersCreateInfoKHR();
+            auto params_info = new vku::safe_VkVideoDecodeH265SessionParametersCreateInfoKHR();
             params_info->maxStdVPSCount = 1;
             params_info->maxStdSPSCount = 1;
             params_info->maxStdPPSCount = 1;
@@ -2872,12 +2874,12 @@ class VkVideoLayerTest : public VkLayerTest {
 
             config.Profile()->videoCodecOperation = VK_VIDEO_CODEC_OPERATION_DECODE_AV1_BIT_KHR;
 
-            auto codec_profile = new safe_VkVideoDecodeAV1ProfileInfoKHR();
+            auto codec_profile = new vku::safe_VkVideoDecodeAV1ProfileInfoKHR();
             codec_profile->filmGrainSupport = (i == 0) ? VK_FALSE : VK_TRUE;
             config.SetCodecProfile(codec_profile);
 
-            auto decode_caps_av1 = new safe_VkVideoDecodeAV1CapabilitiesKHR();
-            auto decode_caps = new safe_VkVideoDecodeCapabilitiesKHR();
+            auto decode_caps_av1 = new vku::safe_VkVideoDecodeAV1CapabilitiesKHR();
+            auto decode_caps = new vku::safe_VkVideoDecodeCapabilitiesKHR();
             decode_caps->pNext = decode_caps_av1;
             config.SetCodecCapsChain(decode_caps);
 
@@ -2895,7 +2897,7 @@ class VkVideoLayerTest : public VkLayerTest {
             for (auto& added_config : configs) {
                 auto seq_header = new StdVideoAV1SequenceHeader();
 
-                auto params_info = new safe_VkVideoDecodeAV1SessionParametersCreateInfoKHR();
+                auto params_info = new vku::safe_VkVideoDecodeAV1SessionParametersCreateInfoKHR();
                 params_info->pStdSequenceHeader = seq_header;
 
                 added_config.SetCodecSessionParamsInfo(params_info);
@@ -2914,15 +2916,15 @@ class VkVideoLayerTest : public VkLayerTest {
 
         config.Profile()->videoCodecOperation = VK_VIDEO_CODEC_OPERATION_ENCODE_H264_BIT_KHR;
 
-        auto codec_profile = new safe_VkVideoEncodeH264ProfileInfoKHR();
+        auto codec_profile = new vku::safe_VkVideoEncodeH264ProfileInfoKHR();
         codec_profile->stdProfileIdc = STD_VIDEO_H264_PROFILE_IDC_BASELINE;
         config.SetCodecProfile(codec_profile);
 
-        auto encode_caps_h264 = new safe_VkVideoEncodeH264CapabilitiesKHR();
-        auto encode_caps = new safe_VkVideoEncodeCapabilitiesKHR();
+        auto encode_caps_h264 = new vku::safe_VkVideoEncodeH264CapabilitiesKHR();
+        auto encode_caps = new vku::safe_VkVideoEncodeCapabilitiesKHR();
         encode_caps->pNext = encode_caps_h264;
         config.SetCodecCapsChain(encode_caps);
-        config.SetCodecEncodeQualityLevelPropsChain(new safe_VkVideoEncodeH264QualityLevelPropertiesKHR());
+        config.SetCodecEncodeQualityLevelPropsChain(new vku::safe_VkVideoEncodeH264QualityLevelPropertiesKHR());
 
         StdVideoH264ProfileIdc profile_idc_list[] = {
             STD_VIDEO_H264_PROFILE_IDC_BASELINE,
@@ -2942,13 +2944,13 @@ class VkVideoLayerTest : public VkLayerTest {
             auto pps = new StdVideoH264PictureParameterSet[1]();
             *pps = added_config.CreateH264PPS(0, 0);
 
-            auto add_info = new safe_VkVideoEncodeH264SessionParametersAddInfoKHR();
+            auto add_info = new vku::safe_VkVideoEncodeH264SessionParametersAddInfoKHR();
             add_info->stdSPSCount = 1;
             add_info->pStdSPSs = sps;
             add_info->stdPPSCount = 1;
             add_info->pStdPPSs = pps;
 
-            auto params_info = new safe_VkVideoEncodeH264SessionParametersCreateInfoKHR();
+            auto params_info = new vku::safe_VkVideoEncodeH264SessionParametersCreateInfoKHR();
             params_info->maxStdSPSCount = 1;
             params_info->maxStdPPSCount = 1;
             params_info->pParametersAddInfo = add_info;
@@ -2968,15 +2970,15 @@ class VkVideoLayerTest : public VkLayerTest {
 
         config.Profile()->videoCodecOperation = VK_VIDEO_CODEC_OPERATION_ENCODE_H265_BIT_KHR;
 
-        auto codec_profile = new safe_VkVideoEncodeH265ProfileInfoKHR();
+        auto codec_profile = new vku::safe_VkVideoEncodeH265ProfileInfoKHR();
         codec_profile->stdProfileIdc = STD_VIDEO_H265_PROFILE_IDC_MAIN;
         config.SetCodecProfile(codec_profile);
 
-        auto encode_caps_h265 = new safe_VkVideoEncodeH265CapabilitiesKHR();
-        auto encode_caps = new safe_VkVideoEncodeCapabilitiesKHR();
+        auto encode_caps_h265 = new vku::safe_VkVideoEncodeH265CapabilitiesKHR();
+        auto encode_caps = new vku::safe_VkVideoEncodeCapabilitiesKHR();
         encode_caps->pNext = encode_caps_h265;
         config.SetCodecCapsChain(encode_caps);
-        config.SetCodecEncodeQualityLevelPropsChain(new safe_VkVideoEncodeH265QualityLevelPropertiesKHR());
+        config.SetCodecEncodeQualityLevelPropsChain(new vku::safe_VkVideoEncodeH265QualityLevelPropertiesKHR());
 
         StdVideoH265ProfileIdc profile_idc_list[] = {
             STD_VIDEO_H265_PROFILE_IDC_MAIN,
@@ -2999,7 +3001,7 @@ class VkVideoLayerTest : public VkLayerTest {
             auto pps = new StdVideoH265PictureParameterSet[1]();
             *pps = added_config.CreateH265PPS(0, 0, 0);
 
-            auto add_info = new safe_VkVideoEncodeH265SessionParametersAddInfoKHR();
+            auto add_info = new vku::safe_VkVideoEncodeH265SessionParametersAddInfoKHR();
             add_info->stdVPSCount = 1;
             add_info->pStdVPSs = vps;
             add_info->stdSPSCount = 1;
@@ -3007,7 +3009,7 @@ class VkVideoLayerTest : public VkLayerTest {
             add_info->stdPPSCount = 1;
             add_info->pStdPPSs = pps;
 
-            auto params_info = new safe_VkVideoEncodeH265SessionParametersCreateInfoKHR();
+            auto params_info = new vku::safe_VkVideoEncodeH265SessionParametersCreateInfoKHR();
             params_info->maxStdVPSCount = 1;
             params_info->maxStdSPSCount = 1;
             params_info->maxStdPPSCount = 1;
@@ -3022,7 +3024,7 @@ class VkVideoLayerTest : public VkLayerTest {
 
     void InitInvalidConfigs() {
         if (IsExtensionsEnabled(VK_KHR_VIDEO_DECODE_QUEUE_EXTENSION_NAME)) {
-            auto codec_profile = new safe_VkVideoDecodeH264ProfileInfoKHR();
+            auto codec_profile = new vku::safe_VkVideoDecodeH264ProfileInfoKHR();
             codec_profile->stdProfileIdc = STD_VIDEO_H264_PROFILE_IDC_INVALID;
 
             config_decode_invalid_.SetDecode();
@@ -3037,7 +3039,7 @@ class VkVideoLayerTest : public VkLayerTest {
         }
 
         if (IsExtensionsEnabled(VK_KHR_VIDEO_ENCODE_QUEUE_EXTENSION_NAME)) {
-            auto codec_profile = new safe_VkVideoEncodeH264ProfileInfoKHR();
+            auto codec_profile = new vku::safe_VkVideoEncodeH264ProfileInfoKHR();
             codec_profile->stdProfileIdc = STD_VIDEO_H264_PROFILE_IDC_INVALID;
 
             config_encode_invalid_.SetEncode();
@@ -3047,7 +3049,7 @@ class VkVideoLayerTest : public VkLayerTest {
             config_encode_invalid_.Profile()->lumaBitDepth = VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR;
             config_encode_invalid_.Profile()->chromaBitDepth = VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR;
             config_encode_invalid_.SetCodecProfile(codec_profile);
-            config_encode_invalid_.SetCodecEncodeQualityLevelPropsChain(new safe_VkVideoEncodeH264QualityLevelPropertiesKHR());
+            config_encode_invalid_.SetCodecEncodeQualityLevelPropsChain(new vku::safe_VkVideoEncodeH264QualityLevelPropertiesKHR());
 
             config_invalid_ = config_encode_invalid_;
         }

@@ -72,7 +72,7 @@ class SCValidationStateTracker : public BASE {
     void RecyclePipelinePoolEntry(const VkPipelineOfflineCreateInfo* offline_info);
 
     // Functions requiring additional/modified state tracking for Vulkan SC
-    void CreateDevice(const VkDeviceCreateInfo* pCreateInfo) override;
+    void CreateDevice(const VkDeviceCreateInfo* pCreateInfo, const Location& loc) override;
     virtual std::shared_ptr<vvl::CommandPool> CreateCommandPoolState(VkCommandPool command_pool,
                                                                      const VkCommandPoolCreateInfo* pCreateInfo) override;
     void PostCallRecordCreateCommandPool(VkDevice device, const VkCommandPoolCreateInfo* pCreateInfo,
@@ -85,18 +85,20 @@ class SCValidationStateTracker : public BASE {
                                                                std::shared_ptr<const vvl::PipelineCache> pipeline_cache,
                                                                std::shared_ptr<const vvl::RenderPass>&& render_pass,
                                                                std::shared_ptr<const vvl::PipelineLayout>&& layout,
-                                                               CreateShaderModuleStates* csm_states) const override;
+                                                               ShaderModuleUniqueIds* shader_unique_id_map) const override;
     std::shared_ptr<vvl::Pipeline> CreateComputePipelineState(const VkComputePipelineCreateInfo* pCreateInfo,
                                                               std::shared_ptr<const vvl::PipelineCache> pipeline_cache,
                                                               std::shared_ptr<const vvl::PipelineLayout>&& layout) const override;
     void PostCallRecordCreateGraphicsPipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t count,
                                                const VkGraphicsPipelineCreateInfo* pCreateInfos,
                                                const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,
-                                               const RecordObject& record_obj, void* cgpl_state) override;
+                                               const RecordObject& record_obj, PipelineStates& pipeline_states,
+                                               chassis::CreateGraphicsPipelines& chassis_state) override;
     void PostCallRecordCreateComputePipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t count,
                                               const VkComputePipelineCreateInfo* pCreateInfos,
                                               const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,
-                                              const RecordObject& record_obj, void* pipe_state) override;
+                                              const RecordObject& record_obj, PipelineStates& pipeline_states,
+                                              chassis::CreateComputePipelines& chassis_state) override;
     void PreCallRecordDestroyPipeline(VkDevice device, VkPipeline pipeline, const VkAllocationCallbacks* pAllocator,
                                       const RecordObject& record_obj) override;
     void PostCallRecordCreateImageView(VkDevice device, const VkImageViewCreateInfo* pCreateInfo,

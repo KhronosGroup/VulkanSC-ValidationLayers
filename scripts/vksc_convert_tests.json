@@ -4,6 +4,7 @@
             "reason": "This test case are replaced with Vulkan SC specific ones",
             "cases": [
                 "VkLayerTest.SpecLinks",
+                "VkLayerTest.MissingCreateInfo",
                 "NegativeImage.ImageMisc",
                 "PositiveInstance.ValidationInstanceExtensions",
                 "NegativeMemory.BindMemory",
@@ -156,7 +157,9 @@
             "cases": [
                 "NegativeDebugExtensions.DebugMarkerName",
                 "NegativeDebugExtensions.DebugMarkerSetObject",
-                "NegativeDebugExtensions.DebugMarkerSetUtils"
+                "NegativeDebugExtensions.DebugMarkerSetUtils",
+                "NegativeDebugExtensions.SwapchainImagesDebugMarker",
+                "PositiveDebugExtensions.SwapchainImagesDebugMarker"
             ]
         },
         {
@@ -209,6 +212,12 @@
             ]
         },
         {
+            "reason": "Not supported in Vulkan SC: VK_EXT_shader_atomic_float2",
+            "cases": [
+                "NegativeAtomic.Float2"
+            ]
+        },
+        {
             "reason": "Not supported in Vulkan SC: miscellaneous Vulkan-only extensions",
             "cases": [
                 "NegativeInstanceless.ExtensionStructsWithoutExtensions",
@@ -222,7 +231,6 @@
             "reason": "This test case requires SPIR-V debug information",
             "cases": [
                 "NegativeAtomic.Float",
-                "NegativeAtomic.Float2",
                 "NegativeAtomic.FragmentStoresAndAtomicsFeatureDisable",
                 "NegativeAtomic.ImageInt64",
                 "NegativeAtomic.ImageInt64Drawtime32",
@@ -267,6 +275,7 @@
                 "NegativeGeometryTessellation.PointSizeGeomShaderWrite",
                 "NegativeGeometryTessellation.TessellationPatchDecorationMismatch",
                 "NegativeGeometryTessellation.TessellationShaderEnabled",
+                "NegativeGeometryTessellation.WritingToLayerWithSingleFramebufferLayer",
                 "NegativeImage.ComputeImageLayout",
                 "NegativeImage.ComputeImageLayout11",
                 "NegativeMultiview.UnboundResourcesAfterBeginRenderPassAndNextSubpass",
@@ -291,6 +300,7 @@
                 "NegativeSampler.UnnormalizedCoordinatesSeparateSampler",
                 "NegativeSampler.UnnormalizedCoordinatesSeparateSamplerSharedImage",
                 "NegativeSampler.UnnormalizedCoordinatesSeparateSamplerSharedSampler",
+                "NegativeSampler.UnnormalizedCoordinatesLevelCount",
                 "NegativeShaderCompute.CmdDispatchExceedLimits",
                 "NegativeShaderCompute.SharedMemoryBooleanOverLimit",
                 "NegativeShaderCompute.SharedMemoryOverLimit",
@@ -305,9 +315,13 @@
                 "NegativeShaderImageAccess.MultisampleMismatchWithPipeline",
                 "NegativeShaderImageAccess.NonMultisampleMismatchWithPipeline",
                 "NegativeShaderImageAccess.UnnormalizedCoordinatesFunction",
+                "NegativeShaderImageAccess.SampledImageShareBinding",
+                "NegativeShaderImageAccess.AliasImageBinding",
                 "NegativeShaderInterface.*",
                 "NegativeShaderLimits.MinAndMaxTexelGatherOffset",
                 "NegativeShaderLimits.MinAndMaxTexelOffset",
+                "NegativeShaderLimits.MaxSampleMaskWordsInput",
+                "NegativeShaderLimits.MaxSampleMaskWordsOutput",
                 "NegativeShaderPushConstants.DrawWithoutUpdate",
                 "NegativeShaderPushConstants.MultipleEntryPoint",
                 "NegativeShaderPushConstants.NotDeclared",
@@ -330,9 +344,11 @@
                 "NegativeShaderSpirv.SpecializationSizeZero",
                 "NegativeShaderSpirv.Storage8and16bitCapability",
                 "NegativeShaderSpirv.Storage8and16bitFeatures",
+                "NegativeShaderSpirv.ShaderFloatControl",
                 "NegativeShaderStorageImage.*",
                 "NegativeShaderStorageTexel.*",
                 "NegativeSubgroup.ExtendedTypesDisabled",
+                "NegativeSubgroup.Properties",
                 "NegativeSubpass.InputAttachmentMissing",
                 "NegativeSubpass.InputAttachmentMissingArray",
                 "NegativeSubpass.InputAttachmentSharingVariable",

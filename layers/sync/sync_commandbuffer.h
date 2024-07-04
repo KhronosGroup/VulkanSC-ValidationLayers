@@ -419,7 +419,7 @@ class CommandBuffer : public vvl::CommandBuffer {
   public:
     CommandBufferAccessContext access_context;
 
-    CommandBuffer(SyncValidator *dev, VkCommandBuffer cb, const VkCommandBufferAllocateInfo *pCreateInfo,
+    CommandBuffer(SyncValidator &dev, VkCommandBuffer handle, const VkCommandBufferAllocateInfo *pCreateInfo,
                   const vvl::CommandPool *pool);
     ~CommandBuffer() { Destroy(); }
 
@@ -432,7 +432,7 @@ class CommandBuffer : public vvl::CommandBuffer {
 
 // Message Creation Helpers
 struct SyncNodeFormatter {
-    const debug_report_data *report_data;
+    const DebugReport *debug_report;
     const vvl::StateObject *node;
     const char *label;
 

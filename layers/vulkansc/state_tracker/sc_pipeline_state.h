@@ -169,7 +169,7 @@ class PipelineCache : public vvl::PipelineCache {
         using ID = PipelineCacheData::Entry::ID;
         using StageModules = std::vector<std::shared_ptr<vvl::ShaderModule>>;
 
-        Entry(const ValidationStateTracker* dev_data, const PipelineCacheData::Entry& cache_entry)
+        Entry(const ValidationStateTracker& dev_data, const PipelineCacheData::Entry& cache_entry)
             : id_(cache_entry.PipelineID()),
               shader_modules_(InitShaderModules(dev_data, cache_entry)),
               json_data_(ParseJsonData(cache_entry)) {}
@@ -204,10 +204,10 @@ class PipelineCache : public vvl::PipelineCache {
         struct JsonData {
             Json::Value json{};
             std::vector<std::string> entrypoint_name{};
-            std::vector<std::unique_ptr<safe_VkSpecializationInfo>> specialization_info{};
+            std::vector<std::unique_ptr<vku::safe_VkSpecializationInfo>> specialization_info{};
         };
 
-        StageModules InitShaderModules(const ValidationStateTracker* dev_data, const PipelineCacheData::Entry& cache_entry);
+        StageModules InitShaderModules(const ValidationStateTracker& dev_data, const PipelineCacheData::Entry& cache_entry);
         JsonData ParseJsonData(const PipelineCacheData::Entry& cache_entry);
 
         ID id_;
@@ -215,7 +215,7 @@ class PipelineCache : public vvl::PipelineCache {
         JsonData json_data_;
     };
 
-    PipelineCache(const ValidationStateTracker* dev_data, VkPipelineCache pipeline_cache,
+    PipelineCache(const ValidationStateTracker& dev_data, VkPipelineCache pipeline_cache,
                   const VkPipelineCacheCreateInfo* pCreateInfo);
 
     const Entry* GetPipeline(const VkPipelineOfflineCreateInfo* offline_info) const {
@@ -235,7 +235,7 @@ class PipelineCache : public vvl::PipelineCache {
             return nullptr;
         }
 
-        auto offline_info = vku::FindStructInPNextChain<VkPipelineOfflineCreateInfo>(pipe_state.PNext());
+        auto offline_info = vku::FindStructInPNextChain<VkPipelineOfflineCreateInfo>(pipe_state.GetCreateInfoPNext());
         auto pipeline_entry = GetPipeline(offline_info);
         if (pipeline_entry) {
             return pipeline_entry->GetShaderModule(stage_index);
@@ -253,16 +253,12 @@ class Pipeline : public vvl::Pipeline {
     const VkPipelineOfflineCreateInfo *offline_info;
 
     template <typename CreateInfo, typename... Args>
-    Pipeline(const ValidationStateTracker* state_data, const CreateInfo* pCreateInfo, Args&&... args)
-        : vvl::Pipeline(state_data, pCreateInfo, std::forward<Args>(args)...), offline_info(FindOfflineCreateInfo(pCreateInfo)) {}
+    Pipeline(const ValidationStateTracker& state_data, const CreateInfo* pCreateInfo, Args&&... args)
+        : vvl::Pipeline(state_data, pCreateInfo, std::forward<Args>(args)...), offline_info(FindOfflineCreateInfo()) {}
 
   private:
-    const VkPipelineOfflineCreateInfo* FindOfflineCreateInfo(const VkGraphicsPipelineCreateInfo*) const {
-        return vku::FindStructInPNextChain<VkPipelineOfflineCreateInfo>(create_info.graphics.pNext);
-    }
-
-    const VkPipelineOfflineCreateInfo* FindOfflineCreateInfo(const VkComputePipelineCreateInfo*) const {
-        return vku::FindStructInPNextChain<VkPipelineOfflineCreateInfo>(create_info.compute.pNext);
+    const VkPipelineOfflineCreateInfo* FindOfflineCreateInfo() const {
+        return vku::FindStructInPNextChain<VkPipelineOfflineCreateInfo>(GetCreateInfoPNext());
     }
 };
 

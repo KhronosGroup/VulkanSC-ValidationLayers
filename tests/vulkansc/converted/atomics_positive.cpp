@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (c) 2015-2023 Google, Inc.
+ * Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (c) 2015-2024 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -109,7 +109,6 @@ TEST_F(PositiveAtomic, ImageInt64DrawtimeSparse) {
     pipe.cs_ = std::make_unique<VkShaderObj>(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
     pipe.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
                           {1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr}};
-    pipe.InitState();
     pipe.CreateComputePipeline();
 
     VkBufferCreateInfo buffer_ci = vku::InitStructHelper();
@@ -129,8 +128,7 @@ TEST_F(PositiveAtomic, ImageInt64DrawtimeSparse) {
     image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
     image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_ci.usage = VK_IMAGE_USAGE_STORAGE_BIT;
-    VkImageObj image(m_device);
-    image.init_no_mem(*m_device, image_ci);
+    vkt::Image image(*m_device, image_ci, vkt::no_mem);
     vkt::ImageView image_view = image.CreateView();
     pipe.descriptor_set_->WriteDescriptorImageInfo(1, image_view, VK_NULL_HANDLE, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
                                                    VK_IMAGE_LAYOUT_GENERAL);
@@ -139,7 +137,7 @@ TEST_F(PositiveAtomic, ImageInt64DrawtimeSparse) {
     m_commandBuffer->begin();
     vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0, 1,
                               &pipe.descriptor_set_->set_, 0, nullptr);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
     vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
     m_commandBuffer->end();
 }
@@ -672,6 +670,7 @@ TEST_F(PositiveAtomic, Float2) {
 TEST_F(PositiveAtomic, PhysicalPointer) {
     TEST_DESCRIPTION("Make sure atomic validation handles if from a OpConvertUToPtr (physical pointer)");
     SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredFeature(vkt::Feature::shaderInt64);
     AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
     RETURN_IF_SKIP(Init());
 
@@ -830,9 +829,8 @@ TEST_F(PositiveAtomic, OpImageTexelPointerWithNoAtomic) {
     formatProps.optimalTilingFeatures &= ~VK_FORMAT_FEATURE_STORAGE_IMAGE_ATOMIC_BIT;
     fpvkSetPhysicalDeviceFormatPropertiesEXT(gpu(), format, formatProps);
 
-    auto image_ci = VkImageObj::ImageCreateInfo2D(64, 64, 1, 1, format, VK_IMAGE_USAGE_STORAGE_BIT);
-    VkImageObj image(m_device);
-    image.Init(image_ci);
+    auto image_ci = vkt::Image::ImageCreateInfo2D(64, 64, 1, 1, format, VK_IMAGE_USAGE_STORAGE_BIT);
+    vkt::Image image(*m_device, image_ci, vkt::set_layout);
     vkt::ImageView image_view = image.CreateView();
 
     const char *spv_source = R"(
@@ -864,7 +862,6 @@ TEST_F(PositiveAtomic, OpImageTexelPointerWithNoAtomic) {
     CreateComputePipelineHelper pipe(*this);
     pipe.cs_ = std::make_unique<VkShaderObj>(this, spv_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
     pipe.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr}};
-    pipe.InitState();
     pipe.CreateComputePipeline();
 
     pipe.descriptor_set_->WriteDescriptorImageInfo(0, image_view, VK_NULL_HANDLE, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
@@ -872,9 +869,74 @@ TEST_F(PositiveAtomic, OpImageTexelPointerWithNoAtomic) {
     pipe.descriptor_set_->UpdateDescriptorSets();
 
     m_commandBuffer->begin();
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
     vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0, 1,
                               &pipe.descriptor_set_->set_, 0, nullptr);
     vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
     m_commandBuffer->end();
+}
+
+TEST_F(PositiveAtomic, ImageFloat16Vector) {
+    TEST_DESCRIPTION("Test VK_NV_shader_atomic_float16_vector.");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+
+    AddRequiredExtensions(VK_NV_SHADER_ATOMIC_FLOAT16_VECTOR_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_SHADER_ATOMIC_FLOAT_2_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::shaderFloat16);
+    AddRequiredFeature(vkt::Feature::shaderFloat16VectorAtomics);
+    AddRequiredFeature(vkt::Feature::storageBuffer16BitAccess);
+    RETURN_IF_SKIP(Init());
+
+    // clang-format off
+    std::string cs_image_base = R"glsl(
+        #version 450
+        #extension GL_EXT_shader_explicit_arithmetic_types_float16 : enable
+        #extension GL_NV_shader_atomic_fp16_vector : enable
+        layout(set = 0, binding = 0) buffer ssbo { f16vec2 y; };
+        layout(set = 0, binding = 1, rg16f) uniform image2D z;
+        void main() {
+    )glsl";
+
+    std::string cs_image_add = cs_image_base + R"glsl(
+           y = imageAtomicAdd(z, ivec2(1, 1), f16vec2(1,2));
+        }
+    )glsl";
+
+    std::string cs_image_min = cs_image_base + R"glsl(
+           y = imageAtomicMin(z, ivec2(1, 1), f16vec2(1,2));
+        }
+    )glsl";
+
+    std::string cs_image_max = cs_image_base + R"glsl(
+           y = imageAtomicMax(z, ivec2(1, 1), f16vec2(1,2));
+        }
+    )glsl";
+
+    std::string cs_image_exchange = cs_image_base + R"glsl(
+           y = imageAtomicExchange(z, ivec2(1, 1), f16vec2(1,2));
+        }
+    )glsl";
+    // clang-format on
+
+    const char *current_shader = nullptr;
+    const auto set_info = [&](CreateComputePipelineHelper &helper) {
+        // Requires SPIR-V 1.3 for SPV_KHR_storage_buffer_storage_class
+        helper.cs_ = std::make_unique<VkShaderObj>(this, current_shader, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+        helper.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
+                                {1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr}};
+    };
+
+    current_shader = cs_image_add.c_str();
+    CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
+
+    current_shader = cs_image_min.c_str();
+    CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
+
+    current_shader = cs_image_max.c_str();
+    CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
+
+    current_shader = cs_image_exchange.c_str();
+    CreateComputePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
 }

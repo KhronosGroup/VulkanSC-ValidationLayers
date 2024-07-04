@@ -49,7 +49,9 @@ class Module {
     InstructionList memory_model_;
     InstructionList entry_points_;
     InstructionList execution_modes_;
-    InstructionList debug_infos_;
+    InstructionList debug_source_;
+    InstructionList debug_name_;
+    InstructionList debug_module_processed_;
     InstructionList annotations_;
     InstructionList types_values_constants_;
     FunctionList functions_;
@@ -68,8 +70,9 @@ class Module {
     void ToBinary(std::vector<uint32_t>& out);
 
     // Passes that can be ran
-    void RunPassBindlessDescriptorPass();
+    void RunPassBindlessDescriptor();
     void RunPassBufferDeviceAddress();
+    void RunPassRayQuery();
 
     // Helpers
     bool HasCapability(spv::Capability capability);

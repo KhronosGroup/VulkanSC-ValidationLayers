@@ -170,7 +170,7 @@ class BuildGeometryInfoKHR {
     BuildGeometryInfoKHR& SetSrcAS(std::shared_ptr<AccelerationStructureKHR> src_as);
     BuildGeometryInfoKHR& SetDstAS(std::shared_ptr<AccelerationStructureKHR> dst_as);
     BuildGeometryInfoKHR& SetScratchBuffer(std::shared_ptr<vkt::Buffer> scratch_buffer);
-    BuildGeometryInfoKHR& SetHostScratchBuffer(std::unique_ptr<uint8_t[]>&& host_scratch);
+    BuildGeometryInfoKHR& SetHostScratchBuffer(std::shared_ptr<std::vector<uint8_t>> host_scratch);
     BuildGeometryInfoKHR& SetDeviceScratchOffset(VkDeviceAddress offset);
     BuildGeometryInfoKHR& SetEnableScratchBuild(bool build_scratch);
     BuildGeometryInfoKHR& SetBottomLevelAS(std::shared_ptr<BuildGeometryInfoKHR> bottom_level_as);
@@ -210,6 +210,7 @@ class BuildGeometryInfoKHR {
 
   private:
     friend void BuildAccelerationStructuresKHR(VkCommandBuffer cmd_buffer, std::vector<BuildGeometryInfoKHR>& infos);
+    friend void BuildHostAccelerationStructuresKHR(VkDevice device, std::vector<BuildGeometryInfoKHR>& infos);
 
     const vkt::Device* device_;
     uint32_t vk_info_count_ = 1;
@@ -224,7 +225,7 @@ class BuildGeometryInfoKHR {
     bool build_scratch_ = true;
     VkDeviceAddress device_scratch_offset_ = 0;
     std::shared_ptr<vkt::Buffer> device_scratch_;
-    std::unique_ptr<uint8_t[]> host_scratch_;
+    std::shared_ptr<std::vector<uint8_t>> host_scratch_;
     std::shared_ptr<BuildGeometryInfoKHR> blas_;
     std::unique_ptr<vkt::Buffer> indirect_buffer_;
     std::optional<VkDeviceAddress> indirect_buffer_address_{};
@@ -235,6 +236,7 @@ class BuildGeometryInfoKHR {
 
 // Helper functions
 void BuildAccelerationStructuresKHR(VkCommandBuffer cmd_buffer, std::vector<BuildGeometryInfoKHR>& infos);
+void BuildHostAccelerationStructuresKHR(VkDevice device, std::vector<BuildGeometryInfoKHR>& infos);
 
 // Helper functions providing simple, valid objects.
 // Calling Build() on them without further modifications results in a usable and valid Vulkan object.
@@ -277,7 +279,7 @@ BuildGeometryInfoKHR BuildGeometryInfoSimpleOnHostTopLevel(const vkt::Device& de
                                                            std::shared_ptr<BuildGeometryInfoKHR> on_host_bottom_level_geometry);
 
 // Create and build a top level acceleration structure
-BuildGeometryInfoKHR BuildOnDeviceTopLevel(const vkt::Device& device, vkt::CommandBuffer& cmd_buffer);
+BuildGeometryInfoKHR BuildOnDeviceTopLevel(const vkt::Device& device, vkt::Queue& queue, vkt::CommandBuffer& cmd_buffer);
 }  // namespace blueprint
 }  // namespace as
 
@@ -300,6 +302,7 @@ class Pipeline {
     void InitLibraryInfo();
     void AddTopLevelAccelStructBinding(std::shared_ptr<as::BuildGeometryInfoKHR> tlas, uint32_t bind_point);
     void SetUniformBufferBinding(std::shared_ptr<vkt::Buffer> uniform_buffer, uint32_t bind_point);
+    void SetStorageBufferBinding(std::shared_ptr<vkt::Buffer> storage_buffer, uint32_t bind_point);
     void SetPushConstantRangeSize(uint32_t byte_size);
     void SetRayGenShader(const char* glsl);
     void AddMissShader(const char* glsl);
@@ -330,6 +333,7 @@ class Pipeline {
     uint32_t push_constant_range_size_ = 0;
     std::vector<std::shared_ptr<as::BuildGeometryInfoKHR>> tlas_vec_{};
     std::shared_ptr<vkt::Buffer> uniform_buffer_{};
+    std::shared_ptr<vkt::Buffer> storage_buffer_{};
     std::vector<VkDescriptorSetLayoutBinding> bindings_{};
     std::unique_ptr<OneOffDescriptorSet> desc_set_{};
     vkt::PipelineLayout pipeline_layout_{};

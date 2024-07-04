@@ -28,55 +28,12 @@
 #include "generated/enum_flag_bits.h"
 #include "generated/layer_chassis_dispatch.h"
 
-bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const VkBaseOutStructure* header, const char* pnext_vuid,
-                                                      VkPhysicalDevice caller_physical_device, bool is_const_param) const {
+bool StatelessValidation::ValidatePnextFeatureStructContents(const Location& loc, const VkBaseOutStructure* header,
+                                                             const char* pnext_vuid, VkPhysicalDevice caller_physical_device,
+                                                             bool is_const_param) const {
     bool skip = false;
     const bool is_physdev_api = caller_physical_device != VK_NULL_HANDLE;
     switch (header->sType) {
-        // Validation code for VkPipelineLayoutCreateInfo structure members
-        case VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO: {  // Covers VUID-VkPipelineLayoutCreateInfo-sType-sType
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPipelineLayoutCreateInfo);
-                VkPipelineLayoutCreateInfo* structure = (VkPipelineLayoutCreateInfo*)header;
-                skip |= ValidateReservedFlags(pNext_loc.dot(Field::flags), structure->flags,
-                                              "VUID-VkPipelineLayoutCreateInfo-flags-zerobitmask");
-
-                skip |= ValidateArray(pNext_loc.dot(Field::pushConstantRangeCount), pNext_loc.dot(Field::pPushConstantRanges),
-                                      structure->pushConstantRangeCount, &structure->pPushConstantRanges, false, true,
-                                      kVUIDUndefined, "VUID-VkPipelineLayoutCreateInfo-pPushConstantRanges-parameter");
-
-                if (structure->pPushConstantRanges != nullptr) {
-                    for (uint32_t pushConstantRangeIndex = 0; pushConstantRangeIndex < structure->pushConstantRangeCount;
-                         ++pushConstantRangeIndex) {
-                        [[maybe_unused]] const Location pPushConstantRanges_loc =
-                            pNext_loc.dot(Field::pPushConstantRanges, pushConstantRangeIndex);
-                        skip |= ValidateFlags(pPushConstantRanges_loc.dot(Field::stageFlags),
-                                              vvl::FlagBitmask::VkShaderStageFlagBits, AllVkShaderStageFlagBits,
-                                              structure->pPushConstantRanges[pushConstantRangeIndex].stageFlags, kRequiredFlags,
-                                              "VUID-VkPushConstantRange-stageFlags-parameter",
-                                              "VUID-VkPushConstantRange-stageFlags-requiredbitmask");
-                    }
-                }
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceSubgroupProperties structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES: {  // Covers VUID-VkPhysicalDeviceSubgroupProperties-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_1) {
-                    skip |=
-                        LogError(pnext_vuid, instance, loc.dot(Field::pNext),
-                                 "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES) "
-                                 "which was added in VK_API_VERSION_1_1 but the "
-                                 "current effective API version is %s.",
-                                 StringAPIVersion(api_version).c_str());
-                }
-            }
-        } break;
-
         // Validation code for VkPhysicalDevice16BitStorageFeatures structure members
         case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_16BIT_STORAGE_FEATURES: {  // Covers
                                                                           // VUID-VkPhysicalDevice16BitStorageFeatures-sType-sType
@@ -85,12 +42,13 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_1) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |= LogError(
                         pnext_vuid, instance, loc.dot(Field::pNext),
                         "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_16BIT_STORAGE_FEATURES) which "
                         "was added in VK_API_VERSION_1_1 but the "
                         "current effective API version is %s.",
-                        StringAPIVersion(api_version).c_str());
+                        StringAPIVersion(device_api_version).c_str());
                 }
             }
             if (is_const_param) {
@@ -107,6 +65,2060 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
             }
         } break;
 
+        // Validation code for VkPhysicalDeviceMultiviewFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_FEATURES: {  // Covers VUID-VkPhysicalDeviceMultiviewFeatures-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_1) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |=
+                        LogError(pnext_vuid, instance, loc.dot(Field::pNext),
+                                 "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_FEATURES) "
+                                 "which was added in VK_API_VERSION_1_1 but the "
+                                 "current effective API version is %s.",
+                                 StringAPIVersion(device_api_version).c_str());
+                }
+            }
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceMultiviewFeatures);
+                VkPhysicalDeviceMultiviewFeatures* structure = (VkPhysicalDeviceMultiviewFeatures*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::multiview), structure->multiview);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::multiviewGeometryShader), structure->multiviewGeometryShader);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::multiviewTessellationShader), structure->multiviewTessellationShader);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceVariablePointersFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VARIABLE_POINTERS_FEATURES: {  // Covers
+                                                                              // VUID-VkPhysicalDeviceVariablePointersFeatures-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_1) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |= LogError(
+                        pnext_vuid, instance, loc.dot(Field::pNext),
+                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VARIABLE_POINTERS_FEATURES) "
+                        "which was added in VK_API_VERSION_1_1 but the "
+                        "current effective API version is %s.",
+                        StringAPIVersion(device_api_version).c_str());
+                }
+            }
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceVariablePointersFeatures);
+                VkPhysicalDeviceVariablePointersFeatures* structure = (VkPhysicalDeviceVariablePointersFeatures*)header;
+                skip |=
+                    ValidateBool32(pNext_loc.dot(Field::variablePointersStorageBuffer), structure->variablePointersStorageBuffer);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::variablePointers), structure->variablePointers);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceProtectedMemoryFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROTECTED_MEMORY_FEATURES: {  // Covers
+                                                                             // VUID-VkPhysicalDeviceProtectedMemoryFeatures-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_1) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |= LogError(
+                        pnext_vuid, instance, loc.dot(Field::pNext),
+                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROTECTED_MEMORY_FEATURES) "
+                        "which was added in VK_API_VERSION_1_1 but the "
+                        "current effective API version is %s.",
+                        StringAPIVersion(device_api_version).c_str());
+                }
+            }
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceProtectedMemoryFeatures);
+                VkPhysicalDeviceProtectedMemoryFeatures* structure = (VkPhysicalDeviceProtectedMemoryFeatures*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::protectedMemory), structure->protectedMemory);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceSamplerYcbcrConversionFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_YCBCR_CONVERSION_FEATURES: {  // Covers
+                                                                                     // VUID-VkPhysicalDeviceSamplerYcbcrConversionFeatures-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_1) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
+                                     "includes a pointer to a VkStructureType "
+                                     "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_YCBCR_CONVERSION_FEATURES) which was added in "
+                                     "VK_API_VERSION_1_1 but the "
+                                     "current effective API version is %s.",
+                                     StringAPIVersion(device_api_version).c_str());
+                }
+            }
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceSamplerYcbcrConversionFeatures);
+                VkPhysicalDeviceSamplerYcbcrConversionFeatures* structure = (VkPhysicalDeviceSamplerYcbcrConversionFeatures*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::samplerYcbcrConversion), structure->samplerYcbcrConversion);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceShaderDrawParametersFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DRAW_PARAMETERS_FEATURES: {  // Covers
+                                                                                   // VUID-VkPhysicalDeviceShaderDrawParametersFeatures-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_1) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
+                                     "includes a pointer to a VkStructureType "
+                                     "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DRAW_PARAMETERS_FEATURES) which was added in "
+                                     "VK_API_VERSION_1_1 but the "
+                                     "current effective API version is %s.",
+                                     StringAPIVersion(device_api_version).c_str());
+                }
+            }
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceShaderDrawParametersFeatures);
+                VkPhysicalDeviceShaderDrawParametersFeatures* structure = (VkPhysicalDeviceShaderDrawParametersFeatures*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderDrawParameters), structure->shaderDrawParameters);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceVulkan11Features structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES: {  // Covers VUID-VkPhysicalDeviceVulkan11Features-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |=
+                        LogError(pnext_vuid, instance, loc.dot(Field::pNext),
+                                 "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES) "
+                                 "which was added in VK_API_VERSION_1_2 but the "
+                                 "current effective API version is %s.",
+                                 StringAPIVersion(device_api_version).c_str());
+                }
+            }
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceVulkan11Features);
+                VkPhysicalDeviceVulkan11Features* structure = (VkPhysicalDeviceVulkan11Features*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::storageBuffer16BitAccess), structure->storageBuffer16BitAccess);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::uniformAndStorageBuffer16BitAccess),
+                                       structure->uniformAndStorageBuffer16BitAccess);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::storagePushConstant16), structure->storagePushConstant16);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::storageInputOutput16), structure->storageInputOutput16);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::multiview), structure->multiview);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::multiviewGeometryShader), structure->multiviewGeometryShader);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::multiviewTessellationShader), structure->multiviewTessellationShader);
+
+                skip |=
+                    ValidateBool32(pNext_loc.dot(Field::variablePointersStorageBuffer), structure->variablePointersStorageBuffer);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::variablePointers), structure->variablePointers);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::protectedMemory), structure->protectedMemory);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::samplerYcbcrConversion), structure->samplerYcbcrConversion);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderDrawParameters), structure->shaderDrawParameters);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceVulkan12Features structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES: {  // Covers VUID-VkPhysicalDeviceVulkan12Features-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |=
+                        LogError(pnext_vuid, instance, loc.dot(Field::pNext),
+                                 "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES) "
+                                 "which was added in VK_API_VERSION_1_2 but the "
+                                 "current effective API version is %s.",
+                                 StringAPIVersion(device_api_version).c_str());
+                }
+            }
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceVulkan12Features);
+                VkPhysicalDeviceVulkan12Features* structure = (VkPhysicalDeviceVulkan12Features*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::samplerMirrorClampToEdge), structure->samplerMirrorClampToEdge);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::drawIndirectCount), structure->drawIndirectCount);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::storageBuffer8BitAccess), structure->storageBuffer8BitAccess);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::uniformAndStorageBuffer8BitAccess),
+                                       structure->uniformAndStorageBuffer8BitAccess);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::storagePushConstant8), structure->storagePushConstant8);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderBufferInt64Atomics), structure->shaderBufferInt64Atomics);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderSharedInt64Atomics), structure->shaderSharedInt64Atomics);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderFloat16), structure->shaderFloat16);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderInt8), structure->shaderInt8);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::descriptorIndexing), structure->descriptorIndexing);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderInputAttachmentArrayDynamicIndexing),
+                                       structure->shaderInputAttachmentArrayDynamicIndexing);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderUniformTexelBufferArrayDynamicIndexing),
+                                       structure->shaderUniformTexelBufferArrayDynamicIndexing);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderStorageTexelBufferArrayDynamicIndexing),
+                                       structure->shaderStorageTexelBufferArrayDynamicIndexing);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderUniformBufferArrayNonUniformIndexing),
+                                       structure->shaderUniformBufferArrayNonUniformIndexing);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderSampledImageArrayNonUniformIndexing),
+                                       structure->shaderSampledImageArrayNonUniformIndexing);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderStorageBufferArrayNonUniformIndexing),
+                                       structure->shaderStorageBufferArrayNonUniformIndexing);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderStorageImageArrayNonUniformIndexing),
+                                       structure->shaderStorageImageArrayNonUniformIndexing);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderInputAttachmentArrayNonUniformIndexing),
+                                       structure->shaderInputAttachmentArrayNonUniformIndexing);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderUniformTexelBufferArrayNonUniformIndexing),
+                                       structure->shaderUniformTexelBufferArrayNonUniformIndexing);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderStorageTexelBufferArrayNonUniformIndexing),
+                                       structure->shaderStorageTexelBufferArrayNonUniformIndexing);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::descriptorBindingUniformBufferUpdateAfterBind),
+                                       structure->descriptorBindingUniformBufferUpdateAfterBind);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::descriptorBindingSampledImageUpdateAfterBind),
+                                       structure->descriptorBindingSampledImageUpdateAfterBind);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::descriptorBindingStorageImageUpdateAfterBind),
+                                       structure->descriptorBindingStorageImageUpdateAfterBind);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::descriptorBindingStorageBufferUpdateAfterBind),
+                                       structure->descriptorBindingStorageBufferUpdateAfterBind);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::descriptorBindingUniformTexelBufferUpdateAfterBind),
+                                       structure->descriptorBindingUniformTexelBufferUpdateAfterBind);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::descriptorBindingStorageTexelBufferUpdateAfterBind),
+                                       structure->descriptorBindingStorageTexelBufferUpdateAfterBind);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::descriptorBindingUpdateUnusedWhilePending),
+                                       structure->descriptorBindingUpdateUnusedWhilePending);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::descriptorBindingPartiallyBound),
+                                       structure->descriptorBindingPartiallyBound);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::descriptorBindingVariableDescriptorCount),
+                                       structure->descriptorBindingVariableDescriptorCount);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::runtimeDescriptorArray), structure->runtimeDescriptorArray);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::samplerFilterMinmax), structure->samplerFilterMinmax);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::scalarBlockLayout), structure->scalarBlockLayout);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::imagelessFramebuffer), structure->imagelessFramebuffer);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::uniformBufferStandardLayout), structure->uniformBufferStandardLayout);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderSubgroupExtendedTypes), structure->shaderSubgroupExtendedTypes);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::separateDepthStencilLayouts), structure->separateDepthStencilLayouts);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::hostQueryReset), structure->hostQueryReset);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::timelineSemaphore), structure->timelineSemaphore);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::bufferDeviceAddress), structure->bufferDeviceAddress);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::bufferDeviceAddressCaptureReplay),
+                                       structure->bufferDeviceAddressCaptureReplay);
+
+                skip |=
+                    ValidateBool32(pNext_loc.dot(Field::bufferDeviceAddressMultiDevice), structure->bufferDeviceAddressMultiDevice);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::vulkanMemoryModel), structure->vulkanMemoryModel);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::vulkanMemoryModelDeviceScope), structure->vulkanMemoryModelDeviceScope);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::vulkanMemoryModelAvailabilityVisibilityChains),
+                                       structure->vulkanMemoryModelAvailabilityVisibilityChains);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderOutputViewportIndex), structure->shaderOutputViewportIndex);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderOutputLayer), structure->shaderOutputLayer);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::subgroupBroadcastDynamicId), structure->subgroupBroadcastDynamicId);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDevice8BitStorageFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_8BIT_STORAGE_FEATURES: {  // Covers
+                                                                         // VUID-VkPhysicalDevice8BitStorageFeatures-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |= LogError(
+                        pnext_vuid, instance, loc.dot(Field::pNext),
+                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_8BIT_STORAGE_FEATURES) which "
+                        "was added in VK_API_VERSION_1_2 but the "
+                        "current effective API version is %s.",
+                        StringAPIVersion(device_api_version).c_str());
+                }
+            }
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDevice8BitStorageFeatures);
+                VkPhysicalDevice8BitStorageFeatures* structure = (VkPhysicalDevice8BitStorageFeatures*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::storageBuffer8BitAccess), structure->storageBuffer8BitAccess);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::uniformAndStorageBuffer8BitAccess),
+                                       structure->uniformAndStorageBuffer8BitAccess);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::storagePushConstant8), structure->storagePushConstant8);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceShaderAtomicInt64Features structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_INT64_FEATURES: {  // Covers
+                                                                                // VUID-VkPhysicalDeviceShaderAtomicInt64Features-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |= LogError(
+                        pnext_vuid, instance, loc.dot(Field::pNext),
+                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_INT64_FEATURES) "
+                        "which was added in VK_API_VERSION_1_2 but the "
+                        "current effective API version is %s.",
+                        StringAPIVersion(device_api_version).c_str());
+                }
+            }
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceShaderAtomicInt64Features);
+                VkPhysicalDeviceShaderAtomicInt64Features* structure = (VkPhysicalDeviceShaderAtomicInt64Features*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderBufferInt64Atomics), structure->shaderBufferInt64Atomics);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderSharedInt64Atomics), structure->shaderSharedInt64Atomics);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceShaderFloat16Int8Features structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES: {  // Covers
+                                                                                // VUID-VkPhysicalDeviceShaderFloat16Int8Features-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |= LogError(
+                        pnext_vuid, instance, loc.dot(Field::pNext),
+                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES) "
+                        "which was added in VK_API_VERSION_1_2 but the "
+                        "current effective API version is %s.",
+                        StringAPIVersion(device_api_version).c_str());
+                }
+            }
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceShaderFloat16Int8Features);
+                VkPhysicalDeviceShaderFloat16Int8Features* structure = (VkPhysicalDeviceShaderFloat16Int8Features*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderFloat16), structure->shaderFloat16);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderInt8), structure->shaderInt8);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceDescriptorIndexingFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES: {  // Covers
+                                                                                // VUID-VkPhysicalDeviceDescriptorIndexingFeatures-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |= LogError(
+                        pnext_vuid, instance, loc.dot(Field::pNext),
+                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES) "
+                        "which was added in VK_API_VERSION_1_2 but the "
+                        "current effective API version is %s.",
+                        StringAPIVersion(device_api_version).c_str());
+                }
+            }
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceDescriptorIndexingFeatures);
+                VkPhysicalDeviceDescriptorIndexingFeatures* structure = (VkPhysicalDeviceDescriptorIndexingFeatures*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderInputAttachmentArrayDynamicIndexing),
+                                       structure->shaderInputAttachmentArrayDynamicIndexing);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderUniformTexelBufferArrayDynamicIndexing),
+                                       structure->shaderUniformTexelBufferArrayDynamicIndexing);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderStorageTexelBufferArrayDynamicIndexing),
+                                       structure->shaderStorageTexelBufferArrayDynamicIndexing);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderUniformBufferArrayNonUniformIndexing),
+                                       structure->shaderUniformBufferArrayNonUniformIndexing);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderSampledImageArrayNonUniformIndexing),
+                                       structure->shaderSampledImageArrayNonUniformIndexing);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderStorageBufferArrayNonUniformIndexing),
+                                       structure->shaderStorageBufferArrayNonUniformIndexing);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderStorageImageArrayNonUniformIndexing),
+                                       structure->shaderStorageImageArrayNonUniformIndexing);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderInputAttachmentArrayNonUniformIndexing),
+                                       structure->shaderInputAttachmentArrayNonUniformIndexing);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderUniformTexelBufferArrayNonUniformIndexing),
+                                       structure->shaderUniformTexelBufferArrayNonUniformIndexing);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderStorageTexelBufferArrayNonUniformIndexing),
+                                       structure->shaderStorageTexelBufferArrayNonUniformIndexing);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::descriptorBindingUniformBufferUpdateAfterBind),
+                                       structure->descriptorBindingUniformBufferUpdateAfterBind);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::descriptorBindingSampledImageUpdateAfterBind),
+                                       structure->descriptorBindingSampledImageUpdateAfterBind);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::descriptorBindingStorageImageUpdateAfterBind),
+                                       structure->descriptorBindingStorageImageUpdateAfterBind);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::descriptorBindingStorageBufferUpdateAfterBind),
+                                       structure->descriptorBindingStorageBufferUpdateAfterBind);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::descriptorBindingUniformTexelBufferUpdateAfterBind),
+                                       structure->descriptorBindingUniformTexelBufferUpdateAfterBind);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::descriptorBindingStorageTexelBufferUpdateAfterBind),
+                                       structure->descriptorBindingStorageTexelBufferUpdateAfterBind);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::descriptorBindingUpdateUnusedWhilePending),
+                                       structure->descriptorBindingUpdateUnusedWhilePending);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::descriptorBindingPartiallyBound),
+                                       structure->descriptorBindingPartiallyBound);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::descriptorBindingVariableDescriptorCount),
+                                       structure->descriptorBindingVariableDescriptorCount);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::runtimeDescriptorArray), structure->runtimeDescriptorArray);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceScalarBlockLayoutFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SCALAR_BLOCK_LAYOUT_FEATURES: {  // Covers
+                                                                                // VUID-VkPhysicalDeviceScalarBlockLayoutFeatures-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |= LogError(
+                        pnext_vuid, instance, loc.dot(Field::pNext),
+                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SCALAR_BLOCK_LAYOUT_FEATURES) "
+                        "which was added in VK_API_VERSION_1_2 but the "
+                        "current effective API version is %s.",
+                        StringAPIVersion(device_api_version).c_str());
+                }
+            }
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceScalarBlockLayoutFeatures);
+                VkPhysicalDeviceScalarBlockLayoutFeatures* structure = (VkPhysicalDeviceScalarBlockLayoutFeatures*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::scalarBlockLayout), structure->scalarBlockLayout);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceVulkanMemoryModelFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_MEMORY_MODEL_FEATURES: {  // Covers
+                                                                                // VUID-VkPhysicalDeviceVulkanMemoryModelFeatures-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |= LogError(
+                        pnext_vuid, instance, loc.dot(Field::pNext),
+                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_MEMORY_MODEL_FEATURES) "
+                        "which was added in VK_API_VERSION_1_2 but the "
+                        "current effective API version is %s.",
+                        StringAPIVersion(device_api_version).c_str());
+                }
+            }
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceVulkanMemoryModelFeatures);
+                VkPhysicalDeviceVulkanMemoryModelFeatures* structure = (VkPhysicalDeviceVulkanMemoryModelFeatures*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::vulkanMemoryModel), structure->vulkanMemoryModel);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::vulkanMemoryModelDeviceScope), structure->vulkanMemoryModelDeviceScope);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::vulkanMemoryModelAvailabilityVisibilityChains),
+                                       structure->vulkanMemoryModelAvailabilityVisibilityChains);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceImagelessFramebufferFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGELESS_FRAMEBUFFER_FEATURES: {  // Covers
+                                                                                  // VUID-VkPhysicalDeviceImagelessFramebufferFeatures-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
+                                     "includes a pointer to a VkStructureType "
+                                     "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGELESS_FRAMEBUFFER_FEATURES) which was added in "
+                                     "VK_API_VERSION_1_2 but the "
+                                     "current effective API version is %s.",
+                                     StringAPIVersion(device_api_version).c_str());
+                }
+            }
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceImagelessFramebufferFeatures);
+                VkPhysicalDeviceImagelessFramebufferFeatures* structure = (VkPhysicalDeviceImagelessFramebufferFeatures*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::imagelessFramebuffer), structure->imagelessFramebuffer);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceUniformBufferStandardLayoutFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_UNIFORM_BUFFER_STANDARD_LAYOUT_FEATURES: {  // Covers
+                                                                                           // VUID-VkPhysicalDeviceUniformBufferStandardLayoutFeatures-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
+                                     "includes a pointer to a VkStructureType "
+                                     "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_UNIFORM_BUFFER_STANDARD_LAYOUT_FEATURES) which was added "
+                                     "in VK_API_VERSION_1_2 but the "
+                                     "current effective API version is %s.",
+                                     StringAPIVersion(device_api_version).c_str());
+                }
+            }
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceUniformBufferStandardLayoutFeatures);
+                VkPhysicalDeviceUniformBufferStandardLayoutFeatures* structure =
+                    (VkPhysicalDeviceUniformBufferStandardLayoutFeatures*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::uniformBufferStandardLayout), structure->uniformBufferStandardLayout);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceShaderSubgroupExtendedTypesFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_SUBGROUP_EXTENDED_TYPES_FEATURES: {  // Covers
+                                                                                           // VUID-VkPhysicalDeviceShaderSubgroupExtendedTypesFeatures-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
+                                     "includes a pointer to a VkStructureType "
+                                     "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_SUBGROUP_EXTENDED_TYPES_FEATURES) which was added "
+                                     "in VK_API_VERSION_1_2 but the "
+                                     "current effective API version is %s.",
+                                     StringAPIVersion(device_api_version).c_str());
+                }
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceSeparateDepthStencilLayoutsFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SEPARATE_DEPTH_STENCIL_LAYOUTS_FEATURES: {  // Covers
+                                                                                           // VUID-VkPhysicalDeviceSeparateDepthStencilLayoutsFeatures-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
+                                     "includes a pointer to a VkStructureType "
+                                     "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SEPARATE_DEPTH_STENCIL_LAYOUTS_FEATURES) which was added "
+                                     "in VK_API_VERSION_1_2 but the "
+                                     "current effective API version is %s.",
+                                     StringAPIVersion(device_api_version).c_str());
+                }
+            }
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceSeparateDepthStencilLayoutsFeatures);
+                VkPhysicalDeviceSeparateDepthStencilLayoutsFeatures* structure =
+                    (VkPhysicalDeviceSeparateDepthStencilLayoutsFeatures*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::separateDepthStencilLayouts), structure->separateDepthStencilLayouts);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceHostQueryResetFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES: {  // Covers
+                                                                             // VUID-VkPhysicalDeviceHostQueryResetFeatures-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |= LogError(
+                        pnext_vuid, instance, loc.dot(Field::pNext),
+                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES) "
+                        "which was added in VK_API_VERSION_1_2 but the "
+                        "current effective API version is %s.",
+                        StringAPIVersion(device_api_version).c_str());
+                }
+            }
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceHostQueryResetFeatures);
+                VkPhysicalDeviceHostQueryResetFeatures* structure = (VkPhysicalDeviceHostQueryResetFeatures*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::hostQueryReset), structure->hostQueryReset);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceTimelineSemaphoreFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES: {  // Covers
+                                                                               // VUID-VkPhysicalDeviceTimelineSemaphoreFeatures-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |= LogError(
+                        pnext_vuid, instance, loc.dot(Field::pNext),
+                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES) "
+                        "which was added in VK_API_VERSION_1_2 but the "
+                        "current effective API version is %s.",
+                        StringAPIVersion(device_api_version).c_str());
+                }
+            }
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceTimelineSemaphoreFeatures);
+                VkPhysicalDeviceTimelineSemaphoreFeatures* structure = (VkPhysicalDeviceTimelineSemaphoreFeatures*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::timelineSemaphore), structure->timelineSemaphore);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceBufferDeviceAddressFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES: {  // Covers
+                                                                                  // VUID-VkPhysicalDeviceBufferDeviceAddressFeatures-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
+                                     "includes a pointer to a VkStructureType "
+                                     "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES) which was added in "
+                                     "VK_API_VERSION_1_2 but the "
+                                     "current effective API version is %s.",
+                                     StringAPIVersion(device_api_version).c_str());
+                }
+            }
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceBufferDeviceAddressFeatures);
+                VkPhysicalDeviceBufferDeviceAddressFeatures* structure = (VkPhysicalDeviceBufferDeviceAddressFeatures*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::bufferDeviceAddress), structure->bufferDeviceAddress);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::bufferDeviceAddressCaptureReplay),
+                                       structure->bufferDeviceAddressCaptureReplay);
+
+                skip |=
+                    ValidateBool32(pNext_loc.dot(Field::bufferDeviceAddressMultiDevice), structure->bufferDeviceAddressMultiDevice);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceVulkan13Features structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES: {  // Covers VUID-VkPhysicalDeviceVulkan13Features-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_3) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |=
+                        LogError(pnext_vuid, instance, loc.dot(Field::pNext),
+                                 "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES) "
+                                 "which was added in VK_API_VERSION_1_3 but the "
+                                 "current effective API version is %s.",
+                                 StringAPIVersion(device_api_version).c_str());
+                }
+            }
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceVulkan13Features);
+                VkPhysicalDeviceVulkan13Features* structure = (VkPhysicalDeviceVulkan13Features*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::robustImageAccess), structure->robustImageAccess);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::inlineUniformBlock), structure->inlineUniformBlock);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::descriptorBindingInlineUniformBlockUpdateAfterBind),
+                                       structure->descriptorBindingInlineUniformBlockUpdateAfterBind);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::pipelineCreationCacheControl), structure->pipelineCreationCacheControl);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::privateData), structure->privateData);
+
+                skip |=
+                    ValidateBool32(pNext_loc.dot(Field::shaderDemoteToHelperInvocation), structure->shaderDemoteToHelperInvocation);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderTerminateInvocation), structure->shaderTerminateInvocation);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::subgroupSizeControl), structure->subgroupSizeControl);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::computeFullSubgroups), structure->computeFullSubgroups);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::synchronization2), structure->synchronization2);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::textureCompressionASTC_HDR), structure->textureCompressionASTC_HDR);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderZeroInitializeWorkgroupMemory),
+                                       structure->shaderZeroInitializeWorkgroupMemory);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::dynamicRendering), structure->dynamicRendering);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderIntegerDotProduct), structure->shaderIntegerDotProduct);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::maintenance4), structure->maintenance4);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceShaderTerminateInvocationFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_TERMINATE_INVOCATION_FEATURES: {  // Covers
+                                                                                        // VUID-VkPhysicalDeviceShaderTerminateInvocationFeatures-sType-sType
+
+            if ((is_physdev_api && !SupportedByPdev(physical_device, vvl::Extension::_VK_KHR_shader_terminate_invocation)) ||
+                (!is_physdev_api && !IsExtEnabled(device_extensions.vk_khr_shader_terminate_invocation))) {
+                skip |=
+                    LogError(pnext_vuid, instance, loc.dot(Field::pNext),
+                             "includes a pointer to a VkStructureType "
+                             "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_TERMINATE_INVOCATION_FEATURES), but its parent extension "
+                             "VK_KHR_shader_terminate_invocation has not been enabled.");
+            }
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceShaderTerminateInvocationFeatures);
+                if (!IsExtEnabled(device_extensions.vk_khr_shader_terminate_invocation)) {
+                    skip |= LogError(pnext_vuid, instance, pNext_loc,
+                                     "includes a pointer to a VkPhysicalDeviceShaderTerminateInvocationFeatures, but when creating "
+                                     "VkDevice, the parent extension "
+                                     "(VK_KHR_shader_terminate_invocation) was not included in ppEnabledExtensionNames.");
+                }
+                VkPhysicalDeviceShaderTerminateInvocationFeatures* structure =
+                    (VkPhysicalDeviceShaderTerminateInvocationFeatures*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderTerminateInvocation), structure->shaderTerminateInvocation);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceShaderDemoteToHelperInvocationFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DEMOTE_TO_HELPER_INVOCATION_FEATURES: {  // Covers
+                                                                                               // VUID-VkPhysicalDeviceShaderDemoteToHelperInvocationFeatures-sType-sType
+
+            if ((is_physdev_api && !SupportedByPdev(physical_device, vvl::Extension::_VK_EXT_shader_demote_to_helper_invocation)) ||
+                (!is_physdev_api && !IsExtEnabled(device_extensions.vk_ext_shader_demote_to_helper_invocation))) {
+                skip |= LogError(
+                    pnext_vuid, instance, loc.dot(Field::pNext),
+                    "includes a pointer to a VkStructureType "
+                    "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DEMOTE_TO_HELPER_INVOCATION_FEATURES), but its parent extension "
+                    "VK_EXT_shader_demote_to_helper_invocation has not been enabled.");
+            }
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc =
+                    loc.pNext(Struct::VkPhysicalDeviceShaderDemoteToHelperInvocationFeatures);
+                if (!IsExtEnabled(device_extensions.vk_ext_shader_demote_to_helper_invocation)) {
+                    skip |= LogError(pnext_vuid, instance, pNext_loc,
+                                     "includes a pointer to a VkPhysicalDeviceShaderDemoteToHelperInvocationFeatures, but when "
+                                     "creating VkDevice, the parent extension "
+                                     "(VK_EXT_shader_demote_to_helper_invocation) was not included in ppEnabledExtensionNames.");
+                }
+                VkPhysicalDeviceShaderDemoteToHelperInvocationFeatures* structure =
+                    (VkPhysicalDeviceShaderDemoteToHelperInvocationFeatures*)header;
+                skip |=
+                    ValidateBool32(pNext_loc.dot(Field::shaderDemoteToHelperInvocation), structure->shaderDemoteToHelperInvocation);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDevicePrivateDataFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRIVATE_DATA_FEATURES: {  // Covers
+                                                                         // VUID-VkPhysicalDevicePrivateDataFeatures-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_3) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |= LogError(
+                        pnext_vuid, instance, loc.dot(Field::pNext),
+                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRIVATE_DATA_FEATURES) which "
+                        "was added in VK_API_VERSION_1_3 but the "
+                        "current effective API version is %s.",
+                        StringAPIVersion(device_api_version).c_str());
+                }
+            }
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDevicePrivateDataFeatures);
+                VkPhysicalDevicePrivateDataFeatures* structure = (VkPhysicalDevicePrivateDataFeatures*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::privateData), structure->privateData);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDevicePipelineCreationCacheControlFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PIPELINE_CREATION_CACHE_CONTROL_FEATURES: {  // Covers
+                                                                                            // VUID-VkPhysicalDevicePipelineCreationCacheControlFeatures-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_3) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
+                                     "includes a pointer to a VkStructureType "
+                                     "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PIPELINE_CREATION_CACHE_CONTROL_FEATURES) which was added "
+                                     "in VK_API_VERSION_1_3 but the "
+                                     "current effective API version is %s.",
+                                     StringAPIVersion(device_api_version).c_str());
+                }
+            }
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDevicePipelineCreationCacheControlFeatures);
+                VkPhysicalDevicePipelineCreationCacheControlFeatures* structure =
+                    (VkPhysicalDevicePipelineCreationCacheControlFeatures*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::pipelineCreationCacheControl), structure->pipelineCreationCacheControl);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceSynchronization2Features structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES: {  // Covers
+                                                                              // VUID-VkPhysicalDeviceSynchronization2Features-sType-sType
+
+            if ((is_physdev_api && !SupportedByPdev(physical_device, vvl::Extension::_VK_KHR_synchronization2)) ||
+                (!is_physdev_api && !IsExtEnabled(device_extensions.vk_khr_synchronization2))) {
+                skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
+                                 "includes a pointer to a VkStructureType "
+                                 "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES), but its parent extension "
+                                 "VK_KHR_synchronization2 has not been enabled.");
+            }
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceSynchronization2Features);
+                if (!IsExtEnabled(device_extensions.vk_khr_synchronization2)) {
+                    skip |= LogError(pnext_vuid, instance, pNext_loc,
+                                     "includes a pointer to a VkPhysicalDeviceSynchronization2Features, but when creating "
+                                     "VkDevice, the parent extension "
+                                     "(VK_KHR_synchronization2) was not included in ppEnabledExtensionNames.");
+                }
+                VkPhysicalDeviceSynchronization2Features* structure = (VkPhysicalDeviceSynchronization2Features*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::synchronization2), structure->synchronization2);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceZeroInitializeWorkgroupMemoryFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ZERO_INITIALIZE_WORKGROUP_MEMORY_FEATURES: {  // Covers
+                                                                                             // VUID-VkPhysicalDeviceZeroInitializeWorkgroupMemoryFeatures-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_3) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
+                                     "includes a pointer to a VkStructureType "
+                                     "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ZERO_INITIALIZE_WORKGROUP_MEMORY_FEATURES) which was "
+                                     "added in VK_API_VERSION_1_3 but the "
+                                     "current effective API version is %s.",
+                                     StringAPIVersion(device_api_version).c_str());
+                }
+            }
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc =
+                    loc.pNext(Struct::VkPhysicalDeviceZeroInitializeWorkgroupMemoryFeatures);
+                VkPhysicalDeviceZeroInitializeWorkgroupMemoryFeatures* structure =
+                    (VkPhysicalDeviceZeroInitializeWorkgroupMemoryFeatures*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderZeroInitializeWorkgroupMemory),
+                                       structure->shaderZeroInitializeWorkgroupMemory);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceImageRobustnessFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_ROBUSTNESS_FEATURES: {  // Covers
+                                                                             // VUID-VkPhysicalDeviceImageRobustnessFeatures-sType-sType
+
+            if ((is_physdev_api && !SupportedByPdev(physical_device, vvl::Extension::_VK_EXT_image_robustness)) ||
+                (!is_physdev_api && !IsExtEnabled(device_extensions.vk_ext_image_robustness))) {
+                skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
+                                 "includes a pointer to a VkStructureType "
+                                 "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_ROBUSTNESS_FEATURES), but its parent extension "
+                                 "VK_EXT_image_robustness has not been enabled.");
+            }
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceImageRobustnessFeatures);
+                if (!IsExtEnabled(device_extensions.vk_ext_image_robustness)) {
+                    skip |= LogError(pnext_vuid, instance, pNext_loc,
+                                     "includes a pointer to a VkPhysicalDeviceImageRobustnessFeatures, but when creating VkDevice, "
+                                     "the parent extension "
+                                     "(VK_EXT_image_robustness) was not included in ppEnabledExtensionNames.");
+                }
+                VkPhysicalDeviceImageRobustnessFeatures* structure = (VkPhysicalDeviceImageRobustnessFeatures*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::robustImageAccess), structure->robustImageAccess);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceSubgroupSizeControlFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_SIZE_CONTROL_FEATURES: {  // Covers
+                                                                                  // VUID-VkPhysicalDeviceSubgroupSizeControlFeatures-sType-sType
+
+            if ((is_physdev_api && !SupportedByPdev(physical_device, vvl::Extension::_VK_EXT_subgroup_size_control)) ||
+                (!is_physdev_api && !IsExtEnabled(device_extensions.vk_ext_subgroup_size_control))) {
+                skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
+                                 "includes a pointer to a VkStructureType "
+                                 "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_SIZE_CONTROL_FEATURES), but its parent extension "
+                                 "VK_EXT_subgroup_size_control has not been enabled.");
+            }
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceSubgroupSizeControlFeatures);
+                if (!IsExtEnabled(device_extensions.vk_ext_subgroup_size_control)) {
+                    skip |= LogError(pnext_vuid, instance, pNext_loc,
+                                     "includes a pointer to a VkPhysicalDeviceSubgroupSizeControlFeatures, but when creating "
+                                     "VkDevice, the parent extension "
+                                     "(VK_EXT_subgroup_size_control) was not included in ppEnabledExtensionNames.");
+                }
+                VkPhysicalDeviceSubgroupSizeControlFeatures* structure = (VkPhysicalDeviceSubgroupSizeControlFeatures*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::subgroupSizeControl), structure->subgroupSizeControl);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::computeFullSubgroups), structure->computeFullSubgroups);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceInlineUniformBlockFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INLINE_UNIFORM_BLOCK_FEATURES: {  // Covers
+                                                                                 // VUID-VkPhysicalDeviceInlineUniformBlockFeatures-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_3) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |= LogError(
+                        pnext_vuid, instance, loc.dot(Field::pNext),
+                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INLINE_UNIFORM_BLOCK_FEATURES) "
+                        "which was added in VK_API_VERSION_1_3 but the "
+                        "current effective API version is %s.",
+                        StringAPIVersion(device_api_version).c_str());
+                }
+            }
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceInlineUniformBlockFeatures);
+                VkPhysicalDeviceInlineUniformBlockFeatures* structure = (VkPhysicalDeviceInlineUniformBlockFeatures*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::inlineUniformBlock), structure->inlineUniformBlock);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::descriptorBindingInlineUniformBlockUpdateAfterBind),
+                                       structure->descriptorBindingInlineUniformBlockUpdateAfterBind);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceTextureCompressionASTCHDRFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TEXTURE_COMPRESSION_ASTC_HDR_FEATURES: {  // Covers
+                                                                                         // VUID-VkPhysicalDeviceTextureCompressionASTCHDRFeatures-sType-sType
+
+            if ((is_physdev_api && !SupportedByPdev(physical_device, vvl::Extension::_VK_EXT_texture_compression_astc_hdr)) ||
+                (!is_physdev_api && !IsExtEnabled(device_extensions.vk_ext_texture_compression_astc_hdr))) {
+                skip |=
+                    LogError(pnext_vuid, instance, loc.dot(Field::pNext),
+                             "includes a pointer to a VkStructureType "
+                             "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TEXTURE_COMPRESSION_ASTC_HDR_FEATURES), but its parent extension "
+                             "VK_EXT_texture_compression_astc_hdr has not been enabled.");
+            }
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceTextureCompressionASTCHDRFeatures);
+                if (!IsExtEnabled(device_extensions.vk_ext_texture_compression_astc_hdr)) {
+                    skip |= LogError(pnext_vuid, instance, pNext_loc,
+                                     "includes a pointer to a VkPhysicalDeviceTextureCompressionASTCHDRFeatures, but when creating "
+                                     "VkDevice, the parent extension "
+                                     "(VK_EXT_texture_compression_astc_hdr) was not included in ppEnabledExtensionNames.");
+                }
+                VkPhysicalDeviceTextureCompressionASTCHDRFeatures* structure =
+                    (VkPhysicalDeviceTextureCompressionASTCHDRFeatures*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::textureCompressionASTC_HDR), structure->textureCompressionASTC_HDR);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceDynamicRenderingFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES: {  // Covers
+                                                                              // VUID-VkPhysicalDeviceDynamicRenderingFeatures-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_3) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |= LogError(
+                        pnext_vuid, instance, loc.dot(Field::pNext),
+                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES) "
+                        "which was added in VK_API_VERSION_1_3 but the "
+                        "current effective API version is %s.",
+                        StringAPIVersion(device_api_version).c_str());
+                }
+            }
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceDynamicRenderingFeatures);
+                VkPhysicalDeviceDynamicRenderingFeatures* structure = (VkPhysicalDeviceDynamicRenderingFeatures*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::dynamicRendering), structure->dynamicRendering);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceShaderIntegerDotProductFeatures structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_INTEGER_DOT_PRODUCT_FEATURES: {  // Covers
+                                                                                       // VUID-VkPhysicalDeviceShaderIntegerDotProductFeatures-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_3) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
+                                     "includes a pointer to a VkStructureType "
+                                     "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_INTEGER_DOT_PRODUCT_FEATURES) which was added in "
+                                     "VK_API_VERSION_1_3 but the "
+                                     "current effective API version is %s.",
+                                     StringAPIVersion(device_api_version).c_str());
+                }
+            }
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceShaderIntegerDotProductFeatures);
+                VkPhysicalDeviceShaderIntegerDotProductFeatures* structure =
+                    (VkPhysicalDeviceShaderIntegerDotProductFeatures*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderIntegerDotProduct), structure->shaderIntegerDotProduct);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceMaintenance4Features structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_4_FEATURES: {  // Covers
+                                                                          // VUID-VkPhysicalDeviceMaintenance4Features-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_3) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |= LogError(
+                        pnext_vuid, instance, loc.dot(Field::pNext),
+                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_4_FEATURES) which "
+                        "was added in VK_API_VERSION_1_3 but the "
+                        "current effective API version is %s.",
+                        StringAPIVersion(device_api_version).c_str());
+                }
+            }
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceMaintenance4Features);
+                VkPhysicalDeviceMaintenance4Features* structure = (VkPhysicalDeviceMaintenance4Features*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::maintenance4), structure->maintenance4);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceVulkanSC10Features structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_SC_1_0_FEATURES: {  // Covers
+                                                                          // VUID-VkPhysicalDeviceVulkanSC10Features-sType-sType
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceVulkanSC10Features);
+                VkPhysicalDeviceVulkanSC10Features* structure = (VkPhysicalDeviceVulkanSC10Features*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderAtomicInstructions), structure->shaderAtomicInstructions);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDevicePerformanceQueryFeaturesKHR structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PERFORMANCE_QUERY_FEATURES_KHR: {  // Covers
+                                                                                  // VUID-VkPhysicalDevicePerformanceQueryFeaturesKHR-sType-sType
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDevicePerformanceQueryFeaturesKHR);
+                if (!IsExtEnabled(device_extensions.vk_khr_performance_query)) {
+                    skip |= LogError(pnext_vuid, instance, pNext_loc,
+                                     "includes a pointer to a VkPhysicalDevicePerformanceQueryFeaturesKHR, but when creating "
+                                     "VkDevice, the parent extension "
+                                     "(VK_KHR_performance_query) was not included in ppEnabledExtensionNames.");
+                }
+                VkPhysicalDevicePerformanceQueryFeaturesKHR* structure = (VkPhysicalDevicePerformanceQueryFeaturesKHR*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::performanceCounterQueryPools), structure->performanceCounterQueryPools);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::performanceCounterMultipleQueryPools),
+                                       structure->performanceCounterMultipleQueryPools);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceShaderClockFeaturesKHR structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_CLOCK_FEATURES_KHR: {  // Covers
+                                                                             // VUID-VkPhysicalDeviceShaderClockFeaturesKHR-sType-sType
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceShaderClockFeaturesKHR);
+                if (!IsExtEnabled(device_extensions.vk_khr_shader_clock)) {
+                    skip |= LogError(pnext_vuid, instance, pNext_loc,
+                                     "includes a pointer to a VkPhysicalDeviceShaderClockFeaturesKHR, but when creating VkDevice, "
+                                     "the parent extension "
+                                     "(VK_KHR_shader_clock) was not included in ppEnabledExtensionNames.");
+                }
+                VkPhysicalDeviceShaderClockFeaturesKHR* structure = (VkPhysicalDeviceShaderClockFeaturesKHR*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderSubgroupClock), structure->shaderSubgroupClock);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderDeviceClock), structure->shaderDeviceClock);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceGlobalPriorityQueryFeaturesKHR structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_GLOBAL_PRIORITY_QUERY_FEATURES_KHR: {  // Covers
+                                                                                      // VUID-VkPhysicalDeviceGlobalPriorityQueryFeaturesKHR-sType-sType
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceGlobalPriorityQueryFeaturesKHR);
+                if (!IsExtEnabled(device_extensions.vk_khr_global_priority)) {
+                    skip |= LogError(pnext_vuid, instance, pNext_loc,
+                                     "includes a pointer to a VkPhysicalDeviceGlobalPriorityQueryFeaturesKHR, but when creating "
+                                     "VkDevice, the parent extension "
+                                     "(VK_KHR_global_priority) was not included in ppEnabledExtensionNames.");
+                }
+                VkPhysicalDeviceGlobalPriorityQueryFeaturesKHR* structure = (VkPhysicalDeviceGlobalPriorityQueryFeaturesKHR*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::globalPriorityQuery), structure->globalPriorityQuery);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceFragmentShadingRateFeaturesKHR structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_FEATURES_KHR: {  // Covers
+                                                                                      // VUID-VkPhysicalDeviceFragmentShadingRateFeaturesKHR-sType-sType
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceFragmentShadingRateFeaturesKHR);
+                if (!IsExtEnabled(device_extensions.vk_khr_fragment_shading_rate)) {
+                    skip |= LogError(pnext_vuid, instance, pNext_loc,
+                                     "includes a pointer to a VkPhysicalDeviceFragmentShadingRateFeaturesKHR, but when creating "
+                                     "VkDevice, the parent extension "
+                                     "(VK_KHR_fragment_shading_rate) was not included in ppEnabledExtensionNames.");
+                }
+                VkPhysicalDeviceFragmentShadingRateFeaturesKHR* structure = (VkPhysicalDeviceFragmentShadingRateFeaturesKHR*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::pipelineFragmentShadingRate), structure->pipelineFragmentShadingRate);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::primitiveFragmentShadingRate), structure->primitiveFragmentShadingRate);
+
+                skip |=
+                    ValidateBool32(pNext_loc.dot(Field::attachmentFragmentShadingRate), structure->attachmentFragmentShadingRate);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceVertexAttributeDivisorFeaturesKHR structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_ATTRIBUTE_DIVISOR_FEATURES_KHR: {  // Covers
+                                                                                         // VUID-VkPhysicalDeviceVertexAttributeDivisorFeaturesKHR-sType-sType
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceVertexAttributeDivisorFeaturesKHR);
+                if (!IsExtEnabled(device_extensions.vk_khr_vertex_attribute_divisor)) {
+                    skip |= LogError(pnext_vuid, instance, pNext_loc,
+                                     "includes a pointer to a VkPhysicalDeviceVertexAttributeDivisorFeaturesKHR, but when creating "
+                                     "VkDevice, the parent extension "
+                                     "(VK_KHR_vertex_attribute_divisor) was not included in ppEnabledExtensionNames.");
+                }
+                VkPhysicalDeviceVertexAttributeDivisorFeaturesKHR* structure =
+                    (VkPhysicalDeviceVertexAttributeDivisorFeaturesKHR*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::vertexAttributeInstanceRateDivisor),
+                                       structure->vertexAttributeInstanceRateDivisor);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::vertexAttributeInstanceRateZeroDivisor),
+                                       structure->vertexAttributeInstanceRateZeroDivisor);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceIndexTypeUint8FeaturesKHR structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INDEX_TYPE_UINT8_FEATURES_KHR: {  // Covers
+                                                                                 // VUID-VkPhysicalDeviceIndexTypeUint8FeaturesKHR-sType-sType
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceIndexTypeUint8FeaturesKHR);
+                if (!IsExtEnabled(device_extensions.vk_khr_index_type_uint8) &&
+                    !IsExtEnabled(device_extensions.vk_ext_index_type_uint8)) {
+                    skip |= LogError(
+                        pnext_vuid, instance, pNext_loc,
+                        "includes a pointer to a VkPhysicalDeviceIndexTypeUint8FeaturesKHR, but when creating VkDevice, the parent "
+                        "extension "
+                        "(VK_KHR_index_type_uint8 or VK_EXT_index_type_uint8) was not included in ppEnabledExtensionNames.");
+                }
+                VkPhysicalDeviceIndexTypeUint8FeaturesKHR* structure = (VkPhysicalDeviceIndexTypeUint8FeaturesKHR*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::indexTypeUint8), structure->indexTypeUint8);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceLineRasterizationFeaturesKHR structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_LINE_RASTERIZATION_FEATURES_KHR: {  // Covers
+                                                                                   // VUID-VkPhysicalDeviceLineRasterizationFeaturesKHR-sType-sType
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceLineRasterizationFeaturesKHR);
+                if (!IsExtEnabled(device_extensions.vk_khr_line_rasterization) &&
+                    !IsExtEnabled(device_extensions.vk_ext_line_rasterization)) {
+                    skip |= LogError(
+                        pnext_vuid, instance, pNext_loc,
+                        "includes a pointer to a VkPhysicalDeviceLineRasterizationFeaturesKHR, but when creating VkDevice, the "
+                        "parent extension "
+                        "(VK_KHR_line_rasterization or VK_EXT_line_rasterization) was not included in ppEnabledExtensionNames.");
+                }
+                VkPhysicalDeviceLineRasterizationFeaturesKHR* structure = (VkPhysicalDeviceLineRasterizationFeaturesKHR*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::rectangularLines), structure->rectangularLines);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::bresenhamLines), structure->bresenhamLines);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::smoothLines), structure->smoothLines);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::stippledRectangularLines), structure->stippledRectangularLines);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::stippledBresenhamLines), structure->stippledBresenhamLines);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::stippledSmoothLines), structure->stippledSmoothLines);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceASTCDecodeFeaturesEXT structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ASTC_DECODE_FEATURES_EXT: {  // Covers
+                                                                            // VUID-VkPhysicalDeviceASTCDecodeFeaturesEXT-sType-sType
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceASTCDecodeFeaturesEXT);
+                if (!IsExtEnabled(device_extensions.vk_ext_astc_decode_mode)) {
+                    skip |= LogError(pnext_vuid, instance, pNext_loc,
+                                     "includes a pointer to a VkPhysicalDeviceASTCDecodeFeaturesEXT, but when creating VkDevice, "
+                                     "the parent extension "
+                                     "(VK_EXT_astc_decode_mode) was not included in ppEnabledExtensionNames.");
+                }
+                VkPhysicalDeviceASTCDecodeFeaturesEXT* structure = (VkPhysicalDeviceASTCDecodeFeaturesEXT*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::decodeModeSharedExponent), structure->decodeModeSharedExponent);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceDepthClipEnableFeaturesEXT structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DEPTH_CLIP_ENABLE_FEATURES_EXT: {  // Covers
+                                                                                  // VUID-VkPhysicalDeviceDepthClipEnableFeaturesEXT-sType-sType
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceDepthClipEnableFeaturesEXT);
+                if (!IsExtEnabled(device_extensions.vk_ext_depth_clip_enable)) {
+                    skip |= LogError(pnext_vuid, instance, pNext_loc,
+                                     "includes a pointer to a VkPhysicalDeviceDepthClipEnableFeaturesEXT, but when creating "
+                                     "VkDevice, the parent extension "
+                                     "(VK_EXT_depth_clip_enable) was not included in ppEnabledExtensionNames.");
+                }
+                VkPhysicalDeviceDepthClipEnableFeaturesEXT* structure = (VkPhysicalDeviceDepthClipEnableFeaturesEXT*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::depthClipEnable), structure->depthClipEnable);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceBlendOperationAdvancedFeaturesEXT structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BLEND_OPERATION_ADVANCED_FEATURES_EXT: {  // Covers
+                                                                                         // VUID-VkPhysicalDeviceBlendOperationAdvancedFeaturesEXT-sType-sType
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceBlendOperationAdvancedFeaturesEXT);
+                if (!IsExtEnabled(device_extensions.vk_ext_blend_operation_advanced)) {
+                    skip |= LogError(pnext_vuid, instance, pNext_loc,
+                                     "includes a pointer to a VkPhysicalDeviceBlendOperationAdvancedFeaturesEXT, but when creating "
+                                     "VkDevice, the parent extension "
+                                     "(VK_EXT_blend_operation_advanced) was not included in ppEnabledExtensionNames.");
+                }
+                VkPhysicalDeviceBlendOperationAdvancedFeaturesEXT* structure =
+                    (VkPhysicalDeviceBlendOperationAdvancedFeaturesEXT*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::advancedBlendCoherentOperations),
+                                       structure->advancedBlendCoherentOperations);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_IMAGE_ATOMIC_INT64_FEATURES_EXT: {  // Covers
+                                                                                          // VUID-VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT-sType-sType
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT);
+                if (!IsExtEnabled(device_extensions.vk_ext_shader_image_atomic_int64)) {
+                    skip |= LogError(pnext_vuid, instance, pNext_loc,
+                                     "includes a pointer to a VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT, but when creating "
+                                     "VkDevice, the parent extension "
+                                     "(VK_EXT_shader_image_atomic_int64) was not included in ppEnabledExtensionNames.");
+                }
+                VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT* structure =
+                    (VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderImageInt64Atomics), structure->shaderImageInt64Atomics);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::sparseImageInt64Atomics), structure->sparseImageInt64Atomics);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADER_INTERLOCK_FEATURES_EXT: {  // Covers
+                                                                                          // VUID-VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT-sType-sType
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT);
+                if (!IsExtEnabled(device_extensions.vk_ext_fragment_shader_interlock)) {
+                    skip |= LogError(pnext_vuid, instance, pNext_loc,
+                                     "includes a pointer to a VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT, but when "
+                                     "creating VkDevice, the parent extension "
+                                     "(VK_EXT_fragment_shader_interlock) was not included in ppEnabledExtensionNames.");
+                }
+                VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT* structure =
+                    (VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT*)header;
+                skip |=
+                    ValidateBool32(pNext_loc.dot(Field::fragmentShaderSampleInterlock), structure->fragmentShaderSampleInterlock);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::fragmentShaderPixelInterlock), structure->fragmentShaderPixelInterlock);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::fragmentShaderShadingRateInterlock),
+                                       structure->fragmentShaderShadingRateInterlock);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceYcbcrImageArraysFeaturesEXT structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_YCBCR_IMAGE_ARRAYS_FEATURES_EXT: {  // Covers
+                                                                                   // VUID-VkPhysicalDeviceYcbcrImageArraysFeaturesEXT-sType-sType
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceYcbcrImageArraysFeaturesEXT);
+                if (!IsExtEnabled(device_extensions.vk_ext_ycbcr_image_arrays)) {
+                    skip |= LogError(pnext_vuid, instance, pNext_loc,
+                                     "includes a pointer to a VkPhysicalDeviceYcbcrImageArraysFeaturesEXT, but when creating "
+                                     "VkDevice, the parent extension "
+                                     "(VK_EXT_ycbcr_image_arrays) was not included in ppEnabledExtensionNames.");
+                }
+                VkPhysicalDeviceYcbcrImageArraysFeaturesEXT* structure = (VkPhysicalDeviceYcbcrImageArraysFeaturesEXT*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::ycbcrImageArrays), structure->ycbcrImageArrays);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceShaderAtomicFloatFeaturesEXT structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_FLOAT_FEATURES_EXT: {  // Covers
+                                                                                    // VUID-VkPhysicalDeviceShaderAtomicFloatFeaturesEXT-sType-sType
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceShaderAtomicFloatFeaturesEXT);
+                if (!IsExtEnabled(device_extensions.vk_ext_shader_atomic_float)) {
+                    skip |= LogError(pnext_vuid, instance, pNext_loc,
+                                     "includes a pointer to a VkPhysicalDeviceShaderAtomicFloatFeaturesEXT, but when creating "
+                                     "VkDevice, the parent extension "
+                                     "(VK_EXT_shader_atomic_float) was not included in ppEnabledExtensionNames.");
+                }
+                VkPhysicalDeviceShaderAtomicFloatFeaturesEXT* structure = (VkPhysicalDeviceShaderAtomicFloatFeaturesEXT*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderBufferFloat32Atomics), structure->shaderBufferFloat32Atomics);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderBufferFloat32AtomicAdd), structure->shaderBufferFloat32AtomicAdd);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderBufferFloat64Atomics), structure->shaderBufferFloat64Atomics);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderBufferFloat64AtomicAdd), structure->shaderBufferFloat64AtomicAdd);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderSharedFloat32Atomics), structure->shaderSharedFloat32Atomics);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderSharedFloat32AtomicAdd), structure->shaderSharedFloat32AtomicAdd);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderSharedFloat64Atomics), structure->shaderSharedFloat64Atomics);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderSharedFloat64AtomicAdd), structure->shaderSharedFloat64AtomicAdd);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderImageFloat32Atomics), structure->shaderImageFloat32Atomics);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::shaderImageFloat32AtomicAdd), structure->shaderImageFloat32AtomicAdd);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::sparseImageFloat32Atomics), structure->sparseImageFloat32Atomics);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::sparseImageFloat32AtomicAdd), structure->sparseImageFloat32AtomicAdd);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceExtendedDynamicStateFeaturesEXT structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT: {  // Covers
+                                                                                       // VUID-VkPhysicalDeviceExtendedDynamicStateFeaturesEXT-sType-sType
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceExtendedDynamicStateFeaturesEXT);
+                if (!IsExtEnabled(device_extensions.vk_ext_extended_dynamic_state)) {
+                    skip |= LogError(pnext_vuid, instance, pNext_loc,
+                                     "includes a pointer to a VkPhysicalDeviceExtendedDynamicStateFeaturesEXT, but when creating "
+                                     "VkDevice, the parent extension "
+                                     "(VK_EXT_extended_dynamic_state) was not included in ppEnabledExtensionNames.");
+                }
+                VkPhysicalDeviceExtendedDynamicStateFeaturesEXT* structure =
+                    (VkPhysicalDeviceExtendedDynamicStateFeaturesEXT*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::extendedDynamicState), structure->extendedDynamicState);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceTexelBufferAlignmentFeaturesEXT structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TEXEL_BUFFER_ALIGNMENT_FEATURES_EXT: {  // Covers
+                                                                                       // VUID-VkPhysicalDeviceTexelBufferAlignmentFeaturesEXT-sType-sType
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceTexelBufferAlignmentFeaturesEXT);
+                if (!IsExtEnabled(device_extensions.vk_ext_texel_buffer_alignment)) {
+                    skip |= LogError(pnext_vuid, instance, pNext_loc,
+                                     "includes a pointer to a VkPhysicalDeviceTexelBufferAlignmentFeaturesEXT, but when creating "
+                                     "VkDevice, the parent extension "
+                                     "(VK_EXT_texel_buffer_alignment) was not included in ppEnabledExtensionNames.");
+                }
+                VkPhysicalDeviceTexelBufferAlignmentFeaturesEXT* structure =
+                    (VkPhysicalDeviceTexelBufferAlignmentFeaturesEXT*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::texelBufferAlignment), structure->texelBufferAlignment);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceRobustness2FeaturesEXT structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT: {  // Covers
+                                                                             // VUID-VkPhysicalDeviceRobustness2FeaturesEXT-sType-sType
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceRobustness2FeaturesEXT);
+                if (!IsExtEnabled(device_extensions.vk_ext_robustness2)) {
+                    skip |= LogError(pnext_vuid, instance, pNext_loc,
+                                     "includes a pointer to a VkPhysicalDeviceRobustness2FeaturesEXT, but when creating VkDevice, "
+                                     "the parent extension "
+                                     "(VK_EXT_robustness2) was not included in ppEnabledExtensionNames.");
+                }
+                VkPhysicalDeviceRobustness2FeaturesEXT* structure = (VkPhysicalDeviceRobustness2FeaturesEXT*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::robustBufferAccess2), structure->robustBufferAccess2);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::robustImageAccess2), structure->robustImageAccess2);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::nullDescriptor), structure->nullDescriptor);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceCustomBorderColorFeaturesEXT structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_CUSTOM_BORDER_COLOR_FEATURES_EXT: {  // Covers
+                                                                                    // VUID-VkPhysicalDeviceCustomBorderColorFeaturesEXT-sType-sType
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceCustomBorderColorFeaturesEXT);
+                if (!IsExtEnabled(device_extensions.vk_ext_custom_border_color)) {
+                    skip |= LogError(pnext_vuid, instance, pNext_loc,
+                                     "includes a pointer to a VkPhysicalDeviceCustomBorderColorFeaturesEXT, but when creating "
+                                     "VkDevice, the parent extension "
+                                     "(VK_EXT_custom_border_color) was not included in ppEnabledExtensionNames.");
+                }
+                VkPhysicalDeviceCustomBorderColorFeaturesEXT* structure = (VkPhysicalDeviceCustomBorderColorFeaturesEXT*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::customBorderColors), structure->customBorderColors);
+
+                skip |=
+                    ValidateBool32(pNext_loc.dot(Field::customBorderColorWithoutFormat), structure->customBorderColorWithoutFormat);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceYcbcr2Plane444FormatsFeaturesEXT structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_YCBCR_2_PLANE_444_FORMATS_FEATURES_EXT: {  // Covers
+                                                                                          // VUID-VkPhysicalDeviceYcbcr2Plane444FormatsFeaturesEXT-sType-sType
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceYcbcr2Plane444FormatsFeaturesEXT);
+                if (!IsExtEnabled(device_extensions.vk_ext_ycbcr_2plane_444_formats)) {
+                    skip |= LogError(pnext_vuid, instance, pNext_loc,
+                                     "includes a pointer to a VkPhysicalDeviceYcbcr2Plane444FormatsFeaturesEXT, but when creating "
+                                     "VkDevice, the parent extension "
+                                     "(VK_EXT_ycbcr_2plane_444_formats) was not included in ppEnabledExtensionNames.");
+                }
+                VkPhysicalDeviceYcbcr2Plane444FormatsFeaturesEXT* structure =
+                    (VkPhysicalDeviceYcbcr2Plane444FormatsFeaturesEXT*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::ycbcr2plane444Formats), structure->ycbcr2plane444Formats);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDevice4444FormatsFeaturesEXT structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_4444_FORMATS_FEATURES_EXT: {  // Covers
+                                                                             // VUID-VkPhysicalDevice4444FormatsFeaturesEXT-sType-sType
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDevice4444FormatsFeaturesEXT);
+                if (!IsExtEnabled(device_extensions.vk_ext_4444_formats)) {
+                    skip |= LogError(pnext_vuid, instance, pNext_loc,
+                                     "includes a pointer to a VkPhysicalDevice4444FormatsFeaturesEXT, but when creating VkDevice, "
+                                     "the parent extension "
+                                     "(VK_EXT_4444_formats) was not included in ppEnabledExtensionNames.");
+                }
+                VkPhysicalDevice4444FormatsFeaturesEXT* structure = (VkPhysicalDevice4444FormatsFeaturesEXT*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::formatA4R4G4B4), structure->formatA4R4G4B4);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::formatA4B4G4R4), structure->formatA4B4G4R4);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_INPUT_DYNAMIC_STATE_FEATURES_EXT: {  // Covers
+                                                                                           // VUID-VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT-sType-sType
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT);
+                if (!IsExtEnabled(device_extensions.vk_ext_vertex_input_dynamic_state)) {
+                    skip |= LogError(pnext_vuid, instance, pNext_loc,
+                                     "includes a pointer to a VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT, but when "
+                                     "creating VkDevice, the parent extension "
+                                     "(VK_EXT_vertex_input_dynamic_state) was not included in ppEnabledExtensionNames.");
+                }
+                VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT* structure =
+                    (VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::vertexInputDynamicState), structure->vertexInputDynamicState);
+            }
+        } break;
+#ifdef VK_USE_PLATFORM_SCI
+
+        // Validation code for VkPhysicalDeviceExternalSciSyncFeaturesNV structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_SCI_SYNC_FEATURES_NV: {  // Covers
+                                                                                 // VUID-VkPhysicalDeviceExternalSciSyncFeaturesNV-sType-sType
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceExternalSciSyncFeaturesNV);
+                if (!IsExtEnabled(device_extensions.vk_nv_external_sci_sync)) {
+                    skip |= LogError(pnext_vuid, instance, pNext_loc,
+                                     "includes a pointer to a VkPhysicalDeviceExternalSciSyncFeaturesNV, but when creating "
+                                     "VkDevice, the parent extension "
+                                     "(VK_NV_external_sci_sync) was not included in ppEnabledExtensionNames.");
+                }
+                VkPhysicalDeviceExternalSciSyncFeaturesNV* structure = (VkPhysicalDeviceExternalSciSyncFeaturesNV*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::sciSyncFence), structure->sciSyncFence);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::sciSyncSemaphore), structure->sciSyncSemaphore);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::sciSyncImport), structure->sciSyncImport);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::sciSyncExport), structure->sciSyncExport);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceExternalMemorySciBufFeaturesNV structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_MEMORY_SCI_BUF_FEATURES_NV: {  // Covers
+                                                                                       // VUID-VkPhysicalDeviceExternalMemorySciBufFeaturesNV-sType-sType
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceExternalMemorySciBufFeaturesNV);
+                if (!IsExtEnabled(device_extensions.vk_nv_external_memory_sci_buf)) {
+                    skip |= LogError(pnext_vuid, instance, pNext_loc,
+                                     "includes a pointer to a VkPhysicalDeviceExternalMemorySciBufFeaturesNV, but when creating "
+                                     "VkDevice, the parent extension "
+                                     "(VK_NV_external_memory_sci_buf) was not included in ppEnabledExtensionNames.");
+                }
+                VkPhysicalDeviceExternalMemorySciBufFeaturesNV* structure = (VkPhysicalDeviceExternalMemorySciBufFeaturesNV*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::sciBufImport), structure->sciBufImport);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::sciBufExport), structure->sciBufExport);
+            }
+        } break;
+#endif  // VK_USE_PLATFORM_SCI
+
+        // Validation code for VkPhysicalDeviceExtendedDynamicState2FeaturesEXT structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_2_FEATURES_EXT: {  // Covers
+                                                                                         // VUID-VkPhysicalDeviceExtendedDynamicState2FeaturesEXT-sType-sType
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceExtendedDynamicState2FeaturesEXT);
+                if (!IsExtEnabled(device_extensions.vk_ext_extended_dynamic_state2)) {
+                    skip |= LogError(pnext_vuid, instance, pNext_loc,
+                                     "includes a pointer to a VkPhysicalDeviceExtendedDynamicState2FeaturesEXT, but when creating "
+                                     "VkDevice, the parent extension "
+                                     "(VK_EXT_extended_dynamic_state2) was not included in ppEnabledExtensionNames.");
+                }
+                VkPhysicalDeviceExtendedDynamicState2FeaturesEXT* structure =
+                    (VkPhysicalDeviceExtendedDynamicState2FeaturesEXT*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::extendedDynamicState2), structure->extendedDynamicState2);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::extendedDynamicState2LogicOp), structure->extendedDynamicState2LogicOp);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::extendedDynamicState2PatchControlPoints),
+                                       structure->extendedDynamicState2PatchControlPoints);
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceColorWriteEnableFeaturesEXT structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COLOR_WRITE_ENABLE_FEATURES_EXT: {  // Covers
+                                                                                   // VUID-VkPhysicalDeviceColorWriteEnableFeaturesEXT-sType-sType
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceColorWriteEnableFeaturesEXT);
+                if (!IsExtEnabled(device_extensions.vk_ext_color_write_enable)) {
+                    skip |= LogError(pnext_vuid, instance, pNext_loc,
+                                     "includes a pointer to a VkPhysicalDeviceColorWriteEnableFeaturesEXT, but when creating "
+                                     "VkDevice, the parent extension "
+                                     "(VK_EXT_color_write_enable) was not included in ppEnabledExtensionNames.");
+                }
+                VkPhysicalDeviceColorWriteEnableFeaturesEXT* structure = (VkPhysicalDeviceColorWriteEnableFeaturesEXT*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::colorWriteEnable), structure->colorWriteEnable);
+            }
+        } break;
+#ifdef VK_USE_PLATFORM_SCI
+
+        // Validation code for VkPhysicalDeviceExternalSciSync2FeaturesNV structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_SCI_SYNC_2_FEATURES_NV: {  // Covers
+                                                                                   // VUID-VkPhysicalDeviceExternalSciSync2FeaturesNV-sType-sType
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceExternalSciSync2FeaturesNV);
+                if (!IsExtEnabled(device_extensions.vk_nv_external_sci_sync2)) {
+                    skip |= LogError(pnext_vuid, instance, pNext_loc,
+                                     "includes a pointer to a VkPhysicalDeviceExternalSciSync2FeaturesNV, but when creating "
+                                     "VkDevice, the parent extension "
+                                     "(VK_NV_external_sci_sync2) was not included in ppEnabledExtensionNames.");
+                }
+                VkPhysicalDeviceExternalSciSync2FeaturesNV* structure = (VkPhysicalDeviceExternalSciSync2FeaturesNV*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::sciSyncFence), structure->sciSyncFence);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::sciSyncSemaphore2), structure->sciSyncSemaphore2);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::sciSyncImport), structure->sciSyncImport);
+
+                skip |= ValidateBool32(pNext_loc.dot(Field::sciSyncExport), structure->sciSyncExport);
+            }
+        } break;
+#endif  // VK_USE_PLATFORM_SCI
+#ifdef VK_USE_PLATFORM_SCREEN_QNX
+
+        // Validation code for VkPhysicalDeviceExternalMemoryScreenBufferFeaturesQNX structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_MEMORY_SCREEN_BUFFER_FEATURES_QNX: {  // Covers
+                                                                                              // VUID-VkPhysicalDeviceExternalMemoryScreenBufferFeaturesQNX-sType-sType
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc =
+                    loc.pNext(Struct::VkPhysicalDeviceExternalMemoryScreenBufferFeaturesQNX);
+                if (!IsExtEnabled(device_extensions.vk_qnx_external_memory_screen_buffer)) {
+                    skip |= LogError(pnext_vuid, instance, pNext_loc,
+                                     "includes a pointer to a VkPhysicalDeviceExternalMemoryScreenBufferFeaturesQNX, but when "
+                                     "creating VkDevice, the parent extension "
+                                     "(VK_QNX_external_memory_screen_buffer) was not included in ppEnabledExtensionNames.");
+                }
+                VkPhysicalDeviceExternalMemoryScreenBufferFeaturesQNX* structure =
+                    (VkPhysicalDeviceExternalMemoryScreenBufferFeaturesQNX*)header;
+                skip |= ValidateBool32(pNext_loc.dot(Field::screenBufferImport), structure->screenBufferImport);
+            }
+        } break;
+#endif  // VK_USE_PLATFORM_SCREEN_QNX
+
+        default:
+            skip = false;
+    }
+    return skip;
+}
+
+bool StatelessValidation::ValidatePnextPropertyStructContents(const Location& loc, const VkBaseOutStructure* header,
+                                                              const char* pnext_vuid, VkPhysicalDevice caller_physical_device,
+                                                              bool is_const_param) const {
+    bool skip = false;
+    const bool is_physdev_api = caller_physical_device != VK_NULL_HANDLE;
+    switch (header->sType) {
+        // Validation code for VkPhysicalDeviceSubgroupProperties structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES: {  // Covers VUID-VkPhysicalDeviceSubgroupProperties-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_1) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |=
+                        LogError(pnext_vuid, instance, loc.dot(Field::pNext),
+                                 "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES) "
+                                 "which was added in VK_API_VERSION_1_1 but the "
+                                 "current effective API version is %s.",
+                                 StringAPIVersion(device_api_version).c_str());
+                }
+            }
+        } break;
+
+        // Validation code for VkPhysicalDevicePointClippingProperties structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_POINT_CLIPPING_PROPERTIES: {  // Covers
+                                                                             // VUID-VkPhysicalDevicePointClippingProperties-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_1) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |= LogError(
+                        pnext_vuid, instance, loc.dot(Field::pNext),
+                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_POINT_CLIPPING_PROPERTIES) "
+                        "which was added in VK_API_VERSION_1_1 but the "
+                        "current effective API version is %s.",
+                        StringAPIVersion(device_api_version).c_str());
+                }
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceMultiviewProperties structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_PROPERTIES: {  // Covers
+                                                                        // VUID-VkPhysicalDeviceMultiviewProperties-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_1) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |=
+                        LogError(pnext_vuid, instance, loc.dot(Field::pNext),
+                                 "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_PROPERTIES) "
+                                 "which was added in VK_API_VERSION_1_1 but the "
+                                 "current effective API version is %s.",
+                                 StringAPIVersion(device_api_version).c_str());
+                }
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceProtectedMemoryProperties structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROTECTED_MEMORY_PROPERTIES: {  // Covers
+                                                                               // VUID-VkPhysicalDeviceProtectedMemoryProperties-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_1) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |= LogError(
+                        pnext_vuid, instance, loc.dot(Field::pNext),
+                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROTECTED_MEMORY_PROPERTIES) "
+                        "which was added in VK_API_VERSION_1_1 but the "
+                        "current effective API version is %s.",
+                        StringAPIVersion(device_api_version).c_str());
+                }
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceIDProperties structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES: {  // Covers VUID-VkPhysicalDeviceIDProperties-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_1) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
+                                     "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES) "
+                                     "which was added in VK_API_VERSION_1_1 but the "
+                                     "current effective API version is %s.",
+                                     StringAPIVersion(device_api_version).c_str());
+                }
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceMaintenance3Properties structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_3_PROPERTIES: {  // Covers
+                                                                            // VUID-VkPhysicalDeviceMaintenance3Properties-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_1) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |= LogError(
+                        pnext_vuid, instance, loc.dot(Field::pNext),
+                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_3_PROPERTIES) "
+                        "which was added in VK_API_VERSION_1_1 but the "
+                        "current effective API version is %s.",
+                        StringAPIVersion(device_api_version).c_str());
+                }
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceVulkan11Properties structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_PROPERTIES: {  // Covers
+                                                                         // VUID-VkPhysicalDeviceVulkan11Properties-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |= LogError(
+                        pnext_vuid, instance, loc.dot(Field::pNext),
+                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_PROPERTIES) which "
+                        "was added in VK_API_VERSION_1_2 but the "
+                        "current effective API version is %s.",
+                        StringAPIVersion(device_api_version).c_str());
+                }
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceVulkan12Properties structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_PROPERTIES: {  // Covers
+                                                                         // VUID-VkPhysicalDeviceVulkan12Properties-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |= LogError(
+                        pnext_vuid, instance, loc.dot(Field::pNext),
+                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_PROPERTIES) which "
+                        "was added in VK_API_VERSION_1_2 but the "
+                        "current effective API version is %s.",
+                        StringAPIVersion(device_api_version).c_str());
+                }
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceDriverProperties structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES: {  // Covers VUID-VkPhysicalDeviceDriverProperties-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |=
+                        LogError(pnext_vuid, instance, loc.dot(Field::pNext),
+                                 "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES) "
+                                 "which was added in VK_API_VERSION_1_2 but the "
+                                 "current effective API version is %s.",
+                                 StringAPIVersion(device_api_version).c_str());
+                }
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceFloatControlsProperties structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FLOAT_CONTROLS_PROPERTIES: {  // Covers
+                                                                             // VUID-VkPhysicalDeviceFloatControlsProperties-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |= LogError(
+                        pnext_vuid, instance, loc.dot(Field::pNext),
+                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FLOAT_CONTROLS_PROPERTIES) "
+                        "which was added in VK_API_VERSION_1_2 but the "
+                        "current effective API version is %s.",
+                        StringAPIVersion(device_api_version).c_str());
+                }
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceDescriptorIndexingProperties structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_PROPERTIES: {  // Covers
+                                                                                  // VUID-VkPhysicalDeviceDescriptorIndexingProperties-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
+                                     "includes a pointer to a VkStructureType "
+                                     "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_PROPERTIES) which was added in "
+                                     "VK_API_VERSION_1_2 but the "
+                                     "current effective API version is %s.",
+                                     StringAPIVersion(device_api_version).c_str());
+                }
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceDepthStencilResolveProperties structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DEPTH_STENCIL_RESOLVE_PROPERTIES: {  // Covers
+                                                                                    // VUID-VkPhysicalDeviceDepthStencilResolveProperties-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
+                                     "includes a pointer to a VkStructureType "
+                                     "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DEPTH_STENCIL_RESOLVE_PROPERTIES) which was added in "
+                                     "VK_API_VERSION_1_2 but the "
+                                     "current effective API version is %s.",
+                                     StringAPIVersion(device_api_version).c_str());
+                }
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceSamplerFilterMinmaxProperties structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_FILTER_MINMAX_PROPERTIES: {  // Covers
+                                                                                    // VUID-VkPhysicalDeviceSamplerFilterMinmaxProperties-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
+                                     "includes a pointer to a VkStructureType "
+                                     "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_FILTER_MINMAX_PROPERTIES) which was added in "
+                                     "VK_API_VERSION_1_2 but the "
+                                     "current effective API version is %s.",
+                                     StringAPIVersion(device_api_version).c_str());
+                }
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceTimelineSemaphoreProperties structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_PROPERTIES: {  // Covers
+                                                                                 // VUID-VkPhysicalDeviceTimelineSemaphoreProperties-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |= LogError(
+                        pnext_vuid, instance, loc.dot(Field::pNext),
+                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_PROPERTIES) "
+                        "which was added in VK_API_VERSION_1_2 but the "
+                        "current effective API version is %s.",
+                        StringAPIVersion(device_api_version).c_str());
+                }
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceVulkan13Properties structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_PROPERTIES: {  // Covers
+                                                                         // VUID-VkPhysicalDeviceVulkan13Properties-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_3) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |= LogError(
+                        pnext_vuid, instance, loc.dot(Field::pNext),
+                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_PROPERTIES) which "
+                        "was added in VK_API_VERSION_1_3 but the "
+                        "current effective API version is %s.",
+                        StringAPIVersion(device_api_version).c_str());
+                }
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceSubgroupSizeControlProperties structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_SIZE_CONTROL_PROPERTIES: {  // Covers
+                                                                                    // VUID-VkPhysicalDeviceSubgroupSizeControlProperties-sType-sType
+
+            if ((is_physdev_api && !SupportedByPdev(physical_device, vvl::Extension::_VK_EXT_subgroup_size_control)) ||
+                (!is_physdev_api && !IsExtEnabled(device_extensions.vk_ext_subgroup_size_control))) {
+                skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
+                                 "includes a pointer to a VkStructureType "
+                                 "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_SIZE_CONTROL_PROPERTIES), but its parent extension "
+                                 "VK_EXT_subgroup_size_control has not been enabled.");
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceInlineUniformBlockProperties structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INLINE_UNIFORM_BLOCK_PROPERTIES: {  // Covers
+                                                                                   // VUID-VkPhysicalDeviceInlineUniformBlockProperties-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_3) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
+                                     "includes a pointer to a VkStructureType "
+                                     "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INLINE_UNIFORM_BLOCK_PROPERTIES) which was added in "
+                                     "VK_API_VERSION_1_3 but the "
+                                     "current effective API version is %s.",
+                                     StringAPIVersion(device_api_version).c_str());
+                }
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceShaderIntegerDotProductProperties structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_INTEGER_DOT_PRODUCT_PROPERTIES: {  // Covers
+                                                                                         // VUID-VkPhysicalDeviceShaderIntegerDotProductProperties-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_3) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
+                                     "includes a pointer to a VkStructureType "
+                                     "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_INTEGER_DOT_PRODUCT_PROPERTIES) which was added in "
+                                     "VK_API_VERSION_1_3 but the "
+                                     "current effective API version is %s.",
+                                     StringAPIVersion(device_api_version).c_str());
+                }
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceTexelBufferAlignmentProperties structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TEXEL_BUFFER_ALIGNMENT_PROPERTIES: {  // Covers
+                                                                                     // VUID-VkPhysicalDeviceTexelBufferAlignmentProperties-sType-sType
+
+            if ((is_physdev_api && !SupportedByPdev(physical_device, vvl::Extension::_VK_EXT_texel_buffer_alignment)) ||
+                (!is_physdev_api && !IsExtEnabled(device_extensions.vk_ext_texel_buffer_alignment))) {
+                skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
+                                 "includes a pointer to a VkStructureType "
+                                 "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TEXEL_BUFFER_ALIGNMENT_PROPERTIES), but its parent extension "
+                                 "VK_EXT_texel_buffer_alignment has not been enabled.");
+            }
+        } break;
+
+        // Validation code for VkPhysicalDeviceMaintenance4Properties structure members
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_4_PROPERTIES: {  // Covers
+                                                                            // VUID-VkPhysicalDeviceMaintenance4Properties-sType-sType
+
+            if (is_physdev_api) {
+                VkPhysicalDeviceProperties device_properties = {};
+                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
+                if (device_properties.apiVersion < VK_API_VERSION_1_3) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
+                    skip |= LogError(
+                        pnext_vuid, instance, loc.dot(Field::pNext),
+                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_4_PROPERTIES) "
+                        "which was added in VK_API_VERSION_1_3 but the "
+                        "current effective API version is %s.",
+                        StringAPIVersion(device_api_version).c_str());
+                }
+            }
+        } break;
+
+            // No Validation code for VkPhysicalDeviceVulkanSC10Properties structure members  -- Covers
+            // VUID-VkPhysicalDeviceVulkanSC10Properties-sType-sType
+
+            // No Validation code for VkPhysicalDevicePerformanceQueryPropertiesKHR structure members  -- Covers
+            // VUID-VkPhysicalDevicePerformanceQueryPropertiesKHR-sType-sType
+
+            // No Validation code for VkPhysicalDeviceFragmentShadingRatePropertiesKHR structure members  -- Covers
+            // VUID-VkPhysicalDeviceFragmentShadingRatePropertiesKHR-sType-sType
+
+            // No Validation code for VkPhysicalDeviceVertexAttributeDivisorPropertiesKHR structure members  -- Covers
+            // VUID-VkPhysicalDeviceVertexAttributeDivisorPropertiesKHR-sType-sType
+
+            // No Validation code for VkPhysicalDeviceLineRasterizationPropertiesKHR structure members  -- Covers
+            // VUID-VkPhysicalDeviceLineRasterizationPropertiesKHR-sType-sType
+
+            // No Validation code for VkPhysicalDeviceDiscardRectanglePropertiesEXT structure members  -- Covers
+            // VUID-VkPhysicalDeviceDiscardRectanglePropertiesEXT-sType-sType
+
+            // No Validation code for VkPhysicalDeviceConservativeRasterizationPropertiesEXT structure members  -- Covers
+            // VUID-VkPhysicalDeviceConservativeRasterizationPropertiesEXT-sType-sType
+
+            // No Validation code for VkPhysicalDeviceSampleLocationsPropertiesEXT structure members  -- Covers
+            // VUID-VkPhysicalDeviceSampleLocationsPropertiesEXT-sType-sType
+
+            // No Validation code for VkPhysicalDeviceBlendOperationAdvancedPropertiesEXT structure members  -- Covers
+            // VUID-VkPhysicalDeviceBlendOperationAdvancedPropertiesEXT-sType-sType
+
+            // No Validation code for VkPhysicalDeviceExternalMemoryHostPropertiesEXT structure members  -- Covers
+            // VUID-VkPhysicalDeviceExternalMemoryHostPropertiesEXT-sType-sType
+
+            // No Validation code for VkPhysicalDevicePCIBusInfoPropertiesEXT structure members  -- Covers
+            // VUID-VkPhysicalDevicePCIBusInfoPropertiesEXT-sType-sType
+
+            // No Validation code for VkPhysicalDeviceRobustness2PropertiesEXT structure members  -- Covers
+            // VUID-VkPhysicalDeviceRobustness2PropertiesEXT-sType-sType
+
+            // No Validation code for VkPhysicalDeviceCustomBorderColorPropertiesEXT structure members  -- Covers
+            // VUID-VkPhysicalDeviceCustomBorderColorPropertiesEXT-sType-sType
+
+        default:
+            skip = false;
+    }
+    return skip;
+}
+
+// All structs that are not a Feature or Property struct
+bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const VkBaseOutStructure* header, const char* pnext_vuid,
+                                                      VkPhysicalDevice caller_physical_device, bool is_const_param) const {
+    bool skip = false;
+    const bool is_physdev_api = caller_physical_device != VK_NULL_HANDLE;
+    switch (header->sType) {
         // Validation code for VkMemoryDedicatedRequirements structure members
         case VK_STRUCTURE_TYPE_MEMORY_DEDICATED_REQUIREMENTS: {  // Covers VUID-VkMemoryDedicatedRequirements-sType-sType
 
@@ -114,11 +2126,12 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_1) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
                                      "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_MEMORY_DEDICATED_REQUIREMENTS) "
                                      "which was added in VK_API_VERSION_1_1 but the "
                                      "current effective API version is %s.",
-                                     StringAPIVersion(api_version).c_str());
+                                     StringAPIVersion(device_api_version).c_str());
                 }
             }
         } break;
@@ -130,11 +2143,12 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_1) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
                                      "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO) "
                                      "which was added in VK_API_VERSION_1_1 but the "
                                      "current effective API version is %s.",
-                                     StringAPIVersion(api_version).c_str());
+                                     StringAPIVersion(device_api_version).c_str());
                 }
             }
         } break;
@@ -146,11 +2160,12 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_1) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
                                      "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO) which "
                                      "was added in VK_API_VERSION_1_1 but the "
                                      "current effective API version is %s.",
-                                     StringAPIVersion(api_version).c_str());
+                                     StringAPIVersion(device_api_version).c_str());
                 }
             }
             if (is_const_param) {
@@ -169,12 +2184,13 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_1) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |=
                         LogError(pnext_vuid, instance, loc.dot(Field::pNext),
                                  "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_DEVICE_GROUP_RENDER_PASS_BEGIN_INFO) "
                                  "which was added in VK_API_VERSION_1_1 but the "
                                  "current effective API version is %s.",
-                                 StringAPIVersion(api_version).c_str());
+                                 StringAPIVersion(device_api_version).c_str());
                 }
             }
             if (is_const_param) {
@@ -202,12 +2218,13 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_1) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |= LogError(
                         pnext_vuid, instance, loc.dot(Field::pNext),
                         "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_DEVICE_GROUP_COMMAND_BUFFER_BEGIN_INFO) which "
                         "was added in VK_API_VERSION_1_1 but the "
                         "current effective API version is %s.",
-                        StringAPIVersion(api_version).c_str());
+                        StringAPIVersion(device_api_version).c_str());
                 }
             }
         } break;
@@ -219,11 +2236,12 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_1) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
                                      "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_DEVICE_GROUP_SUBMIT_INFO) which "
                                      "was added in VK_API_VERSION_1_1 but the "
                                      "current effective API version is %s.",
-                                     StringAPIVersion(api_version).c_str());
+                                     StringAPIVersion(device_api_version).c_str());
                 }
             }
             if (is_const_param) {
@@ -251,12 +2269,13 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_1) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |=
                         LogError(pnext_vuid, instance, loc.dot(Field::pNext),
                                  "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_BIND_BUFFER_MEMORY_DEVICE_GROUP_INFO) "
                                  "which was added in VK_API_VERSION_1_1 but the "
                                  "current effective API version is %s.",
-                                 StringAPIVersion(api_version).c_str());
+                                 StringAPIVersion(device_api_version).c_str());
                 }
             }
             if (is_const_param) {
@@ -275,12 +2294,13 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_1) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |=
                         LogError(pnext_vuid, instance, loc.dot(Field::pNext),
                                  "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_BIND_IMAGE_MEMORY_DEVICE_GROUP_INFO) "
                                  "which was added in VK_API_VERSION_1_1 but the "
                                  "current effective API version is %s.",
-                                 StringAPIVersion(api_version).c_str());
+                                 StringAPIVersion(device_api_version).c_str());
                 }
             }
             if (is_const_param) {
@@ -312,11 +2332,12 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_1) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
                                      "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_DEVICE_GROUP_DEVICE_CREATE_INFO) "
                                      "which was added in VK_API_VERSION_1_1 but the "
                                      "current effective API version is %s.",
-                                     StringAPIVersion(api_version).c_str());
+                                     StringAPIVersion(device_api_version).c_str());
                 }
             }
             if (is_const_param) {
@@ -335,11 +2356,12 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_1) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
                                      "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2) which "
                                      "was added in VK_API_VERSION_1_1 but the "
                                      "current effective API version is %s.",
-                                     StringAPIVersion(api_version).c_str());
+                                     StringAPIVersion(device_api_version).c_str());
                 }
             }
             if (is_const_param) {
@@ -472,24 +2494,6 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
             }
         } break;
 
-        // Validation code for VkPhysicalDevicePointClippingProperties structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_POINT_CLIPPING_PROPERTIES: {  // Covers
-                                                                             // VUID-VkPhysicalDevicePointClippingProperties-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_1) {
-                    skip |= LogError(
-                        pnext_vuid, instance, loc.dot(Field::pNext),
-                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_POINT_CLIPPING_PROPERTIES) "
-                        "which was added in VK_API_VERSION_1_1 but the "
-                        "current effective API version is %s.",
-                        StringAPIVersion(api_version).c_str());
-                }
-            }
-        } break;
-
         // Validation code for VkRenderPassInputAttachmentAspectCreateInfo structure members
         case VK_STRUCTURE_TYPE_RENDER_PASS_INPUT_ATTACHMENT_ASPECT_CREATE_INFO: {  // Covers
                                                                                    // VUID-VkRenderPassInputAttachmentAspectCreateInfo-sType-sType
@@ -498,12 +2502,13 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_1) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
                                      "includes a pointer to a VkStructureType "
                                      "(VK_STRUCTURE_TYPE_RENDER_PASS_INPUT_ATTACHMENT_ASPECT_CREATE_INFO) which was added in "
                                      "VK_API_VERSION_1_1 but the "
                                      "current effective API version is %s.",
-                                     StringAPIVersion(api_version).c_str());
+                                     StringAPIVersion(device_api_version).c_str());
                 }
             }
             if (is_const_param) {
@@ -536,11 +2541,12 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_1) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
                                      "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_IMAGE_VIEW_USAGE_CREATE_INFO) "
                                      "which was added in VK_API_VERSION_1_1 but the "
                                      "current effective API version is %s.",
-                                     StringAPIVersion(api_version).c_str());
+                                     StringAPIVersion(device_api_version).c_str());
                 }
             }
             if (is_const_param) {
@@ -560,12 +2566,13 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_1) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
                                      "includes a pointer to a VkStructureType "
                                      "(VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_DOMAIN_ORIGIN_STATE_CREATE_INFO) which was added in "
                                      "VK_API_VERSION_1_1 but the "
                                      "current effective API version is %s.",
-                                     StringAPIVersion(api_version).c_str());
+                                     StringAPIVersion(device_api_version).c_str());
                 }
             }
             if (is_const_param) {
@@ -585,12 +2592,13 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_1) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |=
                         LogError(pnext_vuid, instance, loc.dot(Field::pNext),
                                  "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_RENDER_PASS_MULTIVIEW_CREATE_INFO) "
                                  "which was added in VK_API_VERSION_1_1 but the "
                                  "current effective API version is %s.",
-                                 StringAPIVersion(api_version).c_str());
+                                 StringAPIVersion(device_api_version).c_str());
                 }
             }
             if (is_const_param) {
@@ -610,117 +2618,6 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
             }
         } break;
 
-        // Validation code for VkPhysicalDeviceMultiviewFeatures structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_FEATURES: {  // Covers VUID-VkPhysicalDeviceMultiviewFeatures-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_1) {
-                    skip |=
-                        LogError(pnext_vuid, instance, loc.dot(Field::pNext),
-                                 "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_FEATURES) "
-                                 "which was added in VK_API_VERSION_1_1 but the "
-                                 "current effective API version is %s.",
-                                 StringAPIVersion(api_version).c_str());
-                }
-            }
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceMultiviewFeatures);
-                VkPhysicalDeviceMultiviewFeatures* structure = (VkPhysicalDeviceMultiviewFeatures*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::multiview), structure->multiview);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::multiviewGeometryShader), structure->multiviewGeometryShader);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::multiviewTessellationShader), structure->multiviewTessellationShader);
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceMultiviewProperties structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_PROPERTIES: {  // Covers
-                                                                        // VUID-VkPhysicalDeviceMultiviewProperties-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_1) {
-                    skip |=
-                        LogError(pnext_vuid, instance, loc.dot(Field::pNext),
-                                 "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_PROPERTIES) "
-                                 "which was added in VK_API_VERSION_1_1 but the "
-                                 "current effective API version is %s.",
-                                 StringAPIVersion(api_version).c_str());
-                }
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceVariablePointersFeatures structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VARIABLE_POINTERS_FEATURES: {  // Covers
-                                                                              // VUID-VkPhysicalDeviceVariablePointersFeatures-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_1) {
-                    skip |= LogError(
-                        pnext_vuid, instance, loc.dot(Field::pNext),
-                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VARIABLE_POINTERS_FEATURES) "
-                        "which was added in VK_API_VERSION_1_1 but the "
-                        "current effective API version is %s.",
-                        StringAPIVersion(api_version).c_str());
-                }
-            }
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceVariablePointersFeatures);
-                VkPhysicalDeviceVariablePointersFeatures* structure = (VkPhysicalDeviceVariablePointersFeatures*)header;
-                skip |=
-                    ValidateBool32(pNext_loc.dot(Field::variablePointersStorageBuffer), structure->variablePointersStorageBuffer);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::variablePointers), structure->variablePointers);
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceProtectedMemoryFeatures structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROTECTED_MEMORY_FEATURES: {  // Covers
-                                                                             // VUID-VkPhysicalDeviceProtectedMemoryFeatures-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_1) {
-                    skip |= LogError(
-                        pnext_vuid, instance, loc.dot(Field::pNext),
-                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROTECTED_MEMORY_FEATURES) "
-                        "which was added in VK_API_VERSION_1_1 but the "
-                        "current effective API version is %s.",
-                        StringAPIVersion(api_version).c_str());
-                }
-            }
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceProtectedMemoryFeatures);
-                VkPhysicalDeviceProtectedMemoryFeatures* structure = (VkPhysicalDeviceProtectedMemoryFeatures*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::protectedMemory), structure->protectedMemory);
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceProtectedMemoryProperties structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROTECTED_MEMORY_PROPERTIES: {  // Covers
-                                                                               // VUID-VkPhysicalDeviceProtectedMemoryProperties-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_1) {
-                    skip |= LogError(
-                        pnext_vuid, instance, loc.dot(Field::pNext),
-                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROTECTED_MEMORY_PROPERTIES) "
-                        "which was added in VK_API_VERSION_1_1 but the "
-                        "current effective API version is %s.",
-                        StringAPIVersion(api_version).c_str());
-                }
-            }
-        } break;
-
         // Validation code for VkProtectedSubmitInfo structure members
         case VK_STRUCTURE_TYPE_PROTECTED_SUBMIT_INFO: {  // Covers VUID-VkProtectedSubmitInfo-sType-sType
 
@@ -728,11 +2625,12 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_1) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
                                      "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PROTECTED_SUBMIT_INFO) which was "
                                      "added in VK_API_VERSION_1_1 but the "
                                      "current effective API version is %s.",
-                                     StringAPIVersion(api_version).c_str());
+                                     StringAPIVersion(device_api_version).c_str());
                 }
             }
             if (is_const_param) {
@@ -749,11 +2647,12 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_1) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
                                      "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_SAMPLER_YCBCR_CONVERSION_INFO) "
                                      "which was added in VK_API_VERSION_1_1 but the "
                                      "current effective API version is %s.",
-                                     StringAPIVersion(api_version).c_str());
+                                     StringAPIVersion(device_api_version).c_str());
                 }
             }
             if (is_const_param) {
@@ -770,11 +2669,12 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_1) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
                                      "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_BIND_IMAGE_PLANE_MEMORY_INFO) "
                                      "which was added in VK_API_VERSION_1_1 but the "
                                      "current effective API version is %s.",
-                                     StringAPIVersion(api_version).c_str());
+                                     StringAPIVersion(device_api_version).c_str());
                 }
             }
             if (is_const_param) {
@@ -795,12 +2695,13 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_1) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |=
                         LogError(pnext_vuid, instance, loc.dot(Field::pNext),
                                  "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_IMAGE_PLANE_MEMORY_REQUIREMENTS_INFO) "
                                  "which was added in VK_API_VERSION_1_1 but the "
                                  "current effective API version is %s.",
-                                 StringAPIVersion(api_version).c_str());
+                                 StringAPIVersion(device_api_version).c_str());
                 }
             }
             if (is_const_param) {
@@ -813,29 +2714,6 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
             }
         } break;
 
-        // Validation code for VkPhysicalDeviceSamplerYcbcrConversionFeatures structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_YCBCR_CONVERSION_FEATURES: {  // Covers
-                                                                                     // VUID-VkPhysicalDeviceSamplerYcbcrConversionFeatures-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_1) {
-                    skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
-                                     "includes a pointer to a VkStructureType "
-                                     "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_YCBCR_CONVERSION_FEATURES) which was added in "
-                                     "VK_API_VERSION_1_1 but the "
-                                     "current effective API version is %s.",
-                                     StringAPIVersion(api_version).c_str());
-                }
-            }
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceSamplerYcbcrConversionFeatures);
-                VkPhysicalDeviceSamplerYcbcrConversionFeatures* structure = (VkPhysicalDeviceSamplerYcbcrConversionFeatures*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::samplerYcbcrConversion), structure->samplerYcbcrConversion);
-            }
-        } break;
-
         // Validation code for VkSamplerYcbcrConversionImageFormatProperties structure members
         case VK_STRUCTURE_TYPE_SAMPLER_YCBCR_CONVERSION_IMAGE_FORMAT_PROPERTIES: {  // Covers
                                                                                     // VUID-VkSamplerYcbcrConversionImageFormatProperties-sType-sType
@@ -844,12 +2722,13 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_1) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
                                      "includes a pointer to a VkStructureType "
                                      "(VK_STRUCTURE_TYPE_SAMPLER_YCBCR_CONVERSION_IMAGE_FORMAT_PROPERTIES) which was added in "
                                      "VK_API_VERSION_1_1 but the "
                                      "current effective API version is %s.",
-                                     StringAPIVersion(api_version).c_str());
+                                     StringAPIVersion(device_api_version).c_str());
                 }
             }
         } break;
@@ -862,12 +2741,13 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_1) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |= LogError(
                         pnext_vuid, instance, loc.dot(Field::pNext),
                         "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_IMAGE_FORMAT_INFO) "
                         "which was added in VK_API_VERSION_1_1 but the "
                         "current effective API version is %s.",
-                        StringAPIVersion(api_version).c_str());
+                        StringAPIVersion(device_api_version).c_str());
                 }
             }
             if (is_const_param) {
@@ -886,27 +2766,12 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_1) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
                                      "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_EXTERNAL_IMAGE_FORMAT_PROPERTIES) "
                                      "which was added in VK_API_VERSION_1_1 but the "
                                      "current effective API version is %s.",
-                                     StringAPIVersion(api_version).c_str());
-                }
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceIDProperties structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES: {  // Covers VUID-VkPhysicalDeviceIDProperties-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_1) {
-                    skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
-                                     "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES) "
-                                     "which was added in VK_API_VERSION_1_1 but the "
-                                     "current effective API version is %s.",
-                                     StringAPIVersion(api_version).c_str());
+                                     StringAPIVersion(device_api_version).c_str());
                 }
             }
         } break;
@@ -918,12 +2783,13 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_1) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |=
                         LogError(pnext_vuid, instance, loc.dot(Field::pNext),
                                  "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO) "
                                  "which was added in VK_API_VERSION_1_1 but the "
                                  "current effective API version is %s.",
-                                 StringAPIVersion(api_version).c_str());
+                                 StringAPIVersion(device_api_version).c_str());
                 }
             }
             if (is_const_param) {
@@ -942,12 +2808,13 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_1) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |=
                         LogError(pnext_vuid, instance, loc.dot(Field::pNext),
                                  "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO) "
                                  "which was added in VK_API_VERSION_1_1 but the "
                                  "current effective API version is %s.",
-                                 StringAPIVersion(api_version).c_str());
+                                 StringAPIVersion(device_api_version).c_str());
                 }
             }
             if (is_const_param) {
@@ -966,11 +2833,12 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_1) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
                                      "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO) "
                                      "which was added in VK_API_VERSION_1_1 but the "
                                      "current effective API version is %s.",
-                                     StringAPIVersion(api_version).c_str());
+                                     StringAPIVersion(device_api_version).c_str());
                 }
             }
             if (is_const_param) {
@@ -989,11 +2857,12 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_1) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
                                      "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_EXPORT_FENCE_CREATE_INFO) which "
                                      "was added in VK_API_VERSION_1_1 but the "
                                      "current effective API version is %s.",
-                                     StringAPIVersion(api_version).c_str());
+                                     StringAPIVersion(device_api_version).c_str());
                 }
             }
             if (is_const_param) {
@@ -1012,11 +2881,12 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_1) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
                                      "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO) "
                                      "which was added in VK_API_VERSION_1_1 but the "
                                      "current effective API version is %s.",
-                                     StringAPIVersion(api_version).c_str());
+                                     StringAPIVersion(device_api_version).c_str());
                 }
             }
             if (is_const_param) {
@@ -1028,266 +2898,6 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
             }
         } break;
 
-        // Validation code for VkPhysicalDeviceMaintenance3Properties structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_3_PROPERTIES: {  // Covers
-                                                                            // VUID-VkPhysicalDeviceMaintenance3Properties-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_1) {
-                    skip |= LogError(
-                        pnext_vuid, instance, loc.dot(Field::pNext),
-                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_3_PROPERTIES) "
-                        "which was added in VK_API_VERSION_1_1 but the "
-                        "current effective API version is %s.",
-                        StringAPIVersion(api_version).c_str());
-                }
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceShaderDrawParametersFeatures structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DRAW_PARAMETERS_FEATURES: {  // Covers
-                                                                                   // VUID-VkPhysicalDeviceShaderDrawParametersFeatures-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_1) {
-                    skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
-                                     "includes a pointer to a VkStructureType "
-                                     "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DRAW_PARAMETERS_FEATURES) which was added in "
-                                     "VK_API_VERSION_1_1 but the "
-                                     "current effective API version is %s.",
-                                     StringAPIVersion(api_version).c_str());
-                }
-            }
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceShaderDrawParametersFeatures);
-                VkPhysicalDeviceShaderDrawParametersFeatures* structure = (VkPhysicalDeviceShaderDrawParametersFeatures*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderDrawParameters), structure->shaderDrawParameters);
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceVulkan11Features structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES: {  // Covers VUID-VkPhysicalDeviceVulkan11Features-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
-                    skip |=
-                        LogError(pnext_vuid, instance, loc.dot(Field::pNext),
-                                 "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES) "
-                                 "which was added in VK_API_VERSION_1_2 but the "
-                                 "current effective API version is %s.",
-                                 StringAPIVersion(api_version).c_str());
-                }
-            }
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceVulkan11Features);
-                VkPhysicalDeviceVulkan11Features* structure = (VkPhysicalDeviceVulkan11Features*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::storageBuffer16BitAccess), structure->storageBuffer16BitAccess);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::uniformAndStorageBuffer16BitAccess),
-                                       structure->uniformAndStorageBuffer16BitAccess);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::storagePushConstant16), structure->storagePushConstant16);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::storageInputOutput16), structure->storageInputOutput16);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::multiview), structure->multiview);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::multiviewGeometryShader), structure->multiviewGeometryShader);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::multiviewTessellationShader), structure->multiviewTessellationShader);
-
-                skip |=
-                    ValidateBool32(pNext_loc.dot(Field::variablePointersStorageBuffer), structure->variablePointersStorageBuffer);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::variablePointers), structure->variablePointers);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::protectedMemory), structure->protectedMemory);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::samplerYcbcrConversion), structure->samplerYcbcrConversion);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderDrawParameters), structure->shaderDrawParameters);
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceVulkan11Properties structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_PROPERTIES: {  // Covers
-                                                                         // VUID-VkPhysicalDeviceVulkan11Properties-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
-                    skip |= LogError(
-                        pnext_vuid, instance, loc.dot(Field::pNext),
-                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_PROPERTIES) which "
-                        "was added in VK_API_VERSION_1_2 but the "
-                        "current effective API version is %s.",
-                        StringAPIVersion(api_version).c_str());
-                }
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceVulkan12Features structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES: {  // Covers VUID-VkPhysicalDeviceVulkan12Features-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
-                    skip |=
-                        LogError(pnext_vuid, instance, loc.dot(Field::pNext),
-                                 "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES) "
-                                 "which was added in VK_API_VERSION_1_2 but the "
-                                 "current effective API version is %s.",
-                                 StringAPIVersion(api_version).c_str());
-                }
-            }
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceVulkan12Features);
-                VkPhysicalDeviceVulkan12Features* structure = (VkPhysicalDeviceVulkan12Features*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::samplerMirrorClampToEdge), structure->samplerMirrorClampToEdge);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::drawIndirectCount), structure->drawIndirectCount);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::storageBuffer8BitAccess), structure->storageBuffer8BitAccess);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::uniformAndStorageBuffer8BitAccess),
-                                       structure->uniformAndStorageBuffer8BitAccess);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::storagePushConstant8), structure->storagePushConstant8);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderBufferInt64Atomics), structure->shaderBufferInt64Atomics);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderSharedInt64Atomics), structure->shaderSharedInt64Atomics);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderFloat16), structure->shaderFloat16);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderInt8), structure->shaderInt8);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::descriptorIndexing), structure->descriptorIndexing);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderInputAttachmentArrayDynamicIndexing),
-                                       structure->shaderInputAttachmentArrayDynamicIndexing);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderUniformTexelBufferArrayDynamicIndexing),
-                                       structure->shaderUniformTexelBufferArrayDynamicIndexing);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderStorageTexelBufferArrayDynamicIndexing),
-                                       structure->shaderStorageTexelBufferArrayDynamicIndexing);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderUniformBufferArrayNonUniformIndexing),
-                                       structure->shaderUniformBufferArrayNonUniformIndexing);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderSampledImageArrayNonUniformIndexing),
-                                       structure->shaderSampledImageArrayNonUniformIndexing);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderStorageBufferArrayNonUniformIndexing),
-                                       structure->shaderStorageBufferArrayNonUniformIndexing);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderStorageImageArrayNonUniformIndexing),
-                                       structure->shaderStorageImageArrayNonUniformIndexing);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderInputAttachmentArrayNonUniformIndexing),
-                                       structure->shaderInputAttachmentArrayNonUniformIndexing);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderUniformTexelBufferArrayNonUniformIndexing),
-                                       structure->shaderUniformTexelBufferArrayNonUniformIndexing);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderStorageTexelBufferArrayNonUniformIndexing),
-                                       structure->shaderStorageTexelBufferArrayNonUniformIndexing);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::descriptorBindingUniformBufferUpdateAfterBind),
-                                       structure->descriptorBindingUniformBufferUpdateAfterBind);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::descriptorBindingSampledImageUpdateAfterBind),
-                                       structure->descriptorBindingSampledImageUpdateAfterBind);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::descriptorBindingStorageImageUpdateAfterBind),
-                                       structure->descriptorBindingStorageImageUpdateAfterBind);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::descriptorBindingStorageBufferUpdateAfterBind),
-                                       structure->descriptorBindingStorageBufferUpdateAfterBind);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::descriptorBindingUniformTexelBufferUpdateAfterBind),
-                                       structure->descriptorBindingUniformTexelBufferUpdateAfterBind);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::descriptorBindingStorageTexelBufferUpdateAfterBind),
-                                       structure->descriptorBindingStorageTexelBufferUpdateAfterBind);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::descriptorBindingUpdateUnusedWhilePending),
-                                       structure->descriptorBindingUpdateUnusedWhilePending);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::descriptorBindingPartiallyBound),
-                                       structure->descriptorBindingPartiallyBound);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::descriptorBindingVariableDescriptorCount),
-                                       structure->descriptorBindingVariableDescriptorCount);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::runtimeDescriptorArray), structure->runtimeDescriptorArray);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::samplerFilterMinmax), structure->samplerFilterMinmax);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::scalarBlockLayout), structure->scalarBlockLayout);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::imagelessFramebuffer), structure->imagelessFramebuffer);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::uniformBufferStandardLayout), structure->uniformBufferStandardLayout);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderSubgroupExtendedTypes), structure->shaderSubgroupExtendedTypes);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::separateDepthStencilLayouts), structure->separateDepthStencilLayouts);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::hostQueryReset), structure->hostQueryReset);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::timelineSemaphore), structure->timelineSemaphore);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::bufferDeviceAddress), structure->bufferDeviceAddress);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::bufferDeviceAddressCaptureReplay),
-                                       structure->bufferDeviceAddressCaptureReplay);
-
-                skip |=
-                    ValidateBool32(pNext_loc.dot(Field::bufferDeviceAddressMultiDevice), structure->bufferDeviceAddressMultiDevice);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::vulkanMemoryModel), structure->vulkanMemoryModel);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::vulkanMemoryModelDeviceScope), structure->vulkanMemoryModelDeviceScope);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::vulkanMemoryModelAvailabilityVisibilityChains),
-                                       structure->vulkanMemoryModelAvailabilityVisibilityChains);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderOutputViewportIndex), structure->shaderOutputViewportIndex);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderOutputLayer), structure->shaderOutputLayer);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::subgroupBroadcastDynamicId), structure->subgroupBroadcastDynamicId);
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceVulkan12Properties structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_PROPERTIES: {  // Covers
-                                                                         // VUID-VkPhysicalDeviceVulkan12Properties-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
-                    skip |= LogError(
-                        pnext_vuid, instance, loc.dot(Field::pNext),
-                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_PROPERTIES) which "
-                        "was added in VK_API_VERSION_1_2 but the "
-                        "current effective API version is %s.",
-                        StringAPIVersion(api_version).c_str());
-                }
-            }
-        } break;
-
         // Validation code for VkImageFormatListCreateInfo structure members
         case VK_STRUCTURE_TYPE_IMAGE_FORMAT_LIST_CREATE_INFO: {  // Covers VUID-VkImageFormatListCreateInfo-sType-sType
 
@@ -1295,11 +2905,12 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_2) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
                                      "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_IMAGE_FORMAT_LIST_CREATE_INFO) "
                                      "which was added in VK_API_VERSION_1_2 but the "
                                      "current effective API version is %s.",
-                                     StringAPIVersion(api_version).c_str());
+                                     StringAPIVersion(device_api_version).c_str());
                 }
             }
             if (is_const_param) {
@@ -1311,119 +2922,6 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
             }
         } break;
 
-        // Validation code for VkPhysicalDevice8BitStorageFeatures structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_8BIT_STORAGE_FEATURES: {  // Covers
-                                                                         // VUID-VkPhysicalDevice8BitStorageFeatures-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
-                    skip |= LogError(
-                        pnext_vuid, instance, loc.dot(Field::pNext),
-                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_8BIT_STORAGE_FEATURES) which "
-                        "was added in VK_API_VERSION_1_2 but the "
-                        "current effective API version is %s.",
-                        StringAPIVersion(api_version).c_str());
-                }
-            }
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDevice8BitStorageFeatures);
-                VkPhysicalDevice8BitStorageFeatures* structure = (VkPhysicalDevice8BitStorageFeatures*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::storageBuffer8BitAccess), structure->storageBuffer8BitAccess);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::uniformAndStorageBuffer8BitAccess),
-                                       structure->uniformAndStorageBuffer8BitAccess);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::storagePushConstant8), structure->storagePushConstant8);
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceDriverProperties structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES: {  // Covers VUID-VkPhysicalDeviceDriverProperties-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
-                    skip |=
-                        LogError(pnext_vuid, instance, loc.dot(Field::pNext),
-                                 "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES) "
-                                 "which was added in VK_API_VERSION_1_2 but the "
-                                 "current effective API version is %s.",
-                                 StringAPIVersion(api_version).c_str());
-                }
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceShaderAtomicInt64Features structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_INT64_FEATURES: {  // Covers
-                                                                                // VUID-VkPhysicalDeviceShaderAtomicInt64Features-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
-                    skip |= LogError(
-                        pnext_vuid, instance, loc.dot(Field::pNext),
-                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_INT64_FEATURES) "
-                        "which was added in VK_API_VERSION_1_2 but the "
-                        "current effective API version is %s.",
-                        StringAPIVersion(api_version).c_str());
-                }
-            }
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceShaderAtomicInt64Features);
-                VkPhysicalDeviceShaderAtomicInt64Features* structure = (VkPhysicalDeviceShaderAtomicInt64Features*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderBufferInt64Atomics), structure->shaderBufferInt64Atomics);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderSharedInt64Atomics), structure->shaderSharedInt64Atomics);
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceShaderFloat16Int8Features structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES: {  // Covers
-                                                                                // VUID-VkPhysicalDeviceShaderFloat16Int8Features-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
-                    skip |= LogError(
-                        pnext_vuid, instance, loc.dot(Field::pNext),
-                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES) "
-                        "which was added in VK_API_VERSION_1_2 but the "
-                        "current effective API version is %s.",
-                        StringAPIVersion(api_version).c_str());
-                }
-            }
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceShaderFloat16Int8Features);
-                VkPhysicalDeviceShaderFloat16Int8Features* structure = (VkPhysicalDeviceShaderFloat16Int8Features*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderFloat16), structure->shaderFloat16);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderInt8), structure->shaderInt8);
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceFloatControlsProperties structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FLOAT_CONTROLS_PROPERTIES: {  // Covers
-                                                                             // VUID-VkPhysicalDeviceFloatControlsProperties-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
-                    skip |= LogError(
-                        pnext_vuid, instance, loc.dot(Field::pNext),
-                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FLOAT_CONTROLS_PROPERTIES) "
-                        "which was added in VK_API_VERSION_1_2 but the "
-                        "current effective API version is %s.",
-                        StringAPIVersion(api_version).c_str());
-                }
-            }
-        } break;
-
         // Validation code for VkDescriptorSetLayoutBindingFlagsCreateInfo structure members
         case VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO: {  // Covers
                                                                                    // VUID-VkDescriptorSetLayoutBindingFlagsCreateInfo-sType-sType
@@ -1432,12 +2930,13 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_2) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
                                      "includes a pointer to a VkStructureType "
                                      "(VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO) which was added in "
                                      "VK_API_VERSION_1_2 but the "
                                      "current effective API version is %s.",
-                                     StringAPIVersion(api_version).c_str());
+                                     StringAPIVersion(device_api_version).c_str());
                 }
             }
             if (is_const_param) {
@@ -1450,104 +2949,6 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
             }
         } break;
 
-        // Validation code for VkPhysicalDeviceDescriptorIndexingFeatures structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES: {  // Covers
-                                                                                // VUID-VkPhysicalDeviceDescriptorIndexingFeatures-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
-                    skip |= LogError(
-                        pnext_vuid, instance, loc.dot(Field::pNext),
-                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES) "
-                        "which was added in VK_API_VERSION_1_2 but the "
-                        "current effective API version is %s.",
-                        StringAPIVersion(api_version).c_str());
-                }
-            }
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceDescriptorIndexingFeatures);
-                VkPhysicalDeviceDescriptorIndexingFeatures* structure = (VkPhysicalDeviceDescriptorIndexingFeatures*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderInputAttachmentArrayDynamicIndexing),
-                                       structure->shaderInputAttachmentArrayDynamicIndexing);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderUniformTexelBufferArrayDynamicIndexing),
-                                       structure->shaderUniformTexelBufferArrayDynamicIndexing);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderStorageTexelBufferArrayDynamicIndexing),
-                                       structure->shaderStorageTexelBufferArrayDynamicIndexing);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderUniformBufferArrayNonUniformIndexing),
-                                       structure->shaderUniformBufferArrayNonUniformIndexing);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderSampledImageArrayNonUniformIndexing),
-                                       structure->shaderSampledImageArrayNonUniformIndexing);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderStorageBufferArrayNonUniformIndexing),
-                                       structure->shaderStorageBufferArrayNonUniformIndexing);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderStorageImageArrayNonUniformIndexing),
-                                       structure->shaderStorageImageArrayNonUniformIndexing);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderInputAttachmentArrayNonUniformIndexing),
-                                       structure->shaderInputAttachmentArrayNonUniformIndexing);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderUniformTexelBufferArrayNonUniformIndexing),
-                                       structure->shaderUniformTexelBufferArrayNonUniformIndexing);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderStorageTexelBufferArrayNonUniformIndexing),
-                                       structure->shaderStorageTexelBufferArrayNonUniformIndexing);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::descriptorBindingUniformBufferUpdateAfterBind),
-                                       structure->descriptorBindingUniformBufferUpdateAfterBind);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::descriptorBindingSampledImageUpdateAfterBind),
-                                       structure->descriptorBindingSampledImageUpdateAfterBind);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::descriptorBindingStorageImageUpdateAfterBind),
-                                       structure->descriptorBindingStorageImageUpdateAfterBind);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::descriptorBindingStorageBufferUpdateAfterBind),
-                                       structure->descriptorBindingStorageBufferUpdateAfterBind);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::descriptorBindingUniformTexelBufferUpdateAfterBind),
-                                       structure->descriptorBindingUniformTexelBufferUpdateAfterBind);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::descriptorBindingStorageTexelBufferUpdateAfterBind),
-                                       structure->descriptorBindingStorageTexelBufferUpdateAfterBind);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::descriptorBindingUpdateUnusedWhilePending),
-                                       structure->descriptorBindingUpdateUnusedWhilePending);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::descriptorBindingPartiallyBound),
-                                       structure->descriptorBindingPartiallyBound);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::descriptorBindingVariableDescriptorCount),
-                                       structure->descriptorBindingVariableDescriptorCount);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::runtimeDescriptorArray), structure->runtimeDescriptorArray);
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceDescriptorIndexingProperties structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_PROPERTIES: {  // Covers
-                                                                                  // VUID-VkPhysicalDeviceDescriptorIndexingProperties-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
-                    skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
-                                     "includes a pointer to a VkStructureType "
-                                     "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_PROPERTIES) which was added in "
-                                     "VK_API_VERSION_1_2 but the "
-                                     "current effective API version is %s.",
-                                     StringAPIVersion(api_version).c_str());
-                }
-            }
-        } break;
-
         // Validation code for VkDescriptorSetVariableDescriptorCountAllocateInfo structure members
         case VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO: {  // Covers
                                                                                           // VUID-VkDescriptorSetVariableDescriptorCountAllocateInfo-sType-sType
@@ -1556,12 +2957,13 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_2) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
                                      "includes a pointer to a VkStructureType "
                                      "(VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO) which was added "
                                      "in VK_API_VERSION_1_2 but the "
                                      "current effective API version is %s.",
-                                     StringAPIVersion(api_version).c_str());
+                                     StringAPIVersion(device_api_version).c_str());
                 }
             }
             if (is_const_param) {
@@ -1582,12 +2984,13 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_2) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
                                      "includes a pointer to a VkStructureType "
                                      "(VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_LAYOUT_SUPPORT) which was added "
                                      "in VK_API_VERSION_1_2 but the "
                                      "current effective API version is %s.",
-                                     StringAPIVersion(api_version).c_str());
+                                     StringAPIVersion(device_api_version).c_str());
                 }
             }
         } break;
@@ -1600,12 +3003,13 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_2) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |= LogError(
                         pnext_vuid, instance, loc.dot(Field::pNext),
                         "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_SUBPASS_DESCRIPTION_DEPTH_STENCIL_RESOLVE) "
                         "which was added in VK_API_VERSION_1_2 but the "
                         "current effective API version is %s.",
-                        StringAPIVersion(api_version).c_str());
+                        StringAPIVersion(device_api_version).c_str());
                 }
             }
             if (is_const_param) {
@@ -1627,47 +3031,6 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
             }
         } break;
 
-        // Validation code for VkPhysicalDeviceDepthStencilResolveProperties structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DEPTH_STENCIL_RESOLVE_PROPERTIES: {  // Covers
-                                                                                    // VUID-VkPhysicalDeviceDepthStencilResolveProperties-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
-                    skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
-                                     "includes a pointer to a VkStructureType "
-                                     "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DEPTH_STENCIL_RESOLVE_PROPERTIES) which was added in "
-                                     "VK_API_VERSION_1_2 but the "
-                                     "current effective API version is %s.",
-                                     StringAPIVersion(api_version).c_str());
-                }
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceScalarBlockLayoutFeatures structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SCALAR_BLOCK_LAYOUT_FEATURES: {  // Covers
-                                                                                // VUID-VkPhysicalDeviceScalarBlockLayoutFeatures-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
-                    skip |= LogError(
-                        pnext_vuid, instance, loc.dot(Field::pNext),
-                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SCALAR_BLOCK_LAYOUT_FEATURES) "
-                        "which was added in VK_API_VERSION_1_2 but the "
-                        "current effective API version is %s.",
-                        StringAPIVersion(api_version).c_str());
-                }
-            }
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceScalarBlockLayoutFeatures);
-                VkPhysicalDeviceScalarBlockLayoutFeatures* structure = (VkPhysicalDeviceScalarBlockLayoutFeatures*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::scalarBlockLayout), structure->scalarBlockLayout);
-            }
-        } break;
-
         // Validation code for VkImageStencilUsageCreateInfo structure members
         case VK_STRUCTURE_TYPE_IMAGE_STENCIL_USAGE_CREATE_INFO: {  // Covers VUID-VkImageStencilUsageCreateInfo-sType-sType
 
@@ -1675,11 +3038,12 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_2) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
                                      "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_IMAGE_STENCIL_USAGE_CREATE_INFO) "
                                      "which was added in VK_API_VERSION_1_2 but the "
                                      "current effective API version is %s.",
-                                     StringAPIVersion(api_version).c_str());
+                                     StringAPIVersion(device_api_version).c_str());
                 }
             }
             if (is_const_param) {
@@ -1699,12 +3063,13 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_2) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |=
                         LogError(pnext_vuid, instance, loc.dot(Field::pNext),
                                  "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_SAMPLER_REDUCTION_MODE_CREATE_INFO) "
                                  "which was added in VK_API_VERSION_1_2 but the "
                                  "current effective API version is %s.",
-                                 StringAPIVersion(api_version).c_str());
+                                 StringAPIVersion(device_api_version).c_str());
                 }
             }
             if (is_const_param) {
@@ -1716,75 +3081,6 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
             }
         } break;
 
-        // Validation code for VkPhysicalDeviceSamplerFilterMinmaxProperties structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_FILTER_MINMAX_PROPERTIES: {  // Covers
-                                                                                    // VUID-VkPhysicalDeviceSamplerFilterMinmaxProperties-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
-                    skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
-                                     "includes a pointer to a VkStructureType "
-                                     "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_FILTER_MINMAX_PROPERTIES) which was added in "
-                                     "VK_API_VERSION_1_2 but the "
-                                     "current effective API version is %s.",
-                                     StringAPIVersion(api_version).c_str());
-                }
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceVulkanMemoryModelFeatures structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_MEMORY_MODEL_FEATURES: {  // Covers
-                                                                                // VUID-VkPhysicalDeviceVulkanMemoryModelFeatures-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
-                    skip |= LogError(
-                        pnext_vuid, instance, loc.dot(Field::pNext),
-                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_MEMORY_MODEL_FEATURES) "
-                        "which was added in VK_API_VERSION_1_2 but the "
-                        "current effective API version is %s.",
-                        StringAPIVersion(api_version).c_str());
-                }
-            }
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceVulkanMemoryModelFeatures);
-                VkPhysicalDeviceVulkanMemoryModelFeatures* structure = (VkPhysicalDeviceVulkanMemoryModelFeatures*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::vulkanMemoryModel), structure->vulkanMemoryModel);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::vulkanMemoryModelDeviceScope), structure->vulkanMemoryModelDeviceScope);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::vulkanMemoryModelAvailabilityVisibilityChains),
-                                       structure->vulkanMemoryModelAvailabilityVisibilityChains);
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceImagelessFramebufferFeatures structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGELESS_FRAMEBUFFER_FEATURES: {  // Covers
-                                                                                  // VUID-VkPhysicalDeviceImagelessFramebufferFeatures-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
-                    skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
-                                     "includes a pointer to a VkStructureType "
-                                     "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGELESS_FRAMEBUFFER_FEATURES) which was added in "
-                                     "VK_API_VERSION_1_2 but the "
-                                     "current effective API version is %s.",
-                                     StringAPIVersion(api_version).c_str());
-                }
-            }
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceImagelessFramebufferFeatures);
-                VkPhysicalDeviceImagelessFramebufferFeatures* structure = (VkPhysicalDeviceImagelessFramebufferFeatures*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::imagelessFramebuffer), structure->imagelessFramebuffer);
-            }
-        } break;
-
         // Validation code for VkFramebufferAttachmentsCreateInfo structure members
         case VK_STRUCTURE_TYPE_FRAMEBUFFER_ATTACHMENTS_CREATE_INFO: {  // Covers VUID-VkFramebufferAttachmentsCreateInfo-sType-sType
 
@@ -1792,12 +3088,13 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_2) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |=
                         LogError(pnext_vuid, instance, loc.dot(Field::pNext),
                                  "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_FRAMEBUFFER_ATTACHMENTS_CREATE_INFO) "
                                  "which was added in VK_API_VERSION_1_2 but the "
                                  "current effective API version is %s.",
-                                 StringAPIVersion(api_version).c_str());
+                                 StringAPIVersion(device_api_version).c_str());
                 }
             }
             if (is_const_param) {
@@ -1844,12 +3141,13 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_2) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |=
                         LogError(pnext_vuid, instance, loc.dot(Field::pNext),
                                  "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_RENDER_PASS_ATTACHMENT_BEGIN_INFO) "
                                  "which was added in VK_API_VERSION_1_2 but the "
                                  "current effective API version is %s.",
-                                 StringAPIVersion(api_version).c_str());
+                                 StringAPIVersion(device_api_version).c_str());
                 }
             }
             if (is_const_param) {
@@ -1861,72 +3159,6 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
             }
         } break;
 
-        // Validation code for VkPhysicalDeviceUniformBufferStandardLayoutFeatures structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_UNIFORM_BUFFER_STANDARD_LAYOUT_FEATURES: {  // Covers
-                                                                                           // VUID-VkPhysicalDeviceUniformBufferStandardLayoutFeatures-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
-                    skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
-                                     "includes a pointer to a VkStructureType "
-                                     "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_UNIFORM_BUFFER_STANDARD_LAYOUT_FEATURES) which was added "
-                                     "in VK_API_VERSION_1_2 but the "
-                                     "current effective API version is %s.",
-                                     StringAPIVersion(api_version).c_str());
-                }
-            }
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceUniformBufferStandardLayoutFeatures);
-                VkPhysicalDeviceUniformBufferStandardLayoutFeatures* structure =
-                    (VkPhysicalDeviceUniformBufferStandardLayoutFeatures*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::uniformBufferStandardLayout), structure->uniformBufferStandardLayout);
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceShaderSubgroupExtendedTypesFeatures structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_SUBGROUP_EXTENDED_TYPES_FEATURES: {  // Covers
-                                                                                           // VUID-VkPhysicalDeviceShaderSubgroupExtendedTypesFeatures-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
-                    skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
-                                     "includes a pointer to a VkStructureType "
-                                     "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_SUBGROUP_EXTENDED_TYPES_FEATURES) which was added "
-                                     "in VK_API_VERSION_1_2 but the "
-                                     "current effective API version is %s.",
-                                     StringAPIVersion(api_version).c_str());
-                }
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceSeparateDepthStencilLayoutsFeatures structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SEPARATE_DEPTH_STENCIL_LAYOUTS_FEATURES: {  // Covers
-                                                                                           // VUID-VkPhysicalDeviceSeparateDepthStencilLayoutsFeatures-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
-                    skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
-                                     "includes a pointer to a VkStructureType "
-                                     "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SEPARATE_DEPTH_STENCIL_LAYOUTS_FEATURES) which was added "
-                                     "in VK_API_VERSION_1_2 but the "
-                                     "current effective API version is %s.",
-                                     StringAPIVersion(api_version).c_str());
-                }
-            }
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceSeparateDepthStencilLayoutsFeatures);
-                VkPhysicalDeviceSeparateDepthStencilLayoutsFeatures* structure =
-                    (VkPhysicalDeviceSeparateDepthStencilLayoutsFeatures*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::separateDepthStencilLayouts), structure->separateDepthStencilLayouts);
-            }
-        } break;
-
         // Validation code for VkAttachmentReferenceStencilLayout structure members
         case VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_STENCIL_LAYOUT: {  // Covers VUID-VkAttachmentReferenceStencilLayout-sType-sType
 
@@ -1934,12 +3166,13 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_2) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |=
                         LogError(pnext_vuid, instance, loc.dot(Field::pNext),
                                  "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_STENCIL_LAYOUT) "
                                  "which was added in VK_API_VERSION_1_2 but the "
                                  "current effective API version is %s.",
-                                 StringAPIVersion(api_version).c_str());
+                                 StringAPIVersion(device_api_version).c_str());
                 }
             }
             if (is_const_param) {
@@ -1958,12 +3191,13 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_2) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |= LogError(
                         pnext_vuid, instance, loc.dot(Field::pNext),
                         "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_ATTACHMENT_DESCRIPTION_STENCIL_LAYOUT) which "
                         "was added in VK_API_VERSION_1_2 but the "
                         "current effective API version is %s.",
-                        StringAPIVersion(api_version).c_str());
+                        StringAPIVersion(device_api_version).c_str());
                 }
             }
             if (is_const_param) {
@@ -1979,70 +3213,6 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
             }
         } break;
 
-        // Validation code for VkPhysicalDeviceHostQueryResetFeatures structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES: {  // Covers
-                                                                             // VUID-VkPhysicalDeviceHostQueryResetFeatures-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
-                    skip |= LogError(
-                        pnext_vuid, instance, loc.dot(Field::pNext),
-                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES) "
-                        "which was added in VK_API_VERSION_1_2 but the "
-                        "current effective API version is %s.",
-                        StringAPIVersion(api_version).c_str());
-                }
-            }
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceHostQueryResetFeatures);
-                VkPhysicalDeviceHostQueryResetFeatures* structure = (VkPhysicalDeviceHostQueryResetFeatures*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::hostQueryReset), structure->hostQueryReset);
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceTimelineSemaphoreFeatures structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES: {  // Covers
-                                                                               // VUID-VkPhysicalDeviceTimelineSemaphoreFeatures-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
-                    skip |= LogError(
-                        pnext_vuid, instance, loc.dot(Field::pNext),
-                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES) "
-                        "which was added in VK_API_VERSION_1_2 but the "
-                        "current effective API version is %s.",
-                        StringAPIVersion(api_version).c_str());
-                }
-            }
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceTimelineSemaphoreFeatures);
-                VkPhysicalDeviceTimelineSemaphoreFeatures* structure = (VkPhysicalDeviceTimelineSemaphoreFeatures*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::timelineSemaphore), structure->timelineSemaphore);
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceTimelineSemaphoreProperties structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_PROPERTIES: {  // Covers
-                                                                                 // VUID-VkPhysicalDeviceTimelineSemaphoreProperties-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
-                    skip |= LogError(
-                        pnext_vuid, instance, loc.dot(Field::pNext),
-                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_PROPERTIES) "
-                        "which was added in VK_API_VERSION_1_2 but the "
-                        "current effective API version is %s.",
-                        StringAPIVersion(api_version).c_str());
-                }
-            }
-        } break;
-
         // Validation code for VkSemaphoreTypeCreateInfo structure members
         case VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO: {  // Covers VUID-VkSemaphoreTypeCreateInfo-sType-sType
 
@@ -2050,11 +3220,12 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_2) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
                                      "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO) which "
                                      "was added in VK_API_VERSION_1_2 but the "
                                      "current effective API version is %s.",
-                                     StringAPIVersion(api_version).c_str());
+                                     StringAPIVersion(device_api_version).c_str());
                 }
             }
             if (is_const_param) {
@@ -2072,41 +3243,13 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_2) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
                                      "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO) "
                                      "which was added in VK_API_VERSION_1_2 but the "
                                      "current effective API version is %s.",
-                                     StringAPIVersion(api_version).c_str());
+                                     StringAPIVersion(device_api_version).c_str());
                 }
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceBufferDeviceAddressFeatures structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES: {  // Covers
-                                                                                  // VUID-VkPhysicalDeviceBufferDeviceAddressFeatures-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_2) {
-                    skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
-                                     "includes a pointer to a VkStructureType "
-                                     "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES) which was added in "
-                                     "VK_API_VERSION_1_2 but the "
-                                     "current effective API version is %s.",
-                                     StringAPIVersion(api_version).c_str());
-                }
-            }
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceBufferDeviceAddressFeatures);
-                VkPhysicalDeviceBufferDeviceAddressFeatures* structure = (VkPhysicalDeviceBufferDeviceAddressFeatures*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::bufferDeviceAddress), structure->bufferDeviceAddress);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::bufferDeviceAddressCaptureReplay),
-                                       structure->bufferDeviceAddressCaptureReplay);
-
-                skip |=
-                    ValidateBool32(pNext_loc.dot(Field::bufferDeviceAddressMultiDevice), structure->bufferDeviceAddressMultiDevice);
             }
         } break;
 
@@ -2118,12 +3261,13 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_2) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |= LogError(
                         pnext_vuid, instance, loc.dot(Field::pNext),
                         "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_BUFFER_OPAQUE_CAPTURE_ADDRESS_CREATE_INFO) "
                         "which was added in VK_API_VERSION_1_2 but the "
                         "current effective API version is %s.",
-                        StringAPIVersion(api_version).c_str());
+                        StringAPIVersion(device_api_version).c_str());
                 }
             }
         } break;
@@ -2136,83 +3280,13 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_2) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |= LogError(
                         pnext_vuid, instance, loc.dot(Field::pNext),
                         "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_MEMORY_OPAQUE_CAPTURE_ADDRESS_ALLOCATE_INFO) "
                         "which was added in VK_API_VERSION_1_2 but the "
                         "current effective API version is %s.",
-                        StringAPIVersion(api_version).c_str());
-                }
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceVulkan13Features structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES: {  // Covers VUID-VkPhysicalDeviceVulkan13Features-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_3) {
-                    skip |=
-                        LogError(pnext_vuid, instance, loc.dot(Field::pNext),
-                                 "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES) "
-                                 "which was added in VK_API_VERSION_1_3 but the "
-                                 "current effective API version is %s.",
-                                 StringAPIVersion(api_version).c_str());
-                }
-            }
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceVulkan13Features);
-                VkPhysicalDeviceVulkan13Features* structure = (VkPhysicalDeviceVulkan13Features*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::robustImageAccess), structure->robustImageAccess);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::inlineUniformBlock), structure->inlineUniformBlock);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::descriptorBindingInlineUniformBlockUpdateAfterBind),
-                                       structure->descriptorBindingInlineUniformBlockUpdateAfterBind);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::pipelineCreationCacheControl), structure->pipelineCreationCacheControl);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::privateData), structure->privateData);
-
-                skip |=
-                    ValidateBool32(pNext_loc.dot(Field::shaderDemoteToHelperInvocation), structure->shaderDemoteToHelperInvocation);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderTerminateInvocation), structure->shaderTerminateInvocation);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::subgroupSizeControl), structure->subgroupSizeControl);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::computeFullSubgroups), structure->computeFullSubgroups);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::synchronization2), structure->synchronization2);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::textureCompressionASTC_HDR), structure->textureCompressionASTC_HDR);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderZeroInitializeWorkgroupMemory),
-                                       structure->shaderZeroInitializeWorkgroupMemory);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::dynamicRendering), structure->dynamicRendering);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderIntegerDotProduct), structure->shaderIntegerDotProduct);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::maintenance4), structure->maintenance4);
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceVulkan13Properties structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_PROPERTIES: {  // Covers
-                                                                         // VUID-VkPhysicalDeviceVulkan13Properties-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_3) {
-                    skip |= LogError(
-                        pnext_vuid, instance, loc.dot(Field::pNext),
-                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_PROPERTIES) which "
-                        "was added in VK_API_VERSION_1_3 but the "
-                        "current effective API version is %s.",
-                        StringAPIVersion(api_version).c_str());
+                        StringAPIVersion(device_api_version).c_str());
                 }
             }
         } break;
@@ -2225,12 +3299,13 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_3) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |= LogError(
                         pnext_vuid, instance, loc.dot(Field::pNext),
                         "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PIPELINE_CREATION_FEEDBACK_CREATE_INFO) which "
                         "was added in VK_API_VERSION_1_3 but the "
                         "current effective API version is %s.",
-                        StringAPIVersion(api_version).c_str());
+                        StringAPIVersion(device_api_version).c_str());
                 }
             }
             if (is_const_param) {
@@ -2259,83 +3334,6 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
             }
         } break;
 
-        // Validation code for VkPhysicalDeviceShaderTerminateInvocationFeatures structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_TERMINATE_INVOCATION_FEATURES: {  // Covers
-                                                                                        // VUID-VkPhysicalDeviceShaderTerminateInvocationFeatures-sType-sType
-
-            if ((is_physdev_api && !SupportedByPdev(physical_device, vvl::Extension::_VK_KHR_shader_terminate_invocation)) ||
-                (!is_physdev_api && !IsExtEnabled(device_extensions.vk_khr_shader_terminate_invocation))) {
-                skip |=
-                    LogError(pnext_vuid, instance, loc.dot(Field::pNext),
-                             "includes a pointer to a VkStructureType "
-                             "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_TERMINATE_INVOCATION_FEATURES), but its parent extension "
-                             "VK_KHR_shader_terminate_invocation has not been enabled.");
-            }
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceShaderTerminateInvocationFeatures);
-                if (!IsExtEnabled(device_extensions.vk_khr_shader_terminate_invocation)) {
-                    skip |= LogError(pnext_vuid, instance, pNext_loc,
-                                     "includes a pointer to a VkPhysicalDeviceShaderTerminateInvocationFeatures, but when creating "
-                                     "VkDevice, the parent extension "
-                                     "(VK_KHR_shader_terminate_invocation) was not included in ppEnabledExtensionNames.");
-                }
-                VkPhysicalDeviceShaderTerminateInvocationFeatures* structure =
-                    (VkPhysicalDeviceShaderTerminateInvocationFeatures*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderTerminateInvocation), structure->shaderTerminateInvocation);
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceShaderDemoteToHelperInvocationFeatures structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DEMOTE_TO_HELPER_INVOCATION_FEATURES: {  // Covers
-                                                                                               // VUID-VkPhysicalDeviceShaderDemoteToHelperInvocationFeatures-sType-sType
-
-            if ((is_physdev_api && !SupportedByPdev(physical_device, vvl::Extension::_VK_EXT_shader_demote_to_helper_invocation)) ||
-                (!is_physdev_api && !IsExtEnabled(device_extensions.vk_ext_shader_demote_to_helper_invocation))) {
-                skip |= LogError(
-                    pnext_vuid, instance, loc.dot(Field::pNext),
-                    "includes a pointer to a VkStructureType "
-                    "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DEMOTE_TO_HELPER_INVOCATION_FEATURES), but its parent extension "
-                    "VK_EXT_shader_demote_to_helper_invocation has not been enabled.");
-            }
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc =
-                    loc.pNext(Struct::VkPhysicalDeviceShaderDemoteToHelperInvocationFeatures);
-                if (!IsExtEnabled(device_extensions.vk_ext_shader_demote_to_helper_invocation)) {
-                    skip |= LogError(pnext_vuid, instance, pNext_loc,
-                                     "includes a pointer to a VkPhysicalDeviceShaderDemoteToHelperInvocationFeatures, but when "
-                                     "creating VkDevice, the parent extension "
-                                     "(VK_EXT_shader_demote_to_helper_invocation) was not included in ppEnabledExtensionNames.");
-                }
-                VkPhysicalDeviceShaderDemoteToHelperInvocationFeatures* structure =
-                    (VkPhysicalDeviceShaderDemoteToHelperInvocationFeatures*)header;
-                skip |=
-                    ValidateBool32(pNext_loc.dot(Field::shaderDemoteToHelperInvocation), structure->shaderDemoteToHelperInvocation);
-            }
-        } break;
-
-        // Validation code for VkPhysicalDevicePrivateDataFeatures structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRIVATE_DATA_FEATURES: {  // Covers
-                                                                         // VUID-VkPhysicalDevicePrivateDataFeatures-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_3) {
-                    skip |= LogError(
-                        pnext_vuid, instance, loc.dot(Field::pNext),
-                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRIVATE_DATA_FEATURES) which "
-                        "was added in VK_API_VERSION_1_3 but the "
-                        "current effective API version is %s.",
-                        StringAPIVersion(api_version).c_str());
-                }
-            }
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDevicePrivateDataFeatures);
-                VkPhysicalDevicePrivateDataFeatures* structure = (VkPhysicalDevicePrivateDataFeatures*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::privateData), structure->privateData);
-            }
-        } break;
-
         // Validation code for VkDevicePrivateDataCreateInfo structure members
         case VK_STRUCTURE_TYPE_DEVICE_PRIVATE_DATA_CREATE_INFO: {  // Covers VUID-VkDevicePrivateDataCreateInfo-sType-sType
 
@@ -2343,36 +3341,13 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_3) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
                                      "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_DEVICE_PRIVATE_DATA_CREATE_INFO) "
                                      "which was added in VK_API_VERSION_1_3 but the "
                                      "current effective API version is %s.",
-                                     StringAPIVersion(api_version).c_str());
+                                     StringAPIVersion(device_api_version).c_str());
                 }
-            }
-        } break;
-
-        // Validation code for VkPhysicalDevicePipelineCreationCacheControlFeatures structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PIPELINE_CREATION_CACHE_CONTROL_FEATURES: {  // Covers
-                                                                                            // VUID-VkPhysicalDevicePipelineCreationCacheControlFeatures-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_3) {
-                    skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
-                                     "includes a pointer to a VkStructureType "
-                                     "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PIPELINE_CREATION_CACHE_CONTROL_FEATURES) which was added "
-                                     "in VK_API_VERSION_1_3 but the "
-                                     "current effective API version is %s.",
-                                     StringAPIVersion(api_version).c_str());
-                }
-            }
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDevicePipelineCreationCacheControlFeatures);
-                VkPhysicalDevicePipelineCreationCacheControlFeatures* structure =
-                    (VkPhysicalDevicePipelineCreationCacheControlFeatures*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::pipelineCreationCacheControl), structure->pipelineCreationCacheControl);
             }
         } break;
 
@@ -2411,119 +3386,6 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
             }
         } break;
 
-        // Validation code for VkPhysicalDeviceSynchronization2Features structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES: {  // Covers
-                                                                              // VUID-VkPhysicalDeviceSynchronization2Features-sType-sType
-
-            if ((is_physdev_api && !SupportedByPdev(physical_device, vvl::Extension::_VK_KHR_synchronization2)) ||
-                (!is_physdev_api && !IsExtEnabled(device_extensions.vk_khr_synchronization2))) {
-                skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
-                                 "includes a pointer to a VkStructureType "
-                                 "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES), but its parent extension "
-                                 "VK_KHR_synchronization2 has not been enabled.");
-            }
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceSynchronization2Features);
-                if (!IsExtEnabled(device_extensions.vk_khr_synchronization2)) {
-                    skip |= LogError(pnext_vuid, instance, pNext_loc,
-                                     "includes a pointer to a VkPhysicalDeviceSynchronization2Features, but when creating "
-                                     "VkDevice, the parent extension "
-                                     "(VK_KHR_synchronization2) was not included in ppEnabledExtensionNames.");
-                }
-                VkPhysicalDeviceSynchronization2Features* structure = (VkPhysicalDeviceSynchronization2Features*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::synchronization2), structure->synchronization2);
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceZeroInitializeWorkgroupMemoryFeatures structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ZERO_INITIALIZE_WORKGROUP_MEMORY_FEATURES: {  // Covers
-                                                                                             // VUID-VkPhysicalDeviceZeroInitializeWorkgroupMemoryFeatures-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_3) {
-                    skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
-                                     "includes a pointer to a VkStructureType "
-                                     "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ZERO_INITIALIZE_WORKGROUP_MEMORY_FEATURES) which was "
-                                     "added in VK_API_VERSION_1_3 but the "
-                                     "current effective API version is %s.",
-                                     StringAPIVersion(api_version).c_str());
-                }
-            }
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc =
-                    loc.pNext(Struct::VkPhysicalDeviceZeroInitializeWorkgroupMemoryFeatures);
-                VkPhysicalDeviceZeroInitializeWorkgroupMemoryFeatures* structure =
-                    (VkPhysicalDeviceZeroInitializeWorkgroupMemoryFeatures*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderZeroInitializeWorkgroupMemory),
-                                       structure->shaderZeroInitializeWorkgroupMemory);
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceImageRobustnessFeatures structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_ROBUSTNESS_FEATURES: {  // Covers
-                                                                             // VUID-VkPhysicalDeviceImageRobustnessFeatures-sType-sType
-
-            if ((is_physdev_api && !SupportedByPdev(physical_device, vvl::Extension::_VK_EXT_image_robustness)) ||
-                (!is_physdev_api && !IsExtEnabled(device_extensions.vk_ext_image_robustness))) {
-                skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
-                                 "includes a pointer to a VkStructureType "
-                                 "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_ROBUSTNESS_FEATURES), but its parent extension "
-                                 "VK_EXT_image_robustness has not been enabled.");
-            }
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceImageRobustnessFeatures);
-                if (!IsExtEnabled(device_extensions.vk_ext_image_robustness)) {
-                    skip |= LogError(pnext_vuid, instance, pNext_loc,
-                                     "includes a pointer to a VkPhysicalDeviceImageRobustnessFeatures, but when creating VkDevice, "
-                                     "the parent extension "
-                                     "(VK_EXT_image_robustness) was not included in ppEnabledExtensionNames.");
-                }
-                VkPhysicalDeviceImageRobustnessFeatures* structure = (VkPhysicalDeviceImageRobustnessFeatures*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::robustImageAccess), structure->robustImageAccess);
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceSubgroupSizeControlFeatures structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_SIZE_CONTROL_FEATURES: {  // Covers
-                                                                                  // VUID-VkPhysicalDeviceSubgroupSizeControlFeatures-sType-sType
-
-            if ((is_physdev_api && !SupportedByPdev(physical_device, vvl::Extension::_VK_EXT_subgroup_size_control)) ||
-                (!is_physdev_api && !IsExtEnabled(device_extensions.vk_ext_subgroup_size_control))) {
-                skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
-                                 "includes a pointer to a VkStructureType "
-                                 "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_SIZE_CONTROL_FEATURES), but its parent extension "
-                                 "VK_EXT_subgroup_size_control has not been enabled.");
-            }
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceSubgroupSizeControlFeatures);
-                if (!IsExtEnabled(device_extensions.vk_ext_subgroup_size_control)) {
-                    skip |= LogError(pnext_vuid, instance, pNext_loc,
-                                     "includes a pointer to a VkPhysicalDeviceSubgroupSizeControlFeatures, but when creating "
-                                     "VkDevice, the parent extension "
-                                     "(VK_EXT_subgroup_size_control) was not included in ppEnabledExtensionNames.");
-                }
-                VkPhysicalDeviceSubgroupSizeControlFeatures* structure = (VkPhysicalDeviceSubgroupSizeControlFeatures*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::subgroupSizeControl), structure->subgroupSizeControl);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::computeFullSubgroups), structure->computeFullSubgroups);
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceSubgroupSizeControlProperties structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_SIZE_CONTROL_PROPERTIES: {  // Covers
-                                                                                    // VUID-VkPhysicalDeviceSubgroupSizeControlProperties-sType-sType
-
-            if ((is_physdev_api && !SupportedByPdev(physical_device, vvl::Extension::_VK_EXT_subgroup_size_control)) ||
-                (!is_physdev_api && !IsExtEnabled(device_extensions.vk_ext_subgroup_size_control))) {
-                skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
-                                 "includes a pointer to a VkStructureType "
-                                 "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_SIZE_CONTROL_PROPERTIES), but its parent extension "
-                                 "VK_EXT_subgroup_size_control has not been enabled.");
-            }
-        } break;
-
         // Validation code for VkPipelineShaderStageRequiredSubgroupSizeCreateInfo structure members
         case VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_REQUIRED_SUBGROUP_SIZE_CREATE_INFO: {  // Covers
                                                                                             // VUID-VkPipelineShaderStageRequiredSubgroupSizeCreateInfo-sType-sType
@@ -2538,50 +3400,6 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
             }
         } break;
 
-        // Validation code for VkPhysicalDeviceInlineUniformBlockFeatures structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INLINE_UNIFORM_BLOCK_FEATURES: {  // Covers
-                                                                                 // VUID-VkPhysicalDeviceInlineUniformBlockFeatures-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_3) {
-                    skip |= LogError(
-                        pnext_vuid, instance, loc.dot(Field::pNext),
-                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INLINE_UNIFORM_BLOCK_FEATURES) "
-                        "which was added in VK_API_VERSION_1_3 but the "
-                        "current effective API version is %s.",
-                        StringAPIVersion(api_version).c_str());
-                }
-            }
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceInlineUniformBlockFeatures);
-                VkPhysicalDeviceInlineUniformBlockFeatures* structure = (VkPhysicalDeviceInlineUniformBlockFeatures*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::inlineUniformBlock), structure->inlineUniformBlock);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::descriptorBindingInlineUniformBlockUpdateAfterBind),
-                                       structure->descriptorBindingInlineUniformBlockUpdateAfterBind);
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceInlineUniformBlockProperties structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INLINE_UNIFORM_BLOCK_PROPERTIES: {  // Covers
-                                                                                   // VUID-VkPhysicalDeviceInlineUniformBlockProperties-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_3) {
-                    skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
-                                     "includes a pointer to a VkStructureType "
-                                     "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INLINE_UNIFORM_BLOCK_PROPERTIES) which was added in "
-                                     "VK_API_VERSION_1_3 but the "
-                                     "current effective API version is %s.",
-                                     StringAPIVersion(api_version).c_str());
-                }
-            }
-        } break;
-
         // Validation code for VkWriteDescriptorSetInlineUniformBlock structure members
         case VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_INLINE_UNIFORM_BLOCK: {  // Covers
                                                                              // VUID-VkWriteDescriptorSetInlineUniformBlock-sType-sType
@@ -2590,12 +3408,13 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_3) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |= LogError(
                         pnext_vuid, instance, loc.dot(Field::pNext),
                         "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_INLINE_UNIFORM_BLOCK) "
                         "which was added in VK_API_VERSION_1_3 but the "
                         "current effective API version is %s.",
-                        StringAPIVersion(api_version).c_str());
+                        StringAPIVersion(device_api_version).c_str());
                 }
             }
             if (is_const_param) {
@@ -2614,39 +3433,14 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_3) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
                                      "includes a pointer to a VkStructureType "
                                      "(VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_INLINE_UNIFORM_BLOCK_CREATE_INFO) which was added in "
                                      "VK_API_VERSION_1_3 but the "
                                      "current effective API version is %s.",
-                                     StringAPIVersion(api_version).c_str());
+                                     StringAPIVersion(device_api_version).c_str());
                 }
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceTextureCompressionASTCHDRFeatures structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TEXTURE_COMPRESSION_ASTC_HDR_FEATURES: {  // Covers
-                                                                                         // VUID-VkPhysicalDeviceTextureCompressionASTCHDRFeatures-sType-sType
-
-            if ((is_physdev_api && !SupportedByPdev(physical_device, vvl::Extension::_VK_EXT_texture_compression_astc_hdr)) ||
-                (!is_physdev_api && !IsExtEnabled(device_extensions.vk_ext_texture_compression_astc_hdr))) {
-                skip |=
-                    LogError(pnext_vuid, instance, loc.dot(Field::pNext),
-                             "includes a pointer to a VkStructureType "
-                             "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TEXTURE_COMPRESSION_ASTC_HDR_FEATURES), but its parent extension "
-                             "VK_EXT_texture_compression_astc_hdr has not been enabled.");
-            }
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceTextureCompressionASTCHDRFeatures);
-                if (!IsExtEnabled(device_extensions.vk_ext_texture_compression_astc_hdr)) {
-                    skip |= LogError(pnext_vuid, instance, pNext_loc,
-                                     "includes a pointer to a VkPhysicalDeviceTextureCompressionASTCHDRFeatures, but when creating "
-                                     "VkDevice, the parent extension "
-                                     "(VK_EXT_texture_compression_astc_hdr) was not included in ppEnabledExtensionNames.");
-                }
-                VkPhysicalDeviceTextureCompressionASTCHDRFeatures* structure =
-                    (VkPhysicalDeviceTextureCompressionASTCHDRFeatures*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::textureCompressionASTC_HDR), structure->textureCompressionASTC_HDR);
             }
         } break;
 
@@ -2657,35 +3451,13 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_3) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
                                      "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO) "
                                      "which was added in VK_API_VERSION_1_3 but the "
                                      "current effective API version is %s.",
-                                     StringAPIVersion(api_version).c_str());
+                                     StringAPIVersion(device_api_version).c_str());
                 }
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceDynamicRenderingFeatures structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES: {  // Covers
-                                                                              // VUID-VkPhysicalDeviceDynamicRenderingFeatures-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_3) {
-                    skip |= LogError(
-                        pnext_vuid, instance, loc.dot(Field::pNext),
-                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES) "
-                        "which was added in VK_API_VERSION_1_3 but the "
-                        "current effective API version is %s.",
-                        StringAPIVersion(api_version).c_str());
-                }
-            }
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceDynamicRenderingFeatures);
-                VkPhysicalDeviceDynamicRenderingFeatures* structure = (VkPhysicalDeviceDynamicRenderingFeatures*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::dynamicRendering), structure->dynamicRendering);
             }
         } break;
 
@@ -2697,12 +3469,13 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_3) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |= LogError(
                         pnext_vuid, instance, loc.dot(Field::pNext),
                         "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_RENDERING_INFO) "
                         "which was added in VK_API_VERSION_1_3 but the "
                         "current effective API version is %s.",
-                        StringAPIVersion(api_version).c_str());
+                        StringAPIVersion(device_api_version).c_str());
                 }
             }
             if (is_const_param) {
@@ -2728,61 +3501,6 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
             }
         } break;
 
-        // Validation code for VkPhysicalDeviceShaderIntegerDotProductFeatures structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_INTEGER_DOT_PRODUCT_FEATURES: {  // Covers
-                                                                                       // VUID-VkPhysicalDeviceShaderIntegerDotProductFeatures-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_3) {
-                    skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
-                                     "includes a pointer to a VkStructureType "
-                                     "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_INTEGER_DOT_PRODUCT_FEATURES) which was added in "
-                                     "VK_API_VERSION_1_3 but the "
-                                     "current effective API version is %s.",
-                                     StringAPIVersion(api_version).c_str());
-                }
-            }
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceShaderIntegerDotProductFeatures);
-                VkPhysicalDeviceShaderIntegerDotProductFeatures* structure =
-                    (VkPhysicalDeviceShaderIntegerDotProductFeatures*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderIntegerDotProduct), structure->shaderIntegerDotProduct);
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceShaderIntegerDotProductProperties structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_INTEGER_DOT_PRODUCT_PROPERTIES: {  // Covers
-                                                                                         // VUID-VkPhysicalDeviceShaderIntegerDotProductProperties-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_3) {
-                    skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
-                                     "includes a pointer to a VkStructureType "
-                                     "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_INTEGER_DOT_PRODUCT_PROPERTIES) which was added in "
-                                     "VK_API_VERSION_1_3 but the "
-                                     "current effective API version is %s.",
-                                     StringAPIVersion(api_version).c_str());
-                }
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceTexelBufferAlignmentProperties structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TEXEL_BUFFER_ALIGNMENT_PROPERTIES: {  // Covers
-                                                                                     // VUID-VkPhysicalDeviceTexelBufferAlignmentProperties-sType-sType
-
-            if ((is_physdev_api && !SupportedByPdev(physical_device, vvl::Extension::_VK_EXT_texel_buffer_alignment)) ||
-                (!is_physdev_api && !IsExtEnabled(device_extensions.vk_ext_texel_buffer_alignment))) {
-                skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
-                                 "includes a pointer to a VkStructureType "
-                                 "(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TEXEL_BUFFER_ALIGNMENT_PROPERTIES), but its parent extension "
-                                 "VK_EXT_texel_buffer_alignment has not been enabled.");
-            }
-        } break;
-
         // Validation code for VkFormatProperties3 structure members
         case VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_3: {  // Covers VUID-VkFormatProperties3-sType-sType
 
@@ -2790,68 +3508,15 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPhysicalDeviceProperties device_properties = {};
                 DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
                 if (device_properties.apiVersion < VK_API_VERSION_1_3) {
+                    APIVersion device_api_version(static_cast<uint32_t>(device_properties.apiVersion));
                     skip |= LogError(pnext_vuid, instance, loc.dot(Field::pNext),
                                      "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_3) which was "
                                      "added in VK_API_VERSION_1_3 but the "
                                      "current effective API version is %s.",
-                                     StringAPIVersion(api_version).c_str());
+                                     StringAPIVersion(device_api_version).c_str());
                 }
             }
         } break;
-
-        // Validation code for VkPhysicalDeviceMaintenance4Features structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_4_FEATURES: {  // Covers
-                                                                          // VUID-VkPhysicalDeviceMaintenance4Features-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_3) {
-                    skip |= LogError(
-                        pnext_vuid, instance, loc.dot(Field::pNext),
-                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_4_FEATURES) which "
-                        "was added in VK_API_VERSION_1_3 but the "
-                        "current effective API version is %s.",
-                        StringAPIVersion(api_version).c_str());
-                }
-            }
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceMaintenance4Features);
-                VkPhysicalDeviceMaintenance4Features* structure = (VkPhysicalDeviceMaintenance4Features*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::maintenance4), structure->maintenance4);
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceMaintenance4Properties structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_4_PROPERTIES: {  // Covers
-                                                                            // VUID-VkPhysicalDeviceMaintenance4Properties-sType-sType
-
-            if (is_physdev_api) {
-                VkPhysicalDeviceProperties device_properties = {};
-                DispatchGetPhysicalDeviceProperties(caller_physical_device, &device_properties);
-                if (device_properties.apiVersion < VK_API_VERSION_1_3) {
-                    skip |= LogError(
-                        pnext_vuid, instance, loc.dot(Field::pNext),
-                        "includes a pointer to a VkStructureType (VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_4_PROPERTIES) "
-                        "which was added in VK_API_VERSION_1_3 but the "
-                        "current effective API version is %s.",
-                        StringAPIVersion(api_version).c_str());
-                }
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceVulkanSC10Features structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_SC_1_0_FEATURES: {  // Covers
-                                                                          // VUID-VkPhysicalDeviceVulkanSC10Features-sType-sType
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceVulkanSC10Features);
-                VkPhysicalDeviceVulkanSC10Features* structure = (VkPhysicalDeviceVulkanSC10Features*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderAtomicInstructions), structure->shaderAtomicInstructions);
-            }
-        } break;
-
-        // No Validation code for VkPhysicalDeviceVulkanSC10Properties structure members  -- Covers
-        // VUID-VkPhysicalDeviceVulkanSC10Properties-sType-sType
 
         // Validation code for VkDeviceObjectReservationCreateInfo structure members
         case VK_STRUCTURE_TYPE_DEVICE_OBJECT_RESERVATION_CREATE_INFO: {  // Covers
@@ -3046,28 +3711,6 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
         // No Validation code for VkSharedPresentSurfaceCapabilitiesKHR structure members  -- Covers
         // VUID-VkSharedPresentSurfaceCapabilitiesKHR-sType-sType
 
-        // Validation code for VkPhysicalDevicePerformanceQueryFeaturesKHR structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PERFORMANCE_QUERY_FEATURES_KHR: {  // Covers
-                                                                                  // VUID-VkPhysicalDevicePerformanceQueryFeaturesKHR-sType-sType
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDevicePerformanceQueryFeaturesKHR);
-                if (!IsExtEnabled(device_extensions.vk_khr_performance_query)) {
-                    skip |= LogError(pnext_vuid, instance, pNext_loc,
-                                     "includes a pointer to a VkPhysicalDevicePerformanceQueryFeaturesKHR, but when creating "
-                                     "VkDevice, the parent extension "
-                                     "(VK_KHR_performance_query) was not included in ppEnabledExtensionNames.");
-                }
-                VkPhysicalDevicePerformanceQueryFeaturesKHR* structure = (VkPhysicalDevicePerformanceQueryFeaturesKHR*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::performanceCounterQueryPools), structure->performanceCounterQueryPools);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::performanceCounterMultipleQueryPools),
-                                       structure->performanceCounterMultipleQueryPools);
-            }
-        } break;
-
-        // No Validation code for VkPhysicalDevicePerformanceQueryPropertiesKHR structure members  -- Covers
-        // VUID-VkPhysicalDevicePerformanceQueryPropertiesKHR-sType-sType
-
         // Validation code for VkQueryPoolPerformanceCreateInfoKHR structure members
         case VK_STRUCTURE_TYPE_QUERY_POOL_PERFORMANCE_CREATE_INFO_KHR: {  // Covers
                                                                           // VUID-VkQueryPoolPerformanceCreateInfoKHR-sType-sType
@@ -3091,23 +3734,24 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
         // No Validation code for VkPerformanceQueryReservationInfoKHR structure members  -- Covers
         // VUID-VkPerformanceQueryReservationInfoKHR-sType-sType
 
-        // Validation code for VkPhysicalDeviceShaderClockFeaturesKHR structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_CLOCK_FEATURES_KHR: {  // Covers
-                                                                             // VUID-VkPhysicalDeviceShaderClockFeaturesKHR-sType-sType
+        // Validation code for VkDeviceQueueGlobalPriorityCreateInfoKHR structure members
+        case VK_STRUCTURE_TYPE_DEVICE_QUEUE_GLOBAL_PRIORITY_CREATE_INFO_KHR: {  // Covers
+                                                                                // VUID-VkDeviceQueueGlobalPriorityCreateInfoKHR-sType-sType
             if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceShaderClockFeaturesKHR);
-                if (!IsExtEnabled(device_extensions.vk_khr_shader_clock)) {
-                    skip |= LogError(pnext_vuid, instance, pNext_loc,
-                                     "includes a pointer to a VkPhysicalDeviceShaderClockFeaturesKHR, but when creating VkDevice, "
-                                     "the parent extension "
-                                     "(VK_KHR_shader_clock) was not included in ppEnabledExtensionNames.");
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkDeviceQueueGlobalPriorityCreateInfoKHR);
+                if (!IsExtEnabled(device_extensions.vk_khr_global_priority)) {
+                    skip |=
+                        LogError(pnext_vuid, instance, pNext_loc, "extended struct requires the extensions VK_KHR_global_priority");
                 }
-                VkPhysicalDeviceShaderClockFeaturesKHR* structure = (VkPhysicalDeviceShaderClockFeaturesKHR*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderSubgroupClock), structure->shaderSubgroupClock);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderDeviceClock), structure->shaderDeviceClock);
+                VkDeviceQueueGlobalPriorityCreateInfoKHR* structure = (VkDeviceQueueGlobalPriorityCreateInfoKHR*)header;
+                skip |= ValidateRangedEnum(pNext_loc.dot(Field::globalPriority), vvl::Enum::VkQueueGlobalPriorityKHR,
+                                           structure->globalPriority,
+                                           "VUID-VkDeviceQueueGlobalPriorityCreateInfoKHR-globalPriority-parameter");
             }
         } break;
+
+        // No Validation code for VkQueueFamilyGlobalPriorityPropertiesKHR structure members  -- Covers
+        // VUID-VkQueueFamilyGlobalPriorityPropertiesKHR-sType-sType
 
         // Validation code for VkFragmentShadingRateAttachmentInfoKHR structure members
         case VK_STRUCTURE_TYPE_FRAGMENT_SHADING_RATE_ATTACHMENT_INFO_KHR: {  // Covers
@@ -3138,32 +3782,53 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
         // No Validation code for VkPipelineFragmentShadingRateStateCreateInfoKHR structure members  -- Covers
         // VUID-VkPipelineFragmentShadingRateStateCreateInfoKHR-sType-sType
 
-        // Validation code for VkPhysicalDeviceFragmentShadingRateFeaturesKHR structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_FEATURES_KHR: {  // Covers
-                                                                                      // VUID-VkPhysicalDeviceFragmentShadingRateFeaturesKHR-sType-sType
+        // No Validation code for VkQueueFamilyCheckpointProperties2NV structure members  -- Covers
+        // VUID-VkQueueFamilyCheckpointProperties2NV-sType-sType
+
+        // Validation code for VkPipelineVertexInputDivisorStateCreateInfoKHR structure members
+        case VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_DIVISOR_STATE_CREATE_INFO_KHR: {  // Covers
+                                                                                       // VUID-VkPipelineVertexInputDivisorStateCreateInfoKHR-sType-sType
             if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceFragmentShadingRateFeaturesKHR);
-                if (!IsExtEnabled(device_extensions.vk_khr_fragment_shading_rate)) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPipelineVertexInputDivisorStateCreateInfoKHR);
+                if (!IsExtEnabled(device_extensions.vk_khr_vertex_attribute_divisor)) {
                     skip |= LogError(pnext_vuid, instance, pNext_loc,
-                                     "includes a pointer to a VkPhysicalDeviceFragmentShadingRateFeaturesKHR, but when creating "
-                                     "VkDevice, the parent extension "
-                                     "(VK_KHR_fragment_shading_rate) was not included in ppEnabledExtensionNames.");
+                                     "extended struct requires the extensions VK_KHR_vertex_attribute_divisor");
                 }
-                VkPhysicalDeviceFragmentShadingRateFeaturesKHR* structure = (VkPhysicalDeviceFragmentShadingRateFeaturesKHR*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::pipelineFragmentShadingRate), structure->pipelineFragmentShadingRate);
+                VkPipelineVertexInputDivisorStateCreateInfoKHR* structure = (VkPipelineVertexInputDivisorStateCreateInfoKHR*)header;
+                skip |= ValidateArray(pNext_loc.dot(Field::vertexBindingDivisorCount), pNext_loc.dot(Field::pVertexBindingDivisors),
+                                      structure->vertexBindingDivisorCount, &structure->pVertexBindingDivisors, true, true,
+                                      "VUID-VkPipelineVertexInputDivisorStateCreateInfoKHR-vertexBindingDivisorCount-arraylength",
+                                      "VUID-VkPipelineVertexInputDivisorStateCreateInfoKHR-pVertexBindingDivisors-parameter");
 
-                skip |= ValidateBool32(pNext_loc.dot(Field::primitiveFragmentShadingRate), structure->primitiveFragmentShadingRate);
-
-                skip |=
-                    ValidateBool32(pNext_loc.dot(Field::attachmentFragmentShadingRate), structure->attachmentFragmentShadingRate);
+                if (structure->pVertexBindingDivisors != nullptr) {
+                    for (uint32_t vertexBindingDivisorIndex = 0; vertexBindingDivisorIndex < structure->vertexBindingDivisorCount;
+                         ++vertexBindingDivisorIndex) {
+                        [[maybe_unused]] const Location pVertexBindingDivisors_loc =
+                            pNext_loc.dot(Field::pVertexBindingDivisors, vertexBindingDivisorIndex);
+                    }
+                }
             }
         } break;
 
-        // No Validation code for VkPhysicalDeviceFragmentShadingRatePropertiesKHR structure members  -- Covers
-        // VUID-VkPhysicalDeviceFragmentShadingRatePropertiesKHR-sType-sType
+        // Validation code for VkPipelineRasterizationLineStateCreateInfoKHR structure members
+        case VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_LINE_STATE_CREATE_INFO_KHR: {  // Covers
+                                                                                     // VUID-VkPipelineRasterizationLineStateCreateInfoKHR-sType-sType
+            if (is_const_param) {
+                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPipelineRasterizationLineStateCreateInfoKHR);
+                if (!IsExtEnabled(device_extensions.vk_khr_line_rasterization) &&
+                    !IsExtEnabled(device_extensions.vk_ext_line_rasterization)) {
+                    skip |=
+                        LogError(pnext_vuid, instance, pNext_loc,
+                                 "extended struct requires the extensions VK_KHR_line_rasterization or VK_EXT_line_rasterization");
+                }
+                VkPipelineRasterizationLineStateCreateInfoKHR* structure = (VkPipelineRasterizationLineStateCreateInfoKHR*)header;
+                skip |= ValidateRangedEnum(pNext_loc.dot(Field::lineRasterizationMode), vvl::Enum::VkLineRasterizationModeKHR,
+                                           structure->lineRasterizationMode,
+                                           "VUID-VkPipelineRasterizationLineStateCreateInfoKHR-lineRasterizationMode-parameter");
 
-        // No Validation code for VkQueueFamilyCheckpointProperties2NV structure members  -- Covers
-        // VUID-VkQueueFamilyCheckpointProperties2NV-sType-sType
+                skip |= ValidateBool32(pNext_loc.dot(Field::stippledLineEnable), structure->stippledLineEnable);
+            }
+        } break;
 
         // Validation code for VkImageViewASTCDecodeModeEXT structure members
         case VK_STRUCTURE_TYPE_IMAGE_VIEW_ASTC_DECODE_MODE_EXT: {  // Covers VUID-VkImageViewASTCDecodeModeEXT-sType-sType
@@ -3176,22 +3841,6 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkImageViewASTCDecodeModeEXT* structure = (VkImageViewASTCDecodeModeEXT*)header;
                 skip |= ValidateRangedEnum(pNext_loc.dot(Field::decodeMode), vvl::Enum::VkFormat, structure->decodeMode,
                                            "VUID-VkImageViewASTCDecodeModeEXT-decodeMode-parameter");
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceASTCDecodeFeaturesEXT structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ASTC_DECODE_FEATURES_EXT: {  // Covers
-                                                                            // VUID-VkPhysicalDeviceASTCDecodeFeaturesEXT-sType-sType
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceASTCDecodeFeaturesEXT);
-                if (!IsExtEnabled(device_extensions.vk_ext_astc_decode_mode)) {
-                    skip |= LogError(pnext_vuid, instance, pNext_loc,
-                                     "includes a pointer to a VkPhysicalDeviceASTCDecodeFeaturesEXT, but when creating VkDevice, "
-                                     "the parent extension "
-                                     "(VK_EXT_astc_decode_mode) was not included in ppEnabledExtensionNames.");
-                }
-                VkPhysicalDeviceASTCDecodeFeaturesEXT* structure = (VkPhysicalDeviceASTCDecodeFeaturesEXT*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::decodeModeSharedExponent), structure->decodeModeSharedExponent);
             }
         } break;
 
@@ -3209,9 +3858,6 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                                       "VUID-VkSwapchainCounterCreateInfoEXT-surfaceCounters-parameter");
             }
         } break;
-
-        // No Validation code for VkPhysicalDeviceDiscardRectanglePropertiesEXT structure members  -- Covers
-        // VUID-VkPhysicalDeviceDiscardRectanglePropertiesEXT-sType-sType
 
         // Validation code for VkPipelineDiscardRectangleStateCreateInfoEXT structure members
         case VK_STRUCTURE_TYPE_PIPELINE_DISCARD_RECTANGLE_STATE_CREATE_INFO_EXT: {  // Covers
@@ -3232,9 +3878,6 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
             }
         } break;
 
-        // No Validation code for VkPhysicalDeviceConservativeRasterizationPropertiesEXT structure members  -- Covers
-        // VUID-VkPhysicalDeviceConservativeRasterizationPropertiesEXT-sType-sType
-
         // Validation code for VkPipelineRasterizationConservativeStateCreateInfoEXT structure members
         case VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_CONSERVATIVE_STATE_CREATE_INFO_EXT: {  // Covers
                                                                                              // VUID-VkPipelineRasterizationConservativeStateCreateInfoEXT-sType-sType
@@ -3254,22 +3897,6 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                     pNext_loc.dot(Field::conservativeRasterizationMode), vvl::Enum::VkConservativeRasterizationModeEXT,
                     structure->conservativeRasterizationMode,
                     "VUID-VkPipelineRasterizationConservativeStateCreateInfoEXT-conservativeRasterizationMode-parameter");
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceDepthClipEnableFeaturesEXT structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DEPTH_CLIP_ENABLE_FEATURES_EXT: {  // Covers
-                                                                                  // VUID-VkPhysicalDeviceDepthClipEnableFeaturesEXT-sType-sType
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceDepthClipEnableFeaturesEXT);
-                if (!IsExtEnabled(device_extensions.vk_ext_depth_clip_enable)) {
-                    skip |= LogError(pnext_vuid, instance, pNext_loc,
-                                     "includes a pointer to a VkPhysicalDeviceDepthClipEnableFeaturesEXT, but when creating "
-                                     "VkDevice, the parent extension "
-                                     "(VK_EXT_depth_clip_enable) was not included in ppEnabledExtensionNames.");
-                }
-                VkPhysicalDeviceDepthClipEnableFeaturesEXT* structure = (VkPhysicalDeviceDepthClipEnableFeaturesEXT*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::depthClipEnable), structure->depthClipEnable);
             }
         } break;
 
@@ -3476,30 +4103,6 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
             }
         } break;
 
-        // No Validation code for VkPhysicalDeviceSampleLocationsPropertiesEXT structure members  -- Covers
-        // VUID-VkPhysicalDeviceSampleLocationsPropertiesEXT-sType-sType
-
-        // Validation code for VkPhysicalDeviceBlendOperationAdvancedFeaturesEXT structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BLEND_OPERATION_ADVANCED_FEATURES_EXT: {  // Covers
-                                                                                         // VUID-VkPhysicalDeviceBlendOperationAdvancedFeaturesEXT-sType-sType
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceBlendOperationAdvancedFeaturesEXT);
-                if (!IsExtEnabled(device_extensions.vk_ext_blend_operation_advanced)) {
-                    skip |= LogError(pnext_vuid, instance, pNext_loc,
-                                     "includes a pointer to a VkPhysicalDeviceBlendOperationAdvancedFeaturesEXT, but when creating "
-                                     "VkDevice, the parent extension "
-                                     "(VK_EXT_blend_operation_advanced) was not included in ppEnabledExtensionNames.");
-                }
-                VkPhysicalDeviceBlendOperationAdvancedFeaturesEXT* structure =
-                    (VkPhysicalDeviceBlendOperationAdvancedFeaturesEXT*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::advancedBlendCoherentOperations),
-                                       structure->advancedBlendCoherentOperations);
-            }
-        } break;
-
-        // No Validation code for VkPhysicalDeviceBlendOperationAdvancedPropertiesEXT structure members  -- Covers
-        // VUID-VkPhysicalDeviceBlendOperationAdvancedPropertiesEXT-sType-sType
-
         // Validation code for VkPipelineColorBlendAdvancedStateCreateInfoEXT structure members
         case VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_ADVANCED_STATE_CREATE_INFO_EXT: {  // Covers
                                                                                        // VUID-VkPipelineColorBlendAdvancedStateCreateInfoEXT-sType-sType
@@ -3602,22 +4205,6 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
         // No Validation code for VkFilterCubicImageViewImageFormatPropertiesEXT structure members  -- Covers
         // VUID-VkFilterCubicImageViewImageFormatPropertiesEXT-sType-sType
 
-        // Validation code for VkDeviceQueueGlobalPriorityCreateInfoKHR structure members
-        case VK_STRUCTURE_TYPE_DEVICE_QUEUE_GLOBAL_PRIORITY_CREATE_INFO_KHR: {  // Covers
-                                                                                // VUID-VkDeviceQueueGlobalPriorityCreateInfoKHR-sType-sType
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkDeviceQueueGlobalPriorityCreateInfoKHR);
-                if (!IsExtEnabled(device_extensions.vk_ext_global_priority)) {
-                    skip |=
-                        LogError(pnext_vuid, instance, pNext_loc, "extended struct requires the extensions VK_EXT_global_priority");
-                }
-                VkDeviceQueueGlobalPriorityCreateInfoKHR* structure = (VkDeviceQueueGlobalPriorityCreateInfoKHR*)header;
-                skip |= ValidateRangedEnum(pNext_loc.dot(Field::globalPriority), vvl::Enum::VkQueueGlobalPriorityKHR,
-                                           structure->globalPriority,
-                                           "VUID-VkDeviceQueueGlobalPriorityCreateInfoKHR-globalPriority-parameter");
-            }
-        } break;
-
         // Validation code for VkImportMemoryHostPointerInfoEXT structure members
         case VK_STRUCTURE_TYPE_IMPORT_MEMORY_HOST_POINTER_INFO_EXT: {  // Covers VUID-VkImportMemoryHostPointerInfoEXT-sType-sType
             if (is_const_param) {
@@ -3634,79 +4221,6 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
 
                 skip |= ValidateRequiredPointer(pNext_loc.dot(Field::pHostPointer), structure->pHostPointer,
                                                 "VUID-VkImportMemoryHostPointerInfoEXT-pHostPointer-parameter");
-            }
-        } break;
-
-        // No Validation code for VkPhysicalDeviceExternalMemoryHostPropertiesEXT structure members  -- Covers
-        // VUID-VkPhysicalDeviceExternalMemoryHostPropertiesEXT-sType-sType
-
-        // No Validation code for VkPhysicalDeviceVertexAttributeDivisorPropertiesEXT structure members  -- Covers
-        // VUID-VkPhysicalDeviceVertexAttributeDivisorPropertiesEXT-sType-sType
-
-        // Validation code for VkPipelineVertexInputDivisorStateCreateInfoKHR structure members
-        case VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_DIVISOR_STATE_CREATE_INFO_KHR: {  // Covers
-                                                                                       // VUID-VkPipelineVertexInputDivisorStateCreateInfoKHR-sType-sType
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPipelineVertexInputDivisorStateCreateInfoKHR);
-                if (!IsExtEnabled(device_extensions.vk_ext_vertex_attribute_divisor)) {
-                    skip |= LogError(pnext_vuid, instance, pNext_loc,
-                                     "extended struct requires the extensions VK_EXT_vertex_attribute_divisor");
-                }
-                VkPipelineVertexInputDivisorStateCreateInfoKHR* structure = (VkPipelineVertexInputDivisorStateCreateInfoKHR*)header;
-                skip |= ValidateArray(pNext_loc.dot(Field::vertexBindingDivisorCount), pNext_loc.dot(Field::pVertexBindingDivisors),
-                                      structure->vertexBindingDivisorCount, &structure->pVertexBindingDivisors, true, true,
-                                      kVUIDUndefined, kVUIDUndefined);
-
-                if (structure->pVertexBindingDivisors != nullptr) {
-                    for (uint32_t vertexBindingDivisorIndex = 0; vertexBindingDivisorIndex < structure->vertexBindingDivisorCount;
-                         ++vertexBindingDivisorIndex) {
-                        [[maybe_unused]] const Location pVertexBindingDivisors_loc =
-                            pNext_loc.dot(Field::pVertexBindingDivisors, vertexBindingDivisorIndex);
-                    }
-                }
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceVertexAttributeDivisorFeaturesKHR structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_ATTRIBUTE_DIVISOR_FEATURES_KHR: {  // Covers
-                                                                                         // VUID-VkPhysicalDeviceVertexAttributeDivisorFeaturesKHR-sType-sType
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceVertexAttributeDivisorFeaturesKHR);
-                if (!IsExtEnabled(device_extensions.vk_ext_vertex_attribute_divisor)) {
-                    skip |= LogError(pnext_vuid, instance, pNext_loc,
-                                     "includes a pointer to a VkPhysicalDeviceVertexAttributeDivisorFeaturesKHR, but when creating "
-                                     "VkDevice, the parent extension "
-                                     "(VK_EXT_vertex_attribute_divisor) was not included in ppEnabledExtensionNames.");
-                }
-                VkPhysicalDeviceVertexAttributeDivisorFeaturesKHR* structure =
-                    (VkPhysicalDeviceVertexAttributeDivisorFeaturesKHR*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::vertexAttributeInstanceRateDivisor),
-                                       structure->vertexAttributeInstanceRateDivisor);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::vertexAttributeInstanceRateZeroDivisor),
-                                       structure->vertexAttributeInstanceRateZeroDivisor);
-            }
-        } break;
-
-        // No Validation code for VkPhysicalDevicePCIBusInfoPropertiesEXT structure members  -- Covers
-        // VUID-VkPhysicalDevicePCIBusInfoPropertiesEXT-sType-sType
-
-        // Validation code for VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_IMAGE_ATOMIC_INT64_FEATURES_EXT: {  // Covers
-                                                                                          // VUID-VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT-sType-sType
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT);
-                if (!IsExtEnabled(device_extensions.vk_ext_shader_image_atomic_int64)) {
-                    skip |= LogError(pnext_vuid, instance, pNext_loc,
-                                     "includes a pointer to a VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT, but when creating "
-                                     "VkDevice, the parent extension "
-                                     "(VK_EXT_shader_image_atomic_int64) was not included in ppEnabledExtensionNames.");
-                }
-                VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT* structure =
-                    (VkPhysicalDeviceShaderImageAtomicInt64FeaturesEXT*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderImageInt64Atomics), structure->shaderImageInt64Atomics);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::sparseImageInt64Atomics), structure->sparseImageInt64Atomics);
             }
         } break;
 
@@ -3732,202 +4246,6 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
             }
         } break;
 
-        // Validation code for VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADER_INTERLOCK_FEATURES_EXT: {  // Covers
-                                                                                          // VUID-VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT-sType-sType
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT);
-                if (!IsExtEnabled(device_extensions.vk_ext_fragment_shader_interlock)) {
-                    skip |= LogError(pnext_vuid, instance, pNext_loc,
-                                     "includes a pointer to a VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT, but when "
-                                     "creating VkDevice, the parent extension "
-                                     "(VK_EXT_fragment_shader_interlock) was not included in ppEnabledExtensionNames.");
-                }
-                VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT* structure =
-                    (VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT*)header;
-                skip |=
-                    ValidateBool32(pNext_loc.dot(Field::fragmentShaderSampleInterlock), structure->fragmentShaderSampleInterlock);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::fragmentShaderPixelInterlock), structure->fragmentShaderPixelInterlock);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::fragmentShaderShadingRateInterlock),
-                                       structure->fragmentShaderShadingRateInterlock);
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceYcbcrImageArraysFeaturesEXT structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_YCBCR_IMAGE_ARRAYS_FEATURES_EXT: {  // Covers
-                                                                                   // VUID-VkPhysicalDeviceYcbcrImageArraysFeaturesEXT-sType-sType
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceYcbcrImageArraysFeaturesEXT);
-                if (!IsExtEnabled(device_extensions.vk_ext_ycbcr_image_arrays)) {
-                    skip |= LogError(pnext_vuid, instance, pNext_loc,
-                                     "includes a pointer to a VkPhysicalDeviceYcbcrImageArraysFeaturesEXT, but when creating "
-                                     "VkDevice, the parent extension "
-                                     "(VK_EXT_ycbcr_image_arrays) was not included in ppEnabledExtensionNames.");
-                }
-                VkPhysicalDeviceYcbcrImageArraysFeaturesEXT* structure = (VkPhysicalDeviceYcbcrImageArraysFeaturesEXT*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::ycbcrImageArrays), structure->ycbcrImageArrays);
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceLineRasterizationFeaturesKHR structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_LINE_RASTERIZATION_FEATURES_KHR: {  // Covers
-                                                                                   // VUID-VkPhysicalDeviceLineRasterizationFeaturesKHR-sType-sType
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceLineRasterizationFeaturesKHR);
-                if (!IsExtEnabled(device_extensions.vk_ext_line_rasterization)) {
-                    skip |= LogError(pnext_vuid, instance, pNext_loc,
-                                     "includes a pointer to a VkPhysicalDeviceLineRasterizationFeaturesKHR, but when creating "
-                                     "VkDevice, the parent extension "
-                                     "(VK_EXT_line_rasterization) was not included in ppEnabledExtensionNames.");
-                }
-                VkPhysicalDeviceLineRasterizationFeaturesKHR* structure = (VkPhysicalDeviceLineRasterizationFeaturesKHR*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::rectangularLines), structure->rectangularLines);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::bresenhamLines), structure->bresenhamLines);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::smoothLines), structure->smoothLines);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::stippledRectangularLines), structure->stippledRectangularLines);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::stippledBresenhamLines), structure->stippledBresenhamLines);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::stippledSmoothLines), structure->stippledSmoothLines);
-            }
-        } break;
-
-        // No Validation code for VkPhysicalDeviceLineRasterizationPropertiesKHR structure members  -- Covers
-        // VUID-VkPhysicalDeviceLineRasterizationPropertiesKHR-sType-sType
-
-        // Validation code for VkPipelineRasterizationLineStateCreateInfoKHR structure members
-        case VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_LINE_STATE_CREATE_INFO_KHR: {  // Covers
-                                                                                     // VUID-VkPipelineRasterizationLineStateCreateInfoKHR-sType-sType
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPipelineRasterizationLineStateCreateInfoKHR);
-                if (!IsExtEnabled(device_extensions.vk_ext_line_rasterization)) {
-                    skip |= LogError(pnext_vuid, instance, pNext_loc,
-                                     "extended struct requires the extensions VK_EXT_line_rasterization");
-                }
-                VkPipelineRasterizationLineStateCreateInfoKHR* structure = (VkPipelineRasterizationLineStateCreateInfoKHR*)header;
-                skip |= ValidateRangedEnum(pNext_loc.dot(Field::lineRasterizationMode), vvl::Enum::VkLineRasterizationModeKHR,
-                                           structure->lineRasterizationMode, kVUIDUndefined);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::stippledLineEnable), structure->stippledLineEnable);
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceShaderAtomicFloatFeaturesEXT structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_FLOAT_FEATURES_EXT: {  // Covers
-                                                                                    // VUID-VkPhysicalDeviceShaderAtomicFloatFeaturesEXT-sType-sType
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceShaderAtomicFloatFeaturesEXT);
-                if (!IsExtEnabled(device_extensions.vk_ext_shader_atomic_float)) {
-                    skip |= LogError(pnext_vuid, instance, pNext_loc,
-                                     "includes a pointer to a VkPhysicalDeviceShaderAtomicFloatFeaturesEXT, but when creating "
-                                     "VkDevice, the parent extension "
-                                     "(VK_EXT_shader_atomic_float) was not included in ppEnabledExtensionNames.");
-                }
-                VkPhysicalDeviceShaderAtomicFloatFeaturesEXT* structure = (VkPhysicalDeviceShaderAtomicFloatFeaturesEXT*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderBufferFloat32Atomics), structure->shaderBufferFloat32Atomics);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderBufferFloat32AtomicAdd), structure->shaderBufferFloat32AtomicAdd);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderBufferFloat64Atomics), structure->shaderBufferFloat64Atomics);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderBufferFloat64AtomicAdd), structure->shaderBufferFloat64AtomicAdd);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderSharedFloat32Atomics), structure->shaderSharedFloat32Atomics);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderSharedFloat32AtomicAdd), structure->shaderSharedFloat32AtomicAdd);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderSharedFloat64Atomics), structure->shaderSharedFloat64Atomics);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderSharedFloat64AtomicAdd), structure->shaderSharedFloat64AtomicAdd);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderImageFloat32Atomics), structure->shaderImageFloat32Atomics);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::shaderImageFloat32AtomicAdd), structure->shaderImageFloat32AtomicAdd);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::sparseImageFloat32Atomics), structure->sparseImageFloat32Atomics);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::sparseImageFloat32AtomicAdd), structure->sparseImageFloat32AtomicAdd);
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceIndexTypeUint8FeaturesKHR structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INDEX_TYPE_UINT8_FEATURES_KHR: {  // Covers
-                                                                                 // VUID-VkPhysicalDeviceIndexTypeUint8FeaturesKHR-sType-sType
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceIndexTypeUint8FeaturesKHR);
-                if (!IsExtEnabled(device_extensions.vk_ext_index_type_uint8)) {
-                    skip |= LogError(pnext_vuid, instance, pNext_loc,
-                                     "includes a pointer to a VkPhysicalDeviceIndexTypeUint8FeaturesKHR, but when creating "
-                                     "VkDevice, the parent extension "
-                                     "(VK_EXT_index_type_uint8) was not included in ppEnabledExtensionNames.");
-                }
-                VkPhysicalDeviceIndexTypeUint8FeaturesKHR* structure = (VkPhysicalDeviceIndexTypeUint8FeaturesKHR*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::indexTypeUint8), structure->indexTypeUint8);
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceExtendedDynamicStateFeaturesEXT structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT: {  // Covers
-                                                                                       // VUID-VkPhysicalDeviceExtendedDynamicStateFeaturesEXT-sType-sType
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceExtendedDynamicStateFeaturesEXT);
-                if (!IsExtEnabled(device_extensions.vk_ext_extended_dynamic_state)) {
-                    skip |= LogError(pnext_vuid, instance, pNext_loc,
-                                     "includes a pointer to a VkPhysicalDeviceExtendedDynamicStateFeaturesEXT, but when creating "
-                                     "VkDevice, the parent extension "
-                                     "(VK_EXT_extended_dynamic_state) was not included in ppEnabledExtensionNames.");
-                }
-                VkPhysicalDeviceExtendedDynamicStateFeaturesEXT* structure =
-                    (VkPhysicalDeviceExtendedDynamicStateFeaturesEXT*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::extendedDynamicState), structure->extendedDynamicState);
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceTexelBufferAlignmentFeaturesEXT structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TEXEL_BUFFER_ALIGNMENT_FEATURES_EXT: {  // Covers
-                                                                                       // VUID-VkPhysicalDeviceTexelBufferAlignmentFeaturesEXT-sType-sType
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceTexelBufferAlignmentFeaturesEXT);
-                if (!IsExtEnabled(device_extensions.vk_ext_texel_buffer_alignment)) {
-                    skip |= LogError(pnext_vuid, instance, pNext_loc,
-                                     "includes a pointer to a VkPhysicalDeviceTexelBufferAlignmentFeaturesEXT, but when creating "
-                                     "VkDevice, the parent extension "
-                                     "(VK_EXT_texel_buffer_alignment) was not included in ppEnabledExtensionNames.");
-                }
-                VkPhysicalDeviceTexelBufferAlignmentFeaturesEXT* structure =
-                    (VkPhysicalDeviceTexelBufferAlignmentFeaturesEXT*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::texelBufferAlignment), structure->texelBufferAlignment);
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceRobustness2FeaturesEXT structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT: {  // Covers
-                                                                             // VUID-VkPhysicalDeviceRobustness2FeaturesEXT-sType-sType
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceRobustness2FeaturesEXT);
-                if (!IsExtEnabled(device_extensions.vk_ext_robustness2)) {
-                    skip |= LogError(pnext_vuid, instance, pNext_loc,
-                                     "includes a pointer to a VkPhysicalDeviceRobustness2FeaturesEXT, but when creating VkDevice, "
-                                     "the parent extension "
-                                     "(VK_EXT_robustness2) was not included in ppEnabledExtensionNames.");
-                }
-                VkPhysicalDeviceRobustness2FeaturesEXT* structure = (VkPhysicalDeviceRobustness2FeaturesEXT*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::robustBufferAccess2), structure->robustBufferAccess2);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::robustImageAccess2), structure->robustImageAccess2);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::nullDescriptor), structure->nullDescriptor);
-            }
-        } break;
-
-        // No Validation code for VkPhysicalDeviceRobustness2PropertiesEXT structure members  -- Covers
-        // VUID-VkPhysicalDeviceRobustness2PropertiesEXT-sType-sType
-
         // Validation code for VkSamplerCustomBorderColorCreateInfoEXT structure members
         case VK_STRUCTURE_TYPE_SAMPLER_CUSTOM_BORDER_COLOR_CREATE_INFO_EXT: {  // Covers
                                                                                // VUID-VkSamplerCustomBorderColorCreateInfoEXT-sType-sType
@@ -3942,80 +4260,6 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                                            "VUID-VkSamplerCustomBorderColorCreateInfoEXT-format-parameter");
             }
         } break;
-
-        // No Validation code for VkPhysicalDeviceCustomBorderColorPropertiesEXT structure members  -- Covers
-        // VUID-VkPhysicalDeviceCustomBorderColorPropertiesEXT-sType-sType
-
-        // Validation code for VkPhysicalDeviceCustomBorderColorFeaturesEXT structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_CUSTOM_BORDER_COLOR_FEATURES_EXT: {  // Covers
-                                                                                    // VUID-VkPhysicalDeviceCustomBorderColorFeaturesEXT-sType-sType
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceCustomBorderColorFeaturesEXT);
-                if (!IsExtEnabled(device_extensions.vk_ext_custom_border_color)) {
-                    skip |= LogError(pnext_vuid, instance, pNext_loc,
-                                     "includes a pointer to a VkPhysicalDeviceCustomBorderColorFeaturesEXT, but when creating "
-                                     "VkDevice, the parent extension "
-                                     "(VK_EXT_custom_border_color) was not included in ppEnabledExtensionNames.");
-                }
-                VkPhysicalDeviceCustomBorderColorFeaturesEXT* structure = (VkPhysicalDeviceCustomBorderColorFeaturesEXT*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::customBorderColors), structure->customBorderColors);
-
-                skip |=
-                    ValidateBool32(pNext_loc.dot(Field::customBorderColorWithoutFormat), structure->customBorderColorWithoutFormat);
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceYcbcr2Plane444FormatsFeaturesEXT structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_YCBCR_2_PLANE_444_FORMATS_FEATURES_EXT: {  // Covers
-                                                                                          // VUID-VkPhysicalDeviceYcbcr2Plane444FormatsFeaturesEXT-sType-sType
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceYcbcr2Plane444FormatsFeaturesEXT);
-                if (!IsExtEnabled(device_extensions.vk_ext_ycbcr_2plane_444_formats)) {
-                    skip |= LogError(pnext_vuid, instance, pNext_loc,
-                                     "includes a pointer to a VkPhysicalDeviceYcbcr2Plane444FormatsFeaturesEXT, but when creating "
-                                     "VkDevice, the parent extension "
-                                     "(VK_EXT_ycbcr_2plane_444_formats) was not included in ppEnabledExtensionNames.");
-                }
-                VkPhysicalDeviceYcbcr2Plane444FormatsFeaturesEXT* structure =
-                    (VkPhysicalDeviceYcbcr2Plane444FormatsFeaturesEXT*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::ycbcr2plane444Formats), structure->ycbcr2plane444Formats);
-            }
-        } break;
-
-        // Validation code for VkPhysicalDevice4444FormatsFeaturesEXT structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_4444_FORMATS_FEATURES_EXT: {  // Covers
-                                                                             // VUID-VkPhysicalDevice4444FormatsFeaturesEXT-sType-sType
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDevice4444FormatsFeaturesEXT);
-                if (!IsExtEnabled(device_extensions.vk_ext_4444_formats)) {
-                    skip |= LogError(pnext_vuid, instance, pNext_loc,
-                                     "includes a pointer to a VkPhysicalDevice4444FormatsFeaturesEXT, but when creating VkDevice, "
-                                     "the parent extension "
-                                     "(VK_EXT_4444_formats) was not included in ppEnabledExtensionNames.");
-                }
-                VkPhysicalDevice4444FormatsFeaturesEXT* structure = (VkPhysicalDevice4444FormatsFeaturesEXT*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::formatA4R4G4B4), structure->formatA4R4G4B4);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::formatA4B4G4R4), structure->formatA4B4G4R4);
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_INPUT_DYNAMIC_STATE_FEATURES_EXT: {  // Covers
-                                                                                           // VUID-VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT-sType-sType
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT);
-                if (!IsExtEnabled(device_extensions.vk_ext_vertex_input_dynamic_state)) {
-                    skip |= LogError(pnext_vuid, instance, pNext_loc,
-                                     "includes a pointer to a VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT, but when "
-                                     "creating VkDevice, the parent extension "
-                                     "(VK_EXT_vertex_input_dynamic_state) was not included in ppEnabledExtensionNames.");
-                }
-                VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT* structure =
-                    (VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::vertexInputDynamicState), structure->vertexInputDynamicState);
-            }
-        } break;
 #ifdef VK_USE_PLATFORM_SCI
 
         // No Validation code for VkExportFenceSciSyncInfoNV structure members  -- Covers
@@ -4023,28 +4267,6 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
 
         // No Validation code for VkExportSemaphoreSciSyncInfoNV structure members  -- Covers
         // VUID-VkExportSemaphoreSciSyncInfoNV-sType-sType
-
-        // Validation code for VkPhysicalDeviceExternalSciSyncFeaturesNV structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_SCI_SYNC_FEATURES_NV: {  // Covers
-                                                                                 // VUID-VkPhysicalDeviceExternalSciSyncFeaturesNV-sType-sType
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceExternalSciSyncFeaturesNV);
-                if (!IsExtEnabled(device_extensions.vk_nv_external_sci_sync)) {
-                    skip |= LogError(pnext_vuid, instance, pNext_loc,
-                                     "includes a pointer to a VkPhysicalDeviceExternalSciSyncFeaturesNV, but when creating "
-                                     "VkDevice, the parent extension "
-                                     "(VK_NV_external_sci_sync) was not included in ppEnabledExtensionNames.");
-                }
-                VkPhysicalDeviceExternalSciSyncFeaturesNV* structure = (VkPhysicalDeviceExternalSciSyncFeaturesNV*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::sciSyncFence), structure->sciSyncFence);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::sciSyncSemaphore), structure->sciSyncSemaphore);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::sciSyncImport), structure->sciSyncImport);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::sciSyncExport), structure->sciSyncExport);
-            }
-        } break;
 
         // No Validation code for VkExportMemorySciBufInfoNV structure members  -- Covers
         // VUID-VkExportMemorySciBufInfoNV-sType-sType
@@ -4064,63 +4286,7 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                                       "VUID-VkImportMemorySciBufInfoNV-handleType-parameter");
             }
         } break;
-
-        // Validation code for VkPhysicalDeviceExternalMemorySciBufFeaturesNV structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_MEMORY_SCI_BUF_FEATURES_NV: {  // Covers
-                                                                                       // VUID-VkPhysicalDeviceExternalMemorySciBufFeaturesNV-sType-sType
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceExternalMemorySciBufFeaturesNV);
-                if (!IsExtEnabled(device_extensions.vk_nv_external_memory_sci_buf)) {
-                    skip |= LogError(pnext_vuid, instance, pNext_loc,
-                                     "includes a pointer to a VkPhysicalDeviceExternalMemorySciBufFeaturesNV, but when creating "
-                                     "VkDevice, the parent extension "
-                                     "(VK_NV_external_memory_sci_buf) was not included in ppEnabledExtensionNames.");
-                }
-                VkPhysicalDeviceExternalMemorySciBufFeaturesNV* structure = (VkPhysicalDeviceExternalMemorySciBufFeaturesNV*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::sciBufImport), structure->sciBufImport);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::sciBufExport), structure->sciBufExport);
-            }
-        } break;
 #endif  // VK_USE_PLATFORM_SCI
-
-        // Validation code for VkPhysicalDeviceExtendedDynamicState2FeaturesEXT structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_2_FEATURES_EXT: {  // Covers
-                                                                                         // VUID-VkPhysicalDeviceExtendedDynamicState2FeaturesEXT-sType-sType
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceExtendedDynamicState2FeaturesEXT);
-                if (!IsExtEnabled(device_extensions.vk_ext_extended_dynamic_state2)) {
-                    skip |= LogError(pnext_vuid, instance, pNext_loc,
-                                     "includes a pointer to a VkPhysicalDeviceExtendedDynamicState2FeaturesEXT, but when creating "
-                                     "VkDevice, the parent extension "
-                                     "(VK_EXT_extended_dynamic_state2) was not included in ppEnabledExtensionNames.");
-                }
-                VkPhysicalDeviceExtendedDynamicState2FeaturesEXT* structure =
-                    (VkPhysicalDeviceExtendedDynamicState2FeaturesEXT*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::extendedDynamicState2), structure->extendedDynamicState2);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::extendedDynamicState2LogicOp), structure->extendedDynamicState2LogicOp);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::extendedDynamicState2PatchControlPoints),
-                                       structure->extendedDynamicState2PatchControlPoints);
-            }
-        } break;
-
-        // Validation code for VkPhysicalDeviceColorWriteEnableFeaturesEXT structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COLOR_WRITE_ENABLE_FEATURES_EXT: {  // Covers
-                                                                                   // VUID-VkPhysicalDeviceColorWriteEnableFeaturesEXT-sType-sType
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceColorWriteEnableFeaturesEXT);
-                if (!IsExtEnabled(device_extensions.vk_ext_color_write_enable)) {
-                    skip |= LogError(pnext_vuid, instance, pNext_loc,
-                                     "includes a pointer to a VkPhysicalDeviceColorWriteEnableFeaturesEXT, but when creating "
-                                     "VkDevice, the parent extension "
-                                     "(VK_EXT_color_write_enable) was not included in ppEnabledExtensionNames.");
-                }
-                VkPhysicalDeviceColorWriteEnableFeaturesEXT* structure = (VkPhysicalDeviceColorWriteEnableFeaturesEXT*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::colorWriteEnable), structure->colorWriteEnable);
-            }
-        } break;
 
         // Validation code for VkPipelineColorWriteCreateInfoEXT structure members
         case VK_STRUCTURE_TYPE_PIPELINE_COLOR_WRITE_CREATE_INFO_EXT: {  // Covers VUID-VkPipelineColorWriteCreateInfoEXT-sType-sType
@@ -4140,28 +4306,6 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
         // No Validation code for VkApplicationParametersEXT structure members  -- Covers
         // VUID-VkApplicationParametersEXT-sType-sType
 #ifdef VK_USE_PLATFORM_SCI
-
-        // Validation code for VkPhysicalDeviceExternalSciSync2FeaturesNV structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_SCI_SYNC_2_FEATURES_NV: {  // Covers
-                                                                                   // VUID-VkPhysicalDeviceExternalSciSync2FeaturesNV-sType-sType
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkPhysicalDeviceExternalSciSync2FeaturesNV);
-                if (!IsExtEnabled(device_extensions.vk_nv_external_sci_sync2)) {
-                    skip |= LogError(pnext_vuid, instance, pNext_loc,
-                                     "includes a pointer to a VkPhysicalDeviceExternalSciSync2FeaturesNV, but when creating "
-                                     "VkDevice, the parent extension "
-                                     "(VK_NV_external_sci_sync2) was not included in ppEnabledExtensionNames.");
-                }
-                VkPhysicalDeviceExternalSciSync2FeaturesNV* structure = (VkPhysicalDeviceExternalSciSync2FeaturesNV*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::sciSyncFence), structure->sciSyncFence);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::sciSyncSemaphore2), structure->sciSyncSemaphore2);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::sciSyncImport), structure->sciSyncImport);
-
-                skip |= ValidateBool32(pNext_loc.dot(Field::sciSyncExport), structure->sciSyncExport);
-            }
-        } break;
 
         // Validation code for VkSemaphoreSciSyncCreateInfoNV structure members
         case VK_STRUCTURE_TYPE_SEMAPHORE_SCI_SYNC_CREATE_INFO_NV: {  // Covers VUID-VkSemaphoreSciSyncCreateInfoNV-sType-sType
@@ -4191,24 +4335,6 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
         // VUID-VkImportScreenBufferInfoQNX-sType-sType
 
         // No Validation code for VkExternalFormatQNX structure members  -- Covers VUID-VkExternalFormatQNX-sType-sType
-
-        // Validation code for VkPhysicalDeviceExternalMemoryScreenBufferFeaturesQNX structure members
-        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_MEMORY_SCREEN_BUFFER_FEATURES_QNX: {  // Covers
-                                                                                              // VUID-VkPhysicalDeviceExternalMemoryScreenBufferFeaturesQNX-sType-sType
-            if (is_const_param) {
-                [[maybe_unused]] const Location pNext_loc =
-                    loc.pNext(Struct::VkPhysicalDeviceExternalMemoryScreenBufferFeaturesQNX);
-                if (!IsExtEnabled(device_extensions.vk_qnx_external_memory_screen_buffer)) {
-                    skip |= LogError(pnext_vuid, instance, pNext_loc,
-                                     "includes a pointer to a VkPhysicalDeviceExternalMemoryScreenBufferFeaturesQNX, but when "
-                                     "creating VkDevice, the parent extension "
-                                     "(VK_QNX_external_memory_screen_buffer) was not included in ppEnabledExtensionNames.");
-                }
-                VkPhysicalDeviceExternalMemoryScreenBufferFeaturesQNX* structure =
-                    (VkPhysicalDeviceExternalMemoryScreenBufferFeaturesQNX*)header;
-                skip |= ValidateBool32(pNext_loc.dot(Field::screenBufferImport), structure->screenBufferImport);
-            }
-        } break;
 #endif  // VK_USE_PLATFORM_SCREEN_QNX
 
         default:
@@ -4433,6 +4559,7 @@ bool StatelessValidation::PreCallValidateCreateDevice(VkPhysicalDevice physicalD
             VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
             VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADER_INTERLOCK_FEATURES_EXT,
             VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_FEATURES_KHR,
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_GLOBAL_PRIORITY_QUERY_FEATURES_KHR,
             VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES,
             VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_ROBUSTNESS_FEATURES,
             VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGELESS_FRAMEBUFFER_FEATURES,
@@ -5570,8 +5697,8 @@ bool StatelessValidation::PreCallValidateCreatePipelineLayout(VkDevice device, c
                                "VUID-vkCreatePipelineLayout-pCreateInfo-parameter", "VUID-VkPipelineLayoutCreateInfo-sType-sType");
     if (pCreateInfo != nullptr) {
         [[maybe_unused]] const Location pCreateInfo_loc = loc.dot(Field::pCreateInfo);
-        skip |= ValidateStructPnext(pCreateInfo_loc, pCreateInfo->pNext, 0, nullptr, GeneratedVulkanHeaderVersion,
-                                    "VUID-VkPipelineLayoutCreateInfo-pNext-pNext", kVUIDUndefined, VK_NULL_HANDLE, true);
+        skip |= ValidateStructPnext(pCreateInfo_loc, pCreateInfo->pNext, 0, nullptr, GeneratedVulkanHeaderVersion, kVUIDUndefined,
+                                    kVUIDUndefined, VK_NULL_HANDLE, true);
 
         skip |= ValidateReservedFlags(pCreateInfo_loc.dot(Field::flags), pCreateInfo->flags,
                                       "VUID-VkPipelineLayoutCreateInfo-flags-zerobitmask");
@@ -7299,7 +7426,7 @@ bool StatelessValidation::PreCallValidateGetPhysicalDeviceProperties2(VkPhysical
             VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_SIZE_CONTROL_PROPERTIES,
             VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TEXEL_BUFFER_ALIGNMENT_PROPERTIES,
             VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_PROPERTIES,
-            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_ATTRIBUTE_DIVISOR_PROPERTIES_EXT,
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_ATTRIBUTE_DIVISOR_PROPERTIES_KHR,
             VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_PROPERTIES,
             VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_PROPERTIES,
             VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_PROPERTIES,
@@ -7428,7 +7555,8 @@ bool StatelessValidation::PreCallValidateGetPhysicalDeviceQueueFamilyProperties2
             [[maybe_unused]] const Location pQueueFamilyProperties_loc =
                 loc.dot(Field::pQueueFamilyProperties, pQueueFamilyPropertyIndex);
             constexpr std::array allowed_structs_VkQueueFamilyProperties2 = {
-                VK_STRUCTURE_TYPE_QUEUE_FAMILY_CHECKPOINT_PROPERTIES_2_NV};
+                VK_STRUCTURE_TYPE_QUEUE_FAMILY_CHECKPOINT_PROPERTIES_2_NV,
+                VK_STRUCTURE_TYPE_QUEUE_FAMILY_GLOBAL_PRIORITY_PROPERTIES_KHR};
 
             skip |= ValidateStructPnext(pQueueFamilyProperties_loc, pQueueFamilyProperties[pQueueFamilyPropertyIndex].pNext,
                                         allowed_structs_VkQueueFamilyProperties2.size(),
@@ -7730,6 +7858,7 @@ bool StatelessValidation::PreCallValidateGetDescriptorSetLayoutSupport(VkDevice 
                                     "VUID-VkDescriptorSetLayoutSupport-pNext-pNext",
                                     "VUID-VkDescriptorSetLayoutSupport-sType-unique", VK_NULL_HANDLE, false);
     }
+    if (!skip) skip |= manual_PreCallValidateGetDescriptorSetLayoutSupport(device, pCreateInfo, pSupport, error_obj);
     return skip;
 }
 
@@ -10933,6 +11062,63 @@ bool StatelessValidation::PreCallValidateCmdResolveImage2KHR(VkCommandBuffer com
     return skip;
 }
 
+bool StatelessValidation::PreCallValidateCmdSetLineStippleKHR(VkCommandBuffer commandBuffer, uint32_t lineStippleFactor,
+                                                              uint16_t lineStipplePattern, const ErrorObject& error_obj) const {
+    bool skip = false;
+    [[maybe_unused]] const Location loc = error_obj.location;
+    if (!IsExtEnabled(device_extensions.vk_khr_line_rasterization) && loc.function == vvl::Func::vkCmdSetLineStippleKHR)
+        skip |= OutputExtensionError(loc, {vvl::Extension::_VK_KHR_line_rasterization});
+    // No xml-driven validation
+    if (!skip) skip |= manual_PreCallValidateCmdSetLineStippleKHR(commandBuffer, lineStippleFactor, lineStipplePattern, error_obj);
+    return skip;
+}
+
+bool StatelessValidation::PreCallValidateGetPhysicalDeviceCalibrateableTimeDomainsKHR(VkPhysicalDevice physicalDevice,
+                                                                                      uint32_t* pTimeDomainCount,
+                                                                                      VkTimeDomainKHR* pTimeDomains,
+                                                                                      const ErrorObject& error_obj) const {
+    bool skip = false;
+    [[maybe_unused]] const Location loc = error_obj.location;
+    skip |=
+        ValidatePointerArray(loc.dot(Field::pTimeDomainCount), loc.dot(Field::pTimeDomains), pTimeDomainCount, &pTimeDomains, true,
+                             false, false, "VUID-vkGetPhysicalDeviceCalibrateableTimeDomainsKHR-pTimeDomainCount-parameter",
+                             kVUIDUndefined, "VUID-vkGetPhysicalDeviceCalibrateableTimeDomainsKHR-pTimeDomains-parameter");
+    return skip;
+}
+
+bool StatelessValidation::PreCallValidateGetCalibratedTimestampsKHR(VkDevice device, uint32_t timestampCount,
+                                                                    const VkCalibratedTimestampInfoKHR* pTimestampInfos,
+                                                                    uint64_t* pTimestamps, uint64_t* pMaxDeviation,
+                                                                    const ErrorObject& error_obj) const {
+    bool skip = false;
+    [[maybe_unused]] const Location loc = error_obj.location;
+    if (!IsExtEnabled(device_extensions.vk_khr_calibrated_timestamps))
+        skip |= OutputExtensionError(loc, {vvl::Extension::_VK_KHR_calibrated_timestamps});
+    skip |= ValidateStructTypeArray(
+        loc.dot(Field::timestampCount), loc.dot(Field::pTimestampInfos), "VK_STRUCTURE_TYPE_CALIBRATED_TIMESTAMP_INFO_KHR",
+        timestampCount, pTimestampInfos, VK_STRUCTURE_TYPE_CALIBRATED_TIMESTAMP_INFO_KHR, true, true,
+        "VUID-VkCalibratedTimestampInfoKHR-sType-sType", "VUID-vkGetCalibratedTimestampsKHR-pTimestampInfos-parameter",
+        "VUID-vkGetCalibratedTimestampsKHR-timestampCount-arraylength");
+    if (pTimestampInfos != nullptr) {
+        for (uint32_t timestampIndex = 0; timestampIndex < timestampCount; ++timestampIndex) {
+            [[maybe_unused]] const Location pTimestampInfos_loc = loc.dot(Field::pTimestampInfos, timestampIndex);
+            skip |= ValidateStructPnext(pTimestampInfos_loc, pTimestampInfos[timestampIndex].pNext, 0, nullptr,
+                                        GeneratedVulkanHeaderVersion, "VUID-VkCalibratedTimestampInfoKHR-pNext-pNext",
+                                        kVUIDUndefined, VK_NULL_HANDLE, true);
+
+            skip |= ValidateRangedEnum(pTimestampInfos_loc.dot(Field::timeDomain), vvl::Enum::VkTimeDomainKHR,
+                                       pTimestampInfos[timestampIndex].timeDomain,
+                                       "VUID-VkCalibratedTimestampInfoKHR-timeDomain-parameter");
+        }
+    }
+    skip |= ValidateArray(loc.dot(Field::timestampCount), loc.dot(Field::pTimestamps), timestampCount, &pTimestamps, true, true,
+                          "VUID-vkGetCalibratedTimestampsKHR-timestampCount-arraylength",
+                          "VUID-vkGetCalibratedTimestampsKHR-pTimestamps-parameter");
+    skip |= ValidateRequiredPointer(loc.dot(Field::pMaxDeviation), pMaxDeviation,
+                                    "VUID-vkGetCalibratedTimestampsKHR-pMaxDeviation-parameter");
+    return skip;
+}
+
 bool StatelessValidation::PreCallValidateReleaseDisplayEXT(VkPhysicalDevice physicalDevice, VkDisplayKHR display,
                                                            const ErrorObject& error_obj) const {
     bool skip = false;
@@ -11530,50 +11716,6 @@ bool StatelessValidation::PreCallValidateGetMemoryHostPointerPropertiesEXT(
     return skip;
 }
 
-bool StatelessValidation::PreCallValidateGetPhysicalDeviceCalibrateableTimeDomainsEXT(VkPhysicalDevice physicalDevice,
-                                                                                      uint32_t* pTimeDomainCount,
-                                                                                      VkTimeDomainKHR* pTimeDomains,
-                                                                                      const ErrorObject& error_obj) const {
-    bool skip = false;
-    [[maybe_unused]] const Location loc = error_obj.location;
-    skip |=
-        ValidatePointerArray(loc.dot(Field::pTimeDomainCount), loc.dot(Field::pTimeDomains), pTimeDomainCount, &pTimeDomains, true,
-                             false, false, "VUID-vkGetPhysicalDeviceCalibrateableTimeDomainsEXT-pTimeDomainCount-parameter",
-                             kVUIDUndefined, "VUID-vkGetPhysicalDeviceCalibrateableTimeDomainsEXT-pTimeDomains-parameter");
-    return skip;
-}
-
-bool StatelessValidation::PreCallValidateGetCalibratedTimestampsEXT(VkDevice device, uint32_t timestampCount,
-                                                                    const VkCalibratedTimestampInfoKHR* pTimestampInfos,
-                                                                    uint64_t* pTimestamps, uint64_t* pMaxDeviation,
-                                                                    const ErrorObject& error_obj) const {
-    bool skip = false;
-    [[maybe_unused]] const Location loc = error_obj.location;
-    if (!IsExtEnabled(device_extensions.vk_ext_calibrated_timestamps))
-        skip |= OutputExtensionError(loc, {vvl::Extension::_VK_EXT_calibrated_timestamps});
-    skip |= ValidateStructTypeArray(loc.dot(Field::timestampCount), loc.dot(Field::pTimestampInfos),
-                                    "VK_STRUCTURE_TYPE_CALIBRATED_TIMESTAMP_INFO_KHR", timestampCount, pTimestampInfos,
-                                    VK_STRUCTURE_TYPE_CALIBRATED_TIMESTAMP_INFO_KHR, true, true, kVUIDUndefined,
-                                    "VUID-vkGetCalibratedTimestampsEXT-pTimestampInfos-parameter",
-                                    "VUID-vkGetCalibratedTimestampsEXT-timestampCount-arraylength");
-    if (pTimestampInfos != nullptr) {
-        for (uint32_t timestampIndex = 0; timestampIndex < timestampCount; ++timestampIndex) {
-            [[maybe_unused]] const Location pTimestampInfos_loc = loc.dot(Field::pTimestampInfos, timestampIndex);
-            skip |= ValidateStructPnext(pTimestampInfos_loc, pTimestampInfos[timestampIndex].pNext, 0, nullptr,
-                                        GeneratedVulkanHeaderVersion, kVUIDUndefined, kVUIDUndefined, VK_NULL_HANDLE, true);
-
-            skip |= ValidateRangedEnum(pTimestampInfos_loc.dot(Field::timeDomain), vvl::Enum::VkTimeDomainKHR,
-                                       pTimestampInfos[timestampIndex].timeDomain, kVUIDUndefined);
-        }
-    }
-    skip |= ValidateArray(loc.dot(Field::timestampCount), loc.dot(Field::pTimestamps), timestampCount, &pTimestamps, true, true,
-                          "VUID-vkGetCalibratedTimestampsEXT-timestampCount-arraylength",
-                          "VUID-vkGetCalibratedTimestampsEXT-pTimestamps-parameter");
-    skip |= ValidateRequiredPointer(loc.dot(Field::pMaxDeviation), pMaxDeviation,
-                                    "VUID-vkGetCalibratedTimestampsEXT-pMaxDeviation-parameter");
-    return skip;
-}
-
 bool StatelessValidation::PreCallValidateCreateHeadlessSurfaceEXT(VkInstance instance,
                                                                   const VkHeadlessSurfaceCreateInfoEXT* pCreateInfo,
                                                                   const VkAllocationCallbacks* pAllocator, VkSurfaceKHR* pSurface,
@@ -11607,8 +11749,7 @@ bool StatelessValidation::PreCallValidateCmdSetLineStippleEXT(VkCommandBuffer co
     [[maybe_unused]] const Location loc = error_obj.location;
     if (!IsExtEnabled(device_extensions.vk_ext_line_rasterization))
         skip |= OutputExtensionError(loc, {vvl::Extension::_VK_EXT_line_rasterization});
-    // No xml-driven validation
-    if (!skip) skip |= manual_PreCallValidateCmdSetLineStippleKHR(commandBuffer, lineStippleFactor, lineStipplePattern, error_obj);
+    skip |= PreCallValidateCmdSetLineStippleKHR(commandBuffer, lineStippleFactor, lineStipplePattern, error_obj);
     return skip;
 }
 
@@ -11739,6 +11880,24 @@ bool StatelessValidation::PreCallValidateCmdSetStencilOpEXT(VkCommandBuffer comm
     skip |= PreCallValidateCmdSetStencilOp(commandBuffer, faceMask, failOp, passOp, depthFailOp, compareOp, error_obj);
     return skip;
 }
+
+#ifdef VK_USE_PLATFORM_WIN32_KHR
+bool StatelessValidation::PreCallValidateAcquireWinrtDisplayNV(VkPhysicalDevice physicalDevice, VkDisplayKHR display,
+                                                               const ErrorObject& error_obj) const {
+    bool skip = false;
+    [[maybe_unused]] const Location loc = error_obj.location;
+    skip |= ValidateRequiredHandle(loc.dot(Field::display), display);
+    return skip;
+}
+
+bool StatelessValidation::PreCallValidateGetWinrtDisplayNV(VkPhysicalDevice physicalDevice, uint32_t deviceRelativeId,
+                                                           VkDisplayKHR* pDisplay, const ErrorObject& error_obj) const {
+    bool skip = false;
+    [[maybe_unused]] const Location loc = error_obj.location;
+    skip |= ValidateRequiredPointer(loc.dot(Field::pDisplay), pDisplay, "VUID-vkGetWinrtDisplayNV-pDisplay-parameter");
+    return skip;
+}
+#endif  // VK_USE_PLATFORM_WIN32_KHR
 
 bool StatelessValidation::PreCallValidateCmdSetVertexInputEXT(
     VkCommandBuffer commandBuffer, uint32_t vertexBindingDescriptionCount,

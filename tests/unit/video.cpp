@@ -32,7 +32,7 @@ TEST_F(NegativeVideo, VideoCodingScope) {
     cb.begin();
     cb.BeginVideoCoding(context.Begin());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkEndCommandBuffer-None-06991");
+    m_errorMonitor->SetDesiredError("VUID-vkEndCommandBuffer-None-06991");
     vk::EndCommandBuffer(cb.handle());
     m_errorMonitor->VerifyFound();
 
@@ -42,7 +42,7 @@ TEST_F(NegativeVideo, VideoCodingScope) {
     // vkCmdEndVideoCoding not allowed outside video coding block
     cb.begin();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEndVideoCodingKHR-videocoding");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEndVideoCodingKHR-videocoding");
     cb.EndVideoCoding(context.End());
     m_errorMonitor->VerifyFound();
 
@@ -52,7 +52,7 @@ TEST_F(NegativeVideo, VideoCodingScope) {
     cb.begin();
     cb.BeginVideoCoding(context.Begin());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBeginVideoCodingKHR-videocoding");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdBeginVideoCodingKHR-videocoding");
     cb.BeginVideoCoding(context.Begin());
     m_errorMonitor->VerifyFound();
 
@@ -62,7 +62,7 @@ TEST_F(NegativeVideo, VideoCodingScope) {
     // vkCmdControlVideoCoding not allowed outside video coding block
     cb.begin();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdControlVideoCodingKHR-videocoding");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdControlVideoCodingKHR-videocoding");
     cb.ControlVideoCoding(context.Control().Reset());
     m_errorMonitor->VerifyFound();
 
@@ -82,21 +82,21 @@ TEST_F(NegativeVideo, VideoProfileInvalidLumaChromaSubsampling) {
     VkVideoProfileInfoKHR profile;
 
     // Multiple bits in chromaSubsampling
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoProfileInfoKHR-chromaSubsampling-07013");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoProfileInfoKHR-chromaSubsampling-07013");
     profile = *config.Profile();
     profile.chromaSubsampling = VK_VIDEO_CHROMA_SUBSAMPLING_420_BIT_KHR | VK_VIDEO_CHROMA_SUBSAMPLING_422_BIT_KHR;
     vk.GetPhysicalDeviceVideoCapabilitiesKHR(gpu(), &profile, config.Caps());
     m_errorMonitor->VerifyFound();
 
     // Multiple bits in lumaBitDepth
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoProfileInfoKHR-lumaBitDepth-07014");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoProfileInfoKHR-lumaBitDepth-07014");
     profile = *config.Profile();
     profile.lumaBitDepth = VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR | VK_VIDEO_COMPONENT_BIT_DEPTH_10_BIT_KHR;
     vk.GetPhysicalDeviceVideoCapabilitiesKHR(gpu(), &profile, config.Caps());
     m_errorMonitor->VerifyFound();
 
     // Multiple bits in chromaBitDepth
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoProfileInfoKHR-chromaSubsampling-07015");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoProfileInfoKHR-chromaSubsampling-07015");
     profile = *config.Profile();
     profile.chromaSubsampling = VK_VIDEO_CHROMA_SUBSAMPLING_420_BIT_KHR;
     profile.chromaBitDepth = VK_VIDEO_COMPONENT_BIT_DEPTH_8_BIT_KHR | VK_VIDEO_COMPONENT_BIT_DEPTH_10_BIT_KHR;
@@ -118,7 +118,7 @@ TEST_F(NegativeVideo, VideoProfileMissingCodecInfo) {
         profile.pNext = nullptr;
 
         // Missing codec-specific info for H.264 decode profile
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoProfileInfoKHR-videoCodecOperation-07179");
+        m_errorMonitor->SetDesiredError("VUID-VkVideoProfileInfoKHR-videoCodecOperation-07179");
         vk.GetPhysicalDeviceVideoCapabilitiesKHR(gpu(), &profile, config.Caps());
         m_errorMonitor->VerifyFound();
     }
@@ -130,7 +130,7 @@ TEST_F(NegativeVideo, VideoProfileMissingCodecInfo) {
         profile.pNext = nullptr;
 
         // Missing codec-specific info for H.265 decode profile
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoProfileInfoKHR-videoCodecOperation-07180");
+        m_errorMonitor->SetDesiredError("VUID-VkVideoProfileInfoKHR-videoCodecOperation-07180");
         vk.GetPhysicalDeviceVideoCapabilitiesKHR(gpu(), &profile, config.Caps());
         m_errorMonitor->VerifyFound();
     }
@@ -142,7 +142,7 @@ TEST_F(NegativeVideo, VideoProfileMissingCodecInfo) {
         profile.pNext = nullptr;
 
         // Missing codec-specific info for AV1 decode profile
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoProfileInfoKHR-videoCodecOperation-09256");
+        m_errorMonitor->SetDesiredError("VUID-VkVideoProfileInfoKHR-videoCodecOperation-09256");
         vk.GetPhysicalDeviceVideoCapabilitiesKHR(gpu(), &profile, config.Caps());
         m_errorMonitor->VerifyFound();
     }
@@ -154,7 +154,7 @@ TEST_F(NegativeVideo, VideoProfileMissingCodecInfo) {
         profile.pNext = nullptr;
 
         // Missing codec-specific info for H.264 encode profile
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoProfileInfoKHR-videoCodecOperation-07181");
+        m_errorMonitor->SetDesiredError("VUID-VkVideoProfileInfoKHR-videoCodecOperation-07181");
         vk.GetPhysicalDeviceVideoCapabilitiesKHR(gpu(), &profile, config.Caps());
         m_errorMonitor->VerifyFound();
     }
@@ -166,7 +166,7 @@ TEST_F(NegativeVideo, VideoProfileMissingCodecInfo) {
         profile.pNext = nullptr;
 
         // Missing codec-specific info for H.265 encode profile
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoProfileInfoKHR-videoCodecOperation-07182");
+        m_errorMonitor->SetDesiredError("VUID-VkVideoProfileInfoKHR-videoCodecOperation-07182");
         vk.GetPhysicalDeviceVideoCapabilitiesKHR(gpu(), &profile, config.Caps());
         m_errorMonitor->VerifyFound();
     }
@@ -185,13 +185,13 @@ TEST_F(NegativeVideo, CapabilityQueryMissingChain) {
         auto decode_h264_caps = vku::InitStruct<VkVideoDecodeH264CapabilitiesKHR>();
 
         // Missing decode caps struct for decode profile
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetPhysicalDeviceVideoCapabilitiesKHR-pVideoProfile-07183");
+        m_errorMonitor->SetDesiredError("VUID-vkGetPhysicalDeviceVideoCapabilitiesKHR-pVideoProfile-07183");
         caps.pNext = &decode_h264_caps;
         vk.GetPhysicalDeviceVideoCapabilitiesKHR(gpu(), config.Profile(), &caps);
         m_errorMonitor->VerifyFound();
 
         // Missing H.264 decode caps struct for H.264 decode profile
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetPhysicalDeviceVideoCapabilitiesKHR-pVideoProfile-07184");
+        m_errorMonitor->SetDesiredError("VUID-vkGetPhysicalDeviceVideoCapabilitiesKHR-pVideoProfile-07184");
         caps.pNext = &decode_caps;
         vk.GetPhysicalDeviceVideoCapabilitiesKHR(gpu(), config.Profile(), &caps);
         m_errorMonitor->VerifyFound();
@@ -205,13 +205,13 @@ TEST_F(NegativeVideo, CapabilityQueryMissingChain) {
         auto decode_h265_caps = vku::InitStruct<VkVideoDecodeH265CapabilitiesKHR>();
 
         // Missing decode caps struct for decode profile
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetPhysicalDeviceVideoCapabilitiesKHR-pVideoProfile-07183");
+        m_errorMonitor->SetDesiredError("VUID-vkGetPhysicalDeviceVideoCapabilitiesKHR-pVideoProfile-07183");
         caps.pNext = &decode_h265_caps;
         vk.GetPhysicalDeviceVideoCapabilitiesKHR(gpu(), config.Profile(), &caps);
         m_errorMonitor->VerifyFound();
 
         // Missing H.265 decode caps struct for H.265 decode profile
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetPhysicalDeviceVideoCapabilitiesKHR-pVideoProfile-07185");
+        m_errorMonitor->SetDesiredError("VUID-vkGetPhysicalDeviceVideoCapabilitiesKHR-pVideoProfile-07185");
         caps.pNext = &decode_caps;
         vk.GetPhysicalDeviceVideoCapabilitiesKHR(gpu(), config.Profile(), &caps);
         m_errorMonitor->VerifyFound();
@@ -225,13 +225,13 @@ TEST_F(NegativeVideo, CapabilityQueryMissingChain) {
         auto decode_av1_caps = vku::InitStruct<VkVideoDecodeAV1CapabilitiesKHR>();
 
         // Missing decode caps struct for decode profile
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetPhysicalDeviceVideoCapabilitiesKHR-pVideoProfile-07183");
+        m_errorMonitor->SetDesiredError("VUID-vkGetPhysicalDeviceVideoCapabilitiesKHR-pVideoProfile-07183");
         caps.pNext = &decode_av1_caps;
         vk.GetPhysicalDeviceVideoCapabilitiesKHR(gpu(), config.Profile(), &caps);
         m_errorMonitor->VerifyFound();
 
         // Missing AV1 decode caps struct for AV1 decode profile
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetPhysicalDeviceVideoCapabilitiesKHR-pVideoProfile-09257");
+        m_errorMonitor->SetDesiredError("VUID-vkGetPhysicalDeviceVideoCapabilitiesKHR-pVideoProfile-09257");
         caps.pNext = &decode_caps;
         vk.GetPhysicalDeviceVideoCapabilitiesKHR(gpu(), config.Profile(), &caps);
         m_errorMonitor->VerifyFound();
@@ -245,13 +245,13 @@ TEST_F(NegativeVideo, CapabilityQueryMissingChain) {
         auto encode_h264_caps = vku::InitStruct<VkVideoEncodeH264CapabilitiesKHR>();
 
         // Missing encode caps struct for encode profile
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetPhysicalDeviceVideoCapabilitiesKHR-pVideoProfile-07186");
+        m_errorMonitor->SetDesiredError("VUID-vkGetPhysicalDeviceVideoCapabilitiesKHR-pVideoProfile-07186");
         caps.pNext = &encode_h264_caps;
         vk.GetPhysicalDeviceVideoCapabilitiesKHR(gpu(), config.Profile(), &caps);
         m_errorMonitor->VerifyFound();
 
         // Missing H.264 encode caps struct for H.264 encode profile
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetPhysicalDeviceVideoCapabilitiesKHR-pVideoProfile-07187");
+        m_errorMonitor->SetDesiredError("VUID-vkGetPhysicalDeviceVideoCapabilitiesKHR-pVideoProfile-07187");
         caps.pNext = &encode_caps;
         vk.GetPhysicalDeviceVideoCapabilitiesKHR(gpu(), config.Profile(), &caps);
         m_errorMonitor->VerifyFound();
@@ -265,13 +265,13 @@ TEST_F(NegativeVideo, CapabilityQueryMissingChain) {
         auto encode_h265_caps = vku::InitStruct<VkVideoEncodeH265CapabilitiesKHR>();
 
         // Missing encode caps struct for encode profile
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetPhysicalDeviceVideoCapabilitiesKHR-pVideoProfile-07186");
+        m_errorMonitor->SetDesiredError("VUID-vkGetPhysicalDeviceVideoCapabilitiesKHR-pVideoProfile-07186");
         caps.pNext = &encode_h265_caps;
         vk.GetPhysicalDeviceVideoCapabilitiesKHR(gpu(), config.Profile(), &caps);
         m_errorMonitor->VerifyFound();
 
         // Missing H.265 encode caps struct for H.265 encode profile
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetPhysicalDeviceVideoCapabilitiesKHR-pVideoProfile-07188");
+        m_errorMonitor->SetDesiredError("VUID-vkGetPhysicalDeviceVideoCapabilitiesKHR-pVideoProfile-07188");
         caps.pNext = &encode_caps;
         vk.GetPhysicalDeviceVideoCapabilitiesKHR(gpu(), config.Profile(), &caps);
         m_errorMonitor->VerifyFound();
@@ -291,14 +291,14 @@ TEST_F(NegativeVideo, VideoFormatQueryMissingProfile) {
     format_info.imageUsage = VK_IMAGE_USAGE_VIDEO_DECODE_DST_BIT_KHR;
     uint32_t format_count = 0;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetPhysicalDeviceVideoFormatPropertiesKHR-pNext-06812");
+    m_errorMonitor->SetDesiredError("VUID-vkGetPhysicalDeviceVideoFormatPropertiesKHR-pNext-06812");
     vk.GetPhysicalDeviceVideoFormatPropertiesKHR(gpu(), &format_info, &format_count, nullptr);
     m_errorMonitor->VerifyFound();
 
     auto profile_list = vku::InitStruct<VkVideoProfileListInfoKHR>();
     format_info.pNext = &profile_list;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetPhysicalDeviceVideoFormatPropertiesKHR-pNext-06812");
+    m_errorMonitor->SetDesiredError("VUID-vkGetPhysicalDeviceVideoFormatPropertiesKHR-pNext-06812");
     vk.GetPhysicalDeviceVideoFormatPropertiesKHR(gpu(), &format_info, &format_count, nullptr);
     m_errorMonitor->VerifyFound();
 }
@@ -316,7 +316,7 @@ TEST_F(NegativeVideo, EncodeQualityLevelPropsUnsupportedProfile) {
     auto quality_level_info = vku::InitStruct<VkPhysicalDeviceVideoEncodeQualityLevelInfoKHR>();
     quality_level_info.pVideoProfile = config.Profile();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPhysicalDeviceVideoEncodeQualityLevelInfoKHR-pVideoProfile-08259");
+    m_errorMonitor->SetDesiredError("VUID-VkPhysicalDeviceVideoEncodeQualityLevelInfoKHR-pVideoProfile-08259");
     vk.GetPhysicalDeviceVideoEncodeQualityLevelPropertiesKHR(gpu(), &quality_level_info, config.EncodeQualityLevelProps());
     m_errorMonitor->VerifyFound();
 }
@@ -334,7 +334,7 @@ TEST_F(NegativeVideo, EncodeQualityLevelPropsProfileNotEncode) {
     auto quality_level_info = vku::InitStruct<VkPhysicalDeviceVideoEncodeQualityLevelInfoKHR>();
     quality_level_info.pVideoProfile = config.Profile();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPhysicalDeviceVideoEncodeQualityLevelInfoKHR-pVideoProfile-08260");
+    m_errorMonitor->SetDesiredError("VUID-VkPhysicalDeviceVideoEncodeQualityLevelInfoKHR-pVideoProfile-08260");
     vk.GetPhysicalDeviceVideoEncodeQualityLevelPropertiesKHR(gpu(), &quality_level_info, config.EncodeQualityLevelProps());
     m_errorMonitor->VerifyFound();
 }
@@ -353,7 +353,7 @@ TEST_F(NegativeVideo, EncodeQualityLevelPropsInvalidQualityLevel) {
     quality_level_info.pVideoProfile = config.Profile();
     quality_level_info.qualityLevel = config.EncodeCaps()->maxQualityLevels;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPhysicalDeviceVideoEncodeQualityLevelInfoKHR-qualityLevel-08261");
+    m_errorMonitor->SetDesiredError("VUID-VkPhysicalDeviceVideoEncodeQualityLevelInfoKHR-qualityLevel-08261");
     vk.GetPhysicalDeviceVideoEncodeQualityLevelPropertiesKHR(gpu(), &quality_level_info, config.EncodeQualityLevelProps());
     m_errorMonitor->VerifyFound();
 }
@@ -375,7 +375,7 @@ TEST_F(NegativeVideo, EncodeQualityLevelPropsMissingCodecInfo) {
 
         // Missing codec-specific info for H.264 encode profile
         m_errorMonitor->SetAllowedFailureMsg("VUID-VkPhysicalDeviceVideoEncodeQualityLevelInfoKHR-pVideoProfile-08259");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoProfileInfoKHR-videoCodecOperation-07181");
+        m_errorMonitor->SetDesiredError("VUID-VkVideoProfileInfoKHR-videoCodecOperation-07181");
         vk.GetPhysicalDeviceVideoEncodeQualityLevelPropertiesKHR(gpu(), &quality_level_info, config.EncodeQualityLevelProps());
         m_errorMonitor->VerifyFound();
     }
@@ -388,7 +388,7 @@ TEST_F(NegativeVideo, EncodeQualityLevelPropsMissingCodecInfo) {
 
         // Missing codec-specific info for H.265 encode profile
         m_errorMonitor->SetAllowedFailureMsg("VUID-VkPhysicalDeviceVideoEncodeQualityLevelInfoKHR-pVideoProfile-08259");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoProfileInfoKHR-videoCodecOperation-07182");
+        m_errorMonitor->SetDesiredError("VUID-VkVideoProfileInfoKHR-videoCodecOperation-07182");
         vk.GetPhysicalDeviceVideoEncodeQualityLevelPropertiesKHR(gpu(), &quality_level_info, config.EncodeQualityLevelProps());
         m_errorMonitor->VerifyFound();
     }
@@ -407,8 +407,7 @@ TEST_F(NegativeVideo, EncodeQualityLevelPropsMissingChain) {
         quality_level_info.pVideoProfile = config.Profile();
 
         // Missing codec-specific output structure for H.264 encode profile
-        m_errorMonitor->SetDesiredFailureMsg(
-            kErrorBit, "VUID-vkGetPhysicalDeviceVideoEncodeQualityLevelPropertiesKHR-pQualityLevelInfo-08257");
+        m_errorMonitor->SetDesiredError("VUID-vkGetPhysicalDeviceVideoEncodeQualityLevelPropertiesKHR-pQualityLevelInfo-08257");
         vk.GetPhysicalDeviceVideoEncodeQualityLevelPropertiesKHR(gpu(), &quality_level_info, &quality_level_props);
         m_errorMonitor->VerifyFound();
     }
@@ -418,8 +417,7 @@ TEST_F(NegativeVideo, EncodeQualityLevelPropsMissingChain) {
         quality_level_info.pVideoProfile = config.Profile();
 
         // Missing codec-specific output structure for H.265 encode profile
-        m_errorMonitor->SetDesiredFailureMsg(
-            kErrorBit, "VUID-vkGetPhysicalDeviceVideoEncodeQualityLevelPropertiesKHR-pQualityLevelInfo-08258");
+        m_errorMonitor->SetDesiredError("VUID-vkGetPhysicalDeviceVideoEncodeQualityLevelPropertiesKHR-pQualityLevelInfo-08258");
         vk.GetPhysicalDeviceVideoEncodeQualityLevelPropertiesKHR(gpu(), &quality_level_info, &quality_level_props);
         m_errorMonitor->VerifyFound();
     }
@@ -450,19 +448,19 @@ TEST_F(NegativeVideo, InUseDestroyed) {
     cb.EndVideoCoding(context.End());
     cb.end();
 
-    context.Queue().submit(cb);
+    context.Queue().Submit(cb);
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkDestroyVideoSessionKHR-videoSession-07192");
-    context.vk.DestroyVideoSessionKHR(m_device->device(), context.Session(), nullptr);
+    m_errorMonitor->SetDesiredError("VUID-vkDestroyVideoSessionKHR-videoSession-07192");
+    context.vk.DestroyVideoSessionKHR(device(), context.Session(), nullptr);
     m_errorMonitor->VerifyFound();
 
     if (config.NeedsSessionParams()) {
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkDestroyVideoSessionParametersKHR-videoSessionParameters-07212");
-        context.vk.DestroyVideoSessionParametersKHR(m_device->device(), context.SessionParams(), nullptr);
+        m_errorMonitor->SetDesiredError("VUID-vkDestroyVideoSessionParametersKHR-videoSessionParameters-07212");
+        context.vk.DestroyVideoSessionParametersKHR(device(), context.SessionParams(), nullptr);
         m_errorMonitor->VerifyFound();
     }
 
-    m_device->wait();
+    m_device->Wait();
 }
 
 TEST_F(NegativeVideo, CreateSessionVideoMaintenance1NotEnabled) {
@@ -484,8 +482,8 @@ TEST_F(NegativeVideo, CreateSessionVideoMaintenance1NotEnabled) {
     create_info.pStdHeaderVersion = config.StdVersion();
 
     m_errorMonitor->SetAllowedFailureMsg("VUID-VkVideoSessionCreateInfoKHR-flags-parameter");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionCreateInfoKHR-flags-08371");
-    context.vk.CreateVideoSessionKHR(m_device->device(), &create_info, nullptr, &session);
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionCreateInfoKHR-flags-08371");
+    context.vk.CreateVideoSessionKHR(device(), &create_info, nullptr, &session);
     m_errorMonitor->VerifyFound();
 }
 
@@ -507,8 +505,8 @@ TEST_F(NegativeVideo, CreateSessionProtectedMemoryNotEnabled) {
     create_info.pVideoProfile = config.Profile();
     create_info.pStdHeaderVersion = config.StdVersion();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionCreateInfoKHR-protectedMemory-07189");
-    context.vk.CreateVideoSessionKHR(m_device->device(), &create_info, nullptr, &session);
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionCreateInfoKHR-protectedMemory-07189");
+    context.vk.CreateVideoSessionKHR(device(), &create_info, nullptr, &session);
     m_errorMonitor->VerifyFound();
 }
 
@@ -534,8 +532,8 @@ TEST_F(NegativeVideo, CreateSessionProtectedContentUnsupported) {
     create_info.pVideoProfile = config.Profile();
     create_info.pStdHeaderVersion = config.StdVersion();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionCreateInfoKHR-protectedMemory-07189");
-    context.vk.CreateVideoSessionKHR(m_device->device(), &create_info, nullptr, &session);
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionCreateInfoKHR-protectedMemory-07189");
+    context.vk.CreateVideoSessionKHR(device(), &create_info, nullptr, &session);
     m_errorMonitor->VerifyFound();
 }
 
@@ -558,8 +556,8 @@ TEST_F(NegativeVideo, CreateSessionUnsupportedProfile) {
     create_info.pStdHeaderVersion = config.StdVersion();
 
     VkVideoSessionKHR session;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionCreateInfoKHR-pVideoProfile-04845");
-    pfn_CreateVideoSessionKHR(m_device->device(), &create_info, nullptr, &session);
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionCreateInfoKHR-pVideoProfile-04845");
+    pfn_CreateVideoSessionKHR(device(), &create_info, nullptr, &session);
     m_errorMonitor->VerifyFound();
 }
 
@@ -583,33 +581,33 @@ TEST_F(NegativeVideo, CreateSessionInvalidReferencePictureCounts) {
     create_info.maxActiveReferencePictures = config.Caps()->maxActiveReferencePictures;
 
     // maxDpbSlots too big
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionCreateInfoKHR-maxDpbSlots-04847");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionCreateInfoKHR-maxDpbSlots-04847");
     create_info.maxDpbSlots++;
-    context.vk.CreateVideoSessionKHR(m_device->device(), &create_info, nullptr, &session);
+    context.vk.CreateVideoSessionKHR(device(), &create_info, nullptr, &session);
     create_info.maxDpbSlots--;
     m_errorMonitor->VerifyFound();
 
     // maxActiveReferencePictures too big
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionCreateInfoKHR-maxActiveReferencePictures-04849");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionCreateInfoKHR-maxActiveReferencePictures-04849");
     create_info.maxActiveReferencePictures++;
-    context.vk.CreateVideoSessionKHR(m_device->device(), &create_info, nullptr, &session);
+    context.vk.CreateVideoSessionKHR(device(), &create_info, nullptr, &session);
     create_info.maxActiveReferencePictures--;
     m_errorMonitor->VerifyFound();
 
     config = GetConfig(GetConfigsWithReferences(GetConfigs()));
     if (config) {
         // maxDpbSlots is 0, but maxActiveReferencePictures is not
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionCreateInfoKHR-maxDpbSlots-04850");
+        m_errorMonitor->SetDesiredError("VUID-VkVideoSessionCreateInfoKHR-maxDpbSlots-04850");
         create_info.maxDpbSlots = 0;
         create_info.maxActiveReferencePictures = 1;
-        context.vk.CreateVideoSessionKHR(m_device->device(), &create_info, nullptr, &session);
+        context.vk.CreateVideoSessionKHR(device(), &create_info, nullptr, &session);
         m_errorMonitor->VerifyFound();
 
         // maxActiveReferencePictures is 0, but maxDpbSlots is not
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionCreateInfoKHR-maxDpbSlots-04850");
+        m_errorMonitor->SetDesiredError("VUID-VkVideoSessionCreateInfoKHR-maxDpbSlots-04850");
         create_info.maxDpbSlots = 1;
         create_info.maxActiveReferencePictures = 0;
-        context.vk.CreateVideoSessionKHR(m_device->device(), &create_info, nullptr, &session);
+        context.vk.CreateVideoSessionKHR(device(), &create_info, nullptr, &session);
         m_errorMonitor->VerifyFound();
     }
 }
@@ -632,31 +630,31 @@ TEST_F(NegativeVideo, CreateSessionInvalidMaxCodedExtent) {
     create_info.pStdHeaderVersion = config.StdVersion();
 
     // maxCodedExtent.width too small
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionCreateInfoKHR-maxCodedExtent-04851");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionCreateInfoKHR-maxCodedExtent-04851");
     create_info.maxCodedExtent = config.Caps()->minCodedExtent;
     --create_info.maxCodedExtent.width;
-    context.vk.CreateVideoSessionKHR(m_device->device(), &create_info, nullptr, &session);
+    context.vk.CreateVideoSessionKHR(device(), &create_info, nullptr, &session);
     m_errorMonitor->VerifyFound();
 
     // maxCodedExtent.height too small
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionCreateInfoKHR-maxCodedExtent-04851");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionCreateInfoKHR-maxCodedExtent-04851");
     create_info.maxCodedExtent = config.Caps()->minCodedExtent;
     --create_info.maxCodedExtent.height;
-    context.vk.CreateVideoSessionKHR(m_device->device(), &create_info, nullptr, &session);
+    context.vk.CreateVideoSessionKHR(device(), &create_info, nullptr, &session);
     m_errorMonitor->VerifyFound();
 
     // maxCodedExtent.width too big
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionCreateInfoKHR-maxCodedExtent-04851");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionCreateInfoKHR-maxCodedExtent-04851");
     create_info.maxCodedExtent = config.Caps()->maxCodedExtent;
     ++create_info.maxCodedExtent.width;
-    context.vk.CreateVideoSessionKHR(m_device->device(), &create_info, nullptr, &session);
+    context.vk.CreateVideoSessionKHR(device(), &create_info, nullptr, &session);
     m_errorMonitor->VerifyFound();
 
     // maxCodedExtent.height too big
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionCreateInfoKHR-maxCodedExtent-04851");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionCreateInfoKHR-maxCodedExtent-04851");
     create_info.maxCodedExtent = config.Caps()->maxCodedExtent;
     ++create_info.maxCodedExtent.height;
-    context.vk.CreateVideoSessionKHR(m_device->device(), &create_info, nullptr, &session);
+    context.vk.CreateVideoSessionKHR(device(), &create_info, nullptr, &session);
     m_errorMonitor->VerifyFound();
 }
 
@@ -679,9 +677,9 @@ TEST_F(NegativeVideo, CreateSessionInvalidDecodeReferencePictureFormat) {
     VkVideoSessionCreateInfoKHR create_info = *config.SessionCreateInfo();
     create_info.pVideoProfile = config.Profile();
     create_info.pStdHeaderVersion = config.StdVersion();
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionCreateInfoKHR-referencePictureFormat-04852");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionCreateInfoKHR-referencePictureFormat-04852");
     create_info.referencePictureFormat = VK_FORMAT_D16_UNORM;
-    context.vk.CreateVideoSessionKHR(m_device->device(), &create_info, nullptr, &session);
+    context.vk.CreateVideoSessionKHR(device(), &create_info, nullptr, &session);
     m_errorMonitor->VerifyFound();
 }
 
@@ -705,9 +703,9 @@ TEST_F(NegativeVideo, CreateSessionInvalidEncodeReferencePictureFormat) {
     create_info.pVideoProfile = config.Profile();
     create_info.pStdHeaderVersion = config.StdVersion();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionCreateInfoKHR-referencePictureFormat-06814");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionCreateInfoKHR-referencePictureFormat-06814");
     create_info.referencePictureFormat = VK_FORMAT_D16_UNORM;
-    context.vk.CreateVideoSessionKHR(m_device->device(), &create_info, nullptr, &session);
+    context.vk.CreateVideoSessionKHR(device(), &create_info, nullptr, &session);
     m_errorMonitor->VerifyFound();
 }
 
@@ -728,9 +726,9 @@ TEST_F(NegativeVideo, CreateSessionInvalidDecodePictureFormat) {
     create_info.pVideoProfile = config.Profile();
     create_info.pStdHeaderVersion = config.StdVersion();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionCreateInfoKHR-pictureFormat-04853");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionCreateInfoKHR-pictureFormat-04853");
     create_info.pictureFormat = VK_FORMAT_D16_UNORM;
-    context.vk.CreateVideoSessionKHR(m_device->device(), &create_info, nullptr, &session);
+    context.vk.CreateVideoSessionKHR(device(), &create_info, nullptr, &session);
     m_errorMonitor->VerifyFound();
 }
 
@@ -751,9 +749,9 @@ TEST_F(NegativeVideo, CreateSessionInvalidEncodePictureFormat) {
     create_info.pVideoProfile = config.Profile();
     create_info.pStdHeaderVersion = config.StdVersion();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionCreateInfoKHR-pictureFormat-04854");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionCreateInfoKHR-pictureFormat-04854");
     create_info.pictureFormat = VK_FORMAT_D16_UNORM;
-    context.vk.CreateVideoSessionKHR(m_device->device(), &create_info, nullptr, &session);
+    context.vk.CreateVideoSessionKHR(device(), &create_info, nullptr, &session);
     m_errorMonitor->VerifyFound();
 }
 
@@ -776,16 +774,16 @@ TEST_F(NegativeVideo, CreateSessionInvalidStdHeaderVersion) {
     create_info.pStdHeaderVersion = &std_version;
 
     // Video Std header version not supported
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionCreateInfoKHR-pStdHeaderVersion-07191");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionCreateInfoKHR-pStdHeaderVersion-07191");
     ++std_version.specVersion;
-    context.vk.CreateVideoSessionKHR(m_device->device(), &create_info, nullptr, &session);
+    context.vk.CreateVideoSessionKHR(device(), &create_info, nullptr, &session);
     --std_version.specVersion;
     m_errorMonitor->VerifyFound();
 
     // Video Std header name not supported
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionCreateInfoKHR-pStdHeaderVersion-07190");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionCreateInfoKHR-pStdHeaderVersion-07190");
     strcpy(std_version.extensionName, "invalid_std_header_name");
-    context.vk.CreateVideoSessionKHR(m_device->device(), &create_info, nullptr, &session);
+    context.vk.CreateVideoSessionKHR(device(), &create_info, nullptr, &session);
     m_errorMonitor->VerifyFound();
 }
 
@@ -813,8 +811,8 @@ TEST_F(NegativeVideo, CreateSessionEncodeH264InvalidMaxLevel) {
     auto unsupported_level = static_cast<int32_t>(config.EncodeCapsH264()->maxLevelIdc) + 1;
     h264_create_info.maxLevelIdc = static_cast<StdVideoH264LevelIdc>(unsupported_level);
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionCreateInfoKHR-pVideoProfile-08251");
-    context.vk.CreateVideoSessionKHR(m_device->device(), &create_info, nullptr, &session);
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionCreateInfoKHR-pVideoProfile-08251");
+    context.vk.CreateVideoSessionKHR(device(), &create_info, nullptr, &session);
     m_errorMonitor->VerifyFound();
 }
 
@@ -842,8 +840,8 @@ TEST_F(NegativeVideo, CreateSessionEncodeH265InvalidMaxLevel) {
     auto unsupported_level = static_cast<int32_t>(config.EncodeCapsH265()->maxLevelIdc) + 1;
     h265_create_info.maxLevelIdc = static_cast<StdVideoH265LevelIdc>(unsupported_level);
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionCreateInfoKHR-pVideoProfile-08252");
-    context.vk.CreateVideoSessionKHR(m_device->device(), &create_info, nullptr, &session);
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionCreateInfoKHR-pVideoProfile-08252");
+    context.vk.CreateVideoSessionKHR(device(), &create_info, nullptr, &session);
     m_errorMonitor->VerifyFound();
 }
 
@@ -860,15 +858,14 @@ TEST_F(NegativeVideo, BindVideoSessionMemory) {
     VideoContext context(m_device, config);
 
     uint32_t mem_req_count;
-    ASSERT_EQ(VK_SUCCESS,
-        context.vk.GetVideoSessionMemoryRequirementsKHR(m_device->device(), context.Session(), &mem_req_count, nullptr));
+    ASSERT_EQ(VK_SUCCESS, context.vk.GetVideoSessionMemoryRequirementsKHR(device(), context.Session(), &mem_req_count, nullptr));
     if (mem_req_count == 0) {
         GTEST_SKIP() << "Test can only run if video session needs memory bindings";
     }
 
     std::vector<VkVideoSessionMemoryRequirementsKHR> mem_reqs(mem_req_count, vku::InitStruct<VkVideoSessionMemoryRequirementsKHR>());
     ASSERT_EQ(VK_SUCCESS,
-        context.vk.GetVideoSessionMemoryRequirementsKHR(m_device->device(), context.Session(), &mem_req_count, mem_reqs.data()));
+              context.vk.GetVideoSessionMemoryRequirementsKHR(device(), context.Session(), &mem_req_count, mem_reqs.data()));
 
     std::vector<VkDeviceMemory> session_memory;
     std::vector<VkBindVideoSessionMemoryInfoKHR> bind_info(mem_req_count, vku::InitStruct<VkBindVideoSessionMemoryInfoKHR>());
@@ -878,7 +875,7 @@ TEST_F(NegativeVideo, BindVideoSessionMemory) {
         alloc_info.allocationSize = mem_reqs[i].memoryRequirements.size * 2;
 
         VkDeviceMemory memory = VK_NULL_HANDLE;
-        ASSERT_EQ(VK_SUCCESS, vk::AllocateMemory(m_device->device(), &alloc_info, nullptr, &memory));
+        ASSERT_EQ(VK_SUCCESS, vk::AllocateMemory(device(), &alloc_info, nullptr, &memory));
         session_memory.push_back(memory);
 
         bind_info[i].memoryBindIndex = mem_reqs[i].memoryBindIndex;
@@ -889,11 +886,11 @@ TEST_F(NegativeVideo, BindVideoSessionMemory) {
 
     // Duplicate memoryBindIndex
     if (mem_req_count > 1) {
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkBindVideoSessionMemoryKHR-memoryBindIndex-07196");
+        m_errorMonitor->SetDesiredError("VUID-vkBindVideoSessionMemoryKHR-memoryBindIndex-07196");
         auto& duplicate = bind_info[mem_req_count / 2];
         auto backup = duplicate;
         duplicate = bind_info[0];
-        context.vk.BindVideoSessionMemoryKHR(m_device->device(), context.Session(), mem_req_count, bind_info.data());
+        context.vk.BindVideoSessionMemoryKHR(device(), context.Session(), mem_req_count, bind_info.data());
         duplicate = backup;
         m_errorMonitor->VerifyFound();
     }
@@ -906,11 +903,11 @@ TEST_F(NegativeVideo, BindVideoSessionMemory) {
         }
     }
     if (invalid_bind_index != vvl::kU32Max) {
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkBindVideoSessionMemoryKHR-pBindSessionMemoryInfos-07197");
+        m_errorMonitor->SetDesiredError("VUID-vkBindVideoSessionMemoryKHR-pBindSessionMemoryInfos-07197");
         auto& invalid = bind_info[mem_req_count / 2];
         auto backup = invalid;
         invalid.memoryBindIndex = invalid_bind_index;
-        context.vk.BindVideoSessionMemoryKHR(m_device->device(), context.Session(), mem_req_count, bind_info.data());
+        context.vk.BindVideoSessionMemoryKHR(device(), context.Session(), mem_req_count, bind_info.data());
         invalid = backup;
         m_errorMonitor->VerifyFound();
     }
@@ -938,17 +935,17 @@ TEST_F(NegativeVideo, BindVideoSessionMemory) {
         alloc_info.allocationSize = mem_req.size * 2;
 
         VkDeviceMemory memory = VK_NULL_HANDLE;
-        ASSERT_EQ(VK_SUCCESS, vk::AllocateMemory(m_device->device(), &alloc_info, nullptr, &memory));
+        ASSERT_EQ(VK_SUCCESS, vk::AllocateMemory(device(), &alloc_info, nullptr, &memory));
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkBindVideoSessionMemoryKHR-pBindSessionMemoryInfos-07198");
+        m_errorMonitor->SetDesiredError("VUID-vkBindVideoSessionMemoryKHR-pBindSessionMemoryInfos-07198");
         auto& invalid = bind_info[invalid_mem_type_req_index];
         auto backup = invalid;
         invalid.memory = memory;
-        context.vk.BindVideoSessionMemoryKHR(m_device->device(), context.Session(), mem_req_count, bind_info.data());
+        context.vk.BindVideoSessionMemoryKHR(device(), context.Session(), mem_req_count, bind_info.data());
         invalid = backup;
         m_errorMonitor->VerifyFound();
 
-        vk::FreeMemory(m_device->device(), memory, nullptr);
+        vk::FreeMemory(device(), memory, nullptr);
     }
 
     // Incorrectly aligned memoryOffset
@@ -962,33 +959,33 @@ TEST_F(NegativeVideo, BindVideoSessionMemory) {
     if (invalid_offset_align_index != vvl::kU32Max) {
         auto& mem_req = mem_reqs[invalid_offset_align_index].memoryRequirements;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkBindVideoSessionMemoryKHR-pBindSessionMemoryInfos-07199");
+        m_errorMonitor->SetDesiredError("VUID-vkBindVideoSessionMemoryKHR-pBindSessionMemoryInfos-07199");
         auto& invalid = bind_info[invalid_offset_align_index];
         auto backup = invalid;
         invalid.memoryOffset = mem_req.alignment / 2;
-        context.vk.BindVideoSessionMemoryKHR(m_device->device(), context.Session(), mem_req_count, bind_info.data());
+        context.vk.BindVideoSessionMemoryKHR(device(), context.Session(), mem_req_count, bind_info.data());
         invalid = backup;
         m_errorMonitor->VerifyFound();
     }
 
     // Incorrect memorySize
     {
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkBindVideoSessionMemoryKHR-pBindSessionMemoryInfos-07200");
+        m_errorMonitor->SetDesiredError("VUID-vkBindVideoSessionMemoryKHR-pBindSessionMemoryInfos-07200");
         auto& invalid = bind_info[mem_req_count / 2];
         auto backup = invalid;
         invalid.memorySize += 16;
-        context.vk.BindVideoSessionMemoryKHR(m_device->device(), context.Session(), mem_req_count, bind_info.data());
+        context.vk.BindVideoSessionMemoryKHR(device(), context.Session(), mem_req_count, bind_info.data());
         invalid = backup;
         m_errorMonitor->VerifyFound();
     }
 
     // Out-of-bounds memoryOffset
     {
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkBindVideoSessionMemoryInfoKHR-memoryOffset-07201");
+        m_errorMonitor->SetDesiredError("VUID-VkBindVideoSessionMemoryInfoKHR-memoryOffset-07201");
         auto& invalid = bind_info[mem_req_count / 2];
         auto backup = invalid;
         invalid.memoryOffset = invalid.memorySize * 2;
-        context.vk.BindVideoSessionMemoryKHR(m_device->device(), context.Session(), mem_req_count, bind_info.data());
+        context.vk.BindVideoSessionMemoryKHR(device(), context.Session(), mem_req_count, bind_info.data());
         invalid = backup;
         m_errorMonitor->VerifyFound();
     }
@@ -997,12 +994,12 @@ TEST_F(NegativeVideo, BindVideoSessionMemory) {
     {
         uint32_t index = mem_req_count / 2;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkBindVideoSessionMemoryInfoKHR-memorySize-07202");
+        m_errorMonitor->SetDesiredError("VUID-VkBindVideoSessionMemoryInfoKHR-memorySize-07202");
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkBindVideoSessionMemoryKHR-pBindSessionMemoryInfos-07199");
         auto& invalid = bind_info[index];
         auto backup = invalid;
         invalid.memoryOffset = invalid.memorySize + 1;
-        context.vk.BindVideoSessionMemoryKHR(m_device->device(), context.Session(), mem_req_count, bind_info.data());
+        context.vk.BindVideoSessionMemoryKHR(device(), context.Session(), mem_req_count, bind_info.data());
         invalid = backup;
         m_errorMonitor->VerifyFound();
     }
@@ -1014,15 +1011,15 @@ TEST_F(NegativeVideo, BindVideoSessionMemory) {
             first_bind_count = 1;
         }
 
-        context.vk.BindVideoSessionMemoryKHR(m_device->device(), context.Session(), first_bind_count, bind_info.data());
+        context.vk.BindVideoSessionMemoryKHR(device(), context.Session(), first_bind_count, bind_info.data());
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkBindVideoSessionMemoryKHR-videoSession-07195");
-        context.vk.BindVideoSessionMemoryKHR(m_device->device(), context.Session(), 1, &bind_info[first_bind_count - 1]);
+        m_errorMonitor->SetDesiredError("VUID-vkBindVideoSessionMemoryKHR-videoSession-07195");
+        context.vk.BindVideoSessionMemoryKHR(device(), context.Session(), 1, &bind_info[first_bind_count - 1]);
         m_errorMonitor->VerifyFound();
     }
 
     for (auto memory : session_memory) {
-        vk::FreeMemory(m_device->device(), memory, nullptr);
+        vk::FreeMemory(device(), memory, nullptr);
     }
 }
 
@@ -1044,9 +1041,8 @@ TEST_F(NegativeVideo, CreateSessionParamsIncompatibleTemplate) {
     create_info.videoSession = context2.Session();
 
     VkVideoSessionParametersKHR params;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit,
-                                         "VUID-VkVideoSessionParametersCreateInfoKHR-videoSessionParametersTemplate-04855");
-    context1.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params);
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSessionParametersTemplate-04855");
+    context1.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params);
     m_errorMonitor->VerifyFound();
 }
 
@@ -1074,40 +1070,37 @@ TEST_F(NegativeVideo, CreateSessionParamsIncompatibleTemplateEncodeQualityLevel)
     create_info.videoSessionParametersTemplate = context.SessionParams();
     quality_level_info.qualityLevel = 1;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit,
-                                         "VUID-VkVideoSessionParametersCreateInfoKHR-videoSessionParametersTemplate-08310");
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params);
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSessionParametersTemplate-08310");
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params);
     m_errorMonitor->VerifyFound();
 
     // Expect to succeed to create parameters object with explicit encode quality level 0 against the same template
     quality_level_info.qualityLevel = 0;
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params);
-    context.vk.DestroyVideoSessionParametersKHR(m_device->device(), params, nullptr);
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params);
+    context.vk.DestroyVideoSessionParametersKHR(device(), params, nullptr);
 
     // Expect to succeed to create parameters object with highest encode quality level index but no template
     create_info.videoSessionParametersTemplate = VK_NULL_HANDLE;
     quality_level_info.qualityLevel = config.EncodeCaps()->maxQualityLevels - 1;
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params);
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params);
 
     // Expect to fail to create parameters object with encode quality level 0
     // with template using highest encode quality level index
     create_info.videoSessionParametersTemplate = params;
     quality_level_info.qualityLevel = 0;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit,
-                                         "VUID-VkVideoSessionParametersCreateInfoKHR-videoSessionParametersTemplate-08310");
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params);
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSessionParametersTemplate-08310");
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params);
     m_errorMonitor->VerifyFound();
 
     // Expect to fail the same with implicit encode quality level 0
     create_info.pNext = quality_level_info.pNext;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit,
-                                         "VUID-VkVideoSessionParametersCreateInfoKHR-videoSessionParametersTemplate-08310");
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params);
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSessionParametersTemplate-08310");
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params);
     m_errorMonitor->VerifyFound();
 
-    context.vk.DestroyVideoSessionParametersKHR(m_device->device(), params, nullptr);
+    context.vk.DestroyVideoSessionParametersKHR(device(), params, nullptr);
 }
 
 TEST_F(NegativeVideo, CreateSessionParamsMissingCodecInfo) {
@@ -1128,8 +1121,8 @@ TEST_F(NegativeVideo, CreateSessionParamsMissingCodecInfo) {
         create_info.pNext = &other_codec_info;
         create_info.videoSession = context.Session();
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-07203");
-        context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params);
+        m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-07203");
+        context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params);
         m_errorMonitor->VerifyFound();
     }
 
@@ -1145,8 +1138,8 @@ TEST_F(NegativeVideo, CreateSessionParamsMissingCodecInfo) {
         create_info.pNext = &other_codec_info;
         create_info.videoSession = context.Session();
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-07206");
-        context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params);
+        m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-07206");
+        context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params);
         m_errorMonitor->VerifyFound();
     }
 
@@ -1162,8 +1155,8 @@ TEST_F(NegativeVideo, CreateSessionParamsMissingCodecInfo) {
         create_info.pNext = &other_codec_info;
         create_info.videoSession = context.Session();
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-09259");
-        context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params);
+        m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-09259");
+        context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params);
         m_errorMonitor->VerifyFound();
     }
 
@@ -1180,8 +1173,8 @@ TEST_F(NegativeVideo, CreateSessionParamsMissingCodecInfo) {
         create_info.pNext = &other_codec_info;
         create_info.videoSession = context.Session();
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-07210");
-        context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params);
+        m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-07210");
+        context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params);
         m_errorMonitor->VerifyFound();
     }
 
@@ -1197,8 +1190,8 @@ TEST_F(NegativeVideo, CreateSessionParamsMissingCodecInfo) {
         create_info.pNext = &other_codec_info;
         create_info.videoSession = context.Session();
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-07211");
-        context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params);
+        m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-07211");
+        context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params);
         m_errorMonitor->VerifyFound();
     }
 }
@@ -1223,8 +1216,8 @@ TEST_F(NegativeVideo, CreateSessionParamsInvalidEncodeQualityLevel) {
     create_info.videoSession = context.Session();
 
     VkVideoSessionParametersKHR params;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeQualityLevelInfoKHR-qualityLevel-08311");
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params);
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeQualityLevelInfoKHR-qualityLevel-08311");
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params);
     m_errorMonitor->VerifyFound();
 }
 
@@ -1262,55 +1255,55 @@ TEST_F(NegativeVideo, CreateSessionParamsDecodeH264ExceededCapacity) {
     h264_ai.stdPPSCount = (uint32_t)pps_list.size();
     h264_ai.pStdPPSs = pps_list.data();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-07204");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-07204");
     h264_ci.maxStdSPSCount = 2;
     h264_ci.maxStdPPSCount = 8;
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params);
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params);
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-07205");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-07205");
     h264_ci.maxStdSPSCount = 3;
     h264_ci.maxStdPPSCount = 5;
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params);
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params);
     m_errorMonitor->VerifyFound();
 
     h264_ci.maxStdSPSCount = 3;
     h264_ci.maxStdPPSCount = 6;
-    ASSERT_EQ(VK_SUCCESS, context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params));
+    ASSERT_EQ(VK_SUCCESS, context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params));
 
     create_info.videoSessionParametersTemplate = params;
     sps_list[1].seq_parameter_set_id = 4;
     pps_list[1].seq_parameter_set_id = 4;
     pps_list[5].seq_parameter_set_id = 4;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-07204");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-07204");
     h264_ci.maxStdSPSCount = 3;
     h264_ci.maxStdPPSCount = 8;
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params2);
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params2);
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-07205");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-07205");
     h264_ci.maxStdSPSCount = 4;
     h264_ci.maxStdPPSCount = 7;
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params2);
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params2);
     m_errorMonitor->VerifyFound();
 
     create_info.videoSessionParametersTemplate = params;
     h264_ci.pParametersAddInfo = nullptr;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-07204");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-07204");
     h264_ci.maxStdSPSCount = 2;
     h264_ci.maxStdPPSCount = 8;
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params2);
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params2);
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-07205");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-07205");
     h264_ci.maxStdSPSCount = 3;
     h264_ci.maxStdPPSCount = 5;
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params2);
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params2);
     m_errorMonitor->VerifyFound();
 
-    context.vk.DestroyVideoSessionParametersKHR(m_device->device(), params, nullptr);
+    context.vk.DestroyVideoSessionParametersKHR(device(), params, nullptr);
 }
 
 TEST_F(NegativeVideo, CreateSessionParamsDecodeH265ExceededCapacity) {
@@ -1359,31 +1352,31 @@ TEST_F(NegativeVideo, CreateSessionParamsDecodeH265ExceededCapacity) {
     h265_ai.stdPPSCount = (uint32_t)pps_list.size();
     h265_ai.pStdPPSs = pps_list.data();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-07207");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-07207");
     h265_ci.maxStdVPSCount = 1;
     h265_ci.maxStdSPSCount = 4;
     h265_ci.maxStdPPSCount = 8;
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params);
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params);
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-07208");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-07208");
     h265_ci.maxStdVPSCount = 2;
     h265_ci.maxStdSPSCount = 3;
     h265_ci.maxStdPPSCount = 9;
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params);
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params);
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-07209");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-07209");
     h265_ci.maxStdVPSCount = 3;
     h265_ci.maxStdSPSCount = 5;
     h265_ci.maxStdPPSCount = 5;
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params);
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params);
     m_errorMonitor->VerifyFound();
 
     h265_ci.maxStdVPSCount = 2;
     h265_ci.maxStdSPSCount = 4;
     h265_ci.maxStdPPSCount = 7;
-    ASSERT_EQ(VK_SUCCESS, context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params));
+    ASSERT_EQ(VK_SUCCESS, context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params));
 
     create_info.videoSessionParametersTemplate = params;
     vps_list[1].vps_video_parameter_set_id = 3;
@@ -1391,52 +1384,52 @@ TEST_F(NegativeVideo, CreateSessionParamsDecodeH265ExceededCapacity) {
     pps_list[1].sps_video_parameter_set_id = 3;
     pps_list[5].sps_video_parameter_set_id = 3;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-07207");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-07207");
     h265_ci.maxStdVPSCount = 2;
     h265_ci.maxStdSPSCount = 5;
     h265_ci.maxStdPPSCount = 10;
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params2);
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params2);
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-07208");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-07208");
     h265_ci.maxStdVPSCount = 3;
     h265_ci.maxStdSPSCount = 4;
     h265_ci.maxStdPPSCount = 9;
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params2);
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params2);
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-07209");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-07209");
     h265_ci.maxStdVPSCount = 3;
     h265_ci.maxStdSPSCount = 5;
     h265_ci.maxStdPPSCount = 8;
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params2);
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params2);
     m_errorMonitor->VerifyFound();
 
     create_info.videoSessionParametersTemplate = params;
     h265_ci.pParametersAddInfo = nullptr;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-07207");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-07207");
     h265_ci.maxStdVPSCount = 1;
     h265_ci.maxStdSPSCount = 4;
     h265_ci.maxStdPPSCount = 7;
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params2);
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params2);
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-07208");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-07208");
     h265_ci.maxStdVPSCount = 2;
     h265_ci.maxStdSPSCount = 3;
     h265_ci.maxStdPPSCount = 7;
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params2);
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params2);
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-07209");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-07209");
     h265_ci.maxStdVPSCount = 2;
     h265_ci.maxStdSPSCount = 4;
     h265_ci.maxStdPPSCount = 6;
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params2);
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params2);
     m_errorMonitor->VerifyFound();
 
-    context.vk.DestroyVideoSessionParametersKHR(m_device->device(), params, nullptr);
+    context.vk.DestroyVideoSessionParametersKHR(device(), params, nullptr);
 }
 
 TEST_F(NegativeVideo, CreateSessionParamsDecodeAV1TemplateNotAllowed) {
@@ -1459,15 +1452,15 @@ TEST_F(NegativeVideo, CreateSessionParamsDecodeAV1TemplateNotAllowed) {
     create_info.pNext = &av1_ci;
     create_info.videoSession = context.Session();
 
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params);
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params);
 
     create_info.videoSessionParametersTemplate = params;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-09258");
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params2);
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-09258");
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params2);
     m_errorMonitor->VerifyFound();
 
-    context.vk.DestroyVideoSessionParametersKHR(m_device->device(), params, nullptr);
+    context.vk.DestroyVideoSessionParametersKHR(device(), params, nullptr);
 }
 
 TEST_F(NegativeVideo, CreateSessionParamsEncodeH264ExceededCapacity) {
@@ -1504,55 +1497,55 @@ TEST_F(NegativeVideo, CreateSessionParamsEncodeH264ExceededCapacity) {
     h264_ai.stdPPSCount = (uint32_t)pps_list.size();
     h264_ai.pStdPPSs = pps_list.data();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-04839");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-04839");
     h264_ci.maxStdSPSCount = 2;
     h264_ci.maxStdPPSCount = 8;
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params);
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params);
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-04840");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-04840");
     h264_ci.maxStdSPSCount = 3;
     h264_ci.maxStdPPSCount = 5;
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params);
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params);
     m_errorMonitor->VerifyFound();
 
     h264_ci.maxStdSPSCount = 3;
     h264_ci.maxStdPPSCount = 6;
-    ASSERT_EQ(VK_SUCCESS, context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params));
+    ASSERT_EQ(VK_SUCCESS, context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params));
 
     create_info.videoSessionParametersTemplate = params;
     sps_list[1].seq_parameter_set_id = 4;
     pps_list[1].seq_parameter_set_id = 4;
     pps_list[5].seq_parameter_set_id = 4;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-04839");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-04839");
     h264_ci.maxStdSPSCount = 3;
     h264_ci.maxStdPPSCount = 8;
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params2);
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params2);
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-04840");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-04840");
     h264_ci.maxStdSPSCount = 4;
     h264_ci.maxStdPPSCount = 7;
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params2);
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params2);
     m_errorMonitor->VerifyFound();
 
     create_info.videoSessionParametersTemplate = params;
     h264_ci.pParametersAddInfo = nullptr;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-04839");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-04839");
     h264_ci.maxStdSPSCount = 2;
     h264_ci.maxStdPPSCount = 8;
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params2);
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params2);
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-04840");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-04840");
     h264_ci.maxStdSPSCount = 3;
     h264_ci.maxStdPPSCount = 5;
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params2);
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params2);
     m_errorMonitor->VerifyFound();
 
-    context.vk.DestroyVideoSessionParametersKHR(m_device->device(), params, nullptr);
+    context.vk.DestroyVideoSessionParametersKHR(device(), params, nullptr);
 }
 
 TEST_F(NegativeVideo, CreateSessionParamsEncodeH265ExceededCapacity) {
@@ -1601,31 +1594,31 @@ TEST_F(NegativeVideo, CreateSessionParamsEncodeH265ExceededCapacity) {
     h265_ai.stdPPSCount = (uint32_t)pps_list.size();
     h265_ai.pStdPPSs = pps_list.data();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-04841");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-04841");
     h265_ci.maxStdVPSCount = 1;
     h265_ci.maxStdSPSCount = 4;
     h265_ci.maxStdPPSCount = 8;
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params);
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params);
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-04842");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-04842");
     h265_ci.maxStdVPSCount = 2;
     h265_ci.maxStdSPSCount = 3;
     h265_ci.maxStdPPSCount = 9;
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params);
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params);
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-04843");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-04843");
     h265_ci.maxStdVPSCount = 3;
     h265_ci.maxStdSPSCount = 5;
     h265_ci.maxStdPPSCount = 5;
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params);
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params);
     m_errorMonitor->VerifyFound();
 
     h265_ci.maxStdVPSCount = 2;
     h265_ci.maxStdSPSCount = 4;
     h265_ci.maxStdPPSCount = 7;
-    ASSERT_EQ(VK_SUCCESS, context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params));
+    ASSERT_EQ(VK_SUCCESS, context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params));
 
     create_info.videoSessionParametersTemplate = params;
     vps_list[1].vps_video_parameter_set_id = 3;
@@ -1633,52 +1626,52 @@ TEST_F(NegativeVideo, CreateSessionParamsEncodeH265ExceededCapacity) {
     pps_list[1].sps_video_parameter_set_id = 3;
     pps_list[5].sps_video_parameter_set_id = 3;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-04841");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-04841");
     h265_ci.maxStdVPSCount = 2;
     h265_ci.maxStdSPSCount = 5;
     h265_ci.maxStdPPSCount = 10;
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params2);
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params2);
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-04842");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-04842");
     h265_ci.maxStdVPSCount = 3;
     h265_ci.maxStdSPSCount = 4;
     h265_ci.maxStdPPSCount = 9;
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params2);
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params2);
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-04843");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-04843");
     h265_ci.maxStdVPSCount = 3;
     h265_ci.maxStdSPSCount = 5;
     h265_ci.maxStdPPSCount = 8;
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params2);
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params2);
     m_errorMonitor->VerifyFound();
 
     create_info.videoSessionParametersTemplate = params;
     h265_ci.pParametersAddInfo = nullptr;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-04841");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-04841");
     h265_ci.maxStdVPSCount = 1;
     h265_ci.maxStdSPSCount = 4;
     h265_ci.maxStdPPSCount = 7;
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params2);
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params2);
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-04842");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-04842");
     h265_ci.maxStdVPSCount = 2;
     h265_ci.maxStdSPSCount = 3;
     h265_ci.maxStdPPSCount = 7;
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params2);
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params2);
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-04843");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-04843");
     h265_ci.maxStdVPSCount = 2;
     h265_ci.maxStdSPSCount = 4;
     h265_ci.maxStdPPSCount = 6;
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params2);
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params2);
     m_errorMonitor->VerifyFound();
 
-    context.vk.DestroyVideoSessionParametersKHR(m_device->device(), params, nullptr);
+    context.vk.DestroyVideoSessionParametersKHR(device(), params, nullptr);
 }
 
 TEST_F(NegativeVideo, CreateUpdateSessionParamsEncodeH265InvalidTileColumnsRows) {
@@ -1739,35 +1732,35 @@ TEST_F(NegativeVideo, CreateUpdateSessionParamsEncodeH265InvalidTileColumnsRows)
     h265_ai.pStdPPSs = h265_pps_list.data();
 
     // Try first all of them together
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-08319");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-08320");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-08319");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-08320");
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params);
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-08319");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-08320");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-08319");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-08320");
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params);
     m_errorMonitor->VerifyFound();
 
     // Then individual invalid ones one-by-one
     h265_ai.stdPPSCount = 1;
 
     h265_ai.pStdPPSs = &h265_pps_list[1];
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-08319");
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params);
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-08319");
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params);
     m_errorMonitor->VerifyFound();
 
     h265_ai.pStdPPSs = &h265_pps_list[4];
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-08320");
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params);
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-08320");
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params);
     m_errorMonitor->VerifyFound();
 
     h265_ai.pStdPPSs = &h265_pps_list[5];
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-08319");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-08320");
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params);
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-08319");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoSessionParametersCreateInfoKHR-videoSession-08320");
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params);
     m_errorMonitor->VerifyFound();
 
     // Successfully create object with an entry with the max limits
     h265_ai.pStdPPSs = &h265_pps_list[2];
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params);
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params);
 
     // But then try to update with invalid ones
     auto update_info = vku::InitStruct<VkVideoSessionParametersUpdateInfoKHR>();
@@ -1779,22 +1772,22 @@ TEST_F(NegativeVideo, CreateUpdateSessionParamsEncodeH265InvalidTileColumnsRows)
     h265_ai.stdPPSCount = 1;
 
     h265_ai.pStdPPSs = &h265_pps_list[1];
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-08321");
-    context.vk.UpdateVideoSessionParametersKHR(m_device->device(), params, &update_info);
+    m_errorMonitor->SetDesiredError("VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-08321");
+    context.vk.UpdateVideoSessionParametersKHR(device(), params, &update_info);
     m_errorMonitor->VerifyFound();
 
     h265_ai.pStdPPSs = &h265_pps_list[4];
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-08322");
-    context.vk.UpdateVideoSessionParametersKHR(m_device->device(), params, &update_info);
+    m_errorMonitor->SetDesiredError("VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-08322");
+    context.vk.UpdateVideoSessionParametersKHR(device(), params, &update_info);
     m_errorMonitor->VerifyFound();
 
     h265_ai.pStdPPSs = &h265_pps_list[5];
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-08321");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-08322");
-    context.vk.UpdateVideoSessionParametersKHR(m_device->device(), params, &update_info);
+    m_errorMonitor->SetDesiredError("VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-08321");
+    m_errorMonitor->SetDesiredError("VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-08322");
+    context.vk.UpdateVideoSessionParametersKHR(device(), params, &update_info);
     m_errorMonitor->VerifyFound();
 
-    context.vk.DestroyVideoSessionParametersKHR(m_device->device(), params, nullptr);
+    context.vk.DestroyVideoSessionParametersKHR(device(), params, nullptr);
 }
 
 TEST_F(NegativeVideo, DecodeH264ParametersAddInfoUniqueness) {
@@ -1837,34 +1830,34 @@ TEST_F(NegativeVideo, DecodeH264ParametersAddInfoUniqueness) {
     h264_ai.stdPPSCount = (uint32_t)pps_list.size();
     h264_ai.pStdPPSs = pps_list.data();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoDecodeH264SessionParametersAddInfoKHR-None-04825");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoDecodeH264SessionParametersAddInfoKHR-None-04825");
     sps_list[0].seq_parameter_set_id = 3;
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params);
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params);
     sps_list[0].seq_parameter_set_id = 1;
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoDecodeH264SessionParametersAddInfoKHR-None-04826");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoDecodeH264SessionParametersAddInfoKHR-None-04826");
     pps_list[0].seq_parameter_set_id = 2;
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params);
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params);
     pps_list[0].seq_parameter_set_id = 1;
     m_errorMonitor->VerifyFound();
 
     h264_ci.pParametersAddInfo = nullptr;
-    ASSERT_EQ(VK_SUCCESS, context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params));
+    ASSERT_EQ(VK_SUCCESS, context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params));
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoDecodeH264SessionParametersAddInfoKHR-None-04825");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoDecodeH264SessionParametersAddInfoKHR-None-04825");
     sps_list[0].seq_parameter_set_id = 3;
-    context.vk.UpdateVideoSessionParametersKHR(m_device->device(), params, &update_info);
+    context.vk.UpdateVideoSessionParametersKHR(device(), params, &update_info);
     sps_list[0].seq_parameter_set_id = 1;
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoDecodeH264SessionParametersAddInfoKHR-None-04826");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoDecodeH264SessionParametersAddInfoKHR-None-04826");
     pps_list[0].seq_parameter_set_id = 2;
-    context.vk.UpdateVideoSessionParametersKHR(m_device->device(), params, &update_info);
+    context.vk.UpdateVideoSessionParametersKHR(device(), params, &update_info);
     pps_list[0].seq_parameter_set_id = 1;
     m_errorMonitor->VerifyFound();
 
-    context.vk.DestroyVideoSessionParametersKHR(m_device->device(), params, nullptr);
+    context.vk.DestroyVideoSessionParametersKHR(device(), params, nullptr);
 }
 
 TEST_F(NegativeVideo, DecodeH265ParametersAddInfoUniqueness) {
@@ -1921,46 +1914,46 @@ TEST_F(NegativeVideo, DecodeH265ParametersAddInfoUniqueness) {
     h265_ai.stdPPSCount = (uint32_t)pps_list.size();
     h265_ai.pStdPPSs = pps_list.data();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoDecodeH265SessionParametersAddInfoKHR-None-04833");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoDecodeH265SessionParametersAddInfoKHR-None-04833");
     vps_list[0].vps_video_parameter_set_id = 2;
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params);
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params);
     vps_list[0].vps_video_parameter_set_id = 1;
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoDecodeH265SessionParametersAddInfoKHR-None-04834");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoDecodeH265SessionParametersAddInfoKHR-None-04834");
     sps_list[0].sps_video_parameter_set_id = 2;
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params);
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params);
     sps_list[0].sps_video_parameter_set_id = 1;
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoDecodeH265SessionParametersAddInfoKHR-None-04835");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoDecodeH265SessionParametersAddInfoKHR-None-04835");
     pps_list[0].pps_seq_parameter_set_id = 2;
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params);
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params);
     pps_list[0].pps_seq_parameter_set_id = 1;
     m_errorMonitor->VerifyFound();
 
     h265_ci.pParametersAddInfo = nullptr;
-    ASSERT_EQ(VK_SUCCESS, context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params));
+    ASSERT_EQ(VK_SUCCESS, context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params));
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoDecodeH265SessionParametersAddInfoKHR-None-04833");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoDecodeH265SessionParametersAddInfoKHR-None-04833");
     vps_list[0].vps_video_parameter_set_id = 2;
-    context.vk.UpdateVideoSessionParametersKHR(m_device->device(), params, &update_info);
+    context.vk.UpdateVideoSessionParametersKHR(device(), params, &update_info);
     vps_list[0].vps_video_parameter_set_id = 1;
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoDecodeH265SessionParametersAddInfoKHR-None-04834");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoDecodeH265SessionParametersAddInfoKHR-None-04834");
     sps_list[0].sps_video_parameter_set_id = 2;
-    context.vk.UpdateVideoSessionParametersKHR(m_device->device(), params, &update_info);
+    context.vk.UpdateVideoSessionParametersKHR(device(), params, &update_info);
     sps_list[0].sps_video_parameter_set_id = 1;
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoDecodeH265SessionParametersAddInfoKHR-None-04835");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoDecodeH265SessionParametersAddInfoKHR-None-04835");
     pps_list[0].pps_seq_parameter_set_id = 2;
-    context.vk.UpdateVideoSessionParametersKHR(m_device->device(), params, &update_info);
+    context.vk.UpdateVideoSessionParametersKHR(device(), params, &update_info);
     pps_list[0].pps_seq_parameter_set_id = 1;
     m_errorMonitor->VerifyFound();
 
-    context.vk.DestroyVideoSessionParametersKHR(m_device->device(), params, nullptr);
+    context.vk.DestroyVideoSessionParametersKHR(device(), params, nullptr);
 }
 
 TEST_F(NegativeVideo, EncodeH264ParametersAddInfoUniqueness) {
@@ -2003,34 +1996,34 @@ TEST_F(NegativeVideo, EncodeH264ParametersAddInfoUniqueness) {
     h264_ai.stdPPSCount = (uint32_t)pps_list.size();
     h264_ai.pStdPPSs = pps_list.data();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeH264SessionParametersAddInfoKHR-None-04837");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeH264SessionParametersAddInfoKHR-None-04837");
     sps_list[0].seq_parameter_set_id = 3;
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params);
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params);
     sps_list[0].seq_parameter_set_id = 1;
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeH264SessionParametersAddInfoKHR-None-04838");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeH264SessionParametersAddInfoKHR-None-04838");
     pps_list[0].seq_parameter_set_id = 2;
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params);
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params);
     pps_list[0].seq_parameter_set_id = 1;
     m_errorMonitor->VerifyFound();
 
     h264_ci.pParametersAddInfo = nullptr;
-    ASSERT_EQ(VK_SUCCESS, context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params));
+    ASSERT_EQ(VK_SUCCESS, context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params));
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeH264SessionParametersAddInfoKHR-None-04837");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeH264SessionParametersAddInfoKHR-None-04837");
     sps_list[0].seq_parameter_set_id = 3;
-    context.vk.UpdateVideoSessionParametersKHR(m_device->device(), params, &update_info);
+    context.vk.UpdateVideoSessionParametersKHR(device(), params, &update_info);
     sps_list[0].seq_parameter_set_id = 1;
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeH264SessionParametersAddInfoKHR-None-04838");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeH264SessionParametersAddInfoKHR-None-04838");
     pps_list[0].seq_parameter_set_id = 2;
-    context.vk.UpdateVideoSessionParametersKHR(m_device->device(), params, &update_info);
+    context.vk.UpdateVideoSessionParametersKHR(device(), params, &update_info);
     pps_list[0].seq_parameter_set_id = 1;
     m_errorMonitor->VerifyFound();
 
-    context.vk.DestroyVideoSessionParametersKHR(m_device->device(), params, nullptr);
+    context.vk.DestroyVideoSessionParametersKHR(device(), params, nullptr);
 }
 
 TEST_F(NegativeVideo, EncodeH265ParametersAddInfoUniqueness) {
@@ -2087,46 +2080,46 @@ TEST_F(NegativeVideo, EncodeH265ParametersAddInfoUniqueness) {
     h265_ai.stdPPSCount = (uint32_t)pps_list.size();
     h265_ai.pStdPPSs = pps_list.data();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeH265SessionParametersAddInfoKHR-None-06438");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeH265SessionParametersAddInfoKHR-None-06438");
     vps_list[0].vps_video_parameter_set_id = 2;
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params);
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params);
     vps_list[0].vps_video_parameter_set_id = 1;
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeH265SessionParametersAddInfoKHR-None-06439");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeH265SessionParametersAddInfoKHR-None-06439");
     sps_list[0].sps_video_parameter_set_id = 2;
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params);
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params);
     sps_list[0].sps_video_parameter_set_id = 1;
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeH265SessionParametersAddInfoKHR-None-06440");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeH265SessionParametersAddInfoKHR-None-06440");
     pps_list[0].pps_seq_parameter_set_id = 2;
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params);
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params);
     pps_list[0].pps_seq_parameter_set_id = 1;
     m_errorMonitor->VerifyFound();
 
     h265_ci.pParametersAddInfo = nullptr;
-    ASSERT_EQ(VK_SUCCESS, context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params));
+    ASSERT_EQ(VK_SUCCESS, context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params));
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeH265SessionParametersAddInfoKHR-None-06438");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeH265SessionParametersAddInfoKHR-None-06438");
     vps_list[0].vps_video_parameter_set_id = 2;
-    context.vk.UpdateVideoSessionParametersKHR(m_device->device(), params, &update_info);
+    context.vk.UpdateVideoSessionParametersKHR(device(), params, &update_info);
     vps_list[0].vps_video_parameter_set_id = 1;
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeH265SessionParametersAddInfoKHR-None-06439");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeH265SessionParametersAddInfoKHR-None-06439");
     sps_list[0].sps_video_parameter_set_id = 2;
-    context.vk.UpdateVideoSessionParametersKHR(m_device->device(), params, &update_info);
+    context.vk.UpdateVideoSessionParametersKHR(device(), params, &update_info);
     sps_list[0].sps_video_parameter_set_id = 1;
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeH265SessionParametersAddInfoKHR-None-06440");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeH265SessionParametersAddInfoKHR-None-06440");
     pps_list[0].pps_seq_parameter_set_id = 2;
-    context.vk.UpdateVideoSessionParametersKHR(m_device->device(), params, &update_info);
+    context.vk.UpdateVideoSessionParametersKHR(device(), params, &update_info);
     pps_list[0].pps_seq_parameter_set_id = 1;
     m_errorMonitor->VerifyFound();
 
-    context.vk.DestroyVideoSessionParametersKHR(m_device->device(), params, nullptr);
+    context.vk.DestroyVideoSessionParametersKHR(device(), params, nullptr);
 }
 
 TEST_F(NegativeVideo, UpdateSessionParamsIncorrectSequenceCount) {
@@ -2142,26 +2135,26 @@ TEST_F(NegativeVideo, UpdateSessionParamsIncorrectSequenceCount) {
 
     auto update_info = vku::InitStruct<VkVideoSessionParametersUpdateInfoKHR>();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkUpdateVideoSessionParametersKHR-pUpdateInfo-07215");
+    m_errorMonitor->SetDesiredError("VUID-vkUpdateVideoSessionParametersKHR-pUpdateInfo-07215");
     update_info.updateSequenceCount = 2;
-    context.vk.UpdateVideoSessionParametersKHR(m_device->device(), context.SessionParams(), &update_info);
+    context.vk.UpdateVideoSessionParametersKHR(device(), context.SessionParams(), &update_info);
     m_errorMonitor->VerifyFound();
 
     update_info.updateSequenceCount = 1;
-    ASSERT_EQ(VK_SUCCESS, context.vk.UpdateVideoSessionParametersKHR(m_device->device(), context.SessionParams(), &update_info));
+    ASSERT_EQ(VK_SUCCESS, context.vk.UpdateVideoSessionParametersKHR(device(), context.SessionParams(), &update_info));
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkUpdateVideoSessionParametersKHR-pUpdateInfo-07215");
+    m_errorMonitor->SetDesiredError("VUID-vkUpdateVideoSessionParametersKHR-pUpdateInfo-07215");
     update_info.updateSequenceCount = 1;
-    context.vk.UpdateVideoSessionParametersKHR(m_device->device(), context.SessionParams(), &update_info);
+    context.vk.UpdateVideoSessionParametersKHR(device(), context.SessionParams(), &update_info);
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkUpdateVideoSessionParametersKHR-pUpdateInfo-07215");
+    m_errorMonitor->SetDesiredError("VUID-vkUpdateVideoSessionParametersKHR-pUpdateInfo-07215");
     update_info.updateSequenceCount = 3;
-    context.vk.UpdateVideoSessionParametersKHR(m_device->device(), context.SessionParams(), &update_info);
+    context.vk.UpdateVideoSessionParametersKHR(device(), context.SessionParams(), &update_info);
     m_errorMonitor->VerifyFound();
 
     update_info.updateSequenceCount = 2;
-    ASSERT_EQ(VK_SUCCESS, context.vk.UpdateVideoSessionParametersKHR(m_device->device(), context.SessionParams(), &update_info));
+    ASSERT_EQ(VK_SUCCESS, context.vk.UpdateVideoSessionParametersKHR(device(), context.SessionParams(), &update_info));
 }
 
 TEST_F(NegativeVideo, UpdateSessionParamsDecodeH264ConflictingKeys) {
@@ -2204,7 +2197,7 @@ TEST_F(NegativeVideo, UpdateSessionParamsDecodeH264ConflictingKeys) {
     h264_ai.stdPPSCount = (uint32_t)pps_list.size();
     h264_ai.pStdPPSs = pps_list.data();
 
-    ASSERT_EQ(VK_SUCCESS, context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params));
+    ASSERT_EQ(VK_SUCCESS, context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params));
 
     std::vector<StdVideoH264SequenceParameterSet> sps_list2{context.CreateH264SPS(4), context.CreateH264SPS(5)};
 
@@ -2216,19 +2209,19 @@ TEST_F(NegativeVideo, UpdateSessionParamsDecodeH264ConflictingKeys) {
     h264_ai.stdPPSCount = (uint32_t)pps_list2.size();
     h264_ai.pStdPPSs = pps_list2.data();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-07216");
+    m_errorMonitor->SetDesiredError("VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-07216");
     sps_list2[1].seq_parameter_set_id = 2;
-    context.vk.UpdateVideoSessionParametersKHR(m_device->device(), params, &update_info);
+    context.vk.UpdateVideoSessionParametersKHR(device(), params, &update_info);
     sps_list2[1].seq_parameter_set_id = 5;
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-07218");
+    m_errorMonitor->SetDesiredError("VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-07218");
     pps_list2[2].seq_parameter_set_id = 1;
-    context.vk.UpdateVideoSessionParametersKHR(m_device->device(), params, &update_info);
+    context.vk.UpdateVideoSessionParametersKHR(device(), params, &update_info);
     pps_list2[2].seq_parameter_set_id = 4;
     m_errorMonitor->VerifyFound();
 
-    context.vk.DestroyVideoSessionParametersKHR(m_device->device(), params, nullptr);
+    context.vk.DestroyVideoSessionParametersKHR(device(), params, nullptr);
 }
 
 TEST_F(NegativeVideo, UpdateSessionParamsDecodeH265ConflictingKeys) {
@@ -2285,7 +2278,7 @@ TEST_F(NegativeVideo, UpdateSessionParamsDecodeH265ConflictingKeys) {
     h265_ai.stdPPSCount = (uint32_t)pps_list.size();
     h265_ai.pStdPPSs = pps_list.data();
 
-    ASSERT_EQ(VK_SUCCESS, context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params));
+    ASSERT_EQ(VK_SUCCESS, context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params));
 
     std::vector<StdVideoH265VideoParameterSet> vps_list2{context.CreateH265VPS(3)};
 
@@ -2301,25 +2294,25 @@ TEST_F(NegativeVideo, UpdateSessionParamsDecodeH265ConflictingKeys) {
     h265_ai.stdPPSCount = (uint32_t)pps_list2.size();
     h265_ai.pStdPPSs = pps_list2.data();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-07220");
+    m_errorMonitor->SetDesiredError("VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-07220");
     vps_list2[0].vps_video_parameter_set_id = 2;
-    context.vk.UpdateVideoSessionParametersKHR(m_device->device(), params, &update_info);
+    context.vk.UpdateVideoSessionParametersKHR(device(), params, &update_info);
     vps_list2[0].vps_video_parameter_set_id = 3;
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-07222");
+    m_errorMonitor->SetDesiredError("VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-07222");
     sps_list2[0].sps_seq_parameter_set_id = 3;
-    context.vk.UpdateVideoSessionParametersKHR(m_device->device(), params, &update_info);
+    context.vk.UpdateVideoSessionParametersKHR(device(), params, &update_info);
     sps_list2[0].sps_seq_parameter_set_id = 2;
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-07224");
+    m_errorMonitor->SetDesiredError("VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-07224");
     pps_list2[1].pps_pic_parameter_set_id = 2;
-    context.vk.UpdateVideoSessionParametersKHR(m_device->device(), params, &update_info);
+    context.vk.UpdateVideoSessionParametersKHR(device(), params, &update_info);
     pps_list2[1].pps_pic_parameter_set_id = 4;
     m_errorMonitor->VerifyFound();
 
-    context.vk.DestroyVideoSessionParametersKHR(m_device->device(), params, nullptr);
+    context.vk.DestroyVideoSessionParametersKHR(device(), params, nullptr);
 }
 
 TEST_F(NegativeVideo, UpdateSessionParamsDecodeAV1) {
@@ -2336,8 +2329,8 @@ TEST_F(NegativeVideo, UpdateSessionParamsDecodeAV1) {
     auto update_info = vku::InitStruct<VkVideoSessionParametersUpdateInfoKHR>();
     update_info.updateSequenceCount = 1;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-09260");
-    context.vk.UpdateVideoSessionParametersKHR(m_device->device(), context.SessionParams(), &update_info);
+    m_errorMonitor->SetDesiredError("VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-09260");
+    context.vk.UpdateVideoSessionParametersKHR(device(), context.SessionParams(), &update_info);
     m_errorMonitor->VerifyFound();
 }
 
@@ -2381,7 +2374,7 @@ TEST_F(NegativeVideo, UpdateSessionParamsEncodeH264ConflictingKeys) {
     h264_ai.stdPPSCount = (uint32_t)pps_list.size();
     h264_ai.pStdPPSs = pps_list.data();
 
-    ASSERT_EQ(VK_SUCCESS, context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params));
+    ASSERT_EQ(VK_SUCCESS, context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params));
 
     std::vector<StdVideoH264SequenceParameterSet> sps_list2{context.CreateH264SPS(4), context.CreateH264SPS(5)};
 
@@ -2393,19 +2386,19 @@ TEST_F(NegativeVideo, UpdateSessionParamsEncodeH264ConflictingKeys) {
     h264_ai.stdPPSCount = (uint32_t)pps_list2.size();
     h264_ai.pStdPPSs = pps_list2.data();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-07226");
+    m_errorMonitor->SetDesiredError("VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-07226");
     sps_list2[1].seq_parameter_set_id = 2;
-    context.vk.UpdateVideoSessionParametersKHR(m_device->device(), params, &update_info);
+    context.vk.UpdateVideoSessionParametersKHR(device(), params, &update_info);
     sps_list2[1].seq_parameter_set_id = 5;
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-07227");
+    m_errorMonitor->SetDesiredError("VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-07227");
     pps_list2[2].seq_parameter_set_id = 1;
-    context.vk.UpdateVideoSessionParametersKHR(m_device->device(), params, &update_info);
+    context.vk.UpdateVideoSessionParametersKHR(device(), params, &update_info);
     pps_list2[2].seq_parameter_set_id = 4;
     m_errorMonitor->VerifyFound();
 
-    context.vk.DestroyVideoSessionParametersKHR(m_device->device(), params, nullptr);
+    context.vk.DestroyVideoSessionParametersKHR(device(), params, nullptr);
 }
 
 TEST_F(NegativeVideo, UpdateSessionParamsEncodeH265ConflictingKeys) {
@@ -2462,7 +2455,7 @@ TEST_F(NegativeVideo, UpdateSessionParamsEncodeH265ConflictingKeys) {
     h265_ai.stdPPSCount = (uint32_t)pps_list.size();
     h265_ai.pStdPPSs = pps_list.data();
 
-    ASSERT_EQ(VK_SUCCESS, context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params));
+    ASSERT_EQ(VK_SUCCESS, context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params));
 
     std::vector<StdVideoH265VideoParameterSet> vps_list2{context.CreateH265VPS(3)};
 
@@ -2478,25 +2471,25 @@ TEST_F(NegativeVideo, UpdateSessionParamsEncodeH265ConflictingKeys) {
     h265_ai.stdPPSCount = (uint32_t)pps_list2.size();
     h265_ai.pStdPPSs = pps_list2.data();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-07228");
+    m_errorMonitor->SetDesiredError("VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-07228");
     vps_list2[0].vps_video_parameter_set_id = 2;
-    context.vk.UpdateVideoSessionParametersKHR(m_device->device(), params, &update_info);
+    context.vk.UpdateVideoSessionParametersKHR(device(), params, &update_info);
     vps_list2[0].vps_video_parameter_set_id = 3;
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-07229");
+    m_errorMonitor->SetDesiredError("VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-07229");
     sps_list2[0].sps_seq_parameter_set_id = 3;
-    context.vk.UpdateVideoSessionParametersKHR(m_device->device(), params, &update_info);
+    context.vk.UpdateVideoSessionParametersKHR(device(), params, &update_info);
     sps_list2[0].sps_seq_parameter_set_id = 2;
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-07230");
+    m_errorMonitor->SetDesiredError("VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-07230");
     pps_list2[1].pps_pic_parameter_set_id = 2;
-    context.vk.UpdateVideoSessionParametersKHR(m_device->device(), params, &update_info);
+    context.vk.UpdateVideoSessionParametersKHR(device(), params, &update_info);
     pps_list2[1].pps_pic_parameter_set_id = 4;
     m_errorMonitor->VerifyFound();
 
-    context.vk.DestroyVideoSessionParametersKHR(m_device->device(), params, nullptr);
+    context.vk.DestroyVideoSessionParametersKHR(device(), params, nullptr);
 }
 
 TEST_F(NegativeVideo, UpdateSessionParamsDecodeH264ExceededCapacity) {
@@ -2539,7 +2532,7 @@ TEST_F(NegativeVideo, UpdateSessionParamsDecodeH264ExceededCapacity) {
     h264_ai.stdPPSCount = (uint32_t)pps_list.size();
     h264_ai.pStdPPSs = pps_list.data();
 
-    ASSERT_EQ(VK_SUCCESS, context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params));
+    ASSERT_EQ(VK_SUCCESS, context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params));
 
     std::vector<StdVideoH264SequenceParameterSet> sps_list2{context.CreateH264SPS(4), context.CreateH264SPS(5)};
 
@@ -2549,19 +2542,19 @@ TEST_F(NegativeVideo, UpdateSessionParamsDecodeH264ExceededCapacity) {
     h264_ai.pStdSPSs = sps_list2.data();
     h264_ai.pStdPPSs = pps_list2.data();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-07217");
+    m_errorMonitor->SetDesiredError("VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-07217");
     h264_ai.stdSPSCount = 2;
     h264_ai.stdPPSCount = 2;
-    context.vk.UpdateVideoSessionParametersKHR(m_device->device(), params, &update_info);
+    context.vk.UpdateVideoSessionParametersKHR(device(), params, &update_info);
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-07219");
+    m_errorMonitor->SetDesiredError("VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-07219");
     h264_ai.stdSPSCount = 1;
     h264_ai.stdPPSCount = 4;
-    context.vk.UpdateVideoSessionParametersKHR(m_device->device(), params, &update_info);
+    context.vk.UpdateVideoSessionParametersKHR(device(), params, &update_info);
     m_errorMonitor->VerifyFound();
 
-    context.vk.DestroyVideoSessionParametersKHR(m_device->device(), params, nullptr);
+    context.vk.DestroyVideoSessionParametersKHR(device(), params, nullptr);
 }
 
 TEST_F(NegativeVideo, UpdateSessionParamsDecodeH265ExceededCapacity) {
@@ -2618,7 +2611,7 @@ TEST_F(NegativeVideo, UpdateSessionParamsDecodeH265ExceededCapacity) {
     h265_ai.stdPPSCount = (uint32_t)pps_list.size();
     h265_ai.pStdPPSs = pps_list.data();
 
-    ASSERT_EQ(VK_SUCCESS, context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params));
+    ASSERT_EQ(VK_SUCCESS, context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params));
 
     std::vector<StdVideoH265VideoParameterSet> vps_list2{context.CreateH265VPS(3)};
 
@@ -2634,28 +2627,28 @@ TEST_F(NegativeVideo, UpdateSessionParamsDecodeH265ExceededCapacity) {
     h265_ai.stdPPSCount = (uint32_t)pps_list2.size();
     h265_ai.pStdPPSs = pps_list2.data();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-07221");
+    m_errorMonitor->SetDesiredError("VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-07221");
     h265_ai.stdVPSCount = 1;
     h265_ai.stdSPSCount = 1;
     h265_ai.stdPPSCount = 2;
-    context.vk.UpdateVideoSessionParametersKHR(m_device->device(), params, &update_info);
+    context.vk.UpdateVideoSessionParametersKHR(device(), params, &update_info);
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-07223");
+    m_errorMonitor->SetDesiredError("VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-07223");
     h265_ai.stdVPSCount = 0;
     h265_ai.stdSPSCount = 2;
     h265_ai.stdPPSCount = 2;
-    context.vk.UpdateVideoSessionParametersKHR(m_device->device(), params, &update_info);
+    context.vk.UpdateVideoSessionParametersKHR(device(), params, &update_info);
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-07225");
+    m_errorMonitor->SetDesiredError("VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-07225");
     h265_ai.stdVPSCount = 0;
     h265_ai.stdSPSCount = 1;
     h265_ai.stdPPSCount = 3;
-    context.vk.UpdateVideoSessionParametersKHR(m_device->device(), params, &update_info);
+    context.vk.UpdateVideoSessionParametersKHR(device(), params, &update_info);
     m_errorMonitor->VerifyFound();
 
-    context.vk.DestroyVideoSessionParametersKHR(m_device->device(), params, nullptr);
+    context.vk.DestroyVideoSessionParametersKHR(device(), params, nullptr);
 }
 
 TEST_F(NegativeVideo, UpdateSessionParamsEncodeH264ExceededCapacity) {
@@ -2698,7 +2691,7 @@ TEST_F(NegativeVideo, UpdateSessionParamsEncodeH264ExceededCapacity) {
     h264_ai.stdPPSCount = (uint32_t)pps_list.size();
     h264_ai.pStdPPSs = pps_list.data();
 
-    ASSERT_EQ(VK_SUCCESS, context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params));
+    ASSERT_EQ(VK_SUCCESS, context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params));
 
     std::vector<StdVideoH264SequenceParameterSet> sps_list2{context.CreateH264SPS(4), context.CreateH264SPS(5)};
 
@@ -2708,19 +2701,19 @@ TEST_F(NegativeVideo, UpdateSessionParamsEncodeH264ExceededCapacity) {
     h264_ai.pStdSPSs = sps_list2.data();
     h264_ai.pStdPPSs = pps_list2.data();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-06441");
+    m_errorMonitor->SetDesiredError("VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-06441");
     h264_ai.stdSPSCount = 2;
     h264_ai.stdPPSCount = 2;
-    context.vk.UpdateVideoSessionParametersKHR(m_device->device(), params, &update_info);
+    context.vk.UpdateVideoSessionParametersKHR(device(), params, &update_info);
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-06442");
+    m_errorMonitor->SetDesiredError("VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-06442");
     h264_ai.stdSPSCount = 1;
     h264_ai.stdPPSCount = 4;
-    context.vk.UpdateVideoSessionParametersKHR(m_device->device(), params, &update_info);
+    context.vk.UpdateVideoSessionParametersKHR(device(), params, &update_info);
     m_errorMonitor->VerifyFound();
 
-    context.vk.DestroyVideoSessionParametersKHR(m_device->device(), params, nullptr);
+    context.vk.DestroyVideoSessionParametersKHR(device(), params, nullptr);
 }
 
 TEST_F(NegativeVideo, UpdateSessionParamsEncodeH265ExceededCapacity) {
@@ -2777,7 +2770,7 @@ TEST_F(NegativeVideo, UpdateSessionParamsEncodeH265ExceededCapacity) {
     h265_ai.stdPPSCount = (uint32_t)pps_list.size();
     h265_ai.pStdPPSs = pps_list.data();
 
-    ASSERT_EQ(VK_SUCCESS, context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params));
+    ASSERT_EQ(VK_SUCCESS, context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params));
 
     std::vector<StdVideoH265VideoParameterSet> vps_list2{context.CreateH265VPS(3)};
 
@@ -2793,28 +2786,28 @@ TEST_F(NegativeVideo, UpdateSessionParamsEncodeH265ExceededCapacity) {
     h265_ai.stdPPSCount = (uint32_t)pps_list2.size();
     h265_ai.pStdPPSs = pps_list2.data();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-06443");
+    m_errorMonitor->SetDesiredError("VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-06443");
     h265_ai.stdVPSCount = 1;
     h265_ai.stdSPSCount = 1;
     h265_ai.stdPPSCount = 2;
-    context.vk.UpdateVideoSessionParametersKHR(m_device->device(), params, &update_info);
+    context.vk.UpdateVideoSessionParametersKHR(device(), params, &update_info);
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-06444");
+    m_errorMonitor->SetDesiredError("VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-06444");
     h265_ai.stdVPSCount = 0;
     h265_ai.stdSPSCount = 2;
     h265_ai.stdPPSCount = 2;
-    context.vk.UpdateVideoSessionParametersKHR(m_device->device(), params, &update_info);
+    context.vk.UpdateVideoSessionParametersKHR(device(), params, &update_info);
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-06445");
+    m_errorMonitor->SetDesiredError("VUID-vkUpdateVideoSessionParametersKHR-videoSessionParameters-06445");
     h265_ai.stdVPSCount = 0;
     h265_ai.stdSPSCount = 1;
     h265_ai.stdPPSCount = 3;
-    context.vk.UpdateVideoSessionParametersKHR(m_device->device(), params, &update_info);
+    context.vk.UpdateVideoSessionParametersKHR(device(), params, &update_info);
     m_errorMonitor->VerifyFound();
 
-    context.vk.DestroyVideoSessionParametersKHR(m_device->device(), params, nullptr);
+    context.vk.DestroyVideoSessionParametersKHR(device(), params, nullptr);
 }
 
 TEST_F(NegativeVideo, GetEncodedSessionParamsRequiresEncodeProfile) {
@@ -2834,8 +2827,8 @@ TEST_F(NegativeVideo, GetEncodedSessionParamsRequiresEncodeProfile) {
     get_info.videoSessionParameters = decode_context.SessionParams();
     size_t data_size = 0;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetEncodedVideoSessionParametersKHR-pVideoSessionParametersInfo-08359");
-    encode_context.vk.GetEncodedVideoSessionParametersKHR(m_device->device(), &get_info, nullptr, &data_size, nullptr);
+    m_errorMonitor->SetDesiredError("VUID-vkGetEncodedVideoSessionParametersKHR-pVideoSessionParametersInfo-08359");
+    encode_context.vk.GetEncodedVideoSessionParametersKHR(device(), &get_info, nullptr, &data_size, nullptr);
     m_errorMonitor->VerifyFound();
 }
 
@@ -2854,9 +2847,8 @@ TEST_F(NegativeVideo, GetEncodedSessionParamsMissingCodecInfo) {
         get_info.videoSessionParameters = context.SessionParams();
         size_t data_size = 0;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit,
-                                             "VUID-vkGetEncodedVideoSessionParametersKHR-pVideoSessionParametersInfo-08262");
-        context.vk.GetEncodedVideoSessionParametersKHR(m_device->device(), &get_info, nullptr, &data_size, nullptr);
+        m_errorMonitor->SetDesiredError("VUID-vkGetEncodedVideoSessionParametersKHR-pVideoSessionParametersInfo-08262");
+        context.vk.GetEncodedVideoSessionParametersKHR(device(), &get_info, nullptr, &data_size, nullptr);
         m_errorMonitor->VerifyFound();
     }
 
@@ -2867,9 +2859,8 @@ TEST_F(NegativeVideo, GetEncodedSessionParamsMissingCodecInfo) {
         get_info.videoSessionParameters = context.SessionParams();
         size_t data_size = 0;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit,
-                                             "VUID-vkGetEncodedVideoSessionParametersKHR-pVideoSessionParametersInfo-08265");
-        context.vk.GetEncodedVideoSessionParametersKHR(m_device->device(), &get_info, nullptr, &data_size, nullptr);
+        m_errorMonitor->SetDesiredError("VUID-vkGetEncodedVideoSessionParametersKHR-pVideoSessionParametersInfo-08265");
+        context.vk.GetEncodedVideoSessionParametersKHR(device(), &get_info, nullptr, &data_size, nullptr);
         m_errorMonitor->VerifyFound();
     }
 }
@@ -2892,8 +2883,8 @@ TEST_F(NegativeVideo, GetEncodedSessionParamsH264) {
     size_t data_size = 0;
 
     // Need to request writing at least one parameter set
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeH264SessionParametersGetInfoKHR-writeStdSPS-08279");
-    context.vk.GetEncodedVideoSessionParametersKHR(m_device->device(), &get_info, nullptr, &data_size, nullptr);
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeH264SessionParametersGetInfoKHR-writeStdSPS-08279");
+    context.vk.GetEncodedVideoSessionParametersKHR(device(), &get_info, nullptr, &data_size, nullptr);
     m_errorMonitor->VerifyFound();
 
     // Trying to request non-existent SPS
@@ -2901,8 +2892,8 @@ TEST_F(NegativeVideo, GetEncodedSessionParamsH264) {
     h264_info.writeStdSPS = VK_TRUE;
     h264_info.stdSPSId = 1;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetEncodedVideoSessionParametersKHR-pVideoSessionParametersInfo-08263");
-    context.vk.GetEncodedVideoSessionParametersKHR(m_device->device(), &get_info, nullptr, &data_size, nullptr);
+    m_errorMonitor->SetDesiredError("VUID-vkGetEncodedVideoSessionParametersKHR-pVideoSessionParametersInfo-08263");
+    context.vk.GetEncodedVideoSessionParametersKHR(device(), &get_info, nullptr, &data_size, nullptr);
     m_errorMonitor->VerifyFound();
 
     // Trying to request non-existent PPS
@@ -2910,15 +2901,15 @@ TEST_F(NegativeVideo, GetEncodedSessionParamsH264) {
     h264_info.writeStdPPS = VK_TRUE;
     h264_info.stdPPSId = 1;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetEncodedVideoSessionParametersKHR-pVideoSessionParametersInfo-08264");
-    context.vk.GetEncodedVideoSessionParametersKHR(m_device->device(), &get_info, nullptr, &data_size, nullptr);
+    m_errorMonitor->SetDesiredError("VUID-vkGetEncodedVideoSessionParametersKHR-pVideoSessionParametersInfo-08264");
+    context.vk.GetEncodedVideoSessionParametersKHR(device(), &get_info, nullptr, &data_size, nullptr);
     m_errorMonitor->VerifyFound();
 
     h264_info.stdSPSId = 1;
     h264_info.stdPPSId = 0;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetEncodedVideoSessionParametersKHR-pVideoSessionParametersInfo-08264");
-    context.vk.GetEncodedVideoSessionParametersKHR(m_device->device(), &get_info, nullptr, &data_size, nullptr);
+    m_errorMonitor->SetDesiredError("VUID-vkGetEncodedVideoSessionParametersKHR-pVideoSessionParametersInfo-08264");
+    context.vk.GetEncodedVideoSessionParametersKHR(device(), &get_info, nullptr, &data_size, nullptr);
     m_errorMonitor->VerifyFound();
 
     // Trying to request both non-existent SPS and PPS
@@ -2927,9 +2918,9 @@ TEST_F(NegativeVideo, GetEncodedSessionParamsH264) {
     h264_info.writeStdPPS = VK_TRUE;
     h264_info.stdSPSId = 1;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetEncodedVideoSessionParametersKHR-pVideoSessionParametersInfo-08263");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetEncodedVideoSessionParametersKHR-pVideoSessionParametersInfo-08264");
-    context.vk.GetEncodedVideoSessionParametersKHR(m_device->device(), &get_info, nullptr, &data_size, nullptr);
+    m_errorMonitor->SetDesiredError("VUID-vkGetEncodedVideoSessionParametersKHR-pVideoSessionParametersInfo-08263");
+    m_errorMonitor->SetDesiredError("VUID-vkGetEncodedVideoSessionParametersKHR-pVideoSessionParametersInfo-08264");
+    context.vk.GetEncodedVideoSessionParametersKHR(device(), &get_info, nullptr, &data_size, nullptr);
     m_errorMonitor->VerifyFound();
 }
 
@@ -2951,8 +2942,8 @@ TEST_F(NegativeVideo, GetEncodedSessionParamsH265) {
     size_t data_size = 0;
 
     // Need to request writing at least one parameter set
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeH265SessionParametersGetInfoKHR-writeStdVPS-08290");
-    context.vk.GetEncodedVideoSessionParametersKHR(m_device->device(), &get_info, nullptr, &data_size, nullptr);
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeH265SessionParametersGetInfoKHR-writeStdVPS-08290");
+    context.vk.GetEncodedVideoSessionParametersKHR(device(), &get_info, nullptr, &data_size, nullptr);
     m_errorMonitor->VerifyFound();
 
     // Trying to request non-existent VPS
@@ -2960,8 +2951,8 @@ TEST_F(NegativeVideo, GetEncodedSessionParamsH265) {
     h265_info.writeStdVPS = VK_TRUE;
     h265_info.stdVPSId = 1;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetEncodedVideoSessionParametersKHR-pVideoSessionParametersInfo-08266");
-    context.vk.GetEncodedVideoSessionParametersKHR(m_device->device(), &get_info, nullptr, &data_size, nullptr);
+    m_errorMonitor->SetDesiredError("VUID-vkGetEncodedVideoSessionParametersKHR-pVideoSessionParametersInfo-08266");
+    context.vk.GetEncodedVideoSessionParametersKHR(device(), &get_info, nullptr, &data_size, nullptr);
     m_errorMonitor->VerifyFound();
 
     // Trying to request non-existent SPS
@@ -2969,15 +2960,15 @@ TEST_F(NegativeVideo, GetEncodedSessionParamsH265) {
     h265_info.writeStdSPS = VK_TRUE;
     h265_info.stdSPSId = 1;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetEncodedVideoSessionParametersKHR-pVideoSessionParametersInfo-08267");
-    context.vk.GetEncodedVideoSessionParametersKHR(m_device->device(), &get_info, nullptr, &data_size, nullptr);
+    m_errorMonitor->SetDesiredError("VUID-vkGetEncodedVideoSessionParametersKHR-pVideoSessionParametersInfo-08267");
+    context.vk.GetEncodedVideoSessionParametersKHR(device(), &get_info, nullptr, &data_size, nullptr);
     m_errorMonitor->VerifyFound();
 
     h265_info.stdVPSId = 1;
     h265_info.stdSPSId = 0;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetEncodedVideoSessionParametersKHR-pVideoSessionParametersInfo-08267");
-    context.vk.GetEncodedVideoSessionParametersKHR(m_device->device(), &get_info, nullptr, &data_size, nullptr);
+    m_errorMonitor->SetDesiredError("VUID-vkGetEncodedVideoSessionParametersKHR-pVideoSessionParametersInfo-08267");
+    context.vk.GetEncodedVideoSessionParametersKHR(device(), &get_info, nullptr, &data_size, nullptr);
     m_errorMonitor->VerifyFound();
 
     // Trying to request non-existent PPS
@@ -2985,22 +2976,22 @@ TEST_F(NegativeVideo, GetEncodedSessionParamsH265) {
     h265_info.writeStdPPS = VK_TRUE;
     h265_info.stdPPSId = 1;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetEncodedVideoSessionParametersKHR-pVideoSessionParametersInfo-08268");
-    context.vk.GetEncodedVideoSessionParametersKHR(m_device->device(), &get_info, nullptr, &data_size, nullptr);
+    m_errorMonitor->SetDesiredError("VUID-vkGetEncodedVideoSessionParametersKHR-pVideoSessionParametersInfo-08268");
+    context.vk.GetEncodedVideoSessionParametersKHR(device(), &get_info, nullptr, &data_size, nullptr);
     m_errorMonitor->VerifyFound();
 
     h265_info.stdSPSId = 1;
     h265_info.stdPPSId = 0;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetEncodedVideoSessionParametersKHR-pVideoSessionParametersInfo-08268");
-    context.vk.GetEncodedVideoSessionParametersKHR(m_device->device(), &get_info, nullptr, &data_size, nullptr);
+    m_errorMonitor->SetDesiredError("VUID-vkGetEncodedVideoSessionParametersKHR-pVideoSessionParametersInfo-08268");
+    context.vk.GetEncodedVideoSessionParametersKHR(device(), &get_info, nullptr, &data_size, nullptr);
     m_errorMonitor->VerifyFound();
 
     h265_info.stdVPSId = 1;
     h265_info.stdSPSId = 0;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetEncodedVideoSessionParametersKHR-pVideoSessionParametersInfo-08268");
-    context.vk.GetEncodedVideoSessionParametersKHR(m_device->device(), &get_info, nullptr, &data_size, nullptr);
+    m_errorMonitor->SetDesiredError("VUID-vkGetEncodedVideoSessionParametersKHR-pVideoSessionParametersInfo-08268");
+    context.vk.GetEncodedVideoSessionParametersKHR(device(), &get_info, nullptr, &data_size, nullptr);
     m_errorMonitor->VerifyFound();
 
     // Trying to request non-existent VPS, SPS, and PPS
@@ -3010,19 +3001,19 @@ TEST_F(NegativeVideo, GetEncodedSessionParamsH265) {
     h265_info.writeStdPPS = VK_TRUE;
     h265_info.stdVPSId = 1;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetEncodedVideoSessionParametersKHR-pVideoSessionParametersInfo-08266");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetEncodedVideoSessionParametersKHR-pVideoSessionParametersInfo-08267");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetEncodedVideoSessionParametersKHR-pVideoSessionParametersInfo-08268");
-    context.vk.GetEncodedVideoSessionParametersKHR(m_device->device(), &get_info, nullptr, &data_size, nullptr);
+    m_errorMonitor->SetDesiredError("VUID-vkGetEncodedVideoSessionParametersKHR-pVideoSessionParametersInfo-08266");
+    m_errorMonitor->SetDesiredError("VUID-vkGetEncodedVideoSessionParametersKHR-pVideoSessionParametersInfo-08267");
+    m_errorMonitor->SetDesiredError("VUID-vkGetEncodedVideoSessionParametersKHR-pVideoSessionParametersInfo-08268");
+    context.vk.GetEncodedVideoSessionParametersKHR(device(), &get_info, nullptr, &data_size, nullptr);
     m_errorMonitor->VerifyFound();
 
     // Trying to request only non-existent SPS and PPS
     h265_info.stdVPSId = 0;
     h265_info.stdSPSId = 1;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetEncodedVideoSessionParametersKHR-pVideoSessionParametersInfo-08267");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetEncodedVideoSessionParametersKHR-pVideoSessionParametersInfo-08268");
-    context.vk.GetEncodedVideoSessionParametersKHR(m_device->device(), &get_info, nullptr, &data_size, nullptr);
+    m_errorMonitor->SetDesiredError("VUID-vkGetEncodedVideoSessionParametersKHR-pVideoSessionParametersInfo-08267");
+    m_errorMonitor->SetDesiredError("VUID-vkGetEncodedVideoSessionParametersKHR-pVideoSessionParametersInfo-08268");
+    context.vk.GetEncodedVideoSessionParametersKHR(device(), &get_info, nullptr, &data_size, nullptr);
     m_errorMonitor->VerifyFound();
 }
 
@@ -3053,11 +3044,11 @@ TEST_F(NegativeVideo, BeginCodingUnsupportedCodecOp) {
     context.CreateAndBindSessionMemory();
 
     vkt::CommandPool pool(*m_device, queue_family_index);
-    vkt::CommandBuffer cb(m_device, &pool);
+    vkt::CommandBuffer cb(*m_device, pool);
 
     cb.begin();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBeginVideoCodingKHR-commandBuffer-07231");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdBeginVideoCodingKHR-commandBuffer-07231");
     cb.BeginVideoCoding(context.Begin());
     m_errorMonitor->VerifyFound();
 
@@ -3086,7 +3077,7 @@ TEST_F(NegativeVideo, BeginCodingActiveQueriesNotAllowed) {
 
     cb.begin();
     vk::CmdBeginQuery(cb.handle(), context.StatusQueryPool(), 0, 0);
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBeginVideoCodingKHR-None-07232");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdBeginVideoCodingKHR-None-07232");
     cb.BeginVideoCoding(context.Begin());
     m_errorMonitor->VerifyFound();
     vk::CmdEndQuery(cb.handle(), context.StatusQueryPool(), 0);
@@ -3122,13 +3113,13 @@ TEST_F(NegativeVideo, BeginCodingProtectedNoFaultSession) {
     vkt::CommandBuffer& protected_cb = protected_context.CmdBuffer();
 
     unprotected_cb.begin();
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBeginVideoCodingKHR-commandBuffer-07233");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdBeginVideoCodingKHR-commandBuffer-07233");
     unprotected_cb.BeginVideoCoding(protected_context.Begin());
     m_errorMonitor->VerifyFound();
     unprotected_cb.end();
 
     protected_cb.begin();
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBeginVideoCodingKHR-commandBuffer-07234");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdBeginVideoCodingKHR-commandBuffer-07234");
     protected_cb.BeginVideoCoding(unprotected_context.Begin());
     m_errorMonitor->VerifyFound();
     protected_cb.end();
@@ -3166,13 +3157,13 @@ TEST_F(NegativeVideo, BeginCodingProtectedNoFaultSlots) {
     vkt::CommandBuffer& protected_cb = protected_context.CmdBuffer();
 
     unprotected_cb.begin();
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBeginVideoCodingKHR-commandBuffer-07235");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdBeginVideoCodingKHR-commandBuffer-07235");
     unprotected_cb.BeginVideoCoding(unprotected_context.Begin().AddResource(-1, 0));
     m_errorMonitor->VerifyFound();
     unprotected_cb.end();
 
     protected_cb.begin();
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBeginVideoCodingKHR-commandBuffer-07236");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdBeginVideoCodingKHR-commandBuffer-07236");
     protected_cb.BeginVideoCoding(protected_context.Begin().AddResource(-1, 0));
     m_errorMonitor->VerifyFound();
     protected_cb.end();
@@ -3191,14 +3182,14 @@ TEST_F(NegativeVideo, BeginCodingSessionMemoryNotBound) {
     VideoContext context(m_device, config);
 
     uint32_t mem_req_count;
-    context.vk.GetVideoSessionMemoryRequirementsKHR(m_device->device(), context.Session(), &mem_req_count, nullptr);
+    context.vk.GetVideoSessionMemoryRequirementsKHR(device(), context.Session(), &mem_req_count, nullptr);
     if (mem_req_count == 0) {
         GTEST_SKIP() << "Test requires video session to need memory bindings";
     }
 
     std::vector<VkVideoSessionMemoryRequirementsKHR> mem_reqs(mem_req_count,
                                                               vku::InitStruct<VkVideoSessionMemoryRequirementsKHR>());
-    context.vk.GetVideoSessionMemoryRequirementsKHR(m_device->device(), context.Session(), &mem_req_count, mem_reqs.data());
+    context.vk.GetVideoSessionMemoryRequirementsKHR(device(), context.Session(), &mem_req_count, mem_reqs.data());
 
     std::vector<VkDeviceMemory> session_memory;
     for (uint32_t i = 0; i < mem_req_count; ++i) {
@@ -3210,7 +3201,7 @@ TEST_F(NegativeVideo, BeginCodingSessionMemoryNotBound) {
         alloc_info.allocationSize = mem_reqs[i].memoryRequirements.size;
 
         VkDeviceMemory memory = VK_NULL_HANDLE;
-        ASSERT_EQ(VK_SUCCESS, vk::AllocateMemory(m_device->device(), &alloc_info, nullptr, &memory));
+        ASSERT_EQ(VK_SUCCESS, vk::AllocateMemory(device(), &alloc_info, nullptr, &memory));
         session_memory.push_back(memory);
 
         VkBindVideoSessionMemoryInfoKHR bind_info = vku::InitStructHelper();
@@ -3219,21 +3210,21 @@ TEST_F(NegativeVideo, BeginCodingSessionMemoryNotBound) {
         bind_info.memoryOffset = 0;
         bind_info.memorySize = mem_reqs[i].memoryRequirements.size;
 
-        ASSERT_EQ(VK_SUCCESS, context.vk.BindVideoSessionMemoryKHR(m_device->device(), context.Session(), 1, &bind_info));
+        ASSERT_EQ(VK_SUCCESS, context.vk.BindVideoSessionMemoryKHR(device(), context.Session(), 1, &bind_info));
     }
 
     vkt::CommandBuffer& cb = context.CmdBuffer();
 
     cb.begin();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoBeginCodingInfoKHR-videoSession-07237");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoBeginCodingInfoKHR-videoSession-07237");
     cb.BeginVideoCoding(context.Begin());
     m_errorMonitor->VerifyFound();
 
     cb.end();
 
     for (auto memory : session_memory) {
-        vk::FreeMemory(m_device->device(), memory, nullptr);
+        vk::FreeMemory(device(), memory, nullptr);
     }
 }
 
@@ -3257,7 +3248,7 @@ TEST_F(NegativeVideo, BeginCodingInvalidSessionParams) {
     begin_info.videoSessionParameters = context2.SessionParams();
 
     cb.begin();
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoBeginCodingInfoKHR-videoSessionParameters-04857");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoBeginCodingInfoKHR-videoSessionParameters-04857");
     cb.BeginVideoCoding(begin_info);
     m_errorMonitor->VerifyFound();
     cb.end();
@@ -3282,7 +3273,7 @@ TEST_F(NegativeVideo, BeginCodingDecodeH264RequiresParams) {
     begin_info.videoSessionParameters = VK_NULL_HANDLE;
 
     cb.begin();
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoBeginCodingInfoKHR-videoSession-07247");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoBeginCodingInfoKHR-videoSession-07247");
     cb.BeginVideoCoding(begin_info);
     m_errorMonitor->VerifyFound();
     cb.end();
@@ -3307,7 +3298,7 @@ TEST_F(NegativeVideo, BeginCodingDecodeH265RequiresParams) {
     begin_info.videoSessionParameters = VK_NULL_HANDLE;
 
     cb.begin();
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoBeginCodingInfoKHR-videoSession-07248");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoBeginCodingInfoKHR-videoSession-07248");
     cb.BeginVideoCoding(begin_info);
     m_errorMonitor->VerifyFound();
     cb.end();
@@ -3332,7 +3323,7 @@ TEST_F(NegativeVideo, BeginCodingDecodeAV1RequiresParams) {
     begin_info.videoSessionParameters = VK_NULL_HANDLE;
 
     cb.begin();
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoBeginCodingInfoKHR-videoSession-09261");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoBeginCodingInfoKHR-videoSession-09261");
     cb.BeginVideoCoding(begin_info);
     m_errorMonitor->VerifyFound();
     cb.end();
@@ -3357,7 +3348,7 @@ TEST_F(NegativeVideo, BeginCodingEncodeH264RequiresParams) {
     begin_info.videoSessionParameters = VK_NULL_HANDLE;
 
     cb.begin();
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoBeginCodingInfoKHR-videoSession-07249");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoBeginCodingInfoKHR-videoSession-07249");
     cb.BeginVideoCoding(begin_info);
     m_errorMonitor->VerifyFound();
     cb.end();
@@ -3382,7 +3373,7 @@ TEST_F(NegativeVideo, BeginCodingEncodeH265RequiresParams) {
     begin_info.videoSessionParameters = VK_NULL_HANDLE;
 
     cb.begin();
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoBeginCodingInfoKHR-videoSession-07250");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoBeginCodingInfoKHR-videoSession-07250");
     cb.BeginVideoCoding(begin_info);
     m_errorMonitor->VerifyFound();
     cb.end();
@@ -3428,7 +3419,7 @@ TEST_F(NegativeVideo, BeginCodingIncompatRefPicProfile) {
     vkt::CommandBuffer& cb = context1.CmdBuffer();
 
     cb.begin();
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoBeginCodingInfoKHR-pPictureResource-07240");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoBeginCodingInfoKHR-pPictureResource-07240");
     cb.BeginVideoCoding(context1.Begin().AddResource(-1, context2.Dpb()->Picture(0)));
     m_errorMonitor->VerifyFound();
     cb.end();
@@ -3459,7 +3450,7 @@ TEST_F(NegativeVideo, BeginCodingInvalidResourceLayer) {
     VkVideoPictureResourceInfoKHR res = context.Dpb()->Picture(0);
     res.baseArrayLayer = 5;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoPictureResourceInfoKHR-baseArrayLayer-07175");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoPictureResourceInfoKHR-baseArrayLayer-07175");
     cb.BeginVideoCoding(context.Begin().AddResource(-1, res));
     m_errorMonitor->VerifyFound();
 
@@ -3490,10 +3481,10 @@ TEST_F(NegativeVideo, BeginCodingDecodeSlotInactive) {
     cb.EndVideoCoding(context.End());
     cb.end();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBeginVideoCodingKHR-slotIndex-07239");
-    context.Queue().submit(cb, false);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdBeginVideoCodingKHR-slotIndex-07239");
+    context.Queue().Submit(cb);
     m_errorMonitor->VerifyFound();
-    m_device->wait();
+    m_device->Wait();
 
     cb.begin();
     cb.BeginVideoCoding(context.Begin().AddResource(-1, 0));
@@ -3503,25 +3494,25 @@ TEST_F(NegativeVideo, BeginCodingDecodeSlotInactive) {
     cb.DecodeVideo(context.DecodeReferenceFrame(0));
     cb.EndVideoCoding(context.End());
     cb.end();
-    context.Queue().submit(cb);
-    m_device->wait();
+    context.Queue().Submit(cb);
+    m_device->Wait();
 
     cb.begin();
     cb.BeginVideoCoding(context.Begin().InvalidateSlot(0));
     cb.EndVideoCoding(context.End());
     cb.end();
-    context.Queue().submit(cb);
-    m_device->wait();
+    context.Queue().Submit(cb);
+    m_device->Wait();
 
     cb.begin();
     cb.BeginVideoCoding(context.Begin().AddResource(0, 0));
     cb.EndVideoCoding(context.End());
     cb.end();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBeginVideoCodingKHR-slotIndex-07239");
-    context.Queue().submit(cb, false);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdBeginVideoCodingKHR-slotIndex-07239");
+    context.Queue().Submit(cb);
     m_errorMonitor->VerifyFound();
-    m_device->wait();
+    m_device->Wait();
 }
 
 TEST_F(NegativeVideo, BeginCodingDecodeInvalidSlotResourceAssociation) {
@@ -3555,10 +3546,10 @@ TEST_F(NegativeVideo, BeginCodingDecodeInvalidSlotResourceAssociation) {
     cb.EndVideoCoding(context.End());
     cb.end();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBeginVideoCodingKHR-pPictureResource-07265");
-    context.Queue().submit(cb, false);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdBeginVideoCodingKHR-pPictureResource-07265");
+    context.Queue().Submit(cb);
     m_errorMonitor->VerifyFound();
-    m_device->wait();
+    m_device->Wait();
 }
 
 TEST_F(NegativeVideo, BeginCodingInvalidSlotIndex) {
@@ -3582,7 +3573,7 @@ TEST_F(NegativeVideo, BeginCodingInvalidSlotIndex) {
 
     cb.begin();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoBeginCodingInfoKHR-slotIndex-04856");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoBeginCodingInfoKHR-slotIndex-04856");
     cb.BeginVideoCoding(context.Begin().AddResource(-1, 0).AddResource(3, 1).AddResource(-1, 2));
     m_errorMonitor->VerifyFound();
 
@@ -3610,7 +3601,7 @@ TEST_F(NegativeVideo, BeginCodingResourcesNotUnique) {
 
     cb.begin();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoBeginCodingInfoKHR-pPictureResource-07238");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoBeginCodingInfoKHR-pPictureResource-07238");
     cb.BeginVideoCoding(context.Begin().AddResource(0, 0).AddResource(1, 0));
     m_errorMonitor->VerifyFound();
 
@@ -3653,7 +3644,7 @@ TEST_F(NegativeVideo, BeginCodingReferenceFormatMismatch) {
 
     cb.begin();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoBeginCodingInfoKHR-pPictureResource-07241");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoBeginCodingInfoKHR-pPictureResource-07241");
     cb.BeginVideoCoding(context.Begin().AddResource(-1, dpb.Picture(0)));
     m_errorMonitor->VerifyFound();
 
@@ -3683,13 +3674,13 @@ TEST_F(NegativeVideo, BeginCodingInvalidCodedOffset) {
 
     cb.begin();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoBeginCodingInfoKHR-pPictureResource-07242");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoBeginCodingInfoKHR-pPictureResource-07242");
     res.codedOffset.x = 5;
     res.codedOffset.y = 0;
     cb.BeginVideoCoding(context.Begin().AddResource(-1, res));
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoBeginCodingInfoKHR-pPictureResource-07242");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoBeginCodingInfoKHR-pPictureResource-07242");
     res.codedOffset.x = 0;
     res.codedOffset.y = 4;
     cb.BeginVideoCoding(context.Begin().AddResource(-1, res));
@@ -3726,13 +3717,13 @@ TEST_F(NegativeVideo, BeginCodingInvalidCodedExtent) {
     cb.BeginVideoCoding(context.Begin().AddResource(-1, res));
     cb.EndVideoCoding(context.End());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoBeginCodingInfoKHR-pPictureResource-07243");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoBeginCodingInfoKHR-pPictureResource-07243");
     res.codedExtent.width = config.Caps()->minCodedExtent.width - 1;
     res.codedExtent.height = config.Caps()->minCodedExtent.height;
     cb.BeginVideoCoding(context.Begin().AddResource(-1, res));
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoBeginCodingInfoKHR-pPictureResource-07243");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoBeginCodingInfoKHR-pPictureResource-07243");
     res.codedExtent.width = config.Caps()->minCodedExtent.width;
     res.codedExtent.height = config.Caps()->minCodedExtent.height - 1;
     cb.BeginVideoCoding(context.Begin().AddResource(-1, res));
@@ -3743,13 +3734,13 @@ TEST_F(NegativeVideo, BeginCodingInvalidCodedExtent) {
     cb.BeginVideoCoding(context.Begin().AddResource(-1, res));
     cb.EndVideoCoding(context.End());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoBeginCodingInfoKHR-pPictureResource-07243");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoBeginCodingInfoKHR-pPictureResource-07243");
     res.codedExtent.width = config.SessionCreateInfo()->maxCodedExtent.width + 1;
     res.codedExtent.height = config.SessionCreateInfo()->maxCodedExtent.height;
     cb.BeginVideoCoding(context.Begin().AddResource(-1, res));
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoBeginCodingInfoKHR-pPictureResource-07243");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoBeginCodingInfoKHR-pPictureResource-07243");
     res.codedExtent.width = config.SessionCreateInfo()->maxCodedExtent.width;
     res.codedExtent.height = config.SessionCreateInfo()->maxCodedExtent.height + 1;
     cb.BeginVideoCoding(context.Begin().AddResource(-1, res));
@@ -3785,7 +3776,7 @@ TEST_F(NegativeVideo, BeginCodingInvalidSeparateReferenceImages) {
 
     cb.begin();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoBeginCodingInfoKHR-flags-07244");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoBeginCodingInfoKHR-flags-07244");
     cb.BeginVideoCoding(context.Begin().AddResource(-1, context.Dpb()->Picture(0)).AddResource(-1, separate_dpb.Picture(1)));
     m_errorMonitor->VerifyFound();
 
@@ -3833,7 +3824,7 @@ TEST_F(NegativeVideo, BeginCodingMissingDecodeDpbUsage) {
 
     cb.begin();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoBeginCodingInfoKHR-slotIndex-07245");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoBeginCodingInfoKHR-slotIndex-07245");
     cb.BeginVideoCoding(context.Begin().AddResource(-1, res));
     m_errorMonitor->VerifyFound();
 
@@ -3881,7 +3872,7 @@ TEST_F(NegativeVideo, BeginCodingMissingEncodeDpbUsage) {
 
     cb.begin();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoBeginCodingInfoKHR-slotIndex-07246");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoBeginCodingInfoKHR-slotIndex-07246");
     cb.BeginVideoCoding(context.Begin().AddResource(-1, res));
     m_errorMonitor->VerifyFound();
 
@@ -3931,7 +3922,7 @@ TEST_F(NegativeVideo, BeginCodingEncodeH264MissingGopRemainingFrames) {
     cb.begin();
 
     // Test with VkVideoEncodeH264GopRemainingFrameInfoKHR missing from pNext chain
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBeginVideoCodingKHR-pBeginInfo-08255");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdBeginVideoCodingKHR-pBeginInfo-08255");
     cb.BeginVideoCoding(begin_info);
     m_errorMonitor->VerifyFound();
 
@@ -3939,7 +3930,7 @@ TEST_F(NegativeVideo, BeginCodingEncodeH264MissingGopRemainingFrames) {
     gop_remaining_frames_info.useGopRemainingFrames = VK_FALSE;
     gop_remaining_frames_info.pNext = begin_info.pNext;
     begin_info.pNext = &gop_remaining_frames_info;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBeginVideoCodingKHR-pBeginInfo-08255");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdBeginVideoCodingKHR-pBeginInfo-08255");
     cb.BeginVideoCoding(begin_info);
     m_errorMonitor->VerifyFound();
 
@@ -3989,7 +3980,7 @@ TEST_F(NegativeVideo, BeginCodingEncodeH265MissingGopRemainingFrames) {
     cb.begin();
 
     // Test with VkVideoEncodeH264GopRemainingFrameInfoKHR missing from pNext chain
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBeginVideoCodingKHR-pBeginInfo-08256");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdBeginVideoCodingKHR-pBeginInfo-08256");
     cb.BeginVideoCoding(begin_info);
     m_errorMonitor->VerifyFound();
 
@@ -3997,7 +3988,7 @@ TEST_F(NegativeVideo, BeginCodingEncodeH265MissingGopRemainingFrames) {
     gop_remaining_frames_info.useGopRemainingFrames = VK_FALSE;
     gop_remaining_frames_info.pNext = begin_info.pNext;
     begin_info.pNext = &gop_remaining_frames_info;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBeginVideoCodingKHR-pBeginInfo-08256");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdBeginVideoCodingKHR-pBeginInfo-08256");
     cb.BeginVideoCoding(begin_info);
     m_errorMonitor->VerifyFound();
 
@@ -4027,7 +4018,7 @@ TEST_F(NegativeVideo, EndCodingActiveQueriesNotAllowed) {
     cb.begin();
     cb.BeginVideoCoding(context.Begin());
     vk::CmdBeginQuery(cb.handle(), context.StatusQueryPool(), 0, 0);
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEndVideoCodingKHR-None-07251");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEndVideoCodingKHR-None-07251");
     cb.EndVideoCoding(context.End());
     m_errorMonitor->VerifyFound();
     vk::CmdEndQuery(cb.handle(), context.StatusQueryPool(), 0);
@@ -4061,11 +4052,11 @@ TEST_F(NegativeVideo, ControlSessionUninitialized) {
     cb.EndVideoCoding(context.End());
     cb.end();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdControlVideoCodingKHR-flags-07017");
-    context.Queue().submit(cb, false);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdControlVideoCodingKHR-flags-07017");
+    context.Queue().Submit(cb);
     m_errorMonitor->VerifyFound();
 
-    m_device->wait();
+    m_device->Wait();
 }
 
 TEST_F(NegativeVideo, EncodeQualityLevelControlInvalidQualityLevel) {
@@ -4091,13 +4082,13 @@ TEST_F(NegativeVideo, EncodeQualityLevelControlInvalidQualityLevel) {
 
     cb.begin();
     cb.BeginVideoCoding(context.Begin());
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeQualityLevelInfoKHR-qualityLevel-08311");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeQualityLevelInfoKHR-qualityLevel-08311");
     cb.ControlVideoCoding(control_info);
     m_errorMonitor->VerifyFound();
     cb.EndVideoCoding(context.End());
     cb.end();
 
-    m_device->wait();
+    m_device->Wait();
 }
 
 TEST_F(NegativeVideo, EncodeQualityLevelControlRequiresEncodeSession) {
@@ -4123,7 +4114,7 @@ TEST_F(NegativeVideo, EncodeQualityLevelControlRequiresEncodeSession) {
     cb.BeginVideoCoding(context.Begin());
 
     control_info.flags = VK_VIDEO_CODING_CONTROL_ENCODE_QUALITY_LEVEL_BIT_KHR;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdControlVideoCodingKHR-pCodingControlInfo-08243");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdControlVideoCodingKHR-pCodingControlInfo-08243");
     cb.ControlVideoCoding(control_info);
     m_errorMonitor->VerifyFound();
 
@@ -4152,7 +4143,7 @@ TEST_F(NegativeVideo, EncodeQualityLevelControlMissingChain) {
 
     cb.begin();
     cb.BeginVideoCoding(context.Begin());
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoCodingControlInfoKHR-flags-08349");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoCodingControlInfoKHR-flags-08349");
     cb.ControlVideoCoding(control_info);
     m_errorMonitor->VerifyFound();
     cb.EndVideoCoding(context.End());
@@ -4183,7 +4174,7 @@ TEST_F(NegativeVideo, EncodeParamsQualityLevelMismatch) {
     create_info.pNext = &quality_level_info;
     create_info.videoSession = context.Session();
 
-    context.vk.CreateVideoSessionParametersKHR(m_device->device(), &create_info, nullptr, &params_quality_level_1);
+    context.vk.CreateVideoSessionParametersKHR(device(), &create_info, nullptr, &params_quality_level_1);
 
     // Submitting command buffer using mismatching parameters object encode quality level is fine as long as
     // there is no encode operation recorded
@@ -4192,8 +4183,8 @@ TEST_F(NegativeVideo, EncodeParamsQualityLevelMismatch) {
     cb.ControlVideoCoding(context.Control().Reset());
     cb.EndVideoCoding(context.End());
     cb.end();
-    context.Queue().submit(cb);
-    context.Queue().wait();
+    context.Queue().Submit(cb);
+    context.Queue().Wait();
 
     // Submitting command buffer with matching parameters object encode quality level is fine even if the
     // quality is modified afterwards.
@@ -4203,8 +4194,8 @@ TEST_F(NegativeVideo, EncodeParamsQualityLevelMismatch) {
     cb.ControlVideoCoding(context.Control().EncodeQualityLevel(1));
     cb.EndVideoCoding(context.End());
     cb.end();
-    context.Queue().submit(cb);
-    context.Queue().wait();
+    context.Queue().Submit(cb);
+    context.Queue().Wait();
 
     // Submitting command buffer with matching parameters object encode quality level is fine, even if state
     // is not set here
@@ -4213,8 +4204,8 @@ TEST_F(NegativeVideo, EncodeParamsQualityLevelMismatch) {
     cb.EncodeVideo(context.EncodeFrame());
     cb.EndVideoCoding(context.End());
     cb.end();
-    context.Queue().submit(cb);
-    context.Queue().wait();
+    context.Queue().Submit(cb);
+    context.Queue().Wait();
 
     // Submitting command buffer with mismatching parameters object is fine if the quality level is modified
     // to the right one before the encode operation
@@ -4224,8 +4215,8 @@ TEST_F(NegativeVideo, EncodeParamsQualityLevelMismatch) {
     cb.EncodeVideo(context.EncodeFrame());
     cb.EndVideoCoding(context.End());
     cb.end();
-    context.Queue().submit(cb);
-    context.Queue().wait();
+    context.Queue().Submit(cb);
+    context.Queue().Wait();
 
     // Submitting an encode operation with mismatching effective and parameters encode quality levels should fail
     cb.begin();
@@ -4233,8 +4224,8 @@ TEST_F(NegativeVideo, EncodeParamsQualityLevelMismatch) {
     cb.EncodeVideo(context.EncodeFrame());
     cb.EndVideoCoding(context.End());
     cb.end();
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-None-08318");
-    context.Queue().submit(cb, false);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-None-08318");
+    context.Queue().Submit(cb);
     m_errorMonitor->VerifyFound();
 
     // Same goes when encode quality level state is changed before/after
@@ -4244,7 +4235,7 @@ TEST_F(NegativeVideo, EncodeParamsQualityLevelMismatch) {
     cb.EncodeVideo(context.EncodeFrame());
     cb.ControlVideoCoding(context.Control().EncodeQualityLevel(1));
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-None-08318");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-None-08318");
     cb.EncodeVideo(context.EncodeFrame());
     m_errorMonitor->VerifyFound();
 
@@ -4258,7 +4249,7 @@ TEST_F(NegativeVideo, EncodeParamsQualityLevelMismatch) {
     cb.EncodeVideo(context.EncodeFrame());
     cb.ControlVideoCoding(context.Control().EncodeQualityLevel(0));
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-None-08318");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-None-08318");
     cb.EncodeVideo(context.EncodeFrame());
     m_errorMonitor->VerifyFound();
 
@@ -4272,11 +4263,11 @@ TEST_F(NegativeVideo, EncodeParamsQualityLevelMismatch) {
     cb.EndVideoCoding(context.End());
     cb.end();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-None-08318");
-    context.Queue().submit(cb, false);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-None-08318");
+    context.Queue().Submit(cb);
     m_errorMonitor->VerifyFound();
 
-    context.vk.DestroyVideoSessionParametersKHR(m_device->device(), params_quality_level_1, nullptr);
+    context.vk.DestroyVideoSessionParametersKHR(device(), params_quality_level_1, nullptr);
 }
 
 TEST_F(NegativeVideo, EncodeRateControlRequiresEncodeSession) {
@@ -4302,7 +4293,7 @@ TEST_F(NegativeVideo, EncodeRateControlRequiresEncodeSession) {
     cb.BeginVideoCoding(context.Begin());
 
     control_info.flags = VK_VIDEO_CODING_CONTROL_ENCODE_RATE_CONTROL_BIT_KHR;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdControlVideoCodingKHR-pCodingControlInfo-08243");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdControlVideoCodingKHR-pCodingControlInfo-08243");
     cb.ControlVideoCoding(control_info);
     m_errorMonitor->VerifyFound();
 
@@ -4343,13 +4334,13 @@ TEST_F(NegativeVideo, EncodeRateControlUnsupportedMode) {
 
     cb.begin();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeRateControlInfoKHR-rateControlMode-08244");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeRateControlInfoKHR-rateControlMode-08244");
     cb.BeginVideoCoding(context.Begin().RateControl(rc_info));
     m_errorMonitor->VerifyFound();
 
     cb.BeginVideoCoding(context.Begin());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeRateControlInfoKHR-rateControlMode-08244");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeRateControlInfoKHR-rateControlMode-08244");
     cb.ControlVideoCoding(context.Control().RateControl(rc_info));
     m_errorMonitor->VerifyFound();
 
@@ -4380,13 +4371,13 @@ TEST_F(NegativeVideo, EncodeRateControlTooManyLayers) {
 
     cb.begin();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeRateControlInfoKHR-layerCount-08245");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeRateControlInfoKHR-layerCount-08245");
     cb.BeginVideoCoding(context.Begin().RateControl(rc_info));
     m_errorMonitor->VerifyFound();
 
     cb.BeginVideoCoding(context.Begin());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeRateControlInfoKHR-layerCount-08245");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeRateControlInfoKHR-layerCount-08245");
     cb.ControlVideoCoding(context.Control().RateControl(rc_info));
     m_errorMonitor->VerifyFound();
 
@@ -4429,13 +4420,13 @@ TEST_F(NegativeVideo, EncodeRateControlNoLayers) {
 
             cb.begin();
 
-            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeRateControlInfoKHR-rateControlMode-08248");
+            m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeRateControlInfoKHR-rateControlMode-08248");
             cb.BeginVideoCoding(context.Begin().RateControl(rc_info));
             m_errorMonitor->VerifyFound();
 
             cb.BeginVideoCoding(context.Begin());
 
-            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeRateControlInfoKHR-rateControlMode-08248");
+            m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeRateControlInfoKHR-rateControlMode-08248");
             cb.ControlVideoCoding(context.Control().RateControl(rc_info));
             m_errorMonitor->VerifyFound();
 
@@ -4474,13 +4465,13 @@ TEST_F(NegativeVideo, EncodeRateControlMissingLayers) {
 
             cb.begin();
 
-            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeRateControlInfoKHR-rateControlMode-08275");
+            m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeRateControlInfoKHR-rateControlMode-08275");
             cb.BeginVideoCoding(context.Begin().RateControl(rc_info));
             m_errorMonitor->VerifyFound();
 
             cb.BeginVideoCoding(context.Begin());
 
-            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeRateControlInfoKHR-rateControlMode-08275");
+            m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeRateControlInfoKHR-rateControlMode-08275");
             cb.ControlVideoCoding(context.Control().RateControl(rc_info));
             m_errorMonitor->VerifyFound();
 
@@ -4519,14 +4510,14 @@ TEST_F(NegativeVideo, EncodeRateControlLayerBitrate) {
 
     // averageBitrate must be greater than 0
     rc_info.Layer(layer_index)->averageBitrate = 0;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeRateControlInfoKHR-pLayers-08276");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeRateControlInfoKHR-pLayers-08276");
     cb.ControlVideoCoding(context.Control().RateControl(rc_info));
     m_errorMonitor->VerifyFound();
 
     // averageBitrate must be less than or equal to maxBitrate cap
     rc_info.Layer(layer_index)->averageBitrate = config.EncodeCaps()->maxBitrate + 1;
     m_errorMonitor->SetAllowedFailureMsg("VUID-VkVideoEncodeRateControlInfoKHR-rateControlMode-08278");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeRateControlInfoKHR-pLayers-08276");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeRateControlInfoKHR-pLayers-08276");
     cb.ControlVideoCoding(context.Control().RateControl(rc_info));
     m_errorMonitor->VerifyFound();
 
@@ -4536,13 +4527,13 @@ TEST_F(NegativeVideo, EncodeRateControlLayerBitrate) {
     // maxBitrate must be greater than 0
     rc_info.Layer(layer_index)->maxBitrate = 0;
     m_errorMonitor->SetAllowedFailureMsg("VUID-VkVideoEncodeRateControlInfoKHR-rateControlMode-08278");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeRateControlInfoKHR-pLayers-08277");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeRateControlInfoKHR-pLayers-08277");
     cb.ControlVideoCoding(context.Control().RateControl(rc_info));
     m_errorMonitor->VerifyFound();
 
     // maxBitrate must be less than or equal to maxBitrate cap
     rc_info.Layer(layer_index)->maxBitrate = config.EncodeCaps()->maxBitrate + 1;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeRateControlInfoKHR-pLayers-08277");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeRateControlInfoKHR-pLayers-08277");
     cb.ControlVideoCoding(context.Control().RateControl(rc_info));
     m_errorMonitor->VerifyFound();
 
@@ -4553,7 +4544,7 @@ TEST_F(NegativeVideo, EncodeRateControlLayerBitrate) {
 
         // averageBitrate must be less than or equal to maxBitrate
         rc_info.Layer(layer_index)->maxBitrate = rc_info.Layer(layer_index)->averageBitrate - 1;
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeRateControlInfoKHR-rateControlMode-08278");
+        m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeRateControlInfoKHR-rateControlMode-08278");
         cb.ControlVideoCoding(context.Control().RateControl(rc_info));
         m_errorMonitor->VerifyFound();
     }
@@ -4590,13 +4581,13 @@ TEST_F(NegativeVideo, EncodeRateControlLayerBitrateCBR) {
 
     // averageBitrate must equal maxBitrate for CBR
     rc_info.Layer(layer_index)->maxBitrate = rc_info.Layer(layer_index)->averageBitrate - 1;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeRateControlInfoKHR-rateControlMode-08356");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeRateControlInfoKHR-rateControlMode-08356");
     cb.ControlVideoCoding(context.Control().RateControl(rc_info));
     m_errorMonitor->VerifyFound();
 
     rc_info.Layer(layer_index)->maxBitrate = rc_info.Layer(layer_index)->averageBitrate;
     rc_info.Layer(layer_index)->averageBitrate -= 1;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeRateControlInfoKHR-rateControlMode-08356");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeRateControlInfoKHR-rateControlMode-08356");
     cb.ControlVideoCoding(context.Control().RateControl(rc_info));
     m_errorMonitor->VerifyFound();
 
@@ -4632,7 +4623,7 @@ TEST_F(NegativeVideo, EncodeRateControlLayerBitrateVBR) {
 
     // averageBitrate must be less than or equal to maxBitrate
     rc_info.Layer(layer_index)->maxBitrate = rc_info.Layer(layer_index)->averageBitrate - 1;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeRateControlInfoKHR-rateControlMode-08278");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeRateControlInfoKHR-rateControlMode-08278");
     cb.ControlVideoCoding(context.Control().RateControl(rc_info));
     m_errorMonitor->VerifyFound();
 
@@ -4668,14 +4659,14 @@ TEST_F(NegativeVideo, EncodeRateControlLayerFrameRate) {
     // frameRateNumerator must be greater than 0
     rc_info.Layer(layer_index)->frameRateNumerator = 0;
     rc_info.Layer(layer_index)->frameRateDenominator = 1;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeRateControlLayerInfoKHR-frameRateNumerator-08350");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeRateControlLayerInfoKHR-frameRateNumerator-08350");
     cb.ControlVideoCoding(context.Control().RateControl(rc_info));
     m_errorMonitor->VerifyFound();
 
     // frameRateDenominator must be greater than 0
     rc_info.Layer(layer_index)->frameRateNumerator = 30;
     rc_info.Layer(layer_index)->frameRateDenominator = 0;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeRateControlLayerInfoKHR-frameRateDenominator-08351");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeRateControlLayerInfoKHR-frameRateDenominator-08351");
     cb.ControlVideoCoding(context.Control().RateControl(rc_info));
     m_errorMonitor->VerifyFound();
 
@@ -4707,15 +4698,15 @@ TEST_F(NegativeVideo, EncodeRateControlVirtualBufferSize) {
 
     // virtualBufferSizeInMs must be greater than 0
     rc_info->virtualBufferSizeInMs = 0;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeRateControlInfoKHR-layerCount-08357");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeRateControlInfoKHR-layerCount-08358");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeRateControlInfoKHR-layerCount-08357");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeRateControlInfoKHR-layerCount-08358");
     cb.ControlVideoCoding(context.Control().RateControl(rc_info));
     m_errorMonitor->VerifyFound();
 
     // initialVirtualBufferSizeInMs must be less than virtualBufferSizeInMs
     rc_info->virtualBufferSizeInMs = 1000;
     rc_info->initialVirtualBufferSizeInMs = 1000;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeRateControlInfoKHR-layerCount-08358");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeRateControlInfoKHR-layerCount-08358");
     cb.ControlVideoCoding(context.Control().RateControl(rc_info));
     m_errorMonitor->VerifyFound();
 
@@ -4752,7 +4743,7 @@ TEST_F(NegativeVideo, EncodeRateControlH264ConstantQpNonZero) {
     if (config.EncodeCapsH264()->maxQp < 1) {
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdEncodeVideoKHR-constantQp-08270");
     }
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-constantQp-08269");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-constantQp-08269");
     cb.EncodeVideo(encode_info);
     m_errorMonitor->VerifyFound();
 
@@ -4788,13 +4779,13 @@ TEST_F(NegativeVideo, EncodeRateControlH264ConstantQpNotInCapRange) {
 
     encode_info.CodecInfo().encode_h264.slice_info.constantQp = config.EncodeCapsH264()->minQp - 1;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-constantQp-08270");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-constantQp-08270");
     cb.EncodeVideo(encode_info);
     m_errorMonitor->VerifyFound();
 
     encode_info.CodecInfo().encode_h264.slice_info.constantQp = config.EncodeCapsH264()->maxQp + 1;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-constantQp-08270");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-constantQp-08270");
     cb.EncodeVideo(encode_info);
     m_errorMonitor->VerifyFound();
 
@@ -4848,7 +4839,7 @@ TEST_F(NegativeVideo, EncodeRateControlH264ConstantQpPerSliceMismatch) {
 
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdEncodeVideoKHR-naluSliceEntryCount-08302");
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdEncodeVideoKHR-naluSliceEntryCount-08312");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-constantQp-08271");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-constantQp-08271");
     cb.EncodeVideo(encode_info);
     m_errorMonitor->VerifyFound();
 
@@ -4885,7 +4876,7 @@ TEST_F(NegativeVideo, EncodeRateControlH265ConstantQpNonZero) {
     if (config.EncodeCapsH265()->maxQp < 1) {
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdEncodeVideoKHR-constantQp-08273");
     }
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-constantQp-08272");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-constantQp-08272");
     cb.EncodeVideo(encode_info);
     m_errorMonitor->VerifyFound();
 
@@ -4921,13 +4912,13 @@ TEST_F(NegativeVideo, EncodeRateControlH265ConstantQpNotInCapRange) {
 
     encode_info.CodecInfo().encode_h265.slice_segment_info.constantQp = config.EncodeCapsH265()->minQp - 1;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-constantQp-08273");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-constantQp-08273");
     cb.EncodeVideo(encode_info);
     m_errorMonitor->VerifyFound();
 
     encode_info.CodecInfo().encode_h265.slice_segment_info.constantQp = config.EncodeCapsH265()->maxQp + 1;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-constantQp-08273");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-constantQp-08273");
     cb.EncodeVideo(encode_info);
     m_errorMonitor->VerifyFound();
 
@@ -4982,7 +4973,7 @@ TEST_F(NegativeVideo, EncodeRateControlH265ConstantQpPerSliceSegmentMismatch) {
     m_errorMonitor->SetAllowedFailureMsg("VUID-VkVideoEncodeH265PictureInfoKHR-flags-08324");
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdEncodeVideoKHR-naluSliceSegmentEntryCount-08307");
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdEncodeVideoKHR-naluSliceSegmentEntryCount-08313");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-constantQp-08274");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-constantQp-08274");
     cb.EncodeVideo(encode_info);
     m_errorMonitor->VerifyFound();
 
@@ -5015,13 +5006,13 @@ TEST_F(NegativeVideo, EncodeRateControlH264LayerCountMismatch) {
     cb.begin();
 
     rc_info.CodecInfo().encode_h264.temporalLayerCount = 1;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeRateControlInfoKHR-videoCodecOperation-07022");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeRateControlInfoKHR-videoCodecOperation-07022");
     cb.BeginVideoCoding(context.Begin().RateControl(rc_info));
     m_errorMonitor->VerifyFound();
 
     if (config.EncodeCapsH264()->maxTemporalLayerCount > 2) {
         rc_info.CodecInfo().encode_h264.temporalLayerCount = 3;
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeRateControlInfoKHR-videoCodecOperation-07022");
+        m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeRateControlInfoKHR-videoCodecOperation-07022");
         cb.BeginVideoCoding(context.Begin().RateControl(rc_info));
         m_errorMonitor->VerifyFound();
     }
@@ -5029,13 +5020,13 @@ TEST_F(NegativeVideo, EncodeRateControlH264LayerCountMismatch) {
     cb.BeginVideoCoding(context.Begin());
 
     rc_info.CodecInfo().encode_h264.temporalLayerCount = 1;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeRateControlInfoKHR-videoCodecOperation-07022");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeRateControlInfoKHR-videoCodecOperation-07022");
     cb.ControlVideoCoding(context.Control().RateControl(rc_info));
     m_errorMonitor->VerifyFound();
 
     if (config.EncodeCapsH264()->maxTemporalLayerCount > 2) {
         rc_info.CodecInfo().encode_h264.temporalLayerCount = 3;
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeRateControlInfoKHR-videoCodecOperation-07022");
+        m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeRateControlInfoKHR-videoCodecOperation-07022");
         cb.ControlVideoCoding(context.Control().RateControl(rc_info));
         m_errorMonitor->VerifyFound();
     }
@@ -5069,13 +5060,13 @@ TEST_F(NegativeVideo, EncodeRateControlH265LayerCountMismatch) {
     cb.begin();
 
     rc_info.CodecInfo().encode_h265.subLayerCount = 1;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeRateControlInfoKHR-videoCodecOperation-07025");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeRateControlInfoKHR-videoCodecOperation-07025");
     cb.BeginVideoCoding(context.Begin().RateControl(rc_info));
     m_errorMonitor->VerifyFound();
 
     if (config.EncodeCapsH265()->maxSubLayerCount > 2) {
         rc_info.CodecInfo().encode_h265.subLayerCount = 3;
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeRateControlInfoKHR-videoCodecOperation-07025");
+        m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeRateControlInfoKHR-videoCodecOperation-07025");
         cb.BeginVideoCoding(context.Begin().RateControl(rc_info));
         m_errorMonitor->VerifyFound();
     }
@@ -5083,13 +5074,13 @@ TEST_F(NegativeVideo, EncodeRateControlH265LayerCountMismatch) {
     cb.BeginVideoCoding(context.Begin());
 
     rc_info.CodecInfo().encode_h265.subLayerCount = 1;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeRateControlInfoKHR-videoCodecOperation-07025");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeRateControlInfoKHR-videoCodecOperation-07025");
     cb.ControlVideoCoding(context.Control().RateControl(rc_info));
     m_errorMonitor->VerifyFound();
 
     if (config.EncodeCapsH265()->maxSubLayerCount > 2) {
         rc_info.CodecInfo().encode_h265.subLayerCount = 3;
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeRateControlInfoKHR-videoCodecOperation-07025");
+        m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeRateControlInfoKHR-videoCodecOperation-07025");
         cb.ControlVideoCoding(context.Control().RateControl(rc_info));
         m_errorMonitor->VerifyFound();
     }
@@ -5122,12 +5113,12 @@ TEST_F(NegativeVideo, EncodeRateControlH264HrdCompliance) {
 
     cb.begin();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeH264RateControlInfoKHR-flags-08280");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeH264RateControlInfoKHR-flags-08280");
     cb.BeginVideoCoding(context.Begin().RateControl(rc_info));
     m_errorMonitor->VerifyFound();
     cb.BeginVideoCoding(context.Begin());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeH264RateControlInfoKHR-flags-08280");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeH264RateControlInfoKHR-flags-08280");
     cb.ControlVideoCoding(context.Control().RateControl(rc_info));
     m_errorMonitor->VerifyFound();
 
@@ -5159,12 +5150,12 @@ TEST_F(NegativeVideo, EncodeRateControlH265HrdCompliance) {
 
     cb.begin();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeH265RateControlInfoKHR-flags-08291");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeH265RateControlInfoKHR-flags-08291");
     cb.BeginVideoCoding(context.Begin().RateControl(rc_info));
     m_errorMonitor->VerifyFound();
     cb.BeginVideoCoding(context.Begin());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeH265RateControlInfoKHR-flags-08291");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeH265RateControlInfoKHR-flags-08291");
     cb.ControlVideoCoding(context.Control().RateControl(rc_info));
     m_errorMonitor->VerifyFound();
 
@@ -5863,7 +5854,7 @@ TEST_F(NegativeVideo, EncodeRateControlMissingChain) {
 
     cb.begin();
     cb.BeginVideoCoding(context.Begin());
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoCodingControlInfoKHR-flags-07018");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoCodingControlInfoKHR-flags-07018");
     cb.ControlVideoCoding(control_info);
     m_errorMonitor->VerifyFound();
     cb.EndVideoCoding(context.End());
@@ -5895,18 +5886,18 @@ TEST_F(NegativeVideo, EncodeRateControlStateMismatchNotDefault) {
     cb.EndVideoCoding(context.End());
     cb.end();
 
-    context.Queue().submit(cb);
-    m_device->wait();
+    context.Queue().Submit(cb);
+    m_device->Wait();
 
     cb.begin();
     cb.BeginVideoCoding(context.Begin());
     cb.EndVideoCoding(context.End());
     cb.end();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBeginVideoCodingKHR-pBeginInfo-08253");
-    context.Queue().submit(cb, false);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdBeginVideoCodingKHR-pBeginInfo-08253");
+    context.Queue().Submit(cb);
     m_errorMonitor->VerifyFound();
-    m_device->wait();
+    m_device->Wait();
 }
 
 TEST_F(NegativeVideo, EncodeRateControlStateMismatch) {
@@ -5953,8 +5944,8 @@ TEST_F(NegativeVideo, EncodeRateControlStateMismatch) {
     cb.EndVideoCoding(context.End());
     cb.end();
 
-    context.Queue().submit(cb);
-    m_device->wait();
+    context.Queue().Submit(cb);
+    m_device->Wait();
 
     VideoEncodeRateControlTestUtils rc_test_utils(this, context);
 
@@ -6069,8 +6060,8 @@ TEST_F(NegativeVideo, EncodeRateControlStateMismatchH264) {
     cb.EndVideoCoding(context.End());
     cb.end();
 
-    context.Queue().submit(cb);
-    m_device->wait();
+    context.Queue().Submit(cb);
+    m_device->Wait();
 
     VideoEncodeRateControlTestUtils rc_test_utils(this, context);
 
@@ -6203,8 +6194,8 @@ TEST_F(NegativeVideo, EncodeRateControlStateMismatchH265) {
     cb.EndVideoCoding(context.End());
     cb.end();
 
-    context.Queue().submit(cb);
-    m_device->wait();
+    context.Queue().Submit(cb);
+    m_device->Wait();
 
     VideoEncodeRateControlTestUtils rc_test_utils(this, context);
 
@@ -6296,7 +6287,7 @@ TEST_F(NegativeVideo, DecodeSessionNotDecode) {
     cb.BeginVideoCoding(encode_context.Begin());
 
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdDecodeVideoKHR-commandBuffer-cmdpool");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-None-08249");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-None-08249");
     cb.DecodeVideo(decode_context.DecodeFrame());
     m_errorMonitor->VerifyFound();
 
@@ -6329,7 +6320,7 @@ TEST_F(NegativeVideo, EncodeSessionNotEncode) {
     cb.BeginVideoCoding(decode_context.Begin());
 
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdEncodeVideoKHR-commandBuffer-cmdpool");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-None-08250");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-None-08250");
     cb.EncodeVideo(encode_context.EncodeFrame());
     m_errorMonitor->VerifyFound();
 
@@ -6359,10 +6350,10 @@ TEST_F(NegativeVideo, DecodeSessionUninitialized) {
     cb.EndVideoCoding(context.End());
     cb.end();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-None-07011");
-    context.Queue().submit(cb, false);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-None-07011");
+    context.Queue().Submit(cb);
     m_errorMonitor->VerifyFound();
-    m_device->wait();
+    m_device->Wait();
 }
 
 TEST_F(NegativeVideo, EncodeSessionUninitialized) {
@@ -6387,10 +6378,10 @@ TEST_F(NegativeVideo, EncodeSessionUninitialized) {
     cb.EndVideoCoding(context.End());
     cb.end();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-None-07012");
-    context.Queue().submit(cb, false);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-None-07012");
+    context.Queue().Submit(cb);
     m_errorMonitor->VerifyFound();
-    m_device->wait();
+    m_device->Wait();
 }
 
 TEST_F(NegativeVideo, DecodeProtectedNoFaultBitstreamBuffer) {
@@ -6424,7 +6415,7 @@ TEST_F(NegativeVideo, DecodeProtectedNoFaultBitstreamBuffer) {
     unprotected_cb.begin();
     unprotected_cb.BeginVideoCoding(unprotected_context.Begin());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-commandBuffer-07136");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-commandBuffer-07136");
     unprotected_cb.DecodeVideo(unprotected_context.DecodeFrame());
     m_errorMonitor->VerifyFound();
 
@@ -6434,7 +6425,7 @@ TEST_F(NegativeVideo, DecodeProtectedNoFaultBitstreamBuffer) {
     protected_cb.begin();
     protected_cb.BeginVideoCoding(protected_context.Begin());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-commandBuffer-07137");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-commandBuffer-07137");
     protected_cb.DecodeVideo(protected_context.DecodeFrame());
     m_errorMonitor->VerifyFound();
 
@@ -6473,7 +6464,7 @@ TEST_F(NegativeVideo, EncodeProtectedNoFaultBitstreamBuffer) {
     unprotected_cb.begin();
     unprotected_cb.BeginVideoCoding(unprotected_context.Begin());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-commandBuffer-08202");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-commandBuffer-08202");
     unprotected_cb.EncodeVideo(unprotected_context.EncodeFrame());
     m_errorMonitor->VerifyFound();
 
@@ -6483,7 +6474,7 @@ TEST_F(NegativeVideo, EncodeProtectedNoFaultBitstreamBuffer) {
     protected_cb.begin();
     protected_cb.BeginVideoCoding(protected_context.Begin());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-commandBuffer-08203");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-commandBuffer-08203");
     protected_cb.EncodeVideo(protected_context.EncodeFrame());
     m_errorMonitor->VerifyFound();
 
@@ -6522,7 +6513,7 @@ TEST_F(NegativeVideo, DecodeProtectedNoFaultDecodeOutput) {
     unprotected_cb.begin();
     unprotected_cb.BeginVideoCoding(unprotected_context.Begin());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-commandBuffer-07147");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-commandBuffer-07147");
     unprotected_cb.DecodeVideo(unprotected_context.DecodeFrame());
     m_errorMonitor->VerifyFound();
 
@@ -6532,7 +6523,7 @@ TEST_F(NegativeVideo, DecodeProtectedNoFaultDecodeOutput) {
     protected_cb.begin();
     protected_cb.BeginVideoCoding(protected_context.Begin());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-commandBuffer-07148");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-commandBuffer-07148");
     protected_cb.DecodeVideo(protected_context.DecodeFrame());
     m_errorMonitor->VerifyFound();
 
@@ -6571,7 +6562,7 @@ TEST_F(NegativeVideo, EncodeProtectedNoFaultEncodeInput) {
     unprotected_cb.begin();
     unprotected_cb.BeginVideoCoding(unprotected_context.Begin());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-commandBuffer-08211");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-commandBuffer-08211");
     unprotected_cb.EncodeVideo(unprotected_context.EncodeFrame());
     m_errorMonitor->VerifyFound();
 
@@ -6581,7 +6572,7 @@ TEST_F(NegativeVideo, EncodeProtectedNoFaultEncodeInput) {
     protected_cb.begin();
     protected_cb.BeginVideoCoding(protected_context.Begin());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-commandBuffer-08212");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-commandBuffer-08212");
     protected_cb.EncodeVideo(protected_context.EncodeFrame());
     m_errorMonitor->VerifyFound();
 
@@ -6618,7 +6609,7 @@ TEST_F(NegativeVideo, DecodeImageLayouts) {
 
     // Decode output must be in DECODE_DST layout if it is distinct from reconstructed
     if (config.SupportsDecodeOutputDistinct()) {
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07252");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07252");
         cb.DecodeVideo(context.DecodeFrame(0));
         m_errorMonitor->VerifyFound();
         vk::CmdPipelineBarrier2KHR(cb.handle(), context.Dpb()->LayoutTransition(VK_IMAGE_LAYOUT_VIDEO_DECODE_DPB_KHR, 0, 1));
@@ -6629,7 +6620,7 @@ TEST_F(NegativeVideo, DecodeImageLayouts) {
     // Decode output must be in DECODE_DPB layout if it coincides with reconstructed
     if (config.SupportsDecodeOutputCoincide()) {
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07254");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07253");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07253");
         vk::CmdPipelineBarrier2KHR(cb.handle(), context.Dpb()->LayoutTransition(VK_IMAGE_LAYOUT_VIDEO_DECODE_DST_KHR, 0, 1));
         cb.DecodeVideo(context.DecodeFrame(0).SetDecodeOutput(context.Dpb()->Picture(0)));
         m_errorMonitor->VerifyFound();
@@ -6637,7 +6628,7 @@ TEST_F(NegativeVideo, DecodeImageLayouts) {
 
     // Reconstructed must be in DECODE_DPB layout
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07253");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07254");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07254");
     vk::CmdPipelineBarrier2KHR(cb.handle(), context.Dpb()->LayoutTransition(VK_IMAGE_LAYOUT_GENERAL, 0, 1));
     cb.DecodeVideo(context.DecodeFrame(0));
     m_errorMonitor->VerifyFound();
@@ -6646,7 +6637,7 @@ TEST_F(NegativeVideo, DecodeImageLayouts) {
     // Reference must be in DECODE_DPB layout
     cb.DecodeVideo(context.DecodeReferenceFrame(0));
     vk::CmdPipelineBarrier2KHR(cb.handle(), context.Dpb()->LayoutTransition(VK_IMAGE_LAYOUT_GENERAL, 0, 1));
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pPictureResource-07255");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pPictureResource-07255");
     cb.DecodeVideo(context.DecodeFrame(1).AddReferenceFrame(0));
     m_errorMonitor->VerifyFound();
 
@@ -6682,14 +6673,14 @@ TEST_F(NegativeVideo, EncodeImageLayouts) {
     cb.EncodeVideo(context.EncodeFrame(0));
 
     // Encode input must be in ENCODE_SRC layout
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-pEncodeInfo-08222");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pEncodeInfo-08222");
     vk::CmdPipelineBarrier2KHR(cb.handle(), context.EncodeInput()->LayoutTransition(VK_IMAGE_LAYOUT_GENERAL));
     cb.EncodeVideo(context.EncodeFrame(0));
     m_errorMonitor->VerifyFound();
     vk::CmdPipelineBarrier2KHR(cb.handle(), context.EncodeInput()->LayoutTransition(VK_IMAGE_LAYOUT_VIDEO_ENCODE_SRC_KHR));
 
     // Reconstructed must be in ENCODE_DPB layout
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-pEncodeInfo-08223");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pEncodeInfo-08223");
     vk::CmdPipelineBarrier2KHR(cb.handle(), context.Dpb()->LayoutTransition(VK_IMAGE_LAYOUT_GENERAL, 0, 1));
     cb.EncodeVideo(context.EncodeFrame(0));
     m_errorMonitor->VerifyFound();
@@ -6698,7 +6689,7 @@ TEST_F(NegativeVideo, EncodeImageLayouts) {
     // Reference must be in ENCODE_DPB layout
     cb.EncodeVideo(context.EncodeReferenceFrame(0));
     vk::CmdPipelineBarrier2KHR(cb.handle(), context.Dpb()->LayoutTransition(VK_IMAGE_LAYOUT_GENERAL, 0, 1));
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-pPictureResource-08224");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pPictureResource-08224");
     cb.EncodeVideo(context.EncodeFrame(1).AddReferenceFrame(0));
     m_errorMonitor->VerifyFound();
 
@@ -6736,21 +6727,21 @@ TEST_F(NegativeVideo, DecodeInvalidResourceLayer) {
 
     // Invalid baseArrayLayer in VkVideoDecodeInfoKHR::dstPictureResource
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07141");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoPictureResourceInfoKHR-baseArrayLayer-07175");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoPictureResourceInfoKHR-baseArrayLayer-07175");
     cb.DecodeVideo(context.DecodeFrame(0).SetDecodeOutput(dst_res));
     m_errorMonitor->VerifyFound();
 
     // Invalid baseArrayLayer in VkVideoDecodeInfoKHR::pSetupReferenceSlot
     if (config.SupportsDecodeOutputDistinct()) {
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07149");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoPictureResourceInfoKHR-baseArrayLayer-07175");
+        m_errorMonitor->SetDesiredError("VUID-VkVideoPictureResourceInfoKHR-baseArrayLayer-07175");
         cb.DecodeVideo(context.DecodeFrame(0, &dpb_res));
         m_errorMonitor->VerifyFound();
     } else {
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07141");
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07149");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoPictureResourceInfoKHR-baseArrayLayer-07175");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoPictureResourceInfoKHR-baseArrayLayer-07175");
+        m_errorMonitor->SetDesiredError("VUID-VkVideoPictureResourceInfoKHR-baseArrayLayer-07175");
+        m_errorMonitor->SetDesiredError("VUID-VkVideoPictureResourceInfoKHR-baseArrayLayer-07175");
         cb.DecodeVideo(context.DecodeFrame(0, &dpb_res).SetDecodeOutput(dst_res));
         m_errorMonitor->VerifyFound();
     }
@@ -6758,7 +6749,7 @@ TEST_F(NegativeVideo, DecodeInvalidResourceLayer) {
     // Invalid baseArrayLayer in VkVideoDecodeInfoKHR::pReferenceSlots
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07151");
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdDecodeVideoKHR-slotIndex-07256");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoPictureResourceInfoKHR-baseArrayLayer-07175");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoPictureResourceInfoKHR-baseArrayLayer-07175");
     cb.DecodeVideo(context.DecodeFrame(1).AddReferenceFrame(0, &dpb_res));
     m_errorMonitor->VerifyFound();
 
@@ -6792,7 +6783,7 @@ TEST_F(NegativeVideo, DecodeQueryTooManyOperations) {
     vk::CmdBeginQuery(cb.handle(), context.StatusQueryPool(), 0, 0);
     cb.DecodeVideo(context.DecodeFrame());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-opCount-07134");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-opCount-07134");
     cb.DecodeVideo(context.DecodeFrame());
     m_errorMonitor->VerifyFound();
 
@@ -6828,7 +6819,7 @@ TEST_F(NegativeVideo, EncodeQueryTooManyOperations) {
     vk::CmdBeginQuery(cb.handle(), context.StatusQueryPool(), 0, 0);
     cb.EncodeVideo(context.EncodeFrame());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-opCount-07174");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-opCount-07174");
     cb.EncodeVideo(context.EncodeFrame());
     m_errorMonitor->VerifyFound();
 
@@ -6841,7 +6832,7 @@ TEST_F(NegativeVideo, EncodeQueryTooManyOperations) {
     vk::CmdBeginQuery(cb.handle(), context.EncodeFeedbackQueryPool(), 0, 0);
     cb.EncodeVideo(context.EncodeFrame());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-opCount-07174");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-opCount-07174");
     cb.EncodeVideo(context.EncodeFrame());
     m_errorMonitor->VerifyFound();
 
@@ -6872,7 +6863,7 @@ TEST_F(NegativeVideo, DecodeIncompatBufferProfile) {
     cb.begin();
     cb.BeginVideoCoding(context1.Begin());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07135");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07135");
     cb.DecodeVideo(context1.DecodeFrame().SetBitstream(context2.Bitstream()));
     m_errorMonitor->VerifyFound();
 
@@ -6902,7 +6893,7 @@ TEST_F(NegativeVideo, EncodeIncompatBufferProfile) {
     cb.begin();
     cb.BeginVideoCoding(context1.Begin());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-pEncodeInfo-08201");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pEncodeInfo-08201");
     cb.EncodeVideo(context1.EncodeFrame().SetBitstream(context2.Bitstream()));
     m_errorMonitor->VerifyFound();
 
@@ -6942,7 +6933,7 @@ TEST_F(NegativeVideo, DecodeBufferMissingDecodeSrcUsage) {
     cb.begin();
     cb.BeginVideoCoding(context.Begin());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoDecodeInfoKHR-srcBuffer-07165");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoDecodeInfoKHR-srcBuffer-07165");
     cb.DecodeVideo(context.DecodeFrame().SetBitstreamBuffer(buffer.handle(), 0, create_info.size));
     m_errorMonitor->VerifyFound();
 
@@ -6982,7 +6973,7 @@ TEST_F(NegativeVideo, EncodeBufferMissingEncodeDstUsage) {
     cb.begin();
     cb.BeginVideoCoding(context.Begin());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeInfoKHR-dstBuffer-08236");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeInfoKHR-dstBuffer-08236");
     cb.EncodeVideo(context.EncodeFrame().SetBitstreamBuffer(buffer.handle(), 0, create_info.size));
     m_errorMonitor->VerifyFound();
 
@@ -7014,7 +7005,7 @@ TEST_F(NegativeVideo, DecodeBufferOffsetOutOfBounds) {
     decode_info->srcBufferOffset += config.Caps()->minBitstreamBufferOffsetAlignment - 1;
     decode_info->srcBufferOffset &= ~(config.Caps()->minBitstreamBufferOffsetAlignment - 1);
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoDecodeInfoKHR-srcBufferOffset-07166");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoDecodeInfoKHR-srcBufferOffset-07166");
     m_errorMonitor->SetAllowedFailureMsg("VUID-VkVideoDecodeInfoKHR-srcBufferRange-07167");
     cb.DecodeVideo(decode_info);
     m_errorMonitor->VerifyFound();
@@ -7047,7 +7038,7 @@ TEST_F(NegativeVideo, EncodeBufferOffsetOutOfBounds) {
     encode_info->dstBufferOffset += config.Caps()->minBitstreamBufferOffsetAlignment - 1;
     encode_info->dstBufferOffset &= ~(config.Caps()->minBitstreamBufferOffsetAlignment - 1);
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeInfoKHR-dstBufferOffset-08237");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeInfoKHR-dstBufferOffset-08237");
     m_errorMonitor->SetAllowedFailureMsg("VUID-VkVideoEncodeInfoKHR-dstBufferRange-08238");
     cb.EncodeVideo(encode_info);
     m_errorMonitor->VerifyFound();
@@ -7080,7 +7071,7 @@ TEST_F(NegativeVideo, DecodeBufferOffsetAlignment) {
     ++decode_info->srcBufferOffset;
     decode_info->srcBufferRange -= config.Caps()->minBitstreamBufferSizeAlignment;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07138");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07138");
     cb.DecodeVideo(decode_info);
     m_errorMonitor->VerifyFound();
 
@@ -7112,7 +7103,7 @@ TEST_F(NegativeVideo, EncodeBufferOffsetAlignment) {
     ++encode_info->dstBufferOffset;
     encode_info->dstBufferRange -= config.Caps()->minBitstreamBufferSizeAlignment;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-pEncodeInfo-08204");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pEncodeInfo-08204");
     cb.EncodeVideo(encode_info);
     m_errorMonitor->VerifyFound();
 
@@ -7141,12 +7132,12 @@ TEST_F(NegativeVideo, DecodeBufferRangeOutOfBounds) {
 
     VideoDecodeInfo decode_info = context.DecodeFrame();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoDecodeInfoKHR-srcBufferRange-07167");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoDecodeInfoKHR-srcBufferRange-07167");
     decode_info->srcBufferOffset += config.Caps()->minBitstreamBufferOffsetAlignment;
     cb.DecodeVideo(decode_info);
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoDecodeInfoKHR-srcBufferRange-07167");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoDecodeInfoKHR-srcBufferRange-07167");
     decode_info->srcBufferOffset = 0;
     decode_info->srcBufferRange += config.Caps()->minBitstreamBufferSizeAlignment;
     cb.DecodeVideo(decode_info);
@@ -7177,12 +7168,12 @@ TEST_F(NegativeVideo, EncodeBufferRangeOutOfBounds) {
 
     VideoEncodeInfo encode_info = context.EncodeFrame();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeInfoKHR-dstBufferRange-08238");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeInfoKHR-dstBufferRange-08238");
     encode_info->dstBufferOffset += config.Caps()->minBitstreamBufferOffsetAlignment;
     cb.EncodeVideo(encode_info);
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeInfoKHR-dstBufferRange-08238");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeInfoKHR-dstBufferRange-08238");
     encode_info->dstBufferOffset = 0;
     encode_info->dstBufferRange += config.Caps()->minBitstreamBufferSizeAlignment;
     cb.EncodeVideo(encode_info);
@@ -7215,7 +7206,7 @@ TEST_F(NegativeVideo, DecodeBufferRangeAlignment) {
     VideoDecodeInfo decode_info = context.DecodeFrame();
     --decode_info->srcBufferRange;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07139");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07139");
     cb.DecodeVideo(decode_info);
     m_errorMonitor->VerifyFound();
 
@@ -7246,7 +7237,7 @@ TEST_F(NegativeVideo, EncodeBufferRangeAlignment) {
     VideoEncodeInfo encode_info = context.EncodeFrame();
     --encode_info->dstBufferRange;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-pEncodeInfo-08205");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pEncodeInfo-08205");
     cb.EncodeVideo(encode_info);
     m_errorMonitor->VerifyFound();
 
@@ -7281,7 +7272,7 @@ TEST_F(NegativeVideo, DecodeInvalidOutputAndSetupCoincide) {
     cb.BeginVideoCoding(context.Begin().AddResource(-1, 0));
 
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07146");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07140");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07140");
     cb.DecodeVideo(context.DecodeFrame(0).SetDecodeOutput(context.Dpb()->Picture(0)));
     m_errorMonitor->VerifyFound();
 
@@ -7315,7 +7306,7 @@ TEST_F(NegativeVideo, DecodeInvalidOutputAndSetupDistinct) {
     cb.begin();
     cb.BeginVideoCoding(context.Begin().AddResource(-1, 0));
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07141");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07141");
     cb.DecodeVideo(context.DecodeFrame(0).SetDecodeOutput(context.DecodeOutput()));
     m_errorMonitor->VerifyFound();
 
@@ -7349,12 +7340,12 @@ TEST_F(NegativeVideo, DecodeInvalidSetupSlotIndex) {
     auto setup_slot = *decode_info->pSetupReferenceSlot;
     decode_info->pSetupReferenceSlot = &setup_slot;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoDecodeInfoKHR-pSetupReferenceSlot-07168");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoDecodeInfoKHR-pSetupReferenceSlot-07168");
     setup_slot.slotIndex = -1;
     cb.DecodeVideo(decode_info);
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07170");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07170");
     setup_slot.slotIndex = 2;
     cb.DecodeVideo(decode_info);
     m_errorMonitor->VerifyFound();
@@ -7389,12 +7380,12 @@ TEST_F(NegativeVideo, EncodeInvalidSetupSlotIndex) {
     auto setup_slot = *encode_info->pSetupReferenceSlot;
     encode_info->pSetupReferenceSlot = &setup_slot;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeInfoKHR-pSetupReferenceSlot-08239");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeInfoKHR-pSetupReferenceSlot-08239");
     setup_slot.slotIndex = -1;
     cb.EncodeVideo(encode_info);
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-pEncodeInfo-08213");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pEncodeInfo-08213");
     setup_slot.slotIndex = 2;
     cb.EncodeVideo(encode_info);
     m_errorMonitor->VerifyFound();
@@ -7425,12 +7416,12 @@ TEST_F(NegativeVideo, DecodeInvalidRefSlotIndex) {
     cb.begin();
     cb.BeginVideoCoding(context.Begin().AddResource(0, 0));
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoDecodeInfoKHR-slotIndex-07171");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoDecodeInfoKHR-slotIndex-07171");
     cb.DecodeVideo(context.DecodeFrame(0).AddReferenceFrame(-1, 0));
     m_errorMonitor->VerifyFound();
 
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07151");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-slotIndex-07256");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-slotIndex-07256");
     cb.DecodeVideo(context.DecodeFrame(0).AddReferenceFrame(2, 0));
     m_errorMonitor->VerifyFound();
 
@@ -7460,12 +7451,12 @@ TEST_F(NegativeVideo, EncodeInvalidRefSlotIndex) {
     cb.begin();
     cb.BeginVideoCoding(context.Begin().AddResource(0, 0));
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeInfoKHR-slotIndex-08241");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeInfoKHR-slotIndex-08241");
     cb.EncodeVideo(context.EncodeFrame(0).AddReferenceFrame(-1, 0));
     m_errorMonitor->VerifyFound();
 
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdEncodeVideoKHR-pPictureResource-08219");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-slotIndex-08217");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-slotIndex-08217");
     cb.EncodeVideo(context.EncodeFrame(0).AddReferenceFrame(2, 0));
     m_errorMonitor->VerifyFound();
 
@@ -7498,7 +7489,7 @@ TEST_F(NegativeVideo, DecodeSetupNull) {
     VideoDecodeInfo decode_info = context.DecodeFrame(0);
     decode_info->pSetupReferenceSlot = NULL;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-08376");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-08376");
     cb.DecodeVideo(decode_info);
     m_errorMonitor->VerifyFound();
 
@@ -7532,7 +7523,7 @@ TEST_F(NegativeVideo, DecodeSetupResourceNull) {
     auto setup_slot = *decode_info->pSetupReferenceSlot;
     decode_info->pSetupReferenceSlot = &setup_slot;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoDecodeInfoKHR-pSetupReferenceSlot-07169");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoDecodeInfoKHR-pSetupReferenceSlot-07169");
     setup_slot.pPictureResource = nullptr;
     cb.DecodeVideo(decode_info);
     m_errorMonitor->VerifyFound();
@@ -7566,7 +7557,7 @@ TEST_F(NegativeVideo, EncodeSetupNull) {
     VideoEncodeInfo encode_info = context.EncodeFrame(0);
     encode_info->pSetupReferenceSlot = NULL;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-pEncodeInfo-08377");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pEncodeInfo-08377");
     cb.EncodeVideo(encode_info);
     m_errorMonitor->VerifyFound();
 
@@ -7600,7 +7591,7 @@ TEST_F(NegativeVideo, EncodeSetupResourceNull) {
     auto setup_slot = *encode_info->pSetupReferenceSlot;
     encode_info->pSetupReferenceSlot = &setup_slot;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeInfoKHR-pSetupReferenceSlot-08240");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeInfoKHR-pSetupReferenceSlot-08240");
     setup_slot.pPictureResource = nullptr;
     cb.EncodeVideo(encode_info);
     m_errorMonitor->VerifyFound();
@@ -7631,7 +7622,7 @@ TEST_F(NegativeVideo, DecodeReferenceResourceNull) {
     cb.begin();
     cb.BeginVideoCoding(context.Begin().AddResource(0, 0).AddResource(-1, 1));
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoDecodeInfoKHR-pPictureResource-07172");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoDecodeInfoKHR-pPictureResource-07172");
     cb.DecodeVideo(context.DecodeFrame(1).AddReferenceFrame(0, nullptr));
     m_errorMonitor->VerifyFound();
 
@@ -7661,7 +7652,7 @@ TEST_F(NegativeVideo, EncodeReferenceResourceNull) {
     cb.begin();
     cb.BeginVideoCoding(context.Begin().AddResource(0, 0).AddResource(-1, 1));
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeInfoKHR-pPictureResource-08242");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeInfoKHR-pPictureResource-08242");
     cb.EncodeVideo(context.EncodeFrame(1).AddReferenceFrame(0, nullptr));
     m_errorMonitor->VerifyFound();
 
@@ -7706,7 +7697,7 @@ TEST_F(NegativeVideo, DecodeIncompatOutputPicProfile) {
     cb.begin();
     cb.BeginVideoCoding(context1.Begin());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07142");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07142");
     cb.DecodeVideo(context1.DecodeFrame().SetDecodeOutput(context2.DecodeOutput()));
     m_errorMonitor->VerifyFound();
 
@@ -7751,7 +7742,7 @@ TEST_F(NegativeVideo, EncodeIncompatInputPicProfile) {
     cb.begin();
     cb.BeginVideoCoding(context1.Begin());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-pEncodeInfo-08206");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pEncodeInfo-08206");
     cb.EncodeVideo(context1.EncodeFrame().SetEncodeInput(context2.EncodeInput()));
     m_errorMonitor->VerifyFound();
 
@@ -7792,7 +7783,7 @@ TEST_F(NegativeVideo, DecodeOutputFormatMismatch) {
     cb.begin();
     cb.BeginVideoCoding(context.Begin());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07143");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07143");
     cb.DecodeVideo(context.DecodeFrame().SetDecodeOutput(output.Picture()));
     m_errorMonitor->VerifyFound();
 
@@ -7833,7 +7824,7 @@ TEST_F(NegativeVideo, EncodeInputFormatMismatch) {
     cb.begin();
     cb.BeginVideoCoding(context.Begin());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-pEncodeInfo-08207");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pEncodeInfo-08207");
     cb.EncodeVideo(context.EncodeFrame().SetEncodeInput(output.Picture()));
     m_errorMonitor->VerifyFound();
 
@@ -7879,7 +7870,7 @@ TEST_F(NegativeVideo, DecodeOutputMissingDecodeDstUsage) {
     cb.begin();
     cb.BeginVideoCoding(context.Begin());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07146");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07146");
     cb.DecodeVideo(context.DecodeFrame().SetDecodeOutput(dst_res));
     m_errorMonitor->VerifyFound();
 
@@ -7925,7 +7916,7 @@ TEST_F(NegativeVideo, EncodeInputMissingEncodeSrcUsage) {
     cb.begin();
     cb.BeginVideoCoding(context.Begin());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-pEncodeInfo-08210");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pEncodeInfo-08210");
     cb.EncodeVideo(context.EncodeFrame().SetEncodeInput(src_res));
     m_errorMonitor->VerifyFound();
 
@@ -7954,25 +7945,25 @@ TEST_F(NegativeVideo, DecodeOutputCodedOffsetExtent) {
 
     VkVideoPictureResourceInfoKHR dst_res = context.DecodeOutput()->Picture();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07144");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07144");
     ++dst_res.codedOffset.x;
     cb.DecodeVideo(context.DecodeFrame().SetDecodeOutput(dst_res));
     --dst_res.codedOffset.x;
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07144");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07144");
     ++dst_res.codedOffset.y;
     cb.DecodeVideo(context.DecodeFrame().SetDecodeOutput(dst_res));
     --dst_res.codedOffset.y;
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07145");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07145");
     ++dst_res.codedExtent.width;
     cb.DecodeVideo(context.DecodeFrame().SetDecodeOutput(dst_res));
     --dst_res.codedExtent.width;
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07145");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07145");
     ++dst_res.codedExtent.height;
     cb.DecodeVideo(context.DecodeFrame().SetDecodeOutput(dst_res));
     --dst_res.codedExtent.height;
@@ -8003,25 +7994,25 @@ TEST_F(NegativeVideo, EncodeInputCodedOffsetExtent) {
 
     VkVideoPictureResourceInfoKHR src_res = context.EncodeInput()->Picture();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-pEncodeInfo-08208");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pEncodeInfo-08208");
     ++src_res.codedOffset.x;
     cb.EncodeVideo(context.EncodeFrame().SetEncodeInput(src_res));
     --src_res.codedOffset.x;
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-pEncodeInfo-08208");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pEncodeInfo-08208");
     ++src_res.codedOffset.y;
     cb.EncodeVideo(context.EncodeFrame().SetEncodeInput(src_res));
     --src_res.codedOffset.y;
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-pEncodeInfo-08209");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pEncodeInfo-08209");
     ++src_res.codedExtent.width;
     cb.EncodeVideo(context.EncodeFrame().SetEncodeInput(src_res));
     --src_res.codedExtent.width;
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-pEncodeInfo-08209");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pEncodeInfo-08209");
     ++src_res.codedExtent.height;
     cb.EncodeVideo(context.EncodeFrame().SetEncodeInput(src_res));
     --src_res.codedExtent.height;
@@ -8059,31 +8050,31 @@ TEST_F(NegativeVideo, DecodeSetupAndRefCodedOffset) {
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07144");
     }
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07149");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07173");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07173");
     ++res.codedOffset.x;
     cb.DecodeVideo(context.DecodeFrame(0, &res));
     --res.codedOffset.x;
     m_errorMonitor->VerifyFound();
 
     if (!config.SupportsDecodeOutputDistinct()) {
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07144");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07144");
     }
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07149");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07173");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07173");
     ++res.codedOffset.y;
     cb.DecodeVideo(context.DecodeFrame(0, &res));
     --res.codedOffset.y;
     m_errorMonitor->VerifyFound();
 
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07151");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-codedOffset-07257");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-codedOffset-07257");
     ++res.codedOffset.x;
     cb.DecodeVideo(context.DecodeFrame(1).AddReferenceFrame(0, &res));
     --res.codedOffset.x;
     m_errorMonitor->VerifyFound();
 
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07151");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-codedOffset-07257");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-codedOffset-07257");
     ++res.codedOffset.y;
     cb.DecodeVideo(context.DecodeFrame(1).AddReferenceFrame(0, &res));
     --res.codedOffset.y;
@@ -8118,28 +8109,28 @@ TEST_F(NegativeVideo, EncodeSetupAndRefCodedOffset) {
     VkVideoPictureResourceInfoKHR res = context.Dpb()->Picture(0);
 
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdEncodeVideoKHR-pEncodeInfo-08215");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-pEncodeInfo-08214");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pEncodeInfo-08214");
     ++res.codedOffset.x;
     cb.EncodeVideo(context.EncodeFrame(0, &res));
     --res.codedOffset.x;
     m_errorMonitor->VerifyFound();
 
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdEncodeVideoKHR-pEncodeInfo-08215");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-pEncodeInfo-08214");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pEncodeInfo-08214");
     ++res.codedOffset.y;
     cb.EncodeVideo(context.EncodeFrame(0, &res));
     --res.codedOffset.y;
     m_errorMonitor->VerifyFound();
 
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdEncodeVideoKHR-pPictureResource-08219");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-codedOffset-08218");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-codedOffset-08218");
     ++res.codedOffset.x;
     cb.EncodeVideo(context.EncodeFrame(1).AddReferenceFrame(0, &res));
     --res.codedOffset.x;
     m_errorMonitor->VerifyFound();
 
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdEncodeVideoKHR-pPictureResource-08219");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-codedOffset-08218");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-codedOffset-08218");
     ++res.codedOffset.y;
     cb.EncodeVideo(context.EncodeFrame(1).AddReferenceFrame(0, &res));
     --res.codedOffset.y;
@@ -8171,7 +8162,7 @@ TEST_F(NegativeVideo, DecodeSetupResourceNotBound) {
     cb.begin();
     cb.BeginVideoCoding(context.Begin());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07149");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07149");
     cb.DecodeVideo(context.DecodeFrame(0));
     m_errorMonitor->VerifyFound();
 
@@ -8201,7 +8192,7 @@ TEST_F(NegativeVideo, EncodeSetupResourceNotBound) {
     cb.begin();
     cb.BeginVideoCoding(context.Begin());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-pEncodeInfo-08215");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pEncodeInfo-08215");
     cb.EncodeVideo(context.EncodeFrame(0));
     m_errorMonitor->VerifyFound();
 
@@ -8234,12 +8225,12 @@ TEST_F(NegativeVideo, DecodeRefResourceNotBoundToDPBSlot) {
     cb.BeginVideoCoding(context.Begin().AddResource(0, 0).AddResource(-1, 2));
 
     // Trying to refer to reference picture resource that is not bound at all
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07151");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07151");
     cb.DecodeVideo(context.DecodeFrame(2).AddReferenceFrame(1));
     m_errorMonitor->VerifyFound();
 
     // Trying to refer to bound reference picture resource, but with incorrect slot index
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07151");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07151");
     cb.DecodeVideo(context.DecodeFrame(2).AddReferenceFrame(1, 0));
     m_errorMonitor->VerifyFound();
 
@@ -8250,14 +8241,14 @@ TEST_F(NegativeVideo, DecodeRefResourceNotBoundToDPBSlot) {
 
     // Trying to refer to bound reference picture resource, but with incorrect slot index after
     // the associated DPB slot index has been updated within the video coding scope
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07151");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07151");
     cb.DecodeVideo(context.DecodeFrame(2).AddReferenceFrame(0, 0));
     m_errorMonitor->VerifyFound();
 
     cb.ControlVideoCoding(context.Control().Reset());
 
     // Trying to refer to bound reference picture resource after reset
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07151");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07151");
     cb.DecodeVideo(context.DecodeFrame(2).AddReferenceFrame(1, 0));
     m_errorMonitor->VerifyFound();
 
@@ -8290,12 +8281,12 @@ TEST_F(NegativeVideo, EncodeRefResourceNotBoundToDPBSlot) {
     cb.BeginVideoCoding(context.Begin().AddResource(0, 0).AddResource(-1, 2));
 
     // Trying to refer to reference picture resource that is not bound at all
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-pPictureResource-08219");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pPictureResource-08219");
     cb.EncodeVideo(context.EncodeFrame(2).AddReferenceFrame(1));
     m_errorMonitor->VerifyFound();
 
     // Trying to refer to bound reference picture resource, but with incorrect slot index
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-pPictureResource-08219");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pPictureResource-08219");
     cb.EncodeVideo(context.EncodeFrame(2).AddReferenceFrame(1, 0));
     m_errorMonitor->VerifyFound();
 
@@ -8306,14 +8297,14 @@ TEST_F(NegativeVideo, EncodeRefResourceNotBoundToDPBSlot) {
 
     // Trying to refer to bound reference picture resource, but with incorrect slot index after
     // the associated DPB slot index has been updated within the video coding scope
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-pPictureResource-08219");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pPictureResource-08219");
     cb.EncodeVideo(context.EncodeFrame(2).AddReferenceFrame(0, 0));
     m_errorMonitor->VerifyFound();
 
     cb.ControlVideoCoding(context.Control().Reset());
 
     // Trying to refer to bound reference picture resource after reset
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-pPictureResource-08219");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pPictureResource-08219");
     cb.EncodeVideo(context.EncodeFrame(2).AddReferenceFrame(1, 0));
     m_errorMonitor->VerifyFound();
 
@@ -8343,7 +8334,7 @@ TEST_F(NegativeVideo, DecodeTooManyReferences) {
     cb.begin();
     cb.BeginVideoCoding(context.Begin().AddResource(0, 0).AddResource(1, 1).AddResource(-1, 2));
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-activeReferencePictureCount-07150");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-activeReferencePictureCount-07150");
     cb.DecodeVideo(context.DecodeFrame(2).AddReferenceFrame(0).AddReferenceFrame(1));
     m_errorMonitor->VerifyFound();
 
@@ -8373,7 +8364,7 @@ TEST_F(NegativeVideo, EncodeTooManyReferences) {
     cb.begin();
     cb.BeginVideoCoding(context.Begin().AddResource(0, 0).AddResource(1, 1).AddResource(-1, 2));
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-activeReferencePictureCount-08216");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-activeReferencePictureCount-08216");
     cb.EncodeVideo(context.EncodeFrame(2).AddReferenceFrame(0).AddReferenceFrame(1));
     m_errorMonitor->VerifyFound();
 
@@ -8405,11 +8396,11 @@ TEST_F(NegativeVideo, DecodeTooManyReferencesH264Interlaced) {
     cb.begin();
     cb.BeginVideoCoding(context.Begin().AddResource(0, 0).AddResource(1, 1).AddResource(-1, 2));
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-activeReferencePictureCount-07150");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-activeReferencePictureCount-07150");
     cb.DecodeVideo(context.DecodeFrame(2).AddReferenceFrame(0).AddReferenceBothFields(1));
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-activeReferencePictureCount-07150");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-activeReferencePictureCount-07150");
     cb.DecodeVideo(context.DecodeFrame(2).AddReferenceBothFields(1).AddReferenceFrame(0));
     m_errorMonitor->VerifyFound();
 
@@ -8442,12 +8433,12 @@ TEST_F(NegativeVideo, DecodeDuplicateRefResource) {
     cb.BeginVideoCoding(context.Begin().AddResource(0, 0).AddResource(-1, 2));
 
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07151");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07264");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07264");
     cb.DecodeVideo(context.DecodeFrame(2).AddReferenceFrame(0, &res).AddReferenceFrame(1, &res));
     m_errorMonitor->VerifyFound();
 
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdDecodeVideoKHR-dpbFrameUseCount-07176");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07264");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07264");
     cb.DecodeVideo(context.DecodeFrame(2).AddReferenceFrame(0, &res).AddReferenceFrame(0, &res));
     m_errorMonitor->VerifyFound();
 
@@ -8479,7 +8470,7 @@ TEST_F(NegativeVideo, DecodeDuplicateRefResourceH264Interlaced) {
     cb.begin();
     cb.BeginVideoCoding(context.Begin().AddResource(0, 0).AddResource(-1, 1));
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07264");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07264");
     cb.DecodeVideo(context.DecodeFrame(1).AddReferenceTopField(0, 0).AddReferenceBottomField(0, 0));
     m_errorMonitor->VerifyFound();
 
@@ -8512,12 +8503,12 @@ TEST_F(NegativeVideo, EncodeDuplicateRefResource) {
     cb.BeginVideoCoding(context.Begin().AddResource(0, 0).AddResource(-1, 2));
 
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdEncodeVideoKHR-pPictureResource-08219");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-pPictureResource-08220");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pPictureResource-08220");
     cb.EncodeVideo(context.EncodeFrame(2).AddReferenceFrame(0, &res).AddReferenceFrame(1, &res));
     m_errorMonitor->VerifyFound();
 
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdEncodeVideoKHR-dpbFrameUseCount-08221");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-pPictureResource-08220");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pPictureResource-08220");
     cb.EncodeVideo(context.EncodeFrame(2).AddReferenceFrame(0, &res).AddReferenceFrame(0, &res));
     m_errorMonitor->VerifyFound();
 
@@ -8547,7 +8538,7 @@ TEST_F(NegativeVideo, DecodeDuplicateFrame) {
     cb.begin();
     cb.BeginVideoCoding(context.Begin().AddResource(0, 0).AddResource(0, 1).AddResource(-1, 2));
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-dpbFrameUseCount-07176");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-dpbFrameUseCount-07176");
     cb.DecodeVideo(context.DecodeFrame(2).AddReferenceFrame(0, 0).AddReferenceFrame(0, 1));
     m_errorMonitor->VerifyFound();
 
@@ -8577,7 +8568,7 @@ TEST_F(NegativeVideo, EncodeDuplicateFrame) {
     cb.begin();
     cb.BeginVideoCoding(context.Begin().AddResource(0, 0).AddResource(0, 1).AddResource(-1, 2));
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-dpbFrameUseCount-08221");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-dpbFrameUseCount-08221");
     cb.EncodeVideo(context.EncodeFrame(2).AddReferenceFrame(0, 0).AddReferenceFrame(0, 1));
     m_errorMonitor->VerifyFound();
 
@@ -8608,29 +8599,29 @@ TEST_F(NegativeVideo, DecodeDuplicateFrameFieldH264Interlaced) {
     cb.BeginVideoCoding(context.Begin().AddResource(0, 0).AddResource(0, 1).AddResource(-1, 2));
 
     // Same DPB frame is used twice
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-dpbFrameUseCount-07176");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-dpbFrameUseCount-07176");
     cb.DecodeVideo(context.DecodeFrame(2).AddReferenceFrame(0, 0).AddReferenceFrame(0, 1));
     m_errorMonitor->VerifyFound();
 
     // Same DPB top field is used twice
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-dpbTopFieldUseCount-07177");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-dpbTopFieldUseCount-07177");
     cb.DecodeVideo(context.DecodeFrame(2).AddReferenceTopField(0, 0).AddReferenceTopField(0, 1));
     m_errorMonitor->VerifyFound();
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-dpbTopFieldUseCount-07177");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-dpbTopFieldUseCount-07177");
     cb.DecodeVideo(context.DecodeFrame(2).AddReferenceTopField(0, 0).AddReferenceBothFields(0, 1));
     m_errorMonitor->VerifyFound();
 
     // Same DPB bottom field is used twice
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-dpbBottomFieldUseCount-07178");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-dpbBottomFieldUseCount-07178");
     cb.DecodeVideo(context.DecodeFrame(2).AddReferenceBottomField(0, 0).AddReferenceBottomField(0, 1));
     m_errorMonitor->VerifyFound();
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-dpbBottomFieldUseCount-07178");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-dpbBottomFieldUseCount-07178");
     cb.DecodeVideo(context.DecodeFrame(2).AddReferenceBottomField(0, 0).AddReferenceBothFields(0, 1));
     m_errorMonitor->VerifyFound();
 
     // Same DPB top & bottom field is used twice
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-dpbTopFieldUseCount-07177");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-dpbBottomFieldUseCount-07178");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-dpbTopFieldUseCount-07177");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-dpbBottomFieldUseCount-07178");
     cb.DecodeVideo(context.DecodeFrame(2).AddReferenceBothFields(0, 0).AddReferenceBothFields(0, 1));
     m_errorMonitor->VerifyFound();
 
@@ -8665,18 +8656,18 @@ TEST_F(NegativeVideo, DecodeImplicitDeactivation) {
     cb.DecodeVideo(context.DecodeFrame(0));
     cb.EndVideoCoding(context.End());
     cb.end();
-    context.Queue().submit(cb);
-    m_device->wait();
+    context.Queue().Submit(cb);
+    m_device->Wait();
 
     // Try to include the DPB slot expecting reference picture association at begin-time
     cb.begin();
     cb.BeginVideoCoding(context.Begin().AddResource(0, 0));
     cb.EndVideoCoding(context.End());
     cb.end();
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBeginVideoCodingKHR-slotIndex-07239");
-    context.Queue().submit(cb, false);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdBeginVideoCodingKHR-slotIndex-07239");
+    context.Queue().Submit(cb);
     m_errorMonitor->VerifyFound();
-    m_device->wait();
+    m_device->Wait();
 }
 
 TEST_F(NegativeVideo, DecodeImplicitDeactivationH264Interlaced) {
@@ -8707,18 +8698,18 @@ TEST_F(NegativeVideo, DecodeImplicitDeactivationH264Interlaced) {
         cb.DecodeVideo(context.DecodeTopField(0));
         cb.EndVideoCoding(context.End());
         cb.end();
-        context.Queue().submit(cb);
-        m_device->wait();
+        context.Queue().Submit(cb);
+        m_device->Wait();
 
         // Try to include the DPB slot expecting reference picture association at begin-time
         cb.begin();
         cb.BeginVideoCoding(context.Begin().AddResource(0, 0));
         cb.EndVideoCoding(context.End());
         cb.end();
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBeginVideoCodingKHR-slotIndex-07239");
-        context.Queue().submit(cb, false);
+        m_errorMonitor->SetDesiredError("VUID-vkCmdBeginVideoCodingKHR-slotIndex-07239");
+        context.Queue().Submit(cb);
         m_errorMonitor->VerifyFound();
-        m_device->wait();
+        m_device->Wait();
     }
 
     {
@@ -8730,18 +8721,18 @@ TEST_F(NegativeVideo, DecodeImplicitDeactivationH264Interlaced) {
         cb.DecodeVideo(context.DecodeTopField(0));
         cb.EndVideoCoding(context.End());
         cb.end();
-        context.Queue().submit(cb);
-        m_device->wait();
+        context.Queue().Submit(cb);
+        m_device->Wait();
 
         // Try to include the DPB slot expecting reference picture association at begin-time
         cb.begin();
         cb.BeginVideoCoding(context.Begin().AddResource(0, 0));
         cb.EndVideoCoding(context.End());
         cb.end();
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBeginVideoCodingKHR-slotIndex-07239");
-        context.Queue().submit(cb, false);
+        m_errorMonitor->SetDesiredError("VUID-vkCmdBeginVideoCodingKHR-slotIndex-07239");
+        context.Queue().Submit(cb);
         m_errorMonitor->VerifyFound();
-        m_device->wait();
+        m_device->Wait();
     }
 
     {
@@ -8753,18 +8744,18 @@ TEST_F(NegativeVideo, DecodeImplicitDeactivationH264Interlaced) {
         cb.DecodeVideo(context.DecodeFrame(0));
         cb.EndVideoCoding(context.End());
         cb.end();
-        context.Queue().submit(cb);
-        m_device->wait();
+        context.Queue().Submit(cb);
+        m_device->Wait();
 
         // Try to include the DPB slot expecting reference picture association at begin-time
         cb.begin();
         cb.BeginVideoCoding(context.Begin().AddResource(0, 0));
         cb.EndVideoCoding(context.End());
         cb.end();
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBeginVideoCodingKHR-slotIndex-07239");
-        context.Queue().submit(cb, false);
+        m_errorMonitor->SetDesiredError("VUID-vkCmdBeginVideoCodingKHR-slotIndex-07239");
+        context.Queue().Submit(cb);
         m_errorMonitor->VerifyFound();
-        m_device->wait();
+        m_device->Wait();
     }
 
     {
@@ -8776,18 +8767,18 @@ TEST_F(NegativeVideo, DecodeImplicitDeactivationH264Interlaced) {
         cb.DecodeVideo(context.DecodeTopField(0));
         cb.EndVideoCoding(context.End());
         cb.end();
-        context.Queue().submit(cb);
-        m_device->wait();
+        context.Queue().Submit(cb);
+        m_device->Wait();
 
         // Try to include the DPB slot expecting reference picture association at begin-time
         cb.begin();
         cb.BeginVideoCoding(context.Begin().AddResource(0, 0));
         cb.EndVideoCoding(context.End());
         cb.end();
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBeginVideoCodingKHR-slotIndex-07239");
-        context.Queue().submit(cb, false);
+        m_errorMonitor->SetDesiredError("VUID-vkCmdBeginVideoCodingKHR-slotIndex-07239");
+        context.Queue().Submit(cb);
         m_errorMonitor->VerifyFound();
-        m_device->wait();
+        m_device->Wait();
     }
 
     {
@@ -8799,18 +8790,18 @@ TEST_F(NegativeVideo, DecodeImplicitDeactivationH264Interlaced) {
         cb.DecodeVideo(context.DecodeFrame(0));
         cb.EndVideoCoding(context.End());
         cb.end();
-        context.Queue().submit(cb);
-        m_device->wait();
+        context.Queue().Submit(cb);
+        m_device->Wait();
 
         // Try to include the DPB slot expecting reference picture association at begin-time
         cb.begin();
         cb.BeginVideoCoding(context.Begin().AddResource(0, 0));
         cb.EndVideoCoding(context.End());
         cb.end();
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBeginVideoCodingKHR-slotIndex-07239");
-        context.Queue().submit(cb, false);
+        m_errorMonitor->SetDesiredError("VUID-vkCmdBeginVideoCodingKHR-slotIndex-07239");
+        context.Queue().Submit(cb);
         m_errorMonitor->VerifyFound();
-        m_device->wait();
+        m_device->Wait();
     }
 
     {
@@ -8822,18 +8813,18 @@ TEST_F(NegativeVideo, DecodeImplicitDeactivationH264Interlaced) {
         cb.DecodeVideo(context.DecodeTopField(0));
         cb.EndVideoCoding(context.End());
         cb.end();
-        context.Queue().submit(cb);
-        m_device->wait();
+        context.Queue().Submit(cb);
+        m_device->Wait();
 
         // Try to include the DPB slot expecting reference picture association at begin-time
         cb.begin();
         cb.BeginVideoCoding(context.Begin().AddResource(0, 0));
         cb.EndVideoCoding(context.End());
         cb.end();
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBeginVideoCodingKHR-slotIndex-07239");
-        context.Queue().submit(cb, false);
+        m_errorMonitor->SetDesiredError("VUID-vkCmdBeginVideoCodingKHR-slotIndex-07239");
+        context.Queue().Submit(cb);
         m_errorMonitor->VerifyFound();
-        m_device->wait();
+        m_device->Wait();
     }
 }
 
@@ -8866,8 +8857,8 @@ TEST_F(NegativeVideo, DecodeRefPictureKindMismatchH264) {
         cb.DecodeVideo(context.DecodeReferenceFrame(0));
         cb.EndVideoCoding(context.End());
         cb.end();
-        context.Queue().submit(cb);
-        m_device->wait();
+        context.Queue().Submit(cb);
+        m_device->Wait();
 
         // Try to reference DPB slot as top field
         cb.begin();
@@ -8875,10 +8866,10 @@ TEST_F(NegativeVideo, DecodeRefPictureKindMismatchH264) {
         cb.DecodeVideo(context.DecodeFrame(1).AddReferenceTopField(0));
         cb.EndVideoCoding(context.End());
         cb.end();
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07267");
-        context.Queue().submit(cb, false);
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07267");
+        context.Queue().Submit(cb);
         m_errorMonitor->VerifyFound();
-        m_device->wait();
+        m_device->Wait();
 
         // Try to reference DPB slot as bottom field
         cb.begin();
@@ -8886,10 +8877,10 @@ TEST_F(NegativeVideo, DecodeRefPictureKindMismatchH264) {
         cb.DecodeVideo(context.DecodeFrame(1).AddReferenceBottomField(0));
         cb.EndVideoCoding(context.End());
         cb.end();
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07268");
-        context.Queue().submit(cb, false);
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07268");
+        context.Queue().Submit(cb);
         m_errorMonitor->VerifyFound();
-        m_device->wait();
+        m_device->Wait();
     }
 
     {
@@ -8900,8 +8891,8 @@ TEST_F(NegativeVideo, DecodeRefPictureKindMismatchH264) {
         cb.DecodeVideo(context.DecodeReferenceTopField(0));
         cb.EndVideoCoding(context.End());
         cb.end();
-        context.Queue().submit(cb);
-        m_device->wait();
+        context.Queue().Submit(cb);
+        m_device->Wait();
 
         // Try to reference DPB slot as frame
         cb.begin();
@@ -8909,10 +8900,10 @@ TEST_F(NegativeVideo, DecodeRefPictureKindMismatchH264) {
         cb.DecodeVideo(context.DecodeFrame(1).AddReferenceFrame(0));
         cb.EndVideoCoding(context.End());
         cb.end();
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07266");
-        context.Queue().submit(cb, false);
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07266");
+        context.Queue().Submit(cb);
         m_errorMonitor->VerifyFound();
-        m_device->wait();
+        m_device->Wait();
 
         // Try to reference DPB slot as bottom field
         cb.begin();
@@ -8920,10 +8911,10 @@ TEST_F(NegativeVideo, DecodeRefPictureKindMismatchH264) {
         cb.DecodeVideo(context.DecodeFrame(1).AddReferenceBottomField(0));
         cb.EndVideoCoding(context.End());
         cb.end();
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07268");
-        context.Queue().submit(cb, false);
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07268");
+        context.Queue().Submit(cb);
         m_errorMonitor->VerifyFound();
-        m_device->wait();
+        m_device->Wait();
     }
 
     {
@@ -8934,8 +8925,8 @@ TEST_F(NegativeVideo, DecodeRefPictureKindMismatchH264) {
         cb.DecodeVideo(context.DecodeReferenceBottomField(0));
         cb.EndVideoCoding(context.End());
         cb.end();
-        context.Queue().submit(cb);
-        m_device->wait();
+        context.Queue().Submit(cb);
+        m_device->Wait();
 
         // Try to reference DPB slot as frame
         cb.begin();
@@ -8943,10 +8934,10 @@ TEST_F(NegativeVideo, DecodeRefPictureKindMismatchH264) {
         cb.DecodeVideo(context.DecodeFrame(1).AddReferenceFrame(0));
         cb.EndVideoCoding(context.End());
         cb.end();
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07266");
-        context.Queue().submit(cb, false);
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07266");
+        context.Queue().Submit(cb);
         m_errorMonitor->VerifyFound();
-        m_device->wait();
+        m_device->Wait();
 
         // Try to reference DPB slot as top field
         cb.begin();
@@ -8954,10 +8945,10 @@ TEST_F(NegativeVideo, DecodeRefPictureKindMismatchH264) {
         cb.DecodeVideo(context.DecodeFrame(1).AddReferenceTopField(0));
         cb.EndVideoCoding(context.End());
         cb.end();
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07267");
-        context.Queue().submit(cb, false);
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07267");
+        context.Queue().Submit(cb);
         m_errorMonitor->VerifyFound();
-        m_device->wait();
+        m_device->Wait();
     }
 }
 
@@ -8990,8 +8981,8 @@ TEST_F(NegativeVideo, DecodeInvalidationOnlyH264Interlaced) {
         cb.DecodeVideo(context.DecodeTopField(0));
         cb.EndVideoCoding(context.End());
         cb.end();
-        context.Queue().submit(cb);
-        m_device->wait();
+        context.Queue().Submit(cb);
+        m_device->Wait();
 
         // Try to reference DPB slot as top field
         cb.begin();
@@ -8999,10 +8990,10 @@ TEST_F(NegativeVideo, DecodeInvalidationOnlyH264Interlaced) {
         cb.DecodeVideo(context.DecodeFrame(1).AddReferenceTopField(0));
         cb.EndVideoCoding(context.End());
         cb.end();
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07267");
-        context.Queue().submit(cb, false);
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07267");
+        context.Queue().Submit(cb);
         m_errorMonitor->VerifyFound();
-        m_device->wait();
+        m_device->Wait();
     }
 
     {
@@ -9015,8 +9006,8 @@ TEST_F(NegativeVideo, DecodeInvalidationOnlyH264Interlaced) {
         cb.DecodeVideo(context.DecodeBottomField(0));
         cb.EndVideoCoding(context.End());
         cb.end();
-        context.Queue().submit(cb);
-        m_device->wait();
+        context.Queue().Submit(cb);
+        m_device->Wait();
 
         // Try to reference DPB slot as bottom field
         cb.begin();
@@ -9024,10 +9015,10 @@ TEST_F(NegativeVideo, DecodeInvalidationOnlyH264Interlaced) {
         cb.DecodeVideo(context.DecodeFrame(1).AddReferenceBottomField(0));
         cb.EndVideoCoding(context.End());
         cb.end();
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07268");
-        context.Queue().submit(cb, false);
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07268");
+        context.Queue().Submit(cb);
         m_errorMonitor->VerifyFound();
-        m_device->wait();
+        m_device->Wait();
     }
 }
 
@@ -9067,7 +9058,7 @@ TEST_F(NegativeVideo, DecodeInvalidCodecInfoH264) {
         decode_info = context.DecodeFrame(0);
         decode_info->pNext = nullptr;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pNext-07152");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pNext-07152");
         cb.DecodeVideo(decode_info);
         m_errorMonitor->VerifyFound();
     }
@@ -9075,12 +9066,12 @@ TEST_F(NegativeVideo, DecodeInvalidCodecInfoH264) {
     // Decode output must be a frame if session does not support interlaced frames
     {
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07259");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-None-07258");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-None-07258");
         cb.DecodeVideo(context.DecodeTopField(0));
         m_errorMonitor->VerifyFound();
 
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07259");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-None-07258");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-None-07258");
         cb.DecodeVideo(context.DecodeBottomField(0));
         m_errorMonitor->VerifyFound();
     }
@@ -9090,7 +9081,7 @@ TEST_F(NegativeVideo, DecodeInvalidCodecInfoH264) {
         decode_info = context.DecodeFrame(0);
         decode_info->pNext = &picture_info;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pSliceOffsets-07153");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pSliceOffsets-07153");
         slice_offset = (uint32_t)decode_info->srcBufferRange;
         cb.DecodeVideo(decode_info);
         slice_offset = 0;
@@ -9102,14 +9093,14 @@ TEST_F(NegativeVideo, DecodeInvalidCodecInfoH264) {
         decode_info = context.DecodeFrame(0);
         decode_info->pNext = &picture_info;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-StdVideoH264SequenceParameterSet-07154");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-StdVideoH264SequenceParameterSet-07154");
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdDecodeVideoKHR-StdVideoH264PictureParameterSet-07155");
         std_picture_info.seq_parameter_set_id = 1;
         cb.DecodeVideo(decode_info);
         std_picture_info.seq_parameter_set_id = 0;
         m_errorMonitor->VerifyFound();
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-StdVideoH264PictureParameterSet-07155");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-StdVideoH264PictureParameterSet-07155");
         std_picture_info.pic_parameter_set_id = 1;
         cb.DecodeVideo(decode_info);
         std_picture_info.pic_parameter_set_id = 0;
@@ -9128,7 +9119,7 @@ TEST_F(NegativeVideo, DecodeInvalidCodecInfoH264) {
         decode_info->pSetupReferenceSlot = &slot;
 
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07141");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07156");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07156");
         cb.DecodeVideo(decode_info);
         m_errorMonitor->VerifyFound();
     }
@@ -9136,12 +9127,12 @@ TEST_F(NegativeVideo, DecodeInvalidCodecInfoH264) {
     // Reconstructed picture must be a frame if session does not support interlaced frames
     {
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07261");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07259");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07259");
         cb.DecodeVideo(context.DecodeReferenceTopField(0).SetFrame(true /* override decode output */));
         m_errorMonitor->VerifyFound();
 
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07261");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07259");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07259");
         cb.DecodeVideo(context.DecodeReferenceBottomField(0).SetFrame(true /* override decode output */));
         m_errorMonitor->VerifyFound();
     }
@@ -9158,22 +9149,22 @@ TEST_F(NegativeVideo, DecodeInvalidCodecInfoH264) {
         decode_info->referenceSlotCount = 1;
         decode_info->pReferenceSlots = &slot;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pNext-07157");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pNext-07157");
         cb.DecodeVideo(decode_info);
         m_errorMonitor->VerifyFound();
     }
 
     // Reference picture must be a frame if session does not support interlaced frames
     {
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07260");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07260");
         cb.DecodeVideo(context.DecodeFrame(1).AddReferenceTopField(0));
         m_errorMonitor->VerifyFound();
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07260");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07260");
         cb.DecodeVideo(context.DecodeFrame(1).AddReferenceBottomField(0));
         m_errorMonitor->VerifyFound();
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07260");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07260");
         cb.DecodeVideo(context.DecodeFrame(1).AddReferenceBothFields(0));
         m_errorMonitor->VerifyFound();
     }
@@ -9207,32 +9198,32 @@ TEST_F(NegativeVideo, DecodeFieldFrameMismatchH264) {
     cb.BeginVideoCoding(context.Begin().AddResource(-1, 0));
 
     // Decode output is frame but reconstructed is top field
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07261");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07261");
     cb.DecodeVideo(context.DecodeReferenceTopField(0).SetFrame(true /* override decode output */));
     m_errorMonitor->VerifyFound();
 
     // Decode output is frame but reconstructed is bottom field
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07261");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07261");
     cb.DecodeVideo(context.DecodeReferenceBottomField(0).SetFrame(true /* override decode output */));
     m_errorMonitor->VerifyFound();
 
     // Decode output is top field but reconstructed is frame
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07262");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07262");
     cb.DecodeVideo(context.DecodeReferenceFrame(0).SetTopField(true /* override decode output */));
     m_errorMonitor->VerifyFound();
 
     // Decode output is top field but reconstructed is bottom field
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07262");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07262");
     cb.DecodeVideo(context.DecodeBottomField(0).SetTopField(true /* override decode output */));
     m_errorMonitor->VerifyFound();
 
     // Decode output is bottom field but reconstructed is frame
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07263");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07263");
     cb.DecodeVideo(context.DecodeReferenceFrame(0).SetBottomField(true /* override decode output */));
     m_errorMonitor->VerifyFound();
 
     // Decode output is bottom field but reconstructed is top field
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07263");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07263");
     cb.DecodeVideo(context.DecodeReferenceTopField(0).SetBottomField(true /* override decode output */));
     m_errorMonitor->VerifyFound();
 
@@ -9276,7 +9267,7 @@ TEST_F(NegativeVideo, DecodeInvalidCodecInfoH265) {
         decode_info = context.DecodeFrame(0);
         decode_info->pNext = nullptr;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pNext-07158");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pNext-07158");
         cb.DecodeVideo(decode_info);
         m_errorMonitor->VerifyFound();
     }
@@ -9286,7 +9277,7 @@ TEST_F(NegativeVideo, DecodeInvalidCodecInfoH265) {
         decode_info = context.DecodeFrame(0);
         decode_info->pNext = &picture_info;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pSliceSegmentOffsets-07159");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pSliceSegmentOffsets-07159");
         slice_segment_offset = (uint32_t)decode_info->srcBufferRange;
         cb.DecodeVideo(decode_info);
         slice_segment_offset = 0;
@@ -9298,7 +9289,7 @@ TEST_F(NegativeVideo, DecodeInvalidCodecInfoH265) {
         decode_info = context.DecodeFrame(0);
         decode_info->pNext = &picture_info;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-StdVideoH265VideoParameterSet-07160");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-StdVideoH265VideoParameterSet-07160");
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdDecodeVideoKHR-StdVideoH265SequenceParameterSet-07161");
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdDecodeVideoKHR-StdVideoH265PictureParameterSet-07162");
         std_picture_info.sps_video_parameter_set_id = 1;
@@ -9306,14 +9297,14 @@ TEST_F(NegativeVideo, DecodeInvalidCodecInfoH265) {
         std_picture_info.sps_video_parameter_set_id = 0;
         m_errorMonitor->VerifyFound();
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-StdVideoH265SequenceParameterSet-07161");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-StdVideoH265SequenceParameterSet-07161");
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdDecodeVideoKHR-StdVideoH265PictureParameterSet-07162");
         std_picture_info.pps_seq_parameter_set_id = 1;
         cb.DecodeVideo(decode_info);
         std_picture_info.pps_seq_parameter_set_id = 0;
         m_errorMonitor->VerifyFound();
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-StdVideoH265PictureParameterSet-07162");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-StdVideoH265PictureParameterSet-07162");
         std_picture_info.pps_pic_parameter_set_id = 1;
         cb.DecodeVideo(decode_info);
         std_picture_info.pps_pic_parameter_set_id = 0;
@@ -9332,7 +9323,7 @@ TEST_F(NegativeVideo, DecodeInvalidCodecInfoH265) {
         decode_info->pSetupReferenceSlot = &slot;
 
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07141");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07163");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07163");
         cb.DecodeVideo(decode_info);
         m_errorMonitor->VerifyFound();
     }
@@ -9349,7 +9340,7 @@ TEST_F(NegativeVideo, DecodeInvalidCodecInfoH265) {
         decode_info->referenceSlotCount = 1;
         decode_info->pReferenceSlots = &slot;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pNext-07164");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pNext-07164");
         cb.DecodeVideo(decode_info);
         m_errorMonitor->VerifyFound();
     }
@@ -9401,7 +9392,7 @@ TEST_F(NegativeVideo, DecodeInvalidCodecInfoAV1) {
         decode_info = context.DecodeFrame(0);
         decode_info->pNext = nullptr;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pNext-09250");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pNext-09250");
         cb.DecodeVideo(decode_info);
         m_errorMonitor->VerifyFound();
     }
@@ -9411,7 +9402,7 @@ TEST_F(NegativeVideo, DecodeInvalidCodecInfoAV1) {
         decode_info = context.DecodeFrame(0);
         decode_info->pNext = &picture_info;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-frameHeaderOffset-09251");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-frameHeaderOffset-09251");
         picture_info.frameHeaderOffset = (uint32_t)decode_info->srcBufferRange;
         cb.DecodeVideo(decode_info);
         picture_info.frameHeaderOffset = 0;
@@ -9424,7 +9415,7 @@ TEST_F(NegativeVideo, DecodeInvalidCodecInfoAV1) {
         decode_info->pNext = &picture_info;
 
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdDecodeVideoKHR-pTileOffsets-09252");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pTileOffsets-09253");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pTileOffsets-09253");
         tile_offset = (uint32_t)decode_info->srcBufferRange;
         cb.DecodeVideo(decode_info);
         tile_offset = 0;
@@ -9436,12 +9427,12 @@ TEST_F(NegativeVideo, DecodeInvalidCodecInfoAV1) {
         decode_info = context.DecodeFrame(0);
         decode_info->pNext = &picture_info;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pTileOffsets-09252");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pTileOffsets-09252");
         tile_size = (uint32_t)decode_info->srcBufferRange + 1;
         cb.DecodeVideo(decode_info);
         m_errorMonitor->VerifyFound();
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pTileOffsets-09252");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pTileOffsets-09252");
         tile_offset = 1;
         tile_size = (uint32_t)decode_info->srcBufferRange;
         cb.DecodeVideo(decode_info);
@@ -9457,7 +9448,7 @@ TEST_F(NegativeVideo, DecodeInvalidCodecInfoAV1) {
         decode_info->pNext = &picture_info;
 
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-09249");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-filmGrainSupport-09248");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-filmGrainSupport-09248");
         std_picture_info.flags.apply_grain = 1;
         cb.DecodeVideo(decode_info);
         std_picture_info.flags.apply_grain = 0;
@@ -9476,7 +9467,7 @@ TEST_F(NegativeVideo, DecodeInvalidCodecInfoAV1) {
         decode_info->pSetupReferenceSlot = &slot;
 
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07141");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-09254");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-09254");
         cb.DecodeVideo(decode_info);
         m_errorMonitor->VerifyFound();
     }
@@ -9495,7 +9486,7 @@ TEST_F(NegativeVideo, DecodeInvalidCodecInfoAV1) {
 
         picture_info.referenceNameSlotIndices[3] = 0;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pNext-09255");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pNext-09255");
         cb.DecodeVideo(decode_info);
         m_errorMonitor->VerifyFound();
 
@@ -9515,7 +9506,7 @@ TEST_F(NegativeVideo, DecodeInvalidCodecInfoAV1) {
         decode_info->pReferenceSlots = &slot;
 
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdDecodeVideoKHR-pNext-09255");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-slotIndex-09263");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-slotIndex-09263");
         cb.DecodeVideo(decode_info);
         m_errorMonitor->VerifyFound();
     }
@@ -9527,7 +9518,7 @@ TEST_F(NegativeVideo, DecodeInvalidCodecInfoAV1) {
 
         picture_info.referenceNameSlotIndices[3] = 0;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-referenceNameSlotIndices-09262");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-referenceNameSlotIndices-09262");
         cb.DecodeVideo(decode_info);
         m_errorMonitor->VerifyFound();
 
@@ -9562,7 +9553,7 @@ TEST_F(NegativeVideo, DecodeAV1FilmGrainRequiresDistinct) {
 
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07140");
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07146");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pDecodeInfo-09249");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-09249");
     cb.DecodeVideo(context.DecodeFrame(0).ApplyFilmGrain().SetDecodeOutput(context.Dpb()->Picture(0)));
     m_errorMonitor->VerifyFound();
 
@@ -9600,7 +9591,7 @@ TEST_F(NegativeVideo, DecodeInlineQueryOpCount) {
     cb.begin();
     cb.BeginVideoCoding(context.Begin());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pNext-08365");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pNext-08365");
     cb.DecodeVideo(context.DecodeFrame().InlineQuery(context.StatusQueryPool(), 0, 2));
     m_errorMonitor->VerifyFound();
 
@@ -9638,13 +9629,13 @@ TEST_F(NegativeVideo, DecodeInlineQueryOutOfBounds) {
     cb.begin();
     cb.BeginVideoCoding(context.Begin());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoInlineQueryInfoKHR-queryPool-08372");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoInlineQueryInfoKHR-queryPool-08373");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoInlineQueryInfoKHR-queryPool-08372");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoInlineQueryInfoKHR-queryPool-08373");
     cb.DecodeVideo(context.DecodeFrame().InlineQuery(context.StatusQueryPool(), 4, 1));
     m_errorMonitor->VerifyFound();
 
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdDecodeVideoKHR-pNext-08365");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoInlineQueryInfoKHR-queryPool-08373");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoInlineQueryInfoKHR-queryPool-08373");
     cb.DecodeVideo(context.DecodeFrame().InlineQuery(context.StatusQueryPool(), 2, 3));
     m_errorMonitor->VerifyFound();
 
@@ -9695,29 +9686,30 @@ TEST_F(NegativeVideo, DecodeInlineQueryUnavailable) {
     m_commandBuffer->end();
 
     // Will fail as query pool has never been reset before
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pNext-08366");
-    context.Queue().submit(cb, false);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pNext-08366");
+    context.Queue().Submit(cb);
     m_errorMonitor->VerifyFound();
-    m_device->wait();
+    m_device->Wait();
 
-    m_commandBuffer->QueueCommandBuffer();
-    m_device->wait();
+    m_default_queue->Submit(*m_commandBuffer);
+    m_device->Wait();
 
     // Will succeed this time as we reset the query
-    context.Queue().submit(cb);
-    m_device->wait();
+    context.Queue().Submit(cb);
+    m_device->Wait();
 
     // Will fail again as we did not reset after use
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-pNext-08366");
-    context.Queue().submit(cb, false);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pNext-08366");
+    context.Queue().Submit(cb);
     m_errorMonitor->VerifyFound();
-    m_device->wait();
+    m_device->Wait();
 
-    m_commandBuffer->QueueCommandBuffer();
+    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Wait();
 
     // Will succeed again after reset
-    context.Queue().submit(cb);
-    m_device->wait();
+    context.Queue().Submit(cb);
+    m_device->Wait();
 }
 
 TEST_F(NegativeVideo, DecodeInlineQueryType) {
@@ -9755,7 +9747,7 @@ TEST_F(NegativeVideo, DecodeInlineQueryType) {
     cb.BeginVideoCoding(context.Begin());
 
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdDecodeVideoKHR-queryPool-08368");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-queryType-08367");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-queryType-08367");
     cb.DecodeVideo(context.DecodeFrame().InlineQuery(query_pool.handle()));
     m_errorMonitor->VerifyFound();
 
@@ -9794,7 +9786,7 @@ TEST_F(NegativeVideo, DecodeInlineQueryProfileMismatch) {
     cb.begin();
     cb.BeginVideoCoding(context1.Begin());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-queryPool-08368");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-queryPool-08368");
     cb.DecodeVideo(context1.DecodeFrame().InlineQuery(context2.StatusQueryPool()));
     m_errorMonitor->VerifyFound();
 
@@ -9836,7 +9828,7 @@ TEST_F(NegativeVideo, DecodeInlineQueryIncompatibleQueueFamily) {
     context.CreateStatusQueryPool();
 
     vkt::CommandPool cmd_pool(*m_device, queue_family_index, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
-    vkt::CommandBuffer cb(m_device, &cmd_pool);
+    vkt::CommandBuffer cb(*m_device, cmd_pool);
 
     cb.begin();
 
@@ -9845,7 +9837,7 @@ TEST_F(NegativeVideo, DecodeInlineQueryIncompatibleQueueFamily) {
     cb.BeginVideoCoding(context.Begin());
 
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdDecodeVideoKHR-commandBuffer-cmdpool");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDecodeVideoKHR-queryType-08369");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-queryType-08369");
     cb.DecodeVideo(context.DecodeFrame().InlineQuery(context.StatusQueryPool()));
     m_errorMonitor->VerifyFound();
 
@@ -9881,7 +9873,7 @@ TEST_F(NegativeVideo, EncodeInlineQueryOpCount) {
     cb.begin();
     cb.BeginVideoCoding(context.Begin());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-pNext-08360");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pNext-08360");
     cb.EncodeVideo(context.EncodeFrame().InlineQuery(context.EncodeFeedbackQueryPool(), 0, 2));
     m_errorMonitor->VerifyFound();
 
@@ -9915,13 +9907,13 @@ TEST_F(NegativeVideo, EncodeInlineQueryOutOfBounds) {
     cb.begin();
     cb.BeginVideoCoding(context.Begin());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoInlineQueryInfoKHR-queryPool-08372");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoInlineQueryInfoKHR-queryPool-08373");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoInlineQueryInfoKHR-queryPool-08372");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoInlineQueryInfoKHR-queryPool-08373");
     cb.EncodeVideo(context.EncodeFrame().InlineQuery(context.EncodeFeedbackQueryPool(), 4, 1));
     m_errorMonitor->VerifyFound();
 
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdEncodeVideoKHR-pNext-08360");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoInlineQueryInfoKHR-queryPool-08373");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoInlineQueryInfoKHR-queryPool-08373");
     cb.EncodeVideo(context.EncodeFrame().InlineQuery(context.EncodeFeedbackQueryPool(), 2, 3));
     m_errorMonitor->VerifyFound();
 
@@ -9968,29 +9960,30 @@ TEST_F(NegativeVideo, EncodeInlineQueryUnavailable) {
     m_commandBuffer->end();
 
     // Will fail as query pool has never been reset before
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-pNext-08361");
-    context.Queue().submit(cb, false);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pNext-08361");
+    context.Queue().Submit(cb);
     m_errorMonitor->VerifyFound();
-    m_device->wait();
+    m_device->Wait();
 
-    m_commandBuffer->QueueCommandBuffer();
-    m_device->wait();
+    m_default_queue->Submit(*m_commandBuffer);
+    m_device->Wait();
 
     // Will succeed this time as we reset the query
-    context.Queue().submit(cb);
-    m_device->wait();
+    context.Queue().Submit(cb);
+    m_device->Wait();
 
     // Will fail again as we did not reset after use
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-pNext-08361");
-    context.Queue().submit(cb, false);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pNext-08361");
+    context.Queue().Submit(cb);
     m_errorMonitor->VerifyFound();
-    m_device->wait();
+    m_device->Wait();
 
-    m_commandBuffer->QueueCommandBuffer();
+    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Wait();
 
     // Will succeed again after reset
-    context.Queue().submit(cb);
-    m_device->wait();
+    context.Queue().Submit(cb);
+    m_device->Wait();
 }
 
 TEST_F(NegativeVideo, EncodeInlineQueryType) {
@@ -10024,7 +10017,7 @@ TEST_F(NegativeVideo, EncodeInlineQueryType) {
     cb.BeginVideoCoding(context.Begin());
 
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdEncodeVideoKHR-queryPool-08363");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-queryType-08362");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-queryType-08362");
     cb.EncodeVideo(context.EncodeFrame().InlineQuery(query_pool.handle()));
     m_errorMonitor->VerifyFound();
 
@@ -10059,7 +10052,7 @@ TEST_F(NegativeVideo, EncodeInlineQueryProfileMismatch) {
     cb.begin();
     cb.BeginVideoCoding(context1.Begin());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-queryPool-08363");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-queryPool-08363");
     cb.EncodeVideo(context1.EncodeFrame().InlineQuery(context2.EncodeFeedbackQueryPool()));
     m_errorMonitor->VerifyFound();
 
@@ -10101,7 +10094,7 @@ TEST_F(NegativeVideo, EncodeInlineQueryIncompatibleQueueFamily) {
     context.CreateStatusQueryPool();
 
     vkt::CommandPool cmd_pool(*m_device, queue_family_index, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
-    vkt::CommandBuffer cb(m_device, &cmd_pool);
+    vkt::CommandBuffer cb(*m_device, cmd_pool);
 
     cb.begin();
 
@@ -10110,7 +10103,7 @@ TEST_F(NegativeVideo, EncodeInlineQueryIncompatibleQueueFamily) {
     cb.BeginVideoCoding(context.Begin());
 
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdEncodeVideoKHR-commandBuffer-cmdpool");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-queryType-08364");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-queryType-08364");
     cb.EncodeVideo(context.EncodeFrame().InlineQuery(context.StatusQueryPool()));
     m_errorMonitor->VerifyFound();
 
@@ -10144,7 +10137,7 @@ TEST_F(NegativeVideo, EncodeCapsH264GenPrefixNalu) {
     VideoEncodeInfo encode_info = context.EncodeFrame();
     encode_info.CodecInfo().encode_h264.picture_info.generatePrefixNalu = VK_TRUE;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeH264PictureInfoKHR-flags-08304");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeH264PictureInfoKHR-flags-08304");
     cb.EncodeVideo(encode_info);
     m_errorMonitor->VerifyFound();
 
@@ -10190,7 +10183,7 @@ TEST_F(NegativeVideo, EncodeCapsH264MaxSliceCount) {
 
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdEncodeVideoKHR-naluSliceEntryCount-08302");
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdEncodeVideoKHR-naluSliceEntryCount-08312");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeH264PictureInfoKHR-naluSliceEntryCount-08301");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeH264PictureInfoKHR-naluSliceEntryCount-08301");
     cb.EncodeVideo(encode_info);
     m_errorMonitor->VerifyFound();
 
@@ -10240,7 +10233,7 @@ TEST_F(NegativeVideo, EncodeCapsH264MoreSlicesThanMBs) {
     if (slice_count > config.EncodeCapsH264()->maxSliceCount) {
         m_errorMonitor->SetAllowedFailureMsg("VUID-VkVideoEncodeH264PictureInfoKHR-naluSliceEntryCount-08301");
     }
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-naluSliceEntryCount-08302");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-naluSliceEntryCount-08302");
     cb.EncodeVideo(encode_info);
     m_errorMonitor->VerifyFound();
 
@@ -10290,7 +10283,7 @@ TEST_F(NegativeVideo, EncodeCapsH264MoreSlicesThanMBRows) {
     if (slice_count > config.EncodeCapsH264()->maxSliceCount) {
         m_errorMonitor->SetAllowedFailureMsg("VUID-VkVideoEncodeH264PictureInfoKHR-naluSliceEntryCount-08301");
     }
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-naluSliceEntryCount-08312");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-naluSliceEntryCount-08312");
     cb.EncodeVideo(encode_info);
     m_errorMonitor->VerifyFound();
 
@@ -10334,7 +10327,7 @@ TEST_F(NegativeVideo, EncodeCapsH264DifferentSliceTypes) {
     slice_headers[0].slice_type = STD_VIDEO_H264_SLICE_TYPE_I;
     slice_headers[1].slice_type = STD_VIDEO_H264_SLICE_TYPE_P;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeH264PictureInfoKHR-flags-08315");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeH264PictureInfoKHR-flags-08315");
     cb.EncodeVideo(encode_info);
     m_errorMonitor->VerifyFound();
 
@@ -10384,7 +10377,7 @@ TEST_F(NegativeVideo, EncodeCapsH265DifferentSliceSegmentTypes) {
     m_errorMonitor->SetAllowedFailureMsg("VUID-VkVideoEncodeH265PictureInfoKHR-flags-08324");
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdEncodeVideoKHR-naluSliceSegmentEntryCount-08307");
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdEncodeVideoKHR-naluSliceSegmentEntryCount-08313");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeH265PictureInfoKHR-flags-08317");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeH265PictureInfoKHR-flags-08317");
     cb.EncodeVideo(encode_info);
     m_errorMonitor->VerifyFound();
 
@@ -10418,7 +10411,7 @@ TEST_F(NegativeVideo, EncodeCapsH265MultipleTilesPerSliceSegment) {
     cb.begin();
     cb.BeginVideoCoding(context.Begin());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeH265PictureInfoKHR-flags-08323");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeH265PictureInfoKHR-flags-08323");
     cb.EncodeVideo(context.EncodeFrame());
     m_errorMonitor->VerifyFound();
 
@@ -10459,7 +10452,7 @@ TEST_F(NegativeVideo, EncodeCapsH265MultipleSliceSegmentsPerTile) {
 
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdEncodeVideoKHR-naluSliceSegmentEntryCount-08307");
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdEncodeVideoKHR-naluSliceSegmentEntryCount-08313");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeH265PictureInfoKHR-flags-08324");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeH265PictureInfoKHR-flags-08324");
     cb.EncodeVideo(encode_info);
     m_errorMonitor->VerifyFound();
 
@@ -10507,7 +10500,7 @@ TEST_F(NegativeVideo, EncodeCapsH265MaxSliceSegmentCount) {
     m_errorMonitor->SetAllowedFailureMsg("VUID-VkVideoEncodeH265PictureInfoKHR-flags-08324");
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdEncodeVideoKHR-naluSliceSegmentEntryCount-08307");
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdEncodeVideoKHR-naluSliceSegmentEntryCount-08313");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeH265PictureInfoKHR-naluSliceSegmentEntryCount-08306");
+    m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeH265PictureInfoKHR-naluSliceSegmentEntryCount-08306");
     cb.EncodeVideo(encode_info);
     m_errorMonitor->VerifyFound();
 
@@ -10559,7 +10552,7 @@ TEST_F(NegativeVideo, EncodeCapsH265MoreSliceSegmentsThanCTBs) {
         m_errorMonitor->SetAllowedFailureMsg("VUID-VkVideoEncodeH265PictureInfoKHR-naluSliceSegmentEntryCount-08306");
     }
     m_errorMonitor->SetAllowedFailureMsg("VUID-VkVideoEncodeH265PictureInfoKHR-flags-08324");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-naluSliceSegmentEntryCount-08307");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-naluSliceSegmentEntryCount-08307");
     cb.EncodeVideo(encode_info);
     m_errorMonitor->VerifyFound();
 
@@ -10611,7 +10604,7 @@ TEST_F(NegativeVideo, EncodeCapsH265MoreSliceSegmentsThanCTBRows) {
         m_errorMonitor->SetAllowedFailureMsg("VUID-VkVideoEncodeH265PictureInfoKHR-naluSliceSegmentEntryCount-08306");
     }
     m_errorMonitor->SetAllowedFailureMsg("VUID-VkVideoEncodeH265PictureInfoKHR-flags-08324");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-naluSliceSegmentEntryCount-08313");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-naluSliceSegmentEntryCount-08313");
     cb.EncodeVideo(encode_info);
     m_errorMonitor->VerifyFound();
 
@@ -10658,7 +10651,7 @@ TEST_F(NegativeVideo, EncodeCapsH264WeightTable) {
 
         VideoEncodeInfo encode_info = context.EncodeFrame(1).AddReferenceFrame(0);
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeH264PictureInfoKHR-flags-08314");
+        m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeH264PictureInfoKHR-flags-08314");
         cb.EncodeVideo(encode_info);
         m_errorMonitor->VerifyFound();
 
@@ -10686,7 +10679,7 @@ TEST_F(NegativeVideo, EncodeCapsH264WeightTable) {
 
         VideoEncodeInfo encode_info = context.EncodeFrame(2).AddReferenceFrame(0).AddBackReferenceFrame(1);
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeH264PictureInfoKHR-flags-08314");
+        m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeH264PictureInfoKHR-flags-08314");
         cb.EncodeVideo(encode_info);
         m_errorMonitor->VerifyFound();
 
@@ -10734,7 +10727,7 @@ TEST_F(NegativeVideo, EncodeCapsH265WeightTable) {
 
         VideoEncodeInfo encode_info = context.EncodeFrame(1).AddReferenceFrame(0);
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeH265PictureInfoKHR-flags-08316");
+        m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeH265PictureInfoKHR-flags-08316");
         cb.EncodeVideo(encode_info);
         m_errorMonitor->VerifyFound();
 
@@ -10764,7 +10757,7 @@ TEST_F(NegativeVideo, EncodeCapsH265WeightTable) {
         encode_info.CodecInfo().encode_h265.std_picture_info.pic_type = STD_VIDEO_H265_PICTURE_TYPE_B;
         encode_info.CodecInfo().encode_h265.std_slice_segment_header.slice_type = STD_VIDEO_H265_SLICE_TYPE_B;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoEncodeH265PictureInfoKHR-flags-08316");
+        m_errorMonitor->SetDesiredError("VUID-VkVideoEncodeH265PictureInfoKHR-flags-08316");
         cb.EncodeVideo(encode_info);
         m_errorMonitor->VerifyFound();
 
@@ -10803,7 +10796,7 @@ TEST_F(NegativeVideo, EncodeCapsH264PicType) {
         VideoEncodeInfo encode_info = context.EncodeFrame();
         encode_info.CodecInfo().encode_h264.std_picture_info.primary_pic_type = STD_VIDEO_H264_PICTURE_TYPE_P;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-maxPPictureL0ReferenceCount-08340");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-maxPPictureL0ReferenceCount-08340");
         cb.EncodeVideo(encode_info);
         m_errorMonitor->VerifyFound();
 
@@ -10826,7 +10819,7 @@ TEST_F(NegativeVideo, EncodeCapsH264PicType) {
         VideoEncodeInfo encode_info = context.EncodeFrame();
         encode_info.CodecInfo().encode_h264.std_picture_info.primary_pic_type = STD_VIDEO_H264_PICTURE_TYPE_B;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-maxBPictureL0ReferenceCount-08341");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-maxBPictureL0ReferenceCount-08341");
         cb.EncodeVideo(encode_info);
         m_errorMonitor->VerifyFound();
 
@@ -10871,8 +10864,8 @@ TEST_F(NegativeVideo, EncodeCapsH264RefPicType) {
         encode_info.CodecInfo().encode_h264.std_picture_info.primary_pic_type = STD_VIDEO_H264_PICTURE_TYPE_P;
         encode_info.CodecInfo().encode_h264.std_reference_info[0].primary_pic_type = STD_VIDEO_H264_PICTURE_TYPE_P;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-maxPPictureL0ReferenceCount-08340");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-maxPPictureL0ReferenceCount-08340");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-maxPPictureL0ReferenceCount-08340");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-maxPPictureL0ReferenceCount-08340");
         cb.EncodeVideo(encode_info);
         m_errorMonitor->VerifyFound();
 
@@ -10900,8 +10893,8 @@ TEST_F(NegativeVideo, EncodeCapsH264RefPicType) {
         encode_info.CodecInfo().encode_h264.std_reference_info[0].primary_pic_type = STD_VIDEO_H264_PICTURE_TYPE_B;
 
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdEncodeVideoKHR-flags-08342");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-maxBPictureL0ReferenceCount-08341");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-maxBPictureL0ReferenceCount-08341");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-maxBPictureL0ReferenceCount-08341");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-maxBPictureL0ReferenceCount-08341");
         cb.EncodeVideo(encode_info);
         m_errorMonitor->VerifyFound();
 
@@ -10945,7 +10938,7 @@ TEST_F(NegativeVideo, EncodeCapsH264BPicInRefList) {
         VideoEncodeInfo encode_info = context.EncodeFrame(1).AddReferenceFrame(0);
         encode_info.CodecInfo().encode_h264.std_reference_info[0].primary_pic_type = STD_VIDEO_H264_PICTURE_TYPE_B;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-flags-08342");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-flags-08342");
         cb.EncodeVideo(encode_info);
         m_errorMonitor->VerifyFound();
 
@@ -10971,7 +10964,7 @@ TEST_F(NegativeVideo, EncodeCapsH264BPicInRefList) {
         VideoEncodeInfo encode_info = context.EncodeFrame(1).AddBackReferenceFrame(0);
         encode_info.CodecInfo().encode_h264.std_reference_info[0].primary_pic_type = STD_VIDEO_H264_PICTURE_TYPE_B;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-flags-08343");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-flags-08343");
         cb.EncodeVideo(encode_info);
         m_errorMonitor->VerifyFound();
 
@@ -11010,7 +11003,7 @@ TEST_F(NegativeVideo, EncodeCapsH265PicType) {
         VideoEncodeInfo encode_info = context.EncodeFrame();
         encode_info.CodecInfo().encode_h265.std_picture_info.pic_type = STD_VIDEO_H265_PICTURE_TYPE_P;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-maxPPictureL0ReferenceCount-08345");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-maxPPictureL0ReferenceCount-08345");
         cb.EncodeVideo(encode_info);
         m_errorMonitor->VerifyFound();
 
@@ -11033,7 +11026,7 @@ TEST_F(NegativeVideo, EncodeCapsH265PicType) {
         VideoEncodeInfo encode_info = context.EncodeFrame();
         encode_info.CodecInfo().encode_h265.std_picture_info.pic_type = STD_VIDEO_H265_PICTURE_TYPE_B;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-maxBPictureL0ReferenceCount-08346");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-maxBPictureL0ReferenceCount-08346");
         cb.EncodeVideo(encode_info);
         m_errorMonitor->VerifyFound();
 
@@ -11078,8 +11071,8 @@ TEST_F(NegativeVideo, EncodeCapsH265RefPicType) {
         encode_info.CodecInfo().encode_h265.std_picture_info.pic_type = STD_VIDEO_H265_PICTURE_TYPE_P;
         encode_info.CodecInfo().encode_h265.std_reference_info[0].pic_type = STD_VIDEO_H265_PICTURE_TYPE_P;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-maxPPictureL0ReferenceCount-08345");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-maxPPictureL0ReferenceCount-08345");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-maxPPictureL0ReferenceCount-08345");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-maxPPictureL0ReferenceCount-08345");
         cb.EncodeVideo(encode_info);
         m_errorMonitor->VerifyFound();
 
@@ -11107,8 +11100,8 @@ TEST_F(NegativeVideo, EncodeCapsH265RefPicType) {
         encode_info.CodecInfo().encode_h265.std_reference_info[0].pic_type = STD_VIDEO_H265_PICTURE_TYPE_B;
 
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdEncodeVideoKHR-flags-08347");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-maxBPictureL0ReferenceCount-08346");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-maxBPictureL0ReferenceCount-08346");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-maxBPictureL0ReferenceCount-08346");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-maxBPictureL0ReferenceCount-08346");
         cb.EncodeVideo(encode_info);
         m_errorMonitor->VerifyFound();
 
@@ -11152,7 +11145,7 @@ TEST_F(NegativeVideo, EncodeCapsH265BPicInRefList) {
         VideoEncodeInfo encode_info = context.EncodeFrame(1).AddReferenceFrame(0);
         encode_info.CodecInfo().encode_h265.std_reference_info[0].pic_type = STD_VIDEO_H265_PICTURE_TYPE_B;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-flags-08347");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-flags-08347");
         cb.EncodeVideo(encode_info);
         m_errorMonitor->VerifyFound();
 
@@ -11178,7 +11171,7 @@ TEST_F(NegativeVideo, EncodeCapsH265BPicInRefList) {
         VideoEncodeInfo encode_info = context.EncodeFrame(1).AddBackReferenceFrame(0);
         encode_info.CodecInfo().encode_h265.std_reference_info[0].pic_type = STD_VIDEO_H265_PICTURE_TYPE_B;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-flags-08348");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-flags-08348");
         cb.EncodeVideo(encode_info);
         m_errorMonitor->VerifyFound();
 
@@ -11232,7 +11225,7 @@ TEST_F(NegativeVideo, EncodeInvalidCodecInfoH264) {
         encode_info = context.EncodeFrame(0);
         encode_info->pNext = nullptr;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-pNext-08225");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pNext-08225");
         cb.EncodeVideo(encode_info);
         m_errorMonitor->VerifyFound();
     }
@@ -11242,14 +11235,14 @@ TEST_F(NegativeVideo, EncodeInvalidCodecInfoH264) {
         encode_info = context.EncodeFrame(0);
         encode_info->pNext = &picture_info;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-StdVideoH264SequenceParameterSet-08226");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-StdVideoH264SequenceParameterSet-08226");
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdEncodeVideoKHR-StdVideoH264PictureParameterSet-08227");
         std_picture_info.seq_parameter_set_id = 1;
         cb.EncodeVideo(encode_info);
         std_picture_info.seq_parameter_set_id = 0;
         m_errorMonitor->VerifyFound();
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-StdVideoH264PictureParameterSet-08227");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-StdVideoH264PictureParameterSet-08227");
         std_picture_info.pic_parameter_set_id = 1;
         cb.EncodeVideo(encode_info);
         std_picture_info.pic_parameter_set_id = 0;
@@ -11267,7 +11260,7 @@ TEST_F(NegativeVideo, EncodeInvalidCodecInfoH264) {
         encode_info->pNext = &picture_info;
         encode_info->pSetupReferenceSlot = &slot;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-pEncodeInfo-08228");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pEncodeInfo-08228");
         cb.EncodeVideo(encode_info);
         m_errorMonitor->VerifyFound();
     }
@@ -11286,7 +11279,7 @@ TEST_F(NegativeVideo, EncodeInvalidCodecInfoH264) {
 
         std_ref_lists.RefPicList0[0] = 0;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-pNext-08229");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pNext-08229");
         cb.EncodeVideo(encode_info);
         m_errorMonitor->VerifyFound();
 
@@ -11308,7 +11301,7 @@ TEST_F(NegativeVideo, EncodeInvalidCodecInfoH264) {
         std_picture_info.pRefLists = nullptr;
 
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdEncodeVideoKHR-pNext-08229");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-pNext-08352");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pNext-08352");
         cb.EncodeVideo(encode_info);
         m_errorMonitor->VerifyFound();
 
@@ -11328,7 +11321,7 @@ TEST_F(NegativeVideo, EncodeInvalidCodecInfoH264) {
         encode_info->pReferenceSlots = &slot;
 
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdEncodeVideoKHR-pNext-08229");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-pNext-08353");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pNext-08353");
         cb.EncodeVideo(encode_info);
         m_errorMonitor->VerifyFound();
     }
@@ -11340,7 +11333,7 @@ TEST_F(NegativeVideo, EncodeInvalidCodecInfoH264) {
 
         std_ref_lists.RefPicList0[0] = 0;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-pNext-08339");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pNext-08339");
         cb.EncodeVideo(encode_info);
         m_errorMonitor->VerifyFound();
 
@@ -11348,7 +11341,7 @@ TEST_F(NegativeVideo, EncodeInvalidCodecInfoH264) {
 
         std_ref_lists.RefPicList1[0] = 0;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-pNext-08339");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pNext-08339");
         cb.EncodeVideo(encode_info);
         m_errorMonitor->VerifyFound();
 
@@ -11404,7 +11397,7 @@ TEST_F(NegativeVideo, EncodeInvalidCodecInfoH265) {
         encode_info = context.EncodeFrame(0);
         encode_info->pNext = nullptr;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-pNext-08230");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pNext-08230");
         cb.EncodeVideo(encode_info);
         m_errorMonitor->VerifyFound();
     }
@@ -11414,7 +11407,7 @@ TEST_F(NegativeVideo, EncodeInvalidCodecInfoH265) {
         encode_info = context.EncodeFrame(0);
         encode_info->pNext = &picture_info;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-StdVideoH265VideoParameterSet-08231");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-StdVideoH265VideoParameterSet-08231");
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdEncodeVideoKHR-StdVideoH265SequenceParameterSet-08232");
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdEncodeVideoKHR-StdVideoH265PictureParameterSet-08233");
         std_picture_info.sps_video_parameter_set_id = 1;
@@ -11422,14 +11415,14 @@ TEST_F(NegativeVideo, EncodeInvalidCodecInfoH265) {
         std_picture_info.sps_video_parameter_set_id = 0;
         m_errorMonitor->VerifyFound();
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-StdVideoH265SequenceParameterSet-08232");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-StdVideoH265SequenceParameterSet-08232");
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdEncodeVideoKHR-StdVideoH265PictureParameterSet-08233");
         std_picture_info.pps_seq_parameter_set_id = 1;
         cb.EncodeVideo(encode_info);
         std_picture_info.pps_seq_parameter_set_id = 0;
         m_errorMonitor->VerifyFound();
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-StdVideoH265PictureParameterSet-08233");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-StdVideoH265PictureParameterSet-08233");
         std_picture_info.pps_pic_parameter_set_id = 1;
         cb.EncodeVideo(encode_info);
         std_picture_info.pps_pic_parameter_set_id = 0;
@@ -11447,7 +11440,7 @@ TEST_F(NegativeVideo, EncodeInvalidCodecInfoH265) {
         encode_info->pNext = &picture_info;
         encode_info->pSetupReferenceSlot = &slot;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-pEncodeInfo-08234");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pEncodeInfo-08234");
         cb.EncodeVideo(encode_info);
         m_errorMonitor->VerifyFound();
     }
@@ -11466,7 +11459,7 @@ TEST_F(NegativeVideo, EncodeInvalidCodecInfoH265) {
 
         std_ref_lists.RefPicList0[0] = 0;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-pNext-08235");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pNext-08235");
         cb.EncodeVideo(encode_info);
         m_errorMonitor->VerifyFound();
 
@@ -11488,7 +11481,7 @@ TEST_F(NegativeVideo, EncodeInvalidCodecInfoH265) {
         std_picture_info.pRefLists = nullptr;
 
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdEncodeVideoKHR-pNext-08235");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-pNext-08354");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pNext-08354");
         cb.EncodeVideo(encode_info);
         m_errorMonitor->VerifyFound();
 
@@ -11508,7 +11501,7 @@ TEST_F(NegativeVideo, EncodeInvalidCodecInfoH265) {
         encode_info->pReferenceSlots = &slot;
 
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdEncodeVideoKHR-pNext-08235");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-pNext-08355");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pNext-08355");
         cb.EncodeVideo(encode_info);
         m_errorMonitor->VerifyFound();
     }
@@ -11520,7 +11513,7 @@ TEST_F(NegativeVideo, EncodeInvalidCodecInfoH265) {
 
         std_ref_lists.RefPicList0[0] = 0;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-pNext-08344");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pNext-08344");
         cb.EncodeVideo(encode_info);
         m_errorMonitor->VerifyFound();
 
@@ -11528,7 +11521,7 @@ TEST_F(NegativeVideo, EncodeInvalidCodecInfoH265) {
 
         std_ref_lists.RefPicList1[0] = 0;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdEncodeVideoKHR-pNext-08344");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdEncodeVideoKHR-pNext-08344");
         cb.EncodeVideo(encode_info);
         m_errorMonitor->VerifyFound();
 
@@ -11560,7 +11553,7 @@ TEST_F(NegativeVideo, CreateBufferInvalidProfileList) {
     if (decode_config) {
         buffer_ci.usage = VK_BUFFER_USAGE_VIDEO_DECODE_SRC_BIT_KHR;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkBufferCreateInfo-usage-04813");
+        m_errorMonitor->SetDesiredError("VUID-VkBufferCreateInfo-usage-04813");
         vk::CreateBuffer(device(), &buffer_ci, nullptr, &buffer);
         m_errorMonitor->VerifyFound();
 
@@ -11569,7 +11562,7 @@ TEST_F(NegativeVideo, CreateBufferInvalidProfileList) {
         video_profiles.pProfiles = profiles;
         buffer_ci.pNext = &video_profiles;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoProfileListInfoKHR-pProfiles-06813");
+        m_errorMonitor->SetDesiredError("VUID-VkVideoProfileListInfoKHR-pProfiles-06813");
         vk::CreateBuffer(device(), &buffer_ci, nullptr, &buffer);
         m_errorMonitor->VerifyFound();
 
@@ -11583,7 +11576,7 @@ TEST_F(NegativeVideo, CreateBufferInvalidProfileList) {
     if (decode_config && encode_config) {
         buffer_ci.usage |= VK_BUFFER_USAGE_VIDEO_ENCODE_DST_BIT_KHR;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkBufferCreateInfo-usage-04814");
+        m_errorMonitor->SetDesiredError("VUID-VkBufferCreateInfo-usage-04814");
         vk::CreateBuffer(device(), &buffer_ci, nullptr, &buffer);
         m_errorMonitor->VerifyFound();
     }
@@ -11592,7 +11585,7 @@ TEST_F(NegativeVideo, CreateBufferInvalidProfileList) {
         buffer_ci.pNext = nullptr;
         buffer_ci.usage = VK_BUFFER_USAGE_VIDEO_ENCODE_DST_BIT_KHR;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkBufferCreateInfo-usage-04814");
+        m_errorMonitor->SetDesiredError("VUID-VkBufferCreateInfo-usage-04814");
         vk::CreateBuffer(device(), &buffer_ci, nullptr, &buffer);
         m_errorMonitor->VerifyFound();
     }
@@ -11623,7 +11616,7 @@ TEST_F(NegativeVideo, CreateBufferProfileIndependentNotSupported) {
     }
 
     m_errorMonitor->SetAllowedFailureMsg("VUID-VkBufferCreateInfo-flags-parameter");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkBufferCreateInfo-flags-08325");
+    m_errorMonitor->SetDesiredError("VUID-VkBufferCreateInfo-flags-08325");
     vk::CreateBuffer(device(), &buffer_ci, nullptr, &buffer);
     m_errorMonitor->VerifyFound();
 }
@@ -11662,7 +11655,7 @@ TEST_F(NegativeVideo, CreateBufferProfileIndependent) {
         video_profiles.pProfiles = profiles;
         buffer_ci.pNext = &video_profiles;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoProfileListInfoKHR-pProfiles-06813");
+        m_errorMonitor->SetDesiredError("VUID-VkVideoProfileListInfoKHR-pProfiles-06813");
         vk::CreateBuffer(device(), &buffer_ci, nullptr, &buffer);
         m_errorMonitor->VerifyFound();
 
@@ -11712,10 +11705,10 @@ TEST_F(NegativeVideo, CreateImageInvalidProfileList) {
         image_ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
         if (config.IsDecode()) {
-            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageCreateInfo-usage-04815");
+            m_errorMonitor->SetDesiredError("VUID-VkImageCreateInfo-usage-04815");
         }
         if (config.IsEncode()) {
-            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageCreateInfo-usage-04816");
+            m_errorMonitor->SetDesiredError("VUID-VkImageCreateInfo-usage-04816");
         }
         vk::CreateImage(device(), &image_ci, nullptr, &image);
         m_errorMonitor->VerifyFound();
@@ -11728,7 +11721,7 @@ TEST_F(NegativeVideo, CreateImageInvalidProfileList) {
             image_ci.pNext = &video_profiles;
 
             m_errorMonitor->SetAllowedFailureMsg("VUID-VkImageCreateInfo-pNext-06811");
-            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoProfileListInfoKHR-pProfiles-06813");
+            m_errorMonitor->SetDesiredError("VUID-VkVideoProfileListInfoKHR-pProfiles-06813");
             vk::CreateImage(device(), &image_ci, nullptr, &image);
             m_errorMonitor->VerifyFound();
         }
@@ -11766,7 +11759,7 @@ TEST_F(NegativeVideo, CreateImageProfileIndependentNotSupported) {
     }
 
     m_errorMonitor->SetAllowedFailureMsg("VUID-VkImageCreateInfo-flags-parameter");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageCreateInfo-flags-08328");
+    m_errorMonitor->SetDesiredError("VUID-VkImageCreateInfo-flags-08328");
     vk::CreateImage(device(), &image_ci, nullptr, &image);
     m_errorMonitor->VerifyFound();
 }
@@ -11804,7 +11797,7 @@ TEST_F(NegativeVideo, CreateImageProfileIndependent) {
         if (config.IsDecode()) {
             // Video profile independent DECODE_DPB usage is not allowed
             image_ci.usage = VK_IMAGE_USAGE_VIDEO_DECODE_DPB_BIT_KHR;
-            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageCreateInfo-flags-08329");
+            m_errorMonitor->SetDesiredError("VUID-VkImageCreateInfo-flags-08329");
             vk::CreateImage(device(), &image_ci, nullptr, &image);
             m_errorMonitor->VerifyFound();
 
@@ -11821,7 +11814,7 @@ TEST_F(NegativeVideo, CreateImageProfileIndependent) {
             image_ci.pNext = &video_profiles;
 
             m_errorMonitor->SetAllowedFailureMsg("VUID-VkImageCreateInfo-pNext-06811");
-            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkVideoProfileListInfoKHR-pProfiles-06813");
+            m_errorMonitor->SetDesiredError("VUID-VkVideoProfileListInfoKHR-pProfiles-06813");
             vk::CreateImage(device(), &image_ci, nullptr, &image);
             m_errorMonitor->VerifyFound();
         }
@@ -11829,7 +11822,7 @@ TEST_F(NegativeVideo, CreateImageProfileIndependent) {
         if (config.IsEncode()) {
             // Video profile independent ENCODE_DPB usage is not allowed
             image_ci.usage = VK_IMAGE_USAGE_VIDEO_ENCODE_DPB_BIT_KHR;
-            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageCreateInfo-flags-08331");
+            m_errorMonitor->SetDesiredError("VUID-VkImageCreateInfo-flags-08331");
             vk::CreateImage(device(), &image_ci, nullptr, &image);
             m_errorMonitor->VerifyFound();
         }
@@ -11869,9 +11862,9 @@ TEST_F(NegativeVideo, CreateImageIncompatibleProfile) {
 
     VkImage image = VK_NULL_HANDLE;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageCreateInfo-pNext-06811");
+    m_errorMonitor->SetDesiredError("VUID-VkImageCreateInfo-pNext-06811");
     image_ci.format = VK_FORMAT_D16_UNORM;
-    vk::CreateImage(m_device->device(), &image_ci, nullptr, &image);
+    vk::CreateImage(device(), &image_ci, nullptr, &image);
     m_errorMonitor->VerifyFound();
 }
 
@@ -11910,8 +11903,7 @@ TEST_F(NegativeVideo, CreateImageViewInvalidViewType) {
         image_ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         image_ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-        vkt::Image image;
-        image.init(*m_device, image_ci);
+        vkt::Image image(*m_device, image_ci);
 
         VkImageViewCreateInfo image_view_ci = vku::InitStructHelper();
         image_view_ci.image = image.handle();
@@ -11923,13 +11915,13 @@ TEST_F(NegativeVideo, CreateImageViewInvalidViewType) {
 
         m_errorMonitor->SetAllowedFailureMsg("VUID-VkImageViewCreateInfo-image-01003");
         if (config.IsDecode()) {
-            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageViewCreateInfo-image-04817");
+            m_errorMonitor->SetDesiredError("VUID-VkImageViewCreateInfo-image-04817");
         }
         if (config.IsEncode()) {
-            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkImageViewCreateInfo-image-04818");
+            m_errorMonitor->SetDesiredError("VUID-VkImageViewCreateInfo-image-04818");
         }
         VkImageView image_view = VK_NULL_HANDLE;
-        vk::CreateImageView(m_device->device(), &image_view_ci, nullptr, &image_view);
+        vk::CreateImageView(device(), &image_view_ci, nullptr, &image_view);
         m_errorMonitor->VerifyFound();
     }
 }
@@ -11993,8 +11985,7 @@ TEST_F(NegativeVideo, CreateImageViewProfileIndependent) {
         image_ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         image_ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-        vkt::Image image;
-        image.init(*m_device, image_ci);
+        vkt::Image image(*m_device, image_ci);
 
         auto image_usage_ci = vku::InitStruct<VkImageViewUsageCreateInfoKHR>();
         image_usage_ci.usage = test_case.usage;
@@ -12010,7 +12001,7 @@ TEST_F(NegativeVideo, CreateImageViewProfileIndependent) {
 
         m_errorMonitor->SetAllowedFailureMsg("VUID-VkImageViewCreateInfo-pNext-02662");
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, test_case.vuid);
-        vk::CreateImageView(m_device->device(), &image_view_ci, nullptr, &image_view);
+        vk::CreateImageView(device(), &image_view_ci, nullptr, &image_view);
         m_errorMonitor->VerifyFound();
     }
 }
@@ -12030,8 +12021,8 @@ TEST_F(NegativeVideo, CreateQueryPoolMissingEncodeFeedbackInfo) {
     create_info.queryCount = 1;
 
     VkQueryPool query_pool;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkQueryPoolCreateInfo-queryType-07906");
-    vk::CreateQueryPool(m_device->device(), &create_info, nullptr, &query_pool);
+    m_errorMonitor->SetDesiredError("VUID-VkQueryPoolCreateInfo-queryType-07906");
+    vk::CreateQueryPool(device(), &create_info, nullptr, &query_pool);
     m_errorMonitor->VerifyFound();
 }
 
@@ -12054,8 +12045,8 @@ TEST_F(NegativeVideo, CreateQueryPoolEncodeFeedbackProfile) {
     create_info.queryCount = 1;
 
     VkQueryPool query_pool;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkQueryPoolCreateInfo-queryType-07133");
-    vk::CreateQueryPool(m_device->device(), &create_info, nullptr, &query_pool);
+    m_errorMonitor->SetDesiredError("VUID-VkQueryPoolCreateInfo-queryType-07133");
+    vk::CreateQueryPool(device(), &create_info, nullptr, &query_pool);
     m_errorMonitor->VerifyFound();
 }
 
@@ -12079,8 +12070,8 @@ TEST_F(NegativeVideo, CreateQueryPoolUnsupportedEncodeFeedback) {
     create_info.queryCount = 1;
 
     VkQueryPool query_pool;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkQueryPoolCreateInfo-queryType-07907");
-    vk::CreateQueryPool(m_device->device(), &create_info, nullptr, &query_pool);
+    m_errorMonitor->SetDesiredError("VUID-VkQueryPoolCreateInfo-queryType-07907");
+    vk::CreateQueryPool(device(), &create_info, nullptr, &query_pool);
     m_errorMonitor->VerifyFound();
 }
 
@@ -12104,11 +12095,11 @@ TEST_F(NegativeVideo, BeginQueryIncompatibleQueueFamily) {
     vkt::QueryPool query_pool(*m_device, VK_QUERY_TYPE_RESULT_STATUS_ONLY_KHR, 1);
 
     vkt::CommandPool cmd_pool(*m_device, queue_family_index, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
-    vkt::CommandBuffer cb(m_device, &cmd_pool);
+    vkt::CommandBuffer cb(*m_device, cmd_pool);
 
     cb.begin();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBeginQuery-queryType-07126");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdBeginQuery-queryType-07126");
     vk::CmdBeginQuery(cb.handle(), query_pool.handle(), 0, 0);
     m_errorMonitor->VerifyFound();
 
@@ -12140,7 +12131,7 @@ TEST_F(NegativeVideo, BeginQueryVideoCodingScopeQueryAlreadyActive) {
     vk::CmdBeginQuery(cb.handle(), context.StatusQueryPool(), 0, 0);
 
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdBeginQuery-queryPool-01922");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBeginQuery-None-07127");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdBeginQuery-None-07127");
     vk::CmdBeginQuery(cb.handle(), context.StatusQueryPool(), 1, 0);
     m_errorMonitor->VerifyFound();
 
@@ -12173,7 +12164,7 @@ TEST_F(NegativeVideo, BeginQueryResultStatusProfileMismatch) {
     cb.begin();
     cb.BeginVideoCoding(context1.Begin());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBeginQuery-queryType-07128");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdBeginQuery-queryType-07128");
     vk::CmdBeginQuery(cb.handle(), context2.StatusQueryPool(), 0, 0);
     m_errorMonitor->VerifyFound();
 
@@ -12201,7 +12192,7 @@ TEST_F(NegativeVideo, BeginQueryEncodeFeedbackProfileMismatch) {
     cb.begin();
     cb.BeginVideoCoding(context1.Begin());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBeginQuery-queryType-07130");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdBeginQuery-queryType-07130");
     vk::CmdBeginQuery(cb.handle(), context2.EncodeFeedbackQueryPool(), 0, 0);
     m_errorMonitor->VerifyFound();
 
@@ -12227,7 +12218,7 @@ TEST_F(NegativeVideo, BeginQueryEncodeFeedbackNoBoundVideoSession) {
 
     cb.begin();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBeginQuery-queryType-07129");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdBeginQuery-queryType-07129");
     vk::CmdBeginQuery(cb.handle(), context.EncodeFeedbackQueryPool(), 0, 0);
     m_errorMonitor->VerifyFound();
 
@@ -12256,7 +12247,7 @@ TEST_F(NegativeVideo, BeginQueryVideoCodingScopeIncompatibleQueryType) {
 
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdBeginQuery-queryType-00803");
     m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdBeginQuery-queryType-07128");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBeginQuery-queryType-07131");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdBeginQuery-queryType-07131");
     vk::CmdBeginQuery(cb.handle(), query_pool.handle(), 0, 0);
     m_errorMonitor->VerifyFound();
 
@@ -12289,7 +12280,7 @@ TEST_F(NegativeVideo, BeginQueryInlineQueries) {
     cb.begin();
     cb.BeginVideoCoding(context.Begin());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdBeginQuery-None-08370");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdBeginQuery-None-08370");
     vk::CmdBeginQuery(cb.handle(), context.StatusQueryPool(), 0, 0);
     m_errorMonitor->VerifyFound();
 
@@ -12322,49 +12313,47 @@ TEST_F(NegativeVideo, GetQueryPoolResultsVideoQueryDataSize) {
 
         // Test 32-bit no availability/status
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkGetQueryPoolResults-None-09401");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetQueryPoolResults-dataSize-00817");
-        vk::GetQueryPoolResults(m_device->device(), query_pool, 0, query_count, sizeof(uint32_t) * (total_feedback_count - 1),
-                                results.data(), sizeof(uint32_t) * (total_feedback_count - 1), 0);
+        m_errorMonitor->SetDesiredError("VUID-vkGetQueryPoolResults-dataSize-00817");
+        vk::GetQueryPoolResults(device(), query_pool, 0, query_count, sizeof(uint32_t) * (total_feedback_count - 1), results.data(),
+                                sizeof(uint32_t) * (total_feedback_count - 1), 0);
         m_errorMonitor->VerifyFound();
 
         // Test 32-bit with availability
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkGetQueryPoolResults-None-09401");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetQueryPoolResults-dataSize-00817");
-        vk::GetQueryPoolResults(m_device->device(), query_pool, 0, query_count,
-                                sizeof(uint32_t) * (total_feedback_count + query_count - 1), results.data(),
-                                sizeof(uint32_t) * (total_feedback_count + query_count - 1), VK_QUERY_RESULT_WITH_AVAILABILITY_BIT);
+        m_errorMonitor->SetDesiredError("VUID-vkGetQueryPoolResults-dataSize-00817");
+        vk::GetQueryPoolResults(device(), query_pool, 0, query_count, sizeof(uint32_t) * (total_feedback_count + query_count - 1),
+                                results.data(), sizeof(uint32_t) * (total_feedback_count + query_count - 1),
+                                VK_QUERY_RESULT_WITH_AVAILABILITY_BIT);
         m_errorMonitor->VerifyFound();
 
         // Test 32-bit with status
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkGetQueryPoolResults-None-09401");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetQueryPoolResults-dataSize-00817");
-        vk::GetQueryPoolResults(m_device->device(), query_pool, 0, query_count,
-                                sizeof(uint32_t) * (total_feedback_count + query_count - 1), results.data(),
-                                sizeof(uint32_t) * (total_feedback_count + query_count - 1), VK_QUERY_RESULT_WITH_STATUS_BIT_KHR);
+        m_errorMonitor->SetDesiredError("VUID-vkGetQueryPoolResults-dataSize-00817");
+        vk::GetQueryPoolResults(device(), query_pool, 0, query_count, sizeof(uint32_t) * (total_feedback_count + query_count - 1),
+                                results.data(), sizeof(uint32_t) * (total_feedback_count + query_count - 1),
+                                VK_QUERY_RESULT_WITH_STATUS_BIT_KHR);
         m_errorMonitor->VerifyFound();
 
         // Test 64-bit no availability/status
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkGetQueryPoolResults-None-09401");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetQueryPoolResults-dataSize-00817");
-        vk::GetQueryPoolResults(m_device->device(), query_pool, 0, query_count, sizeof(uint64_t) * (total_feedback_count - 1),
-                                results.data(), sizeof(uint64_t) * (total_feedback_count - 1), VK_QUERY_RESULT_64_BIT);
+        m_errorMonitor->SetDesiredError("VUID-vkGetQueryPoolResults-dataSize-00817");
+        vk::GetQueryPoolResults(device(), query_pool, 0, query_count, sizeof(uint64_t) * (total_feedback_count - 1), results.data(),
+                                sizeof(uint64_t) * (total_feedback_count - 1), VK_QUERY_RESULT_64_BIT);
         m_errorMonitor->VerifyFound();
 
         // Test 64-bit with availability
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkGetQueryPoolResults-None-09401");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetQueryPoolResults-dataSize-00817");
-        vk::GetQueryPoolResults(m_device->device(), query_pool, 0, query_count,
-                                sizeof(uint64_t) * (total_feedback_count + query_count - 1), results.data(),
-                                sizeof(uint64_t) * (total_feedback_count + query_count - 1),
+        m_errorMonitor->SetDesiredError("VUID-vkGetQueryPoolResults-dataSize-00817");
+        vk::GetQueryPoolResults(device(), query_pool, 0, query_count, sizeof(uint64_t) * (total_feedback_count + query_count - 1),
+                                results.data(), sizeof(uint64_t) * (total_feedback_count + query_count - 1),
                                 VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WITH_AVAILABILITY_BIT);
         m_errorMonitor->VerifyFound();
 
         // Test 64-bit with status
         m_errorMonitor->SetAllowedFailureMsg("VUID-vkGetQueryPoolResults-None-09401");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetQueryPoolResults-dataSize-00817");
-        vk::GetQueryPoolResults(m_device->device(), query_pool, 0, query_count,
-                                sizeof(uint64_t) * (total_feedback_count + query_count - 1), results.data(),
-                                sizeof(uint64_t) * (total_feedback_count + query_count - 1),
+        m_errorMonitor->SetDesiredError("VUID-vkGetQueryPoolResults-dataSize-00817");
+        vk::GetQueryPoolResults(device(), query_pool, 0, query_count, sizeof(uint64_t) * (total_feedback_count + query_count - 1),
+                                results.data(), sizeof(uint64_t) * (total_feedback_count + query_count - 1),
                                 VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WITH_STATUS_BIT_KHR);
         m_errorMonitor->VerifyFound();
     }
@@ -12384,14 +12373,14 @@ TEST_F(NegativeVideo, GetQueryPoolResultsStatusBit) {
     uint32_t status;
     VkQueryResultFlags flags;
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetQueryPoolResults-queryType-09442");
+    m_errorMonitor->SetDesiredError("VUID-vkGetQueryPoolResults-queryType-09442");
     flags = 0;
-    vk::GetQueryPoolResults(m_device->device(), query_pool.handle(), 0, 1, sizeof(status), &status, sizeof(status), flags);
+    vk::GetQueryPoolResults(device(), query_pool.handle(), 0, 1, sizeof(status), &status, sizeof(status), flags);
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetQueryPoolResults-flags-09443");
+    m_errorMonitor->SetDesiredError("VUID-vkGetQueryPoolResults-flags-09443");
     flags = VK_QUERY_RESULT_WITH_STATUS_BIT_KHR | VK_QUERY_RESULT_WITH_AVAILABILITY_BIT;
-    vk::GetQueryPoolResults(m_device->device(), query_pool.handle(), 0, 1, sizeof(status), &status, sizeof(status), flags);
+    vk::GetQueryPoolResults(device(), query_pool.handle(), 0, 1, sizeof(status), &status, sizeof(status), flags);
     m_errorMonitor->VerifyFound();
 }
 
@@ -12415,12 +12404,12 @@ TEST_F(NegativeVideo, CopyQueryPoolResultsStatusBit) {
 
     m_commandBuffer->begin();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdCopyQueryPoolResults-queryType-09442");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdCopyQueryPoolResults-queryType-09442");
     flags = 0;
     vk::CmdCopyQueryPoolResults(m_commandBuffer->handle(), query_pool.handle(), 0, 1, buffer.handle(), 0, sizeof(uint32_t), flags);
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdCopyQueryPoolResults-flags-09443");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdCopyQueryPoolResults-flags-09443");
     flags = VK_QUERY_RESULT_WITH_STATUS_BIT_KHR | VK_QUERY_RESULT_WITH_AVAILABILITY_BIT;
     vk::CmdCopyQueryPoolResults(m_commandBuffer->handle(), query_pool.handle(), 0, 1, buffer.handle(), 0, sizeof(uint32_t), flags);
     m_errorMonitor->VerifyFound();
@@ -12494,14 +12483,14 @@ TEST_F(NegativeVideo, ImageLayoutUsageMismatch) {
     for (const auto& params : test_params) {
         image_barrier.image = params.image;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, params.vuid);
+        m_errorMonitor->SetDesiredError(params.vuid);
         image_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         image_barrier.newLayout = params.invalid_layout;
         vk::CmdPipelineBarrier(cb.handle(), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr,
                                0, nullptr, 1, &image_barrier);
         m_errorMonitor->VerifyFound();
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, params.vuid);
+        m_errorMonitor->SetDesiredError(params.vuid);
         image_barrier.oldLayout = params.invalid_layout;
         image_barrier.newLayout = params.valid_layout;
         vk::CmdPipelineBarrier(cb.handle(), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr,
@@ -12510,13 +12499,13 @@ TEST_F(NegativeVideo, ImageLayoutUsageMismatch) {
 
         image_barrier2.image = params.image;
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, params.vuid2);
+        m_errorMonitor->SetDesiredError(params.vuid2);
         image_barrier2.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         image_barrier2.newLayout = params.invalid_layout;
         vk::CmdPipelineBarrier2KHR(cb.handle(), &dep_info);
         m_errorMonitor->VerifyFound();
 
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, params.vuid2);
+        m_errorMonitor->SetDesiredError(params.vuid2);
         image_barrier2.oldLayout = params.invalid_layout;
         image_barrier2.newLayout = params.valid_layout;
         vk::CmdPipelineBarrier2KHR(cb.handle(), &dep_info);
@@ -12548,7 +12537,7 @@ TEST_F(NegativeVideoSyncVal, DecodeOutputPicture) {
 
     cb.DecodeVideo(context.DecodeFrame());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "SYNC-HAZARD-WRITE-AFTER-WRITE");
+    m_errorMonitor->SetDesiredError("SYNC-HAZARD-WRITE-AFTER-WRITE");
     cb.DecodeVideo(context.DecodeFrame());
     m_errorMonitor->VerifyFound();
 
@@ -12583,11 +12572,11 @@ TEST_F(NegativeVideoSyncVal, DecodeReconstructedPicture) {
     cb.DecodeVideo(context.DecodeFrame(0));
     vk::CmdPipelineBarrier2KHR(cb.handle(), context.DecodeOutput()->MemoryBarrier());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "SYNC-HAZARD-WRITE-AFTER-WRITE");
+    m_errorMonitor->SetDesiredError("SYNC-HAZARD-WRITE-AFTER-WRITE");
     cb.DecodeVideo(context.DecodeReferenceFrame(0));
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "SYNC-HAZARD-WRITE-AFTER-WRITE");
+    m_errorMonitor->SetDesiredError("SYNC-HAZARD-WRITE-AFTER-WRITE");
     cb.DecodeVideo(context.DecodeFrame(0));
     m_errorMonitor->VerifyFound();
 
@@ -12599,11 +12588,11 @@ TEST_F(NegativeVideoSyncVal, DecodeReconstructedPicture) {
     cb.DecodeVideo(context.DecodeFrame(1).AddReferenceFrame(0));
     vk::CmdPipelineBarrier2KHR(cb.handle(), context.DecodeOutput()->MemoryBarrier());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "SYNC-HAZARD-WRITE-AFTER-READ");
+    m_errorMonitor->SetDesiredError("SYNC-HAZARD-WRITE-AFTER-READ");
     cb.DecodeVideo(context.DecodeReferenceFrame(0));
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "SYNC-HAZARD-WRITE-AFTER-READ");
+    m_errorMonitor->SetDesiredError("SYNC-HAZARD-WRITE-AFTER-READ");
     cb.DecodeVideo(context.DecodeFrame(0));
     m_errorMonitor->VerifyFound();
 
@@ -12640,7 +12629,7 @@ TEST_F(NegativeVideoSyncVal, DecodeReferencePicture) {
     cb.DecodeVideo(context.DecodeReferenceFrame(1));
     vk::CmdPipelineBarrier2KHR(cb.handle(), context.DecodeOutput()->MemoryBarrier());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "SYNC-HAZARD-READ-AFTER-WRITE");
+    m_errorMonitor->SetDesiredError("SYNC-HAZARD-READ-AFTER-WRITE");
     cb.DecodeVideo(context.DecodeFrame(2).AddReferenceFrame(0));
     m_errorMonitor->VerifyFound();
 
@@ -12650,7 +12639,7 @@ TEST_F(NegativeVideoSyncVal, DecodeReferencePicture) {
     vk::CmdPipelineBarrier2KHR(cb.handle(), context.DecodeOutput()->MemoryBarrier());
     vk::CmdPipelineBarrier2KHR(cb.handle(), context.Dpb()->MemoryBarrier(2, 1));
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "SYNC-HAZARD-READ-AFTER-WRITE");
+    m_errorMonitor->SetDesiredError("SYNC-HAZARD-READ-AFTER-WRITE");
     cb.DecodeVideo(context.DecodeFrame(2).AddReferenceFrame(1));
     m_errorMonitor->VerifyFound();
 
@@ -12683,7 +12672,7 @@ TEST_F(NegativeVideoSyncVal, EncodeBitstream) {
 
     cb.EncodeVideo(context.EncodeFrame());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "SYNC-HAZARD-WRITE-AFTER-WRITE");
+    m_errorMonitor->SetDesiredError("SYNC-HAZARD-WRITE-AFTER-WRITE");
     cb.EncodeVideo(context.EncodeFrame());
     m_errorMonitor->VerifyFound();
 
@@ -12717,11 +12706,11 @@ TEST_F(NegativeVideoSyncVal, EncodeReconstructedPicture) {
     cb.EncodeVideo(context.EncodeFrame(0));
     vk::CmdPipelineBarrier2KHR(cb.handle(), context.Bitstream().MemoryBarrier());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "SYNC-HAZARD-WRITE-AFTER-WRITE");
+    m_errorMonitor->SetDesiredError("SYNC-HAZARD-WRITE-AFTER-WRITE");
     cb.EncodeVideo(context.EncodeReferenceFrame(0));
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "SYNC-HAZARD-WRITE-AFTER-WRITE");
+    m_errorMonitor->SetDesiredError("SYNC-HAZARD-WRITE-AFTER-WRITE");
     cb.EncodeVideo(context.EncodeFrame(0));
     m_errorMonitor->VerifyFound();
 
@@ -12733,11 +12722,11 @@ TEST_F(NegativeVideoSyncVal, EncodeReconstructedPicture) {
     cb.EncodeVideo(context.EncodeFrame(1).AddReferenceFrame(0));
     vk::CmdPipelineBarrier2KHR(cb.handle(), context.Bitstream().MemoryBarrier());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "SYNC-HAZARD-WRITE-AFTER-READ");
+    m_errorMonitor->SetDesiredError("SYNC-HAZARD-WRITE-AFTER-READ");
     cb.EncodeVideo(context.EncodeReferenceFrame(0));
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "SYNC-HAZARD-WRITE-AFTER-READ");
+    m_errorMonitor->SetDesiredError("SYNC-HAZARD-WRITE-AFTER-READ");
     cb.EncodeVideo(context.EncodeFrame(0));
     m_errorMonitor->VerifyFound();
 
@@ -12774,7 +12763,7 @@ TEST_F(NegativeVideoSyncVal, EncodeReferencePicture) {
     cb.EncodeVideo(context.EncodeReferenceFrame(1));
     vk::CmdPipelineBarrier2KHR(cb.handle(), context.Bitstream().MemoryBarrier());
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "SYNC-HAZARD-READ-AFTER-WRITE");
+    m_errorMonitor->SetDesiredError("SYNC-HAZARD-READ-AFTER-WRITE");
     cb.EncodeVideo(context.EncodeFrame(2).AddReferenceFrame(0));
     m_errorMonitor->VerifyFound();
 
@@ -12784,7 +12773,7 @@ TEST_F(NegativeVideoSyncVal, EncodeReferencePicture) {
     vk::CmdPipelineBarrier2KHR(cb.handle(), context.Bitstream().MemoryBarrier());
     vk::CmdPipelineBarrier2KHR(cb.handle(), context.Dpb()->MemoryBarrier(2, 1));
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "SYNC-HAZARD-READ-AFTER-WRITE");
+    m_errorMonitor->SetDesiredError("SYNC-HAZARD-READ-AFTER-WRITE");
     cb.EncodeVideo(context.EncodeFrame(2).AddReferenceFrame(1));
     m_errorMonitor->VerifyFound();
 
@@ -12811,7 +12800,7 @@ TEST_F(NegativeVideoBestPractices, GetVideoSessionMemoryRequirements) {
     uint32_t mem_req_count = 1;
 
     m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "BestPractices-vkGetVideoSessionMemoryRequirementsKHR-count-not-retrieved");
-    context.vk.GetVideoSessionMemoryRequirementsKHR(m_device->device(), context.Session(), &mem_req_count, &mem_req);
+    context.vk.GetVideoSessionMemoryRequirementsKHR(device(), context.Session(), &mem_req_count, &mem_req);
     m_errorMonitor->VerifyFound();
 }
 
@@ -12848,27 +12837,27 @@ TEST_F(NegativeVideoBestPractices, BindVideoSessionMemory) {
     bind_info.memorySize = alloc_info.allocationSize;
 
     m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "BestPractices-vkBindVideoSessionMemoryKHR-requirements-count-not-retrieved");
-    context.vk.BindVideoSessionMemoryKHR(m_device->device(), context.Session(), 1, &bind_info);
+    context.vk.BindVideoSessionMemoryKHR(device(), context.Session(), 1, &bind_info);
     m_errorMonitor->VerifyFound();
 
     uint32_t mem_req_count = 0;
-    context.vk.GetVideoSessionMemoryRequirementsKHR(m_device->device(), context.Session(), &mem_req_count, nullptr);
+    context.vk.GetVideoSessionMemoryRequirementsKHR(device(), context.Session(), &mem_req_count, nullptr);
 
     if (mem_req_count > 0) {
         m_errorMonitor->SetDesiredFailureMsg(kWarningBit,
                                              "BestPractices-vkBindVideoSessionMemoryKHR-requirements-not-all-retrieved");
-        context.vk.BindVideoSessionMemoryKHR(m_device->device(), context.Session(), 1, &bind_info);
+        context.vk.BindVideoSessionMemoryKHR(device(), context.Session(), 1, &bind_info);
         m_errorMonitor->VerifyFound();
 
         if (mem_req_count > 1) {
             auto mem_req = vku::InitStruct<VkVideoSessionMemoryRequirementsKHR>();
             mem_req_count = 1;
 
-            context.vk.GetVideoSessionMemoryRequirementsKHR(m_device->device(), context.Session(), &mem_req_count, &mem_req);
+            context.vk.GetVideoSessionMemoryRequirementsKHR(device(), context.Session(), &mem_req_count, &mem_req);
 
             m_errorMonitor->SetDesiredFailureMsg(kWarningBit,
                                                  "BestPractices-vkBindVideoSessionMemoryKHR-requirements-not-all-retrieved");
-            context.vk.BindVideoSessionMemoryKHR(m_device->device(), context.Session(), 1, &bind_info);
+            context.vk.BindVideoSessionMemoryKHR(device(), context.Session(), 1, &bind_info);
             m_errorMonitor->VerifyFound();
         }
     }

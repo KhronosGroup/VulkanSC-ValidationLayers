@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (c) 2015-2023 Google, Inc.
+ * Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (c) 2015-2024 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,7 +40,6 @@ TEST_F(PositivePushDescriptor, NullDstSet) {
 
     // Use helper to create graphics pipeline
     CreatePipelineHelper helper(*this);
-    helper.InitState();
     helper.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&push_ds_layout, &ds_layout});
     helper.CreateGraphicsPipeline();
 
@@ -63,7 +62,7 @@ TEST_F(PositivePushDescriptor, NullDstSet) {
     m_commandBuffer->begin();
 
     // In Intel GPU, it needs to bind pipeline before push descriptor set.
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, helper.pipeline_);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, helper.Handle());
     vk::CmdPushDescriptorSetKHR(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, helper.pipeline_layout_.handle(), 0, 1,
                                 &descriptor_write);
 }
@@ -105,7 +104,6 @@ TEST_F(PositivePushDescriptor, UnboundSet) {
     VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
-    pipe.InitState();
     // Now use the descriptor layouts to create a pipeline layout
     pipe.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&push_ds_layout, &descriptor_set.layout_});
     pipe.CreateGraphicsPipeline();
@@ -119,7 +117,7 @@ TEST_F(PositivePushDescriptor, UnboundSet) {
 
     m_commandBuffer->begin();
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
 
     // Push descriptors and bind descriptor set
     vk::CmdPushDescriptorSetKHR(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_layout_.handle(), 0, 1,
@@ -183,7 +181,6 @@ TEST_F(PositivePushDescriptor, SetUpdatingSetNumber) {
         )glsl";
 
         VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
-        pipe0.InitState();
         pipe0.shader_stages_[1] = fs.GetStageCreateInfo();
         pipe0.gp_ci_.layout = pipeline_layout.handle();
         pipe0.CreateGraphicsPipeline();
@@ -217,7 +214,6 @@ TEST_F(PositivePushDescriptor, SetUpdatingSetNumber) {
         )glsl";
 
         VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
-        pipe1.InitState();
         pipe1.shader_stages_[1] = fs.GetStageCreateInfo();
         pipe1.gp_ci_.layout = pipeline_layout.handle();
         pipe1.CreateGraphicsPipeline();
@@ -293,8 +289,7 @@ TEST_F(PositivePushDescriptor, ImmutableSampler) {
     vkt::Sampler sampler(*m_device, sampler_ci);
     VkSampler sampler_handle = sampler.handle();
 
-    VkImageObj image(m_device);
-    image.InitNoLayout(32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    vkt::Image image(*m_device, 32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     vkt::ImageView imageView = image.CreateView();
 
     std::vector<VkDescriptorSetLayoutBinding> ds_bindings = {
@@ -366,7 +361,7 @@ TEST_F(PositivePushDescriptor, TemplateBasic) {
     update_template_ci.pipelineLayout = pipeline_layout.handle();
 
     VkDescriptorUpdateTemplate update_template = VK_NULL_HANDLE;
-    vk::CreateDescriptorUpdateTemplateKHR(m_device->device(), &update_template_ci, nullptr, &update_template);
+    vk::CreateDescriptorUpdateTemplateKHR(device(), &update_template_ci, nullptr, &update_template);
 
     SimpleTemplateData update_template_data;
     update_template_data.buff_info = {buffer.handle(), 0, 32};
@@ -376,7 +371,7 @@ TEST_F(PositivePushDescriptor, TemplateBasic) {
                                             &update_template_data);
     m_commandBuffer->end();
 
-    vk::DestroyDescriptorUpdateTemplateKHR(m_device->device(), update_template, nullptr);
+    vk::DestroyDescriptorUpdateTemplateKHR(device(), update_template, nullptr);
 }
 
 TEST_F(PositivePushDescriptor, WriteDescriptorSetNotAllocated) {
@@ -471,7 +466,7 @@ TEST_F(PositivePushDescriptor, PushDescriptorWithTemplateMultipleSets) {
     update_template_ci.set = 1;
 
     VkDescriptorUpdateTemplate update_template = VK_NULL_HANDLE;
-    vk::CreateDescriptorUpdateTemplateKHR(m_device->device(), &update_template_ci, nullptr, &update_template);
+    vk::CreateDescriptorUpdateTemplateKHR(device(), &update_template_ci, nullptr, &update_template);
 
     SimpleTemplateData update_template_data;
     update_template_data.buff_info = {buffer.handle(), 0, 32};
@@ -481,5 +476,5 @@ TEST_F(PositivePushDescriptor, PushDescriptorWithTemplateMultipleSets) {
                                             &update_template_data);
     m_commandBuffer->end();
 
-    vk::DestroyDescriptorUpdateTemplateKHR(m_device->device(), update_template, nullptr);
+    vk::DestroyDescriptorUpdateTemplateKHR(device(), update_template, nullptr);
 }

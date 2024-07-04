@@ -22,6 +22,10 @@
 #include <android_native_app_glue.h>
 #endif
 
+#if defined(VK_USE_PLATFORM_WAYLAND_KHR)
+#include "wayland-client.h"
+#endif
+
 #include <vulkan/utility/vk_format_utils.h>
 #include <vulkan/utility/vk_struct_helper.hpp>
 
@@ -247,7 +251,7 @@ class VkBestPracticesLayerTest : public VkLayerTest {
 class VkAmdBestPracticesLayerTest : public VkBestPracticesLayerTest {};
 class VkArmBestPracticesLayerTest : public VkBestPracticesLayerTest {
   public:
-    std::unique_ptr<VkImageObj> CreateImage(VkFormat format, const uint32_t width, const uint32_t height,
+    std::unique_ptr<vkt::Image> CreateImage(VkFormat format, const uint32_t width, const uint32_t height,
                                             VkImageUsageFlags attachment_usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     VkRenderPass CreateRenderPass(VkFormat format, VkAttachmentLoadOp load_op = VK_ATTACHMENT_LOAD_OP_CLEAR,
                                   VkAttachmentStoreOp store_op = VK_ATTACHMENT_STORE_OP_STORE);
@@ -289,11 +293,18 @@ class GpuAVOOBTest : public GpuAVTest {};
 class NegativeGpuAVOOB : public GpuAVOOBTest {
   public:
     void ShaderBufferSizeTest(VkDeviceSize buffer_size, VkDeviceSize binding_offset, VkDeviceSize binding_range,
-                              VkDescriptorType descriptor_type, const char *fragment_shader, const char *expected_error,
-                              bool shader_objects = false);
+                              VkDescriptorType descriptor_type, const char *fragment_shader,
+                              std::vector<const char *> expected_errors, bool shader_objects = false);
     void ComputeStorageBufferTest(const char *expected_error, const char *shader, VkDeviceSize buffer_size);
 };
 class PositiveGpuAVOOB : public GpuAVOOBTest {};
+
+class GpuAVRayQueryTest : public GpuAVTest {
+  public:
+    void InitGpuAVRayQuery();
+};
+class NegativeGpuAVRayQuery : public GpuAVRayQueryTest {};
+class PositiveGpuAVRayQuery : public GpuAVRayQueryTest {};
 
 class NegativeDebugPrintf : public VkLayerTest {
   public:
@@ -338,6 +349,14 @@ class CommandTest : public VkLayerTest {};
 class NegativeCommand : public CommandTest {};
 class PositiveCommand : public CommandTest {};
 
+class SecondaryCommandBufferTest : public VkLayerTest {};
+class NegativeSecondaryCommandBuffer : public SecondaryCommandBufferTest {};
+class PositiveSecondaryCommandBuffer : public SecondaryCommandBufferTest {};
+
+class CopyBufferImageTest : public VkLayerTest {};
+class NegativeCopyBufferImage : public CopyBufferImageTest {};
+class PositiveCopyBufferImage : public CopyBufferImageTest {};
+
 class DescriptorsTest : public VkLayerTest {};
 class NegativeDescriptors : public DescriptorsTest {};
 class PositiveDescriptors : public DescriptorsTest {};
@@ -369,9 +388,13 @@ class NegativeDeviceQueue : public VkLayerTest {};
 class DynamicRenderingTest : public VkLayerTest {
   public:
     void InitBasicDynamicRendering();
+    void InitBasicDynamicRenderingLocalRead();
 };
 class NegativeDynamicRendering : public DynamicRenderingTest {};
 class PositiveDynamicRendering : public DynamicRenderingTest {};
+
+class NegativeDynamicRenderingLocalRead : public DynamicRenderingTest {};
+class PositiveDynamicRenderingLocalRead : public DynamicRenderingTest {};
 
 class DynamicStateTest : public VkLayerTest {
   public:
@@ -416,13 +439,19 @@ class PositiveGraphicsLibrary : public GraphicsLibraryTest {};
 
 class HostImageCopyTest : public VkLayerTest {
   public:
-    void InitHostImageCopyTest(const VkImageCreateInfo &image_ci);
+    void InitHostImageCopyTest(const VkImageCreateInfo &create_info);
     bool CopyLayoutSupported(const std::vector<VkImageLayout> &copy_src_layouts, const std::vector<VkImageLayout> &copy_dst_layouts,
                              VkImageLayout layout);
     VkFormat compressed_format = VK_FORMAT_UNDEFINED;
     bool separate_depth_stencil = false;
     std::vector<VkImageLayout> copy_src_layouts;
     std::vector<VkImageLayout> copy_dst_layouts;
+
+    // Every test will use these, set the default most will use
+    uint32_t width = 32;
+    uint32_t height = 32;
+    VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
+    VkImageCreateInfo image_ci;
 };
 class NegativeHostImageCopy : public HostImageCopyTest {};
 class PositiveHostImageCopy : public HostImageCopyTest {};
@@ -514,7 +543,7 @@ class PositiveRayTracingPipelineNV : public PositiveRayTracingPipeline {};
 
 class GpuAVRayTracingTest : public GpuAVTest, public RayTracingTest {};
 class NegativeGpuAVRayTracing : public GpuAVRayTracingTest {};
-class NegativeGpuAVRayTracingNV : public NegativeGpuAVRayTracing {};
+class PositiveGpuAVRayTracing : public GpuAVRayTracingTest {};
 
 class RenderPassTest : public VkLayerTest {};
 class NegativeRenderPass : public RenderPassTest {};
@@ -533,18 +562,14 @@ class NegativeShaderCompute : public ShaderComputeTest {};
 class PositiveShaderCompute : public ShaderComputeTest {};
 
 class ShaderObjectTest : public virtual VkLayerTest {
-    vkt::Buffer vertexBuffer;
-
   public:
     void InitBasicShaderObject();
-    void InitBasicMeshShaderObject(void *pNextFeatures = nullptr, APIVersion targetApiVersion = VK_API_VERSION_1_1,
-                                   bool taskShader = true, bool meshShader = true);
-    void BindVertFragShader(const vkt::Shader &vertShader, const vkt::Shader &fragShader);
-    void BindCompShader(const vkt::Shader &compShader);
-    void SetDefaultDynamicStates(const std::vector<VkDynamicState>& exclude = {}, bool tessellation = false, VkCommandBuffer commandBuffer = VK_NULL_HANDLE);
+    void InitBasicMeshShaderObject(APIVersion target_api_version);
 };
 class NegativeShaderObject : public ShaderObjectTest {};
 class PositiveShaderObject : public ShaderObjectTest {};
+
+class PositiveGpuAVShaderObject : public PositiveGpuAV {};
 
 class ShaderInterfaceTest : public VkLayerTest {};
 class NegativeShaderInterface : public ShaderInterfaceTest {};
@@ -618,6 +643,20 @@ class WsiTest : public VkLayerTest {
   public:
     // most tests need images in VK_IMAGE_LAYOUT_PRESENT_SRC_KHR layout
     void SetImageLayoutPresentSrc(VkImage image);
+    VkImageMemoryBarrier TransitionToPresent(VkImage swapchain_image, VkImageLayout old_layout, VkAccessFlags src_access_mask);
+
+  protected:
+#ifdef VK_USE_PLATFORM_WAYLAND_KHR
+    struct WaylandContext {
+        wl_display *display = nullptr;
+        wl_registry *registry = nullptr;
+        wl_surface *surface = nullptr;
+        wl_compositor *compositor = nullptr;
+    };
+    void InitWaylandContext(WaylandContext& context);
+    void ReleaseWaylandContext(WaylandContext& context);
+#endif
+
 };
 class NegativeWsi : public WsiTest {};
 class PositiveWsi : public WsiTest {};
@@ -629,7 +668,12 @@ class YcbcrTest : public VkLayerTest {
 class NegativeYcbcr : public YcbcrTest {};
 class PositiveYcbcr : public YcbcrTest {};
 
-class CooperativeMatrixTest : public VkLayerTest {};
+class CooperativeMatrixTest : public VkLayerTest {
+  public:
+    void InitCooperativeMatrixKHR();
+    bool HasValidProperty(VkScopeKHR scope, uint32_t m, uint32_t n, uint32_t k, VkComponentTypeKHR type);
+    std::vector<VkCooperativeMatrixPropertiesKHR> coop_matrix_props;
+};
 class NegativeShaderCooperativeMatrix : public CooperativeMatrixTest {};
 class PositiveShaderCooperativeMatrix : public CooperativeMatrixTest {};
 

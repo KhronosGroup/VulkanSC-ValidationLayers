@@ -40,8 +40,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, PageableDeviceLocalMemory) {
     pageable.pageableDeviceLocalMemory = VK_TRUE;
 
     {
-        m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT,
-                                             "BestPractices-CreateDevice-PageableDeviceLocalMemory");
+        m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-CreateDevice-PageableDeviceLocalMemory");
         VkDevice test_device = VK_NULL_HANDLE;
         VkResult err = vk::CreateDevice(gpu(), &device_ci, nullptr, &test_device);
         m_errorMonitor->VerifyFound();
@@ -56,8 +55,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, PageableDeviceLocalMemory) {
     device_ci.pNext = &pageable;
 
     {
-        m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT,
-                                             "BestPractices-CreateDevice-PageableDeviceLocalMemory");
+        m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-CreateDevice-PageableDeviceLocalMemory");
         vkt::Device test_device(gpu(), device_ci);
         m_errorMonitor->Finish();
     }
@@ -65,7 +63,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, PageableDeviceLocalMemory) {
 
 TEST_F(VkNvidiaBestPracticesLayerTest, TilingLinear) {
     RETURN_IF_SKIP(InitBestPracticesFramework(kEnableNVIDIAValidation));
-    InitState();
+    RETURN_IF_SKIP(InitState());
 
     VkImageCreateInfo image_ci = vku::InitStructHelper();
     image_ci.imageType = VK_IMAGE_TYPE_2D;
@@ -78,7 +76,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, TilingLinear) {
     image_ci.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
 
     {
-        m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT, "BestPractices-CreateImage-TilingLinear");
+        m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-CreateImage-TilingLinear");
         vkt::Image image(*m_device, image_ci, vkt::no_mem);
         m_errorMonitor->Finish();
     }
@@ -86,7 +84,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, TilingLinear) {
     image_ci.tiling = VK_IMAGE_TILING_LINEAR;
 
     {
-        m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT, "BestPractices-CreateImage-TilingLinear");
+        m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-CreateImage-TilingLinear");
         vkt::Image image(*m_device, image_ci, vkt::no_mem);
         m_errorMonitor->VerifyFound();
     }
@@ -94,7 +92,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, TilingLinear) {
 
 TEST_F(VkNvidiaBestPracticesLayerTest, Depth32Format) {
     RETURN_IF_SKIP(InitBestPracticesFramework(kEnableNVIDIAValidation));
-    InitState();
+    RETURN_IF_SKIP(InitState());
 
     VkImageCreateInfo image_ci = vku::InitStructHelper();
     image_ci.imageType = VK_IMAGE_TYPE_2D;
@@ -108,8 +106,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, Depth32Format) {
     image_ci.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
 
     {
-        m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT,
-                                             "BestPractices-CreateImage-Depth32Format");
+        m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-CreateImage-Depth32Format");
         vkt::Image image(*m_device, image_ci, vkt::no_mem);
         m_errorMonitor->Finish();
     }
@@ -119,8 +116,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, Depth32Format) {
     for (VkFormat format : formats) {
         image_ci.format = format;
 
-        m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT,
-                                             "BestPractices-CreateImage-Depth32Format");
+        m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-CreateImage-Depth32Format");
         vkt::Image image(*m_device, image_ci, vkt::no_mem);
         m_errorMonitor->VerifyFound();
     }
@@ -128,7 +124,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, Depth32Format) {
 
 TEST_F(VkNvidiaBestPracticesLayerTest, QueueBindSparse_NotAsync) {
     RETURN_IF_SKIP(InitBestPracticesFramework(kEnableNVIDIAValidation));
-    InitState();
+    RETURN_IF_SKIP(InitState());
 
     if (!m_device->phy().features().sparseBinding) {
         GTEST_SKIP() << "Test requires sparseBinding";
@@ -138,8 +134,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, QueueBindSparse_NotAsync) {
     general_queue_ci.queueCount = 1;
     general_queue_ci.pQueuePriorities = &defaultQueuePriority;
     {
-        const std::optional<uint32_t> familyIndex =
-            m_device->QueueFamilyMatching(VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_SPARSE_BINDING_BIT, 0);
+        const std::optional<uint32_t> familyIndex = m_device->QueueFamily(VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_SPARSE_BINDING_BIT);
         if (!familyIndex) {
             GTEST_SKIP() << "Required queue families not present";
         }
@@ -150,8 +145,8 @@ TEST_F(VkNvidiaBestPracticesLayerTest, QueueBindSparse_NotAsync) {
     transfer_queue_ci.queueCount = 1;
     transfer_queue_ci.pQueuePriorities = &defaultQueuePriority;
     {
-        const std::optional<uint32_t> familyIndex = m_device->QueueFamilyMatching(
-            VK_QUEUE_TRANSFER_BIT | VK_QUEUE_SPARSE_BINDING_BIT, VK_QUEUE_COMPUTE_BIT | VK_QUEUE_GRAPHICS_BIT);
+        const std::optional<uint32_t> familyIndex = m_device->QueueFamily(VK_QUEUE_TRANSFER_BIT | VK_QUEUE_SPARSE_BINDING_BIT,
+                                                                          VK_QUEUE_COMPUTE_BIT | VK_QUEUE_GRAPHICS_BIT);
         if (!familyIndex) {
             GTEST_SKIP() << "Required queue families not present";
         }
@@ -224,15 +219,15 @@ TEST_F(VkNvidiaBestPracticesLayerTest, QueueBindSparse_NotAsync) {
     bind_info.pBufferBinds = &sparse_buffer_bind;
 
     {
-        m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT, "BestPractices-QueueBindSparse-NotAsync");
+        m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-QueueBindSparse-NotAsync");
         vk::QueueBindSparse(transfer_queue, 1, &bind_info, VK_NULL_HANDLE);
         m_errorMonitor->Finish();
     }
 
-    test_device.wait();
+    test_device.Wait();
 
     {
-        m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT, "BestPractices-QueueBindSparse-NotAsync");
+        m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-QueueBindSparse-NotAsync");
         vk::QueueBindSparse(graphics_queue, 1, &bind_info, VK_NULL_HANDLE);
         m_errorMonitor->VerifyFound();
     }
@@ -251,12 +246,12 @@ TEST_F(VkNvidiaBestPracticesLayerTest, AccelerationStructure_NotAsync) {
     GetPhysicalDeviceFeatures2(bda_features);
     RETURN_IF_SKIP(InitState(nullptr, &bda_features));
 
-    vkt::Queue *graphics_queue = m_device->graphics_queues()[0];
+    vkt::Queue *graphics_queue = m_device->QueuesWithGraphicsCapability()[0];
 
     vkt::Queue *compute_queue = nullptr;
-    for (uint32_t i = 0; i < m_device->compute_queues().size(); ++i) {
-        auto cqi = m_device->compute_queues()[i];
-        if (cqi->get_family_index() != graphics_queue->get_family_index()) {
+    for (uint32_t i = 0; i < m_device->QueuesWithComputeCapability().size(); ++i) {
+        auto cqi = m_device->QueuesWithComputeCapability()[i];
+        if (cqi->family_index != graphics_queue->family_index) {
             compute_queue = cqi;
             break;
         }
@@ -271,8 +266,8 @@ TEST_F(VkNvidiaBestPracticesLayerTest, AccelerationStructure_NotAsync) {
     auto build_geometry_info = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
 
     for (vkt::Queue *queue : queues) {
-        vkt::CommandPool compute_pool(*m_device, queue->get_family_index());
-        vkt::CommandBuffer cmd_buffer(m_device, &compute_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, queue);
+        vkt::CommandPool compute_pool(*m_device, queue->family_index);
+        vkt::CommandBuffer cmd_buffer(*m_device, compute_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY);
 
         cmd_buffer.begin();
 
@@ -297,15 +292,14 @@ TEST_F(VkNvidiaBestPracticesLayerTest, AccelerationStructure_NotAsync) {
 
 TEST_F(VkNvidiaBestPracticesLayerTest, AllocateMemory_SetPriority) {
     RETURN_IF_SKIP(InitBestPracticesFramework(kEnableNVIDIAValidation));
-    InitState();
+    RETURN_IF_SKIP(InitState());
 
     VkMemoryAllocateInfo memory_ai = vku::InitStructHelper();
     memory_ai.allocationSize = 0x100000;
     memory_ai.memoryTypeIndex = 0;
 
     {
-        m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT,
-                                             "BestPractices-AllocateMemory-SetPriority");
+        m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-AllocateMemory-SetPriority");
         vkt::DeviceMemory memory(*m_device, memory_ai);
         m_errorMonitor->VerifyFound();
     }
@@ -315,8 +309,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, AllocateMemory_SetPriority) {
     memory_ai.pNext = &priority;
 
     {
-        m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT,
-                                             "BestPractices-AllocateMemory-SetPriority");
+        m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-AllocateMemory-SetPriority");
         vkt::DeviceMemory memory(*m_device, memory_ai);
         m_errorMonitor->Finish();
     }
@@ -324,7 +317,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, AllocateMemory_SetPriority) {
 
 TEST_F(VkNvidiaBestPracticesLayerTest, AllocateMemory_ReuseAllocations) {
     RETURN_IF_SKIP(InitBestPracticesFramework(kEnableNVIDIAValidation));
-    InitState();
+    RETURN_IF_SKIP(InitState());
 
     VkMemoryAllocateInfo memory_ai = vku::InitStructHelper();
     memory_ai.allocationSize = 0x100000;
@@ -334,8 +327,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, AllocateMemory_ReuseAllocations) {
     priority.priority = 0.5f;
     memory_ai.pNext = &priority;
 
-    m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT,
-                                         "BestPractices-AllocateMemory-ReuseAllocations");
+    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-AllocateMemory-ReuseAllocations");
     { vkt::DeviceMemory memory(*m_device, memory_ai); }
 
     std::this_thread::sleep_for(std::chrono::seconds{6});
@@ -344,8 +336,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, AllocateMemory_ReuseAllocations) {
 
     m_errorMonitor->Finish();
 
-    m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT,
-                                         "BestPractices-AllocateMemory-ReuseAllocations");
+    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-AllocateMemory-ReuseAllocations");
 
     { vkt::DeviceMemory memory(*m_device, memory_ai); }
 
@@ -358,7 +349,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, BindMemory_NoPriority) {
     AddRequiredExtensions(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
     RETURN_IF_SKIP(InitBestPracticesFramework(kEnableNVIDIAValidation));
 
-    InitState();
+    RETURN_IF_SKIP(InitState());
 
     VkDeviceQueueCreateInfo queue_ci = vku::InitStructHelper();
     queue_ci.queueFamilyIndex = 0;
@@ -409,7 +400,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, BindMemory_NoPriority) {
     vkt::DeviceMemory memory(test_device, memory_ai);
 
     {
-        m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT, "BestPractices-BindMemory-NoPriority");
+        m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-BindMemory-NoPriority");
         vk::BindBufferMemory(test_device.handle(), buffer_a.handle(), memory.handle(), 0);
         m_errorMonitor->VerifyFound();
     }
@@ -417,7 +408,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, BindMemory_NoPriority) {
     vk::SetDeviceMemoryPriorityEXT(test_device.handle(), memory.handle(), 0.5f);
 
     {
-        m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT, "BestPractices-BindMemory-NoPriority");
+        m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-BindMemory-NoPriority");
         vk::BindBufferMemory(test_device.handle(), buffer_b.handle(), memory.handle(), 0);
         m_errorMonitor->Finish();
     }
@@ -435,7 +426,7 @@ static VkDescriptorSetLayoutBinding CreateSingleDescriptorBinding(VkDescriptorTy
 
 TEST_F(VkNvidiaBestPracticesLayerTest, CreatePipelineLayout_SeparateSampler) {
     RETURN_IF_SKIP(InitBestPracticesFramework(kEnableNVIDIAValidation));
-    InitState();
+    RETURN_IF_SKIP(InitState());
 
     VkDescriptorSetLayoutBinding separate_bindings[] = {
         CreateSingleDescriptorBinding(VK_DESCRIPTOR_TYPE_SAMPLER, 0),
@@ -464,15 +455,13 @@ TEST_F(VkNvidiaBestPracticesLayerTest, CreatePipelineLayout_SeparateSampler) {
     pipeline_layout_ci.pPushConstantRanges = nullptr;
 
     {
-        m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT,
-                                             "BestPractices-CreatePipelineLayout-SeparateSampler");
+        m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-CreatePipelineLayout-SeparateSampler");
         vkt::PipelineLayout pipeline_layout(*m_device, pipeline_layout_ci, {&separate_set_layout});
         m_errorMonitor->VerifyFound();
     }
 
     {
-        m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT,
-                                             "BestPractices-CreatePipelineLayout-SeparateSampler");
+        m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-CreatePipelineLayout-SeparateSampler");
         vkt::PipelineLayout pipeline_layout(*m_device, pipeline_layout_ci, {&combined_set_layout});
         m_errorMonitor->Finish();
     }
@@ -480,7 +469,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, CreatePipelineLayout_SeparateSampler) {
 
 TEST_F(VkNvidiaBestPracticesLayerTest, CreatePipelineLayout_LargePipelineLayout) {
     RETURN_IF_SKIP(InitBestPracticesFramework(kEnableNVIDIAValidation));
-    InitState();
+    RETURN_IF_SKIP(InitState());
 
     VkDescriptorSetLayoutBinding large_bindings[] = {
         { 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 16, VK_SHADER_STAGE_VERTEX_BIT, nullptr },
@@ -509,15 +498,13 @@ TEST_F(VkNvidiaBestPracticesLayerTest, CreatePipelineLayout_LargePipelineLayout)
     pipeline_layout_ci.pPushConstantRanges = nullptr;
 
     {
-        m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT,
-                                             "BestPractices-CreatePipelineLayout-LargePipelineLayout");
+        m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-CreatePipelineLayout-LargePipelineLayout");
         vkt::PipelineLayout pipeline_layout(*m_device, pipeline_layout_ci, {&large_set_layout});
         m_errorMonitor->VerifyFound();
     }
 
     {
-        m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT,
-                                             "BestPractices-CreatePipelineLayout-LargePipelineLayout");
+        m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-CreatePipelineLayout-LargePipelineLayout");
         vkt::PipelineLayout pipeline_layout(*m_device, pipeline_layout_ci, {&small_set_layout});
         m_errorMonitor->Finish();
     }
@@ -560,34 +547,30 @@ TEST_F(VkNvidiaBestPracticesLayerTest, BindPipeline_SwitchTessGeometryMesh)
 
     VkPipelineRenderingCreateInfo pipeline_rendering_info = vku::InitStructHelper();
 
-    CreatePipelineHelper vsPipe(*this);
+    CreatePipelineHelper vsPipe(*this, &pipeline_rendering_info);
     vsPipe.shader_stages_ = {vs.GetStageCreateInfo()};
-    vsPipe.InitState();
-    vsPipe.gp_ci_.pNext = &pipeline_rendering_info;
+    vsPipe.rs_state_ci_.rasterizerDiscardEnable = VK_TRUE;
     vsPipe.CreateGraphicsPipeline();
 
-    CreatePipelineHelper vgsPipe(*this);
+    CreatePipelineHelper vgsPipe(*this, &pipeline_rendering_info);
     vgsPipe.shader_stages_ = {vs.GetStageCreateInfo(), gs.GetStageCreateInfo()};
-    vgsPipe.InitState();
-    vgsPipe.gp_ci_.pNext = &pipeline_rendering_info;
+    vgsPipe.rs_state_ci_.rasterizerDiscardEnable = VK_TRUE;
     vgsPipe.CreateGraphicsPipeline();
 
     m_commandBuffer->begin();
 
     {
         m_errorMonitor->SetAllowedFailureMsg("BestPractices-Pipeline-SortAndBind");
-        m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT,
-                                             "BestPractices-BindPipeline-SwitchTessGeometryMesh");
-        vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, vsPipe.pipeline_);
+        m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-BindPipeline-SwitchTessGeometryMesh");
+        vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, vsPipe.Handle());
         m_errorMonitor->Finish();
     }
     {
         m_errorMonitor->SetAllowedFailureMsg("BestPractices-Pipeline-SortAndBind");
-        m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT,
-                                             "BestPractices-BindPipeline-SwitchTessGeometryMesh");
+        m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-BindPipeline-SwitchTessGeometryMesh");
         for (int i = 0; i < 10; ++i) {
-            vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, vgsPipe.pipeline_);
-            vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, vsPipe.pipeline_);
+            vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, vgsPipe.Handle());
+            vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, vsPipe.Handle());
         }
         m_errorMonitor->VerifyFound();
     }
@@ -612,11 +595,10 @@ TEST_F(VkNvidiaBestPracticesLayerTest, BindPipeline_ZcullDirection)
     pipeline_rendering_info.depthAttachmentFormat = depth_format;
     pipeline_rendering_info.stencilAttachmentFormat = depth_format;
 
-    VkImageObj image(m_device);
     // 3 array layers
-    image.Init(image.ImageCreateInfo2D(32, 32, 1, 3, depth_format,
-                                       VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT));
-    ASSERT_TRUE(image.initialized());
+    auto image_ci = vkt::Image::ImageCreateInfo2D(32, 32, 1, 3, depth_format,
+                                                  VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+    vkt::Image image(*m_device, image_ci);
 
     VkImageViewCreateInfo image_view_ci = vku::InitStructHelper();
     image_view_ci.image = image.handle();
@@ -670,14 +652,12 @@ TEST_F(VkNvidiaBestPracticesLayerTest, BindPipeline_ZcullDirection)
     discard_dependency_info.pImageMemoryBarriers = &discard_barrier2;
 
     auto set_desired_failure_msg = [this] {
-        m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT, "BestPractices-Zcull-LessGreaterRatio");
+        m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-Zcull-LessGreaterRatio");
     };
 
     VkPipelineDepthStencilStateCreateInfo depth_stencil_state_ci = vku::InitStructHelper();
 
-    CreatePipelineHelper pipe(*this);
-    pipe.InitState();
-    pipe.gp_ci_.pNext = &pipeline_rendering_info;
+    CreatePipelineHelper pipe(*this, &pipeline_rendering_info);
     pipe.ds_ci_ = depth_stencil_state_ci;
     pipe.AddDynamicState(VK_DYNAMIC_STATE_DEPTH_TEST_ENABLE);
     pipe.AddDynamicState(VK_DYNAMIC_STATE_DEPTH_COMPARE_OP);
@@ -979,13 +959,12 @@ TEST_F(VkNvidiaBestPracticesLayerTest, ClearColor_NotCompressed)
 
     auto set_desired = [this] {
         m_errorMonitor->Finish();
-        m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT, "BestPractices-ClearColor-NotCompressed");
+        m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-ClearColor-NotCompressed");
         m_errorMonitor->SetAllowedFailureMsg("BestPractices-DrawState-ClearCmdBeforeDraw");
     };
 
-    VkImageObj image(m_device);
-    image.Init(m_width, m_height, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
-    ASSERT_TRUE(image.initialized());
+    vkt::Image image(*m_device, m_width, m_height, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
 
     VkImageViewCreateInfo image_view_ci = vku::InitStructHelper();
     image_view_ci.image = image.handle();
@@ -1077,7 +1056,7 @@ TEST_F(VkNvidiaBestPracticesLayerTest, ClearColor_NotCompressed)
 
 TEST_F(VkNvidiaBestPracticesLayerTest, BeginCommandBuffer_OneTimeSubmit) {
     RETURN_IF_SKIP(InitBestPracticesFramework(kEnableNVIDIAValidation));
-    InitState();
+    RETURN_IF_SKIP(InitState());
 
     VkCommandPoolCreateInfo command_pool_ci = vku::InitStructHelper();
     command_pool_ci.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
@@ -1096,28 +1075,26 @@ TEST_F(VkNvidiaBestPracticesLayerTest, BeginCommandBuffer_OneTimeSubmit) {
     VkCommandBufferBeginInfo begin_info = vku::InitStructHelper();
 
     {
-        m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT,
-                                             "BestPractices-vkBeginCommandBuffer-one-time-submit");
+        m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-vkBeginCommandBuffer-one-time-submit");
 
         command_buffer0.begin(&begin_info);
         command_buffer0.end();
 
-        m_default_queue->submit(command_buffer0, false);
-        m_device->wait();
+        m_default_queue->Submit(command_buffer0);
+        m_device->Wait();
 
         vk::BeginCommandBuffer(command_buffer0.handle(), &begin_info);
         m_errorMonitor->VerifyFound();
     }
     {
-        m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT,
-                                             "BestPractices-vkBeginCommandBuffer-one-time-submit");
+        m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-vkBeginCommandBuffer-one-time-submit");
 
         command_buffer1.begin(&begin_info);
         command_buffer1.end();
 
         for (int i = 0; i < 2; ++i) {
-            m_default_queue->submit(command_buffer1, false);
-            m_device->wait();
+            m_default_queue->Submit(command_buffer1);
+            m_device->Wait();
         }
 
         vk::BeginCommandBuffer(command_buffer1.handle(), &begin_info);
@@ -1125,14 +1102,13 @@ TEST_F(VkNvidiaBestPracticesLayerTest, BeginCommandBuffer_OneTimeSubmit) {
     }
     {
         begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-        m_errorMonitor->SetDesiredFailureMsg(VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT,
-                                             "BestPractices-vkBeginCommandBuffer-one-time-submit");
+        m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-vkBeginCommandBuffer-one-time-submit");
 
         command_buffer2.begin(&begin_info);
         command_buffer2.end();
 
-        m_default_queue->submit(command_buffer2, false);
-        m_device->wait();
+        m_default_queue->Submit(command_buffer2);
+        m_device->Wait();
 
         vk::BeginCommandBuffer(command_buffer2.handle(), &begin_info);
         m_errorMonitor->Finish();

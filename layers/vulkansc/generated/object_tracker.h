@@ -29,8 +29,6 @@ bool PreCallValidateDestroyInstance(VkInstance instance, const VkAllocationCallb
                                     const ErrorObject& error_obj) const override;
 void PreCallRecordDestroyInstance(VkInstance instance, const VkAllocationCallbacks* pAllocator,
                                   const RecordObject& record_obj) override;
-bool PreCallValidateEnumeratePhysicalDevices(VkInstance instance, uint32_t* pPhysicalDeviceCount,
-                                             VkPhysicalDevice* pPhysicalDevices, const ErrorObject& error_obj) const override;
 void PostCallRecordEnumeratePhysicalDevices(VkInstance instance, uint32_t* pPhysicalDeviceCount, VkPhysicalDevice* pPhysicalDevices,
                                             const RecordObject& record_obj) override;
 bool PreCallValidateGetPhysicalDeviceQueueFamilyProperties(VkPhysicalDevice physicalDevice, uint32_t* pQueueFamilyPropertyCount,
@@ -45,8 +43,6 @@ void PostCallRecordCreateDevice(VkPhysicalDevice physicalDevice, const VkDeviceC
 bool PreCallValidateDestroyDevice(VkDevice device, const VkAllocationCallbacks* pAllocator,
                                   const ErrorObject& error_obj) const override;
 void PreCallRecordDestroyDevice(VkDevice device, const VkAllocationCallbacks* pAllocator, const RecordObject& record_obj) override;
-bool PreCallValidateGetDeviceQueue(VkDevice device, uint32_t queueFamilyIndex, uint32_t queueIndex, VkQueue* pQueue,
-                                   const ErrorObject& error_obj) const override;
 void PostCallRecordGetDeviceQueue(VkDevice device, uint32_t queueFamilyIndex, uint32_t queueIndex, VkQueue* pQueue,
                                   const RecordObject& record_obj) override;
 bool PreCallValidateQueueSubmit(VkQueue queue, uint32_t submitCount, const VkSubmitInfo* pSubmits, VkFence fence,
@@ -376,8 +372,6 @@ bool PreCallValidateGetImageSparseMemoryRequirements2(VkDevice device, const VkI
 bool PreCallValidateGetPhysicalDeviceQueueFamilyProperties2(VkPhysicalDevice physicalDevice, uint32_t* pQueueFamilyPropertyCount,
                                                             VkQueueFamilyProperties2* pQueueFamilyProperties,
                                                             const ErrorObject& error_obj) const override;
-bool PreCallValidateGetDeviceQueue2(VkDevice device, const VkDeviceQueueInfo2* pQueueInfo, VkQueue* pQueue,
-                                    const ErrorObject& error_obj) const override;
 void PostCallRecordGetDeviceQueue2(VkDevice device, const VkDeviceQueueInfo2* pQueueInfo, VkQueue* pQueue,
                                    const RecordObject& record_obj) override;
 void PostCallRecordCreateSamplerYcbcrConversion(VkDevice device, const VkSamplerYcbcrConversionCreateInfo* pCreateInfo,
@@ -514,15 +508,17 @@ bool PreCallValidateGetPhysicalDevicePresentRectanglesKHR(VkPhysicalDevice physi
                                                           const ErrorObject& error_obj) const override;
 bool PreCallValidateAcquireNextImage2KHR(VkDevice device, const VkAcquireNextImageInfoKHR* pAcquireInfo, uint32_t* pImageIndex,
                                          const ErrorObject& error_obj) const override;
-bool PreCallValidateGetPhysicalDeviceDisplayPropertiesKHR(VkPhysicalDevice physicalDevice, uint32_t* pPropertyCount,
-                                                          VkDisplayPropertiesKHR* pProperties,
-                                                          const ErrorObject& error_obj) const override;
+void PostCallRecordGetPhysicalDeviceDisplayPropertiesKHR(VkPhysicalDevice physicalDevice, uint32_t* pPropertyCount,
+                                                         VkDisplayPropertiesKHR* pProperties,
+                                                         const RecordObject& record_obj) override;
 void PostCallRecordGetDisplayPlaneSupportedDisplaysKHR(VkPhysicalDevice physicalDevice, uint32_t planeIndex,
                                                        uint32_t* pDisplayCount, VkDisplayKHR* pDisplays,
                                                        const RecordObject& record_obj) override;
 bool PreCallValidateGetDisplayModePropertiesKHR(VkPhysicalDevice physicalDevice, VkDisplayKHR display, uint32_t* pPropertyCount,
                                                 VkDisplayModePropertiesKHR* pProperties,
                                                 const ErrorObject& error_obj) const override;
+void PostCallRecordGetDisplayModePropertiesKHR(VkPhysicalDevice physicalDevice, VkDisplayKHR display, uint32_t* pPropertyCount,
+                                               VkDisplayModePropertiesKHR* pProperties, const RecordObject& record_obj) override;
 bool PreCallValidateCreateDisplayModeKHR(VkPhysicalDevice physicalDevice, VkDisplayKHR display,
                                          const VkDisplayModeCreateInfoKHR* pCreateInfo, const VkAllocationCallbacks* pAllocator,
                                          VkDisplayModeKHR* pMode, const ErrorObject& error_obj) const override;
@@ -665,12 +661,14 @@ bool PreCallValidateGetPhysicalDeviceSurfaceFormats2KHR(VkPhysicalDevice physica
                                                         const VkPhysicalDeviceSurfaceInfo2KHR* pSurfaceInfo,
                                                         uint32_t* pSurfaceFormatCount, VkSurfaceFormat2KHR* pSurfaceFormats,
                                                         const ErrorObject& error_obj) const override;
-bool PreCallValidateGetPhysicalDeviceDisplayProperties2KHR(VkPhysicalDevice physicalDevice, uint32_t* pPropertyCount,
-                                                           VkDisplayProperties2KHR* pProperties,
-                                                           const ErrorObject& error_obj) const override;
+void PostCallRecordGetPhysicalDeviceDisplayProperties2KHR(VkPhysicalDevice physicalDevice, uint32_t* pPropertyCount,
+                                                          VkDisplayProperties2KHR* pProperties,
+                                                          const RecordObject& record_obj) override;
 bool PreCallValidateGetDisplayModeProperties2KHR(VkPhysicalDevice physicalDevice, VkDisplayKHR display, uint32_t* pPropertyCount,
                                                  VkDisplayModeProperties2KHR* pProperties,
                                                  const ErrorObject& error_obj) const override;
+void PostCallRecordGetDisplayModeProperties2KHR(VkPhysicalDevice physicalDevice, VkDisplayKHR display, uint32_t* pPropertyCount,
+                                                VkDisplayModeProperties2KHR* pProperties, const RecordObject& record_obj) override;
 bool PreCallValidateGetDisplayPlaneCapabilities2KHR(VkPhysicalDevice physicalDevice,
                                                     const VkDisplayPlaneInfo2KHR* pDisplayPlaneInfo,
                                                     VkDisplayPlaneCapabilities2KHR* pCapabilities,
@@ -1085,6 +1083,8 @@ bool PreCallValidateGetAccelerationStructureOpaqueCaptureDescriptorDataEXT(
     VkDevice device, const VkAccelerationStructureCaptureDescriptorDataInfoEXT* pInfo, void* pData,
     const ErrorObject& error_obj) const override;
 #ifdef VK_USE_PLATFORM_WIN32_KHR
+bool PreCallValidateAcquireWinrtDisplayNV(VkPhysicalDevice physicalDevice, VkDisplayKHR display,
+                                          const ErrorObject& error_obj) const override;
 void PostCallRecordGetWinrtDisplayNV(VkPhysicalDevice physicalDevice, uint32_t deviceRelativeId, VkDisplayKHR* pDisplay,
                                      const RecordObject& record_obj) override;
 #endif  // VK_USE_PLATFORM_WIN32_KHR
@@ -1308,16 +1308,6 @@ void PostCallRecordGetPhysicalDeviceQueueFamilyProperties2(VkPhysicalDevice phys
 void PostCallRecordGetPhysicalDeviceQueueFamilyProperties2KHR(VkPhysicalDevice physicalDevice, uint32_t* pQueueFamilyPropertyCount,
                                                               VkQueueFamilyProperties2* pQueueFamilyProperties,
                                                               const RecordObject& record_obj) override;
-void PostCallRecordGetPhysicalDeviceDisplayPropertiesKHR(VkPhysicalDevice physicalDevice, uint32_t* pPropertyCount,
-                                                         VkDisplayPropertiesKHR* pProperties,
-                                                         const RecordObject& record_obj) override;
-void PostCallRecordGetDisplayModePropertiesKHR(VkPhysicalDevice physicalDevice, VkDisplayKHR display, uint32_t* pPropertyCount,
-                                               VkDisplayModePropertiesKHR* pProperties, const RecordObject& record_obj) override;
-void PostCallRecordGetPhysicalDeviceDisplayProperties2KHR(VkPhysicalDevice physicalDevice, uint32_t* pPropertyCount,
-                                                          VkDisplayProperties2KHR* pProperties,
-                                                          const RecordObject& record_obj) override;
-void PostCallRecordGetDisplayModeProperties2KHR(VkPhysicalDevice physicalDevice, VkDisplayKHR display, uint32_t* pPropertyCount,
-                                                VkDisplayModeProperties2KHR* pProperties, const RecordObject& record_obj) override;
 void PostCallRecordGetPhysicalDeviceDisplayPlanePropertiesKHR(VkPhysicalDevice physicalDevice, uint32_t* pPropertyCount,
                                                               VkDisplayPlanePropertiesKHR* pProperties,
                                                               const RecordObject& record_obj) override;

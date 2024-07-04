@@ -1,7 +1,7 @@
 /*
- * Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
+ * Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,7 +45,7 @@ TEST_F(PositiveRobustness, WriteDescriptorSetAccelerationStructureNVNullDescript
     descriptor_write.descriptorCount = 1;
     descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV;
 
-    vk::UpdateDescriptorSets(m_device->device(), 1, &descriptor_write, 0, nullptr);
+    vk::UpdateDescriptorSets(device(), 1, &descriptor_write, 0, nullptr);
 }
 
 TEST_F(PositiveRobustness, BindVertexBuffers2EXTNullDescriptors) {
@@ -100,10 +100,8 @@ TEST_F(PositiveRobustness, PipelineRobustnessRobustImageAccessExposed) {
     }
     RETURN_IF_SKIP(InitState(nullptr, &pipeline_robustness_features));
 
-    CreateComputePipelineHelper pipe(*this);
-    pipe.InitState();
     VkPipelineRobustnessCreateInfoEXT pipeline_robustness_info = vku::InitStructHelper();
+    CreateComputePipelineHelper pipe(*this, &pipeline_robustness_info);
     pipeline_robustness_info.images = VK_PIPELINE_ROBUSTNESS_IMAGE_BEHAVIOR_ROBUST_IMAGE_ACCESS_EXT;
-    pipe.cp_ci_.pNext = &pipeline_robustness_info;
     pipe.CreateComputePipeline();
 }

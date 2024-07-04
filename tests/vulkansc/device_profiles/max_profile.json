@@ -3,7 +3,7 @@
     "profiles": {
         "MAX_PROFILE": {
             "version": 1,
-            "api-version": "1.0.14",
+            "api-version": "1.0.15",
             "label": "Max Vulkan SC Profile",
             "description": "Profile that supports everything possible",
             "contributors": {},
@@ -253,7 +253,10 @@
                     "shaderSubgroupClock": true,
                     "shaderDeviceClock": true
                 },
-                "VkPhysicalDeviceVertexAttributeDivisorFeaturesEXT": {
+                "VkPhysicalDeviceGlobalPriorityQueryFeaturesKHR": {
+                    "globalPriorityQuery": true
+                },
+                "VkPhysicalDeviceVertexAttributeDivisorFeaturesKHR": {
                     "vertexAttributeInstanceRateDivisor": true,
                     "vertexAttributeInstanceRateZeroDivisor": true
                 },
@@ -278,7 +281,7 @@
                     "fragmentShaderPixelInterlock": true,
                     "fragmentShaderShadingRateInterlock": true
                 },
-                "VkPhysicalDeviceLineRasterizationFeaturesEXT": {
+                "VkPhysicalDeviceLineRasterizationFeaturesKHR": {
                     "rectangularLines": true,
                     "bresenhamLines": true,
                     "smoothLines": true,
@@ -303,7 +306,7 @@
                     "sparseImageFloat32Atomics": true,
                     "sparseImageFloat32AtomicAdd": true
                 },
-                "VkPhysicalDeviceIndexTypeUint8FeaturesEXT": {
+                "VkPhysicalDeviceIndexTypeUint8FeaturesKHR": {
                     "indexTypeUint8": true
                 },
                 "VkPhysicalDeviceExtendedDynamicStateFeaturesEXT": {
@@ -862,7 +865,7 @@
                     "fragmentShadingRateStrictMultiplyCombiner": true
                 },
                 "VkPhysicalDevicePCIBusInfoPropertiesEXT": {},
-                "VkPhysicalDeviceLineRasterizationPropertiesEXT": {},
+                "VkPhysicalDeviceLineRasterizationPropertiesKHR": {},
                 "VkPhysicalDeviceTexelBufferAlignmentPropertiesEXT": {
                     "storageTexelBufferOffsetSingleTexelAlignment": true,
                     "storageTexelBufferOffsetAlignmentBytes": 16,
@@ -908,11 +911,11 @@
                 "VK_EXT_post_depth_coverage": 1,
                 "VK_EXT_image_drm_format_modifier": 1,
                 "VK_EXT_filter_cubic": 1,
-                "VK_EXT_global_priority": 1,
+                "VK_KHR_global_priority": 1,
                 "VK_EXT_external_memory_host": 1,
                 "VK_KHR_shader_clock": 1,
-                "VK_EXT_calibrated_timestamps": 1,
-                "VK_EXT_vertex_attribute_divisor": 1,
+                "VK_KHR_calibrated_timestamps": 1,
+                "VK_KHR_vertex_attribute_divisor": 1,
                 "VK_KHR_swapchain_mutable_format": 1,
                 "VK_EXT_pci_bus_info": 1,
                 "VK_KHR_shader_terminate_invocation": 1,
@@ -924,9 +927,9 @@
                 "VK_EXT_fragment_shader_interlock": 1,
                 "VK_EXT_ycbcr_image_arrays": 1,
                 "VK_EXT_headless_surface": 1,
-                "VK_EXT_line_rasterization": 1,
+                "VK_KHR_line_rasterization": 1,
                 "VK_EXT_shader_atomic_float": 1,
-                "VK_EXT_index_type_uint8": 1,
+                "VK_KHR_index_type_uint8": 1,
                 "VK_EXT_extended_dynamic_state": 1,
                 "VK_EXT_shader_demote_to_helper_invocation": 1,
                 "VK_EXT_texel_buffer_alignment": 1,

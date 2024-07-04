@@ -109,6 +109,7 @@ class PipelineBuilder {
     virtual void AddStage(const Shader& shader);
     virtual void BuildCacheData();
     void TestDeviceCreateFail();
+    vksc::PipelineCache CreatePipelineCache(vkt::Device& device);
     virtual vksc::Pipeline CreatePipeline(vkt::Device& device);
 
     std::vector<VkPipelineShaderStageCreateInfo> stage_ci;

@@ -65,7 +65,10 @@ void BestPractices::PreCallRecordBeginCommandBuffer(VkCommandBuffer commandBuffe
     auto cb_state = GetWrite<bp_state::CommandBuffer>(commandBuffer);
     if (!cb_state) return;
 
+    // reset
     cb_state->num_submits = 0;
+    cb_state->uses_vertex_buffer = false;
+    cb_state->small_indexed_draw_call_count = 0;
 }
 
 bool BestPractices::PreCallValidateBeginCommandBuffer(VkCommandBuffer commandBuffer, const VkCommandBufferBeginInfo* pBeginInfo,
@@ -110,7 +113,8 @@ bool BestPractices::PreCallValidateCmdWriteTimestamp(VkCommandBuffer commandBuff
                                                      VkQueryPool queryPool, uint32_t query, const ErrorObject& error_obj) const {
     bool skip = false;
 
-    skip |= CheckPipelineStageFlags(error_obj.location.dot(Field::pipelineStage), static_cast<VkPipelineStageFlags>(pipelineStage));
+    skip |= CheckPipelineStageFlags(commandBuffer, error_obj.location.dot(Field::pipelineStage),
+                                    static_cast<VkPipelineStageFlags>(pipelineStage));
 
     return skip;
 }
@@ -125,7 +129,7 @@ bool BestPractices::PreCallValidateCmdWriteTimestamp2(VkCommandBuffer commandBuf
                                                       VkQueryPool queryPool, uint32_t query, const ErrorObject& error_obj) const {
     bool skip = false;
 
-    skip |= CheckPipelineStageFlags(error_obj.location.dot(Field::pipelineStage), pipelineStage);
+    skip |= CheckPipelineStageFlags(commandBuffer, error_obj.location.dot(Field::pipelineStage), pipelineStage);
 
     return skip;
 }
@@ -219,7 +223,7 @@ bool BestPractices::PreCallValidateCmdExecuteCommands(VkCommandBuffer commandBuf
     if (VendorCheckEnabled(kBPVendorAMD)) {
         if (commandBufferCount > 0) {
             skip |=
-                LogPerformanceWarning(kVUID_BestPractices_CmdBuffer_AvoidSecondaryCmdBuffers, device, error_obj.location,
+                LogPerformanceWarning(kVUID_BestPractices_CmdBuffer_AvoidSecondaryCmdBuffers, commandBuffer, error_obj.location,
                                       "%s Use of secondary command buffers is not recommended.", VendorSpecificTag(kBPVendorAMD));
         }
     }

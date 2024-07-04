@@ -78,7 +78,7 @@ TEST_F(PositiveExternalMemorySync, ImportMemoryFd) {
     mgfi.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
 
     int fd;
-    vk::GetMemoryFdKHR(m_device->device(), &mgfi, &fd);
+    vk::GetMemoryFdKHR(device(), &mgfi, &fd);
 
     VkImportMemoryFdInfoKHR import_info = vku::InitStructHelper(&dedicated_info);
     import_info.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
@@ -203,7 +203,7 @@ TEST_F(PositiveExternalMemorySync, ExternalMemory) {
     VkMemoryGetWin32HandleInfoKHR mghi = {VK_STRUCTURE_TYPE_MEMORY_GET_WIN32_HANDLE_INFO_KHR, nullptr, memory_export.handle(),
                                           handle_type};
     HANDLE handle;
-    ASSERT_EQ(VK_SUCCESS, vk::GetMemoryWin32HandleKHR(m_device->device(), &mghi, &handle));
+    ASSERT_EQ(VK_SUCCESS, vk::GetMemoryWin32HandleKHR(device(), &mghi, &handle));
 
     VkImportMemoryWin32HandleInfoKHR import_info = {VK_STRUCTURE_TYPE_IMPORT_MEMORY_WIN32_HANDLE_INFO_KHR, nullptr, handle_type,
                                                     handle};
@@ -211,7 +211,7 @@ TEST_F(PositiveExternalMemorySync, ExternalMemory) {
     // Export memory to fd
     VkMemoryGetFdInfoKHR mgfi = {VK_STRUCTURE_TYPE_MEMORY_GET_FD_INFO_KHR, nullptr, memory_export.handle(), handle_type};
     int fd;
-    ASSERT_EQ(VK_SUCCESS, vk::GetMemoryFdKHR(m_device->device(), &mgfi, &fd));
+    ASSERT_EQ(VK_SUCCESS, vk::GetMemoryFdKHR(device(), &mgfi, &fd));
 
     VkImportMemoryFdInfoKHR import_info = {VK_STRUCTURE_TYPE_IMPORT_MEMORY_FD_INFO_KHR, nullptr, handle_type, fd};
 #endif
@@ -247,7 +247,8 @@ TEST_F(PositiveExternalMemorySync, ExternalMemory) {
                            &mem_barrier, 0, nullptr, 0, nullptr);
     vk::CmdCopyBuffer(m_commandBuffer->handle(), buffer_import.handle(), buffer_output.handle(), 1, &copy_info);
     m_commandBuffer->end();
-    m_commandBuffer->QueueCommandBuffer();
+    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Wait();
 }
 
 TEST_F(PositiveExternalMemorySync, BufferDedicatedAllocation) {
@@ -323,7 +324,7 @@ TEST_F(PositiveExternalMemorySync, SyncFdSemaphore) {
     vkt::Semaphore import_semaphore(*m_device);
     import_semaphore.import_handle(fd_handle, handle_type, VK_SEMAPHORE_IMPORT_TEMPORARY_BIT);
 
-    m_default_queue->wait();
+    m_default_queue->Wait();
 }
 
 #ifdef VK_USE_PLATFORM_METAL_EXT
@@ -350,7 +351,7 @@ TEST_F(PositiveExternalMemorySync, ExportMetalObjects) {
         RETURN_IF_SKIP(InitState(nullptr, &features2));
     }
 
-    const VkDevice device = m_device->device();
+    const VkDevice device = this->device();
 
     // Get Metal Device and Metal Command Queue in 1 call
     {
@@ -409,9 +410,7 @@ TEST_F(PositiveExternalMemorySync, ExportMetalObjects) {
         ici.samples = VK_SAMPLE_COUNT_1_BIT;
         ici.tiling = VK_IMAGE_TILING_LINEAR;
         ici.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-        VkImageObj image(m_device);
-        image.Init(ici);
-        ASSERT_TRUE(image.initialized());
+        vkt::Image image(*m_device, ici, vkt::set_layout);
 
         VkExportMetalIOSurfaceInfoEXT surfaceInfo = vku::InitStructHelper();
         surfaceInfo.image = image.handle();
@@ -496,3 +495,25 @@ TEST_F(PositiveExternalMemorySync, ExportFromImportedFence) {
     }
 }
 #endif  // VK_USE_PLATFORM_WIN32_KHR
+
+TEST_F(PositiveExternalMemorySync, MultipleExportOpaqueFd) {
+    TEST_DESCRIPTION("regression from dEQP-VK.api.external.semaphore.opaque_fd.export_multiple_times_temporary");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME);
+    RETURN_IF_SKIP(Init());
+    IgnoreHandleTypeError(m_errorMonitor);
+
+    const auto handle_types = FindSupportedExternalSemaphoreHandleTypes(gpu(), VK_EXTERNAL_SEMAPHORE_FEATURE_EXPORTABLE_BIT);
+    if ((handle_types & VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT) == 0) {
+        GTEST_SKIP() << "VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT is not exportable";
+    }
+
+    VkExportSemaphoreCreateInfo export_info = vku::InitStructHelper();
+    export_info.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT;
+    const VkSemaphoreCreateInfo create_info = vku::InitStructHelper(&export_info);
+    vkt::Semaphore semaphore(*m_device, create_info);
+
+    int handle = 0;
+    semaphore.export_handle(handle, VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT);
+    semaphore.export_handle(handle, VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT);
+}

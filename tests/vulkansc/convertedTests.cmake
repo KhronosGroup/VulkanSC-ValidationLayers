@@ -32,6 +32,8 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/buffer_positive.cpp
     converted/command.cpp
     converted/command_positive.cpp
+    converted/copy_buffer_image.cpp
+    converted/copy_buffer_image_positive.cpp
     converted/debug_extensions.cpp
     converted/debug_extensions_positive.cpp
     converted/debug_printf.cpp
@@ -43,6 +45,8 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/descriptors_positive.cpp
     converted/device_queue.cpp
     converted/dynamic_rendering.cpp
+    converted/dynamic_rendering_local_read.cpp
+    converted/dynamic_rendering_local_read_positive.cpp
     converted/dynamic_rendering_positive.cpp
     converted/dynamic_state.cpp
     converted/dynamic_state_positive.cpp
@@ -61,6 +65,11 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/gpu_av_oob.cpp
     converted/gpu_av_oob_positive.cpp
     converted/gpu_av_positive.cpp
+    converted/gpu_av_ray_query.cpp
+    converted/gpu_av_ray_query_positive.cpp
+    converted/gpu_av_ray_tracing.cpp
+    converted/gpu_av_ray_tracing_positive.cpp
+    converted/gpu_av_shader_object_positive.cpp
     converted/gpu_av_spirv.cpp
     converted/gpu_av_spirv_positive.cpp
     converted/graphics_library.cpp
@@ -103,8 +112,6 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/query.cpp
     converted/query_positive.cpp
     converted/ray_tracing.cpp
-    converted/ray_tracing_gpu.cpp
-    converted/ray_tracing_gpu_nv.cpp
     converted/ray_tracing_nv.cpp
     converted/ray_tracing_pipeline.cpp
     converted/ray_tracing_pipeline_nv.cpp
@@ -117,6 +124,8 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/robustness_positive.cpp
     converted/sampler.cpp
     converted/sampler_positive.cpp
+    converted/secondary_command_buffer.cpp
+    converted/secondary_command_buffer_positive.cpp
     converted/shader_compute.cpp
     converted/shader_compute_positive.cpp
     converted/shader_cooperative_matrix.cpp

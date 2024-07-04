@@ -16,6 +16,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import pickle
+import os
+import tempfile
 from generators.vulkan_object import (VulkanObject,
     Extension, Version, Handle, Param, Queues, CommandScope, Command,
     EnumField, Enum, Flag, Bitmask, Member, Struct,
@@ -33,7 +36,7 @@ vulkanConventions = VulkanConventions()
 
 # Helpers to keep things cleaner
 def splitIfGet(elem, name):
-    return elem.get(name).split(',') if elem.get(name) is not None else None
+    return elem.get(name).split(',') if elem.get(name) is not None and elem.get(name) != '' else None
 
 def textIfFind(elem, name):
     return elem.find(name).text if elem.find(name) is not None else None
@@ -79,6 +82,10 @@ def SetMergedApiNames(names: str) -> None:
     global mergedApiNames
     mergedApiNames = names
 
+cachingEnabled = False
+def EnableCaching() -> None:
+    global cachingEnabled
+    cachingEnabled = True
 
 # This class is a container for any source code, data, or other behavior that is necessary to
 # customize the generator script for a specific target API variant (e.g. Vulkan SC). As such,
@@ -128,7 +135,7 @@ class BaseGeneratorOptions(GeneratorOptions):
         self.apicall         = 'VKAPI_ATTR '
         self.apientry        = 'VKAPI_CALL '
         self.apientryp       = 'VKAPI_PTR *'
-        self.alignFuncParam   = 48
+        self.alignFuncParam  = 48
 
 #
 # This object handles all the parsing from reg.py generator scripts in the Vulkan-Headers
@@ -351,7 +358,24 @@ class BaseGenerator(OutputGenerator):
         # All inherited generators should run from here
         self.generate()
 
+        if cachingEnabled:
+            cachePath = os.path.join(tempfile.gettempdir(), f'vkobject_{os.getpid()}')
+            if not os.path.isfile(cachePath):
+                cacheFile = open(cachePath, 'wb')
+                pickle.dump(self.vk, cacheFile)
+                cacheFile.close()
+
         # This should not have to do anything but call into OutputGenerator
+        OutputGenerator.endFile(self)
+
+    #
+    # Bypass the entire processing and load in the VkObject data
+    # Still need to handle the beingFile/endFile for reg.py
+    def generateFromCache(self, cacheVkObjectData, genOpts):
+        OutputGenerator.beginFile(self, genOpts)
+        self.filename = genOpts.filename
+        self.vk = cacheVkObjectData
+        self.generate()
         OutputGenerator.endFile(self)
 
     #
@@ -375,9 +399,10 @@ class BaseGenerator(OutputGenerator):
             obsoletedby = interface.get('obsoletedby')
             specialuse = splitIfGet(interface, 'specialuse')
             # Not sure if better way to get this info
+            specVersion = self.featureDictionary[name]['enumconstant'][None][None][0]
             nameString = self.featureDictionary[name]['enumconstant'][None][None][1]
 
-            self.currentExtension = Extension(name, nameString, instance, device, depends, vendorTag,
+            self.currentExtension = Extension(name, nameString, specVersion, instance, device, depends, vendorTag,
                                             platform, protect, provisional, promotedto, deprecatedby,
                                             obsoletedby, specialuse)
             self.vk.extensions[name] = self.currentExtension

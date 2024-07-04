@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2015-2022 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (c) 2015-2022 Google, Inc.
+ * Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (c) 2015-2024 Google, Inc.
  * Modifications Copyright (C) 2020-2021 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,7 +18,7 @@
 
 #if GTEST_IS_THREADSAFE
 TEST_F(NegativeThreading, CommandBufferCollision) {
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "THREADING ERROR");
+    m_errorMonitor->SetDesiredError("THREADING ERROR");
     m_errorMonitor->SetAllowedFailureMsg("THREADING ERROR");  // Ignore any extra threading errors found beyond the first one
 
     RETURN_IF_SKIP(Init());
@@ -30,7 +30,7 @@ TEST_F(NegativeThreading, CommandBufferCollision) {
     }
 
     // Calls AllocateCommandBuffers
-    vkt::CommandBuffer commandBuffer(m_device, m_commandPool);
+    vkt::CommandBuffer commandBuffer(*m_device, m_command_pool);
 
     commandBuffer.begin();
 
@@ -74,7 +74,7 @@ TEST_F(NegativeThreading, CommandBufferCollision) {
 TEST_F(NegativeThreading, UpdateDescriptorCollision) {
     TEST_DESCRIPTION("Two threads updating the same descriptor set, expected to generate a threading error");
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "vkUpdateDescriptorSets():  THREADING ERROR");
+    m_errorMonitor->SetDesiredError("vkUpdateDescriptorSets():  THREADING ERROR");
     m_errorMonitor->SetAllowedFailureMsg("THREADING ERROR");  // Ignore any extra threading errors found beyond the first one
 
     RETURN_IF_SKIP(Init());

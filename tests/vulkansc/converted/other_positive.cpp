@@ -15,7 +15,6 @@
  */
 
 #include "../framework/layer_validation_tests.h"
-#include "generated/vk_safe_struct.h"
 #include "generated/vk_extension_helper.h"
 
 #include <cstdlib>
@@ -42,7 +41,7 @@ TEST_F(VkPositiveLayerTest, Maintenance1Tests) {
 
     AddRequiredExtensions(VK_KHR_MAINTENANCE_1_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
-    vkt::CommandBuffer cmd_buf(m_device, m_commandPool);
+    vkt::CommandBuffer cmd_buf(*m_device, m_command_pool);
     cmd_buf.begin();
     // Set Negative height, should give error if Maintenance 1 is not enabled
     VkViewport viewport = {0, 0, 16, -16, 0, 1};
@@ -67,11 +66,11 @@ TEST_F(VkPositiveLayerTest, ValidStructPNext) {
     buffer_create_info.pQueueFamilyIndices = &queue_family_index;
 
     VkBuffer buffer;
-    VkResult err = vk::CreateBuffer(m_device->device(), &buffer_create_info, NULL, &buffer);
+    VkResult err = vk::CreateBuffer(device(), &buffer_create_info, NULL, &buffer);
     ASSERT_EQ(VK_SUCCESS, err);
 
     VkMemoryRequirements memory_reqs;
-    vk::GetBufferMemoryRequirements(m_device->device(), buffer, &memory_reqs);
+    vk::GetBufferMemoryRequirements(device(), buffer, &memory_reqs);
 
     VkDedicatedAllocationMemoryAllocateInfoNV dedicated_memory_info = vku::InitStructHelper();
     dedicated_memory_info.buffer = buffer;
@@ -85,14 +84,14 @@ TEST_F(VkPositiveLayerTest, ValidStructPNext) {
     ASSERT_TRUE(pass);
 
     VkDeviceMemory buffer_memory;
-    err = vk::AllocateMemory(m_device->device(), &memory_info, NULL, &buffer_memory);
+    err = vk::AllocateMemory(device(), &memory_info, NULL, &buffer_memory);
     ASSERT_EQ(VK_SUCCESS, err);
 
-    err = vk::BindBufferMemory(m_device->device(), buffer, buffer_memory, 0);
+    err = vk::BindBufferMemory(device(), buffer, buffer_memory, 0);
     ASSERT_EQ(VK_SUCCESS, err);
 
-    vk::DestroyBuffer(m_device->device(), buffer, NULL);
-    vk::FreeMemory(m_device->device(), buffer_memory, NULL);
+    vk::DestroyBuffer(device(), buffer, NULL);
+    vk::FreeMemory(device(), buffer_memory, NULL);
 }
 
 TEST_F(VkPositiveLayerTest, DeviceIDPropertiesExtensions) {
@@ -228,7 +227,8 @@ TEST_F(VkPositiveLayerTest, GetDevProcAddrNullPtr) {
     TEST_DESCRIPTION("Call GetDeviceProcAddr on an enabled instance extension expecting nullptr");
     AddRequiredExtensions(VK_KHR_SURFACE_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
-    auto fpDestroySurface = (PFN_vkCreateValidationCacheEXT)vk::GetDeviceProcAddr(m_device->device(), "vkDestroySurfaceKHR");
+    m_errorMonitor->SetAllowedFailureMsg("WARNING-vkGetDeviceProcAddr-device");
+    auto fpDestroySurface = (PFN_vkCreateValidationCacheEXT)vk::GetDeviceProcAddr(device(), "vkDestroySurfaceKHR");
     if (fpDestroySurface) {
         m_errorMonitor->SetError("Null was expected!");
     }
@@ -239,8 +239,8 @@ TEST_F(VkPositiveLayerTest, DISABLED_GetDevProcAddrExtensions) {
     TEST_DESCRIPTION("Call GetDeviceProcAddr with and without extension enabled");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     RETURN_IF_SKIP(Init());
-    auto vkTrimCommandPool = vk::GetDeviceProcAddr(m_device->device(), "vkTrimCommandPool");
-    auto vkTrimCommandPoolKHR = vk::GetDeviceProcAddr(m_device->device(), "vkTrimCommandPoolKHR");
+    auto vkTrimCommandPool = vk::GetDeviceProcAddr(device(), "vkTrimCommandPool");
+    auto vkTrimCommandPoolKHR = vk::GetDeviceProcAddr(device(), "vkTrimCommandPoolKHR");
     if (nullptr == vkTrimCommandPool) m_errorMonitor->SetError("Unexpected null pointer");
     if (nullptr != vkTrimCommandPoolKHR) m_errorMonitor->SetError("Didn't receive expected null pointer");
 
@@ -290,7 +290,7 @@ TEST_F(VkPositiveLayerTest, DISABLED_Vulkan12FeaturesBufferDeviceAddress) {
 
     // Also verify that we don't get the KHR extension address without enabling the KHR extension
     auto vkGetBufferDeviceAddressKHR =
-        (PFN_vkGetBufferDeviceAddressKHR)vk::GetDeviceProcAddr(m_device->device(), "vkGetBufferDeviceAddressKHR");
+        (PFN_vkGetBufferDeviceAddressKHR)vk::GetDeviceProcAddr(device(), "vkGetBufferDeviceAddressKHR");
     if (nullptr != vkGetBufferDeviceAddressKHR) m_errorMonitor->SetError("Didn't receive expected null pointer");
 }
 
@@ -366,51 +366,6 @@ TEST_F(VkPositiveLayerTest, ExtensionXmlDependsLogic) {
     RETURN_IF_SKIP(InitState());
 }
 
-// https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/5112
-TEST_F(VkPositiveLayerTest, SafeVoidPointerCopies) {
-    TEST_DESCRIPTION("Ensure valid deep copy of pData / dataSize combination structures");
-
-    // safe_VkSpecializationInfo, constructor
-    {
-        std::vector<std::byte> data(20, std::byte{0b11110000});
-
-        VkSpecializationInfo info = {};
-        info.dataSize = size32(data);
-        info.pData = data.data();
-
-        safe_VkSpecializationInfo safe(&info);
-
-        ASSERT_TRUE(safe.pData != info.pData);
-        ASSERT_TRUE(safe.dataSize == info.dataSize);
-
-        data.clear();  // Invalidate any references, pointers, or iterators referring to contained elements.
-
-        auto copied_bytes = reinterpret_cast<const std::byte *>(safe.pData);
-        ASSERT_TRUE(copied_bytes[19] == std::byte{0b11110000});
-    }
-
-    // safe_VkPipelineExecutableInternalRepresentationKHR, initialize
-    {
-        std::vector<std::byte> data(11, std::byte{0b01001001});
-
-        VkPipelineExecutableInternalRepresentationKHR info = {};
-        info.dataSize = size32(data);
-        info.pData = data.data();
-
-        safe_VkPipelineExecutableInternalRepresentationKHR safe;
-
-        safe.initialize(&info);
-
-        ASSERT_TRUE(safe.dataSize == info.dataSize);
-        ASSERT_TRUE(safe.pData != info.pData);
-
-        data.clear();  // Invalidate any references, pointers, or iterators referring to contained elements.
-
-        auto copied_bytes = reinterpret_cast<const std::byte *>(safe.pData);
-        ASSERT_TRUE(copied_bytes[10] == std::byte{0b01001001});
-    }
-}
-
 TEST_F(VkPositiveLayerTest, FormatProperties3FromProfiles) {
     // https://github.com/KhronosGroup/Vulkan-Profiles/pull/392
     TEST_DESCRIPTION("Make sure VkFormatProperties3KHR is overwritten correctly in Profiles layer");
@@ -444,7 +399,7 @@ TEST_F(VkPositiveLayerTest, UseInteractionApi1) {
     }
 
     VkDeviceGroupPresentCapabilitiesKHR device_group_present_caps = vku::InitStructHelper();
-    vk::GetDeviceGroupPresentCapabilitiesKHR(m_device->device(), &device_group_present_caps);
+    vk::GetDeviceGroupPresentCapabilitiesKHR(device(), &device_group_present_caps);
 }
 
 // Not supported in Vulkan SC: assumes availability of pre-Vulkan 1.2 functionality
@@ -462,7 +417,7 @@ TEST_F(VkPositiveLayerTest, DISABLED_UseInteractionApi2) {
     }
 
     VkDeviceGroupPresentCapabilitiesKHR device_group_present_caps = vku::InitStructHelper();
-    vk::GetDeviceGroupPresentCapabilitiesKHR(m_device->device(), &device_group_present_caps);
+    vk::GetDeviceGroupPresentCapabilitiesKHR(device(), &device_group_present_caps);
 }
 
 TEST_F(VkPositiveLayerTest, ExtensionExpressions) {
@@ -538,83 +493,6 @@ TEST_F(VkPositiveLayerTest, DISABLED_ExtensionsInCreateInstance) {
     }
 
     RETURN_IF_SKIP(InitFramework());
-}
-
-TEST_F(VkPositiveLayerTest, CustomSafePNextCopy) {
-    TEST_DESCRIPTION("Check passing custom data down the pNext chain for safe struct construction");
-
-    // This tests an additional "copy_state" parameter in the SafePNextCopy function that allows "customizing" safe_* struct
-    // construction.. This is required for structs such as VkPipelineRenderingCreateInfo (which extend VkGraphicsPipelineCreateInfo)
-    // whose members must be partially ignored depending on the graphics sub-state present.
-
-    VkFormat format = VK_FORMAT_B8G8R8A8_UNORM;
-    VkPipelineRenderingCreateInfo pri = vku::InitStructHelper();
-    pri.colorAttachmentCount = 1;
-    pri.pColorAttachmentFormats = &format;
-
-    bool ignore_default_construction = true;
-    PNextCopyState copy_state = {
-        [&ignore_default_construction](VkBaseOutStructure *safe_struct, const VkBaseOutStructure *in_struct) -> bool {
-            if (ignore_default_construction) {
-                auto tmp = reinterpret_cast<safe_VkPipelineRenderingCreateInfo *>(safe_struct);
-                tmp->colorAttachmentCount = 0;
-                tmp->pColorAttachmentFormats = nullptr;
-                return true;
-            }
-            return false;
-        },
-    };
-
-    {
-        VkGraphicsPipelineCreateInfo gpci = vku::InitStructHelper(&pri);
-        safe_VkGraphicsPipelineCreateInfo safe_gpci(&gpci, false, false, &copy_state);
-
-        auto safe_pri = reinterpret_cast<const safe_VkPipelineRenderingCreateInfo *>(safe_gpci.pNext);
-        // Ensure original input struct was not modified
-        ASSERT_EQ(pri.colorAttachmentCount, 1);
-        ASSERT_EQ(pri.pColorAttachmentFormats, &format);
-
-        // Ensure safe struct was modified
-        ASSERT_EQ(safe_pri->colorAttachmentCount, 0);
-        ASSERT_EQ(safe_pri->pColorAttachmentFormats, nullptr);
-    }
-
-    // Ensure PNextCopyState::init is also applied when there is more than one element in the pNext chain
-    {
-        VkGraphicsPipelineLibraryCreateInfoEXT gpl_info = vku::InitStructHelper(&pri);
-        VkGraphicsPipelineCreateInfo gpci = vku::InitStructHelper(&gpl_info);
-
-        safe_VkGraphicsPipelineCreateInfo safe_gpci(&gpci, false, false, &copy_state);
-
-        auto safe_gpl_info = reinterpret_cast<const safe_VkGraphicsPipelineLibraryCreateInfoEXT *>(safe_gpci.pNext);
-        auto safe_pri = reinterpret_cast<const safe_VkPipelineRenderingCreateInfo *>(safe_gpl_info->pNext);
-        // Ensure original input struct was not modified
-        ASSERT_EQ(pri.colorAttachmentCount, 1);
-        ASSERT_EQ(pri.pColorAttachmentFormats, &format);
-
-        // Ensure safe struct was modified
-        ASSERT_EQ(safe_pri->colorAttachmentCount, 0);
-        ASSERT_EQ(safe_pri->pColorAttachmentFormats, nullptr);
-    }
-
-    // Check that signaling to use the default constructor works
-    {
-        pri.colorAttachmentCount = 1;
-        pri.pColorAttachmentFormats = &format;
-
-        ignore_default_construction = false;
-        VkGraphicsPipelineCreateInfo gpci = vku::InitStructHelper(&pri);
-        safe_VkGraphicsPipelineCreateInfo safe_gpci(&gpci, false, false, &copy_state);
-
-        auto safe_pri = reinterpret_cast<const safe_VkPipelineRenderingCreateInfo *>(safe_gpci.pNext);
-        // Ensure original input struct was not modified
-        ASSERT_EQ(pri.colorAttachmentCount, 1);
-        ASSERT_EQ(pri.pColorAttachmentFormats, &format);
-
-        // Ensure safe struct was modified
-        ASSERT_EQ(safe_pri->colorAttachmentCount, 1);
-        ASSERT_EQ(*safe_pri->pColorAttachmentFormats, format);
-    }
 }
 
 TEST_F(VkPositiveLayerTest, ExclusiveScissorVersionCount) {
@@ -720,4 +598,57 @@ TEST_F(VkPositiveLayerTest, NoExtensionFromInstanceFunction) {
     VkFormatProperties format_properties;
     // need VK_KHR_sampler_ycbcr_conversion if it was a device function
     vk::GetPhysicalDeviceFormatProperties(gpu(), VK_FORMAT_B16G16R16G16_422_UNORM, &format_properties);
+}
+
+TEST_F(VkPositiveLayerTest, InstanceExtensionsCallingDeviceStruct0) {
+    TEST_DESCRIPTION(
+        "Use VkImageFormatListCreateInfo with VkPhysicalDeviceImageFormatInfo2 if VK_KHR_image_format_list is available");
+    SetTargetApiVersion(VK_API_VERSION_1_0);
+    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+    RETURN_IF_SKIP(Init());
+    if (!DeviceExtensionSupported(gpu(), nullptr, VK_KHR_IMAGE_FORMAT_LIST_EXTENSION_NAME)) {
+        GTEST_SKIP() << "VK_KHR_image_format_list is not supported";
+    }
+    const VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
+
+    // Requires device extension (VK_KHR_image_format_list)
+    VkImageFormatListCreateInfo format_list_info = vku::InitStructHelper();
+    format_list_info.viewFormatCount = 1;
+    format_list_info.pViewFormats = &format;
+
+    VkPhysicalDeviceImageFormatInfo2 image_format_info = vku::InitStructHelper(&format_list_info);
+    image_format_info.type = VK_IMAGE_TYPE_2D;
+    image_format_info.format = format;
+    image_format_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_format_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+
+    VkImageFormatProperties2 image_format_properties = vku::InitStructHelper();
+    // Requires instance extension (VK_KHR_get_physical_device_properties2)
+    vk::GetPhysicalDeviceImageFormatProperties2KHR(gpu(), &image_format_info, &image_format_properties);
+}
+
+TEST_F(VkPositiveLayerTest, InstanceExtensionsCallingDeviceStruct1) {
+    TEST_DESCRIPTION(
+        "Use VkBufferUsageFlags2CreateInfoKHR with VkPhysicalDeviceExternalBufferInfo if VK_KHR_maintenance5 is available");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    RETURN_IF_SKIP(Init());
+    if (!DeviceExtensionSupported(gpu(), nullptr, VK_KHR_MAINTENANCE_5_EXTENSION_NAME)) {
+        GTEST_SKIP() << "VK_KHR_maintenance5 is not supported";
+    }
+
+#ifdef _WIN32
+    const auto handle_type = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT_KHR;
+#else
+    const auto handle_type = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT_KHR;
+#endif
+
+    // Requires device extension (VK_KHR_maintenance5)
+    VkBufferUsageFlags2CreateInfoKHR bufferUsageFlags2 = vku::InitStructHelper();
+    bufferUsageFlags2.usage = VK_BUFFER_USAGE_2_TRANSFER_SRC_BIT_KHR;
+
+    VkPhysicalDeviceExternalBufferInfo externalBufferInfo = vku::InitStructHelper(&bufferUsageFlags2);
+    externalBufferInfo.handleType = handle_type;
+    VkExternalBufferProperties externalBufferProperties = vku::InitStructHelper();
+    // Instance extension promoted to VK_VERSION_1_1
+    vk::GetPhysicalDeviceExternalBufferProperties(gpu(), &externalBufferInfo, &externalBufferProperties);
 }

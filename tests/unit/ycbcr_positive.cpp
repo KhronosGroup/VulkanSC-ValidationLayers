@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (c) 2015-2023 Google, Inc.
+ * Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (c) 2015-2024 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -77,9 +77,7 @@ TEST_F(PositiveYcbcr, MultiplaneGetImageSubresourceLayout) {
         // Assume there's low ROI on searching for different mp formats
         GTEST_SKIP() << "Multiplane image format not supported";
     }
-
-    VkImageObj image{m_device};
-    image.init_no_mem(*m_device, ci);
+    vkt::Image image(*m_device, ci, vkt::no_mem);
 
     // Query layout of 3rd plane
     VkImageSubresource subres = {};
@@ -114,9 +112,7 @@ TEST_F(PositiveYcbcr, MultiplaneImageCopyBufferToImage) {
         // Assume there's low ROI on searching for different mp formats
         GTEST_SKIP() << "Multiplane image format not supported";
     }
-
-    VkImageObj image(m_device);
-    image.init(&ci);
+    vkt::Image image(*m_device, ci, vkt::set_layout);
 
     m_commandBuffer->reset();
     m_commandBuffer->begin();
@@ -174,9 +170,7 @@ TEST_F(PositiveYcbcr, MultiplaneImageCopy) {
         GTEST_SKIP() << "Multiplane image format not supported";
     }
 
-    VkImageObj image{m_device};
-    image.init_no_mem(*m_device, ci);
-
+    vkt::Image image(*m_device, ci, vkt::no_mem);
     vkt::DeviceMemory mem_obj;
     mem_obj.init(*m_device, vkt::DeviceMemory::get_resource_alloc_info(*m_device, image.memory_requirements(), 0));
 
@@ -204,8 +198,8 @@ TEST_F(PositiveYcbcr, MultiplaneImageCopy) {
                      &copyRegion);
     m_commandBuffer->end();
 
-    m_default_queue->submit(*m_commandBuffer);
-    m_default_queue->wait();
+    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Wait();
 }
 
 TEST_F(PositiveYcbcr, MultiplaneImageBindDisjoint) {
@@ -240,8 +234,7 @@ TEST_F(PositiveYcbcr, MultiplaneImageBindDisjoint) {
         GTEST_SKIP() << "Multiplane image format not supported";
     }
 
-    VkImageObj image{m_device};
-    image.init_no_mem(*m_device, ci);
+    vkt::Image image(*m_device, ci, vkt::no_mem);
 
     // Allocate & bind memory
     auto image_plane_req = vku::InitStruct<VkImagePlaneMemoryRequirementsInfo>();
@@ -328,10 +321,7 @@ TEST_F(PositiveYcbcr, ImageLayout) {
         // Assume there's low ROI on searching for different mp formats
         GTEST_SKIP() << "Multiplane image format not supported";
     }
-
-    VkImageObj image(m_device);
-    image.Init(ci);
-
+    vkt::Image image(*m_device, ci, vkt::set_layout);
     vkt::Buffer buffer(*m_device, 128 * 128 * 3, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
 
     VkBufferImageCopy copy_region = {};
@@ -349,7 +339,8 @@ TEST_F(PositiveYcbcr, ImageLayout) {
     vk::CmdCopyBufferToImage(m_commandBuffer->handle(), buffer.handle(), image.handle(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
                              &copy_region);
     m_commandBuffer->end();
-    m_commandBuffer->QueueCommandBuffer(false);
+    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Wait();
 
     // Test to verify that views of multiplanar images have layouts tracked correctly
     // by changing the image's layout then using a view of that image
@@ -379,7 +370,6 @@ TEST_F(PositiveYcbcr, ImageLayout) {
     descriptor_set.UpdateDescriptorSets();
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitState();
     pipe.CreateGraphicsPipeline();
 
     m_commandBuffer->begin();
@@ -406,8 +396,8 @@ TEST_F(PositiveYcbcr, ImageLayout) {
     vk::CmdDraw(m_commandBuffer->handle(), 1, 0, 0, 0);
     m_commandBuffer->EndRenderPass();
     m_commandBuffer->end();
-    m_default_queue->submit(*m_commandBuffer);
-    m_default_queue->wait();
+    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Wait();
 }
 
 TEST_F(PositiveYcbcr, DrawCombinedImageSampler) {
@@ -430,9 +420,7 @@ TEST_F(PositiveYcbcr, DrawCombinedImageSampler) {
         // Assume there's low ROI on searching for different mp formats
         GTEST_SKIP() << "Multiplane image format not supported";
     }
-
-    VkImageObj image(m_device);
-    image.Init(ci);
+    vkt::Image image(*m_device, ci, vkt::set_layout);
 
     vkt::SamplerYcbcrConversion conversion(*m_device, format);
     auto conversion_info = conversion.ConversionInfo();
@@ -470,7 +458,79 @@ TEST_F(PositiveYcbcr, DrawCombinedImageSampler) {
     VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     CreatePipelineHelper pipe(*this);
-    pipe.InitState();
+    pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
+    pipe.gp_ci_.layout = pipeline_layout.handle();
+    pipe.CreateGraphicsPipeline();
+
+    m_commandBuffer->begin();
+    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1,
+                              &descriptor_set.set_, 0, nullptr);
+    vk::CmdDraw(m_commandBuffer->handle(), 1, 0, 0, 0);
+    m_commandBuffer->EndRenderPass();
+    m_commandBuffer->end();
+}
+
+TEST_F(PositiveYcbcr, ImageQuerySizeLod) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/7903");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    RETURN_IF_SKIP(InitBasicYcbcr());
+    InitRenderTarget();
+    const VkFormat format = VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM_KHR;
+
+    auto ci = vku::InitStruct<VkImageCreateInfo>();
+    ci.imageType = VK_IMAGE_TYPE_2D;
+    ci.format = format;
+    ci.tiling = VK_IMAGE_TILING_OPTIMAL;
+    ci.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    ci.extent = {256, 256, 1};
+    ci.mipLevels = 1;
+    ci.arrayLayers = 1;
+    ci.samples = VK_SAMPLE_COUNT_1_BIT;
+    if (!ImageFormatIsSupported(instance(), gpu(), ci, VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT)) {
+        // Assume there's low ROI on searching for different mp formats
+        GTEST_SKIP() << "Multiplane image format not supported";
+    }
+    vkt::Image image(*m_device, ci, vkt::set_layout);
+
+    vkt::SamplerYcbcrConversion conversion(*m_device, format);
+    auto conversion_info = conversion.ConversionInfo();
+    auto ivci = vku::InitStruct<VkImageViewCreateInfo>(&conversion_info);
+    ivci.image = image.handle();
+    ivci.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    ivci.format = format;
+    ivci.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    vkt::ImageView view(*m_device, ivci);
+
+    VkSamplerCreateInfo sampler_ci = SafeSaneSamplerCreateInfo();
+    sampler_ci.pNext = &conversion_info;
+    vkt::Sampler sampler(*m_device, sampler_ci);
+
+    OneOffDescriptorSet descriptor_set(
+        m_device, {
+                      {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, &sampler.handle()},
+                  });
+    if (!descriptor_set.set_) {
+        GTEST_SKIP() << "Can't allocate descriptor with immutable sampler";
+    }
+
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
+    descriptor_set.WriteDescriptorImageInfo(0, view.handle(), sampler.handle());
+    descriptor_set.UpdateDescriptorSets();
+
+    const char fsSource[] = R"glsl(
+        #version 450
+        layout (set = 0, binding = 0) uniform sampler2D ycbcr;
+        layout(location=0) out vec4 out_color;
+        void main() {
+            int x = textureSize(ycbcr, 0).x;
+            out_color = vec4(0.0) * x;
+        }
+    )glsl";
+    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
     pipe.gp_ci_.layout = pipeline_layout.handle();
     pipe.CreateGraphicsPipeline();

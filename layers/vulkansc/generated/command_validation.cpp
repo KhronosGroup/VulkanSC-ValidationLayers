@@ -835,9 +835,9 @@ static const vvl::unordered_map<Func, CommandValidationInfo> kCommandValidationT
     CMD_SCOPE_OUTSIDE, "UNASSIGNED-vkCmdBindIndexBuffer2KHR-videocoding",
 }},
 {Func::vkCmdSetLineStippleKHR, {
-    "UNASSIGNED-vkCmdSetLineStippleKHR-commandBuffer-recording",
+    "VUID-vkCmdSetLineStippleKHR-commandBuffer-recording",
     nullptr,
-    VK_QUEUE_GRAPHICS_BIT, "UNASSIGNED-vkCmdSetLineStippleKHR-commandBuffer-cmdpool",
+    VK_QUEUE_GRAPHICS_BIT, "VUID-vkCmdSetLineStippleKHR-commandBuffer-cmdpool",
     CMD_SCOPE_BOTH, "kVUIDUndefined",
     CMD_SCOPE_OUTSIDE, "UNASSIGNED-vkCmdSetLineStippleKHR-videocoding",
 }},
@@ -1185,9 +1185,9 @@ static const vvl::unordered_map<Func, CommandValidationInfo> kCommandValidationT
     CMD_SCOPE_OUTSIDE, "UNASSIGNED-vkCmdSetPerformanceOverrideINTEL-videocoding",
 }},
 {Func::vkCmdSetLineStippleEXT, {
-    "UNASSIGNED-vkCmdSetLineStippleKHR-commandBuffer-recording",
+    "VUID-vkCmdSetLineStippleKHR-commandBuffer-recording",
     nullptr,
-    VK_QUEUE_GRAPHICS_BIT, "UNASSIGNED-vkCmdSetLineStippleKHR-commandBuffer-cmdpool",
+    VK_QUEUE_GRAPHICS_BIT, "VUID-vkCmdSetLineStippleKHR-commandBuffer-cmdpool",
     CMD_SCOPE_BOTH, "kVUIDUndefined",
     CMD_SCOPE_OUTSIDE, "UNASSIGNED-vkCmdSetLineStippleKHR-videocoding",
 }},
@@ -1854,7 +1854,11 @@ bool CoreChecks::ValidateCmd(const vvl::CommandBuffer& cb_state, const Location&
     }
 
     // Validate the command pool from which the command buffer is from that the command is allowed for queue type
-    skip |= ValidateCmdQueueFlags(cb_state, loc, info.queue_flags, info.queue_vuid);
+    if (!HasRequiredQueueFlags(cb_state, *physical_device_state, info.queue_flags)) {
+        const LogObjectList objlist(cb_state.Handle(), cb_state.command_pool->Handle());
+        skip |= LogError(info.queue_vuid, objlist, loc, "%s",
+                         DescribeRequiredQueueFlag(cb_state, *physical_device_state, info.queue_flags).c_str());
+    }
 
     // Validate if command is inside or outside a render pass if applicable
     if (info.render_pass == CMD_SCOPE_INSIDE) {

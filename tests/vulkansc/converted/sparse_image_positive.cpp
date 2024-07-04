@@ -30,7 +30,6 @@ TEST_F(PositiveSparseImage, DISABLED_MultipleBinds) {
         GTEST_SKIP() << "Graphics queue does not have sparse binding bit";
     }
 
-    VkImageObj image(m_device);
     VkImageCreateInfo image_create_info = vku::InitStructHelper();
     image_create_info.imageType = VK_IMAGE_TYPE_2D;
     image_create_info.format = VK_FORMAT_B8G8R8A8_UNORM;
@@ -43,10 +42,10 @@ TEST_F(PositiveSparseImage, DISABLED_MultipleBinds) {
     image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_create_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     image_create_info.flags = VK_IMAGE_CREATE_SPARSE_BINDING_BIT;
-    image.init_no_mem(*m_device, image_create_info);
+    vkt::Image image(*m_device, image_create_info, vkt::no_mem);
 
     VkMemoryRequirements memory_reqs;
-    vk::GetImageMemoryRequirements(m_device->device(), image, &memory_reqs);
+    vk::GetImageMemoryRequirements(device(), image, &memory_reqs);
     // Find an image big enough to allow sparse mapping of 2 memory regions
     // Increase the image size until it is at least twice the
     // size of the required alignment, to ensure we can bind both
@@ -56,7 +55,7 @@ TEST_F(PositiveSparseImage, DISABLED_MultipleBinds) {
         image_create_info.extent.width *= 2;
         image_create_info.extent.height *= 2;
         image.init_no_mem(*m_device, image_create_info);
-        vk::GetImageMemoryRequirements(m_device->device(), image, &memory_reqs);
+        vk::GetImageMemoryRequirements(device(), image, &memory_reqs);
     }
     // Allocate 2 memory regions of minimum alignment size, bind one at 0, the other
     // at the end of the first
@@ -89,7 +88,7 @@ TEST_F(PositiveSparseImage, DISABLED_MultipleBinds) {
     vk::QueueBindSparse(m_default_queue->handle(), 1, &bindSparseInfo, VK_NULL_HANDLE);
 
     // Wait for operations to finish before destroying anything
-    m_default_queue->wait();
+    m_default_queue->Wait();
 }
 
 // Not supported in Vulkan SC: sparse resources
@@ -104,7 +103,6 @@ TEST_F(PositiveSparseImage, DISABLED_BindFreeMemory) {
         GTEST_SKIP() << "Graphics queue does not have sparse binding bit";
     }
 
-    VkImageObj image(m_device);
     VkImageCreateInfo image_create_info = vku::InitStructHelper();
     image_create_info.imageType = VK_IMAGE_TYPE_2D;
     image_create_info.format = VK_FORMAT_B8G8R8A8_UNORM;
@@ -117,11 +115,11 @@ TEST_F(PositiveSparseImage, DISABLED_BindFreeMemory) {
     image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_create_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
     image_create_info.flags = VK_IMAGE_CREATE_SPARSE_BINDING_BIT | VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT;
-    image.init_no_mem(*m_device, image_create_info);
+    vkt::Image image(*m_device, image_create_info, vkt::no_mem);
 
     VkMemoryRequirements memory_reqs;
 
-    vk::GetImageMemoryRequirements(m_device->device(), image, &memory_reqs);
+    vk::GetImageMemoryRequirements(device(), image, &memory_reqs);
     VkMemoryAllocateInfo memory_info = vku::InitStructHelper();
     memory_info.allocationSize = memory_reqs.size;
     bool pass = m_device->phy().set_memory_type(memory_reqs.memoryTypeBits, &memory_info, 0);
@@ -152,7 +150,7 @@ TEST_F(PositiveSparseImage, DISABLED_BindFreeMemory) {
     bind.memory = VK_NULL_HANDLE;
     vk::QueueBindSparse(m_default_queue->handle(), 1, &bindSparseInfo, VK_NULL_HANDLE);
 
-    m_default_queue->wait();
+    m_default_queue->Wait();
 
     // Free the memory, then use the image in a new command buffer
     memory.destroy();
@@ -177,9 +175,9 @@ TEST_F(PositiveSparseImage, DISABLED_BindFreeMemory) {
     VkImageSubresourceRange range = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
     vk::CmdClearColorImage(m_commandBuffer->handle(), image, VK_IMAGE_LAYOUT_GENERAL, &clear_color, 1, &range);
     m_commandBuffer->end();
-    m_default_queue->submit(*m_commandBuffer);
+    m_default_queue->Submit(*m_commandBuffer);
     // Wait for operations to finish before destroying anything
-    m_default_queue->wait();
+    m_default_queue->Wait();
 }
 
 // Not supported in Vulkan SC: sparse resources
@@ -195,7 +193,6 @@ TEST_F(PositiveSparseImage, DISABLED_BindMetadata) {
     }
 
     // Create a sparse image
-    VkImageObj image(m_device);
     VkImageCreateInfo image_create_info = vku::InitStructHelper();
     image_create_info.imageType = VK_IMAGE_TYPE_2D;
     image_create_info.format = VK_FORMAT_B8G8R8A8_UNORM;
@@ -208,17 +205,17 @@ TEST_F(PositiveSparseImage, DISABLED_BindMetadata) {
     image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_create_info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     image_create_info.flags = VK_IMAGE_CREATE_SPARSE_BINDING_BIT | VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT;
-    image.init_no_mem(*m_device, image_create_info);
+    vkt::Image image(*m_device, image_create_info, vkt::no_mem);
 
     // Query image memory requirements
     VkMemoryRequirements memory_reqs;
-    vk::GetImageMemoryRequirements(m_device->device(), image, &memory_reqs);
+    vk::GetImageMemoryRequirements(device(), image, &memory_reqs);
 
     // Query sparse memory requirements
     uint32_t sparse_reqs_count = 0;
-    vk::GetImageSparseMemoryRequirements(m_device->device(), image, &sparse_reqs_count, nullptr);
+    vk::GetImageSparseMemoryRequirements(device(), image, &sparse_reqs_count, nullptr);
     std::vector<VkSparseImageMemoryRequirements> sparse_reqs(sparse_reqs_count);
-    vk::GetImageSparseMemoryRequirements(m_device->device(), image, &sparse_reqs_count, sparse_reqs.data());
+    vk::GetImageSparseMemoryRequirements(device(), image, &sparse_reqs_count, sparse_reqs.data());
 
     // Find requirements for metadata aspect
     const VkSparseImageMemoryRequirements *metadata_reqs = nullptr;
@@ -258,7 +255,7 @@ TEST_F(PositiveSparseImage, DISABLED_BindMetadata) {
     vk::QueueBindSparse(m_default_queue->handle(), 1, &bind_info, VK_NULL_HANDLE);
 
     // Wait for operations to finish before destroying anything
-    m_default_queue->wait();
+    m_default_queue->Wait();
 }
 
 // Not supported in Vulkan SC: sparse resources
@@ -287,8 +284,7 @@ TEST_F(PositiveSparseImage, DISABLED_OpImageSparse) {
     image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_create_info.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
     image_create_info.flags = VK_IMAGE_CREATE_SPARSE_BINDING_BIT | VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT;
-    VkImageObj image(m_device);
-    image.init_no_mem(*m_device, image_create_info);
+    vkt::Image image(*m_device, image_create_info, vkt::no_mem);
 
     vkt::ImageView image_view = image.CreateView();
 
@@ -325,13 +321,12 @@ TEST_F(PositiveSparseImage, DISABLED_OpImageSparse) {
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
-    pipe.InitState();
     pipe.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&ds.layout_});
     pipe.CreateGraphicsPipeline();
 
     m_commandBuffer->begin();
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
     vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_layout_, 0, 1, &ds.set_, 0,
                               nullptr);
     vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
@@ -344,7 +339,7 @@ TEST_F(PositiveSparseImage, DISABLED_BindImage) {
     AddRequiredFeature(vkt::Feature::sparseResidencyImage2D);
     RETURN_IF_SKIP(Init());
 
-    if (m_device->sparse_queues().empty()) {
+    if (m_device->QueuesWithSparseCapability().empty()) {
         GTEST_SKIP() << "Required SPARSE_BINDING queue families not present";
     }
 
@@ -359,8 +354,7 @@ TEST_F(PositiveSparseImage, DISABLED_BindImage) {
     image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_create_info.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
     image_create_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-    VkImageObj image(m_device);
-    image.init_no_mem(*m_device, image_create_info);
+    vkt::Image image(*m_device, image_create_info, vkt::no_mem);
 
     VkSparseImageMemoryBind image_memory_bind = {};
     image_memory_bind.subresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -375,7 +369,7 @@ TEST_F(PositiveSparseImage, DISABLED_BindImage) {
     bind_info.imageBindCount = 1;
     bind_info.pImageBinds = &image_memory_bind_info;
 
-    vkt::Queue *sparse_queue = m_device->sparse_queues()[0];
+    vkt::Queue *sparse_queue = m_device->QueuesWithSparseCapability()[0];
     vk::QueueBindSparse(sparse_queue->handle(), 1, &bind_info, VK_NULL_HANDLE);
-    sparse_queue->wait();
+    sparse_queue->Wait();
 }

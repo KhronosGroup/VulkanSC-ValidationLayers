@@ -20,7 +20,7 @@ TEST_F(VkSCNegativeCommand, CreateCommandPoolMissingMemoryReservationInfo) {
     VkCommandPool cmd_pool = VK_NULL_HANDLE;
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkCommandPoolCreateInfo-pNext-05002");
-    vksc::CreateCommandPool(m_device->device(), &create_info, nullptr, &cmd_pool);
+    vksc::CreateCommandPool(m_device->handle(), &create_info, nullptr, &cmd_pool);
     m_errorMonitor->VerifyFound();
 }
 
@@ -37,7 +37,7 @@ TEST_F(VkSCNegativeCommand, CreateCommandPoolInvalidReservedSize) {
     VkCommandPool cmd_pool = VK_NULL_HANDLE;
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkCommandPoolMemoryReservationCreateInfo-commandPoolReservedSize-05003");
-    vksc::CreateCommandPool(m_device->device(), &create_info, nullptr, &cmd_pool);
+    vksc::CreateCommandPool(m_device->handle(), &create_info, nullptr, &cmd_pool);
     m_errorMonitor->VerifyFound();
 }
 
@@ -56,14 +56,14 @@ TEST_F(VkSCNegativeCommand, CreateCommandPoolInvalidMaxCommandBuffers) {
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit,
                                          "VUID-VkCommandPoolMemoryReservationCreateInfo-commandPoolMaxCommandBuffers-05004");
     mem_reservation_info.commandPoolMaxCommandBuffers = 0;
-    vksc::CreateCommandPool(m_device->device(), &create_info, nullptr, &cmd_pool);
+    vksc::CreateCommandPool(m_device->handle(), &create_info, nullptr, &cmd_pool);
     m_errorMonitor->VerifyFound();
 
     m_errorMonitor->SetAllowedFailureMsg("VUID-VkCommandPoolMemoryReservationCreateInfo-commandPoolMaxCommandBuffers-05074");
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit,
                                          "VUID-VkCommandPoolMemoryReservationCreateInfo-commandPoolMaxCommandBuffers-05090");
     mem_reservation_info.commandPoolMaxCommandBuffers = GetVulkanSC10Properties().maxCommandPoolCommandBuffers + 1;
-    vksc::CreateCommandPool(m_device->device(), &create_info, nullptr, &cmd_pool);
+    vksc::CreateCommandPool(m_device->handle(), &create_info, nullptr, &cmd_pool);
     m_errorMonitor->VerifyFound();
 }
 
@@ -92,7 +92,7 @@ TEST_F(VkSCNegativeCommand, AllocateCommandBuffersExceededMaxCommandBuffers) {
     // Cannot allocate more than reserved
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkCommandBufferAllocateInfo-commandPool-05006");
     alloc_info.commandBufferCount = max_cmd_buffers + 1;
-    vksc::AllocateCommandBuffers(m_device->device(), &alloc_info, cmd_buffers);
+    vksc::AllocateCommandBuffers(m_device->handle(), &alloc_info, cmd_buffers);
     m_errorMonitor->VerifyFound();
 
     // Allocate some command buffers and try to allocate more than remaining
@@ -103,7 +103,7 @@ TEST_F(VkSCNegativeCommand, AllocateCommandBuffersExceededMaxCommandBuffers) {
 
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkCommandBufferAllocateInfo-commandPool-05006");
         alloc_info.commandBufferCount = avail_cmd_buffers + 1;
-        vksc::AllocateCommandBuffers(m_device->device(), &alloc_info, cmd_buffers);
+        vksc::AllocateCommandBuffers(m_device->handle(), &alloc_info, cmd_buffers);
         m_errorMonitor->VerifyFound();
     }
 
@@ -117,7 +117,7 @@ TEST_F(VkSCNegativeCommand, AllocateCommandBuffersExceededMaxCommandBuffers) {
 
         m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkCommandBufferAllocateInfo-commandPool-05006");
         alloc_info.commandBufferCount = avail_cmd_buffers + 1;
-        vksc::AllocateCommandBuffers(m_device->device(), &alloc_info, cmd_buffers);
+        vksc::AllocateCommandBuffers(m_device->handle(), &alloc_info, cmd_buffers);
         m_errorMonitor->VerifyFound();
 
         for (uint32_t j = 0; j < cmd_buffers_to_free; ++j) {

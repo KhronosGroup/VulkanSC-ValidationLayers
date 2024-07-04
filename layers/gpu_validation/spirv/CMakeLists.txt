@@ -21,6 +21,8 @@ target_sources(gpu_av_spirv PRIVATE
     bindless_descriptor_pass.cpp
     buffer_device_address_pass.h
     buffer_device_address_pass.cpp
+    ray_query_pass.h
+    ray_query_pass.cpp
 
     # Framework
     instruction.h
@@ -35,6 +37,14 @@ target_sources(gpu_av_spirv PRIVATE
     pass.h
     pass.cpp
     ${VVL_SOURCE_DIR}/layers/${API_TYPE}/generated/spirv_grammar_helper.cpp
+
+    ${VVL_SOURCE_DIR}/layers/${API_TYPE}/generated/inst_bindless_descriptor_comp.h
+    ${VVL_SOURCE_DIR}/layers/${API_TYPE}/generated/inst_bindless_descriptor_comp.cpp
+    ${VVL_SOURCE_DIR}/layers/${API_TYPE}/generated/inst_buffer_device_address_comp.h
+    ${VVL_SOURCE_DIR}/layers/${API_TYPE}/generated/inst_buffer_device_address_comp.cpp
+    ${VVL_SOURCE_DIR}/layers/${API_TYPE}/generated/inst_ray_query_comp.h
+    ${VVL_SOURCE_DIR}/layers/${API_TYPE}/generated/inst_ray_query_comp.cpp
+
 )
 
 target_include_directories(gpu_av_spirv PRIVATE .

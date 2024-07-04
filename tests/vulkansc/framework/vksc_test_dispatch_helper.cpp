@@ -49,7 +49,7 @@ static void InitDefaultObjectReservationInfo() {
     default_object_reservation_info.commandBufferRequestCount = 4096;
     default_object_reservation_info.fenceRequestCount = 65536;
     default_object_reservation_info.deviceMemoryRequestCount = 1024;
-    default_object_reservation_info.bufferRequestCount = 256;
+    default_object_reservation_info.bufferRequestCount = 512;
     default_object_reservation_info.imageRequestCount = 256;
     default_object_reservation_info.eventRequestCount = 4096;
     default_object_reservation_info.queryPoolRequestCount = 256;
@@ -325,6 +325,10 @@ static VKAPI_ATTR VkResult VKAPI_CALL CreateDevice(VkPhysicalDevice physicalDevi
 static VKAPI_ATTR VkResult VKAPI_CALL CreatePipelineCache(VkDevice device, const VkPipelineCacheCreateInfo* pCreateInfo,
                                                           const VkAllocationCallbacks* pAllocator,
                                                           VkPipelineCache* pPipelineCache) {
+    if (pCreateInfo == nullptr) {
+        return vksc::CreatePipelineCache(device, pCreateInfo, pAllocator, pPipelineCache);
+    }
+
     VkPipelineCacheCreateInfo create_info = *pCreateInfo;
     if (create_info.initialDataSize == 0) {
         // When running Vulkan validation layer tests against the Vulkan SC validation layers
@@ -342,6 +346,10 @@ static VKAPI_ATTR VkResult VKAPI_CALL CreateComputePipelines(VkDevice device, Vk
                                                              uint32_t createInfoCount,
                                                              const VkComputePipelineCreateInfo* pCreateInfos,
                                                              const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines) {
+    if (pCreateInfos == nullptr) {
+        return vksc::CreateComputePipelines(device, pipelineCache, createInfoCount, pCreateInfos, pAllocator, pPipelines);
+    }
+
     // Copy create infos to be able to patch pipeline cache information
     std::vector<VkPipelineOfflineCreateInfo> offline_info(createInfoCount, vku::InitStruct<VkPipelineOfflineCreateInfo>());
     std::vector<VkComputePipelineCreateInfo> create_info(createInfoCount);
@@ -399,6 +407,10 @@ static VKAPI_ATTR VkResult VKAPI_CALL CreateGraphicsPipelines(VkDevice device, V
                                                               uint32_t createInfoCount,
                                                               const VkGraphicsPipelineCreateInfo* pCreateInfos,
                                                               const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines) {
+    if (pCreateInfos == nullptr) {
+        return vksc::CreateGraphicsPipelines(device, pipelineCache, createInfoCount, pCreateInfos, pAllocator, pPipelines);
+    }
+
     // Copy create infos to be able to patch pipeline cache information
     std::vector<VkPipelineOfflineCreateInfo> offline_info(createInfoCount, vku::InitStruct<VkPipelineOfflineCreateInfo>());
     std::vector<VkGraphicsPipelineCreateInfo> create_info(createInfoCount);
@@ -473,6 +485,10 @@ static VKAPI_ATTR void VKAPI_CALL DestroyPipeline(VkDevice device, VkPipeline pi
 
 static VKAPI_ATTR VkResult VKAPI_CALL CreateCommandPool(VkDevice device, const VkCommandPoolCreateInfo* pCreateInfo,
                                                         const VkAllocationCallbacks* pAllocator, VkCommandPool* pCommandPool) {
+    if (pCreateInfo == nullptr) {
+        return vksc::CreateCommandPool(device, pCreateInfo, pAllocator, pCommandPool);
+    }
+
     // When running Vulkan validation layer tests against the Vulkan SC validation layers
     // we need to manually inject the command pool memory reservation info structure to the
     // pNext chain of pCreateInfo.
@@ -520,6 +536,10 @@ static VKAPI_ATTR VkResult VKAPI_CALL ResetCommandBuffer(VkCommandBuffer command
 
 static VKAPI_ATTR VkResult VKAPI_CALL CreateRenderPass(VkDevice device, const VkRenderPassCreateInfo* pCreateInfo,
                                                        const VkAllocationCallbacks* pAllocator, VkRenderPass* pRenderPass) {
+    if (pCreateInfo == nullptr) {
+        return vksc::CreateRenderPass(device, pCreateInfo, pAllocator, pRenderPass);
+    }
+
     static auto policy =
         DispatchHelper()
             ->CreateDispatchPolicy()
@@ -559,6 +579,10 @@ static VKAPI_ATTR VkResult VKAPI_CALL CreateRenderPass(VkDevice device, const Vk
 
 static VKAPI_ATTR VkResult VKAPI_CALL CreateRenderPass2(VkDevice device, const VkRenderPassCreateInfo2* pCreateInfo,
                                                         const VkAllocationCallbacks* pAllocator, VkRenderPass* pRenderPass) {
+    if (pCreateInfo == nullptr) {
+        return vksc::CreateRenderPass2(device, pCreateInfo, pAllocator, pRenderPass);
+    }
+
     static auto policy =
         DispatchHelper()
             ->CreateDispatchPolicy()
@@ -598,6 +622,10 @@ static VKAPI_ATTR VkResult VKAPI_CALL CreateRenderPass2(VkDevice device, const V
 
 static VKAPI_ATTR VkResult VKAPI_CALL CreateFramebuffer(VkDevice device, const VkFramebufferCreateInfo* pCreateInfo,
                                                         const VkAllocationCallbacks* pAllocator, VkFramebuffer* pFramebuffer) {
+    if (pCreateInfo == nullptr) {
+        return vksc::CreateFramebuffer(device, pCreateInfo, pAllocator, pFramebuffer);
+    }
+
     // Vulkan SC allows maxFramebufferLayers = 1 in certain cases while Vulkan requires 256
     // so we have to skip test cases that rely on higher capabilities
     const uint32_t max_framebuffer_layers =
@@ -611,6 +639,10 @@ static VKAPI_ATTR VkResult VKAPI_CALL CreateFramebuffer(VkDevice device, const V
 
 static VKAPI_ATTR VkResult VKAPI_CALL CreateSemaphore(VkDevice device, const VkSemaphoreCreateInfo* pCreateInfo,
                                                       const VkAllocationCallbacks* pAllocator, VkSemaphore* pSemaphore) {
+    if (pCreateInfo == nullptr) {
+        return vksc::CreateSemaphore(device, pCreateInfo, pAllocator, pSemaphore);
+    }
+
     static auto policy = DispatchHelper()->CreateDispatchPolicy().SkipOnMessage(
         "VUID-VkSemaphoreTypeCreateInfo-timelineSemaphore-03252",
         "Test requires timelineSemaphore support which is not required in Vulkan SC.",

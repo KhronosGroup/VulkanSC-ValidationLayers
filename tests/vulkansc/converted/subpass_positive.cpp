@@ -2,8 +2,8 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2023 Valve Corporation
- * Copyright (c) 2023 LunarG, Inc.
+ * Copyright (c) 2023-2024 Valve Corporation
+ * Copyright (c) 2023-2024 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -54,10 +54,8 @@ TEST_F(PositiveSubpass, SubpassImageBarrier) {
     rpci.dependencyCount = 1;
     rpci.pDependencies = &dependency;
     vkt::RenderPass render_pass(*m_device, rpci);
-
-    VkImageObj image(m_device);
-    image.InitNoLayout(32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM,
-                       VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    vkt::Image image(*m_device, 32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM,
+                     VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     vkt::ImageView image_view = image.CreateView();
     vkt::Framebuffer framebuffer(*m_device, render_pass, 1, &image_view.handle());
 
@@ -77,8 +75,8 @@ TEST_F(PositiveSubpass, SubpassImageBarrier) {
     barrier.subresourceRange.levelCount = 1;
 
     // VkDependencyInfo with VkImageMemoryBarrier2
-    const safe_VkImageMemoryBarrier2 safe_barrier2 = ConvertVkImageMemoryBarrierToV2(
-        barrier, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+    const auto safe_barrier2 = ConvertVkImageMemoryBarrierToV2(barrier, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                                                               VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
     VkDependencyInfo dependency_info = vku::InitStructHelper();
     dependency_info.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
     dependency_info.imageMemoryBarrierCount = 1;
@@ -134,10 +132,8 @@ TEST_F(PositiveSubpass, SubpassWithEventWait) {
     rpci.dependencyCount = 1;
     rpci.pDependencies = &dependency;
     vkt::RenderPass render_pass(*m_device, rpci);
-
-    VkImageObj image(m_device);
-    image.InitNoLayout(32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM,
-                       VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    vkt::Image image(*m_device, 32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM,
+                     VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     vkt::ImageView image_view = image.CreateView();
     vkt::Framebuffer framebuffer(*m_device, render_pass, 1, &image_view.handle());
 
@@ -157,8 +153,8 @@ TEST_F(PositiveSubpass, SubpassWithEventWait) {
     barrier.subresourceRange.levelCount = 1;
 
     // VkDependencyInfo with VkImageMemoryBarrier2
-    const safe_VkImageMemoryBarrier2 safe_barrier2 = ConvertVkImageMemoryBarrierToV2(
-        barrier, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+    const auto safe_barrier2 = ConvertVkImageMemoryBarrierToV2(barrier, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                                                               VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
     VkDependencyInfo dependency_info = vku::InitStructHelper();
     dependency_info.dependencyFlags = 0;
     dependency_info.imageMemoryBarrierCount = 1;

@@ -2,10 +2,10 @@
 // See vksc_convert_tests.py for modifications
 
 /*
- * Copyright (c) 2015-2023 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
- * Copyright (c) 2015-2023 Google, Inc.
+ * Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
+ * Copyright (c) 2015-2024 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,7 +30,6 @@ TEST_F(PositivePipelineTopology, PointSizeWriteInFunction) {
         CreatePipelineHelper pipe(*this);
         pipe.shader_stages_ = {vs.GetStageCreateInfo(), ps.GetStageCreateInfo()};
         pipe.ia_ci_.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
-        pipe.InitState();
         pipe.CreateGraphicsPipeline();
     }
 }
@@ -53,7 +52,6 @@ TEST_F(PositivePipelineTopology, PointSizeGeomShaderSuccess) {
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), gs.GetStageCreateInfo(), ps.GetStageCreateInfo()};
     // Set Input Assembly to TOPOLOGY POINT LIST
     pipe.ia_ci_.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
-    pipe.InitState();
     pipe.CreateGraphicsPipeline();
 }
 
@@ -167,7 +165,6 @@ TEST_F(PositivePipelineTopology, LoosePointSizeWrite) {
         pipe.shader_stages_ = {vs.GetStageCreateInfo(), ps.GetStageCreateInfo()};
         // Set Input Assembly to TOPOLOGY POINT LIST
         pipe.ia_ci_.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
-        pipe.InitState();
         pipe.CreateGraphicsPipeline();
     }
 }
@@ -304,7 +301,6 @@ TEST_F(PositivePipelineTopology, PointSizeStructMemeberWritten) {
         pipe.vi_ci_.vertexBindingDescriptionCount = 2;
         pipe.vi_ci_.pVertexAttributeDescriptions = input_attribs;
         pipe.vi_ci_.vertexAttributeDescriptionCount = 2;
-        pipe.InitState();
         pipe.CreateGraphicsPipeline();
     } else {
         printf("Error creating shader from assembly\n");
@@ -362,7 +358,6 @@ TEST_F(PositivePipelineTopology, PolygonModeValid) {
     {
         CreatePipelineHelper pipe(*this);
         pipe.device_ = &test_device;
-        pipe.InitState();
         pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
         pipe.gp_ci_.layout = pipeline_layout.handle();
         pipe.gp_ci_.renderPass = render_pass.handle();
@@ -395,7 +390,6 @@ TEST_F(PositivePipelineTopology, NotPointSizeGeometry) {
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), gs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
     pipe.ia_ci_.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
-    pipe.InitState();
 
     pipe.CreateGraphicsPipeline();
 }
@@ -449,14 +443,13 @@ TEST_F(PositivePipelineTopology, Rasterizer) {
     pipe.shader_stages_.emplace_back(gs.GetStageCreateInfo());
     pipe.shader_stages_.emplace_back(tcs.GetStageCreateInfo());
     pipe.shader_stages_.emplace_back(tes.GetStageCreateInfo());
-    pipe.InitState();
     pipe.AddDynamicState(VK_DYNAMIC_STATE_LINE_WIDTH);
     pipe.CreateGraphicsPipeline();
 
     m_commandBuffer->begin();
     m_commandBuffer->BeginRenderPass(renderPass(), framebuffer(), 32, 32, m_renderPassClearValues.size(),
                                      m_renderPassClearValues.data());
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
     vk::CmdDraw(m_commandBuffer->handle(), 4, 1, 0, 0);
     m_commandBuffer->EndRenderPass();
     m_commandBuffer->end();
@@ -482,16 +475,15 @@ TEST_F(PositivePipelineTopology, LineTopologyClasses) {
     VkVertexInputAttributeDescription attribute = {0, 0, VK_FORMAT_R32_SFLOAT, 0};
     pipe.vi_ci_.pVertexAttributeDescriptions = &attribute;
     pipe.ia_ci_.topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
-    pipe.InitState();
     pipe.CreateGraphicsPipeline();
 
     vkt::Buffer vbo(*m_device, sizeof(float) * 3, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
-    vkt::CommandBuffer cb(m_device, m_commandPool);
+    vkt::CommandBuffer cb(*m_device, m_command_pool);
     cb.begin();
     cb.BeginRenderPass(m_renderPassBeginInfo);
 
-    vk::CmdBindPipeline(cb.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_);
+    vk::CmdBindPipeline(cb.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
     vk::CmdBindVertexBuffers(cb.handle(), 0, 1, &vbo.handle(), &kZeroDeviceSize);
     vk::CmdSetPrimitiveTopologyEXT(cb.handle(), VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY);
     vk::CmdDraw(cb.handle(), 1, 1, 0, 0);

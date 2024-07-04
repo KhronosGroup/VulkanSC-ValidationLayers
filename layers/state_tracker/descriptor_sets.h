@@ -23,6 +23,7 @@
 #include "utils/vk_layer_utils.h"
 #include "utils/shader_utils.h"
 #include "generated/vk_object_types.h"
+#include <vulkan/utility/vk_safe_struct.hpp>
 #include <map>
 #include <set>
 #include <vector>
@@ -30,7 +31,6 @@
 class CoreChecks;
 class ValidationObject;
 class ValidationStateTracker;
-class UPDATE_TEMPLATE_STATE;
 struct DeviceExtensions;
 
 namespace vvl {
@@ -47,13 +47,13 @@ struct AllocateDescriptorSetsData;
 
 class DescriptorPool : public StateObject {
   public:
-    DescriptorPool(ValidationStateTracker *dev, const VkDescriptorPool pool, const VkDescriptorPoolCreateInfo *pCreateInfo);
+    DescriptorPool(ValidationStateTracker &dev, const VkDescriptorPool handle, const VkDescriptorPoolCreateInfo *pCreateInfo);
     ~DescriptorPool() { Destroy(); }
 
     VkDescriptorPool VkHandle() const { return handle_.Cast<VkDescriptorPool>(); };
 
     void Allocate(const VkDescriptorSetAllocateInfo *alloc_info, const VkDescriptorSet *descriptor_sets,
-                  const vvl::AllocateDescriptorSetsData *ds_data);
+                  const vvl::AllocateDescriptorSetsData &ds_data);
     void Free(uint32_t count, const VkDescriptorSet *descriptor_sets);
     void Reset();
     void Destroy() override;
@@ -77,8 +77,10 @@ class DescriptorPool : public StateObject {
         return available_sets_;
     }
 
+    const vku::safe_VkDescriptorPoolCreateInfo safe_create_info;
+    const VkDescriptorPoolCreateInfo &create_info;
+
     const uint32_t maxSets;  // Max descriptor sets allowed in this pool
-    const safe_VkDescriptorPoolCreateInfo createInfo;
     using TypeCountMap = vvl::unordered_map<uint32_t, uint32_t>;
     const TypeCountMap maxDescriptorTypeCount;  // Max # of descriptors of each type in this pool
 
@@ -88,16 +90,19 @@ class DescriptorPool : public StateObject {
     uint32_t available_sets_;        // Available descriptor sets in this pool
     TypeCountMap available_counts_;  // Available # of descriptors of each type in this pool
     vvl::unordered_map<VkDescriptorSet, vvl::DescriptorSet *> sets_;  // Collection of all sets in this pool
-    ValidationStateTracker *dev_data_;
+    ValidationStateTracker &dev_data_;
     mutable std::shared_mutex lock_;
 };
 
 class DescriptorUpdateTemplate : public StateObject {
   public:
-    const safe_VkDescriptorUpdateTemplateCreateInfo create_info;
+    const vku::safe_VkDescriptorUpdateTemplateCreateInfo safe_create_info;
+    const VkDescriptorUpdateTemplateCreateInfo &create_info;
 
-    DescriptorUpdateTemplate(VkDescriptorUpdateTemplate update_template, const VkDescriptorUpdateTemplateCreateInfo *pCreateInfo)
-        : StateObject(update_template, kVulkanObjectTypeDescriptorUpdateTemplate), create_info(pCreateInfo) {}
+    DescriptorUpdateTemplate(VkDescriptorUpdateTemplate handle, const VkDescriptorUpdateTemplateCreateInfo *pCreateInfo)
+        : StateObject(handle, kVulkanObjectTypeDescriptorUpdateTemplate),
+          safe_create_info(pCreateInfo),
+          create_info(*safe_create_info.ptr()) {}
 
     VkDescriptorUpdateTemplate VkHandle() const { return handle_.Cast<VkDescriptorUpdateTemplate>(); };
 };
@@ -169,7 +174,7 @@ class DescriptorSetLayoutDef {
     VkDescriptorSetLayoutBinding const *GetDescriptorSetLayoutBindingPtrFromBinding(uint32_t binding) const {
         return GetDescriptorSetLayoutBindingPtrFromIndex(GetIndexFromBinding(binding));
     }
-    const std::vector<safe_VkDescriptorSetLayoutBinding> &GetBindings() const { return bindings_; }
+    const std::vector<vku::safe_VkDescriptorSetLayoutBinding> &GetBindings() const { return bindings_; }
     const VkDescriptorSetLayoutBinding *GetBindingInfoFromIndex(const uint32_t index) const { return bindings_[index].ptr(); }
     const VkDescriptorSetLayoutBinding *GetBindingInfoFromBinding(const uint32_t binding) const {
         return GetBindingInfoFromIndex(GetIndexFromBinding(binding));
@@ -209,7 +214,7 @@ class DescriptorSetLayoutDef {
     // Only the first three data members are used for hash and equality checks, the other members are derived from them, and are
     // used to speed up the various lookups/queries/validations
     VkDescriptorSetLayoutCreateFlags flags_;
-    std::vector<safe_VkDescriptorSetLayoutBinding> bindings_;
+    std::vector<vku::safe_VkDescriptorSetLayoutBinding> bindings_;
     std::vector<VkDescriptorBindingFlags> binding_flags_;
     // List of mutable types for each binding: [binding][mutable type]
     std::vector<std::vector<VkDescriptorType>> mutable_types_;
@@ -226,20 +231,49 @@ class DescriptorSetLayoutDef {
     BindingTypeStats binding_type_stats_;
 };
 
-static inline bool operator==(const DescriptorSetLayoutDef &lhs, const DescriptorSetLayoutDef &rhs) {
-    bool result = (lhs.GetCreateFlags() == rhs.GetCreateFlags()) && (lhs.GetBindings() == rhs.GetBindings()) &&
-                  (lhs.GetBindingFlags() == rhs.GetBindingFlags() && lhs.GetMutableTypes() == rhs.GetMutableTypes());
-    return result;
-}
-
 // Canonical dictionary of DSL definitions -- independent of device or handle
 using DescriptorSetLayoutDict = hash_util::Dictionary<DescriptorSetLayoutDef, hash_util::HasHashMember<DescriptorSetLayoutDef>>;
 using DescriptorSetLayoutId = DescriptorSetLayoutDict::Id;
 
+static inline bool operator==(const DescriptorSetLayoutDef &lhs, const DescriptorSetLayoutDef &rhs) {
+    // trivial types
+    if ((lhs.GetCreateFlags() != rhs.GetCreateFlags()) || (lhs.GetBindingFlags() != rhs.GetBindingFlags())) {
+        return false;
+    }
+    // vectors of enums
+    if (lhs.GetMutableTypes() != rhs.GetMutableTypes()) {
+        return false;
+    }
+    // vectors of vku::safe_VkDescriptorSetLayoutBinding structures
+    const auto &lhs_bindings = lhs.GetBindings();
+    const auto &rhs_bindings = rhs.GetBindings();
+    if (lhs_bindings.size() != rhs_bindings.size()) {
+        return false;
+    }
+    for (size_t i = 0; i < lhs_bindings.size(); i++) {
+        const auto &l = lhs_bindings[i];
+        const auto &r = rhs_bindings[i];
+        if (l.descriptorType != r.descriptorType || l.descriptorCount != r.descriptorCount || l.stageFlags != r.stageFlags) {
+            return false;
+        }
+        if (l.pImmutableSamplers != r.pImmutableSamplers) {
+            return false;
+        }
+        if (l.pImmutableSamplers) {
+            for (uint32_t s = 0; s < l.descriptorCount; s++) {
+                if (l.pImmutableSamplers[s] != r.pImmutableSamplers[s]) {
+                    return false;
+                }
+            }
+        }
+    }
+    return true;
+}
+
 class DescriptorSetLayout : public StateObject {
   public:
     // Constructors and destructor
-    DescriptorSetLayout(const VkDescriptorSetLayoutCreateInfo *p_create_info, const VkDescriptorSetLayout layout);
+    DescriptorSetLayout(const VkDescriptorSetLayoutCreateInfo *pCreateInfo, const VkDescriptorSetLayout handle);
     virtual ~DescriptorSetLayout() { Destroy(); }
 
     bool HasBinding(const uint32_t binding) const { return layout_id_->HasBinding(binding); }
@@ -265,7 +299,7 @@ class DescriptorSetLayout : public StateObject {
     VkDescriptorSetLayoutBinding const *GetDescriptorSetLayoutBindingPtrFromBinding(uint32_t binding) const {
         return layout_id_->GetDescriptorSetLayoutBindingPtrFromBinding(binding);
     }
-    const std::vector<safe_VkDescriptorSetLayoutBinding> &GetBindings() const { return layout_id_->GetBindings(); }
+    const std::vector<vku::safe_VkDescriptorSetLayoutBinding> &GetBindings() const { return layout_id_->GetBindings(); }
     uint32_t GetDescriptorCountFromIndex(const uint32_t index) const { return layout_id_->GetDescriptorCountFromIndex(index); }
     uint32_t GetDescriptorCountFromBinding(const uint32_t binding) const {
         return layout_id_->GetDescriptorCountFromBinding(binding);
@@ -610,7 +644,7 @@ struct AllocateDescriptorSetsData {
     AllocateDescriptorSetsData(){};
 };
 // "Perform" does the update with the assumption that ValidateUpdateDescriptorSets() has passed for the given update
-void PerformUpdateDescriptorSets(ValidationStateTracker *, uint32_t, const VkWriteDescriptorSet *, uint32_t,
+void PerformUpdateDescriptorSets(ValidationStateTracker &, uint32_t, const VkWriteDescriptorSet *, uint32_t,
                                  const VkCopyDescriptorSet *);
 
 class DescriptorBinding {
@@ -719,7 +753,7 @@ struct DecodedTemplateUpdate {
     std::vector<VkWriteDescriptorSetInlineUniformBlockEXT> inline_infos;
     std::vector<VkWriteDescriptorSetAccelerationStructureKHR> inline_infos_khr;
     std::vector<VkWriteDescriptorSetAccelerationStructureNV> inline_infos_nv;
-    DecodedTemplateUpdate(const ValidationStateTracker *device_data, VkDescriptorSet descriptorSet,
+    DecodedTemplateUpdate(const ValidationStateTracker &device_data, VkDescriptorSet descriptorSet,
                           const DescriptorUpdateTemplate *template_state, const void *pData,
                           VkDescriptorSetLayout push_layout = VK_NULL_HANDLE);
 };
@@ -755,7 +789,7 @@ class DescriptorSet : public StateObject {
     using ConstBindingIterator = BindingVector::const_iterator;
     using StateTracker = ValidationStateTracker;
 
-    DescriptorSet(const VkDescriptorSet, vvl::DescriptorPool *, const std::shared_ptr<DescriptorSetLayout const> &,
+    DescriptorSet(const VkDescriptorSet handle, vvl::DescriptorPool *, const std::shared_ptr<DescriptorSetLayout const> &,
                   uint32_t variable_count, StateTracker *state_data);
     void LinkChildNodes() override;
     void NotifyInvalidate(const NodeList &invalid_nodes, bool unlink) override;
@@ -846,7 +880,7 @@ class DescriptorSet : public StateObject {
     }
     uint64_t GetChangeCount() const { return change_count_; }
 
-    const std::vector<safe_VkWriteDescriptorSet> &GetWrites() const { return push_descriptor_set_writes; }
+    const std::vector<vku::safe_VkWriteDescriptorSet> &GetWrites() const { return push_descriptor_set_writes; }
 
     void Destroy() override;
 
@@ -978,7 +1012,7 @@ class DescriptorSet : public StateObject {
 
     // If this descriptor set is a push descriptor set, the descriptor
     // set writes that were last pushed.
-    std::vector<safe_VkWriteDescriptorSet> push_descriptor_set_writes;
+    std::vector<vku::safe_VkWriteDescriptorSet> push_descriptor_set_writes;
 };
 
 }  // namespace vvl

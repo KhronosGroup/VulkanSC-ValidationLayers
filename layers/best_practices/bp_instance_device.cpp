@@ -21,6 +21,7 @@
 #include "generated/layer_chassis_dispatch.h"
 #include "best_practices/best_practices_error_enums.h"
 #include "best_practices/bp_state.h"
+#include "state_tracker/queue_state.h"
 
 bool BestPractices::ValidateDeprecatedExtensions(const Location& loc, vvl::Extension extension, APIVersion version) const {
     bool skip = false;
@@ -196,27 +197,27 @@ bool BestPractices::PreCallValidateCreateDevice(VkPhysicalDevice physicalDevice,
 }
 
 // Common function to handle validation for GetPhysicalDeviceQueueFamilyProperties & 2KHR version
-bool BestPractices::ValidateCommonGetPhysicalDeviceQueueFamilyProperties(const vvl::PhysicalDevice* bp_pd_state,
+bool BestPractices::ValidateCommonGetPhysicalDeviceQueueFamilyProperties(const vvl::PhysicalDevice& bp_pd_state,
                                                                          uint32_t requested_queue_family_property_count,
                                                                          const CALL_STATE call_state, const Location& loc) const {
     bool skip = false;
     // Verify that for each physical device, this command is called first with NULL pQueueFamilyProperties in order to get count
     if (UNCALLED == call_state) {
         skip |= LogWarning(
-            kVUID_BestPractices_DevLimit_MissingQueryCount, bp_pd_state->Handle(), loc,
+            kVUID_BestPractices_DevLimit_MissingQueryCount, bp_pd_state.Handle(), loc,
             "is called with non-NULL pQueueFamilyProperties before obtaining pQueueFamilyPropertyCount. It is "
             "recommended "
             "to first call %s with NULL pQueueFamilyProperties in order to obtain the maximal pQueueFamilyPropertyCount.",
             loc.StringFunc());
         // Then verify that pCount that is passed in on second call matches what was returned
-    } else if (bp_pd_state->queue_family_known_count != requested_queue_family_property_count) {
-        skip |= LogWarning(kVUID_BestPractices_DevLimit_CountMismatch, bp_pd_state->Handle(), loc,
+    } else if (bp_pd_state.queue_family_known_count != requested_queue_family_property_count) {
+        skip |= LogWarning(kVUID_BestPractices_DevLimit_CountMismatch, bp_pd_state.Handle(), loc,
                            "is called with non-NULL pQueueFamilyProperties and pQueueFamilyPropertyCount value %" PRIu32
                            ", but the largest previously returned pQueueFamilyPropertyCount for this physicalDevice is %" PRIu32
                            ". It is recommended to instead receive all the properties by calling %s with "
                            "pQueueFamilyPropertyCount that was "
                            "previously obtained by calling %s with NULL pQueueFamilyProperties.",
-                           requested_queue_family_property_count, bp_pd_state->queue_family_known_count, loc.StringFunc(),
+                           requested_queue_family_property_count, bp_pd_state.queue_family_known_count, loc.StringFunc(),
                            loc.StringFunc());
     }
 
@@ -229,7 +230,7 @@ bool BestPractices::PreCallValidateGetPhysicalDeviceQueueFamilyProperties(VkPhys
                                                                           const ErrorObject& error_obj) const {
     const auto bp_pd_state = Get<bp_state::PhysicalDevice>(physicalDevice);
     if (pQueueFamilyProperties && bp_pd_state) {
-        return ValidateCommonGetPhysicalDeviceQueueFamilyProperties(bp_pd_state.get(), *pQueueFamilyPropertyCount,
+        return ValidateCommonGetPhysicalDeviceQueueFamilyProperties(*bp_pd_state, *pQueueFamilyPropertyCount,
                                                                     bp_pd_state->vkGetPhysicalDeviceQueueFamilyPropertiesState,
                                                                     error_obj.location);
     }
@@ -242,7 +243,7 @@ bool BestPractices::PreCallValidateGetPhysicalDeviceQueueFamilyProperties2(VkPhy
                                                                            const ErrorObject& error_obj) const {
     const auto bp_pd_state = Get<bp_state::PhysicalDevice>(physicalDevice);
     if (pQueueFamilyProperties && bp_pd_state) {
-        return ValidateCommonGetPhysicalDeviceQueueFamilyProperties(bp_pd_state.get(), *pQueueFamilyPropertyCount,
+        return ValidateCommonGetPhysicalDeviceQueueFamilyProperties(*bp_pd_state, *pQueueFamilyPropertyCount,
                                                                     bp_pd_state->vkGetPhysicalDeviceQueueFamilyProperties2State,
                                                                     error_obj.location);
     }
@@ -349,16 +350,16 @@ bool BestPractices::PreCallValidateQueueSubmit(VkQueue queue, uint32_t submitCou
     for (uint32_t submit = 0; submit < submitCount; submit++) {
         const Location submit_loc = error_obj.location.dot(Field::pSubmits, submit);
         for (uint32_t semaphore = 0; semaphore < pSubmits[submit].waitSemaphoreCount; semaphore++) {
-            skip |= CheckPipelineStageFlags(submit_loc.dot(Field::pWaitDstStageMask, semaphore),
+            skip |= CheckPipelineStageFlags(queue, submit_loc.dot(Field::pWaitDstStageMask, semaphore),
                                             pSubmits[submit].pWaitDstStageMask[semaphore]);
         }
         if (pSubmits[submit].signalSemaphoreCount == 0 && pSubmits[submit].pSignalSemaphores != nullptr) {
-            LogInfo(kVUID_BestPractices_SemaphoreCount, device, error_obj.location,
+            LogInfo(kVUID_BestPractices_SemaphoreCount, queue, error_obj.location,
                     "pSubmits[%" PRIu32 "].pSignalSemaphores is set, but pSubmits[%" PRIu32 "].signalSemaphoreCount is 0.", submit,
                     submit);
         }
         if (pSubmits[submit].waitSemaphoreCount == 0 && pSubmits[submit].pWaitSemaphores != nullptr) {
-            LogInfo(kVUID_BestPractices_SemaphoreCount, device, error_obj.location,
+            LogInfo(kVUID_BestPractices_SemaphoreCount, queue, error_obj.location,
                     "pSubmits[%" PRIu32 "].pWaitSemaphores is set, but pSubmits[%" PRIu32 "].waitSemaphoreCount is 0.", submit,
                     submit);
         }
@@ -380,7 +381,7 @@ bool BestPractices::PreCallValidateQueueSubmit2(VkQueue queue, uint32_t submitCo
         const Location submit_loc = error_obj.location.dot(Field::pSubmits, submit);
         for (uint32_t semaphore = 0; semaphore < pSubmits[submit].waitSemaphoreInfoCount; semaphore++) {
             const Location semaphore_loc = submit_loc.dot(Field::pWaitSemaphoreInfos, semaphore);
-            skip |= CheckPipelineStageFlags(semaphore_loc.dot(Field::stageMask),
+            skip |= CheckPipelineStageFlags(queue, semaphore_loc.dot(Field::stageMask),
                                             pSubmits[submit].pWaitSemaphoreInfos[semaphore].stageMask);
         }
     }
@@ -507,8 +508,8 @@ void BestPractices::ManualPostCallRecordQueueSubmit(VkQueue queue, uint32_t subm
     num_queue_submissions_ += submitCount;
 }
 
-std::shared_ptr<vvl::PhysicalDevice> BestPractices::CreatePhysicalDeviceState(VkPhysicalDevice phys_dev) {
-    return std::static_pointer_cast<vvl::PhysicalDevice>(std::make_shared<bp_state::PhysicalDevice>(phys_dev));
+std::shared_ptr<vvl::PhysicalDevice> BestPractices::CreatePhysicalDeviceState(VkPhysicalDevice handle) {
+    return std::static_pointer_cast<vvl::PhysicalDevice>(std::make_shared<bp_state::PhysicalDevice>(handle));
 }
 
 bp_state::PhysicalDevice* BestPractices::GetPhysicalDeviceState() {

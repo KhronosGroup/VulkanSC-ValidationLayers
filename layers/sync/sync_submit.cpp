@@ -24,15 +24,6 @@ AcquiredImage::AcquiredImage(const PresentedImage& presented, ResourceUsageTag a
 
 bool AcquiredImage::Invalid() const { return vvl::StateObject::Invalid(image); }
 
-// This is a const method, force the returned value to be const
-std::shared_ptr<const SignaledSemaphores::Signal> SignaledSemaphores::GetPrev(VkSemaphore sem) const {
-    std::shared_ptr<Signal> prev_state;
-    if (prev_) {
-        prev_state = syncval_state::GetMapped(prev_->signaled_, sem, [&prev_state]() { return prev_state; });
-    }
-    return prev_state;
-}
-
 SignaledSemaphores::Signal::Signal(const std::shared_ptr<const vvl::Semaphore>& sem_state_,
                                    const std::shared_ptr<QueueBatchContext>& batch_, const SyncExecScope& exec_scope_)
     : sem_state(sem_state_), batch(batch_), first_scope({batch->GetQueueId(), exec_scope_}) {
@@ -64,8 +55,7 @@ bool SignaledSemaphores::Insert(const std::shared_ptr<const vvl::Semaphore>& sem
     std::shared_ptr<Signal> insert_signal;
     if (signal_it == signaled_.end()) {
         if (prev_) {
-            auto prev_sig =
-                syncval_state::GetMapped(prev_->signaled_, sem_state->VkHandle(), []() { return std::shared_ptr<Signal>(); });
+            auto prev_sig = GetMapped(prev_->signaled_, sem_state->VkHandle());
             if (prev_sig) {
                 // The is an invalid signal, as this semaphore is already signaled... copy the prev state (as prev_ is const)
                 insert_signal = std::make_shared<Signal>(*prev_sig);
@@ -92,31 +82,25 @@ bool SignaledSemaphores::SignalSemaphore(const std::shared_ptr<const vvl::Semaph
 }
 
 std::shared_ptr<const SignaledSemaphores::Signal> SignaledSemaphores::Unsignal(VkSemaphore sem) {
+    assert(prev_ != nullptr);
     std::shared_ptr<const Signal> unsignaled;
     const auto found_it = signaled_.find(sem);
     if (found_it != signaled_.end()) {
         // Move the unsignaled singal out from the signaled list, but keep the shared_ptr as the caller needs the contents for
         // a bit.
         unsignaled = std::move(found_it->second);
-        if (!prev_) {
-            // No parent, not need to keep the entry
-            // IFF (prev_)  leave the entry in the leaf table as we use it to export unsignal to prev_ during record phase
-            signaled_.erase(found_it);
-        }
-    } else if (prev_) {
+    } else {
         // We can't unsignal prev_ because it's const * by design.
         // We put in an empty placeholder
         signaled_.emplace(sem, std::shared_ptr<Signal>());
-        unsignaled = GetPrev(sem);
+        unsignaled = GetMapped(prev_->signaled_, sem);
     }
-    // NOTE: No else clause. Because if we didn't find it, and there's no previous, this indicates an error,
-    // but CoreChecks should have reported it
 
     // If unsignaled is null, there was a missing pending semaphore, and that's also issue CoreChecks reports
     return unsignaled;
 }
 
-void SignaledSemaphores::Resolve(SignaledSemaphores& parent, std::shared_ptr<QueueBatchContext>& last_batch) {
+void SignaledSemaphores::Resolve(SignaledSemaphores& parent, const std::shared_ptr<QueueBatchContext>& last_batch) {
     // Must only be called on child objects, with the non-const reference of the parent/previous object passed in
     assert(prev_ == &parent);
 
@@ -161,9 +145,9 @@ FenceSyncState::FenceSyncState(const std::shared_ptr<const vvl::Fence>& fence_, 
 FenceSyncState::FenceSyncState(const std::shared_ptr<const vvl::Fence>& fence_, const PresentedImage& image, ResourceUsageTag tag_)
     : fence(fence_), tag(tag_), queue_id(kQueueIdInvalid), acquired(image, tag) {}
 
-syncval_state::Swapchain::Swapchain(ValidationStateTracker* dev_data, const VkSwapchainCreateInfoKHR* pCreateInfo,
-                                    VkSwapchainKHR swapchain)
-    : vvl::Swapchain(dev_data, pCreateInfo, swapchain) {}
+syncval_state::Swapchain::Swapchain(ValidationStateTracker& dev_data, const VkSwapchainCreateInfoKHR* pCreateInfo,
+                                    VkSwapchainKHR handle)
+    : vvl::Swapchain(dev_data, pCreateInfo, handle) {}
 
 void syncval_state::Swapchain::RecordPresentedImage(PresentedImage&& presented_image) {
     // All presented images are stored within the swapchain until the are reaquired.
@@ -562,7 +546,7 @@ void QueueBatchContext::CommonSetupAccessContext(const std::shared_ptr<const Que
         }
 
         // The start of the asynchronous access range for a given queue is one more than the highest tagged reference
-        access_context_.AddAsyncContext(async_batch->GetCurrentAccessContext(), sync_tag);
+        access_context_.AddAsyncContext(async_batch->GetCurrentAccessContext(), sync_tag, async_batch->GetQueueId());
         // We need to snapshot the async log information for async hazard reporting
         batch_log_.Import(async_batch->batch_log_);
     }
@@ -706,16 +690,16 @@ std::ostream& QueueBatchContext::AcquireResourceRecord::Format(std::ostream& out
 // Batch Contexts saved during signalling have their AccessLog reset when the pending signals are signalled.
 // NOTE: By design, QueueBatchContexts that are neither last, nor referenced by a signal are abandoned as unowned, since
 //       the contexts Resolve all history from previous all contexts when created
-void QueueSyncState::UpdateLastBatch(std::shared_ptr<QueueBatchContext>&& new_last) {
+void QueueSyncState::UpdateLastBatch() {
     // Update the queue to point to the last batch from the submit
-    if (new_last) {
+    if (pending_last_batch_) {
         // Clean up the events data in the previous last batch on queue, as only the subsequent batches have valid use for them
         // and the QueueBatchContext::Setup calls have be copying them along from batch to batch during submit.
         if (last_batch_) {
             last_batch_->ResetEventsContext();
         }
-        new_last->Trim();
-        last_batch_ = std::move(new_last);
+        pending_last_batch_->Trim();
+        last_batch_ = std::move(pending_last_batch_);
     }
 }
 
@@ -772,6 +756,8 @@ QueueBatchContext::BatchSet SyncValidator::GetQueueBatchSnapshot() {
 // atomic... but as the ops are per submit, the performance cost is negible for the peace of mind.
 uint64_t QueueSyncState::ReserveSubmitId() const { return submit_index_.fetch_add(1); }
 
+void QueueSyncState::SetPendingLastBatch(std::shared_ptr<QueueBatchContext>&& last) const { pending_last_batch_ = std::move(last); }
+
 VkSemaphoreSubmitInfo SubmitInfoConverter::BatchStore::WaitSemaphore(const VkSubmitInfo& info, uint32_t index) {
     VkSemaphoreSubmitInfo semaphore_info = vku::InitStructHelper();
     semaphore_info.semaphore = info.pWaitSemaphores[index];
@@ -788,9 +774,7 @@ VkSemaphoreSubmitInfo SubmitInfoConverter::BatchStore::SignalSemaphore(const VkS
                                                                        VkQueueFlags queue_flags) {
     VkSemaphoreSubmitInfo semaphore_info = vku::InitStructHelper();
     semaphore_info.semaphore = info.pSignalSemaphores[index];
-    // Can't just use BOTTOM, because of how access expansion is done
-    semaphore_info.stageMask =
-        sync_utils::ExpandPipelineStages(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, queue_flags, VK_PIPELINE_STAGE_2_HOST_BIT);
+    semaphore_info.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
     return semaphore_info;
 }
 

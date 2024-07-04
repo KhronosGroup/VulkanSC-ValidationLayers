@@ -590,6 +590,7 @@ struct DeviceExtensions : public InstanceExtensions {
     ExtEnabled vk_nv_ray_tracing_invocation_reorder{kNotEnabled};
     ExtEnabled vk_nv_extended_sparse_address_space{kNotEnabled};
     ExtEnabled vk_ext_mutable_descriptor_type{kNotEnabled};
+    ExtEnabled vk_ext_legacy_vertex_attributes{kNotEnabled};
     ExtEnabled vk_arm_shader_core_builtins{kNotEnabled};
     ExtEnabled vk_ext_pipeline_library_group_handles{kNotEnabled};
     ExtEnabled vk_ext_dynamic_rendering_unused_attachments{kNotEnabled};
@@ -604,7 +605,10 @@ struct DeviceExtensions : public InstanceExtensions {
     ExtEnabled vk_qnx_external_memory_screen_buffer{kNotEnabled};
     ExtEnabled vk_msft_layered_driver{kNotEnabled};
     ExtEnabled vk_nv_descriptor_pool_overallocation{kNotEnabled};
+    ExtEnabled vk_nv_raw_access_chains{kNotEnabled};
     ExtEnabled vk_nv_shader_atomic_float16_vector{kNotEnabled};
+    ExtEnabled vk_nv_ray_tracing_validation{kNotEnabled};
+    ExtEnabled vk_mesa_image_alignment_control{kNotEnabled};
     ExtEnabled vk_khr_acceleration_structure{kNotEnabled};
     ExtEnabled vk_khr_ray_tracing_pipeline{kNotEnabled};
     ExtEnabled vk_khr_ray_query{kNotEnabled};
@@ -652,9 +656,9 @@ struct DeviceExtensions : public InstanceExtensions {
                   {{{&DeviceExtensions::vk_khr_video_decode_queue, VK_KHR_VIDEO_DECODE_QUEUE_EXTENSION_NAME}}})},
             {vvl::Extension::_VK_KHR_dynamic_rendering,
              Info(&DeviceExtensions::vk_khr_dynamic_rendering,
-                  {{{&DeviceExtensions::vk_khr_depth_stencil_resolve, VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME},
-                    {&DeviceExtensions::vk_khr_get_physical_device_properties2,
-                     VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME}}})},
+                  {{{&DeviceExtensions::vk_khr_get_physical_device_properties2,
+                     VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME},
+                    {&DeviceExtensions::vk_khr_depth_stencil_resolve, VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME}}})},
             {vvl::Extension::_VK_KHR_multiview,
              Info(&DeviceExtensions::vk_khr_multiview, {{{&DeviceExtensions::vk_khr_get_physical_device_properties2,
                                                           VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME}}})},
@@ -707,10 +711,10 @@ struct DeviceExtensions : public InstanceExtensions {
             {vvl::Extension::_VK_KHR_descriptor_update_template, Info(&DeviceExtensions::vk_khr_descriptor_update_template, {})},
             {vvl::Extension::_VK_KHR_imageless_framebuffer,
              Info(&DeviceExtensions::vk_khr_imageless_framebuffer,
-                  {{{&DeviceExtensions::vk_khr_maintenance2, VK_KHR_MAINTENANCE_2_EXTENSION_NAME},
-                    {&DeviceExtensions::vk_khr_image_format_list, VK_KHR_IMAGE_FORMAT_LIST_EXTENSION_NAME},
-                    {&DeviceExtensions::vk_khr_get_physical_device_properties2,
-                     VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME}}})},
+                  {{{&DeviceExtensions::vk_khr_get_physical_device_properties2,
+                     VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME},
+                    {&DeviceExtensions::vk_khr_maintenance2, VK_KHR_MAINTENANCE_2_EXTENSION_NAME},
+                    {&DeviceExtensions::vk_khr_image_format_list, VK_KHR_IMAGE_FORMAT_LIST_EXTENSION_NAME}}})},
             {vvl::Extension::_VK_KHR_create_renderpass2,
              Info(&DeviceExtensions::vk_khr_create_renderpass2,
                   {{{&DeviceExtensions::vk_khr_multiview, VK_KHR_MULTIVIEW_EXTENSION_NAME},
@@ -812,9 +816,9 @@ struct DeviceExtensions : public InstanceExtensions {
                      VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME}}})},
             {vvl::Extension::_VK_KHR_fragment_shading_rate,
              Info(&DeviceExtensions::vk_khr_fragment_shading_rate,
-                  {{{&DeviceExtensions::vk_khr_create_renderpass2, VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME},
-                    {&DeviceExtensions::vk_khr_get_physical_device_properties2,
-                     VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME}}})},
+                  {{{&DeviceExtensions::vk_khr_get_physical_device_properties2,
+                     VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME},
+                    {&DeviceExtensions::vk_khr_create_renderpass2, VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME}}})},
             {vvl::Extension::_VK_KHR_dynamic_rendering_local_read,
              Info(&DeviceExtensions::vk_khr_dynamic_rendering_local_read,
                   {{{&DeviceExtensions::vk_khr_dynamic_rendering, VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME}}})},
@@ -1037,8 +1041,8 @@ struct DeviceExtensions : public InstanceExtensions {
              Info(&DeviceExtensions::vk_android_external_memory_android_hardware_buffer,
                   {{{&DeviceExtensions::vk_khr_sampler_ycbcr_conversion, VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME},
                     {&DeviceExtensions::vk_khr_external_memory, VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME},
-                    {&DeviceExtensions::vk_ext_queue_family_foreign, VK_EXT_QUEUE_FAMILY_FOREIGN_EXTENSION_NAME},
-                    {&DeviceExtensions::vk_khr_dedicated_allocation, VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME}}})},
+                    {&DeviceExtensions::vk_khr_dedicated_allocation, VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME},
+                    {&DeviceExtensions::vk_ext_queue_family_foreign, VK_EXT_QUEUE_FAMILY_FOREIGN_EXTENSION_NAME}}})},
 #endif  // VK_USE_PLATFORM_ANDROID_KHR
             {vvl::Extension::_VK_EXT_sampler_filter_minmax,
              Info(&DeviceExtensions::vk_ext_sampler_filter_minmax, {{{&DeviceExtensions::vk_khr_get_physical_device_properties2,
@@ -1313,8 +1317,8 @@ struct DeviceExtensions : public InstanceExtensions {
                   {{{&DeviceExtensions::vk_khr_get_physical_device_properties2,
                      VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME},
                     {&DeviceExtensions::vk_khr_buffer_device_address, VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME},
-                    {&DeviceExtensions::vk_khr_synchronization2, VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME},
-                    {&DeviceExtensions::vk_ext_descriptor_indexing, VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME}}})},
+                    {&DeviceExtensions::vk_ext_descriptor_indexing, VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME},
+                    {&DeviceExtensions::vk_khr_synchronization2, VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME}}})},
             {vvl::Extension::_VK_EXT_graphics_pipeline_library,
              Info(&DeviceExtensions::vk_ext_graphics_pipeline_library,
                   {{{&DeviceExtensions::vk_khr_get_physical_device_properties2,
@@ -1584,6 +1588,9 @@ struct DeviceExtensions : public InstanceExtensions {
             {vvl::Extension::_VK_EXT_mutable_descriptor_type,
              Info(&DeviceExtensions::vk_ext_mutable_descriptor_type,
                   {{{&DeviceExtensions::vk_khr_maintenance3, VK_KHR_MAINTENANCE_3_EXTENSION_NAME}}})},
+            {vvl::Extension::_VK_EXT_legacy_vertex_attributes,
+             Info(&DeviceExtensions::vk_ext_legacy_vertex_attributes,
+                  {{{&DeviceExtensions::vk_ext_vertex_input_dynamic_state, VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME}}})},
             {vvl::Extension::_VK_ARM_shader_core_builtins,
              Info(&DeviceExtensions::vk_arm_shader_core_builtins, {{{&DeviceExtensions::vk_khr_get_physical_device_properties2,
                                                                      VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME}}})},
@@ -1637,7 +1644,12 @@ struct DeviceExtensions : public InstanceExtensions {
             {vvl::Extension::_VK_NV_descriptor_pool_overallocation,
              Info(&DeviceExtensions::vk_nv_descriptor_pool_overallocation,
                   {{{&DeviceExtensions::vk_feature_version_1_1, "VK_VERSION_1_1"}}})},
+            {vvl::Extension::_VK_NV_raw_access_chains, Info(&DeviceExtensions::vk_nv_raw_access_chains, {})},
             {vvl::Extension::_VK_NV_shader_atomic_float16_vector, Info(&DeviceExtensions::vk_nv_shader_atomic_float16_vector, {})},
+            {vvl::Extension::_VK_NV_ray_tracing_validation, Info(&DeviceExtensions::vk_nv_ray_tracing_validation, {})},
+            {vvl::Extension::_VK_MESA_image_alignment_control, Info(&DeviceExtensions::vk_mesa_image_alignment_control,
+                                                                    {{{&DeviceExtensions::vk_khr_get_physical_device_properties2,
+                                                                       VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME}}})},
             {vvl::Extension::_VK_KHR_acceleration_structure,
              Info(&DeviceExtensions::vk_khr_acceleration_structure,
                   {{{&DeviceExtensions::vk_feature_version_1_1, "VK_VERSION_1_1"},
@@ -2036,6 +2048,7 @@ constexpr bool IsDeviceExtension(vvl::Extension extension) {
         case vvl::Extension::_VK_NV_ray_tracing_invocation_reorder:
         case vvl::Extension::_VK_NV_extended_sparse_address_space:
         case vvl::Extension::_VK_EXT_mutable_descriptor_type:
+        case vvl::Extension::_VK_EXT_legacy_vertex_attributes:
         case vvl::Extension::_VK_ARM_shader_core_builtins:
         case vvl::Extension::_VK_EXT_pipeline_library_group_handles:
         case vvl::Extension::_VK_EXT_dynamic_rendering_unused_attachments:
@@ -2050,7 +2063,10 @@ constexpr bool IsDeviceExtension(vvl::Extension extension) {
         case vvl::Extension::_VK_QNX_external_memory_screen_buffer:
         case vvl::Extension::_VK_MSFT_layered_driver:
         case vvl::Extension::_VK_NV_descriptor_pool_overallocation:
+        case vvl::Extension::_VK_NV_raw_access_chains:
         case vvl::Extension::_VK_NV_shader_atomic_float16_vector:
+        case vvl::Extension::_VK_NV_ray_tracing_validation:
+        case vvl::Extension::_VK_MESA_image_alignment_control:
         case vvl::Extension::_VK_KHR_acceleration_structure:
         case vvl::Extension::_VK_KHR_ray_tracing_pipeline:
         case vvl::Extension::_VK_KHR_ray_query:
