@@ -1101,6 +1101,7 @@ static VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceDisplayPropertiesKHR(VkPh
     return VK_SUCCESS;
 }
 
+#ifndef VULKANSC  // Vulkan SC does not support Vulkan Video
 static VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceVideoCapabilitiesKHR(VkPhysicalDevice physicalDevice,
                                                                             const VkVideoProfileInfoKHR* pVideoProfile,
                                                                             VkVideoCapabilitiesKHR* pCapabilities) {
@@ -1606,6 +1607,7 @@ GetVideoSessionMemoryRequirementsKHR(VkDevice device, VkVideoSessionKHR videoSes
     }
     return VK_SUCCESS;
 }
+#endif  // VULKANSC
 
 static VKAPI_ATTR void VKAPI_CALL GetPhysicalDeviceFeatures2(VkPhysicalDevice physicalDevice,
                                                              VkPhysicalDeviceFeatures2* pFeatures) {
@@ -2093,6 +2095,7 @@ GetPhysicalDeviceFragmentShadingRatesKHR(VkPhysicalDevice physicalDevice, uint32
     return VK_SUCCESS;
 }
 
+#ifndef VULKANSC  // Vulkan SC does not support VK_KHR_map_memory2
 static VKAPI_ATTR VkResult VKAPI_CALL MapMemory2KHR(VkDevice device, const VkMemoryMapInfoKHR* pMemoryMapInfo, void** ppData) {
     return MapMemory(device, pMemoryMapInfo->memory, pMemoryMapInfo->offset, pMemoryMapInfo->size, pMemoryMapInfo->flags, ppData);
 }
@@ -2101,7 +2104,9 @@ static VKAPI_ATTR VkResult VKAPI_CALL UnmapMemory2KHR(VkDevice device, const VkM
     UnmapMemory(device, pMemoryUnmapInfo->memory);
     return VK_SUCCESS;
 }
+#endif  // VULKANSC
 
+#ifndef VULKANSC  // Vulkan SC does not support VK_KHR_cooperative_matrix
 static VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceCooperativeMatrixPropertiesKHR(
     VkPhysicalDevice physicalDevice, uint32_t* pPropertyCount, VkCooperativeMatrixPropertiesKHR* pProperties) {
     if (!pProperties) {
@@ -2123,6 +2128,7 @@ static VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceCooperativeMatrixProperti
     }
     return VK_SUCCESS;
 }
+#endif  // VULKANSC
 
 static VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceCalibrateableTimeDomainsKHR(VkPhysicalDevice physicalDevice,
                                                                                    uint32_t* pTimeDomainCount,
@@ -2171,6 +2177,7 @@ static VKAPI_ATTR void VKAPI_CALL GetPhysicalDeviceMultisamplePropertiesEXT(VkPh
     }
 }
 
+#ifndef VULKANSC  // Vulkan SC does not support VK_NV_ray_tracing
 static VKAPI_ATTR void VKAPI_CALL GetAccelerationStructureMemoryRequirementsNV(
     VkDevice device, const VkAccelerationStructureMemoryRequirementsInfoNV* pInfo, VkMemoryRequirements2KHR* pMemoryRequirements) {
     // arbitrary
@@ -2178,6 +2185,7 @@ static VKAPI_ATTR void VKAPI_CALL GetAccelerationStructureMemoryRequirementsNV(
     pMemoryRequirements->memoryRequirements.alignment = 1;
     pMemoryRequirements->memoryRequirements.memoryTypeBits = 0xFFFF;
 }
+#endif  // VULKANSC
 
 static VKAPI_ATTR VkResult VKAPI_CALL
 GetMemoryHostPointerPropertiesEXT(VkDevice device, VkExternalMemoryHandleTypeFlagBits handleType, const void* pHostPointer,
@@ -2186,12 +2194,15 @@ GetMemoryHostPointerPropertiesEXT(VkDevice device, VkExternalMemoryHandleTypeFla
     return VK_SUCCESS;
 }
 
+#ifndef VULKANSC  // Vulkan SC does not support VK_EXT_descriptor_buffer
 static VKAPI_ATTR void VKAPI_CALL GetDescriptorSetLayoutSizeEXT(VkDevice device, VkDescriptorSetLayout layout,
                                                                 VkDeviceSize* pLayoutSizeInBytes) {
     // Need to give something non-zero
     *pLayoutSizeInBytes = 4;
 }
+#endif  // VULKANSC
 
+#ifndef VULKANSC  // Vulkan SC does not support VK_EXT_shader_module_identifier
 static VKAPI_ATTR void VKAPI_CALL GetShaderModuleIdentifierEXT(VkDevice device, VkShaderModule shaderModule,
                                                                VkShaderModuleIdentifierEXT* pIdentifier) {
     if (pIdentifier) {
@@ -2200,7 +2211,9 @@ static VKAPI_ATTR void VKAPI_CALL GetShaderModuleIdentifierEXT(VkDevice device, 
         pIdentifier->identifier[0] = 0x01;
     }
 }
+#endif  // VULKANSC
 
+#ifndef VULKANSC  // Vulkan SC does not support VK_KHR_ray_tracing
 static VKAPI_ATTR VkDeviceAddress VKAPI_CALL
 GetAccelerationStructureDeviceAddressKHR(VkDevice device, const VkAccelerationStructureDeviceAddressInfoKHR* pInfo) {
     // arbitrary - need to be aligned to 256 bytes
@@ -2215,6 +2228,7 @@ static VKAPI_ATTR void VKAPI_CALL GetAccelerationStructureBuildSizesKHR(
     pSizeInfo->updateScratchSize = 4;
     pSizeInfo->buildScratchSize = 4;
 }
+#endif  // VULKANSC
 
 static VKAPI_ATTR VkResult VKAPI_CALL RegisterDisplayEventEXT(VkDevice device, VkDisplayKHR display,
                                                               const VkDisplayEventInfoEXT* pDisplayEventInfo,
