@@ -366,6 +366,7 @@ if(VULKANSC)
     find_package(jsoncpp REQUIRED CONFIG)
 
     target_link_libraries(vvl PRIVATE
+        cppcodec
         jsoncpp_static
     )
 endif()
