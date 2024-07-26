@@ -220,10 +220,9 @@
             "build_dir": "cppcodec/build",
             "install_dir": "cppcodec/build/install",
             "commit": "8019b8b580f8573c33c50372baec7039dfe5a8ce",
-            "cmake_options": [
-                "-DCPPCODEC_BUILD_EXAMPLES=OFF",
-                "-DCPPCODEC_BUILD_TESTING=OFF",
-                "-DCPPCODEC_BUILD_TOOLS=OFF"
+            "build_step": "custom",
+            "custom_build": [
+                "cmake -E copy_directory cppcodec build/install/include/cppcodec"
             ]
         }
     ],
