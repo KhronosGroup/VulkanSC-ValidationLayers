@@ -21,6 +21,8 @@
 #include "state_tracker/state_tracker.h"
 #include "vulkansc/sc_vuid_enums.h"
 
+#include <cppcodec/base64_rfc4648.hpp>
+
 #include <sstream>
 
 namespace vvl::sc {
@@ -94,6 +96,7 @@ PipelineCache::Entry::JsonData PipelineCache::Entry::ParseJsonData(const Pipelin
             result->mapEntryCount = spec_info["mapEntryCount"].asUInt();
             auto map_entries = new VkSpecializationMapEntry[result->mapEntryCount];
             auto map_entries_json = spec_info["pMapEntries"];
+            auto data_json = spec_info["pData"];
             for (uint32_t i = 0; i < result->mapEntryCount; ++i) {
                 map_entries[i].constantID = map_entries_json["constantID"].asUInt();
                 map_entries[i].offset = map_entries_json["offset"].asUInt();
@@ -101,13 +104,36 @@ PipelineCache::Entry::JsonData PipelineCache::Entry::ParseJsonData(const Pipelin
             }
             result->pMapEntries = map_entries;
             result->dataSize = spec_info["dataSize"].asUInt();
-            auto data = new std::byte[result->dataSize];
-            auto data_json = spec_info["pData"];
-            for (size_t i = 0; i < result->dataSize; ++i) {
-                data[i] = static_cast<std::byte>(data_json[static_cast<uint32_t>(i)].asUInt());
+
+            std::byte* data = nullptr;
+            bool data_parsed = false;
+            if (data_json.isArray()) {
+                // Parse specialization data as array
+                if (data_json.size() == result->dataSize) {
+                    data = new std::byte[result->dataSize];
+                    for (size_t data_idx = 0; data_idx < result->dataSize; ++data_idx) {
+                        data[data_idx] = static_cast<std::byte>(data_json[static_cast<uint32_t>(data_idx)].asUInt());
+                    }
+                    data_parsed = true;
+                }
+            } else if (data_json.isString()) {
+                // Parse specialization data as Base64 string
+                std::vector<std::uint8_t> parsed_data = cppcodec::base64_rfc4648::decode(data_json.asString());
+                if (parsed_data.size() == result->dataSize) {
+                    data = new std::byte[result->dataSize];
+                    for (size_t data_idx = 0; data_idx < result->dataSize; ++data_idx) {
+                        data[data_idx] = static_cast<std::byte>(parsed_data[data_idx]);
+                    }
+                    data_parsed = true;
+                }
             }
-            result->pData = data;
-            return result;
+
+            if (data_parsed) {
+                result->pData = data;
+                return result;
+            } else {
+                delete[](data);
+            }
         }
         return nullptr;
     };
