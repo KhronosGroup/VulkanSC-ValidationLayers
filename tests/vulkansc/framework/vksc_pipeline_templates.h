@@ -229,3 +229,48 @@
         }
     }
 )json";
+
+[[maybe_unused]] static char const kSampleComputePipelineWithBase64SpecializationConstantJson[] = R"json(
+    {
+        "ComputePipelineState": {
+            "YcbcrSamplers": [],
+            "ImmutableSamplers": [],
+            "DescriptorSetLayouts": [],
+            "PipelineLayout": {
+                "sType": "VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO",
+                "pNext": "NULL",
+                "flags": 0,
+                "setLayoutCount": 0,
+                "pSetLayouts": "NULL",
+                "pushConstantRangeCount": 0,
+                "pPushConstantRanges": "NULL"
+            },
+            "ComputePipeline": {
+                "sType": "VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO",
+                "pNext": "NULL",
+                "flags": "0",
+                "stage": {
+                    "sType": "VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO",
+                    "pNext": "NULL",
+                    "flags": "0",
+                    "stage": "VK_SHADER_STAGE_COMPUTE_BIT",
+                    "module": "",
+                    "pName": "main",
+                    "pSpecializationInfo": {
+                        "mapEntryCount": 1,
+                        "pMapEntries": {
+                            "constantID": 0,
+                            "offset": 0,
+                            "size": 4
+                        },
+                        "dataSize": 4,
+                        "pData": "AAAAAA=="
+                    }
+                },
+                "layout": "",
+                "basePipelineHandle": "",
+                "basePipelineIndex": 0
+            }
+        }
+    }
+)json";
