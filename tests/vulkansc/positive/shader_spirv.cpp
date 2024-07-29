@@ -77,3 +77,19 @@ TEST_F(VkSCPositiveShaderSpirv, MissingSpecializationInfo) {
     m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit);
     builder.CreatePipeline(*m_device);
 }
+
+TEST_F(VkSCPositiveShaderSpirv, MissingSpecializationInfoBase64) {
+    TEST_DESCRIPTION(
+        "If specialization info is missing, but pipeline JSON data has specialization info"
+        " with Base64 data, then SPIR-V dependent validation is not disabled.");
+
+    vksc::ComputePipelineBuilder builder(this);
+    builder.AddBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    builder.SetPipelineJsonData(kSampleComputePipelineWithBase64SpecializationConstantJson);
+    builder.Init(vksc::Shader::Compute(kComputeShaderWithSpecializationConstantSpv));
+
+    RETURN_IF_SKIP(Init());
+
+    m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit);
+    builder.CreatePipeline(*m_device);
+}

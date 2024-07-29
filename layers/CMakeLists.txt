@@ -348,6 +348,7 @@ if(VULKANSC)
     endif()
 
     target_sources(vvl PRIVATE
+        vulkansc/base64.h
         vulkansc/sc_vuid_enums.h
         vulkansc/core_checks/sc_core_validation.cpp
         vulkansc/core_checks/sc_core_validation.h
