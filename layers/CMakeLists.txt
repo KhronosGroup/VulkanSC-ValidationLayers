@@ -348,6 +348,7 @@ if(VULKANSC)
     endif()
 
     target_sources(vvl PRIVATE
+        vulkansc/base64.h
         vulkansc/sc_vuid_enums.h
         vulkansc/core_checks/sc_core_validation.cpp
         vulkansc/core_checks/sc_core_validation.h
@@ -366,7 +367,6 @@ if(VULKANSC)
     find_package(jsoncpp REQUIRED CONFIG)
 
     target_link_libraries(vvl PRIVATE
-        cppcodec
         jsoncpp_static
     )
 endif()

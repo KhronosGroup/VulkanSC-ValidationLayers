@@ -101,16 +101,6 @@ find_package(SPIRV-Headers CONFIG QUIET)
 
 find_package(SPIRV-Tools-opt CONFIG QUIET)
 
-# NOTE: cppcodec only installs pkgconfig files, but no CMake Find Modules or Package Config files.
-# Pkgconfig is fairly alien on Windows. FindPkgConfig.cmake exists, but the only available OSS pkgcfg implementation
-# requires an extra Ruby install. This is the core logic of what FindCppcodec.cmake would have without the extra cruft.
-find_path(CPPCODEC_INCLUDE_DIR cppcodec/base64_rfc4648.hpp
-    PATH_SUFFIXES include
-    REQUIRED
-)
-add_library(cppcodec INTERFACE)
-target_include_directories(cppcodec INTERFACE "${CPPCODEC_INCLUDE_DIR}")
-
 # NOTE: Our custom code generation target isn't desirable for system package managers or add_subdirectory users.
 # So this target needs to be off by default to avoid obtuse build errors or patches.
 option(VVL_CODEGEN "Enable vulkan validation layer code generation")
