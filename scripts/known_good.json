@@ -212,18 +212,6 @@
                 "-DJSONCPP_WITH_PKGCONFIG_SUPPORT=OFF",
                 "-DJSONCPP_STATIC_WINDOWS_RUNTIME=OFF"
             ]
-        },
-        {
-            "name": "cppcodec",
-            "url": "https://github.com/tplgy/cppcodec.git",
-            "sub_dir": "cppcodec",
-            "build_dir": "cppcodec/build",
-            "install_dir": "cppcodec/build/install",
-            "commit": "8019b8b580f8573c33c50372baec7039dfe5a8ce",
-            "build_step": "custom",
-            "custom_build": [
-                "cmake -E copy_directory cppcodec build/install/include/cppcodec"
-            ]
         }
     ],
     "install_names": {
@@ -235,7 +223,6 @@
         "jsoncpp": "JSONCPP_INSTALL_DIR",
         "robin-hood-hashing": "ROBIN_HOOD_HASHING_INSTALL_DIR",
         "googletest": "GOOGLETEST_INSTALL_DIR",
-        "mimalloc": "MIMALLOC_INSTALL_DIR",
-        "cppcodec": "CPPCODEC_INSTALL_DIR"
+        "mimalloc": "MIMALLOC_INSTALL_DIR"
     }
 }
