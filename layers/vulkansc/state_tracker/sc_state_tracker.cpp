@@ -284,6 +284,7 @@ void SCValidationStateTracker<BASE>::PostCallRecordCreateGraphicsPipelines(
                                                chassis::CreateGraphicsPipelines& chassis_state) {
     BASE::PostCallRecordCreateGraphicsPipelines(device, pipelineCache, count, pCreateInfos, pAllocator, pPipelines, record_obj,
                                                 pipeline_states, chassis_state);
+    if (VK_SUCCESS != record_obj.result) return;
 
     ReservePipelinePoolEntries(count, pCreateInfos);
 
@@ -304,6 +305,7 @@ void SCValidationStateTracker<BASE>::PostCallRecordCreateComputePipelines(
                                                chassis::CreateComputePipelines& chassis_state) {
     BASE::PostCallRecordCreateComputePipelines(device, pipelineCache, count, pCreateInfos, pAllocator, pPipelines, record_obj,
                                                pipeline_states, chassis_state);
+    if (VK_SUCCESS != record_obj.result) return;
 
     ReservePipelinePoolEntries(count, pCreateInfos);
 
