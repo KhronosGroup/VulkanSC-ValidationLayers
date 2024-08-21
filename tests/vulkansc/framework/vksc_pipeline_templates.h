@@ -213,11 +213,13 @@
                     "pName": "main",
                     "pSpecializationInfo": {
                         "mapEntryCount": 1,
-                        "pMapEntries": {
-                            "constantID": 0,
-                            "offset": 0,
-                            "size": 4
-                        },
+                        "pMapEntries": [
+                            {
+                                "constantID": 0,
+                                "offset": 0,
+                                "size": 4
+                            }
+                        ],
                         "dataSize": 4,
                         "pData": [ 0, 0, 0, 0 ]
                     }
@@ -258,11 +260,13 @@
                     "pName": "main",
                     "pSpecializationInfo": {
                         "mapEntryCount": 1,
-                        "pMapEntries": {
-                            "constantID": 0,
-                            "offset": 0,
-                            "size": 4
-                        },
+                        "pMapEntries": [
+                            {
+                                "constantID": 0,
+                                "offset": 0,
+                                "size": 4
+                            }
+                        ],
                         "dataSize": 4,
                         "pData": "AAAAAA=="
                     }
