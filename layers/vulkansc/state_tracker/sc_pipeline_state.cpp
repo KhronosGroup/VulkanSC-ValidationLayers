@@ -97,9 +97,9 @@ PipelineCache::Entry::JsonData PipelineCache::Entry::ParseJsonData(const Pipelin
             auto map_entries_json = spec_info["pMapEntries"];
             auto data_json = spec_info["pData"];
             for (uint32_t i = 0; i < result->mapEntryCount; ++i) {
-                map_entries[i].constantID = map_entries_json["constantID"].asUInt();
-                map_entries[i].offset = map_entries_json["offset"].asUInt();
-                map_entries[i].size = map_entries_json["size"].asUInt();
+                map_entries[i].constantID = map_entries_json[i]["constantID"].asUInt();
+                map_entries[i].offset = map_entries_json[i]["offset"].asUInt();
+                map_entries[i].size = map_entries_json[i]["size"].asUInt();
             }
             result->pMapEntries = map_entries;
             result->dataSize = spec_info["dataSize"].asUInt();
