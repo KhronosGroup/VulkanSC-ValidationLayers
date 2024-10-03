@@ -38,6 +38,8 @@
 
 static VkInstance dummy_instance;
 
+class NegativeInstanceless : public VkLayerTest {};
+
 TEST_F(NegativeInstanceless, InstanceExtensionDependencies) {
     TEST_DESCRIPTION("Test enabling instance extension without dependencies met.");
 
@@ -254,7 +256,7 @@ TEST_F(NegativeInstanceless, DISABLED_DestroyInstanceAllocationCallbacksCompatib
     }
 }
 
-// TODO - Currently can not be ran with Profile layer
+// When address/tread sanitizer is on, this tends to fail tests after it
 TEST_F(NegativeInstanceless, DISABLED_DestroyInstanceHandleLeak) {
     TEST_DESCRIPTION("Test vkDestroyInstance while leaking a VkDevice object.");
     RETURN_IF_SKIP(InitFramework());
@@ -357,3 +359,43 @@ TEST_F(NegativeInstanceless, DISABLED_ExtensionStructsWithoutExtensions) {
     m_errorMonitor->VerifyFound();
 }
 #endif
+
+// The test works, you will see the errors, but the test framework is not setup to hook into the debug callback before the create
+// instance so no way to detect it
+TEST_F(NegativeInstanceless, DISABLED_VkLayerSettingEXT) {
+    const char* ids[] = {"something"};
+    VkLayerSettingEXT setting = {nullptr, "message_id_filter", VK_LAYER_SETTING_TYPE_STRING_EXT, 1, ids};
+    VkLayerSettingsCreateInfoEXT layer_settings_create_info = vku::InitStructHelper();
+    layer_settings_create_info.settingCount = 1;
+    layer_settings_create_info.pSettings = &setting;
+
+    auto ici = GetInstanceCreateInfo();
+    ici.pNext = &layer_settings_create_info;
+
+    {
+        Monitor().SetDesiredError("VUID-VkLayerSettingEXT-pLayerName-parameter");
+        vk::CreateInstance(&ici, nullptr, &dummy_instance);
+        Monitor().VerifyFound();
+    }
+
+    {
+        setting = {OBJECT_LAYER_NAME, nullptr, VK_LAYER_SETTING_TYPE_STRING_EXT, 1, ids};
+        Monitor().SetDesiredError("VUID-VkLayerSettingEXT-pSettingName-parameter");
+        vk::CreateInstance(&ici, nullptr, &dummy_instance);
+        Monitor().VerifyFound();
+    }
+
+    {
+        setting = {OBJECT_LAYER_NAME, "message_id_filter", VK_LAYER_SETTING_TYPE_STRING_EXT, 1, nullptr};
+        Monitor().SetDesiredError("VUID-VkLayerSettingEXT-valueCount-10070");
+        vk::CreateInstance(&ici, nullptr, &dummy_instance);
+        Monitor().VerifyFound();
+    }
+
+    {
+        layer_settings_create_info.pSettings = nullptr;
+        Monitor().SetDesiredError("VUID-VkLayerSettingsCreateInfoEXT-pSettings-parameter");
+        vk::CreateInstance(&ici, nullptr, &dummy_instance);
+        Monitor().VerifyFound();
+    }
+}

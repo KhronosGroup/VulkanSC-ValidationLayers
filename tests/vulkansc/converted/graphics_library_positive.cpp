@@ -17,13 +17,14 @@
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
 #include "../framework/descriptor_helper.h"
-#include "generated/vk_extension_helper.h"
 
 void GraphicsLibraryTest::InitBasicGraphicsLibrary() {
     AddRequiredExtensions(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::graphicsPipelineLibrary);
     RETURN_IF_SKIP(Init());
 }
+
+class PositiveGraphicsLibrary : public GraphicsLibraryTest {};
 
 // Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
 TEST_F(PositiveGraphicsLibrary, DISABLED_VertexInput) {
@@ -855,7 +856,7 @@ TEST_F(PositiveGraphicsLibrary, DISABLED_LinkingInputAttachment) {
                OpReturn
                OpFunctionEnd
         )";
-        vector<uint32_t> fs_spv;
+        std::vector<uint32_t> fs_spv;
         ASMtoSPV(SPV_ENV_VULKAN_1_0, 0, fs_src, fs_spv);
         vkt::GraphicsPipelineLibraryStage fs_stage(fs_spv, VK_SHADER_STAGE_FRAGMENT_BIT);
         frag_shader_lib.InitFragmentLibInfo(&fs_stage.stage_ci);

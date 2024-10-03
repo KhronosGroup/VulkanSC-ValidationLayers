@@ -14,6 +14,8 @@
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
 
+class PositiveShaderSpirv : public VkLayerTest {};
+
 TEST_F(PositiveShaderSpirv, NonSemanticInfo) {
     // This is a positive test, no errors expected
     // Verifies the ability to use non-semantic extended instruction sets when the extension is enabled
@@ -603,7 +605,7 @@ TEST_F(PositiveShaderSpirv, Spirv16Vulkan13) {
     VkShaderObj vs(this, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_3);
 }
 
-TEST_F(PositiveShaderInterface, OpTypeArraySpecConstant) {
+TEST_F(PositiveShaderSpirv, OpTypeArraySpecConstant) {
     TEST_DESCRIPTION("Make sure spec constants for a OpTypeArray doesn't assert");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     RETURN_IF_SKIP(Init());
@@ -1303,6 +1305,7 @@ TEST_F(PositiveShaderSpirv, Storage8and16bit) {
     AddRequiredExtensions(VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_EXTENSION_NAME);
     AddOptionalExtensions(VK_KHR_8BIT_STORAGE_EXTENSION_NAME);
     AddOptionalExtensions(VK_KHR_16BIT_STORAGE_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::vertexPipelineStoresAndAtomics);
     RETURN_IF_SKIP(InitFramework());
     bool support_8_bit = IsExtensionsEnabled(VK_KHR_8BIT_STORAGE_EXTENSION_NAME);
     bool support_16_bit = IsExtensionsEnabled(VK_KHR_16BIT_STORAGE_EXTENSION_NAME);
@@ -2031,4 +2034,109 @@ TEST_F(PositiveShaderSpirv, FPFastMathMode) {
         )";
 
     VkShaderObj cs(this, spv_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1, SPV_SOURCE_ASM);
+}
+
+TEST_F(PositiveShaderSpirv, ScalarBlockLayoutShaderCache) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8031");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::scalarBlockLayout);  // will set --scalar-block-layout
+    RETURN_IF_SKIP(Init());
+
+    // Matches glsl from other ScalarBlockLayoutShaderCache test
+    char const *cs_source = R"glsl(
+        #version 460
+        #extension GL_EXT_buffer_reference : require
+        #extension GL_EXT_scalar_block_layout : require
+
+        struct Transform {
+            mat3x3 rotScaMatrix; //  0, 36
+            vec3 pos;            // 36, 12
+            vec3 pos_err;        // 48, 12
+            float padding;       // 60, 4
+        };
+
+        layout(scalar, buffer_reference, buffer_reference_align = 64) readonly buffer Transforms {
+            Transform transforms[];
+        };
+        layout(std430, push_constant) uniform PushConstant {
+            Transforms pTransforms;
+        };
+
+        void main() {
+            Transform transform = pTransforms.transforms[0];
+        }
+    )glsl";
+    VkShaderObj cs(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2);
+}
+
+TEST_F(PositiveShaderSpirv, ExtendedTypesEnabled) {
+    TEST_DESCRIPTION("Test VK_KHR_shader_subgroup_extended_types.");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+
+    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_SHADER_SUBGROUP_EXTENDED_TYPES_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::shaderFloat16);
+    AddRequiredFeature(vkt::Feature::shaderSubgroupExtendedTypes);
+    RETURN_IF_SKIP(Init());
+
+    VkPhysicalDeviceSubgroupProperties subgroup_prop = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(subgroup_prop);
+    if (!(subgroup_prop.supportedOperations & VK_SUBGROUP_FEATURE_ARITHMETIC_BIT) ||
+        !(subgroup_prop.supportedStages & VK_SHADER_STAGE_COMPUTE_BIT)) {
+        GTEST_SKIP() << "Required features not supported";
+    }
+
+    std::vector<VkDescriptorSetLayoutBinding> bindings(0);
+    const vkt::DescriptorSetLayout dsl(*m_device, bindings);
+    const vkt::PipelineLayout pl(*m_device, {&dsl});
+
+    char const *csSource = R"glsl(
+        #version 450
+        #extension GL_KHR_shader_subgroup_arithmetic : enable
+        #extension GL_EXT_shader_subgroup_extended_types_float16 : enable
+        #extension GL_EXT_shader_explicit_arithmetic_types_float16 : enable
+        layout(local_size_x = 32) in;
+        void main() {
+           subgroupAdd(float16_t(0.0));
+        }
+    )glsl";
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cs_ = std::make_unique<VkShaderObj>(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+    pipe.CreateComputePipeline();
+}
+
+TEST_F(PositiveShaderSpirv, RayQueryPositionFetch) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8055");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_RAY_QUERY_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_RAY_TRACING_POSITION_FETCH_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::rayQuery);
+    AddRequiredFeature(vkt::Feature::rayTracingPositionFetch);
+    RETURN_IF_SKIP(Init());
+
+    char const *cs_source = R"glsl(
+        #version 460
+        #extension GL_EXT_ray_query : enable
+        #extension GL_EXT_ray_tracing_position_fetch : enable
+
+        layout(set = 0, binding = 0) buffer Log { uint x; };
+        layout(set = 0, binding = 1) uniform accelerationStructureEXT rtas;
+
+        void main() {
+            rayQueryEXT rayQuery;
+            rayQueryInitializeEXT(rayQuery, rtas, gl_RayFlagsNoneEXT, 0xFF, vec3(0,0,0), 0.0, vec3(1,0,0), 1.0);
+
+            vec3 positions[3];
+            rayQueryGetIntersectionTriangleVertexPositionsEXT(rayQuery, true, positions);
+            if (positions[0].x > 0) {
+                x = 2;
+            } else {
+                x = 1;
+            }
+        }
+    )glsl";
+    VkShaderObj cs(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2);
 }

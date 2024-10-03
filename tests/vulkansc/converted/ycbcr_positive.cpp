@@ -17,7 +17,6 @@
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
 #include "../framework/descriptor_helper.h"
-#include "generated/vk_extension_helper.h"
 
 void YcbcrTest::InitBasicYcbcr(void *pNextFeatures) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
@@ -36,6 +35,8 @@ void YcbcrTest::InitBasicYcbcr(void *pNextFeatures) {
     RETURN_IF_SKIP(InitState(nullptr, &features2));
 }
 
+class PositiveYcbcr : public YcbcrTest {};
+
 TEST_F(PositiveYcbcr, PlaneAspectNone) {
     SetTargetApiVersion(VK_API_VERSION_1_3);
     RETURN_IF_SKIP(Init());
@@ -49,8 +50,6 @@ TEST_F(PositiveYcbcr, PlaneAspectNone) {
     image_createinfo.samples = VK_SAMPLE_COUNT_1_BIT;
     image_createinfo.tiling = VK_IMAGE_TILING_LINEAR;
     image_createinfo.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-    image_createinfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    image_createinfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     VkDeviceImageMemoryRequirements image_mem_reqs = vku::InitStructHelper();
     image_mem_reqs.pCreateInfo = &image_createinfo;
     image_mem_reqs.planeAspect = VK_IMAGE_ASPECT_NONE;
@@ -72,9 +71,6 @@ TEST_F(PositiveYcbcr, MultiplaneGetImageSubresourceLayout) {
     ci.samples = VK_SAMPLE_COUNT_1_BIT;
     ci.tiling = VK_IMAGE_TILING_LINEAR;
     ci.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-    ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-
     // Verify format
     if (!ImageFormatIsSupported(instance(), gpu(), ci, VK_FORMAT_FEATURE_TRANSFER_SRC_BIT)) {
         // Assume there's low ROI on searching for different mp formats
@@ -107,8 +103,6 @@ TEST_F(PositiveYcbcr, MultiplaneImageCopyBufferToImage) {
     ci.mipLevels = 1;
     ci.arrayLayers = 1;
     ci.samples = VK_SAMPLE_COUNT_1_BIT;
-    ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
     VkFormatFeatureFlags features = VK_FORMAT_FEATURE_TRANSFER_SRC_BIT | VK_FORMAT_FEATURE_TRANSFER_DST_BIT;
     if (!ImageFormatIsSupported(instance(), gpu(), ci, features)) {
@@ -163,8 +157,6 @@ TEST_F(PositiveYcbcr, MultiplaneImageCopy) {
     ci.mipLevels = 1;
     ci.arrayLayers = 1;
     ci.samples = VK_SAMPLE_COUNT_1_BIT;
-    ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
     // Verify format
     VkFormatFeatureFlags features = VK_FORMAT_FEATURE_TRANSFER_SRC_BIT | VK_FORMAT_FEATURE_TRANSFER_DST_BIT;
@@ -181,19 +173,11 @@ TEST_F(PositiveYcbcr, MultiplaneImageCopy) {
 
     // Copy plane 0 to plane 2
     VkImageCopy copyRegion = {};
-    copyRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_PLANE_0_BIT_KHR;
-    copyRegion.srcSubresource.mipLevel = 0;
-    copyRegion.srcSubresource.baseArrayLayer = 0;
-    copyRegion.srcSubresource.layerCount = 1;
+    copyRegion.srcSubresource = {VK_IMAGE_ASPECT_PLANE_0_BIT_KHR, 0, 0, 1};
     copyRegion.srcOffset = {0, 0, 0};
-    copyRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_PLANE_2_BIT_KHR;
-    copyRegion.dstSubresource.mipLevel = 0;
-    copyRegion.dstSubresource.baseArrayLayer = 0;
-    copyRegion.dstSubresource.layerCount = 1;
+    copyRegion.dstSubresource = {VK_IMAGE_ASPECT_PLANE_2_BIT_KHR, 0, 0, 1};
     copyRegion.dstOffset = {0, 0, 0};
-    copyRegion.extent.width = 128;
-    copyRegion.extent.height = 128;
-    copyRegion.extent.depth = 1;
+    copyRegion.extent = {128, 128, 1};
 
     m_commandBuffer->begin();
     image.ImageMemoryBarrier(m_commandBuffer, VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, VK_IMAGE_LAYOUT_GENERAL);
@@ -226,8 +210,6 @@ TEST_F(PositiveYcbcr, MultiplaneImageBindDisjoint) {
     ci.mipLevels = 1;
     ci.arrayLayers = 1;
     ci.samples = VK_SAMPLE_COUNT_1_BIT;
-    ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
     // Verify format
     VkFormatFeatureFlags features =
@@ -315,8 +297,6 @@ TEST_F(PositiveYcbcr, ImageLayout) {
     ci.mipLevels = 1;
     ci.arrayLayers = 1;
     ci.samples = VK_SAMPLE_COUNT_1_BIT;
-    ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
     // Verify format
     VkFormatFeatureFlags features = VK_FORMAT_FEATURE_TRANSFER_SRC_BIT | VK_FORMAT_FEATURE_TRANSFER_DST_BIT;
@@ -427,12 +407,7 @@ TEST_F(PositiveYcbcr, DrawCombinedImageSampler) {
 
     vkt::SamplerYcbcrConversion conversion(*m_device, format);
     auto conversion_info = conversion.ConversionInfo();
-    auto ivci = vku::InitStruct<VkImageViewCreateInfo>(&conversion_info);
-    ivci.image = image.handle();
-    ivci.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    ivci.format = format;
-    ivci.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-    vkt::ImageView view(*m_device, ivci);
+    vkt::ImageView view = image.CreateView(VK_IMAGE_ASPECT_COLOR_BIT, &conversion_info);
 
     VkSamplerCreateInfo sampler_ci = SafeSaneSamplerCreateInfo();
     sampler_ci.pNext = &conversion_info;
@@ -499,12 +474,7 @@ TEST_F(PositiveYcbcr, ImageQuerySizeLod) {
 
     vkt::SamplerYcbcrConversion conversion(*m_device, format);
     auto conversion_info = conversion.ConversionInfo();
-    auto ivci = vku::InitStruct<VkImageViewCreateInfo>(&conversion_info);
-    ivci.image = image.handle();
-    ivci.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    ivci.format = format;
-    ivci.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-    vkt::ImageView view(*m_device, ivci);
+    vkt::ImageView view = image.CreateView(VK_IMAGE_ASPECT_COLOR_BIT, &conversion_info);
 
     VkSamplerCreateInfo sampler_ci = SafeSaneSamplerCreateInfo();
     sampler_ci.pNext = &conversion_info;

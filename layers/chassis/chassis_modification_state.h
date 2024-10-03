@@ -40,12 +40,15 @@ struct CreateShaderModule {
     // creation time where the rest of the information is needed to do the remaining SPIR-V validation.
     std::shared_ptr<spirv::Module> module_state;  // contains SPIR-V to validate
     spirv::StatelessData stateless_data;
+};
 
-    uint32_t unique_shader_id = 0;
-
-    // Pass the instrumented SPIR-V info from PreCallRecord to Dispatch (so GPU-AV logic can run with it)
-    VkShaderModuleCreateInfo instrumented_create_info;
+struct ShaderObjectInstrumentationData {
+    // Need to hold this in memory between the PreCallRecord and the Dispatch
     std::vector<uint32_t> instrumented_spirv;
+    // Need to hold this in memory between the PreCallRecord and the PostCallRecord
+    uint32_t unique_shader_id;
+
+    std::vector<VkDescriptorSetLayout> new_layouts;
 };
 
 // VkShaderEXT (VK_EXT_shader_object)
@@ -55,50 +58,60 @@ struct ShaderObject {
 
     std::vector<std::shared_ptr<spirv::Module>> module_states;  // contains SPIR-V to validate
     std::vector<spirv::StatelessData> stateless_data;
-    std::vector<uint32_t> unique_shader_ids;
+
+    std::vector<VkShaderCreateInfoEXT> modified_create_infos;
+    const VkShaderCreateInfoEXT* pCreateInfos = nullptr;
 
     // Pass the instrumented SPIR-V info from PreCallRecord to Dispatch (so GPU-AV logic can run with it)
-    VkShaderCreateInfoEXT* instrumented_create_info;
-    std::vector<std::vector<uint32_t>> instrumented_spirv;
+    std::vector<ShaderObjectInstrumentationData> instrumentations_data;
 
-    std::vector<VkDescriptorSetLayout> new_layouts;
-
-    ShaderObject(uint32_t createInfoCount, const VkShaderCreateInfoEXT* pCreateInfos) {
-        instrumented_create_info = const_cast<VkShaderCreateInfoEXT*>(pCreateInfos);
+    ShaderObject(uint32_t createInfoCount, const VkShaderCreateInfoEXT* create_info) {
+        pCreateInfos = create_info;
         module_states.resize(createInfoCount);
         stateless_data.resize(createInfoCount);
-        unique_shader_ids.resize(createInfoCount);
-        instrumented_spirv.resize(createInfoCount);
     }
 };
 
-// We hold one slot for each potential graphics stage
-// This is used to pass the unique_shader_id around for GPL
-// Tried to use `vvl::unordered_map` but caused compiler errors
-using ShaderModuleUniqueIds = std::unordered_map<VkShaderStageFlagBits, uint32_t>;
+struct ShaderInstrumentationMetadata {
+    // Holds a unique shader id for each VkGraphicsPipelineCreateInfo::pStages[i]
+    // Unique shader ids are used to map SPIR-V to a specific VkShaderModule/VkPipeline/etc handle
+    std::vector<uint32_t> spirv_unique_id_map;
+
+    // Used to know if VkShaderModuleCreateInfo is passed down VkPipelineShaderStageCreateInfo
+    bool passed_in_shader_stage_ci = false;
+};
 
 struct CreateGraphicsPipelines {
     std::vector<vku::safe_VkGraphicsPipelineCreateInfo> modified_create_infos;
-    std::vector<ShaderModuleUniqueIds> shader_unique_id_maps;
-    const VkGraphicsPipelineCreateInfo* pCreateInfos;
+    const VkGraphicsPipelineCreateInfo* pCreateInfos = nullptr;
+    spirv::StatelessData stateless_data[kCommonMaxGraphicsShaderStages];
+    std::vector<ShaderInstrumentationMetadata> shader_instrumentations_metadata;
+
+    CreateGraphicsPipelines(const VkGraphicsPipelineCreateInfo* create_info) { pCreateInfos = create_info; }
 };
 
 struct CreateComputePipelines {
     std::vector<vku::safe_VkComputePipelineCreateInfo> modified_create_infos;
-    std::vector<ShaderModuleUniqueIds> shader_unique_id_maps;  // not used, here for template function
-    const VkComputePipelineCreateInfo* pCreateInfos;
+    const VkComputePipelineCreateInfo* pCreateInfos = nullptr;
+    spirv::StatelessData stateless_data;
+    std::vector<ShaderInstrumentationMetadata> shader_instrumentations_metadata;
+    CreateComputePipelines(const VkComputePipelineCreateInfo* create_info) { pCreateInfos = create_info; }
 };
 
 struct CreateRayTracingPipelinesNV {
     std::vector<vku::safe_VkRayTracingPipelineCreateInfoCommon> modified_create_infos;
-    std::vector<ShaderModuleUniqueIds> shader_unique_id_maps;  // not used, here for template function
-    const VkRayTracingPipelineCreateInfoNV* pCreateInfos;
+    const VkRayTracingPipelineCreateInfoNV* pCreateInfos = nullptr;
+    std::vector<ShaderInstrumentationMetadata> shader_instrumentations_metadata;
+
+    CreateRayTracingPipelinesNV(const VkRayTracingPipelineCreateInfoNV* create_info) { pCreateInfos = create_info; }
 };
 
 struct CreateRayTracingPipelinesKHR {
-    std::vector<vku::safe_VkRayTracingPipelineCreateInfoCommon> modified_create_infos;
-    std::vector<ShaderModuleUniqueIds> shader_unique_id_maps;  // not used, here for template function
-    const VkRayTracingPipelineCreateInfoKHR* pCreateInfos;
+    std::vector<vku::safe_VkRayTracingPipelineCreateInfoKHR> modified_create_infos;
+    const VkRayTracingPipelineCreateInfoKHR* pCreateInfos = nullptr;
+    std::vector<ShaderInstrumentationMetadata> shader_instrumentations_metadata;
+
+    CreateRayTracingPipelinesKHR(const VkRayTracingPipelineCreateInfoKHR* create_info) { pCreateInfos = create_info; }
 };
 
 struct CreatePipelineLayout {

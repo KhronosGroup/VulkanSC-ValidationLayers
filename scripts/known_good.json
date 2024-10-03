@@ -7,7 +7,7 @@
             "sub_dir": "Vulkan-Headers",
             "build_dir": "Vulkan-Headers/build",
             "install_dir": "Vulkan-Headers/build/install",
-            "commit": "v1.3.285"
+            "commit": "v1.3.295"
         },
         {
             "name": "Vulkan-Headers",
@@ -19,7 +19,7 @@
             "cmake_options": [
                 "-DGEN_VULKANSC_COMBINED=ON"
             ],
-            "commit": "vksc1.0.15"
+            "commit": "662d344a7910de45a523f11efd8af7479c71e29e"
         },
         {
             "name": "Vulkan-Utility-Libraries",
@@ -28,7 +28,7 @@
             "sub_dir": "Vulkan-Utility-Libraries",
             "build_dir": "Vulkan-Utility-Libraries/build",
             "install_dir": "Vulkan-Utility-Libraries/build/install",
-            "commit": "v1.3.285",
+            "commit": "v1.3.295",
             "deps": [
                 {
                     "var_name": "VULKAN_HEADERS_INSTALL_DIR",
@@ -43,7 +43,7 @@
             "sub_dir": "Vulkan-Utility-Libraries",
             "build_dir": "Vulkan-Utility-Libraries/build",
             "install_dir": "Vulkan-Utility-Libraries/build/install",
-            "commit": "vksc1.0.15",
+            "commit": "6d51694ec8fa6e68b2f21291533e1efae31f9b71",
             "deps": [
                 {
                     "var_name": "VULKAN_HEADERS_INSTALL_DIR",
@@ -57,7 +57,7 @@
             "sub_dir": "SPIRV-Headers",
             "build_dir": "SPIRV-Headers/build",
             "install_dir": "SPIRV-Headers/build/install",
-            "commit": "49a1fceb9b1d087f3c25ad5ec077bb0e46231297"
+            "commit": "f013f08e4455bcc1f0eed8e3dd5e2009682656d9"
         },
         {
             "name": "SPIRV-Tools",
@@ -71,7 +71,7 @@
                 "-DSPIRV_SKIP_TESTS=ON",
                 "-DSPIRV_SKIP_EXECUTABLES=OFF"
             ],
-            "commit": "9241a58a8028c49510bc174b6c970e3c2b4b8e51"
+            "commit": "363486479d4c8dfbfdf2e2dc397cd10aa15f80b0"
         },
         {
             "name": "robin-hood-hashing",
@@ -123,7 +123,7 @@
             "sub_dir": "glslang",
             "build_dir": "glslang/build",
             "install_dir": "glslang/build/install",
-            "commit": "effcbf7893a177b756bc80bf74009a950c3073a1",
+            "commit": "69249e46b6286e41ee47b5f51bf814881f15b63a",
             "cmake_options": [
                 "-DENABLE_OPT=OFF"
             ],
@@ -138,7 +138,7 @@
             "sub_dir": "Vulkan-Loader",
             "build_dir": "Vulkan-Loader/build",
             "install_dir": "Vulkan-Loader/build/install",
-            "commit": "v1.3.285",
+            "commit": "v1.3.295",
             "build_step": "skip",
             "optional": [
                 "tests"
@@ -151,7 +151,7 @@
             "sub_dir": "Vulkan-Loader",
             "build_dir": "Vulkan-Loader/build",
             "install_dir": "Vulkan-Loader/build/install",
-            "commit": "vksc1.0.15",
+            "commit": "c59c24a2b43714fbd73686acbb2de37392d04747",
             "build_step": "skip",
             "optional": [
                 "tests"
@@ -164,7 +164,7 @@
             "sub_dir": "Vulkan-Profiles",
             "build_dir": "Vulkan-Profiles/build",
             "install_dir": "Vulkan-Profiles/build/install",
-            "commit": "1ff97fd38c2f563bfadd6290162168299c2b5d3d",
+            "commit": "v1.3.294",
             "build_step": "skip",
             "optional": [
                 "tests"
@@ -177,7 +177,7 @@
             "sub_dir": "Vulkan-Tools",
             "build_dir": "Vulkan-Tools/build",
             "install_dir": "Vulkan-Tools/build/install",
-            "commit": "v1.3.285",
+            "commit": "v1.3.295",
             "build_step": "skip",
             "optional": [
                 "tests"
@@ -190,7 +190,7 @@
             "sub_dir": "Vulkan-Tools",
             "build_dir": "Vulkan-Tools/build",
             "install_dir": "Vulkan-Tools/build/install",
-            "commit": "vksc1.0.15",
+            "commit": "d7cfe6a6fb3fc38db3382adcc5194bf1f7b9f218",
             "build_step": "skip",
             "optional": [
                 "tests"

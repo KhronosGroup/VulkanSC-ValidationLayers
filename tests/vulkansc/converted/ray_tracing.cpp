@@ -44,6 +44,8 @@ constexpr T binom(T n, T k) {
     return numerator / denominator;
 }
 
+class NegativeRayTracing : public RayTracingTest {};
+
 TEST_F(NegativeRayTracing, BarrierAccessAccelerationStructure) {
     TEST_DESCRIPTION("Test barrier with access ACCELERATION_STRUCTURE bit.");
 
@@ -520,12 +522,12 @@ TEST_F(NegativeRayTracing, BeginQueryQueryPoolType) {
             vkt::QueryPool query_pool(*m_device, query_type, 1);
 
             m_commandBuffer->begin();
-            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, vuid_begin_query);
+            m_errorMonitor->SetDesiredError(vuid_begin_query);
             vk::CmdBeginQuery(m_commandBuffer->handle(), query_pool.handle(), 0, 0);
             m_errorMonitor->VerifyFound();
 
             if (ext_transform_feedback) {
-                m_errorMonitor->SetDesiredFailureMsg(kErrorBit, vuid_begin_query_indexed);
+                m_errorMonitor->SetDesiredError(vuid_begin_query_indexed);
                 vk::CmdBeginQueryIndexedEXT(m_commandBuffer->handle(), query_pool.handle(), 0, 0, 0);
                 m_errorMonitor->VerifyFound();
             }
@@ -617,7 +619,6 @@ TEST_F(NegativeRayTracing, CopyAccelerationStructureOverlappingMemory) {
     vkt::DeviceMemory buffer_memory(*m_device, alloc_info);
 
     VkBufferCreateInfo blas_buffer_ci = vku::InitStructHelper();
-    blas_buffer_ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     blas_buffer_ci.size = 4096;
     blas_buffer_ci.usage = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR |
                            VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
@@ -754,7 +755,7 @@ TEST_F(NegativeRayTracing, CopyAccelerationStructureNoHostMem) {
     copy_info.dst = blas->handle();
 
     m_errorMonitor->SetDesiredError("VUID-vkCopyAccelerationStructureKHR-buffer-03727");
-    m_errorMonitor->SetDesiredError(" VUID-VkCopyAccelerationStructureInfoKHR-src-04963");
+    m_errorMonitor->SetDesiredError("VUID-VkCopyAccelerationStructureInfoKHR-src-04963");
     vk::CopyAccelerationStructureKHR(device(), VK_NULL_HANDLE, &copy_info);
     m_errorMonitor->VerifyFound();
 
@@ -762,7 +763,7 @@ TEST_F(NegativeRayTracing, CopyAccelerationStructureNoHostMem) {
     copy_info.dst = blas_no_host_mem->handle();
 
     m_errorMonitor->SetDesiredError("VUID-vkCopyAccelerationStructureKHR-buffer-03728");
-    m_errorMonitor->SetDesiredError(" VUID-VkCopyAccelerationStructureInfoKHR-src-04963");
+    m_errorMonitor->SetDesiredError("VUID-VkCopyAccelerationStructureInfoKHR-src-04963");
     vk::CopyAccelerationStructureKHR(device(), VK_NULL_HANDLE, &copy_info);
     m_errorMonitor->VerifyFound();
 }
@@ -1199,7 +1200,6 @@ TEST_F(NegativeRayTracing, CmdTraceRaysKHR) {
     buffer_ci.usage =
         VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR;
     buffer_ci.size = 4096;
-    buffer_ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     vkt::Buffer buffer(*m_device, buffer_ci, vkt::no_mem);
 
     VkMemoryRequirements mem_reqs;
@@ -1227,19 +1227,16 @@ TEST_F(NegativeRayTracing, CmdTraceRaysKHR) {
         VkStridedDeviceAddressRegionKHR invalid_stride = stridebufregion;
         invalid_stride.stride = (stridebufregion.size + 1) % stridebufregion.size;
         if (invalid_stride.stride > 0) {
-            m_errorMonitor->SetUnexpectedError("VUID-vkCmdTraceRaysKHR-None-08606");
             m_errorMonitor->SetDesiredError("VUID-vkCmdTraceRaysKHR-stride-03694");
             vk::CmdTraceRaysKHR(m_commandBuffer->handle(), &stridebufregion, &stridebufregion, &stridebufregion, &invalid_stride,
                                 100, 100, 1);
             m_errorMonitor->VerifyFound();
 
-            m_errorMonitor->SetUnexpectedError("VUID-vkCmdTraceRaysKHR-None-08606");
             m_errorMonitor->SetDesiredError("VUID-vkCmdTraceRaysKHR-stride-03690");
             vk::CmdTraceRaysKHR(m_commandBuffer->handle(), &stridebufregion, &stridebufregion, &invalid_stride, &stridebufregion,
                                 100, 100, 1);
             m_errorMonitor->VerifyFound();
 
-            m_errorMonitor->SetUnexpectedError("VUID-vkCmdTraceRaysKHR-None-08606");
             m_errorMonitor->SetDesiredError("VUID-vkCmdTraceRaysKHR-stride-03686");
             vk::CmdTraceRaysKHR(m_commandBuffer->handle(), &stridebufregion, &invalid_stride, &stridebufregion, &stridebufregion,
                                 100, 100, 1);
@@ -1252,19 +1249,16 @@ TEST_F(NegativeRayTracing, CmdTraceRaysKHR) {
         uint32_t align = ray_tracing_properties.shaderGroupHandleSize;
         invalid_stride.stride = static_cast<VkDeviceSize>(ray_tracing_properties.maxShaderGroupStride) +
                                 (align - (ray_tracing_properties.maxShaderGroupStride % align));
-        m_errorMonitor->SetUnexpectedError("VUID-vkCmdTraceRaysKHR-None-08606");
         m_errorMonitor->SetDesiredError("VUID-vkCmdTraceRaysKHR-stride-04041");
         vk::CmdTraceRaysKHR(m_commandBuffer->handle(), &stridebufregion, &stridebufregion, &stridebufregion, &invalid_stride, 100,
                             100, 1);
         m_errorMonitor->VerifyFound();
 
-        m_errorMonitor->SetUnexpectedError("VUID-vkCmdTraceRaysKHR-None-08606");
         m_errorMonitor->SetDesiredError("VUID-vkCmdTraceRaysKHR-stride-04035");
         vk::CmdTraceRaysKHR(m_commandBuffer->handle(), &stridebufregion, &stridebufregion, &invalid_stride, &stridebufregion, 100,
                             100, 1);
         m_errorMonitor->VerifyFound();
 
-        m_errorMonitor->SetUnexpectedError("VUID-vkCmdTraceRaysKHR-None-08606");
         m_errorMonitor->SetDesiredError("VUID-vkCmdTraceRaysKHR-stride-04029");
         vk::CmdTraceRaysKHR(m_commandBuffer->handle(), &stridebufregion, &invalid_stride, &stridebufregion, &stridebufregion, 100,
                             100, 1);
@@ -1340,17 +1334,10 @@ TEST_F(NegativeRayTracing, CmdTraceRaysIndirectKHR) {
     RETURN_IF_SKIP(InitFrameworkForRayTracingTest());
     RETURN_IF_SKIP(InitState());
 
-    VkBufferCreateInfo buf_info = vku::InitStructHelper();
-    buf_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
-    buf_info.size = 4096;
-    buf_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    VkMemoryAllocateFlagsInfo allocate_flag_info = vku::InitStructHelper();
-    allocate_flag_info.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
-    vkt::Buffer buffer(*m_device, buf_info, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &allocate_flag_info);
-
     VkPhysicalDeviceRayTracingPipelinePropertiesKHR ray_tracing_properties = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(ray_tracing_properties);
 
+    vkt::Buffer buffer(*m_device, 4096, VK_BUFFER_USAGE_TRANSFER_DST_BIT, vkt::device_address);
     const VkDeviceAddress device_address = buffer.address();
 
     VkStridedDeviceAddressRegionKHR stridebufregion = {};
@@ -1363,21 +1350,18 @@ TEST_F(NegativeRayTracing, CmdTraceRaysIndirectKHR) {
     {
         VkStridedDeviceAddressRegionKHR invalid_stride = stridebufregion;
         invalid_stride.stride = (stridebufregion.size + 1) % stridebufregion.size;
+        invalid_stride.size = invalid_stride.stride;
         if (invalid_stride.stride > 0) {
-            // TODO - Create minimal ray tracing pipeline helper - remove all extra `08606`
-            m_errorMonitor->SetDesiredError("VUID-vkCmdTraceRaysIndirectKHR-None-08606");
             m_errorMonitor->SetDesiredError("VUID-vkCmdTraceRaysIndirectKHR-stride-03694");
             vk::CmdTraceRaysIndirectKHR(m_commandBuffer->handle(), &stridebufregion, &stridebufregion, &stridebufregion,
                                         &invalid_stride, device_address);
             m_errorMonitor->VerifyFound();
 
-            m_errorMonitor->SetDesiredError("VUID-vkCmdTraceRaysIndirectKHR-None-08606");
             m_errorMonitor->SetDesiredError("VUID-vkCmdTraceRaysIndirectKHR-stride-03690");
             vk::CmdTraceRaysIndirectKHR(m_commandBuffer->handle(), &stridebufregion, &stridebufregion, &invalid_stride,
                                         &stridebufregion, device_address);
             m_errorMonitor->VerifyFound();
 
-            m_errorMonitor->SetDesiredError("VUID-vkCmdTraceRaysIndirectKHR-None-08606");
             m_errorMonitor->SetDesiredError("VUID-vkCmdTraceRaysIndirectKHR-stride-03686");
             vk::CmdTraceRaysIndirectKHR(m_commandBuffer->handle(), &stridebufregion, &invalid_stride, &stridebufregion,
                                         &stridebufregion, device_address);
@@ -1394,21 +1378,18 @@ TEST_F(NegativeRayTracing, CmdTraceRaysIndirectKHR) {
         } else {
             invalid_stride.stride = ray_tracing_properties.maxShaderGroupStride + 1;
 
-            m_errorMonitor->SetDesiredError("VUID-vkCmdTraceRaysIndirectKHR-None-08606");
             m_errorMonitor->SetDesiredError("VUID-vkCmdTraceRaysIndirectKHR-stride-04041");
             m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdTraceRaysIndirectKHR-stride-03694");
             vk::CmdTraceRaysIndirectKHR(m_commandBuffer->handle(), &stridebufregion, &stridebufregion, &stridebufregion,
                                         &invalid_stride, device_address);
             m_errorMonitor->VerifyFound();
 
-            m_errorMonitor->SetDesiredError("VUID-vkCmdTraceRaysIndirectKHR-None-08606");
             m_errorMonitor->SetDesiredError("VUID-vkCmdTraceRaysIndirectKHR-stride-04035");
             m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdTraceRaysIndirectKHR-stride-03690");
             vk::CmdTraceRaysIndirectKHR(m_commandBuffer->handle(), &stridebufregion, &stridebufregion, &invalid_stride,
                                         &stridebufregion, device_address);
             m_errorMonitor->VerifyFound();
 
-            m_errorMonitor->SetDesiredError("VUID-vkCmdTraceRaysIndirectKHR-None-08606");
             m_errorMonitor->SetDesiredError("VUID-vkCmdTraceRaysIndirectKHR-stride-04029");
             m_errorMonitor->SetAllowedFailureMsg("VUID-vkCmdTraceRaysIndirectKHR-stride-03686");
             vk::CmdTraceRaysIndirectKHR(m_commandBuffer->handle(), &stridebufregion, &invalid_stride, &stridebufregion,
@@ -1430,20 +1411,12 @@ TEST_F(NegativeRayTracing, CmdTraceRaysIndirect2KHRFeatureDisabled) {
     RETURN_IF_SKIP(InitFrameworkForRayTracingTest());
     RETURN_IF_SKIP(InitState());
 
-    VkBufferCreateInfo buffer_info = vku::InitStructHelper();
-    buffer_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
-    buffer_info.size = 4096;
-    buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    VkMemoryAllocateFlagsInfo allocate_flag_info = vku::InitStructHelper();
-    allocate_flag_info.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
-    vkt::Buffer buffer(*m_device, buffer_info, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &allocate_flag_info);
-
+    vkt::Buffer buffer(*m_device, 4096, VK_BUFFER_USAGE_TRANSFER_DST_BIT, vkt::device_address);
     const VkDeviceAddress device_address = buffer.address();
 
     m_commandBuffer->begin();
     // No VkPhysicalDeviceRayTracingMaintenance1FeaturesKHR was in the device create info pNext chain
     {
-        m_errorMonitor->SetDesiredError("VUID-vkCmdTraceRaysIndirect2KHR-None-08606");
         m_errorMonitor->SetDesiredError("VUID-vkCmdTraceRaysIndirect2KHR-rayTracingPipelineTraceRaysIndirect2-03637");
         vk::CmdTraceRaysIndirect2KHR(m_commandBuffer->handle(), device_address);
         m_errorMonitor->VerifyFound();
@@ -1462,20 +1435,12 @@ TEST_F(NegativeRayTracing, CmdTraceRaysIndirect2KHRAddress) {
     RETURN_IF_SKIP(InitFrameworkForRayTracingTest());
     RETURN_IF_SKIP(InitState());
 
-    VkBufferCreateInfo buffer_info = vku::InitStructHelper();
-    buffer_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
-    buffer_info.size = 4096;
-    buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    VkMemoryAllocateFlagsInfo allocate_flag_info = vku::InitStructHelper();
-    allocate_flag_info.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
-    vkt::Buffer buffer(*m_device, buffer_info, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &allocate_flag_info);
-
+    vkt::Buffer buffer(*m_device, 4096, VK_BUFFER_USAGE_TRANSFER_DST_BIT, vkt::device_address);
     const VkDeviceAddress device_address = buffer.address();
 
     m_commandBuffer->begin();
     // indirectDeviceAddress is not a multiple of 4
     {
-        m_errorMonitor->SetDesiredError("VUID-vkCmdTraceRaysIndirect2KHR-None-08606");
         m_errorMonitor->SetDesiredError("VUID-vkCmdTraceRaysIndirect2KHR-indirectDeviceAddress-03634");
         vk::CmdTraceRaysIndirect2KHR(m_commandBuffer->handle(), device_address + 1);
         m_errorMonitor->VerifyFound();
@@ -1599,253 +1564,255 @@ TEST_F(NegativeRayTracing, CmdBuildAccelerationStructuresKHR) {
     }
 
     // dstAccelerationStructure == VK_NULL_HANDLE
-    {// Command buffer build
-     {auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
-    blas.SetDstAS(vkt::as::blueprint::AccelStructNull(*m_device));
+    {  // Command buffer build
+        {
+            auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
+            blas.SetDstAS(vkt::as::blueprint::AccelStructNull(*m_device));
 
-    m_errorMonitor->SetDesiredError("VUID-vkCmdBuildAccelerationStructuresKHR-dstAccelerationStructure-03800");
-    blas.BuildCmdBuffer(m_commandBuffer->handle());
-    m_errorMonitor->VerifyFound();
-}
-}
+            m_errorMonitor->SetDesiredError("VUID-vkCmdBuildAccelerationStructuresKHR-dstAccelerationStructure-03800");
+            blas.BuildCmdBuffer(m_commandBuffer->handle());
+            m_errorMonitor->VerifyFound();
+        }
+    }
 
-// Positive build tests
-{
-    m_commandBuffer->begin();
-    auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
-    blas.BuildCmdBuffer(m_commandBuffer->handle(), true);
-    m_commandBuffer->end();
-}
-
-{
-    m_commandBuffer->begin();
-    auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
-    blas.BuildCmdBuffer(m_commandBuffer->handle(), false);
-    m_commandBuffer->end();
-}
-
-m_commandBuffer->begin();
-
-// Invalid info count
-{
-    auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
-    blas.SetInfoCount(0);
-    m_errorMonitor->SetDesiredError("VUID-vkCmdBuildAccelerationStructuresKHR-infoCount-arraylength");
-    m_errorMonitor->SetDesiredError("VUID-vkCmdBuildAccelerationStructuresKHR-infoCount-arraylength");
-    blas.BuildCmdBuffer(m_commandBuffer->handle());
-    m_errorMonitor->VerifyFound();
-}
-
-// Invalid pInfos
-{
-    auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
-    blas.SetNullInfos(true);
-    m_errorMonitor->SetDesiredError("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-parameter");
-    blas.BuildCmdBuffer(m_commandBuffer->handle());
-    m_errorMonitor->VerifyFound();
-}
-
-// Invalid ppBuildRangeInfos
-{
-    auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
-    blas.SetNullBuildRangeInfos(true);
-    m_errorMonitor->SetDesiredError("VUID-vkCmdBuildAccelerationStructuresKHR-ppBuildRangeInfos-parameter");
-    blas.BuildCmdBuffer(m_commandBuffer->handle());
-    m_errorMonitor->VerifyFound();
-}
-
-// must be called outside renderpass
-{
-    InitRenderTarget();
-    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-    auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
-    m_errorMonitor->SetDesiredError("VUID-vkCmdBuildAccelerationStructuresKHR-renderpass");
-    blas.BuildCmdBuffer(m_commandBuffer->handle());
-    m_commandBuffer->EndRenderPass();
-    m_errorMonitor->VerifyFound();
-}
-// Invalid flags
-{
-    auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
-    blas.SetUpdateDstAccelStructSizeBeforeBuild(false);
-    blas.SetFlags(VK_BUILD_ACCELERATION_STRUCTURE_FLAG_BITS_MAX_ENUM_KHR);
-    m_errorMonitor->SetDesiredError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-flags-parameter");
-    m_errorMonitor->SetDesiredError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-flags-parameter");
-    blas.BuildCmdBuffer(m_commandBuffer->handle());
-    m_errorMonitor->VerifyFound();
-}
-
-// Invalid dst buffer
-{
-    auto buffer_ci =
-        vkt::Buffer::create_info(4096, VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-                                           VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR);
-    vkt::Buffer invalid_buffer(*m_device, buffer_ci, vkt::no_mem);
-    auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
-    blas.GetDstAS()->SetDeviceBuffer(std::move(invalid_buffer));
-    m_errorMonitor->SetDesiredError("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03707");
-    blas.BuildCmdBuffer(m_commandBuffer->handle());
-    m_errorMonitor->VerifyFound();
-}
-// Invalid sType
-{
-    auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
-    blas.GetInfo().sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
-    blas.SetUpdateDstAccelStructSizeBeforeBuild(false);
-    m_errorMonitor->SetDesiredError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-sType-sType");
-    m_errorMonitor->SetDesiredError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-sType-sType");
-    blas.BuildCmdBuffer(m_commandBuffer->handle());
-    m_errorMonitor->VerifyFound();
-}
-// Invalid Type
-{
-    auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
-    blas.SetType(VK_ACCELERATION_STRUCTURE_TYPE_GENERIC_KHR);
-    blas.SetUpdateDstAccelStructSizeBeforeBuild(false);
-    m_errorMonitor->SetDesiredError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-type-03654");
-    m_errorMonitor->SetDesiredError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-type-03654");
-    blas.BuildCmdBuffer(m_commandBuffer->handle());
-    m_errorMonitor->VerifyFound();
-
-    blas.SetType(VK_ACCELERATION_STRUCTURE_TYPE_MAX_ENUM_KHR);
-    blas.SetUpdateDstAccelStructSizeBeforeBuild(false);
-    m_errorMonitor->SetDesiredError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-type-parameter");
-    m_errorMonitor->SetDesiredError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-type-parameter");
-    blas.BuildCmdBuffer(m_commandBuffer->handle());
-    m_errorMonitor->VerifyFound();
-}
-// Total number of triangles in all geometries superior to VkPhysicalDeviceAccelerationStructurePropertiesKHR::maxPrimitiveCount
-{
-    constexpr auto primitive_count = vvl::kU32Max;
-    // Check that primitive count is indeed superior to limit
-    if (primitive_count > acc_struct_properties.maxPrimitiveCount) {
+    // Positive build tests
+    {
+        m_commandBuffer->begin();
         auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
-        blas.GetGeometries()[0].SetPrimitiveCount(primitive_count);
-        m_errorMonitor->SetDesiredError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-type-03795");
-        blas.GetSizeInfo();
-        m_errorMonitor->VerifyFound();
+        blas.BuildCmdBuffer(m_commandBuffer->handle(), true);
+        m_commandBuffer->end();
     }
-}
-// Total number of AABBs in all geometries superior to VkPhysicalDeviceAccelerationStructurePropertiesKHR::maxPrimitiveCount
-{
-    constexpr auto primitive_count = vvl::kU32Max;
-    // Check that primitive count is indeed superior to limit
-    if (primitive_count > acc_struct_properties.maxPrimitiveCount) {
-        auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device, vkt::as::GeometryKHR::Type::AABB);
-        blas.GetGeometries()[0].SetPrimitiveCount(primitive_count);
-        m_errorMonitor->SetDesiredError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-type-03794");
-        blas.GetSizeInfo();
-        m_errorMonitor->VerifyFound();
-    }
-}
-// Invalid stride in pGeometry.geometry.aabbs (not a multiple of 8)
-{
-    auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device, vkt::as::GeometryKHR::Type::AABB);
-    blas.GetGeometries()[0].SetStride(1);
-    m_errorMonitor->SetDesiredError("VUID-VkAccelerationStructureGeometryAabbsDataKHR-stride-03545");
-    blas.GetSizeInfo(false);
-    m_errorMonitor->VerifyFound();
-}
-// Invalid stride in ppGeometry.geometry.aabbs (not a multiple of 8)
-{
-    auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device, vkt::as::GeometryKHR::Type::AABB);
-    blas.GetGeometries()[0].SetStride(1);
-    m_errorMonitor->SetDesiredError("VUID-VkAccelerationStructureGeometryAabbsDataKHR-stride-03545");
-    blas.GetSizeInfo(true);
-    m_errorMonitor->VerifyFound();
-}
-// Invalid stride in pGeometry.geometry.aabbs (superior to UINT32_MAX)
-{
-    auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device, vkt::as::GeometryKHR::Type::AABB);
-    blas.GetGeometries()[0].SetStride(8ull * vvl::kU32Max);
-    m_errorMonitor->SetDesiredError("VUID-VkAccelerationStructureGeometryAabbsDataKHR-stride-03820");
-    blas.GetSizeInfo(false);
-    m_errorMonitor->VerifyFound();
-}
-// Invalid stride in ppGeometry.geometry.aabbs (superior to UINT32_MAX)
-{
-    auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device, vkt::as::GeometryKHR::Type::AABB);
-    blas.GetGeometries()[0].SetStride(8ull * vvl::kU32Max);
-    m_errorMonitor->SetDesiredError("VUID-VkAccelerationStructureGeometryAabbsDataKHR-stride-03820");
-    blas.GetSizeInfo(true);
-    m_errorMonitor->VerifyFound();
-}
-// Invalid vertex stride
-{
-    auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
-    blas.GetGeometries()[0].SetStride(VkDeviceSize(vvl::kU32Max) + 1);
-    blas.SetUpdateDstAccelStructSizeBeforeBuild(false);
-    m_errorMonitor->SetDesiredError("VUID-VkAccelerationStructureGeometryTrianglesDataKHR-vertexStride-03819");
-    m_errorMonitor->SetDesiredError("VUID-VkAccelerationStructureGeometryTrianglesDataKHR-vertexStride-03819");
-    blas.BuildCmdBuffer(m_commandBuffer->handle());
-    m_errorMonitor->VerifyFound();
-}
-// Invalid index type
-if (index_type_uint8) {
-    auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
-    blas.GetGeometries()[0].SetTrianglesIndexType(VK_INDEX_TYPE_UINT8_KHR);
-    blas.SetUpdateDstAccelStructSizeBeforeBuild(false);
-    m_errorMonitor->SetDesiredError("VUID-VkAccelerationStructureGeometryTrianglesDataKHR-indexType-03798");
-    m_errorMonitor->SetDesiredError("VUID-VkAccelerationStructureGeometryTrianglesDataKHR-indexType-03798");
-    blas.BuildCmdBuffer(m_commandBuffer->handle());
-    m_errorMonitor->VerifyFound();
-}
-// ppGeometries and pGeometries both valid pointer
-{
-    auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
-    blas.SetUpdateDstAccelStructSizeBeforeBuild(false);
-    std::vector<VkAccelerationStructureGeometryKHR> geometries;
-    for (const auto &geometry : blas.GetGeometries()) {
-        geometries.emplace_back(geometry.GetVkObj());
-    }
-    blas.GetInfo().pGeometries = geometries.data();  // .ppGeometries is set in .BuildCmdBuffer()
-    m_errorMonitor->SetDesiredError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-pGeometries-03788");
-    // computed scratch buffer size will be 0 since vkGetAccelerationStructureBuildSizesKHR fails
-    m_errorMonitor->SetDesiredError("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03802");
-    blas.BuildCmdBuffer(m_commandBuffer->handle());
-    m_errorMonitor->VerifyFound();
-}
-// Buffer is missing VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR usage flag
-{
-    VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
-    alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR;
-    vkt::Buffer bad_usage_buffer(*m_device, 1024, VK_BUFFER_USAGE_RAY_TRACING_BIT_NV | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-                                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &alloc_flags);
-    auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
-    blas.GetGeometries()[0].SetTrianglesDeviceVertexBuffer(std::move(bad_usage_buffer), 3);
-    m_errorMonitor->SetDesiredError("VUID-vkCmdBuildAccelerationStructuresKHR-geometry-03673");
-    blas.BuildCmdBuffer(m_commandBuffer->handle());
-    m_errorMonitor->VerifyFound();
-}
-// Scratch data buffer is missing VK_BUFFER_USAGE_STORAGE_BUFFER_BIT usage flag
-{
-    auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
-    const VkDeviceSize scratch_size =
-        blas.GetSizeInfo().buildScratchSize + acc_struct_properties.minAccelerationStructureScratchOffsetAlignment;
-    VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
-    alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR;
-    auto bad_scratch = std::make_shared<vkt::Buffer>(*m_device, scratch_size, VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-                                                     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &alloc_flags);
-    blas.SetScratchBuffer(std::move(bad_scratch));
-    m_errorMonitor->SetDesiredError("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03674");
-    blas.BuildCmdBuffer(m_commandBuffer->handle());
-    m_errorMonitor->VerifyFound();
-}
-// Scratch data buffer is 0
-{
-    VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
-    alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR;
-    // no VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT => scratch address will be set to 0
-    auto bad_scratch = std::make_shared<vkt::Buffer>(*m_device, 4096, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                                                     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &alloc_flags);
-    auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
-    blas.SetScratchBuffer(std::move(bad_scratch));
-    m_errorMonitor->SetDesiredError("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03802");
-    blas.BuildCmdBuffer(m_commandBuffer->handle());
-    m_errorMonitor->VerifyFound();
-}
 
-m_commandBuffer->end();
+    {
+        m_commandBuffer->begin();
+        auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
+        blas.BuildCmdBuffer(m_commandBuffer->handle(), false);
+        m_commandBuffer->end();
+    }
+
+    m_commandBuffer->begin();
+
+    // Invalid info count
+    {
+        auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
+        blas.SetInfoCount(0);
+        m_errorMonitor->SetDesiredError("VUID-vkCmdBuildAccelerationStructuresKHR-infoCount-arraylength");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdBuildAccelerationStructuresKHR-infoCount-arraylength");
+        blas.BuildCmdBuffer(m_commandBuffer->handle());
+        m_errorMonitor->VerifyFound();
+    }
+
+    // Invalid pInfos
+    {
+        auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
+        blas.SetNullInfos(true);
+        m_errorMonitor->SetDesiredError("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-parameter");
+        blas.BuildCmdBuffer(m_commandBuffer->handle());
+        m_errorMonitor->VerifyFound();
+    }
+
+    // Invalid ppBuildRangeInfos
+    {
+        auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
+        blas.SetNullBuildRangeInfos(true);
+        m_errorMonitor->SetDesiredError("VUID-vkCmdBuildAccelerationStructuresKHR-ppBuildRangeInfos-parameter");
+        blas.BuildCmdBuffer(m_commandBuffer->handle());
+        m_errorMonitor->VerifyFound();
+    }
+
+    // must be called outside renderpass
+    {
+        InitRenderTarget();
+        m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
+        auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
+        m_errorMonitor->SetDesiredError("VUID-vkCmdBuildAccelerationStructuresKHR-renderpass");
+        blas.BuildCmdBuffer(m_commandBuffer->handle());
+        m_commandBuffer->EndRenderPass();
+        m_errorMonitor->VerifyFound();
+    }
+    // Invalid flags
+    {
+        auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
+        blas.SetUpdateDstAccelStructSizeBeforeBuild(false);
+        blas.SetFlags(VK_BUILD_ACCELERATION_STRUCTURE_FLAG_BITS_MAX_ENUM_KHR);
+        m_errorMonitor->SetDesiredError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-flags-parameter");
+        m_errorMonitor->SetDesiredError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-flags-parameter");
+        blas.BuildCmdBuffer(m_commandBuffer->handle());
+        m_errorMonitor->VerifyFound();
+    }
+
+    // Invalid dst buffer
+    {
+        auto buffer_ci =
+            vkt::Buffer::create_info(4096, VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                                               VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR);
+        vkt::Buffer invalid_buffer(*m_device, buffer_ci, vkt::no_mem);
+        auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
+        blas.GetDstAS()->SetDeviceBuffer(std::move(invalid_buffer));
+        m_errorMonitor->SetDesiredError("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03707");
+        blas.BuildCmdBuffer(m_commandBuffer->handle());
+        m_errorMonitor->VerifyFound();
+    }
+    // Invalid sType
+    {
+        auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
+        blas.GetInfo().sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
+        blas.SetUpdateDstAccelStructSizeBeforeBuild(false);
+        m_errorMonitor->SetDesiredError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-sType-sType");
+        m_errorMonitor->SetDesiredError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-sType-sType");
+        blas.BuildCmdBuffer(m_commandBuffer->handle());
+        m_errorMonitor->VerifyFound();
+    }
+    // Invalid Type
+    {
+        auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
+        blas.SetType(VK_ACCELERATION_STRUCTURE_TYPE_GENERIC_KHR);
+        blas.SetUpdateDstAccelStructSizeBeforeBuild(false);
+        m_errorMonitor->SetDesiredError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-type-03654");
+        m_errorMonitor->SetDesiredError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-type-03654");
+        blas.BuildCmdBuffer(m_commandBuffer->handle());
+        m_errorMonitor->VerifyFound();
+
+        blas.SetType(VK_ACCELERATION_STRUCTURE_TYPE_MAX_ENUM_KHR);
+        blas.SetUpdateDstAccelStructSizeBeforeBuild(false);
+        m_errorMonitor->SetDesiredError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-type-parameter");
+        m_errorMonitor->SetDesiredError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-type-parameter");
+        blas.BuildCmdBuffer(m_commandBuffer->handle());
+        m_errorMonitor->VerifyFound();
+    }
+    // Total number of triangles in all geometries superior to VkPhysicalDeviceAccelerationStructurePropertiesKHR::maxPrimitiveCount
+    {
+        constexpr auto primitive_count = vvl::kU32Max;
+        // Check that primitive count is indeed superior to limit
+        if (primitive_count > acc_struct_properties.maxPrimitiveCount) {
+            auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
+            blas.GetGeometries()[0].SetPrimitiveCount(primitive_count);
+            m_errorMonitor->SetDesiredError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-type-03795");
+            blas.GetSizeInfo();
+            m_errorMonitor->VerifyFound();
+        }
+    }
+    // Total number of AABBs in all geometries superior to VkPhysicalDeviceAccelerationStructurePropertiesKHR::maxPrimitiveCount
+    {
+        constexpr auto primitive_count = vvl::kU32Max;
+        // Check that primitive count is indeed superior to limit
+        if (primitive_count > acc_struct_properties.maxPrimitiveCount) {
+            auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device, vkt::as::GeometryKHR::Type::AABB);
+            blas.GetGeometries()[0].SetPrimitiveCount(primitive_count);
+            m_errorMonitor->SetDesiredError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-type-03794");
+            blas.GetSizeInfo();
+            m_errorMonitor->VerifyFound();
+        }
+    }
+    // Invalid stride in pGeometry.geometry.aabbs (not a multiple of 8)
+    {
+        auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device, vkt::as::GeometryKHR::Type::AABB);
+        blas.GetGeometries()[0].SetStride(1);
+        m_errorMonitor->SetDesiredError("VUID-VkAccelerationStructureGeometryAabbsDataKHR-stride-03545");
+        blas.GetSizeInfo(false);
+        m_errorMonitor->VerifyFound();
+    }
+    // Invalid stride in ppGeometry.geometry.aabbs (not a multiple of 8)
+    {
+        auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device, vkt::as::GeometryKHR::Type::AABB);
+        blas.GetGeometries()[0].SetStride(1);
+        m_errorMonitor->SetDesiredError("VUID-VkAccelerationStructureGeometryAabbsDataKHR-stride-03545");
+        blas.GetSizeInfo(true);
+        m_errorMonitor->VerifyFound();
+    }
+    // Invalid stride in pGeometry.geometry.aabbs (superior to UINT32_MAX)
+    {
+        auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device, vkt::as::GeometryKHR::Type::AABB);
+        blas.GetGeometries()[0].SetStride(8ull * vvl::kU32Max);
+        m_errorMonitor->SetDesiredError("VUID-VkAccelerationStructureGeometryAabbsDataKHR-stride-03820");
+        blas.GetSizeInfo(false);
+        m_errorMonitor->VerifyFound();
+    }
+    // Invalid stride in ppGeometry.geometry.aabbs (superior to UINT32_MAX)
+    {
+        auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device, vkt::as::GeometryKHR::Type::AABB);
+        blas.GetGeometries()[0].SetStride(8ull * vvl::kU32Max);
+        m_errorMonitor->SetDesiredError("VUID-VkAccelerationStructureGeometryAabbsDataKHR-stride-03820");
+        blas.GetSizeInfo(true);
+        m_errorMonitor->VerifyFound();
+    }
+    // Invalid vertex stride
+    {
+        auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
+        blas.GetGeometries()[0].SetStride(VkDeviceSize(vvl::kU32Max) + 1);
+        blas.SetUpdateDstAccelStructSizeBeforeBuild(false);
+        m_errorMonitor->SetDesiredError("VUID-VkAccelerationStructureGeometryTrianglesDataKHR-vertexStride-03819");
+        m_errorMonitor->SetDesiredError("VUID-VkAccelerationStructureGeometryTrianglesDataKHR-vertexStride-03819");
+        blas.BuildCmdBuffer(m_commandBuffer->handle());
+        m_errorMonitor->VerifyFound();
+    }
+    // Invalid index type
+    if (index_type_uint8) {
+        auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
+        blas.GetGeometries()[0].SetTrianglesIndexType(VK_INDEX_TYPE_UINT8_KHR);
+        blas.SetUpdateDstAccelStructSizeBeforeBuild(false);
+        m_errorMonitor->SetDesiredError("VUID-VkAccelerationStructureGeometryTrianglesDataKHR-indexType-03798");
+        m_errorMonitor->SetDesiredError("VUID-VkAccelerationStructureGeometryTrianglesDataKHR-indexType-03798");
+        blas.BuildCmdBuffer(m_commandBuffer->handle());
+        m_errorMonitor->VerifyFound();
+    }
+    // ppGeometries and pGeometries both valid pointer
+    {
+        auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
+        blas.SetUpdateDstAccelStructSizeBeforeBuild(false);
+        std::vector<VkAccelerationStructureGeometryKHR> geometries;
+        for (const auto &geometry : blas.GetGeometries()) {
+            geometries.emplace_back(geometry.GetVkObj());
+        }
+        blas.GetInfo().pGeometries = geometries.data();  // .ppGeometries is set in .BuildCmdBuffer()
+        m_errorMonitor->SetDesiredError("VUID-VkAccelerationStructureBuildGeometryInfoKHR-pGeometries-03788");
+        // computed scratch buffer size will be 0 since vkGetAccelerationStructureBuildSizesKHR fails
+        m_errorMonitor->SetDesiredError("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03802");
+        blas.BuildCmdBuffer(m_commandBuffer->handle());
+        m_errorMonitor->VerifyFound();
+    }
+    // Buffer is missing VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR usage flag
+    {
+        VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
+        alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR;
+        vkt::Buffer bad_usage_buffer(*m_device, 1024,
+                                     VK_BUFFER_USAGE_RAY_TRACING_BIT_NV | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+                                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &alloc_flags);
+        auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
+        blas.GetGeometries()[0].SetTrianglesDeviceVertexBuffer(std::move(bad_usage_buffer), 3);
+        m_errorMonitor->SetDesiredError("VUID-vkCmdBuildAccelerationStructuresKHR-geometry-03673");
+        blas.BuildCmdBuffer(m_commandBuffer->handle());
+        m_errorMonitor->VerifyFound();
+    }
+    // Scratch data buffer is missing VK_BUFFER_USAGE_STORAGE_BUFFER_BIT usage flag
+    {
+        auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
+        const VkDeviceSize scratch_size =
+            blas.GetSizeInfo().buildScratchSize + acc_struct_properties.minAccelerationStructureScratchOffsetAlignment;
+        VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
+        alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR;
+        auto bad_scratch = std::make_shared<vkt::Buffer>(*m_device, scratch_size, VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+                                                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &alloc_flags);
+        blas.SetScratchBuffer(std::move(bad_scratch));
+        m_errorMonitor->SetDesiredError("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03674");
+        blas.BuildCmdBuffer(m_commandBuffer->handle());
+        m_errorMonitor->VerifyFound();
+    }
+    // Scratch data buffer is 0
+    {
+        VkMemoryAllocateFlagsInfo alloc_flags = vku::InitStructHelper();
+        alloc_flags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT_KHR;
+        // no VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT => scratch address will be set to 0
+        auto bad_scratch = std::make_shared<vkt::Buffer>(*m_device, 4096, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                                                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &alloc_flags);
+        auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
+        blas.SetScratchBuffer(std::move(bad_scratch));
+        m_errorMonitor->SetDesiredError("VUID-vkCmdBuildAccelerationStructuresKHR-pInfos-03802");
+        blas.BuildCmdBuffer(m_commandBuffer->handle());
+        m_errorMonitor->VerifyFound();
+    }
+
+    m_commandBuffer->end();
 }
 
 TEST_F(NegativeRayTracing, AccelerationStructuresOverlappingMemory) {
@@ -1871,7 +1838,6 @@ TEST_F(NegativeRayTracing, AccelerationStructuresOverlappingMemory) {
     // Test overlapping destination acceleration structures
     {
         VkBufferCreateInfo dst_blas_buffer_ci = vku::InitStructHelper();
-        dst_blas_buffer_ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         dst_blas_buffer_ci.size = 4096;
         dst_blas_buffer_ci.usage = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR |
                                    VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR |
@@ -1901,7 +1867,6 @@ TEST_F(NegativeRayTracing, AccelerationStructuresOverlappingMemory) {
     // Test overlapping source acceleration structure and destination acceleration structures
     {
         VkBufferCreateInfo blas_buffer_ci = vku::InitStructHelper();
-        blas_buffer_ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         blas_buffer_ci.size = 4096;
         blas_buffer_ci.usage = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR |
                                VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
@@ -1976,7 +1941,6 @@ TEST_F(NegativeRayTracing, AccelerationStructuresOverlappingMemory2) {
     // Test overlapping scratch buffers
     {
         VkBufferCreateInfo scratch_buffer_ci = vku::InitStructHelper();
-        scratch_buffer_ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         scratch_buffer_ci.size = alloc_info.allocationSize;
         scratch_buffer_ci.usage = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR |
                                   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
@@ -2035,13 +1999,11 @@ TEST_F(NegativeRayTracing, AccelerationStructuresOverlappingMemory3) {
     // Test overlapping destination acceleration structure and scratch buffer
     {
         VkBufferCreateInfo dst_blas_buffer_ci = vku::InitStructHelper();
-        dst_blas_buffer_ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         dst_blas_buffer_ci.size = 4096;
         dst_blas_buffer_ci.usage = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR |
                                    VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR |
                                    VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
         VkBufferCreateInfo scratch_buffer_ci = vku::InitStructHelper();
-        scratch_buffer_ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         scratch_buffer_ci.size = alloc_info.allocationSize;
         scratch_buffer_ci.usage = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR |
                                   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
@@ -2111,12 +2073,10 @@ TEST_F(NegativeRayTracing, AccelerationStructuresOverlappingMemory4) {
     // Test overlapping source acceleration structure and scratch buffer
     {
         VkBufferCreateInfo blas_buffer_ci = vku::InitStructHelper();
-        blas_buffer_ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         blas_buffer_ci.size = 4096;
         blas_buffer_ci.usage = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR |
                                VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
         VkBufferCreateInfo scratch_buffer_ci = vku::InitStructHelper();
-        scratch_buffer_ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         scratch_buffer_ci.size = alloc_info.allocationSize;
         scratch_buffer_ci.usage = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR |
                                   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
@@ -2366,7 +2326,6 @@ TEST_F(NegativeRayTracing, BuffersAndBufferDeviceAddressesMapping) {
         VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
 
     VkBufferCreateInfo buffer_ci = vku::InitStructHelper();
-    buffer_ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     buffer_ci.size = 4096;
     buffer_ci.usage = good_buffer_usage;
     for (size_t i = 0; i < N; ++i) {
@@ -3347,7 +3306,7 @@ TEST_F(NegativeRayTracing, DynamicRayTracingPipelineStack) {
     RETURN_IF_SKIP(InitState());
 
     vkt::rt::Pipeline pipeline(*this, m_device);
-    pipeline.SetRayGenShader(kRayTracingMinimalGlsl);
+    pipeline.SetGlslRayGenShader(kRayTracingMinimalGlsl);
     pipeline.AddDynamicState(VK_DYNAMIC_STATE_RAY_TRACING_PIPELINE_STACK_SIZE_KHR);
     pipeline.Build();
 
@@ -3357,46 +3316,6 @@ TEST_F(NegativeRayTracing, DynamicRayTracingPipelineStack) {
     vkt::rt::TraceRaysSbt trace_rays_sbt = pipeline.GetTraceRaysSbt();
     vk::CmdTraceRaysKHR(*m_commandBuffer, &trace_rays_sbt.ray_gen_sbt, &trace_rays_sbt.miss_sbt, &trace_rays_sbt.hit_sbt,
                         &trace_rays_sbt.callable_sbt, 1, 1, 1);
-    m_errorMonitor->VerifyFound();
-    m_commandBuffer->end();
-}
-
-TEST_F(NegativeRayTracing, UpdatedFirstVertex) {
-    TEST_DESCRIPTION(
-        "Build a list of destination acceleration structures, then do an update build on that same list but with a different "
-        "VkAccelerationStructureBuildRangeInfoKHR::firstVertex");
-
-    SetTargetApiVersion(VK_API_VERSION_1_1);
-
-    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
-    AddRequiredFeature(vkt::Feature::accelerationStructure);
-    AddRequiredFeature(vkt::Feature::rayQuery);
-    RETURN_IF_SKIP(InitFrameworkForRayTracingTest());
-    RETURN_IF_SKIP(InitState());
-
-    m_commandBuffer->begin();
-    auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
-    blas.AddFlags(VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR);
-
-    blas.BuildCmdBuffer(m_commandBuffer->handle());
-
-    m_commandBuffer->end();
-
-    m_default_queue->Submit(*m_commandBuffer);
-    m_device->Wait();
-
-    m_commandBuffer->begin();
-
-    blas.SetMode(VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR);
-    blas.SetSrcAS(blas.GetDstAS());
-
-    // Create custom build ranges, with the default valid as a template, then somehow supply it?
-    auto build_range_infos = blas.GetDefaultBuildRangeInfos();
-    build_range_infos[0].firstVertex = 666;
-    blas.SetBuildRanges(build_range_infos);
-
-    m_errorMonitor->SetDesiredError("VUID-vkCmdBuildAccelerationStructuresKHR-firstVertex-03770");
-    blas.BuildCmdBuffer(m_commandBuffer->handle());
     m_errorMonitor->VerifyFound();
     m_commandBuffer->end();
 }
@@ -3466,7 +3385,6 @@ TEST_F(NegativeRayTracing, ScratchBufferBadAddressSpaceOpBuild) {
     vkt::DeviceMemory buffer_memory(*m_device, alloc_info);
 
     VkBufferCreateInfo small_buffer_ci = vku::InitStructHelper();
-    small_buffer_ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     small_buffer_ci.size = 64;
     small_buffer_ci.usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
 
@@ -3541,7 +3459,6 @@ TEST_F(NegativeRayTracing, ScratchBufferBadMemory) {
     auto blas = vkt::as::blueprint::BuildGeometryInfoSimpleOnDeviceBottomLevel(*m_device);
 
     VkBufferCreateInfo scratch_buffer_ci = vku::InitStructHelper();
-    scratch_buffer_ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     scratch_buffer_ci.size = blas.GetSizeInfo().buildScratchSize;
     scratch_buffer_ci.usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
 
@@ -3634,17 +3551,19 @@ TEST_F(NegativeRayTracing, PipelineNullMissShader) {
     RETURN_IF_SKIP(InitState());
 
     vkt::rt::Pipeline pipeline(*this, m_device);
-    auto tlas = std::make_shared<vkt::as::BuildGeometryInfoKHR>(
-        vkt::as::blueprint::BuildOnDeviceTopLevel(*m_device, *m_default_queue, *m_commandBuffer));
-    pipeline.AddTopLevelAccelStructBinding(std::move(tlas), 0);
+    pipeline.AddBinding(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0);
+    pipeline.CreateDescriptorSet();
+    vkt::as::BuildGeometryInfoKHR tlas(vkt::as::blueprint::BuildOnDeviceTopLevel(*m_device, *m_default_queue, *m_commandBuffer));
+    pipeline.GetDescriptorSet().WriteDescriptorAccelStruct(0, 1, &tlas.GetDstAS()->handle());
+    pipeline.GetDescriptorSet().UpdateDescriptorSets();
 
     pipeline.AddCreateInfoFlags(VK_PIPELINE_CREATE_RAY_TRACING_NO_NULL_MISS_SHADERS_BIT_KHR);
 
-    pipeline.SetRayGenShader(kRayTracingMinimalGlsl);
+    pipeline.SetGlslRayGenShader(kRayTracingMinimalGlsl);
     pipeline.Build();
     m_commandBuffer->begin();
     vk::CmdBindDescriptorSets(*m_commandBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.GetPipelineLayout(), 0, 1,
-                              &pipeline.GetDescriptorSet()->set_, 0, nullptr);
+                              &pipeline.GetDescriptorSet().set_, 0, nullptr);
     vk::CmdBindPipeline(*m_commandBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.Handle());
     vkt::rt::TraceRaysSbt trace_rays_sbt = pipeline.GetTraceRaysSbt();
     m_errorMonitor->SetDesiredError("VUID-vkCmdTraceRaysKHR-flags-03511");

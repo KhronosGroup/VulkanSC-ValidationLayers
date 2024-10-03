@@ -37,6 +37,7 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/debug_extensions.cpp
     converted/debug_extensions_positive.cpp
     converted/debug_printf.cpp
+    converted/debug_printf_shader_debug_info.cpp
     converted/descriptor_buffer.cpp
     converted/descriptor_buffer_positive.cpp
     converted/descriptor_indexing.cpp
@@ -69,6 +70,7 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/gpu_av_ray_query_positive.cpp
     converted/gpu_av_ray_tracing.cpp
     converted/gpu_av_ray_tracing_positive.cpp
+    converted/gpu_av_shader_debug_info.cpp
     converted/gpu_av_shader_object_positive.cpp
     converted/gpu_av_spirv.cpp
     converted/gpu_av_spirv_positive.cpp
@@ -158,6 +160,10 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/sync_object_positive.cpp
     converted/sync_val.cpp
     converted/sync_val_positive.cpp
+    converted/sync_val_semaphore.cpp
+    converted/sync_val_semaphore_positive.cpp
+    converted/sync_val_wsi.cpp
+    converted/sync_val_wsi_positive.cpp
     converted/threading.cpp
     converted/threading_positive.cpp
     converted/tooling.cpp

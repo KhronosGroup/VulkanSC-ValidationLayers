@@ -17,9 +17,10 @@
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
 #include "../framework/descriptor_helper.h"
-#include "../framework/gpu_av_helper.h"
 
-#include "../layers/gpu_shaders/gpu_shaders_constants.h"
+#include "../layers/gpu/shaders/gpu_shaders_constants.h"
+
+class NegativeGpuAVDescriptorIndexing : public GpuAVDescriptorIndexingTest {};
 
 TEST_F(NegativeGpuAVDescriptorIndexing, DISABLED_ArrayOOBBuffer) {
     TEST_DESCRIPTION(
@@ -126,7 +127,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, DISABLED_ArrayOOBBuffer) {
         buffer0.memory().unmap();
 
         SCOPED_TRACE("Out of Bounds");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-Descriptor index out of bounds");
+        m_errorMonitor->SetDesiredError("UNASSIGNED-Descriptor index out of bounds");
         m_default_queue->Submit(*m_commandBuffer);
         m_default_queue->Wait();
         m_errorMonitor->VerifyFound();
@@ -136,7 +137,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, DISABLED_ArrayOOBBuffer) {
         buffer0.memory().unmap();
 
         SCOPED_TRACE("uninitialized");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDraw-None-08114");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-08114");
         m_default_queue->Submit(*m_commandBuffer);
         m_default_queue->Wait();
         m_errorMonitor->VerifyFound();
@@ -855,7 +856,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBGeom) {
     buffer0.memory().unmap();
 
     SCOPED_TRACE("Out of Bounds");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-Descriptor index out of bounds");
+    m_errorMonitor->SetDesiredError("UNASSIGNED-Descriptor index out of bounds");
     m_default_queue->Submit(*m_commandBuffer);
     m_default_queue->Wait();
     m_errorMonitor->VerifyFound();
@@ -865,7 +866,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBGeom) {
     buffer0.memory().unmap();
 
     SCOPED_TRACE("Uninitialized");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDraw-None-08114");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-08114");
     m_default_queue->Submit(*m_commandBuffer);
     m_default_queue->Wait();
     m_errorMonitor->VerifyFound();
@@ -956,7 +957,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBCompute) {
         data[0] = 5;
         buffer0.memory().unmap();
         // Invalid read
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDispatch-None-08114");
+        m_errorMonitor->SetDesiredError("VUID-vkCmdDispatch-None-08114");
         m_default_queue->Submit(*m_commandBuffer);
         m_default_queue->Wait();
         m_errorMonitor->VerifyFound();
@@ -968,8 +969,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, ArrayOOBCompute) {
         data[0] = 25;
         buffer0.memory().unmap();
         // Invalid read and invalid write
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-Descriptor index out of bounds");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-Descriptor index out of bounds");
+        m_errorMonitor->SetDesiredError("UNASSIGNED-Descriptor index out of bounds", 2);
         m_default_queue->Submit(*m_commandBuffer);
         m_default_queue->Wait();
         m_errorMonitor->VerifyFound();
@@ -1516,7 +1516,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, UpdateAfterBindImageViewTypeMismatch) {
     m_commandBuffer->EndRenderPass();
     m_commandBuffer->end();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDraw-viewType-07752");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-viewType-07752");
     m_default_queue->Submit(*m_commandBuffer);
     m_default_queue->Wait();
     m_errorMonitor->VerifyFound();
@@ -1578,7 +1578,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, DISABLED_BindPipelineAfterBindingDescrip
     m_commandBuffer->EndRenderPass();
     m_commandBuffer->end();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDraw-viewType-07752");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-viewType-07752");
     m_default_queue->Submit(*m_commandBuffer);
     m_default_queue->Wait();
     m_errorMonitor->VerifyFound();
@@ -1698,7 +1698,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, BasicHLSL) {
     vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
     m_commandBuffer->end();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-Descriptor index out of bounds");
+    m_errorMonitor->SetDesiredError("UNASSIGNED-Descriptor index out of bounds");
     m_default_queue->Submit(*m_commandBuffer);
     m_default_queue->Wait();
     m_errorMonitor->VerifyFound();
@@ -1821,7 +1821,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, BasicHLSLRuntimeArray) {
     vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
     m_commandBuffer->end();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDispatch-None-08114");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDispatch-None-08114");
     m_default_queue->Submit(*m_commandBuffer);
     m_default_queue->Wait();
     m_errorMonitor->VerifyFound();
@@ -1879,7 +1879,7 @@ TEST_F(NegativeGpuAVDescriptorIndexing, PushConstant) {
     vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
     m_commandBuffer->end();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "UNASSIGNED-Descriptor index out of bounds");
+    m_errorMonitor->SetDesiredError("UNASSIGNED-Descriptor index out of bounds");
     m_default_queue->Submit(*m_commandBuffer);
     m_default_queue->Wait();
     m_errorMonitor->VerifyFound();
@@ -1947,8 +1947,8 @@ TEST_F(NegativeGpuAVDescriptorIndexing, MultipleIndexes) {
     vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
     m_commandBuffer->end();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "(set = 0, binding = 1) Index of 3 used to index descriptor array of length 2");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "(set = 0, binding = 1) Index of 5 used to index descriptor array of length 2");
+    m_errorMonitor->SetDesiredError("(set = 0, binding = 1) Index of 3 used to index descriptor array of length 2");
+    m_errorMonitor->SetDesiredError("(set = 0, binding = 1) Index of 5 used to index descriptor array of length 2");
     m_default_queue->Submit(*m_commandBuffer);
     m_default_queue->Wait();
     m_errorMonitor->VerifyFound();
@@ -2366,6 +2366,144 @@ TEST_F(NegativeGpuAVDescriptorIndexing, MultipleOOBTypesInOneCmdBuffer) {
         kErrorBit, "vkCmdDispatch():  (set = 0, binding = 1) Index of 24 used to index descriptor array of length 6");
     m_default_queue->Submit(*m_commandBuffer);
 
+    m_default_queue->Wait();
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeGpuAVDescriptorIndexing, MixingProtectedResources) {
+    TEST_DESCRIPTION("Have protected resources that is found in the GPU-AV post processing");
+    AddRequiredFeature(vkt::Feature::protectedMemory);
+    RETURN_IF_SKIP(InitGpuVUDescriptorIndexing());
+    VkPhysicalDeviceProtectedMemoryProperties protected_memory_properties = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(protected_memory_properties);
+    if (protected_memory_properties.protectedNoFault) {
+        GTEST_SKIP() << "protectedNoFault is supported";
+    }
+
+    VkImageCreateInfo image_create_info =
+        vkt::Image::ImageCreateInfo2D(64, 64, 1, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    image_create_info.flags = VK_IMAGE_CREATE_PROTECTED_BIT;
+    vkt::Image image_protected(*m_device, image_create_info, vkt::no_mem);
+
+    VkMemoryRequirements mem_reqs_image_protected;
+    vk::GetImageMemoryRequirements(device(), image_protected.handle(), &mem_reqs_image_protected);
+
+    VkMemoryAllocateInfo alloc_info = vku::InitStructHelper();
+    alloc_info.allocationSize = mem_reqs_image_protected.size;
+    if (!m_device->phy().set_memory_type(mem_reqs_image_protected.memoryTypeBits, &alloc_info, VK_MEMORY_PROPERTY_PROTECTED_BIT)) {
+        GTEST_SKIP() << "Memory type not found";
+    }
+    vkt::DeviceMemory memory_image_protected(*m_device, alloc_info);
+    vk::BindImageMemory(device(), image_protected.handle(), memory_image_protected.handle(), 0);
+    image_protected.SetLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    vkt::ImageView image_view_protected = image_protected.CreateView();
+
+    VkMemoryPropertyFlags mem_props = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+    vkt::Buffer buffer(*m_device, 32, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, mem_props);
+    uint32_t *data = (uint32_t *)buffer.memory().map();
+    data[0] = 1;  // access protected
+    buffer.memory().unmap();
+
+    OneOffDescriptorSet descriptor_set(m_device,
+                                       {
+                                           {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
+                                           {1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2, VK_SHADER_STAGE_ALL, nullptr},
+                                       });
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
+
+    vkt::Image image(*m_device, 16, 16, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
+    image.SetLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    vkt::ImageView image_view = image.CreateView();
+    vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
+
+    descriptor_set.WriteDescriptorBufferInfo(0, buffer.handle(), 0, sizeof(uint32_t));
+    descriptor_set.WriteDescriptorImageInfo(1, image_view, sampler.handle(), VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0);
+    descriptor_set.WriteDescriptorImageInfo(1, image_view_protected, sampler.handle(), VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 1);
+    descriptor_set.UpdateDescriptorSets();
+
+    char const *cs_source = R"glsl(
+        #version 450
+        #extension GL_EXT_nonuniform_qualifier : enable
+
+        layout(set = 0, binding = 0) uniform Input {
+            uint index;
+        } in_buffer;
+
+        // [0] non-protected
+        // [1] protected
+        layout(set = 0, binding = 1) uniform sampler2D tex[];
+
+        void main() {
+           vec4 result = texture(tex[in_buffer.index], vec2(0, 0));
+        }
+    )glsl";
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cs_ = std::make_unique<VkShaderObj>(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2);
+    pipe.cp_ci_.layout = pipeline_layout.handle();
+    pipe.CreateComputePipeline();
+
+    m_commandBuffer->begin();
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout.handle(), 0, 1,
+                              &descriptor_set.set_, 0, nullptr);
+    vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
+    m_commandBuffer->end();
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-commandBuffer-02707");
+    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Wait();
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeGpuAVDescriptorIndexing, PartialBoundDescriptorSSBO) {
+    TEST_DESCRIPTION("Only bound part of a SSBO (with update after bind), and use the part that is not valid");
+    RETURN_IF_SKIP(InitGpuVUDescriptorIndexing());
+
+    char const *shader_source = R"glsl(
+        #version 450
+        layout(set = 0, binding = 0) buffer foo {
+            vec4 a; // offset 0
+            vec4 b; // offset 16
+            vec4 c; // offset 32 - not bound, can't use
+            vec4 d; // offset 48 - not bound, can't use
+        };
+        void main() {
+            a = c;
+        }
+    )glsl";
+
+    VkDescriptorBindingFlags binding_flags = VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT;
+    VkDescriptorSetLayoutBindingFlagsCreateInfo flags_create_info = vku::InitStructHelper();
+    flags_create_info.bindingCount = 1;
+    flags_create_info.pBindingFlags = &binding_flags;
+
+    OneOffDescriptorSet descriptor_set(m_device, {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}},
+                                       VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT_EXT, &flags_create_info,
+                                       VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT_EXT);
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cp_ci_.layout = pipeline_layout.handle();
+    pipe.cs_ = std::make_unique<VkShaderObj>(this, shader_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+    pipe.CreateComputePipeline();
+
+    m_commandBuffer->begin();
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout.handle(), 0, 1,
+                              &descriptor_set.set_, 0, nullptr);
+    vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
+    m_commandBuffer->end();
+
+    vkt::Buffer buffer(*m_device, 32, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    descriptor_set.WriteDescriptorBufferInfo(0, buffer.handle(), 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    descriptor_set.UpdateDescriptorSets();
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDispatch-storageBuffers-06936");
+    m_default_queue->Submit(*m_commandBuffer);
     m_default_queue->Wait();
     m_errorMonitor->VerifyFound();
 }

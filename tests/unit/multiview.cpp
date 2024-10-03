@@ -13,11 +13,13 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "utils/cast_utils.h"
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
 #include "../framework/descriptor_helper.h"
 #include "../framework/render_pass_helper.h"
+#include "utils/convert_utils.h"
+
+class NegativeMultiview : public VkLayerTest {};
 
 TEST_F(NegativeMultiview, MaxInstanceIndex) {
     TEST_DESCRIPTION("Verify if instance index in CmdDraw is greater than maxMultiviewInstanceIndex.");
@@ -371,23 +373,10 @@ TEST_F(NegativeMultiview, UnboundResourcesAfterBeginRenderPassAndNextSubpass) {
 
     // Descriptor sets
     {
+        vkt::Buffer buffer(*m_device, 8, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
         OneOffDescriptorSet descriptor_set{m_device, {{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}}};
-
-        VkBufferCreateInfo bci = vku::InitStructHelper();
-        bci.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-        bci.size = 8;
-        vkt::Buffer buffer(*m_device, bci);
-        VkDescriptorBufferInfo buffer_info;
-        buffer_info.buffer = buffer.handle();
-        buffer_info.offset = 0;
-        buffer_info.range = VK_WHOLE_SIZE;
-        VkWriteDescriptorSet descriptor_write = vku::InitStructHelper();
-        descriptor_write.dstSet = descriptor_set.set_;
-        descriptor_write.dstBinding = 0;
-        descriptor_write.descriptorCount = 1;
-        descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        descriptor_write.pBufferInfo = &buffer_info;
-        vk::UpdateDescriptorSets(device(), 1, &descriptor_write, 0, NULL);
+        descriptor_set.WriteDescriptorBufferInfo(0, buffer.handle(), 0, VK_WHOLE_SIZE);
+        descriptor_set.UpdateDescriptorSets();
 
         VkPipelineLayoutCreateInfo pipeline_layout_info = vku::InitStructHelper();
         pipeline_layout_info.setLayoutCount = 1;
@@ -891,19 +880,9 @@ TEST_F(NegativeMultiview, DrawWithPipelineIncompatibleWithRenderPass) {
         rp2[2].init(*m_device, rpci2);
     }
 
-    // Create image view
     auto ici2d = vkt::Image::ImageCreateInfo2D(128, 128, 1, 2, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     vkt::Image image(*m_device, ici2d);
-    ASSERT_TRUE(image.initialized());
-
-    VkImageViewCreateInfo ivci = vku::InitStructHelper();
-    ivci.image = image.handle();
-    ivci.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
-    ivci.format = VK_FORMAT_B8G8R8A8_UNORM;
-    ivci.components = {VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
-                       VK_COMPONENT_SWIZZLE_IDENTITY};
-    ivci.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 2};
-    vkt::ImageView iv(*m_device, ivci);
+    vkt::ImageView iv = image.CreateView(VK_IMAGE_VIEW_TYPE_2D_ARRAY, 0, 1, 0, 2);
 
     // Create framebuffers for rp[0] and rp2[0]
     VkFramebufferCreateInfo fbci = vku::InitStructHelper();

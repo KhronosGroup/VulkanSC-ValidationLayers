@@ -1047,6 +1047,28 @@ bool Contains(const Container &container, const Key &key) {
     return container.find(key) != container.cend();
 }
 
+//
+// if (vvl::Contains(objects_vector, candidate)) { candidate->jump(); }
+//
+template <typename T>
+bool Contains(const std::vector<T> &v, const T &value) {
+    return std::find(v.cbegin(), v.cend(), value) != v.cend();
+}
+
+//
+// if (auto* thing = vvl::Find(map, key)) { thing->jump(); }
+//
+template <typename Container, typename Key = typename Container::key_type, typename Value = typename Container::mapped_type>
+Value *Find(Container &container, const Key &key) {
+    auto it = container.find(key);
+    return (it != container.end()) ? &it->second : nullptr;
+}
+template <typename Container, typename Key = typename Container::key_type, typename Value = typename Container::mapped_type>
+const Value *Find(const Container &container, const Key &key) {
+    auto it = container.find(key);
+    return (it != container.cend()) ? &it->second : nullptr;
+}
+
 // EraseIf is not implemented as std::erase(std::remove_if(...), ...) for two reasons:
 //   1) Robin Hood containers don't support two-argument erase functions
 //   2) STL remove_if requires the predicate to be const w.r.t the value-type, and std::erase_if doesn't AFAICT
@@ -1082,6 +1104,10 @@ constexpr auto kU64Max = std::numeric_limits<uint64_t>::max();
 constexpr auto kI32Max = std::numeric_limits<int32_t>::max();
 // Typesafe INT64_MAX
 constexpr auto kI64Max = std::numeric_limits<int64_t>::max();
+
+// Descriptive names to indicate uninitialized/invalid unsigned index values
+constexpr auto kNoIndex32 = kU32Max;
+constexpr auto kNoIndex64 = kU64Max;
 
 template <typename T>
 T GetQuotientCeil(T numerator, T denominator) {

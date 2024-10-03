@@ -16,11 +16,12 @@
  */
 
 #include "utils/cast_utils.h"
-#include "generated/enum_flag_bits.h"
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
 #include "../framework/descriptor_helper.h"
 #include "utils/vk_layer_utils.h"
+
+class NegativeImage : public ImageTest {};
 
 TEST_F(NegativeImage, UsageBits) {
     TEST_DESCRIPTION(
@@ -128,14 +129,8 @@ TEST_F(NegativeImage, SampleCounts) {
     image_create_info.flags = 0;
 
     VkImageBlit blit_region = {};
-    blit_region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    blit_region.srcSubresource.baseArrayLayer = 0;
-    blit_region.srcSubresource.layerCount = 1;
-    blit_region.srcSubresource.mipLevel = 0;
-    blit_region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    blit_region.dstSubresource.baseArrayLayer = 0;
-    blit_region.dstSubresource.layerCount = 1;
-    blit_region.dstSubresource.mipLevel = 0;
+    blit_region.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    blit_region.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
     blit_region.srcOffsets[0] = {0, 0, 0};
     blit_region.srcOffsets[1] = {256, 256, 1};
     blit_region.dstOffsets[0] = {0, 0, 0};
@@ -269,14 +264,8 @@ TEST_F(NegativeImage, BlitFormatTypes) {
     depth_image2.SetLayout(VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_GENERAL);
 
     VkImageBlit blitRegion = {};
-    blitRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    blitRegion.srcSubresource.baseArrayLayer = 0;
-    blitRegion.srcSubresource.layerCount = 1;
-    blitRegion.srcSubresource.mipLevel = 0;
-    blitRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    blitRegion.dstSubresource.baseArrayLayer = 0;
-    blitRegion.dstSubresource.layerCount = 1;
-    blitRegion.dstSubresource.mipLevel = 0;
+    blitRegion.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    blitRegion.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
     blitRegion.srcOffsets[0] = {0, 0, 0};
     blitRegion.srcOffsets[1] = {64, 64, 1};
     blitRegion.dstOffsets[0] = {0, 0, 0};
@@ -459,18 +448,11 @@ TEST_F(NegativeImage, BlitFilters) {
     ci.samples = VK_SAMPLE_COUNT_1_BIT;
     ci.tiling = VK_IMAGE_TILING_OPTIMAL;
     ci.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-    ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     vkt::Image src3D(*m_device, ci, vkt::set_layout);
 
     VkImageBlit blitRegion = {};
-    blitRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    blitRegion.srcSubresource.baseArrayLayer = 0;
-    blitRegion.srcSubresource.layerCount = 1;
-    blitRegion.srcSubresource.mipLevel = 0;
-    blitRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    blitRegion.dstSubresource.baseArrayLayer = 0;
-    blitRegion.dstSubresource.layerCount = 1;
-    blitRegion.dstSubresource.mipLevel = 0;
+    blitRegion.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    blitRegion.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
     blitRegion.srcOffsets[0] = {0, 0, 0};
     blitRegion.srcOffsets[1] = {48, 48, 1};
     blitRegion.dstOffsets[0] = {0, 0, 0};
@@ -523,14 +505,8 @@ TEST_F(NegativeImage, BlitLayout) {
     img_color.SetLayout(VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
     VkImageBlit blit_region = {};
-    blit_region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    blit_region.srcSubresource.baseArrayLayer = 0;
-    blit_region.srcSubresource.layerCount = 1;
-    blit_region.srcSubresource.mipLevel = 0;
-    blit_region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    blit_region.dstSubresource.baseArrayLayer = 0;
-    blit_region.dstSubresource.layerCount = 1;
-    blit_region.dstSubresource.mipLevel = 0;
+    blit_region.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    blit_region.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
     blit_region.srcOffsets[0] = {0, 0, 0};
     blit_region.srcOffsets[1] = {32, 32, 1};
     blit_region.dstOffsets[0] = {32, 32, 0};
@@ -654,10 +630,6 @@ TEST_F(NegativeImage, BlitOffsets) {
     ci.samples = VK_SAMPLE_COUNT_1_BIT;
     ci.tiling = VK_IMAGE_TILING_OPTIMAL;
     ci.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-    ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    ci.queueFamilyIndexCount = 0;
-    ci.pQueueFamilyIndices = NULL;
-    ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     vkt::Image image_1D(*m_device, ci, vkt::set_layout);
 
     ci.imageType = VK_IMAGE_TYPE_2D;
@@ -669,14 +641,8 @@ TEST_F(NegativeImage, BlitOffsets) {
     vkt::Image image_3D(*m_device, ci, vkt::set_layout);
 
     VkImageBlit blit_region = {};
-    blit_region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    blit_region.srcSubresource.baseArrayLayer = 0;
-    blit_region.srcSubresource.layerCount = 1;
-    blit_region.srcSubresource.mipLevel = 0;
-    blit_region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    blit_region.dstSubresource.baseArrayLayer = 0;
-    blit_region.dstSubresource.layerCount = 1;
-    blit_region.dstSubresource.mipLevel = 0;
+    blit_region.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    blit_region.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
 
     m_commandBuffer->begin();
 
@@ -790,21 +756,11 @@ TEST_F(NegativeImage, BlitOverlap) {
     ci.samples = VK_SAMPLE_COUNT_1_BIT;
     ci.tiling = VK_IMAGE_TILING_OPTIMAL;
     ci.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-    ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    ci.queueFamilyIndexCount = 0;
-    ci.pQueueFamilyIndices = nullptr;
-    ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     vkt::Image image_2D(*m_device, ci, vkt::set_layout);
 
     VkImageBlit blit_region = {};
-    blit_region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    blit_region.srcSubresource.baseArrayLayer = 0;
-    blit_region.srcSubresource.layerCount = 1;
-    blit_region.srcSubresource.mipLevel = 0;
-    blit_region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    blit_region.dstSubresource.baseArrayLayer = 0;
-    blit_region.dstSubresource.layerCount = 1;
-    blit_region.dstSubresource.mipLevel = 0;
+    blit_region.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    blit_region.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
 
     m_commandBuffer->begin();
 
@@ -840,10 +796,6 @@ TEST_F(NegativeImage, MiscBlitTests) {
     ci.samples = VK_SAMPLE_COUNT_1_BIT;
     ci.tiling = VK_IMAGE_TILING_OPTIMAL;
     ci.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-    ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    ci.queueFamilyIndexCount = 0;
-    ci.pQueueFamilyIndices = NULL;
-    ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
     // 2D color image
     vkt::Image color_img(*m_device, ci, vkt::set_layout);
@@ -859,14 +811,8 @@ TEST_F(NegativeImage, MiscBlitTests) {
     vkt::Image color_3D_img(*m_device, ci, vkt::set_layout);
 
     VkImageBlit blitRegion = {};
-    blitRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    blitRegion.srcSubresource.baseArrayLayer = 0;
-    blitRegion.srcSubresource.layerCount = 1;
-    blitRegion.srcSubresource.mipLevel = 0;
-    blitRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    blitRegion.dstSubresource.baseArrayLayer = 0;
-    blitRegion.dstSubresource.layerCount = 1;
-    blitRegion.dstSubresource.mipLevel = 0;
+    blitRegion.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    blitRegion.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
     blitRegion.srcOffsets[0] = {0, 0, 0};
     blitRegion.srcOffsets[1] = {16, 16, 1};
     blitRegion.dstOffsets[0] = {32, 32, 0};
@@ -1022,23 +968,13 @@ TEST_F(NegativeImage, BlitToDepth) {
     ci.samples = VK_SAMPLE_COUNT_1_BIT;
     ci.tiling = VK_IMAGE_TILING_OPTIMAL;
     ci.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-    ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    ci.queueFamilyIndexCount = 0;
-    ci.pQueueFamilyIndices = NULL;
-    ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
     // 2D depth image
     vkt::Image depth_img(*m_device, ci, vkt::set_layout);
 
     VkImageBlit blitRegion = {};
-    blitRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    blitRegion.srcSubresource.baseArrayLayer = 0;
-    blitRegion.srcSubresource.layerCount = 1;
-    blitRegion.srcSubresource.mipLevel = 0;
-    blitRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    blitRegion.dstSubresource.baseArrayLayer = 0;
-    blitRegion.dstSubresource.layerCount = 1;
-    blitRegion.dstSubresource.mipLevel = 0;
+    blitRegion.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    blitRegion.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
     blitRegion.srcOffsets[0] = {0, 0, 0};
     blitRegion.srcOffsets[1] = {16, 16, 1};
     blitRegion.dstOffsets[0] = {32, 32, 0};
@@ -1777,10 +1713,6 @@ TEST_F(NegativeImage, ImageViewNoSeparateStencilUsage) {
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
     image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_create_info.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
-    image_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    image_create_info.queueFamilyIndexCount = 0;
-    image_create_info.pQueueFamilyIndices = nullptr;
-    image_create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
     VkImageViewCreateInfo image_view_create_info = vku::InitStructHelper();
     image_view_create_info.flags = 0;
@@ -1826,10 +1758,6 @@ TEST_F(NegativeImage, ImageViewStencilUsageCreateInfo) {
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
     image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_create_info.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
-    image_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    image_create_info.queueFamilyIndexCount = 0;
-    image_create_info.pQueueFamilyIndices = nullptr;
-    image_create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
     VkImageViewCreateInfo image_view_create_info = vku::InitStructHelper();
     image_view_create_info.flags = 0;
@@ -2695,8 +2623,6 @@ TEST_F(NegativeImage, ImageViewLayerCount) {
     image_ci.mipLevels = 1;
     image_ci.arrayLayers = 1;
     image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
-    image_ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    image_ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
     image_ci.imageType = VK_IMAGE_TYPE_1D;
     vkt::Image image_1d(*m_device, image_ci, vkt::set_layout);
@@ -3198,11 +3124,7 @@ TEST_F(NegativeImage, CornerSampledImageNV) {
     image_create_info.arrayLayers = 1;
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
     image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    image_create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     image_create_info.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-    image_create_info.queueFamilyIndexCount = 0;
-    image_create_info.pQueueFamilyIndices = NULL;
-    image_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     image_create_info.flags = VK_IMAGE_CREATE_CORNER_SAMPLED_BIT_NV;
 
     // image type must be 2D or 3D
@@ -3265,11 +3187,6 @@ TEST_F(NegativeImage, Stencil) {
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
     image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_create_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-    image_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    image_create_info.queueFamilyIndexCount = 0;
-    image_create_info.pQueueFamilyIndices = nullptr;
-    image_create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-
     VkImageStencilUsageCreateInfoEXT image_stencil_create_info = vku::InitStructHelper();
     image_stencil_create_info.stencilUsage = VK_IMAGE_USAGE_STORAGE_BIT;
 
@@ -3765,9 +3682,6 @@ TEST_F(NegativeImage, DISABLED_ImageSplitInstanceBindRegionCount) {
     image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_create_info.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
     image_create_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-    image_create_info.queueFamilyIndexCount = 0;
-    image_create_info.pQueueFamilyIndices = NULL;
-    image_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     vkt::Image image(*m_device, image_create_info, vkt::no_mem);
 
     vkt::DeviceMemory image_mem;
@@ -3852,9 +3766,6 @@ TEST_F(NegativeImage, ImageSplitInstanceBindRegionCountWithDeviceGroup) {
     image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_create_info.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
     image_create_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-    image_create_info.queueFamilyIndexCount = 0;
-    image_create_info.pQueueFamilyIndices = NULL;
-    image_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     vkt::Image image(*m_device, image_create_info, vkt::no_mem);
 
     VkMemoryRequirements mem_reqs;
@@ -3904,11 +3815,7 @@ TEST_F(NegativeImage, BlockTexelViewLevelOrLayerCount) {
     image_create_info.arrayLayers = 2;
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
     image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    image_create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     image_create_info.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
-    image_create_info.queueFamilyIndexCount = 0;
-    image_create_info.pQueueFamilyIndices = NULL;
-    image_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
     VkFormatProperties image_fmt;
     vk::GetPhysicalDeviceFormatProperties(m_device->phy().handle(), image_create_info.format, &image_fmt);
@@ -3925,9 +3832,11 @@ TEST_F(NegativeImage, BlockTexelViewLevelOrLayerCount) {
     ivci.subresourceRange.baseArrayLayer = 0;
     ivci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 
-    // Test for error message
     ivci.subresourceRange.layerCount = 1;
     ivci.subresourceRange.levelCount = 4;
+    CreateImageViewTest(*this, &ivci, "VUID-VkImageViewCreateInfo-image-07072");
+
+    ivci.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
     CreateImageViewTest(*this, &ivci, "VUID-VkImageViewCreateInfo-image-07072");
 
     // Test for error message
@@ -4086,11 +3995,7 @@ TEST_F(NegativeImage, BlockTexelViewType) {
     image_create_info.arrayLayers = 1;
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
     image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    image_create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     image_create_info.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
-    image_create_info.queueFamilyIndexCount = 0;
-    image_create_info.pQueueFamilyIndices = NULL;
-    image_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
     VkFormatProperties image_fmt;
     vk::GetPhysicalDeviceFormatProperties(m_device->phy().handle(), image_create_info.format, &image_fmt);
@@ -4129,11 +4034,7 @@ TEST_F(NegativeImage, BlockTexelViewFormat) {
     image_create_info.arrayLayers = 1;
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
     image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    image_create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     image_create_info.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
-    image_create_info.queueFamilyIndexCount = 0;
-    image_create_info.pQueueFamilyIndices = NULL;
-    image_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
     VkFormatProperties image_fmt;
     vk::GetPhysicalDeviceFormatProperties(m_device->phy().handle(), image_create_info.format, &image_fmt);
@@ -4192,11 +4093,7 @@ TEST_F(NegativeImage, ImageSubresourceRangeAspectMask) {
     image_create_info.arrayLayers = 1;
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
     image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    image_create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     image_create_info.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
-    image_create_info.queueFamilyIndexCount = 0;
-    image_create_info.pQueueFamilyIndices = NULL;
-    image_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     vkt::Image image(*m_device, image_create_info, vkt::set_layout);
 
     VkSamplerYcbcrConversionCreateInfo ycbcr_create_info = vku::InitStructHelper();
@@ -4363,7 +4260,6 @@ TEST_F(NegativeImage, Image2DViewOf3D) {
     image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
     image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_ci.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
-    image_ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     image_ci.flags = VK_IMAGE_CREATE_2D_ARRAY_COMPATIBLE_BIT;
     vkt::Image image_3d(*m_device, image_ci, vkt::set_layout);
 
@@ -4430,7 +4326,6 @@ TEST_F(NegativeImage, Image2DViewOf3DFeature) {
     image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
     image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_ci.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
-    image_ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     image_ci.flags = VK_IMAGE_CREATE_2D_VIEW_COMPATIBLE_BIT_EXT;
     vkt::Image image_3d(*m_device, image_ci, vkt::set_layout);
 
@@ -4927,8 +4822,6 @@ TEST_F(NegativeImage, SlicedDeviceFeature) {
     ci.samples = VK_SAMPLE_COUNT_1_BIT;
     ci.tiling = VK_IMAGE_TILING_OPTIMAL;
     ci.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     vkt::Image image(*m_device, ci, vkt::set_layout);
 
     VkImageViewSlicedCreateInfoEXT sliced_info = vku::InitStructHelper();
@@ -4966,8 +4859,6 @@ TEST_F(NegativeImage, SlicedImageType) {
     ci.samples = VK_SAMPLE_COUNT_1_BIT;
     ci.tiling = VK_IMAGE_TILING_OPTIMAL;
     ci.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     vkt::Image image(*m_device, ci, vkt::set_layout);
 
     VkImageViewSlicedCreateInfoEXT sliced_info = vku::InitStructHelper();
@@ -5006,8 +4897,6 @@ TEST_F(NegativeImage, SlicedMipLevel) {
     ci.samples = VK_SAMPLE_COUNT_1_BIT;
     ci.tiling = VK_IMAGE_TILING_OPTIMAL;
     ci.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     vkt::Image image(*m_device, ci, vkt::set_layout);
 
     VkImageViewSlicedCreateInfoEXT sliced_info = vku::InitStructHelper();
@@ -5021,12 +4910,9 @@ TEST_F(NegativeImage, SlicedMipLevel) {
     ivci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     ivci.subresourceRange.layerCount = 1;
 
-    auto get_effective_mip_levels = [&]() -> uint32_t { return ResolveRemainingLevels(ci, ivci.subresourceRange); };
-
     {
         ivci.subresourceRange.baseMipLevel = 0;
         ivci.subresourceRange.levelCount = 4;
-        ASSERT_TRUE(get_effective_mip_levels() == 4);
 
         m_errorMonitor->SetDesiredError("VUID-VkImageViewSlicedCreateInfoEXT-None-07870");
         vkt::ImageView image_view(*m_device, ivci);
@@ -5036,7 +4922,6 @@ TEST_F(NegativeImage, SlicedMipLevel) {
     {
         ivci.subresourceRange.baseMipLevel = 0;
         ivci.subresourceRange.levelCount = 2;
-        ASSERT_TRUE(get_effective_mip_levels() == 2);
 
         m_errorMonitor->SetDesiredError("VUID-VkImageViewSlicedCreateInfoEXT-None-07870");
         vkt::ImageView image_view(*m_device, ivci);
@@ -5046,7 +4931,6 @@ TEST_F(NegativeImage, SlicedMipLevel) {
     {
         ivci.subresourceRange.baseMipLevel = 1;
         ivci.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
-        ASSERT_TRUE(get_effective_mip_levels() == 5);
 
         m_errorMonitor->SetDesiredError("VUID-VkImageViewSlicedCreateInfoEXT-None-07870");
         vkt::ImageView image_view(*m_device, ivci);
@@ -5056,7 +4940,6 @@ TEST_F(NegativeImage, SlicedMipLevel) {
     {
         ivci.subresourceRange.baseMipLevel = 3;
         ivci.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
-        ASSERT_TRUE(get_effective_mip_levels() == 3);
 
         m_errorMonitor->SetDesiredError("VUID-VkImageViewSlicedCreateInfoEXT-None-07870");
         vkt::ImageView image_view(*m_device, ivci);
@@ -5081,8 +4964,6 @@ TEST_F(NegativeImage, SlicedUsage) {
     ci.samples = VK_SAMPLE_COUNT_1_BIT;
     ci.tiling = VK_IMAGE_TILING_OPTIMAL;
     ci.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     vkt::Image image(*m_device, ci, vkt::set_layout);
 
     VkImageViewSlicedCreateInfoEXT sliced_info = vku::InitStructHelper();
@@ -5496,14 +5377,8 @@ TEST_F(NegativeImage, BlitColorToDepth) {
     }
 
     VkImageBlit region;
-    region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    region.srcSubresource.baseArrayLayer = 0;
-    region.srcSubresource.layerCount = 1;
-    region.srcSubresource.mipLevel = 0;
-    region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-    region.dstSubresource.baseArrayLayer = 0;
-    region.dstSubresource.layerCount = 1;
-    region.dstSubresource.mipLevel = 0;
+    region.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    region.dstSubresource = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 0, 1};
     region.srcOffsets[0] = {0, 0, 0};
     region.srcOffsets[1] = {32, 32, 1};
     region.dstOffsets[0] = {0, 0, 0};
@@ -5627,5 +5502,127 @@ TEST_F(NegativeImage, IncompatibleArrayAndSparseFlags) {
     VkImage image;
     m_errorMonitor->SetDesiredError("VUID-VkImageCreateInfo-flags-09403");
     vk::CreateImage(*m_device, &create_info, nullptr, &image);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeImage, ImageAlignmentControlFeature) {
+    AddRequiredExtensions(VK_MESA_IMAGE_ALIGNMENT_CONTROL_EXTENSION_NAME);
+    RETURN_IF_SKIP(Init());
+
+    VkImageAlignmentControlCreateInfoMESA alignment_control = vku::InitStructHelper();
+    alignment_control.maximumRequestedAlignment = 1;
+
+    VkImageCreateInfo image_create_info = DefaultImageInfo();
+    image_create_info.pNext = &alignment_control;
+
+    VkImage image;
+    m_errorMonitor->SetDesiredError("VUID-VkImageAlignmentControlCreateInfoMESA-imageAlignmentControl-09657");
+    m_errorMonitor->SetUnexpectedError("VUID-VkImageAlignmentControlCreateInfoMESA-maximumRequestedAlignment-09656");
+    vk::CreateImage(*m_device, &image_create_info, nullptr, &image);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeImage, ImageAlignmentControlPowerOfTwo) {
+    AddRequiredExtensions(VK_MESA_IMAGE_ALIGNMENT_CONTROL_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::imageAlignmentControl);
+    RETURN_IF_SKIP(Init());
+
+    VkImageAlignmentControlCreateInfoMESA alignment_control = vku::InitStructHelper();
+    alignment_control.maximumRequestedAlignment = 3;  // non-power of 2
+
+    VkImageCreateInfo image_create_info = DefaultImageInfo();
+    image_create_info.pNext = &alignment_control;
+
+    VkImage image;
+    m_errorMonitor->SetDesiredError("VUID-VkImageAlignmentControlCreateInfoMESA-maximumRequestedAlignment-09655");
+    // incase not supported
+    m_errorMonitor->SetUnexpectedError("VUID-VkImageAlignmentControlCreateInfoMESA-maximumRequestedAlignment-09656");
+    vk::CreateImage(*m_device, &image_create_info, nullptr, &image);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeImage, ImageAlignmentControlBitmask) {
+    AddRequiredExtensions(VK_MESA_IMAGE_ALIGNMENT_CONTROL_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::imageAlignmentControl);
+    RETURN_IF_SKIP(Init());
+
+    const uint32_t bad_alignment = 0x40000000;
+    VkPhysicalDeviceImageAlignmentControlPropertiesMESA props = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(props);
+    if (props.supportedImageAlignmentMask & bad_alignment) {
+        GTEST_SKIP() << "supportedImageAlignmentMask support testing alignment";
+    }
+
+    VkImageAlignmentControlCreateInfoMESA alignment_control = vku::InitStructHelper();
+    alignment_control.maximumRequestedAlignment = bad_alignment;
+
+    VkImageCreateInfo image_create_info = DefaultImageInfo();
+    image_create_info.pNext = &alignment_control;
+
+    VkImage image;
+    m_errorMonitor->SetDesiredError("VUID-VkImageAlignmentControlCreateInfoMESA-maximumRequestedAlignment-09656");
+    vk::CreateImage(*m_device, &image_create_info, nullptr, &image);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeImage, ImageAlignmentControlLinear) {
+    AddRequiredExtensions(VK_MESA_IMAGE_ALIGNMENT_CONTROL_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::imageAlignmentControl);
+    RETURN_IF_SKIP(Init());
+
+    VkImageAlignmentControlCreateInfoMESA alignment_control = vku::InitStructHelper();
+    alignment_control.maximumRequestedAlignment = 0;  // Should ignore
+
+    VkImageCreateInfo image_create_info = DefaultImageInfo();
+    image_create_info.tiling = VK_IMAGE_TILING_LINEAR;
+    image_create_info.pNext = &alignment_control;
+    VkImage image;
+    m_errorMonitor->SetDesiredError("VUID-VkImageCreateInfo-pNext-09653");
+    vk::CreateImage(*m_device, &image_create_info, nullptr, &image);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeImage, ImageAlignmentControlExternalMemory) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_MESA_IMAGE_ALIGNMENT_CONTROL_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::imageAlignmentControl);
+    RETURN_IF_SKIP(Init());
+
+    VkExternalMemoryImageCreateInfo external_memory = vku::InitStructHelper();
+    external_memory.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
+
+    VkImageAlignmentControlCreateInfoMESA alignment_control = vku::InitStructHelper(&external_memory);
+    alignment_control.maximumRequestedAlignment = 0;  // Should ignore
+
+    VkImageCreateInfo image_create_info = DefaultImageInfo();
+    image_create_info.pNext = &alignment_control;
+    VkImage image;
+    m_errorMonitor->SetDesiredError("VUID-VkImageCreateInfo-pNext-09654");
+    vk::CreateImage(*m_device, &image_create_info, nullptr, &image);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeImage, RemainingMipLevels2DViewOf3D) {
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_1_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_IMAGE_2D_VIEW_OF_3D_EXTENSION_NAME);
+    RETURN_IF_SKIP(Init());
+
+    VkImageCreateInfo image_ci = vku::InitStructHelper();
+    image_ci.flags = VK_IMAGE_CREATE_2D_ARRAY_COMPATIBLE_BIT | VK_IMAGE_CREATE_2D_VIEW_COMPATIBLE_BIT_EXT;
+    image_ci.imageType = VK_IMAGE_TYPE_3D;
+    image_ci.format = VK_FORMAT_R8G8B8A8_UNORM;
+    image_ci.extent.width = 32;
+    image_ci.extent.height = 32;
+    image_ci.extent.depth = 2;
+    image_ci.mipLevels = 2;
+    image_ci.arrayLayers = 1;
+    image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
+    image_ci.usage = VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
+    image_ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    vkt::Image image(*m_device, image_ci, vkt::set_layout);
+
+    m_errorMonitor->SetDesiredError("VUID-VkImageViewCreateInfo-image-04970");
+    vkt::ImageView view = image.CreateView(VK_IMAGE_VIEW_TYPE_2D, 0, VK_REMAINING_MIP_LEVELS, 0, 1);
     m_errorMonitor->VerifyFound();
 }

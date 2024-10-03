@@ -19,9 +19,9 @@
 #pragma once
 
 #include "state_tracker/state_object.h"
-#include "utils/hash_vk_types.h"
+#include "utils/hash_util.h"
 #include "utils/vk_layer_utils.h"
-#include "utils/shader_utils.h"
+#include "state_tracker/shader_stage_state.h"
 #include "generated/vk_object_types.h"
 #include <vulkan/utility/vk_safe_struct.hpp>
 #include <map>
@@ -44,6 +44,13 @@ class Pipeline;
 class AccelerationStructureNV;
 class AccelerationStructureKHR;
 struct AllocateDescriptorSetsData;
+
+// "bindless" does not have a concrete definition, but we use it as means to know:
+// "is GPU-AV going to have to validate this or not"
+// (see docs/gpu_av_bindless.md for more details)
+static inline bool IsBindless(VkDescriptorBindingFlags flags) {
+    return (flags & (VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT | VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT)) != 0;
+}
 
 class DescriptorPool : public StateObject {
   public:
@@ -169,7 +176,10 @@ class DescriptorSetLayoutDef {
     uint32_t GetIndexFromBinding(uint32_t binding) const;
     // Various Get functions that can either be passed a binding#, which will
     //  be automatically translated into the appropriate index, or the index# can be passed in directly
-    uint32_t GetMaxBinding() const { return bindings_[bindings_.size() - 1].binding; }
+    uint32_t GetMaxBinding() const {
+        assert(!bindings_.empty());
+        return bindings_.empty() ? 0 : bindings_[bindings_.size() - 1].binding;
+    }
     VkDescriptorSetLayoutBinding const *GetDescriptorSetLayoutBindingPtrFromIndex(const uint32_t) const;
     VkDescriptorSetLayoutBinding const *GetDescriptorSetLayoutBindingPtrFromBinding(uint32_t binding) const {
         return GetDescriptorSetLayoutBindingPtrFromIndex(GetIndexFromBinding(binding));
@@ -209,6 +219,8 @@ class DescriptorSetLayoutDef {
         uint32_t non_dynamic_buffer_count;
     };
     const BindingTypeStats &GetBindingTypeStats() const { return binding_type_stats_; }
+
+    std::string DescribeDifference(uint32_t index, const DescriptorSetLayoutDef &other) const;
 
   private:
     // Only the first three data members are used for hash and equality checks, the other members are derived from them, and are
@@ -518,6 +530,7 @@ class BufferDescriptor : public Descriptor {
     std::shared_ptr<vvl::Buffer> GetSharedBufferState() const { return buffer_state_; }
     VkDeviceSize GetOffset() const { return offset_; }
     VkDeviceSize GetRange() const { return range_; }
+    VkDeviceSize GetEffectiveRange() const;
 
     bool AddParent(StateObject *state_object) override;
     void RemoveParent(StateObject *state_object) override;
@@ -586,6 +599,7 @@ class MutableDescriptor : public Descriptor {
     std::shared_ptr<vvl::Buffer> GetSharedBufferState() const { return buffer_state_; }
     VkDeviceSize GetOffset() const { return offset_; }
     VkDeviceSize GetRange() const { return range_; }
+    VkDeviceSize GetEffectiveRange() const;
     std::shared_ptr<vvl::BufferView> GetSharedBufferViewState() const { return buffer_view_state_; }
     VkAccelerationStructureKHR GetAccelerationStructureKHR() const { return acc_; }
     const vvl::AccelerationStructureKHR *GetAccelerationStructureStateKHR() const { return acc_state_.get(); }
@@ -667,10 +681,6 @@ class DescriptorBinding {
 
     virtual const Descriptor *GetDescriptor(const uint32_t index) const = 0;
     virtual Descriptor *GetDescriptor(const uint32_t index) = 0;
-
-    bool IsBindless() const {
-        return (binding_flags & (VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT | VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT)) != 0;
-    }
 
     bool IsVariableCount() const { return (binding_flags & VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT) != 0; }
 
@@ -878,6 +888,12 @@ class DescriptorSet : public StateObject {
         auto pos = dynamic_offset_idx_to_descriptor_list_.at(index);
         return bindings_[pos.first]->GetDescriptor(pos.second);
     }
+
+    // Returns index in the dynamic offset array (specified by
+    // vkCmdBindDescriptorSets) for the given dynamic descriptor binding.
+    // The caller has to ensure that binding has dynamic descriptor type.
+    uint32_t GetDynamicOffsetIndexFromBinding(uint32_t dynamic_binding) const;
+
     uint64_t GetChangeCount() const { return change_count_; }
 
     const std::vector<vku::safe_VkWriteDescriptorSet> &GetWrites() const { return push_descriptor_set_writes; }
@@ -970,7 +986,7 @@ class DescriptorSet : public StateObject {
     virtual bool SkipBinding(const DescriptorBinding &binding, bool is_dynamic_accessed) const {
         // core validation case: We check if all parts of the descriptor are statically known, from here spirv-val should have
         // caught any OOB values.
-        return binding.IsBindless() || is_dynamic_accessed;
+        return IsBindless(binding.binding_flags) || is_dynamic_accessed;
     }
 
   protected:

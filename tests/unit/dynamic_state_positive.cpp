@@ -14,13 +14,14 @@
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
 #include "../framework/render_pass_helper.h"
-#include "generated/vk_extension_helper.h"
 
 void DynamicStateTest::InitBasicExtendedDynamicState() {
     AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::extendedDynamicState);
     RETURN_IF_SKIP(Init());
 }
+
+class PositiveDynamicState : public DynamicStateTest {};
 
 TEST_F(PositiveDynamicState, DiscardRectanglesVersion) {
     TEST_DESCRIPTION("check version of VK_EXT_discard_rectangles");
@@ -356,33 +357,6 @@ TEST_F(PositiveDynamicState, DepthTestEnableOverridesDynamicDepthWriteEnable) {
     vk::CmdDraw(m_commandBuffer->handle(), 1, 1, 0, 0);
     m_commandBuffer->EndRenderPass();
     m_commandBuffer->end();
-}
-
-TEST_F(PositiveDynamicState, DynamicStateDoublePipelineBind) {
-    TEST_DESCRIPTION("Validate binding a non-dynamic pipeline doesn't trigger dynamic static errors");
-
-    SetTargetApiVersion(VK_API_VERSION_1_1);
-    AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::extendedDynamicState2);
-    RETURN_IF_SKIP(Init());
-    InitRenderTarget();
-
-    CreatePipelineHelper pipe(*this);
-    pipe.AddDynamicState(VK_DYNAMIC_STATE_PRIMITIVE_RESTART_ENABLE_EXT);
-    pipe.CreateGraphicsPipeline();
-
-    CreatePipelineHelper pipe_no_dynamic(*this);
-    pipe_no_dynamic.CreateGraphicsPipeline();
-
-    vkt::CommandBuffer command_buffer(*m_device, m_command_pool);
-    command_buffer.begin();
-    vk::CmdSetPrimitiveRestartEnableEXT(command_buffer.handle(), VK_TRUE);
-    command_buffer.BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe_no_dynamic.Handle());
-    vk::CmdBindPipeline(command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    vk::CmdDraw(command_buffer.handle(), 1, 1, 0, 0);
-    vk::CmdEndRenderPass(command_buffer.handle());
-    command_buffer.end();
 }
 
 TEST_F(PositiveDynamicState, SetBeforePipeline) {
@@ -1010,6 +984,127 @@ TEST_F(PositiveDynamicState, RasterizationSamples) {
     vk::CmdSetRasterizationSamplesEXT(m_commandBuffer->handle(), VK_SAMPLE_COUNT_4_BIT);
     vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
     vk::CmdDraw(m_commandBuffer->handle(), 4u, 1u, 0u, 0u);
+    m_commandBuffer->EndRenderPass();
+    m_commandBuffer->end();
+}
+
+TEST_F(PositiveDynamicState, PrimitiveTopology) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8028");
+    AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::extendedDynamicState);
+    AddRequiredFeature(vkt::Feature::extendedDynamicState2);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    CreatePipelineHelper pipe(*this);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_PRIMITIVE_RESTART_ENABLE);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY);
+    pipe.ia_ci_.primitiveRestartEnable = VK_FALSE;
+    pipe.ia_ci_.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    pipe.CreateGraphicsPipeline();
+
+    m_commandBuffer->begin();
+    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdSetPrimitiveTopologyEXT(m_commandBuffer->handle(), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
+    vk::CmdSetPrimitiveRestartEnableEXT(m_commandBuffer->handle(), VK_TRUE);
+    vk::CmdDraw(m_commandBuffer->handle(), 4u, 1u, 0u, 0u);
+    m_commandBuffer->EndRenderPass();
+    m_commandBuffer->end();
+}
+
+TEST_F(PositiveDynamicState, ColorBlendEquationMultipleAttachments) {
+    TEST_DESCRIPTION("Only update some of the dynamic color blend equations");
+    AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::extendedDynamicState3ColorBlendEquation);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget(2);
+
+    VkPipelineColorBlendAttachmentState color_blend[2] = {};
+    color_blend[0] = DefaultColorBlendAttachmentState();
+    color_blend[1] = DefaultColorBlendAttachmentState();
+
+    CreatePipelineHelper pipe(*this);
+    pipe.cb_ci_.attachmentCount = 2;
+    pipe.cb_ci_.pAttachments = color_blend;
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_COLOR_BLEND_EQUATION_EXT);
+    pipe.CreateGraphicsPipeline();
+
+    m_commandBuffer->begin();
+    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
+
+    const VkColorBlendEquationEXT equation = {VK_BLEND_FACTOR_SRC_COLOR, VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR, VK_BLEND_OP_ADD,
+                                              VK_BLEND_FACTOR_SRC_ALPHA, VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, VK_BLEND_OP_ADD};
+    vk::CmdSetColorBlendEquationEXT(m_commandBuffer->handle(), 0, 1, &equation);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdSetColorBlendEquationEXT(m_commandBuffer->handle(), 1, 1, &equation);
+    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
+    m_commandBuffer->EndRenderPass();
+    m_commandBuffer->end();
+}
+
+TEST_F(PositiveDynamicState, MaxFragmentDualSrcAttachmentsDynamicBlendEnable) {
+    TEST_DESCRIPTION("Test maxFragmentDualSrcAttachments when blend is not enabled.");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::dualSrcBlend);
+    AddRequiredFeature(vkt::Feature::extendedDynamicState3ColorBlendEnable);
+    AddRequiredFeature(vkt::Feature::extendedDynamicState3ColorBlendEquation);
+    AddRequiredFeature(vkt::Feature::extendedDynamicState3ColorWriteMask);
+    RETURN_IF_SKIP(Init());
+
+    const uint32_t count = m_device->phy().limits_.maxFragmentDualSrcAttachments + 1;
+    if (count != 2) {
+        GTEST_SKIP() << "Test is designed for a maxFragmentDualSrcAttachments of 1";
+    }
+    InitRenderTarget(count);
+
+    const char *fs_src = R"glsl(
+        #version 460
+        layout(location = 0) out vec4 c0;
+        layout(location = 1) out vec4 c1;
+        void main() {
+		    c0 = vec4(0.0f);
+		    c1 = vec4(0.0f);
+        }
+    )glsl";
+    VkShaderObj fs(this, fs_src, VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    VkPipelineColorBlendAttachmentState cb_attachments = DefaultColorBlendAttachmentState();
+
+    CreatePipelineHelper pipe(*this);
+    pipe.cb_ci_.pAttachments = &cb_attachments;
+    pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_COLOR_BLEND_ENABLE_EXT);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_COLOR_BLEND_EQUATION_EXT);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT);
+    pipe.CreateGraphicsPipeline();
+
+    m_commandBuffer->begin();
+    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
+
+    VkColorBlendEquationEXT dual_color_blend_equation = {
+        VK_BLEND_FACTOR_SRC1_COLOR, VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR, VK_BLEND_OP_ADD,
+        VK_BLEND_FACTOR_SRC_ALPHA,  VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, VK_BLEND_OP_ADD};
+    VkColorBlendEquationEXT normal_color_blend_equation = {
+        VK_BLEND_FACTOR_ONE,       VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR, VK_BLEND_OP_ADD,
+        VK_BLEND_FACTOR_SRC_ALPHA, VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, VK_BLEND_OP_ADD};
+    vk::CmdSetColorBlendEquationEXT(m_commandBuffer->handle(), 0, 1, &dual_color_blend_equation);
+    vk::CmdSetColorBlendEquationEXT(m_commandBuffer->handle(), 1, 1, &normal_color_blend_equation);
+
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+
+    // The dual color blend is disabled
+    VkBool32 color_blend_enabled[2] = {VK_FALSE, VK_TRUE};
+    vk::CmdSetColorBlendEnableEXT(m_commandBuffer->handle(), 0, 2, color_blend_enabled);
+
+    VkColorComponentFlags color_component_flags[2] = {VK_COLOR_COMPONENT_R_BIT, VK_COLOR_COMPONENT_R_BIT};
+    vk::CmdSetColorWriteMaskEXT(m_commandBuffer->handle(), 0, 2, color_component_flags);
+
+    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
+
     m_commandBuffer->EndRenderPass();
     m_commandBuffer->end();
 }

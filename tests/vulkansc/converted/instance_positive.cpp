@@ -15,7 +15,8 @@
  */
 
 #include "../framework/layer_validation_tests.h"
-#include "generated/vk_extension_helper.h"
+
+class PositiveInstance : public VkLayerTest {};
 
 TEST_F(PositiveInstance, TwoInstances) {
     TEST_DESCRIPTION("Create two instances before destroy");
@@ -81,10 +82,6 @@ TEST_F(PositiveInstance, ValidEnumBeforeLogicalDevice) {
     ci.mipLevels = 1;
     ci.arrayLayers = 1;
     ci.samples = VK_SAMPLE_COUNT_1_BIT;
-    ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    ci.queueFamilyIndexCount = 0;
-    ci.pQueueFamilyIndices = NULL;
-    ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
     // Verify formats
     VkFormatFeatureFlags features = VK_FORMAT_FEATURE_TRANSFER_SRC_BIT | VK_FORMAT_FEATURE_TRANSFER_DST_BIT;

@@ -28,7 +28,7 @@
     do {                                                                                                   \
         assert(!initialized());                                                                            \
         handle_type handle;                                                                                \
-        auto result = create_func(dev.handle(), __VA_ARGS__, NULL, &handle);                               \
+        auto result = create_func(dev.handle(), __VA_ARGS__, nullptr, &handle);                            \
         ASSERT_TRUE((result == VK_SUCCESS) || (result == VK_ERROR_VALIDATION_FAILED_EXT) ||                \
                     (result == VK_ERROR_OUT_OF_DEVICE_MEMORY) || (result == VK_ERROR_OUT_OF_HOST_MEMORY)); \
         if (result == VK_SUCCESS) {                                                                        \
@@ -800,6 +800,12 @@ VkMemoryAllocateInfo DeviceMemory::get_resource_alloc_info(const Device &dev, co
 
 NON_DISPATCHABLE_HANDLE_DTOR(Fence, vk::DestroyFence)
 
+Fence &Fence::operator=(Fence &&rhs) noexcept {
+    destroy();
+    NonDispHandle<VkFence>::operator=(std::move(rhs));
+    return *this;
+}
+
 void Fence::init(const Device &dev, const VkFenceCreateInfo &info) { NON_DISPATCHABLE_HANDLE_INIT(vk::CreateFence, dev, &info); }
 
 VkResult Fence::wait(uint64_t timeout) const {
@@ -858,6 +864,12 @@ Semaphore::Semaphore(const Device &dev, VkSemaphoreType type, uint64_t initial_v
         VkSemaphoreCreateInfo semaphore_ci = vku::InitStructHelper(&semaphore_type_ci);
         init(dev, semaphore_ci);
     }
+}
+
+Semaphore &Semaphore::operator=(Semaphore &&rhs) noexcept {
+    destroy();
+    NonDispHandle<VkSemaphore>::operator=(std::move(rhs));
+    return *this;
 }
 
 void Semaphore::init(const Device &dev, const VkSemaphoreCreateInfo &info) {
@@ -1309,10 +1321,11 @@ VkImageViewCreateInfo Image::BasicViewCreatInfo(VkImageAspectFlags aspect_mask) 
     return ci;
 }
 
-ImageView Image::CreateView(VkImageAspectFlags aspect) const {
+ImageView Image::CreateView(VkImageAspectFlags aspect, void *pNext) const {
     VkImageViewCreateInfo ci = BasicViewCreatInfo(aspect);
     ci.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
     ci.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
+    ci.pNext = pNext;
     return ImageView(*device_, ci);
 }
 
@@ -1539,6 +1552,16 @@ void Pipeline::init(const Device &dev, const VkComputePipelineCreateInfo &info) 
 
 void Pipeline::init(const Device &dev, const VkRayTracingPipelineCreateInfoKHR &info) {
     NON_DISPATCHABLE_HANDLE_INIT(vk::CreateRayTracingPipelinesKHR, dev, VK_NULL_HANDLE, VK_NULL_HANDLE, 1, &info);
+}
+
+void Pipeline::InitDeferred(const Device &dev, const VkRayTracingPipelineCreateInfoKHR &info, VkDeferredOperationKHR deferred_op) {
+    // ALL parameters need to survive until deferred operation is completed
+    // In our case, it means both info and handle need to be kept alive
+    // => cannot use NON_DISPATCHABLE_HANDLE_INIT because used handle is a temporary
+    const VkResult result =
+        vk::CreateRayTracingPipelinesKHR(dev.handle(), deferred_op, VK_NULL_HANDLE, 1, &info, nullptr, &handle());
+    ASSERT_TRUE(result == VK_OPERATION_DEFERRED_KHR || result == VK_OPERATION_NOT_DEFERRED_KHR || result == VK_SUCCESS);
+    NonDispHandle::set_device(dev.handle());
 }
 
 NON_DISPATCHABLE_HANDLE_DTOR(PipelineLayout, vk::DestroyPipelineLayout)
@@ -1797,6 +1820,14 @@ void CommandBuffer::EndVideoCoding(const VkVideoEndCodingInfoKHR &endInfo) {
 
     vkCmdEndVideoCodingKHR(handle(), &endInfo);
 }
+
+void CommandBuffer::Copy(const Buffer &src, const Buffer &dst) {
+    assert(src.create_info().size == dst.create_info().size);
+    const VkBufferCopy region = {0, 0, src.create_info().size};
+    vk::CmdCopyBuffer(handle(), src.handle(), dst.handle(), 1, &region);
+}
+
+void CommandBuffer::ExecuteCommands(const CommandBuffer &secondary) { vk::CmdExecuteCommands(handle(), 1, &secondary.handle()); }
 
 void RenderPass::init(const Device &dev, const VkRenderPassCreateInfo &info) {
     NON_DISPATCHABLE_HANDLE_INIT(vk::CreateRenderPass, dev, &info);

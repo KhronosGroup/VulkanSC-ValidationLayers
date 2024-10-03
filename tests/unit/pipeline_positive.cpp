@@ -15,7 +15,8 @@
 #include "../framework/pipeline_helper.h"
 #include "../framework/descriptor_helper.h"
 #include "../framework/render_pass_helper.h"
-#include "generated/vk_extension_helper.h"
+
+class PositivePipeline : public VkLayerTest {};
 
 TEST_F(PositivePipeline, ComplexTypes) {
     TEST_DESCRIPTION("Smoke test for complex types across VS/FS boundary");
@@ -1116,23 +1117,12 @@ TEST_F(PositivePipeline, MutableStorageImageFormatWriteForFormat) {
     image_create_info.arrayLayers = 1;
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
     image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    image_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    image_create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     image_create_info.usage = VK_IMAGE_USAGE_STORAGE_BIT;
     vkt::Image image(*m_device, image_create_info, vkt::set_layout);
     vkt::ImageView view = image.CreateView();
 
-    VkDescriptorImageInfo image_info = {};
-    image_info.imageView = view;
-    image_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-
-    VkWriteDescriptorSet descriptor_write = vku::InitStructHelper();
-    descriptor_write.dstSet = ds.set_;
-    descriptor_write.dstBinding = 0;
-    descriptor_write.descriptorCount = 1;
-    descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    descriptor_write.pImageInfo = &image_info;
-    vk::UpdateDescriptorSets(device(), 1, &descriptor_write, 0, NULL);
+    ds.WriteDescriptorImageInfo(0, view, VK_NULL_HANDLE, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_IMAGE_LAYOUT_GENERAL);
+    ds.UpdateDescriptorSets();
 
     m_commandBuffer->reset();
     m_commandBuffer->begin();
@@ -1339,9 +1329,9 @@ TEST_F(PositivePipeline, DualBlendShader) {
     m_commandBuffer->end();
 }
 
-// TODO: CTS was written, but still fails on many older drivers in CI
+// CTS was written, but may fail on older drivers
 // https://gitlab.khronos.org/Tracker/vk-gl-cts/-/issues/3736
-TEST_F(PositivePipeline, DISABLED_CreationFeedbackCount0) {
+TEST_F(PositivePipeline, CreationFeedbackCount0) {
     TEST_DESCRIPTION("Test graphics pipeline feedback stage count check with 0.");
 
     AddRequiredExtensions(VK_EXT_PIPELINE_CREATION_FEEDBACK_EXTENSION_NAME);
@@ -1672,11 +1662,12 @@ TEST_F(PositivePipeline, InterpolateAtSample) {
 
 TEST_F(PositivePipeline, ShaderModuleIdentifierZeroLength) {
     TEST_DESCRIPTION("Use shader module identifier with zero size and provide a shader module");
-
+    AddRequiredExtensions(VK_EXT_SHADER_MODULE_IDENTIFIER_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     VkPipelineShaderStageModuleIdentifierCreateInfoEXT moduleIdentifier = vku::InitStructHelper();
+    moduleIdentifier.identifierSize = 0;
 
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_[0].pNext = &moduleIdentifier;
@@ -1717,10 +1708,16 @@ TEST_F(PositivePipeline, AttachmentCountIgnored) {
     pipe.CreateGraphicsPipeline();
 }
 
-TEST_F(PositivePipeline, DynamicRasterizationState) {
+TEST_F(PositivePipeline, NoRasterizationState) {
     TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/7899");
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8051");
+    AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::extendedDynamicState);
     AddRequiredFeature(vkt::Feature::extendedDynamicState2);
+    AddRequiredFeature(vkt::Feature::extendedDynamicState3DepthClampEnable);
+    AddRequiredFeature(vkt::Feature::extendedDynamicState3PolygonMode);
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
@@ -1731,8 +1728,265 @@ TEST_F(PositivePipeline, DynamicRasterizationState) {
     ms_ci.pSampleMask = nullptr;
 
     CreatePipelineHelper pipe(*this);
-    pipe.AddDynamicState(VK_DYNAMIC_STATE_RASTERIZER_DISCARD_ENABLE);
     pipe.gp_ci_.pRasterizationState = nullptr;
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_DEPTH_CLAMP_ENABLE_EXT);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_POLYGON_MODE_EXT);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_RASTERIZER_DISCARD_ENABLE);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_CULL_MODE);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_FRONT_FACE);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_DEPTH_BIAS_ENABLE);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_DEPTH_BIAS);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_LINE_WIDTH);
     pipe.ms_ci_ = ms_ci;
     pipe.CreateGraphicsPipeline();
+}
+
+TEST_F(PositivePipeline, NoRasterizationStateDynamicRendering) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/7899");
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8051");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    AddRequiredFeature(vkt::Feature::extendedDynamicState);
+    AddRequiredFeature(vkt::Feature::extendedDynamicState2);
+    AddRequiredFeature(vkt::Feature::extendedDynamicState3DepthClampEnable);
+    AddRequiredFeature(vkt::Feature::extendedDynamicState3PolygonMode);
+    RETURN_IF_SKIP(Init());
+
+    VkFormat color_formats = VK_FORMAT_UNDEFINED;
+    VkPipelineRenderingCreateInfoKHR pipeline_rendering_info = vku::InitStructHelper();
+    pipeline_rendering_info.colorAttachmentCount = 1;
+    pipeline_rendering_info.pColorAttachmentFormats = &color_formats;
+
+    VkPipelineMultisampleStateCreateInfo ms_ci = vku::InitStructHelper();
+    ms_ci.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    ms_ci.sampleShadingEnable = 0;
+    ms_ci.minSampleShading = 1.0;
+    ms_ci.pSampleMask = nullptr;
+
+    CreatePipelineHelper pipe(*this, &pipeline_rendering_info);
+    pipe.gp_ci_.pRasterizationState = nullptr;
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_DEPTH_CLAMP_ENABLE_EXT);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_POLYGON_MODE_EXT);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_RASTERIZER_DISCARD_ENABLE);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_CULL_MODE);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_FRONT_FACE);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_DEPTH_BIAS_ENABLE);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_DEPTH_BIAS);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_LINE_WIDTH);
+    pipe.ms_ci_ = ms_ci;
+    pipe.CreateGraphicsPipeline();
+}
+
+TEST_F(PositivePipeline, ColorBlendUnsupportedLogicOpDynamic) {
+    TEST_DESCRIPTION("VkPipelineColorBlendStateCreateInfo::logicOpEnable is ignored with VK_DYNAMIC_STATE_LOGIC_OP_ENABLE_EXT");
+    AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::extendedDynamicState3LogicOpEnable);
+    AddDisabledFeature(vkt::Feature::logicOp);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    CreatePipelineHelper pipe(*this);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_LOGIC_OP_ENABLE_EXT);
+    pipe.cb_ci_.logicOpEnable = VK_TRUE;  // ignored now
+    pipe.CreateGraphicsPipeline();
+}
+
+TEST_F(PositivePipeline, PipelineMissingFeaturesDynamic) {
+    TEST_DESCRIPTION("Use dynamic state to set state that would be invalid since the features are not set");
+    AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::extendedDynamicState);
+    AddRequiredFeature(vkt::Feature::extendedDynamicState3AlphaToOneEnable);
+    AddRequiredFeature(vkt::Feature::extendedDynamicState3DepthClampEnable);
+    AddDisabledFeature(vkt::Feature::depthBounds);
+    AddDisabledFeature(vkt::Feature::depthClamp);
+    AddDisabledFeature(vkt::Feature::alphaToOne);
+    RETURN_IF_SKIP(Init());
+
+    const VkFormat ds_format = FindSupportedDepthStencilFormat(m_device->phy().handle());
+    RenderPassSingleSubpass rp(*this);
+    rp.AddAttachmentDescription(ds_format, VK_IMAGE_LAYOUT_PREINITIALIZED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+    rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL});
+    rp.AddDepthStencilAttachment(0);
+    rp.CreateRenderPass();
+
+    CreatePipelineHelper pipe(*this);
+    pipe.ds_ci_ = vku::InitStructHelper();
+    pipe.ds_ci_.depthBoundsTestEnable = VK_TRUE;
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_DEPTH_BOUNDS_TEST_ENABLE);
+
+    pipe.ms_ci_.alphaToOneEnable = VK_TRUE;
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_ALPHA_TO_ONE_ENABLE_EXT);
+
+    pipe.rs_state_ci_.depthClampEnable = VK_TRUE;
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_DEPTH_CLAMP_ENABLE_EXT);
+
+    pipe.gp_ci_.renderPass = rp.Handle();
+    pipe.CreateGraphicsPipeline();
+}
+
+TEST_F(PositivePipeline, PipelineBinaryCreateBinaryFromPipeline) {
+    TEST_DESCRIPTION("Create pipeline binaries from a pipeline");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::maintenance5);
+    AddRequiredExtensions(VK_KHR_PIPELINE_BINARY_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::pipelineBinaries);
+    RETURN_IF_SKIP(Init());
+
+    VkResult err;
+
+    VkShaderObj cs(this, kMinimalShaderGlsl, VK_SHADER_STAGE_COMPUTE_BIT);
+
+    std::vector<VkDescriptorSetLayoutBinding> bindings(0);
+    const vkt::DescriptorSetLayout pipeline_dsl(*m_device, bindings);
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&pipeline_dsl});
+
+    VkComputePipelineCreateInfo compute_create_info = vku::InitStructHelper();
+    compute_create_info.stage = cs.GetStageCreateInfo();
+    compute_create_info.layout = pipeline_layout.handle();
+
+    VkPipelineCreateFlags2CreateInfoKHR flags2 = vku::InitStructHelper();
+    flags2.flags = VK_PIPELINE_CREATE_2_CAPTURE_DATA_BIT_KHR;
+    compute_create_info.pNext = &flags2;
+
+    VkPipeline test_pipeline1;
+
+    err = vk::CreateComputePipelines(device(), VK_NULL_HANDLE, 1, &compute_create_info, nullptr, &test_pipeline1);
+    ASSERT_EQ(VK_SUCCESS, err);
+
+    VkPipelineBinaryCreateInfoKHR binary_create_info = vku::InitStructHelper();
+    binary_create_info.pipeline = test_pipeline1;
+
+    VkPipelineBinaryKHR pipeline_binary;
+    VkPipelineBinaryHandlesInfoKHR handlesInfo = vku::InitStructHelper();
+    handlesInfo.pipelineBinaryCount = 1;
+    handlesInfo.pPipelineBinaries = &pipeline_binary;
+
+    err = vk::CreatePipelineBinariesKHR(device(), &binary_create_info, nullptr, &handlesInfo);
+    ASSERT_EQ(VK_SUCCESS, err);
+
+    vk::DestroyPipelineBinaryKHR(device(), pipeline_binary, nullptr);
+    vk::DestroyPipeline(device(), test_pipeline1, nullptr);
+}
+
+TEST_F(PositivePipeline, PipelineBinaryCreateBinaryFromData) {
+    TEST_DESCRIPTION("Create pipeline binary from data blob");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::maintenance5);
+    AddRequiredExtensions(VK_KHR_PIPELINE_BINARY_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::pipelineBinaries);
+    RETURN_IF_SKIP(Init());
+
+    VkResult err;
+
+    VkShaderObj cs(this, kMinimalShaderGlsl, VK_SHADER_STAGE_COMPUTE_BIT);
+
+    std::vector<VkDescriptorSetLayoutBinding> bindings(0);
+    const vkt::DescriptorSetLayout pipeline_dsl(*m_device, bindings);
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&pipeline_dsl});
+
+    VkComputePipelineCreateInfo compute_create_info = vku::InitStructHelper();
+    compute_create_info.stage = cs.GetStageCreateInfo();
+    compute_create_info.layout = pipeline_layout.handle();
+
+    VkPipelineCreateFlags2CreateInfoKHR flags2 = vku::InitStructHelper();
+    flags2.flags = VK_PIPELINE_CREATE_2_CAPTURE_DATA_BIT_KHR;
+    compute_create_info.pNext = &flags2;
+
+    std::vector<uint8_t> binary_data;
+    size_t data_size;
+    VkPipelineBinaryKeyKHR binary_key = vku::InitStructHelper();
+
+    // create binary from pipeline
+    {
+        VkPipeline test_pipeline1;
+
+        err = vk::CreateComputePipelines(device(), VK_NULL_HANDLE, 1, &compute_create_info, nullptr, &test_pipeline1);
+        ASSERT_EQ(VK_SUCCESS, err);
+
+        VkPipelineBinaryCreateInfoKHR binary_create_info = vku::InitStructHelper();
+        binary_create_info.pipeline = test_pipeline1;
+
+        VkPipelineBinaryHandlesInfoKHR handlesInfo = vku::InitStructHelper();
+        handlesInfo.pPipelineBinaries = nullptr;
+
+        err = vk::CreatePipelineBinariesKHR(device(), &binary_create_info, nullptr, &handlesInfo);
+        ASSERT_EQ(VK_SUCCESS, err);
+
+        if (handlesInfo.pipelineBinaryCount != 1) {
+            for (uint32_t i = 0; i < handlesInfo.pipelineBinaryCount; i++) {
+                vk::DestroyPipelineBinaryKHR(device(), handlesInfo.pPipelineBinaries[i], nullptr);
+            }
+
+            vk::DestroyPipeline(device(), test_pipeline1, nullptr);
+
+            GTEST_SKIP() << "Test doesn't support multiple binaries";
+        }
+
+        VkPipelineBinaryKHR pipeline_binary1;
+        handlesInfo.pPipelineBinaries = &pipeline_binary1;
+
+        err = vk::CreatePipelineBinariesKHR(device(), &binary_create_info, nullptr, &handlesInfo);
+        ASSERT_EQ(VK_SUCCESS, err);
+
+        vk::DestroyPipeline(device(), test_pipeline1, nullptr);
+
+        VkPipelineBinaryDataInfoKHR data_info = vku::InitStructHelper();
+        data_info.pipelineBinary = pipeline_binary1;
+
+        err = vk::GetPipelineBinaryDataKHR(device(), &data_info, &binary_key, &data_size, nullptr);
+        ASSERT_EQ(VK_SUCCESS, err);
+
+        binary_data.resize(data_size);
+
+        err = vk::GetPipelineBinaryDataKHR(device(), &data_info, &binary_key, &data_size, binary_data.data());
+        ASSERT_EQ(VK_SUCCESS, err);
+
+        vk::DestroyPipelineBinaryKHR(device(), pipeline_binary1, nullptr);
+    }
+
+    // create binary from data, then create pipeline from binary
+    {
+        VkPipelineBinaryKHR pipeline_binary2;
+
+        VkPipelineBinaryDataKHR data;
+        data.dataSize = data_size;
+        data.pData = binary_data.data();
+
+        VkPipelineBinaryKeysAndDataKHR keys_data_info;
+        keys_data_info.binaryCount = 1;
+        keys_data_info.pPipelineBinaryKeys = &binary_key;
+        keys_data_info.pPipelineBinaryData = &data;
+
+        VkPipelineBinaryCreateInfoKHR binary_create_info = vku::InitStructHelper();
+        binary_create_info.pKeysAndDataInfo = &keys_data_info;
+
+        VkPipelineBinaryHandlesInfoKHR handlesInfo = vku::InitStructHelper();
+        handlesInfo.pipelineBinaryCount = 1;
+        handlesInfo.pPipelineBinaries = &pipeline_binary2;
+
+        err = vk::CreatePipelineBinariesKHR(device(), &binary_create_info, nullptr, &handlesInfo);
+        ASSERT_EQ(VK_SUCCESS, err);
+
+        VkPipeline test_pipeline2;
+        VkPipelineBinaryInfoKHR binary_info = vku::InitStructHelper();
+
+        binary_info.binaryCount = 1;
+        binary_info.pPipelineBinaries = &pipeline_binary2;
+
+        flags2.pNext = &binary_info;
+
+        err = vk::CreateComputePipelines(device(), VK_NULL_HANDLE, 1, &compute_create_info, nullptr, &test_pipeline2);
+        ASSERT_EQ(VK_SUCCESS, err);
+
+        vk::DestroyPipelineBinaryKHR(device(), pipeline_binary2, nullptr);
+
+        vk::DestroyPipeline(device(), test_pipeline2, nullptr);
+    }
 }

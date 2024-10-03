@@ -25,7 +25,6 @@
 #include <vulkan/utility/vk_format_utils.h>
 
 #include "generated/vk_extension_helper.h"
-#include "utils/vk_layer_utils.h"
 #include "layer_validation_tests.h"
 
 #if defined(VK_USE_PLATFORM_METAL_EXT)
@@ -80,7 +79,6 @@ const VkPhysicalDeviceProperties &VkRenderFramework::physDevProps() const {
 // Return true if layer name is found and spec+implementation values are >= requested values
 bool VkRenderFramework::InstanceLayerSupported(const char *const layer_name, const uint32_t spec_version,
                                                const uint32_t impl_version) {
-
     if (available_layers_.empty()) {
         available_layers_ = vkt::GetGlobalLayers();
     }
@@ -153,34 +151,6 @@ VkInstanceCreateInfo VkRenderFramework::GetInstanceCreateInfo() const {
     return info;
 }
 
-void *VkRenderFramework::SetupValidationSettings(void *first_pnext) {
-    auto validation = GetEnvironment("VK_LAYER_TESTS_VALIDATION_FEATURES");
-    vvl::ToLower(validation);
-    VkValidationFeaturesEXT *features = vku::FindStructInPNextChain<VkValidationFeaturesEXT>(first_pnext);
-    if (validation == "all" || validation == "core" || validation == "none") {
-        if (!features) {
-            features = &m_validation_features;
-            features->sType = VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT;
-            features->pNext = first_pnext;
-            first_pnext = features;
-        }
-
-        if (validation == "all") {
-            features->enabledValidationFeatureCount = 4;
-            features->pEnabledValidationFeatures = validation_enable_all;
-            features->disabledValidationFeatureCount = 0;
-        } else if (validation == "core") {
-            features->disabledValidationFeatureCount = 0;
-        } else if (validation == "none") {
-            features->disabledValidationFeatureCount = 1;
-            features->pDisabledValidationFeatures = &validation_disable_all;
-            features->enabledValidationFeatureCount = 0;
-        }
-    }
-
-    return first_pnext;
-}
-
 void VkRenderFramework::InitFramework(void *instance_pnext) {
     ASSERT_EQ((VkInstance)0, instance_);
 
@@ -241,10 +211,6 @@ void VkRenderFramework::InitFramework(void *instance_pnext) {
     RemoveIf(m_instance_extension_names, ExtensionNotSupportedWithReporting);
 
     auto ici = GetInstanceCreateInfo();
-
-    // If is validation features then check for disabled validation
-
-    instance_pnext = SetupValidationSettings(instance_pnext);
 
     // concatenate pNexts
     void *last_pnext = nullptr;
@@ -732,7 +698,10 @@ void VkRenderFramework::InitState(VkPhysicalDeviceFeatures *features, void *crea
 void VkRenderFramework::InitSurface() {
     // NOTE: Currently InitSurface can leak the WIN32 handle if called multiple times without first calling DestroySurfaceContext.
     // This is intentional. Each swapchain/surface combo needs a unique HWND.
-    ASSERT_EQ(VK_SUCCESS, CreateSurface(m_surface_context, m_surface));
+    VkResult result = CreateSurface(m_surface_context, m_surface);
+    if (result != VK_SUCCESS) {
+        GTEST_SKIP() << "Failed to create surface.";
+    }
     ASSERT_TRUE(m_surface != VK_NULL_HANDLE);
 }
 
@@ -799,7 +768,8 @@ VkResult VkRenderFramework::CreateSurface(SurfaceContext &surface_context, VkSur
 #if defined(VK_USE_PLATFORM_XCB_KHR)
     if (IsExtensionsEnabled(VK_KHR_XCB_SURFACE_EXTENSION_NAME)) {
         surface_context.m_surface_xcb_conn = xcb_connect(nullptr, nullptr);
-        if (surface_context.m_surface_xcb_conn) {
+        int err = xcb_connection_has_error(surface_context.m_surface_xcb_conn);
+        if (surface_context.m_surface_xcb_conn && !err) {
             xcb_window_t window = xcb_generate_id(surface_context.m_surface_xcb_conn);
             VkXcbSurfaceCreateInfoKHR surface_create_info = vku::InitStructHelper();
             surface_create_info.connection = surface_context.m_surface_xcb_conn;
@@ -809,7 +779,7 @@ VkResult VkRenderFramework::CreateSurface(SurfaceContext &surface_context, VkSur
     }
 #endif
 
-    return VK_SUCCESS;
+    return VK_ERROR_UNKNOWN;
 }
 
 void VkRenderFramework::DestroySurface() {

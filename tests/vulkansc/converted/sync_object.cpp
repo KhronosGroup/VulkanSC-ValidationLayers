@@ -16,10 +16,11 @@
  */
 
 #include "utils/cast_utils.h"
-#include "generated/enum_flag_bits.h"
 #include "../framework/layer_validation_tests.h"
 #include "../framework/barrier_queue_family.h"
 #include "../framework/render_pass_helper.h"
+
+class NegativeSyncObject : public SyncObjectTest {};
 
 TEST_F(NegativeSyncObject, ImageBarrierSubpassConflicts) {
     TEST_DESCRIPTION("Add a pipeline barrier within a subpass that has conflicting state");
@@ -1121,46 +1122,6 @@ TEST_F(NegativeSyncObject, Sync2Barriers) {
     conc_test.buffer_barrier_.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
     conc_test.buffer_barrier_.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
     conc_test("", "VUID-VkBufferMemoryBarrier2-dstAccessMask-03911");
-
-    // Attempt to mismatch barriers/waitEvents calls with incompatible queues
-    // Create command pool with incompatible queueflags
-    const std::vector<VkQueueFamilyProperties> queue_props = m_device->phy().queue_properties_;
-    const std::optional<uint32_t> queue_family_index = m_device->ComputeOnlyQueueFamily();
-    if (!queue_family_index) {
-        GTEST_SKIP() << "No compute-only queue found";
-    }
-
-    VkBufferMemoryBarrier2KHR buf_barrier = vku::InitStructHelper();
-    buf_barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    buf_barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    buf_barrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-    buf_barrier.dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-    buf_barrier.buffer = buffer.handle();
-    buf_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    buf_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    buf_barrier.offset = 0;
-    buf_barrier.size = VK_WHOLE_SIZE;
-
-    dep_info = vku::InitStructHelper();
-    dep_info.bufferMemoryBarrierCount = 1;
-    dep_info.pBufferMemoryBarriers = &buf_barrier;
-
-    vk::CmdPipelineBarrier2KHR(m_commandBuffer->handle(), &dep_info);
-
-    m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier2-srcStageMask-03849");
-
-    vkt::CommandPool command_pool(*m_device, queue_family_index.value(), VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
-    vkt::CommandBuffer bad_command_buffer(*m_device, command_pool);
-
-    bad_command_buffer.begin();
-    buf_barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-    // Set two bits that should both be supported as a bonus positive check
-    buf_barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT | VK_ACCESS_TRANSFER_READ_BIT;
-    buf_barrier.srcStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-    buf_barrier.dstStageMask = VK_PIPELINE_STAGE_TRANSFER_BIT;
-
-    vk::CmdPipelineBarrier2KHR(bad_command_buffer.handle(), &dep_info);
-    m_errorMonitor->VerifyFound();
 }
 
 TEST_F(NegativeSyncObject, DepthStencilImageNonSeparate) {
@@ -1814,7 +1775,6 @@ TEST_F(NegativeSyncObject, BarrierAccessSync2) {
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
-    AddOptionalExtensions(VK_KHR_RAY_TRACING_MAINTENANCE_1_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::synchronization2);
     RETURN_IF_SKIP(Init());
 
@@ -1860,13 +1820,6 @@ TEST_F(NegativeSyncObject, BarrierAccessSync2) {
     mem_barrier.srcStageMask = VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT;
     m_errorMonitor->SetDesiredError("VUID-VkMemoryBarrier2-srcAccessMask-03906");
     vk::CmdPipelineBarrier2KHR(m_commandBuffer->handle(), &dependency_info);
-
-    if (DeviceExtensionSupported(VK_KHR_RAY_TRACING_MAINTENANCE_1_EXTENSION_NAME)) {
-        mem_barrier.srcAccessMask = VK_ACCESS_2_SHADER_BINDING_TABLE_READ_BIT_KHR;
-        mem_barrier.srcStageMask = VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT;
-        m_errorMonitor->SetDesiredError("VUID-VkMemoryBarrier2-srcAccessMask-07272");
-        vk::CmdPipelineBarrier2KHR(m_commandBuffer->handle(), &dependency_info);
-    }
 
     mem_barrier.srcAccessMask = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
     mem_barrier.srcStageMask = VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT;
@@ -1951,12 +1904,6 @@ TEST_F(NegativeSyncObject, BarrierAccessSync2) {
     m_errorMonitor->SetDesiredError("VUID-VkMemoryBarrier2-dstAccessMask-03906");
     vk::CmdPipelineBarrier2KHR(m_commandBuffer->handle(), &dependency_info);
 
-    if (DeviceExtensionSupported(VK_KHR_RAY_TRACING_MAINTENANCE_1_EXTENSION_NAME)) {
-        mem_barrier.dstAccessMask = VK_ACCESS_2_SHADER_BINDING_TABLE_READ_BIT_KHR;
-        m_errorMonitor->SetDesiredError("VUID-VkMemoryBarrier2-dstAccessMask-07272");
-        vk::CmdPipelineBarrier2KHR(m_commandBuffer->handle(), &dependency_info);
-    }
-
     mem_barrier.dstAccessMask = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
     m_errorMonitor->SetDesiredError("VUID-VkMemoryBarrier2-dstAccessMask-03907");
     vk::CmdPipelineBarrier2KHR(m_commandBuffer->handle(), &dependency_info);
@@ -2003,6 +1950,76 @@ TEST_F(NegativeSyncObject, BarrierAccessSync2) {
 
     m_commandBuffer->end();
 
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeSyncObject, BarrierAccessSync2RtxMaintenance1) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_RAY_TRACING_MAINTENANCE_1_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    AddRequiredFeature(vkt::Feature::rayTracingMaintenance1);
+    RETURN_IF_SKIP(Init());
+
+    VkMemoryBarrier2 mem_barrier = vku::InitStructHelper();
+    VkDependencyInfo dependency_info = vku::InitStructHelper();
+    dependency_info.memoryBarrierCount = 1;
+    dependency_info.pMemoryBarriers = &mem_barrier;
+
+    m_commandBuffer->begin();
+
+    mem_barrier.srcAccessMask = VK_ACCESS_2_SHADER_BINDING_TABLE_READ_BIT_KHR;
+    mem_barrier.srcStageMask = VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT;
+    mem_barrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+    mem_barrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+    m_errorMonitor->SetDesiredError("VUID-VkMemoryBarrier2-srcAccessMask-07272");
+    vk::CmdPipelineBarrier2KHR(m_commandBuffer->handle(), &dependency_info);
+    m_errorMonitor->VerifyFound();
+
+    mem_barrier.srcAccessMask = VK_ACCESS_2_HOST_WRITE_BIT;
+    mem_barrier.srcStageMask = VK_PIPELINE_STAGE_2_HOST_BIT;
+    mem_barrier.dstAccessMask = VK_ACCESS_2_SHADER_BINDING_TABLE_READ_BIT_KHR;
+    mem_barrier.dstStageMask = VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT;
+    m_errorMonitor->SetDesiredError("VUID-VkMemoryBarrier2-dstAccessMask-07272");
+    vk::CmdPipelineBarrier2KHR(m_commandBuffer->handle(), &dependency_info);
+    m_errorMonitor->VerifyFound();
+
+    m_commandBuffer->end();
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeSyncObject, BarrierAccessSync2DescriptorBuffer) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    AddRequiredFeature(vkt::Feature::descriptorBuffer);
+    RETURN_IF_SKIP(Init());
+
+    VkMemoryBarrier2 mem_barrier = vku::InitStructHelper();
+    VkDependencyInfo dependency_info = vku::InitStructHelper();
+    dependency_info.memoryBarrierCount = 1;
+    dependency_info.pMemoryBarriers = &mem_barrier;
+
+    m_commandBuffer->begin();
+
+    mem_barrier.srcAccessMask = VK_ACCESS_2_DESCRIPTOR_BUFFER_READ_BIT_EXT;
+    mem_barrier.srcStageMask = VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT;
+    mem_barrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+    mem_barrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+    m_errorMonitor->SetDesiredError("VUID-VkMemoryBarrier2-srcAccessMask-08118");
+    vk::CmdPipelineBarrier2KHR(m_commandBuffer->handle(), &dependency_info);
+    m_errorMonitor->VerifyFound();
+
+    mem_barrier.srcAccessMask = VK_ACCESS_2_HOST_WRITE_BIT;
+    mem_barrier.srcStageMask = VK_PIPELINE_STAGE_2_HOST_BIT;
+    mem_barrier.dstAccessMask = VK_ACCESS_2_DESCRIPTOR_BUFFER_READ_BIT_EXT;
+    mem_barrier.dstStageMask = VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT;
+    m_errorMonitor->SetDesiredError("VUID-VkMemoryBarrier2-dstAccessMask-08118");
+    vk::CmdPipelineBarrier2KHR(m_commandBuffer->handle(), &dependency_info);
+    m_errorMonitor->VerifyFound();
+
+    m_commandBuffer->end();
     m_errorMonitor->VerifyFound();
 }
 
@@ -2947,119 +2964,62 @@ TEST_F(NegativeSyncObject, SignalSemaphoreValue) {
     VkPhysicalDeviceTimelineSemaphorePropertiesKHR timelineproperties = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(timelineproperties);
 
-    VkSemaphoreTypeCreateInfoKHR semaphore_type_create_info = vku::InitStructHelper();
-    semaphore_type_create_info.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE_KHR;
-    semaphore_type_create_info.initialValue = 5;
-
-    VkSemaphoreCreateInfo semaphore_create_info = vku::InitStructHelper(&semaphore_type_create_info);
-
-    VkSemaphore semaphore[2];
-    ASSERT_EQ(VK_SUCCESS, vk::CreateSemaphore(device(), &semaphore_create_info, nullptr, &semaphore[0]));
-    ASSERT_EQ(VK_SUCCESS, vk::CreateSemaphore(device(), &semaphore_create_info, nullptr, &semaphore[1]));
-
-    VkSemaphoreSignalInfo semaphore_signal_info = vku::InitStructHelper();
-    semaphore_signal_info.semaphore = semaphore[0];
-    semaphore_signal_info.value = 3;
+    vkt::Semaphore timeline0(*m_device, VK_SEMAPHORE_TYPE_TIMELINE, 5);
+    vkt::Semaphore timeline1(*m_device, VK_SEMAPHORE_TYPE_TIMELINE, 5);
 
     m_errorMonitor->SetDesiredError("VUID-VkSemaphoreSignalInfo-value-03258");
-    vk::SignalSemaphoreKHR(device(), &semaphore_signal_info);
+    timeline0.SignalKHR(3);
     m_errorMonitor->VerifyFound();
 
-    semaphore_signal_info.value = 10;
-    ASSERT_EQ(VK_SUCCESS, vk::SignalSemaphoreKHR(device(), &semaphore_signal_info));
-
-    VkTimelineSemaphoreSubmitInfoKHR timeline_semaphore_submit_info = vku::InitStructHelper();
-    uint64_t waitValue = 10;
-    uint64_t signalValue = 20;
-    timeline_semaphore_submit_info.waitSemaphoreValueCount = 1;
-    timeline_semaphore_submit_info.pWaitSemaphoreValues = &waitValue;
-    timeline_semaphore_submit_info.signalSemaphoreValueCount = 1;
-    timeline_semaphore_submit_info.pSignalSemaphoreValues = &signalValue;
-
-    VkPipelineStageFlags stageFlags = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-    VkSubmitInfo submit_info = vku::InitStructHelper(&timeline_semaphore_submit_info);
-    submit_info.pWaitDstStageMask = &stageFlags;
-    submit_info.waitSemaphoreCount = 1;
-    submit_info.pWaitSemaphores = &(semaphore[1]);
-    submit_info.signalSemaphoreCount = 1;
-    submit_info.pSignalSemaphores = &(semaphore[0]);
-    ASSERT_EQ(VK_SUCCESS, vk::QueueSubmit(m_default_queue->handle(), 1, &submit_info, VK_NULL_HANDLE));
-
-    semaphore_signal_info.value = 25;
+    timeline0.SignalKHR(10);
+    m_default_queue->SubmitWithTimelineSemaphore(vkt::no_cmd, timeline1, 10, timeline0, 20);
 
     m_errorMonitor->SetDesiredError("VUID-VkSemaphoreSignalInfo-value-03259");
-    vk::SignalSemaphoreKHR(device(), &semaphore_signal_info);
+    timeline0.SignalKHR(25);
     m_errorMonitor->VerifyFound();
 
-    semaphore_signal_info.value = 15;
-    ASSERT_EQ(VK_SUCCESS, vk::SignalSemaphoreKHR(device(), &semaphore_signal_info));
-    semaphore_signal_info.semaphore = semaphore[1];
-    ASSERT_EQ(VK_SUCCESS, vk::SignalSemaphoreKHR(device(), &semaphore_signal_info));
+    timeline0.SignalKHR(15);
+    timeline1.SignalKHR(15);
 
-    // Check if we can test violations of maxTimelineSemaphoreValueDifference
+    // Test violations of maxTimelineSemaphoreValueDifference
     if (timelineproperties.maxTimelineSemaphoreValueDifference < vvl::kU64Max) {
-        VkSemaphore sem;
-
-        semaphore_type_create_info.initialValue = 0;
-        ASSERT_EQ(VK_SUCCESS, vk::CreateSemaphore(device(), &semaphore_create_info, nullptr, &sem));
-
-        semaphore_signal_info.semaphore = sem;
-        semaphore_signal_info.value = timelineproperties.maxTimelineSemaphoreValueDifference + 1;
+        vkt::Semaphore sem(*m_device, VK_SEMAPHORE_TYPE_TIMELINE);
 
         m_errorMonitor->SetDesiredError("VUID-VkSemaphoreSignalInfo-value-03260");
-        vk::SignalSemaphoreKHR(device(), &semaphore_signal_info);
+        sem.SignalKHR(timelineproperties.maxTimelineSemaphoreValueDifference + 1);
         m_errorMonitor->VerifyFound();
 
-        semaphore_signal_info.value--;
-        ASSERT_EQ(VK_SUCCESS, vk::SignalSemaphoreKHR(device(), &semaphore_signal_info));
-
+        sem.SignalKHR(timelineproperties.maxTimelineSemaphoreValueDifference);
         m_default_queue->Wait();
-
-        vk::DestroySemaphore(device(), sem, nullptr);
-
-        // Regression test for value difference validations ran against binary semaphores
-        {
-            VkSemaphore timeline_sem;
-            VkSemaphore binary_sem;
-
-            semaphore_type_create_info.initialValue = 0;
-            ASSERT_EQ(VK_SUCCESS, vk::CreateSemaphore(device(), &semaphore_create_info, nullptr, &timeline_sem));
-
-            VkSemaphoreCreateInfo binary_semaphore_create_info = vku::InitStructHelper();
-
-            ASSERT_EQ(VK_SUCCESS, vk::CreateSemaphore(device(), &binary_semaphore_create_info, nullptr, &binary_sem));
-
-            signalValue = 1;
-            uint64_t offendingValue = timelineproperties.maxTimelineSemaphoreValueDifference + 1;
-
-            submit_info.waitSemaphoreCount = 1;
-            submit_info.pWaitSemaphores = &timeline_sem;
-            submit_info.signalSemaphoreCount = 1;
-            submit_info.pSignalSemaphores = &binary_sem;
-
-            timeline_semaphore_submit_info.waitSemaphoreValueCount = 1;
-            timeline_semaphore_submit_info.pWaitSemaphoreValues = &signalValue;
-
-            // These two assignments are not required by the spec, but would segfault on older versions of validation layers
-            timeline_semaphore_submit_info.signalSemaphoreValueCount = 1;
-            timeline_semaphore_submit_info.pSignalSemaphoreValues = &offendingValue;
-
-            vk::QueueSubmit(m_default_queue->handle(), 1, &submit_info, VK_NULL_HANDLE);
-
-            semaphore_signal_info.semaphore = timeline_sem;
-            semaphore_signal_info.value = 1;
-            vk::SignalSemaphoreKHR(device(), &semaphore_signal_info);
-
-            m_default_queue->Wait();
-
-            vk::DestroySemaphore(device(), binary_sem, nullptr);
-            vk::DestroySemaphore(device(), timeline_sem, nullptr);
-        }
     }
+    // Regression test for value difference validations ran against binary semaphores
+    {
+        vkt::Semaphore timeline_sem(*m_device, VK_SEMAPHORE_TYPE_TIMELINE);
+        vkt::Semaphore binary_sem(*m_device);
 
+        uint64_t signalValue = 1;
+        uint64_t offendingValue = timelineproperties.maxTimelineSemaphoreValueDifference + 1;
+
+        VkTimelineSemaphoreSubmitInfoKHR timeline_semaphore_submit_info = vku::InitStructHelper();
+        timeline_semaphore_submit_info.waitSemaphoreValueCount = 1;
+        timeline_semaphore_submit_info.pWaitSemaphoreValues = &signalValue;
+        // These two assignments are not required by the spec, but would segfault on older versions of validation layers
+        timeline_semaphore_submit_info.signalSemaphoreValueCount = 1;
+        timeline_semaphore_submit_info.pSignalSemaphoreValues = &offendingValue;
+
+        VkPipelineStageFlags stageFlags = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        VkSubmitInfo submit_info = vku::InitStructHelper(&timeline_semaphore_submit_info);
+        submit_info.pWaitDstStageMask = &stageFlags;
+        submit_info.waitSemaphoreCount = 1;
+        submit_info.pWaitSemaphores = &timeline_sem.handle();
+        submit_info.signalSemaphoreCount = 1;
+        submit_info.pSignalSemaphores = &binary_sem.handle();
+
+        vk::QueueSubmit(m_default_queue->handle(), 1, &submit_info, VK_NULL_HANDLE);
+        timeline_sem.SignalKHR(signalValue);
+        m_default_queue->Wait();
+    }
     m_default_queue->Wait();
-    vk::DestroySemaphore(device(), semaphore[0], nullptr);
-    vk::DestroySemaphore(device(), semaphore[1], nullptr);
 }
 
 TEST_F(NegativeSyncObject, Sync2SignalSemaphoreValue) {
@@ -3564,4 +3524,156 @@ TEST_F(NegativeSyncObject, RenderPassPipelineBarrierGraphicsStage) {
     vk::CmdPipelineBarrier(m_commandBuffer->handle(), VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0,
                            0, nullptr, 0, nullptr, 0, nullptr);
     m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeSyncObject, MemoryBarrierStageNotSupportedByQueue) {
+    TEST_DESCRIPTION("Memory barrier uses pipeline stages not supported by the queue family");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    RETURN_IF_SKIP(Init());
+
+    std::optional<uint32_t> transfer_only_family = m_device->TransferOnlyQueueFamily();
+    if (!transfer_only_family.has_value()) {
+        GTEST_SKIP() << "Transfer-only queue family is required";
+    }
+    vkt::CommandPool transfer_pool(*m_device, transfer_only_family.value());
+    vkt::CommandBuffer transfer_cb(*m_device, transfer_pool);
+
+    vkt::Buffer buffer(*m_device, 256, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+
+    VkMemoryBarrier2 barrier_src_gfx = vku::InitStructHelper();
+    barrier_src_gfx.srcStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;  // graphics stage
+    barrier_src_gfx.srcAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+    barrier_src_gfx.dstStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
+    barrier_src_gfx.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+
+    VkMemoryBarrier2 barrier_dst_gfx = vku::InitStructHelper();
+    barrier_dst_gfx.srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
+    barrier_dst_gfx.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    barrier_dst_gfx.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;  // graphics stage
+    barrier_dst_gfx.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+
+    VkDependencyInfo dep_info_src_gfx = vku::InitStructHelper();
+    dep_info_src_gfx.memoryBarrierCount = 1;
+    dep_info_src_gfx.pMemoryBarriers = &barrier_src_gfx;
+
+    VkDependencyInfo dep_info_dst_gfx = vku::InitStructHelper();
+    dep_info_dst_gfx.memoryBarrierCount = 1;
+    dep_info_dst_gfx.pMemoryBarriers = &barrier_dst_gfx;
+
+    transfer_cb.begin();
+    m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier2-srcStageMask-09673");
+    vk::CmdPipelineBarrier2(transfer_cb.handle(), &dep_info_src_gfx);
+    m_errorMonitor->VerifyFound();
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier2-dstStageMask-09674");
+    vk::CmdPipelineBarrier2(transfer_cb.handle(), &dep_info_dst_gfx);
+    m_errorMonitor->VerifyFound();
+    transfer_cb.end();
+}
+
+TEST_F(NegativeSyncObject, BufferBarrierStageNotSupportedByQueue) {
+    TEST_DESCRIPTION("Buffer memory barrier without ownership transfer uses pipeline stages not supported by the queue family");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    RETURN_IF_SKIP(Init());
+
+    std::optional<uint32_t> compute_only_family = m_device->ComputeOnlyQueueFamily();
+    if (!compute_only_family.has_value()) {
+        GTEST_SKIP() << "Compute-only queue family is required";
+    }
+    vkt::CommandPool compute_pool(*m_device, compute_only_family.value());
+    vkt::CommandBuffer compute_cb(*m_device, compute_pool);
+
+    vkt::Buffer buffer(*m_device, 256, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+
+    VkBufferMemoryBarrier2 barrier_src_gfx = vku::InitStructHelper();
+    barrier_src_gfx.srcStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;  // graphics stage
+    barrier_src_gfx.srcAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+    barrier_src_gfx.dstStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
+    barrier_src_gfx.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    barrier_src_gfx.buffer = buffer.handle();
+    barrier_src_gfx.offset = 0;
+    barrier_src_gfx.size = 256;
+
+    VkBufferMemoryBarrier2 barrier_dst_gfx = vku::InitStructHelper();
+    barrier_dst_gfx.srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
+    barrier_dst_gfx.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    barrier_dst_gfx.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;  // graphics stage
+    barrier_dst_gfx.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+    barrier_dst_gfx.buffer = buffer.handle();
+    barrier_dst_gfx.offset = 0;
+    barrier_dst_gfx.size = 256;
+
+    VkDependencyInfo dep_info_src_gfx = vku::InitStructHelper();
+    dep_info_src_gfx.bufferMemoryBarrierCount = 1;
+    dep_info_src_gfx.pBufferMemoryBarriers = &barrier_src_gfx;
+
+    VkDependencyInfo dep_info_dst_gfx = vku::InitStructHelper();
+    dep_info_dst_gfx.bufferMemoryBarrierCount = 1;
+    dep_info_dst_gfx.pBufferMemoryBarriers = &barrier_dst_gfx;
+
+    compute_cb.begin();
+    m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier2-srcStageMask-09675");
+    vk::CmdPipelineBarrier2(compute_cb.handle(), &dep_info_src_gfx);
+    m_errorMonitor->VerifyFound();
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier2-dstStageMask-09676");
+    vk::CmdPipelineBarrier2(compute_cb.handle(), &dep_info_dst_gfx);
+    m_errorMonitor->VerifyFound();
+    compute_cb.end();
+}
+
+TEST_F(NegativeSyncObject, ImageBarrierStageNotSupportedByQueue) {
+    TEST_DESCRIPTION("Image memory barrier without ownership transfer uses pipeline stages not supported by the queue family");
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredFeature(vkt::Feature::synchronization2);
+    RETURN_IF_SKIP(Init());
+
+    std::optional<uint32_t> compute_only_family = m_device->ComputeOnlyQueueFamily();
+    if (!compute_only_family.has_value()) {
+        GTEST_SKIP() << "Compute-only queue family is required";
+    }
+    vkt::CommandPool compute_pool(*m_device, compute_only_family.value());
+    vkt::CommandBuffer compute_cb(*m_device, compute_pool);
+
+    vkt::Image image(*m_device, 32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+
+    VkImageMemoryBarrier2 barrier_src_gfx = vku::InitStructHelper();
+    barrier_src_gfx.srcStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;  // graphics stage
+    barrier_src_gfx.srcAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+    barrier_src_gfx.dstStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
+    barrier_src_gfx.dstAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    barrier_src_gfx.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+    barrier_src_gfx.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    barrier_src_gfx.image = image.handle();
+    barrier_src_gfx.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+    VkImageMemoryBarrier2 barrier_dst_gfx = vku::InitStructHelper();
+    barrier_dst_gfx.srcStageMask = VK_PIPELINE_STAGE_2_COPY_BIT;
+    barrier_dst_gfx.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+    barrier_dst_gfx.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;  // graphics stage
+    barrier_dst_gfx.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+    barrier_dst_gfx.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+    barrier_dst_gfx.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    barrier_dst_gfx.image = image.handle();
+    barrier_dst_gfx.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+    VkDependencyInfo dep_info_src_gfx = vku::InitStructHelper();
+    dep_info_src_gfx.imageMemoryBarrierCount = 1;
+    dep_info_src_gfx.pImageMemoryBarriers = &barrier_src_gfx;
+
+    VkDependencyInfo dep_info_dst_gfx = vku::InitStructHelper();
+    dep_info_dst_gfx.imageMemoryBarrierCount = 1;
+    dep_info_dst_gfx.pImageMemoryBarriers = &barrier_dst_gfx;
+
+    compute_cb.begin();
+    m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier2-srcStageMask-09675");
+    vk::CmdPipelineBarrier2(compute_cb.handle(), &dep_info_src_gfx);
+    m_errorMonitor->VerifyFound();
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier2-dstStageMask-09676");
+    vk::CmdPipelineBarrier2(compute_cb.handle(), &dep_info_dst_gfx);
+    m_errorMonitor->VerifyFound();
+    compute_cb.end();
 }

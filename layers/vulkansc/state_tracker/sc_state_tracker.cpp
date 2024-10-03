@@ -71,8 +71,8 @@ void SCValidationStateTracker<BASE>::RecyclePipelinePoolEntry(const VkPipelineOf
 }
 
 template <typename BASE>
-void SCValidationStateTracker<BASE>::CreateDevice(const VkDeviceCreateInfo *pCreateInfo, const Location& loc) {
-    BASE::CreateDevice(pCreateInfo, loc);
+void SCValidationStateTracker<BASE>::PostCreateDevice(const VkDeviceCreateInfo *pCreateInfo, const Location &loc) {
+    BASE::PostCreateDevice(pCreateInfo, loc);
 
     const auto *sc_10_features = vku::FindStructInPNextChain<VkPhysicalDeviceVulkanSC10Features>(pCreateInfo->pNext);
     if (sc_10_features != nullptr) {
@@ -196,7 +196,7 @@ template <typename BASE>
 std::shared_ptr<vvl::Pipeline> SCValidationStateTracker<BASE>::CreateGraphicsPipelineState(
     const VkGraphicsPipelineCreateInfo *pCreateInfo, std::shared_ptr<const vvl::PipelineCache> pipeline_cache,
     std::shared_ptr<const vvl::RenderPass> &&render_pass, std::shared_ptr<const vvl::PipelineLayout> &&layout,
-    ShaderModuleUniqueIds *shader_unique_id_map) const {
+    spirv::StatelessData stateless_data[kCommonMaxGraphicsShaderStages]) const {
     // If any of the VkPipelineShaderStageCreateInfo entries are missing:
     //  * the entry point name (pName == NULL)
     //  * specialization info (pSpecializationInfo == NULL), if necessary
@@ -237,13 +237,13 @@ std::shared_ptr<vvl::Pipeline> SCValidationStateTracker<BASE>::CreateGraphicsPip
     }
 
     return std::static_pointer_cast<vvl::Pipeline>(std::make_shared<vvl::sc::Pipeline>(
-        *this, pCreateInfo, std::move(pipeline_cache), std::move(render_pass), std::move(layout), shader_unique_id_map));
+        *this, pCreateInfo, std::move(pipeline_cache), std::move(render_pass), std::move(layout), stateless_data));
 }
 
 template <typename BASE>
 std::shared_ptr<vvl::Pipeline> SCValidationStateTracker<BASE>::CreateComputePipelineState(
     const VkComputePipelineCreateInfo *pCreateInfo, std::shared_ptr<const vvl::PipelineCache> pipeline_cache,
-    std::shared_ptr<const vvl::PipelineLayout> &&layout) const {
+    std::shared_ptr<const vvl::PipelineLayout> &&layout, spirv::StatelessData *stateless_data) const {
     // If the VkPipelineShaderStageCreateInfo entries is missing:
     //  * the entry point name (pName == NULL)
     //  * specialization info (pSpecializationInfo == NULL), if necessary
@@ -274,7 +274,7 @@ std::shared_ptr<vvl::Pipeline> SCValidationStateTracker<BASE>::CreateComputePipe
     }
 
     return std::static_pointer_cast<vvl::Pipeline>(
-        std::make_shared<vvl::sc::Pipeline>(*this, pCreateInfo, std::move(pipeline_cache), std::move(layout)));
+        std::make_shared<vvl::sc::Pipeline>(*this, pCreateInfo, std::move(pipeline_cache), std::move(layout), stateless_data));
 }
 
 template <typename BASE>

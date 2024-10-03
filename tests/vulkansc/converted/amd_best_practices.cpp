@@ -14,12 +14,13 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "utils/cast_utils.h"
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
 
 // Tests for AMD-specific best practices
 const char *kEnableAMDValidation = "VALIDATION_CHECK_ENABLE_VENDOR_SPECIFIC_AMD";
+
+class VkAmdBestPracticesLayerTest : public VkBestPracticesLayerTest {};
 
 // this is a very long test (~10 minutes)
 // disabled for now
@@ -49,7 +50,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_TooManyPipelines) {
         if (i == 1) {
             // change check to too many pipelines
             m_errorMonitor->VerifyFound();
-            m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-CreatePipelines-TooManyPipelines");
+            m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-AMD-CreatePipelines-TooManyPipelines");
         }
     }
 
@@ -64,7 +65,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_UseMutableRT) {
 
     InitRenderTarget();
 
-    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-vkImage-DontUseMutableRenderTargets");
+    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-AMD-vkImage-DontUseMutableRenderTargets");
 
     // create a colot attachment image with mutable bit set
     VkImageCreateInfo img_info = {VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
@@ -86,7 +87,8 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_UseMutableRT) {
     vk::CreateImage(m_device->handle(), &img_info, nullptr, &test_image);
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-vkImage-DontUseMutableRenderTargets");
+    m_errorMonitor->SetAllowedFailureMsg("VUID-VkImageCreateInfo-imageCreateMaxMipLevels-02251");
+    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-AMD-vkImage-DontUseMutableRenderTargets");
     // create a depth attachment image with mutable bit set
     img_info = {VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
                 nullptr,
@@ -107,7 +109,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_UseMutableRT) {
     vk::CreateImage(m_device->handle(), &img_info, nullptr, &test_image);
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-vkImage-DontUseMutableRenderTargets");
+    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-AMD-vkImage-DontUseMutableRenderTargets");
     // create a storage image with mutable bit set
     img_info = {VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
                 nullptr,
@@ -145,7 +147,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_UsageConcurentRT) {
         queueFamilies[i] = i;
     }
 
-    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-vkImage-AvoidConcurrentRenderTargets");
+    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-AMD-vkImage-AvoidConcurrentRenderTargets");
 
     // create a render target image with mutable bit set
     VkImageCreateInfo img_info = {VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
@@ -167,7 +169,8 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_UsageConcurentRT) {
     vk::CreateImage(m_device->handle(), &img_info, nullptr, &test_image);
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-vkImage-AvoidConcurrentRenderTargets");
+    m_errorMonitor->SetAllowedFailureMsg("VUID-VkImageCreateInfo-imageCreateMaxMipLevels-02251");
+    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-AMD-vkImage-AvoidConcurrentRenderTargets");
     // create a render target image with mutable bit set
     img_info = {VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
                 nullptr,
@@ -196,7 +199,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_UsageStorageRT) {
 
     InitRenderTarget();
 
-    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-vkImage-DontUseStorageRenderTargets");
+    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-AMD-vkImage-DontUseStorageRenderTargets");
 
     // create a render target image with mutable bit set
     VkImageCreateInfo img_info = {VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
@@ -226,7 +229,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_PrimitiveRestart) {
 
     InitRenderTarget();
 
-    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-CreatePipelines-AvoidPrimitiveRestart");
+    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-AMD-CreatePipelines-AvoidPrimitiveRestart");
 
     CreatePipelineHelper pipe(*this);
     pipe.ia_ci_.primitiveRestartEnable = true;
@@ -242,7 +245,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_NumDynamicStates) {
 
     InitRenderTarget();
 
-    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-CreatePipelines-MinimizeNumDynamicStates");
+    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-AMD-CreatePipelines-MinimizeNumDynamicStates");
 
     // fill the dynamic array with the first 8 types in the enum
     // imitates a case where the user have set most dynamic states unnecessarily
@@ -271,7 +274,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_KeepLayoutSmall) {
 
     InitRenderTarget();
 
-    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-CreatePipelinesLayout-KeepLayoutSmall");
+    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-AMD-CreatePipelinesLayout-KeepLayoutSmall");
 
     // create a layout of 15 DWORDS (40 bytes push constants (10 DWORDS), a descriptor set (1 DWORD), and 2 dynamic buffers (4
     // DWORDS)
@@ -316,7 +319,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_CopyingDescriptors) {
 
     InitRenderTarget();
 
-    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-UpdateDescriptors-AvoidCopyingDescriptors");
+    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-AMD-UpdateDescriptors-AvoidCopyingDescriptors");
 
     VkDescriptorPoolSize ds_type_count = {};
     ds_type_count.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
@@ -400,7 +403,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_ClearImage) {
         image_range.levelCount = 1;
         image_range.layerCount = 1;
 
-        m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-ClearAttachment-ClearImage");
+        m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-AMD-ClearAttachment-ClearImage-color");
 
         vk::CmdClearColorImage(m_commandBuffer->handle(), image_1D.handle(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clear_value, 1,
                                &image_range);
@@ -427,6 +430,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_ClearImage) {
                                       0,
                                       nullptr,
                                       VK_IMAGE_LAYOUT_UNDEFINED};
+        m_errorMonitor->SetAllowedFailureMsg("VUID-VkImageCreateInfo-imageCreateMaxMipLevels-02251");
         vkt::Image image_1D(*m_device, img_info, vkt::set_layout);
 
         m_commandBuffer->begin();
@@ -439,7 +443,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_ClearImage) {
         image_range.levelCount = 1;
         image_range.layerCount = 1;
 
-        m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-ClearAttachment-ClearImage");
+        m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-AMD-ClearAttachment-ClearImage-depth-stencil");
 
         vk::CmdClearDepthStencilImage(m_commandBuffer->handle(), image_1D.handle(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                                       &clear_value, 1, &image_range);
@@ -474,7 +478,6 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_ImageToImageCopy) {
 
     img_info.tiling = VK_IMAGE_TILING_LINEAR;
     img_info.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-    img_info.initialLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
     vkt::Image image_1D_2(*m_device, img_info, vkt::set_layout);
     if (!image_1D_2.initialized()) {
         GTEST_SKIP() << "Could not initilize Linear image, skipping image to image copy test";
@@ -483,7 +486,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_ImageToImageCopy) {
     m_commandBuffer->begin();
 
     image1D_1.SetLayout(m_commandBuffer, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-vkImage-AvoidImageToImageCopy");
+    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-AMD-vkImage-AvoidImageToImageCopy");
 
     VkImageCopy copy{};
     copy.extent = img_info.extent;
@@ -517,8 +520,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_GeneralLayout) {
                                   0,
                                   nullptr,
                                   VK_IMAGE_LAYOUT_UNDEFINED};
-    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-vkImage-AvoidGeneral");
-    m_errorMonitor->SetAllowedFailureMsg("BestPractices-VkCommandBuffer-AvoidTinyCmdBuffers");
+    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-AMD-vkImage-AvoidGeneral");
 
     // the init function initializes to general layout
     vkt::Image image_1D(*m_device, img_info);
@@ -582,7 +584,6 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_Barriers) {
     m_commandBuffer->begin();
     // check for read-to-read barrier
     m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-PipelineBarrier-readToReadBarrier");
-    m_errorMonitor->SetAllowedFailureMsg("BestPractices-CmdBuffer-backToBackBarrier");  // we already test for this above
     image_1D.SetLayout(m_commandBuffer, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     image_1D.SetLayout(m_commandBuffer, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
@@ -597,8 +598,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_Barriers) {
         image_1D.SetLayout(m_commandBuffer, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
     }
 
-    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-CmdBuffer-highBarrierCount");
-    m_errorMonitor->SetAllowedFailureMsg("BestPractices-CmdBuffer-backToBackBarrier");  // we already test for this above
+    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-AMD-CmdBuffer-highBarrierCount");
     image_1D.SetLayout(m_commandBuffer, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
     m_errorMonitor->VerifyFound();
 
@@ -655,6 +655,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_NumberOfSubmissions) {
 
     m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-Submission-ReduceNumberOfSubmissions");
     m_errorMonitor->SetUnexpectedError("VUID-VkPresentInfoKHR-pImageIndices-01430");
+    m_errorMonitor->SetUnexpectedError("UNASSIGNED-VkPresentInfoKHR-pImageIndices-MissingAcquireWait");
 
     vk::QueuePresentKHR(m_default_queue->handle(), &present_info);
 
@@ -745,7 +746,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_SecondaryCmdBuffer) {
     m_commandBuffer->begin();
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
     m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-DrawState-ClearCmdBeforeDraw");
-    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-VkCommandBuffer-AvoidSecondaryCmdBuffers");
+    m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-AMD-VkCommandBuffer-AvoidSecondaryCmdBuffers");
 
     vk::CmdExecuteCommands(m_commandBuffer->handle(), 1, &secondary_cmd_buf.handle());
 
@@ -767,7 +768,7 @@ TEST_F(VkAmdBestPracticesLayerTest, DISABLED_ComputeWorkgroupSize) {
                                   "layout(local_size_x = 4, local_size_y = 1, local_size_z = 1) in;\n\n"
                                   "void main() {}\n",
                                   VK_SHADER_STAGE_COMPUTE_BIT);
-        m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-LocalWorkgroup-Multiple64");
+        m_errorMonitor->SetDesiredFailureMsg(kPerformanceWarningBit, "BestPractices-AMD-LocalWorkgroup-Multiple64");
         CreateComputePipelineHelper pipe(*this);
         pipe.cp_ci_.stage = compute_4_1_1.GetStageCreateInfo();
         pipe.CreateComputePipeline();

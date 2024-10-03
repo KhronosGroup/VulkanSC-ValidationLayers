@@ -42,6 +42,7 @@ struct CommandValidationInfo {
 
 using Func = vvl::Func;
 // clang-format off
+const auto &GetCommandValidationTable() {
 static const vvl::unordered_map<Func, CommandValidationInfo> kCommandValidationTable {
 {Func::vkCmdBindPipeline, {
     "VUID-vkCmdBindPipeline-commandBuffer-recording",
@@ -1822,6 +1823,8 @@ static const vvl::unordered_map<Func, CommandValidationInfo> kCommandValidationT
     CMD_SCOPE_OUTSIDE, "UNASSIGNED-vkCmdDrawMeshTasksIndirectCountEXT-videocoding",
 }},
 };
+return kCommandValidationTable;
+}
 // clang-format on
 
 // Ran on all vkCmd* commands
@@ -1830,8 +1833,8 @@ static const vvl::unordered_map<Func, CommandValidationInfo> kCommandValidationT
 bool CoreChecks::ValidateCmd(const vvl::CommandBuffer& cb_state, const Location& loc) const {
     bool skip = false;
 
-    auto info_it = kCommandValidationTable.find(loc.function);
-    if (info_it == kCommandValidationTable.end()) {
+    auto info_it = GetCommandValidationTable().find(loc.function);
+    if (info_it == GetCommandValidationTable().end()) {
         assert(false);
     }
     const auto& info = info_it->second;

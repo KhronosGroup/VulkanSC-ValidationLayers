@@ -19,6 +19,8 @@
 #include "wayland-client.h"
 #endif
 
+class NegativeWsi : public WsiTest {};
+
 TEST_F(NegativeWsi, GetPhysicalDeviceDisplayPropertiesNull) {
     TEST_DESCRIPTION("Call vkGetPhysicalDeviceDisplayPropertiesKHR with null pointer");
     AddRequiredExtensions(VK_KHR_DISPLAY_EXTENSION_NAME);
@@ -330,11 +332,8 @@ TEST_F(NegativeWsi, TransferImageToSwapchainLayoutDeviceGroup) {
     m_commandBuffer->begin();
 
     VkImageCopy copy_region = {};
-    copy_region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    copy_region.srcSubresource.mipLevel = 0;
-    copy_region.srcSubresource.baseArrayLayer = 0;
-    copy_region.srcSubresource.layerCount = 1;
-    copy_region.dstSubresource = copy_region.srcSubresource;
+    copy_region.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    copy_region.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
     copy_region.srcOffset = {0, 0, 0};
     copy_region.dstOffset = {0, 0, 0};
     copy_region.extent = {test_extent_value, test_extent_value, 1};
@@ -460,6 +459,58 @@ TEST_F(NegativeWsi, SwapchainAcquireImageNoSync) {
         m_errorMonitor->SetDesiredError("VUID-vkAcquireNextImageKHR-semaphore-01780");
         uint32_t dummy;
         vk::AcquireNextImageKHR(device(), m_swapchain, kWaitTimeout, VK_NULL_HANDLE, VK_NULL_HANDLE, &dummy);
+        m_errorMonitor->VerifyFound();
+    }
+}
+
+TEST_F(NegativeWsi, SwapchainAcquireImageSignaledFence) {
+    TEST_DESCRIPTION("Test vkAcquireNextImageKHR with signaled fence");
+
+    AddSurfaceExtension();
+
+    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitSwapchain());
+
+    vkt::Fence fence(*m_device);
+
+    vk::QueueSubmit(m_default_queue->handle(), 0, nullptr, fence.handle());
+
+    vk::WaitForFences(device(), 1, &fence.handle(), VK_TRUE, kWaitTimeout);
+
+    {
+        m_errorMonitor->SetDesiredError("VUID-vkAcquireNextImageKHR-fence-01287");
+        uint32_t dummy;
+        vk::AcquireNextImageKHR(device(), m_swapchain, kWaitTimeout, VK_NULL_HANDLE, fence.handle(), &dummy);
+        m_errorMonitor->VerifyFound();
+    }
+}
+
+TEST_F(NegativeWsi, SwapchainAcquireImageSignaledFence2KHR) {
+    TEST_DESCRIPTION("Test vkAcquireNextImage2KHR with signaled fence");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+
+    AddSurfaceExtension();
+
+    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitSwapchain());
+
+    vkt::Fence fence(*m_device);
+
+    vk::QueueSubmit(m_default_queue->handle(), 0, nullptr, fence.handle());
+
+    vk::WaitForFences(device(), 1, &fence.handle(), VK_TRUE, kWaitTimeout);
+
+    {
+        m_errorMonitor->SetDesiredError("VUID-VkAcquireNextImageInfoKHR-fence-01289");
+        VkAcquireNextImageInfoKHR acquire_info = vku::InitStructHelper();
+        acquire_info.swapchain = m_swapchain;
+        acquire_info.timeout = kWaitTimeout;
+        acquire_info.semaphore = VK_NULL_HANDLE;
+        acquire_info.fence = fence.handle();
+        acquire_info.deviceMask = 0x1;
+
+        uint32_t dummy;
+        vk::AcquireNextImage2KHR(device(), &acquire_info, &dummy);
         m_errorMonitor->VerifyFound();
     }
 }
@@ -1577,7 +1628,10 @@ TEST_F(NegativeWsi, LeakASwapchain) {
     SurfaceContext surface_context{};
     VkSurfaceKHR surface{};
     VkSwapchainKHR swapchain{};
-    ASSERT_EQ(VK_SUCCESS, CreateSurface(surface_context, surface));
+    if (CreateSurface(surface_context, surface) != VK_SUCCESS) {
+        GTEST_SKIP() << "Cannot create required surface";
+    }
+
     ASSERT_TRUE(CreateSwapchain(surface, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR, swapchain));
 
     // Warn about the surface/swapchain not being destroyed
@@ -1740,9 +1794,6 @@ TEST_F(NegativeWsi, GetSwapchainImagesCountButNotImages) {
     swapchain_info.imageExtent = img_ext;
     swapchain_info.imageArrayLayers = 1;
     swapchain_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    swapchain_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    swapchain_info.queueFamilyIndexCount = 0;
-    swapchain_info.pQueueFamilyIndices = nullptr;
     swapchain_info.preTransform = m_surface_capabilities.currentTransform;
     swapchain_info.compositeAlpha = m_surface_composite_alpha;
     swapchain_info.presentMode = m_surface_present_modes[0];
@@ -3221,7 +3272,7 @@ TEST_F(NegativeWsi, PresentRegionsKHR) {
     }
 }
 
-TEST_F(PositiveWsi, UseDestroyedSwapchain) {
+TEST_F(NegativeWsi, UseDestroyedSwapchain) {
     TEST_DESCRIPTION("Draw to images of a destroyed swapchain");
     AddSurfaceExtension();
 
@@ -3468,5 +3519,52 @@ TEST_F(NegativeWsi, SwapchainPresentModeInfoImplicit) {
     present_mode_info.pPresentModes = nullptr;
     m_errorMonitor->SetDesiredError("VUID-VkSwapchainPresentModeInfoEXT-pPresentModes-parameter");
     vk::QueuePresentKHR(m_default_queue->handle(), &present);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeWsi, NonSupportedPresentMode) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8204");
+    AddSurfaceExtension();
+    RETURN_IF_SKIP(Init());
+    RETURN_IF_SKIP(InitSurface());
+
+    uint32_t count;
+    vk::GetPhysicalDeviceSurfacePresentModesKHR(gpu(), m_surface, &count, nullptr);
+    std::vector<VkPresentModeKHR> present_modes(count);
+    vk::GetPhysicalDeviceSurfacePresentModesKHR(gpu(), m_surface, &count, present_modes.data());
+    for (auto present_mode : present_modes) {
+        if (present_mode == VK_PRESENT_MODE_IMMEDIATE_KHR) {
+            GTEST_SKIP() << "Need no support for VK_PRESENT_MODE_IMMEDIATE_KHR";
+        }
+    }
+
+    VkBool32 supported;
+    vk::GetPhysicalDeviceSurfaceSupportKHR(gpu(), m_device->graphics_queue_node_index_, m_surface, &supported);
+    if (!supported) {
+        GTEST_SKIP() << "Surface not supported.";
+    }
+
+    SurfaceInformation info = GetSwapchainInfo(m_surface);
+    InitSwapchainInfo();
+
+    VkSwapchainCreateInfoKHR swapchain_create_info = vku::InitStructHelper();
+    swapchain_create_info.surface = m_surface;
+    swapchain_create_info.minImageCount = info.surface_capabilities.minImageCount;
+    swapchain_create_info.imageFormat = info.surface_formats[0].format;
+    swapchain_create_info.imageColorSpace = info.surface_formats[0].colorSpace;
+    swapchain_create_info.imageExtent = {info.surface_capabilities.minImageExtent.width,
+                                         info.surface_capabilities.minImageExtent.height};
+    swapchain_create_info.imageArrayLayers = 1;
+    swapchain_create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    swapchain_create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    swapchain_create_info.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+    swapchain_create_info.compositeAlpha = info.surface_composite_alpha;
+    swapchain_create_info.presentMode = VK_PRESENT_MODE_IMMEDIATE_KHR;
+    swapchain_create_info.clipped = VK_FALSE;
+    swapchain_create_info.oldSwapchain = VK_NULL_HANDLE;
+
+    VkSwapchainKHR swapchain;
+    m_errorMonitor->SetDesiredError("VUID-VkSwapchainCreateInfoKHR-presentMode-01281");
+    vk::CreateSwapchainKHR(device(), &swapchain_create_info, nullptr, &swapchain);
     m_errorMonitor->VerifyFound();
 }

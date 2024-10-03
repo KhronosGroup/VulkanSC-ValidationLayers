@@ -70,7 +70,7 @@ def RunGenerators(api: str, registry: str, grammar: str, directory: str, styleFi
     from generators.spirv_tool_commit_id_generator import SpirvToolCommitIdOutputGenerator
     from generators.error_location_helper_generator import ErrorLocationHelperOutputGenerator
     from generators.pnext_chain_extraction_generator import PnextChainExtractionGenerator
-    from generators.state_tracker_helper_generator import StateTrackerHelperOutputGenerator
+    from generators.device_features_generator import DeviceFeaturesOutputGenerator
     from generators.feature_requirements import FeatureRequirementsGenerator
     from generators.test_icd_generator import TestIcdGenerator
 
@@ -196,7 +196,7 @@ def RunGenerators(api: str, registry: str, grammar: str, directory: str, styleFi
         },
         'chassis.cpp' : {
             'generator' : LayerChassisOutputGenerator,
-            'genCombined': False,
+            'genCombined': True,
         },
         'chassis_dispatch_helper.h' : {
             'generator' : LayerChassisOutputGenerator,
@@ -267,12 +267,12 @@ def RunGenerators(api: str, registry: str, grammar: str, directory: str, styleFi
             'generator' : PnextChainExtractionGenerator,
             'genCombined': True,
         },
-        'state_tracker_helper.h' : {
-            'generator' : StateTrackerHelperOutputGenerator,
+        'device_features.h' : {
+            'generator' : DeviceFeaturesOutputGenerator,
             'genCombined': True,
         },
-        'state_tracker_helper.cpp' : {
-            'generator' : StateTrackerHelperOutputGenerator,
+        'device_features.cpp' : {
+            'generator' : DeviceFeaturesOutputGenerator,
             'genCombined': True,
         },
         'feature_requirements_helper.h' : {
@@ -344,7 +344,7 @@ def RunGenerators(api: str, registry: str, grammar: str, directory: str, styleFi
                 cacheVkObjectData = pickle.load(file)
                 file.close()
 
-        if caching and cacheVkObjectData and 'regenerate' not in generators[target]:
+        if caching and cacheVkObjectData and ('regenerate' not in generators[target] or not generators[target]['regenerate']):
             # TODO - We shouldn't have to regenerate any files, need to investigate why we some scripts need it
             reg.gen.generateFromCache(cacheVkObjectData, reg.genOpts)
         else:
@@ -367,21 +367,25 @@ def main(argv):
     # The shaders requires glslangvalidator, so they are updated manually with generate_spirv when needed
     verify_exclude = [
         '.clang-format',
-        'gpu_pre_dispatch_comp.cpp',
-        'gpu_pre_draw_vert.cpp',
-        'gpu_pre_trace_rays_rgen.cpp',
-        'gpu_pre_copy_buffer_to_image_comp.cpp',
-        'inst_buffer_device_address_comp.cpp',
-        'inst_bindless_descriptor_comp.cpp',
-        'inst_ray_query_comp.cpp',
-        'gpu_pre_dispatch_comp.h',
-        'gpu_pre_draw_vert.h',
-        'gpu_pre_trace_rays_rgen.h',
-        'gpu_pre_copy_buffer_to_image_comp.h',
-        'inst_buffer_device_address_comp.h',
-        'inst_bindless_descriptor_comp.h',
-        'inst_ray_query_comp.h',
-        'gpu_inst_shader_hash.h'
+        'cmd_validation_dispatch_comp.h',
+        'cmd_validation_dispatch_comp.cpp',
+        'cmd_validation_draw_vert.h',
+        'cmd_validation_draw_vert.cpp',
+        'cmd_validation_trace_rays_rgen.h',
+        'cmd_validation_trace_rays_rgen.cpp',
+        'cmd_validation_copy_buffer_to_image_comp.h',
+        'cmd_validation_copy_buffer_to_image_comp.cpp',
+        'instrumentation_buffer_device_address_comp.h',
+        'instrumentation_buffer_device_address_comp.cpp',
+        'instrumentation_bindless_descriptor_comp.h',
+        'instrumentation_bindless_descriptor_comp.cpp',
+        'instrumentation_non_bindless_oob_buffer_comp.h',
+        'instrumentation_non_bindless_oob_buffer_comp.cpp',
+        'instrumentation_non_bindless_oob_texel_buffer_comp.h',
+        'instrumentation_non_bindless_oob_texel_buffer_comp.cpp',
+        'instrumentation_ray_query_comp.h',
+        'instrumentation_ray_query_comp.cpp',
+        'gpu_av_shader_hash.h'
     ]
 
     parser = argparse.ArgumentParser(description='Generate source code for this repository')

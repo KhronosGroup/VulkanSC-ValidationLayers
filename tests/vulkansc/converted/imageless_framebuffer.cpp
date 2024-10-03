@@ -18,6 +18,8 @@
 #include "../framework/layer_validation_tests.h"
 #include "../framework/render_pass_helper.h"
 
+class NegativeImagelessFramebuffer : public VkLayerTest {};
+
 TEST_F(NegativeImagelessFramebuffer, RenderPassBeginImageViewMismatch) {
     TEST_DESCRIPTION(
         "Begin a renderPass where the image views specified do not match the parameters used to create the framebuffer and render "
@@ -855,7 +857,7 @@ TEST_F(NegativeImagelessFramebuffer, FragmentShadingRateDimensions) {
 }
 
 TEST_F(NegativeImagelessFramebuffer, FragmentShadingRateDimensionsMultiview) {
-    TEST_DESCRIPTION("Specify a fragment shading rate attachment without the correct usage");
+    TEST_DESCRIPTION("Specify a fragment shading rate attachment without the correct usage with imageless FB");
 
     AddRequiredExtensions(VK_KHR_IMAGELESS_FRAMEBUFFER_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME);
@@ -867,10 +869,6 @@ TEST_F(NegativeImagelessFramebuffer, FragmentShadingRateDimensionsMultiview) {
 
     VkPhysicalDeviceFragmentShadingRatePropertiesKHR fsr_properties = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(fsr_properties);
-
-    if (fsr_properties.layeredShadingRateAttachments) {
-        GTEST_SKIP() << "requires layeredShadingRateAttachments to be unsupported.";
-    }
 
     RenderPass2SingleSubpass rp(*this);
     rp.AddAttachmentDescription(VK_FORMAT_R8_UINT);
@@ -900,8 +898,8 @@ TEST_F(NegativeImagelessFramebuffer, FragmentShadingRateDimensionsMultiview) {
     fb_info.width = fsr_properties.minFragmentShadingRateAttachmentTexelSize.width;
     fb_info.height = fsr_properties.minFragmentShadingRateAttachmentTexelSize.height;
     fb_info.layers = 1;
-    ;
-    m_errorMonitor->SetDesiredError("VUID-VkFramebufferCreateInfo-renderPass-08921");
+
+    m_errorMonitor->SetDesiredError("VUID-VkFramebufferCreateInfo-flags-04587");
     vkt::Framebuffer fb(*m_device, fb_info);
     m_errorMonitor->VerifyFound();
 }
@@ -941,17 +939,7 @@ TEST_F(NegativeImagelessFramebuffer, RenderPassBeginImageView3D) {
     imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
     imageCreateInfo.format = attachmentFormats[0];
     vkt::Image image3D(*m_device, imageCreateInfo, vkt::set_layout);
-
-    VkImageViewCreateInfo imageViewCreateInfo = vku::InitStructHelper();
-    imageViewCreateInfo.image = image3D;
-    imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_3D;
-    imageViewCreateInfo.format = attachmentFormats[0];
-    imageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    imageViewCreateInfo.subresourceRange.baseMipLevel = 0;
-    imageViewCreateInfo.subresourceRange.levelCount = 1;
-    imageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
-    imageViewCreateInfo.subresourceRange.layerCount = 1;
-    const vkt::ImageView imageView3D(*m_device, imageViewCreateInfo);
+    vkt::ImageView imageView3D = image3D.CreateView(VK_IMAGE_VIEW_TYPE_3D);
 
     VkFramebufferAttachmentImageInfoKHR framebufferAttachmentImageInfo = vku::InitStructHelper();
     framebufferAttachmentImageInfo.flags = 0;

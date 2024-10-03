@@ -15,7 +15,8 @@
  */
 
 #include "../framework/layer_validation_tests.h"
-#include "generated/vk_extension_helper.h"
+
+class PositiveTooling : public VkLayerTest {};
 
 // Not supported in Vulkan SC: VK_EXT_tooling_info
 TEST_F(PositiveTooling, DISABLED_InfoExt) {

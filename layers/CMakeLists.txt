@@ -35,6 +35,7 @@ target_sources(VkLayer_utils PRIVATE
     error_message/error_strings.h
     error_message/record_object.h
     external/xxhash.h
+    external/inplace_function.h
     ${API_TYPE}/generated/error_location_helper.cpp
     ${API_TYPE}/generated/error_location_helper.h
     ${API_TYPE}/generated/feature_requirements_helper.cpp
@@ -66,6 +67,8 @@ target_sources(VkLayer_utils PRIVATE
     utils/ray_tracing_utils.h
     utils/vk_layer_utils.cpp
     utils/vk_layer_utils.h
+    utils/vk_struct_compare.cpp
+    utils/vk_struct_compare.h
     vk_layer_config.h
     vk_layer_config.cpp
 )
@@ -114,7 +117,7 @@ elseif(MSVC)
     )
 endif()
 
-add_subdirectory(gpu_validation/spirv)
+add_subdirectory(gpu/spirv)
 
 if(IOS)
     add_library(vvl SHARED)
@@ -123,7 +126,6 @@ else()
 endif()
 
 target_sources(vvl PRIVATE
-    best_practices/best_practices_error_enums.h
     best_practices/best_practices_utils.cpp
     best_practices/bp_buffer.cpp
     best_practices/bp_cmd_buffer.cpp
@@ -193,6 +195,8 @@ target_sources(vvl PRIVATE
     ${API_TYPE}/generated/valid_enum_values.h
     ${API_TYPE}/generated/valid_flag_values.cpp
     ${API_TYPE}/generated/command_validation.cpp
+    ${API_TYPE}/generated/device_features.cpp
+    ${API_TYPE}/generated/device_features.h
     ${API_TYPE}/generated/dynamic_state_helper.cpp
     ${API_TYPE}/generated/dynamic_state_helper.h
     ${API_TYPE}/generated/enum_flag_bits.h
@@ -201,8 +205,6 @@ target_sources(vvl PRIVATE
     ${API_TYPE}/generated/object_tracker.h
     ${API_TYPE}/generated/spirv_grammar_helper.cpp
     ${API_TYPE}/generated/spirv_validation_helper.cpp
-    ${API_TYPE}/generated/state_tracker_helper.cpp
-    ${API_TYPE}/generated/state_tracker_helper.h
     ${API_TYPE}/generated/stateless_validation_helper.cpp
     ${API_TYPE}/generated/stateless_validation_helper.h
     ${API_TYPE}/generated/sync_validation_types.cpp
@@ -211,41 +213,55 @@ target_sources(vvl PRIVATE
     ${API_TYPE}/generated/thread_safety_counter_bodies.h
     ${API_TYPE}/generated/thread_safety_counter_definitions.h
     ${API_TYPE}/generated/thread_safety_counter_instances.h
-    ${API_TYPE}/generated/gpu_inst_shader_hash.h
-    ${API_TYPE}/generated/gpu_inst_shader_hash.h
-    ${API_TYPE}/generated/gpu_pre_copy_buffer_to_image_comp.h
-    ${API_TYPE}/generated/gpu_pre_copy_buffer_to_image_comp.cpp
-    ${API_TYPE}/generated/gpu_pre_dispatch_comp.h
-    ${API_TYPE}/generated/gpu_pre_dispatch_comp.cpp
-    ${API_TYPE}/generated/gpu_pre_draw_vert.h
-    ${API_TYPE}/generated/gpu_pre_draw_vert.cpp
-    ${API_TYPE}/generated/gpu_pre_trace_rays_rgen.h
-    ${API_TYPE}/generated/gpu_pre_trace_rays_rgen.cpp
-    gpu_validation/debug_printf.cpp
-    gpu_validation/debug_printf.h
-    gpu_validation/gpu_constants.h
-    gpu_validation/gpu_descriptor_set.cpp
-    gpu_validation/gpu_descriptor_set.h
-    gpu_validation/gpu_error_message.cpp
-    gpu_validation/gpu_error_message.h
-    gpu_validation/gpu_image_layout.cpp
-    gpu_validation/gpu_shader_instrumentor.cpp
-    gpu_validation/gpu_shader_instrumentor.h
-    gpu_validation/gpu_state_tracker.cpp
-    gpu_validation/gpu_state_tracker.h
-    gpu_validation/gpu_subclasses.cpp
-    gpu_validation/gpu_subclasses.h
-    gpu_validation/gpu_record.cpp
-    gpu_validation/gpu_resources.h
-    gpu_validation/gpu_settings.h
-    gpu_validation/gpu_setup.cpp
-    gpu_validation/gpu_validation.cpp
-    gpu_validation/gpu_validation.h
-    gpu_validation/gpu_vuids.cpp
-    gpu_validation/gpu_vuids.h
-    gpu_shaders/gpu_error_codes.h
-    gpu_shaders/gpu_error_header.h
-    gpu_shaders/gpu_shaders_constants.h
+    ${API_TYPE}/generated/gpu_av_shader_hash.h
+    ${API_TYPE}/generated/cmd_validation_copy_buffer_to_image_comp.h
+    ${API_TYPE}/generated/cmd_validation_copy_buffer_to_image_comp.cpp
+    ${API_TYPE}/generated/cmd_validation_dispatch_comp.h
+    ${API_TYPE}/generated/cmd_validation_dispatch_comp.cpp
+    ${API_TYPE}/generated/cmd_validation_draw_vert.h
+    ${API_TYPE}/generated/cmd_validation_draw_vert.cpp
+    ${API_TYPE}/generated/cmd_validation_trace_rays_rgen.h
+    ${API_TYPE}/generated/cmd_validation_trace_rays_rgen.cpp
+    gpu/core/gpu_settings.h
+    gpu/core/gpu_shader_cache_hash.h
+    gpu/core/gpuav_constants.h
+    gpu/cmd_validation/gpuav_cmd_validation_common.h
+    gpu/cmd_validation/gpuav_cmd_validation_common.cpp
+    gpu/cmd_validation/gpuav_draw.h
+    gpu/cmd_validation/gpuav_draw.cpp
+    gpu/cmd_validation/gpuav_dispatch.h
+    gpu/cmd_validation/gpuav_dispatch.cpp
+    gpu/cmd_validation/gpuav_trace_rays.h
+    gpu/cmd_validation/gpuav_trace_rays.cpp
+    gpu/cmd_validation/gpuav_copy_buffer_to_image.h
+    gpu/cmd_validation/gpuav_copy_buffer_to_image.cpp
+    gpu/descriptor_validation/gpuav_descriptor_validation.h
+    gpu/descriptor_validation/gpuav_descriptor_validation.cpp
+    gpu/descriptor_validation/gpuav_descriptor_set.cpp
+    gpu/descriptor_validation/gpuav_descriptor_set.h
+    gpu/descriptor_validation/gpuav_image_layout.h
+    gpu/descriptor_validation/gpuav_image_layout.cpp
+    gpu/core/gpuav.h
+    gpu/core/gpu_state_tracker.cpp
+    gpu/core/gpu_state_tracker.h
+    gpu/core/gpuav_record.cpp
+    gpu/core/gpuav_setup.cpp
+    gpu/debug_printf/debug_printf.cpp
+    gpu/debug_printf/debug_printf.h
+    gpu/error_message/gpuav_vuids.cpp
+    gpu/error_message/gpuav_vuids.h
+    gpu/instrumentation/gpu_shader_instrumentor.cpp
+    gpu/instrumentation/gpu_shader_instrumentor.h
+    gpu/instrumentation/gpuav_instrumentation.h
+    gpu/instrumentation/gpuav_instrumentation.cpp
+    gpu/resources/gpuav_subclasses.cpp
+    gpu/resources/gpuav_subclasses.h
+    gpu/resources/gpu_shader_resources.h
+    gpu/resources/gpu_resources.h
+    gpu/resources/gpu_resources.cpp
+    gpu/shaders/gpu_error_codes.h
+    gpu/shaders/gpu_error_header.h
+    gpu/shaders/gpu_shaders_constants.h
     object_tracker/object_lifetime_validation.h
     object_tracker/object_tracker_utils.cpp
     state_tracker/buffer_state.cpp
@@ -256,6 +272,7 @@ target_sources(vvl PRIVATE
     state_tracker/descriptor_sets.h
     state_tracker/device_memory_state.cpp
     state_tracker/device_memory_state.h
+    state_tracker/device_state.cpp
     state_tracker/device_state.h
     state_tracker/fence_state.cpp
     state_tracker/fence_state.h
@@ -286,6 +303,8 @@ target_sources(vvl PRIVATE
     state_tracker/shader_module.h
     state_tracker/shader_object_state.cpp
     state_tracker/shader_object_state.h
+    state_tracker/shader_stage_state.cpp
+    state_tracker/shader_stage_state.h
     state_tracker/state_tracker.cpp
     state_tracker/state_tracker.h
     state_tracker/submission_reference.h
@@ -307,6 +326,8 @@ target_sources(vvl PRIVATE
     stateless/sl_shader_object.cpp
     stateless/sl_synchronization.cpp
     stateless/sl_utils.cpp
+    stateless/sl_vuid_maps.cpp
+    stateless/sl_vuid_maps.h
     stateless/sl_wsi.cpp
     stateless/stateless_validation.h
     sync/sync_access_context.cpp
@@ -322,6 +343,9 @@ target_sources(vvl PRIVATE
     sync/sync_op.h
     sync/sync_renderpass.cpp
     sync/sync_renderpass.h
+    sync/sync_settings.h
+    sync/sync_stats.cpp
+    sync/sync_stats.h
     sync/sync_submit.cpp
     sync/sync_submit.h
     sync/sync_utils.cpp
@@ -336,6 +360,7 @@ target_sources(vvl PRIVATE
     utils/shader_utils.h
     layer_options.cpp
     layer_options.h
+    profiling/profiling.h
 )
 get_target_property(LAYER_SOURCES vvl SOURCES)
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${LAYER_SOURCES})
@@ -433,6 +458,26 @@ target_link_libraries(vvl PRIVATE
     VkLayer_utils
 )
 
+if (VVL_ENABLE_TRACY)
+    # Rely on FetchContent to get Tracy, it is simple
+    # update_deps.py is too chaotic. Quite ok since Tracy is intended as a dev tool
+    include(FetchContent)
+    FetchContent_Declare(
+        tracy
+        GIT_REPOSITORY https://github.com/wolfpld/tracy.git
+        GIT_TAG v0.11.0
+        GIT_SHALLOW TRUE
+        GIT_PROGRESS TRUE)
+
+    FetchContent_MakeAvailable(tracy)
+
+    target_sources(vvl PRIVATE
+        profiling/profiling.h
+        profiling/profiling.cpp
+    )
+    target_link_libraries(vvl PRIVATE TracyClient)
+endif()
+
 target_include_directories(vvl SYSTEM PRIVATE external)
 
 if (ANDROID)
@@ -461,7 +506,13 @@ endif()
 # NOTE: For WIN32 the JSON and dll MUST be placed in the same location, due to Win32 using a relative path for installation.
 set(INPUT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/${LAYER_NAME}.json.in")
 set(INTERMEDIATE_FILE "${CMAKE_CURRENT_BINARY_DIR}/json/validation.json")
-set(OUTPUT_FILE_FINAL_NAME "${LAYER_NAME}.json")
+if (BUILD_SELF_VVL)
+    set(OUTPUT_FILE_FINAL_NAME "VkLayer_dev_self_validation.json")
+    set(JSON_LAYER_NAME "VK_LAYER_DEV_self_validation")
+else()
+    set(OUTPUT_FILE_FINAL_NAME "${LAYER_NAME}.json")
+    set(JSON_LAYER_NAME "VK_LAYER_KHRONOS_validation")
+endif()
 set(LAYER_INSTALL_DIR ${CMAKE_INSTALL_LIBDIR})
 if (WIN32)
     set(LAYER_INSTALL_DIR ${CMAKE_INSTALL_BINDIR}) # WIN32/MINGW expect the dll in the `bin` dir, this matches our WIN32 SDK process

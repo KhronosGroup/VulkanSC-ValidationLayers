@@ -14,9 +14,6 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include <type_traits>
-
-#include "utils/cast_utils.h"
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
 #include "../framework/render_pass_helper.h"
@@ -2350,15 +2347,9 @@ TEST_F(NegativeSyncVal, CmdDrawDepthStencil) {
     image_st.SetLayout(m_commandBuffer, VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT, VK_IMAGE_LAYOUT_GENERAL);
 
     VkImageCopy copyRegion;
-    copyRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
-    copyRegion.srcSubresource.mipLevel = 0;
-    copyRegion.srcSubresource.baseArrayLayer = 0;
-    copyRegion.srcSubresource.layerCount = 1;
+    copyRegion.srcSubresource = {VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT, 0, 0, 1};
     copyRegion.srcOffset = {0, 0, 0};
-    copyRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
-    copyRegion.dstSubresource.mipLevel = 0;
-    copyRegion.dstSubresource.baseArrayLayer = 0;
-    copyRegion.dstSubresource.layerCount = 1;
+    copyRegion.dstSubresource = {VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT, 0, 0, 1};
     copyRegion.dstOffset = {0, 0, 0};
     copyRegion.extent = {16, 16, 1};
 
@@ -3040,8 +3031,7 @@ TEST_F(NegativeSyncVal, SubpassMultiDep) {
     rp_helper_negative.InitFramebuffer();
     rp_helper_negative.InitBeginInfo();
 
-    VkSamplerCreateInfo sampler_info = SafeSaneSamplerCreateInfo();
-    vkt::Sampler sampler(*m_device, sampler_info);
+    vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
 
     CreatePipelineHelper g_pipe(*this);
     rp_helper_positive.InitPipelineHelper(g_pipe);
@@ -3158,10 +3148,6 @@ TEST_F(NegativeSyncVal, RenderPassAsyncHazard) {
     src_img_info.samples = VK_SAMPLE_COUNT_1_BIT;
     src_img_info.tiling = VK_IMAGE_TILING_OPTIMAL;
     src_img_info.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
-    src_img_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    src_img_info.queueFamilyIndexCount = 0;
-    src_img_info.pQueueFamilyIndices = nullptr;
-    src_img_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
     VkImageCreateInfo dst_img_info = vku::InitStructHelper();
     dst_img_info.flags = 0;
@@ -3173,15 +3159,11 @@ TEST_F(NegativeSyncVal, RenderPassAsyncHazard) {
     dst_img_info.samples = VK_SAMPLE_COUNT_1_BIT;
     dst_img_info.tiling = VK_IMAGE_TILING_OPTIMAL;
     dst_img_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    dst_img_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    dst_img_info.queueFamilyIndexCount = 0;
-    dst_img_info.pQueueFamilyIndices = nullptr;
-    dst_img_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
     std::vector<std::unique_ptr<vkt::Image>> images;
-    images.emplace_back(new vkt::Image(*m_device, src_img_info));
+    images.emplace_back(std::make_unique<vkt::Image>(*m_device, src_img_info));
     for (uint32_t i = 1; i < kNumImages; i++) {
-        images.emplace_back(new vkt::Image(*m_device, dst_img_info));
+        images.emplace_back(std::make_unique<vkt::Image>(*m_device, dst_img_info));
     }
 
     vkt::ImageView attachment_wrappers[kNumImages];
@@ -3929,12 +3911,9 @@ TEST_F(NegativeSyncVal, DestroyedUnusedDescriptors) {
                                        },
                                        0, &layout_createinfo_binding_flags, 0);
     const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
-    uint32_t qfi = 0;
     VkBufferCreateInfo buffer_create_info = vku::InitStructHelper();
     buffer_create_info.size = 32;
     buffer_create_info.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-    buffer_create_info.queueFamilyIndexCount = 1;
-    buffer_create_info.pQueueFamilyIndices = &qfi;
 
     vkt::Buffer doit_buffer(*m_device, buffer_create_info);
 
@@ -3961,10 +3940,7 @@ TEST_F(NegativeSyncVal, DestroyedUnusedDescriptors) {
     auto texel_bufferview = std::make_unique<vkt::BufferView>();
     texel_bufferview->init(*m_device, bvci);
 
-    VkBufferCreateInfo index_buffer_create_info = vku::InitStructHelper();
-    index_buffer_create_info.size = sizeof(uint32_t);
-    index_buffer_create_info.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-    vkt::Buffer index_buffer(*m_device, index_buffer_create_info);
+    vkt::Buffer index_buffer(*m_device, sizeof(uint32_t), VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
 
     VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
     auto image_ci = vkt::Image::ImageCreateInfo2D(128, 128, 1, 1, format, VK_IMAGE_USAGE_SAMPLED_BIT);
@@ -3979,8 +3955,7 @@ TEST_F(NegativeSyncVal, DestroyedUnusedDescriptors) {
     auto combined_view = std::make_unique<vkt::ImageView>();
     combined_view->init(*m_device, imageview_ci);
 
-    VkSamplerCreateInfo sampler_ci = SafeSaneSamplerCreateInfo();
-    vkt::Sampler sampler(*m_device, sampler_ci);
+    vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
 
     VkDescriptorImageInfo image_info[3] = {};
     image_info[0].sampler = sampler.handle();
@@ -4156,18 +4131,7 @@ TEST_F(NegativeSyncVal, TestInvalidExternalSubpassDependency) {
     image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_ci.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
     vkt::Image image1(*m_device, image_ci, vkt::set_layout);
-
-    VkImageViewCreateInfo iv_ci = vku::InitStructHelper();
-    iv_ci.image = image1.handle();
-    iv_ci.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    iv_ci.format = VK_FORMAT_D32_SFLOAT;
-    iv_ci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-    iv_ci.subresourceRange.baseMipLevel = 0;
-    iv_ci.subresourceRange.levelCount = 1;
-    iv_ci.subresourceRange.baseArrayLayer = 0;
-    iv_ci.subresourceRange.layerCount = 1;
-    vkt::ImageView image_view1(*m_device, iv_ci);
-
+    vkt::ImageView image_view1 = image1.CreateView(VK_IMAGE_ASPECT_DEPTH_BIT);
     VkImageView framebuffer_attachments[1] = {image_view1.handle()};
 
     vkt::Framebuffer framebuffer(*m_device, render_pass.handle(), 1, framebuffer_attachments);
@@ -4213,26 +4177,14 @@ TEST_F(NegativeSyncVal, CopyToCompressedImage) {
     vkt::Image dst_image(*m_device, 12, 4, 1, VK_FORMAT_BC1_RGBA_UNORM_BLOCK, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
 
     VkImageCopy copy_regions[2] = {};
-    copy_regions[0].srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    copy_regions[0].srcSubresource.mipLevel = 0;
-    copy_regions[0].srcSubresource.baseArrayLayer = 0;
-    copy_regions[0].srcSubresource.layerCount = 1;
+    copy_regions[0].srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
     copy_regions[0].srcOffset = {0, 0, 0};
-    copy_regions[0].dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    copy_regions[0].dstSubresource.mipLevel = 0;
-    copy_regions[0].dstSubresource.baseArrayLayer = 0;
-    copy_regions[0].dstSubresource.layerCount = 1;
+    copy_regions[0].dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
     copy_regions[0].dstOffset = {0, 0, 0};
     copy_regions[0].extent = {1, 1, 1};
-    copy_regions[1].srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    copy_regions[1].srcSubresource.mipLevel = 0;
-    copy_regions[1].srcSubresource.baseArrayLayer = 0;
-    copy_regions[1].srcSubresource.layerCount = 1;
+    copy_regions[1].srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
     copy_regions[1].srcOffset = {0, 0, 0};
-    copy_regions[1].dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    copy_regions[1].dstSubresource.mipLevel = 0;
-    copy_regions[1].dstSubresource.baseArrayLayer = 0;
-    copy_regions[1].dstSubresource.layerCount = 1;
+    copy_regions[1].dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
     copy_regions[1].dstOffset = {4, 0, 0};
     copy_regions[1].extent = {1, 1, 1};
 
@@ -4255,27 +4207,15 @@ TEST_F(NegativeSyncVal, CopyToCompressedImage) {
 
         VkImageCopy2KHR copy_regions2[2];
         copy_regions2[0] = vku::InitStructHelper();
-        copy_regions2[0].srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        copy_regions2[0].srcSubresource.mipLevel = 0;
-        copy_regions2[0].srcSubresource.baseArrayLayer = 0;
-        copy_regions2[0].srcSubresource.layerCount = 1;
+        copy_regions2[0].srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
         copy_regions2[0].srcOffset = {0, 0, 0};
-        copy_regions2[0].dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        copy_regions2[0].dstSubresource.mipLevel = 0;
-        copy_regions2[0].dstSubresource.baseArrayLayer = 0;
-        copy_regions2[0].dstSubresource.layerCount = 1;
+        copy_regions2[0].dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
         copy_regions2[0].dstOffset = {0, 0, 0};
         copy_regions2[0].extent = {1, 1, 1};
         copy_regions2[1] = vku::InitStructHelper();
-        copy_regions2[1].srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        copy_regions2[1].srcSubresource.mipLevel = 0;
-        copy_regions2[1].srcSubresource.baseArrayLayer = 0;
-        copy_regions2[1].srcSubresource.layerCount = 1;
+        copy_regions2[1].srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
         copy_regions2[1].srcOffset = {0, 0, 0};
-        copy_regions2[1].dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        copy_regions2[1].dstSubresource.mipLevel = 0;
-        copy_regions2[1].dstSubresource.baseArrayLayer = 0;
-        copy_regions2[1].dstSubresource.layerCount = 1;
+        copy_regions2[1].dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
         copy_regions2[1].dstOffset = {4, 0, 0};
         copy_regions2[1].extent = {1, 1, 1};
 
@@ -4641,6 +4581,7 @@ TEST_F(NegativeSyncVal, QSBufferCopyVsFence) {
 }
 
 TEST_F(NegativeSyncVal, QSBufferCopyQSORules) {
+    all_queue_count_ = true;
     RETURN_IF_SKIP(InitSyncValFramework());
     RETURN_IF_SKIP(InitState());
 
@@ -4725,6 +4666,7 @@ TEST_F(NegativeSyncVal, QSBufferCopyQSORules) {
 }
 
 TEST_F(NegativeSyncVal, QSBufferEvents) {
+    all_queue_count_ = true;
     RETURN_IF_SKIP(InitSyncValFramework());
     RETURN_IF_SKIP(InitState());
 
@@ -4828,6 +4770,7 @@ TEST_F(NegativeSyncVal, QSBufferEvents) {
 }
 
 TEST_F(NegativeSyncVal, QSOBarrierHazard) {
+    all_queue_count_ = true;
     AddRequiredExtensions(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::synchronization2);
     RETURN_IF_SKIP(InitSyncValFramework());
@@ -4996,276 +4939,6 @@ TEST_F(NegativeSyncVal, QSRenderPass) {
     m_errorMonitor->VerifyFound();
 
     m_device->Wait();  // and quiesce the system
-}
-
-// Wrap FAIL:
-//  * DRY for common messages
-//  * for test stability reasons sometimes cleanup code is required *prior* to the return hidden in FAIL
-//  * result_arg_ *can* (should) have side-effect, but is referenced exactly once
-//  * label_ must be converitble to bool, and *should* *not* have side-effects
-//    * "{}" or ";" are valid clean_ values for noop
-#define REQUIRE_SUCCESS(result_arg_, label_)                            \
-    {                                                                   \
-        const VkResult result_ = (result_arg_);                         \
-        if (result_ != VK_SUCCESS) {                                    \
-            { m_device->Wait(); }                                       \
-            if (bool(label_)) {                                         \
-                FAIL() << string_VkResult(result_) << ": " << (label_); \
-            } else {                                                    \
-                FAIL() << string_VkResult(result_);                     \
-            }                                                           \
-        }                                                               \
-    }
-
-TEST_F(NegativeSyncVal, QSPresentAcquire) {
-    TEST_DESCRIPTION("Try destroying a swapchain presentable image with vkDestroyImage");
-
-    AddSurfaceExtension();
-    RETURN_IF_SKIP(InitSyncValFramework());
-    RETURN_IF_SKIP(InitState());
-    RETURN_IF_SKIP(InitSwapchain());
-    uint32_t image_count;
-    std::vector<VkImage> images;
-    ASSERT_EQ(VK_SUCCESS, vk::GetSwapchainImagesKHR(device(), m_swapchain, &image_count, nullptr));
-    images.resize(image_count, VK_NULL_HANDLE);
-    ASSERT_EQ(VK_SUCCESS, vk::GetSwapchainImagesKHR(device(), m_swapchain, &image_count, images.data()));
-
-    std::vector<bool> image_used(images.size(), false);
-    vkt::Fence fence(*m_device);
-
-    // Loop through the indices until we find one we are reusing...
-    // When fence is non-null this can timeout so we need to track results
-    auto present_image = [this](uint32_t index, vkt::Semaphore* sem, vkt::Fence* fence) {
-        VkResult result = VK_SUCCESS;
-        if (fence) {
-            result = fence->wait(kWaitTimeout);
-            if (VK_SUCCESS == result) {
-                fence->reset();
-            }
-        }
-
-        if (VK_SUCCESS == result) {
-            VkPresentInfoKHR present_info = vku::InitStructHelper();
-            present_info.swapchainCount = 1;
-            present_info.pSwapchains = &m_swapchain;
-            present_info.pImageIndices = &index;
-            VkSemaphore h_sem = VK_NULL_HANDLE;
-            if (sem) {
-                h_sem = sem->handle();
-                present_info.waitSemaphoreCount = 1;
-                present_info.pWaitSemaphores = &h_sem;
-            }
-            vk::QueuePresentKHR(m_default_queue->handle(), &present_info);
-        }
-        return result;
-    };
-
-    // Acquire can always timeout, so we need to track results
-    auto acquire_used_image = [this, &image_used, &present_image](vkt::Semaphore* sem, vkt::Fence* fence, uint32_t& index) {
-        VkSemaphore h_sem = sem ? sem->handle() : VK_NULL_HANDLE;
-        VkFence h_fence = fence ? fence->handle() : VK_NULL_HANDLE;
-        VkResult result = VK_SUCCESS;
-
-        while (true) {
-            result = vk::AcquireNextImageKHR(m_device->handle(), m_swapchain, kWaitTimeout, h_sem, h_fence, &index);
-            if ((result != VK_SUCCESS) || image_used[index]) break;
-
-            result = present_image(index, sem, fence);
-            if (result != VK_SUCCESS) break;
-            image_used[index] = true;
-        }
-        return result;
-    };
-
-    auto write_barrier_cb = [this](const VkImage h_image, VkImageLayout from, VkImageLayout to) {
-        VkImageSubresourceRange full_image{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-        VkImageMemoryBarrier image_barrier = vku::InitStructHelper();
-        image_barrier.srcAccessMask = 0U;
-        image_barrier.dstAccessMask = 0U;
-        image_barrier.oldLayout = from;
-        image_barrier.newLayout = to;
-        image_barrier.image = h_image;
-
-        image_barrier.subresourceRange = full_image;
-        m_commandBuffer->begin();
-        vk::CmdPipelineBarrier(m_commandBuffer->handle(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0,
-                               nullptr, 0, nullptr, 1, &image_barrier);
-        m_commandBuffer->end();
-    };
-
-    // Transition swapchain images to PRESENT_SRC layout for presentation
-    for (VkImage image : images) {
-        write_barrier_cb(image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
-        m_default_queue->Submit(*m_commandBuffer);
-        m_device->Wait();
-        m_commandBuffer->reset();
-    }
-
-    uint32_t acquired_index = 0;
-    REQUIRE_SUCCESS(acquire_used_image(nullptr, &fence, acquired_index), "acquire_used_image");
-
-    write_barrier_cb(images[acquired_index], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
-
-    // Look for errors between the acquire and first use...
-    // No sync operations...
-    m_errorMonitor->SetDesiredError("SYNC-HAZARD-WRITE-AFTER-PRESENT");
-    m_default_queue->Submit(*m_commandBuffer);
-    m_errorMonitor->VerifyFound();
-
-    // Sync operations that should ignore present operations
-    m_device->Wait();
-    m_errorMonitor->SetDesiredError("SYNC-HAZARD-WRITE-AFTER-PRESENT");
-    m_default_queue->Submit(*m_commandBuffer);
-    m_errorMonitor->VerifyFound();
-
-    // Finally we wait for the fence associated with the acquire
-    REQUIRE_SUCCESS(vk::WaitForFences(m_device->handle(), 1, &fence.handle(), VK_TRUE, kWaitTimeout), "WaitForFences");
-    fence.reset();
-    m_default_queue->Submit(*m_commandBuffer);
-    m_device->Wait();
-
-    // Release the image back to the present engine, so we don't run out
-    present_image(acquired_index, nullptr, nullptr);  // present without fence can't timeout
-
-    vkt::Semaphore sem(*m_device);
-    REQUIRE_SUCCESS(acquire_used_image(&sem, nullptr, acquired_index), "acquire_used_image");
-
-    m_commandBuffer->reset();
-    write_barrier_cb(images[acquired_index], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
-
-    // The wait mask doesn't match the operations in the command buffer
-    m_errorMonitor->SetDesiredError("SYNC-HAZARD-WRITE-AFTER-READ");
-    m_default_queue->Submit(*m_commandBuffer, vkt::wait, sem, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
-    m_errorMonitor->VerifyFound();
-
-    // Now then wait mask matches the operations in the command buffer
-    m_default_queue->Submit(*m_commandBuffer, vkt::wait, sem, VK_PIPELINE_STAGE_TRANSFER_BIT);
-
-    // Try presenting without waiting for the ILT to finish
-    m_errorMonitor->SetDesiredError("SYNC-HAZARD-PRESENT-AFTER-WRITE");
-    present_image(acquired_index, nullptr, nullptr);  // present without fence can't timeout
-    m_errorMonitor->VerifyFound();
-
-    // Let the ILT complete, and the release the image back
-    m_device->Wait();
-    present_image(acquired_index, nullptr, nullptr);  // present without fence can't timeout
-
-    REQUIRE_SUCCESS(acquire_used_image(VK_NULL_HANDLE, &fence, acquired_index), "acquire_used_index");
-    REQUIRE_SUCCESS(fence.wait(kWaitTimeout), "WaitForFences");
-
-    m_commandBuffer->reset();
-    write_barrier_cb(images[acquired_index], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
-
-    fence.reset();
-    m_default_queue->Submit(*m_commandBuffer, vkt::signal, sem);
-
-    m_errorMonitor->SetDesiredError("SYNC-HAZARD-PRESENT-AFTER-WRITE");
-    present_image(acquired_index, nullptr, nullptr);  // present without fence can't timeout
-    m_errorMonitor->VerifyFound();
-
-    present_image(acquired_index, &sem, nullptr);  // present without fence can't timeout
-    m_device->Wait();
-}
-
-TEST_F(NegativeSyncVal, PresentDoesNotWaitForSubmit2) {
-    TEST_DESCRIPTION("Present does not specify semaphore to wait for submit.");
-    SetTargetApiVersion(VK_API_VERSION_1_3);
-    AddSurfaceExtension();
-    AddRequiredFeature(vkt::Feature::synchronization2);
-    RETURN_IF_SKIP(InitSyncValFramework());
-    RETURN_IF_SKIP(InitState());
-    RETURN_IF_SKIP(InitSwapchain());
-    const vkt::Semaphore acquire_semaphore(*m_device);
-    const vkt::Semaphore submit_semaphore(*m_device);
-    const auto swapchain_images = GetSwapchainImages(m_swapchain);
-
-    uint32_t image_index = 0;
-    ASSERT_EQ(VK_SUCCESS,
-              vk::AcquireNextImageKHR(device(), m_swapchain, kWaitTimeout, acquire_semaphore, VK_NULL_HANDLE, &image_index));
-
-    VkImageMemoryBarrier2 layout_transition = vku::InitStructHelper();
-    layout_transition.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-    layout_transition.srcAccessMask = 0;
-    layout_transition.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-    layout_transition.dstAccessMask = 0;
-    layout_transition.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    layout_transition.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-    layout_transition.image = swapchain_images[image_index];
-    layout_transition.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    layout_transition.subresourceRange.baseMipLevel = 0;
-    layout_transition.subresourceRange.levelCount = 1;
-    layout_transition.subresourceRange.baseArrayLayer = 0;
-    layout_transition.subresourceRange.layerCount = 1;
-
-    VkDependencyInfoKHR dep_info = vku::InitStructHelper();
-    dep_info.imageMemoryBarrierCount = 1;
-    dep_info.pImageMemoryBarriers = &layout_transition;
-
-    m_commandBuffer->begin();
-    vk::CmdPipelineBarrier2(*m_commandBuffer, &dep_info);
-    m_commandBuffer->end();
-
-    m_default_queue->Submit2(*m_commandBuffer, acquire_semaphore, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, submit_semaphore,
-                             VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT);
-
-    VkPresentInfoKHR present = vku::InitStructHelper();
-    present.waitSemaphoreCount = 0;  // DO NOT wait on submit. This should generate present after write (ILT) harard.
-    present.pWaitSemaphores = nullptr;
-    present.swapchainCount = 1;
-    present.pSwapchains = &m_swapchain;
-    present.pImageIndices = &image_index;
-
-    m_errorMonitor->SetDesiredError("SYNC-HAZARD-PRESENT-AFTER-WRITE");
-    vk::QueuePresentKHR(m_default_queue->handle(), &present);
-    m_errorMonitor->VerifyFound();
-    m_device->Wait();
-}
-
-TEST_F(NegativeSyncVal, PresentDoesNotWaitForSubmit) {
-    TEST_DESCRIPTION("Present does not specify semaphore to wait for submit.");
-    AddSurfaceExtension();
-    RETURN_IF_SKIP(InitSyncValFramework());
-    RETURN_IF_SKIP(InitState());
-    RETURN_IF_SKIP(InitSwapchain());
-    const vkt::Semaphore acquire_semaphore(*m_device);
-    const vkt::Semaphore submit_semaphore(*m_device);
-    const auto swapchain_images = GetSwapchainImages(m_swapchain);
-
-    uint32_t image_index = 0;
-    ASSERT_EQ(VK_SUCCESS,
-              vk::AcquireNextImageKHR(device(), m_swapchain, kWaitTimeout, acquire_semaphore, VK_NULL_HANDLE, &image_index));
-
-    VkImageMemoryBarrier layout_transition = vku::InitStructHelper();
-    layout_transition.srcAccessMask = 0;
-    layout_transition.dstAccessMask = 0;
-
-    layout_transition.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    layout_transition.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-    layout_transition.image = swapchain_images[image_index];
-    layout_transition.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    layout_transition.subresourceRange.baseMipLevel = 0;
-    layout_transition.subresourceRange.levelCount = 1;
-    layout_transition.subresourceRange.baseArrayLayer = 0;
-    layout_transition.subresourceRange.layerCount = 1;
-
-    m_commandBuffer->begin();
-    vk::CmdPipelineBarrier(*m_commandBuffer, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-                           VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, nullptr, 0, nullptr, 1, &layout_transition);
-    m_commandBuffer->end();
-
-    m_default_queue->Submit(*m_commandBuffer, acquire_semaphore, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, submit_semaphore);
-
-    VkPresentInfoKHR present = vku::InitStructHelper();
-    present.waitSemaphoreCount = 0;  // DO NOT wait on submit. This should generate present after write (ILT) harard.
-    present.pWaitSemaphores = nullptr;
-    present.swapchainCount = 1;
-    present.pSwapchains = &m_swapchain;
-    present.pImageIndices = &image_index;
-
-    m_errorMonitor->SetDesiredError("SYNC-HAZARD-PRESENT-AFTER-WRITE");
-    vk::QueuePresentKHR(m_default_queue->handle(), &present);
-    m_errorMonitor->VerifyFound();
-    m_device->Wait();
 }
 
 TEST_F(NegativeSyncVal, AvailabilityWithoutVisibilityForBuffer) {
@@ -6560,4 +6233,354 @@ TEST_F(NegativeSyncVal, RenderPassStoreOpNone) {
     vk::CmdPipelineBarrier2(*m_commandBuffer, &dep_info);
     m_errorMonitor->VerifyFound();
     m_commandBuffer->end();
+}
+
+TEST_F(NegativeSyncVal, DebugResourceName) {
+    TEST_DESCRIPTION("Test that hazardous buffer is reported. Two copies write to a buffer");
+    AddRequiredExtensions(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitSyncVal());
+
+    vkt::Buffer buffer_a(*m_device, 256, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+    buffer_a.SetName("BufferA");
+    vkt::Buffer buffer_b(*m_device, 256, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    buffer_b.SetName("BufferB");
+    VkBufferCopy region = {0, 0, 256};
+
+    vkt::CommandBuffer cb0(*m_device, m_command_pool);
+    cb0.begin();
+    vk::CmdCopyBuffer(cb0, buffer_a, buffer_b, 1, &region);
+    cb0.end();
+    m_default_queue->Submit(cb0);
+
+    vkt::CommandBuffer cb1(*m_device, m_command_pool);
+    cb1.begin();
+    vk::CmdCopyBuffer(cb1, buffer_a, buffer_b, 1, &region);
+    cb1.end();
+    // Two writes without synchronization (WAW). Expect BufferB in the error message but not BufferA.
+    const char* contains_buffer_b_but_not_a = "(?=.*BufferB)(?!.*BufferA)";
+    m_errorMonitor->SetDesiredErrorRegex("SYNC-HAZARD-WRITE-AFTER-WRITE", contains_buffer_b_but_not_a);
+    m_default_queue->Submit(cb1);
+    m_errorMonitor->VerifyFound();
+    m_default_queue->Wait();
+}
+
+TEST_F(NegativeSyncVal, DebugDescriptorBufferName) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
+    TEST_DESCRIPTION("Test that hazardous buffer is reported. Two dispatches write to a buffer");
+    AddRequiredExtensions(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitSyncVal());
+
+    vkt::Buffer buffer_a(*m_device, 128, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    buffer_a.SetName("BufferA");
+    vkt::Buffer buffer_b(*m_device, 128, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    buffer_b.SetName("BufferB");
+
+    OneOffDescriptorSet descriptor_set(m_device,
+                                       {
+                                           {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+                                           {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+                                       });
+    descriptor_set.WriteDescriptorBufferInfo(0, buffer_a, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    descriptor_set.WriteDescriptorBufferInfo(1, buffer_b, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    descriptor_set.UpdateDescriptorSets();
+
+    const char* cs_source = R"glsl(
+        #version 450
+        layout(set=0, binding=0) buffer buf_a { uint values_a[]; };
+        layout(set=0, binding=1) buffer buf_b { uint values_b[]; };
+        void main(){
+            values_b[0] = values_a[0];
+        }
+    )glsl";
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cs_ = std::make_unique<VkShaderObj>(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&descriptor_set.layout_});
+    pipe.CreateComputePipeline();
+
+    // Submit dispatch that writes to buffer_b
+    vkt::CommandBuffer cb(*m_device, m_command_pool);
+    cb.begin();
+    vk::CmdBindPipeline(cb.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdBindDescriptorSets(cb.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_, 0, 1, &descriptor_set.set_, 0,
+                              nullptr);
+    vk::CmdDispatch(cb.handle(), 1, 1, 1);
+    cb.end();
+    m_default_queue->Submit(cb);
+
+    // Submit one more dispatch that writes to the same buffer
+    vkt::CommandBuffer cb2(*m_device, m_command_pool);
+    cb2.begin();
+    vk::CmdBindPipeline(cb2.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdBindDescriptorSets(cb2.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_, 0, 1, &descriptor_set.set_, 0,
+                              nullptr);
+    vk::CmdDispatch(cb2.handle(), 1, 1, 1);
+    cb2.end();
+    // Two writes without synchronization (WAW). Expect BufferB in the error message but not bufferA.
+    const char* contains_buffer_b_but_not_a = "(?=.*BufferB)(?!.*BufferA)";
+    m_errorMonitor->SetDesiredErrorRegex("SYNC-HAZARD-WRITE-AFTER-WRITE", contains_buffer_b_but_not_a);
+    m_default_queue->Submit(cb2);
+    m_errorMonitor->VerifyFound();
+    m_default_queue->Wait();
+}
+
+TEST_F(NegativeSyncVal, DebugDescriptorBufferName2) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
+    TEST_DESCRIPTION("Test that hazardous buffer is reported. Dispatch writes to a buffer, then copy to the same buffer");
+    AddRequiredExtensions(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitSyncVal());
+
+    vkt::Buffer buffer_a(*m_device, 128, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    buffer_a.SetName("BufferA");
+    vkt::Buffer buffer_c(*m_device, 128, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    buffer_c.SetName("BufferC");
+    vkt::Buffer buffer_e(*m_device, 128, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    buffer_e.SetName("BufferD");
+
+    OneOffDescriptorSet descriptor_set(m_device,
+                                       {
+                                           {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+                                           {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+                                           {2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+                                       });
+    descriptor_set.WriteDescriptorBufferInfo(0, buffer_a, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    descriptor_set.WriteDescriptorBufferInfo(1, buffer_c, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    descriptor_set.WriteDescriptorBufferInfo(2, buffer_e, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    descriptor_set.UpdateDescriptorSets();
+
+    const char* cs_source = R"glsl(
+        #version 450
+        layout(set=0, binding=0) buffer buf_a { uint values_a[]; };
+        layout(set=0, binding=1) buffer buf_c { uint values_c[]; };
+        layout(set=0, binding=2) buffer buf_e { uint values_e[]; };
+        void main(){
+            values_c[0] = values_e[0];
+        }
+    )glsl";
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cs_ = std::make_unique<VkShaderObj>(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&descriptor_set.layout_});
+    pipe.CreateComputePipeline();
+
+    // Submit dispatch that writes to buffer_b
+    vkt::CommandBuffer cb(*m_device, m_command_pool);
+    cb.begin();
+    vk::CmdBindPipeline(cb.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdBindDescriptorSets(cb.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_, 0, 1, &descriptor_set.set_, 0,
+                              nullptr);
+    vk::CmdDispatch(cb.handle(), 1, 1, 1);
+    cb.end();
+    m_default_queue->Submit(cb);
+
+    // Submit copy that writes to the same buffer
+    vkt::CommandBuffer cb2(*m_device, m_command_pool);
+    cb2.begin();
+    cb2.Copy(buffer_a, buffer_c);
+    cb2.end();
+    // Two writes without synchronization (WAW). Expect BufferC in the error message but not bufferA/bufferE
+    const char* contains_buffer_c_but_not_a_and_e = "(?=.*BufferC)(?!.*BufferA)(?!.*BufferE)";
+    m_errorMonitor->SetDesiredErrorRegex("SYNC-HAZARD-WRITE-AFTER-WRITE", contains_buffer_c_but_not_a_and_e);
+    m_default_queue->Submit(cb2);
+    m_errorMonitor->VerifyFound();
+    m_default_queue->Wait();
+}
+
+TEST_F(NegativeSyncVal, DebugDescriptorBufferName3) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
+    TEST_DESCRIPTION("Different buffer of the same shader is reported depending on the previous access");
+    AddRequiredExtensions(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    RETURN_IF_SKIP(InitSyncVal());
+
+    vkt::Buffer buffer_copy_src(*m_device, 128, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+    buffer_copy_src.SetName("BufferSrc");
+    vkt::Buffer buffer_a(*m_device, 128, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    buffer_a.SetName("BufferA");
+    vkt::Buffer buffer_b(*m_device, 128, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    buffer_b.SetName("BufferB");
+    vkt::Buffer buffer_c(*m_device, 128, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    buffer_c.SetName("BufferC");
+    vkt::Buffer buffer_d(*m_device, 128, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    buffer_d.SetName("BufferD");
+
+    OneOffDescriptorSet descriptor_set(m_device,
+                                       {
+                                           {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+                                           {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+                                           {2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+                                           {3, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr},
+                                       });
+    descriptor_set.WriteDescriptorBufferInfo(0, buffer_a, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    descriptor_set.WriteDescriptorBufferInfo(1, buffer_b, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    descriptor_set.WriteDescriptorBufferInfo(2, buffer_c, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    descriptor_set.WriteDescriptorBufferInfo(3, buffer_d, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    descriptor_set.UpdateDescriptorSets();
+
+    const char* cs_source = R"glsl(
+        #version 450
+        layout(set=0, binding=0) buffer buf_a { uint values_a[]; };
+        layout(set=0, binding=1) buffer buf_b { uint values_b[]; };
+        layout(set=0, binding=2) buffer buf_c { uint values_c[]; };
+        layout(set=0, binding=3) buffer buf_d { uint values_d[]; };
+        void main(){
+            // Depending on which buffer was written before (B or D) one of the following writes causes a WAW hazard
+            values_b[0] = values_a[0];
+            values_d[0] = values_c[0];
+
+        }
+    )glsl";
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cs_ = std::make_unique<VkShaderObj>(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&descriptor_set.layout_});
+    pipe.CreateComputePipeline();
+
+    // Create WAW with bufferB. Copy-write then dispatch-write.
+    vkt::CommandBuffer cb(*m_device, m_command_pool);
+    cb.begin();
+    cb.Copy(buffer_copy_src, buffer_b);
+    cb.end();
+    m_default_queue->Submit(cb);
+
+    vkt::CommandBuffer cb2(*m_device, m_command_pool);
+    cb2.begin();
+    vk::CmdBindPipeline(cb2.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdBindDescriptorSets(cb2.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_, 0, 1, &descriptor_set.set_, 0,
+                              nullptr);
+    vk::CmdDispatch(cb2.handle(), 1, 1, 1);
+    cb2.end();
+    const char* contains_buffer_b_but_not_d = "(?=.*BufferB)(?!.*BufferD)";
+    m_errorMonitor->SetDesiredErrorRegex("SYNC-HAZARD-WRITE-AFTER-WRITE", contains_buffer_b_but_not_d);
+    m_default_queue->Submit(cb2);
+    m_errorMonitor->VerifyFound();
+    m_default_queue->Wait();
+
+    // Create WAW with bufferD. Copy-write then dispatch-write.
+    vkt::CommandBuffer cb3(*m_device, m_command_pool);
+    cb3.begin();
+    cb3.Copy(buffer_copy_src, buffer_d);
+    cb3.end();
+    m_default_queue->Submit(cb3);
+    const char* contains_buffer_d_but_not_b = "(?=.*BufferD)(?!.*BufferB)";
+    m_errorMonitor->SetDesiredErrorRegex("SYNC-HAZARD-WRITE-AFTER-WRITE", contains_buffer_d_but_not_b);
+    m_default_queue->Submit(cb2);
+    m_errorMonitor->VerifyFound();
+    m_default_queue->Wait();
+}
+
+// TODO: this very simple case should cause WRITE-AFTER-WRITE hazard but it passes successfully.
+// This happens because of SupressedBoundDescriptorWAW(). Remove SupressedBoundDescriptorWAW()
+// after SDK release. SupressedBoundDescriptorWAW works only for command buffer validation,
+// that's why the next test (WriteSameLocationFromTwoSubmits) that uses Submit does not have this problem.
+//
+// Prevention of tricky/complex false-positives should be done by having descriptor validation feature
+// turned off as default (current plan), as opposite to solutions where syncval behaves unreliable even
+// in simple scenarios. Simple should work. Complex should be manageable.
+TEST_F(NegativeSyncVal, WriteSameLocationFromTwoDispatches) {
+    TEST_DESCRIPTION("Not synchronized write to the same location causes WAW hazard");
+    RETURN_IF_SKIP(InitSyncVal());
+
+    vkt::Buffer buffer(*m_device, 128, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+
+    OneOffDescriptorSet descriptor_set(m_device, {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT}});
+    descriptor_set.WriteDescriptorBufferInfo(0, buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    descriptor_set.UpdateDescriptorSets();
+
+    const char* cs_source = R"glsl(
+        #version 450
+        layout(set=0, binding=0) buffer ssbo { uint data[]; };
+        void main(){
+            data[0] = 42;
+        }
+    )glsl";
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cs_ = std::make_unique<VkShaderObj>(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&descriptor_set.layout_});
+    pipe.CreateComputePipeline();
+
+    m_command_buffer.begin();
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_, 0, 1,
+                              &descriptor_set.set_, 0, nullptr);
+    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    // TODO: enable error monitor when we fix WAW detection.
+    // m_errorMonitor->SetDesiredError("SYNC-HAZARD-WRITE-AFTER-WRITE");
+    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    // m_errorMonitor->VerifyFound();
+    m_command_buffer.end();
+}
+
+TEST_F(NegativeSyncVal, WriteSameLocationFromTwoSubmits) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
+    TEST_DESCRIPTION("Not synchronized write to the same location causes WAW hazard");
+    RETURN_IF_SKIP(InitSyncVal());
+
+    vkt::Buffer buffer(*m_device, 128, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+
+    OneOffDescriptorSet descriptor_set(m_device, {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT}});
+    descriptor_set.WriteDescriptorBufferInfo(0, buffer, 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    descriptor_set.UpdateDescriptorSets();
+
+    const char* cs_source = R"glsl(
+        #version 450
+        layout(set=0, binding=0) buffer ssbo { uint data[]; };
+        void main(){
+            data[0] = 42;
+        }
+    )glsl";
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cs_ = std::make_unique<VkShaderObj>(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT);
+    pipe.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&descriptor_set.layout_});
+    pipe.CreateComputePipeline();
+
+    m_command_buffer.begin(VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_, 0, 1,
+                              &descriptor_set.set_, 0, nullptr);
+    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    m_command_buffer.end();
+
+    m_default_queue->Submit(m_command_buffer);
+    m_errorMonitor->SetDesiredError("SYNC-HAZARD-WRITE-AFTER-WRITE");
+    m_default_queue->Submit(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+    m_default_queue->Wait();
+}
+
+TEST_F(NegativeSyncVal, ResourceHandleIndexStability) {
+    TEST_DESCRIPTION("Test that stale handle indices (inconsistent state after core validation error) are handled correctly");
+    RETURN_IF_SKIP(InitSyncVal());
+
+    vkt::Buffer buffer(*m_device, 256, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    vkt::Buffer buffer_a(*m_device, 256, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+    vkt::Buffer buffer_b(*m_device, 256, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    vkt::Buffer buffer_c(*m_device, 256, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+    vkt::Buffer buffer_d(*m_device, 256, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+
+    m_command_buffer.begin();
+    m_command_buffer.Copy(buffer_a, buffer_b);  // buffer_a: handle index 0, buffer_b: handle index 1
+    m_command_buffer.Copy(buffer_c, buffer);    // buffer_c: handle index 2, buffer: handle index 3
+    m_command_buffer.end();
+    m_default_queue->Submit(m_command_buffer);
+
+    // Intentional violation of core validation. Begin command buffer while previous one is still pending.
+    // The command buffer's Reset call clears HandleRecord array. Due to missing synchronization, the
+    // access context still contains references to already remove handles. This core validation error
+    // leads to inconsistent command buffer state, but syncval should handle this gracefully and do not
+    // crash/assert (although no guarantees about validity of syncval reporting from this moment).
+    m_errorMonitor->SetAllowedFailureMsg("VUID-vkBeginCommandBuffer-commandBuffer-00049");
+    m_errorMonitor->SetAllowedFailureMsg("VUID-vkQueueSubmit-pCommandBuffers-00071");
+
+    m_command_buffer.begin();
+    m_command_buffer.Copy(buffer, buffer_d);
+    m_command_buffer.end();
+
+    m_errorMonitor->SetDesiredError("SYNC-HAZARD-READ-AFTER-WRITE");
+    // Hazard prior access refers to "buffer" (handle 3) but handles array is cleared
+    // (does not happen under normal circumstances). This should not cause out of bounds array access.
+    m_default_queue->Submit(m_command_buffer);
+    m_errorMonitor->VerifyFound();
+
+    m_default_queue->Wait();
 }

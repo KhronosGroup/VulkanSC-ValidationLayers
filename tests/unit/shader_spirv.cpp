@@ -14,13 +14,14 @@
 
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
-#include "../framework/render_pass_helper.h"
 
 struct icd_spv_header {
     uint32_t magic = 0x07230203;
     uint32_t version = 99;
     uint32_t gen_magic = 0;  // Generator's magic number
 };
+
+class NegativeShaderSpirv : public VkLayerTest {};
 
 TEST_F(NegativeShaderSpirv, CodeSize) {
     TEST_DESCRIPTION("Test that errors are produced for a spirv modules with invalid code sizes");
@@ -68,6 +69,78 @@ TEST_F(NegativeShaderSpirv, CodeSize) {
     }
 }
 
+TEST_F(NegativeShaderSpirv, CodeSizeMaintenance5) {
+    TEST_DESCRIPTION("Test SPIRV is still checked if using new pNext in VkPipelineShaderStageCreateInfo");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::maintenance5);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    VkShaderModuleCreateInfo module_create_info = vku::InitStructHelper();
+    module_create_info.pCode = nullptr;
+    module_create_info.codeSize = 0;
+
+    VkPipelineShaderStageCreateInfo stage_ci = vku::InitStructHelper(&module_create_info);
+    stage_ci.stage = VK_SHADER_STAGE_VERTEX_BIT;
+    stage_ci.module = VK_NULL_HANDLE;
+    stage_ci.pName = "main";
+
+    CreatePipelineHelper pipe(*this);
+    pipe.gp_ci_.stageCount = 1;
+    pipe.gp_ci_.pStages = &stage_ci;
+
+    m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-codeSize-01085");
+    pipe.CreateGraphicsPipeline();
+    m_errorMonitor->VerifyFound();
+
+    std::vector<uint32_t> shader;
+    this->GLSLtoSPV(&m_device->phy().limits_, VK_SHADER_STAGE_VERTEX_BIT, kVertexMinimalGlsl, shader);
+    module_create_info.pCode = shader.data();
+    // Introduce failure by making codeSize a non-multiple of 4
+    module_create_info.codeSize = shader.size() * sizeof(uint32_t) - 1;
+
+    m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-codeSize-08735");
+    pipe.CreateGraphicsPipeline();
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeShaderSpirv, CodeSizeMaintenance5Compute) {
+    TEST_DESCRIPTION("Test SPIRV is still checked if using new pNext in VkPipelineShaderStageCreateInfo");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::maintenance5);
+    RETURN_IF_SKIP(Init());
+
+    VkShaderModuleCreateInfo module_create_info = vku::InitStructHelper();
+    module_create_info.pCode = nullptr;
+    module_create_info.codeSize = 0;
+
+    VkPipelineShaderStageCreateInfo stage_ci = vku::InitStructHelper(&module_create_info);
+    stage_ci.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+    stage_ci.module = VK_NULL_HANDLE;
+    stage_ci.pName = "main";
+
+    vkt::PipelineLayout layout(*m_device, {});
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cp_ci_.stage = stage_ci;
+    pipe.cp_ci_.layout = layout.handle();
+
+    m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-codeSize-01085");
+    pipe.CreateComputePipeline(false);
+    m_errorMonitor->VerifyFound();
+
+    std::vector<uint32_t> shader;
+    this->GLSLtoSPV(&m_device->phy().limits_, VK_SHADER_STAGE_VERTEX_BIT, kMinimalShaderGlsl, shader);
+    module_create_info.pCode = shader.data();
+    // Introduce failure by making codeSize a non-multiple of 4
+    module_create_info.codeSize = shader.size() * sizeof(uint32_t) - 1;
+
+    m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-codeSize-08735");
+    pipe.CreateComputePipeline(false);
+    m_errorMonitor->VerifyFound();
+}
+
 TEST_F(NegativeShaderSpirv, Magic) {
     TEST_DESCRIPTION("Test that an error is produced for a spirv module with a bad magic number");
     RETURN_IF_SKIP(Init());
@@ -83,6 +156,63 @@ TEST_F(NegativeShaderSpirv, Magic) {
 
     m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-07912");
     vk::CreateShaderModule(device(), &module_create_info, nullptr, &module);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeShaderSpirv, MagicMaintenance5) {
+    TEST_DESCRIPTION("Test SPIRV is still checked if using new pNext in VkPipelineShaderStageCreateInfo");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::maintenance5);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    constexpr uint32_t bad_magic = 4175232508U;
+    constexpr icd_spv_header spv = {bad_magic};
+
+    VkShaderModuleCreateInfo module_create_info = vku::InitStructHelper();
+    module_create_info.pCode = reinterpret_cast<const uint32_t *>(&spv);
+    module_create_info.codeSize = sizeof(spv);
+
+    VkPipelineShaderStageCreateInfo stage_ci = vku::InitStructHelper(&module_create_info);
+    stage_ci.stage = VK_SHADER_STAGE_VERTEX_BIT;
+    stage_ci.module = VK_NULL_HANDLE;
+    stage_ci.pName = "main";
+
+    CreatePipelineHelper pipe(*this);
+    pipe.gp_ci_.stageCount = 1;
+    pipe.gp_ci_.pStages = &stage_ci;
+
+    m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-07912");
+    pipe.CreateGraphicsPipeline();
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeShaderSpirv, MagicMaintenance5Compute) {
+    TEST_DESCRIPTION("Test SPIRV is still checked if using new pNext in VkPipelineShaderStageCreateInfo");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::maintenance5);
+    RETURN_IF_SKIP(Init());
+
+    constexpr uint32_t bad_magic = 4175232508U;
+    constexpr icd_spv_header spv = {bad_magic};
+
+    VkShaderModuleCreateInfo module_create_info = vku::InitStructHelper();
+    module_create_info.pCode = reinterpret_cast<const uint32_t *>(&spv);
+    module_create_info.codeSize = sizeof(spv);
+
+    VkPipelineShaderStageCreateInfo stage_ci = vku::InitStructHelper(&module_create_info);
+    stage_ci.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+    stage_ci.module = VK_NULL_HANDLE;
+    stage_ci.pName = "main";
+    vkt::PipelineLayout layout(*m_device, {});
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cp_ci_.stage = stage_ci;
+    pipe.cp_ci_.layout = layout.handle();
+
+    m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-07912");
+    pipe.CreateComputePipeline(false);
     m_errorMonitor->VerifyFound();
 }
 
@@ -479,6 +609,51 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitCapability) {
         VkShaderObj const fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0);
         m_errorMonitor->VerifyFound();
     }
+}
+
+TEST_F(NegativeShaderSpirv, SpirvStatelessMaintenance5) {
+    TEST_DESCRIPTION("Test SPIRV is still checked if using new pNext in VkPipelineShaderStageCreateInfo");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::vertexPipelineStoresAndAtomics);
+    AddRequiredFeature(vkt::Feature::maintenance5);
+    AddDisabledFeature(vkt::Feature::shaderInt16);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    char const *vsSource = R"glsl(
+        #version 450
+        #extension GL_EXT_shader_8bit_storage: enable
+        #extension GL_EXT_shader_explicit_arithmetic_types_int8: enable
+        layout(set = 0, binding = 0) buffer SSBO { int8_t x; } data;
+        void main(){
+            int8_t a = data.x + data.x;
+            gl_Position = vec4(float(a) * 0.0);
+        }
+    )glsl";
+    std::vector<uint32_t> shader;
+    this->GLSLtoSPV(&m_device->phy().limits_, VK_SHADER_STAGE_VERTEX_BIT, vsSource, shader);
+
+    VkShaderModuleCreateInfo module_create_info = vku::InitStructHelper();
+    module_create_info.pCode = shader.data();
+    module_create_info.codeSize = shader.size() * sizeof(uint32_t);
+
+    VkPipelineShaderStageCreateInfo stage_ci = vku::InitStructHelper(&module_create_info);
+    stage_ci.stage = VK_SHADER_STAGE_VERTEX_BIT;
+    stage_ci.module = VK_NULL_HANDLE;
+    stage_ci.pName = "main";
+
+    CreatePipelineHelper pipe(*this);
+    pipe.gp_ci_.stageCount = 1;
+    pipe.gp_ci_.pStages = &stage_ci;
+    pipe.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT, nullptr}};
+
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-uniformAndStorageBuffer8BitAccess-06329");  // feature
+    m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740", 2);               // Int8
+    pipe.CreateGraphicsPipeline();
+    m_errorMonitor->VerifyFound();
 }
 
 TEST_F(NegativeShaderSpirv, Storage8and16bitFeatures) {
@@ -936,7 +1111,6 @@ TEST_F(NegativeShaderSpirv, Storage8and16bitFeatures) {
 TEST_F(NegativeShaderSpirv, ReadShaderClock) {
     TEST_DESCRIPTION("Test VK_KHR_shader_clock");
 
-    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_SHADER_CLOCK_EXTENSION_NAME);
     // Don't enable either feature bit on
     RETURN_IF_SKIP(Init());
@@ -2266,5 +2440,42 @@ TEST_F(NegativeShaderSpirv, FPFastMathMode) {
 
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-shaderSignedZeroInfNanPreserveFloat32-09562");
     VkShaderObj cs(this, spv_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1, SPV_SOURCE_ASM);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeShaderSpirv, ScalarBlockLayoutShaderCache) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8031");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddDisabledFeature(vkt::Feature::scalarBlockLayout);  // will NOT set --scalar-block-layout
+    RETURN_IF_SKIP(Init());
+
+    // Matches glsl from other ScalarBlockLayoutShaderCache test
+    char const *cs_source = R"glsl(
+        #version 460
+        #extension GL_EXT_buffer_reference : require
+        #extension GL_EXT_scalar_block_layout : require
+
+        struct Transform {
+            mat3x3 rotScaMatrix; //  0, 36
+            vec3 pos;            // 36, 12
+            vec3 pos_err;        // 48, 12
+            float padding;       // 60, 4
+        };
+
+        layout(scalar, buffer_reference, buffer_reference_align = 64) readonly buffer Transforms {
+            Transform transforms[];
+        };
+        layout(std430, push_constant) uniform PushConstant {
+            Transforms pTransforms;
+        };
+
+        void main() {
+            Transform transform = pTransforms.transforms[0];
+        }
+    )glsl";
+
+    m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08737");
+    VkShaderObj cs(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2);
     m_errorMonitor->VerifyFound();
 }

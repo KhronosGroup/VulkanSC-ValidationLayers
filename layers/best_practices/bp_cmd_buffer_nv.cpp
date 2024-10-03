@@ -18,7 +18,6 @@
  */
 
 #include "best_practices/best_practices_validation.h"
-#include "best_practices/best_practices_error_enums.h"
 #include "best_practices/bp_state.h"
 
 static std::array<uint32_t, 4> GetRawClearColor(VkFormat format, const VkClearColorValue& clear_value) {
@@ -88,7 +87,7 @@ void BestPractices::RecordBindZcullScope(bp_state::CommandBuffer& cmd_state, VkI
     assert((subresource_range.aspectMask & VK_IMAGE_ASPECT_DEPTH_BIT) != 0U);
 
     auto image_state = Get<vvl::Image>(depth_attachment);
-    assert(image_state);
+    ASSERT_AND_RETURN(image_state);
 
     const uint32_t mip_levels = image_state->create_info.mipLevels;
     const uint32_t array_layers = image_state->create_info.arrayLayers;
@@ -120,14 +119,14 @@ void BestPractices::RecordResetScopeZcullDirection(bp_state::CommandBuffer& cmd_
 
 template <typename Func>
 static void ForEachSubresource(const vvl::Image& image, const VkImageSubresourceRange& range, Func&& func) {
-    const uint32_t layerCount =
+    const uint32_t layer_count =
         (range.layerCount == VK_REMAINING_ARRAY_LAYERS) ? (image.full_range.layerCount - range.baseArrayLayer) : range.layerCount;
-    const uint32_t levelCount =
+    const uint32_t level_count =
         (range.levelCount == VK_REMAINING_MIP_LEVELS) ? (image.full_range.levelCount - range.baseMipLevel) : range.levelCount;
 
-    for (uint32_t i = 0; i < layerCount; ++i) {
+    for (uint32_t i = 0; i < layer_count; ++i) {
         const uint32_t layer = range.baseArrayLayer + i;
-        for (uint32_t j = 0; j < levelCount; ++j) {
+        for (uint32_t j = 0; j < level_count; ++j) {
             const uint32_t level = range.baseMipLevel + j;
             func(layer, level);
         }
@@ -147,7 +146,7 @@ void BestPractices::RecordResetZcullDirection(bp_state::CommandBuffer& cmd_state
     auto& tree = image_it->second;
 
     auto image = Get<vvl::Image>(depth_image);
-    if (!image) return;
+    ASSERT_AND_RETURN(image);
 
     ForEachSubresource(*image, subresource_range, [&tree](uint32_t layer, uint32_t level) {
         auto& subresource = tree.GetState(layer, level);
@@ -174,7 +173,7 @@ void BestPractices::RecordSetZcullDirection(bp_state::CommandBuffer& cmd_state, 
     auto& tree = image_it->second;
 
     auto image = Get<vvl::Image>(depth_image);
-    if (!image) return;
+    ASSERT_AND_RETURN(image);
 
     ForEachSubresource(*image, subresource_range, [&tree, &cmd_state](uint32_t layer, uint32_t level) {
         tree.GetState(layer, level).direction = cmd_state.nv.zcull_direction;
@@ -196,7 +195,7 @@ void BestPractices::RecordZcullDraw(bp_state::CommandBuffer& cmd_state) {
         switch (subresource.direction) {
             case ZcullDirection::Unknown:
                 // Unreachable
-                assert(0);
+                assert(false);
                 break;
             case ZcullDirection::Less:
                 ++subresource.num_less_draws;
@@ -236,9 +235,7 @@ bool BestPractices::ValidateZcull(const bp_state::CommandBuffer& cmd_state, VkIm
     const auto& tree = image_it->second;
 
     auto image_state = Get<vvl::Image>(image);
-    if (!image_state) {
-        return skip;
-    }
+    ASSERT_AND_RETURN_SKIP(image_state);
 
     ForEachSubresource(*image_state, subresource_range, [&](uint32_t layer, uint32_t level) {
         if (is_balanced) {
@@ -268,7 +265,7 @@ bool BestPractices::ValidateZcull(const bp_state::CommandBuffer& cmd_state, VkIm
 
     if (is_balanced) {
         skip |= LogPerformanceWarning(
-            kVUID_BestPractices_Zcull_LessGreaterRatio, cmd_state.Handle(), loc,
+            "BestPractices-NVIDIA-Zcull-LessGreaterRatio", cmd_state.Handle(), loc,
             "%s Depth attachment %s is primarily rendered with depth compare op %s, but some draws use %s. "
             "Z-cull is disabled for the least used direction, which harms depth testing performance. "
             "The Z-cull direction can be reset by clearing the depth attachment, transitioning from VK_IMAGE_LAYOUT_UNDEFINED, "
@@ -335,7 +332,7 @@ bool BestPractices::ValidateClearColor(VkCommandBuffer commandBuffer, VkFormat f
             }
         }
 
-        skip |= LogPerformanceWarning(kVUID_BestPractices_ClearColor_NotCompressed, commandBuffer, loc,
+        skip |= LogPerformanceWarning("BestPractices-NVIDIA-ClearColor-NotCompressed", commandBuffer, loc,
                                       "%s Clearing image with format %s without a 1.0f or 0.0f clear color. "
                                       "The clear will not get compressed in the GPU, harming performance. "
                                       "This can be fixed using a clear color of VkClearColorValue{0.0f, 0.0f, 0.0f, 0.0f}, or "
@@ -368,7 +365,7 @@ bool BestPractices::ValidateClearColor(VkCommandBuffer commandBuffer, VkFormat f
             }
 
             skip |= LogPerformanceWarning(
-                kVUID_BestPractices_ClearColor_NotCompressed, commandBuffer, loc,
+                "BestPractices-NVIDIA-ClearColor-NotCompressed", commandBuffer, loc,
                 "%s Clearing image with unregistered VkClearColorValue{%s}. "
                 "This clear will not get compressed in the GPU, harming performance. "
                 "The clear color is not registered because too many unique colors have been used. "

@@ -13,7 +13,6 @@
 
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
-#include "generated/vk_extension_helper.h"
 
 bool QueryTest::HasZeroTimestampValidBits() {
     uint32_t queue_count;
@@ -22,6 +21,8 @@ bool QueryTest::HasZeroTimestampValidBits() {
     vk::GetPhysicalDeviceQueueFamilyProperties(gpu(), &queue_count, queue_props.data());
     return (queue_props[m_device->graphics_queue_node_index_].timestampValidBits == 0);
 }
+
+class PositiveQuery : public QueryTest {};
 
 TEST_F(PositiveQuery, OutsideRenderPass) {
     AddRequiredFeature(vkt::Feature::pipelineStatisticsQuery);
@@ -116,14 +117,7 @@ TEST_F(PositiveQuery, BasicQuery) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    uint32_t qfi = 0;
-    VkBufferCreateInfo bci = vku::InitStructHelper();
-    bci.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-    bci.size = 4 * sizeof(uint64_t);
-    bci.queueFamilyIndexCount = 1;
-    bci.pQueueFamilyIndices = &qfi;
-    VkMemoryPropertyFlags mem_props = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-    vkt::Buffer buffer(*m_device, bci, mem_props);
+    vkt::Buffer buffer(*m_device, 4 * sizeof(uint64_t), VK_BUFFER_USAGE_TRANSFER_DST_BIT);
 
     vkt::QueryPool query_pool(*m_device, VK_QUERY_TYPE_OCCLUSION, 2);
 
@@ -175,14 +169,7 @@ TEST_F(PositiveQuery, DestroyQueryPoolBasedOnQueryPoolResults) {
     constexpr uint64_t sizeof_samples_passed = samples_passed.size() * sizeof(uint64_t);
     constexpr VkDeviceSize sample_stride = sizeof(uint64_t);
 
-    uint32_t qfi = 0;
-    VkBufferCreateInfo bci = vku::InitStructHelper();
-    bci.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-    bci.size = sizeof_samples_passed;
-    bci.queueFamilyIndexCount = 1;
-    bci.pQueueFamilyIndices = &qfi;
-    VkMemoryPropertyFlags mem_props = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-    vkt::Buffer buffer(*m_device, bci, mem_props);
+    vkt::Buffer buffer(*m_device, sizeof_samples_passed, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
 
     constexpr uint32_t query_count = 2;
 
@@ -251,14 +238,7 @@ TEST_F(PositiveQuery, QueryAndCopySecondaryCommandBuffers) {
     VkQueue queue = VK_NULL_HANDLE;
     vk::GetDeviceQueue(device(), m_device->graphics_queue_node_index_, 1, &queue);
 
-    uint32_t qfi = 0;
-    VkBufferCreateInfo buff_create_info = vku::InitStructHelper();
-    buff_create_info.size = 1024;
-    buff_create_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-    buff_create_info.queueFamilyIndexCount = 1;
-    buff_create_info.pQueueFamilyIndices = &qfi;
-
-    vkt::Buffer buffer(*m_device, buff_create_info);
+    vkt::Buffer buffer(*m_device, 1024, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
 
     VkCommandBufferInheritanceInfo hinfo = vku::InitStructHelper();
     hinfo.renderPass = VK_NULL_HANDLE;
@@ -317,14 +297,7 @@ TEST_F(PositiveQuery, QueryAndCopyMultipleCommandBuffers) {
     VkQueue queue = VK_NULL_HANDLE;
     vk::GetDeviceQueue(device(), m_device->graphics_queue_node_index_, 1, &queue);
 
-    uint32_t qfi = 0;
-    VkBufferCreateInfo buff_create_info = vku::InitStructHelper();
-    buff_create_info.size = 1024;
-    buff_create_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-    buff_create_info.queueFamilyIndexCount = 1;
-    buff_create_info.pQueueFamilyIndices = &qfi;
-
-    vkt::Buffer buffer(*m_device, buff_create_info);
+    vkt::Buffer buffer(*m_device, 1024, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
 
     {
         VkCommandBufferBeginInfo begin_info = vku::InitStructHelper();

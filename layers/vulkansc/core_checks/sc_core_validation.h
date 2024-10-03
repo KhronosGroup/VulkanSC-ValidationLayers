@@ -134,7 +134,8 @@ class SCCoreChecks : public SCValidationStateTracker<CoreChecks> {
                                         const ErrorObject& error_obj) const override;
 
     // Validation utility functions overridden for Vulkan SC
-    bool ValidateShaderModuleId(const vvl::Pipeline& pipeline, const Location& loc) const override;
+    bool ValidatePipelineShaderStage(const vvl::Pipeline& pipeline, const vku::safe_VkPipelineShaderStageCreateInfo& stage_ci,
+                                     const void* pipeline_ci_pnext, const Location& loc) const override;
 
     // Intercept instance creation to set up VUID filters
     void PreCallRecordCreateInstance(const VkInstanceCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator,
@@ -146,7 +147,7 @@ class SCCoreChecks : public SCValidationStateTracker<CoreChecks> {
     bool PreCallValidateCreateDevice(VkPhysicalDevice physicalDevice, const VkDeviceCreateInfo* pCreateInfo,
                                      const VkAllocationCallbacks* pAllocator, VkDevice* pDevice,
                                      const ErrorObject& error_obj) const override;
-    void CreateDevice(const VkDeviceCreateInfo* pCreateInfo, const Location& loc) override;
+    void PostCreateDevice(const VkDeviceCreateInfo* pCreateInfo, const Location& loc) override;
 
     bool PreCallValidateCreateCommandPool(VkDevice device, const VkCommandPoolCreateInfo* pCreateInfo,
                                           const VkAllocationCallbacks* pAllocator, VkCommandPool* pCommandPool,
@@ -243,7 +244,7 @@ class SCCoreChecks : public SCValidationStateTracker<CoreChecks> {
     bool ValidatePipelineStageInfo(uint32_t stage_index, const VkPipelineShaderStageCreateInfo& stage_info,
                                    const vvl::sc::PipelineCache* pipeline_cache_state,
                                    const VkPipelineOfflineCreateInfo* offline_info, const Location& loc) const;
-    bool ValidatePipelineShaderStage(const StageCreateInfo& stage_create_info, const PipelineStageState& stage_state,
+    virtual bool ValidateShaderStage(const ShaderStageState& stage_state, const vvl::Pipeline* pipeline,
                                      const Location& loc) const override;
 
 };  // Class SCCoreChecks

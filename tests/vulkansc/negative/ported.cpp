@@ -18,7 +18,9 @@
 // which don't apply to Vulkan SC or parameterize them accordingly.
 
 class VkSCPortedLayerTest : public VkLayerTest {};
+class NegativeImage : public ImageTest {};
 class VkSCPortedNegativeImage : public NegativeImage {};
+class NegativeMemory : public VkLayerTest {};
 class VkSCPortedNegativeMemory : public NegativeMemory {};
 
 TEST_F(VkSCPortedLayerTest, SpecLinks) {

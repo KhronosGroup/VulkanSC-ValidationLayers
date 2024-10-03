@@ -17,9 +17,11 @@
  *
  */
 
-#include "utils/cast_utils.h"
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
+#include "utils/convert_utils.h"
+
+class NegativeDynamicRenderingLocalRead : public DynamicRenderingTest {};
 
 TEST_F(NegativeDynamicRenderingLocalRead, AttachmentLayout) {
     TEST_DESCRIPTION(
@@ -576,8 +578,8 @@ TEST_F(NegativeDynamicRenderingLocalRead, BeginWithinRenderPass) {
     const bool rp2Supported = IsExtensionsEnabled(VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME);
 
     for (uint32_t i = 0; i < 3; i++) {
-        vector<VkAttachmentReference> color_references;
-        vector<VkAttachmentDescription> attachment_descriptions;
+        std::vector<VkAttachmentReference> color_references;
+        std::vector<VkAttachmentDescription> attachment_descriptions;
         std::shared_ptr<vkt::Framebuffer> framebuffer;
         std::vector<std::unique_ptr<vkt::Image>> renderTargets;
         std::vector<vkt::ImageView> render_target_views;   // color attachments but not depth
@@ -1159,4 +1161,197 @@ TEST_F(NegativeDynamicRenderingLocalRead, FramebufferSpaceStagesDst) {
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier2-srcStageMask-09556");
     vk::CmdPipelineBarrier2KHR(m_commandBuffer->handle(), &dependency_info);
     m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeDynamicRenderingLocalRead, RenderingAttachmentLocationInfoMismatch) {
+    RETURN_IF_SKIP(InitBasicDynamicRenderingLocalRead());
+    InitDynamicRenderTarget();
+
+    const auto render_target_ci = vkt::Image::ImageCreateInfo2D(m_renderTargets[0]->width(), m_renderTargets[0]->height(),
+                                                                m_renderTargets[0]->create_info().mipLevels, 1,
+                                                                m_renderTargets[0]->format(), m_renderTargets[0]->usage());
+
+    vkt::Image render_target(*m_device, render_target_ci, vkt::set_layout);
+    vkt::ImageView render_target_view = render_target.CreateView(VK_IMAGE_VIEW_TYPE_2D, 0, 1, 0, render_target_ci.arrayLayers);
+
+    VkCommandBufferAllocateInfo secondary_cmd_buffer_alloc_info = vku::InitStructHelper();
+    secondary_cmd_buffer_alloc_info.commandPool = m_command_pool.handle();
+    secondary_cmd_buffer_alloc_info.level = VK_COMMAND_BUFFER_LEVEL_SECONDARY;
+    secondary_cmd_buffer_alloc_info.commandBufferCount = 1;
+
+    vkt::CommandBuffer secondary_cmd_buffer(*m_device, secondary_cmd_buffer_alloc_info);
+
+    uint32_t color_attachment_locations[1] = {0};
+    uint32_t invalid_attachment_locations[1] = {1};
+
+    VkRenderingAttachmentLocationInfoKHR rendering_attachment_location_info = vku::InitStructHelper{};
+    rendering_attachment_location_info.colorAttachmentCount = 1;
+    rendering_attachment_location_info.pColorAttachmentLocations = color_attachment_locations;
+
+    VkRenderingAttachmentLocationInfoKHR invalid_rendering_attachment_location_info = vku::InitStructHelper{};
+    invalid_rendering_attachment_location_info.colorAttachmentCount = 0;
+    invalid_rendering_attachment_location_info.pColorAttachmentLocations = nullptr;
+
+    VkCommandBufferInheritanceRenderingInfo inheritance_rendering_info =
+        vku::InitStructHelper(&invalid_rendering_attachment_location_info);
+    inheritance_rendering_info.colorAttachmentCount = 1;
+    inheritance_rendering_info.pColorAttachmentFormats = &render_target_ci.format;
+    inheritance_rendering_info.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    VkCommandBufferInheritanceInfo cmd_buffer_inheritance_info = vku::InitStructHelper(&inheritance_rendering_info);
+
+    VkCommandBufferBeginInfo secondary_cmd_buffer_begin_info = vku::InitStructHelper{};
+    secondary_cmd_buffer_begin_info.flags =
+        VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT | VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
+    secondary_cmd_buffer_begin_info.pInheritanceInfo = &cmd_buffer_inheritance_info;
+
+    secondary_cmd_buffer.begin(&secondary_cmd_buffer_begin_info);
+    secondary_cmd_buffer.end();
+
+    m_command_buffer.begin();
+
+    VkRenderingAttachmentInfoKHR color_attachment_info = vku::InitStructHelper{};
+    color_attachment_info.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    color_attachment_info.imageView = render_target_view.handle();
+
+    VkClearRect clear_rect = {{{0, 0}, {m_width, m_height}}, 0, 1};
+
+    VkRenderingInfoKHR begin_rendering_info = vku::InitStructHelper{};
+    begin_rendering_info.flags = VK_RENDERING_CONTENTS_SECONDARY_COMMAND_BUFFERS_BIT_KHR;
+    begin_rendering_info.renderArea = clear_rect.rect;
+    begin_rendering_info.layerCount = 2;
+    begin_rendering_info.colorAttachmentCount = 1;
+    begin_rendering_info.pColorAttachments = &color_attachment_info;
+
+    // Force invalid colorAttachmentCount
+    m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-pCommandBuffers-09504");
+    m_command_buffer.BeginRendering(begin_rendering_info);
+    vk::CmdSetRenderingAttachmentLocationsKHR(m_command_buffer.handle(), &rendering_attachment_location_info);
+    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary_cmd_buffer.handle());
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.EndRendering();
+    m_command_buffer.end();
+
+    // Force colorAttachmentLocation mismatch.
+    invalid_rendering_attachment_location_info.colorAttachmentCount = 1;
+    invalid_rendering_attachment_location_info.pColorAttachmentLocations = invalid_attachment_locations;
+
+    secondary_cmd_buffer.reset();
+    secondary_cmd_buffer.begin(&secondary_cmd_buffer_begin_info);
+    secondary_cmd_buffer.end();
+
+    m_command_buffer.reset();
+    m_command_buffer.begin();
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-pCommandBuffers-09504");
+    m_command_buffer.BeginRendering(begin_rendering_info);
+    vk::CmdSetRenderingAttachmentLocationsKHR(m_command_buffer.handle(), &rendering_attachment_location_info);
+    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary_cmd_buffer.handle());
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.EndRendering();
+
+    m_command_buffer.end();
+}
+
+TEST_F(NegativeDynamicRenderingLocalRead, RenderingInputAttachmentIndexInfoMismatch) {
+    RETURN_IF_SKIP(InitBasicDynamicRenderingLocalRead());
+    InitDynamicRenderTarget();
+
+    const auto render_target_ci = vkt::Image::ImageCreateInfo2D(m_renderTargets[0]->width(), m_renderTargets[0]->height(),
+                                                                m_renderTargets[0]->create_info().mipLevels, 1,
+                                                                m_renderTargets[0]->format(), m_renderTargets[0]->usage());
+
+    vkt::Image render_target(*m_device, render_target_ci, vkt::set_layout);
+    vkt::ImageView render_target_view = render_target.CreateView(VK_IMAGE_VIEW_TYPE_2D, 0, 1, 0, render_target_ci.arrayLayers);
+
+    VkCommandBufferAllocateInfo secondary_cmd_buffer_alloc_info = vku::InitStructHelper();
+    secondary_cmd_buffer_alloc_info.commandPool = m_command_pool.handle();
+    secondary_cmd_buffer_alloc_info.level = VK_COMMAND_BUFFER_LEVEL_SECONDARY;
+    secondary_cmd_buffer_alloc_info.commandBufferCount = 1;
+
+    vkt::CommandBuffer secondary_cmd_buffer(*m_device, secondary_cmd_buffer_alloc_info);
+
+    uint32_t color_attachment_indices[1] = {1};
+    uint32_t invalid_color_attachment_indices[1] = {0};
+
+    const uint32_t depth_attachment_index = VK_ATTACHMENT_UNUSED;
+    const uint32_t stencil_attachment_index = VK_ATTACHMENT_UNUSED;
+    const uint32_t invalid_depth_attachment_index = 0;
+    const uint32_t invalid_stencil_attachment_index = 0;
+
+    VkRenderingInputAttachmentIndexInfoKHR rendering_input_attachment_index_info = vku::InitStructHelper{};
+    rendering_input_attachment_index_info.colorAttachmentCount = 1;
+    rendering_input_attachment_index_info.pColorAttachmentInputIndices = color_attachment_indices;
+    rendering_input_attachment_index_info.pDepthInputAttachmentIndex = &depth_attachment_index;
+    rendering_input_attachment_index_info.pStencilInputAttachmentIndex = &stencil_attachment_index;
+
+    VkRenderingInputAttachmentIndexInfoKHR invalid_rendering_input_attachment_index_info = vku::InitStructHelper{};
+    invalid_rendering_input_attachment_index_info.colorAttachmentCount = 1;
+    invalid_rendering_input_attachment_index_info.pColorAttachmentInputIndices = color_attachment_indices;
+    invalid_rendering_input_attachment_index_info.pDepthInputAttachmentIndex = &depth_attachment_index;
+    invalid_rendering_input_attachment_index_info.pStencilInputAttachmentIndex = &stencil_attachment_index;
+
+    VkCommandBufferInheritanceRenderingInfo inheritance_rendering_info =
+        vku::InitStructHelper(&invalid_rendering_input_attachment_index_info);
+    inheritance_rendering_info.colorAttachmentCount = 1;
+    inheritance_rendering_info.pColorAttachmentFormats = &render_target_ci.format;
+    inheritance_rendering_info.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    VkCommandBufferInheritanceInfo cmd_buffer_inheritance_info = vku::InitStructHelper(&inheritance_rendering_info);
+
+    VkCommandBufferBeginInfo secondary_cmd_buffer_begin_info = vku::InitStructHelper{};
+    secondary_cmd_buffer_begin_info.flags =
+        VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT | VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
+    secondary_cmd_buffer_begin_info.pInheritanceInfo = &cmd_buffer_inheritance_info;
+
+    VkRenderingAttachmentInfoKHR color_attachment_info = vku::InitStructHelper{};
+    color_attachment_info.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    color_attachment_info.imageView = render_target_view.handle();
+
+    VkClearRect clear_rect = {{{0, 0}, {m_width, m_height}}, 0, 1};
+
+    VkRenderingInfoKHR begin_rendering_info = vku::InitStructHelper{};
+    begin_rendering_info.flags = VK_RENDERING_CONTENTS_SECONDARY_COMMAND_BUFFERS_BIT_KHR;
+    begin_rendering_info.renderArea = clear_rect.rect;
+    begin_rendering_info.layerCount = 2;
+    begin_rendering_info.colorAttachmentCount = 1;
+    begin_rendering_info.pColorAttachments = &color_attachment_info;
+
+    const auto begin_record_and_verify_cmd_buffers = [&](const VkCommandBufferBeginInfo &commandBufferBeginInfo) {
+        secondary_cmd_buffer.begin(&commandBufferBeginInfo);
+        secondary_cmd_buffer.end();
+
+        m_command_buffer.begin();
+        m_command_buffer.BeginRendering(begin_rendering_info);
+
+        vk::CmdSetRenderingInputAttachmentIndicesKHR(m_command_buffer.handle(), &rendering_input_attachment_index_info);
+
+        m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-pCommandBuffers-09505");
+        vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary_cmd_buffer.handle());
+        m_errorMonitor->VerifyFound();
+
+        m_command_buffer.EndRendering();
+        m_command_buffer.end();
+    };
+
+    // Force invalid colorAttachmentCount
+    invalid_rendering_input_attachment_index_info.colorAttachmentCount = 0;
+
+    begin_record_and_verify_cmd_buffers(secondary_cmd_buffer_begin_info);
+
+    // Force colorAttachmentIndices mismatch.
+    invalid_rendering_input_attachment_index_info.colorAttachmentCount = 1;
+    invalid_rendering_input_attachment_index_info.pColorAttachmentInputIndices = invalid_color_attachment_indices;
+
+    begin_record_and_verify_cmd_buffers(secondary_cmd_buffer_begin_info);
+
+    // Force pDepthInputAttachmentIndex mismatch
+    invalid_rendering_input_attachment_index_info.pColorAttachmentInputIndices = color_attachment_indices;
+    invalid_rendering_input_attachment_index_info.pDepthInputAttachmentIndex = &invalid_depth_attachment_index;
+
+    begin_record_and_verify_cmd_buffers(secondary_cmd_buffer_begin_info);
+
+    // Force pStencilInputAttachmentIndex mismatch
+    invalid_rendering_input_attachment_index_info.pDepthInputAttachmentIndex = &depth_attachment_index;
+    invalid_rendering_input_attachment_index_info.pStencilInputAttachmentIndex = &invalid_stencil_attachment_index;
+
+    begin_record_and_verify_cmd_buffers(secondary_cmd_buffer_begin_info);
 }

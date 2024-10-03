@@ -23,11 +23,6 @@
 #include "core_validation.h"
 #include "chassis/chassis_modification_state.h"
 
-bool CoreChecks::ValidateComputePipelineShaderState(const vvl::Pipeline &pipeline, const Location &create_info_loc) const {
-    StageCreateInfo stage_create_info(&pipeline);
-    return ValidatePipelineShaderStage(stage_create_info, pipeline.stage_states[0], create_info_loc.dot(Field::stage));
-}
-
 bool CoreChecks::PreCallValidateCreateComputePipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t count,
                                                        const VkComputePipelineCreateInfo *pCreateInfos,
                                                        const VkAllocationCallbacks *pAllocator, VkPipeline *pPipelines,
@@ -35,23 +30,36 @@ bool CoreChecks::PreCallValidateCreateComputePipelines(VkDevice device, VkPipeli
                                                        chassis::CreateComputePipelines &chassis_state) const {
     bool skip = StateTracker::PreCallValidateCreateComputePipelines(device, pipelineCache, count, pCreateInfos, pAllocator,
                                                                     pPipelines, error_obj, pipeline_states, chassis_state);
+
+    skip |= ValidateDeviceQueueSupport(error_obj.location);
     for (uint32_t i = 0; i < count; i++) {
         const vvl::Pipeline *pipeline = pipeline_states[i].get();
-        if (!pipeline) {
-            continue;
-        }
+        ASSERT_AND_CONTINUE(pipeline);
+
         const Location create_info_loc = error_obj.location.dot(Field::pCreateInfos, i);
-        skip |= ValidateComputePipelineShaderState(*pipeline, create_info_loc);
-        skip |= ValidateShaderModuleId(*pipeline, create_info_loc);
+        const Location stage_info = create_info_loc.dot(Field::stage);
+        const auto &stage_state = pipeline->stage_states[0];
+        skip |= ValidateShaderStage(stage_state, pipeline, stage_info);
+        if (stage_state.pipeline_create_info) {
+            skip |= ValidatePipelineShaderStage(*pipeline, *stage_state.pipeline_create_info, pCreateInfos[i].pNext, stage_info);
+        }
+
         skip |= ValidatePipelineCacheControlFlags(pipeline->create_flags, create_info_loc.dot(Field::flags),
                                                   "VUID-VkComputePipelineCreateInfo-pipelineCreationCacheControl-02875");
         skip |= ValidatePipelineIndirectBindableFlags(pipeline->create_flags, create_info_loc.dot(Field::flags),
                                                       "VUID-VkComputePipelineCreateInfo-flags-09007");
 
         if (const auto *pipeline_robustness_info =
-                vku::FindStructInPNextChain<VkPipelineRobustnessCreateInfoEXT>(pCreateInfos[i].pNext);
-            pipeline_robustness_info) {
+                vku::FindStructInPNextChain<VkPipelineRobustnessCreateInfoEXT>(pCreateInfos[i].pNext)) {
             skip |= ValidatePipelineRobustnessCreateInfo(*pipeline, *pipeline_robustness_info, create_info_loc);
+        }
+
+        // From dumping traces, we found almost all apps only create one pipeline at a time. To greatly simplify the logic, only
+        // check the stateless validation in the pNext chain for the first pipeline. (The core issue is because we parse the SPIR-V
+        // at state tracking time, and we state track pipelines first)
+        if (i == 0 && chassis_state.stateless_data.pipeline_pnext_module) {
+            skip |= ValidateSpirvStateless(*chassis_state.stateless_data.pipeline_pnext_module, chassis_state.stateless_data,
+                                           create_info_loc.dot(Field::stage).pNext(Struct::VkShaderModuleCreateInfo, Field::pCode));
         }
     }
     return skip;

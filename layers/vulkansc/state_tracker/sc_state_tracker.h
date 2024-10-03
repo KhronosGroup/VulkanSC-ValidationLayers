@@ -72,7 +72,7 @@ class SCValidationStateTracker : public BASE {
     void RecyclePipelinePoolEntry(const VkPipelineOfflineCreateInfo* offline_info);
 
     // Functions requiring additional/modified state tracking for Vulkan SC
-    void CreateDevice(const VkDeviceCreateInfo* pCreateInfo, const Location& loc) override;
+    void PostCreateDevice(const VkDeviceCreateInfo* pCreateInfo, const Location& loc) override;
     virtual std::shared_ptr<vvl::CommandPool> CreateCommandPoolState(VkCommandPool command_pool,
                                                                      const VkCommandPoolCreateInfo* pCreateInfo) override;
     void PostCallRecordCreateCommandPool(VkDevice device, const VkCommandPoolCreateInfo* pCreateInfo,
@@ -81,14 +81,14 @@ class SCValidationStateTracker : public BASE {
     std::shared_ptr<vvl::PipelineCache> CreatePipelineCacheState(VkPipelineCache pipeline_cache,
                                                                  const VkPipelineCacheCreateInfo* pCreateInfo) const override;
 
-    std::shared_ptr<vvl::Pipeline> CreateGraphicsPipelineState(const VkGraphicsPipelineCreateInfo* pCreateInfo,
-                                                               std::shared_ptr<const vvl::PipelineCache> pipeline_cache,
-                                                               std::shared_ptr<const vvl::RenderPass>&& render_pass,
-                                                               std::shared_ptr<const vvl::PipelineLayout>&& layout,
-                                                               ShaderModuleUniqueIds* shader_unique_id_map) const override;
-    std::shared_ptr<vvl::Pipeline> CreateComputePipelineState(const VkComputePipelineCreateInfo* pCreateInfo,
+    std::shared_ptr<vvl::Pipeline> CreateGraphicsPipelineState(
+        const VkGraphicsPipelineCreateInfo* create_info, std::shared_ptr<const vvl::PipelineCache> pipeline_cache,
+        std::shared_ptr<const vvl::RenderPass>&& render_pass, std::shared_ptr<const vvl::PipelineLayout>&& layout,
+        spirv::StatelessData stateless_data[kCommonMaxGraphicsShaderStages]) const override;
+    std::shared_ptr<vvl::Pipeline> CreateComputePipelineState(const VkComputePipelineCreateInfo* create_info,
                                                               std::shared_ptr<const vvl::PipelineCache> pipeline_cache,
-                                                              std::shared_ptr<const vvl::PipelineLayout>&& layout) const override;
+                                                              std::shared_ptr<const vvl::PipelineLayout>&& layout,
+                                                              spirv::StatelessData* stateless_data) const override;
     void PostCallRecordCreateGraphicsPipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t count,
                                                const VkGraphicsPipelineCreateInfo* pCreateInfos,
                                                const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,

@@ -22,7 +22,6 @@
 #include <cstring>
 #include <fstream>
 #include <iostream>
-#include <sstream>
 #include <string>
 #include <charconv>
 #include <sys/stat.h>
@@ -64,7 +63,10 @@ class ConfigFile {
     void ParseFile(const char *filename);
 };
 
-static ConfigFile layer_config;
+ConfigFile &GetLayerConfig() {
+    static ConfigFile layer_config;
+    return layer_config;
+}
 
 #if defined(__ANDROID__)
 static void PropCallback(void *cookie, [[maybe_unused]] const char *name, const char *value, [[maybe_unused]] uint32_t serial) {
@@ -123,9 +125,9 @@ void SetEnvironment(const char *variable, const char *value) {
 #endif
 }
 
-const char *getLayerOption(const char *option) { return layer_config.GetOption(option); }
+const char *getLayerOption(const char *option) { return GetLayerConfig().GetOption(option); }
 
-const SettingsFileInfo *GetLayerSettingsFileInfo() { return &layer_config.settings_info; }
+const SettingsFileInfo *GetLayerSettingsFileInfo() { return &GetLayerConfig().settings_info; }
 
 // If option is NULL or stdout, return stdout, otherwise try to open option
 // as a filename. If successful, return file handle, otherwise stdout
@@ -151,7 +153,7 @@ FILE *getLayerLogOutput(const char *option, const char *layer_name) {
 // Map option strings to flag enum values
 VkFlags GetLayerOptionFlags(const string &option, vvl::unordered_map<string, VkFlags> const &enum_data, uint32_t option_default) {
     VkDebugReportFlagsEXT flags = option_default;
-    string option_list = layer_config.GetOption(option.c_str());
+    string option_list = GetLayerConfig().GetOption(option.c_str());
 
     while (option_list.length() != 0) {
         // Find length of option string
@@ -468,8 +470,8 @@ void PrintMessageType(VkFlags vk_flags, char *msg_flags) {
 
 #ifdef VK_USE_PLATFORM_ANDROID_KHR
 
-// Require at least NDK 20 to build Validation Layers. Makes everything simpler to just have people building the layers to use a
-// recent (over 2 years old) version of the NDK.
+// Require at least NDK 25 to build Validation Layers. Makes everything simpler to just have people building the layers to use a
+// recent version of the NDK.
 //
 // This avoids issues with older NDKs which complicate correct CMake builds:
 // Example:
@@ -477,7 +479,7 @@ void PrintMessageType(VkFlags vk_flags, char *msg_flags) {
 // The NDK toolchain file in r23 contains a bug which means CMAKE_ANDROID_EXCEPTIONS might not be set correctly in some
 // circumstances, if not set directly by the developer.
 #if __NDK_MAJOR__ < 25
-#error "Validation Layers require at least NDK r20 or greater to build"
+#error "Validation Layers require at least NDK r25 or greater to build"
 #endif
 
 // This catches before dlopen fails if the default Android-26 layers are being used and attempted to be ran on Android 25 or below

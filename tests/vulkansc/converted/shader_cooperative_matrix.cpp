@@ -15,9 +15,10 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "utils/cast_utils.h"
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
+
+class NegativeShaderCooperativeMatrix : public CooperativeMatrixTest {};
 
 TEST_F(NegativeShaderCooperativeMatrix, SpecInfo) {
     TEST_DESCRIPTION("Test VK_KHR_cooperative_matrix.");
@@ -306,10 +307,10 @@ TEST_F(NegativeShaderCooperativeMatrix, SameScope) {
     m_errorMonitor->SetAllowedFailureMsg("VUID-VkPipelineShaderStageCreateInfo-pSpecializationInfo-06849");
 
     // The scope will be invalid
-    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-KSize-08977");
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-OpCooperativeMatrixMulAddKHR-10060");
     // Expect gl_ScopeInvocation will not be found in the implementation since it is not allowed in Vulkan
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-OpTypeCooperativeMatrixKHR-08974");
-    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-scope-08984");
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-OpCooperativeMatrixMulAddKHR-10060");
     pipe.CreateComputePipeline();
     m_errorMonitor->VerifyFound();
 }
@@ -351,7 +352,7 @@ TEST_F(NegativeShaderCooperativeMatrix, MatchSizeWithProperties) {
     // There is no way to avoid this message
     m_errorMonitor->SetAllowedFailureMsg("VUID-RuntimeSpirv-OpTypeCooperativeMatrixKHR-08974");
 
-    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-MSize-08975");
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-OpCooperativeMatrixMulAddKHR-10060");
     CreateComputePipelineHelper pipe(*this);
     pipe.cs_ = std::make_unique<VkShaderObj>(this, source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2);
     pipe.CreateComputePipeline();
@@ -429,10 +430,10 @@ TEST_F(NegativeShaderCooperativeMatrix, SignedCheck) {
         const char *remove;
         const char *expect;
     } subtests[] = {
-        {"MatrixASignedComponentsKHR|", "VUID-RuntimeSpirv-OpCooperativeMatrixMulAddKHR-08976"},
-        {"MatrixBSignedComponentsKHR|", "VUID-RuntimeSpirv-OpCooperativeMatrixMulAddKHR-08978"},
-        {"MatrixCSignedComponentsKHR|", "VUID-RuntimeSpirv-OpCooperativeMatrixMulAddKHR-08980"},
-        {"|MatrixResultSignedComponentsKHR", "VUID-RuntimeSpirv-OpCooperativeMatrixMulAddKHR-08982"},
+        {"MatrixASignedComponentsKHR|", "VUID-RuntimeSpirv-OpCooperativeMatrixMulAddKHR-10060"},
+        {"MatrixBSignedComponentsKHR|", "VUID-RuntimeSpirv-OpCooperativeMatrixMulAddKHR-10060"},
+        {"MatrixCSignedComponentsKHR|", "VUID-RuntimeSpirv-OpCooperativeMatrixMulAddKHR-10060"},
+        {"|MatrixResultSignedComponentsKHR", "VUID-RuntimeSpirv-OpCooperativeMatrixMulAddKHR-10060"},
     };
 
     for (const auto &x : subtests) {
@@ -453,10 +454,10 @@ TEST_F(NegativeShaderCooperativeMatrix, SignedCheck) {
         }
 
         // Ignore messages that types and sizes are unsupported by implementation
-        m_errorMonitor->SetAllowedFailureMsg("VUID-RuntimeSpirv-MSize-08975");
-        m_errorMonitor->SetAllowedFailureMsg("VUID-RuntimeSpirv-KSize-08977");
-        m_errorMonitor->SetAllowedFailureMsg("VUID-RuntimeSpirv-MSize-08979");
-        m_errorMonitor->SetAllowedFailureMsg("VUID-RuntimeSpirv-MSize-08981");
+        m_errorMonitor->SetAllowedFailureMsg("VUID-RuntimeSpirv-OpCooperativeMatrixMulAddKHR-10060");
+        m_errorMonitor->SetAllowedFailureMsg("VUID-RuntimeSpirv-OpCooperativeMatrixMulAddKHR-10060");
+        m_errorMonitor->SetAllowedFailureMsg("VUID-RuntimeSpirv-OpCooperativeMatrixMulAddKHR-10060");
+        m_errorMonitor->SetAllowedFailureMsg("VUID-RuntimeSpirv-OpCooperativeMatrixMulAddKHR-10060");
         m_errorMonitor->SetAllowedFailureMsg("VUID-RuntimeSpirv-OpTypeCooperativeMatrixKHR-08974");
 
         pipe.CreateComputePipeline();

@@ -13,9 +13,10 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "utils/cast_utils.h"
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
+
+class NegativeRobustness : public VkLayerTest {};
 
 TEST_F(NegativeRobustness, PipelineRobustnessDisabled) {
     TEST_DESCRIPTION("Create a pipeline using VK_EXT_pipeline_robustness but with pipelineRobustness == VK_FALSE");

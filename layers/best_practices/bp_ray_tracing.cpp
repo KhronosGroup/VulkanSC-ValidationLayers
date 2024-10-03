@@ -18,7 +18,6 @@
  */
 
 #include "best_practices/best_practices_validation.h"
-#include "best_practices/best_practices_error_enums.h"
 #include "best_practices/bp_state.h"
 #include "state_tracker/ray_tracing_state.h"
 
@@ -46,12 +45,11 @@ bool BestPractices::PreCallValidateCmdBuildAccelerationStructuresKHR(
 
 bool BestPractices::ValidateBuildAccelerationStructure(VkCommandBuffer commandBuffer, const Location& loc) const {
     bool skip = false;
-    auto cb_node = GetRead<bp_state::CommandBuffer>(commandBuffer);
-    assert(cb_node);
+    auto cb_state = GetRead<bp_state::CommandBuffer>(commandBuffer);
 
     if (VendorCheckEnabled(kBPVendorNVIDIA)) {
-        if ((cb_node->GetQueueFlags() & VK_QUEUE_GRAPHICS_BIT) != 0) {
-            skip |= LogPerformanceWarning(kVUID_BestPractices_AccelerationStructure_NotAsync, commandBuffer, loc,
+        if ((cb_state->GetQueueFlags() & VK_QUEUE_GRAPHICS_BIT) != 0) {
+            skip |= LogPerformanceWarning("BestPractices-NVIDIA-AccelerationStructure-NotAsync", commandBuffer, loc,
                                           "%s Prefer building acceleration structures on an asynchronous "
                                           "compute queue, instead of using the universal graphics queue.",
                                           VendorSpecificTag(kBPVendorNVIDIA));
@@ -68,13 +66,15 @@ bool BestPractices::PreCallValidateBindAccelerationStructureMemoryNV(VkDevice de
 
     for (uint32_t i = 0; i < bindInfoCount; i++) {
         auto as_state = Get<vvl::AccelerationStructureNV>(pBindInfos[i].accelerationStructure);
+        ASSERT_AND_CONTINUE(as_state);
         if (!as_state->memory_requirements_checked) {
             // There's not an explicit requirement in the spec to call vkGetImageMemoryRequirements() prior to calling
             // BindAccelerationStructureMemoryNV but it's implied in that memory being bound must conform with
             // VkAccelerationStructureMemoryRequirementsInfoNV from vkGetAccelerationStructureMemoryRequirementsNV
             skip |= LogWarning(
-                kVUID_BestPractices_BindAccelNV_NoMemReqQuery, device, error_obj.location,
-                "Binding memory to %s but vkGetAccelerationStructureMemoryRequirementsNV() has not been called on that structure.",
+                "BestPractices-BindAccelerationStructureMemoryNV-requirements-not-retrieved", device,
+                error_obj.location.dot(Field::pBindInfos, i).dot(Field::accelerationStructure),
+                "(%s) is being bound, but vkGetAccelerationStructureMemoryRequirementsNV() has not been called on that structure.",
                 FormatHandle(pBindInfos[i].accelerationStructure).c_str());
         }
     }

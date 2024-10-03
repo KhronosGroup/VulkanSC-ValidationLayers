@@ -18,6 +18,8 @@
 #include "../framework/pipeline_helper.h"
 #include "../framework/descriptor_helper.h"
 
+class NegativePushDescriptor : public VkLayerTest {};
+
 TEST_F(NegativePushDescriptor, DSBufferInfo) {
     TEST_DESCRIPTION(
         "Attempt to update buffer descriptor set that has incorrect parameters in VkDescriptorBufferInfo struct. This includes:\n"
@@ -37,7 +39,6 @@ TEST_F(NegativePushDescriptor, DSBufferInfo) {
     VkBufferCreateInfo buff_ci = vku::InitStructHelper();
     buff_ci.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
     buff_ci.size = m_device->phy().limits_.minUniformBufferOffsetAlignment;
-    buff_ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     vkt::Buffer buffer(*m_device, buff_ci);
 
     VkDescriptorBufferInfo buff_info = {};
@@ -189,10 +190,7 @@ TEST_F(NegativePushDescriptor, TemplateDestroyDescriptorSetLayout) {
     AddRequiredExtensions(VK_KHR_DESCRIPTOR_UPDATE_TEMPLATE_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
 
-    VkBufferCreateInfo buffer_ci = vku::InitStructHelper();
-    buffer_ci.size = 32;
-    buffer_ci.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-    vkt::Buffer buffer(*m_device, buffer_ci);
+    vkt::Buffer buffer(*m_device, 32, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 
     VkDescriptorSetLayoutBinding ds_binding = {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr};
     VkDescriptorSetLayout ds_layout = VK_NULL_HANDLE;
@@ -409,9 +407,9 @@ TEST_F(NegativePushDescriptor, CreateDescriptorUpdateTemplate) {
     create_info.descriptorUpdateEntryCount = 1;
     create_info.pDescriptorUpdateEntries = &entries;
 
-    auto do_test = [&](std::string err) {
+    auto do_test = [&](const char* err) {
         VkDescriptorUpdateTemplateKHR dut = VK_NULL_HANDLE;
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, err);
+        m_errorMonitor->SetDesiredError(err);
         if (VK_SUCCESS == vk::CreateDescriptorUpdateTemplateKHR(m_device->handle(), &create_info, nullptr, &dut)) {
             vk::DestroyDescriptorUpdateTemplateKHR(m_device->handle(), dut, nullptr);
         }
@@ -490,9 +488,9 @@ TEST_F(NegativePushDescriptor, SetLayout) {
     ds_layout_ci.pBindings = &binding;
 
     // Note that as binding is referenced in ds_layout_ci, it is effectively in the closure by reference as well.
-    auto test_create_ds_layout = [&ds_layout_ci, this](std::string error) {
+    auto test_create_ds_layout = [&ds_layout_ci, this](const char* error) {
         VkDescriptorSetLayout ds_layout = VK_NULL_HANDLE;
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, error);
+        m_errorMonitor->SetDesiredError(error);
         vk::CreateDescriptorSetLayout(m_device->handle(), &ds_layout_ci, nullptr, &ds_layout);
         m_errorMonitor->VerifyFound();
     };
@@ -526,7 +524,7 @@ TEST_F(NegativePushDescriptor, GetSupportSetLayout) {
     ds_layout_ci.pBindings = &binding;
 
     VkDescriptorSetLayoutSupport support = vku::InitStructHelper();
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkDescriptorSetLayoutCreateInfo-flags-00280");
+    m_errorMonitor->SetDesiredError("VUID-VkDescriptorSetLayoutCreateInfo-flags-00280");
     vk::GetDescriptorSetLayoutSupportKHR(device(), &ds_layout_ci, &support);
     m_errorMonitor->VerifyFound();
 }
@@ -601,12 +599,7 @@ TEST_F(NegativePushDescriptor, DescriptorUpdateTemplateEntryWithInlineUniformBlo
         {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}};
     OneOffDescriptorSet descriptor_set(m_device, ds_bindings);
 
-    // Create a buffer to be used for invalid updates
-    VkBufferCreateInfo buff_ci = vku::InitStructHelper();
-    buff_ci.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-    buff_ci.size = m_device->phy().limits_.minUniformBufferOffsetAlignment;
-    buff_ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    vkt::Buffer buffer(*m_device, buff_ci);
+    vkt::Buffer buffer(*m_device, m_device->phy().limits_.minUniformBufferOffsetAlignment, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 
     struct SimpleTemplateData {
         VkDescriptorBufferInfo buff_info;
@@ -820,10 +813,7 @@ TEST_F(NegativePushDescriptor, UnsupportedDescriptorTemplateBindPoint) {
     vkt::CommandPool command_pool(*m_device, compute_qfi.value());
     vkt::CommandBuffer command_buffer(*m_device, command_pool);
 
-    VkBufferCreateInfo buffer_ci = vku::InitStructHelper();
-    buffer_ci.size = 32;
-    buffer_ci.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-    vkt::Buffer buffer(*m_device, buffer_ci);
+    vkt::Buffer buffer(*m_device, 32, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 
     std::vector<VkDescriptorSetLayoutBinding> ds_bindings = {
         {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}};
@@ -876,10 +866,7 @@ TEST_F(NegativePushDescriptor, InvalidDescriptorUpdateTemplateType) {
     AddRequiredExtensions(VK_KHR_DESCRIPTOR_UPDATE_TEMPLATE_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
 
-    VkBufferCreateInfo buffer_ci = vku::InitStructHelper();
-    buffer_ci.size = 32;
-    buffer_ci.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-    vkt::Buffer buffer(*m_device, buffer_ci);
+    vkt::Buffer buffer(*m_device, 32, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 
     std::vector<VkDescriptorSetLayoutBinding> ds_bindings = {
         {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}};
@@ -932,10 +919,7 @@ TEST_F(NegativePushDescriptor, DescriptorTemplateIncompatibleLayout) {
     AddRequiredExtensions(VK_KHR_DESCRIPTOR_UPDATE_TEMPLATE_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
 
-    VkBufferCreateInfo buffer_ci = vku::InitStructHelper();
-    buffer_ci.size = 32;
-    buffer_ci.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-    vkt::Buffer buffer(*m_device, buffer_ci);
+    vkt::Buffer buffer(*m_device, 32, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 
     std::vector<VkDescriptorSetLayoutBinding> ds_bindings = {
         {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}};

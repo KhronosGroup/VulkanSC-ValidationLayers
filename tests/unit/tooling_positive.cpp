@@ -12,7 +12,8 @@
  */
 
 #include "../framework/layer_validation_tests.h"
-#include "generated/vk_extension_helper.h"
+
+class PositiveTooling : public VkLayerTest {};
 
 TEST_F(PositiveTooling, InfoExt) {
     TEST_DESCRIPTION("Basic usage calling Tooling Extension and verify layer results.");

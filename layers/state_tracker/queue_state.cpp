@@ -49,11 +49,16 @@ void vvl::QueueSubmission::EndUse() {
     }
 }
 
-uint64_t vvl::Queue::PreSubmit(std::vector<vvl::QueueSubmission> &&submissions) {
-    if (!submissions.empty()) {
-        submissions.back().end_batch = true;
+void vvl::Queue::SetupSubmissions(std::vector<vvl::QueueSubmission> &submissions) {
+    assert(!submissions.empty());
+    for (auto &s : submissions) {
+        s.seq = ++seq_;
     }
-    uint64_t retire_early_seq = 0;
+    submissions.back().end_batch = true;
+}
+
+vvl::SubmitResult vvl::Queue::PostSubmit(std::vector<vvl::QueueSubmission> &&submissions) {
+    SubmitResult result;
     for (auto &submission : submissions) {
         for (auto &cb_state : submission.cbs) {
             auto cb_guard = cb_state->WriteLock();
@@ -64,10 +69,7 @@ uint64_t vvl::Queue::PreSubmit(std::vector<vvl::QueueSubmission> &&submissions) 
             cb_state->IncrementResources();
             cb_state->Submit(VkHandle(), submission.perf_submit_pass, submission.loc.Get());
         }
-        // seq_ is atomic so we don't need a lock until updating the deque below.
-        // Note that this relies on the external synchonization requirements for the
-        // VkQueue
-        submission.seq = ++seq_;
+        assert(submission.seq != 0);
         submission.BeginUse();
         for (auto &wait : submission.wait_semaphores) {
             wait.semaphore->EnqueueWait(SubmissionReference(this, submission.seq), wait.payload);
@@ -79,18 +81,20 @@ uint64_t vvl::Queue::PreSubmit(std::vector<vvl::QueueSubmission> &&submissions) 
 
         if (submission.fence) {
             if (submission.fence->EnqueueSignal(this, submission.seq)) {
-                retire_early_seq = submission.seq;
+                result.has_external_fence = true;
+                result.submission_with_external_fence_seq = submission.seq;
             }
         }
         {
             auto guard = Lock();
+            PostSubmit(submission);
             submissions_.emplace_back(std::move(submission));
             if (!thread_) {
                 thread_ = std::make_unique<std::thread>(&Queue::ThreadFunc, this);
             }
         }
     }
-    return retire_early_seq;
+    return result;
 }
 
 void vvl::Queue::Notify(uint64_t until_seq) {
@@ -146,13 +150,6 @@ void vvl::Queue::Destroy() {
         dead_thread.reset();
     }
     StateObject::Destroy();
-}
-
-void vvl::Queue::PostSubmit() {
-    auto guard = Lock();
-    if (!submissions_.empty()) {
-        PostSubmit(submissions_.back());
-    }
 }
 
 vvl::QueueSubmission *vvl::Queue::NextSubmission() {

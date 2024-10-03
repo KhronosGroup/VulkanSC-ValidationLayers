@@ -26,6 +26,7 @@
 #include "sync/sync_access_context.h"
 #include "sync/sync_renderpass.h"
 #include "sync/sync_commandbuffer.h"
+#include "sync/sync_stats.h"
 #include "sync/sync_submit.h"
 
 VALSTATETRACK_DERIVED_STATE_OBJECT(VkImage, syncval_state::ImageState, vvl::Image)
@@ -43,26 +44,38 @@ class SyncValidator : public ValidationStateTracker, public SyncStageAccess {
     using Field = vvl::Field;
 
     SyncValidator() { container_type = LayerObjectTypeSyncValidation; }
+    ~SyncValidator();
+
+    // Stats object must be the first member of this class:
+    // - it is the first to be constructed: can observe all subsequent syncval stats events
+    // - it is the last to be destroyed: ensures there are no unreported syncval stats events.
+    mutable syncval_stats::Stats stats;  // Stats object is thread safe
 
     // Global tag range for submitted command buffers resource usage logs
     // Started the global tag count at 1 s.t. zero are invalid and ResourceUsageTag normalization can just zero them.
     mutable std::atomic<ResourceUsageTag> tag_limit_{1};  // This is reserved in Validation phase, thus mutable and atomic
     ResourceUsageRange ReserveGlobalTagRange(size_t tag_count) const;  // Note that the tag_limit_ is mutable this has side effects
 
-    vvl::unordered_map<VkQueue, std::shared_ptr<QueueSyncState>> queue_sync_states_;
-    QueueId queue_id_limit_ = kQueueIdBase;
+    std::vector<std::shared_ptr<QueueSyncState>> queue_sync_states_;
+    QueueId queue_id_limit_ = 0;
+
     SignaledSemaphores signaled_semaphores_;
 
     using SignaledFences = vvl::unordered_map<VkFence, FenceSyncState>;
-    using SignaledFence = SignaledFences::value_type;
     SignaledFences waitable_fences_;
 
     uint32_t debug_command_number = vvl::kU32Max;
     uint32_t debug_reset_count = 1;
     std::string debug_cmdbuf_pattern;
 
+    // Applies information from update object to signaled_semaphores_.
+    // The update object is mutable to be able to std::move SignalInfo from it.
+    void UpdateSignaledSemaphores(SignaledSemaphoresUpdate &update, const QueueBatchContext::Ptr &last_batch);
+
     void ApplyTaggedWait(QueueId queue_id, ResourceUsageTag tag);
     void ApplyAcquireWait(const AcquiredImage &acquired);
+
+    // Go through every queue batch context and apply synchronization operation
     template <typename BatchOp>
     void ForAllQueueBatchContexts(BatchOp &&op);
 
@@ -75,32 +88,24 @@ class SyncValidator : public ValidationStateTracker, public SyncStageAccess {
     void UpdateSyncImageMemoryBindState(uint32_t count, const VkBindImageMemoryInfo *infos);
 
     std::shared_ptr<const QueueSyncState> GetQueueSyncStateShared(VkQueue queue) const;
-    std::shared_ptr<QueueSyncState> GetQueueSyncStateShared(VkQueue queue);
     QueueId GetQueueIdLimit() const { return queue_id_limit_; }
 
-    QueueBatchContext::BatchSet GetQueueBatchSnapshot();
+    std::vector<QueueBatchContext::ConstPtr> GetLastBatches(std::function<bool(const QueueBatchContext::ConstPtr &)> filter) const;
+    std::vector<QueueBatchContext::Ptr> GetLastBatches(std::function<bool(const QueueBatchContext::ConstPtr &)> filter);
 
-    template <typename Predicate>
-    QueueBatchContext::ConstBatchSet GetQueueLastBatchSnapshot(Predicate &&pred) const;
-    QueueBatchContext::ConstBatchSet GetQueueLastBatchSnapshot() const {
-        return GetQueueLastBatchSnapshot(QueueBatchContext::TruePred);
-    };
-
-    template <typename Predicate>
-    QueueBatchContext::BatchSet GetQueueLastBatchSnapshot(Predicate &&pred);
-    QueueBatchContext::BatchSet GetQueueLastBatchSnapshot() { return GetQueueLastBatchSnapshot(QueueBatchContext::TruePred); };
-
-    std::shared_ptr<vvl::CommandBuffer> CreateCmdBufferState(VkCommandBuffer cb, const VkCommandBufferAllocateInfo *pCreateInfo,
+    std::shared_ptr<vvl::CommandBuffer> CreateCmdBufferState(VkCommandBuffer handle,
+                                                             const VkCommandBufferAllocateInfo *allocate_info,
                                                              const vvl::CommandPool *cmd_pool) override;
     std::shared_ptr<vvl::Swapchain> CreateSwapchainState(const VkSwapchainCreateInfoKHR *create_info,
                                                          VkSwapchainKHR swapchain) final;
-    std::shared_ptr<vvl::Image> CreateImageState(VkImage img, const VkImageCreateInfo *pCreateInfo,
-                                                 VkFormatFeatureFlags2KHR features) final;
+    std::shared_ptr<vvl::Image> CreateImageState(VkImage handle, const VkImageCreateInfo *create_info,
+                                                 VkFormatFeatureFlags2 features) final;
 
-    std::shared_ptr<vvl::Image> CreateImageState(VkImage img, const VkImageCreateInfo *pCreateInfo, VkSwapchainKHR swapchain,
-                                                 uint32_t swapchain_index, VkFormatFeatureFlags2KHR features) final;
-    std::shared_ptr<vvl::ImageView> CreateImageViewState(const std::shared_ptr<vvl::Image> &image_state, VkImageView iv,
-                                                         const VkImageViewCreateInfo *ci, VkFormatFeatureFlags2KHR ff,
+    std::shared_ptr<vvl::Image> CreateImageState(VkImage handle, const VkImageCreateInfo *create_info, VkSwapchainKHR swapchain,
+                                                 uint32_t swapchain_index, VkFormatFeatureFlags2 features) final;
+    std::shared_ptr<vvl::ImageView> CreateImageViewState(const std::shared_ptr<vvl::Image> &image_state, VkImageView handle,
+                                                         const VkImageViewCreateInfo *create_info,
+                                                         VkFormatFeatureFlags2 format_features,
                                                          const VkFilterCubicImageViewImageFormatPropertiesEXT &cubic_props) final;
 
     void RecordCmdBeginRenderPass(VkCommandBuffer commandBuffer, const VkRenderPassBeginInfo *pRenderPassBegin,
@@ -110,7 +115,7 @@ class SyncValidator : public ValidationStateTracker, public SyncStageAccess {
     void RecordCmdEndRenderPass(VkCommandBuffer commandBuffer, const VkSubpassEndInfo *pSubpassEndInfo, Func command);
     bool SupressedBoundDescriptorWAW(const HazardResult &hazard) const;
 
-    void CreateDevice(const VkDeviceCreateInfo *pCreateInfo, const Location &loc) override;
+    void PostCreateDevice(const VkDeviceCreateInfo *pCreateInfo, const Location &loc) override;
 
     bool ValidateBeginRenderPass(VkCommandBuffer commandBuffer, const VkRenderPassBeginInfo *pRenderPassBegin,
                                  const VkSubpassBeginInfo *pSubpassBeginInfo, const ErrorObject &error_obj) const;
@@ -317,12 +322,12 @@ class SyncValidator : public ValidationStateTracker, public SyncStageAccess {
                                 VkCommandBuffer commandBuffer, const VkDeviceSize struct_size, const VkBuffer buffer,
                                 const VkDeviceSize offset, const uint32_t drawCount, const uint32_t stride,
                                 const Location &loc) const;
-    void RecordIndirectBuffer(AccessContext &context, ResourceUsageTag tag, const VkDeviceSize struct_size, const VkBuffer buffer,
-                              const VkDeviceSize offset, const uint32_t drawCount, uint32_t stride);
+    void RecordIndirectBuffer(CommandBufferAccessContext &cb_context, ResourceUsageTag tag, const VkDeviceSize struct_size,
+                              const VkBuffer buffer, const VkDeviceSize offset, const uint32_t drawCount, uint32_t stride);
 
     bool ValidateCountBuffer(const CommandBufferAccessContext &cb_context, const AccessContext &context,
                              VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset, const Location &loc) const;
-    void RecordCountBuffer(AccessContext &context, ResourceUsageTag tag, VkBuffer buffer, VkDeviceSize offset);
+    void RecordCountBuffer(CommandBufferAccessContext &cb_context, ResourceUsageTag tag, VkBuffer buffer, VkDeviceSize offset);
 
     bool PreCallValidateCmdDispatch(VkCommandBuffer commandBuffer, uint32_t x, uint32_t y, uint32_t z,
                                     const ErrorObject &error_obj) const override;
@@ -540,8 +545,8 @@ class SyncValidator : public ValidationStateTracker, public SyncStageAccess {
 
     bool PreCallValidateQueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo,
                                         const ErrorObject &error_obj) const override;
-    ResourceUsageRange SetupPresentInfo(const VkPresentInfoKHR &present_info, std::shared_ptr<QueueBatchContext> &batch,
-                                        PresentedImages &presented_images) const;
+    uint32_t SetupPresentInfo(const VkPresentInfoKHR &present_info, QueueBatchContext::Ptr &batch,
+                              PresentedImages &presented_images) const;
     void PostCallRecordQueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo,
                                        const RecordObject &record_obj) override;
     void PostCallRecordAcquireNextImageKHR(VkDevice device, VkSwapchainKHR swapchain, uint64_t timeout, VkSemaphore semaphore,

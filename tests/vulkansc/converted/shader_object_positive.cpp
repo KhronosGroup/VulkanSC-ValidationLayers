@@ -15,6 +15,7 @@
 #include "../framework/layer_validation_tests.h"
 #include "../framework/shader_object_helper.h"
 #include "../framework/descriptor_helper.h"
+#include "../framework/shader_templates.h"
 
 void ShaderObjectTest::InitBasicShaderObject() {
     SetTargetApiVersion(VK_API_VERSION_1_1);
@@ -40,6 +41,8 @@ void ShaderObjectTest::InitBasicMeshShaderObject(APIVersion target_api_version) 
     AddDisabledFeature(vkt::Feature::primitiveFragmentShadingRateMeshShader);
     RETURN_IF_SKIP(Init());
 }
+
+class PositiveShaderObject : public ShaderObjectTest {};
 
 TEST_F(PositiveShaderObject, CreateAndDestroyShaderObject) {
     TEST_DESCRIPTION("Create and destroy shader object.");
@@ -232,20 +235,9 @@ TEST_F(PositiveShaderObject, VertFragShaderDraw) {
     vkt::Buffer buffer(*m_device, sizeof(float) * 4u, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                        VK_BUFFER_USAGE_TRANSFER_DST_BIT);
 
-    VkImageCreateInfo imageInfo = vku::InitStructHelper();
-    imageInfo.imageType = VK_IMAGE_TYPE_2D;
-    imageInfo.format = VK_FORMAT_R32G32B32A32_SFLOAT;
-    imageInfo.extent = {static_cast<uint32_t>(m_width), static_cast<uint32_t>(m_height), 1};
-    imageInfo.mipLevels = 1u;
-    imageInfo.arrayLayers = 1u;
-    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-    imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-    imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    imageInfo.queueFamilyIndexCount = 0u;
-    imageInfo.pQueueFamilyIndices = nullptr;
-    imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    vkt::Image image(*m_device, imageInfo, vkt::set_layout);
+    vkt::Image image(*m_device, m_width, m_height, 1, VK_FORMAT_R32G32B32A32_SFLOAT,
+                     VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+    image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
     vkt::ImageView view = image.CreateView();
 
     VkRenderingAttachmentInfo color_attachment = vku::InitStructHelper();
@@ -308,15 +300,10 @@ TEST_F(PositiveShaderObject, VertFragShaderDraw) {
     }
 
     VkBufferImageCopy copyRegion = {};
-    copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    copyRegion.imageSubresource.mipLevel = 0u;
-    copyRegion.imageSubresource.baseArrayLayer = 0u;
-    copyRegion.imageSubresource.layerCount = 1u;
+    copyRegion.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
     copyRegion.imageOffset.x = static_cast<int32_t>(m_width / 2) + 1;
     copyRegion.imageOffset.y = static_cast<int32_t>(m_height / 2) + 1;
-    copyRegion.imageExtent.width = 1u;
-    copyRegion.imageExtent.height = 1u;
-    copyRegion.imageExtent.depth = 1u;
+    copyRegion.imageExtent = {1, 1, 1};
 
     vk::CmdCopyImageToBuffer(m_commandBuffer->handle(), image.handle(), VK_IMAGE_LAYOUT_GENERAL, buffer.handle(), 1u, &copyRegion);
 
@@ -339,7 +326,7 @@ TEST_F(PositiveShaderObject, DrawWithAllGraphicsShaderStagesUsed) {
         #version 460
         void main() {
             vec2 pos = vec2(float(gl_VertexIndex & 1), float((gl_VertexIndex >> 1) & 1));
-            gl_Position = vec4(pos - 0.5f, 0.0f, 1.0f);;
+            gl_Position = vec4(pos - 0.5f, 0.0f, 1.0f);
         }
     )glsl";
 
@@ -423,21 +410,9 @@ TEST_F(PositiveShaderObject, DrawWithAllGraphicsShaderStagesUsed) {
     VkShaderEXT shaders[5] = {vertShader.handle(), tescShader.handle(), teseShader.handle(), geomShader.handle(),
                               fragShader.handle()};
 
-    VkImageCreateInfo imageInfo = vku::InitStructHelper();
-    imageInfo.flags = 0;
-    imageInfo.imageType = VK_IMAGE_TYPE_2D;
-    imageInfo.format = VK_FORMAT_R32G32B32A32_SFLOAT;
-    imageInfo.extent = {static_cast<uint32_t>(m_width), static_cast<uint32_t>(m_height), 1};
-    imageInfo.mipLevels = 1u;
-    imageInfo.arrayLayers = 1u;
-    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-    imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-    imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    imageInfo.queueFamilyIndexCount = 0u;
-    imageInfo.pQueueFamilyIndices = nullptr;
-    imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    vkt::Image image(*m_device, imageInfo, vkt::set_layout);
+    vkt::Image image(*m_device, m_width, m_height, 1, VK_FORMAT_R32G32B32A32_SFLOAT,
+                     VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+    image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
     vkt::ImageView view = image.CreateView();
 
     VkRenderingAttachmentInfo color_attachment = vku::InitStructHelper();
@@ -508,56 +483,19 @@ TEST_F(PositiveShaderObject, ComputeShader) {
     vkt::Buffer storageBuffer(*m_device, sizeof(float), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                               VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-    VkDescriptorPoolSize ds_type_count = {};
-    ds_type_count.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    ds_type_count.descriptorCount = 1;
+    OneOffDescriptorSet descriptor_set(m_device, {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}});
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
+    descriptor_set.WriteDescriptorBufferInfo(0, storageBuffer.handle(), 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    descriptor_set.UpdateDescriptorSets();
 
-    VkDescriptorPoolCreateInfo ds_pool_ci = vku::InitStructHelper();
-    ds_pool_ci.maxSets = 1;
-    ds_pool_ci.poolSizeCount = 1;
-    ds_pool_ci.flags = 0;
-    ds_pool_ci.pPoolSizes = &ds_type_count;
-
-    vkt::DescriptorPool ds_pool(*m_device, ds_pool_ci);
-
-    VkDescriptorSetLayoutBinding dsl_binding = {};
-    dsl_binding.binding = 0;
-    dsl_binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    dsl_binding.descriptorCount = 1;
-    dsl_binding.stageFlags = VK_SHADER_STAGE_ALL;
-    dsl_binding.pImmutableSamplers = nullptr;
-
-    const vkt::DescriptorSetLayout ds_layout(*m_device, {dsl_binding});
-
-    VkDescriptorSet descriptorSet;
-    VkDescriptorSetAllocateInfo alloc_info = vku::InitStructHelper();
-    alloc_info.descriptorSetCount = 1;
-    alloc_info.descriptorPool = ds_pool.handle();
-    alloc_info.pSetLayouts = &ds_layout.handle();
-    vk::AllocateDescriptorSets(device(), &alloc_info, &descriptorSet);
-
-    VkDescriptorBufferInfo storage_buffer_info = {storageBuffer.handle(), 0, sizeof(uint32_t)};
-
-    VkWriteDescriptorSet descriptorWrite = vku::InitStructHelper();
-    descriptorWrite.dstSet = descriptorSet;
-    descriptorWrite.dstBinding = 0;
-    descriptorWrite.descriptorCount = 1;
-    descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    descriptorWrite.pBufferInfo = &storage_buffer_info;
-
-    vk::UpdateDescriptorSets(m_device->handle(), 1u, &descriptorWrite, 0u, nullptr);
-
-    const vkt::DescriptorSetLayout descriptor_set_layout(*m_device, {dsl_binding});
-    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set_layout});
-
-    VkDescriptorSetLayout descriptorSetLayout = descriptor_set_layout.handle();
+    VkDescriptorSetLayout descriptorSetLayout = descriptor_set.layout_.handle();
 
     const vkt::Shader compShader(*m_device, shaderStages[0], GLSLToSPV(shaderStages[0], comp_src), &descriptorSetLayout);
 
     m_commandBuffer->begin();
 
     vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout.handle(), 0u, 1u,
-                              &descriptorSet, 0u, nullptr);
+                              &descriptor_set.set_, 0u, nullptr);
 
     vk::CmdBindShadersEXT(m_commandBuffer->handle(), 1u, shaderStages, &compShader.handle());
     vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
@@ -617,21 +555,9 @@ TEST_F(PositiveShaderObject, TaskMeshShadersDraw) {
 
     VkShaderEXT shaders[3] = {taskShader.handle(), meshShader.handle(), fragShader.handle()};
 
-    VkImageCreateInfo imageInfo = vku::InitStructHelper();
-    imageInfo.flags = 0;
-    imageInfo.imageType = VK_IMAGE_TYPE_2D;
-    imageInfo.format = VK_FORMAT_R32G32B32A32_SFLOAT;
-    imageInfo.extent = {static_cast<uint32_t>(m_width), static_cast<uint32_t>(m_height), 1};
-    imageInfo.mipLevels = 1u;
-    imageInfo.arrayLayers = 1u;
-    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-    imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-    imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    imageInfo.queueFamilyIndexCount = 0u;
-    imageInfo.pQueueFamilyIndices = nullptr;
-    imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    vkt::Image image(*m_device, imageInfo, vkt::set_layout);
+    vkt::Image image(*m_device, m_width, m_height, 1, VK_FORMAT_R32G32B32A32_SFLOAT,
+                     VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+    image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
     vkt::ImageView view = image.CreateView();
 
     VkRenderingAttachmentInfo color_attachment = vku::InitStructHelper();
@@ -705,7 +631,7 @@ TEST_F(PositiveShaderObject, FailCreateShaders) {
         #version 460
         void main() {
             vec2 pos = vec2(float(gl_VertexIndex & 1), float((gl_VertexIndex >> 1) & 1));
-            gl_Position = vec4(pos - 0.5f, 0.0f, 1.0f);;
+            gl_Position = vec4(pos - 0.5f, 0.0f, 1.0f);
         }
     )glsl";
 
@@ -954,9 +880,7 @@ TEST_F(PositiveShaderObject, ShadersDescriptorSets) {
     auto image_ci = vkt::Image::ImageCreateInfo2D(64, 64, 1, 2, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT);
     vkt::Image image(*m_device, image_ci, vkt::set_layout);
     vkt::ImageView view = image.CreateView(VK_IMAGE_VIEW_TYPE_2D, 0, 1, 1, 1);
-
-    VkSamplerCreateInfo sampler_info = SafeSaneSamplerCreateInfo();
-    vkt::Sampler sampler(*m_device, sampler_info);
+    vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
 
     frag_descriptor_set.WriteDescriptorImageInfo(0, view, sampler.handle());
     frag_descriptor_set.UpdateDescriptorSets();
@@ -986,12 +910,7 @@ TEST_F(PositiveShaderObject, DescriptorBuffer) {
     RETURN_IF_SKIP(Init());
     InitDynamicRenderTarget();
 
-    VkBufferCreateInfo buffer_ci = vku::InitStructHelper();
-    buffer_ci.size = 4096;
-    buffer_ci.usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT;
-    VkMemoryAllocateFlagsInfo allocate_flag_info = vku::InitStructHelper();
-    allocate_flag_info.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
-    vkt::Buffer buffer(*m_device, buffer_ci, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &allocate_flag_info);
+    vkt::Buffer buffer(*m_device, 4096, VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT, vkt::device_address);
 
     VkDescriptorBufferBindingInfoEXT buffer_binding_info = vku::InitStructHelper();
     buffer_binding_info.address = buffer.address();
@@ -1155,7 +1074,7 @@ TEST_F(PositiveShaderObject, IndirectDraw) {
         #version 460
         void main() {
             vec2 pos = vec2(float(gl_VertexIndex & 1), float((gl_VertexIndex >> 1) & 1));
-            gl_Position = vec4(pos - 0.5f, 0.0f, 1.0f);;
+            gl_Position = vec4(pos - 0.5f, 0.0f, 1.0f);
         }
     )glsl";
 
@@ -1624,4 +1543,25 @@ TEST_F(PositiveShaderObject, IgnoredColorAttachmentCount) {
     m_commandBuffer->end();
 
     m_errorMonitor->VerifyFound();
+}
+
+TEST_F(PositiveShaderObject, DisabledColorBlend) {
+    TEST_DESCRIPTION("Draw with shader objects without setting vkCmdSetColorBlendEquationEXT when color blend is disabled.");
+
+    RETURN_IF_SKIP(InitBasicShaderObject());
+    InitDynamicRenderTarget();
+
+    const vkt::Shader vertShader(*m_device, VK_SHADER_STAGE_VERTEX_BIT, GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, kVertexMinimalGlsl));
+
+    const vkt::Shader fragShader(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT,
+                                 GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, kFragmentMinimalGlsl));
+    m_commandBuffer->begin();
+    m_commandBuffer->BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
+    SetDefaultDynamicStatesExclude({VK_DYNAMIC_STATE_COLOR_BLEND_EQUATION_EXT});
+    m_commandBuffer->BindVertFragShader(vertShader, fragShader);
+    VkBool32 colorBlendEnable = VK_FALSE;
+    vk::CmdSetColorBlendEnableEXT(m_commandBuffer->handle(), 0u, 1u, &colorBlendEnable);
+    vk::CmdDraw(m_commandBuffer->handle(), 4, 1, 0, 0);
+    m_commandBuffer->EndRendering();
+    m_commandBuffer->end();
 }

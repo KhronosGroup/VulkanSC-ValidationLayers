@@ -172,35 +172,13 @@ TEST_F(VkPositiveBestPracticesLayerTest, DynStateIgnoreAttachments) {
     m_commandBuffer->end();
 }
 
-TEST_F(VkPositiveBestPracticesLayerTest, ImageInputAttachmentLayout) {
-    TEST_DESCRIPTION("Test transitioning image layout to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL for input attachment");
-
-    RETURN_IF_SKIP(InitBestPracticesFramework());
-    RETURN_IF_SKIP(InitState());
-
-    m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit);
-
-    vkt::Image image(*m_device, 32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT);
-
-    VkImageMemoryBarrier image_memory_barrier = vku::InitStructHelper();
-    image_memory_barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-    image_memory_barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
-    image_memory_barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-    image_memory_barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    image_memory_barrier.image = image.handle();
-    image_memory_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0u, 1u, 0u, 1u};
-
-    m_commandBuffer->begin();
-    vk::CmdPipelineBarrier(m_commandBuffer->handle(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0u, 0u,
-                           nullptr, 0u, nullptr, 1u, &image_memory_barrier);
-    m_commandBuffer->end();
-}
-
 TEST_F(VkPositiveBestPracticesLayerTest, PipelineLibraryNoRendering) {
     TEST_DESCRIPTION("Create a pipeline library without a render pass or rendering info");
-
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::graphicsPipelineLibrary);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
     RETURN_IF_SKIP(InitBestPracticesFramework());
     RETURN_IF_SKIP(InitState());
 
@@ -232,7 +210,9 @@ TEST_F(VkPositiveBestPracticesLayerTest, PushConstantSet) {
 
     const char fsSource[] = R"glsl(
         #version 460
-        layout(push_constant, std430) uniform foo { float x; } constants;
+        layout(push_constant, std430) uniform foo {
+            layout(offset = 16) float x;
+        } constants;
         layout(location = 0) out vec4 uFragColor;
         void main(){
             uFragColor = vec4(0,1,0,constants.x);
@@ -263,6 +243,8 @@ TEST_F(VkPositiveBestPracticesLayerTest, PushConstantSet) {
 
 TEST_F(VkPositiveBestPracticesLayerTest, VertexBufferNotForAllDraws) {
     TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/7636");
+    AddRequiredExtensions(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::nullDescriptor);
     RETURN_IF_SKIP(InitBestPracticesFramework());
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
@@ -297,4 +279,149 @@ TEST_F(VkPositiveBestPracticesLayerTest, VertexBufferNotForAllDraws) {
     vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
     m_commandBuffer->EndRenderPass();
     m_commandBuffer->end();
+}
+
+TEST_F(VkPositiveBestPracticesLayerTest, SetDifferentEvents) {
+    TEST_DESCRIPTION("Signal different events");
+    RETURN_IF_SKIP(InitBestPractices());
+    m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit);  // TODO: should be part of BP config
+
+    vkt::Event event(*m_device);
+    vkt::Event event2(*m_device);
+
+    m_command_buffer.begin();
+    m_command_buffer.SetEvent(event, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
+    m_command_buffer.SetEvent(event2, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
+    m_command_buffer.end();
+}
+
+TEST_F(VkPositiveBestPracticesLayerTest, ResetEventBeforeSet) {
+    TEST_DESCRIPTION("Set event two times with reset in between");
+    RETURN_IF_SKIP(InitBestPractices());
+    m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit);  // TODO: should be part of BP config
+
+    vkt::Event event(*m_device);
+
+    m_command_buffer.begin();
+    m_command_buffer.SetEvent(event, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
+    m_command_buffer.ResetEvent(event, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
+    m_command_buffer.SetEvent(event, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
+    m_command_buffer.end();
+}
+
+TEST_F(VkPositiveBestPracticesLayerTest, ResetEventBeforeSetMultipleSubmits) {
+    TEST_DESCRIPTION("Set event two times with reset in between from multiple submits");
+    RETURN_IF_SKIP(InitBestPractices());
+    m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit);  // TODO: should be part of BP config
+
+    vkt::Event event(*m_device);
+
+    m_command_buffer.begin();
+    m_command_buffer.SetEvent(event, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
+    m_command_buffer.ResetEvent(event, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
+    m_command_buffer.end();
+    m_default_queue->Submit(m_command_buffer);
+
+    vkt::CommandBuffer cb2(*m_device, m_command_pool);
+    cb2.begin();
+    cb2.SetEvent(event, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
+    cb2.end();
+    m_default_queue->Submit(cb2);
+    m_default_queue->Wait();
+}
+
+TEST_F(VkPositiveBestPracticesLayerTest, ResetEventBeforeSetMultipleSubmits2) {
+    TEST_DESCRIPTION("Set event two times with reset in between using single submit with two batches");
+    RETURN_IF_SKIP(InitBestPractices());
+    m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit);  // TODO: should be part of BP config
+
+    vkt::Event event(*m_device);
+
+    m_command_buffer.begin();
+    m_command_buffer.SetEvent(event, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
+    m_command_buffer.end();
+
+    vkt::CommandBuffer cb2(*m_device, m_command_pool);
+    cb2.begin();
+    cb2.ResetEvent(event, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
+    cb2.SetEvent(event, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
+    cb2.end();
+
+    VkSubmitInfo submits[2];
+    submits[0] = vku::InitStructHelper();
+    submits[0].commandBufferCount = 1;
+    submits[0].pCommandBuffers = &m_command_buffer.handle();
+    submits[1] = vku::InitStructHelper();
+    submits[1].commandBufferCount = 1;
+    submits[1].pCommandBuffers = &cb2.handle();
+
+    vk::QueueSubmit(m_default_queue->handle(), 2, submits, VK_NULL_HANDLE);
+    m_default_queue->Wait();
+}
+
+TEST_F(VkPositiveBestPracticesLayerTest, ResetEventFromSecondary) {
+    TEST_DESCRIPTION("Set event two times with reset in between executed from a secondary command buffer");
+    RETURN_IF_SKIP(InitBestPractices());
+    m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit);  // TODO: should be part of BP config
+
+    vkt::Event event(*m_device);
+
+    vkt::CommandBuffer secondary_cb(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+    secondary_cb.begin();
+    secondary_cb.ResetEvent(event, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
+    secondary_cb.end();
+
+    m_command_buffer.begin();
+    m_command_buffer.SetEvent(event, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
+    m_command_buffer.ExecuteCommands(secondary_cb);
+    m_command_buffer.SetEvent(event, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
+    m_command_buffer.end();
+}
+
+TEST_F(VkPositiveBestPracticesLayerTest, CreateFifoRelaxedSwapchain) {
+    TEST_DESCRIPTION("Test creating fifo relaxed swapchain");
+
+    AddSurfaceExtension();
+    RETURN_IF_SKIP(InitBestPracticesFramework());
+    RETURN_IF_SKIP(InitState());
+    RETURN_IF_SKIP(InitSurface());
+    InitSwapchainInfo();
+
+    VkBool32 supported;
+    vk::GetPhysicalDeviceSurfaceSupportKHR(gpu(), m_device->graphics_queue_node_index_, m_surface, &supported);
+    if (!supported) {
+        GTEST_SKIP() << "Graphics queue does not support present";
+    }
+
+    bool fifo_relaxed = false;
+    for (const auto &present_mode : m_surface_present_modes) {
+        if (present_mode == VK_PRESENT_MODE_FIFO_RELAXED_KHR) {
+            fifo_relaxed = true;
+            break;
+        }
+    }
+    if (!fifo_relaxed) {
+        GTEST_SKIP() << "fifo relaxed present mode not supported";
+    }
+
+    VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    VkSurfaceTransformFlagBitsKHR preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+
+    VkSwapchainCreateInfoKHR swapchain_create_info = vku::InitStructHelper();
+    swapchain_create_info.surface = m_surface;
+    swapchain_create_info.minImageCount = 2;
+    swapchain_create_info.imageFormat = m_surface_formats[0].format;
+    swapchain_create_info.imageColorSpace = m_surface_formats[0].colorSpace;
+    swapchain_create_info.imageExtent = {m_surface_capabilities.minImageExtent.width, m_surface_capabilities.minImageExtent.height};
+    swapchain_create_info.imageArrayLayers = 1;
+    swapchain_create_info.imageUsage = imageUsage;
+    swapchain_create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    swapchain_create_info.preTransform = preTransform;
+    swapchain_create_info.compositeAlpha = m_surface_composite_alpha;
+    swapchain_create_info.presentMode = VK_PRESENT_MODE_FIFO_RELAXED_KHR;
+    swapchain_create_info.clipped = VK_FALSE;
+    swapchain_create_info.oldSwapchain = 0;
+
+    m_errorMonitor->SetAllowedFailureMsg("VUID-VkSwapchainCreateInfoKHR-presentMode-02839");
+    vk::CreateSwapchainKHR(device(), &swapchain_create_info, nullptr, &m_swapchain);
 }

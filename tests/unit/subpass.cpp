@@ -13,10 +13,12 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "utils/cast_utils.h"
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
 #include "../framework/render_pass_helper.h"
+#include "utils/convert_utils.h"
+
+class NegativeSubpass : public VkLayerTest {};
 
 TEST_F(NegativeSubpass, NonGraphicsPipeline) {
     TEST_DESCRIPTION("Create a subpass with the compute pipeline bind point");
@@ -578,9 +580,7 @@ TEST_F(NegativeSubpass, SubpassInputNotBoundDescriptorSet) {
                                                             size32(subpasses), subpasses.data(), 0u, nullptr);
     vkt::RenderPass rp(*m_device, rpci);
     vkt::Framebuffer fb(*m_device, rp.handle(), 1, &view_input.handle(), 64, 64);
-
-    VkSamplerCreateInfo sampler_info = SafeSaneSamplerCreateInfo();
-    vkt::Sampler sampler(*m_device, sampler_info);
+    vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
 
     VkShaderObj vs(this, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
 

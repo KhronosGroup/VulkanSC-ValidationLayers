@@ -3607,13 +3607,15 @@ void ThreadSafety::PostCallRecordCmdSetRenderingAttachmentLocationsKHR(VkCommand
 }
 
 void ThreadSafety::PreCallRecordCmdSetRenderingInputAttachmentIndicesKHR(
-    VkCommandBuffer commandBuffer, const VkRenderingInputAttachmentIndexInfoKHR* pLocationInfo, const RecordObject& record_obj) {
+    VkCommandBuffer commandBuffer, const VkRenderingInputAttachmentIndexInfoKHR* pInputAttachmentIndexInfo,
+    const RecordObject& record_obj) {
     StartWriteObject(commandBuffer, record_obj.location);
     // Host access to commandBuffer must be externally synchronized
 }
 
 void ThreadSafety::PostCallRecordCmdSetRenderingInputAttachmentIndicesKHR(
-    VkCommandBuffer commandBuffer, const VkRenderingInputAttachmentIndexInfoKHR* pLocationInfo, const RecordObject& record_obj) {
+    VkCommandBuffer commandBuffer, const VkRenderingInputAttachmentIndexInfoKHR* pInputAttachmentIndexInfo,
+    const RecordObject& record_obj) {
     FinishWriteObject(commandBuffer, record_obj.location);
     // Host access to commandBuffer must be externally synchronized
 }
@@ -4053,6 +4055,61 @@ void ThreadSafety::PostCallRecordGetImageSubresourceLayout2KHR(VkDevice device, 
                                                                VkSubresourceLayout2KHR* pLayout, const RecordObject& record_obj) {
     FinishReadObjectParentInstance(device, record_obj.location);
     FinishReadObject(image, record_obj.location);
+}
+
+void ThreadSafety::PreCallRecordDestroyPipelineBinaryKHR(VkDevice device, VkPipelineBinaryKHR pipelineBinary,
+                                                         const VkAllocationCallbacks* pAllocator, const RecordObject& record_obj) {
+    StartReadObjectParentInstance(device, record_obj.location);
+    StartWriteObject(pipelineBinary, record_obj.location);
+    // Host access to pipelineBinary must be externally synchronized
+}
+
+void ThreadSafety::PostCallRecordDestroyPipelineBinaryKHR(VkDevice device, VkPipelineBinaryKHR pipelineBinary,
+                                                          const VkAllocationCallbacks* pAllocator, const RecordObject& record_obj) {
+    FinishReadObjectParentInstance(device, record_obj.location);
+    FinishWriteObject(pipelineBinary, record_obj.location);
+    DestroyObject(pipelineBinary);
+    // Host access to pipelineBinary must be externally synchronized
+}
+
+void ThreadSafety::PreCallRecordGetPipelineKeyKHR(VkDevice device, const VkPipelineCreateInfoKHR* pPipelineCreateInfo,
+                                                  VkPipelineBinaryKeyKHR* pPipelineKey, const RecordObject& record_obj) {
+    StartReadObjectParentInstance(device, record_obj.location);
+}
+
+void ThreadSafety::PostCallRecordGetPipelineKeyKHR(VkDevice device, const VkPipelineCreateInfoKHR* pPipelineCreateInfo,
+                                                   VkPipelineBinaryKeyKHR* pPipelineKey, const RecordObject& record_obj) {
+    FinishReadObjectParentInstance(device, record_obj.location);
+}
+
+void ThreadSafety::PreCallRecordGetPipelineBinaryDataKHR(VkDevice device, const VkPipelineBinaryDataInfoKHR* pInfo,
+                                                         VkPipelineBinaryKeyKHR* pPipelineBinaryKey,
+                                                         size_t* pPipelineBinaryDataSize, void* pPipelineBinaryData,
+                                                         const RecordObject& record_obj) {
+    StartReadObjectParentInstance(device, record_obj.location);
+}
+
+void ThreadSafety::PostCallRecordGetPipelineBinaryDataKHR(VkDevice device, const VkPipelineBinaryDataInfoKHR* pInfo,
+                                                          VkPipelineBinaryKeyKHR* pPipelineBinaryKey,
+                                                          size_t* pPipelineBinaryDataSize, void* pPipelineBinaryData,
+                                                          const RecordObject& record_obj) {
+    FinishReadObjectParentInstance(device, record_obj.location);
+}
+
+void ThreadSafety::PreCallRecordReleaseCapturedPipelineDataKHR(VkDevice device, const VkReleaseCapturedPipelineDataInfoKHR* pInfo,
+                                                               const VkAllocationCallbacks* pAllocator,
+                                                               const RecordObject& record_obj) {
+    StartReadObjectParentInstance(device, record_obj.location);
+    StartWriteObject(pInfo->pipeline, record_obj.location);
+    // Host access to pInfo->pipeline must be externally synchronized
+}
+
+void ThreadSafety::PostCallRecordReleaseCapturedPipelineDataKHR(VkDevice device, const VkReleaseCapturedPipelineDataInfoKHR* pInfo,
+                                                                const VkAllocationCallbacks* pAllocator,
+                                                                const RecordObject& record_obj) {
+    FinishReadObjectParentInstance(device, record_obj.location);
+    FinishWriteObject(pInfo->pipeline, record_obj.location);
+    // Host access to pInfo->pipeline must be externally synchronized
 }
 
 void ThreadSafety::PreCallRecordCmdSetLineStippleKHR(VkCommandBuffer commandBuffer, uint32_t lineStippleFactor,
@@ -7616,6 +7673,14 @@ void ThreadSafety::PostCallRecordCmdOpticalFlowExecuteNV(VkCommandBuffer command
                                                          const RecordObject& record_obj) {
     FinishReadObject(commandBuffer, record_obj.location);
     FinishReadObject(session, record_obj.location);
+}
+
+void ThreadSafety::PreCallRecordAntiLagUpdateAMD(VkDevice device, const VkAntiLagDataAMD* pData, const RecordObject& record_obj) {
+    StartReadObjectParentInstance(device, record_obj.location);
+}
+
+void ThreadSafety::PostCallRecordAntiLagUpdateAMD(VkDevice device, const VkAntiLagDataAMD* pData, const RecordObject& record_obj) {
+    FinishReadObjectParentInstance(device, record_obj.location);
 }
 
 void ThreadSafety::PreCallRecordCreateShadersEXT(VkDevice device, uint32_t createInfoCount,

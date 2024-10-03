@@ -12,11 +12,14 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
+#include <thread>
 #include "../framework/layer_validation_tests.h"
 #include "../framework/descriptor_helper.h"
 #include "../framework/thread_helper.h"
 
 #if GTEST_IS_THREADSAFE
+class PositiveThreading : public VkLayerTest {};
+
 TEST_F(PositiveThreading, DisplayObjects) {
     TEST_DESCRIPTION("Create and use VkDisplayKHR objects with GetPhysicalDeviceDisplayPropertiesKHR in thread-safety.");
 

@@ -21,6 +21,7 @@
 #include "state_tracker/state_tracker.h"
 #include "vulkansc/sc_vuid_enums.h"
 #include "vulkansc/base64.h"
+#include "spirv-tools/optimizer.hpp"
 
 #include <sstream>
 
@@ -66,7 +67,7 @@ PipelineCache::Entry::StageModules PipelineCache::Entry::InitShaderModules(const
 
             // We use the SPIR-V module pointer as the internal shader module handle
             auto handle = (VkShaderModule)spirv_module.get();
-            auto module_state = std::make_shared<vvl::ShaderModule>(handle, spirv_module, 0);
+            auto module_state = std::make_shared<vvl::ShaderModule>(handle, spirv_module);
 
             stage_modules.emplace_back(std::move(module_state));
         } else {

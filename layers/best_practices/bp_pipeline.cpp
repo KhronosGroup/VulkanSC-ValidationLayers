@@ -18,7 +18,6 @@
  */
 
 #include "best_practices/best_practices_validation.h"
-#include "best_practices/best_practices_error_enums.h"
 #include "best_practices/bp_state.h"
 #include "state_tracker/render_pass_state.h"
 #include "chassis/chassis_modification_state.h"
@@ -41,40 +40,35 @@ static inline bool FormatHasFullThroughputBlendingArm(VkFormat format) {
     }
 }
 
-bool BestPractices::ValidateMultisampledBlendingArm(uint32_t create_info_count, const VkGraphicsPipelineCreateInfo* create_infos,
+bool BestPractices::ValidateMultisampledBlendingArm(const VkGraphicsPipelineCreateInfo& create_info,
                                                     const Location& create_info_loc) const {
     bool skip = false;
 
-    for (uint32_t i = 0; i < create_info_count; i++) {
-        auto create_info = &create_infos[i];
+    if (!create_info.pColorBlendState || !create_info.pMultisampleState ||
+        create_info.pMultisampleState->rasterizationSamples == VK_SAMPLE_COUNT_1_BIT ||
+        create_info.pMultisampleState->sampleShadingEnable) {
+        return skip;
+    }
 
-        if (!create_info->pColorBlendState || !create_info->pMultisampleState ||
-            create_info->pMultisampleState->rasterizationSamples == VK_SAMPLE_COUNT_1_BIT ||
-            create_info->pMultisampleState->sampleShadingEnable) {
-            return skip;
-        }
+    auto rp_state = Get<vvl::RenderPass>(create_info.renderPass);
+    if (!rp_state) return skip;
 
-        auto rp_state = Get<vvl::RenderPass>(create_info->renderPass);
-        if (!rp_state) {
-            continue;
-        }
-        const auto& subpass = rp_state->create_info.pSubpasses[create_info->subpass];
+    const auto& subpass = rp_state->create_info.pSubpasses[create_info.subpass];
 
-        // According to spec, pColorBlendState must be ignored if subpass does not have color attachments.
-        uint32_t num_color_attachments = std::min(subpass.colorAttachmentCount, create_info->pColorBlendState->attachmentCount);
+    // According to spec, pColorBlendState must be ignored if subpass does not have color attachments.
+    uint32_t num_color_attachments = std::min(subpass.colorAttachmentCount, create_info.pColorBlendState->attachmentCount);
 
-        for (uint32_t j = 0; j < num_color_attachments; j++) {
-            const auto& blend_att = create_info->pColorBlendState->pAttachments[j];
-            uint32_t att = subpass.pColorAttachments[j].attachment;
+    for (uint32_t j = 0; j < num_color_attachments; j++) {
+        const auto& blend_att = create_info.pColorBlendState->pAttachments[j];
+        uint32_t att = subpass.pColorAttachments[j].attachment;
 
-            if (att != VK_ATTACHMENT_UNUSED && blend_att.blendEnable && blend_att.colorWriteMask) {
-                if (!FormatHasFullThroughputBlendingArm(rp_state->create_info.pAttachments[att].format)) {
-                    skip |= LogPerformanceWarning(kVUID_BestPractices_CreatePipelines_MultisampledBlending, device, create_info_loc,
-                                                  "%s Pipeline is multisampled and "
-                                                  "color attachment #%u makes use "
-                                                  "of a format which cannot be blended at full throughput when using MSAA.",
-                                                  VendorSpecificTag(kBPVendorArm), j);
-                }
+        if (att != VK_ATTACHMENT_UNUSED && blend_att.blendEnable && blend_att.colorWriteMask) {
+            if (!FormatHasFullThroughputBlendingArm(rp_state->create_info.pAttachments[att].format)) {
+                skip |= LogPerformanceWarning("BestPractices-Arm-vkCreatePipelines-multisampled-blending", device, create_info_loc,
+                                              "%s Pipeline is multisampled and "
+                                              "color attachment #%u makes use "
+                                              "of a format which cannot be blended at full throughput when using MSAA.",
+                                              VendorSpecificTag(kBPVendorArm), j);
             }
         }
     }
@@ -92,6 +86,69 @@ void BestPractices::ManualPostCallRecordCreateComputePipelines(VkDevice device, 
     pipeline_cache_ = pipelineCache;
 }
 
+bool BestPractices::ValidateCreateGraphicsPipeline(const VkGraphicsPipelineCreateInfo& create_info, const vvl::Pipeline& pipeline,
+                                                   const Location create_info_loc) const {
+    bool skip = false;
+    if (!(pipeline.active_shaders & VK_SHADER_STAGE_MESH_BIT_EXT) && create_info.pVertexInputState) {
+        const auto& vertex_input = *create_info.pVertexInputState;
+        uint32_t count = 0;
+        for (uint32_t j = 0; j < vertex_input.vertexBindingDescriptionCount; j++) {
+            if (vertex_input.pVertexBindingDescriptions[j].inputRate == VK_VERTEX_INPUT_RATE_INSTANCE) {
+                count++;
+            }
+        }
+        if (count > kMaxInstancedVertexBuffers) {
+            skip |= LogPerformanceWarning(
+                "BestPractices-vkCreateGraphicsPipelines-too-many-instanced-vertex-buffers", device, create_info_loc,
+                "The pipeline is using %u instanced vertex buffers (current limit: %u), but this can be inefficient on the "
+                "GPU. If using instanced vertex attributes prefer interleaving them in a single buffer.",
+                count, kMaxInstancedVertexBuffers);
+        }
+    }
+
+    if ((create_info.pRasterizationState) && (create_info.pRasterizationState->depthBiasEnable) &&
+        (create_info.pRasterizationState->depthBiasConstantFactor == 0.0f) &&
+        (create_info.pRasterizationState->depthBiasSlopeFactor == 0.0f) && VendorCheckEnabled(kBPVendorArm)) {
+        skip |=
+            LogPerformanceWarning("BestPractices-Arm-vkCreatePipelines-depthbias-zero", device, create_info_loc,
+                                  "%s This vkCreateGraphicsPipelines call is created with depthBiasEnable set to true "
+                                  "and both depthBiasConstantFactor and depthBiasSlopeFactor are set to 0. This can cause reduced "
+                                  "efficiency during rasterization. Consider disabling depthBias or increasing either "
+                                  "depthBiasConstantFactor or depthBiasSlopeFactor.",
+                                  VendorSpecificTag(kBPVendorArm));
+    }
+
+    const auto* graphics_lib_info = vku::FindStructInPNextChain<VkGraphicsPipelineLibraryCreateInfoEXT>(create_info.pNext);
+    if (create_info.renderPass == VK_NULL_HANDLE &&
+        !vku::FindStructInPNextChain<VkPipelineRenderingCreateInfoKHR>(create_info.pNext) &&
+        (!graphics_lib_info ||
+         (graphics_lib_info->flags & (VK_GRAPHICS_PIPELINE_LIBRARY_FRAGMENT_SHADER_BIT_EXT |
+                                      VK_GRAPHICS_PIPELINE_LIBRARY_FRAGMENT_OUTPUT_INTERFACE_BIT_EXT)) != 0)) {
+        skip |= LogWarning("BestPractices-Pipeline-NoRendering", device, create_info_loc,
+                           "renderPass is VK_NULL_HANDLE and pNext chain does not contain VkPipelineRenderingCreateInfoKHR.");
+    }
+
+    if (VendorCheckEnabled(kBPVendorArm)) {
+        skip |= ValidateMultisampledBlendingArm(create_info, create_info_loc);
+    }
+
+    if (VendorCheckEnabled(kBPVendorAMD)) {
+        if (create_info.pInputAssemblyState && create_info.pInputAssemblyState->primitiveRestartEnable) {
+            skip |= LogPerformanceWarning("BestPractices-AMD-CreatePipelines-AvoidPrimitiveRestart", device, create_info_loc,
+                                          "%s Use of primitive restart is not recommended", VendorSpecificTag(kBPVendorAMD));
+        }
+
+        // TODO: this might be too aggressive of a check
+        if (create_info.pDynamicState && create_info.pDynamicState->dynamicStateCount > kDynamicStatesWarningLimitAMD) {
+            skip |= LogPerformanceWarning("BestPractices-AMD-CreatePipelines-MinimizeNumDynamicStates", device, create_info_loc,
+                                          "%s Dynamic States usage incurs a performance cost. Ensure that they are truly needed",
+                                          VendorSpecificTag(kBPVendorAMD));
+        }
+    }
+
+    return skip;
+}
+
 bool BestPractices::PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t createInfoCount,
                                                            const VkGraphicsPipelineCreateInfo* pCreateInfos,
                                                            const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines,
@@ -104,107 +161,36 @@ bool BestPractices::PreCallValidateCreateGraphicsPipelines(VkDevice device, VkPi
     }
 
     if ((createInfoCount > 1) && (!pipelineCache)) {
-        skip |= LogPerformanceWarning(kVUID_BestPractices_CreatePipelines_MultiplePipelines, device, error_obj.location,
-                                      "This vkCreateGraphicsPipelines call is creating multiple pipelines but is not using a "
-                                      "pipeline cache, which may help with performance");
+        skip |=
+            LogPerformanceWarning("BestPractices-vkCreateGraphicsPipelines-multiple-pipelines-no-cache", device, error_obj.location,
+                                  "creating multiple pipelines (createInfoCount is %" PRIu32
+                                  ") but is not using a "
+                                  "pipeline cache, which may help with performance",
+                                  createInfoCount);
     }
 
     for (uint32_t i = 0; i < createInfoCount; i++) {
-        const Location create_info_loc = error_obj.location.dot(Field::pCreateInfos, i);
-        const auto& create_info = pCreateInfos[i];
-        const auto& pipeline = *pipeline_states[i].get();
-
-        if (!(pipeline.active_shaders & VK_SHADER_STAGE_MESH_BIT_EXT) && create_info.pVertexInputState) {
-            const auto& vertex_input = *create_info.pVertexInputState;
-            uint32_t count = 0;
-            for (uint32_t j = 0; j < vertex_input.vertexBindingDescriptionCount; j++) {
-                if (vertex_input.pVertexBindingDescriptions[j].inputRate == VK_VERTEX_INPUT_RATE_INSTANCE) {
-                    count++;
-                }
-            }
-            if (count > kMaxInstancedVertexBuffers) {
-                skip |= LogPerformanceWarning(
-                    kVUID_BestPractices_CreatePipelines_TooManyInstancedVertexBuffers, device, create_info_loc,
-                    "The pipeline is using %u instanced vertex buffers (current limit: %u), but this can be inefficient on the "
-                    "GPU. If using instanced vertex attributes prefer interleaving them in a single buffer.",
-                    count, kMaxInstancedVertexBuffers);
-            }
-        }
-
-        if ((pCreateInfos[i].pRasterizationState) && (pCreateInfos[i].pRasterizationState->depthBiasEnable) &&
-            (pCreateInfos[i].pRasterizationState->depthBiasConstantFactor == 0.0f) &&
-            (pCreateInfos[i].pRasterizationState->depthBiasSlopeFactor == 0.0f) && VendorCheckEnabled(kBPVendorArm)) {
-            skip |= LogPerformanceWarning(
-                kVUID_BestPractices_CreatePipelines_DepthBias_Zero, device, create_info_loc,
-                "%s This vkCreateGraphicsPipelines call is created with depthBiasEnable set to true "
-                "and both depthBiasConstantFactor and depthBiasSlopeFactor are set to 0. This can cause reduced "
-                "efficiency during rasterization. Consider disabling depthBias or increasing either "
-                "depthBiasConstantFactor or depthBiasSlopeFactor.",
-                VendorSpecificTag(kBPVendorArm));
-        }
-
-        skip |= VendorCheckEnabled(kBPVendorArm) && ValidateMultisampledBlendingArm(createInfoCount, pCreateInfos, create_info_loc);
-
-        const auto* graphics_lib_info = vku::FindStructInPNextChain<VkGraphicsPipelineLibraryCreateInfoEXT>(create_info.pNext);
-        if (pCreateInfos[i].renderPass == VK_NULL_HANDLE &&
-            !vku::FindStructInPNextChain<VkPipelineRenderingCreateInfoKHR>(pCreateInfos[i].pNext) &&
-            (!graphics_lib_info ||
-             (graphics_lib_info->flags & (VK_GRAPHICS_PIPELINE_LIBRARY_FRAGMENT_SHADER_BIT_EXT |
-                                          VK_GRAPHICS_PIPELINE_LIBRARY_FRAGMENT_OUTPUT_INTERFACE_BIT_EXT)) != 0)) {
-            skip |= LogWarning(kVUID_BestPractices_Pipeline_NoRendering, device, create_info_loc,
-                               "renderPass is VK_NULL_HANDLE and pNext chain does not contain VkPipelineRenderingCreateInfoKHR.");
-        }
-
-        if (VendorCheckEnabled(kBPVendorAMD)) {
-            if (pCreateInfos[i].pInputAssemblyState && pCreateInfos[i].pInputAssemblyState->primitiveRestartEnable) {
-                skip |= LogPerformanceWarning(kVUID_BestPractices_CreatePipelines_AvoidPrimitiveRestart, device, create_info_loc,
-                                              "%s Use of primitive restart is not recommended", VendorSpecificTag(kBPVendorAMD));
-            }
-
-            // TODO: this might be too aggressive of a check
-            if (pCreateInfos[i].pDynamicState && pCreateInfos[i].pDynamicState->dynamicStateCount > kDynamicStatesWarningLimitAMD) {
-                skip |=
-                    LogPerformanceWarning(kVUID_BestPractices_CreatePipelines_MinimizeNumDynamicStates, device, create_info_loc,
-                                          "%s Dynamic States usage incurs a performance cost. Ensure that they are truly needed",
-                                          VendorSpecificTag(kBPVendorAMD));
-            }
-        }
-
-        for (const auto& stage : pipeline.stage_states) {
-            if (stage.GetStage() != VK_SHADER_STAGE_FRAGMENT_BIT) {
-                continue;
-            }
-            const auto& rp_state = pipeline.RenderPassState();
-            if (rp_state && !rp_state->UsesDynamicRendering() && stage.entrypoint) {
-                auto rpci = rp_state->create_info.ptr();
-                auto subpass = pipeline.Subpass();
-                for (const auto& variable : stage.entrypoint->resource_interface_variables) {
-                    if (!variable.decorations.Has(spirv::DecorationSet::input_attachment_bit)) {
-                        continue;
-                    }
-                    auto slot = variable.decorations.input_attachment_index_start;
-                    if (!rpci->pSubpasses[subpass].pInputAttachments || slot >= rpci->pSubpasses[subpass].inputAttachmentCount) {
-                        const LogObjectList objlist(stage.module_state->Handle(), pipeline.PipelineLayoutState()->Handle());
-                        skip |= LogWarning(kVUID_BestPractices_Shader_MissingInputAttachment, device, create_info_loc,
-                                           "Shader consumes input attachment index %" PRIu32 " but not provided in subpass", slot);
-                    }
-                }
-            }
-        }
+        const auto* pipeline = pipeline_states[i].get();
+        ASSERT_AND_CONTINUE(pipeline);
+        skip |= ValidateCreateGraphicsPipeline(pCreateInfos[i], *pipeline, error_obj.location.dot(Field::pCreateInfos, i));
     }
+
     if (VendorCheckEnabled(kBPVendorAMD) || VendorCheckEnabled(kBPVendorNVIDIA)) {
         auto prev_pipeline = pipeline_cache_.load();
         if (pipelineCache && prev_pipeline && pipelineCache != prev_pipeline) {
-            skip |= LogPerformanceWarning(kVUID_BestPractices_CreatePipelines_MultiplePipelineCaches, device, error_obj.location,
+            skip |= LogPerformanceWarning("BestPractices-vkCreatePipelines-multiple-pipelines-caches", device, error_obj.location,
                                           "%s %s A second pipeline cache is in use. "
                                           "Consider using only one pipeline cache to improve cache hit rate.",
                                           VendorSpecificTag(kBPVendorAMD), VendorSpecificTag(kBPVendorNVIDIA));
         }
     }
     if (VendorCheckEnabled(kBPVendorAMD)) {
-        if (num_pso_ > kMaxRecommendedNumberOfPSOAMD) {
-            skip |= LogPerformanceWarning(kVUID_BestPractices_CreatePipelines_TooManyPipelines, device, error_obj.location,
-                                          "%s Too many pipelines created, consider consolidation", VendorSpecificTag(kBPVendorAMD));
+        const uint32_t pso_count = num_pso_.load();
+        if (pso_count > kMaxRecommendedNumberOfPSOAMD) {
+            skip |= LogPerformanceWarning("BestPractices-AMD-CreatePipelines-TooManyPipelines", device, error_obj.location,
+                                          "%s Too many pipelines created (%" PRIu32 " but max recommended is %" PRIu32
+                                          "), consider consolidation",
+                                          VendorSpecificTag(kBPVendorAMD), pso_count, kMaxRecommendedNumberOfPSOAMD);
         }
     }
 
@@ -229,7 +215,7 @@ static std::vector<bp_state::AttachmentInfo> GetAttachmentAccess(bp_state::Pipel
             if (create_info.pColorBlendState->pAttachments[j].colorWriteMask != 0) {
                 uint32_t attachment = subpass.pColorAttachments[j].attachment;
                 if (attachment != VK_ATTACHMENT_UNUSED) {
-                    result.push_back({attachment, VK_IMAGE_ASPECT_COLOR_BIT});
+                    result.emplace_back(attachment, VK_IMAGE_ASPECT_COLOR_BIT);
                 }
             }
         }
@@ -247,26 +233,24 @@ static std::vector<bp_state::AttachmentInfo> GetAttachmentAccess(bp_state::Pipel
             if (create_info.pDepthStencilState->stencilTestEnable) {
                 aspects |= VK_IMAGE_ASPECT_STENCIL_BIT;
             }
-            result.push_back({attachment, aspects});
+            result.emplace_back(attachment, aspects);
         }
     }
     return result;
 }
 
-bp_state::Pipeline::Pipeline(const ValidationStateTracker& state_data, const VkGraphicsPipelineCreateInfo* pCreateInfo,
+bp_state::Pipeline::Pipeline(const ValidationStateTracker& state_data, const VkGraphicsPipelineCreateInfo* create_info,
                              std::shared_ptr<const vvl::PipelineCache>&& pipe_cache,
-                             std::shared_ptr<const vvl::RenderPass>&& rpstate, std::shared_ptr<const vvl::PipelineLayout>&& layout,
-                             ShaderModuleUniqueIds* shader_unique_id_map)
-    : vvl::Pipeline(state_data, pCreateInfo, std::move(pipe_cache), std::move(rpstate), std::move(layout), shader_unique_id_map),
+                             std::shared_ptr<const vvl::RenderPass>&& rpstate, std::shared_ptr<const vvl::PipelineLayout>&& layout)
+    : vvl::Pipeline(state_data, create_info, std::move(pipe_cache), std::move(rpstate), std::move(layout), nullptr),
       access_framebuffer_attachments(GetAttachmentAccess(*this)) {}
 
-std::shared_ptr<vvl::Pipeline> BestPractices::CreateGraphicsPipelineState(const VkGraphicsPipelineCreateInfo* pCreateInfo,
-                                                                          std::shared_ptr<const vvl::PipelineCache> pipeline_cache,
-                                                                          std::shared_ptr<const vvl::RenderPass>&& render_pass,
-                                                                          std::shared_ptr<const vvl::PipelineLayout>&& layout,
-                                                                          ShaderModuleUniqueIds* shader_unique_id_map) const {
+std::shared_ptr<vvl::Pipeline> BestPractices::CreateGraphicsPipelineState(
+    const VkGraphicsPipelineCreateInfo* create_info, std::shared_ptr<const vvl::PipelineCache> pipeline_cache,
+    std::shared_ptr<const vvl::RenderPass>&& render_pass, std::shared_ptr<const vvl::PipelineLayout>&& layout,
+    spirv::StatelessData stateless_data[kCommonMaxGraphicsShaderStages]) const {
     return std::static_pointer_cast<vvl::Pipeline>(std::make_shared<bp_state::Pipeline>(
-        *this, pCreateInfo, std::move(pipeline_cache), std::move(render_pass), std::move(layout), shader_unique_id_map));
+        *this, create_info, std::move(pipeline_cache), std::move(render_pass), std::move(layout)));
 }
 
 void BestPractices::ManualPostCallRecordCreateGraphicsPipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t count,
@@ -287,15 +271,18 @@ bool BestPractices::PreCallValidateCreateComputePipelines(VkDevice device, VkPip
         device, pipelineCache, createInfoCount, pCreateInfos, pAllocator, pPipelines, error_obj, pipeline_states, chassis_state);
 
     if ((createInfoCount > 1) && (!pipelineCache)) {
-        skip |= LogPerformanceWarning(kVUID_BestPractices_CreatePipelines_MultiplePipelines, device, error_obj.location,
-                                      "This vkCreateComputePipelines call is creating multiple pipelines but is not using a "
-                                      "pipeline cache, which may help with performance");
+        skip |=
+            LogPerformanceWarning("BestPractices-vkCreateComputePipelines-multiple-pipelines-no-cache", device, error_obj.location,
+                                  "creating multiple pipelines (createInfoCount is %" PRIu32
+                                  ") but is not using a "
+                                  "pipeline cache, which may help with performance",
+                                  createInfoCount);
     }
 
     if (VendorCheckEnabled(kBPVendorAMD)) {
         auto prev_pipeline = pipeline_cache_.load();
         if (pipelineCache && prev_pipeline && pipelineCache != prev_pipeline) {
-            skip |= LogPerformanceWarning(kVUID_BestPractices_CreatePipelines_MultiplePipelines, device, error_obj.location,
+            skip |= LogPerformanceWarning("BestPractices-vkCreateComputePipelines-multiple-cache", device, error_obj.location,
                                           "%s A second pipeline cache is in use. Consider using only one pipeline cache to "
                                           "improve cache hit rate",
                                           VendorSpecificTag(kBPVendorAMD));
@@ -317,7 +304,7 @@ bool BestPractices::PreCallValidateCreateComputePipelines(VkDevice device, VkPip
             auto module_state = Get<vvl::ShaderModule>(create_info.stage.module);
             if (module_state &&
                 module_state->spirv->static_data_.has_builtin_workgroup_size) {  // No module if creating from module identifier
-                skip |= LogWarning(kVUID_BestPractices_SpirvDeprecated_WorkgroupSize, device, create_info_loc,
+                skip |= LogWarning("BestPractices-SpirvDeprecated_WorkgroupSize", device, create_info_loc,
                                    "is using the SPIR-V Workgroup built-in which SPIR-V 1.6 deprecated. When using "
                                    "VK_KHR_maintenance4 or Vulkan 1.3+, the new SPIR-V LocalSizeId execution mode should be used "
                                    "instead. This can be done by recompiling your shader and targeting Vulkan 1.3+.");
@@ -350,7 +337,7 @@ bool BestPractices::ValidateCreateComputePipelineArm(const VkComputePipelineCrea
     // Generate a priori warnings about work group sizes.
     if (thread_count > kMaxEfficientWorkGroupThreadCountArm) {
         skip |= LogPerformanceWarning(
-            kVUID_BestPractices_CreateComputePipelines_ComputeWorkGroupSize, device, create_info_loc,
+            "BestPractices-Arm-vkCreateComputePipelines-compute-work-group-size", device, create_info_loc,
             "%s compute shader with work group dimensions (%u, %u, "
             "%u) (%u threads total), has more threads than advised in a single work group. It is advised to use work "
             "groups with less than %u threads, especially when using barrier() or shared memory.",
@@ -361,7 +348,7 @@ bool BestPractices::ValidateCreateComputePipelineArm(const VkComputePipelineCrea
         ((y > 1) && (y & (kThreadGroupDispatchCountAlignmentArm - 1))) ||
         ((z > 1) && (z & (kThreadGroupDispatchCountAlignmentArm - 1)))) {
         skip |= LogPerformanceWarning(
-            kVUID_BestPractices_CreateComputePipelines_ComputeThreadGroupAlignment, device, create_info_loc,
+            "BestPractices-Arm-vkCreateComputePipelines-compute-thread-group-alignment", device, create_info_loc,
             "%s compute shader with work group dimensions (%u, "
             "%u, %u) is not aligned to %u "
             "threads. On Arm Mali architectures, not aligning work group sizes to %u may "
@@ -389,7 +376,7 @@ bool BestPractices::ValidateCreateComputePipelineArm(const VkComputePipelineCrea
     }
 
     if (accesses_2d && dimensions < 2) {
-        LogPerformanceWarning(kVUID_BestPractices_CreateComputePipelines_ComputeSpatialLocality, device, create_info_loc,
+        LogPerformanceWarning("BestPractices-Arm-vkCreateComputePipelines-compute-spatial-locality", device, create_info_loc,
                               "%s compute shader has work group dimensions (%u, %u, %u), which "
                               "suggests a 1D dispatch, but the shader is accessing 2D or 3D images. The shader may be "
                               "exhibiting poor spatial locality with respect to one or more shader resources.",
@@ -421,7 +408,7 @@ bool BestPractices::ValidateCreateComputePipelineAmd(const VkComputePipelineCrea
     const bool multiple_64 = ((thread_count % 64) == 0);
 
     if (!multiple_64) {
-        skip |= LogPerformanceWarning(kVUID_BestPractices_LocalWorkgroup_Multiple64, device, create_info_loc,
+        skip |= LogPerformanceWarning("BestPractices-AMD-LocalWorkgroup-Multiple64", device, create_info_loc,
                                       "%s compute shader with work group dimensions (%" PRIu32 ", %" PRIu32 ", %" PRIu32
                                       "), workgroup size (%" PRIu32
                                       "), is not a multiple of 64. Make the workgroup size a multiple of 64 to obtain best "
@@ -432,56 +419,6 @@ bool BestPractices::ValidateCreateComputePipelineAmd(const VkComputePipelineCrea
     return skip;
 }
 
-void BestPractices::PreCallRecordCmdBindPipeline(VkCommandBuffer commandBuffer, VkPipelineBindPoint pipelineBindPoint,
-                                                 VkPipeline pipeline, const RecordObject& record_obj) {
-    StateTracker::PreCallRecordCmdBindPipeline(commandBuffer, pipelineBindPoint, pipeline, record_obj);
-
-    auto pipeline_info = Get<vvl::Pipeline>(pipeline);
-    auto cb_state = GetWrite<bp_state::CommandBuffer>(commandBuffer);
-
-    assert(pipeline_info);
-    assert(cb_state);
-
-    if (pipelineBindPoint == VK_PIPELINE_BIND_POINT_GRAPHICS && VendorCheckEnabled(kBPVendorNVIDIA)) {
-        using TessGeometryMeshState = bp_state::CommandBufferStateNV::TessGeometryMesh::State;
-        auto& tgm = cb_state->nv.tess_geometry_mesh;
-
-        // Make sure the message is only signaled once per command buffer
-        tgm.threshold_signaled = tgm.num_switches >= kNumBindPipelineTessGeometryMeshSwitchesThresholdNVIDIA;
-
-        // Track pipeline switches with tessellation, geometry, and/or mesh shaders enabled, and disabled
-        auto tgm_stages = VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT | VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT |
-                          VK_SHADER_STAGE_GEOMETRY_BIT | VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_MESH_BIT_EXT;
-        auto new_tgm_state =
-            (pipeline_info->active_shaders & tgm_stages) != 0 ? TessGeometryMeshState::Enabled : TessGeometryMeshState::Disabled;
-        if (tgm.state != new_tgm_state && tgm.state != TessGeometryMeshState::Unknown) {
-            tgm.num_switches++;
-        }
-        tgm.state = new_tgm_state;
-
-        // Track depthTestEnable and depthCompareOp
-        auto& pipeline_create_info = pipeline_info->GraphicsCreateInfo();
-        auto depth_stencil_state = pipeline_create_info.pDepthStencilState;
-        auto dynamic_state = pipeline_create_info.pDynamicState;
-        if (depth_stencil_state && dynamic_state) {
-            auto dynamic_state_begin = dynamic_state->pDynamicStates;
-            auto dynamic_state_end = dynamic_state->pDynamicStates + dynamic_state->dynamicStateCount;
-
-            const bool dynamic_depth_test_enable =
-                std::find(dynamic_state_begin, dynamic_state_end, VK_DYNAMIC_STATE_DEPTH_TEST_ENABLE) != dynamic_state_end;
-            const bool dynamic_depth_func =
-                std::find(dynamic_state_begin, dynamic_state_end, VK_DYNAMIC_STATE_DEPTH_COMPARE_OP) != dynamic_state_end;
-
-            if (!dynamic_depth_test_enable) {
-                RecordSetDepthTestState(*cb_state, cb_state->nv.depth_compare_op, depth_stencil_state->depthTestEnable != VK_FALSE);
-            }
-            if (!dynamic_depth_func) {
-                RecordSetDepthTestState(*cb_state, depth_stencil_state->depthCompareOp, cb_state->nv.depth_test_enable);
-            }
-        }
-    }
-}
-
 void BestPractices::PostCallRecordCmdBindPipeline(VkCommandBuffer commandBuffer, VkPipelineBindPoint pipelineBindPoint,
                                                   VkPipeline pipeline, const RecordObject& record_obj) {
     StateTracker::PostCallRecordCmdBindPipeline(commandBuffer, pipelineBindPoint, pipeline, record_obj);
@@ -490,11 +427,9 @@ void BestPractices::PostCallRecordCmdBindPipeline(VkCommandBuffer commandBuffer,
     PipelineUsedInFrame(pipeline);
 
     if (pipelineBindPoint == VK_PIPELINE_BIND_POINT_GRAPHICS) {
-        auto pipeline_state = Get<bp_state::Pipeline>(pipeline);
         // check for depth/blend state tracking
-        if (pipeline_state) {
+        if (auto pipeline_state = Get<bp_state::Pipeline>(pipeline)) {
             auto cb_state = GetWrite<bp_state::CommandBuffer>(commandBuffer);
-            assert(cb_state);
             auto& render_pass_state = cb_state->render_pass_state;
 
             render_pass_state.nextDrawTouchesAttachments = pipeline_state->access_framebuffer_attachments;
@@ -527,6 +462,46 @@ void BestPractices::PostCallRecordCmdBindPipeline(VkCommandBuffer commandBuffer,
                         break;
                 }
             }
+
+            if (VendorCheckEnabled(kBPVendorNVIDIA)) {
+                using TessGeometryMeshState = bp_state::CommandBufferStateNV::TessGeometryMesh::State;
+                auto& tgm = cb_state->nv.tess_geometry_mesh;
+
+                // Make sure the message is only signaled once per command buffer
+                tgm.threshold_signaled = tgm.num_switches >= kNumBindPipelineTessGeometryMeshSwitchesThresholdNVIDIA;
+
+                // Track pipeline switches with tessellation, geometry, and/or mesh shaders enabled, and disabled
+                auto tgm_stages = VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT | VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT |
+                                  VK_SHADER_STAGE_GEOMETRY_BIT | VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_MESH_BIT_EXT;
+                auto new_tgm_state = (pipeline_state->active_shaders & tgm_stages) != 0 ? TessGeometryMeshState::Enabled
+                                                                                        : TessGeometryMeshState::Disabled;
+                if (tgm.state != new_tgm_state && tgm.state != TessGeometryMeshState::Unknown) {
+                    tgm.num_switches++;
+                }
+                tgm.state = new_tgm_state;
+
+                // Track depthTestEnable and depthCompareOp
+                auto& pipeline_create_info = pipeline_state->GraphicsCreateInfo();
+                auto depth_stencil_state = pipeline_create_info.pDepthStencilState;
+                auto dynamic_state = pipeline_create_info.pDynamicState;
+                if (depth_stencil_state && dynamic_state) {
+                    auto dynamic_state_begin = dynamic_state->pDynamicStates;
+                    auto dynamic_state_end = dynamic_state->pDynamicStates + dynamic_state->dynamicStateCount;
+
+                    const bool dynamic_depth_test_enable =
+                        std::find(dynamic_state_begin, dynamic_state_end, VK_DYNAMIC_STATE_DEPTH_TEST_ENABLE) != dynamic_state_end;
+                    const bool dynamic_depth_func =
+                        std::find(dynamic_state_begin, dynamic_state_end, VK_DYNAMIC_STATE_DEPTH_COMPARE_OP) != dynamic_state_end;
+
+                    if (!dynamic_depth_test_enable) {
+                        RecordSetDepthTestState(*cb_state, cb_state->nv.depth_compare_op,
+                                                depth_stencil_state->depthTestEnable != VK_FALSE);
+                    }
+                    if (!dynamic_depth_func) {
+                        RecordSetDepthTestState(*cb_state, depth_stencil_state->depthCompareOp, cb_state->nv.depth_test_enable);
+                    }
+                }
+            }
         }
     }
 }
@@ -554,6 +529,7 @@ bool BestPractices::PreCallValidateCreatePipelineLayout(VkDevice device, const V
         uint32_t pipeline_size = pCreateInfo->setLayoutCount;  // in DWORDS
         for (uint32_t i = 0; i < pCreateInfo->setLayoutCount; i++) {
             auto descriptor_set_layout_state = Get<vvl::DescriptorSetLayout>(pCreateInfo->pSetLayouts[i]);
+            if (!descriptor_set_layout_state) continue;
             pipeline_size += descriptor_set_layout_state->GetDynamicDescriptorCount() * descriptor_size;
         }
 
@@ -562,7 +538,7 @@ bool BestPractices::PreCallValidateCreatePipelineLayout(VkDevice device, const V
         }
 
         if (pipeline_size > kPipelineLayoutSizeWarningLimitAMD) {
-            skip |= LogPerformanceWarning(kVUID_BestPractices_CreatePipelinesLayout_KeepLayoutSmall, device, error_obj.location,
+            skip |= LogPerformanceWarning("BestPractices-AMD-CreatePipelinesLayout-KeepLayoutSmall", device, error_obj.location,
                                           "%s pipeline layout size is too large. Prefer smaller pipeline layouts."
                                           "Descriptor sets cost 1 DWORD each. "
                                           "Dynamic buffers cost 2 DWORDs each when robust buffer access is OFF. "
@@ -578,6 +554,7 @@ bool BestPractices::PreCallValidateCreatePipelineLayout(VkDevice device, const V
 
         for (uint32_t i = 0; i < pCreateInfo->setLayoutCount; ++i) {
             auto descriptor_set_layout_state = Get<vvl::DescriptorSetLayout>(pCreateInfo->pSetLayouts[i]);
+            if (!descriptor_set_layout_state) continue;
             for (const auto& binding : descriptor_set_layout_state->GetBindings()) {
                 if (binding.descriptorType == VK_DESCRIPTOR_TYPE_SAMPLER) {
                     has_separate_sampler = true;
@@ -624,14 +601,14 @@ bool BestPractices::PreCallValidateCreatePipelineLayout(VkDevice device, const V
 
         if (has_separate_sampler) {
             skip |= LogPerformanceWarning(
-                kVUID_BestPractices_CreatePipelineLayout_SeparateSampler, device, error_obj.location,
+                "BestPractices-NVIDIA-CreatePipelineLayout-SeparateSampler", device, error_obj.location,
                 "%s Consider using combined image samplers instead of separate samplers for marginally better performance.",
                 VendorSpecificTag(kBPVendorNVIDIA));
         }
 
         if (fast_space_usage > kPipelineLayoutFastDescriptorSpaceNVIDIA) {
             skip |= LogPerformanceWarning(
-                kVUID_BestPractices_CreatePipelinesLayout_LargePipelineLayout, device, error_obj.location,
+                "BestPractices-NVIDIA-CreatePipelineLayout-LargePipelineLayout", device, error_obj.location,
                 "%s Pipeline layout size is too large, prefer using pipeline-specific descriptor set layouts. "
                 "Aim for consuming less than %" PRIu32
                 " bytes to allow fast reads for all non-bindless descriptors. "
@@ -653,7 +630,7 @@ bool BestPractices::PreCallValidateCmdBindPipeline(VkCommandBuffer commandBuffer
     if (VendorCheckEnabled(kBPVendorAMD) || VendorCheckEnabled(kBPVendorNVIDIA)) {
         if (IsPipelineUsedInFrame(pipeline)) {
             skip |= LogPerformanceWarning(
-                kVUID_BestPractices_Pipeline_SortAndBind, commandBuffer, error_obj.location,
+                "BestPractices-Pipeline-SortAndBind", commandBuffer, error_obj.location,
                 "%s %s Pipeline %s was bound twice in the frame. "
                 "Keep pipeline state changes to a minimum, for example, by sorting draw calls by pipeline.",
                 VendorSpecificTag(kBPVendorAMD), VendorSpecificTag(kBPVendorNVIDIA), FormatHandle(pipeline).c_str());
@@ -663,7 +640,7 @@ bool BestPractices::PreCallValidateCmdBindPipeline(VkCommandBuffer commandBuffer
         auto cb_state = Get<bp_state::CommandBuffer>(commandBuffer);
         const auto& tgm = cb_state->nv.tess_geometry_mesh;
         if (tgm.num_switches >= kNumBindPipelineTessGeometryMeshSwitchesThresholdNVIDIA && !tgm.threshold_signaled) {
-            LogPerformanceWarning(kVUID_BestPractices_BindPipeline_SwitchTessGeometryMesh, commandBuffer, error_obj.location,
+            LogPerformanceWarning("BestPractices-NVIDIA-BindPipeline-SwitchTessGeometryMesh", commandBuffer, error_obj.location,
                                   "%s Avoid switching between pipelines with and without tessellation, geometry, task, "
                                   "and/or mesh shaders. Group draw calls using these shader stages together.",
                                   VendorSpecificTag(kBPVendorNVIDIA));

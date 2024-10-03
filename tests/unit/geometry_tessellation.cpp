@@ -12,14 +12,16 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "utils/cast_utils.h"
+#include <vulkan/vulkan_core.h>
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
 
+class NegativeGeometryTessellation : public VkLayerTest {};
+
 TEST_F(NegativeGeometryTessellation, StageMaskGsTsEnabled) {
     TEST_DESCRIPTION(
-        "Attempt to use a stageMask w/ geometry shader and tesselation shader bits enabled when those features are disabled on the "
-        "device.");
+        "Attempt to use a stageMask w/ geometry shader and tessellation shader bits enabled when those features are disabled on "
+        "the device.");
 
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
@@ -142,7 +144,7 @@ TEST_F(NegativeGeometryTessellation, TessellationShaderEnabled) {
         helper.shader_stages_.emplace_back(tcs.GetStageCreateInfo());
         helper.shader_stages_.emplace_back(tes.GetStageCreateInfo());
     };
-    constexpr std::array vuids = {"VUID-VkPipelineShaderStageCreateInfo-stage-00705", "VUID-RuntimeSpirv-OpVariable-08746",
+    constexpr std::array vuids = {"VUID-VkPipelineShaderStageCreateInfo-stage-00705",
                                   "VUID-VkPipelineInputAssemblyStateCreateInfo-topology-00430"};
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, vuids);
 }
@@ -748,15 +750,16 @@ TEST_F(NegativeGeometryTessellation, MaxGeometryInstanceVertexCount) {
         };
         if (overflow) {
             CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit,
-                                              vector<string>{"VUID-VkPipelineShaderStageCreateInfo-stage-00714",
-                                                             "VUID-VkPipelineShaderStageCreateInfo-stage-00715"});
+                                              std::vector<std::string>{"VUID-VkPipelineShaderStageCreateInfo-stage-00714",
+                                                                       "VUID-VkPipelineShaderStageCreateInfo-stage-00715"});
         } else {
             CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
         }
     }
 }
 
-TEST_F(NegativeGeometryTessellation, TessellationPatchDecorationMismatch) {
+// Waiting on https://gitlab.khronos.org/vulkan/vulkan/-/issues/3858 to know what is valid or not
+TEST_F(NegativeGeometryTessellation, DISABLED_TessellationPatchDecorationMismatch) {
     TEST_DESCRIPTION(
         "Test that an error is produced for a variable output from the TCS without the patch decoration, but consumed in the TES "
         "with the decoration.");
@@ -1507,7 +1510,7 @@ TEST_F(NegativeGeometryTessellation, MismatchedTessellationExecutionModes) {
         pipe.tess_ci_ = tess_ci;
         pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), tesc.GetStageCreateInfo(), tese.GetStageCreateInfo(),
                                pipe.fs_->GetStageCreateInfo()};
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, vuids[i]);
+        m_errorMonitor->SetDesiredError(vuids[i].c_str());
         pipe.CreateGraphicsPipeline();
         m_errorMonitor->VerifyFound();
     }
@@ -1540,7 +1543,57 @@ TEST_F(NegativeGeometryTessellation, WritingToLayerWithSingleFramebufferLayer) {
     m_commandBuffer->begin();
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
     vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "Undefined-Layer-Written");
+    m_errorMonitor->SetDesiredWarning("Undefined-Layer-Written");
+    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
+    m_errorMonitor->VerifyFound();
+    m_commandBuffer->EndRenderPass();
+    m_commandBuffer->end();
+}
+
+TEST_F(NegativeGeometryTessellation, DrawDynamicPrimitiveTopology) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8319");
+
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::extendedDynamicState);
+    AddRequiredFeature(vkt::Feature::geometryShader);
+    AddRequiredFeature(vkt::Feature::shaderTessellationAndGeometryPointSize);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    static const char *gsSource = R"glsl(
+        #version 450
+        layout (points) in;
+        layout (triangle_strip) out;
+        layout (max_vertices = 3) out;
+        in gl_PerVertex
+        {
+            vec4 gl_Position;
+            float gl_PointSize;
+        } gl_in[];
+        void main()
+        {
+            gl_Position = gl_in[0].gl_Position;
+            gl_PointSize = gl_in[0].gl_PointSize;
+            EmitVertex();
+        }
+    )glsl";
+
+    VkShaderObj vs(this, kVertexPointSizeGlsl, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj gs(this, gsSource, VK_SHADER_STAGE_GEOMETRY_BIT);
+
+    CreatePipelineHelper pipe(*this);
+    pipe.ia_ci_.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY_EXT);
+    pipe.shader_stages_ = {vs.GetStageCreateInfo(), gs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
+    pipe.CreateGraphicsPipeline();
+
+    m_commandBuffer->begin();
+    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
+    // Invalid - matches the Geometry output, but we need to match the input
+    vk::CmdSetPrimitiveTopologyEXT(m_commandBuffer->handle(), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-dynamicPrimitiveTopologyUnrestricted-07500");
     vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
     m_errorMonitor->VerifyFound();
     m_commandBuffer->EndRenderPass();

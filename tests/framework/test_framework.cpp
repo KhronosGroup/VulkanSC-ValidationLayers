@@ -17,7 +17,8 @@
  */
 
 #include "test_framework.h"
-#include "render.h"
+#include "vk_layer_config.h"
+#include "generated/vk_function_pointers.h"
 #include CONFIG_HEADER_FILE
 #include <filesystem>
 #include <cmath>

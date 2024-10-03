@@ -33,6 +33,7 @@
 #include <string.h>
 #include <string>
 #include <valarray>
+#include <algorithm>
 
 #include "vulkan/vk_enum_string_helper.h"
 #include "generated/chassis.h"
@@ -42,6 +43,8 @@
 #include "state_tracker/shader_module.h"
 #include "utils/vk_layer_utils.h"
 #include "generated/enum_flag_bits.h"
+#include "generated/spirv_grammar_helper.h"
+#include "state_tracker/shader_instruction.h"
 
 bool SCCoreChecks::ValidatePipelineCacheSpirv(VkPhysicalDevice physical_device, const vvl::sc::PipelineCacheData& data,
                                               uint32_t pipeline_index, uint32_t stage_index, const Location& loc) const {
@@ -118,7 +121,7 @@ bool SCCoreChecks::ValidatePipelineCacheSpirv(VkPhysicalDevice physical_device, 
             spv_const_binary_t binary{code.data(), code.size()};
             spv_diagnostic diag = nullptr;
             spvtools::ValidatorOptions options;
-            AdjustValidatorOptions(device_extensions, enabled_features, options);
+            AdjustValidatorOptions(device_extensions, enabled_features, options, nullptr);
             spv_valid = spvValidateWithOptions(ctx, options, &binary, &diag);
             if (spv_valid != SPV_SUCCESS) {
                 if (spv_valid == SPV_WARNING) {
@@ -217,9 +220,9 @@ bool SCCoreChecks::ValidatePipelineStageInfo(uint32_t stage_index, const VkPipel
     return skip;
 }
 
-bool SCCoreChecks::ValidatePipelineShaderStage(const StageCreateInfo& stage_create_info, const PipelineStageState& stage_state,
-                                               const Location& loc) const {
-    bool skip = BASE::ValidatePipelineShaderStage(stage_create_info, stage_state, loc);
+bool SCCoreChecks::ValidateShaderStage(const ShaderStageState& stage_state, const vvl::Pipeline* pipeline,
+                                       const Location& loc) const {
+    bool skip = BASE::ValidateShaderStage(stage_state, pipeline, loc);
 
     if (!stage_state.spirv_state || !stage_state.entrypoint) {
         // From here on we only do SPIR-V validation, so without SPIR-V data we stop here
@@ -228,7 +231,12 @@ bool SCCoreChecks::ValidatePipelineShaderStage(const StageCreateInfo& stage_crea
 
     const spirv::Module& module_state = *stage_state.spirv_state.get();
 
-    if (!module_state.static_data_.atomic_pointer_ids.empty() && (enabled_features.shaderAtomicInstructions == VK_FALSE)) {
+    auto is_atomic = [](const spirv::Instruction& insn) { return AtomicOperation(insn.Opcode()); };
+    auto are_any_atomic = [is_atomic](auto&& insn_range) {
+        return std::any_of(std::begin(insn_range), std::end(insn_range), is_atomic);
+    };
+
+    if (are_any_atomic(module_state.GetInstructions()) && (enabled_features.shaderAtomicInstructions == VK_FALSE)) {
         skip |= LogError("VUID-RuntimeSpirv-OpAtomic-05091", module_state.handle(), loc,
                          "SPIR-V is using atomic instructions, but shaderAtomicInstructions was not enabled.");
     }

@@ -11,11 +11,13 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
+#include <thread>
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
 #include "../framework/render_pass_helper.h"
 #include "../framework/thread_helper.h"
-#include "generated/vk_extension_helper.h"
+
+class PositiveCommand : public VkLayerTest {};
 
 TEST_F(PositiveCommand, DrawIndirectCountWithoutFeature) {
     TEST_DESCRIPTION("Use VK_KHR_draw_indirect_count in 1.1 before drawIndirectCount feature was added");
@@ -223,7 +225,8 @@ TEST_F(PositiveCommand, FramebufferBindingDestroyCommandPool) {
     vk::DestroyCommandPool(device(), command_pool, NULL);
 }
 
-TEST_F(PositiveCommand, ClearRectWith2DArray) {
+// https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/5356
+TEST_F(PositiveCommand, DISABLED_ClearRectWith2DArray) {
     TEST_DESCRIPTION("Test using VkClearRect with an image that is of a 2D array type.");
 
     AddRequiredExtensions(VK_KHR_MAINTENANCE_1_EXTENSION_NAME);
@@ -426,6 +429,22 @@ TEST_F(PositiveCommand, ClearDepthStencilWithValidRange) {
         VkImageSubresourceRange range = {ds_aspect, 0, VK_REMAINING_MIP_LEVELS, 0, VK_REMAINING_ARRAY_LAYERS};
         vk::CmdClearDepthStencilImage(cb_handle, image.handle(), image.Layout(), &clear_value, 1, &range);
     }
+}
+
+TEST_F(PositiveCommand, ClearColor64Bit) {
+    TEST_DESCRIPTION("Clear with a 64-bit format");
+    RETURN_IF_SKIP(Init());
+
+    if (!FormatFeaturesAreSupported(gpu(), VK_FORMAT_R64_UINT, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_TRANSFER_DST_BIT)) {
+        GTEST_SKIP() << "VK_FORMAT_R64_UINT format not supported";
+    }
+    vkt::Image image(*m_device, 32, 32, 1, VK_FORMAT_R64_UINT, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+    image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
+
+    m_commandBuffer->begin();
+    const VkClearColorValue clear_color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+    VkImageSubresourceRange range = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    vk::CmdClearColorImage(m_commandBuffer->handle(), image.handle(), image.Layout(), &clear_color, 1, &range);
 }
 
 TEST_F(PositiveCommand, FillBufferCmdPoolTransferQueue) {
@@ -658,27 +677,6 @@ TEST_F(PositiveCommand, ImageFormatTypeMismatchRedundantExtend) {
     vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
 
     m_commandBuffer->end();
-}
-
-// TODO - Currently crashing on Linux-Mesa-6800
-// added in https://github.com/KhronosGroup/Vulkan-ValidationLayers/pull/6769
-TEST_F(PositiveCommand, DISABLED_ClearAttachmentBasicUsage) {
-    TEST_DESCRIPTION("Points to a wrong colorAttachment index in a VkClearAttachment structure passed to vkCmdClearAttachments");
-    RETURN_IF_SKIP(Init());
-    InitRenderTarget();
-
-    CreatePipelineHelper pipe(*this);
-    pipe.CreateGraphicsPipeline();
-
-    m_commandBuffer->begin();
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
-
-    VkClearAttachment color_attachment = {VK_IMAGE_ASPECT_COLOR_BIT, 1, VkClearValue{}};
-    VkClearRect clear_rect = {{{0, 0}, {m_width, m_height}}, 0, 1};
-
-    vk::CmdClearAttachments(m_commandBuffer->handle(), 1, &color_attachment, 1, &clear_rect);
 }
 
 TEST_F(PositiveCommand, DeviceLost) {

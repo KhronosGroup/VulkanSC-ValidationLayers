@@ -113,7 +113,7 @@ def convert_test_file(args, filename, data, converted_cases):
         output.write('// See vksc_convert_tests.py for modifications\n')
         output.write('\n')
         for line in input:
-            m = re.search('\s*TEST_F\(\s*(\w+)\s*,\s*(\w+)\s*\)', line)
+            m = re.search(r'\s*TEST_F\(\s*(\w+)\s*,\s*(\w+)\s*\)', line)
             if not m:
                 output.write(line)
             else:

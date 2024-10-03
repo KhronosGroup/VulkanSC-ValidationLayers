@@ -16,6 +16,8 @@
 #include "../framework/pipeline_helper.h"
 #include "../framework/descriptor_helper.h"
 
+class NegativeShaderStorageImage : public VkLayerTest {};
+
 TEST_F(NegativeShaderStorageImage, MissingFormatRead) {
     TEST_DESCRIPTION("Create a shader reading a storage image without an image format");
 
@@ -254,17 +256,9 @@ TEST_F(NegativeShaderStorageImage, MissingFormatReadForFormat) {
         image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
         vkt::ImageView view = image.CreateView();
 
-        VkDescriptorImageInfo image_info = {};
-        image_info.imageView = view;
-        image_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-
-        VkWriteDescriptorSet descriptor_write = vku::InitStructHelper();
-        descriptor_write.dstSet = ds.set_;
-        descriptor_write.dstBinding = 0;
-        descriptor_write.descriptorCount = 1;
-        descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-        descriptor_write.pImageInfo = &image_info;
-        vk::UpdateDescriptorSets(device(), 1, &descriptor_write, 0, NULL);
+        ds.Clear();
+        ds.WriteDescriptorImageInfo(0, view, VK_NULL_HANDLE, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_IMAGE_LAYOUT_GENERAL);
+        ds.UpdateDescriptorSets();
 
         m_commandBuffer->reset();
         m_commandBuffer->begin();
@@ -407,17 +401,9 @@ TEST_F(NegativeShaderStorageImage, MissingFormatWriteForFormat) {
         image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
         vkt::ImageView view = image.CreateView();
 
-        VkDescriptorImageInfo image_info = {};
-        image_info.imageView = view;
-        image_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-
-        VkWriteDescriptorSet descriptor_write = vku::InitStructHelper();
-        descriptor_write.dstSet = ds.set_;
-        descriptor_write.dstBinding = 0;
-        descriptor_write.descriptorCount = 1;
-        descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-        descriptor_write.pImageInfo = &image_info;
-        vk::UpdateDescriptorSets(device(), 1, &descriptor_write, 0, NULL);
+        ds.Clear();
+        ds.WriteDescriptorImageInfo(0, view, VK_NULL_HANDLE, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_IMAGE_LAYOUT_GENERAL);
+        ds.UpdateDescriptorSets();
 
         m_commandBuffer->reset();
         m_commandBuffer->begin();
@@ -802,17 +788,8 @@ TEST_F(NegativeShaderStorageImage, UnknownWriteLessComponent) {
     image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
     vkt::ImageView view = image.CreateView();
 
-    VkDescriptorImageInfo image_info = {};
-    image_info.imageView = view;
-    image_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-
-    VkWriteDescriptorSet descriptor_write = vku::InitStructHelper();
-    descriptor_write.dstSet = ds.set_;
-    descriptor_write.dstBinding = 0;
-    descriptor_write.descriptorCount = 1;
-    descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    descriptor_write.pImageInfo = &image_info;
-    vk::UpdateDescriptorSets(device(), 1, &descriptor_write, 0, nullptr);
+    ds.WriteDescriptorImageInfo(0, view, VK_NULL_HANDLE, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_IMAGE_LAYOUT_GENERAL);
+    ds.UpdateDescriptorSets();
 
     CreateComputePipelineHelper pipe(*this);
     pipe.cs_ = std::make_unique<VkShaderObj>(this, source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
@@ -883,17 +860,8 @@ TEST_F(NegativeShaderStorageImage, UnknownWriteComponentA8Unorm) {
     image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
     vkt::ImageView view = image.CreateView();
 
-    VkDescriptorImageInfo image_info = {};
-    image_info.imageView = view;
-    image_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-
-    VkWriteDescriptorSet descriptor_write = vku::InitStructHelper();
-    descriptor_write.dstSet = ds.set_;
-    descriptor_write.dstBinding = 0;
-    descriptor_write.descriptorCount = 1;
-    descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    descriptor_write.pImageInfo = &image_info;
-    vk::UpdateDescriptorSets(device(), 1, &descriptor_write, 0, nullptr);
+    ds.WriteDescriptorImageInfo(0, view, VK_NULL_HANDLE, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_IMAGE_LAYOUT_GENERAL);
+    ds.UpdateDescriptorSets();
 
     CreateComputePipelineHelper pipe(*this);
     pipe.cs_ = std::make_unique<VkShaderObj>(this, source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);

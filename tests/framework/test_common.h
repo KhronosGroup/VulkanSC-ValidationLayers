@@ -1,7 +1,7 @@
 /*
- * Copyright (c) 2015-2022 The Khronos Group Inc.
- * Copyright (c) 2015-2023 Valve Corporation
- * Copyright (c) 2015-2023 LunarG, Inc.
+ * Copyright (c) 2015-2024 The Khronos Group Inc.
+ * Copyright (c) 2015-2024 Valve Corporation
+ * Copyright (c) 2015-2024 LunarG, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,17 +17,9 @@
  */
 #pragma once
 
-#include <cassert>
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
-#include <thread>
-
-#include "error_message/logging.h"
-
 #include <vulkan/vulkan.h>
-
 #include <vulkan/vk_enum_string_helper.h>
+#include <vulkan/utility/vk_struct_helper.hpp>
 
 // GTest and Xlib collide due to redefinitions of "None" and "Bool"
 #ifdef VK_USE_PLATFORM_XLIB_KHR
@@ -50,8 +42,6 @@
 #define RETURN_IF_SKIP(function) \
     function;                    \
     if (::testing::Test::IsSkipped()) return;
-
-#include "binding.h"
 
 // Stream operator for VkResult so GTEST will print out error codes as strings (automatically)
 inline std::ostream& operator<<(std::ostream& os, const VkResult& result) { return os << string_VkResult(result); }

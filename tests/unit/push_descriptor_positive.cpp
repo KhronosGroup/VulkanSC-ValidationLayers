@@ -15,6 +15,8 @@
 #include "../framework/pipeline_helper.h"
 #include "../framework/descriptor_helper.h"
 
+class PositivePushDescriptor : public VkLayerTest {};
+
 TEST_F(PositivePushDescriptor, NullDstSet) {
     TEST_DESCRIPTION("Use null dstSet in CmdPushDescriptorSetKHR");
 
@@ -282,8 +284,7 @@ TEST_F(PositivePushDescriptor, ImmutableSampler) {
     AddRequiredExtensions(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
 
-    VkSamplerCreateInfo sampler_ci = SafeSaneSamplerCreateInfo();
-    vkt::Sampler sampler(*m_device, sampler_ci);
+    vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
     VkSampler sampler_handle = sampler.handle();
 
     vkt::Image image(*m_device, 32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
@@ -324,10 +325,7 @@ TEST_F(PositivePushDescriptor, TemplateBasic) {
     AddRequiredExtensions(VK_KHR_DESCRIPTOR_UPDATE_TEMPLATE_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
 
-    VkBufferCreateInfo buffer_ci = vku::InitStructHelper();
-    buffer_ci.size = 32;
-    buffer_ci.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-    vkt::Buffer buffer(*m_device, buffer_ci);
+    vkt::Buffer buffer(*m_device, 32, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 
     std::vector<VkDescriptorSetLayoutBinding> ds_bindings = {
         {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}};
@@ -424,10 +422,7 @@ TEST_F(PositivePushDescriptor, PushDescriptorWithTemplateMultipleSets) {
     AddRequiredExtensions(VK_KHR_DESCRIPTOR_UPDATE_TEMPLATE_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
 
-    VkBufferCreateInfo buffer_ci = vku::InitStructHelper();
-    buffer_ci.size = 32;
-    buffer_ci.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-    vkt::Buffer buffer(*m_device, buffer_ci);
+    vkt::Buffer buffer(*m_device, 32, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
 
     std::vector<VkDescriptorSetLayoutBinding> ds_bindings = {
         {0, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},

@@ -16,6 +16,7 @@
  */
 
 #include <algorithm>
+#include <iostream>
 #include <limits>
 #include <memory>
 #include <vector>
@@ -24,6 +25,19 @@
 #include "sync/sync_image.h"
 #include "state_tracker/device_state.h"
 #include "state_tracker/buffer_state.h"
+#include "utils/convert_utils.h"
+
+SyncValidator::~SyncValidator() {
+    // Instance level SyncValidator does not have much to say
+    const bool device_validation_object = (device != nullptr);
+    // Get environment variable. Specify non-zero number to enable
+    const auto show_stats_str = GetEnvironment("VK_SYNCVAL_SHOW_STATS");
+    const bool show_stats = !show_stats_str.empty() && std::stoul(show_stats_str) != 0;
+
+    if (device_validation_object && show_stats) {
+        stats.ReportOnDestruction();
+    }
+}
 
 ResourceUsageRange SyncValidator::ReserveGlobalTagRange(size_t tag_count) const {
     ResourceUsageRange reserve;
@@ -32,8 +46,31 @@ ResourceUsageRange SyncValidator::ReserveGlobalTagRange(size_t tag_count) const 
     return reserve;
 }
 
+void SyncValidator::UpdateSignaledSemaphores(SignaledSemaphoresUpdate &update, const QueueBatchContext::Ptr &last_batch) {
+    // NOTE: All conserved QueueBatchContexts need to have their access logs reset to use the global
+    // logger and the only conserved QBCs are those referenced by unwaited signals and the last batch.
+
+    for (auto &signal_entry : update.signals_to_add) {
+        auto &signal_batch = signal_entry.second.batch;
+        // Batches retained for signalled semaphore don't need to retain
+        // event data, unless it's the last batch in the submit
+        if (signal_batch != last_batch) {
+            signal_batch->ResetEventsContext();
+            // Make sure that retained batches are minimal, and trim
+            // after the events contexts has been cleared.
+            signal_batch->Trim();
+        }
+        const VkSemaphore semaphore = signal_entry.first;
+        SignalInfo &signal_info = signal_entry.second;
+        signaled_semaphores_.insert_or_assign(semaphore, std::move(signal_info));
+    }
+    for (VkSemaphore semaphore : update.signals_to_remove) {
+        signaled_semaphores_.erase(semaphore);
+    }
+}
+
 void SyncValidator::ApplyTaggedWait(QueueId queue_id, ResourceUsageTag tag) {
-    auto tagged_wait_op = [queue_id, tag](const std::shared_ptr<QueueBatchContext> &batch) {
+    auto tagged_wait_op = [queue_id, tag](const QueueBatchContext::Ptr &batch) {
         batch->ApplyTaggedWait(queue_id, tag);
         batch->Trim();
 
@@ -52,7 +89,7 @@ void SyncValidator::ApplyTaggedWait(QueueId queue_id, ResourceUsageTag tag) {
 }
 
 void SyncValidator::ApplyAcquireWait(const AcquiredImage &acquired) {
-    auto acq_wait_op = [&acquired](const std::shared_ptr<QueueBatchContext> &batch) {
+    auto acq_wait_op = [&acquired](const QueueBatchContext::Ptr &batch) {
         batch->ApplyAcquireWait(acquired);
         batch->Trim();
     };
@@ -61,16 +98,28 @@ void SyncValidator::ApplyAcquireWait(const AcquiredImage &acquired) {
 
 template <typename BatchOp>
 void SyncValidator::ForAllQueueBatchContexts(BatchOp &&op) {
-    // Often we need to go through every queue batch context and apply synchronization operations
-    // As usual -- two groups, the "last batch" and the signaled semaphores
-    QueueBatchContext::BatchSet queue_batch_contexts = GetQueueBatchSnapshot();
+    // Get last batch from each queue
+    std::vector<QueueBatchContext::Ptr> batch_contexts = GetLastBatches([](auto) { return true; });
+
+    // Get batches from signaled binary semaphores
+    for (auto &[_, signal_info] : signaled_semaphores_) {
+        if (!vvl::Contains(batch_contexts, signal_info.batch)) {
+            batch_contexts.emplace_back(signal_info.batch);
+        }
+    }
+
+    // Get present batches
+    ForEachShared<vvl::Swapchain>([&batch_contexts](const std::shared_ptr<vvl::Swapchain> &swapchain) {
+        auto sync_swapchain = std::static_pointer_cast<syncval_state::Swapchain>(swapchain);
+        sync_swapchain->GetPresentBatches(batch_contexts);
+    });
 
     // Note: The const is to force the reference to const be on all platforms.
     //
     // It's not obivious (nor cross platform consitent), that the batch reference should be const
     // but since it's pointing to the actual *key* for the set it must be. This doesn't make the
     // object the shared pointer is referencing constant however.
-    for (const auto &batch : queue_batch_contexts) {
+    for (const auto &batch : batch_contexts) {
         op(batch);
     }
 }
@@ -116,17 +165,18 @@ void SyncValidator::UpdateSyncImageMemoryBindState(uint32_t count, const VkBindI
 }
 
 std::shared_ptr<const QueueSyncState> SyncValidator::GetQueueSyncStateShared(VkQueue queue) const {
-    return GetMapped(queue_sync_states_, queue);
-}
-
-std::shared_ptr<QueueSyncState> SyncValidator::GetQueueSyncStateShared(VkQueue queue) {
-    return GetMapped(queue_sync_states_, queue);
+    for (const auto &queue_sync_state : queue_sync_states_) {
+        if (queue_sync_state->GetQueueState()->VkHandle() == queue) {
+            return queue_sync_state;
+        }
+    }
+    return {};
 }
 
 std::shared_ptr<vvl::CommandBuffer> SyncValidator::CreateCmdBufferState(VkCommandBuffer handle,
-                                                                        const VkCommandBufferAllocateInfo *pCreateInfo,
+                                                                        const VkCommandBufferAllocateInfo *allocate_info,
                                                                         const vvl::CommandPool *cmd_pool) {
-    auto cb_state = std::make_shared<syncval_state::CommandBuffer>(*this, handle, pCreateInfo, cmd_pool);
+    auto cb_state = std::make_shared<syncval_state::CommandBuffer>(*this, handle, allocate_info, cmd_pool);
     if (cb_state) {
         cb_state->access_context.SetSelfReference();
     }
@@ -138,20 +188,20 @@ std::shared_ptr<vvl::Swapchain> SyncValidator::CreateSwapchainState(const VkSwap
     return std::static_pointer_cast<vvl::Swapchain>(std::make_shared<syncval_state::Swapchain>(*this, create_info, handle));
 }
 
-std::shared_ptr<vvl::Image> SyncValidator::CreateImageState(VkImage handle, const VkImageCreateInfo *pCreateInfo,
-                                                            VkFormatFeatureFlags2KHR features) {
-    return std::make_shared<ImageState>(*this, handle, pCreateInfo, features);
+std::shared_ptr<vvl::Image> SyncValidator::CreateImageState(VkImage handle, const VkImageCreateInfo *create_info,
+                                                            VkFormatFeatureFlags2 features) {
+    return std::make_shared<ImageState>(*this, handle, create_info, features);
 }
 
-std::shared_ptr<vvl::Image> SyncValidator::CreateImageState(VkImage handle, const VkImageCreateInfo *pCreateInfo,
+std::shared_ptr<vvl::Image> SyncValidator::CreateImageState(VkImage handle, const VkImageCreateInfo *create_info,
                                                             VkSwapchainKHR swapchain, uint32_t swapchain_index,
-                                                            VkFormatFeatureFlags2KHR features) {
-    return std::make_shared<ImageState>(*this, handle, pCreateInfo, swapchain, swapchain_index, features);
+                                                            VkFormatFeatureFlags2 features) {
+    return std::make_shared<ImageState>(*this, handle, create_info, swapchain, swapchain_index, features);
 }
 std::shared_ptr<vvl::ImageView> SyncValidator::CreateImageViewState(
-    const std::shared_ptr<vvl::Image> &image_state, VkImageView iv, const VkImageViewCreateInfo *ci, VkFormatFeatureFlags2KHR ff,
-    const VkFilterCubicImageViewImageFormatPropertiesEXT &cubic_props) {
-    return std::make_shared<ImageViewState>(image_state, iv, ci, ff, cubic_props);
+    const std::shared_ptr<vvl::Image> &image_state, VkImageView handle, const VkImageViewCreateInfo *create_info,
+    VkFormatFeatureFlags2 format_features, const VkFilterCubicImageViewImageFormatPropertiesEXT &cubic_props) {
+    return std::make_shared<ImageViewState>(image_state, handle, create_info, format_features, cubic_props);
 }
 
 bool SyncValidator::PreCallValidateCmdCopyBuffer(VkCommandBuffer commandBuffer, VkBuffer srcBuffer, VkBuffer dstBuffer,
@@ -207,17 +257,20 @@ void SyncValidator::PreCallRecordCmdCopyBuffer(VkCommandBuffer commandBuffer, Vk
     auto *context = cb_context->GetCurrentAccessContext();
 
     auto src_buffer = Get<vvl::Buffer>(srcBuffer);
+    auto src_tag_ex = src_buffer ? cb_context->AddCommandHandle(tag, src_buffer->Handle()) : ResourceUsageTagEx{tag};
+
     auto dst_buffer = Get<vvl::Buffer>(dstBuffer);
+    auto dst_tag_ex = dst_buffer ? cb_context->AddCommandHandle(tag, dst_buffer->Handle()) : ResourceUsageTagEx{tag};
 
     for (uint32_t region = 0; region < regionCount; region++) {
         const auto &copy_region = pRegions[region];
         if (src_buffer) {
             const ResourceAccessRange src_range = MakeRange(*src_buffer, copy_region.srcOffset, copy_region.size);
-            context->UpdateAccessState(*src_buffer, SYNC_COPY_TRANSFER_READ, SyncOrdering::kNonAttachment, src_range, tag);
+            context->UpdateAccessState(*src_buffer, SYNC_COPY_TRANSFER_READ, SyncOrdering::kNonAttachment, src_range, src_tag_ex);
         }
         if (dst_buffer) {
             const ResourceAccessRange dst_range = MakeRange(*dst_buffer, copy_region.dstOffset, copy_region.size);
-            context->UpdateAccessState(*dst_buffer, SYNC_COPY_TRANSFER_WRITE, SyncOrdering::kNonAttachment, dst_range, tag);
+            context->UpdateAccessState(*dst_buffer, SYNC_COPY_TRANSFER_WRITE, SyncOrdering::kNonAttachment, dst_range, dst_tag_ex);
         }
     }
 }
@@ -279,17 +332,20 @@ void SyncValidator::RecordCmdCopyBuffer2(VkCommandBuffer commandBuffer, const Vk
     auto *context = cb_context->GetCurrentAccessContext();
 
     auto src_buffer = Get<vvl::Buffer>(pCopyBufferInfo->srcBuffer);
+    auto src_tag_ex = src_buffer ? cb_context->AddCommandHandle(tag, src_buffer->Handle()) : ResourceUsageTagEx{tag};
+
     auto dst_buffer = Get<vvl::Buffer>(pCopyBufferInfo->dstBuffer);
+    auto dst_tag_ex = dst_buffer ? cb_context->AddCommandHandle(tag, dst_buffer->Handle()) : ResourceUsageTagEx{tag};
 
     for (uint32_t region = 0; region < pCopyBufferInfo->regionCount; region++) {
         const auto &copy_region = pCopyBufferInfo->pRegions[region];
         if (src_buffer) {
             const ResourceAccessRange src_range = MakeRange(*src_buffer, copy_region.srcOffset, copy_region.size);
-            context->UpdateAccessState(*src_buffer, SYNC_COPY_TRANSFER_READ, SyncOrdering::kNonAttachment, src_range, tag);
+            context->UpdateAccessState(*src_buffer, SYNC_COPY_TRANSFER_READ, SyncOrdering::kNonAttachment, src_range, src_tag_ex);
         }
         if (dst_buffer) {
             const ResourceAccessRange dst_range = MakeRange(*dst_buffer, copy_region.dstOffset, copy_region.size);
-            context->UpdateAccessState(*dst_buffer, SYNC_COPY_TRANSFER_WRITE, SyncOrdering::kNonAttachment, dst_range, tag);
+            context->UpdateAccessState(*dst_buffer, SYNC_COPY_TRANSFER_WRITE, SyncOrdering::kNonAttachment, dst_range, dst_tag_ex);
         }
     }
 }
@@ -362,7 +418,13 @@ void SyncValidator::PreCallRecordCmdCopyImage(VkCommandBuffer commandBuffer, VkI
     assert(context);
 
     auto src_image = Get<ImageState>(srcImage);
+    if (src_image) {
+        cb_access_context->AddCommandHandle(tag, src_image->Handle());
+    }
     auto dst_image = Get<ImageState>(dstImage);
+    if (dst_image) {
+        cb_access_context->AddCommandHandle(tag, dst_image->Handle());
+    }
 
     for (uint32_t region = 0; region < regionCount; region++) {
         const auto &copy_region = pRegions[region];
@@ -438,7 +500,13 @@ void SyncValidator::RecordCmdCopyImage2(VkCommandBuffer commandBuffer, const VkC
     assert(context);
 
     auto src_image = Get<ImageState>(pCopyImageInfo->srcImage);
+    if (src_image) {
+        cb_access_context->AddCommandHandle(tag, src_image->Handle());
+    }
     auto dst_image = Get<ImageState>(pCopyImageInfo->dstImage);
+    if (dst_image) {
+        cb_access_context->AddCommandHandle(tag, dst_image->Handle());
+    }
 
     for (uint32_t region = 0; region < pCopyImageInfo->regionCount; region++) {
         const auto &copy_region = pCopyImageInfo->pRegions[region];
@@ -539,16 +607,25 @@ void SyncValidator::PreCallRecordCmdPipelineBarrier2(VkCommandBuffer commandBuff
                                                            *pDependencyInfo);
 }
 
-void SyncValidator::CreateDevice(const VkDeviceCreateInfo *pCreateInfo, const Location &loc) {
+void SyncValidator::PostCreateDevice(const VkDeviceCreateInfo *pCreateInfo, const Location &loc) {
     // The state tracker sets up the device state
-    StateTracker::CreateDevice(pCreateInfo, loc);
+    StateTracker::PostCreateDevice(pCreateInfo, loc);
 
-    ForEachShared<vvl::Queue>([this](const std::shared_ptr<vvl::Queue> &queue_state) {
-        auto queue_flags = physical_device_state->queue_family_properties[queue_state->queueFamilyIndex].queueFlags;
-        std::shared_ptr<QueueSyncState> queue_sync_state =
-            std::make_shared<QueueSyncState>(queue_state, queue_flags, queue_id_limit_++);
-        queue_sync_states_.emplace(std::make_pair(queue_state->VkHandle(), std::move(queue_sync_state)));
-    });
+    // Returns queues in the same order as advertised by the driver.
+    // This allows to have deterministic QueueId between runs that simplifies debugging.
+    auto get_sorted_queues = [this]() {
+        std::vector<std::shared_ptr<vvl::Queue>> queues;
+        ForEachShared<vvl::Queue>([&queues](const std::shared_ptr<vvl::Queue> &queue) { queues.emplace_back(queue); });
+        std::sort(queues.begin(), queues.end(), [](const auto &q1, const auto &q2) {
+            return (q1->queue_family_index < q2->queue_family_index) ||
+                   (q1->queue_family_index == q2->queue_family_index && q1->queue_index < q2->queue_index);
+        });
+        return queues;
+    };
+    queue_sync_states_.reserve(Count<vvl::Queue>());
+    for (const auto &queue : get_sorted_queues()) {
+        queue_sync_states_.emplace_back(std::make_shared<QueueSyncState>(queue, queue_id_limit_++));
+    }
 
     const auto env_debug_command_number = GetEnvironment("VK_SYNCVAL_DEBUG_COMMAND_NUMBER");
     if (!env_debug_command_number.empty()) {
@@ -918,7 +995,12 @@ void SyncValidator::RecordCmdCopyBufferToImage(VkCommandBuffer commandBuffer, Vk
     assert(context);
 
     auto src_buffer = Get<vvl::Buffer>(srcBuffer);
+    auto src_tag_ex = src_buffer ? cb_access_context->AddCommandHandle(tag, src_buffer->Handle()) : ResourceUsageTagEx{tag};
+
     auto dst_image = Get<ImageState>(dstImage);
+    if (dst_image) {
+        cb_access_context->AddCommandHandle(tag, dst_image->Handle());
+    }
 
     for (uint32_t region = 0; region < regionCount; region++) {
         const auto &copy_region = pRegions[region];
@@ -927,7 +1009,8 @@ void SyncValidator::RecordCmdCopyBufferToImage(VkCommandBuffer commandBuffer, Vk
                 ResourceAccessRange src_range = MakeRange(
                     copy_region.bufferOffset,
                     GetBufferSizeFromCopyImage(copy_region, dst_image->create_info.format, dst_image->create_info.arrayLayers));
-                context->UpdateAccessState(*src_buffer, SYNC_COPY_TRANSFER_READ, SyncOrdering::kNonAttachment, src_range, tag);
+                context->UpdateAccessState(*src_buffer, SYNC_COPY_TRANSFER_READ, SyncOrdering::kNonAttachment, src_range,
+                                           src_tag_ex);
             }
             context->UpdateAccessState(*dst_image, SYNC_COPY_TRANSFER_WRITE, SyncOrdering::kNonAttachment,
                                        RangeFromLayers(copy_region.imageSubresource), copy_region.imageOffset,
@@ -1042,7 +1125,13 @@ void SyncValidator::RecordCmdCopyImageToBuffer(VkCommandBuffer commandBuffer, Vk
     assert(context);
 
     auto src_image = Get<ImageState>(srcImage);
+    if (src_image) {
+        cb_access_context->AddCommandHandle(tag, src_image->Handle());
+    }
+
     auto dst_buffer = Get<vvl::Buffer>(dstBuffer);
+    auto dst_tag_ex = dst_buffer ? cb_access_context->AddCommandHandle(tag, dst_buffer->Handle()) : ResourceUsageTagEx{tag};
+
     const auto dst_mem = (dst_buffer && !dst_buffer->sparse) ? dst_buffer->MemState()->VkHandle() : VK_NULL_HANDLE;
     const VulkanTypedHandle dst_handle(dst_mem, kVulkanObjectTypeDeviceMemory);
 
@@ -1056,7 +1145,8 @@ void SyncValidator::RecordCmdCopyImageToBuffer(VkCommandBuffer commandBuffer, Vk
                 ResourceAccessRange dst_range = MakeRange(
                     copy_region.bufferOffset,
                     GetBufferSizeFromCopyImage(copy_region, src_image->create_info.format, src_image->create_info.arrayLayers));
-                context->UpdateAccessState(*dst_buffer, SYNC_COPY_TRANSFER_WRITE, SyncOrdering::kNonAttachment, dst_range, tag);
+                context->UpdateAccessState(*dst_buffer, SYNC_COPY_TRANSFER_WRITE, SyncOrdering::kNonAttachment, dst_range,
+                                           dst_tag_ex);
             }
         }
     }
@@ -1176,7 +1266,13 @@ void SyncValidator::RecordCmdBlitImage(VkCommandBuffer commandBuffer, VkImage sr
     assert(context);
 
     auto src_image = Get<ImageState>(srcImage);
+    if (src_image) {
+        cb_state->access_context.AddCommandHandle(tag, src_image->Handle());
+    }
     auto dst_image = Get<ImageState>(dstImage);
+    if (dst_image) {
+        cb_state->access_context.AddCommandHandle(tag, dst_image->Handle());
+    }
 
     for (uint32_t region = 0; region < regionCount; region++) {
         const auto &blit_region = pRegions[region];
@@ -1260,20 +1356,24 @@ bool SyncValidator::ValidateIndirectBuffer(const CommandBufferAccessContext &cb_
     return skip;
 }
 
-void SyncValidator::RecordIndirectBuffer(AccessContext &context, const ResourceUsageTag tag, const VkDeviceSize struct_size,
-                                         const VkBuffer buffer, const VkDeviceSize offset, const uint32_t drawCount,
-                                         uint32_t stride) {
+void SyncValidator::RecordIndirectBuffer(CommandBufferAccessContext &cb_context, const ResourceUsageTag tag,
+                                         const VkDeviceSize struct_size, const VkBuffer buffer, const VkDeviceSize offset,
+                                         const uint32_t drawCount, uint32_t stride) {
     auto buf_state = Get<vvl::Buffer>(buffer);
+    auto tag_ex = buf_state ? cb_context.AddCommandHandle(tag, buf_state->Handle()) : ResourceUsageTagEx{tag};
+
     VkDeviceSize size = struct_size;
+    AccessContext &context = *cb_context.GetCurrentAccessContext();
     if (drawCount == 1 || stride == size) {
         if (drawCount > 1) size *= drawCount;
         const ResourceAccessRange range = MakeRange(offset, size);
-        context.UpdateAccessState(*buf_state, SYNC_DRAW_INDIRECT_INDIRECT_COMMAND_READ, SyncOrdering::kNonAttachment, range, tag);
+        context.UpdateAccessState(*buf_state, SYNC_DRAW_INDIRECT_INDIRECT_COMMAND_READ, SyncOrdering::kNonAttachment, range,
+                                  tag_ex);
     } else {
         for (uint32_t i = 0; i < drawCount; ++i) {
             const ResourceAccessRange range = MakeRange(offset + i * stride, size);
             context.UpdateAccessState(*buf_state, SYNC_DRAW_INDIRECT_INDIRECT_COMMAND_READ, SyncOrdering::kNonAttachment, range,
-                                      tag);
+                                      tag_ex);
         }
     }
 }
@@ -1295,10 +1395,14 @@ bool SyncValidator::ValidateCountBuffer(const CommandBufferAccessContext &cb_con
     return skip;
 }
 
-void SyncValidator::RecordCountBuffer(AccessContext &context, const ResourceUsageTag tag, VkBuffer buffer, VkDeviceSize offset) {
+void SyncValidator::RecordCountBuffer(CommandBufferAccessContext &cb_context, const ResourceUsageTag tag, VkBuffer buffer,
+                                      VkDeviceSize offset) {
     auto count_buf_state = Get<vvl::Buffer>(buffer);
     const ResourceAccessRange range = MakeRange(offset, 4);
-    context.UpdateAccessState(*count_buf_state, SYNC_DRAW_INDIRECT_INDIRECT_COMMAND_READ, SyncOrdering::kNonAttachment, range, tag);
+    const ResourceUsageTagEx tag_ex = cb_context.AddCommandHandle(tag, count_buf_state->Handle());
+    AccessContext &context = *cb_context.GetCurrentAccessContext();
+    context.UpdateAccessState(*count_buf_state, SYNC_DRAW_INDIRECT_INDIRECT_COMMAND_READ, SyncOrdering::kNonAttachment, range,
+                              tag_ex);
 }
 
 bool SyncValidator::PreCallValidateCmdDispatch(VkCommandBuffer commandBuffer, uint32_t x, uint32_t y, uint32_t z,
@@ -1347,11 +1451,10 @@ void SyncValidator::PreCallRecordCmdDispatchIndirect(VkCommandBuffer commandBuff
     assert(cb_state);
     auto *cb_access_context = &cb_state->access_context;
     const auto tag = cb_access_context->NextCommandTag(record_obj.location.function);
-    auto *context = cb_access_context->GetCurrentAccessContext();
-    assert(context);
 
     cb_access_context->RecordDispatchDrawDescriptorSet(VK_PIPELINE_BIND_POINT_COMPUTE, tag);
-    RecordIndirectBuffer(*context, tag, sizeof(VkDispatchIndirectCommand), buffer, offset, 1, sizeof(VkDispatchIndirectCommand));
+    RecordIndirectBuffer(*cb_access_context, tag, sizeof(VkDispatchIndirectCommand), buffer, offset, 1,
+                         sizeof(VkDispatchIndirectCommand));
 }
 
 bool SyncValidator::PreCallValidateCmdDraw(VkCommandBuffer commandBuffer, uint32_t vertexCount, uint32_t instanceCount,
@@ -1445,12 +1548,10 @@ void SyncValidator::PreCallRecordCmdDrawIndirect(VkCommandBuffer commandBuffer, 
     assert(cb_state);
     auto *cb_access_context = &cb_state->access_context;
     const auto tag = cb_access_context->NextCommandTag(record_obj.location.function);
-    auto *context = cb_access_context->GetCurrentAccessContext();
-    assert(context);
 
     cb_access_context->RecordDispatchDrawDescriptorSet(VK_PIPELINE_BIND_POINT_GRAPHICS, tag);
     cb_access_context->RecordDrawAttachment(tag);
-    RecordIndirectBuffer(*context, tag, sizeof(VkDrawIndirectCommand), buffer, offset, drawCount, stride);
+    RecordIndirectBuffer(*cb_access_context, tag, sizeof(VkDrawIndirectCommand), buffer, offset, drawCount, stride);
 
     // TODO: For now, we record the whole vertex buffer. It might cause some false positive.
     //       VkDrawIndirectCommand buffer could be changed until SubmitQueue.
@@ -1491,12 +1592,10 @@ void SyncValidator::PreCallRecordCmdDrawIndexedIndirect(VkCommandBuffer commandB
     if (!cb_state) return;
     auto *cb_access_context = &cb_state->access_context;
     const auto tag = cb_access_context->NextCommandTag(record_obj.location.function);
-    auto *context = cb_access_context->GetCurrentAccessContext();
-    assert(context);
 
     cb_access_context->RecordDispatchDrawDescriptorSet(VK_PIPELINE_BIND_POINT_GRAPHICS, tag);
     cb_access_context->RecordDrawAttachment(tag);
-    RecordIndirectBuffer(*context, tag, sizeof(VkDrawIndexedIndirectCommand), buffer, offset, drawCount, stride);
+    RecordIndirectBuffer(*cb_access_context, tag, sizeof(VkDrawIndexedIndirectCommand), buffer, offset, drawCount, stride);
 
     // TODO: For now, we record the whole index and vertex buffer. It might cause some false positive.
     //       VkDrawIndexedIndirectCommand buffer could be changed until SubmitQueue.
@@ -1538,13 +1637,11 @@ void SyncValidator::RecordCmdDrawIndirectCount(VkCommandBuffer commandBuffer, Vk
     if (!cb_state) return;
     auto *cb_access_context = &cb_state->access_context;
     const auto tag = cb_access_context->NextCommandTag(command);
-    auto *context = cb_access_context->GetCurrentAccessContext();
-    assert(context);
 
     cb_access_context->RecordDispatchDrawDescriptorSet(VK_PIPELINE_BIND_POINT_GRAPHICS, tag);
     cb_access_context->RecordDrawAttachment(tag);
-    RecordIndirectBuffer(*context, tag, sizeof(VkDrawIndirectCommand), buffer, offset, 1, stride);
-    RecordCountBuffer(*context, tag, countBuffer, countBufferOffset);
+    RecordIndirectBuffer(*cb_access_context, tag, sizeof(VkDrawIndirectCommand), buffer, offset, 1, stride);
+    RecordCountBuffer(*cb_access_context, tag, countBuffer, countBufferOffset);
 
     // TODO: For now, we record the whole vertex buffer. It might cause some false positive.
     //       VkDrawIndirectCommand buffer could be changed until SubmitQueue.
@@ -1625,13 +1722,11 @@ void SyncValidator::RecordCmdDrawIndexedIndirectCount(VkCommandBuffer commandBuf
     if (!cb_state) return;
     auto *cb_access_context = &cb_state->access_context;
     const auto tag = cb_access_context->NextCommandTag(command);
-    auto *context = cb_access_context->GetCurrentAccessContext();
-    assert(context);
 
     cb_access_context->RecordDispatchDrawDescriptorSet(VK_PIPELINE_BIND_POINT_GRAPHICS, tag);
     cb_access_context->RecordDrawAttachment(tag);
-    RecordIndirectBuffer(*context, tag, sizeof(VkDrawIndexedIndirectCommand), buffer, offset, 1, stride);
-    RecordCountBuffer(*context, tag, countBuffer, countBufferOffset);
+    RecordIndirectBuffer(*cb_access_context, tag, sizeof(VkDrawIndexedIndirectCommand), buffer, offset, 1, stride);
+    RecordCountBuffer(*cb_access_context, tag, countBuffer, countBufferOffset);
 
     // TODO: For now, we record the whole index and vertex buffer. It might cause some false positive.
     //       VkDrawIndexedIndirectCommand buffer could be changed until SubmitQueue.
@@ -1724,6 +1819,9 @@ void SyncValidator::PreCallRecordCmdClearColorImage(VkCommandBuffer commandBuffe
     assert(context);
 
     auto image_state = Get<ImageState>(image);
+    if (image_state) {
+        cb_access_context->AddCommandHandle(tag, image_state->Handle());
+    }
 
     for (uint32_t index = 0; index < rangeCount; index++) {
         const auto &range = pRanges[index];
@@ -1779,6 +1877,9 @@ void SyncValidator::PreCallRecordCmdClearDepthStencilImage(VkCommandBuffer comma
     assert(context);
 
     auto image_state = Get<ImageState>(image);
+    if (image_state) {
+        cb_access_context->AddCommandHandle(tag, image_state->Handle());
+    }
 
     for (uint32_t index = 0; index < rangeCount; index++) {
         const auto &range = pRanges[index];
@@ -1870,7 +1971,8 @@ void SyncValidator::PreCallRecordCmdCopyQueryPoolResults(VkCommandBuffer command
 
     if (dst_buffer) {
         const ResourceAccessRange range = MakeRange(dstOffset, stride * queryCount);
-        context->UpdateAccessState(*dst_buffer, SYNC_COPY_TRANSFER_WRITE, SyncOrdering::kNonAttachment, range, tag);
+        const ResourceUsageTagEx tag_ex = cb_access_context->AddCommandHandle(tag, dst_buffer->Handle());
+        context->UpdateAccessState(*dst_buffer, SYNC_COPY_TRANSFER_WRITE, SyncOrdering::kNonAttachment, range, tag_ex);
     }
 
     // TODO:Track VkQueryPool
@@ -1918,7 +2020,8 @@ void SyncValidator::PreCallRecordCmdFillBuffer(VkCommandBuffer commandBuffer, Vk
 
     if (dst_buffer) {
         const ResourceAccessRange range = MakeRange(*dst_buffer, dstOffset, size);
-        context->UpdateAccessState(*dst_buffer, SYNC_CLEAR_TRANSFER_WRITE, SyncOrdering::kNonAttachment, range, tag);
+        const ResourceUsageTagEx tag_ex = cb_access_context->AddCommandHandle(tag, dst_buffer->Handle());
+        context->UpdateAccessState(*dst_buffer, SYNC_CLEAR_TRANSFER_WRITE, SyncOrdering::kNonAttachment, range, tag_ex);
     }
 }
 
@@ -1984,7 +2087,13 @@ void SyncValidator::PreCallRecordCmdResolveImage(VkCommandBuffer commandBuffer, 
     assert(context);
 
     auto src_image = Get<ImageState>(srcImage);
+    if (src_image) {
+        cb_access_context->AddCommandHandle(tag, src_image->Handle());
+    }
     auto dst_image = Get<ImageState>(dstImage);
+    if (dst_image) {
+        cb_access_context->AddCommandHandle(tag, dst_image->Handle());
+    }
 
     for (uint32_t region = 0; region < regionCount; region++) {
         const auto &resolve_region = pRegions[region];
@@ -2068,7 +2177,13 @@ void SyncValidator::PreCallRecordCmdResolveImage2(VkCommandBuffer commandBuffer,
     assert(context);
 
     auto src_image = Get<ImageState>(pResolveImageInfo->srcImage);
+    if (src_image) {
+        cb_access_context->AddCommandHandle(tag, src_image->Handle());
+    }
     auto dst_image = Get<ImageState>(pResolveImageInfo->dstImage);
+    if (dst_image) {
+        cb_access_context->AddCommandHandle(tag, dst_image->Handle());
+    }
 
     for (uint32_t region = 0; region < pResolveImageInfo->regionCount; region++) {
         const auto &resolve_region = pResolveImageInfo->pRegions[region];
@@ -2134,7 +2249,8 @@ void SyncValidator::PreCallRecordCmdUpdateBuffer(VkCommandBuffer commandBuffer, 
     if (dst_buffer) {
         // VK_WHOLE_SIZE not allowed
         const ResourceAccessRange range = MakeRange(dstOffset, dataSize);
-        context->UpdateAccessState(*dst_buffer, SYNC_CLEAR_TRANSFER_WRITE, SyncOrdering::kNonAttachment, range, tag);
+        const ResourceUsageTagEx tag_ex = cb_access_context->AddCommandHandle(tag, dst_buffer->Handle());
+        context->UpdateAccessState(*dst_buffer, SYNC_CLEAR_TRANSFER_WRITE, SyncOrdering::kNonAttachment, range, tag_ex);
     }
 }
 
@@ -2181,7 +2297,8 @@ void SyncValidator::PreCallRecordCmdWriteBufferMarkerAMD(VkCommandBuffer command
 
     if (dst_buffer) {
         const ResourceAccessRange range = MakeRange(dstOffset, 4);
-        context->UpdateAccessState(*dst_buffer, SYNC_COPY_TRANSFER_WRITE, SyncOrdering::kNonAttachment, range, tag);
+        const ResourceUsageTagEx tag_ex = cb_access_context->AddCommandHandle(tag, dst_buffer->Handle());
+        context->UpdateAccessState(*dst_buffer, SYNC_COPY_TRANSFER_WRITE, SyncOrdering::kNonAttachment, range, tag_ex);
     }
 }
 
@@ -2272,7 +2389,9 @@ void SyncValidator::PreCallRecordCmdDecodeVideoKHR(VkCommandBuffer commandBuffer
     auto src_buffer = Get<vvl::Buffer>(pDecodeInfo->srcBuffer);
     if (src_buffer) {
         const ResourceAccessRange src_range = MakeRange(*src_buffer, pDecodeInfo->srcBufferOffset, pDecodeInfo->srcBufferRange);
-        context->UpdateAccessState(*src_buffer, SYNC_VIDEO_DECODE_VIDEO_DECODE_READ, SyncOrdering::kNonAttachment, src_range, tag);
+        const ResourceUsageTagEx src_tag_ex = cb_access_context->AddCommandHandle(tag, src_buffer->Handle());
+        context->UpdateAccessState(*src_buffer, SYNC_VIDEO_DECODE_VIDEO_DECODE_READ, SyncOrdering::kNonAttachment, src_range,
+                                   src_tag_ex);
     }
 
     auto dst_resource = vvl::VideoPictureResource(*this, pDecodeInfo->dstPictureResource);
@@ -2384,7 +2503,9 @@ void SyncValidator::PreCallRecordCmdEncodeVideoKHR(VkCommandBuffer commandBuffer
     auto src_buffer = Get<vvl::Buffer>(pEncodeInfo->dstBuffer);
     if (src_buffer) {
         const ResourceAccessRange src_range = MakeRange(*src_buffer, pEncodeInfo->dstBufferOffset, pEncodeInfo->dstBufferRange);
-        context->UpdateAccessState(*src_buffer, SYNC_VIDEO_ENCODE_VIDEO_ENCODE_WRITE, SyncOrdering::kNonAttachment, src_range, tag);
+        const ResourceUsageTagEx src_tag_ex = cb_access_context->AddCommandHandle(tag, src_buffer->Handle());
+        context->UpdateAccessState(*src_buffer, SYNC_VIDEO_ENCODE_VIDEO_ENCODE_WRITE, SyncOrdering::kNonAttachment, src_range,
+                                   src_tag_ex);
     }
 
     auto src_resource = vvl::VideoPictureResource(*this, pEncodeInfo->srcPictureResource);
@@ -2655,7 +2776,8 @@ void SyncValidator::PreCallRecordCmdWriteBufferMarker2AMD(VkCommandBuffer comman
 
     if (dst_buffer) {
         const ResourceAccessRange range = MakeRange(dstOffset, 4);
-        context->UpdateAccessState(*dst_buffer, SYNC_COPY_TRANSFER_WRITE, SyncOrdering::kNonAttachment, range, tag);
+        const ResourceUsageTagEx tag_ex = cb_access_context->AddCommandHandle(tag, dst_buffer->Handle());
+        context->UpdateAccessState(*dst_buffer, SYNC_COPY_TRANSFER_WRITE, SyncOrdering::kNonAttachment, range, tag_ex);
     }
 }
 
@@ -2675,22 +2797,27 @@ bool SyncValidator::PreCallValidateCmdExecuteCommands(VkCommandBuffer commandBuf
 
     // Make working copies of the access and events contexts
     for (uint32_t cb_index = 0; cb_index < commandBufferCount; ++cb_index) {
-        proxy_cb_context.NextIndexedCommandTag(error_obj.location.function, cb_index);
+        if (cb_index == 0) {
+            proxy_cb_context.NextCommandTag(error_obj.location.function, ResourceUsageRecord::SubcommandType::kIndex);
+        } else {
+            proxy_cb_context.NextSubcommandTag(error_obj.location.function, ResourceUsageRecord::SubcommandType::kIndex);
+        }
 
         const auto recorded_cb = Get<syncval_state::CommandBuffer>(pCommandBuffers[cb_index]);
         if (!recorded_cb) continue;
         const auto *recorded_cb_context = &recorded_cb->access_context;
         assert(recorded_cb_context);
 
-        skip |= ReplayState(proxy_cb_context, *recorded_cb_context, error_obj, cb_index).ValidateFirstUse();
+        const ResourceUsageTag base_tag = proxy_cb_context.GetTagCount();
+        skip |= ReplayState(proxy_cb_context, *recorded_cb_context, error_obj, cb_index, base_tag).ValidateFirstUse();
 
-        // Update proxy label commands so they can be used by InsertRecordedAccessLogEntries
+        // Update proxy label commands so they can be used by ImportRecordedAccessLog
         const auto &recorded_label_commands = recorded_cb->GetLabelCommands();
         proxy_label_commands.insert(proxy_label_commands.end(), recorded_label_commands.begin(), recorded_label_commands.end());
 
         // The barriers have already been applied in ValidatFirstUse
-        ResourceUsageRange tag_range = proxy_cb_context.ImportRecordedAccessLog(*recorded_cb_context);
-        proxy_cb_context.ResolveExecutedCommandBuffer(*recorded_cb_context->GetCurrentAccessContext(), tag_range.begin);
+        proxy_cb_context.ImportRecordedAccessLog(*recorded_cb_context);
+        proxy_cb_context.ResolveExecutedCommandBuffer(*recorded_cb_context->GetCurrentAccessContext(), base_tag);
     }
     proxy_label_commands.clear();
 
@@ -2705,12 +2832,17 @@ void SyncValidator::PreCallRecordCmdExecuteCommands(VkCommandBuffer commandBuffe
     if (!cb_state) return;
     auto *cb_context = &cb_state->access_context;
     for (uint32_t cb_index = 0; cb_index < commandBufferCount; ++cb_index) {
-        const ResourceUsageTag cb_tag = cb_context->NextIndexedCommandTag(record_obj.location.function, cb_index);
-        const auto recorded_cb = Get<syncval_state::CommandBuffer>(pCommandBuffers[cb_index]);
-        if (!recorded_cb) continue;
-        cb_context->AddHandle(cb_tag, "pCommandBuffers", recorded_cb->Handle(), cb_index);
-        const auto *recorded_cb_context = &recorded_cb->access_context;
-        cb_context->RecordExecutedCommandBuffer(*recorded_cb_context);
+        if (const auto recorded_cb = Get<syncval_state::CommandBuffer>(pCommandBuffers[cb_index])) {
+            const auto subcommand = ResourceUsageRecord::SubcommandType::kIndex;
+            if (cb_index == 0) {
+                ResourceUsageTag cb_tag = cb_context->NextCommandTag(record_obj.location.function, subcommand);
+                cb_context->AddCommandHandle(cb_tag, recorded_cb->Handle(), cb_index);
+            } else {
+                ResourceUsageTag cb_tag = cb_context->NextSubcommandTag(record_obj.location.function, subcommand);
+                cb_context->AddSubcommandHandle(cb_tag, recorded_cb->Handle(), cb_index);
+            }
+            cb_context->RecordExecutedCommandBuffer(recorded_cb->access_context);
+        }
     }
 }
 
@@ -2736,15 +2868,16 @@ void SyncValidator::PostCallRecordBindImageMemory2KHR(VkDevice device, uint32_t 
 
 void SyncValidator::PostCallRecordQueueWaitIdle(VkQueue queue, const RecordObject &record_obj) {
     StateTracker::PostCallRecordQueueWaitIdle(queue, record_obj);
-    if ((record_obj.result != VK_SUCCESS) || (disabled[sync_validation_queue_submit]) || (queue == VK_NULL_HANDLE)) return;
-
+    if (record_obj.result != VK_SUCCESS || !syncval_settings.submit_time_validation || queue == VK_NULL_HANDLE) {
+        return;
+    }
     const auto queue_state = GetQueueSyncStateShared(queue);
     if (!queue_state) return;  // Invalid queue
     QueueId waited_queue = queue_state->GetQueueId();
     ApplyTaggedWait(waited_queue, ResourceUsageRecord::kMaxIndex);
 
     // Eliminate waitable fences from the current queue.
-    vvl::EraseIf(waitable_fences_, [waited_queue](const SignaledFence &sf) { return sf.second.queue_id == waited_queue; });
+    vvl::EraseIf(waitable_fences_, [waited_queue](const auto &sf) { return sf.second.queue_id == waited_queue; });
 }
 
 void SyncValidator::PostCallRecordDeviceWaitIdle(VkDevice device, const RecordObject &record_obj) {
@@ -2752,7 +2885,7 @@ void SyncValidator::PostCallRecordDeviceWaitIdle(VkDevice device, const RecordOb
 
     // We need to treat this a fence waits for all queues... noting that present engine ops will be preserved.
     ForAllQueueBatchContexts(
-        [](const std::shared_ptr<QueueBatchContext> &batch) { batch->ApplyTaggedWait(kQueueAny, ResourceUsageRecord::kMaxIndex); });
+        [](const QueueBatchContext::Ptr &batch) { batch->ApplyTaggedWait(kQueueAny, ResourceUsageRecord::kMaxIndex); });
 
     // As we we've waited for everything on device, any waits are mooted. (except for acquires)
     vvl::EraseIf(waitable_fences_, [](SignaledFences::value_type &waitable) { return waitable.second.acquired.Invalid(); });
@@ -2760,9 +2893,9 @@ void SyncValidator::PostCallRecordDeviceWaitIdle(VkDevice device, const RecordOb
 
 struct QueuePresentCmdState {
     std::shared_ptr<const QueueSyncState> queue;
-    SignaledSemaphores signaled;
+    SignaledSemaphoresUpdate signaled_semaphores_update;
     PresentedImages presented_images;
-    QueuePresentCmdState(const SignaledSemaphores &parent_semaphores) : signaled(parent_semaphores) {}
+    QueuePresentCmdState(const SyncValidator &sync_validator) : signaled_semaphores_update(sync_validator) {}
 };
 
 bool SyncValidator::PreCallValidateQueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo,
@@ -2770,30 +2903,37 @@ bool SyncValidator::PreCallValidateQueuePresentKHR(VkQueue queue, const VkPresen
     bool skip = false;
 
     // Since this early return is above the TlsGuard, the Record phase must also be.
-    if (disabled[sync_validation_queue_submit]) return skip;
+    if (!syncval_settings.submit_time_validation) return skip;
 
-    vvl::TlsGuard<QueuePresentCmdState> cmd_state(&skip, signaled_semaphores_);
+    vvl::TlsGuard<QueuePresentCmdState> cmd_state(&skip, *this);
     cmd_state->queue = GetQueueSyncStateShared(queue);
     if (!cmd_state->queue) return skip;  // Invalid Queue
 
     // The submit id is a mutable automic which is not recoverable on a skip == true condition
     uint64_t submit_id = cmd_state->queue->ReserveSubmitId();
 
-    std::shared_ptr<const QueueBatchContext> last_batch = cmd_state->queue->LastBatch();
-    std::shared_ptr<QueueBatchContext> batch(std::make_shared<QueueBatchContext>(*this, *cmd_state->queue, submit_id, 0));
+    QueueBatchContext::ConstPtr last_batch = cmd_state->queue->LastBatch();
+    QueueBatchContext::Ptr batch(std::make_shared<QueueBatchContext>(*this, *cmd_state->queue));
 
-    ResourceUsageRange tag_range = SetupPresentInfo(*pPresentInfo, batch, cmd_state->presented_images);
-    batch->SetupAccessContext(last_batch, *pPresentInfo, cmd_state->presented_images, cmd_state->signaled);
-    batch->SetupBatchTags(tag_range);
-    // Update the present tags
+    uint32_t present_tag_count = SetupPresentInfo(*pPresentInfo, batch, cmd_state->presented_images);
+
+    const auto wait_semaphores = vvl::make_span(pPresentInfo->pWaitSemaphores, pPresentInfo->waitSemaphoreCount);
+    const auto resolved_batches = batch->ResolvePresentDependencies(wait_semaphores, last_batch, cmd_state->presented_images,
+                                                                    cmd_state->signaled_semaphores_update);
+
+    // The purpose of keeping return value is to ensure async batches are alive during validation.
+    // Validation accesses raw pointer to async contexts stored in AsyncReference.
+    const auto async_batches = batch->RegisterAsyncContexts(resolved_batches);
+
+    const ResourceUsageTag global_range_start = batch->SetupBatchTags(present_tag_count);
+    // Update the present tags (convert to global range)
     for (auto &presented : cmd_state->presented_images) {
-        presented.tag += batch->GetTagRange().begin;
+        presented.tag += global_range_start;
     }
 
     skip |= batch->DoQueuePresentValidate(error_obj.location, cmd_state->presented_images);
     batch->DoPresentOperations(cmd_state->presented_images);
-    batch->LogPresentOperations(cmd_state->presented_images);
-    batch->Cleanup();
+    batch->LogPresentOperations(cmd_state->presented_images, submit_id);
 
     if (!skip) {
         cmd_state->queue->SetPendingLastBatch(std::move(batch));
@@ -2801,15 +2941,15 @@ bool SyncValidator::PreCallValidateQueuePresentKHR(VkQueue queue, const VkPresen
     return skip;
 }
 
-ResourceUsageRange SyncValidator::SetupPresentInfo(const VkPresentInfoKHR &present_info, std::shared_ptr<QueueBatchContext> &batch,
-                                                   PresentedImages &presented_images) const {
+uint32_t SyncValidator::SetupPresentInfo(const VkPresentInfoKHR &present_info, QueueBatchContext::Ptr &batch,
+                                         PresentedImages &presented_images) const {
     const VkSwapchainKHR *const swapchains = present_info.pSwapchains;
     const uint32_t *const image_indices = present_info.pImageIndices;
-    const uint32_t swap_count = present_info.swapchainCount;
+    const uint32_t swapchain_count = present_info.swapchainCount;
 
     // Create the working list of presented images
-    presented_images.reserve(swap_count);
-    for (uint32_t present_index = 0; present_index < swap_count; present_index++) {
+    presented_images.reserve(swapchain_count);
+    for (uint32_t present_index = 0; present_index < swapchain_count; present_index++) {
         // Note: Given the "EraseIf" implementation for acquire fence waits, each presentation needs a unique tag.
         const ResourceUsageTag tag = presented_images.size();
         presented_images.emplace_back(*this, batch, swapchains[present_index], image_indices[present_index], present_index, tag);
@@ -2817,15 +2957,14 @@ ResourceUsageRange SyncValidator::SetupPresentInfo(const VkPresentInfoKHR &prese
             presented_images.pop_back();
         }
     }
-
-    // Present is tagged for each swap.
-    return ResourceUsageRange(0, presented_images.size());
+    // Present is tagged for each swapchain.
+    return static_cast<uint32_t>(presented_images.size());
 }
 
 void SyncValidator::PostCallRecordQueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo,
                                                   const RecordObject &record_obj) {
     StateTracker::PostCallRecordQueuePresentKHR(queue, pPresentInfo, record_obj);
-    if (disabled[sync_validation_queue_submit]) return;
+    if (!syncval_settings.submit_time_validation) return;
 
     // The earliest return (when enabled), must be *after* the TlsGuard, as it is the TlsGuard that cleans up the cmd_state
     // static payload
@@ -2839,7 +2978,7 @@ void SyncValidator::PostCallRecordQueuePresentKHR(VkQueue queue, const VkPresent
 
     // Update the state with the data from the validate phase
     std::shared_ptr<QueueSyncState> queue_state = std::const_pointer_cast<QueueSyncState>(std::move(cmd_state->queue));
-    cmd_state->signaled.Resolve(signaled_semaphores_, queue_state->PendingLastBatch());
+    UpdateSignaledSemaphores(cmd_state->signaled_semaphores_update, queue_state->PendingLastBatch());
     for (auto &presented : cmd_state->presented_images) {
         presented.ExportToSwapchain(*this);
     }
@@ -2850,14 +2989,14 @@ void SyncValidator::PostCallRecordAcquireNextImageKHR(VkDevice device, VkSwapcha
                                                       VkSemaphore semaphore, VkFence fence, uint32_t *pImageIndex,
                                                       const RecordObject &record_obj) {
     StateTracker::PostCallRecordAcquireNextImageKHR(device, swapchain, timeout, semaphore, fence, pImageIndex, record_obj);
-    if (disabled[sync_validation_queue_submit]) return;
+    if (!syncval_settings.submit_time_validation) return;
     RecordAcquireNextImageState(device, swapchain, timeout, semaphore, fence, pImageIndex, record_obj);
 }
 
 void SyncValidator::PostCallRecordAcquireNextImage2KHR(VkDevice device, const VkAcquireNextImageInfoKHR *pAcquireInfo,
                                                        uint32_t *pImageIndex, const RecordObject &record_obj) {
     StateTracker::PostCallRecordAcquireNextImage2KHR(device, pAcquireInfo, pImageIndex, record_obj);
-    if (disabled[sync_validation_queue_submit]) return;
+    if (!syncval_settings.submit_time_validation) return;
     RecordAcquireNextImageState(device, pAcquireInfo->swapchain, pAcquireInfo->timeout, pAcquireInfo->semaphore,
                                 pAcquireInfo->fence, pImageIndex, record_obj);
 }
@@ -2882,9 +3021,7 @@ void SyncValidator::RecordAcquireNextImageState(VkDevice device, VkSwapchainKHR 
     // acquire doesn't happen on a queue, but we need a place to put the acquire operation access record.
     auto batch = std::make_shared<QueueBatchContext>(*this);
     batch->SetupAccessContext(presented);
-    ResourceUsageRange acquire_tag_range(0, 1);
-    batch->SetupBatchTags(ResourceUsageRange(0, 1));
-    const ResourceUsageTag acquire_tag = batch->GetTagRange().begin;
+    const ResourceUsageTag acquire_tag = batch->SetupBatchTags(1);
     batch->DoAcquireOperation(presented);
     batch->LogAcquireOperation(presented, record_obj.location.function);
 
@@ -2895,9 +3032,10 @@ void SyncValidator::RecordAcquireNextImageState(VkDevice device, VkSwapchainKHR 
 
     if (semaphore != VK_NULL_HANDLE) {
         std::shared_ptr<const vvl::Semaphore> sem_state = Get<vvl::Semaphore>(semaphore);
-
-        if (bool(sem_state)) {
-            signaled_semaphores_.SignalSemaphore(sem_state, presented, acquire_tag);
+        if (sem_state) {
+            // This will ignore any duplicated signal (emplace does not update existing entry),
+            // and the core validation reports and error in this case.
+            signaled_semaphores_.emplace(sem_state->VkHandle(), SignalInfo(presented, acquire_tag));
         }
     }
     if (fence != VK_NULL_HANDLE) {
@@ -2907,10 +3045,8 @@ void SyncValidator::RecordAcquireNextImageState(VkDevice device, VkSwapchainKHR 
 
 bool SyncValidator::PreCallValidateQueueSubmit(VkQueue queue, uint32_t submitCount, const VkSubmitInfo *pSubmits, VkFence fence,
                                                const ErrorObject &error_obj) const {
-    auto queue_state = GetQueueSyncStateShared(queue);
-    if (!bool(queue_state)) return false;
-    SubmitInfoConverter submit_info(submitCount, pSubmits, queue_state->GetQueueFlags());
-    return ValidateQueueSubmit(queue, submitCount, submit_info.info2s.data(), fence, error_obj);
+    SubmitInfoConverter submit_info(pSubmits, submitCount);
+    return ValidateQueueSubmit(queue, submitCount, submit_info.submit_infos2.data(), fence, error_obj);
 }
 
 bool SyncValidator::ValidateQueueSubmit(VkQueue queue, uint32_t submitCount, const VkSubmitInfo2 *pSubmits, VkFence fence,
@@ -2918,11 +3054,13 @@ bool SyncValidator::ValidateQueueSubmit(VkQueue queue, uint32_t submitCount, con
     bool skip = false;
 
     // Since this early return is above the TlsGuard, the Record phase must also be.
-    if (disabled[sync_validation_queue_submit]) return skip;
+    if (!syncval_settings.submit_time_validation) return skip;
 
-    vvl::TlsGuard<QueueSubmitCmdState> cmd_state(&skip, error_obj, signaled_semaphores_);
+    vvl::TlsGuard<QueueSubmitCmdState> cmd_state(&skip, *this);
     cmd_state->queue = GetQueueSyncStateShared(queue);
     if (!cmd_state->queue) return skip;  // Invalid Queue
+
+    SignaledSemaphoresUpdate &signals_update = cmd_state->signaled_semaphores_update;
 
     // The submit id is a mutable automic which is not recoverable on a skip == true condition
     uint64_t submit_id = cmd_state->queue->ReserveSubmitId();
@@ -2930,37 +3068,29 @@ bool SyncValidator::ValidateQueueSubmit(VkQueue queue, uint32_t submitCount, con
     // Update label stack as we progress through batches and command buffers
     auto current_label_stack = cmd_state->queue->GetQueueState()->cmdbuf_label_stack;
 
-    // verify each submit batch
-    // Since the last batch from the queue state is const, we need to track the last_batch separately from the
-    // most recently created batch
-    std::shared_ptr<const QueueBatchContext> last_batch = cmd_state->queue->LastBatch();
-    std::shared_ptr<QueueBatchContext> batch;
+    QueueBatchContext::ConstPtr last_batch = cmd_state->queue->LastBatch();
+    QueueBatchContext::Ptr batch;
     for (uint32_t batch_idx = 0; batch_idx < submitCount; batch_idx++) {
         const VkSubmitInfo2 &submit = pSubmits[batch_idx];
-        batch = std::make_shared<QueueBatchContext>(*this, *cmd_state->queue, submit_id, batch_idx);
-        batch->SetupCommandBufferInfo(submit);
-        batch->SetupAccessContext(last_batch, submit, cmd_state->signaled);
-        batch->SetCurrentLabelStack(&current_label_stack);
+        batch = std::make_shared<QueueBatchContext>(*this, *cmd_state->queue);
 
-        // Skip import and validation of empty batches
-        if (batch->GetTagRange().size()) {
-            batch->SetupBatchTags();
-            skip |= batch->DoQueueSubmitValidate(*this, *cmd_state, submit);
-        } else {
-            batch->ReplayLabelCommandsFromEmptyBatch();
+        const auto wait_semaphores = vvl::make_span(submit.pWaitSemaphoreInfos, submit.waitSemaphoreInfoCount);
+        const auto resolved_batches = batch->ResolveSubmitDependencies(wait_semaphores, last_batch, signals_update);
+
+        // The purpose of keeping return value is to ensure async batches are alive during validation.
+        // Validation accesses raw pointer to async contexts stored in AsyncReference.
+        // TODO: All syncval tests pass when the return value is ignored. Write a regression test that fails/crashes in this case.
+        const auto async_batches = batch->RegisterAsyncContexts(resolved_batches);
+
+        skip |= batch->ValidateSubmit(submit, submit_id, batch_idx, current_label_stack, error_obj);
+
+        const auto signal_semaphores = vvl::make_span(submit.pSignalSemaphoreInfos, submit.signalSemaphoreInfoCount);
+        for (const auto &semaphore_info : signal_semaphores) {
+            signals_update.OnSignal(batch, semaphore_info);
         }
 
-        // Empty batches could have semaphores, though.
-        for (uint32_t sem_idx = 0; sem_idx < submit.signalSemaphoreInfoCount; ++sem_idx) {
-            const VkSemaphoreSubmitInfo &semaphore_info = submit.pSignalSemaphoreInfos[sem_idx];
-            // Make a copy of the state, signal the copy and pend it...
-            auto sem_state = Get<vvl::Semaphore>(semaphore_info.semaphore);
-            if (!sem_state) continue;
-            cmd_state->signaled.SignalSemaphore(sem_state, batch, semaphore_info);
-        }
-        // Unless the previous batch was referenced by a signal, the QueueBatchContext will self destruct, but as
-        // we ResolvePrevious as we can let any contexts we've fully referenced go.
-        batch->Cleanup();  // Clear the temporaries that the batch holds.
+        // Unless the previous batch was referenced by a signal it will self destruct
+        // in the record phase when the last batch is updated.
         last_batch = batch;
     }
     // The most recently created batch will become the queue's "last batch" in the record phase
@@ -2981,7 +3111,7 @@ void SyncValidator::PostCallRecordQueueSubmit(VkQueue queue, uint32_t submitCoun
 
 void SyncValidator::RecordQueueSubmit(VkQueue queue, VkFence fence, const RecordObject &record_obj) {
     // If this return is above the TlsGuard, then the Validate phase return must also be.
-    if (disabled[sync_validation_queue_submit]) return;  // Queue submit validation disabled
+    if (!syncval_settings.submit_time_validation) return;  // Queue submit validation disabled
 
     // The earliest return (when enabled), must be *after* the TlsGuard, as it is the TlsGuard that cleans up the cmd_state
     // static payload
@@ -2992,8 +3122,7 @@ void SyncValidator::RecordQueueSubmit(VkQueue queue, VkFence fence, const Record
 
     // Don't need to look up the queue state again, but we need a non-const version
     std::shared_ptr<QueueSyncState> queue_state = std::const_pointer_cast<QueueSyncState>(std::move(cmd_state->queue));
-
-    cmd_state->signaled.Resolve(signaled_semaphores_, queue_state->PendingLastBatch());
+    UpdateSignaledSemaphores(cmd_state->signaled_semaphores_update, queue_state->PendingLastBatch());
     queue_state->UpdateLastBatch();
 
     ResourceUsageRange fence_tag_range = ReserveGlobalTagRange(1U);
@@ -3022,7 +3151,7 @@ void SyncValidator::PostCallRecordQueueSubmit2(VkQueue queue, uint32_t submitCou
 
 void SyncValidator::PostCallRecordGetFenceStatus(VkDevice device, VkFence fence, const RecordObject &record_obj) {
     StateTracker::PostCallRecordGetFenceStatus(device, fence, record_obj);
-    if (disabled[sync_validation_queue_submit]) return;
+    if (!syncval_settings.submit_time_validation) return;
     if (record_obj.result == VK_SUCCESS) {
         // fence is signalled, mark it as waited for
         WaitForFence(fence);
@@ -3032,7 +3161,7 @@ void SyncValidator::PostCallRecordGetFenceStatus(VkDevice device, VkFence fence,
 void SyncValidator::PostCallRecordWaitForFences(VkDevice device, uint32_t fenceCount, const VkFence *pFences, VkBool32 waitAll,
                                                 uint64_t timeout, const RecordObject &record_obj) {
     StateTracker::PostCallRecordWaitForFences(device, fenceCount, pFences, waitAll, timeout, record_obj);
-    if (disabled[sync_validation_queue_submit]) return;
+    if (!syncval_settings.submit_time_validation) return;
     if ((record_obj.result == VK_SUCCESS) && ((VK_TRUE == waitAll) || (1 == fenceCount))) {
         // We can only know the pFences have signal if we waited for all of them, or there was only one of them
         for (uint32_t i = 0; i < fenceCount; i++) {

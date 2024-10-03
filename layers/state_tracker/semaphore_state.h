@@ -21,7 +21,7 @@
 #include "state_tracker/submission_reference.h"
 #include <future>
 #include <map>
-#include <mutex>
+#include <shared_mutex>
 #include "containers/custom_containers.h"
 #include "error_message/error_location.h"
 
@@ -107,14 +107,13 @@ class Semaphore : public RefcountedStateObject {
     bool CanBinaryBeSignaled() const;
     bool CanBinaryBeWaited() const;
 
-    bool HasImportedHandleType() const;
-    VkExternalSemaphoreHandleTypeFlagBits ImportedHandleType() const;
     void Import(VkExternalSemaphoreHandleTypeFlagBits handle_type, VkSemaphoreImportFlags flags);
     void Export(VkExternalSemaphoreHandleTypeFlagBits handle_type);
+    std::optional<VkExternalSemaphoreHandleTypeFlagBits> ImportedHandleType() const;
 
     const VkSemaphoreType type;
     const VkSemaphoreCreateFlags flags;
-    const VkExternalSemaphoreHandleTypeFlags exportHandleTypes;
+    const VkExternalSemaphoreHandleTypeFlags export_handle_types;
 
 #ifdef VK_USE_PLATFORM_METAL_EXT
     static bool GetMetalExport(const VkSemaphoreCreateInfo *info);
@@ -124,7 +123,6 @@ class Semaphore : public RefcountedStateObject {
   private:
     Semaphore(ValidationStateTracker &dev, VkSemaphore handle, const VkSemaphoreTypeCreateInfo *type_create_info,
               const VkSemaphoreCreateInfo *pCreateInfo);
-    VkExternalSemaphoreHandleTypeFlags GetExportHandleTypes(const VkSemaphoreCreateInfo *pCreateInfo);
 
     // Signal queue(s) that need to retire because a wait on this payload has finished
     void Notify(uint64_t payload);
@@ -187,8 +185,8 @@ struct SemaphoreSubmitState {
     VkQueue AnotherQueueWaits(const vvl::Semaphore &semaphore_state) const;
 
     bool ValidateBinaryWait(const Location &loc, VkQueue queue, const vvl::Semaphore &semaphore_state);
-    bool ValidateWaitSemaphore(const Location &wait_semaphore_loc, VkSemaphore semaphore, uint64_t value);
-    bool ValidateSignalSemaphore(const Location &signal_semaphore_loc, VkSemaphore semaphore, uint64_t value);
+    bool ValidateWaitSemaphore(const Location &wait_semaphore_loc, const vvl::Semaphore &semaphore_state, uint64_t value);
+    bool ValidateSignalSemaphore(const Location &signal_semaphore_loc, const vvl::Semaphore &semaphore_state, uint64_t value);
 
     bool CannotSignalBinary(const vvl::Semaphore &semaphore_state, VkQueue &other_queue, vvl::Func &other_command) const;
 

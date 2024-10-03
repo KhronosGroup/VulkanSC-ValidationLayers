@@ -12,7 +12,7 @@
 #pragma once
 
 #include "layer_validation_tests.h"
-#include "generated/vk_extension_helper.h"
+#include <vulkan/utility/vk_safe_struct.hpp>
 #include <vk_video/vulkan_video_codecs_common.h>
 #include <vk_video/vulkan_video_codec_h264std.h>
 #include <vk_video/vulkan_video_codec_h264std_decode.h>
@@ -23,7 +23,6 @@
 
 #include <memory>
 #include <vector>
-#include <tuple>
 #include <functional>
 #include <math.h>
 

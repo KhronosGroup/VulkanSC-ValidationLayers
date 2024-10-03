@@ -15,11 +15,11 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "utils/cast_utils.h"
-#include "generated/enum_flag_bits.h"
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
 #include "../framework/descriptor_helper.h"
+
+class NegativeSampler : public VkLayerTest {};
 
 // Not supported in Vulkan SC: assumes availability of pre-Vulkan 1.2 functionality
 TEST_F(NegativeSampler, DISABLED_MirrorClampToEdgeNotEnabled) {
@@ -645,18 +645,8 @@ TEST_F(NegativeSampler, MultiplaneImageSamplerConversionMismatch) {
 
     // Create an image without a Ycbcr conversion
     vkt::Image mpimage(*m_device, ci, vkt::set_layout);
-
     ycbcr_info.conversion = conversions[0].handle();  // Need two samplers with different conversions
-    VkImageViewCreateInfo ivci = vku::InitStructHelper(&ycbcr_info);
-    ivci.image = mpimage.handle();
-    ivci.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    ivci.format = VK_FORMAT_G8_B8R8_2PLANE_420_UNORM_KHR;
-    ivci.subresourceRange.layerCount = 1;
-    ivci.subresourceRange.baseMipLevel = 0;
-    ivci.subresourceRange.levelCount = 1;
-    ivci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_PLANE_0_BIT;
-
-    vkt::ImageView view(*m_device, ivci);
+    vkt::ImageView view = mpimage.CreateView(VK_IMAGE_ASPECT_PLANE_0_BIT, &ycbcr_info);
 
     VkSampler vksamplers[2] = {samplers[0].handle(), samplers[1].handle()};
     // Use the image and sampler together in a descriptor set
@@ -906,20 +896,9 @@ TEST_F(NegativeSampler, CustomBorderColorFormatUndefined) {
     auto image_view_create_info = image.BasicViewCreatInfo();
     vkt::ImageView view(*m_device, image_view_create_info);
 
-    VkDescriptorImageInfo img_info = {};
-    img_info.sampler = sampler.handle();
-    img_info.imageView = view.handle();
-    img_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    descriptor_set.WriteDescriptorImageInfo(0, view, sampler);
+    descriptor_set.UpdateDescriptorSets();
 
-    VkWriteDescriptorSet descriptor_writes[2] = {};
-    descriptor_writes[0] = vku::InitStructHelper();
-    descriptor_writes[0].dstSet = descriptor_set.set_;
-    descriptor_writes[0].dstBinding = 0;
-    descriptor_writes[0].descriptorCount = 1;
-    descriptor_writes[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    descriptor_writes[0].pImageInfo = &img_info;
-
-    vk::UpdateDescriptorSets(device(), 1, descriptor_writes, 0, NULL);
     char const *fsSource = R"glsl(
         #version 450
         layout(set=0, binding=0) uniform sampler2D s;
@@ -1541,18 +1520,16 @@ TEST_F(NegativeSampler, ReductionModeFeature) {
     CreateSamplerTest(*this, &sampler_ci, "VUID-VkSamplerCreateInfo-pNext-06726");
 }
 
-// Not possible to hit 07911 without first hitting an early return in parameter validation.
-TEST_F(NegativeSampler, DISABLED_ReductionMode) {
+TEST_F(NegativeSampler, ReductionModeCubicIMG) {
     TEST_DESCRIPTION("Create sampler with invalid combination of filter and reduction mode.");
     AddRequiredExtensions(VK_EXT_SAMPLER_FILTER_MINMAX_EXTENSION_NAME);
+    AddRequiredExtensions(VK_IMG_FILTER_CUBIC_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
 
     VkSamplerReductionModeCreateInfo sampler_reduction_mode_ci = vku::InitStructHelper();
     sampler_reduction_mode_ci.reductionMode = VK_SAMPLER_REDUCTION_MODE_MAX;
     VkSamplerCreateInfo sampler_ci = vku::InitStructHelper(&sampler_reduction_mode_ci);
     sampler_ci.magFilter = VK_FILTER_CUBIC_EXT;
-
-    m_errorMonitor->SetDesiredError("VUID-VkSamplerCreateInfo-magFilter-parameter");
     CreateSamplerTest(*this, &sampler_ci, "VUID-VkSamplerCreateInfo-magFilter-07911");
 }
 

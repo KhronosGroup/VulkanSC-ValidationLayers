@@ -31,15 +31,15 @@ class BestPractices;
 namespace bp_state {
 class Image : public vvl::Image {
   public:
-    Image(const ValidationStateTracker& dev_data, VkImage handle, const VkImageCreateInfo* pCreateInfo,
-          VkFormatFeatureFlags2KHR features)
-        : vvl::Image(dev_data, handle, pCreateInfo, features) {
+    Image(const ValidationStateTracker& dev_data, VkImage handle, const VkImageCreateInfo* create_info,
+          VkFormatFeatureFlags2 features)
+        : vvl::Image(dev_data, handle, create_info, features) {
         SetupUsages();
     }
 
-    Image(const ValidationStateTracker& dev_data, VkImage handle, const VkImageCreateInfo* pCreateInfo, VkSwapchainKHR swapchain,
-          uint32_t swapchain_index, VkFormatFeatureFlags2KHR features)
-        : vvl::Image(dev_data, handle, pCreateInfo, swapchain, swapchain_index, features) {
+    Image(const ValidationStateTracker& dev_data, VkImage handle, const VkImageCreateInfo* create_info, VkSwapchainKHR swapchain,
+          uint32_t swapchain_index, VkFormatFeatureFlags2 features)
+        : vvl::Image(dev_data, handle, create_info, swapchain, swapchain_index, features) {
         SetupUsages();
     }
 
@@ -100,18 +100,18 @@ class PhysicalDevice : public vvl::PhysicalDevice {
 
 class Swapchain : public vvl::Swapchain {
   public:
-    Swapchain(ValidationStateTracker& dev_data, const VkSwapchainCreateInfoKHR* pCreateInfo, VkSwapchainKHR handle)
-        : vvl::Swapchain(dev_data, pCreateInfo, handle) {}
+    Swapchain(ValidationStateTracker& dev_data, const VkSwapchainCreateInfoKHR* create_info, VkSwapchainKHR handle)
+        : vvl::Swapchain(dev_data, create_info, handle) {}
 
     CALL_STATE vkGetSwapchainImagesKHRState = UNCALLED;
 };
 
 class DeviceMemory : public vvl::DeviceMemory {
   public:
-    DeviceMemory(VkDeviceMemory handle, const VkMemoryAllocateInfo* pAllocateInfo, uint64_t fake_address,
+    DeviceMemory(VkDeviceMemory handle, const VkMemoryAllocateInfo* allocate_info, uint64_t fake_address,
                  const VkMemoryType& memory_type, const VkMemoryHeap& memory_heap,
                  std::optional<vvl::DedicatedBinding>&& dedicated_binding, uint32_t physical_device_count)
-        : vvl::DeviceMemory(handle, pAllocateInfo, fake_address, memory_type, memory_heap, std::move(dedicated_binding),
+        : vvl::DeviceMemory(handle, allocate_info, fake_address, memory_type, memory_heap, std::move(dedicated_binding),
                             physical_device_count) {}
 
     std::optional<float> dynamic_priority;  // VK_EXT_pageable_device_local_memory priority
@@ -120,6 +120,9 @@ class DeviceMemory : public vvl::DeviceMemory {
 struct AttachmentInfo {
     uint32_t framebufferAttachment;
     VkImageAspectFlags aspects;
+
+    AttachmentInfo(uint32_t framebufferAttachment_, VkImageAspectFlags aspects_)
+        : framebufferAttachment(framebufferAttachment_), aspects(aspects_) {}
 };
 
 // used to track state regarding render pass heuristic checks
@@ -189,7 +192,7 @@ struct CommandBufferStateNV {
 
 class CommandBuffer : public vvl::CommandBuffer {
   public:
-    CommandBuffer(BestPractices& bp, VkCommandBuffer handle, const VkCommandBufferAllocateInfo* pCreateInfo,
+    CommandBuffer(BestPractices& bp, VkCommandBuffer handle, const VkCommandBufferAllocateInfo* allocate_info,
                   const vvl::CommandPool* pool);
 
     RenderPassState render_pass_state;
@@ -198,23 +201,39 @@ class CommandBuffer : public vvl::CommandBuffer {
     bool uses_vertex_buffer = false;
     uint32_t small_indexed_draw_call_count = 0;
 
-    std::vector<uint8_t> push_constant_data_set;
-    void UnbindResources() { push_constant_data_set.clear(); }
+    // This function used to not be empty. It has been left empty because
+    // the logic to decide to call this function is not simple, so adding this
+    // function back could tedious.
+    void UnbindResources() {}
+
+    struct SignalingInfo {
+        // True, if the event's first state change within a command buffer is a signal (SetEvent)
+        // rather than an unsignal (ResetEvent). It is used to do validation on the boundary
+        // between two command buffers.
+        const bool first_state_change_is_signal = false;
+
+        // Tracks how the event signaling state changes as the command buffer recording progresses.
+        // When recording is finished, this is the event state "at the end of the command buffer".
+        bool signaled = false;
+
+        SignalingInfo(bool signal) : first_state_change_is_signal(signal), signaled(signal) {}
+    };
+    vvl::unordered_map<VkEvent, SignalingInfo> event_signaling_state;
 };
 
 class DescriptorPool : public vvl::DescriptorPool {
   public:
-    DescriptorPool(ValidationStateTracker& dev, const VkDescriptorPool handle, const VkDescriptorPoolCreateInfo* pCreateInfo)
-        : vvl::DescriptorPool(dev, handle, pCreateInfo) {}
+    DescriptorPool(ValidationStateTracker& dev, const VkDescriptorPool handle, const VkDescriptorPoolCreateInfo* create_info)
+        : vvl::DescriptorPool(dev, handle, create_info) {}
 
     uint32_t freed_count{0};
 };
 
 class Pipeline : public vvl::Pipeline {
   public:
-    Pipeline(const ValidationStateTracker& state_data, const VkGraphicsPipelineCreateInfo* pCreateInfo,
+    Pipeline(const ValidationStateTracker& state_data, const VkGraphicsPipelineCreateInfo* create_info,
              std::shared_ptr<const vvl::PipelineCache>&& pipe_cache, std::shared_ptr<const vvl::RenderPass>&& rpstate,
-             std::shared_ptr<const vvl::PipelineLayout>&& layout, ShaderModuleUniqueIds* shader_unique_id_map);
+             std::shared_ptr<const vvl::PipelineLayout>&& layout);
 
     const std::vector<AttachmentInfo> access_framebuffer_attachments;
 };

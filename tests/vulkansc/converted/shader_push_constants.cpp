@@ -18,6 +18,8 @@
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
 
+class NegativeShaderPushConstants : public VkLayerTest {};
+
 TEST_F(NegativeShaderPushConstants, NotDeclared) {
     // This test case requires SPIR-V debug information
     RequiresSpvDebugInfo();

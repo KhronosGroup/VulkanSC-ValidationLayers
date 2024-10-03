@@ -14,6 +14,8 @@
 #include "../framework/layer_validation_tests.h"
 #include "../framework/render_pass_helper.h"
 
+class PositiveSecondaryCommandBuffer : public VkLayerTest {};
+
 TEST_F(PositiveSecondaryCommandBuffer, Barrier) {
     TEST_DESCRIPTION("Add a pipeline barrier in a secondary command buffer");
     RETURN_IF_SKIP(Init());
@@ -364,6 +366,7 @@ TEST_F(PositiveSecondaryCommandBuffer, Nested) {
     AddRequiredExtensions(VK_EXT_NESTED_COMMAND_BUFFER_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::nestedCommandBuffer);
+    AddRequiredFeature(vkt::Feature::nestedCommandBufferRendering);
     AddRequiredFeature(vkt::Feature::dynamicRendering);
     RETURN_IF_SKIP(Init());
     InitRenderTarget();

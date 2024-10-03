@@ -275,3 +275,72 @@ vku::safe_VkImageMemoryBarrier2 ConvertVkImageMemoryBarrierToV2(const VkImageMem
     barrier2.subresourceRange = barrier.subresourceRange;
     return vku::safe_VkImageMemoryBarrier2(&barrier2);
 }
+
+SubmitInfoConverter::SubmitInfoConverter(const VkSubmitInfo* submit_infos, uint32_t count) {
+    size_t wait_count = 0;
+    size_t cb_count = 0;
+    size_t signal_count = 0;
+
+    for (uint32_t batch = 0; batch < count; batch++) {
+        const VkSubmitInfo& info = submit_infos[batch];
+        wait_count += info.waitSemaphoreCount;
+        cb_count += info.commandBufferCount;
+        signal_count += info.signalSemaphoreCount;
+    }
+    wait_infos.resize(wait_count);
+    auto* current_wait = wait_infos.data();
+
+    cb_infos.resize(cb_count);
+    auto* current_cb = cb_infos.data();
+
+    signal_infos.resize(signal_count);
+    auto* current_signal = signal_infos.data();
+
+    submit_infos2.resize(count);
+    for (uint32_t batch = 0; batch < count; batch++) {
+        const VkSubmitInfo& info = submit_infos[batch];
+        const auto* timeline_values = vku::FindStructInPNextChain<VkTimelineSemaphoreSubmitInfo>(info.pNext);
+
+        VkSubmitInfo2& info2 = submit_infos2[batch];
+        info2 = vku::InitStructHelper();
+
+        if (info.waitSemaphoreCount) {
+            info2.waitSemaphoreInfoCount = info.waitSemaphoreCount;
+            info2.pWaitSemaphoreInfos = current_wait;
+            for (uint32_t i = 0; i < info.waitSemaphoreCount; i++, current_wait++) {
+                *current_wait = vku::InitStructHelper();
+                current_wait->semaphore = info.pWaitSemaphores[i];
+                current_wait->stageMask = info.pWaitDstStageMask[i];
+                if (timeline_values) {
+                    if (i >= timeline_values->waitSemaphoreValueCount) {
+                        continue;  // [core validation check]
+                    }
+                    current_wait->value = timeline_values->pWaitSemaphoreValues[i];
+                }
+            }
+        }
+        if (info.commandBufferCount) {
+            info2.commandBufferInfoCount = info.commandBufferCount;
+            info2.pCommandBufferInfos = current_cb;
+            for (uint32_t i = 0; i < info.commandBufferCount; i++, current_cb++) {
+                *current_cb = vku::InitStructHelper();
+                current_cb->commandBuffer = info.pCommandBuffers[i];
+            }
+        }
+        if (info.signalSemaphoreCount) {
+            info2.signalSemaphoreInfoCount = info.signalSemaphoreCount;
+            info2.pSignalSemaphoreInfos = current_signal;
+            for (uint32_t i = 0; i < info.signalSemaphoreCount; i++, current_signal++) {
+                *current_signal = vku::InitStructHelper();
+                current_signal->semaphore = info.pSignalSemaphores[i];
+                current_signal->stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+                if (timeline_values) {
+                    if (i >= timeline_values->signalSemaphoreValueCount) {
+                        continue;  // [core validation check]
+                    }
+                    current_signal->value = timeline_values->pSignalSemaphoreValues[i];
+                }
+            }
+        }
+    }
+}

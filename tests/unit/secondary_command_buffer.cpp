@@ -15,6 +15,8 @@
 #include "../framework/layer_validation_tests.h"
 #include "../framework/render_pass_helper.h"
 
+class NegativeSecondaryCommandBuffer : public VkLayerTest {};
+
 TEST_F(NegativeSecondaryCommandBuffer, AsPrimary) {
     TEST_DESCRIPTION("Create a secondary command buffer and pass it to QueueSubmit.");
     m_errorMonitor->SetDesiredError("VUID-VkSubmitInfo-pCommandBuffers-00075");
@@ -332,23 +334,13 @@ TEST_F(NegativeSecondaryCommandBuffer, ExecuteWithLayoutMismatch) {
 
     RETURN_IF_SKIP(Init());
 
-    VkImageCreateInfo image_create_info = vku::InitStructHelper();
-    image_create_info.imageType = VK_IMAGE_TYPE_2D;
-    image_create_info.format = VK_FORMAT_B8G8R8A8_UNORM;
-    image_create_info.extent.width = 32;
-    image_create_info.extent.height = 1;
-    image_create_info.extent.depth = 1;
-    image_create_info.mipLevels = 1;
-    image_create_info.arrayLayers = 1;
-    image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
-    image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    image_create_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-    image_create_info.flags = 0;
+    VkImageCreateInfo image_create_info = vkt::Image::ImageCreateInfo2D(
+        32, 1, 1, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+    vkt::Image image(*m_device, image_create_info, vkt::set_layout);
 
     VkImageSubresource image_sub = vkt::Image::subresource(VK_IMAGE_ASPECT_COLOR_BIT, 0, 0);
     VkImageSubresourceRange image_sub_range = vkt::Image::subresource_range(image_sub);
 
-    vkt::Image image(*m_device, image_create_info, vkt::set_layout);
     VkImageMemoryBarrier image_barrier =
         image.image_memory_barrier(0, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, image_sub_range);
 
@@ -476,11 +468,10 @@ TEST_F(NegativeSecondaryCommandBuffer, ClearColorAttachmentsRenderArea) {
     m_commandBuffer->end();
 }
 
-TEST_F(NegativeSecondaryCommandBuffer, RenderPassContentsWhenCallingCmdExecuteCommandsWithBeginRenderPass) {
+TEST_F(NegativeSecondaryCommandBuffer, RenderPassContentsFirstSubpass) {
     TEST_DESCRIPTION(
         "Test CmdExecuteCommands inside a render pass begun with CmdBeginRenderPass that hasn't set "
         "VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS");
-
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
@@ -505,7 +496,65 @@ TEST_F(NegativeSecondaryCommandBuffer, RenderPassContentsWhenCallingCmdExecuteCo
     m_commandBuffer->BeginRenderPass(m_renderPass, framebuffer(), 32, 32, m_renderPassClearValues.size(),
                                      m_renderPassClearValues.data());
 
-    m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-contents-06018");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-contents-09680");
+    vk::CmdExecuteCommands(m_commandBuffer->handle(), 1, &secondary.handle());
+    m_errorMonitor->VerifyFound();
+
+    m_commandBuffer->EndRenderPass();
+    m_commandBuffer->end();
+}
+
+TEST_F(NegativeSecondaryCommandBuffer, RenderPassContentsNotFirstSubpass) {
+    TEST_DESCRIPTION(
+        "Test CmdExecuteCommands inside a render pass begun with vkCmdNextSubpass that hasn't set "
+        "VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS");
+    AddRequiredExtensions(VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME);
+    RETURN_IF_SKIP(Init());
+
+    VkAttachmentDescription2 attach_desc = vku::InitStructHelper();
+    attach_desc.format = VK_FORMAT_R8G8B8A8_UNORM;
+    attach_desc.samples = VK_SAMPLE_COUNT_1_BIT;
+    attach_desc.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
+    attach_desc.finalLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+    std::array subpasses = {vku::InitStruct<VkSubpassDescription2>(), vku::InitStruct<VkSubpassDescription2>()};
+
+    VkRenderPassCreateInfo2 render_pass_ci = vku::InitStructHelper();
+    render_pass_ci.subpassCount = subpasses.size();
+    render_pass_ci.pSubpasses = subpasses.data();
+    render_pass_ci.attachmentCount = 1;
+    render_pass_ci.pAttachments = &attach_desc;
+
+    vkt::RenderPass rp(*m_device, render_pass_ci);
+
+    // A compatible framebuffer.
+    vkt::Image image(*m_device, 32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
+    vkt::ImageView view = image.CreateView();
+    vkt::Framebuffer fb(*m_device, rp.handle(), 1, &view.handle());
+
+    vkt::CommandBuffer secondary(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+
+    const VkCommandBufferInheritanceInfo cmdbuff_ii = {
+        VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
+        nullptr,  // pNext
+        rp.handle(),
+        1,  // subpass
+        fb.handle(),
+    };
+
+    VkCommandBufferBeginInfo cmdbuff__bi = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+                                            nullptr,  // pNext
+                                            VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, &cmdbuff_ii};
+    cmdbuff__bi.flags |= VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
+    secondary.begin(&cmdbuff__bi);
+    secondary.end();
+
+    m_commandBuffer->begin();
+    m_commandBuffer->BeginRenderPass(rp.handle(), fb.handle(), 32, 32, m_renderPassClearValues.size(),
+                                     m_renderPassClearValues.data());
+    m_commandBuffer->NextSubpass();
+    m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-None-09681");
     vk::CmdExecuteCommands(m_commandBuffer->handle(), 1, &secondary.handle());
     m_errorMonitor->VerifyFound();
 
@@ -654,4 +703,127 @@ TEST_F(NegativeSecondaryCommandBuffer, CommandBufferInheritanceInfo) {
     m_errorMonitor->SetDesiredError("VUID-vkBeginCommandBuffer-commandBuffer-00052");
     vk::BeginCommandBuffer(secondary.handle(), &begin_info);
     m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeSecondaryCommandBuffer, NestedCommandBufferRendering) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_EXT_NESTED_COMMAND_BUFFER_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::nestedCommandBuffer);
+    AddDisabledFeature(vkt::Feature::nestedCommandBufferRendering);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    vkt::CommandBuffer secondary1(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+    vkt::CommandBuffer secondary2(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+
+    VkCommandBufferInheritanceRenderingInfoKHR cbiri = vku::InitStructHelper();
+    cbiri.colorAttachmentCount = 1;
+    cbiri.pColorAttachmentFormats = &m_render_target_fmt;
+    cbiri.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+    VkCommandBufferInheritanceInfo cbii = vku::InitStructHelper(&cbiri);
+    cbii.occlusionQueryEnable = VK_FALSE;
+
+    VkCommandBufferBeginInfo cbbi = vku::InitStructHelper();
+    cbbi.flags = VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
+    cbbi.pInheritanceInfo = &cbii;
+
+    secondary1.begin(&cbbi);
+    secondary1.end();
+
+    secondary2.begin(&cbbi);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-nestedCommandBufferRendering-09377");
+    vk::CmdExecuteCommands(secondary2.handle(), 1u, &secondary1.handle());
+    m_errorMonitor->VerifyFound();
+    secondary2.end();
+}
+
+TEST_F(NegativeSecondaryCommandBuffer, NestedCommandBufferSimultaneousUse) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_EXT_NESTED_COMMAND_BUFFER_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::nestedCommandBuffer);
+    AddRequiredFeature(vkt::Feature::nestedCommandBufferRendering);
+    AddDisabledFeature(vkt::Feature::nestedCommandBufferSimultaneousUse);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    vkt::CommandBuffer secondary1(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+    vkt::CommandBuffer secondary2(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+
+    VkCommandBufferInheritanceRenderingInfoKHR cbiri = vku::InitStructHelper();
+    cbiri.colorAttachmentCount = 1;
+    cbiri.pColorAttachmentFormats = &m_render_target_fmt;
+    cbiri.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+    VkCommandBufferInheritanceInfo cbii = vku::InitStructHelper(&cbiri);
+    cbii.occlusionQueryEnable = VK_FALSE;
+
+    VkCommandBufferBeginInfo cbbi = vku::InitStructHelper();
+    cbbi.flags = VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT | VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
+    cbbi.pInheritanceInfo = &cbii;
+
+    secondary1.begin(&cbbi);
+    secondary1.end();
+
+    secondary2.begin(&cbbi);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-nestedCommandBufferSimultaneousUse-09378");
+    vk::CmdExecuteCommands(secondary2.handle(), 1u, &secondary1.handle());
+    m_errorMonitor->VerifyFound();
+    secondary2.end();
+}
+
+TEST_F(NegativeSecondaryCommandBuffer, MaxCommandBufferNestingLevel) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_EXT_NESTED_COMMAND_BUFFER_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::nestedCommandBuffer);
+    AddRequiredFeature(vkt::Feature::nestedCommandBufferRendering);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    VkPhysicalDeviceNestedCommandBufferPropertiesEXT nested_cb_props = vku::InitStructHelper();
+    GetPhysicalDeviceProperties2(nested_cb_props);
+    if (nested_cb_props.maxCommandBufferNestingLevel != 2) {
+        GTEST_SKIP() << "needs maxCommandBufferNestingLevel to be 2";
+    }
+
+    vkt::CommandBuffer secondary1(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+    vkt::CommandBuffer secondary2(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+    vkt::CommandBuffer secondary3(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+    vkt::CommandBuffer secondary4(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+
+    VkCommandBufferInheritanceRenderingInfoKHR cbiri = vku::InitStructHelper();
+    cbiri.colorAttachmentCount = 1;
+    cbiri.pColorAttachmentFormats = &m_render_target_fmt;
+    cbiri.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+    VkCommandBufferInheritanceInfo cbii = vku::InitStructHelper(&cbiri);
+    cbii.occlusionQueryEnable = VK_FALSE;
+
+    VkCommandBufferBeginInfo cbbi = vku::InitStructHelper();
+    cbbi.flags = VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
+    cbbi.pInheritanceInfo = &cbii;
+
+    secondary1.begin(&cbbi);
+    secondary1.end();
+
+    secondary2.begin(&cbbi);
+    vk::CmdExecuteCommands(secondary2.handle(), 1u, &secondary1.handle());
+    secondary2.end();
+
+    secondary3.begin(&cbbi);
+    vk::CmdExecuteCommands(secondary3.handle(), 1u, &secondary2.handle());
+    vk::CmdExecuteCommands(secondary3.handle(), 1u, &secondary1.handle());
+    secondary3.end();
+
+    secondary4.begin(&cbbi);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-nestedCommandBuffer-09376");
+    vk::CmdExecuteCommands(secondary4.handle(), 1u, &secondary3.handle());
+    m_errorMonitor->VerifyFound();
+    secondary4.end();
 }

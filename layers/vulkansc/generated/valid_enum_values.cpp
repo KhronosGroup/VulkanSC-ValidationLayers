@@ -177,6 +177,8 @@ ValidValue StatelessValidation::IsValidEnumValue(VkObjectType value) const {
             return IsExtEnabled(device_extensions.vk_nv_optical_flow) ? ValidValue::Valid : ValidValue::NoExtension;
         case VK_OBJECT_TYPE_SHADER_EXT:
             return IsExtEnabled(device_extensions.vk_ext_shader_object) ? ValidValue::Valid : ValidValue::NoExtension;
+        case VK_OBJECT_TYPE_PIPELINE_BINARY_KHR:
+            return IsExtEnabled(device_extensions.vk_khr_pipeline_binary) ? ValidValue::Valid : ValidValue::NoExtension;
         case VK_OBJECT_TYPE_SEMAPHORE_SCI_SYNC_POOL_NV:
             return IsExtEnabled(device_extensions.vk_nv_external_sci_sync2) ? ValidValue::Valid : ValidValue::NoExtension;
         default:
@@ -1045,8 +1047,11 @@ ValidValue StatelessValidation::IsValidEnumValue(VkSubpassContents value) const 
         case VK_SUBPASS_CONTENTS_INLINE:
         case VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS:
             return ValidValue::Valid;
-        case VK_SUBPASS_CONTENTS_INLINE_AND_SECONDARY_COMMAND_BUFFERS_EXT:
-            return IsExtEnabled(device_extensions.vk_ext_nested_command_buffer) ? ValidValue::Valid : ValidValue::NoExtension;
+        case VK_SUBPASS_CONTENTS_INLINE_AND_SECONDARY_COMMAND_BUFFERS_KHR:
+            return IsExtEnabled(device_extensions.vk_khr_maintenance7) ||
+                           IsExtEnabled(device_extensions.vk_ext_nested_command_buffer)
+                       ? ValidValue::Valid
+                       : ValidValue::NoExtension;
         default:
             return ValidValue::NotFound;
     };
@@ -1951,6 +1956,29 @@ ValidValue StatelessValidation::IsValidEnumValue(VkOpticalFlowSessionBindingPoin
 }
 
 template <>
+ValidValue StatelessValidation::IsValidEnumValue(VkAntiLagModeAMD value) const {
+    switch (value) {
+        case VK_ANTI_LAG_MODE_DRIVER_CONTROL_AMD:
+        case VK_ANTI_LAG_MODE_ON_AMD:
+        case VK_ANTI_LAG_MODE_OFF_AMD:
+            return ValidValue::Valid;
+        default:
+            return ValidValue::NotFound;
+    };
+}
+
+template <>
+ValidValue StatelessValidation::IsValidEnumValue(VkAntiLagStageAMD value) const {
+    switch (value) {
+        case VK_ANTI_LAG_STAGE_INPUT_AMD:
+        case VK_ANTI_LAG_STAGE_PRESENT_AMD:
+            return ValidValue::Valid;
+        default:
+            return ValidValue::NotFound;
+    };
+}
+
+template <>
 ValidValue StatelessValidation::IsValidEnumValue(VkShaderCodeTypeEXT value) const {
     switch (value) {
         case VK_SHADER_CODE_TYPE_BINARY_EXT:
@@ -2151,6 +2179,8 @@ vvl::Extensions StatelessValidation::GetEnumExtensions(VkObjectType value) const
             return {vvl::Extension::_VK_NV_optical_flow};
         case VK_OBJECT_TYPE_SHADER_EXT:
             return {vvl::Extension::_VK_EXT_shader_object};
+        case VK_OBJECT_TYPE_PIPELINE_BINARY_KHR:
+            return {vvl::Extension::_VK_KHR_pipeline_binary};
         case VK_OBJECT_TYPE_SEMAPHORE_SCI_SYNC_POOL_NV:
             return {vvl::Extension::_VK_NV_external_sci_sync2};
         default:
@@ -2596,8 +2626,8 @@ vvl::Extensions StatelessValidation::GetEnumExtensions(VkIndexType value) const 
 template <>
 vvl::Extensions StatelessValidation::GetEnumExtensions(VkSubpassContents value) const {
     switch (value) {
-        case VK_SUBPASS_CONTENTS_INLINE_AND_SECONDARY_COMMAND_BUFFERS_EXT:
-            return {vvl::Extension::_VK_EXT_nested_command_buffer};
+        case VK_SUBPASS_CONTENTS_INLINE_AND_SECONDARY_COMMAND_BUFFERS_KHR:
+            return {vvl::Extension::_VK_KHR_maintenance7, vvl::Extension::_VK_EXT_nested_command_buffer};
         default:
             return {};
     };
@@ -3004,6 +3034,16 @@ vvl::Extensions StatelessValidation::GetEnumExtensions(VkOpticalFlowPerformanceL
 
 template <>
 vvl::Extensions StatelessValidation::GetEnumExtensions(VkOpticalFlowSessionBindingPointNV value) const {
+    return {};
+}
+
+template <>
+vvl::Extensions StatelessValidation::GetEnumExtensions(VkAntiLagModeAMD value) const {
+    return {};
+}
+
+template <>
+vvl::Extensions StatelessValidation::GetEnumExtensions(VkAntiLagStageAMD value) const {
     return {};
 }
 

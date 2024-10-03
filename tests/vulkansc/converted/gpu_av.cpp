@@ -19,6 +19,8 @@
 #include "../framework/descriptor_helper.h"
 #include "../framework/gpu_av_helper.h"
 
+class NegativeGpuAV : public GpuAVTest {};
+
 // Not supported in Vulkan SC: GPU AV
 TEST_F(NegativeGpuAV, DISABLED_DestroyedPipelineLayout) {
     TEST_DESCRIPTION("Check if can catch pipeline layout not being bound");
@@ -37,7 +39,7 @@ TEST_F(NegativeGpuAV, DISABLED_DestroyedPipelineLayout) {
     m_commandBuffer->begin();
     vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
     m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "Unable to find pipeline layout to bind debug descriptor set");
+    m_errorMonitor->SetDesiredError("Unable to find pipeline layout to bind debug descriptor set");
     vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
     m_errorMonitor->VerifyFound();
     m_commandBuffer->EndRenderPass();
@@ -62,9 +64,23 @@ TEST_F(NegativeGpuAV, DISABLED_ValidationAbort) {
     features.vertexPipelineStoresAndAtomics = false;
     features.fragmentStoresAndAtomics = false;
     fpvkSetPhysicalDeviceFeaturesEXT(gpu(), features);
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "GPU-Assisted Validation disabled");
+    m_errorMonitor->SetDesiredError("GPU-AV is being disabled");
     RETURN_IF_SKIP(InitState());
     m_errorMonitor->VerifyFound();
+
+    // Still make sure we can use Vulkan as expected without errors
+    InitRenderTarget();
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.CreateComputePipeline();
+
+    m_commandBuffer->begin();
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
+    m_commandBuffer->end();
+
+    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Wait();
 }
 
 // Not supported in Vulkan SC: GPU AV
@@ -80,7 +96,7 @@ TEST_F(NegativeGpuAV, DISABLED_ValidationFeatures) {
     features.pNext = ici.pNext;
     ici.pNext = &features;
     VkInstance instance;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkValidationFeaturesEXT-pEnabledValidationFeatures-02967");
+    m_errorMonitor->SetDesiredError("VUID-VkValidationFeaturesEXT-pEnabledValidationFeatures-02967");
     vk::CreateInstance(&ici, nullptr, &instance);
     m_errorMonitor->VerifyFound();
 
@@ -88,7 +104,7 @@ TEST_F(NegativeGpuAV, DISABLED_ValidationFeatures) {
                                                      VK_VALIDATION_FEATURE_ENABLE_DEBUG_PRINTF_EXT};
     features.pEnabledValidationFeatures = printf_enables;
     features.enabledValidationFeatureCount = 2;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkValidationFeaturesEXT-pEnabledValidationFeatures-02968");
+    m_errorMonitor->SetDesiredError("VUID-VkValidationFeaturesEXT-pEnabledValidationFeatures-02968");
     vk::CreateInstance(&ici, nullptr, &instance);
     m_errorMonitor->VerifyFound();
 }
@@ -169,6 +185,171 @@ TEST_F(NegativeGpuAV, DISABLED_SelectInstrumentedShaders) {
     // Should get a warning since shader was instrumented
     m_errorMonitor->ExpectSuccess(kWarningBit | kErrorBit);
     m_errorMonitor->SetDesiredWarning("VUID-vkCmdDraw-storageBuffers-06936", 3);
+    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Wait();
+    m_errorMonitor->VerifyFound();
+}
+
+// Not supported in Vulkan SC: GPU AV
+TEST_F(NegativeGpuAV, DISABLED_UseAllDescriptorSlotsPipelineNotReserved) {
+    TEST_DESCRIPTION("Don't reserve a descriptor slot and proceed to use them all so GPU-AV can't");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddDisabledFeature(vkt::Feature::robustBufferAccess);
+
+    // not using VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_RESERVE_BINDING_SLOT_EXT
+    const VkValidationFeatureEnableEXT gpu_av_enables = VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT;
+    VkValidationFeaturesEXT validation_features = vku::InitStructHelper();
+    validation_features.enabledValidationFeatureCount = 1;
+    validation_features.pEnabledValidationFeatures = &gpu_av_enables;
+    RETURN_IF_SKIP(InitFramework(&validation_features));
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    }
+    RETURN_IF_SKIP(InitState());
+    m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit);
+
+    vkt::Buffer block_buffer(*m_device, 16, 0, vkt::device_address);
+    vkt::Buffer in_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    auto data = static_cast<VkDeviceAddress *>(in_buffer.memory().map());
+    data[0] = block_buffer.address();
+    in_buffer.memory().unmap();
+
+    OneOffDescriptorSet descriptor_set(m_device, {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}});
+    descriptor_set.WriteDescriptorBufferInfo(0, in_buffer.handle(), 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    descriptor_set.UpdateDescriptorSets();
+
+    const uint32_t set_limit = m_device->phy().limits_.maxBoundDescriptorSets;
+
+    // First try to use too many sets in the pipeline layout
+    {
+        m_errorMonitor->SetDesiredWarning(
+            "This Pipeline Layout has too many descriptor sets that will not allow GPU shader instrumentation to be setup for "
+            "pipelines created with it");
+        std::vector<const vkt::DescriptorSetLayout *> empty_layouts(set_limit);
+        for (uint32_t i = 0; i < set_limit; i++) {
+            empty_layouts[i] = &descriptor_set.layout_;
+        }
+        vkt::PipelineLayout bad_pipe_layout(*m_device, empty_layouts);
+        m_errorMonitor->VerifyFound();
+    }
+
+    // Reduce by one (so there is room now) and do something invalid. (To make sure things still work as expected)
+    std::vector<const vkt::DescriptorSetLayout *> layouts(set_limit - 1);
+    for (uint32_t i = 0; i < set_limit - 1; i++) {
+        layouts[i] = &descriptor_set.layout_;
+    }
+    vkt::PipelineLayout pipe_layout(*m_device, layouts);
+
+    char const *shader_source = R"glsl(
+        #version 450
+        #extension GL_EXT_buffer_reference : enable
+        layout(buffer_reference, std430) readonly buffer IndexBuffer {
+            int indices[];
+        };
+        layout(set = 0, binding = 0) buffer foo {
+            IndexBuffer data;
+            int x;
+        };
+        void main()  {
+            x = data.indices[16];
+        }
+    )glsl";
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cs_ = std::make_unique<VkShaderObj>(this, shader_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2);
+    pipe.cp_ci_.layout = pipe_layout.handle();
+    pipe.CreateComputePipeline();
+
+    m_commandBuffer->begin();
+    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe_layout.handle(), 0, 1,
+                              &descriptor_set.set_, 0, nullptr);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
+    m_commandBuffer->end();
+
+    m_errorMonitor->SetDesiredError("UNASSIGNED-Device address out of bounds");
+    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Wait();
+    m_errorMonitor->VerifyFound();
+}
+
+// Not supported in Vulkan SC: GPU AV
+TEST_F(NegativeGpuAV, DISABLED_UseAllDescriptorSlotsPipelineReserved) {
+    TEST_DESCRIPTION("Reserve a descriptor slot and proceed to use them all anyway so GPU-AV can't");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddDisabledFeature(vkt::Feature::robustBufferAccess);
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
+    m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit);
+
+    vkt::Buffer block_buffer(*m_device, 16, 0, vkt::device_address);
+    vkt::Buffer in_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    auto data = static_cast<VkDeviceAddress *>(in_buffer.memory().map());
+    data[0] = block_buffer.address();
+    in_buffer.memory().unmap();
+
+    OneOffDescriptorSet descriptor_set(m_device, {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}});
+    descriptor_set.WriteDescriptorBufferInfo(0, in_buffer.handle(), 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    descriptor_set.UpdateDescriptorSets();
+
+    // Add one to use the descriptor slot we tried to reserve
+    const uint32_t set_limit = m_device->phy().limits_.maxBoundDescriptorSets + 1;
+
+    // First try to use too many sets in the pipeline layout
+    {
+        m_errorMonitor->SetDesiredWarning(
+            "This Pipeline Layout has too many descriptor sets that will not allow GPU shader instrumentation to be setup for "
+            "pipelines created with it");
+        std::vector<const vkt::DescriptorSetLayout *> empty_layouts(set_limit);
+        for (uint32_t i = 0; i < set_limit; i++) {
+            empty_layouts[i] = &descriptor_set.layout_;
+        }
+        vkt::PipelineLayout bad_pipe_layout(*m_device, empty_layouts);
+        m_errorMonitor->VerifyFound();
+    }
+
+    // Reduce by one (so there is room now) and do something invalid. (To make sure things still work as expected)
+    std::vector<const vkt::DescriptorSetLayout *> layouts(set_limit - 1);
+    for (uint32_t i = 0; i < set_limit - 1; i++) {
+        layouts[i] = &descriptor_set.layout_;
+    }
+    vkt::PipelineLayout pipe_layout(*m_device, layouts);
+
+    char const *shader_source = R"glsl(
+        #version 450
+        #extension GL_EXT_buffer_reference : enable
+        layout(buffer_reference, std430) readonly buffer IndexBuffer {
+            int indices[];
+        };
+        layout(set = 0, binding = 0) buffer foo {
+            IndexBuffer data;
+            int x;
+        };
+        void main()  {
+            x = data.indices[16];
+        }
+    )glsl";
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cs_ = std::make_unique<VkShaderObj>(this, shader_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2);
+    pipe.cp_ci_.layout = pipe_layout.handle();
+    pipe.CreateComputePipeline();
+
+    m_commandBuffer->begin();
+    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe_layout.handle(), 0, 1,
+                              &descriptor_set.set_, 0, nullptr);
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
+    m_commandBuffer->end();
+
+    m_errorMonitor->SetDesiredError("UNASSIGNED-Device address out of bounds");
     m_default_queue->Submit(*m_commandBuffer);
     m_default_queue->Wait();
     m_errorMonitor->VerifyFound();
@@ -271,10 +452,8 @@ TEST_F(NegativeGpuAV, DISABLED_DISABLED_InvalidAtomicStorageOperation) {
     vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe.pipeline_layout_.handle(), 0, 1,
                               &g_pipe.descriptor_set_->set_, 0, nullptr);
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDraw-None-02691");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDraw-None-02691");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDraw-None-07888");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDraw-None-07888");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-02691", 2);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-07888", 2);
     vk::CmdDraw(m_commandBuffer->handle(), 1, 0, 0, 0);
     m_errorMonitor->VerifyFound();
 
@@ -297,14 +476,14 @@ TEST_F(NegativeGpuAV, DISABLED_DISABLED_UnnormalizedCoordinatesInBoundsAccess) {
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
-    //#version 450
+    // #version 450
     // layout (set = 0, binding = 0) uniform sampler2D tex[2];
     // layout(location=0) out vec4 color;
     //
     // void main() {
-    //    color = textureLodOffset(tex[1], vec2(0), 0, ivec2(0));
-    //}
-    // but with OpInBoundsAccessChain instead of normal generated OpAccessChain
+    //     color = textureLodOffset(tex[1], vec2(0), 0, ivec2(0));
+    // }
+    //  but with OpInBoundsAccessChain instead of normal generated OpAccessChain
     const char *fsSource = R"(
                OpCapability Shader
                OpCapability PhysicalStorageBufferAddresses
@@ -385,7 +564,7 @@ TEST_F(NegativeGpuAV, DISABLED_DISABLED_UnnormalizedCoordinatesInBoundsAccess) {
     vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe.pipeline_layout_.handle(), 0, 1,
                               &g_pipe.descriptor_set_->set_, 0, nullptr);
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDraw-None-08611");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-08611");
     vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
 
     m_commandBuffer->EndRenderPass();
@@ -489,7 +668,7 @@ TEST_F(NegativeGpuAV, DISABLED_DISABLED_UnnormalizedCoordinatesCopyObject) {
     vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe.pipeline_layout_.handle(), 0, 1,
                               &g_pipe.descriptor_set_->set_, 0, nullptr);
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDraw-None-08611");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-08611");
     vk::CmdDraw(m_commandBuffer->handle(), 1, 0, 0, 0);
     m_errorMonitor->VerifyFound();
 
@@ -576,8 +755,8 @@ TEST_F(NegativeGpuAV, DISABLED_UnnormalizedCoordinatesSeparateSamplerSharedSampl
     m_commandBuffer->EndRenderPass();
     m_commandBuffer->end();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDraw-None-08609");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDraw-None-08610");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-08609");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-08610");
     m_default_queue->Submit(*m_commandBuffer);
     m_default_queue->Wait();
     m_errorMonitor->VerifyFound();
@@ -688,7 +867,7 @@ TEST_F(NegativeGpuAV, DISABLED_ShareOpSampledImage) {
     m_commandBuffer->EndRenderPass();
     m_commandBuffer->end();
 
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDraw-None-08610");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-08610");
     m_default_queue->Submit(*m_commandBuffer);
     m_default_queue->Wait();
     m_errorMonitor->VerifyFound();
@@ -725,15 +904,9 @@ TEST_F(NegativeGpuAV, DISABLED_DISABLED_YcbcrDrawFetchIndexed) {
     }
 
     vkt::Image image(*m_device, ci, vkt::set_layout);
-
     vkt::SamplerYcbcrConversion conversion(*m_device, format);
     auto conversion_info = conversion.ConversionInfo();
-    auto ivci = vku::InitStruct<VkImageViewCreateInfo>(&conversion_info);
-    ivci.image = image.handle();
-    ivci.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    ivci.format = format;
-    ivci.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-    vkt::ImageView view(*m_device, ivci);
+    vkt::ImageView view = image.CreateView(VK_IMAGE_ASPECT_COLOR_BIT, &conversion_info);
 
     VkSamplerCreateInfo sampler_ci = SafeSaneSamplerCreateInfo();
     sampler_ci.pNext = &conversion_info;
@@ -782,7 +955,7 @@ TEST_F(NegativeGpuAV, DISABLED_DISABLED_YcbcrDrawFetchIndexed) {
     vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
     vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1,
                               &descriptor_set.set_, 0, nullptr);
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCmdDraw-None-06550");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-06550");
     vk::CmdDraw(m_commandBuffer->handle(), 1, 0, 0, 0);
     m_errorMonitor->VerifyFound();
     m_commandBuffer->EndRenderPass();
@@ -810,16 +983,8 @@ TEST_F(NegativeGpuAV, DISABLED_CopyBufferToImageD32) {
     ptr[4094] = 42.0f;
     copy_src_buffer.memory().unmap();
 
-    VkImageCreateInfo image_ci = vku::InitStructHelper();
-    image_ci.imageType = VK_IMAGE_TYPE_2D;
-    image_ci.format = VK_FORMAT_D32_SFLOAT;
-    image_ci.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-    image_ci.extent = {64, 64, 1};
-    image_ci.mipLevels = 1;
-    image_ci.arrayLayers = 1;
-    image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
-    image_ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    vkt::Image copy_dst_image(*m_device, image_ci, vkt::set_layout);
+    vkt::Image copy_dst_image(*m_device, 64, 64, 1, VK_FORMAT_D32_SFLOAT,
+                              VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
     copy_dst_image.SetLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
     m_commandBuffer->begin();
@@ -828,10 +993,7 @@ TEST_F(NegativeGpuAV, DISABLED_CopyBufferToImageD32) {
     buffer_image_copy_1.bufferOffset = 0;
     buffer_image_copy_1.bufferRowLength = 0;
     buffer_image_copy_1.bufferImageHeight = 0;
-    buffer_image_copy_1.imageSubresource.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-    buffer_image_copy_1.imageSubresource.mipLevel = 0;
-    buffer_image_copy_1.imageSubresource.baseArrayLayer = 0;
-    buffer_image_copy_1.imageSubresource.layerCount = 1;
+    buffer_image_copy_1.imageSubresource = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 0, 1};
     buffer_image_copy_1.imageOffset = {0, 0, 0};
     buffer_image_copy_1.imageExtent = {64, 64, 1};
 
@@ -846,8 +1008,8 @@ TEST_F(NegativeGpuAV, DISABLED_CopyBufferToImageD32) {
                              &buffer_image_copy_2);
 
     m_commandBuffer->end();
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "has a float value at offset 16376 that is not in the range [0, 1]");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "has a float value at offset 16376 that is not in the range [0, 1]");
+    m_errorMonitor->SetDesiredError("has a float value at offset 16376 that is not in the range [0, 1]");
+    m_errorMonitor->SetDesiredError("has a float value at offset 16376 that is not in the range [0, 1]");
     m_default_queue->Submit(*m_commandBuffer);
     m_default_queue->Wait();
     m_errorMonitor->VerifyFound();
@@ -875,16 +1037,8 @@ TEST_F(NegativeGpuAV, DISABLED_CopyBufferToImageD32Vk13) {
     ptr[4094] = 42.0f;
     copy_src_buffer.memory().unmap();
 
-    VkImageCreateInfo image_ci = vku::InitStructHelper();
-    image_ci.imageType = VK_IMAGE_TYPE_2D;
-    image_ci.format = VK_FORMAT_D32_SFLOAT;
-    image_ci.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-    image_ci.extent = {64, 64, 1};
-    image_ci.mipLevels = 1;
-    image_ci.arrayLayers = 1;
-    image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
-    image_ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    vkt::Image copy_dst_image(*m_device, image_ci, vkt::set_layout);
+    vkt::Image copy_dst_image(*m_device, 64, 64, 1, VK_FORMAT_D32_SFLOAT,
+                              VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
     copy_dst_image.SetLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
     m_commandBuffer->begin();
@@ -893,10 +1047,7 @@ TEST_F(NegativeGpuAV, DISABLED_CopyBufferToImageD32Vk13) {
     region_1.bufferOffset = 0;
     region_1.bufferRowLength = 0;
     region_1.bufferImageHeight = 0;
-    region_1.imageSubresource.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-    region_1.imageSubresource.mipLevel = 0;
-    region_1.imageSubresource.baseArrayLayer = 0;
-    region_1.imageSubresource.layerCount = 1;
+    region_1.imageSubresource = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 0, 1};
     region_1.imageOffset = {0, 0, 0};
     region_1.imageExtent = {64, 64, 1};
 
@@ -915,8 +1066,8 @@ TEST_F(NegativeGpuAV, DISABLED_CopyBufferToImageD32Vk13) {
     vk::CmdCopyBufferToImage2(*m_commandBuffer, &buffer_image_copy);
 
     m_commandBuffer->end();
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "has a float value at offset 16376 that is not in the range [0, 1]");
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "has a float value at offset 16376 that is not in the range [0, 1]");
+    m_errorMonitor->SetDesiredError("has a float value at offset 16376 that is not in the range [0, 1]");
+    m_errorMonitor->SetDesiredError("has a float value at offset 16376 that is not in the range [0, 1]");
     m_default_queue->Submit(*m_commandBuffer);
     m_default_queue->Wait();
     m_errorMonitor->VerifyFound();
@@ -948,16 +1099,8 @@ TEST_F(NegativeGpuAV, DISABLED_CopyBufferToImageD32U8) {
 
     copy_src_buffer.memory().unmap();
 
-    VkImageCreateInfo image_ci = vku::InitStructHelper();
-    image_ci.imageType = VK_IMAGE_TYPE_2D;
-    image_ci.format = VK_FORMAT_D32_SFLOAT_S8_UINT;
-    image_ci.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-    image_ci.extent = {64, 64, 1};
-    image_ci.mipLevels = 1;
-    image_ci.arrayLayers = 1;
-    image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
-    image_ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    vkt::Image copy_dst_image(*m_device, image_ci, vkt::set_layout);
+    vkt::Image copy_dst_image(*m_device, 64, 64, 1, VK_FORMAT_D32_SFLOAT_S8_UINT,
+                              VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
     copy_dst_image.SetLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
     m_commandBuffer->begin();
@@ -966,10 +1109,7 @@ TEST_F(NegativeGpuAV, DISABLED_CopyBufferToImageD32U8) {
     buffer_image_copy.bufferOffset = 0;
     buffer_image_copy.bufferRowLength = 0;
     buffer_image_copy.bufferImageHeight = 0;
-    buffer_image_copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-    buffer_image_copy.imageSubresource.mipLevel = 0;
-    buffer_image_copy.imageSubresource.baseArrayLayer = 0;
-    buffer_image_copy.imageSubresource.layerCount = 1;
+    buffer_image_copy.imageSubresource = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 0, 1};
     buffer_image_copy.imageOffset = {33, 33, 0};
     buffer_image_copy.imageExtent = {31, 31, 1};
 
@@ -977,7 +1117,7 @@ TEST_F(NegativeGpuAV, DISABLED_CopyBufferToImageD32U8) {
                              &buffer_image_copy);
 
     m_commandBuffer->end();
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "has a float value at offset 20475 that is not in the range [0, 1]");
+    m_errorMonitor->SetDesiredError("has a float value at offset 20475 that is not in the range [0, 1]");
     m_default_queue->Submit(*m_commandBuffer);
     m_default_queue->Wait();
     m_errorMonitor->VerifyFound();
@@ -1010,16 +1150,8 @@ TEST_F(NegativeGpuAV, DISABLED_CopyBufferToImageD32U8Vk13) {
 
     copy_src_buffer.memory().unmap();
 
-    VkImageCreateInfo image_ci = vku::InitStructHelper();
-    image_ci.imageType = VK_IMAGE_TYPE_2D;
-    image_ci.format = VK_FORMAT_D32_SFLOAT_S8_UINT;
-    image_ci.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-    image_ci.extent = {64, 64, 1};
-    image_ci.mipLevels = 1;
-    image_ci.arrayLayers = 1;
-    image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
-    image_ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    vkt::Image copy_dst_image(*m_device, image_ci, vkt::set_layout);
+    vkt::Image copy_dst_image(*m_device, 64, 64, 1, VK_FORMAT_D32_SFLOAT_S8_UINT,
+                              VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
     copy_dst_image.SetLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
     m_commandBuffer->begin();
@@ -1028,10 +1160,7 @@ TEST_F(NegativeGpuAV, DISABLED_CopyBufferToImageD32U8Vk13) {
     region_1.bufferOffset = 0;
     region_1.bufferRowLength = 0;
     region_1.bufferImageHeight = 0;
-    region_1.imageSubresource.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-    region_1.imageSubresource.mipLevel = 0;
-    region_1.imageSubresource.baseArrayLayer = 0;
-    region_1.imageSubresource.layerCount = 1;
+    region_1.imageSubresource = {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 0, 1};
     region_1.imageOffset = {33, 33, 0};
     region_1.imageExtent = {31, 31, 1};
 
@@ -1045,7 +1174,7 @@ TEST_F(NegativeGpuAV, DISABLED_CopyBufferToImageD32U8Vk13) {
     vk::CmdCopyBufferToImage2(*m_commandBuffer, &buffer_image_copy);
 
     m_commandBuffer->end();
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "has a float value at offset 20475 that is not in the range [0, 1]");
+    m_errorMonitor->SetDesiredError("has a float value at offset 20475 that is not in the range [0, 1]");
     m_default_queue->Submit(*m_commandBuffer);
     m_default_queue->Wait();
     m_errorMonitor->VerifyFound();

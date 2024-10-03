@@ -18,7 +18,8 @@
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
 #include "../framework/descriptor_helper.h"
-#include "../framework/gpu_av_helper.h"
+
+class NegativeGpuAVSpirv : public GpuAVTest {};
 
 // https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/7462
 TEST_F(NegativeGpuAVSpirv, DISABLED_LoopHeaderPhi) {

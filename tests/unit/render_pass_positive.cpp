@@ -16,6 +16,8 @@
 #include "../framework/descriptor_helper.h"
 #include "../framework/render_pass_helper.h"
 
+class PositiveRenderPass : public VkLayerTest {};
+
 TEST_F(PositiveRenderPass, AttachmentUsedTwiceOK) {
     TEST_DESCRIPTION("Attachment is used simultaneously as color and input, with the same layout. This is OK.");
 
@@ -46,20 +48,7 @@ TEST_F(PositiveRenderPass, InitialLayoutUndefined) {
     // A compatible framebuffer.
     vkt::Image image(*m_device, 32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
-
-    VkImageViewCreateInfo ivci = {
-        VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-        nullptr,
-        0,
-        image.handle(),
-        VK_IMAGE_VIEW_TYPE_2D,
-        VK_FORMAT_R8G8B8A8_UNORM,
-        {VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
-         VK_COMPONENT_SWIZZLE_IDENTITY},
-        {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1},
-    };
-
-    vkt::ImageView view(*m_device, ivci);
+    vkt::ImageView view = image.CreateView();
     vkt::Framebuffer fb(*m_device, rp.Handle(), 1, &view.handle());
 
     // Record a single command buffer which uses this renderpass twice. The
@@ -222,23 +211,11 @@ TEST_F(PositiveRenderPass, BeginStencilLoadOp) {
                                  VK_ACCESS_TRANSFER_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, 0,
                                  VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
     VkImageCopy cregion;
-    cregion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
-    cregion.srcSubresource.mipLevel = 0;
-    cregion.srcSubresource.baseArrayLayer = 0;
-    cregion.srcSubresource.layerCount = 1;
-    cregion.srcOffset.x = 0;
-    cregion.srcOffset.y = 0;
-    cregion.srcOffset.z = 0;
-    cregion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
-    cregion.dstSubresource.mipLevel = 0;
-    cregion.dstSubresource.baseArrayLayer = 0;
-    cregion.dstSubresource.layerCount = 1;
-    cregion.dstOffset.x = 0;
-    cregion.dstOffset.y = 0;
-    cregion.dstOffset.z = 0;
-    cregion.extent.width = 100;
-    cregion.extent.height = 100;
-    cregion.extent.depth = 1;
+    cregion.srcSubresource = {VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT, 0, 0, 1};
+    cregion.srcOffset = {0, 0, 0};
+    cregion.dstSubresource = {VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT, 0, 0, 1};
+    cregion.dstOffset = {0, 0, 0};
+    cregion.extent = {100, 100, 1};
     vk::CmdCopyImage(cmdbuf.handle(), m_depthStencil->handle(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, destImage.handle(),
                      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &cregion);
     cmdbuf.end();
@@ -286,19 +263,7 @@ TEST_F(PositiveRenderPass, BeginDepthStencilLayoutTransitionFromUndefined) {
     // A compatible ds image.
     vkt::Image image(*m_device, 32, 32, 1, depth_format, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
     image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
-
-    VkImageViewCreateInfo ivci = {
-        VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-        nullptr,
-        0,
-        image.handle(),
-        VK_IMAGE_VIEW_TYPE_2D,
-        depth_format,
-        {VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
-         VK_COMPONENT_SWIZZLE_IDENTITY},
-        {VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1},
-    };
-    vkt::ImageView view(*m_device, ivci);
+    vkt::ImageView view = image.CreateView(VK_IMAGE_ASPECT_DEPTH_BIT);
     vkt::Framebuffer fb(*m_device, rp.Handle(), 1, &view.handle());
 
     m_commandBuffer->begin();
@@ -401,16 +366,7 @@ TEST_F(PositiveRenderPass, ImagelessFramebufferNonZeroBaseMip) {
     image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
     image_ci.format = formats[0];
     vkt::Image image(*m_device, image_ci, vkt::set_layout);
-
-    VkImageViewCreateInfo image_view_ci = vku::InitStructHelper();
-    image_view_ci.image = image;
-    image_view_ci.viewType = VK_IMAGE_VIEW_TYPE_1D_ARRAY;
-    image_view_ci.format = formats[0];
-    image_view_ci.subresourceRange.layerCount = 1;
-    image_view_ci.subresourceRange.levelCount = 1;
-    image_view_ci.subresourceRange.baseMipLevel = base_mip;
-    image_view_ci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    vkt::ImageView image_view_obj(*m_device, image_view_ci);
+    vkt::ImageView image_view_obj = image.CreateView(VK_IMAGE_VIEW_TYPE_1D_ARRAY, base_mip, 1, 0, 1);
     VkImageView image_view = image_view_obj.handle();
 
     VkRenderPassAttachmentBeginInfoKHR rp_attachment_begin_info = vku::InitStructHelper();
@@ -550,21 +506,9 @@ TEST_F(PositiveRenderPass, SingleMipTransition) {
     const vkt::PipelineLayout pipeline_layout(*m_device, {&pipeline_dsl});
     OneOffDescriptorSet descriptor_set(m_device, binding_defs);
 
-    VkDescriptorImageInfo image_info = {
-        sampler.handle(),
-        fullViews[1],
-        VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
-    };
-
-    VkWriteDescriptorSet descriptor_writes[1] = {};
-    descriptor_writes[0] = vku::InitStructHelper();
-    descriptor_writes[0].dstSet = descriptor_set.set_;
-    descriptor_writes[0].dstBinding = 2;
-    descriptor_writes[0].descriptorCount = 1;
-    descriptor_writes[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    descriptor_writes[0].pImageInfo = &image_info;
-
-    // Create Pipeline.
+    descriptor_set.WriteDescriptorImageInfo(2, fullViews[1], sampler, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                                            VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL);
+    descriptor_set.UpdateDescriptorSets();
 
     VkPipelineDepthStencilStateCreateInfo ds_ci = {};
     ds_ci.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
@@ -582,15 +526,10 @@ TEST_F(PositiveRenderPass, SingleMipTransition) {
 
     m_commandBuffer->begin();
     m_commandBuffer->BeginRenderPass(rp.Handle(), fb.handle(), 32, 32);
-
-    vk::UpdateDescriptorSets(device(), 1, descriptor_writes, 0, nullptr);
-
     vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1,
                               &descriptor_set.set_, 0, NULL);
-
     vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
     vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
-
     m_commandBuffer->EndRenderPass();
 
     // At this point the first miplevel should be in GENERAL due to the "finalLayout" in the render pass.
@@ -675,16 +614,7 @@ TEST_F(PositiveRenderPass, BeginWithViewMasks) {
     // A compatible framebuffer.
     vkt::Image image(*m_device, 32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
-
-    VkImageViewCreateInfo ivci = vku::InitStructHelper();
-    ivci.image = image.handle();
-    ivci.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    ivci.format = VK_FORMAT_R8G8B8A8_UNORM;
-    ivci.components = {VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
-                       VK_COMPONENT_SWIZZLE_IDENTITY};
-    ivci.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-
-    vkt::ImageView view(*m_device, ivci);
+    vkt::ImageView view = image.CreateView();
     vkt::Framebuffer fb(*m_device, render_pass.handle(), 1, &view.handle());
 
     VkDescriptorSetLayoutBinding dsl_binding = {};
@@ -829,13 +759,7 @@ TEST_F(PositiveRenderPass, QueriesInMultiview) {
     image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
     image_ci.format = VK_FORMAT_R8G8B8A8_UNORM;
     vkt::Image image(*m_device, image_ci, vkt::set_layout);
-
-    VkImageViewCreateInfo ivci = vku::InitStructHelper();
-    ivci.image = image.handle();
-    ivci.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
-    ivci.format = VK_FORMAT_R8G8B8A8_UNORM;
-    ivci.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 3};
-    vkt::ImageView view(*m_device, ivci);
+    vkt::ImageView view = image.CreateView(VK_IMAGE_VIEW_TYPE_2D_ARRAY, 0, 1, 0, 3);
     VkImageView image_view_handle = view.handle();
 
     vkt::Framebuffer fb(*m_device, rp.Handle(), 1, &image_view_handle);
@@ -1122,18 +1046,7 @@ TEST_F(PositiveRenderPass, SubpassWithReadOnlyLayoutWithoutDependency) {
     // A compatible framebuffer.
     vkt::Image image(*m_device, 32, 32, 1, depth_format, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
     image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
-
-    VkImageViewCreateInfo ivci = {VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-                                  nullptr,
-                                  0,
-                                  image.handle(),
-                                  VK_IMAGE_VIEW_TYPE_2D,
-                                  depth_format,
-                                  {VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
-                                   VK_COMPONENT_SWIZZLE_IDENTITY},
-                                  {VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT, 0, 1, 0, 1}};
-
-    vkt::ImageView view(*m_device, ivci);
+    vkt::ImageView view = image.CreateView(VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
     std::array<VkImageView, size> views = {{view.handle(), view.handle()}};
 
     vkt::Framebuffer fb(*m_device, rp.handle(), size, views.data());
@@ -1433,4 +1346,22 @@ TEST_F(PositiveRenderPass, BeginRenderPassWithRenderPassStriped) {
     submit_info.pCommandBufferInfos = &cb_submit_info;
     vk::QueueSubmit2KHR(m_default_queue->handle(), 1, &submit_info, VK_NULL_HANDLE);
     m_default_queue->Wait();
+}
+
+TEST_F(PositiveRenderPass, NestedCommandBuffersFeatureMaintenance7) {
+    TEST_DESCRIPTION(
+        "Use VK_SUBPASS_CONTENTS_INLINE_AND_SECONDARY_COMMAND_BUFFERS_KHR with maintenance7, but not nextedCommandBuffers is not "
+        "enabled");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_EXT_NESTED_COMMAND_BUFFER_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_7_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::maintenance7);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    m_commandBuffer->begin();
+    vk::CmdBeginRenderPass(m_commandBuffer->handle(), &m_renderPassBeginInfo,
+                           VK_SUBPASS_CONTENTS_INLINE_AND_SECONDARY_COMMAND_BUFFERS_KHR);
+    vk::CmdEndRenderPass(m_commandBuffer->handle());
+    m_commandBuffer->end();
 }

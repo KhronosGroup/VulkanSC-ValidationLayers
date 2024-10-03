@@ -14,6 +14,7 @@
 ** limitations under the License.
 */
 
+#include <algorithm>
 #include "test_icd.h"
 #include "test_icd_helper.h"
 #include <vulkan/utility/vk_format_utils.h>
@@ -2241,5 +2242,35 @@ static VKAPI_ATTR VkResult VKAPI_CALL RegisterDisplayEventEXT(VkDevice device, V
     *pFence = (VkFence)global_unique_handle++;
     return VK_SUCCESS;
 }
+
+#ifndef VULKANSC  // Vulkan SC does not support VK_KHR_pipeline_binary
+
+static VKAPI_ATTR VkResult VKAPI_CALL CreatePipelineBinariesKHR(VkDevice device, const VkPipelineBinaryCreateInfoKHR* pCreateInfo,
+                                                                const VkAllocationCallbacks* pAllocator,
+                                                                VkPipelineBinaryHandlesInfoKHR* pBinaries) {
+    unique_lock_t lock(global_lock);
+
+    pBinaries->pipelineBinaryCount = 1;
+
+    if (pBinaries->pPipelineBinaries != nullptr) {
+        pBinaries->pPipelineBinaries[0] = (VkPipelineBinaryKHR)global_unique_handle++;
+    }
+
+    return VK_SUCCESS;
+}
+
+static VKAPI_ATTR VkResult VKAPI_CALL GetPipelineBinaryDataKHR(VkDevice device, const VkPipelineBinaryDataInfoKHR* pInfo,
+                                                               VkPipelineBinaryKeyKHR* pPipelineBinaryKey,
+                                                               size_t* pPipelineBinaryDataSize, void* pPipelineBinaryData) {
+    *pPipelineBinaryDataSize = 1;
+
+    if (pPipelineBinaryData != nullptr) {
+        *reinterpret_cast<uint8_t*>(pPipelineBinaryData) = 0x01;
+    }
+
+    return VK_SUCCESS;
+}
+
+#endif  // VULKANSC
 
 }  // namespace icd

@@ -12,12 +12,11 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "utils/cast_utils.h"
-#include "generated/enum_flag_bits.h"
 #include "../framework/layer_validation_tests.h"
 #include "../framework/descriptor_helper.h"
 #include "../framework/pipeline_helper.h"
-#include "utils/vk_layer_utils.h"
+
+class NegativeYcbcr : public YcbcrTest {};
 
 TEST_F(NegativeYcbcr, Sampler) {
     TEST_DESCRIPTION("Verify YCbCr sampler creation.");
@@ -423,10 +422,6 @@ TEST_F(NegativeYcbcr, CopyImageSinglePlane422Alignment) {
     ci.mipLevels = 1;
     ci.arrayLayers = 1;
     ci.samples = VK_SAMPLE_COUNT_1_BIT;
-    ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    ci.queueFamilyIndexCount = 0;
-    ci.pQueueFamilyIndices = NULL;
-    ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
     // Verify formats
     VkFormatFeatureFlags features = VK_FORMAT_FEATURE_TRANSFER_SRC_BIT | VK_FORMAT_FEATURE_TRANSFER_DST_BIT;
@@ -448,11 +443,8 @@ TEST_F(NegativeYcbcr, CopyImageSinglePlane422Alignment) {
 
     VkImageCopy copy_region;
     copy_region.extent = {48, 48, 1};
-    copy_region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    copy_region.srcSubresource.mipLevel = 0;
-    copy_region.srcSubresource.baseArrayLayer = 0;
-    copy_region.srcSubresource.layerCount = 1;
-    copy_region.dstSubresource = copy_region.srcSubresource;
+    copy_region.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    copy_region.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
     copy_region.srcOffset = {0, 0, 0};
     copy_region.dstOffset = {0, 0, 0};
 
@@ -509,10 +501,6 @@ TEST_F(NegativeYcbcr, CopyImageMultiplaneAspectBits) {
     ci.mipLevels = 1;
     ci.arrayLayers = 1;
     ci.samples = VK_SAMPLE_COUNT_1_BIT;
-    ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    ci.queueFamilyIndexCount = 0;
-    ci.pQueueFamilyIndices = NULL;
-    ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
     // Verify formats
     VkFormatFeatureFlags features = VK_FORMAT_FEATURE_TRANSFER_SRC_BIT | VK_FORMAT_FEATURE_TRANSFER_DST_BIT;
@@ -539,14 +527,8 @@ TEST_F(NegativeYcbcr, CopyImageMultiplaneAspectBits) {
 
     VkImageCopy copy_region;
     copy_region.extent = {128, 128, 1};
-    copy_region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_PLANE_2_BIT_KHR;
-    copy_region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_PLANE_2_BIT_KHR;
-    copy_region.srcSubresource.mipLevel = 0;
-    copy_region.dstSubresource.mipLevel = 0;
-    copy_region.srcSubresource.baseArrayLayer = 0;
-    copy_region.dstSubresource.baseArrayLayer = 0;
-    copy_region.srcSubresource.layerCount = 1;
-    copy_region.dstSubresource.layerCount = 1;
+    copy_region.srcSubresource = {VK_IMAGE_ASPECT_PLANE_2_BIT_KHR, 0, 0, 1};
+    copy_region.dstSubresource = {VK_IMAGE_ASPECT_PLANE_2_BIT_KHR, 0, 0, 1};
     copy_region.srcOffset = {0, 0, 0};
     copy_region.dstOffset = {0, 0, 0};
 
@@ -694,17 +676,7 @@ TEST_F(NegativeYcbcr, WriteDescriptorSet) {
 
     VkSamplerYcbcrConversionInfo ycbcr_info = vku::InitStructHelper();
     ycbcr_info.conversion = conversion.handle();
-
-    VkImageViewCreateInfo image_view_create_info = vku::InitStructHelper(&ycbcr_info);
-    image_view_create_info.image = image_obj.handle();
-    image_view_create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    image_view_create_info.format = mp_format;
-    image_view_create_info.subresourceRange.layerCount = 1;
-    image_view_create_info.subresourceRange.baseMipLevel = 0;
-    image_view_create_info.subresourceRange.levelCount = 1;
-    image_view_create_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    vkt::ImageView image_view(*m_device, image_view_create_info);
-
+    vkt::ImageView image_view = image_obj.CreateView(VK_IMAGE_ASPECT_COLOR_BIT, &ycbcr_info);
     descriptor_set.WriteDescriptorImageInfo(0, image_view.handle(), VK_NULL_HANDLE, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE);
 
     m_errorMonitor->SetDesiredError("VUID-VkWriteDescriptorSet-descriptorType-01946");
@@ -726,8 +698,6 @@ TEST_F(NegativeYcbcr, MultiplaneImageLayoutAspectFlags) {
     ci.samples = VK_SAMPLE_COUNT_1_BIT;
     ci.tiling = VK_IMAGE_TILING_LINEAR;
     ci.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-    ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
     // Verify formats
     bool supported = ImageFormatIsSupported(instance(), gpu(), ci, VK_FORMAT_FEATURE_TRANSFER_SRC_BIT);
@@ -1345,8 +1315,6 @@ TEST_F(NegativeYcbcr, MultiplaneIncompatibleViewFormat) {
     ci.mipLevels = 1;
     ci.arrayLayers = 1;
     ci.samples = VK_SAMPLE_COUNT_1_BIT;
-    ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
     const VkFormatFeatureFlags features = VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT;
     bool supported = ImageFormatIsSupported(instance(), gpu(), ci, features);
@@ -1443,8 +1411,6 @@ TEST_F(NegativeYcbcr, MultiplaneImageViewAspectMasks) {
     ci.mipLevels = 1;
     ci.arrayLayers = 1;
     ci.samples = VK_SAMPLE_COUNT_1_BIT;
-    ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
     VkImageViewCreateInfo ivci = vku::InitStructHelper();
     ivci.viewType = VK_IMAGE_VIEW_TYPE_2D;
@@ -1645,12 +1611,7 @@ TEST_F(NegativeYcbcr, DrawFetch) {
 
     vkt::SamplerYcbcrConversion conversion(*m_device, format);
     auto conversion_info = conversion.ConversionInfo();
-    auto ivci = vku::InitStruct<VkImageViewCreateInfo>(&conversion_info);
-    ivci.image = image.handle();
-    ivci.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    ivci.format = format;
-    ivci.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-    vkt::ImageView view(*m_device, ivci);
+    vkt::ImageView view = image.CreateView(VK_IMAGE_ASPECT_COLOR_BIT, &conversion_info);
 
     VkSamplerCreateInfo sampler_ci = SafeSaneSamplerCreateInfo();
     sampler_ci.pNext = &conversion_info;
@@ -1719,12 +1680,7 @@ TEST_F(NegativeYcbcr, DrawConstOffset) {
 
     vkt::SamplerYcbcrConversion conversion(*m_device, format);
     auto conversion_info = conversion.ConversionInfo();
-    auto ivci = vku::InitStruct<VkImageViewCreateInfo>(&conversion_info);
-    ivci.image = image.handle();
-    ivci.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    ivci.format = format;
-    ivci.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-    vkt::ImageView view(*m_device, ivci);
+    vkt::ImageView view = image.CreateView(VK_IMAGE_ASPECT_COLOR_BIT, &conversion_info);
 
     VkSamplerCreateInfo sampler_ci = SafeSaneSamplerCreateInfo();
     sampler_ci.pNext = &conversion_info;

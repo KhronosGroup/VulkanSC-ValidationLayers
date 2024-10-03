@@ -3015,11 +3015,11 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
             if (is_const_param) {
                 [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkSubpassDescriptionDepthStencilResolve);
                 VkSubpassDescriptionDepthStencilResolve* structure = (VkSubpassDescriptionDepthStencilResolve*)header;
-                skip |= ValidateStructType(pNext_loc.dot(Field::pDepthStencilResolveAttachment),
-                                           "VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2", structure->pDepthStencilResolveAttachment,
-                                           VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2, false,
-                                           "VUID-VkSubpassDescriptionDepthStencilResolve-pDepthStencilResolveAttachment-parameter",
-                                           "VUID-VkAttachmentReference2-sType-sType");
+                skip |=
+                    ValidateStructType(pNext_loc.dot(Field::pDepthStencilResolveAttachment),
+                                       structure->pDepthStencilResolveAttachment, VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2, false,
+                                       "VUID-VkSubpassDescriptionDepthStencilResolve-pDepthStencilResolveAttachment-parameter",
+                                       "VUID-VkAttachmentReference2-sType-sType");
 
                 if (structure->pDepthStencilResolveAttachment != nullptr) {
                     [[maybe_unused]] const Location pDepthStencilResolveAttachment_loc =
@@ -3102,8 +3102,8 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkFramebufferAttachmentsCreateInfo* structure = (VkFramebufferAttachmentsCreateInfo*)header;
                 skip |= ValidateStructTypeArray(
                     pNext_loc.dot(Field::attachmentImageInfoCount), pNext_loc.dot(Field::pAttachmentImageInfos),
-                    "VK_STRUCTURE_TYPE_FRAMEBUFFER_ATTACHMENT_IMAGE_INFO", structure->attachmentImageInfoCount,
-                    structure->pAttachmentImageInfos, VK_STRUCTURE_TYPE_FRAMEBUFFER_ATTACHMENT_IMAGE_INFO, false, true,
+                    structure->attachmentImageInfoCount, structure->pAttachmentImageInfos,
+                    VK_STRUCTURE_TYPE_FRAMEBUFFER_ATTACHMENT_IMAGE_INFO, false, true,
                     "VUID-VkFramebufferAttachmentImageInfo-sType-sType",
                     "VUID-VkFramebufferAttachmentsCreateInfo-pAttachmentImageInfos-parameter", kVUIDUndefined);
 
@@ -3526,9 +3526,8 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkDeviceObjectReservationCreateInfo* structure = (VkDeviceObjectReservationCreateInfo*)header;
                 skip |= ValidateStructTypeArray(
                     pNext_loc.dot(Field::pipelineCacheCreateInfoCount), pNext_loc.dot(Field::pPipelineCacheCreateInfos),
-                    "VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO", structure->pipelineCacheCreateInfoCount,
-                    structure->pPipelineCacheCreateInfos, VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO, false, true,
-                    "VUID-VkPipelineCacheCreateInfo-sType-sType",
+                    structure->pipelineCacheCreateInfoCount, structure->pPipelineCacheCreateInfos,
+                    VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO, false, true, "VUID-VkPipelineCacheCreateInfo-sType-sType",
                     "VUID-VkDeviceObjectReservationCreateInfo-pPipelineCacheCreateInfos-parameter", kVUIDUndefined);
 
                 if (structure->pPipelineCacheCreateInfos != nullptr) {
@@ -3552,8 +3551,8 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
 
                 skip |= ValidateStructTypeArray(
                     pNext_loc.dot(Field::pipelinePoolSizeCount), pNext_loc.dot(Field::pPipelinePoolSizes),
-                    "VK_STRUCTURE_TYPE_PIPELINE_POOL_SIZE", structure->pipelinePoolSizeCount, structure->pPipelinePoolSizes,
-                    VK_STRUCTURE_TYPE_PIPELINE_POOL_SIZE, false, true, "VUID-VkPipelinePoolSize-sType-sType",
+                    structure->pipelinePoolSizeCount, structure->pPipelinePoolSizes, VK_STRUCTURE_TYPE_PIPELINE_POOL_SIZE, false,
+                    true, "VUID-VkPipelinePoolSize-sType-sType",
                     "VUID-VkDeviceObjectReservationCreateInfo-pPipelinePoolSizes-parameter", kVUIDUndefined);
 
                 if (structure->pPipelinePoolSizes != nullptr) {
@@ -3575,9 +3574,9 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 [[maybe_unused]] const Location pNext_loc = loc.pNext(Struct::VkFaultCallbackInfo);
                 VkFaultCallbackInfo* structure = (VkFaultCallbackInfo*)header;
                 skip |= ValidateStructTypeArray(pNext_loc.dot(Field::faultCount), pNext_loc.dot(Field::pFaults),
-                                                "VK_STRUCTURE_TYPE_FAULT_DATA", structure->faultCount, structure->pFaults,
-                                                VK_STRUCTURE_TYPE_FAULT_DATA, false, false, "VUID-VkFaultData-sType-sType",
-                                                "VUID-VkFaultCallbackInfo-pFaults-parameter", kVUIDUndefined);
+                                                structure->faultCount, structure->pFaults, VK_STRUCTURE_TYPE_FAULT_DATA, false,
+                                                false, "VUID-VkFaultData-sType-sType", "VUID-VkFaultCallbackInfo-pFaults-parameter",
+                                                kVUIDUndefined);
 
                 if (structure->pFaults != nullptr) {
                     for (uint32_t faultIndex = 0; faultIndex < structure->faultCount; ++faultIndex) {
@@ -3763,11 +3762,11 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                                      "extended struct requires the extensions VK_KHR_fragment_shading_rate");
                 }
                 VkFragmentShadingRateAttachmentInfoKHR* structure = (VkFragmentShadingRateAttachmentInfoKHR*)header;
-                skip |= ValidateStructType(pNext_loc.dot(Field::pFragmentShadingRateAttachment),
-                                           "VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2", structure->pFragmentShadingRateAttachment,
-                                           VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2, false,
-                                           "VUID-VkFragmentShadingRateAttachmentInfoKHR-pFragmentShadingRateAttachment-parameter",
-                                           "VUID-VkAttachmentReference2-sType-sType");
+                skip |=
+                    ValidateStructType(pNext_loc.dot(Field::pFragmentShadingRateAttachment),
+                                       structure->pFragmentShadingRateAttachment, VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2, false,
+                                       "VUID-VkFragmentShadingRateAttachmentInfoKHR-pFragmentShadingRateAttachment-parameter",
+                                       "VUID-VkAttachmentReference2-sType-sType");
 
                 if (structure->pFragmentShadingRateAttachment != nullptr) {
                     [[maybe_unused]] const Location pFragmentShadingRateAttachment_loc =
@@ -4001,7 +4000,6 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                             pNext_loc.dot(Field::pAttachmentInitialSampleLocations, attachmentInitialSampleLocationsIndex);
                         skip |=
                             ValidateStructType(pAttachmentInitialSampleLocations_loc.dot(Field::sampleLocationsInfo),
-                                               "VK_STRUCTURE_TYPE_SAMPLE_LOCATIONS_INFO_EXT",
                                                &(structure->pAttachmentInitialSampleLocations[attachmentInitialSampleLocationsIndex]
                                                      .sampleLocationsInfo),
                                                VK_STRUCTURE_TYPE_SAMPLE_LOCATIONS_INFO_EXT, false, kVUIDUndefined,
@@ -4043,7 +4041,6 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                             pNext_loc.dot(Field::pPostSubpassSampleLocations, postSubpassSampleLocationsIndex);
                         skip |= ValidateStructType(
                             pPostSubpassSampleLocations_loc.dot(Field::sampleLocationsInfo),
-                            "VK_STRUCTURE_TYPE_SAMPLE_LOCATIONS_INFO_EXT",
                             &(structure->pPostSubpassSampleLocations[postSubpassSampleLocationsIndex].sampleLocationsInfo),
                             VK_STRUCTURE_TYPE_SAMPLE_LOCATIONS_INFO_EXT, false, kVUIDUndefined,
                             "VUID-VkSampleLocationsInfoEXT-sType-sType");
@@ -4084,9 +4081,9 @@ bool StatelessValidation::ValidatePnextStructContents(const Location& loc, const
                 VkPipelineSampleLocationsStateCreateInfoEXT* structure = (VkPipelineSampleLocationsStateCreateInfoEXT*)header;
                 skip |= ValidateBool32(pNext_loc.dot(Field::sampleLocationsEnable), structure->sampleLocationsEnable);
 
-                skip |= ValidateStructType(pNext_loc.dot(Field::sampleLocationsInfo), "VK_STRUCTURE_TYPE_SAMPLE_LOCATIONS_INFO_EXT",
-                                           &(structure->sampleLocationsInfo), VK_STRUCTURE_TYPE_SAMPLE_LOCATIONS_INFO_EXT, false,
-                                           kVUIDUndefined, "VUID-VkSampleLocationsInfoEXT-sType-sType");
+                skip |= ValidateStructType(pNext_loc.dot(Field::sampleLocationsInfo), &(structure->sampleLocationsInfo),
+                                           VK_STRUCTURE_TYPE_SAMPLE_LOCATIONS_INFO_EXT, false, kVUIDUndefined,
+                                           "VUID-VkSampleLocationsInfoEXT-sType-sType");
 
                 skip |= ValidateArray(pNext_loc.dot(Field::sampleLocationsCount), pNext_loc.dot(Field::pSampleLocations),
                                       structure->sampleLocationsInfo.sampleLocationsCount,
@@ -4348,9 +4345,8 @@ bool StatelessValidation::PreCallValidateCreateInstance(const VkInstanceCreateIn
                                                         const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), "VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO", pCreateInfo,
-                               VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO, true, "VUID-vkCreateInstance-pCreateInfo-parameter",
-                               "VUID-VkInstanceCreateInfo-sType-sType");
+    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), pCreateInfo, VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO, true,
+                               "VUID-vkCreateInstance-pCreateInfo-parameter", "VUID-VkInstanceCreateInfo-sType-sType");
     if (pCreateInfo != nullptr) {
         [[maybe_unused]] const Location pCreateInfo_loc = loc.dot(Field::pCreateInfo);
         constexpr std::array allowed_structs_VkInstanceCreateInfo = {VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
@@ -4364,8 +4360,8 @@ bool StatelessValidation::PreCallValidateCreateInstance(const VkInstanceCreateIn
         skip |= ValidateReservedFlags(pCreateInfo_loc.dot(Field::flags), pCreateInfo->flags,
                                       "VUID-VkInstanceCreateInfo-flags-zerobitmask");
 
-        skip |= ValidateStructType(pCreateInfo_loc.dot(Field::pApplicationInfo), "VK_STRUCTURE_TYPE_APPLICATION_INFO",
-                                   pCreateInfo->pApplicationInfo, VK_STRUCTURE_TYPE_APPLICATION_INFO, false,
+        skip |= ValidateStructType(pCreateInfo_loc.dot(Field::pApplicationInfo), pCreateInfo->pApplicationInfo,
+                                   VK_STRUCTURE_TYPE_APPLICATION_INFO, false,
                                    "VUID-VkInstanceCreateInfo-pApplicationInfo-parameter", "VUID-VkApplicationInfo-sType-sType");
 
         if (pCreateInfo->pApplicationInfo != nullptr) {
@@ -4526,9 +4522,8 @@ bool StatelessValidation::PreCallValidateCreateDevice(VkPhysicalDevice physicalD
                                                       const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), "VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO", pCreateInfo,
-                               VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO, true, "VUID-vkCreateDevice-pCreateInfo-parameter",
-                               "VUID-VkDeviceCreateInfo-sType-sType");
+    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), pCreateInfo, VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO, true,
+                               "VUID-vkCreateDevice-pCreateInfo-parameter", "VUID-VkDeviceCreateInfo-sType-sType");
     if (pCreateInfo != nullptr) {
         [[maybe_unused]] const Location pCreateInfo_loc = loc.dot(Field::pCreateInfo);
         constexpr std::array allowed_structs_VkDeviceCreateInfo = {
@@ -4614,9 +4609,9 @@ bool StatelessValidation::PreCallValidateCreateDevice(VkPhysicalDevice physicalD
 
         skip |= ValidateStructTypeArray(
             pCreateInfo_loc.dot(Field::queueCreateInfoCount), pCreateInfo_loc.dot(Field::pQueueCreateInfos),
-            "VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO", pCreateInfo->queueCreateInfoCount, pCreateInfo->pQueueCreateInfos,
-            VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO, true, true, "VUID-VkDeviceQueueCreateInfo-sType-sType",
-            "VUID-VkDeviceCreateInfo-pQueueCreateInfos-parameter", "VUID-VkDeviceCreateInfo-queueCreateInfoCount-arraylength");
+            pCreateInfo->queueCreateInfoCount, pCreateInfo->pQueueCreateInfos, VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO, true,
+            true, "VUID-VkDeviceQueueCreateInfo-sType-sType", "VUID-VkDeviceCreateInfo-pQueueCreateInfos-parameter",
+            "VUID-VkDeviceCreateInfo-queueCreateInfoCount-arraylength");
 
         if (pCreateInfo->pQueueCreateInfos != nullptr) {
             for (uint32_t queueCreateInfoIndex = 0; queueCreateInfoIndex < pCreateInfo->queueCreateInfoCount;
@@ -4837,9 +4832,9 @@ bool StatelessValidation::PreCallValidateQueueSubmit(VkQueue queue, uint32_t sub
                                                      VkFence fence, const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructTypeArray(loc.dot(Field::submitCount), loc.dot(Field::pSubmits), "VK_STRUCTURE_TYPE_SUBMIT_INFO",
-                                    submitCount, pSubmits, VK_STRUCTURE_TYPE_SUBMIT_INFO, false, true,
-                                    "VUID-VkSubmitInfo-sType-sType", "VUID-vkQueueSubmit-pSubmits-parameter", kVUIDUndefined);
+    skip |= ValidateStructTypeArray(loc.dot(Field::submitCount), loc.dot(Field::pSubmits), submitCount, pSubmits,
+                                    VK_STRUCTURE_TYPE_SUBMIT_INFO, false, true, "VUID-VkSubmitInfo-sType-sType",
+                                    "VUID-vkQueueSubmit-pSubmits-parameter", kVUIDUndefined);
     if (pSubmits != nullptr) {
         for (uint32_t submitIndex = 0; submitIndex < submitCount; ++submitIndex) {
             [[maybe_unused]] const Location pSubmits_loc = loc.dot(Field::pSubmits, submitIndex);
@@ -4891,9 +4886,8 @@ bool StatelessValidation::PreCallValidateAllocateMemory(VkDevice device, const V
                                                         const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pAllocateInfo), "VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO", pAllocateInfo,
-                               VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO, true, "VUID-vkAllocateMemory-pAllocateInfo-parameter",
-                               "VUID-VkMemoryAllocateInfo-sType-sType");
+    skip |= ValidateStructType(loc.dot(Field::pAllocateInfo), pAllocateInfo, VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO, true,
+                               "VUID-vkAllocateMemory-pAllocateInfo-parameter", "VUID-VkMemoryAllocateInfo-sType-sType");
     if (pAllocateInfo != nullptr) {
         [[maybe_unused]] const Location pAllocateInfo_loc = loc.dot(Field::pAllocateInfo);
         constexpr std::array allowed_structs_VkMemoryAllocateInfo = {VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO,
@@ -4942,8 +4936,8 @@ bool StatelessValidation::PreCallValidateFlushMappedMemoryRanges(VkDevice device
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
     skip |= ValidateStructTypeArray(
-        loc.dot(Field::memoryRangeCount), loc.dot(Field::pMemoryRanges), "VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE", memoryRangeCount,
-        pMemoryRanges, VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE, true, true, "VUID-VkMappedMemoryRange-sType-sType",
+        loc.dot(Field::memoryRangeCount), loc.dot(Field::pMemoryRanges), memoryRangeCount, pMemoryRanges,
+        VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE, true, true, "VUID-VkMappedMemoryRange-sType-sType",
         "VUID-vkFlushMappedMemoryRanges-pMemoryRanges-parameter", "VUID-vkFlushMappedMemoryRanges-memoryRangeCount-arraylength");
     if (pMemoryRanges != nullptr) {
         for (uint32_t memoryRangeIndex = 0; memoryRangeIndex < memoryRangeCount; ++memoryRangeIndex) {
@@ -4963,11 +4957,11 @@ bool StatelessValidation::PreCallValidateInvalidateMappedMemoryRanges(VkDevice d
                                                                       const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructTypeArray(loc.dot(Field::memoryRangeCount), loc.dot(Field::pMemoryRanges),
-                                    "VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE", memoryRangeCount, pMemoryRanges,
-                                    VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE, true, true, "VUID-VkMappedMemoryRange-sType-sType",
-                                    "VUID-vkInvalidateMappedMemoryRanges-pMemoryRanges-parameter",
-                                    "VUID-vkInvalidateMappedMemoryRanges-memoryRangeCount-arraylength");
+    skip |=
+        ValidateStructTypeArray(loc.dot(Field::memoryRangeCount), loc.dot(Field::pMemoryRanges), memoryRangeCount, pMemoryRanges,
+                                VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE, true, true, "VUID-VkMappedMemoryRange-sType-sType",
+                                "VUID-vkInvalidateMappedMemoryRanges-pMemoryRanges-parameter",
+                                "VUID-vkInvalidateMappedMemoryRanges-memoryRangeCount-arraylength");
     if (pMemoryRanges != nullptr) {
         for (uint32_t memoryRangeIndex = 0; memoryRangeIndex < memoryRangeCount; ++memoryRangeIndex) {
             [[maybe_unused]] const Location pMemoryRanges_loc = loc.dot(Field::pMemoryRanges, memoryRangeIndex);
@@ -5045,9 +5039,8 @@ bool StatelessValidation::PreCallValidateCreateFence(VkDevice device, const VkFe
                                                      const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), "VK_STRUCTURE_TYPE_FENCE_CREATE_INFO", pCreateInfo,
-                               VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, true, "VUID-vkCreateFence-pCreateInfo-parameter",
-                               "VUID-VkFenceCreateInfo-sType-sType");
+    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), pCreateInfo, VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, true,
+                               "VUID-vkCreateFence-pCreateInfo-parameter", "VUID-VkFenceCreateInfo-sType-sType");
     if (pCreateInfo != nullptr) {
         [[maybe_unused]] const Location pCreateInfo_loc = loc.dot(Field::pCreateInfo);
         constexpr std::array allowed_structs_VkFenceCreateInfo = {VK_STRUCTURE_TYPE_EXPORT_FENCE_CREATE_INFO,
@@ -5109,9 +5102,8 @@ bool StatelessValidation::PreCallValidateCreateSemaphore(VkDevice device, const 
                                                          const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), "VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO", pCreateInfo,
-                               VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, true, "VUID-vkCreateSemaphore-pCreateInfo-parameter",
-                               "VUID-VkSemaphoreCreateInfo-sType-sType");
+    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), pCreateInfo, VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, true,
+                               "VUID-vkCreateSemaphore-pCreateInfo-parameter", "VUID-VkSemaphoreCreateInfo-sType-sType");
     if (pCreateInfo != nullptr) {
         [[maybe_unused]] const Location pCreateInfo_loc = loc.dot(Field::pCreateInfo);
         constexpr std::array allowed_structs_VkSemaphoreCreateInfo = {
@@ -5150,9 +5142,8 @@ bool StatelessValidation::PreCallValidateCreateEvent(VkDevice device, const VkEv
                                                      const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), "VK_STRUCTURE_TYPE_EVENT_CREATE_INFO", pCreateInfo,
-                               VK_STRUCTURE_TYPE_EVENT_CREATE_INFO, true, "VUID-vkCreateEvent-pCreateInfo-parameter",
-                               "VUID-VkEventCreateInfo-sType-sType");
+    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), pCreateInfo, VK_STRUCTURE_TYPE_EVENT_CREATE_INFO, true,
+                               "VUID-vkCreateEvent-pCreateInfo-parameter", "VUID-VkEventCreateInfo-sType-sType");
     if (pCreateInfo != nullptr) {
         [[maybe_unused]] const Location pCreateInfo_loc = loc.dot(Field::pCreateInfo);
         skip |= ValidateStructPnext(pCreateInfo_loc, pCreateInfo->pNext, 0, nullptr, GeneratedVulkanHeaderVersion,
@@ -5205,9 +5196,8 @@ bool StatelessValidation::PreCallValidateCreateQueryPool(VkDevice device, const 
                                                          const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), "VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO", pCreateInfo,
-                               VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO, true, "VUID-vkCreateQueryPool-pCreateInfo-parameter",
-                               "VUID-VkQueryPoolCreateInfo-sType-sType");
+    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), pCreateInfo, VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO, true,
+                               "VUID-vkCreateQueryPool-pCreateInfo-parameter", "VUID-VkQueryPoolCreateInfo-sType-sType");
     if (pCreateInfo != nullptr) {
         [[maybe_unused]] const Location pCreateInfo_loc = loc.dot(Field::pCreateInfo);
         constexpr std::array allowed_structs_VkQueryPoolCreateInfo = {VK_STRUCTURE_TYPE_QUERY_POOL_PERFORMANCE_CREATE_INFO_KHR};
@@ -5252,9 +5242,8 @@ bool StatelessValidation::PreCallValidateCreateBuffer(VkDevice device, const VkB
                                                       const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), "VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO", pCreateInfo,
-                               VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO, true, "VUID-vkCreateBuffer-pCreateInfo-parameter",
-                               "VUID-VkBufferCreateInfo-sType-sType");
+    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), pCreateInfo, VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO, true,
+                               "VUID-vkCreateBuffer-pCreateInfo-parameter", "VUID-VkBufferCreateInfo-sType-sType");
     if (pCreateInfo != nullptr) {
         [[maybe_unused]] const Location pCreateInfo_loc = loc.dot(Field::pCreateInfo);
         constexpr std::array allowed_structs_VkBufferCreateInfo = {VK_STRUCTURE_TYPE_BUFFER_OPAQUE_CAPTURE_ADDRESS_CREATE_INFO,
@@ -5295,9 +5284,8 @@ bool StatelessValidation::PreCallValidateCreateBufferView(VkDevice device, const
                                                           const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), "VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO", pCreateInfo,
-                               VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO, true, "VUID-vkCreateBufferView-pCreateInfo-parameter",
-                               "VUID-VkBufferViewCreateInfo-sType-sType");
+    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), pCreateInfo, VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO, true,
+                               "VUID-vkCreateBufferView-pCreateInfo-parameter", "VUID-VkBufferViewCreateInfo-sType-sType");
     if (pCreateInfo != nullptr) {
         [[maybe_unused]] const Location pCreateInfo_loc = loc.dot(Field::pCreateInfo);
         skip |= ValidateStructPnext(pCreateInfo_loc, pCreateInfo->pNext, 0, nullptr, GeneratedVulkanHeaderVersion,
@@ -5335,9 +5323,8 @@ bool StatelessValidation::PreCallValidateCreateImage(VkDevice device, const VkIm
                                                      const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), "VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO", pCreateInfo,
-                               VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO, true, "VUID-vkCreateImage-pCreateInfo-parameter",
-                               "VUID-VkImageCreateInfo-sType-sType");
+    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), pCreateInfo, VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO, true,
+                               "VUID-vkCreateImage-pCreateInfo-parameter", "VUID-VkImageCreateInfo-sType-sType");
     if (pCreateInfo != nullptr) {
         [[maybe_unused]] const Location pCreateInfo_loc = loc.dot(Field::pCreateInfo);
         constexpr std::array allowed_structs_VkImageCreateInfo = {
@@ -5424,9 +5411,8 @@ bool StatelessValidation::PreCallValidateCreateImageView(VkDevice device, const 
                                                          const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), "VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO", pCreateInfo,
-                               VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO, true, "VUID-vkCreateImageView-pCreateInfo-parameter",
-                               "VUID-VkImageViewCreateInfo-sType-sType");
+    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), pCreateInfo, VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO, true,
+                               "VUID-vkCreateImageView-pCreateInfo-parameter", "VUID-VkImageViewCreateInfo-sType-sType");
     if (pCreateInfo != nullptr) {
         [[maybe_unused]] const Location pCreateInfo_loc = loc.dot(Field::pCreateInfo);
         constexpr std::array allowed_structs_VkImageViewCreateInfo = {VK_STRUCTURE_TYPE_IMAGE_VIEW_ASTC_DECODE_MODE_EXT,
@@ -5490,8 +5476,7 @@ bool StatelessValidation::PreCallValidateCreatePipelineCache(VkDevice device, co
                                                              VkPipelineCache* pPipelineCache, const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), "VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO", pCreateInfo,
-                               VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO, true,
+    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), pCreateInfo, VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO, true,
                                "VUID-vkCreatePipelineCache-pCreateInfo-parameter", "VUID-VkPipelineCacheCreateInfo-sType-sType");
     if (pCreateInfo != nullptr) {
         [[maybe_unused]] const Location pCreateInfo_loc = loc.dot(Field::pCreateInfo);
@@ -5535,10 +5520,9 @@ bool StatelessValidation::PreCallValidateCreateGraphicsPipelines(VkDevice device
     [[maybe_unused]] const Location loc = error_obj.location;
     skip |= ValidateRequiredHandle(loc.dot(Field::pipelineCache), pipelineCache);
     skip |= ValidateStructTypeArray(
-        loc.dot(Field::createInfoCount), loc.dot(Field::pCreateInfos), "VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO",
-        createInfoCount, pCreateInfos, VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO, true, true,
-        "VUID-VkGraphicsPipelineCreateInfo-sType-sType", "VUID-vkCreateGraphicsPipelines-pCreateInfos-parameter",
-        "VUID-vkCreateGraphicsPipelines-createInfoCount-arraylength");
+        loc.dot(Field::createInfoCount), loc.dot(Field::pCreateInfos), createInfoCount, pCreateInfos,
+        VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO, true, true, "VUID-VkGraphicsPipelineCreateInfo-sType-sType",
+        "VUID-vkCreateGraphicsPipelines-pCreateInfos-parameter", "VUID-vkCreateGraphicsPipelines-createInfoCount-arraylength");
     if (pCreateInfos != nullptr) {
         for (uint32_t createInfoIndex = 0; createInfoIndex < createInfoCount; ++createInfoIndex) {
             [[maybe_unused]] const Location pCreateInfos_loc = loc.dot(Field::pCreateInfos, createInfoIndex);
@@ -5554,10 +5538,10 @@ bool StatelessValidation::PreCallValidateCreateGraphicsPipelines(VkDevice device
                                         "VUID-VkGraphicsPipelineCreateInfo-pNext-pNext",
                                         "VUID-VkGraphicsPipelineCreateInfo-sType-unique", VK_NULL_HANDLE, true);
 
-            skip |= ValidateStructType(
-                pCreateInfos_loc.dot(Field::pDynamicState), "VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO",
-                pCreateInfos[createInfoIndex].pDynamicState, VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO, false,
-                "VUID-VkGraphicsPipelineCreateInfo-pDynamicState-parameter", "VUID-VkPipelineDynamicStateCreateInfo-sType-sType");
+            skip |= ValidateStructType(pCreateInfos_loc.dot(Field::pDynamicState), pCreateInfos[createInfoIndex].pDynamicState,
+                                       VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO, false,
+                                       "VUID-VkGraphicsPipelineCreateInfo-pDynamicState-parameter",
+                                       "VUID-VkPipelineDynamicStateCreateInfo-sType-sType");
 
             if (pCreateInfos[createInfoIndex].pDynamicState != nullptr) {
                 [[maybe_unused]] const Location pDynamicState_loc = pCreateInfos_loc.dot(Field::pDynamicState);
@@ -5598,10 +5582,9 @@ bool StatelessValidation::PreCallValidateCreateComputePipelines(VkDevice device,
     [[maybe_unused]] const Location loc = error_obj.location;
     skip |= ValidateRequiredHandle(loc.dot(Field::pipelineCache), pipelineCache);
     skip |= ValidateStructTypeArray(
-        loc.dot(Field::createInfoCount), loc.dot(Field::pCreateInfos), "VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO",
-        createInfoCount, pCreateInfos, VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO, true, true,
-        "VUID-VkComputePipelineCreateInfo-sType-sType", "VUID-vkCreateComputePipelines-pCreateInfos-parameter",
-        "VUID-vkCreateComputePipelines-createInfoCount-arraylength");
+        loc.dot(Field::createInfoCount), loc.dot(Field::pCreateInfos), createInfoCount, pCreateInfos,
+        VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO, true, true, "VUID-VkComputePipelineCreateInfo-sType-sType",
+        "VUID-vkCreateComputePipelines-pCreateInfos-parameter", "VUID-vkCreateComputePipelines-createInfoCount-arraylength");
     if (pCreateInfos != nullptr) {
         for (uint32_t createInfoIndex = 0; createInfoIndex < createInfoCount; ++createInfoIndex) {
             [[maybe_unused]] const Location pCreateInfos_loc = loc.dot(Field::pCreateInfos, createInfoIndex);
@@ -5614,9 +5597,9 @@ bool StatelessValidation::PreCallValidateCreateComputePipelines(VkDevice device,
                                         "VUID-VkComputePipelineCreateInfo-pNext-pNext",
                                         "VUID-VkComputePipelineCreateInfo-sType-unique", VK_NULL_HANDLE, true);
 
-            skip |= ValidateStructType(pCreateInfos_loc.dot(Field::stage), "VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO",
-                                       &(pCreateInfos[createInfoIndex].stage), VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-                                       false, kVUIDUndefined, "VUID-VkPipelineShaderStageCreateInfo-sType-sType");
+            skip |= ValidateStructType(pCreateInfos_loc.dot(Field::stage), &(pCreateInfos[createInfoIndex].stage),
+                                       VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, false, kVUIDUndefined,
+                                       "VUID-VkPipelineShaderStageCreateInfo-sType-sType");
 
             constexpr std::array allowed_structs_VkPipelineShaderStageCreateInfo = {
                 VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
@@ -5692,8 +5675,7 @@ bool StatelessValidation::PreCallValidateCreatePipelineLayout(VkDevice device, c
                                                               const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), "VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO", pCreateInfo,
-                               VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO, true,
+    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), pCreateInfo, VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO, true,
                                "VUID-vkCreatePipelineLayout-pCreateInfo-parameter", "VUID-VkPipelineLayoutCreateInfo-sType-sType");
     if (pCreateInfo != nullptr) {
         [[maybe_unused]] const Location pCreateInfo_loc = loc.dot(Field::pCreateInfo);
@@ -5744,9 +5726,8 @@ bool StatelessValidation::PreCallValidateCreateSampler(VkDevice device, const Vk
                                                        const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), "VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO", pCreateInfo,
-                               VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO, true, "VUID-vkCreateSampler-pCreateInfo-parameter",
-                               "VUID-VkSamplerCreateInfo-sType-sType");
+    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), pCreateInfo, VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO, true,
+                               "VUID-vkCreateSampler-pCreateInfo-parameter", "VUID-VkSamplerCreateInfo-sType-sType");
     if (pCreateInfo != nullptr) {
         [[maybe_unused]] const Location pCreateInfo_loc = loc.dot(Field::pCreateInfo);
         constexpr std::array allowed_structs_VkSamplerCreateInfo = {VK_STRUCTURE_TYPE_SAMPLER_CUSTOM_BORDER_COLOR_CREATE_INFO_EXT,
@@ -5810,8 +5791,7 @@ bool StatelessValidation::PreCallValidateCreateDescriptorSetLayout(VkDevice devi
                                                                    const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), "VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO", pCreateInfo,
-                               VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO, true,
+    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), pCreateInfo, VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO, true,
                                "VUID-vkCreateDescriptorSetLayout-pCreateInfo-parameter",
                                "VUID-VkDescriptorSetLayoutCreateInfo-sType-sType");
     if (pCreateInfo != nullptr) {
@@ -5867,8 +5847,7 @@ bool StatelessValidation::PreCallValidateCreateDescriptorPool(VkDevice device, c
                                                               const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), "VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO", pCreateInfo,
-                               VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO, true,
+    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), pCreateInfo, VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO, true,
                                "VUID-vkCreateDescriptorPool-pCreateInfo-parameter", "VUID-VkDescriptorPoolCreateInfo-sType-sType");
     if (pCreateInfo != nullptr) {
         [[maybe_unused]] const Location pCreateInfo_loc = loc.dot(Field::pCreateInfo);
@@ -5919,8 +5898,7 @@ bool StatelessValidation::PreCallValidateAllocateDescriptorSets(VkDevice device,
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
     skip |=
-        ValidateStructType(loc.dot(Field::pAllocateInfo), "VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO", pAllocateInfo,
-                           VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO, true,
+        ValidateStructType(loc.dot(Field::pAllocateInfo), pAllocateInfo, VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO, true,
                            "VUID-vkAllocateDescriptorSets-pAllocateInfo-parameter", "VUID-VkDescriptorSetAllocateInfo-sType-sType");
     if (pAllocateInfo != nullptr) {
         [[maybe_unused]] const Location pAllocateInfo_loc = loc.dot(Field::pAllocateInfo);
@@ -5967,9 +5945,9 @@ bool StatelessValidation::PreCallValidateUpdateDescriptorSets(VkDevice device, u
                                                               const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructTypeArray(loc.dot(Field::descriptorWriteCount), loc.dot(Field::pDescriptorWrites),
-                                    "VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET", descriptorWriteCount, pDescriptorWrites,
-                                    VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, false, true, "VUID-VkWriteDescriptorSet-sType-sType",
+    skip |= ValidateStructTypeArray(loc.dot(Field::descriptorWriteCount), loc.dot(Field::pDescriptorWrites), descriptorWriteCount,
+                                    pDescriptorWrites, VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, false, true,
+                                    "VUID-VkWriteDescriptorSet-sType-sType",
                                     "VUID-vkUpdateDescriptorSets-pDescriptorWrites-parameter", kVUIDUndefined);
     if (pDescriptorWrites != nullptr) {
         for (uint32_t descriptorWriteIndex = 0; descriptorWriteIndex < descriptorWriteCount; ++descriptorWriteIndex) {
@@ -5992,9 +5970,9 @@ bool StatelessValidation::PreCallValidateUpdateDescriptorSets(VkDevice device, u
                                   "VUID-VkWriteDescriptorSet-descriptorCount-arraylength", kVUIDUndefined);
         }
     }
-    skip |= ValidateStructTypeArray(loc.dot(Field::descriptorCopyCount), loc.dot(Field::pDescriptorCopies),
-                                    "VK_STRUCTURE_TYPE_COPY_DESCRIPTOR_SET", descriptorCopyCount, pDescriptorCopies,
-                                    VK_STRUCTURE_TYPE_COPY_DESCRIPTOR_SET, false, true, "VUID-VkCopyDescriptorSet-sType-sType",
+    skip |= ValidateStructTypeArray(loc.dot(Field::descriptorCopyCount), loc.dot(Field::pDescriptorCopies), descriptorCopyCount,
+                                    pDescriptorCopies, VK_STRUCTURE_TYPE_COPY_DESCRIPTOR_SET, false, true,
+                                    "VUID-VkCopyDescriptorSet-sType-sType",
                                     "VUID-vkUpdateDescriptorSets-pDescriptorCopies-parameter", kVUIDUndefined);
     if (pDescriptorCopies != nullptr) {
         for (uint32_t descriptorCopyIndex = 0; descriptorCopyIndex < descriptorCopyCount; ++descriptorCopyIndex) {
@@ -6019,9 +5997,8 @@ bool StatelessValidation::PreCallValidateCreateFramebuffer(VkDevice device, cons
                                                            const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), "VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO", pCreateInfo,
-                               VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO, true, "VUID-vkCreateFramebuffer-pCreateInfo-parameter",
-                               "VUID-VkFramebufferCreateInfo-sType-sType");
+    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), pCreateInfo, VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO, true,
+                               "VUID-vkCreateFramebuffer-pCreateInfo-parameter", "VUID-VkFramebufferCreateInfo-sType-sType");
     if (pCreateInfo != nullptr) {
         [[maybe_unused]] const Location pCreateInfo_loc = loc.dot(Field::pCreateInfo);
         constexpr std::array allowed_structs_VkFramebufferCreateInfo = {VK_STRUCTURE_TYPE_FRAMEBUFFER_ATTACHMENTS_CREATE_INFO};
@@ -6061,9 +6038,8 @@ bool StatelessValidation::PreCallValidateCreateRenderPass(VkDevice device, const
                                                           const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), "VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO", pCreateInfo,
-                               VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO, true, "VUID-vkCreateRenderPass-pCreateInfo-parameter",
-                               "VUID-VkRenderPassCreateInfo-sType-sType");
+    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), pCreateInfo, VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO, true,
+                               "VUID-vkCreateRenderPass-pCreateInfo-parameter", "VUID-VkRenderPassCreateInfo-sType-sType");
     if (pCreateInfo != nullptr) {
         [[maybe_unused]] const Location pCreateInfo_loc = loc.dot(Field::pCreateInfo);
         constexpr std::array allowed_structs_VkRenderPassCreateInfo = {
@@ -6266,9 +6242,8 @@ bool StatelessValidation::PreCallValidateCreateCommandPool(VkDevice device, cons
                                                            const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), "VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO", pCreateInfo,
-                               VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO, true, "VUID-vkCreateCommandPool-pCreateInfo-parameter",
-                               "VUID-VkCommandPoolCreateInfo-sType-sType");
+    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), pCreateInfo, VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO, true,
+                               "VUID-vkCreateCommandPool-pCreateInfo-parameter", "VUID-VkCommandPoolCreateInfo-sType-sType");
     if (pCreateInfo != nullptr) {
         [[maybe_unused]] const Location pCreateInfo_loc = loc.dot(Field::pCreateInfo);
         constexpr std::array allowed_structs_VkCommandPoolCreateInfo = {
@@ -6305,8 +6280,7 @@ bool StatelessValidation::PreCallValidateAllocateCommandBuffers(VkDevice device,
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
     skip |=
-        ValidateStructType(loc.dot(Field::pAllocateInfo), "VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO", pAllocateInfo,
-                           VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO, true,
+        ValidateStructType(loc.dot(Field::pAllocateInfo), pAllocateInfo, VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO, true,
                            "VUID-vkAllocateCommandBuffers-pAllocateInfo-parameter", "VUID-VkCommandBufferAllocateInfo-sType-sType");
     if (pAllocateInfo != nullptr) {
         [[maybe_unused]] const Location pAllocateInfo_loc = loc.dot(Field::pAllocateInfo);
@@ -6345,9 +6319,8 @@ bool StatelessValidation::PreCallValidateBeginCommandBuffer(VkCommandBuffer comm
                                                             const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pBeginInfo), "VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO", pBeginInfo,
-                               VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, true, "VUID-vkBeginCommandBuffer-pBeginInfo-parameter",
-                               "VUID-VkCommandBufferBeginInfo-sType-sType");
+    skip |= ValidateStructType(loc.dot(Field::pBeginInfo), pBeginInfo, VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, true,
+                               "VUID-vkBeginCommandBuffer-pBeginInfo-parameter", "VUID-VkCommandBufferBeginInfo-sType-sType");
     if (pBeginInfo != nullptr) {
         [[maybe_unused]] const Location pBeginInfo_loc = loc.dot(Field::pBeginInfo);
         constexpr std::array allowed_structs_VkCommandBufferBeginInfo = {VK_STRUCTURE_TYPE_DEVICE_GROUP_COMMAND_BUFFER_BEGIN_INFO};
@@ -6906,10 +6879,10 @@ bool StatelessValidation::PreCallValidateCmdWaitEvents(
                           srcStageMask, kOptionalFlags, "VUID-vkCmdWaitEvents-srcStageMask-parameter");
     skip |= ValidateFlags(loc.dot(Field::dstStageMask), vvl::FlagBitmask::VkPipelineStageFlagBits, AllVkPipelineStageFlagBits,
                           dstStageMask, kOptionalFlags, "VUID-vkCmdWaitEvents-dstStageMask-parameter");
-    skip |= ValidateStructTypeArray(loc.dot(Field::memoryBarrierCount), loc.dot(Field::pMemoryBarriers),
-                                    "VK_STRUCTURE_TYPE_MEMORY_BARRIER", memoryBarrierCount, pMemoryBarriers,
-                                    VK_STRUCTURE_TYPE_MEMORY_BARRIER, false, true, "VUID-VkMemoryBarrier-sType-sType",
-                                    "VUID-vkCmdWaitEvents-pMemoryBarriers-parameter", kVUIDUndefined);
+    skip |=
+        ValidateStructTypeArray(loc.dot(Field::memoryBarrierCount), loc.dot(Field::pMemoryBarriers), memoryBarrierCount,
+                                pMemoryBarriers, VK_STRUCTURE_TYPE_MEMORY_BARRIER, false, true, "VUID-VkMemoryBarrier-sType-sType",
+                                "VUID-vkCmdWaitEvents-pMemoryBarriers-parameter", kVUIDUndefined);
     if (pMemoryBarriers != nullptr) {
         for (uint32_t memoryBarrierIndex = 0; memoryBarrierIndex < memoryBarrierCount; ++memoryBarrierIndex) {
             [[maybe_unused]] const Location pMemoryBarriers_loc = loc.dot(Field::pMemoryBarriers, memoryBarrierIndex);
@@ -6927,8 +6900,8 @@ bool StatelessValidation::PreCallValidateCmdWaitEvents(
         }
     }
     skip |= ValidateStructTypeArray(loc.dot(Field::bufferMemoryBarrierCount), loc.dot(Field::pBufferMemoryBarriers),
-                                    "VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER", bufferMemoryBarrierCount, pBufferMemoryBarriers,
-                                    VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER, false, true, "VUID-VkBufferMemoryBarrier-sType-sType",
+                                    bufferMemoryBarrierCount, pBufferMemoryBarriers, VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER, false,
+                                    true, "VUID-VkBufferMemoryBarrier-sType-sType",
                                     "VUID-vkCmdWaitEvents-pBufferMemoryBarriers-parameter", kVUIDUndefined);
     if (pBufferMemoryBarriers != nullptr) {
         for (uint32_t bufferMemoryBarrierIndex = 0; bufferMemoryBarrierIndex < bufferMemoryBarrierCount;
@@ -6944,8 +6917,8 @@ bool StatelessValidation::PreCallValidateCmdWaitEvents(
         }
     }
     skip |= ValidateStructTypeArray(loc.dot(Field::imageMemoryBarrierCount), loc.dot(Field::pImageMemoryBarriers),
-                                    "VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER", imageMemoryBarrierCount, pImageMemoryBarriers,
-                                    VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER, false, true, "VUID-VkImageMemoryBarrier-sType-sType",
+                                    imageMemoryBarrierCount, pImageMemoryBarriers, VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER, false,
+                                    true, "VUID-VkImageMemoryBarrier-sType-sType",
                                     "VUID-vkCmdWaitEvents-pImageMemoryBarriers-parameter", kVUIDUndefined);
     if (pImageMemoryBarriers != nullptr) {
         for (uint32_t imageMemoryBarrierIndex = 0; imageMemoryBarrierIndex < imageMemoryBarrierCount; ++imageMemoryBarrierIndex) {
@@ -6991,10 +6964,10 @@ bool StatelessValidation::PreCallValidateCmdPipelineBarrier(
                           dstStageMask, kOptionalFlags, "VUID-vkCmdPipelineBarrier-dstStageMask-parameter");
     skip |= ValidateFlags(loc.dot(Field::dependencyFlags), vvl::FlagBitmask::VkDependencyFlagBits, AllVkDependencyFlagBits,
                           dependencyFlags, kOptionalFlags, "VUID-vkCmdPipelineBarrier-dependencyFlags-parameter");
-    skip |= ValidateStructTypeArray(loc.dot(Field::memoryBarrierCount), loc.dot(Field::pMemoryBarriers),
-                                    "VK_STRUCTURE_TYPE_MEMORY_BARRIER", memoryBarrierCount, pMemoryBarriers,
-                                    VK_STRUCTURE_TYPE_MEMORY_BARRIER, false, true, "VUID-VkMemoryBarrier-sType-sType",
-                                    "VUID-vkCmdPipelineBarrier-pMemoryBarriers-parameter", kVUIDUndefined);
+    skip |=
+        ValidateStructTypeArray(loc.dot(Field::memoryBarrierCount), loc.dot(Field::pMemoryBarriers), memoryBarrierCount,
+                                pMemoryBarriers, VK_STRUCTURE_TYPE_MEMORY_BARRIER, false, true, "VUID-VkMemoryBarrier-sType-sType",
+                                "VUID-vkCmdPipelineBarrier-pMemoryBarriers-parameter", kVUIDUndefined);
     if (pMemoryBarriers != nullptr) {
         for (uint32_t memoryBarrierIndex = 0; memoryBarrierIndex < memoryBarrierCount; ++memoryBarrierIndex) {
             [[maybe_unused]] const Location pMemoryBarriers_loc = loc.dot(Field::pMemoryBarriers, memoryBarrierIndex);
@@ -7012,8 +6985,8 @@ bool StatelessValidation::PreCallValidateCmdPipelineBarrier(
         }
     }
     skip |= ValidateStructTypeArray(loc.dot(Field::bufferMemoryBarrierCount), loc.dot(Field::pBufferMemoryBarriers),
-                                    "VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER", bufferMemoryBarrierCount, pBufferMemoryBarriers,
-                                    VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER, false, true, "VUID-VkBufferMemoryBarrier-sType-sType",
+                                    bufferMemoryBarrierCount, pBufferMemoryBarriers, VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER, false,
+                                    true, "VUID-VkBufferMemoryBarrier-sType-sType",
                                     "VUID-vkCmdPipelineBarrier-pBufferMemoryBarriers-parameter", kVUIDUndefined);
     if (pBufferMemoryBarriers != nullptr) {
         for (uint32_t bufferMemoryBarrierIndex = 0; bufferMemoryBarrierIndex < bufferMemoryBarrierCount;
@@ -7029,8 +7002,8 @@ bool StatelessValidation::PreCallValidateCmdPipelineBarrier(
         }
     }
     skip |= ValidateStructTypeArray(loc.dot(Field::imageMemoryBarrierCount), loc.dot(Field::pImageMemoryBarriers),
-                                    "VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER", imageMemoryBarrierCount, pImageMemoryBarriers,
-                                    VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER, false, true, "VUID-VkImageMemoryBarrier-sType-sType",
+                                    imageMemoryBarrierCount, pImageMemoryBarriers, VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER, false,
+                                    true, "VUID-VkImageMemoryBarrier-sType-sType",
                                     "VUID-vkCmdPipelineBarrier-pImageMemoryBarriers-parameter", kVUIDUndefined);
     if (pImageMemoryBarriers != nullptr) {
         for (uint32_t imageMemoryBarrierIndex = 0; imageMemoryBarrierIndex < imageMemoryBarrierCount; ++imageMemoryBarrierIndex) {
@@ -7135,8 +7108,7 @@ bool StatelessValidation::PreCallValidateCmdBeginRenderPass(VkCommandBuffer comm
                                                             VkSubpassContents contents, const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pRenderPassBegin), "VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO", pRenderPassBegin,
-                               VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO, true,
+    skip |= ValidateStructType(loc.dot(Field::pRenderPassBegin), pRenderPassBegin, VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO, true,
                                "VUID-vkCmdBeginRenderPass-pRenderPassBegin-parameter", "VUID-VkRenderPassBeginInfo-sType-sType");
     if (pRenderPassBegin != nullptr) {
         [[maybe_unused]] const Location pRenderPassBegin_loc = loc.dot(Field::pRenderPassBegin);
@@ -7194,10 +7166,10 @@ bool StatelessValidation::PreCallValidateBindBufferMemory2(VkDevice device, uint
                                                            const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructTypeArray(
-        loc.dot(Field::bindInfoCount), loc.dot(Field::pBindInfos), "VK_STRUCTURE_TYPE_BIND_BUFFER_MEMORY_INFO", bindInfoCount,
-        pBindInfos, VK_STRUCTURE_TYPE_BIND_BUFFER_MEMORY_INFO, true, true, "VUID-VkBindBufferMemoryInfo-sType-sType",
-        "VUID-vkBindBufferMemory2-pBindInfos-parameter", "VUID-vkBindBufferMemory2-bindInfoCount-arraylength");
+    skip |= ValidateStructTypeArray(loc.dot(Field::bindInfoCount), loc.dot(Field::pBindInfos), bindInfoCount, pBindInfos,
+                                    VK_STRUCTURE_TYPE_BIND_BUFFER_MEMORY_INFO, true, true,
+                                    "VUID-VkBindBufferMemoryInfo-sType-sType", "VUID-vkBindBufferMemory2-pBindInfos-parameter",
+                                    "VUID-vkBindBufferMemory2-bindInfoCount-arraylength");
     if (pBindInfos != nullptr) {
         for (uint32_t bindInfoIndex = 0; bindInfoIndex < bindInfoCount; ++bindInfoIndex) {
             [[maybe_unused]] const Location pBindInfos_loc = loc.dot(Field::pBindInfos, bindInfoIndex);
@@ -7221,10 +7193,10 @@ bool StatelessValidation::PreCallValidateBindImageMemory2(VkDevice device, uint3
                                                           const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructTypeArray(
-        loc.dot(Field::bindInfoCount), loc.dot(Field::pBindInfos), "VK_STRUCTURE_TYPE_BIND_IMAGE_MEMORY_INFO", bindInfoCount,
-        pBindInfos, VK_STRUCTURE_TYPE_BIND_IMAGE_MEMORY_INFO, true, true, "VUID-VkBindImageMemoryInfo-sType-sType",
-        "VUID-vkBindImageMemory2-pBindInfos-parameter", "VUID-vkBindImageMemory2-bindInfoCount-arraylength");
+    skip |= ValidateStructTypeArray(loc.dot(Field::bindInfoCount), loc.dot(Field::pBindInfos), bindInfoCount, pBindInfos,
+                                    VK_STRUCTURE_TYPE_BIND_IMAGE_MEMORY_INFO, true, true, "VUID-VkBindImageMemoryInfo-sType-sType",
+                                    "VUID-vkBindImageMemory2-pBindInfos-parameter",
+                                    "VUID-vkBindImageMemory2-bindInfoCount-arraylength");
     if (pBindInfos != nullptr) {
         for (uint32_t bindInfoIndex = 0; bindInfoIndex < bindInfoCount; ++bindInfoIndex) {
             [[maybe_unused]] const Location pBindInfos_loc = loc.dot(Field::pBindInfos, bindInfoIndex);
@@ -7280,9 +7252,9 @@ bool StatelessValidation::PreCallValidateEnumeratePhysicalDeviceGroups(
         CheckPromotedApiAgainstVulkanVersion(instance, loc, VK_API_VERSION_1_1))
         return true;
     skip |= ValidateStructTypeArray(loc.dot(Field::pPhysicalDeviceGroupCount), loc.dot(Field::pPhysicalDeviceGroupProperties),
-                                    "VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_GROUP_PROPERTIES", pPhysicalDeviceGroupCount,
-                                    pPhysicalDeviceGroupProperties, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_GROUP_PROPERTIES, true, false,
-                                    false, "VUID-VkPhysicalDeviceGroupProperties-sType-sType",
+                                    pPhysicalDeviceGroupCount, pPhysicalDeviceGroupProperties,
+                                    VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_GROUP_PROPERTIES, true, false, false,
+                                    "VUID-VkPhysicalDeviceGroupProperties-sType-sType",
                                     "VUID-vkEnumeratePhysicalDeviceGroups-pPhysicalDeviceGroupProperties-parameter",
                                     "VUID-vkEnumeratePhysicalDeviceGroups-pPhysicalDeviceGroupCount-parameter", kVUIDUndefined);
     if (pPhysicalDeviceGroupProperties != nullptr) {
@@ -7305,8 +7277,7 @@ bool StatelessValidation::PreCallValidateGetImageMemoryRequirements2(VkDevice de
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
     skip |=
-        ValidateStructType(loc.dot(Field::pInfo), "VK_STRUCTURE_TYPE_IMAGE_MEMORY_REQUIREMENTS_INFO_2", pInfo,
-                           VK_STRUCTURE_TYPE_IMAGE_MEMORY_REQUIREMENTS_INFO_2, true,
+        ValidateStructType(loc.dot(Field::pInfo), pInfo, VK_STRUCTURE_TYPE_IMAGE_MEMORY_REQUIREMENTS_INFO_2, true,
                            "VUID-vkGetImageMemoryRequirements2-pInfo-parameter", "VUID-VkImageMemoryRequirementsInfo2-sType-sType");
     if (pInfo != nullptr) {
         [[maybe_unused]] const Location pInfo_loc = loc.dot(Field::pInfo);
@@ -7320,9 +7291,8 @@ bool StatelessValidation::PreCallValidateGetImageMemoryRequirements2(VkDevice de
 
         skip |= ValidateRequiredHandle(pInfo_loc.dot(Field::image), pInfo->image);
     }
-    skip |= ValidateStructType(loc.dot(Field::pMemoryRequirements), "VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2", pMemoryRequirements,
-                               VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2, true,
-                               "VUID-vkGetImageMemoryRequirements2-pMemoryRequirements-parameter",
+    skip |= ValidateStructType(loc.dot(Field::pMemoryRequirements), pMemoryRequirements, VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2,
+                               true, "VUID-vkGetImageMemoryRequirements2-pMemoryRequirements-parameter",
                                "VUID-VkMemoryRequirements2-sType-sType");
     if (pMemoryRequirements != nullptr) {
         [[maybe_unused]] const Location pMemoryRequirements_loc = loc.dot(Field::pMemoryRequirements);
@@ -7341,8 +7311,7 @@ bool StatelessValidation::PreCallValidateGetBufferMemoryRequirements2(VkDevice d
                                                                       const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pInfo), "VK_STRUCTURE_TYPE_BUFFER_MEMORY_REQUIREMENTS_INFO_2", pInfo,
-                               VK_STRUCTURE_TYPE_BUFFER_MEMORY_REQUIREMENTS_INFO_2, true,
+    skip |= ValidateStructType(loc.dot(Field::pInfo), pInfo, VK_STRUCTURE_TYPE_BUFFER_MEMORY_REQUIREMENTS_INFO_2, true,
                                "VUID-vkGetBufferMemoryRequirements2-pInfo-parameter",
                                "VUID-VkBufferMemoryRequirementsInfo2-sType-sType");
     if (pInfo != nullptr) {
@@ -7352,9 +7321,8 @@ bool StatelessValidation::PreCallValidateGetBufferMemoryRequirements2(VkDevice d
 
         skip |= ValidateRequiredHandle(pInfo_loc.dot(Field::buffer), pInfo->buffer);
     }
-    skip |= ValidateStructType(loc.dot(Field::pMemoryRequirements), "VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2", pMemoryRequirements,
-                               VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2, true,
-                               "VUID-vkGetBufferMemoryRequirements2-pMemoryRequirements-parameter",
+    skip |= ValidateStructType(loc.dot(Field::pMemoryRequirements), pMemoryRequirements, VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2,
+                               true, "VUID-vkGetBufferMemoryRequirements2-pMemoryRequirements-parameter",
                                "VUID-VkMemoryRequirements2-sType-sType");
     if (pMemoryRequirements != nullptr) {
         [[maybe_unused]] const Location pMemoryRequirements_loc = loc.dot(Field::pMemoryRequirements);
@@ -7377,8 +7345,7 @@ bool StatelessValidation::PreCallValidateGetPhysicalDeviceFeatures2(VkPhysicalDe
         CheckPromotedApiAgainstVulkanVersion(physicalDevice, loc, VK_API_VERSION_1_1))
         return true;
     skip |=
-        ValidateStructType(loc.dot(Field::pFeatures), "VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2", pFeatures,
-                           VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2, true,
+        ValidateStructType(loc.dot(Field::pFeatures), pFeatures, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2, true,
                            "VUID-vkGetPhysicalDeviceFeatures2-pFeatures-parameter", "VUID-VkPhysicalDeviceFeatures2-sType-sType");
     return skip;
 }
@@ -7391,8 +7358,7 @@ bool StatelessValidation::PreCallValidateGetPhysicalDeviceProperties2(VkPhysical
     if (loc.function == vvl::Func::vkGetPhysicalDeviceProperties2 &&
         CheckPromotedApiAgainstVulkanVersion(physicalDevice, loc, VK_API_VERSION_1_1))
         return true;
-    skip |= ValidateStructType(loc.dot(Field::pProperties), "VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2", pProperties,
-                               VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2, true,
+    skip |= ValidateStructType(loc.dot(Field::pProperties), pProperties, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2, true,
                                "VUID-vkGetPhysicalDeviceProperties2-pProperties-parameter",
                                "VUID-VkPhysicalDeviceProperties2-sType-sType");
     if (pProperties != nullptr) {
@@ -7437,6 +7403,7 @@ bool StatelessValidation::PreCallValidateGetPhysicalDeviceProperties2(VkPhysical
                                     "VUID-VkPhysicalDeviceProperties2-pNext-pNext", "VUID-VkPhysicalDeviceProperties2-sType-unique",
                                     physicalDevice, false);
     }
+    if (!skip) skip |= manual_PreCallValidateGetPhysicalDeviceProperties2(physicalDevice, pProperties, error_obj);
     return skip;
 }
 
@@ -7450,8 +7417,7 @@ bool StatelessValidation::PreCallValidateGetPhysicalDeviceFormatProperties2(VkPh
         return true;
     skip |= ValidateRangedEnum(loc.dot(Field::format), vvl::Enum::VkFormat, format,
                                "VUID-vkGetPhysicalDeviceFormatProperties2-format-parameter");
-    skip |= ValidateStructType(loc.dot(Field::pFormatProperties), "VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_2", pFormatProperties,
-                               VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_2, true,
+    skip |= ValidateStructType(loc.dot(Field::pFormatProperties), pFormatProperties, VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_2, true,
                                "VUID-vkGetPhysicalDeviceFormatProperties2-pFormatProperties-parameter",
                                "VUID-VkFormatProperties2-sType-sType");
     if (pFormatProperties != nullptr) {
@@ -7476,8 +7442,8 @@ bool StatelessValidation::PreCallValidateGetPhysicalDeviceImageFormatProperties2
     if (loc.function == vvl::Func::vkGetPhysicalDeviceImageFormatProperties2 &&
         CheckPromotedApiAgainstVulkanVersion(physicalDevice, loc, VK_API_VERSION_1_1))
         return true;
-    skip |= ValidateStructType(loc.dot(Field::pImageFormatInfo), "VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_FORMAT_INFO_2",
-                               pImageFormatInfo, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_FORMAT_INFO_2, true,
+    skip |= ValidateStructType(loc.dot(Field::pImageFormatInfo), pImageFormatInfo,
+                               VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_FORMAT_INFO_2, true,
                                "VUID-vkGetPhysicalDeviceImageFormatProperties2-pImageFormatInfo-parameter",
                                "VUID-VkPhysicalDeviceImageFormatInfo2-sType-sType");
     if (pImageFormatInfo != nullptr) {
@@ -7512,8 +7478,8 @@ bool StatelessValidation::PreCallValidateGetPhysicalDeviceImageFormatProperties2
             ValidateFlags(pImageFormatInfo_loc.dot(Field::flags), vvl::FlagBitmask::VkImageCreateFlagBits, AllVkImageCreateFlagBits,
                           pImageFormatInfo->flags, kOptionalFlags, "VUID-VkPhysicalDeviceImageFormatInfo2-flags-parameter");
     }
-    skip |= ValidateStructType(loc.dot(Field::pImageFormatProperties), "VK_STRUCTURE_TYPE_IMAGE_FORMAT_PROPERTIES_2",
-                               pImageFormatProperties, VK_STRUCTURE_TYPE_IMAGE_FORMAT_PROPERTIES_2, true,
+    skip |= ValidateStructType(loc.dot(Field::pImageFormatProperties), pImageFormatProperties,
+                               VK_STRUCTURE_TYPE_IMAGE_FORMAT_PROPERTIES_2, true,
                                "VUID-vkGetPhysicalDeviceImageFormatProperties2-pImageFormatProperties-parameter",
                                "VUID-VkImageFormatProperties2-sType-sType");
     if (pImageFormatProperties != nullptr) {
@@ -7543,12 +7509,12 @@ bool StatelessValidation::PreCallValidateGetPhysicalDeviceQueueFamilyProperties2
     if (loc.function == vvl::Func::vkGetPhysicalDeviceQueueFamilyProperties2 &&
         CheckPromotedApiAgainstVulkanVersion(physicalDevice, loc, VK_API_VERSION_1_1))
         return true;
-    skip |= ValidateStructTypeArray(
-        loc.dot(Field::pQueueFamilyPropertyCount), loc.dot(Field::pQueueFamilyProperties),
-        "VK_STRUCTURE_TYPE_QUEUE_FAMILY_PROPERTIES_2", pQueueFamilyPropertyCount, pQueueFamilyProperties,
-        VK_STRUCTURE_TYPE_QUEUE_FAMILY_PROPERTIES_2, true, false, false, "VUID-VkQueueFamilyProperties2-sType-sType",
-        "VUID-vkGetPhysicalDeviceQueueFamilyProperties2-pQueueFamilyProperties-parameter",
-        "VUID-vkGetPhysicalDeviceQueueFamilyProperties2-pQueueFamilyPropertyCount-parameter", kVUIDUndefined);
+    skip |= ValidateStructTypeArray(loc.dot(Field::pQueueFamilyPropertyCount), loc.dot(Field::pQueueFamilyProperties),
+                                    pQueueFamilyPropertyCount, pQueueFamilyProperties, VK_STRUCTURE_TYPE_QUEUE_FAMILY_PROPERTIES_2,
+                                    true, false, false, "VUID-VkQueueFamilyProperties2-sType-sType",
+                                    "VUID-vkGetPhysicalDeviceQueueFamilyProperties2-pQueueFamilyProperties-parameter",
+                                    "VUID-vkGetPhysicalDeviceQueueFamilyProperties2-pQueueFamilyPropertyCount-parameter",
+                                    kVUIDUndefined);
     if (pQueueFamilyProperties != nullptr) {
         for (uint32_t pQueueFamilyPropertyIndex = 0; pQueueFamilyPropertyIndex < *pQueueFamilyPropertyCount;
              ++pQueueFamilyPropertyIndex) {
@@ -7576,8 +7542,8 @@ bool StatelessValidation::PreCallValidateGetPhysicalDeviceMemoryProperties2(VkPh
     if (loc.function == vvl::Func::vkGetPhysicalDeviceMemoryProperties2 &&
         CheckPromotedApiAgainstVulkanVersion(physicalDevice, loc, VK_API_VERSION_1_1))
         return true;
-    skip |= ValidateStructType(loc.dot(Field::pMemoryProperties), "VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2",
-                               pMemoryProperties, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2, true,
+    skip |= ValidateStructType(loc.dot(Field::pMemoryProperties), pMemoryProperties,
+                               VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2, true,
                                "VUID-vkGetPhysicalDeviceMemoryProperties2-pMemoryProperties-parameter",
                                "VUID-VkPhysicalDeviceMemoryProperties2-sType-sType");
     if (pMemoryProperties != nullptr) {
@@ -7598,9 +7564,8 @@ bool StatelessValidation::PreCallValidateGetDeviceQueue2(VkDevice device, const 
                                                          const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pQueueInfo), "VK_STRUCTURE_TYPE_DEVICE_QUEUE_INFO_2", pQueueInfo,
-                               VK_STRUCTURE_TYPE_DEVICE_QUEUE_INFO_2, true, "VUID-vkGetDeviceQueue2-pQueueInfo-parameter",
-                               "VUID-VkDeviceQueueInfo2-sType-sType");
+    skip |= ValidateStructType(loc.dot(Field::pQueueInfo), pQueueInfo, VK_STRUCTURE_TYPE_DEVICE_QUEUE_INFO_2, true,
+                               "VUID-vkGetDeviceQueue2-pQueueInfo-parameter", "VUID-VkDeviceQueueInfo2-sType-sType");
     if (pQueueInfo != nullptr) {
         [[maybe_unused]] const Location pQueueInfo_loc = loc.dot(Field::pQueueInfo);
         skip |= ValidateStructPnext(pQueueInfo_loc, pQueueInfo->pNext, 0, nullptr, GeneratedVulkanHeaderVersion,
@@ -7621,9 +7586,8 @@ bool StatelessValidation::PreCallValidateCreateSamplerYcbcrConversion(VkDevice d
                                                                       const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), "VK_STRUCTURE_TYPE_SAMPLER_YCBCR_CONVERSION_CREATE_INFO", pCreateInfo,
-                               VK_STRUCTURE_TYPE_SAMPLER_YCBCR_CONVERSION_CREATE_INFO, true,
-                               "VUID-vkCreateSamplerYcbcrConversion-pCreateInfo-parameter",
+    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), pCreateInfo, VK_STRUCTURE_TYPE_SAMPLER_YCBCR_CONVERSION_CREATE_INFO,
+                               true, "VUID-vkCreateSamplerYcbcrConversion-pCreateInfo-parameter",
                                "VUID-VkSamplerYcbcrConversionCreateInfo-sType-sType");
     if (pCreateInfo != nullptr) {
         [[maybe_unused]] const Location pCreateInfo_loc = loc.dot(Field::pCreateInfo);
@@ -7697,8 +7661,8 @@ bool StatelessValidation::PreCallValidateGetPhysicalDeviceExternalBufferProperti
     if (loc.function == vvl::Func::vkGetPhysicalDeviceExternalBufferProperties &&
         CheckPromotedApiAgainstVulkanVersion(physicalDevice, loc, VK_API_VERSION_1_1))
         return true;
-    skip |= ValidateStructType(loc.dot(Field::pExternalBufferInfo), "VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_BUFFER_INFO",
-                               pExternalBufferInfo, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_BUFFER_INFO, true,
+    skip |= ValidateStructType(loc.dot(Field::pExternalBufferInfo), pExternalBufferInfo,
+                               VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_BUFFER_INFO, true,
                                "VUID-vkGetPhysicalDeviceExternalBufferProperties-pExternalBufferInfo-parameter",
                                "VUID-VkPhysicalDeviceExternalBufferInfo-sType-sType");
     if (pExternalBufferInfo != nullptr) {
@@ -7715,8 +7679,8 @@ bool StatelessValidation::PreCallValidateGetPhysicalDeviceExternalBufferProperti
                               "VUID-VkPhysicalDeviceExternalBufferInfo-handleType-parameter",
                               "VUID-VkPhysicalDeviceExternalBufferInfo-handleType-parameter");
     }
-    skip |= ValidateStructType(loc.dot(Field::pExternalBufferProperties), "VK_STRUCTURE_TYPE_EXTERNAL_BUFFER_PROPERTIES",
-                               pExternalBufferProperties, VK_STRUCTURE_TYPE_EXTERNAL_BUFFER_PROPERTIES, true,
+    skip |= ValidateStructType(loc.dot(Field::pExternalBufferProperties), pExternalBufferProperties,
+                               VK_STRUCTURE_TYPE_EXTERNAL_BUFFER_PROPERTIES, true,
                                "VUID-vkGetPhysicalDeviceExternalBufferProperties-pExternalBufferProperties-parameter",
                                "VUID-VkExternalBufferProperties-sType-sType");
     if (pExternalBufferProperties != nullptr) {
@@ -7739,8 +7703,8 @@ bool StatelessValidation::PreCallValidateGetPhysicalDeviceExternalFencePropertie
     if (loc.function == vvl::Func::vkGetPhysicalDeviceExternalFenceProperties &&
         CheckPromotedApiAgainstVulkanVersion(physicalDevice, loc, VK_API_VERSION_1_1))
         return true;
-    skip |= ValidateStructType(loc.dot(Field::pExternalFenceInfo), "VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_FENCE_INFO",
-                               pExternalFenceInfo, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_FENCE_INFO, true,
+    skip |= ValidateStructType(loc.dot(Field::pExternalFenceInfo), pExternalFenceInfo,
+                               VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_FENCE_INFO, true,
                                "VUID-vkGetPhysicalDeviceExternalFenceProperties-pExternalFenceInfo-parameter",
                                "VUID-VkPhysicalDeviceExternalFenceInfo-sType-sType");
     if (pExternalFenceInfo != nullptr) {
@@ -7753,8 +7717,8 @@ bool StatelessValidation::PreCallValidateGetPhysicalDeviceExternalFencePropertie
                               "VUID-VkPhysicalDeviceExternalFenceInfo-handleType-parameter",
                               "VUID-VkPhysicalDeviceExternalFenceInfo-handleType-parameter");
     }
-    skip |= ValidateStructType(loc.dot(Field::pExternalFenceProperties), "VK_STRUCTURE_TYPE_EXTERNAL_FENCE_PROPERTIES",
-                               pExternalFenceProperties, VK_STRUCTURE_TYPE_EXTERNAL_FENCE_PROPERTIES, true,
+    skip |= ValidateStructType(loc.dot(Field::pExternalFenceProperties), pExternalFenceProperties,
+                               VK_STRUCTURE_TYPE_EXTERNAL_FENCE_PROPERTIES, true,
                                "VUID-vkGetPhysicalDeviceExternalFenceProperties-pExternalFenceProperties-parameter",
                                "VUID-VkExternalFenceProperties-sType-sType");
     if (pExternalFenceProperties != nullptr) {
@@ -7774,8 +7738,8 @@ bool StatelessValidation::PreCallValidateGetPhysicalDeviceExternalSemaphorePrope
     if (loc.function == vvl::Func::vkGetPhysicalDeviceExternalSemaphoreProperties &&
         CheckPromotedApiAgainstVulkanVersion(physicalDevice, loc, VK_API_VERSION_1_1))
         return true;
-    skip |= ValidateStructType(loc.dot(Field::pExternalSemaphoreInfo), "VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_SEMAPHORE_INFO",
-                               pExternalSemaphoreInfo, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_SEMAPHORE_INFO, true,
+    skip |= ValidateStructType(loc.dot(Field::pExternalSemaphoreInfo), pExternalSemaphoreInfo,
+                               VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_SEMAPHORE_INFO, true,
                                "VUID-vkGetPhysicalDeviceExternalSemaphoreProperties-pExternalSemaphoreInfo-parameter",
                                "VUID-VkPhysicalDeviceExternalSemaphoreInfo-sType-sType");
     if (pExternalSemaphoreInfo != nullptr) {
@@ -7794,8 +7758,8 @@ bool StatelessValidation::PreCallValidateGetPhysicalDeviceExternalSemaphorePrope
                               "VUID-VkPhysicalDeviceExternalSemaphoreInfo-handleType-parameter",
                               "VUID-VkPhysicalDeviceExternalSemaphoreInfo-handleType-parameter");
     }
-    skip |= ValidateStructType(loc.dot(Field::pExternalSemaphoreProperties), "VK_STRUCTURE_TYPE_EXTERNAL_SEMAPHORE_PROPERTIES",
-                               pExternalSemaphoreProperties, VK_STRUCTURE_TYPE_EXTERNAL_SEMAPHORE_PROPERTIES, true,
+    skip |= ValidateStructType(loc.dot(Field::pExternalSemaphoreProperties), pExternalSemaphoreProperties,
+                               VK_STRUCTURE_TYPE_EXTERNAL_SEMAPHORE_PROPERTIES, true,
                                "VUID-vkGetPhysicalDeviceExternalSemaphoreProperties-pExternalSemaphoreProperties-parameter",
                                "VUID-VkExternalSemaphoreProperties-sType-sType");
     if (pExternalSemaphoreProperties != nullptr) {
@@ -7813,8 +7777,7 @@ bool StatelessValidation::PreCallValidateGetDescriptorSetLayoutSupport(VkDevice 
                                                                        const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), "VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO", pCreateInfo,
-                               VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO, true,
+    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), pCreateInfo, VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO, true,
                                "VUID-vkGetDescriptorSetLayoutSupport-pCreateInfo-parameter",
                                "VUID-VkDescriptorSetLayoutCreateInfo-sType-sType");
     if (pCreateInfo != nullptr) {
@@ -7844,8 +7807,7 @@ bool StatelessValidation::PreCallValidateGetDescriptorSetLayoutSupport(VkDevice 
             }
         }
     }
-    skip |= ValidateStructType(loc.dot(Field::pSupport), "VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_SUPPORT", pSupport,
-                               VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_SUPPORT, true,
+    skip |= ValidateStructType(loc.dot(Field::pSupport), pSupport, VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_SUPPORT, true,
                                "VUID-vkGetDescriptorSetLayoutSupport-pSupport-parameter",
                                "VUID-VkDescriptorSetLayoutSupport-sType-sType");
     if (pSupport != nullptr) {
@@ -7889,9 +7851,8 @@ bool StatelessValidation::PreCallValidateCreateRenderPass2(VkDevice device, cons
                                                            const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), "VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO_2", pCreateInfo,
-                               VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO_2, true, "VUID-vkCreateRenderPass2-pCreateInfo-parameter",
-                               "VUID-VkRenderPassCreateInfo2-sType-sType");
+    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), pCreateInfo, VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO_2, true,
+                               "VUID-vkCreateRenderPass2-pCreateInfo-parameter", "VUID-VkRenderPassCreateInfo2-sType-sType");
     if (pCreateInfo != nullptr) {
         [[maybe_unused]] const Location pCreateInfo_loc = loc.dot(Field::pCreateInfo);
         skip |= ValidateStructPnext(pCreateInfo_loc, pCreateInfo->pNext, 0, nullptr, GeneratedVulkanHeaderVersion,
@@ -7900,11 +7861,10 @@ bool StatelessValidation::PreCallValidateCreateRenderPass2(VkDevice device, cons
         skip |= ValidateReservedFlags(pCreateInfo_loc.dot(Field::flags), pCreateInfo->flags,
                                       "VUID-VkRenderPassCreateInfo2-flags-zerobitmask");
 
-        skip |= ValidateStructTypeArray(pCreateInfo_loc.dot(Field::attachmentCount), pCreateInfo_loc.dot(Field::pAttachments),
-                                        "VK_STRUCTURE_TYPE_ATTACHMENT_DESCRIPTION_2", pCreateInfo->attachmentCount,
-                                        pCreateInfo->pAttachments, VK_STRUCTURE_TYPE_ATTACHMENT_DESCRIPTION_2, false, true,
-                                        "VUID-VkAttachmentDescription2-sType-sType",
-                                        "VUID-VkRenderPassCreateInfo2-pAttachments-parameter", kVUIDUndefined);
+        skip |= ValidateStructTypeArray(
+            pCreateInfo_loc.dot(Field::attachmentCount), pCreateInfo_loc.dot(Field::pAttachments), pCreateInfo->attachmentCount,
+            pCreateInfo->pAttachments, VK_STRUCTURE_TYPE_ATTACHMENT_DESCRIPTION_2, false, true,
+            "VUID-VkAttachmentDescription2-sType-sType", "VUID-VkRenderPassCreateInfo2-pAttachments-parameter", kVUIDUndefined);
 
         if (pCreateInfo->pAttachments != nullptr) {
             for (uint32_t attachmentIndex = 0; attachmentIndex < pCreateInfo->attachmentCount; ++attachmentIndex) {
@@ -7958,9 +7918,8 @@ bool StatelessValidation::PreCallValidateCreateRenderPass2(VkDevice device, cons
         }
 
         skip |= ValidateStructTypeArray(
-            pCreateInfo_loc.dot(Field::subpassCount), pCreateInfo_loc.dot(Field::pSubpasses),
-            "VK_STRUCTURE_TYPE_SUBPASS_DESCRIPTION_2", pCreateInfo->subpassCount, pCreateInfo->pSubpasses,
-            VK_STRUCTURE_TYPE_SUBPASS_DESCRIPTION_2, true, true, "VUID-VkSubpassDescription2-sType-sType",
+            pCreateInfo_loc.dot(Field::subpassCount), pCreateInfo_loc.dot(Field::pSubpasses), pCreateInfo->subpassCount,
+            pCreateInfo->pSubpasses, VK_STRUCTURE_TYPE_SUBPASS_DESCRIPTION_2, true, true, "VUID-VkSubpassDescription2-sType-sType",
             "VUID-VkRenderPassCreateInfo2-pSubpasses-parameter", "VUID-VkRenderPassCreateInfo2-subpassCount-arraylength");
 
         if (pCreateInfo->pSubpasses != nullptr) {
@@ -7984,7 +7943,7 @@ bool StatelessValidation::PreCallValidateCreateRenderPass2(VkDevice device, cons
 
                 skip |= ValidateStructTypeArray(
                     pSubpasses_loc.dot(Field::inputAttachmentCount), pSubpasses_loc.dot(Field::pInputAttachments),
-                    "VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2", pCreateInfo->pSubpasses[subpassIndex].inputAttachmentCount,
+                    pCreateInfo->pSubpasses[subpassIndex].inputAttachmentCount,
                     pCreateInfo->pSubpasses[subpassIndex].pInputAttachments, VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2, false, true,
                     "VUID-VkAttachmentReference2-sType-sType", "VUID-VkSubpassDescription2-pInputAttachments-parameter",
                     kVUIDUndefined);
@@ -8014,7 +7973,7 @@ bool StatelessValidation::PreCallValidateCreateRenderPass2(VkDevice device, cons
 
                 skip |= ValidateStructTypeArray(
                     pSubpasses_loc.dot(Field::colorAttachmentCount), pSubpasses_loc.dot(Field::pColorAttachments),
-                    "VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2", pCreateInfo->pSubpasses[subpassIndex].colorAttachmentCount,
+                    pCreateInfo->pSubpasses[subpassIndex].colorAttachmentCount,
                     pCreateInfo->pSubpasses[subpassIndex].pColorAttachments, VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2, false, true,
                     "VUID-VkAttachmentReference2-sType-sType", "VUID-VkSubpassDescription2-pColorAttachments-parameter",
                     kVUIDUndefined);
@@ -8044,7 +8003,7 @@ bool StatelessValidation::PreCallValidateCreateRenderPass2(VkDevice device, cons
 
                 skip |= ValidateStructTypeArray(
                     pSubpasses_loc.dot(Field::colorAttachmentCount), pSubpasses_loc.dot(Field::pResolveAttachments),
-                    "VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2", pCreateInfo->pSubpasses[subpassIndex].colorAttachmentCount,
+                    pCreateInfo->pSubpasses[subpassIndex].colorAttachmentCount,
                     pCreateInfo->pSubpasses[subpassIndex].pResolveAttachments, VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2, false,
                     false, "VUID-VkAttachmentReference2-sType-sType", "VUID-VkSubpassDescription2-pResolveAttachments-parameter",
                     kVUIDUndefined);
@@ -8073,7 +8032,7 @@ bool StatelessValidation::PreCallValidateCreateRenderPass2(VkDevice device, cons
                 }
 
                 skip |= ValidateStructType(
-                    pSubpasses_loc.dot(Field::pDepthStencilAttachment), "VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2",
+                    pSubpasses_loc.dot(Field::pDepthStencilAttachment),
                     pCreateInfo->pSubpasses[subpassIndex].pDepthStencilAttachment, VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2, false,
                     "VUID-VkSubpassDescription2-pDepthStencilAttachment-parameter", "VUID-VkAttachmentReference2-sType-sType");
 
@@ -8102,11 +8061,10 @@ bool StatelessValidation::PreCallValidateCreateRenderPass2(VkDevice device, cons
             }
         }
 
-        skip |= ValidateStructTypeArray(pCreateInfo_loc.dot(Field::dependencyCount), pCreateInfo_loc.dot(Field::pDependencies),
-                                        "VK_STRUCTURE_TYPE_SUBPASS_DEPENDENCY_2", pCreateInfo->dependencyCount,
-                                        pCreateInfo->pDependencies, VK_STRUCTURE_TYPE_SUBPASS_DEPENDENCY_2, false, true,
-                                        "VUID-VkSubpassDependency2-sType-sType",
-                                        "VUID-VkRenderPassCreateInfo2-pDependencies-parameter", kVUIDUndefined);
+        skip |= ValidateStructTypeArray(
+            pCreateInfo_loc.dot(Field::dependencyCount), pCreateInfo_loc.dot(Field::pDependencies), pCreateInfo->dependencyCount,
+            pCreateInfo->pDependencies, VK_STRUCTURE_TYPE_SUBPASS_DEPENDENCY_2, false, true,
+            "VUID-VkSubpassDependency2-sType-sType", "VUID-VkRenderPassCreateInfo2-pDependencies-parameter", kVUIDUndefined);
 
         if (pCreateInfo->pDependencies != nullptr) {
             for (uint32_t dependencyIndex = 0; dependencyIndex < pCreateInfo->dependencyCount; ++dependencyIndex) {
@@ -8167,8 +8125,7 @@ bool StatelessValidation::PreCallValidateCmdBeginRenderPass2(VkCommandBuffer com
                                                              const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pRenderPassBegin), "VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO", pRenderPassBegin,
-                               VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO, true,
+    skip |= ValidateStructType(loc.dot(Field::pRenderPassBegin), pRenderPassBegin, VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO, true,
                                "VUID-vkCmdBeginRenderPass2-pRenderPassBegin-parameter", "VUID-VkRenderPassBeginInfo-sType-sType");
     if (pRenderPassBegin != nullptr) {
         [[maybe_unused]] const Location pRenderPassBegin_loc = loc.dot(Field::pRenderPassBegin);
@@ -8189,9 +8146,8 @@ bool StatelessValidation::PreCallValidateCmdBeginRenderPass2(VkCommandBuffer com
 
         // No xml-driven validation
     }
-    skip |= ValidateStructType(loc.dot(Field::pSubpassBeginInfo), "VK_STRUCTURE_TYPE_SUBPASS_BEGIN_INFO", pSubpassBeginInfo,
-                               VK_STRUCTURE_TYPE_SUBPASS_BEGIN_INFO, true, "VUID-vkCmdBeginRenderPass2-pSubpassBeginInfo-parameter",
-                               "VUID-VkSubpassBeginInfo-sType-sType");
+    skip |= ValidateStructType(loc.dot(Field::pSubpassBeginInfo), pSubpassBeginInfo, VK_STRUCTURE_TYPE_SUBPASS_BEGIN_INFO, true,
+                               "VUID-vkCmdBeginRenderPass2-pSubpassBeginInfo-parameter", "VUID-VkSubpassBeginInfo-sType-sType");
     if (pSubpassBeginInfo != nullptr) {
         [[maybe_unused]] const Location pSubpassBeginInfo_loc = loc.dot(Field::pSubpassBeginInfo);
         skip |= ValidateStructPnext(pSubpassBeginInfo_loc, pSubpassBeginInfo->pNext, 0, nullptr, GeneratedVulkanHeaderVersion,
@@ -8209,9 +8165,8 @@ bool StatelessValidation::PreCallValidateCmdNextSubpass2(VkCommandBuffer command
                                                          const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pSubpassBeginInfo), "VK_STRUCTURE_TYPE_SUBPASS_BEGIN_INFO", pSubpassBeginInfo,
-                               VK_STRUCTURE_TYPE_SUBPASS_BEGIN_INFO, true, "VUID-vkCmdNextSubpass2-pSubpassBeginInfo-parameter",
-                               "VUID-VkSubpassBeginInfo-sType-sType");
+    skip |= ValidateStructType(loc.dot(Field::pSubpassBeginInfo), pSubpassBeginInfo, VK_STRUCTURE_TYPE_SUBPASS_BEGIN_INFO, true,
+                               "VUID-vkCmdNextSubpass2-pSubpassBeginInfo-parameter", "VUID-VkSubpassBeginInfo-sType-sType");
     if (pSubpassBeginInfo != nullptr) {
         [[maybe_unused]] const Location pSubpassBeginInfo_loc = loc.dot(Field::pSubpassBeginInfo);
         skip |= ValidateStructPnext(pSubpassBeginInfo_loc, pSubpassBeginInfo->pNext, 0, nullptr, GeneratedVulkanHeaderVersion,
@@ -8220,9 +8175,8 @@ bool StatelessValidation::PreCallValidateCmdNextSubpass2(VkCommandBuffer command
         skip |= ValidateRangedEnum(pSubpassBeginInfo_loc.dot(Field::contents), vvl::Enum::VkSubpassContents,
                                    pSubpassBeginInfo->contents, "VUID-VkSubpassBeginInfo-contents-parameter");
     }
-    skip |= ValidateStructType(loc.dot(Field::pSubpassEndInfo), "VK_STRUCTURE_TYPE_SUBPASS_END_INFO", pSubpassEndInfo,
-                               VK_STRUCTURE_TYPE_SUBPASS_END_INFO, true, "VUID-vkCmdNextSubpass2-pSubpassEndInfo-parameter",
-                               "VUID-VkSubpassEndInfo-sType-sType");
+    skip |= ValidateStructType(loc.dot(Field::pSubpassEndInfo), pSubpassEndInfo, VK_STRUCTURE_TYPE_SUBPASS_END_INFO, true,
+                               "VUID-vkCmdNextSubpass2-pSubpassEndInfo-parameter", "VUID-VkSubpassEndInfo-sType-sType");
     if (pSubpassEndInfo != nullptr) {
         [[maybe_unused]] const Location pSubpassEndInfo_loc = loc.dot(Field::pSubpassEndInfo);
         skip |= ValidateStructPnext(pSubpassEndInfo_loc, pSubpassEndInfo->pNext, 0, nullptr, GeneratedVulkanHeaderVersion,
@@ -8235,9 +8189,8 @@ bool StatelessValidation::PreCallValidateCmdEndRenderPass2(VkCommandBuffer comma
                                                            const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pSubpassEndInfo), "VK_STRUCTURE_TYPE_SUBPASS_END_INFO", pSubpassEndInfo,
-                               VK_STRUCTURE_TYPE_SUBPASS_END_INFO, true, "VUID-vkCmdEndRenderPass2-pSubpassEndInfo-parameter",
-                               "VUID-VkSubpassEndInfo-sType-sType");
+    skip |= ValidateStructType(loc.dot(Field::pSubpassEndInfo), pSubpassEndInfo, VK_STRUCTURE_TYPE_SUBPASS_END_INFO, true,
+                               "VUID-vkCmdEndRenderPass2-pSubpassEndInfo-parameter", "VUID-VkSubpassEndInfo-sType-sType");
     if (pSubpassEndInfo != nullptr) {
         [[maybe_unused]] const Location pSubpassEndInfo_loc = loc.dot(Field::pSubpassEndInfo);
         skip |= ValidateStructPnext(pSubpassEndInfo_loc, pSubpassEndInfo->pNext, 0, nullptr, GeneratedVulkanHeaderVersion,
@@ -8267,9 +8220,8 @@ bool StatelessValidation::PreCallValidateWaitSemaphores(VkDevice device, const V
                                                         const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pWaitInfo), "VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO", pWaitInfo,
-                               VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO, true, "VUID-vkWaitSemaphores-pWaitInfo-parameter",
-                               "VUID-VkSemaphoreWaitInfo-sType-sType");
+    skip |= ValidateStructType(loc.dot(Field::pWaitInfo), pWaitInfo, VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO, true,
+                               "VUID-vkWaitSemaphores-pWaitInfo-parameter", "VUID-VkSemaphoreWaitInfo-sType-sType");
     if (pWaitInfo != nullptr) {
         [[maybe_unused]] const Location pWaitInfo_loc = loc.dot(Field::pWaitInfo);
         skip |= ValidateStructPnext(pWaitInfo_loc, pWaitInfo->pNext, 0, nullptr, GeneratedVulkanHeaderVersion,
@@ -8294,9 +8246,8 @@ bool StatelessValidation::PreCallValidateSignalSemaphore(VkDevice device, const 
                                                          const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pSignalInfo), "VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO", pSignalInfo,
-                               VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO, true, "VUID-vkSignalSemaphore-pSignalInfo-parameter",
-                               "VUID-VkSemaphoreSignalInfo-sType-sType");
+    skip |= ValidateStructType(loc.dot(Field::pSignalInfo), pSignalInfo, VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO, true,
+                               "VUID-vkSignalSemaphore-pSignalInfo-parameter", "VUID-VkSemaphoreSignalInfo-sType-sType");
     if (pSignalInfo != nullptr) {
         [[maybe_unused]] const Location pSignalInfo_loc = loc.dot(Field::pSignalInfo);
         skip |= ValidateStructPnext(pSignalInfo_loc, pSignalInfo->pNext, 0, nullptr, GeneratedVulkanHeaderVersion,
@@ -8311,9 +8262,8 @@ bool StatelessValidation::PreCallValidateGetBufferDeviceAddress(VkDevice device,
                                                                 const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pInfo), "VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO", pInfo,
-                               VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, true, "VUID-vkGetBufferDeviceAddress-pInfo-parameter",
-                               "VUID-VkBufferDeviceAddressInfo-sType-sType");
+    skip |= ValidateStructType(loc.dot(Field::pInfo), pInfo, VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, true,
+                               "VUID-vkGetBufferDeviceAddress-pInfo-parameter", "VUID-VkBufferDeviceAddressInfo-sType-sType");
     if (pInfo != nullptr) {
         [[maybe_unused]] const Location pInfo_loc = loc.dot(Field::pInfo);
         skip |= ValidateStructPnext(pInfo_loc, pInfo->pNext, 0, nullptr, GeneratedVulkanHeaderVersion,
@@ -8328,9 +8278,9 @@ bool StatelessValidation::PreCallValidateGetBufferOpaqueCaptureAddress(VkDevice 
                                                                        const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(
-        loc.dot(Field::pInfo), "VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO", pInfo, VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
-        true, "VUID-vkGetBufferOpaqueCaptureAddress-pInfo-parameter", "VUID-VkBufferDeviceAddressInfo-sType-sType");
+    skip |=
+        ValidateStructType(loc.dot(Field::pInfo), pInfo, VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, true,
+                           "VUID-vkGetBufferOpaqueCaptureAddress-pInfo-parameter", "VUID-VkBufferDeviceAddressInfo-sType-sType");
     if (pInfo != nullptr) {
         [[maybe_unused]] const Location pInfo_loc = loc.dot(Field::pInfo);
         skip |= ValidateStructPnext(pInfo_loc, pInfo->pNext, 0, nullptr, GeneratedVulkanHeaderVersion,
@@ -8346,8 +8296,7 @@ bool StatelessValidation::PreCallValidateGetDeviceMemoryOpaqueCaptureAddress(VkD
                                                                              const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pInfo), "VK_STRUCTURE_TYPE_DEVICE_MEMORY_OPAQUE_CAPTURE_ADDRESS_INFO", pInfo,
-                               VK_STRUCTURE_TYPE_DEVICE_MEMORY_OPAQUE_CAPTURE_ADDRESS_INFO, true,
+    skip |= ValidateStructType(loc.dot(Field::pInfo), pInfo, VK_STRUCTURE_TYPE_DEVICE_MEMORY_OPAQUE_CAPTURE_ADDRESS_INFO, true,
                                "VUID-vkGetDeviceMemoryOpaqueCaptureAddress-pInfo-parameter",
                                "VUID-VkDeviceMemoryOpaqueCaptureAddressInfo-sType-sType");
     if (pInfo != nullptr) {
@@ -8369,8 +8318,7 @@ bool StatelessValidation::PreCallValidateGetPhysicalDeviceToolProperties(VkPhysi
     if (loc.function == vvl::Func::vkGetPhysicalDeviceToolProperties &&
         CheckPromotedApiAgainstVulkanVersion(physicalDevice, loc, VK_API_VERSION_1_3))
         return true;
-    skip |= ValidateStructTypeArray(loc.dot(Field::pToolCount), loc.dot(Field::pToolProperties),
-                                    "VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TOOL_PROPERTIES", pToolCount, pToolProperties,
+    skip |= ValidateStructTypeArray(loc.dot(Field::pToolCount), loc.dot(Field::pToolProperties), pToolCount, pToolProperties,
                                     VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TOOL_PROPERTIES, true, false, false, kVUIDUndefined,
                                     kVUIDUndefined, kVUIDUndefined, kVUIDUndefined);
     if (pToolProperties != nullptr) {
@@ -8389,8 +8337,8 @@ bool StatelessValidation::PreCallValidateCreatePrivateDataSlot(VkDevice device, 
                                                                const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), "VK_STRUCTURE_TYPE_PRIVATE_DATA_SLOT_CREATE_INFO", pCreateInfo,
-                               VK_STRUCTURE_TYPE_PRIVATE_DATA_SLOT_CREATE_INFO, true, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), pCreateInfo, VK_STRUCTURE_TYPE_PRIVATE_DATA_SLOT_CREATE_INFO, true,
+                               kVUIDUndefined, kVUIDUndefined);
     if (pCreateInfo != nullptr) {
         [[maybe_unused]] const Location pCreateInfo_loc = loc.dot(Field::pCreateInfo);
         skip |= ValidateStructPnext(pCreateInfo_loc, pCreateInfo->pNext, 0, nullptr, GeneratedVulkanHeaderVersion, kVUIDUndefined,
@@ -8442,9 +8390,8 @@ bool StatelessValidation::PreCallValidateCmdSetEvent2(VkCommandBuffer commandBuf
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
     skip |= ValidateRequiredHandle(loc.dot(Field::event), event);
-    skip |= ValidateStructType(loc.dot(Field::pDependencyInfo), "VK_STRUCTURE_TYPE_DEPENDENCY_INFO", pDependencyInfo,
-                               VK_STRUCTURE_TYPE_DEPENDENCY_INFO, true, "VUID-vkCmdSetEvent2-pDependencyInfo-parameter",
-                               "VUID-VkDependencyInfo-sType-sType");
+    skip |= ValidateStructType(loc.dot(Field::pDependencyInfo), pDependencyInfo, VK_STRUCTURE_TYPE_DEPENDENCY_INFO, true,
+                               "VUID-vkCmdSetEvent2-pDependencyInfo-parameter", "VUID-VkDependencyInfo-sType-sType");
     if (pDependencyInfo != nullptr) {
         [[maybe_unused]] const Location pDependencyInfo_loc = loc.dot(Field::pDependencyInfo);
         skip |= ValidateStructPnext(pDependencyInfo_loc, pDependencyInfo->pNext, 0, nullptr, GeneratedVulkanHeaderVersion,
@@ -8454,11 +8401,10 @@ bool StatelessValidation::PreCallValidateCmdSetEvent2(VkCommandBuffer commandBuf
                               AllVkDependencyFlagBits, pDependencyInfo->dependencyFlags, kOptionalFlags,
                               "VUID-VkDependencyInfo-dependencyFlags-parameter");
 
-        skip |= ValidateStructTypeArray(pDependencyInfo_loc.dot(Field::memoryBarrierCount),
-                                        pDependencyInfo_loc.dot(Field::pMemoryBarriers), "VK_STRUCTURE_TYPE_MEMORY_BARRIER_2",
-                                        pDependencyInfo->memoryBarrierCount, pDependencyInfo->pMemoryBarriers,
-                                        VK_STRUCTURE_TYPE_MEMORY_BARRIER_2, false, true, "VUID-VkMemoryBarrier2-sType-sType",
-                                        "VUID-VkDependencyInfo-pMemoryBarriers-parameter", kVUIDUndefined);
+        skip |= ValidateStructTypeArray(
+            pDependencyInfo_loc.dot(Field::memoryBarrierCount), pDependencyInfo_loc.dot(Field::pMemoryBarriers),
+            pDependencyInfo->memoryBarrierCount, pDependencyInfo->pMemoryBarriers, VK_STRUCTURE_TYPE_MEMORY_BARRIER_2, false, true,
+            "VUID-VkMemoryBarrier2-sType-sType", "VUID-VkDependencyInfo-pMemoryBarriers-parameter", kVUIDUndefined);
 
         if (pDependencyInfo->pMemoryBarriers != nullptr) {
             for (uint32_t memoryBarrierIndex = 0; memoryBarrierIndex < pDependencyInfo->memoryBarrierCount; ++memoryBarrierIndex) {
@@ -8490,9 +8436,9 @@ bool StatelessValidation::PreCallValidateCmdSetEvent2(VkCommandBuffer commandBuf
 
         skip |= ValidateStructTypeArray(
             pDependencyInfo_loc.dot(Field::bufferMemoryBarrierCount), pDependencyInfo_loc.dot(Field::pBufferMemoryBarriers),
-            "VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2", pDependencyInfo->bufferMemoryBarrierCount,
-            pDependencyInfo->pBufferMemoryBarriers, VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2, false, true,
-            "VUID-VkBufferMemoryBarrier2-sType-sType", "VUID-VkDependencyInfo-pBufferMemoryBarriers-parameter", kVUIDUndefined);
+            pDependencyInfo->bufferMemoryBarrierCount, pDependencyInfo->pBufferMemoryBarriers,
+            VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2, false, true, "VUID-VkBufferMemoryBarrier2-sType-sType",
+            "VUID-VkDependencyInfo-pBufferMemoryBarriers-parameter", kVUIDUndefined);
 
         if (pDependencyInfo->pBufferMemoryBarriers != nullptr) {
             for (uint32_t bufferMemoryBarrierIndex = 0; bufferMemoryBarrierIndex < pDependencyInfo->bufferMemoryBarrierCount;
@@ -8530,9 +8476,9 @@ bool StatelessValidation::PreCallValidateCmdSetEvent2(VkCommandBuffer commandBuf
 
         skip |= ValidateStructTypeArray(
             pDependencyInfo_loc.dot(Field::imageMemoryBarrierCount), pDependencyInfo_loc.dot(Field::pImageMemoryBarriers),
-            "VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2", pDependencyInfo->imageMemoryBarrierCount,
-            pDependencyInfo->pImageMemoryBarriers, VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2, false, true,
-            "VUID-VkImageMemoryBarrier2-sType-sType", "VUID-VkDependencyInfo-pImageMemoryBarriers-parameter", kVUIDUndefined);
+            pDependencyInfo->imageMemoryBarrierCount, pDependencyInfo->pImageMemoryBarriers,
+            VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2, false, true, "VUID-VkImageMemoryBarrier2-sType-sType",
+            "VUID-VkDependencyInfo-pImageMemoryBarriers-parameter", kVUIDUndefined);
 
         if (pDependencyInfo->pImageMemoryBarriers != nullptr) {
             for (uint32_t imageMemoryBarrierIndex = 0; imageMemoryBarrierIndex < pDependencyInfo->imageMemoryBarrierCount;
@@ -8606,10 +8552,10 @@ bool StatelessValidation::PreCallValidateCmdWaitEvents2(VkCommandBuffer commandB
     [[maybe_unused]] const Location loc = error_obj.location;
     skip |= ValidateHandleArray(loc.dot(Field::eventCount), loc.dot(Field::pEvents), eventCount, pEvents, true, true,
                                 "VUID-vkCmdWaitEvents2-eventCount-arraylength");
-    skip |= ValidateStructTypeArray(
-        loc.dot(Field::eventCount), loc.dot(Field::pDependencyInfos), "VK_STRUCTURE_TYPE_DEPENDENCY_INFO", eventCount,
-        pDependencyInfos, VK_STRUCTURE_TYPE_DEPENDENCY_INFO, true, true, "VUID-VkDependencyInfo-sType-sType",
-        "VUID-vkCmdWaitEvents2-pDependencyInfos-parameter", "VUID-vkCmdWaitEvents2-eventCount-arraylength");
+    skip |=
+        ValidateStructTypeArray(loc.dot(Field::eventCount), loc.dot(Field::pDependencyInfos), eventCount, pDependencyInfos,
+                                VK_STRUCTURE_TYPE_DEPENDENCY_INFO, true, true, "VUID-VkDependencyInfo-sType-sType",
+                                "VUID-vkCmdWaitEvents2-pDependencyInfos-parameter", "VUID-vkCmdWaitEvents2-eventCount-arraylength");
     if (pDependencyInfos != nullptr) {
         for (uint32_t eventIndex = 0; eventIndex < eventCount; ++eventIndex) {
             [[maybe_unused]] const Location pDependencyInfos_loc = loc.dot(Field::pDependencyInfos, eventIndex);
@@ -8623,9 +8569,9 @@ bool StatelessValidation::PreCallValidateCmdWaitEvents2(VkCommandBuffer commandB
 
             skip |= ValidateStructTypeArray(
                 pDependencyInfos_loc.dot(Field::memoryBarrierCount), pDependencyInfos_loc.dot(Field::pMemoryBarriers),
-                "VK_STRUCTURE_TYPE_MEMORY_BARRIER_2", pDependencyInfos[eventIndex].memoryBarrierCount,
-                pDependencyInfos[eventIndex].pMemoryBarriers, VK_STRUCTURE_TYPE_MEMORY_BARRIER_2, false, true,
-                "VUID-VkMemoryBarrier2-sType-sType", "VUID-VkDependencyInfo-pMemoryBarriers-parameter", kVUIDUndefined);
+                pDependencyInfos[eventIndex].memoryBarrierCount, pDependencyInfos[eventIndex].pMemoryBarriers,
+                VK_STRUCTURE_TYPE_MEMORY_BARRIER_2, false, true, "VUID-VkMemoryBarrier2-sType-sType",
+                "VUID-VkDependencyInfo-pMemoryBarriers-parameter", kVUIDUndefined);
 
             if (pDependencyInfos[eventIndex].pMemoryBarriers != nullptr) {
                 for (uint32_t memoryBarrierIndex = 0; memoryBarrierIndex < pDependencyInfos[eventIndex].memoryBarrierCount;
@@ -8660,9 +8606,9 @@ bool StatelessValidation::PreCallValidateCmdWaitEvents2(VkCommandBuffer commandB
 
             skip |= ValidateStructTypeArray(
                 pDependencyInfos_loc.dot(Field::bufferMemoryBarrierCount), pDependencyInfos_loc.dot(Field::pBufferMemoryBarriers),
-                "VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2", pDependencyInfos[eventIndex].bufferMemoryBarrierCount,
-                pDependencyInfos[eventIndex].pBufferMemoryBarriers, VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2, false, true,
-                "VUID-VkBufferMemoryBarrier2-sType-sType", "VUID-VkDependencyInfo-pBufferMemoryBarriers-parameter", kVUIDUndefined);
+                pDependencyInfos[eventIndex].bufferMemoryBarrierCount, pDependencyInfos[eventIndex].pBufferMemoryBarriers,
+                VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2, false, true, "VUID-VkBufferMemoryBarrier2-sType-sType",
+                "VUID-VkDependencyInfo-pBufferMemoryBarriers-parameter", kVUIDUndefined);
 
             if (pDependencyInfos[eventIndex].pBufferMemoryBarriers != nullptr) {
                 for (uint32_t bufferMemoryBarrierIndex = 0;
@@ -8704,9 +8650,9 @@ bool StatelessValidation::PreCallValidateCmdWaitEvents2(VkCommandBuffer commandB
 
             skip |= ValidateStructTypeArray(
                 pDependencyInfos_loc.dot(Field::imageMemoryBarrierCount), pDependencyInfos_loc.dot(Field::pImageMemoryBarriers),
-                "VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2", pDependencyInfos[eventIndex].imageMemoryBarrierCount,
-                pDependencyInfos[eventIndex].pImageMemoryBarriers, VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2, false, true,
-                "VUID-VkImageMemoryBarrier2-sType-sType", "VUID-VkDependencyInfo-pImageMemoryBarriers-parameter", kVUIDUndefined);
+                pDependencyInfos[eventIndex].imageMemoryBarrierCount, pDependencyInfos[eventIndex].pImageMemoryBarriers,
+                VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2, false, true, "VUID-VkImageMemoryBarrier2-sType-sType",
+                "VUID-VkDependencyInfo-pImageMemoryBarriers-parameter", kVUIDUndefined);
 
             if (pDependencyInfos[eventIndex].pImageMemoryBarriers != nullptr) {
                 for (uint32_t imageMemoryBarrierIndex = 0;
@@ -8770,9 +8716,8 @@ bool StatelessValidation::PreCallValidateCmdPipelineBarrier2(VkCommandBuffer com
                                                              const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pDependencyInfo), "VK_STRUCTURE_TYPE_DEPENDENCY_INFO", pDependencyInfo,
-                               VK_STRUCTURE_TYPE_DEPENDENCY_INFO, true, "VUID-vkCmdPipelineBarrier2-pDependencyInfo-parameter",
-                               "VUID-VkDependencyInfo-sType-sType");
+    skip |= ValidateStructType(loc.dot(Field::pDependencyInfo), pDependencyInfo, VK_STRUCTURE_TYPE_DEPENDENCY_INFO, true,
+                               "VUID-vkCmdPipelineBarrier2-pDependencyInfo-parameter", "VUID-VkDependencyInfo-sType-sType");
     if (pDependencyInfo != nullptr) {
         [[maybe_unused]] const Location pDependencyInfo_loc = loc.dot(Field::pDependencyInfo);
         skip |= ValidateStructPnext(pDependencyInfo_loc, pDependencyInfo->pNext, 0, nullptr, GeneratedVulkanHeaderVersion,
@@ -8782,11 +8727,10 @@ bool StatelessValidation::PreCallValidateCmdPipelineBarrier2(VkCommandBuffer com
                               AllVkDependencyFlagBits, pDependencyInfo->dependencyFlags, kOptionalFlags,
                               "VUID-VkDependencyInfo-dependencyFlags-parameter");
 
-        skip |= ValidateStructTypeArray(pDependencyInfo_loc.dot(Field::memoryBarrierCount),
-                                        pDependencyInfo_loc.dot(Field::pMemoryBarriers), "VK_STRUCTURE_TYPE_MEMORY_BARRIER_2",
-                                        pDependencyInfo->memoryBarrierCount, pDependencyInfo->pMemoryBarriers,
-                                        VK_STRUCTURE_TYPE_MEMORY_BARRIER_2, false, true, "VUID-VkMemoryBarrier2-sType-sType",
-                                        "VUID-VkDependencyInfo-pMemoryBarriers-parameter", kVUIDUndefined);
+        skip |= ValidateStructTypeArray(
+            pDependencyInfo_loc.dot(Field::memoryBarrierCount), pDependencyInfo_loc.dot(Field::pMemoryBarriers),
+            pDependencyInfo->memoryBarrierCount, pDependencyInfo->pMemoryBarriers, VK_STRUCTURE_TYPE_MEMORY_BARRIER_2, false, true,
+            "VUID-VkMemoryBarrier2-sType-sType", "VUID-VkDependencyInfo-pMemoryBarriers-parameter", kVUIDUndefined);
 
         if (pDependencyInfo->pMemoryBarriers != nullptr) {
             for (uint32_t memoryBarrierIndex = 0; memoryBarrierIndex < pDependencyInfo->memoryBarrierCount; ++memoryBarrierIndex) {
@@ -8818,9 +8762,9 @@ bool StatelessValidation::PreCallValidateCmdPipelineBarrier2(VkCommandBuffer com
 
         skip |= ValidateStructTypeArray(
             pDependencyInfo_loc.dot(Field::bufferMemoryBarrierCount), pDependencyInfo_loc.dot(Field::pBufferMemoryBarriers),
-            "VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2", pDependencyInfo->bufferMemoryBarrierCount,
-            pDependencyInfo->pBufferMemoryBarriers, VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2, false, true,
-            "VUID-VkBufferMemoryBarrier2-sType-sType", "VUID-VkDependencyInfo-pBufferMemoryBarriers-parameter", kVUIDUndefined);
+            pDependencyInfo->bufferMemoryBarrierCount, pDependencyInfo->pBufferMemoryBarriers,
+            VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2, false, true, "VUID-VkBufferMemoryBarrier2-sType-sType",
+            "VUID-VkDependencyInfo-pBufferMemoryBarriers-parameter", kVUIDUndefined);
 
         if (pDependencyInfo->pBufferMemoryBarriers != nullptr) {
             for (uint32_t bufferMemoryBarrierIndex = 0; bufferMemoryBarrierIndex < pDependencyInfo->bufferMemoryBarrierCount;
@@ -8858,9 +8802,9 @@ bool StatelessValidation::PreCallValidateCmdPipelineBarrier2(VkCommandBuffer com
 
         skip |= ValidateStructTypeArray(
             pDependencyInfo_loc.dot(Field::imageMemoryBarrierCount), pDependencyInfo_loc.dot(Field::pImageMemoryBarriers),
-            "VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2", pDependencyInfo->imageMemoryBarrierCount,
-            pDependencyInfo->pImageMemoryBarriers, VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2, false, true,
-            "VUID-VkImageMemoryBarrier2-sType-sType", "VUID-VkDependencyInfo-pImageMemoryBarriers-parameter", kVUIDUndefined);
+            pDependencyInfo->imageMemoryBarrierCount, pDependencyInfo->pImageMemoryBarriers,
+            VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2, false, true, "VUID-VkImageMemoryBarrier2-sType-sType",
+            "VUID-VkDependencyInfo-pImageMemoryBarriers-parameter", kVUIDUndefined);
 
         if (pDependencyInfo->pImageMemoryBarriers != nullptr) {
             for (uint32_t imageMemoryBarrierIndex = 0; imageMemoryBarrierIndex < pDependencyInfo->imageMemoryBarrierCount;
@@ -8932,9 +8876,9 @@ bool StatelessValidation::PreCallValidateQueueSubmit2(VkQueue queue, uint32_t su
                                                       VkFence fence, const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructTypeArray(loc.dot(Field::submitCount), loc.dot(Field::pSubmits), "VK_STRUCTURE_TYPE_SUBMIT_INFO_2",
-                                    submitCount, pSubmits, VK_STRUCTURE_TYPE_SUBMIT_INFO_2, false, true,
-                                    "VUID-VkSubmitInfo2-sType-sType", "VUID-vkQueueSubmit2-pSubmits-parameter", kVUIDUndefined);
+    skip |= ValidateStructTypeArray(loc.dot(Field::submitCount), loc.dot(Field::pSubmits), submitCount, pSubmits,
+                                    VK_STRUCTURE_TYPE_SUBMIT_INFO_2, false, true, "VUID-VkSubmitInfo2-sType-sType",
+                                    "VUID-vkQueueSubmit2-pSubmits-parameter", kVUIDUndefined);
     if (pSubmits != nullptr) {
         for (uint32_t submitIndex = 0; submitIndex < submitCount; ++submitIndex) {
             [[maybe_unused]] const Location pSubmits_loc = loc.dot(Field::pSubmits, submitIndex);
@@ -8949,9 +8893,9 @@ bool StatelessValidation::PreCallValidateQueueSubmit2(VkQueue queue, uint32_t su
 
             skip |= ValidateStructTypeArray(
                 pSubmits_loc.dot(Field::waitSemaphoreInfoCount), pSubmits_loc.dot(Field::pWaitSemaphoreInfos),
-                "VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO", pSubmits[submitIndex].waitSemaphoreInfoCount,
-                pSubmits[submitIndex].pWaitSemaphoreInfos, VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO, false, true,
-                "VUID-VkSemaphoreSubmitInfo-sType-sType", "VUID-VkSubmitInfo2-pWaitSemaphoreInfos-parameter", kVUIDUndefined);
+                pSubmits[submitIndex].waitSemaphoreInfoCount, pSubmits[submitIndex].pWaitSemaphoreInfos,
+                VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO, false, true, "VUID-VkSemaphoreSubmitInfo-sType-sType",
+                "VUID-VkSubmitInfo2-pWaitSemaphoreInfos-parameter", kVUIDUndefined);
 
             if (pSubmits[submitIndex].pWaitSemaphoreInfos != nullptr) {
                 for (uint32_t waitSemaphoreInfoIndex = 0; waitSemaphoreInfoIndex < pSubmits[submitIndex].waitSemaphoreInfoCount;
@@ -8975,9 +8919,9 @@ bool StatelessValidation::PreCallValidateQueueSubmit2(VkQueue queue, uint32_t su
 
             skip |= ValidateStructTypeArray(
                 pSubmits_loc.dot(Field::commandBufferInfoCount), pSubmits_loc.dot(Field::pCommandBufferInfos),
-                "VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO", pSubmits[submitIndex].commandBufferInfoCount,
-                pSubmits[submitIndex].pCommandBufferInfos, VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO, false, true,
-                "VUID-VkCommandBufferSubmitInfo-sType-sType", "VUID-VkSubmitInfo2-pCommandBufferInfos-parameter", kVUIDUndefined);
+                pSubmits[submitIndex].commandBufferInfoCount, pSubmits[submitIndex].pCommandBufferInfos,
+                VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO, false, true, "VUID-VkCommandBufferSubmitInfo-sType-sType",
+                "VUID-VkSubmitInfo2-pCommandBufferInfos-parameter", kVUIDUndefined);
 
             if (pSubmits[submitIndex].pCommandBufferInfos != nullptr) {
                 for (uint32_t commandBufferInfoIndex = 0; commandBufferInfoIndex < pSubmits[submitIndex].commandBufferInfoCount;
@@ -8996,9 +8940,9 @@ bool StatelessValidation::PreCallValidateQueueSubmit2(VkQueue queue, uint32_t su
 
             skip |= ValidateStructTypeArray(
                 pSubmits_loc.dot(Field::signalSemaphoreInfoCount), pSubmits_loc.dot(Field::pSignalSemaphoreInfos),
-                "VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO", pSubmits[submitIndex].signalSemaphoreInfoCount,
-                pSubmits[submitIndex].pSignalSemaphoreInfos, VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO, false, true,
-                "VUID-VkSemaphoreSubmitInfo-sType-sType", "VUID-VkSubmitInfo2-pSignalSemaphoreInfos-parameter", kVUIDUndefined);
+                pSubmits[submitIndex].signalSemaphoreInfoCount, pSubmits[submitIndex].pSignalSemaphoreInfos,
+                VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO, false, true, "VUID-VkSemaphoreSubmitInfo-sType-sType",
+                "VUID-VkSubmitInfo2-pSignalSemaphoreInfos-parameter", kVUIDUndefined);
 
             if (pSubmits[submitIndex].pSignalSemaphoreInfos != nullptr) {
                 for (uint32_t signalSemaphoreInfoIndex = 0;
@@ -9028,9 +8972,8 @@ bool StatelessValidation::PreCallValidateCmdCopyBuffer2(VkCommandBuffer commandB
                                                         const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pCopyBufferInfo), "VK_STRUCTURE_TYPE_COPY_BUFFER_INFO_2", pCopyBufferInfo,
-                               VK_STRUCTURE_TYPE_COPY_BUFFER_INFO_2, true, "VUID-vkCmdCopyBuffer2-pCopyBufferInfo-parameter",
-                               "VUID-VkCopyBufferInfo2-sType-sType");
+    skip |= ValidateStructType(loc.dot(Field::pCopyBufferInfo), pCopyBufferInfo, VK_STRUCTURE_TYPE_COPY_BUFFER_INFO_2, true,
+                               "VUID-vkCmdCopyBuffer2-pCopyBufferInfo-parameter", "VUID-VkCopyBufferInfo2-sType-sType");
     if (pCopyBufferInfo != nullptr) {
         [[maybe_unused]] const Location pCopyBufferInfo_loc = loc.dot(Field::pCopyBufferInfo);
         skip |= ValidateStructPnext(pCopyBufferInfo_loc, pCopyBufferInfo->pNext, 0, nullptr, GeneratedVulkanHeaderVersion,
@@ -9040,11 +8983,10 @@ bool StatelessValidation::PreCallValidateCmdCopyBuffer2(VkCommandBuffer commandB
 
         skip |= ValidateRequiredHandle(pCopyBufferInfo_loc.dot(Field::dstBuffer), pCopyBufferInfo->dstBuffer);
 
-        skip |=
-            ValidateStructTypeArray(pCopyBufferInfo_loc.dot(Field::regionCount), pCopyBufferInfo_loc.dot(Field::pRegions),
-                                    "VK_STRUCTURE_TYPE_BUFFER_COPY_2", pCopyBufferInfo->regionCount, pCopyBufferInfo->pRegions,
-                                    VK_STRUCTURE_TYPE_BUFFER_COPY_2, true, true, "VUID-VkBufferCopy2-sType-sType",
-                                    "VUID-VkCopyBufferInfo2-pRegions-parameter", "VUID-VkCopyBufferInfo2-regionCount-arraylength");
+        skip |= ValidateStructTypeArray(pCopyBufferInfo_loc.dot(Field::regionCount), pCopyBufferInfo_loc.dot(Field::pRegions),
+                                        pCopyBufferInfo->regionCount, pCopyBufferInfo->pRegions, VK_STRUCTURE_TYPE_BUFFER_COPY_2,
+                                        true, true, "VUID-VkBufferCopy2-sType-sType", "VUID-VkCopyBufferInfo2-pRegions-parameter",
+                                        "VUID-VkCopyBufferInfo2-regionCount-arraylength");
 
         if (pCopyBufferInfo->pRegions != nullptr) {
             for (uint32_t regionIndex = 0; regionIndex < pCopyBufferInfo->regionCount; ++regionIndex) {
@@ -9063,9 +9005,8 @@ bool StatelessValidation::PreCallValidateCmdCopyImage2(VkCommandBuffer commandBu
                                                        const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pCopyImageInfo), "VK_STRUCTURE_TYPE_COPY_IMAGE_INFO_2", pCopyImageInfo,
-                               VK_STRUCTURE_TYPE_COPY_IMAGE_INFO_2, true, "VUID-vkCmdCopyImage2-pCopyImageInfo-parameter",
-                               "VUID-VkCopyImageInfo2-sType-sType");
+    skip |= ValidateStructType(loc.dot(Field::pCopyImageInfo), pCopyImageInfo, VK_STRUCTURE_TYPE_COPY_IMAGE_INFO_2, true,
+                               "VUID-vkCmdCopyImage2-pCopyImageInfo-parameter", "VUID-VkCopyImageInfo2-sType-sType");
     if (pCopyImageInfo != nullptr) {
         [[maybe_unused]] const Location pCopyImageInfo_loc = loc.dot(Field::pCopyImageInfo);
         skip |= ValidateStructPnext(pCopyImageInfo_loc, pCopyImageInfo->pNext, 0, nullptr, GeneratedVulkanHeaderVersion,
@@ -9081,11 +9022,10 @@ bool StatelessValidation::PreCallValidateCmdCopyImage2(VkCommandBuffer commandBu
         skip |= ValidateRangedEnum(pCopyImageInfo_loc.dot(Field::dstImageLayout), vvl::Enum::VkImageLayout,
                                    pCopyImageInfo->dstImageLayout, "VUID-VkCopyImageInfo2-dstImageLayout-parameter");
 
-        skip |=
-            ValidateStructTypeArray(pCopyImageInfo_loc.dot(Field::regionCount), pCopyImageInfo_loc.dot(Field::pRegions),
-                                    "VK_STRUCTURE_TYPE_IMAGE_COPY_2", pCopyImageInfo->regionCount, pCopyImageInfo->pRegions,
-                                    VK_STRUCTURE_TYPE_IMAGE_COPY_2, true, true, "VUID-VkImageCopy2-sType-sType",
-                                    "VUID-VkCopyImageInfo2-pRegions-parameter", "VUID-VkCopyImageInfo2-regionCount-arraylength");
+        skip |= ValidateStructTypeArray(pCopyImageInfo_loc.dot(Field::regionCount), pCopyImageInfo_loc.dot(Field::pRegions),
+                                        pCopyImageInfo->regionCount, pCopyImageInfo->pRegions, VK_STRUCTURE_TYPE_IMAGE_COPY_2, true,
+                                        true, "VUID-VkImageCopy2-sType-sType", "VUID-VkCopyImageInfo2-pRegions-parameter",
+                                        "VUID-VkCopyImageInfo2-regionCount-arraylength");
 
         if (pCopyImageInfo->pRegions != nullptr) {
             for (uint32_t regionIndex = 0; regionIndex < pCopyImageInfo->regionCount; ++regionIndex) {
@@ -9120,10 +9060,9 @@ bool StatelessValidation::PreCallValidateCmdCopyBufferToImage2(VkCommandBuffer c
                                                                const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pCopyBufferToImageInfo), "VK_STRUCTURE_TYPE_COPY_BUFFER_TO_IMAGE_INFO_2",
-                               pCopyBufferToImageInfo, VK_STRUCTURE_TYPE_COPY_BUFFER_TO_IMAGE_INFO_2, true,
-                               "VUID-vkCmdCopyBufferToImage2-pCopyBufferToImageInfo-parameter",
-                               "VUID-VkCopyBufferToImageInfo2-sType-sType");
+    skip |= ValidateStructType(
+        loc.dot(Field::pCopyBufferToImageInfo), pCopyBufferToImageInfo, VK_STRUCTURE_TYPE_COPY_BUFFER_TO_IMAGE_INFO_2, true,
+        "VUID-vkCmdCopyBufferToImage2-pCopyBufferToImageInfo-parameter", "VUID-VkCopyBufferToImageInfo2-sType-sType");
     if (pCopyBufferToImageInfo != nullptr) {
         [[maybe_unused]] const Location pCopyBufferToImageInfo_loc = loc.dot(Field::pCopyBufferToImageInfo);
         skip |=
@@ -9138,11 +9077,11 @@ bool StatelessValidation::PreCallValidateCmdCopyBufferToImage2(VkCommandBuffer c
             ValidateRangedEnum(pCopyBufferToImageInfo_loc.dot(Field::dstImageLayout), vvl::Enum::VkImageLayout,
                                pCopyBufferToImageInfo->dstImageLayout, "VUID-VkCopyBufferToImageInfo2-dstImageLayout-parameter");
 
-        skip |= ValidateStructTypeArray(
-            pCopyBufferToImageInfo_loc.dot(Field::regionCount), pCopyBufferToImageInfo_loc.dot(Field::pRegions),
-            "VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2", pCopyBufferToImageInfo->regionCount, pCopyBufferToImageInfo->pRegions,
-            VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2, true, true, "VUID-VkBufferImageCopy2-sType-sType",
-            "VUID-VkCopyBufferToImageInfo2-pRegions-parameter", "VUID-VkCopyBufferToImageInfo2-regionCount-arraylength");
+        skip |= ValidateStructTypeArray(pCopyBufferToImageInfo_loc.dot(Field::regionCount),
+                                        pCopyBufferToImageInfo_loc.dot(Field::pRegions), pCopyBufferToImageInfo->regionCount,
+                                        pCopyBufferToImageInfo->pRegions, VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2, true, true,
+                                        "VUID-VkBufferImageCopy2-sType-sType", "VUID-VkCopyBufferToImageInfo2-pRegions-parameter",
+                                        "VUID-VkCopyBufferToImageInfo2-regionCount-arraylength");
 
         if (pCopyBufferToImageInfo->pRegions != nullptr) {
             for (uint32_t regionIndex = 0; regionIndex < pCopyBufferToImageInfo->regionCount; ++regionIndex) {
@@ -9171,10 +9110,9 @@ bool StatelessValidation::PreCallValidateCmdCopyImageToBuffer2(VkCommandBuffer c
                                                                const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pCopyImageToBufferInfo), "VK_STRUCTURE_TYPE_COPY_IMAGE_TO_BUFFER_INFO_2",
-                               pCopyImageToBufferInfo, VK_STRUCTURE_TYPE_COPY_IMAGE_TO_BUFFER_INFO_2, true,
-                               "VUID-vkCmdCopyImageToBuffer2-pCopyImageToBufferInfo-parameter",
-                               "VUID-VkCopyImageToBufferInfo2-sType-sType");
+    skip |= ValidateStructType(
+        loc.dot(Field::pCopyImageToBufferInfo), pCopyImageToBufferInfo, VK_STRUCTURE_TYPE_COPY_IMAGE_TO_BUFFER_INFO_2, true,
+        "VUID-vkCmdCopyImageToBuffer2-pCopyImageToBufferInfo-parameter", "VUID-VkCopyImageToBufferInfo2-sType-sType");
     if (pCopyImageToBufferInfo != nullptr) {
         [[maybe_unused]] const Location pCopyImageToBufferInfo_loc = loc.dot(Field::pCopyImageToBufferInfo);
         skip |=
@@ -9189,11 +9127,11 @@ bool StatelessValidation::PreCallValidateCmdCopyImageToBuffer2(VkCommandBuffer c
 
         skip |= ValidateRequiredHandle(pCopyImageToBufferInfo_loc.dot(Field::dstBuffer), pCopyImageToBufferInfo->dstBuffer);
 
-        skip |= ValidateStructTypeArray(
-            pCopyImageToBufferInfo_loc.dot(Field::regionCount), pCopyImageToBufferInfo_loc.dot(Field::pRegions),
-            "VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2", pCopyImageToBufferInfo->regionCount, pCopyImageToBufferInfo->pRegions,
-            VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2, true, true, "VUID-VkBufferImageCopy2-sType-sType",
-            "VUID-VkCopyImageToBufferInfo2-pRegions-parameter", "VUID-VkCopyImageToBufferInfo2-regionCount-arraylength");
+        skip |= ValidateStructTypeArray(pCopyImageToBufferInfo_loc.dot(Field::regionCount),
+                                        pCopyImageToBufferInfo_loc.dot(Field::pRegions), pCopyImageToBufferInfo->regionCount,
+                                        pCopyImageToBufferInfo->pRegions, VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2, true, true,
+                                        "VUID-VkBufferImageCopy2-sType-sType", "VUID-VkCopyImageToBufferInfo2-pRegions-parameter",
+                                        "VUID-VkCopyImageToBufferInfo2-regionCount-arraylength");
 
         if (pCopyImageToBufferInfo->pRegions != nullptr) {
             for (uint32_t regionIndex = 0; regionIndex < pCopyImageToBufferInfo->regionCount; ++regionIndex) {
@@ -9221,9 +9159,8 @@ bool StatelessValidation::PreCallValidateCmdBlitImage2(VkCommandBuffer commandBu
                                                        const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pBlitImageInfo), "VK_STRUCTURE_TYPE_BLIT_IMAGE_INFO_2", pBlitImageInfo,
-                               VK_STRUCTURE_TYPE_BLIT_IMAGE_INFO_2, true, "VUID-vkCmdBlitImage2-pBlitImageInfo-parameter",
-                               "VUID-VkBlitImageInfo2-sType-sType");
+    skip |= ValidateStructType(loc.dot(Field::pBlitImageInfo), pBlitImageInfo, VK_STRUCTURE_TYPE_BLIT_IMAGE_INFO_2, true,
+                               "VUID-vkCmdBlitImage2-pBlitImageInfo-parameter", "VUID-VkBlitImageInfo2-sType-sType");
     if (pBlitImageInfo != nullptr) {
         [[maybe_unused]] const Location pBlitImageInfo_loc = loc.dot(Field::pBlitImageInfo);
         skip |= ValidateStructPnext(pBlitImageInfo_loc, pBlitImageInfo->pNext, 0, nullptr, GeneratedVulkanHeaderVersion,
@@ -9239,11 +9176,10 @@ bool StatelessValidation::PreCallValidateCmdBlitImage2(VkCommandBuffer commandBu
         skip |= ValidateRangedEnum(pBlitImageInfo_loc.dot(Field::dstImageLayout), vvl::Enum::VkImageLayout,
                                    pBlitImageInfo->dstImageLayout, "VUID-VkBlitImageInfo2-dstImageLayout-parameter");
 
-        skip |=
-            ValidateStructTypeArray(pBlitImageInfo_loc.dot(Field::regionCount), pBlitImageInfo_loc.dot(Field::pRegions),
-                                    "VK_STRUCTURE_TYPE_IMAGE_BLIT_2", pBlitImageInfo->regionCount, pBlitImageInfo->pRegions,
-                                    VK_STRUCTURE_TYPE_IMAGE_BLIT_2, true, true, "VUID-VkImageBlit2-sType-sType",
-                                    "VUID-VkBlitImageInfo2-pRegions-parameter", "VUID-VkBlitImageInfo2-regionCount-arraylength");
+        skip |= ValidateStructTypeArray(pBlitImageInfo_loc.dot(Field::regionCount), pBlitImageInfo_loc.dot(Field::pRegions),
+                                        pBlitImageInfo->regionCount, pBlitImageInfo->pRegions, VK_STRUCTURE_TYPE_IMAGE_BLIT_2, true,
+                                        true, "VUID-VkImageBlit2-sType-sType", "VUID-VkBlitImageInfo2-pRegions-parameter",
+                                        "VUID-VkBlitImageInfo2-regionCount-arraylength");
 
         if (pBlitImageInfo->pRegions != nullptr) {
             for (uint32_t regionIndex = 0; regionIndex < pBlitImageInfo->regionCount; ++regionIndex) {
@@ -9275,9 +9211,8 @@ bool StatelessValidation::PreCallValidateCmdResolveImage2(VkCommandBuffer comman
                                                           const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pResolveImageInfo), "VK_STRUCTURE_TYPE_RESOLVE_IMAGE_INFO_2", pResolveImageInfo,
-                               VK_STRUCTURE_TYPE_RESOLVE_IMAGE_INFO_2, true, "VUID-vkCmdResolveImage2-pResolveImageInfo-parameter",
-                               "VUID-VkResolveImageInfo2-sType-sType");
+    skip |= ValidateStructType(loc.dot(Field::pResolveImageInfo), pResolveImageInfo, VK_STRUCTURE_TYPE_RESOLVE_IMAGE_INFO_2, true,
+                               "VUID-vkCmdResolveImage2-pResolveImageInfo-parameter", "VUID-VkResolveImageInfo2-sType-sType");
     if (pResolveImageInfo != nullptr) {
         [[maybe_unused]] const Location pResolveImageInfo_loc = loc.dot(Field::pResolveImageInfo);
         skip |= ValidateStructPnext(pResolveImageInfo_loc, pResolveImageInfo->pNext, 0, nullptr, GeneratedVulkanHeaderVersion,
@@ -9293,11 +9228,11 @@ bool StatelessValidation::PreCallValidateCmdResolveImage2(VkCommandBuffer comman
         skip |= ValidateRangedEnum(pResolveImageInfo_loc.dot(Field::dstImageLayout), vvl::Enum::VkImageLayout,
                                    pResolveImageInfo->dstImageLayout, "VUID-VkResolveImageInfo2-dstImageLayout-parameter");
 
-        skip |= ValidateStructTypeArray(pResolveImageInfo_loc.dot(Field::regionCount), pResolveImageInfo_loc.dot(Field::pRegions),
-                                        "VK_STRUCTURE_TYPE_IMAGE_RESOLVE_2", pResolveImageInfo->regionCount,
-                                        pResolveImageInfo->pRegions, VK_STRUCTURE_TYPE_IMAGE_RESOLVE_2, true, true,
-                                        "VUID-VkImageResolve2-sType-sType", "VUID-VkResolveImageInfo2-pRegions-parameter",
-                                        "VUID-VkResolveImageInfo2-regionCount-arraylength");
+        skip |=
+            ValidateStructTypeArray(pResolveImageInfo_loc.dot(Field::regionCount), pResolveImageInfo_loc.dot(Field::pRegions),
+                                    pResolveImageInfo->regionCount, pResolveImageInfo->pRegions, VK_STRUCTURE_TYPE_IMAGE_RESOLVE_2,
+                                    true, true, "VUID-VkImageResolve2-sType-sType", "VUID-VkResolveImageInfo2-pRegions-parameter",
+                                    "VUID-VkResolveImageInfo2-regionCount-arraylength");
 
         if (pResolveImageInfo->pRegions != nullptr) {
             for (uint32_t regionIndex = 0; regionIndex < pResolveImageInfo->regionCount; ++regionIndex) {
@@ -9331,8 +9266,8 @@ bool StatelessValidation::PreCallValidateCmdBeginRendering(VkCommandBuffer comma
                                                            const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pRenderingInfo), "VK_STRUCTURE_TYPE_RENDERING_INFO", pRenderingInfo,
-                               VK_STRUCTURE_TYPE_RENDERING_INFO, true, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateStructType(loc.dot(Field::pRenderingInfo), pRenderingInfo, VK_STRUCTURE_TYPE_RENDERING_INFO, true,
+                               kVUIDUndefined, kVUIDUndefined);
     if (pRenderingInfo != nullptr) {
         [[maybe_unused]] const Location pRenderingInfo_loc = loc.dot(Field::pRenderingInfo);
         constexpr std::array allowed_structs_VkRenderingInfo = {VK_STRUCTURE_TYPE_DEVICE_GROUP_RENDER_PASS_BEGIN_INFO};
@@ -9348,10 +9283,10 @@ bool StatelessValidation::PreCallValidateCmdBeginRendering(VkCommandBuffer comma
 
         // No xml-driven validation
 
-        skip |= ValidateStructTypeArray(
-            pRenderingInfo_loc.dot(Field::colorAttachmentCount), pRenderingInfo_loc.dot(Field::pColorAttachments),
-            "VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO", pRenderingInfo->colorAttachmentCount, pRenderingInfo->pColorAttachments,
-            VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO, false, true, kVUIDUndefined, kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateStructTypeArray(pRenderingInfo_loc.dot(Field::colorAttachmentCount),
+                                        pRenderingInfo_loc.dot(Field::pColorAttachments), pRenderingInfo->colorAttachmentCount,
+                                        pRenderingInfo->pColorAttachments, VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO, false, true,
+                                        kVUIDUndefined, kVUIDUndefined, kVUIDUndefined);
 
         if (pRenderingInfo->pColorAttachments != nullptr) {
             for (uint32_t colorAttachmentIndex = 0; colorAttachmentIndex < pRenderingInfo->colorAttachmentCount;
@@ -9383,9 +9318,8 @@ bool StatelessValidation::PreCallValidateCmdBeginRendering(VkCommandBuffer comma
             }
         }
 
-        skip |= ValidateStructType(pRenderingInfo_loc.dot(Field::pDepthAttachment), "VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO",
-                                   pRenderingInfo->pDepthAttachment, VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO, false,
-                                   kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateStructType(pRenderingInfo_loc.dot(Field::pDepthAttachment), pRenderingInfo->pDepthAttachment,
+                                   VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO, false, kVUIDUndefined, kVUIDUndefined);
 
         if (pRenderingInfo->pDepthAttachment != nullptr) {
             [[maybe_unused]] const Location pDepthAttachment_loc = pRenderingInfo_loc.dot(Field::pDepthAttachment);
@@ -9411,9 +9345,8 @@ bool StatelessValidation::PreCallValidateCmdBeginRendering(VkCommandBuffer comma
             // No xml-driven validation
         }
 
-        skip |= ValidateStructType(pRenderingInfo_loc.dot(Field::pStencilAttachment), "VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO",
-                                   pRenderingInfo->pStencilAttachment, VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO, false,
-                                   kVUIDUndefined, kVUIDUndefined);
+        skip |= ValidateStructType(pRenderingInfo_loc.dot(Field::pStencilAttachment), pRenderingInfo->pStencilAttachment,
+                                   VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO, false, kVUIDUndefined, kVUIDUndefined);
 
         if (pRenderingInfo->pStencilAttachment != nullptr) {
             [[maybe_unused]] const Location pStencilAttachment_loc = pRenderingInfo_loc.dot(Field::pStencilAttachment);
@@ -9617,16 +9550,15 @@ bool StatelessValidation::PreCallValidateGetDeviceBufferMemoryRequirements(VkDev
                                                                            const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pInfo), "VK_STRUCTURE_TYPE_DEVICE_BUFFER_MEMORY_REQUIREMENTS", pInfo,
-                               VK_STRUCTURE_TYPE_DEVICE_BUFFER_MEMORY_REQUIREMENTS, true, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateStructType(loc.dot(Field::pInfo), pInfo, VK_STRUCTURE_TYPE_DEVICE_BUFFER_MEMORY_REQUIREMENTS, true,
+                               kVUIDUndefined, kVUIDUndefined);
     if (pInfo != nullptr) {
         [[maybe_unused]] const Location pInfo_loc = loc.dot(Field::pInfo);
         skip |= ValidateStructPnext(pInfo_loc, pInfo->pNext, 0, nullptr, GeneratedVulkanHeaderVersion, kVUIDUndefined,
                                     kVUIDUndefined, VK_NULL_HANDLE, true);
 
-        skip |=
-            ValidateStructType(pInfo_loc.dot(Field::pCreateInfo), "VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO", pInfo->pCreateInfo,
-                               VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO, true, kVUIDUndefined, "VUID-VkBufferCreateInfo-sType-sType");
+        skip |= ValidateStructType(pInfo_loc.dot(Field::pCreateInfo), pInfo->pCreateInfo, VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+                                   true, kVUIDUndefined, "VUID-VkBufferCreateInfo-sType-sType");
 
         if (pInfo->pCreateInfo != nullptr) {
             [[maybe_unused]] const Location pCreateInfo_loc = pInfo_loc.dot(Field::pCreateInfo);
@@ -9646,9 +9578,8 @@ bool StatelessValidation::PreCallValidateGetDeviceBufferMemoryRequirements(VkDev
                                        pInfo->pCreateInfo->sharingMode, "VUID-VkBufferCreateInfo-sharingMode-parameter");
         }
     }
-    skip |=
-        ValidateStructType(loc.dot(Field::pMemoryRequirements), "VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2", pMemoryRequirements,
-                           VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2, true, kVUIDUndefined, "VUID-VkMemoryRequirements2-sType-sType");
+    skip |= ValidateStructType(loc.dot(Field::pMemoryRequirements), pMemoryRequirements, VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2,
+                               true, kVUIDUndefined, "VUID-VkMemoryRequirements2-sType-sType");
     if (pMemoryRequirements != nullptr) {
         [[maybe_unused]] const Location pMemoryRequirements_loc = loc.dot(Field::pMemoryRequirements);
         constexpr std::array allowed_structs_VkMemoryRequirements2 = {VK_STRUCTURE_TYPE_MEMORY_DEDICATED_REQUIREMENTS};
@@ -9667,15 +9598,15 @@ bool StatelessValidation::PreCallValidateGetDeviceImageMemoryRequirements(VkDevi
                                                                           const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pInfo), "VK_STRUCTURE_TYPE_DEVICE_IMAGE_MEMORY_REQUIREMENTS", pInfo,
-                               VK_STRUCTURE_TYPE_DEVICE_IMAGE_MEMORY_REQUIREMENTS, true, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateStructType(loc.dot(Field::pInfo), pInfo, VK_STRUCTURE_TYPE_DEVICE_IMAGE_MEMORY_REQUIREMENTS, true,
+                               kVUIDUndefined, kVUIDUndefined);
     if (pInfo != nullptr) {
         [[maybe_unused]] const Location pInfo_loc = loc.dot(Field::pInfo);
         skip |= ValidateStructPnext(pInfo_loc, pInfo->pNext, 0, nullptr, GeneratedVulkanHeaderVersion, kVUIDUndefined,
                                     kVUIDUndefined, VK_NULL_HANDLE, true);
 
-        skip |= ValidateStructType(pInfo_loc.dot(Field::pCreateInfo), "VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO", pInfo->pCreateInfo,
-                                   VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO, true, kVUIDUndefined, "VUID-VkImageCreateInfo-sType-sType");
+        skip |= ValidateStructType(pInfo_loc.dot(Field::pCreateInfo), pInfo->pCreateInfo, VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO, true,
+                                   kVUIDUndefined, "VUID-VkImageCreateInfo-sType-sType");
 
         if (pInfo->pCreateInfo != nullptr) {
             [[maybe_unused]] const Location pCreateInfo_loc = pInfo_loc.dot(Field::pCreateInfo);
@@ -9726,9 +9657,8 @@ bool StatelessValidation::PreCallValidateGetDeviceImageMemoryRequirements(VkDevi
         skip |= ValidateFlags(pInfo_loc.dot(Field::planeAspect), vvl::FlagBitmask::VkImageAspectFlagBits, AllVkImageAspectFlagBits,
                               pInfo->planeAspect, kOptionalSingleBit, kVUIDUndefined);
     }
-    skip |=
-        ValidateStructType(loc.dot(Field::pMemoryRequirements), "VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2", pMemoryRequirements,
-                           VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2, true, kVUIDUndefined, "VUID-VkMemoryRequirements2-sType-sType");
+    skip |= ValidateStructType(loc.dot(Field::pMemoryRequirements), pMemoryRequirements, VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2,
+                               true, kVUIDUndefined, "VUID-VkMemoryRequirements2-sType-sType");
     if (pMemoryRequirements != nullptr) {
         [[maybe_unused]] const Location pMemoryRequirements_loc = loc.dot(Field::pMemoryRequirements);
         constexpr std::array allowed_structs_VkMemoryRequirements2 = {VK_STRUCTURE_TYPE_MEMORY_DEDICATED_REQUIREMENTS};
@@ -9747,15 +9677,15 @@ bool StatelessValidation::PreCallValidateGetDeviceImageSparseMemoryRequirements(
     VkSparseImageMemoryRequirements2* pSparseMemoryRequirements, const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pInfo), "VK_STRUCTURE_TYPE_DEVICE_IMAGE_MEMORY_REQUIREMENTS", pInfo,
-                               VK_STRUCTURE_TYPE_DEVICE_IMAGE_MEMORY_REQUIREMENTS, true, kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateStructType(loc.dot(Field::pInfo), pInfo, VK_STRUCTURE_TYPE_DEVICE_IMAGE_MEMORY_REQUIREMENTS, true,
+                               kVUIDUndefined, kVUIDUndefined);
     if (pInfo != nullptr) {
         [[maybe_unused]] const Location pInfo_loc = loc.dot(Field::pInfo);
         skip |= ValidateStructPnext(pInfo_loc, pInfo->pNext, 0, nullptr, GeneratedVulkanHeaderVersion, kVUIDUndefined,
                                     kVUIDUndefined, VK_NULL_HANDLE, true);
 
-        skip |= ValidateStructType(pInfo_loc.dot(Field::pCreateInfo), "VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO", pInfo->pCreateInfo,
-                                   VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO, true, kVUIDUndefined, "VUID-VkImageCreateInfo-sType-sType");
+        skip |= ValidateStructType(pInfo_loc.dot(Field::pCreateInfo), pInfo->pCreateInfo, VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO, true,
+                                   kVUIDUndefined, "VUID-VkImageCreateInfo-sType-sType");
 
         if (pInfo->pCreateInfo != nullptr) {
             [[maybe_unused]] const Location pCreateInfo_loc = pInfo_loc.dot(Field::pCreateInfo);
@@ -9822,8 +9752,7 @@ bool StatelessValidation::PreCallValidateGetCommandPoolMemoryConsumption(VkDevic
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
     skip |= ValidateRequiredHandle(loc.dot(Field::commandPool), commandPool);
-    skip |= ValidateStructType(loc.dot(Field::pConsumption), "VK_STRUCTURE_TYPE_COMMAND_POOL_MEMORY_CONSUMPTION", pConsumption,
-                               VK_STRUCTURE_TYPE_COMMAND_POOL_MEMORY_CONSUMPTION, true,
+    skip |= ValidateStructType(loc.dot(Field::pConsumption), pConsumption, VK_STRUCTURE_TYPE_COMMAND_POOL_MEMORY_CONSUMPTION, true,
                                "VUID-vkGetCommandPoolMemoryConsumption-pConsumption-parameter",
                                "VUID-VkCommandPoolMemoryConsumption-sType-sType");
     if (pConsumption != nullptr) {
@@ -9843,10 +9772,10 @@ bool StatelessValidation::PreCallValidateGetFaultData(VkDevice device, VkFaultQu
                                "VUID-vkGetFaultData-faultQueryBehavior-parameter");
     skip |= ValidateRequiredPointer(loc.dot(Field::pUnrecordedFaults), pUnrecordedFaults,
                                     "VUID-vkGetFaultData-pUnrecordedFaults-parameter");
-    skip |= ValidateStructTypeArray(loc.dot(Field::pFaultCount), loc.dot(Field::pFaults), "VK_STRUCTURE_TYPE_FAULT_DATA",
-                                    pFaultCount, pFaults, VK_STRUCTURE_TYPE_FAULT_DATA, true, false, false,
-                                    "VUID-VkFaultData-sType-sType", "VUID-vkGetFaultData-pFaults-parameter",
-                                    "VUID-vkGetFaultData-pFaultCount-parameter", kVUIDUndefined);
+    skip |= ValidateStructTypeArray(loc.dot(Field::pFaultCount), loc.dot(Field::pFaults), pFaultCount, pFaults,
+                                    VK_STRUCTURE_TYPE_FAULT_DATA, true, false, false, "VUID-VkFaultData-sType-sType",
+                                    "VUID-vkGetFaultData-pFaults-parameter", "VUID-vkGetFaultData-pFaultCount-parameter",
+                                    kVUIDUndefined);
     if (pFaults != nullptr) {
         for (uint32_t pFaultIndex = 0; pFaultIndex < *pFaultCount; ++pFaultIndex) {
             [[maybe_unused]] const Location pFaults_loc = loc.dot(Field::pFaults, pFaultIndex);
@@ -9944,9 +9873,8 @@ bool StatelessValidation::PreCallValidateCreateSwapchainKHR(VkDevice device, con
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
     if (!IsExtEnabled(device_extensions.vk_khr_swapchain)) skip |= OutputExtensionError(loc, {vvl::Extension::_VK_KHR_swapchain});
-    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), "VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR", pCreateInfo,
-                               VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR, true, "VUID-vkCreateSwapchainKHR-pCreateInfo-parameter",
-                               "VUID-VkSwapchainCreateInfoKHR-sType-sType");
+    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), pCreateInfo, VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR, true,
+                               "VUID-vkCreateSwapchainKHR-pCreateInfo-parameter", "VUID-VkSwapchainCreateInfoKHR-sType-sType");
     if (pCreateInfo != nullptr) {
         [[maybe_unused]] const Location pCreateInfo_loc = loc.dot(Field::pCreateInfo);
         constexpr std::array allowed_structs_VkSwapchainCreateInfoKHR = {VK_STRUCTURE_TYPE_DEVICE_GROUP_SWAPCHAIN_CREATE_INFO_KHR,
@@ -10035,9 +9963,8 @@ bool StatelessValidation::PreCallValidateQueuePresentKHR(VkQueue queue, const Vk
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
     if (!IsExtEnabled(device_extensions.vk_khr_swapchain)) skip |= OutputExtensionError(loc, {vvl::Extension::_VK_KHR_swapchain});
-    skip |= ValidateStructType(loc.dot(Field::pPresentInfo), "VK_STRUCTURE_TYPE_PRESENT_INFO_KHR", pPresentInfo,
-                               VK_STRUCTURE_TYPE_PRESENT_INFO_KHR, true, "VUID-vkQueuePresentKHR-pPresentInfo-parameter",
-                               "VUID-VkPresentInfoKHR-sType-sType");
+    skip |= ValidateStructType(loc.dot(Field::pPresentInfo), pPresentInfo, VK_STRUCTURE_TYPE_PRESENT_INFO_KHR, true,
+                               "VUID-vkQueuePresentKHR-pPresentInfo-parameter", "VUID-VkPresentInfoKHR-sType-sType");
     if (pPresentInfo != nullptr) {
         [[maybe_unused]] const Location pPresentInfo_loc = loc.dot(Field::pPresentInfo);
         constexpr std::array allowed_structs_VkPresentInfoKHR = {VK_STRUCTURE_TYPE_DEVICE_GROUP_PRESENT_INFO_KHR,
@@ -10074,8 +10001,7 @@ bool StatelessValidation::PreCallValidateGetDeviceGroupPresentCapabilitiesKHR(
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
     if (!IsExtEnabled(device_extensions.vk_khr_swapchain)) skip |= OutputExtensionError(loc, {vvl::Extension::_VK_KHR_swapchain});
-    skip |= ValidateStructType(loc.dot(Field::pDeviceGroupPresentCapabilities),
-                               "VK_STRUCTURE_TYPE_DEVICE_GROUP_PRESENT_CAPABILITIES_KHR", pDeviceGroupPresentCapabilities,
+    skip |= ValidateStructType(loc.dot(Field::pDeviceGroupPresentCapabilities), pDeviceGroupPresentCapabilities,
                                VK_STRUCTURE_TYPE_DEVICE_GROUP_PRESENT_CAPABILITIES_KHR, true,
                                "VUID-vkGetDeviceGroupPresentCapabilitiesKHR-pDeviceGroupPresentCapabilities-parameter",
                                "VUID-VkDeviceGroupPresentCapabilitiesKHR-sType-sType");
@@ -10117,8 +10043,7 @@ bool StatelessValidation::PreCallValidateAcquireNextImage2KHR(VkDevice device, c
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
     if (!IsExtEnabled(device_extensions.vk_khr_swapchain)) skip |= OutputExtensionError(loc, {vvl::Extension::_VK_KHR_swapchain});
-    skip |= ValidateStructType(loc.dot(Field::pAcquireInfo), "VK_STRUCTURE_TYPE_ACQUIRE_NEXT_IMAGE_INFO_KHR", pAcquireInfo,
-                               VK_STRUCTURE_TYPE_ACQUIRE_NEXT_IMAGE_INFO_KHR, true,
+    skip |= ValidateStructType(loc.dot(Field::pAcquireInfo), pAcquireInfo, VK_STRUCTURE_TYPE_ACQUIRE_NEXT_IMAGE_INFO_KHR, true,
                                "VUID-vkAcquireNextImage2KHR-pAcquireInfo-parameter", "VUID-VkAcquireNextImageInfoKHR-sType-sType");
     if (pAcquireInfo != nullptr) {
         [[maybe_unused]] const Location pAcquireInfo_loc = loc.dot(Field::pAcquireInfo);
@@ -10210,8 +10135,7 @@ bool StatelessValidation::PreCallValidateCreateDisplayModeKHR(VkPhysicalDevice p
     [[maybe_unused]] const Location loc = error_obj.location;
     if (!IsExtEnabled(instance_extensions.vk_khr_display)) skip |= OutputExtensionError(loc, {vvl::Extension::_VK_KHR_display});
     skip |= ValidateRequiredHandle(loc.dot(Field::display), display);
-    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), "VK_STRUCTURE_TYPE_DISPLAY_MODE_CREATE_INFO_KHR", pCreateInfo,
-                               VK_STRUCTURE_TYPE_DISPLAY_MODE_CREATE_INFO_KHR, true,
+    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), pCreateInfo, VK_STRUCTURE_TYPE_DISPLAY_MODE_CREATE_INFO_KHR, true,
                                "VUID-vkCreateDisplayModeKHR-pCreateInfo-parameter", "VUID-VkDisplayModeCreateInfoKHR-sType-sType");
     if (pCreateInfo != nullptr) {
         [[maybe_unused]] const Location pCreateInfo_loc = loc.dot(Field::pCreateInfo);
@@ -10256,8 +10180,7 @@ bool StatelessValidation::PreCallValidateCreateDisplayPlaneSurfaceKHR(VkInstance
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
     if (!IsExtEnabled(instance_extensions.vk_khr_display)) skip |= OutputExtensionError(loc, {vvl::Extension::_VK_KHR_display});
-    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), "VK_STRUCTURE_TYPE_DISPLAY_SURFACE_CREATE_INFO_KHR", pCreateInfo,
-                               VK_STRUCTURE_TYPE_DISPLAY_SURFACE_CREATE_INFO_KHR, true,
+    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), pCreateInfo, VK_STRUCTURE_TYPE_DISPLAY_SURFACE_CREATE_INFO_KHR, true,
                                "VUID-vkCreateDisplayPlaneSurfaceKHR-pCreateInfo-parameter",
                                "VUID-VkDisplaySurfaceCreateInfoKHR-sType-sType");
     if (pCreateInfo != nullptr) {
@@ -10300,8 +10223,8 @@ bool StatelessValidation::PreCallValidateCreateSharedSwapchainsKHR(VkDevice devi
     if (!IsExtEnabled(device_extensions.vk_khr_display_swapchain))
         skip |= OutputExtensionError(loc, {vvl::Extension::_VK_KHR_display_swapchain});
     skip |= ValidateStructTypeArray(
-        loc.dot(Field::swapchainCount), loc.dot(Field::pCreateInfos), "VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR", swapchainCount,
-        pCreateInfos, VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR, true, true, "VUID-VkSwapchainCreateInfoKHR-sType-sType",
+        loc.dot(Field::swapchainCount), loc.dot(Field::pCreateInfos), swapchainCount, pCreateInfos,
+        VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR, true, true, "VUID-VkSwapchainCreateInfoKHR-sType-sType",
         "VUID-vkCreateSharedSwapchainsKHR-pCreateInfos-parameter", "VUID-vkCreateSharedSwapchainsKHR-swapchainCount-arraylength");
     if (pCreateInfos != nullptr) {
         for (uint32_t swapchainIndex = 0; swapchainIndex < swapchainCount; ++swapchainIndex) {
@@ -10375,9 +10298,8 @@ bool StatelessValidation::PreCallValidateGetMemoryFdKHR(VkDevice device, const V
     [[maybe_unused]] const Location loc = error_obj.location;
     if (!IsExtEnabled(device_extensions.vk_khr_external_memory_fd))
         skip |= OutputExtensionError(loc, {vvl::Extension::_VK_KHR_external_memory_fd});
-    skip |= ValidateStructType(loc.dot(Field::pGetFdInfo), "VK_STRUCTURE_TYPE_MEMORY_GET_FD_INFO_KHR", pGetFdInfo,
-                               VK_STRUCTURE_TYPE_MEMORY_GET_FD_INFO_KHR, true, "VUID-vkGetMemoryFdKHR-pGetFdInfo-parameter",
-                               "VUID-VkMemoryGetFdInfoKHR-sType-sType");
+    skip |= ValidateStructType(loc.dot(Field::pGetFdInfo), pGetFdInfo, VK_STRUCTURE_TYPE_MEMORY_GET_FD_INFO_KHR, true,
+                               "VUID-vkGetMemoryFdKHR-pGetFdInfo-parameter", "VUID-VkMemoryGetFdInfoKHR-sType-sType");
     if (pGetFdInfo != nullptr) {
         [[maybe_unused]] const Location pGetFdInfo_loc = loc.dot(Field::pGetFdInfo);
         skip |= ValidateStructPnext(pGetFdInfo_loc, pGetFdInfo->pNext, 0, nullptr, GeneratedVulkanHeaderVersion,
@@ -10405,9 +10327,8 @@ bool StatelessValidation::PreCallValidateGetMemoryFdPropertiesKHR(VkDevice devic
                           AllVkExternalMemoryHandleTypeFlagBits, handleType, kRequiredSingleBit,
                           "VUID-vkGetMemoryFdPropertiesKHR-handleType-parameter",
                           "VUID-vkGetMemoryFdPropertiesKHR-handleType-parameter");
-    skip |= ValidateStructType(loc.dot(Field::pMemoryFdProperties), "VK_STRUCTURE_TYPE_MEMORY_FD_PROPERTIES_KHR",
-                               pMemoryFdProperties, VK_STRUCTURE_TYPE_MEMORY_FD_PROPERTIES_KHR, true,
-                               "VUID-vkGetMemoryFdPropertiesKHR-pMemoryFdProperties-parameter",
+    skip |= ValidateStructType(loc.dot(Field::pMemoryFdProperties), pMemoryFdProperties, VK_STRUCTURE_TYPE_MEMORY_FD_PROPERTIES_KHR,
+                               true, "VUID-vkGetMemoryFdPropertiesKHR-pMemoryFdProperties-parameter",
                                "VUID-VkMemoryFdPropertiesKHR-sType-sType");
     if (pMemoryFdProperties != nullptr) {
         [[maybe_unused]] const Location pMemoryFdProperties_loc = loc.dot(Field::pMemoryFdProperties);
@@ -10425,10 +10346,9 @@ bool StatelessValidation::PreCallValidateImportSemaphoreFdKHR(VkDevice device,
     [[maybe_unused]] const Location loc = error_obj.location;
     if (!IsExtEnabled(device_extensions.vk_khr_external_semaphore_fd))
         skip |= OutputExtensionError(loc, {vvl::Extension::_VK_KHR_external_semaphore_fd});
-    skip |= ValidateStructType(loc.dot(Field::pImportSemaphoreFdInfo), "VK_STRUCTURE_TYPE_IMPORT_SEMAPHORE_FD_INFO_KHR",
-                               pImportSemaphoreFdInfo, VK_STRUCTURE_TYPE_IMPORT_SEMAPHORE_FD_INFO_KHR, true,
-                               "VUID-vkImportSemaphoreFdKHR-pImportSemaphoreFdInfo-parameter",
-                               "VUID-VkImportSemaphoreFdInfoKHR-sType-sType");
+    skip |= ValidateStructType(
+        loc.dot(Field::pImportSemaphoreFdInfo), pImportSemaphoreFdInfo, VK_STRUCTURE_TYPE_IMPORT_SEMAPHORE_FD_INFO_KHR, true,
+        "VUID-vkImportSemaphoreFdKHR-pImportSemaphoreFdInfo-parameter", "VUID-VkImportSemaphoreFdInfoKHR-sType-sType");
     if (pImportSemaphoreFdInfo != nullptr) {
         [[maybe_unused]] const Location pImportSemaphoreFdInfo_loc = loc.dot(Field::pImportSemaphoreFdInfo);
         skip |=
@@ -10456,9 +10376,8 @@ bool StatelessValidation::PreCallValidateGetSemaphoreFdKHR(VkDevice device, cons
     [[maybe_unused]] const Location loc = error_obj.location;
     if (!IsExtEnabled(device_extensions.vk_khr_external_semaphore_fd))
         skip |= OutputExtensionError(loc, {vvl::Extension::_VK_KHR_external_semaphore_fd});
-    skip |= ValidateStructType(loc.dot(Field::pGetFdInfo), "VK_STRUCTURE_TYPE_SEMAPHORE_GET_FD_INFO_KHR", pGetFdInfo,
-                               VK_STRUCTURE_TYPE_SEMAPHORE_GET_FD_INFO_KHR, true, "VUID-vkGetSemaphoreFdKHR-pGetFdInfo-parameter",
-                               "VUID-VkSemaphoreGetFdInfoKHR-sType-sType");
+    skip |= ValidateStructType(loc.dot(Field::pGetFdInfo), pGetFdInfo, VK_STRUCTURE_TYPE_SEMAPHORE_GET_FD_INFO_KHR, true,
+                               "VUID-vkGetSemaphoreFdKHR-pGetFdInfo-parameter", "VUID-VkSemaphoreGetFdInfoKHR-sType-sType");
     if (pGetFdInfo != nullptr) {
         [[maybe_unused]] const Location pGetFdInfo_loc = loc.dot(Field::pGetFdInfo);
         skip |= ValidateStructPnext(pGetFdInfo_loc, pGetFdInfo->pNext, 0, nullptr, GeneratedVulkanHeaderVersion,
@@ -10492,9 +10411,9 @@ bool StatelessValidation::PreCallValidateImportFenceFdKHR(VkDevice device, const
     [[maybe_unused]] const Location loc = error_obj.location;
     if (!IsExtEnabled(device_extensions.vk_khr_external_fence_fd))
         skip |= OutputExtensionError(loc, {vvl::Extension::_VK_KHR_external_fence_fd});
-    skip |= ValidateStructType(loc.dot(Field::pImportFenceFdInfo), "VK_STRUCTURE_TYPE_IMPORT_FENCE_FD_INFO_KHR", pImportFenceFdInfo,
-                               VK_STRUCTURE_TYPE_IMPORT_FENCE_FD_INFO_KHR, true,
-                               "VUID-vkImportFenceFdKHR-pImportFenceFdInfo-parameter", "VUID-VkImportFenceFdInfoKHR-sType-sType");
+    skip |=
+        ValidateStructType(loc.dot(Field::pImportFenceFdInfo), pImportFenceFdInfo, VK_STRUCTURE_TYPE_IMPORT_FENCE_FD_INFO_KHR, true,
+                           "VUID-vkImportFenceFdKHR-pImportFenceFdInfo-parameter", "VUID-VkImportFenceFdInfoKHR-sType-sType");
     if (pImportFenceFdInfo != nullptr) {
         [[maybe_unused]] const Location pImportFenceFdInfo_loc = loc.dot(Field::pImportFenceFdInfo);
         skip |= ValidateStructPnext(pImportFenceFdInfo_loc, pImportFenceFdInfo->pNext, 0, nullptr, GeneratedVulkanHeaderVersion,
@@ -10521,9 +10440,8 @@ bool StatelessValidation::PreCallValidateGetFenceFdKHR(VkDevice device, const Vk
     [[maybe_unused]] const Location loc = error_obj.location;
     if (!IsExtEnabled(device_extensions.vk_khr_external_fence_fd))
         skip |= OutputExtensionError(loc, {vvl::Extension::_VK_KHR_external_fence_fd});
-    skip |= ValidateStructType(loc.dot(Field::pGetFdInfo), "VK_STRUCTURE_TYPE_FENCE_GET_FD_INFO_KHR", pGetFdInfo,
-                               VK_STRUCTURE_TYPE_FENCE_GET_FD_INFO_KHR, true, "VUID-vkGetFenceFdKHR-pGetFdInfo-parameter",
-                               "VUID-VkFenceGetFdInfoKHR-sType-sType");
+    skip |= ValidateStructType(loc.dot(Field::pGetFdInfo), pGetFdInfo, VK_STRUCTURE_TYPE_FENCE_GET_FD_INFO_KHR, true,
+                               "VUID-vkGetFenceFdKHR-pGetFdInfo-parameter", "VUID-VkFenceGetFdInfoKHR-sType-sType");
     if (pGetFdInfo != nullptr) {
         [[maybe_unused]] const Location pGetFdInfo_loc = loc.dot(Field::pGetFdInfo);
         skip |= ValidateStructPnext(pGetFdInfo_loc, pGetFdInfo->pNext, 0, nullptr, GeneratedVulkanHeaderVersion,
@@ -10546,8 +10464,8 @@ bool StatelessValidation::PreCallValidateEnumeratePhysicalDeviceQueueFamilyPerfo
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
     skip |= ValidateStructTypeArray(
-        loc.dot(Field::pCounterCount), loc.dot(Field::pCounters), "VK_STRUCTURE_TYPE_PERFORMANCE_COUNTER_KHR", pCounterCount,
-        pCounters, VK_STRUCTURE_TYPE_PERFORMANCE_COUNTER_KHR, true, false, false, "VUID-VkPerformanceCounterKHR-sType-sType",
+        loc.dot(Field::pCounterCount), loc.dot(Field::pCounters), pCounterCount, pCounters,
+        VK_STRUCTURE_TYPE_PERFORMANCE_COUNTER_KHR, true, false, false, "VUID-VkPerformanceCounterKHR-sType-sType",
         "VUID-vkEnumeratePhysicalDeviceQueueFamilyPerformanceQueryCountersKHR-pCounters-parameter",
         "VUID-vkEnumeratePhysicalDeviceQueueFamilyPerformanceQueryCountersKHR-pCounterCount-parameter", kVUIDUndefined);
     if (pCounters != nullptr) {
@@ -10558,8 +10476,7 @@ bool StatelessValidation::PreCallValidateEnumeratePhysicalDeviceQueueFamilyPerfo
         }
     }
     skip |= ValidateStructTypeArray(
-        loc.dot(Field::pCounterCount), loc.dot(Field::pCounterDescriptions),
-        "VK_STRUCTURE_TYPE_PERFORMANCE_COUNTER_DESCRIPTION_KHR", pCounterCount, pCounterDescriptions,
+        loc.dot(Field::pCounterCount), loc.dot(Field::pCounterDescriptions), pCounterCount, pCounterDescriptions,
         VK_STRUCTURE_TYPE_PERFORMANCE_COUNTER_DESCRIPTION_KHR, true, false, false,
         "VUID-VkPerformanceCounterDescriptionKHR-sType-sType",
         "VUID-vkEnumeratePhysicalDeviceQueueFamilyPerformanceQueryCountersKHR-pCounterDescriptions-parameter",
@@ -10580,11 +10497,10 @@ bool StatelessValidation::PreCallValidateGetPhysicalDeviceQueueFamilyPerformance
     const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |=
-        ValidateStructType(loc.dot(Field::pPerformanceQueryCreateInfo), "VK_STRUCTURE_TYPE_QUERY_POOL_PERFORMANCE_CREATE_INFO_KHR",
-                           pPerformanceQueryCreateInfo, VK_STRUCTURE_TYPE_QUERY_POOL_PERFORMANCE_CREATE_INFO_KHR, true,
-                           "VUID-vkGetPhysicalDeviceQueueFamilyPerformanceQueryPassesKHR-pPerformanceQueryCreateInfo-parameter",
-                           "VUID-VkQueryPoolPerformanceCreateInfoKHR-sType-sType");
+    skip |= ValidateStructType(loc.dot(Field::pPerformanceQueryCreateInfo), pPerformanceQueryCreateInfo,
+                               VK_STRUCTURE_TYPE_QUERY_POOL_PERFORMANCE_CREATE_INFO_KHR, true,
+                               "VUID-vkGetPhysicalDeviceQueueFamilyPerformanceQueryPassesKHR-pPerformanceQueryCreateInfo-parameter",
+                               "VUID-VkQueryPoolPerformanceCreateInfoKHR-sType-sType");
     if (pPerformanceQueryCreateInfo != nullptr) {
         [[maybe_unused]] const Location pPerformanceQueryCreateInfo_loc = loc.dot(Field::pPerformanceQueryCreateInfo);
         skip |= ValidateStructPnext(pPerformanceQueryCreateInfo_loc, pPerformanceQueryCreateInfo->pNext, 0, nullptr,
@@ -10607,8 +10523,7 @@ bool StatelessValidation::PreCallValidateAcquireProfilingLockKHR(VkDevice device
     [[maybe_unused]] const Location loc = error_obj.location;
     if (!IsExtEnabled(device_extensions.vk_khr_performance_query))
         skip |= OutputExtensionError(loc, {vvl::Extension::_VK_KHR_performance_query});
-    skip |= ValidateStructType(loc.dot(Field::pInfo), "VK_STRUCTURE_TYPE_ACQUIRE_PROFILING_LOCK_INFO_KHR", pInfo,
-                               VK_STRUCTURE_TYPE_ACQUIRE_PROFILING_LOCK_INFO_KHR, true,
+    skip |= ValidateStructType(loc.dot(Field::pInfo), pInfo, VK_STRUCTURE_TYPE_ACQUIRE_PROFILING_LOCK_INFO_KHR, true,
                                "VUID-vkAcquireProfilingLockKHR-pInfo-parameter", "VUID-VkAcquireProfilingLockInfoKHR-sType-sType");
     if (pInfo != nullptr) {
         [[maybe_unused]] const Location pInfo_loc = loc.dot(Field::pInfo);
@@ -10637,19 +10552,18 @@ bool StatelessValidation::PreCallValidateGetPhysicalDeviceSurfaceCapabilities2KH
     [[maybe_unused]] const Location loc = error_obj.location;
     if (!IsExtEnabled(instance_extensions.vk_khr_get_surface_capabilities2))
         skip |= OutputExtensionError(loc, {vvl::Extension::_VK_KHR_get_surface_capabilities2});
-    skip |= ValidateStructType(loc.dot(Field::pSurfaceInfo), "VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SURFACE_INFO_2_KHR", pSurfaceInfo,
-                               VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SURFACE_INFO_2_KHR, true,
-                               "VUID-vkGetPhysicalDeviceSurfaceCapabilities2KHR-pSurfaceInfo-parameter",
+    skip |= ValidateStructType(loc.dot(Field::pSurfaceInfo), pSurfaceInfo, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SURFACE_INFO_2_KHR,
+                               true, "VUID-vkGetPhysicalDeviceSurfaceCapabilities2KHR-pSurfaceInfo-parameter",
                                "VUID-VkPhysicalDeviceSurfaceInfo2KHR-sType-sType");
     if (pSurfaceInfo != nullptr) {
         [[maybe_unused]] const Location pSurfaceInfo_loc = loc.dot(Field::pSurfaceInfo);
         skip |= ValidateStructPnext(pSurfaceInfo_loc, pSurfaceInfo->pNext, 0, nullptr, GeneratedVulkanHeaderVersion,
                                     "VUID-VkPhysicalDeviceSurfaceInfo2KHR-pNext-pNext", kVUIDUndefined, physicalDevice, true);
     }
-    skip |= ValidateStructType(loc.dot(Field::pSurfaceCapabilities), "VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES_2_KHR",
-                               pSurfaceCapabilities, VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES_2_KHR, true,
-                               "VUID-vkGetPhysicalDeviceSurfaceCapabilities2KHR-pSurfaceCapabilities-parameter",
-                               "VUID-VkSurfaceCapabilities2KHR-sType-sType");
+    skip |=
+        ValidateStructType(loc.dot(Field::pSurfaceCapabilities), pSurfaceCapabilities, VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES_2_KHR,
+                           true, "VUID-vkGetPhysicalDeviceSurfaceCapabilities2KHR-pSurfaceCapabilities-parameter",
+                           "VUID-VkSurfaceCapabilities2KHR-sType-sType");
     if (pSurfaceCapabilities != nullptr) {
         [[maybe_unused]] const Location pSurfaceCapabilities_loc = loc.dot(Field::pSurfaceCapabilities);
         constexpr std::array allowed_structs_VkSurfaceCapabilities2KHR = {
@@ -10675,20 +10589,19 @@ bool StatelessValidation::PreCallValidateGetPhysicalDeviceSurfaceFormats2KHR(VkP
     [[maybe_unused]] const Location loc = error_obj.location;
     if (!IsExtEnabled(instance_extensions.vk_khr_get_surface_capabilities2))
         skip |= OutputExtensionError(loc, {vvl::Extension::_VK_KHR_get_surface_capabilities2});
-    skip |= ValidateStructType(loc.dot(Field::pSurfaceInfo), "VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SURFACE_INFO_2_KHR", pSurfaceInfo,
-                               VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SURFACE_INFO_2_KHR, true,
-                               "VUID-vkGetPhysicalDeviceSurfaceFormats2KHR-pSurfaceInfo-parameter",
+    skip |= ValidateStructType(loc.dot(Field::pSurfaceInfo), pSurfaceInfo, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SURFACE_INFO_2_KHR,
+                               true, "VUID-vkGetPhysicalDeviceSurfaceFormats2KHR-pSurfaceInfo-parameter",
                                "VUID-VkPhysicalDeviceSurfaceInfo2KHR-sType-sType");
     if (pSurfaceInfo != nullptr) {
         [[maybe_unused]] const Location pSurfaceInfo_loc = loc.dot(Field::pSurfaceInfo);
         skip |= ValidateStructPnext(pSurfaceInfo_loc, pSurfaceInfo->pNext, 0, nullptr, GeneratedVulkanHeaderVersion,
                                     "VUID-VkPhysicalDeviceSurfaceInfo2KHR-pNext-pNext", kVUIDUndefined, physicalDevice, true);
     }
-    skip |= ValidateStructTypeArray(
-        loc.dot(Field::pSurfaceFormatCount), loc.dot(Field::pSurfaceFormats), "VK_STRUCTURE_TYPE_SURFACE_FORMAT_2_KHR",
-        pSurfaceFormatCount, pSurfaceFormats, VK_STRUCTURE_TYPE_SURFACE_FORMAT_2_KHR, true, false, false,
-        "VUID-VkSurfaceFormat2KHR-sType-sType", "VUID-vkGetPhysicalDeviceSurfaceFormats2KHR-pSurfaceFormats-parameter",
-        "VUID-vkGetPhysicalDeviceSurfaceFormats2KHR-pSurfaceFormatCount-parameter", kVUIDUndefined);
+    skip |= ValidateStructTypeArray(loc.dot(Field::pSurfaceFormatCount), loc.dot(Field::pSurfaceFormats), pSurfaceFormatCount,
+                                    pSurfaceFormats, VK_STRUCTURE_TYPE_SURFACE_FORMAT_2_KHR, true, false, false,
+                                    "VUID-VkSurfaceFormat2KHR-sType-sType",
+                                    "VUID-vkGetPhysicalDeviceSurfaceFormats2KHR-pSurfaceFormats-parameter",
+                                    "VUID-vkGetPhysicalDeviceSurfaceFormats2KHR-pSurfaceFormatCount-parameter", kVUIDUndefined);
     if (pSurfaceFormats != nullptr) {
         for (uint32_t pSurfaceFormatIndex = 0; pSurfaceFormatIndex < *pSurfaceFormatCount; ++pSurfaceFormatIndex) {
             [[maybe_unused]] const Location pSurfaceFormats_loc = loc.dot(Field::pSurfaceFormats, pSurfaceFormatIndex);
@@ -10711,11 +10624,11 @@ bool StatelessValidation::PreCallValidateGetPhysicalDeviceDisplayProperties2KHR(
     [[maybe_unused]] const Location loc = error_obj.location;
     if (!IsExtEnabled(instance_extensions.vk_khr_get_display_properties2))
         skip |= OutputExtensionError(loc, {vvl::Extension::_VK_KHR_get_display_properties2});
-    skip |= ValidateStructTypeArray(
-        loc.dot(Field::pPropertyCount), loc.dot(Field::pProperties), "VK_STRUCTURE_TYPE_DISPLAY_PROPERTIES_2_KHR", pPropertyCount,
-        pProperties, VK_STRUCTURE_TYPE_DISPLAY_PROPERTIES_2_KHR, true, false, false, "VUID-VkDisplayProperties2KHR-sType-sType",
-        "VUID-vkGetPhysicalDeviceDisplayProperties2KHR-pProperties-parameter",
-        "VUID-vkGetPhysicalDeviceDisplayProperties2KHR-pPropertyCount-parameter", kVUIDUndefined);
+    skip |= ValidateStructTypeArray(loc.dot(Field::pPropertyCount), loc.dot(Field::pProperties), pPropertyCount, pProperties,
+                                    VK_STRUCTURE_TYPE_DISPLAY_PROPERTIES_2_KHR, true, false, false,
+                                    "VUID-VkDisplayProperties2KHR-sType-sType",
+                                    "VUID-vkGetPhysicalDeviceDisplayProperties2KHR-pProperties-parameter",
+                                    "VUID-vkGetPhysicalDeviceDisplayProperties2KHR-pPropertyCount-parameter", kVUIDUndefined);
     if (pProperties != nullptr) {
         for (uint32_t pPropertyIndex = 0; pPropertyIndex < *pPropertyCount; ++pPropertyIndex) {
             [[maybe_unused]] const Location pProperties_loc = loc.dot(Field::pProperties, pPropertyIndex);
@@ -10735,11 +10648,11 @@ bool StatelessValidation::PreCallValidateGetPhysicalDeviceDisplayPlaneProperties
     [[maybe_unused]] const Location loc = error_obj.location;
     if (!IsExtEnabled(instance_extensions.vk_khr_get_display_properties2))
         skip |= OutputExtensionError(loc, {vvl::Extension::_VK_KHR_get_display_properties2});
-    skip |= ValidateStructTypeArray(
-        loc.dot(Field::pPropertyCount), loc.dot(Field::pProperties), "VK_STRUCTURE_TYPE_DISPLAY_PLANE_PROPERTIES_2_KHR",
-        pPropertyCount, pProperties, VK_STRUCTURE_TYPE_DISPLAY_PLANE_PROPERTIES_2_KHR, true, false, false,
-        "VUID-VkDisplayPlaneProperties2KHR-sType-sType", "VUID-vkGetPhysicalDeviceDisplayPlaneProperties2KHR-pProperties-parameter",
-        "VUID-vkGetPhysicalDeviceDisplayPlaneProperties2KHR-pPropertyCount-parameter", kVUIDUndefined);
+    skip |= ValidateStructTypeArray(loc.dot(Field::pPropertyCount), loc.dot(Field::pProperties), pPropertyCount, pProperties,
+                                    VK_STRUCTURE_TYPE_DISPLAY_PLANE_PROPERTIES_2_KHR, true, false, false,
+                                    "VUID-VkDisplayPlaneProperties2KHR-sType-sType",
+                                    "VUID-vkGetPhysicalDeviceDisplayPlaneProperties2KHR-pProperties-parameter",
+                                    "VUID-vkGetPhysicalDeviceDisplayPlaneProperties2KHR-pPropertyCount-parameter", kVUIDUndefined);
     if (pProperties != nullptr) {
         for (uint32_t pPropertyIndex = 0; pPropertyIndex < *pPropertyCount; ++pPropertyIndex) {
             [[maybe_unused]] const Location pProperties_loc = loc.dot(Field::pProperties, pPropertyIndex);
@@ -10760,11 +10673,11 @@ bool StatelessValidation::PreCallValidateGetDisplayModeProperties2KHR(VkPhysical
     if (!IsExtEnabled(instance_extensions.vk_khr_get_display_properties2))
         skip |= OutputExtensionError(loc, {vvl::Extension::_VK_KHR_get_display_properties2});
     skip |= ValidateRequiredHandle(loc.dot(Field::display), display);
-    skip |= ValidateStructTypeArray(
-        loc.dot(Field::pPropertyCount), loc.dot(Field::pProperties), "VK_STRUCTURE_TYPE_DISPLAY_MODE_PROPERTIES_2_KHR",
-        pPropertyCount, pProperties, VK_STRUCTURE_TYPE_DISPLAY_MODE_PROPERTIES_2_KHR, true, false, false,
-        "VUID-VkDisplayModeProperties2KHR-sType-sType", "VUID-vkGetDisplayModeProperties2KHR-pProperties-parameter",
-        "VUID-vkGetDisplayModeProperties2KHR-pPropertyCount-parameter", kVUIDUndefined);
+    skip |= ValidateStructTypeArray(loc.dot(Field::pPropertyCount), loc.dot(Field::pProperties), pPropertyCount, pProperties,
+                                    VK_STRUCTURE_TYPE_DISPLAY_MODE_PROPERTIES_2_KHR, true, false, false,
+                                    "VUID-VkDisplayModeProperties2KHR-sType-sType",
+                                    "VUID-vkGetDisplayModeProperties2KHR-pProperties-parameter",
+                                    "VUID-vkGetDisplayModeProperties2KHR-pPropertyCount-parameter", kVUIDUndefined);
     if (pProperties != nullptr) {
         for (uint32_t pPropertyIndex = 0; pPropertyIndex < *pPropertyCount; ++pPropertyIndex) {
             [[maybe_unused]] const Location pProperties_loc = loc.dot(Field::pProperties, pPropertyIndex);
@@ -10784,9 +10697,8 @@ bool StatelessValidation::PreCallValidateGetDisplayPlaneCapabilities2KHR(VkPhysi
     [[maybe_unused]] const Location loc = error_obj.location;
     if (!IsExtEnabled(instance_extensions.vk_khr_get_display_properties2))
         skip |= OutputExtensionError(loc, {vvl::Extension::_VK_KHR_get_display_properties2});
-    skip |= ValidateStructType(loc.dot(Field::pDisplayPlaneInfo), "VK_STRUCTURE_TYPE_DISPLAY_PLANE_INFO_2_KHR", pDisplayPlaneInfo,
-                               VK_STRUCTURE_TYPE_DISPLAY_PLANE_INFO_2_KHR, true,
-                               "VUID-vkGetDisplayPlaneCapabilities2KHR-pDisplayPlaneInfo-parameter",
+    skip |= ValidateStructType(loc.dot(Field::pDisplayPlaneInfo), pDisplayPlaneInfo, VK_STRUCTURE_TYPE_DISPLAY_PLANE_INFO_2_KHR,
+                               true, "VUID-vkGetDisplayPlaneCapabilities2KHR-pDisplayPlaneInfo-parameter",
                                "VUID-VkDisplayPlaneInfo2KHR-sType-sType");
     if (pDisplayPlaneInfo != nullptr) {
         [[maybe_unused]] const Location pDisplayPlaneInfo_loc = loc.dot(Field::pDisplayPlaneInfo);
@@ -10795,9 +10707,8 @@ bool StatelessValidation::PreCallValidateGetDisplayPlaneCapabilities2KHR(VkPhysi
 
         skip |= ValidateRequiredHandle(pDisplayPlaneInfo_loc.dot(Field::mode), pDisplayPlaneInfo->mode);
     }
-    skip |= ValidateStructType(loc.dot(Field::pCapabilities), "VK_STRUCTURE_TYPE_DISPLAY_PLANE_CAPABILITIES_2_KHR", pCapabilities,
-                               VK_STRUCTURE_TYPE_DISPLAY_PLANE_CAPABILITIES_2_KHR, true,
-                               "VUID-vkGetDisplayPlaneCapabilities2KHR-pCapabilities-parameter",
+    skip |= ValidateStructType(loc.dot(Field::pCapabilities), pCapabilities, VK_STRUCTURE_TYPE_DISPLAY_PLANE_CAPABILITIES_2_KHR,
+                               true, "VUID-vkGetDisplayPlaneCapabilities2KHR-pCapabilities-parameter",
                                "VUID-VkDisplayPlaneCapabilities2KHR-sType-sType");
     if (pCapabilities != nullptr) {
         [[maybe_unused]] const Location pCapabilities_loc = loc.dot(Field::pCapabilities);
@@ -10812,13 +10723,12 @@ bool StatelessValidation::PreCallValidateGetPhysicalDeviceFragmentShadingRatesKH
     VkPhysicalDeviceFragmentShadingRateKHR* pFragmentShadingRates, const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructTypeArray(loc.dot(Field::pFragmentShadingRateCount), loc.dot(Field::pFragmentShadingRates),
-                                    "VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_KHR", pFragmentShadingRateCount,
-                                    pFragmentShadingRates, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_KHR, true, false,
-                                    false, "VUID-VkPhysicalDeviceFragmentShadingRateKHR-sType-sType",
-                                    "VUID-vkGetPhysicalDeviceFragmentShadingRatesKHR-pFragmentShadingRates-parameter",
-                                    "VUID-vkGetPhysicalDeviceFragmentShadingRatesKHR-pFragmentShadingRateCount-parameter",
-                                    kVUIDUndefined);
+    skip |= ValidateStructTypeArray(
+        loc.dot(Field::pFragmentShadingRateCount), loc.dot(Field::pFragmentShadingRates), pFragmentShadingRateCount,
+        pFragmentShadingRates, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_KHR, true, false, false,
+        "VUID-VkPhysicalDeviceFragmentShadingRateKHR-sType-sType",
+        "VUID-vkGetPhysicalDeviceFragmentShadingRatesKHR-pFragmentShadingRates-parameter",
+        "VUID-vkGetPhysicalDeviceFragmentShadingRatesKHR-pFragmentShadingRateCount-parameter", kVUIDUndefined);
     if (pFragmentShadingRates != nullptr) {
         for (uint32_t pFragmentShadingRateIndex = 0; pFragmentShadingRateIndex < *pFragmentShadingRateCount;
              ++pFragmentShadingRateIndex) {
@@ -10859,8 +10769,7 @@ bool StatelessValidation::PreCallValidateCmdRefreshObjectsKHR(VkCommandBuffer co
     [[maybe_unused]] const Location loc = error_obj.location;
     if (!IsExtEnabled(device_extensions.vk_khr_object_refresh))
         skip |= OutputExtensionError(loc, {vvl::Extension::_VK_KHR_object_refresh});
-    skip |= ValidateStructType(loc.dot(Field::pRefreshObjects), "VK_STRUCTURE_TYPE_REFRESH_OBJECT_LIST_KHR", pRefreshObjects,
-                               VK_STRUCTURE_TYPE_REFRESH_OBJECT_LIST_KHR, true,
+    skip |= ValidateStructType(loc.dot(Field::pRefreshObjects), pRefreshObjects, VK_STRUCTURE_TYPE_REFRESH_OBJECT_LIST_KHR, true,
                                "VUID-vkCmdRefreshObjectsKHR-pRefreshObjects-parameter", "VUID-VkRefreshObjectListKHR-sType-sType");
     if (pRefreshObjects != nullptr) {
         [[maybe_unused]] const Location pRefreshObjects_loc = loc.dot(Field::pRefreshObjects);
@@ -10985,10 +10894,9 @@ bool StatelessValidation::PreCallValidateGetQueueCheckpointData2NV(VkQueue queue
     [[maybe_unused]] const Location loc = error_obj.location;
     if (!IsExtEnabled(device_extensions.vk_khr_synchronization2))
         skip |= OutputExtensionError(loc, {vvl::Extension::_VK_KHR_synchronization2});
-    skip |= ValidateStructTypeArray(loc.dot(Field::pCheckpointDataCount), loc.dot(Field::pCheckpointData),
-                                    "VK_STRUCTURE_TYPE_CHECKPOINT_DATA_2_NV", pCheckpointDataCount, pCheckpointData,
-                                    VK_STRUCTURE_TYPE_CHECKPOINT_DATA_2_NV, true, false, false, kVUIDUndefined, kVUIDUndefined,
-                                    kVUIDUndefined, kVUIDUndefined);
+    skip |= ValidateStructTypeArray(loc.dot(Field::pCheckpointDataCount), loc.dot(Field::pCheckpointData), pCheckpointDataCount,
+                                    pCheckpointData, VK_STRUCTURE_TYPE_CHECKPOINT_DATA_2_NV, true, false, false, kVUIDUndefined,
+                                    kVUIDUndefined, kVUIDUndefined, kVUIDUndefined);
     if (pCheckpointData != nullptr) {
         for (uint32_t pCheckpointDataIndex = 0; pCheckpointDataIndex < *pCheckpointDataCount; ++pCheckpointDataIndex) {
             [[maybe_unused]] const Location pCheckpointData_loc = loc.dot(Field::pCheckpointData, pCheckpointDataIndex);
@@ -11094,11 +11002,11 @@ bool StatelessValidation::PreCallValidateGetCalibratedTimestampsKHR(VkDevice dev
     [[maybe_unused]] const Location loc = error_obj.location;
     if (!IsExtEnabled(device_extensions.vk_khr_calibrated_timestamps))
         skip |= OutputExtensionError(loc, {vvl::Extension::_VK_KHR_calibrated_timestamps});
-    skip |= ValidateStructTypeArray(
-        loc.dot(Field::timestampCount), loc.dot(Field::pTimestampInfos), "VK_STRUCTURE_TYPE_CALIBRATED_TIMESTAMP_INFO_KHR",
-        timestampCount, pTimestampInfos, VK_STRUCTURE_TYPE_CALIBRATED_TIMESTAMP_INFO_KHR, true, true,
-        "VUID-VkCalibratedTimestampInfoKHR-sType-sType", "VUID-vkGetCalibratedTimestampsKHR-pTimestampInfos-parameter",
-        "VUID-vkGetCalibratedTimestampsKHR-timestampCount-arraylength");
+    skip |= ValidateStructTypeArray(loc.dot(Field::timestampCount), loc.dot(Field::pTimestampInfos), timestampCount,
+                                    pTimestampInfos, VK_STRUCTURE_TYPE_CALIBRATED_TIMESTAMP_INFO_KHR, true, true,
+                                    "VUID-VkCalibratedTimestampInfoKHR-sType-sType",
+                                    "VUID-vkGetCalibratedTimestampsKHR-pTimestampInfos-parameter",
+                                    "VUID-vkGetCalibratedTimestampsKHR-timestampCount-arraylength");
     if (pTimestampInfos != nullptr) {
         for (uint32_t timestampIndex = 0; timestampIndex < timestampCount; ++timestampIndex) {
             [[maybe_unused]] const Location pTimestampInfos_loc = loc.dot(Field::pTimestampInfos, timestampIndex);
@@ -11138,10 +11046,10 @@ bool StatelessValidation::PreCallValidateGetPhysicalDeviceSurfaceCapabilities2EX
     if (!IsExtEnabled(instance_extensions.vk_ext_display_surface_counter))
         skip |= OutputExtensionError(loc, {vvl::Extension::_VK_EXT_display_surface_counter});
     skip |= ValidateRequiredHandle(loc.dot(Field::surface), surface);
-    skip |= ValidateStructType(loc.dot(Field::pSurfaceCapabilities), "VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES_2_EXT",
-                               pSurfaceCapabilities, VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES_2_EXT, true,
-                               "VUID-vkGetPhysicalDeviceSurfaceCapabilities2EXT-pSurfaceCapabilities-parameter",
-                               "VUID-VkSurfaceCapabilities2EXT-sType-sType");
+    skip |=
+        ValidateStructType(loc.dot(Field::pSurfaceCapabilities), pSurfaceCapabilities, VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES_2_EXT,
+                           true, "VUID-vkGetPhysicalDeviceSurfaceCapabilities2EXT-pSurfaceCapabilities-parameter",
+                           "VUID-VkSurfaceCapabilities2EXT-sType-sType");
     if (pSurfaceCapabilities != nullptr) {
         [[maybe_unused]] const Location pSurfaceCapabilities_loc = loc.dot(Field::pSurfaceCapabilities);
         skip |= ValidateStructPnext(pSurfaceCapabilities_loc, pSurfaceCapabilities->pNext, 0, nullptr, GeneratedVulkanHeaderVersion,
@@ -11159,8 +11067,7 @@ bool StatelessValidation::PreCallValidateDisplayPowerControlEXT(VkDevice device,
         skip |= OutputExtensionError(loc, {vvl::Extension::_VK_EXT_display_control});
     skip |= ValidateRequiredHandle(loc.dot(Field::display), display);
     skip |=
-        ValidateStructType(loc.dot(Field::pDisplayPowerInfo), "VK_STRUCTURE_TYPE_DISPLAY_POWER_INFO_EXT", pDisplayPowerInfo,
-                           VK_STRUCTURE_TYPE_DISPLAY_POWER_INFO_EXT, true,
+        ValidateStructType(loc.dot(Field::pDisplayPowerInfo), pDisplayPowerInfo, VK_STRUCTURE_TYPE_DISPLAY_POWER_INFO_EXT, true,
                            "VUID-vkDisplayPowerControlEXT-pDisplayPowerInfo-parameter", "VUID-VkDisplayPowerInfoEXT-sType-sType");
     if (pDisplayPowerInfo != nullptr) {
         [[maybe_unused]] const Location pDisplayPowerInfo_loc = loc.dot(Field::pDisplayPowerInfo);
@@ -11180,8 +11087,7 @@ bool StatelessValidation::PreCallValidateRegisterDeviceEventEXT(VkDevice device,
     [[maybe_unused]] const Location loc = error_obj.location;
     if (!IsExtEnabled(device_extensions.vk_ext_display_control))
         skip |= OutputExtensionError(loc, {vvl::Extension::_VK_EXT_display_control});
-    skip |= ValidateStructType(loc.dot(Field::pDeviceEventInfo), "VK_STRUCTURE_TYPE_DEVICE_EVENT_INFO_EXT", pDeviceEventInfo,
-                               VK_STRUCTURE_TYPE_DEVICE_EVENT_INFO_EXT, true,
+    skip |= ValidateStructType(loc.dot(Field::pDeviceEventInfo), pDeviceEventInfo, VK_STRUCTURE_TYPE_DEVICE_EVENT_INFO_EXT, true,
                                "VUID-vkRegisterDeviceEventEXT-pDeviceEventInfo-parameter", "VUID-VkDeviceEventInfoEXT-sType-sType");
     if (pDeviceEventInfo != nullptr) {
         [[maybe_unused]] const Location pDeviceEventInfo_loc = loc.dot(Field::pDeviceEventInfo);
@@ -11208,8 +11114,7 @@ bool StatelessValidation::PreCallValidateRegisterDisplayEventEXT(VkDevice device
         skip |= OutputExtensionError(loc, {vvl::Extension::_VK_EXT_display_control});
     skip |= ValidateRequiredHandle(loc.dot(Field::display), display);
     skip |=
-        ValidateStructType(loc.dot(Field::pDisplayEventInfo), "VK_STRUCTURE_TYPE_DISPLAY_EVENT_INFO_EXT", pDisplayEventInfo,
-                           VK_STRUCTURE_TYPE_DISPLAY_EVENT_INFO_EXT, true,
+        ValidateStructType(loc.dot(Field::pDisplayEventInfo), pDisplayEventInfo, VK_STRUCTURE_TYPE_DISPLAY_EVENT_INFO_EXT, true,
                            "VUID-vkRegisterDisplayEventEXT-pDisplayEventInfo-parameter", "VUID-VkDisplayEventInfoEXT-sType-sType");
     if (pDisplayEventInfo != nullptr) {
         [[maybe_unused]] const Location pDisplayEventInfo_loc = loc.dot(Field::pDisplayEventInfo);
@@ -11301,9 +11206,9 @@ bool StatelessValidation::PreCallValidateSetHdrMetadataEXT(VkDevice device, uint
         skip |= OutputExtensionError(loc, {vvl::Extension::_VK_EXT_hdr_metadata});
     skip |= ValidateHandleArray(loc.dot(Field::swapchainCount), loc.dot(Field::pSwapchains), swapchainCount, pSwapchains, true,
                                 true, "VUID-vkSetHdrMetadataEXT-swapchainCount-arraylength");
-    skip |= ValidateStructTypeArray(loc.dot(Field::swapchainCount), loc.dot(Field::pMetadata), "VK_STRUCTURE_TYPE_HDR_METADATA_EXT",
-                                    swapchainCount, pMetadata, VK_STRUCTURE_TYPE_HDR_METADATA_EXT, true, true,
-                                    "VUID-VkHdrMetadataEXT-sType-sType", "VUID-vkSetHdrMetadataEXT-pMetadata-parameter",
+    skip |= ValidateStructTypeArray(loc.dot(Field::swapchainCount), loc.dot(Field::pMetadata), swapchainCount, pMetadata,
+                                    VK_STRUCTURE_TYPE_HDR_METADATA_EXT, true, true, "VUID-VkHdrMetadataEXT-sType-sType",
+                                    "VUID-vkSetHdrMetadataEXT-pMetadata-parameter",
                                     "VUID-vkSetHdrMetadataEXT-swapchainCount-arraylength");
     if (pMetadata != nullptr) {
         for (uint32_t swapchainIndex = 0; swapchainIndex < swapchainCount; ++swapchainIndex) {
@@ -11321,8 +11226,7 @@ bool StatelessValidation::PreCallValidateSetDebugUtilsObjectNameEXT(VkDevice dev
     [[maybe_unused]] const Location loc = error_obj.location;
     if (!IsExtEnabled(instance_extensions.vk_ext_debug_utils))
         skip |= OutputExtensionError(loc, {vvl::Extension::_VK_EXT_debug_utils});
-    skip |= ValidateStructType(loc.dot(Field::pNameInfo), "VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT", pNameInfo,
-                               VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT, true,
+    skip |= ValidateStructType(loc.dot(Field::pNameInfo), pNameInfo, VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT, true,
                                "VUID-vkSetDebugUtilsObjectNameEXT-pNameInfo-parameter",
                                "VUID-VkDebugUtilsObjectNameInfoEXT-sType-sType");
     if (pNameInfo != nullptr) {
@@ -11344,8 +11248,7 @@ bool StatelessValidation::PreCallValidateSetDebugUtilsObjectTagEXT(VkDevice devi
     if (!IsExtEnabled(instance_extensions.vk_ext_debug_utils))
         skip |= OutputExtensionError(loc, {vvl::Extension::_VK_EXT_debug_utils});
     skip |=
-        ValidateStructType(loc.dot(Field::pTagInfo), "VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_TAG_INFO_EXT", pTagInfo,
-                           VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_TAG_INFO_EXT, true,
+        ValidateStructType(loc.dot(Field::pTagInfo), pTagInfo, VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_TAG_INFO_EXT, true,
                            "VUID-vkSetDebugUtilsObjectTagEXT-pTagInfo-parameter", "VUID-VkDebugUtilsObjectTagInfoEXT-sType-sType");
     if (pTagInfo != nullptr) {
         [[maybe_unused]] const Location pTagInfo_loc = loc.dot(Field::pTagInfo);
@@ -11369,8 +11272,7 @@ bool StatelessValidation::PreCallValidateQueueBeginDebugUtilsLabelEXT(VkQueue qu
     [[maybe_unused]] const Location loc = error_obj.location;
     if (!IsExtEnabled(instance_extensions.vk_ext_debug_utils))
         skip |= OutputExtensionError(loc, {vvl::Extension::_VK_EXT_debug_utils});
-    skip |= ValidateStructType(loc.dot(Field::pLabelInfo), "VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT", pLabelInfo,
-                               VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT, true,
+    skip |= ValidateStructType(loc.dot(Field::pLabelInfo), pLabelInfo, VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT, true,
                                "VUID-vkQueueBeginDebugUtilsLabelEXT-pLabelInfo-parameter", "VUID-VkDebugUtilsLabelEXT-sType-sType");
     if (pLabelInfo != nullptr) {
         [[maybe_unused]] const Location pLabelInfo_loc = loc.dot(Field::pLabelInfo);
@@ -11398,9 +11300,9 @@ bool StatelessValidation::PreCallValidateQueueInsertDebugUtilsLabelEXT(VkQueue q
     [[maybe_unused]] const Location loc = error_obj.location;
     if (!IsExtEnabled(instance_extensions.vk_ext_debug_utils))
         skip |= OutputExtensionError(loc, {vvl::Extension::_VK_EXT_debug_utils});
-    skip |= ValidateStructType(
-        loc.dot(Field::pLabelInfo), "VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT", pLabelInfo, VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT,
-        true, "VUID-vkQueueInsertDebugUtilsLabelEXT-pLabelInfo-parameter", "VUID-VkDebugUtilsLabelEXT-sType-sType");
+    skip |=
+        ValidateStructType(loc.dot(Field::pLabelInfo), pLabelInfo, VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT, true,
+                           "VUID-vkQueueInsertDebugUtilsLabelEXT-pLabelInfo-parameter", "VUID-VkDebugUtilsLabelEXT-sType-sType");
     if (pLabelInfo != nullptr) {
         [[maybe_unused]] const Location pLabelInfo_loc = loc.dot(Field::pLabelInfo);
         skip |= ValidateStructPnext(pLabelInfo_loc, pLabelInfo->pNext, 0, nullptr, GeneratedVulkanHeaderVersion,
@@ -11419,8 +11321,7 @@ bool StatelessValidation::PreCallValidateCmdBeginDebugUtilsLabelEXT(VkCommandBuf
     [[maybe_unused]] const Location loc = error_obj.location;
     if (!IsExtEnabled(instance_extensions.vk_ext_debug_utils))
         skip |= OutputExtensionError(loc, {vvl::Extension::_VK_EXT_debug_utils});
-    skip |= ValidateStructType(loc.dot(Field::pLabelInfo), "VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT", pLabelInfo,
-                               VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT, true,
+    skip |= ValidateStructType(loc.dot(Field::pLabelInfo), pLabelInfo, VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT, true,
                                "VUID-vkCmdBeginDebugUtilsLabelEXT-pLabelInfo-parameter", "VUID-VkDebugUtilsLabelEXT-sType-sType");
     if (pLabelInfo != nullptr) {
         [[maybe_unused]] const Location pLabelInfo_loc = loc.dot(Field::pLabelInfo);
@@ -11450,8 +11351,7 @@ bool StatelessValidation::PreCallValidateCmdInsertDebugUtilsLabelEXT(VkCommandBu
     [[maybe_unused]] const Location loc = error_obj.location;
     if (!IsExtEnabled(instance_extensions.vk_ext_debug_utils))
         skip |= OutputExtensionError(loc, {vvl::Extension::_VK_EXT_debug_utils});
-    skip |= ValidateStructType(loc.dot(Field::pLabelInfo), "VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT", pLabelInfo,
-                               VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT, true,
+    skip |= ValidateStructType(loc.dot(Field::pLabelInfo), pLabelInfo, VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT, true,
                                "VUID-vkCmdInsertDebugUtilsLabelEXT-pLabelInfo-parameter", "VUID-VkDebugUtilsLabelEXT-sType-sType");
     if (pLabelInfo != nullptr) {
         [[maybe_unused]] const Location pLabelInfo_loc = loc.dot(Field::pLabelInfo);
@@ -11473,9 +11373,8 @@ bool StatelessValidation::PreCallValidateCreateDebugUtilsMessengerEXT(VkInstance
     [[maybe_unused]] const Location loc = error_obj.location;
     if (!IsExtEnabled(instance_extensions.vk_ext_debug_utils))
         skip |= OutputExtensionError(loc, {vvl::Extension::_VK_EXT_debug_utils});
-    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), "VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT", pCreateInfo,
-                               VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT, true,
-                               "VUID-vkCreateDebugUtilsMessengerEXT-pCreateInfo-parameter",
+    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), pCreateInfo, VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
+                               true, "VUID-vkCreateDebugUtilsMessengerEXT-pCreateInfo-parameter",
                                "VUID-VkDebugUtilsMessengerCreateInfoEXT-sType-sType");
     if (pCreateInfo != nullptr) {
         [[maybe_unused]] const Location pCreateInfo_loc = loc.dot(Field::pCreateInfo);
@@ -11539,10 +11438,9 @@ bool StatelessValidation::PreCallValidateSubmitDebugUtilsMessageEXT(VkInstance i
                           AllVkDebugUtilsMessageTypeFlagBitsEXT, messageTypes, kRequiredFlags,
                           "VUID-vkSubmitDebugUtilsMessageEXT-messageTypes-parameter",
                           "VUID-vkSubmitDebugUtilsMessageEXT-messageTypes-requiredbitmask");
-    skip |= ValidateStructType(loc.dot(Field::pCallbackData), "VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CALLBACK_DATA_EXT",
-                               pCallbackData, VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CALLBACK_DATA_EXT, true,
-                               "VUID-vkSubmitDebugUtilsMessageEXT-pCallbackData-parameter",
-                               "VUID-VkDebugUtilsMessengerCallbackDataEXT-sType-sType");
+    skip |= ValidateStructType(
+        loc.dot(Field::pCallbackData), pCallbackData, VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CALLBACK_DATA_EXT, true,
+        "VUID-vkSubmitDebugUtilsMessageEXT-pCallbackData-parameter", "VUID-VkDebugUtilsMessengerCallbackDataEXT-sType-sType");
     if (pCallbackData != nullptr) {
         [[maybe_unused]] const Location pCallbackData_loc = loc.dot(Field::pCallbackData);
         skip |= ValidateStructPnext(pCallbackData_loc, pCallbackData->pNext, 0, nullptr, GeneratedVulkanHeaderVersion,
@@ -11551,11 +11449,11 @@ bool StatelessValidation::PreCallValidateSubmitDebugUtilsMessageEXT(VkInstance i
         skip |= ValidateReservedFlags(pCallbackData_loc.dot(Field::flags), pCallbackData->flags,
                                       "VUID-VkDebugUtilsMessengerCallbackDataEXT-flags-zerobitmask");
 
-        skip |= ValidateStructTypeArray(pCallbackData_loc.dot(Field::queueLabelCount), pCallbackData_loc.dot(Field::pQueueLabels),
-                                        "VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT", pCallbackData->queueLabelCount,
-                                        pCallbackData->pQueueLabels, VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT, false, true,
-                                        "VUID-VkDebugUtilsLabelEXT-sType-sType",
-                                        "VUID-VkDebugUtilsMessengerCallbackDataEXT-pQueueLabels-parameter", kVUIDUndefined);
+        skip |=
+            ValidateStructTypeArray(pCallbackData_loc.dot(Field::queueLabelCount), pCallbackData_loc.dot(Field::pQueueLabels),
+                                    pCallbackData->queueLabelCount, pCallbackData->pQueueLabels,
+                                    VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT, false, true, "VUID-VkDebugUtilsLabelEXT-sType-sType",
+                                    "VUID-VkDebugUtilsMessengerCallbackDataEXT-pQueueLabels-parameter", kVUIDUndefined);
 
         if (pCallbackData->pQueueLabels != nullptr) {
             for (uint32_t queueLabelIndex = 0; queueLabelIndex < pCallbackData->queueLabelCount; ++queueLabelIndex) {
@@ -11570,11 +11468,11 @@ bool StatelessValidation::PreCallValidateSubmitDebugUtilsMessageEXT(VkInstance i
             }
         }
 
-        skip |= ValidateStructTypeArray(pCallbackData_loc.dot(Field::cmdBufLabelCount), pCallbackData_loc.dot(Field::pCmdBufLabels),
-                                        "VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT", pCallbackData->cmdBufLabelCount,
-                                        pCallbackData->pCmdBufLabels, VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT, false, true,
-                                        "VUID-VkDebugUtilsLabelEXT-sType-sType",
-                                        "VUID-VkDebugUtilsMessengerCallbackDataEXT-pCmdBufLabels-parameter", kVUIDUndefined);
+        skip |=
+            ValidateStructTypeArray(pCallbackData_loc.dot(Field::cmdBufLabelCount), pCallbackData_loc.dot(Field::pCmdBufLabels),
+                                    pCallbackData->cmdBufLabelCount, pCallbackData->pCmdBufLabels,
+                                    VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT, false, true, "VUID-VkDebugUtilsLabelEXT-sType-sType",
+                                    "VUID-VkDebugUtilsMessengerCallbackDataEXT-pCmdBufLabels-parameter", kVUIDUndefined);
 
         if (pCallbackData->pCmdBufLabels != nullptr) {
             for (uint32_t cmdBufLabelIndex = 0; cmdBufLabelIndex < pCallbackData->cmdBufLabelCount; ++cmdBufLabelIndex) {
@@ -11590,8 +11488,8 @@ bool StatelessValidation::PreCallValidateSubmitDebugUtilsMessageEXT(VkInstance i
         }
 
         skip |= ValidateStructTypeArray(pCallbackData_loc.dot(Field::objectCount), pCallbackData_loc.dot(Field::pObjects),
-                                        "VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT", pCallbackData->objectCount,
-                                        pCallbackData->pObjects, VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT, false, true,
+                                        pCallbackData->objectCount, pCallbackData->pObjects,
+                                        VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT, false, true,
                                         "VUID-VkDebugUtilsObjectNameInfoEXT-sType-sType",
                                         "VUID-VkDebugUtilsMessengerCallbackDataEXT-pObjects-parameter", kVUIDUndefined);
 
@@ -11617,10 +11515,9 @@ bool StatelessValidation::PreCallValidateCmdSetSampleLocationsEXT(VkCommandBuffe
     [[maybe_unused]] const Location loc = error_obj.location;
     if (!IsExtEnabled(device_extensions.vk_ext_sample_locations))
         skip |= OutputExtensionError(loc, {vvl::Extension::_VK_EXT_sample_locations});
-    skip |= ValidateStructType(loc.dot(Field::pSampleLocationsInfo), "VK_STRUCTURE_TYPE_SAMPLE_LOCATIONS_INFO_EXT",
-                               pSampleLocationsInfo, VK_STRUCTURE_TYPE_SAMPLE_LOCATIONS_INFO_EXT, true,
-                               "VUID-vkCmdSetSampleLocationsEXT-pSampleLocationsInfo-parameter",
-                               "VUID-VkSampleLocationsInfoEXT-sType-sType");
+    skip |= ValidateStructType(
+        loc.dot(Field::pSampleLocationsInfo), pSampleLocationsInfo, VK_STRUCTURE_TYPE_SAMPLE_LOCATIONS_INFO_EXT, true,
+        "VUID-vkCmdSetSampleLocationsEXT-pSampleLocationsInfo-parameter", "VUID-VkSampleLocationsInfoEXT-sType-sType");
     if (pSampleLocationsInfo != nullptr) {
         [[maybe_unused]] const Location pSampleLocationsInfo_loc = loc.dot(Field::pSampleLocationsInfo);
         skip |= ValidateStructPnext(pSampleLocationsInfo_loc, pSampleLocationsInfo->pNext, 0, nullptr, GeneratedVulkanHeaderVersion,
@@ -11653,8 +11550,8 @@ bool StatelessValidation::PreCallValidateGetPhysicalDeviceMultisamplePropertiesE
     skip |= ValidateFlags(loc.dot(Field::samples), vvl::FlagBitmask::VkSampleCountFlagBits, AllVkSampleCountFlagBits, samples,
                           kRequiredSingleBit, "VUID-vkGetPhysicalDeviceMultisamplePropertiesEXT-samples-parameter",
                           "VUID-vkGetPhysicalDeviceMultisamplePropertiesEXT-samples-parameter");
-    skip |= ValidateStructType(loc.dot(Field::pMultisampleProperties), "VK_STRUCTURE_TYPE_MULTISAMPLE_PROPERTIES_EXT",
-                               pMultisampleProperties, VK_STRUCTURE_TYPE_MULTISAMPLE_PROPERTIES_EXT, true,
+    skip |= ValidateStructType(loc.dot(Field::pMultisampleProperties), pMultisampleProperties,
+                               VK_STRUCTURE_TYPE_MULTISAMPLE_PROPERTIES_EXT, true,
                                "VUID-vkGetPhysicalDeviceMultisamplePropertiesEXT-pMultisampleProperties-parameter",
                                "VUID-VkMultisamplePropertiesEXT-sType-sType");
     if (pMultisampleProperties != nullptr) {
@@ -11674,9 +11571,8 @@ bool StatelessValidation::PreCallValidateGetImageDrmFormatModifierPropertiesEXT(
     if (!IsExtEnabled(device_extensions.vk_ext_image_drm_format_modifier))
         skip |= OutputExtensionError(loc, {vvl::Extension::_VK_EXT_image_drm_format_modifier});
     skip |= ValidateRequiredHandle(loc.dot(Field::image), image);
-    skip |= ValidateStructType(loc.dot(Field::pProperties), "VK_STRUCTURE_TYPE_IMAGE_DRM_FORMAT_MODIFIER_PROPERTIES_EXT",
-                               pProperties, VK_STRUCTURE_TYPE_IMAGE_DRM_FORMAT_MODIFIER_PROPERTIES_EXT, true,
-                               "VUID-vkGetImageDrmFormatModifierPropertiesEXT-pProperties-parameter",
+    skip |= ValidateStructType(loc.dot(Field::pProperties), pProperties, VK_STRUCTURE_TYPE_IMAGE_DRM_FORMAT_MODIFIER_PROPERTIES_EXT,
+                               true, "VUID-vkGetImageDrmFormatModifierPropertiesEXT-pProperties-parameter",
                                "VUID-VkImageDrmFormatModifierPropertiesEXT-sType-sType");
     if (pProperties != nullptr) {
         [[maybe_unused]] const Location pProperties_loc = loc.dot(Field::pProperties);
@@ -11700,8 +11596,8 @@ bool StatelessValidation::PreCallValidateGetMemoryHostPointerPropertiesEXT(
                           "VUID-vkGetMemoryHostPointerPropertiesEXT-handleType-parameter");
     skip |= ValidateRequiredPointer(loc.dot(Field::pHostPointer), pHostPointer,
                                     "VUID-vkGetMemoryHostPointerPropertiesEXT-pHostPointer-parameter");
-    skip |= ValidateStructType(loc.dot(Field::pMemoryHostPointerProperties), "VK_STRUCTURE_TYPE_MEMORY_HOST_POINTER_PROPERTIES_EXT",
-                               pMemoryHostPointerProperties, VK_STRUCTURE_TYPE_MEMORY_HOST_POINTER_PROPERTIES_EXT, true,
+    skip |= ValidateStructType(loc.dot(Field::pMemoryHostPointerProperties), pMemoryHostPointerProperties,
+                               VK_STRUCTURE_TYPE_MEMORY_HOST_POINTER_PROPERTIES_EXT, true,
                                "VUID-vkGetMemoryHostPointerPropertiesEXT-pMemoryHostPointerProperties-parameter",
                                "VUID-VkMemoryHostPointerPropertiesEXT-sType-sType");
     if (pMemoryHostPointerProperties != nullptr) {
@@ -11724,8 +11620,7 @@ bool StatelessValidation::PreCallValidateCreateHeadlessSurfaceEXT(VkInstance ins
     [[maybe_unused]] const Location loc = error_obj.location;
     if (!IsExtEnabled(instance_extensions.vk_ext_headless_surface))
         skip |= OutputExtensionError(loc, {vvl::Extension::_VK_EXT_headless_surface});
-    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), "VK_STRUCTURE_TYPE_HEADLESS_SURFACE_CREATE_INFO_EXT", pCreateInfo,
-                               VK_STRUCTURE_TYPE_HEADLESS_SURFACE_CREATE_INFO_EXT, true,
+    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), pCreateInfo, VK_STRUCTURE_TYPE_HEADLESS_SURFACE_CREATE_INFO_EXT, true,
                                "VUID-vkCreateHeadlessSurfaceEXT-pCreateInfo-parameter",
                                "VUID-VkHeadlessSurfaceCreateInfoEXT-sType-sType");
     if (pCreateInfo != nullptr) {
@@ -11908,9 +11803,9 @@ bool StatelessValidation::PreCallValidateCmdSetVertexInputEXT(
     if (!IsExtEnabled(device_extensions.vk_ext_vertex_input_dynamic_state))
         skip |= OutputExtensionError(loc, {vvl::Extension::_VK_EXT_vertex_input_dynamic_state});
     skip |= ValidateStructTypeArray(loc.dot(Field::vertexBindingDescriptionCount), loc.dot(Field::pVertexBindingDescriptions),
-                                    "VK_STRUCTURE_TYPE_VERTEX_INPUT_BINDING_DESCRIPTION_2_EXT", vertexBindingDescriptionCount,
-                                    pVertexBindingDescriptions, VK_STRUCTURE_TYPE_VERTEX_INPUT_BINDING_DESCRIPTION_2_EXT, false,
-                                    true, "VUID-VkVertexInputBindingDescription2EXT-sType-sType",
+                                    vertexBindingDescriptionCount, pVertexBindingDescriptions,
+                                    VK_STRUCTURE_TYPE_VERTEX_INPUT_BINDING_DESCRIPTION_2_EXT, false, true,
+                                    "VUID-VkVertexInputBindingDescription2EXT-sType-sType",
                                     "VUID-vkCmdSetVertexInputEXT-pVertexBindingDescriptions-parameter", kVUIDUndefined);
     if (pVertexBindingDescriptions != nullptr) {
         for (uint32_t vertexBindingDescriptionIndex = 0; vertexBindingDescriptionIndex < vertexBindingDescriptionCount;
@@ -11923,9 +11818,9 @@ bool StatelessValidation::PreCallValidateCmdSetVertexInputEXT(
         }
     }
     skip |= ValidateStructTypeArray(loc.dot(Field::vertexAttributeDescriptionCount), loc.dot(Field::pVertexAttributeDescriptions),
-                                    "VK_STRUCTURE_TYPE_VERTEX_INPUT_ATTRIBUTE_DESCRIPTION_2_EXT", vertexAttributeDescriptionCount,
-                                    pVertexAttributeDescriptions, VK_STRUCTURE_TYPE_VERTEX_INPUT_ATTRIBUTE_DESCRIPTION_2_EXT, false,
-                                    true, "VUID-VkVertexInputAttributeDescription2EXT-sType-sType",
+                                    vertexAttributeDescriptionCount, pVertexAttributeDescriptions,
+                                    VK_STRUCTURE_TYPE_VERTEX_INPUT_ATTRIBUTE_DESCRIPTION_2_EXT, false, true,
+                                    "VUID-VkVertexInputAttributeDescription2EXT-sType-sType",
                                     "VUID-vkCmdSetVertexInputEXT-pVertexAttributeDescriptions-parameter", kVUIDUndefined);
     if (pVertexAttributeDescriptions != nullptr) {
         for (uint32_t vertexAttributeDescriptionIndex = 0; vertexAttributeDescriptionIndex < vertexAttributeDescriptionCount;
@@ -11952,10 +11847,9 @@ bool StatelessValidation::PreCallValidateGetFenceSciSyncFenceNV(VkDevice device,
     [[maybe_unused]] const Location loc = error_obj.location;
     if (!(IsExtEnabled(device_extensions.vk_nv_external_sci_sync) || IsExtEnabled(device_extensions.vk_nv_external_sci_sync2)))
         skip |= OutputExtensionError(loc, {vvl::Extension::_VK_NV_external_sci_sync, vvl::Extension::_VK_NV_external_sci_sync2});
-    skip |= ValidateStructType(loc.dot(Field::pGetSciSyncHandleInfo), "VK_STRUCTURE_TYPE_FENCE_GET_SCI_SYNC_INFO_NV",
-                               pGetSciSyncHandleInfo, VK_STRUCTURE_TYPE_FENCE_GET_SCI_SYNC_INFO_NV, true,
-                               "VUID-vkGetFenceSciSyncFenceNV-pGetSciSyncHandleInfo-parameter",
-                               "VUID-VkFenceGetSciSyncInfoNV-sType-sType");
+    skip |= ValidateStructType(
+        loc.dot(Field::pGetSciSyncHandleInfo), pGetSciSyncHandleInfo, VK_STRUCTURE_TYPE_FENCE_GET_SCI_SYNC_INFO_NV, true,
+        "VUID-vkGetFenceSciSyncFenceNV-pGetSciSyncHandleInfo-parameter", "VUID-VkFenceGetSciSyncInfoNV-sType-sType");
     if (pGetSciSyncHandleInfo != nullptr) {
         [[maybe_unused]] const Location pGetSciSyncHandleInfo_loc = loc.dot(Field::pGetSciSyncHandleInfo);
         skip |=
@@ -11979,10 +11873,9 @@ bool StatelessValidation::PreCallValidateGetFenceSciSyncObjNV(VkDevice device, c
     [[maybe_unused]] const Location loc = error_obj.location;
     if (!(IsExtEnabled(device_extensions.vk_nv_external_sci_sync) || IsExtEnabled(device_extensions.vk_nv_external_sci_sync2)))
         skip |= OutputExtensionError(loc, {vvl::Extension::_VK_NV_external_sci_sync, vvl::Extension::_VK_NV_external_sci_sync2});
-    skip |= ValidateStructType(loc.dot(Field::pGetSciSyncHandleInfo), "VK_STRUCTURE_TYPE_FENCE_GET_SCI_SYNC_INFO_NV",
-                               pGetSciSyncHandleInfo, VK_STRUCTURE_TYPE_FENCE_GET_SCI_SYNC_INFO_NV, true,
-                               "VUID-vkGetFenceSciSyncObjNV-pGetSciSyncHandleInfo-parameter",
-                               "VUID-VkFenceGetSciSyncInfoNV-sType-sType");
+    skip |= ValidateStructType(
+        loc.dot(Field::pGetSciSyncHandleInfo), pGetSciSyncHandleInfo, VK_STRUCTURE_TYPE_FENCE_GET_SCI_SYNC_INFO_NV, true,
+        "VUID-vkGetFenceSciSyncObjNV-pGetSciSyncHandleInfo-parameter", "VUID-VkFenceGetSciSyncInfoNV-sType-sType");
     if (pGetSciSyncHandleInfo != nullptr) {
         [[maybe_unused]] const Location pGetSciSyncHandleInfo_loc = loc.dot(Field::pGetSciSyncHandleInfo);
         skip |=
@@ -12007,10 +11900,9 @@ bool StatelessValidation::PreCallValidateImportFenceSciSyncFenceNV(VkDevice devi
     [[maybe_unused]] const Location loc = error_obj.location;
     if (!(IsExtEnabled(device_extensions.vk_nv_external_sci_sync) || IsExtEnabled(device_extensions.vk_nv_external_sci_sync2)))
         skip |= OutputExtensionError(loc, {vvl::Extension::_VK_NV_external_sci_sync, vvl::Extension::_VK_NV_external_sci_sync2});
-    skip |= ValidateStructType(loc.dot(Field::pImportFenceSciSyncInfo), "VK_STRUCTURE_TYPE_IMPORT_FENCE_SCI_SYNC_INFO_NV",
-                               pImportFenceSciSyncInfo, VK_STRUCTURE_TYPE_IMPORT_FENCE_SCI_SYNC_INFO_NV, true,
-                               "VUID-vkImportFenceSciSyncFenceNV-pImportFenceSciSyncInfo-parameter",
-                               "VUID-VkImportFenceSciSyncInfoNV-sType-sType");
+    skip |= ValidateStructType(
+        loc.dot(Field::pImportFenceSciSyncInfo), pImportFenceSciSyncInfo, VK_STRUCTURE_TYPE_IMPORT_FENCE_SCI_SYNC_INFO_NV, true,
+        "VUID-vkImportFenceSciSyncFenceNV-pImportFenceSciSyncInfo-parameter", "VUID-VkImportFenceSciSyncInfoNV-sType-sType");
     if (pImportFenceSciSyncInfo != nullptr) {
         [[maybe_unused]] const Location pImportFenceSciSyncInfo_loc = loc.dot(Field::pImportFenceSciSyncInfo);
         skip |= ValidateStructPnext(pImportFenceSciSyncInfo_loc, pImportFenceSciSyncInfo->pNext, 0, nullptr,
@@ -12037,10 +11929,9 @@ bool StatelessValidation::PreCallValidateImportFenceSciSyncObjNV(VkDevice device
     [[maybe_unused]] const Location loc = error_obj.location;
     if (!(IsExtEnabled(device_extensions.vk_nv_external_sci_sync) || IsExtEnabled(device_extensions.vk_nv_external_sci_sync2)))
         skip |= OutputExtensionError(loc, {vvl::Extension::_VK_NV_external_sci_sync, vvl::Extension::_VK_NV_external_sci_sync2});
-    skip |= ValidateStructType(loc.dot(Field::pImportFenceSciSyncInfo), "VK_STRUCTURE_TYPE_IMPORT_FENCE_SCI_SYNC_INFO_NV",
-                               pImportFenceSciSyncInfo, VK_STRUCTURE_TYPE_IMPORT_FENCE_SCI_SYNC_INFO_NV, true,
-                               "VUID-vkImportFenceSciSyncObjNV-pImportFenceSciSyncInfo-parameter",
-                               "VUID-VkImportFenceSciSyncInfoNV-sType-sType");
+    skip |= ValidateStructType(
+        loc.dot(Field::pImportFenceSciSyncInfo), pImportFenceSciSyncInfo, VK_STRUCTURE_TYPE_IMPORT_FENCE_SCI_SYNC_INFO_NV, true,
+        "VUID-vkImportFenceSciSyncObjNV-pImportFenceSciSyncInfo-parameter", "VUID-VkImportFenceSciSyncInfoNV-sType-sType");
     if (pImportFenceSciSyncInfo != nullptr) {
         [[maybe_unused]] const Location pImportFenceSciSyncInfo_loc = loc.dot(Field::pImportFenceSciSyncInfo);
         skip |= ValidateStructPnext(pImportFenceSciSyncInfo_loc, pImportFenceSciSyncInfo->pNext, 0, nullptr,
@@ -12065,8 +11956,8 @@ bool StatelessValidation::PreCallValidateGetPhysicalDeviceSciSyncAttributesNV(
     const ErrorObject& error_obj) const {
     bool skip = false;
     [[maybe_unused]] const Location loc = error_obj.location;
-    skip |= ValidateStructType(loc.dot(Field::pSciSyncAttributesInfo), "VK_STRUCTURE_TYPE_SCI_SYNC_ATTRIBUTES_INFO_NV",
-                               pSciSyncAttributesInfo, VK_STRUCTURE_TYPE_SCI_SYNC_ATTRIBUTES_INFO_NV, true,
+    skip |= ValidateStructType(loc.dot(Field::pSciSyncAttributesInfo), pSciSyncAttributesInfo,
+                               VK_STRUCTURE_TYPE_SCI_SYNC_ATTRIBUTES_INFO_NV, true,
                                "VUID-vkGetPhysicalDeviceSciSyncAttributesNV-pSciSyncAttributesInfo-parameter",
                                "VUID-VkSciSyncAttributesInfoNV-sType-sType");
     if (pSciSyncAttributesInfo != nullptr) {
@@ -12091,9 +11982,8 @@ bool StatelessValidation::PreCallValidateGetSemaphoreSciSyncObjNV(VkDevice devic
     [[maybe_unused]] const Location loc = error_obj.location;
     if (!IsExtEnabled(device_extensions.vk_nv_external_sci_sync))
         skip |= OutputExtensionError(loc, {vvl::Extension::_VK_NV_external_sci_sync});
-    skip |= ValidateStructType(loc.dot(Field::pGetSciSyncInfo), "VK_STRUCTURE_TYPE_SEMAPHORE_GET_SCI_SYNC_INFO_NV", pGetSciSyncInfo,
-                               VK_STRUCTURE_TYPE_SEMAPHORE_GET_SCI_SYNC_INFO_NV, true,
-                               "VUID-vkGetSemaphoreSciSyncObjNV-pGetSciSyncInfo-parameter",
+    skip |= ValidateStructType(loc.dot(Field::pGetSciSyncInfo), pGetSciSyncInfo, VK_STRUCTURE_TYPE_SEMAPHORE_GET_SCI_SYNC_INFO_NV,
+                               true, "VUID-vkGetSemaphoreSciSyncObjNV-pGetSciSyncInfo-parameter",
                                "VUID-VkSemaphoreGetSciSyncInfoNV-sType-sType");
     if (pGetSciSyncInfo != nullptr) {
         [[maybe_unused]] const Location pGetSciSyncInfo_loc = loc.dot(Field::pGetSciSyncInfo);
@@ -12117,8 +12007,8 @@ bool StatelessValidation::PreCallValidateImportSemaphoreSciSyncObjNV(
     [[maybe_unused]] const Location loc = error_obj.location;
     if (!IsExtEnabled(device_extensions.vk_nv_external_sci_sync))
         skip |= OutputExtensionError(loc, {vvl::Extension::_VK_NV_external_sci_sync});
-    skip |= ValidateStructType(loc.dot(Field::pImportSemaphoreSciSyncInfo), "VK_STRUCTURE_TYPE_IMPORT_SEMAPHORE_SCI_SYNC_INFO_NV",
-                               pImportSemaphoreSciSyncInfo, VK_STRUCTURE_TYPE_IMPORT_SEMAPHORE_SCI_SYNC_INFO_NV, true,
+    skip |= ValidateStructType(loc.dot(Field::pImportSemaphoreSciSyncInfo), pImportSemaphoreSciSyncInfo,
+                               VK_STRUCTURE_TYPE_IMPORT_SEMAPHORE_SCI_SYNC_INFO_NV, true,
                                "VUID-vkImportSemaphoreSciSyncObjNV-pImportSemaphoreSciSyncInfo-parameter",
                                "VUID-VkImportSemaphoreSciSyncInfoNV-sType-sType");
     if (pImportSemaphoreSciSyncInfo != nullptr) {
@@ -12147,8 +12037,7 @@ bool StatelessValidation::PreCallValidateGetMemorySciBufNV(VkDevice device, cons
     [[maybe_unused]] const Location loc = error_obj.location;
     if (!IsExtEnabled(device_extensions.vk_nv_external_memory_sci_buf))
         skip |= OutputExtensionError(loc, {vvl::Extension::_VK_NV_external_memory_sci_buf});
-    skip |= ValidateStructType(loc.dot(Field::pGetSciBufInfo), "VK_STRUCTURE_TYPE_MEMORY_GET_SCI_BUF_INFO_NV", pGetSciBufInfo,
-                               VK_STRUCTURE_TYPE_MEMORY_GET_SCI_BUF_INFO_NV, true,
+    skip |= ValidateStructType(loc.dot(Field::pGetSciBufInfo), pGetSciBufInfo, VK_STRUCTURE_TYPE_MEMORY_GET_SCI_BUF_INFO_NV, true,
                                "VUID-vkGetMemorySciBufNV-pGetSciBufInfo-parameter", "VUID-VkMemoryGetSciBufInfoNV-sType-sType");
     if (pGetSciBufInfo != nullptr) {
         [[maybe_unused]] const Location pGetSciBufInfo_loc = loc.dot(Field::pGetSciBufInfo);
@@ -12175,8 +12064,8 @@ bool StatelessValidation::PreCallValidateGetPhysicalDeviceExternalMemorySciBufPr
                           AllVkExternalMemoryHandleTypeFlagBits, handleType, kRequiredSingleBit,
                           "VUID-vkGetPhysicalDeviceExternalMemorySciBufPropertiesNV-handleType-parameter",
                           "VUID-vkGetPhysicalDeviceExternalMemorySciBufPropertiesNV-handleType-parameter");
-    skip |= ValidateStructType(loc.dot(Field::pMemorySciBufProperties), "VK_STRUCTURE_TYPE_MEMORY_SCI_BUF_PROPERTIES_NV",
-                               pMemorySciBufProperties, VK_STRUCTURE_TYPE_MEMORY_SCI_BUF_PROPERTIES_NV, true,
+    skip |= ValidateStructType(loc.dot(Field::pMemorySciBufProperties), pMemorySciBufProperties,
+                               VK_STRUCTURE_TYPE_MEMORY_SCI_BUF_PROPERTIES_NV, true,
                                "VUID-vkGetPhysicalDeviceExternalMemorySciBufPropertiesNV-pMemorySciBufProperties-parameter",
                                "VUID-VkMemorySciBufPropertiesNV-sType-sType");
     return skip;
@@ -12267,9 +12156,8 @@ bool StatelessValidation::PreCallValidateCreateSemaphoreSciSyncPoolNV(VkDevice d
     [[maybe_unused]] const Location loc = error_obj.location;
     if (!IsExtEnabled(device_extensions.vk_nv_external_sci_sync2))
         skip |= OutputExtensionError(loc, {vvl::Extension::_VK_NV_external_sci_sync2});
-    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), "VK_STRUCTURE_TYPE_SEMAPHORE_SCI_SYNC_POOL_CREATE_INFO_NV", pCreateInfo,
-                               VK_STRUCTURE_TYPE_SEMAPHORE_SCI_SYNC_POOL_CREATE_INFO_NV, true,
-                               "VUID-vkCreateSemaphoreSciSyncPoolNV-pCreateInfo-parameter",
+    skip |= ValidateStructType(loc.dot(Field::pCreateInfo), pCreateInfo, VK_STRUCTURE_TYPE_SEMAPHORE_SCI_SYNC_POOL_CREATE_INFO_NV,
+                               true, "VUID-vkCreateSemaphoreSciSyncPoolNV-pCreateInfo-parameter",
                                "VUID-VkSemaphoreSciSyncPoolCreateInfoNV-sType-sType");
     if (pCreateInfo != nullptr) {
         [[maybe_unused]] const Location pCreateInfo_loc = loc.dot(Field::pCreateInfo);
@@ -12295,8 +12183,7 @@ bool StatelessValidation::PreCallValidateGetScreenBufferPropertiesQNX(VkDevice d
     if (!IsExtEnabled(device_extensions.vk_qnx_external_memory_screen_buffer))
         skip |= OutputExtensionError(loc, {vvl::Extension::_VK_QNX_external_memory_screen_buffer});
     skip |= ValidateRequiredPointer(loc.dot(Field::buffer), buffer, "VUID-vkGetScreenBufferPropertiesQNX-buffer-parameter");
-    skip |= ValidateStructType(loc.dot(Field::pProperties), "VK_STRUCTURE_TYPE_SCREEN_BUFFER_PROPERTIES_QNX", pProperties,
-                               VK_STRUCTURE_TYPE_SCREEN_BUFFER_PROPERTIES_QNX, true,
+    skip |= ValidateStructType(loc.dot(Field::pProperties), pProperties, VK_STRUCTURE_TYPE_SCREEN_BUFFER_PROPERTIES_QNX, true,
                                "VUID-vkGetScreenBufferPropertiesQNX-pProperties-parameter",
                                "VUID-VkScreenBufferPropertiesQNX-sType-sType");
     if (pProperties != nullptr) {
@@ -12315,8 +12202,7 @@ bool StatelessValidation::PreCallValidateGetScreenBufferPropertiesQNX(VkDevice d
 bool StatelessValidation::ValidatePipelineViewportStateCreateInfo(const VkPipelineViewportStateCreateInfo& info,
                                                                   const Location& loc) const {
     bool skip = false;
-    skip |= ValidateStructType(loc, "VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO", &info,
-                               VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO, false, kVUIDUndefined,
+    skip |= ValidateStructType(loc, &info, VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO, false, kVUIDUndefined,
                                "VUID-VkPipelineViewportStateCreateInfo-sType-sType");
 
     skip |= ValidateStructPnext(loc, info.pNext, 0, nullptr, GeneratedVulkanHeaderVersion,
@@ -12328,8 +12214,7 @@ bool StatelessValidation::ValidatePipelineViewportStateCreateInfo(const VkPipeli
 bool StatelessValidation::ValidatePipelineTessellationStateCreateInfo(const VkPipelineTessellationStateCreateInfo& info,
                                                                       const Location& loc) const {
     bool skip = false;
-    skip |= ValidateStructType(loc, "VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO", &info,
-                               VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO, false, kVUIDUndefined,
+    skip |= ValidateStructType(loc, &info, VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO, false, kVUIDUndefined,
                                "VUID-VkPipelineTessellationStateCreateInfo-sType-sType");
 
     constexpr std::array allowed_structs_VkPipelineTessellationStateCreateInfo = {
@@ -12347,8 +12232,7 @@ bool StatelessValidation::ValidatePipelineTessellationStateCreateInfo(const VkPi
 bool StatelessValidation::ValidatePipelineVertexInputStateCreateInfo(const VkPipelineVertexInputStateCreateInfo& info,
                                                                      const Location& loc) const {
     bool skip = false;
-    skip |= ValidateStructType(loc, "VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO", &info,
-                               VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO, false, kVUIDUndefined,
+    skip |= ValidateStructType(loc, &info, VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO, false, kVUIDUndefined,
                                "VUID-VkPipelineVertexInputStateCreateInfo-sType-sType");
 
     constexpr std::array allowed_structs_VkPipelineVertexInputStateCreateInfo = {
@@ -12395,8 +12279,7 @@ bool StatelessValidation::ValidatePipelineVertexInputStateCreateInfo(const VkPip
 bool StatelessValidation::ValidatePipelineMultisampleStateCreateInfo(const VkPipelineMultisampleStateCreateInfo& info,
                                                                      const Location& loc) const {
     bool skip = false;
-    skip |= ValidateStructType(loc, "VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO", &info,
-                               VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO, false, kVUIDUndefined,
+    skip |= ValidateStructType(loc, &info, VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO, false, kVUIDUndefined,
                                "VUID-VkPipelineMultisampleStateCreateInfo-sType-sType");
 
     constexpr std::array allowed_structs_VkPipelineMultisampleStateCreateInfo = {
@@ -12428,8 +12311,7 @@ bool StatelessValidation::ValidatePipelineMultisampleStateCreateInfo(const VkPip
 bool StatelessValidation::ValidatePipelineColorBlendStateCreateInfo(const VkPipelineColorBlendStateCreateInfo& info,
                                                                     const Location& loc) const {
     bool skip = false;
-    skip |= ValidateStructType(loc, "VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO", &info,
-                               VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO, false, kVUIDUndefined,
+    skip |= ValidateStructType(loc, &info, VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO, false, kVUIDUndefined,
                                "VUID-VkPipelineColorBlendStateCreateInfo-sType-sType");
 
     constexpr std::array allowed_structs_VkPipelineColorBlendStateCreateInfo = {
@@ -12484,8 +12366,7 @@ bool StatelessValidation::ValidatePipelineColorBlendStateCreateInfo(const VkPipe
 bool StatelessValidation::ValidatePipelineDepthStencilStateCreateInfo(const VkPipelineDepthStencilStateCreateInfo& info,
                                                                       const Location& loc) const {
     bool skip = false;
-    skip |= ValidateStructType(loc, "VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO", &info,
-                               VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO, false, kVUIDUndefined,
+    skip |= ValidateStructType(loc, &info, VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO, false, kVUIDUndefined,
                                "VUID-VkPipelineDepthStencilStateCreateInfo-sType-sType");
 
     skip |= ValidateStructPnext(loc, info.pNext, 0, nullptr, GeneratedVulkanHeaderVersion,
@@ -12533,8 +12414,7 @@ bool StatelessValidation::ValidatePipelineDepthStencilStateCreateInfo(const VkPi
 bool StatelessValidation::ValidatePipelineInputAssemblyStateCreateInfo(const VkPipelineInputAssemblyStateCreateInfo& info,
                                                                        const Location& loc) const {
     bool skip = false;
-    skip |= ValidateStructType(loc, "VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO", &info,
-                               VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO, false, kVUIDUndefined,
+    skip |= ValidateStructType(loc, &info, VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO, false, kVUIDUndefined,
                                "VUID-VkPipelineInputAssemblyStateCreateInfo-sType-sType");
 
     skip |= ValidateStructPnext(loc, info.pNext, 0, nullptr, GeneratedVulkanHeaderVersion,
@@ -12552,8 +12432,7 @@ bool StatelessValidation::ValidatePipelineInputAssemblyStateCreateInfo(const VkP
 bool StatelessValidation::ValidatePipelineRasterizationStateCreateInfo(const VkPipelineRasterizationStateCreateInfo& info,
                                                                        const Location& loc) const {
     bool skip = false;
-    skip |= ValidateStructType(loc, "VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO", &info,
-                               VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO, false, kVUIDUndefined,
+    skip |= ValidateStructType(loc, &info, VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO, false, kVUIDUndefined,
                                "VUID-VkPipelineRasterizationStateCreateInfo-sType-sType");
 
     constexpr std::array allowed_structs_VkPipelineRasterizationStateCreateInfo = {
@@ -12583,6 +12462,45 @@ bool StatelessValidation::ValidatePipelineRasterizationStateCreateInfo(const VkP
                                "VUID-VkPipelineRasterizationStateCreateInfo-frontFace-parameter");
 
     skip |= ValidateBool32(loc.dot(Field::depthBiasEnable), info.depthBiasEnable);
+    return skip;
+}
+bool StatelessValidation::ValidatePipelineShaderStageCreateInfo(const VkPipelineShaderStageCreateInfo& info,
+                                                                const Location& loc) const {
+    bool skip = false;
+    constexpr std::array allowed_structs_VkPipelineShaderStageCreateInfo = {
+        VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+        VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_REQUIRED_SUBGROUP_SIZE_CREATE_INFO};
+
+    skip |= ValidateStructPnext(loc, info.pNext, allowed_structs_VkPipelineShaderStageCreateInfo.size(),
+                                allowed_structs_VkPipelineShaderStageCreateInfo.data(), GeneratedVulkanHeaderVersion,
+                                "VUID-VkPipelineShaderStageCreateInfo-pNext-pNext",
+                                "VUID-VkPipelineShaderStageCreateInfo-sType-unique", VK_NULL_HANDLE, true);
+
+    skip |= ValidateFlags(loc.dot(Field::flags), vvl::FlagBitmask::VkPipelineShaderStageCreateFlagBits,
+                          AllVkPipelineShaderStageCreateFlagBits, info.flags, kOptionalFlags,
+                          "VUID-VkPipelineShaderStageCreateInfo-flags-parameter");
+
+    skip |= ValidateFlags(loc.dot(Field::stage), vvl::FlagBitmask::VkShaderStageFlagBits, AllVkShaderStageFlagBits, info.stage,
+                          kRequiredSingleBit, "VUID-VkPipelineShaderStageCreateInfo-stage-parameter",
+                          "VUID-VkPipelineShaderStageCreateInfo-stage-parameter");
+
+    if (info.pSpecializationInfo != nullptr) {
+        [[maybe_unused]] const Location pSpecializationInfo_loc = loc.dot(Field::pSpecializationInfo);
+        skip |= ValidateArray(pSpecializationInfo_loc.dot(Field::mapEntryCount), pSpecializationInfo_loc.dot(Field::pMapEntries),
+                              info.pSpecializationInfo->mapEntryCount, &info.pSpecializationInfo->pMapEntries, false, true,
+                              kVUIDUndefined, "VUID-VkSpecializationInfo-pMapEntries-parameter");
+
+        if (info.pSpecializationInfo->pMapEntries != nullptr) {
+            for (uint32_t mapEntryIndex = 0; mapEntryIndex < info.pSpecializationInfo->mapEntryCount; ++mapEntryIndex) {
+                [[maybe_unused]] const Location pMapEntries_loc = pSpecializationInfo_loc.dot(Field::pMapEntries, mapEntryIndex);
+                // No xml-driven validation
+            }
+        }
+
+        skip |= ValidateArray(pSpecializationInfo_loc.dot(Field::dataSize), pSpecializationInfo_loc.dot(Field::pData),
+                              info.pSpecializationInfo->dataSize, &info.pSpecializationInfo->pData, false, true, kVUIDUndefined,
+                              "VUID-VkSpecializationInfo-pData-parameter");
+    }
     return skip;
 }
 bool StatelessValidation::ValidateDescriptorAddressInfoEXT(const VkDescriptorAddressInfoEXT& info, const Location& loc) const {

@@ -14,6 +14,8 @@
 
 #include "../framework/layer_validation_tests.h"
 
+class NegativeDebugExtensions : public VkLayerTest {};
+
 TEST_F(NegativeDebugExtensions, DebugMarkerName) {
     TEST_DESCRIPTION("Ensure debug marker object names are printed in debug report output");
     AddRequiredExtensions(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
@@ -49,7 +51,7 @@ TEST_F(NegativeDebugExtensions, DebugMarkerName) {
     vk::BindBufferMemory(device(), buffer.handle(), memory_1.handle(), 0);
 
     // Test core_validation layer
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, memory_name);
+    m_errorMonitor->SetDesiredError(memory_name.c_str());
     vk::BindBufferMemory(device(), buffer.handle(), memory_2.handle(), 0);
     m_errorMonitor->VerifyFound();
 
@@ -80,12 +82,12 @@ TEST_F(NegativeDebugExtensions, DebugMarkerName) {
     const VkRect2D scissors[] = {scissor, scissor};
 
     // Test parameter_validation layer
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, commandBuffer_name);
+    m_errorMonitor->SetDesiredError(commandBuffer_name.c_str());
     vk::CmdSetScissor(commandBuffer, 0, 1, scissors);
     m_errorMonitor->VerifyFound();
 
     // Test object_tracker layer
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, commandBuffer_name);
+    m_errorMonitor->SetDesiredError(commandBuffer_name.c_str());
     vk::FreeCommandBuffers(device(), command_pool_2.handle(), 1, &commandBuffer);
     m_errorMonitor->VerifyFound();
 }
@@ -198,7 +200,7 @@ TEST_F(NegativeDebugExtensions, DebugUtilsName) {
     vk::BindBufferMemory(device(), buffer.handle(), memory_1.handle(), 0);
 
     // Test core_validation layer
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, memory_name);
+    m_errorMonitor->SetDesiredError(memory_name.c_str());
     vk::BindBufferMemory(device(), buffer.handle(), memory_2.handle(), 0);
     m_errorMonitor->VerifyFound();
 
@@ -247,7 +249,7 @@ TEST_F(NegativeDebugExtensions, DebugUtilsName) {
 
     vk::CmdInsertDebugUtilsLabelEXT(commandBuffer, &command_label);
     // Test parameter_validation layer
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, commandBuffer_name);
+    m_errorMonitor->SetDesiredError(commandBuffer_name.c_str());
     vk::CmdSetScissor(commandBuffer, 0, 1, scissors);
     m_errorMonitor->VerifyFound();
 
@@ -257,7 +259,7 @@ TEST_F(NegativeDebugExtensions, DebugUtilsName) {
     }
 
     // Test object_tracker layer
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, commandBuffer_name);
+    m_errorMonitor->SetDesiredError(commandBuffer_name.c_str());
     vk::FreeCommandBuffers(device(), command_pool_2.handle(), 1, &commandBuffer);
     m_errorMonitor->VerifyFound();
 

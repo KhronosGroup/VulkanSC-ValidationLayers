@@ -36,8 +36,23 @@ permissions:
   contents: read
 
 jobs:
+  code-format:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: '0'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: clang-format version
+        run: clang-format --version
+      - name: Execute Source Code Format Checking Script
+        run: python3 scripts/check_code_format.py --fetch-main --target-refspec=FETCH_HEAD
+
   # Ensure we can build on an older Ubuntu distro with an older version of CMake.
   linux_back_compat:
+    needs: check_vvl
     runs-on: ubuntu-20.04
     name: "Ubuntu Backcompat"
     steps:
@@ -60,6 +75,7 @@ jobs:
       - run: cmake --install build --prefix /tmp
 
   linux:
+    needs: check_vvl
     runs-on: ubuntu-22.04
     name: "linux (${{matrix.sanitize}} sanitizer, ${{matrix.config}}, robinhood ${{matrix.robin_hood}} )"
     strategy:
@@ -74,6 +90,11 @@ jobs:
           - config: release
             robin_hood: "OFF"
             sanitize: address
+        exclude:
+          # Have found over time this finds nothing extra, while taking the longest and using the most CI minutes.
+          - config: debug
+            robin_hood: "ON"
+            sanitize: thread
     steps:
       - uses: actions/checkout@v4
       - uses: lukka/get-cmake@latest
@@ -110,6 +131,7 @@ jobs:
           VKSC_LAYER_TESTS_NO_SPV_DEBUG_INFO: TRUE
 
   windows:
+    needs: check_vvl
     runs-on: windows-2022
     strategy:
       matrix:
@@ -149,6 +171,7 @@ jobs:
           VKSC_LAYER_TESTS_NO_SPV_DEBUG_INFO: TRUE
 
   mingw:
+    needs: check_vvl
     runs-on: windows-latest
     defaults:
       run:
@@ -176,6 +199,7 @@ jobs:
       - run: cmake --install build --prefix /tmp
 
   check_vvl:
+    needs: code-format
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

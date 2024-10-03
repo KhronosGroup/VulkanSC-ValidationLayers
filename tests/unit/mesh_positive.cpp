@@ -13,7 +13,8 @@
 
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
-#include "generated/vk_extension_helper.h"
+
+class PositiveMesh : public VkLayerTest {};
 
 TEST_F(PositiveMesh, BasicUsage) {
     TEST_DESCRIPTION("Test basic VK_EXT_mesh_shader.");

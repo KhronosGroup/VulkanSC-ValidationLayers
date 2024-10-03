@@ -13,9 +13,10 @@
  */
 
 #include "utils/cast_utils.h"
-#include "generated/enum_flag_bits.h"
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
+
+class NegativeQuery : public QueryTest {};
 
 TEST_F(NegativeQuery, PerformanceCreation) {
     TEST_DESCRIPTION("Create performance query without support");
@@ -156,24 +157,7 @@ TEST_F(NegativeQuery, PerformanceCounterCommandbufferScope) {
 
     // Not the first command.
     {
-        VkBufferCreateInfo buf_info = vku::InitStructHelper();
-        buf_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-        buf_info.size = 4096;
-        buf_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        VkBuffer buffer;
-        VkResult err = vk::CreateBuffer(device(), &buf_info, NULL, &buffer);
-        ASSERT_EQ(VK_SUCCESS, err);
-
-        VkMemoryRequirements mem_reqs;
-        vk::GetBufferMemoryRequirements(device(), buffer, &mem_reqs);
-
-        VkMemoryAllocateInfo alloc_info = vku::InitStructHelper();
-        alloc_info.allocationSize = 4096;
-        VkDeviceMemory mem;
-        err = vk::AllocateMemory(device(), &alloc_info, NULL, &mem);
-        ASSERT_EQ(VK_SUCCESS, err);
-        vk::BindBufferMemory(device(), buffer, mem, 0);
-
+        vkt::Buffer buffer(*m_device, 4096, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
         m_commandBuffer->begin();
         vk::CmdResetQueryPool(m_commandBuffer->handle(), query_pool.handle(), 0, 1);
         vk::CmdFillBuffer(m_commandBuffer->handle(), buffer, 0, 4096, 0);
@@ -194,39 +178,16 @@ TEST_F(NegativeQuery, PerformanceCounterCommandbufferScope) {
         submit_info.pSignalSemaphores = NULL;
         vk::QueueSubmit(queue, 1, &submit_info, VK_NULL_HANDLE);
         vk::QueueWaitIdle(queue);
-
-        vk::DestroyBuffer(device(), buffer, nullptr);
-        vk::FreeMemory(device(), mem, NULL);
     }
 
     // Not last command.
     {
-        VkBufferCreateInfo buf_info = vku::InitStructHelper();
-        buf_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-        buf_info.size = 4096;
-        buf_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        VkBuffer buffer;
-        VkResult err = vk::CreateBuffer(device(), &buf_info, NULL, &buffer);
-        ASSERT_EQ(VK_SUCCESS, err);
-
-        VkMemoryRequirements mem_reqs;
-        vk::GetBufferMemoryRequirements(device(), buffer, &mem_reqs);
-
-        VkMemoryAllocateInfo alloc_info = vku::InitStructHelper();
-        alloc_info.allocationSize = 4096;
-        VkDeviceMemory mem;
-        err = vk::AllocateMemory(device(), &alloc_info, NULL, &mem);
-        ASSERT_EQ(VK_SUCCESS, err);
-        vk::BindBufferMemory(device(), buffer, mem, 0);
+        vkt::Buffer buffer(*m_device, 4096, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
 
         m_commandBuffer->begin();
-
         vk::CmdBeginQuery(m_commandBuffer->handle(), query_pool.handle(), 0, 0);
-
         vk::CmdEndQuery(m_commandBuffer->handle(), query_pool.handle(), 0);
-
         vk::CmdFillBuffer(m_commandBuffer->handle(), buffer, 0, 4096, 0);
-
         m_commandBuffer->end();
 
         VkSubmitInfo submit_info = vku::InitStructHelper();
@@ -240,9 +201,6 @@ TEST_F(NegativeQuery, PerformanceCounterCommandbufferScope) {
         m_errorMonitor->SetDesiredError("VUID-vkCmdEndQuery-queryPool-03227");
         vk::QueueSubmit(queue, 1, &submit_info, VK_NULL_HANDLE);
         m_errorMonitor->VerifyFound();
-
-        vk::DestroyBuffer(device(), buffer, nullptr);
-        vk::FreeMemory(device(), mem, NULL);
     }
 
     vk::ReleaseProfilingLockKHR(device());
@@ -425,23 +383,7 @@ TEST_F(NegativeQuery, PerformanceReleaseProfileLockBeforeSubmit) {
     }
 
     {
-        VkBufferCreateInfo buf_info = vku::InitStructHelper();
-        buf_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-        buf_info.size = 4096;
-        buf_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        VkBuffer buffer;
-        VkResult err = vk::CreateBuffer(device(), &buf_info, NULL, &buffer);
-        ASSERT_EQ(VK_SUCCESS, err);
-
-        VkMemoryRequirements mem_reqs;
-        vk::GetBufferMemoryRequirements(device(), buffer, &mem_reqs);
-
-        VkMemoryAllocateInfo alloc_info = vku::InitStructHelper();
-        alloc_info.allocationSize = 4096;
-        VkDeviceMemory mem;
-        err = vk::AllocateMemory(device(), &alloc_info, NULL, &mem);
-        ASSERT_EQ(VK_SUCCESS, err);
-        vk::BindBufferMemory(device(), buffer, mem, 0);
+        vkt::Buffer buffer(*m_device, 4096, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
 
         m_commandBuffer->reset();
         m_commandBuffer->begin();
@@ -474,9 +416,6 @@ TEST_F(NegativeQuery, PerformanceReleaseProfileLockBeforeSubmit) {
         m_errorMonitor->VerifyFound();
 
         vk::QueueWaitIdle(queue);
-
-        vk::DestroyBuffer(device(), buffer, nullptr);
-        vk::FreeMemory(device(), mem, NULL);
     }
 
     vk::ReleaseProfilingLockKHR(device());
@@ -569,24 +508,7 @@ TEST_F(NegativeQuery, PerformanceIncompletePasses) {
     {
         const VkDeviceSize buf_size =
             std::max((VkDeviceSize)4096, (VkDeviceSize)(sizeof(VkPerformanceCounterResultKHR) * counterIndices.size()));
-
-        VkBufferCreateInfo buf_info = vku::InitStructHelper();
-        buf_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-        buf_info.size = buf_size;
-        buf_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        VkBuffer buffer;
-        VkResult err = vk::CreateBuffer(device(), &buf_info, NULL, &buffer);
-        ASSERT_EQ(VK_SUCCESS, err);
-
-        VkMemoryRequirements mem_reqs;
-        vk::GetBufferMemoryRequirements(device(), buffer, &mem_reqs);
-
-        VkMemoryAllocateInfo alloc_info = vku::InitStructHelper();
-        alloc_info.allocationSize = mem_reqs.size;
-        VkDeviceMemory mem;
-        err = vk::AllocateMemory(device(), &alloc_info, NULL, &mem);
-        ASSERT_EQ(VK_SUCCESS, err);
-        vk::BindBufferMemory(device(), buffer, mem, 0);
+        vkt::Buffer buffer(*m_device, buf_size, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
 
         VkCommandBufferBeginInfo command_buffer_begin_info = vku::InitStructHelper();
         command_buffer_begin_info.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
@@ -731,9 +653,6 @@ TEST_F(NegativeQuery, PerformanceIncompletePasses) {
 
         vk::GetQueryPoolResults(device(), query_pool.handle(), 0, 1, sizeof(VkPerformanceCounterResultKHR) * results.size(),
                                 &results[0], sizeof(VkPerformanceCounterResultKHR) * results.size(), VK_QUERY_RESULT_WAIT_BIT);
-
-        vk::DestroyBuffer(device(), buffer, nullptr);
-        vk::FreeMemory(device(), mem, NULL);
     }
 
     vk::ReleaseProfilingLockKHR(device());
@@ -801,23 +720,7 @@ TEST_F(NegativeQuery, PerformanceResetAndBegin) {
     }
 
     {
-        VkBufferCreateInfo buf_info = vku::InitStructHelper();
-        buf_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-        buf_info.size = 4096;
-        buf_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        VkBuffer buffer;
-        VkResult err = vk::CreateBuffer(device(), &buf_info, NULL, &buffer);
-        ASSERT_EQ(VK_SUCCESS, err);
-
-        VkMemoryRequirements mem_reqs;
-        vk::GetBufferMemoryRequirements(device(), buffer, &mem_reqs);
-
-        VkMemoryAllocateInfo alloc_info = vku::InitStructHelper();
-        alloc_info.allocationSize = 4096;
-        VkDeviceMemory mem;
-        err = vk::AllocateMemory(device(), &alloc_info, NULL, &mem);
-        ASSERT_EQ(VK_SUCCESS, err);
-        vk::BindBufferMemory(device(), buffer, mem, 0);
+        vkt::Buffer buffer(*m_device, 4096, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
 
         VkCommandBufferBeginInfo command_buffer_begin_info = vku::InitStructHelper();
         command_buffer_begin_info.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
@@ -848,9 +751,6 @@ TEST_F(NegativeQuery, PerformanceResetAndBegin) {
 
         vk::QueueWaitIdle(queue);
         m_errorMonitor->VerifyFound();
-
-        vk::DestroyBuffer(device(), buffer, nullptr);
-        vk::FreeMemory(device(), mem, NULL);
     }
 
     vk::ReleaseProfilingLockKHR(device());
@@ -1684,18 +1584,7 @@ TEST_F(NegativeQuery, MultiviewBeginQuery) {
     image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_ci.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     vkt::Image image(*m_device, image_ci, vkt::set_layout);
-
-    VkImageViewCreateInfo iv_ci = vku::InitStructHelper();
-    iv_ci.image = image.handle();
-    iv_ci.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
-    iv_ci.format = VK_FORMAT_B8G8R8A8_UNORM;
-    iv_ci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    iv_ci.subresourceRange.baseMipLevel = 0;
-    iv_ci.subresourceRange.levelCount = 1;
-    iv_ci.subresourceRange.baseArrayLayer = 0;
-    iv_ci.subresourceRange.layerCount = 4;
-    vkt::ImageView image_view(*m_device, iv_ci);
-
+    vkt::ImageView image_view = image.CreateView(VK_IMAGE_VIEW_TYPE_2D_ARRAY, 0, 1, 0, 4);
     VkImageView image_view_handle = image_view.handle();
 
     vkt::Framebuffer framebuffer(*m_device, render_pass.handle(), 1, &image_view_handle, 64, 64);
@@ -2015,132 +1904,6 @@ TEST_F(NegativeQuery, CommandBufferInheritanceFlags) {
     m_errorMonitor->VerifyFound();
 }
 
-// Doesn't seem like these VUs are suppose to be in the spec
-// https://gitlab.khronos.org/vulkan/vulkan/-/issues/3733
-TEST_F(NegativeQuery, DISABLED_MultiviewEndQuery) {
-    TEST_DESCRIPTION("Test CmdEndQuery in subpass with multiview");
-
-    SetTargetApiVersion(VK_API_VERSION_1_1);
-    AddRequiredExtensions(VK_EXT_TRANSFORM_FEEDBACK_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-
-    const bool indexed_queries = DeviceExtensionSupported(gpu(), nullptr, VK_EXT_TRANSFORM_FEEDBACK_EXTENSION_NAME);
-
-    VkPhysicalDeviceMultiviewFeatures multiview_features = vku::InitStructHelper();
-    auto features2 = GetPhysicalDeviceFeatures2(multiview_features);
-    if (multiview_features.multiview == VK_FALSE) {
-        GTEST_SKIP() << "multiview feature not supported";
-    }
-
-    RETURN_IF_SKIP(InitState(nullptr, &features2));
-
-    VkAttachmentDescription attach = {};
-    attach.format = VK_FORMAT_B8G8R8A8_UNORM;
-    attach.samples = VK_SAMPLE_COUNT_1_BIT;
-    attach.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    attach.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    attach.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attach.finalLayout = VK_IMAGE_LAYOUT_GENERAL;
-
-    VkAttachmentReference color_att = {};
-    color_att.layout = VK_IMAGE_LAYOUT_GENERAL;
-
-    VkSubpassDescription subpasses[2] = {};
-    subpasses[0].pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpasses[0].colorAttachmentCount = 1;
-    subpasses[0].pColorAttachments = &color_att;
-    subpasses[1].pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpasses[1].colorAttachmentCount = 1;
-    subpasses[1].pColorAttachments = &color_att;
-
-    uint32_t viewMasks[2] = {0x1u, 0x3u};
-    uint32_t correlationMasks[] = {0x1u};
-    VkRenderPassMultiviewCreateInfo rpmv_ci = vku::InitStructHelper();
-    rpmv_ci.subpassCount = 2;
-    rpmv_ci.pViewMasks = viewMasks;
-    rpmv_ci.correlationMaskCount = 1;
-    rpmv_ci.pCorrelationMasks = correlationMasks;
-
-    VkSubpassDependency dependency = {};
-    dependency.srcSubpass = 0;
-    dependency.dstSubpass = 1;
-    dependency.srcStageMask = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
-    dependency.dstStageMask = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
-    dependency.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-
-    VkRenderPassCreateInfo rp_ci = vku::InitStructHelper(&rpmv_ci);
-    rp_ci.attachmentCount = 1;
-    rp_ci.pAttachments = &attach;
-    rp_ci.subpassCount = 2;
-    rp_ci.pSubpasses = subpasses;
-    rp_ci.dependencyCount = 1;
-    rp_ci.pDependencies = &dependency;
-
-    vkt::RenderPass render_pass(*m_device, rp_ci);
-
-    VkImageCreateInfo image_ci = vku::InitStructHelper();
-    image_ci.imageType = VK_IMAGE_TYPE_2D;
-    image_ci.format = VK_FORMAT_B8G8R8A8_UNORM;
-    image_ci.extent.width = 64;
-    image_ci.extent.height = 64;
-    image_ci.extent.depth = 1;
-    image_ci.mipLevels = 1;
-    image_ci.arrayLayers = 4;
-    image_ci.samples = VK_SAMPLE_COUNT_1_BIT;
-    image_ci.tiling = VK_IMAGE_TILING_OPTIMAL;
-    image_ci.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    vkt::Image image(*m_device, image_ci, vkt::set_layout);
-
-    VkImageViewCreateInfo iv_ci = vku::InitStructHelper();
-    iv_ci.image = image.handle();
-    iv_ci.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
-    iv_ci.format = VK_FORMAT_B8G8R8A8_UNORM;
-    iv_ci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    iv_ci.subresourceRange.baseMipLevel = 0;
-    iv_ci.subresourceRange.levelCount = 1;
-    iv_ci.subresourceRange.baseArrayLayer = 0;
-    iv_ci.subresourceRange.layerCount = 4;
-    vkt::ImageView image_view(*m_device, iv_ci);
-
-    VkImageView image_view_handle = image_view.handle();
-
-    vkt::Framebuffer framebuffer(*m_device, render_pass.handle(), 1, &image_view_handle, 64, 64);
-
-    vkt::QueryPool query_pool(*m_device, VK_QUERY_TYPE_OCCLUSION, 2);
-
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRenderPass(render_pass.handle(), framebuffer.handle(), 64, 64);
-
-    vk::CmdBeginQuery(m_commandBuffer->handle(), query_pool.handle(), 1, 0);
-
-    m_commandBuffer->NextSubpass();
-
-    m_errorMonitor->SetDesiredError("VUID-vkCmdEndQuery-query-00812");
-    vk::CmdEndQuery(m_commandBuffer->handle(), query_pool.handle(), 1);
-    m_errorMonitor->VerifyFound();
-
-    m_commandBuffer->EndRenderPass();
-    vk::CmdEndQuery(m_commandBuffer->handle(), query_pool.handle(), 1);
-    m_commandBuffer->end();
-
-    if (indexed_queries) {
-        m_commandBuffer->reset();
-        m_commandBuffer->begin();
-        m_commandBuffer->BeginRenderPass(render_pass.handle(), framebuffer.handle(), 64, 64);
-        vk::CmdBeginQueryIndexedEXT(m_commandBuffer->handle(), query_pool.handle(), 1, 0, 0);
-        m_commandBuffer->NextSubpass();
-
-        m_errorMonitor->SetDesiredError("VUID-vkCmdEndQueryIndexedEXT-query-02345");
-        vk::CmdEndQueryIndexedEXT(m_commandBuffer->handle(), query_pool.handle(), 1, 0);
-        m_errorMonitor->VerifyFound();
-
-        m_commandBuffer->EndRenderPass();
-        vk::CmdEndQueryIndexedEXT(m_commandBuffer->handle(), query_pool.handle(), 1, 0);
-        m_commandBuffer->end();
-    }
-}
-
 TEST_F(NegativeQuery, MeshShaderQueries) {
     TEST_DESCRIPTION("Invalid usage without meshShaderQueries enabled");
 
@@ -2244,10 +2007,7 @@ TEST_F(NegativeQuery, CmdCopyQueryPoolResultsWithoutQueryPool) {
     vk::CmdBeginQuery(m_commandBuffer->handle(), query_pool.handle(), 0, 0);
     vk::CmdEndQuery(m_commandBuffer->handle(), query_pool.handle(), 0);
 
-    VkBufferCreateInfo buffer_ci = vku::InitStructHelper();
-    buffer_ci.size = 1024;
-    buffer_ci.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-    vkt::Buffer buffer(*m_device, buffer_ci);
+    vkt::Buffer buffer(*m_device, 1024, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdCopyQueryPoolResults-queryPool-parameter");
     vk::CmdCopyQueryPoolResults(m_commandBuffer->handle(), bad_query_pool, 0, 1, buffer.handle(), 0, 0, VK_QUERY_RESULT_WAIT_BIT);
@@ -2775,4 +2535,24 @@ TEST_F(NegativeQuery, PerfQueryQueueFamilyIndex) {
     m_errorMonitor->VerifyFound();
     cb.end();
     vk::ReleaseProfilingLockKHR(*m_device);
+}
+
+TEST_F(NegativeQuery, NoInitReset) {
+    AddRequiredFeature(vkt::Feature::pipelineStatisticsQuery);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    VkQueryPoolCreateInfo qpci = vkt::QueryPool::create_info(VK_QUERY_TYPE_PIPELINE_STATISTICS, 1);
+    qpci.pipelineStatistics = VK_QUERY_PIPELINE_STATISTIC_INPUT_ASSEMBLY_VERTICES_BIT;
+    vkt::QueryPool query_pool(*m_device, qpci);
+
+    m_commandBuffer->begin();
+    vk::CmdBeginQuery(m_commandBuffer->handle(), query_pool.handle(), 0, 0);
+    vk::CmdEndQuery(m_commandBuffer->handle(), query_pool.handle(), 0);
+    m_commandBuffer->end();
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdBeginQuery-None-00807");
+    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Wait();
+    m_errorMonitor->VerifyFound();
 }

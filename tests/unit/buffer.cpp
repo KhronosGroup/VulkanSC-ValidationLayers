@@ -12,12 +12,10 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "utils/cast_utils.h"
-#include "generated/enum_flag_bits.h"
 #include "../framework/layer_validation_tests.h"
-#include "../framework/pipeline_helper.h"
 #include "../framework/descriptor_helper.h"
-#include "utils/vk_layer_utils.h"
+
+class NegativeBuffer : public VkLayerTest {};
 
 TEST_F(NegativeBuffer, UpdateBufferAlignment) {
     TEST_DESCRIPTION("Check alignment parameters for vkCmdUpdateBuffer");
@@ -99,15 +97,7 @@ TEST_F(NegativeBuffer, BufferViewObject) {
                                                  });
     VkBufferView view;
     {
-        // Create a valid bufferView to start with
-        uint32_t queue_family_index = 0;
-        VkBufferCreateInfo buffer_create_info = vku::InitStructHelper();
-        buffer_create_info.size = 1024;
-        buffer_create_info.usage = VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT;
-        buffer_create_info.queueFamilyIndexCount = 1;
-        buffer_create_info.pQueueFamilyIndices = &queue_family_index;
-        vkt::Buffer buffer(*m_device, buffer_create_info);
-
+        vkt::Buffer buffer(*m_device, 1024, VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT);
         VkBufferViewCreateInfo bvci = vku::InitStructHelper();
         bvci.buffer = buffer.handle();
         bvci.format = VK_FORMAT_R32_SFLOAT;
@@ -322,10 +312,10 @@ TEST_F(NegativeBuffer, TexelBufferAlignment) {
     buff_view_ci.offset = 1;
     std::vector<std::string> expectedErrors;
     if (buff_view_ci.offset < align_props.storageTexelBufferOffsetAlignmentBytes) {
-        expectedErrors.push_back("VUID-VkBufferViewCreateInfo-buffer-02750");
+        expectedErrors.emplace_back("VUID-VkBufferViewCreateInfo-buffer-02750");
     }
     if (buff_view_ci.offset < align_props.uniformTexelBufferOffsetAlignmentBytes) {
-        expectedErrors.push_back("VUID-VkBufferViewCreateInfo-buffer-02751");
+        expectedErrors.emplace_back("VUID-VkBufferViewCreateInfo-buffer-02751");
     }
     CreateBufferViewTest(*this, &buff_view_ci, expectedErrors);
     expectedErrors.clear();
@@ -333,11 +323,11 @@ TEST_F(NegativeBuffer, TexelBufferAlignment) {
     buff_view_ci.offset = 4;
     if (buff_view_ci.offset < align_props.storageTexelBufferOffsetAlignmentBytes &&
         !align_props.storageTexelBufferOffsetSingleTexelAlignment) {
-        expectedErrors.push_back("VUID-VkBufferViewCreateInfo-buffer-02750");
+        expectedErrors.emplace_back("VUID-VkBufferViewCreateInfo-buffer-02750");
     }
     if (buff_view_ci.offset < align_props.uniformTexelBufferOffsetAlignmentBytes &&
         !align_props.uniformTexelBufferOffsetSingleTexelAlignment) {
-        expectedErrors.push_back("VUID-VkBufferViewCreateInfo-buffer-02751");
+        expectedErrors.emplace_back("VUID-VkBufferViewCreateInfo-buffer-02751");
     }
     CreateBufferViewTest(*this, &buff_view_ci, expectedErrors);
     expectedErrors.clear();
@@ -356,7 +346,7 @@ TEST_F(NegativeBuffer, TexelBufferAlignment) {
         buff_view_ci.format = VK_FORMAT_R32G32B32_SFLOAT;
         buff_view_ci.offset = 1;
         if (buff_view_ci.offset < align_props.uniformTexelBufferOffsetAlignmentBytes) {
-            expectedErrors.push_back("VUID-VkBufferViewCreateInfo-buffer-02751");
+            expectedErrors.emplace_back("VUID-VkBufferViewCreateInfo-buffer-02751");
         }
         CreateBufferViewTest(*this, &buff_view_ci, expectedErrors);
         expectedErrors.clear();
@@ -364,7 +354,7 @@ TEST_F(NegativeBuffer, TexelBufferAlignment) {
         buff_view_ci.offset = 4;
         if (buff_view_ci.offset < align_props.uniformTexelBufferOffsetAlignmentBytes &&
             !align_props.uniformTexelBufferOffsetSingleTexelAlignment) {
-            expectedErrors.push_back("VUID-VkBufferViewCreateInfo-buffer-02751");
+            expectedErrors.emplace_back("VUID-VkBufferViewCreateInfo-buffer-02751");
         }
         CreateBufferViewTest(*this, &buff_view_ci, expectedErrors);
         expectedErrors.clear();
@@ -418,16 +408,7 @@ TEST_F(NegativeBuffer, UpdateBufferWithinRenderPass) {
 TEST_F(NegativeBuffer, IdxBufferAlignmentError) {
     // Bind a BeginRenderPass within an active RenderPass
     RETURN_IF_SKIP(Init());
-    InitRenderTarget();
-
-    uint32_t const indices[] = {0};
-    VkBufferCreateInfo buf_info = vku::InitStructHelper();
-    buf_info.size = 1024;
-    buf_info.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-    buf_info.queueFamilyIndexCount = 1;
-    buf_info.pQueueFamilyIndices = indices;
-    vkt::Buffer buffer(*m_device, buf_info);
-
+    vkt::Buffer buffer(*m_device, 1024, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
     m_commandBuffer->begin();
     m_errorMonitor->SetDesiredError("VUID-vkCmdBindIndexBuffer-offset-08783");
     vk::CmdBindIndexBuffer(m_commandBuffer->handle(), buffer.handle(), 7, VK_INDEX_TYPE_UINT16);
@@ -618,10 +599,7 @@ TEST_F(NegativeBuffer, BufferUsageFlags2) {
     AddRequiredFeature(vkt::Feature::maintenance5);
     RETURN_IF_SKIP(Init());
 
-    VkBufferCreateInfo buffer_ci = vku::InitStructHelper();
-    buffer_ci.size = 32;
-    buffer_ci.usage = VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-    vkt::Buffer buffer(*m_device, buffer_ci);
+    vkt::Buffer buffer(*m_device, 32, VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
 
     VkBufferUsageFlags2CreateInfoKHR buffer_usage_flags = vku::InitStructHelper();
     buffer_usage_flags.usage = VK_BUFFER_USAGE_2_UNIFORM_TEXEL_BUFFER_BIT_KHR | VK_BUFFER_USAGE_2_INDEX_BUFFER_BIT_KHR;
@@ -653,10 +631,7 @@ TEST_F(NegativeBuffer, BufferUsageFlags2Subset) {
     AddRequiredFeature(vkt::Feature::maintenance5);
     RETURN_IF_SKIP(Init());
 
-    VkBufferCreateInfo buffer_ci = vku::InitStructHelper();
-    buffer_ci.size = 32;
-    buffer_ci.usage = VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT;
-    vkt::Buffer buffer(*m_device, buffer_ci);
+    vkt::Buffer buffer(*m_device, 32, VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT);
 
     VkBufferUsageFlags2CreateInfoKHR buffer_usage_flags = vku::InitStructHelper();
     buffer_usage_flags.usage = VK_BUFFER_USAGE_2_UNIFORM_TEXEL_BUFFER_BIT_KHR;
@@ -689,14 +664,10 @@ TEST_F(NegativeBuffer, DedicatedAllocationBufferFlags) {
     VkDedicatedAllocationBufferCreateInfoNV dedicated_buffer_create_info = vku::InitStructHelper();
     dedicated_buffer_create_info.dedicatedAllocation = VK_TRUE;
 
-    uint32_t queue_family_index = 0;
-    VkBufferCreateInfo buffer_create_info = vku::InitStructHelper();
-    buffer_create_info.pNext = &dedicated_buffer_create_info;
+    VkBufferCreateInfo buffer_create_info = vku::InitStructHelper(&dedicated_buffer_create_info);
     buffer_create_info.flags = VK_BUFFER_CREATE_SPARSE_BINDING_BIT;
     buffer_create_info.size = 1024;
     buffer_create_info.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-    buffer_create_info.queueFamilyIndexCount = 1;
-    buffer_create_info.pQueueFamilyIndices = &queue_family_index;
     CreateBufferTest(*this, &buffer_create_info, "VUID-VkBufferCreateInfo-pNext-01571");
 }
 
@@ -723,14 +694,9 @@ TEST_F(NegativeBuffer, FillBufferCmdPoolUnsupported) {
 
 TEST_F(NegativeBuffer, ConditionalRenderingBufferUsage) {
     TEST_DESCRIPTION("Use a buffer without conditional rendering usage when needed.");
-
     AddRequiredExtensions(VK_EXT_CONDITIONAL_RENDERING_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
-
-    VkBufferCreateInfo buffer_create_info = vku::InitStructHelper();
-    buffer_create_info.size = 1024;
-    buffer_create_info.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-    vkt::Buffer buffer(*m_device, buffer_create_info);
+    vkt::Buffer buffer(*m_device, 1024, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 
     VkConditionalRenderingBeginInfoEXT conditional_rendering_begin = vku::InitStructHelper();
     conditional_rendering_begin.buffer = buffer.handle();
@@ -744,14 +710,11 @@ TEST_F(NegativeBuffer, ConditionalRenderingBufferUsage) {
 
 TEST_F(NegativeBuffer, ConditionalRenderingOffset) {
     TEST_DESCRIPTION("Begin conditional rendering with invalid offset.");
-
     AddRequiredExtensions(VK_EXT_CONDITIONAL_RENDERING_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
 
-    VkBufferCreateInfo buffer_create_info = vku::InitStructHelper();
-    buffer_create_info.size = 128;
-    buffer_create_info.usage = VK_BUFFER_USAGE_CONDITIONAL_RENDERING_BIT_EXT;
-    vkt::Buffer buffer(*m_device, buffer_create_info);
+    const uint32_t buffer_size = 128;
+    vkt::Buffer buffer(*m_device, buffer_size, VK_BUFFER_USAGE_CONDITIONAL_RENDERING_BIT_EXT);
 
     VkConditionalRenderingBeginInfoEXT conditional_rendering_begin = vku::InitStructHelper();
     conditional_rendering_begin.buffer = buffer.handle();
@@ -763,7 +726,7 @@ TEST_F(NegativeBuffer, ConditionalRenderingOffset) {
     vk::CmdBeginConditionalRenderingEXT(m_commandBuffer->handle(), &conditional_rendering_begin);
     m_errorMonitor->VerifyFound();
 
-    conditional_rendering_begin.offset = buffer_create_info.size;
+    conditional_rendering_begin.offset = buffer_size;
     m_errorMonitor->SetDesiredError("VUID-VkConditionalRenderingBeginInfoEXT-offset-01983");
     vk::CmdBeginConditionalRenderingEXT(m_commandBuffer->handle(), &conditional_rendering_begin);
     m_errorMonitor->VerifyFound();
@@ -773,14 +736,9 @@ TEST_F(NegativeBuffer, ConditionalRenderingOffset) {
 
 TEST_F(NegativeBuffer, BeginConditionalRendering) {
     TEST_DESCRIPTION("Begin conditional rendering when it is already active.");
-
     AddRequiredExtensions(VK_EXT_CONDITIONAL_RENDERING_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
-
-    VkBufferCreateInfo buffer_create_info = vku::InitStructHelper();
-    buffer_create_info.size = 32;
-    buffer_create_info.usage = VK_BUFFER_USAGE_CONDITIONAL_RENDERING_BIT_EXT;
-    vkt::Buffer buffer(*m_device, buffer_create_info);
+    vkt::Buffer buffer(*m_device, 32, VK_BUFFER_USAGE_CONDITIONAL_RENDERING_BIT_EXT);
 
     VkConditionalRenderingBeginInfoEXT conditional_rendering_begin = vku::InitStructHelper();
     conditional_rendering_begin.buffer = buffer.handle();

@@ -16,6 +16,8 @@
 
 #include <cstdlib>
 
+class VkPositiveLayerTest : public VkLayerTest {};
+
 TEST_F(VkPositiveLayerTest, StatelessValidationDisable) {
     TEST_DESCRIPTION("Specify a non-zero value for a reserved parameter with stateless validation disabled");
 
@@ -55,16 +57,10 @@ TEST_F(VkPositiveLayerTest, ValidStructPNext) {
     VkDedicatedAllocationBufferCreateInfoNV dedicated_buffer_create_info = vku::InitStructHelper();
     dedicated_buffer_create_info.dedicatedAllocation = VK_TRUE;
 
-    uint32_t queue_family_index = 0;
     VkBufferCreateInfo buffer_create_info = vku::InitStructHelper(&dedicated_buffer_create_info);
     buffer_create_info.size = 1024;
     buffer_create_info.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-    buffer_create_info.queueFamilyIndexCount = 1;
-    buffer_create_info.pQueueFamilyIndices = &queue_family_index;
-
-    VkBuffer buffer;
-    VkResult err = vk::CreateBuffer(device(), &buffer_create_info, NULL, &buffer);
-    ASSERT_EQ(VK_SUCCESS, err);
+    vkt::Buffer buffer(*m_device, buffer_create_info, vkt::no_mem);
 
     VkMemoryRequirements memory_reqs;
     vk::GetBufferMemoryRequirements(device(), buffer, &memory_reqs);
@@ -80,15 +76,8 @@ TEST_F(VkPositiveLayerTest, ValidStructPNext) {
     pass = m_device->phy().set_memory_type(memory_reqs.memoryTypeBits, &memory_info, 0);
     ASSERT_TRUE(pass);
 
-    VkDeviceMemory buffer_memory;
-    err = vk::AllocateMemory(device(), &memory_info, NULL, &buffer_memory);
-    ASSERT_EQ(VK_SUCCESS, err);
-
-    err = vk::BindBufferMemory(device(), buffer, buffer_memory, 0);
-    ASSERT_EQ(VK_SUCCESS, err);
-
-    vk::DestroyBuffer(device(), buffer, NULL);
-    vk::FreeMemory(device(), buffer_memory, NULL);
+    vkt::DeviceMemory buffer_memory(*m_device, memory_info);
+    vk::BindBufferMemory(device(), buffer, buffer_memory, 0);
 }
 
 TEST_F(VkPositiveLayerTest, DeviceIDPropertiesExtensions) {
@@ -100,12 +89,12 @@ TEST_F(VkPositiveLayerTest, DeviceIDPropertiesExtensions) {
     RETURN_IF_SKIP(InitFramework());
 
     if (DeviceValidationVersion() != VK_API_VERSION_1_0) {
-        GTEST_SKIP() << "Tests for 1.0 only";
+        GTEST_SKIP() << "Test's for 1.0 only";
     }
 
-    VkPhysicalDeviceIDProperties id_props =  vku::InitStructHelper();
-    VkPhysicalDeviceFeatures2 features2 = vku::InitStructHelper(&id_props);
-    vk::GetPhysicalDeviceFeatures2KHR(gpu(), &features2);
+    VkPhysicalDeviceIDProperties id_props = vku::InitStructHelper();
+    VkPhysicalDeviceProperties2 props2 = vku::InitStructHelper(&id_props);
+    vk::GetPhysicalDeviceProperties2KHR(gpu(), &props2);
 }
 
 TEST_F(VkPositiveLayerTest, ParameterLayerFeatures2Capture) {
@@ -645,4 +634,12 @@ TEST_F(VkPositiveLayerTest, InstanceExtensionsCallingDeviceStruct1) {
     VkExternalBufferProperties externalBufferProperties = vku::InitStructHelper();
     // Instance extension promoted to VK_VERSION_1_1
     vk::GetPhysicalDeviceExternalBufferProperties(gpu(), &externalBufferInfo, &externalBufferProperties);
+}
+
+TEST_F(VkPositiveLayerTest, TimelineSemaphoreWithVulkan11) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8308");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_NV_LOW_LATENCY_2_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
+    RETURN_IF_SKIP(Init());
 }

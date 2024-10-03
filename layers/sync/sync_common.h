@@ -41,8 +41,7 @@ using ImageRangeGen = subresource_adapter::ImageRangeGenerator;
 
 // The resource tag index is relative to the command buffer or queue in which it's found
 using QueueId = uint32_t;
-constexpr static QueueId kQueueIdBase = QueueId(0);
-constexpr static QueueId kQueueIdInvalid = ~kQueueIdBase;
+constexpr static QueueId kQueueIdInvalid = QueueId(vvl::kU32Max);
 constexpr static QueueId kQueueAny = kQueueIdInvalid - 1;
 
 using ResourceUsageTag = size_t;
@@ -52,6 +51,12 @@ constexpr static ResourceUsageTag kInvalidTag = kMaxIndex;
 using ResourceUsageRange = sparse_container::range<ResourceUsageTag>;
 using ResourceAddress = VkDeviceSize;
 using ResourceAccessRange = sparse_container::range<ResourceAddress>;
+
+// Usage tag extended with resource handle information
+struct ResourceUsageTagEx {
+    ResourceUsageTag tag = kInvalidTag;
+    uint32_t handle_index = vvl::kNoIndex32;
+};
 
 template <typename T>
 ResourceAccessRange MakeRange(const T &has_offset_and_size) {
@@ -80,7 +85,7 @@ class SyncValidationInfo {
         return *sync_state_;
     }
     std::string FormatHazard(const HazardResult& hazard) const;
-    virtual std::string FormatUsage(ResourceUsageTag tag) const = 0;
+    virtual std::string FormatUsage(ResourceUsageTagEx tag_ex) const = 0;
 
   protected:
     const SyncValidator* sync_state_;
@@ -167,12 +172,3 @@ class SingleRangeGenerator {
     const KeyType range_;
     KeyType current_;
 };
-
-template <typename Map>
-typename Map::mapped_type GetMapped(const Map &map, const typename Map::key_type &key) {
-    auto it = map.find(key);
-    if (it != map.cend()) {
-        return it->second;
-    }
-    return typename Map::mapped_type{};
-}

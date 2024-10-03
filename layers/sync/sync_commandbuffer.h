@@ -80,43 +80,36 @@ struct FormatterImpl {
     FormatterImpl(const State &state_, const That &that_) : state(state_), that(that_) {}
 };
 
-struct NamedHandle {
-    const static size_t kInvalidIndex = std::numeric_limits<size_t>::max();
-    std::string name;
-    VulkanTypedHandle handle;
-    size_t index = kInvalidIndex;
+// Vulkan handle and associated information.
+// Command buffer context stores array of handles that are referenced by the tagged commands.
+// VulkanTypedHandle is stored in unpacked form to avoid structure padding gaps.
+struct HandleRecord {
+    uint64_t handle = 0;
+    VulkanObjectType type = kVulkanObjectTypeUnknown;
+    uint32_t index = vvl::kNoIndex32;
 
-    using FormatterState = FormatterImpl<SyncValidator, NamedHandle>;
-    // NOTE: CRTP could DRY this
+    HandleRecord() = default;
+    explicit HandleRecord(const VulkanTypedHandle &typed_handle, uint32_t index = vvl::kNoIndex32)
+        : handle(typed_handle.handle), type(typed_handle.type), index(index) {}
+    bool IsIndexed() const { return index != vvl::kNoIndex32; }
+
+    VulkanTypedHandle TypedHandle() const {
+        VulkanTypedHandle typed_handle;
+        typed_handle.handle = handle;
+        typed_handle.type = type;
+        return typed_handle;
+    }
+    using FormatterState = FormatterImpl<SyncValidator, HandleRecord>;
     FormatterState Formatter(const SyncValidator &sync_state) const { return FormatterState(sync_state, *this); }
-
-    NamedHandle() = default;
-    NamedHandle(const NamedHandle &other) = default;
-    NamedHandle(NamedHandle &&other) = default;
-    NamedHandle(const std::string &name_, const VulkanTypedHandle &handle_, size_t index_ = kInvalidIndex)
-        : name(name_), handle(handle_), index(index_) {}
-    NamedHandle(const char *name_, const VulkanTypedHandle &handle_, size_t index_ = kInvalidIndex)
-        : name(name_), handle(handle_), index(index_) {}
-    NamedHandle(const VulkanTypedHandle &handle_) : name(), handle(handle_) {}
-    NamedHandle &operator=(const NamedHandle &other) = default;
-    NamedHandle &operator=(NamedHandle &&other) = default;
-
-    operator bool() const { return (handle.handle != 0U) && (handle.type != VulkanObjectType::kVulkanObjectTypeUnknown); }
-    bool IsIndexed() const { return index != kInvalidIndex; }
 };
 
-using NamedHandleVector = small_vector<NamedHandle, 1, uint32_t>;
-
 struct ResourceCmdUsageRecord {
-    using TagIndex = ResourceUsageTag;
-    using Count = uint32_t;
-    constexpr static TagIndex kMaxIndex = std::numeric_limits<TagIndex>::max();
-
+    static constexpr auto kMaxIndex = std::numeric_limits<ResourceUsageTag>::max();
     enum class SubcommandType { kNone, kSubpassTransition, kLoadOp, kStoreOp, kResolveOp, kIndex };
 
     ResourceCmdUsageRecord() = default;
-    ResourceCmdUsageRecord(vvl::Func command_, Count seq_num_, SubcommandType sub_type_, Count sub_command_,
-                           const vvl::CommandBuffer *cb_state_, Count reset_count_)
+    ResourceCmdUsageRecord(vvl::Func command_, uint32_t seq_num_, SubcommandType sub_type_, uint32_t sub_command_,
+                           const vvl::CommandBuffer *cb_state_, uint32_t reset_count_)
         : command(command_),
           seq_num(seq_num_),
           sub_command_type(sub_type_),
@@ -124,25 +117,21 @@ struct ResourceCmdUsageRecord {
           cb_state(cb_state_),
           reset_count(reset_count_) {}
 
-    // NamedHandle must be constructable from args
-    template <class... Args>
-    void AddHandle(Args &&...args) {
-        handles.emplace_back(std::forward<Args>(args)...);
-    }
-
     vvl::Func command = vvl::Func::Empty;
-    Count seq_num = 0U;
+    uint32_t seq_num = 0U;
     SubcommandType sub_command_type = SubcommandType::kNone;
-    Count sub_command = 0U;
+    uint32_t sub_command = 0U;
 
     // This is somewhat repetitive, but it prevents the need for Exec/Submit time touchup, after which usage records can be
     // from different command buffers and resets.
     // plain pointer as a shared pointer is held by the context storing this record
     const vvl::CommandBuffer *cb_state = nullptr;
-    Count reset_count;
-    NamedHandleVector handles;
+    uint32_t reset_count = 0;
 
-    uint32_t label_command_index = vvl::kU32Max;
+    uint32_t first_handle_index = vvl::kNoIndex32;
+    uint32_t handle_count = 0;
+
+    uint32_t label_command_index = vvl::kNoIndex32;
 };
 
 struct DebugNameProvider;
@@ -150,23 +139,28 @@ struct DebugNameProvider;
 struct ResourceUsageRecord : public ResourceCmdUsageRecord {
     struct FormatterState {
         FormatterState(const SyncValidator &sync_state_, const ResourceUsageRecord &record_, const vvl::CommandBuffer *cb_state_,
-                       const DebugNameProvider *debug_name_provider_)
-            : sync_state(sync_state_), record(record_), ex_cb_state(cb_state_), debug_name_provider(debug_name_provider_) {}
+                       const DebugNameProvider *debug_name_provider_, uint32_t handle_index)
+            : sync_state(sync_state_),
+              record(record_),
+              ex_cb_state(cb_state_),
+              debug_name_provider(debug_name_provider_),
+              handle_index(handle_index) {}
         const SyncValidator &sync_state;
         const ResourceUsageRecord &record;
         const vvl::CommandBuffer *ex_cb_state;
         const DebugNameProvider *debug_name_provider;
+        uint32_t handle_index;
     };
     FormatterState Formatter(const SyncValidator &sync_state, const vvl::CommandBuffer *ex_cb_state,
-                             const DebugNameProvider *debug_name_provider) const {
-        return FormatterState(sync_state, *this, ex_cb_state, debug_name_provider);
+                             const DebugNameProvider *debug_name_provider, uint32_t handle_index) const {
+        return FormatterState(sync_state, *this, ex_cb_state, debug_name_provider, handle_index);
     }
 
     AlternateResourceUsage alt_usage;
 
     ResourceUsageRecord() = default;
-    ResourceUsageRecord(vvl::Func command_, Count seq_num_, SubcommandType sub_type_, Count sub_command_,
-                        const vvl::CommandBuffer *cb_state_, Count reset_count_)
+    ResourceUsageRecord(vvl::Func command_, uint32_t seq_num_, SubcommandType sub_type_, uint32_t sub_command_,
+                        const vvl::CommandBuffer *cb_state_, uint32_t reset_count_)
         : ResourceCmdUsageRecord(command_, seq_num_, sub_type_, sub_command_, cb_state_, reset_count_) {}
 
     ResourceUsageRecord(const AlternateResourceUsage &other) : ResourceCmdUsageRecord(), alt_usage(other) {}
@@ -215,11 +209,7 @@ class CommandExecutionContext : public SyncValidationInfo {
     virtual const SyncEventsContext *GetCurrentEventsContext() const = 0;
     virtual QueueId GetQueueId() const = 0;
 
-    ResourceUsageRange ImportRecordedAccessLog(const CommandBufferAccessContext &recorded_context);
-
-    virtual ResourceUsageTag GetTagLimit() const = 0;
     virtual VulkanTypedHandle Handle() const = 0;
-    virtual void InsertRecordedAccessLogEntries(const CommandBufferAccessContext &cb_context) = 0;
 
     virtual void BeginRenderPassReplaySetup(ReplayState &replay, const SyncOpBeginRenderPass &begin_op) {
         // Must override if use by derived type is valid
@@ -259,20 +249,17 @@ class CommandBufferAccessContext : public CommandExecutionContext, DebugNameProv
         SyncOpEntry(const SyncOpEntry &other) = default;
     };
 
-    CommandBufferAccessContext(const SyncValidator *sync_validator = nullptr);
-    CommandBufferAccessContext(SyncValidator &sync_validator, vvl::CommandBuffer *cb_state)
-        : CommandBufferAccessContext(&sync_validator) {
-        cb_state_ = cb_state;
-    }
+    CommandBufferAccessContext(SyncValidator &sync_validator, vvl::CommandBuffer *cb_state);
 
     struct AsProxyContext {};
     CommandBufferAccessContext(const CommandBufferAccessContext &real_context, AsProxyContext dummy);
+
+    ~CommandBufferAccessContext() override;
 
     // NOTE: because this class is encapsulated in syncval_state::CommandBuffer, it isn't safe
     // to use shared_from_this from the constructor.
     void SetSelfReference() { cbs_referenced_->push_back(cb_state_->shared_from_this()); }
 
-    ~CommandBufferAccessContext() override = default;
     const CommandExecutionContext &GetExecutionContext() const { return *this; }
 
     void Destroy() {
@@ -283,7 +270,7 @@ class CommandBufferAccessContext : public CommandExecutionContext, DebugNameProv
 
     void Reset();
 
-    std::string FormatUsage(ResourceUsageTag tag) const override;
+    std::string FormatUsage(ResourceUsageTagEx tag_ex) const override;
     std::string FormatUsage(const char *usage_string,
                             const ResourceFirstAccess &access) const;  //  Only command buffers have "first usage"
     AccessContext *GetCurrentAccessContext() override { return current_context_; }
@@ -324,11 +311,8 @@ class CommandBufferAccessContext : public CommandExecutionContext, DebugNameProv
 
     VkQueueFlags GetQueueFlags() const { return cb_state_ ? cb_state_->GetQueueFlags() : 0; }
 
-    ResourceUsageTag NextSubcommandTag(vvl::Func command, ResourceUsageRecord::SubcommandType subcommand);
-    ResourceUsageTag NextSubcommandTag(vvl::Func command, NamedHandle &&handle, ResourceUsageRecord::SubcommandType subcommand);
-
     ExecutionType Type() const override { return kExecuted; }
-    ResourceUsageTag GetTagLimit() const override { return access_log_->size(); }
+    size_t GetTagCount() const { return access_log_->size(); }
     VulkanTypedHandle Handle() const override {
         if (cb_state_) {
             return cb_state_->Handle();
@@ -336,21 +320,18 @@ class CommandBufferAccessContext : public CommandExecutionContext, DebugNameProv
         return VulkanTypedHandle(static_cast<VkCommandBuffer>(VK_NULL_HANDLE), kVulkanObjectTypeCommandBuffer);
     }
 
-    ResourceUsageTag NextCommandTag(vvl::Func command, NamedHandle &&handle,
-                                    ResourceUsageRecord::SubcommandType subcommand = ResourceUsageRecord::SubcommandType::kNone);
-
     ResourceUsageTag NextCommandTag(vvl::Func command,
                                     ResourceUsageRecord::SubcommandType subcommand = ResourceUsageRecord::SubcommandType::kNone);
-    ResourceUsageTag NextIndexedCommandTag(vvl::Func command, uint32_t index);
+    ResourceUsageTag NextSubcommandTag(vvl::Func command, ResourceUsageRecord::SubcommandType subcommand);
 
-    // NamedHandle must be constructable from args
-    template <class... Args>
-    void AddHandle(ResourceUsageTag tag, Args &&...args) {
-        assert(tag < access_log_->size());
-        if (tag < access_log_->size()) {
-            (*access_log_)[tag].AddHandle(std::forward<Args>(args)...);
-        }
-    }
+    ResourceUsageTagEx AddCommandHandle(ResourceUsageTag tag, const VulkanTypedHandle &typed_handle,
+                                        uint32_t index = vvl::kNoIndex32);
+
+    // Default subcommand behavior is that it references the same handles as the main command.
+    // The following method allows to set subcommand handles independently of the main command.
+    void AddSubcommandHandle(ResourceUsageTag tag, const VulkanTypedHandle &typed_handle, uint32_t index = vvl::kNoIndex32);
+
+    const std::vector<HandleRecord> &GetHandleRecords() const { return handles_; }
 
     std::shared_ptr<const vvl::CommandBuffer> GetCBStateShared() const { return cb_state_->shared_from_this(); }
 
@@ -367,7 +348,7 @@ class CommandBufferAccessContext : public CommandExecutionContext, DebugNameProv
     }
     std::shared_ptr<AccessLog> GetAccessLogShared() const { return access_log_; }
     std::shared_ptr<CommandBufferSet> GetCBReferencesShared() const { return cbs_referenced_; }
-    void InsertRecordedAccessLogEntries(const CommandBufferAccessContext &cb_context) override;
+    void ImportRecordedAccessLog(const CommandBufferAccessContext &cb_context);
     const std::vector<SyncOpEntry> &GetSyncOps() const { return sync_ops_; };
 
     // DebugNameProvider
@@ -376,6 +357,10 @@ class CommandBufferAccessContext : public CommandExecutionContext, DebugNameProv
     std::vector<vvl::CommandBuffer::LabelCommand> &GetProxyLabelCommands() { return proxy_label_commands_; }
 
   private:
+    CommandBufferAccessContext(const SyncValidator &sync_validator);
+
+    uint32_t AddHandle(const VulkanTypedHandle &typed_handle, uint32_t index);
+
     // As this is passing around a shared pointer to record, move to avoid needless atomics.
     void RecordSyncOp(SyncOpPointer &&sync_op);
 
@@ -384,6 +369,7 @@ class CommandBufferAccessContext : public CommandExecutionContext, DebugNameProv
 
     void CheckCommandTagDebugCheckpoint();
 
+  private:
     // Note: since every CommandBufferAccessContext is encapsulated in its CommandBuffer object,
     // a reference count is not needed here.
     vvl::CommandBuffer *cb_state_;
@@ -393,7 +379,13 @@ class CommandBufferAccessContext : public CommandExecutionContext, DebugNameProv
     uint32_t command_number_;
     uint32_t subcommand_number_;
     uint32_t reset_count_;
-    NamedHandleVector command_handles_;
+
+    // Handles referenced by the tagged commands
+    std::vector<HandleRecord> handles_;
+
+    // Location of the current command in the access log (it's not always the last element, there might be
+    // subcommands that follow). The subcommands by default reference the same handles as the main command.
+    ResourceUsageTag current_command_tag_ = vvl::kNoIndex32;
 
     AccessContext cb_access_context_;
     AccessContext *current_context_;
@@ -419,14 +411,14 @@ class CommandBuffer : public vvl::CommandBuffer {
   public:
     CommandBufferAccessContext access_context;
 
-    CommandBuffer(SyncValidator &dev, VkCommandBuffer handle, const VkCommandBufferAllocateInfo *pCreateInfo,
+    CommandBuffer(SyncValidator &dev, VkCommandBuffer handle, const VkCommandBufferAllocateInfo *allocate_info,
                   const vvl::CommandPool *pool);
     ~CommandBuffer() { Destroy(); }
 
     void NotifyInvalidate(const vvl::StateObject::NodeList &invalid_nodes, bool unlink) override;
 
     void Destroy() override;
-    void Reset() override;
+    void Reset(const Location &loc) override;
 };
 }  // namespace syncval_state
 
@@ -443,6 +435,6 @@ struct SyncNodeFormatter {
 };
 
 std::ostream &operator<<(std::ostream &out, const SyncNodeFormatter &formatter);
-std::ostream &operator<<(std::ostream &out, const NamedHandle::FormatterState &formatter);
+std::ostream &operator<<(std::ostream &out, const HandleRecord::FormatterState &formatter);
 std::ostream &operator<<(std::ostream &out, const ResourceUsageRecord::FormatterState &formatter);
 std::ostream &operator<<(std::ostream &out, const HazardResult::HazardState &hazard);

@@ -17,6 +17,8 @@
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
 
+class PositivePipelineTopology : public VkLayerTest {};
+
 TEST_F(PositivePipelineTopology, PointSizeWriteInFunction) {
     TEST_DESCRIPTION("Create a pipeline using TOPOLOGY_POINT_LIST and write PointSize in vertex shader function.");
 
@@ -564,4 +566,25 @@ TEST_F(PositivePipelineTopology, PointSizeMaintenance5) {
         helper.shader_stages_ = {vs.GetStageCreateInfo(), helper.fs_->GetStageCreateInfo()};
     };
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit);
+}
+
+TEST_F(PositivePipelineTopology, PrimitiveTopologyListRestartDynamic) {
+    TEST_DESCRIPTION("Ignore invalid primitiveRestartEnable");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_EXT_PRIMITIVE_TOPOLOGY_LIST_RESTART_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::extendedDynamicState2);
+    AddDisabledFeature(vkt::Feature::primitiveTopologyListRestart);
+    AddDisabledFeature(vkt::Feature::primitiveTopologyPatchListRestart);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    VkShaderObj vs(this, kVertexPointSizeGlsl, VK_SHADER_STAGE_VERTEX_BIT);
+
+    CreatePipelineHelper pipe(*this);
+    pipe.AddDynamicState(VK_DYNAMIC_STATE_PRIMITIVE_RESTART_ENABLE);
+    pipe.ia_ci_.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+    pipe.ia_ci_.primitiveRestartEnable = VK_TRUE;
+    pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
+    pipe.CreateGraphicsPipeline();
 }

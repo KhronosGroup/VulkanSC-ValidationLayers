@@ -20,9 +20,7 @@
 
 #include <cassert>
 #include <cctype>
-#include <cstddef>
 #include <cstring>
-#include <functional>
 #include <string>
 #include <vector>
 #include <bitset>
@@ -31,7 +29,6 @@
 #include <vulkan/utility/vk_format_utils.h>
 #include <vulkan/utility/vk_concurrent_unordered_map.hpp>
 
-#include "cast_utils.h"
 #include "generated/vk_extension_helper.h"
 #include "error_message/logging.h"
 
@@ -55,6 +52,33 @@
 #endif
 #endif
 
+// There are many times we want to assert, but also it is highly important to not crash for release builds.
+// This Macro also makes it more obvious if we are returning early because of a known situation or if we are just guarding against
+// something wrong actually happening.
+#define ASSERT_AND_RETURN(cond) \
+    do {                        \
+        if (!(cond)) {          \
+            assert(false);      \
+            return;             \
+        }                       \
+    } while (0)
+
+#define ASSERT_AND_RETURN_SKIP(cond) \
+    do {                             \
+        if (!(cond)) {               \
+            assert(false);           \
+            return skip;             \
+        }                            \
+    } while (0)
+
+#define ASSERT_AND_CONTINUE(cond) \
+    do {                          \
+        if (!(cond)) {            \
+            assert(false);        \
+            continue;             \
+        }                         \
+    } while (0)
+
 static inline VkExtent3D CastTo3D(const VkExtent2D &d2) {
     VkExtent3D d3 = {d2.width, d2.height, 1};
     return d3;
@@ -64,6 +88,9 @@ static inline VkOffset3D CastTo3D(const VkOffset2D &d2) {
     VkOffset3D d3 = {d2.x, d2.y, 0};
     return d3;
 }
+
+// It is very rare to have more than 3 stages (really only geo/tess) and better to save memory/time for the 99% use cases
+static const uint32_t kCommonMaxGraphicsShaderStages = 3;
 
 typedef void *dispatch_key;
 static inline dispatch_key GetDispatchKey(const void *object) { return (dispatch_key) * (VkLayerDispatchTable **)object; }
@@ -383,16 +410,6 @@ static inline uint32_t FullMipChainLevels(VkExtent3D extent) {
 // Returns the effective extent of an image subresource, adjusted for mip level and array depth.
 VkExtent3D GetEffectiveExtent(const VkImageCreateInfo &ci, const VkImageAspectFlags aspect_mask, const uint32_t mip_level);
 
-// Calculates the number of mip levels a VkImageView references.
-constexpr uint32_t ResolveRemainingLevels(const VkImageCreateInfo &ci, VkImageSubresourceRange const &range) {
-    return (range.levelCount == VK_REMAINING_MIP_LEVELS) ? (ci.mipLevels - range.baseMipLevel) : range.levelCount;
-}
-
-// Calculates the number of mip layers a VkImageView references.
-constexpr uint32_t ResolveRemainingLayers(const VkImageCreateInfo &ci, VkImageSubresourceRange const &range) {
-    return (range.layerCount == VK_REMAINING_ARRAY_LAYERS) ? (ci.arrayLayers - range.baseArrayLayer) : range.layerCount;
-}
-
 // Used to get the VkExternalFormatANDROID without having to use ifdef in logic
 // Result of zero is same of not having pNext struct
 constexpr uint64_t GetExternalFormat(const void *pNext) {
@@ -501,11 +518,20 @@ const typename T::value_type *DataOrNull(const T &container) {
     return nullptr;
 }
 
-
 // Workaround for static_assert(false) before C++ 23 arrives
 // https://en.cppreference.com/w/cpp/language/static_assert
 // https://cplusplus.github.io/CWG/issues/2518.html
 template <typename>
 inline constexpr bool dependent_false_v = false;
+
+// Until C++ 26 std::atomic<T>::fetch_max arrives
+// https://en.cppreference.com/w/cpp/atomic/atomic/fetch_max
+// https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p0493r5.pdf
+template <typename T>
+inline T atomic_fetch_max(std::atomic<T> &current_max, const T &value) noexcept {
+    T t = current_max.load();
+    while (!current_max.compare_exchange_weak(t, std::max(t, value)));
+    return t;
+}
 
 }  // namespace vvl

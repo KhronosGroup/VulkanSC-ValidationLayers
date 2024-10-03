@@ -83,6 +83,7 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/debug_extensions.cpp
     unit/debug_extensions_positive.cpp
     unit/debug_printf.cpp
+    unit/debug_printf_shader_debug_info.cpp
     unit/descriptor_buffer.cpp
     unit/descriptor_buffer_positive.cpp
     unit/descriptor_indexing.cpp
@@ -112,6 +113,7 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/gpu_av_oob_positive.cpp
     unit/gpu_av_positive.cpp
     unit/gpu_av_shader_object_positive.cpp
+    unit/gpu_av_shader_debug_info.cpp
     unit/gpu_av_spirv.cpp
     unit/gpu_av_spirv_positive.cpp
     unit/gpu_av_ray_query.cpp
@@ -204,6 +206,10 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/sync_object_positive.cpp
     unit/sync_val.cpp
     unit/sync_val_positive.cpp
+    unit/sync_val_semaphore.cpp
+    unit/sync_val_semaphore_positive.cpp
+    unit/sync_val_wsi.cpp
+    unit/sync_val_wsi_positive.cpp
     unit/threading.cpp
     unit/threading_positive.cpp
     unit/tooling.cpp

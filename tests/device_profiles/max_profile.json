@@ -138,6 +138,9 @@
                 "VkPhysicalDeviceHostImageCopyFeaturesEXT": {
                     "hostImageCopy": true
                 },
+                "VkPhysicalDeviceImageAlignmentControlFeaturesMESA": {
+                    "imageAlignmentControl": true
+                },
                 "VkPhysicalDeviceSubgroupSizeControlFeatures": {
                     "subgroupSizeControl": true,
                     "computeFullSubgroups": true
@@ -154,6 +157,9 @@
                 },
                 "VkPhysicalDeviceMaintenance6FeaturesKHR": {
                     "maintenance6": true
+                },
+                "VkPhysicalDeviceMaintenance7FeaturesKHR": {
+                    "maintenance7": true
                 },
                 "VkPhysicalDeviceShaderDrawParametersFeatures": {
                     "shaderDrawParameters": true
@@ -892,6 +898,9 @@
                 },
                 "VkPhysicalDeviceDynamicRenderingLocalReadFeaturesKHR": {
                     "dynamicRenderingLocalRead": true
+                },
+                "VkPhysicalDevicePipelineBinaryFeaturesKHR": {
+                    "pipelineBinaries": true
                 }
             },
             "properties": {
@@ -983,7 +992,7 @@
                         "maxFragmentCombinedOutputResources": 4294967000,
                         "maxFragmentDualSrcAttachments": 1,
                         "maxFragmentInputComponents": 128,
-                        "maxFragmentOutputAttachments": 8,
+                        "maxFragmentOutputAttachments": 4,
                         "maxFramebufferHeight": 32768,
                         "maxFramebufferLayers": 2048,
                         "maxFramebufferWidth": 32768,
@@ -1191,7 +1200,7 @@
                 },
                 "VkPhysicalDevicePointClippingProperties": {},
                 "VkPhysicalDeviceProtectedMemoryProperties": {
-                    "protectedNoFault": true
+                    "protectedNoFault": false
                 },
                 "VkPhysicalDeviceSamplerFilterMinmaxProperties": {
                     "filterMinmaxSingleComponentFormats": true,
@@ -1231,6 +1240,16 @@
                     "blockTexelViewCompatibleMultipleLayers": true,
                     "maxCombinedImageSamplerDescriptorCount": 1073741824,
                     "fragmentShadingRateClampCombinerInputs": true
+                },
+                "VkPhysicalDeviceMaintenance7PropertiesKHR": {
+                    "robustFragmentShadingRateAttachmentAccess": false,
+                    "separateDepthStencilAttachmentAccess": false,
+                    "maxDescriptorSetTotalUniformBuffersDynamic": 15,
+                    "maxDescriptorSetTotalStorageBuffersDynamic": 16,
+                    "maxDescriptorSetTotalBuffersDynamic": 31,
+                    "maxDescriptorSetUpdateAfterBindTotalUniformBuffersDynamic": 4294967000,
+                    "maxDescriptorSetUpdateAfterBindTotalStorageBuffersDynamic": 4294967000,
+                    "maxDescriptorSetUpdateAfterBindTotalBuffersDynamic": 4294967000
                 },
                 "VkPhysicalDeviceFloatControlsProperties": {
                     "shaderSignedZeroInfNanPreserveFloat16": true,
@@ -1484,6 +1503,9 @@
                     "uniformTexelBufferOffsetSingleTexelAlignment": true,
                     "uniformTexelBufferOffsetAlignmentBytes": 16
                 },
+                "VkPhysicalDeviceImageAlignmentControlPropertiesMESA": {
+                    "supportedImageAlignmentMask": 1
+                },
                 "VkPhysicalDeviceSubpassShadingPropertiesHUAWEI": {},
                 "VkPhysicalDeviceLineRasterizationPropertiesEXT": {},
                 "VkPhysicalDeviceLineRasterizationPropertiesKHR": {},
@@ -1521,7 +1543,7 @@
                     "subgroupQuadOperationsInAllStages": true,
                     "maxMultiviewViewCount": 16,
                     "maxMultiviewInstanceIndex": 4294967000,
-                    "protectedNoFault": true,
+                    "protectedNoFault": false,
                     "maxPerSetDescriptors": 4294967000,
                     "maxMemoryAllocationSize": 4294967000
                 },
@@ -1804,6 +1826,13 @@
                         "height": 64
                     },
                     "maxRenderPassStripes": 32
+                },
+                "VkPhysicalDevicePipelineBinaryPropertiesKHR": {
+                    "pipelineBinaryInternalCache": true,
+                    "pipelineBinaryInternalCacheControl": true,
+                    "pipelineBinaryPrefersInternalCache": true,
+                    "pipelineBinaryPrecompiledInternalCache": true,
+                    "pipelineBinaryCompressedData": true
                 }
             },
             "extensions": {
@@ -2034,8 +2063,10 @@
                 "VK_KHR_maintenance4": 1,
                 "VK_KHR_maintenance5": 1,
                 "VK_KHR_maintenance6": 1,
+                "VK_KHR_maintenance7": 1,
                 "VK_KHR_multiview": 1,
                 "VK_KHR_performance_query": 1,
+                "VK_KHR_pipeline_binary": 1,
                 "VK_KHR_pipeline_executable_properties": 1,
                 "VK_KHR_pipeline_library": 1,
                 "VK_KHR_portability_enumeration": 1,
@@ -2094,6 +2125,7 @@
                 "VK_KHR_xlib_surface": 1,
                 "VK_KHR_zero_initialize_workgroup_memory": 1,
                 "VK_LUNARG_direct_driver_loading": 1,
+                "VK_MESA_image_alignment_control": 1,
                 "VK_MVK_ios_surface": 1,
                 "VK_MVK_macos_surface": 1,
                 "VK_NN_vi_surface": 1,
@@ -2141,7 +2173,7 @@
                 "VK_NV_ray_tracing_motion_blur": 1,
                 "VK_NV_representative_fragment_test": 1,
                 "VK_NV_sample_mask_override_coverage": 1,
-                "VK_NV_scissor_exclusive": 1,
+                "VK_NV_scissor_exclusive": 2,
                 "VK_NV_shader_atomic_float16_vector": 1,
                 "VK_NV_shader_image_footprint": 1,
                 "VK_NV_shader_sm_builtins": 1,

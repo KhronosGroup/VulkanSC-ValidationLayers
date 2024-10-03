@@ -1,5 +1,5 @@
 <!-- markdownlint-disable MD041 -->
-<!-- Copyright 2015-2023 LunarG, Inc. -->
+<!-- Copyright 2015-2024 LunarG, Inc. -->
 [![Khronos Vulkan][1]][2]
 
 [1]: https://vulkan.lunarg.com/img/Vulkan_100px_Dec16.png "https://www.khronos.org/vulkan/"
@@ -22,14 +22,9 @@ For an overview of how to configure layers, refer to the [Layers Overview and Co
 Synchronization Validation settings are managed by configuring the Validation Layer. These settings are described in the
 [VK_LAYER_KHRONOS_validation](https://vulkan.lunarg.com/doc/sdk/latest/windows/khronos_validation_layer.html#user-content-layer-details) document.
 
-Synchronization Validation settings can also be enabled and configured using the [Vulkan Configurator](https://vulkan.lunarg.com/doc/sdk/latest/windows/vkconfig.html) included with the Vulkan SDK.
+The `khronos_validation.validate_sync` configuration variable enables Synchronization Validation. Additional configuration settings have this naming pattern: `khronos_validation.syncval_*`.
 
-Queue submit time validation can be disabled using the [Vulkan Configurator](https://vulkan.lunarg.com/doc/sdk/latest/windows/vkconfig.html), or by adding:
-
-`VALIDATION_CHECK_DISABLE_SYNCHRONIZATION_VALIDATION_QUEUE_SUBMIT`
-
-to the "Disables" as documented in [VK_LAYER_KHRONOS_validation](https://vulkan.lunarg.com/doc/sdk/latest/windows/khronos_validation_layer.html#user-content-layer-details).
-
+Synchronization Validation settings can also be managed using the [Vulkan Configurator](https://vulkan.lunarg.com/doc/sdk/latest/windows/vkconfig.html) included with the Vulkan SDK.
 
 ## Synchronization Validation Functionality
 
@@ -111,6 +106,8 @@ The pipelined and multi-threaded nature of Vulkan makes it particularly importan
 - Indirectly accessed (indirect/indexed) buffers validated at *binding* granularity. (Every valid location assumed to be accessed.)
 - Host synchronization not supported, except Fences (above).
 - Timeline Semaphore not supported
+- Queue family ownership transfer not supported
+- Hazards related to memory aliasing are not detected properly
 
 ## Typical Synchronization Validation Usage
 

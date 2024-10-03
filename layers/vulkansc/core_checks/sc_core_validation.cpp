@@ -33,6 +33,7 @@
 #include <string.h>
 #include <string>
 #include <valarray>
+#include <unordered_set>
 
 #include "vulkan/vk_enum_string_helper.h"
 #include "state_tracker/image_state.h"
@@ -455,15 +456,15 @@ bool SCCoreChecks::ValidateSwapchainCreateInfo(VkDevice device, const VkSwapchai
     return skip;
 }
 
-bool SCCoreChecks::ValidateShaderModuleId(const vvl::Pipeline& pipeline, const Location& loc) const {
+bool SCCoreChecks::ValidatePipelineShaderStage(const vvl::Pipeline& pipeline,
+                                               const vku::safe_VkPipelineShaderStageCreateInfo& stage_ci,
+                                               const void* pipeline_ci_pnext, const Location& loc) const {
     bool skip = false;
 
-    for (const auto& stage_ci : pipeline.shader_stages_ci) {
-        if (stage_ci.module != VK_NULL_HANDLE) {
-            skip |= LogError("VUID-VkPipelineShaderStageCreateInfo-module-05026", device, loc,
-                             "module in VkPipelineShaderStageCreateInfo (stage %s) is not VK_NULL_HANDLE.",
-                             string_VkShaderStageFlagBits(stage_ci.stage));
-        }
+    if (stage_ci.module != VK_NULL_HANDLE) {
+        skip |= LogError("VUID-VkPipelineShaderStageCreateInfo-module-05026", device, loc,
+                         "module in VkPipelineShaderStageCreateInfo (stage %s) is not VK_NULL_HANDLE.",
+                         string_VkShaderStageFlagBits(stage_ci.stage));
     }
 
     return skip;
@@ -619,9 +620,9 @@ bool SCCoreChecks::PreCallValidateCreateDevice(VkPhysicalDevice physicalDevice, 
     return skip;
 }
 
-void SCCoreChecks::CreateDevice(const VkDeviceCreateInfo* pCreateInfo, const Location& loc) {
+void SCCoreChecks::PostCreateDevice(const VkDeviceCreateInfo* pCreateInfo, const Location& loc) {
     // The state tracker sets up the device state
-    BASE::CreateDevice(pCreateInfo, loc);
+    BASE::PostCreateDevice(pCreateInfo, loc);
 }
 
 bool SCCoreChecks::PreCallValidateCreateCommandPool(VkDevice device, const VkCommandPoolCreateInfo* pCreateInfo,
@@ -1181,30 +1182,29 @@ bool SCCoreChecks::PreCallValidateCreateImageView(VkDevice device, const VkImage
                                        Count<vvl::ImageView>(), "imageView", sc_object_limits_.imageViewRequestCount, 1);
 
     if (pCreateInfo) {
-        const uint32_t effective_mip_levels = ResolveRemainingLevels(image_state->create_info, pCreateInfo->subresourceRange);
-        const uint32_t effective_array_layers = ResolveRemainingLayers(image_state->create_info, pCreateInfo->subresourceRange);
+        const auto normalized_subresource_range = image_state->NormalizeSubresourceRange(pCreateInfo->subresourceRange);
 
-        if (effective_mip_levels > sc_object_limits_.maxImageViewMipLevels) {
+        if (normalized_subresource_range.levelCount > sc_object_limits_.maxImageViewMipLevels) {
             const char* vuid = pCreateInfo->subresourceRange.levelCount == VK_REMAINING_MIP_LEVELS
                                    ? "VUID-VkImageViewCreateInfo-subresourceRange-05200"
                                    : "VUID-VkImageViewCreateInfo-subresourceRange-05064";
             skip |= LogError(vuid, device, error_obj.location,
                              "the requested mip level count (%u) exceeds the limit requested in "
                              "VkDeviceObjectReservationCreateInfo::maxImageViewMipLevels (%u).",
-                             effective_mip_levels, sc_object_limits_.maxImageViewMipLevels);
+                             normalized_subresource_range.levelCount, sc_object_limits_.maxImageViewMipLevels);
         }
 
-        if (effective_array_layers > sc_object_limits_.maxImageViewArrayLayers) {
+        if (normalized_subresource_range.layerCount > sc_object_limits_.maxImageViewArrayLayers) {
             const char* vuid = pCreateInfo->subresourceRange.layerCount == VK_REMAINING_ARRAY_LAYERS
                                    ? "VUID-VkImageViewCreateInfo-subresourceRange-05201"
                                    : "VUID-VkImageViewCreateInfo-subresourceRange-05065";
             skip |= LogError(vuid, device, error_obj.location,
                              "the requested array layer count (%u) exceeds the limit requested in "
                              "VkDeviceObjectReservationCreateInfo::maxImageViewArrayLayers (%u).",
-                             effective_array_layers, sc_object_limits_.maxImageViewArrayLayers);
+                             normalized_subresource_range.layerCount, sc_object_limits_.maxImageViewArrayLayers);
         }
 
-        if (effective_array_layers > 1) {
+        if (normalized_subresource_range.layerCount > 1) {
             uint32_t reserved_layered_image_views = sc_reserved_objects_.layered_image_views.load();
             if (reserved_layered_image_views >= sc_object_limits_.layeredImageViewRequestCount) {
                 skip |= LogError("VUID-vkCreateImageView-subresourceRange-05063", device, error_obj.location,
@@ -1214,14 +1214,14 @@ bool SCCoreChecks::PreCallValidateCreateImageView(VkDevice device, const VkImage
                                  reserved_layered_image_views, sc_object_limits_.layeredImageViewRequestCount);
             }
 
-            if (effective_mip_levels > sc_object_limits_.maxLayeredImageViewMipLevels) {
+            if (normalized_subresource_range.levelCount > sc_object_limits_.maxLayeredImageViewMipLevels) {
                 const char* vuid = pCreateInfo->subresourceRange.levelCount == VK_REMAINING_MIP_LEVELS
                                        ? "VUID-VkImageViewCreateInfo-subresourceRange-05202"
                                        : "VUID-VkImageViewCreateInfo-subresourceRange-05066";
                 skip |= LogError(vuid, device, error_obj.location,
                                  "the requested mip level count (%u) exceeds the limit requested in "
                                  "VkDeviceObjectReservationCreateInfo::maxLayeredImageViewMipLevels (%u).",
-                                 effective_mip_levels, sc_object_limits_.maxLayeredImageViewMipLevels);
+                                 normalized_subresource_range.levelCount, sc_object_limits_.maxLayeredImageViewMipLevels);
             }
         }
     }

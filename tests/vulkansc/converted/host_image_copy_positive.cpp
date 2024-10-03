@@ -15,7 +15,6 @@
  */
 
 #include "../framework/layer_validation_tests.h"
-#include "utils/vk_layer_utils.h"
 
 bool HostImageCopyTest::CopyLayoutSupported(const std::vector<VkImageLayout> &src_layouts,
                                             const std::vector<VkImageLayout> &dst_layouts, VkImageLayout layout) {
@@ -67,6 +66,8 @@ void HostImageCopyTest::InitHostImageCopyTest(const VkImageCreateInfo &create_in
         GTEST_SKIP() << "Required formats/features not supported";
     }
 }
+
+class PositiveHostImageCopy : public HostImageCopyTest {};
 
 TEST_F(PositiveHostImageCopy, BasicUsage) {
     TEST_DESCRIPTION("Use VK_EXT_host_image_copy to copy to and from host memory");
@@ -213,17 +214,11 @@ TEST_F(PositiveHostImageCopy, CopyImageToMemoryMipLevel) {
     const uint32_t bufferSize = width * height * 4u;
     std::vector<uint8_t> data(bufferSize);
 
-    VkImageSubresourceLayers imageSubresource;
-    imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    imageSubresource.mipLevel = 3u;
-    imageSubresource.baseArrayLayer = 0u;
-    imageSubresource.layerCount = 1u;
-
     VkImageToMemoryCopyEXT region = vku::InitStructHelper();
     region.pHostPointer = data.data();
     region.memoryRowLength = 0u;
     region.memoryImageHeight = 0u;
-    region.imageSubresource = imageSubresource;
+    region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 3u, 0u, 1u};
     region.imageOffset = {0u, 0u, 0u};
     region.imageExtent = {4u, 4u, 1u};
 

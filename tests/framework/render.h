@@ -18,22 +18,17 @@
 
 #pragma once
 
-#include "generated/vk_function_pointers.h"
 #include "error_monitor.h"
 #include "test_framework.h"
 #include "feature_requirements.h"
+#include "binding.h"
 
 #if defined(VK_USE_PLATFORM_ANDROID_KHR)
 #include <android/log.h>
 #include <android_native_app_glue.h>
 #endif
 
-#include <algorithm>
-#include <array>
-#include <memory>
 #include <vector>
-#include <unordered_map>
-#include <unordered_set>
 
 using vkt::MakeVkHandles;
 
@@ -155,8 +150,6 @@ class VkRenderFramework : public VkTestFramework {
     // struct, so be sure to call SetTargetApiVersion before
     void AddDisabledFeature(vkt::Feature feature);
 
-    void *SetupValidationSettings(void *first_pnext);
-
     template <typename GLSLContainer>
     std::vector<uint32_t> GLSLToSPV(VkShaderStageFlagBits stage, const GLSLContainer &code,
                                     const spv_target_env env = SPV_ENV_VULKAN_1_0) {
@@ -244,13 +237,6 @@ class VkRenderFramework : public VkTestFramework {
     std::vector<const char *> m_wsi_extensions;
     // Device extensions to enable
     std::vector<const char *> m_device_extension_names;
-
-    VkValidationFeaturesEXT m_validation_features;
-    VkValidationFeatureEnableEXT validation_enable_all[4] = {VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_EXT,
-                                                             VK_VALIDATION_FEATURE_ENABLE_BEST_PRACTICES_EXT,
-                                                             VK_VALIDATION_FEATURE_ENABLE_GPU_ASSISTED_RESERVE_BINDING_SLOT_EXT,
-                                                             VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT};
-    VkValidationFeatureDisableEXT validation_disable_all = VK_VALIDATION_FEATURE_DISABLE_ALL_EXT;
 
   private:
     // TODO - move to own helper logic

@@ -17,8 +17,13 @@
  */
 #pragma once
 
-#include "test_common.h"
-#include <unordered_set>
+#include <atomic>
+#include <mutex>
+#include <regex>
+#include <cassert>
+
+#include "vk_layer_config.h"
+#include <vulkan/vulkan.h>
 
 // ErrorMonitor Usage:
 //
@@ -50,8 +55,11 @@ class ErrorMonitor {
     // ErrorMonitor will look for an error message containing the specified string(s)
     void SetDesiredFailureMsg(const VkFlags msg_flags, const char *const msg_string);
     void SetDesiredFailureMsg(const VkFlags msg_flags, const std::string &msg);
+    void SetDesiredFailureMsgRegex(const VkFlags msg_flags, const char *vuid, std::string regex_str);
     // Most tests check for kErrorBit so default to just using it
     void SetDesiredError(const char *msg, uint32_t count = 1);
+    // Regex uses modified ECMAScript regular expression grammar https://eel.is/c++draft/re.grammar
+    void SetDesiredErrorRegex(const char *vuid, std::string regex_str, uint32_t count = 1);
     // And use this for warnings
     void SetDesiredWarning(const char *msg, uint32_t count = 1);
 
@@ -63,7 +71,7 @@ class ErrorMonitor {
     // Set an error that should not cause a test failure
     void SetAllowedFailureMsg(const char *const msg);
 
-    VkBool32 CheckForDesiredMsg(const char *const msg_string);
+    VkBool32 CheckForDesiredMsg(const char *vuid, const char *const msg_string);
     VkDebugReportFlagsEXT GetMessageFlags();
     void SetError(const char *const errorString);
     void SetBailout(std::atomic<bool> *bailout);
@@ -78,6 +86,7 @@ class ErrorMonitor {
     void ExpectSuccess(VkDebugReportFlagsEXT const message_flag_mask = kErrorBit);
 
   private:
+    void SetDesiredFailureMsgRegex(const VkFlags msg_flags, const char *vuid, std::string msg_regex, std::regex regex);
     bool ExpectingSuccess() const;
     bool NeedCheckSuccess() const;
     void VerifyNotFound();
@@ -97,8 +106,25 @@ class ErrorMonitor {
 #endif
 
     VkFlags message_flags_{};
-    std::unordered_multiset<std::string> desired_message_strings_;
-    std::unordered_multiset<std::string> failure_message_strings_;
+    std::vector<std::string> failure_message_strings_;
+    struct VuidAndMessage {
+        std::string_view vuid;
+        enum MsgType { Undefined, String, Regex } msg_type = Undefined;
+        std::string msg_string;  // also used to store regex string
+        std::regex msg_regex;
+        void SetMsgString(std::string msg) {
+            msg_type = MsgType::String;
+            msg_string = std::move(msg);
+        }
+        void SetMsgRegex(std::string regex_str, std::regex regex) {
+            msg_type = MsgType::Regex;
+            msg_string = std::move(regex_str);
+            msg_regex = std::move(regex);
+        }
+        bool Search(const char *vuid, std::string_view msg) const;
+        std::string Print() const;
+    };
+    std::vector<VuidAndMessage> desired_messages_;
     std::vector<std::string> ignore_message_strings_;
     std::vector<std::string> allowed_message_strings_;
     mutable std::mutex mutex_;

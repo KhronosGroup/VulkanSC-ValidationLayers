@@ -99,7 +99,7 @@ void ThreadSafety::PostCallRecordAllocateDescriptorSets(VkDevice device, const V
             if (iter != dsl_read_only_map.end()) {
                 ds_read_only_map.insert_or_assign(pDescriptorSets[index0], iter->second);
             } else {
-                assert(0 && "descriptor set layout not found");
+                assert(false && "descriptor set layout not found");
             }
         }
     }
@@ -803,4 +803,25 @@ void ThreadSafety::PreCallRecordWaitForPresentKHR(VkDevice device, VkSwapchainKH
 void ThreadSafety::PostCallRecordWaitForPresentKHR(VkDevice device, VkSwapchainKHR swapchain, uint64_t presentId, uint64_t timeout,
                                                    const RecordObject& record_obj) {
     FinishReadObjectParentInstance(device, record_obj.location);
+}
+
+void ThreadSafety::PreCallRecordCreatePipelineBinariesKHR(VkDevice device, const VkPipelineBinaryCreateInfoKHR* pCreateInfo,
+                                                          const VkAllocationCallbacks* pAllocator,
+                                                          VkPipelineBinaryHandlesInfoKHR* pBinaries,
+                                                          const RecordObject& record_obj) {
+    StartReadObjectParentInstance(device, record_obj.location);
+}
+
+void ThreadSafety::PostCallRecordCreatePipelineBinariesKHR(VkDevice device, const VkPipelineBinaryCreateInfoKHR* pCreateInfo,
+                                                           const VkAllocationCallbacks* pAllocator,
+                                                           VkPipelineBinaryHandlesInfoKHR* pBinaries,
+                                                           const RecordObject& record_obj) {
+    FinishReadObjectParentInstance(device, record_obj.location);
+    if (record_obj.result == VK_SUCCESS) {
+        for (uint32_t i = 0; i < pBinaries->pipelineBinaryCount; ++i) {
+            if (pBinaries->pPipelineBinaries != nullptr) {
+                CreateObject(pBinaries->pPipelineBinaries[i]);
+            }
+        }
+    }
 }

@@ -18,7 +18,6 @@
  * limitations under the License.
  */
 #pragma once
-#include "utils/hash_vk_types.h"
 #include "state_tracker/state_object.h"
 #include "state_tracker/image_layout_map.h"
 #include "state_tracker/pipeline_state.h"
@@ -40,25 +39,15 @@ class VideoSession;
 class VideoSessionParameters;
 }  // namespace vvl
 
-#ifdef VK_USE_PLATFORM_METAL_EXT
-static bool GetMetalExport(const VkEventCreateInfo *info) {
-    bool retval = false;
-    auto export_metal_object_info = vku::FindStructInPNextChain<VkExportMetalObjectCreateInfoEXT>(info->pNext);
-    while (export_metal_object_info) {
-        if (export_metal_object_info->exportObjectType == VK_EXPORT_METAL_OBJECT_TYPE_METAL_SHARED_EVENT_BIT_EXT) {
-            retval = true;
-            break;
-        }
-        export_metal_object_info = vku::FindStructInPNextChain<VkExportMetalObjectCreateInfoEXT>(export_metal_object_info->pNext);
-    }
-    return retval;
-}
-#endif  // VK_USE_PLATFORM_METAL_EXT
-
 // Only CoreChecks uses this, but the state tracker stores it.
 constexpr static auto kInvalidLayout = image_layout_map::kInvalidLayout;
 using ImageSubresourceLayoutMap = image_layout_map::ImageSubresourceLayoutMap;
-typedef vvl::unordered_map<VkEvent, VkPipelineStageFlags2KHR> EventToStageMap;
+
+struct EventInfo {
+    VkPipelineStageFlags2 src_stage_mask = VK_PIPELINE_STAGE_2_NONE;
+    bool signal = false;  // signal (SetEvent) or unsignal (ResetEvent)
+};
+using EventMap = vvl::unordered_map<VkEvent, EventInfo>;
 
 enum class CbState {
     New,                // Newly created CB w/o any cmds
@@ -114,28 +103,27 @@ namespace vvl {
 
 class Event : public StateObject {
   public:
-    int write_in_use;
+    Event(VkEvent handle, const VkEventCreateInfo *create_info);
+    VkEvent VkHandle() const { return handle_.Cast<VkEvent>(); }
+
+    const VkEventCreateFlags flags;
+
 #ifdef VK_USE_PLATFORM_METAL_EXT
     const bool metal_event_export;
 #endif  // VK_USE_PLATFORM_METAL_EXT
-    const VkEventCreateFlags flags;
 
-    // Source stage specified by the "set event" command
+    int write_in_use = 0;
+
+    // Signaling state.
+    // Gets updated at queue submission granularity or when signaled from the host.
+    bool signaled = false;
+
+    // Source stage specified by the "set event" command.
+    // Gets updated at queue submission granularity.
     VkPipelineStageFlags2 signal_src_stage_mask = VK_PIPELINE_STAGE_2_NONE;
 
-    // Queue that signaled this event. It's null if event was signaled from the host
+    // Queue that signaled this event. It's null if event was signaled from the host.
     VkQueue signaling_queue = VK_NULL_HANDLE;
-
-    Event(VkEvent handle, const VkEventCreateInfo *pCreateInfo)
-        : StateObject(handle, kVulkanObjectTypeEvent),
-          write_in_use(0),
-#ifdef VK_USE_PLATFORM_METAL_EXT
-          metal_event_export(GetMetalExport(pCreateInfo)),
-#endif  // VK_USE_PLATFORM_METAL_EXT
-          flags(pCreateInfo->flags) {
-    }
-
-    VkEvent VkHandle() const { return handle_.Cast<VkEvent>(); }
 };
 
 // Track command pools and their command buffers
@@ -149,14 +137,14 @@ class CommandPool : public StateObject {
     // Cmd buffers allocated from this pool
     vvl::unordered_map<VkCommandBuffer, CommandBuffer *> commandBuffers;
 
-    CommandPool(ValidationStateTracker &dev, VkCommandPool handle, const VkCommandPoolCreateInfo *pCreateInfo, VkQueueFlags flags);
+    CommandPool(ValidationStateTracker &dev, VkCommandPool handle, const VkCommandPoolCreateInfo *create_info, VkQueueFlags flags);
     virtual ~CommandPool() { Destroy(); }
 
     VkCommandPool VkHandle() const { return handle_.Cast<VkCommandPool>(); }
 
-    void Allocate(const VkCommandBufferAllocateInfo *create_info, const VkCommandBuffer *command_buffers);
+    void Allocate(const VkCommandBufferAllocateInfo *allocate_info, const VkCommandBuffer *command_buffers);
     void Free(uint32_t count, const VkCommandBuffer *command_buffers);
-    void Reset();
+    void Reset(const Location &loc);
 
     void Destroy() override;
 };
@@ -197,9 +185,24 @@ class CommandBuffer : public RefcountedStateObject {
 
     // Track status of all vkCmdSet* calls, if 1, means it was set
     struct DynamicStateStatus {
-        CBDynamicFlags cb;        // for lifetime of CommandBuffer
+        CBDynamicFlags cb;        // for lifetime of CommandBuffer (invalidated if static pipeline is bound)
         CBDynamicFlags pipeline;  // for lifetime since last bound pipeline
+
+        CBDynamicFlags history;  // for lifetime of CommandBuffer, regardless if invalidated, used for better error messages
+
+        // There is currently only a single non-graphics dynamic state, for now manage manually to save memory
+        bool rtx_stack_size_cb;        // for lifetime of CommandBuffer
+        bool rtx_stack_size_pipeline;  // for lifetime since last bound pipeline
     } dynamic_state_status;
+
+    // used to mark which pipeline invalidated dynamic state so error message knows
+    // Note that index zero is not used due to the enum size being bitset friendly
+    VkPipeline invalidated_state_pipe[CB_DYNAMIC_STATE_STATUS_NUM];
+    std::string DescribeInvalidatedState(CBDynamicState dynamic_state) const;
+
+    // Return true if the corresponding vkCmdSet* call has occured in the command buffer.
+    // Used to know if the DynamicStateValue will be valid or not to read.
+    bool IsDynamicStateSet(CBDynamicState state) const { return dynamic_state_status.cb[state]; }
 
     // These are values that are being set with vkCmdSet* tied to a command buffer
     struct DynamicStateValue {
@@ -279,9 +282,8 @@ class CommandBuffer : public RefcountedStateObject {
         std::vector<VkColorBlendEquationEXT> color_blend_equations;  // VK_DYNAMIC_STATE_COLOR_BLEND_EQUATION_EXT
         std::vector<VkColorComponentFlags> color_write_masks;        // VK_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT
 
-        // VK_DYNAMIC_STATE_VERTEX_INPUT_EXT
-        std::vector<uint32_t> vertex_binding_descriptions_divisor;
-        std::vector<VkVertexInputAttributeDescription2EXT> vertex_attribute_descriptions;
+        // VK_DYNAMIC_STATE_VERTEX_INPUT_EXT, key is binding number
+        vvl::unordered_map<uint32_t, VertexBindingState> vertex_bindings;
 
         // VK_DYNAMIC_STATE_CONSERVATIVE_RASTERIZATION_MODE_EXT
         VkConservativeRasterizationModeEXT conservative_rasterization_mode;
@@ -317,31 +319,56 @@ class CommandBuffer : public RefcountedStateObject {
 
         // When the Command Buffer resets, the value most things in this struct don't matter because if they are read without
         // setting the state, it will fail in ValidateDynamicStateIsSet() for us. Some values (ex. the bitset) are tracking in
-        // replacement for static_status/dynamic_status so this needs to reset along with those
-        void reset() {
+        // replacement for static_status/dynamic_status so this needs to reset along with those.
+        //
+        // The only time this is reset is when the command buffer is reset, and vkCmdBindPipeline for static state
+        void reset(CBDynamicFlags mask) {
+            // Mask tells which things to reset
+            if (mask[CB_DYNAMIC_STATE_VIEWPORT]) {
+                viewports.clear();
+            }
+            if (mask[CB_DYNAMIC_STATE_DISCARD_RECTANGLE_EXT]) {
+                discard_rectangles.reset();
+            }
+            if (mask[CB_DYNAMIC_STATE_COLOR_BLEND_ENABLE_EXT]) {
+                color_blend_enable_attachments.reset();
+                color_blend_enabled.reset();
+            }
+            if (mask[CB_DYNAMIC_STATE_COLOR_BLEND_EQUATION_EXT]) {
+                color_blend_equation_attachments.reset();
+                color_blend_equations.clear();
+            }
+            if (mask[CB_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT]) {
+                color_write_mask_attachments.reset();
+                color_write_masks.clear();
+            }
+            if (mask[CB_DYNAMIC_STATE_COLOR_BLEND_ADVANCED_EXT]) {
+                color_blend_advanced_attachments.reset();
+            }
+            if (mask[CB_DYNAMIC_STATE_COLOR_WRITE_ENABLE_EXT]) {
+                color_write_enabled.reset();
+                color_write_enable_attachment_count = 0u;
+            }
+            if (mask[CB_DYNAMIC_STATE_VERTEX_INPUT_EXT]) {
+                vertex_bindings.clear();
+            }
+            if (mask[CB_DYNAMIC_STATE_VIEWPORT_W_SCALING_NV]) {
+                viewport_w_scalings.clear();
+            }
+            if (mask[CB_DYNAMIC_STATE_EXCLUSIVE_SCISSOR_ENABLE_NV]) {
+                exclusive_scissor_enables.clear();
+            }
+            if (mask[CB_DYNAMIC_STATE_EXCLUSIVE_SCISSOR_NV]) {
+                exclusive_scissors.clear();
+            }
+
             // There are special because the Secondary CB Inheritance is tracking these defaults
-            viewport_count = 0u;
-            scissor_count = 0u;
-
-            depth_bias_enable = false;
-
-            viewports.clear();
-            discard_rectangles.reset();
-            color_blend_enable_attachments.reset();
-            color_blend_enabled.reset();
-            color_blend_equation_attachments.reset();
-            color_write_mask_attachments.reset();
-            color_blend_advanced_attachments.reset();
-            color_write_enabled.reset();
-            color_blend_equations.clear();
-            color_write_masks.clear();
-            vertex_binding_descriptions_divisor.clear();
-            vertex_attribute_descriptions.clear();
-            viewport_w_scalings.clear();
-            exclusive_scissor_enables.clear();
-            exclusive_scissors.clear();
-
-            color_write_enable_attachment_count = 0u;
+            if (mask[CB_DYNAMIC_STATE_VIEWPORT_WITH_COUNT]) {
+                viewport_count = 0u;
+            }
+            if (mask[CB_DYNAMIC_STATE_SCISSOR_WITH_COUNT]) {
+                scissor_count = 0u;
+            }
         }
     } dynamic_state_value;
 
@@ -463,7 +490,7 @@ class CommandBuffer : public RefcountedStateObject {
     std::vector<std::function<bool(const CommandBuffer &secondary, const CommandBuffer *primary, const vvl::Framebuffer *)>>
         cmd_execute_commands_functions;
 
-    using EventCallback = std::function<bool(CommandBuffer &cb_state, bool do_validate, EventToStageMap &local_event_signal_info,
+    using EventCallback = std::function<bool(CommandBuffer &cb_state, bool do_validate, EventMap &local_event_signal_info,
                                              VkQueue waiting_queue, const Location &loc)>;
     std::vector<EventCallback> eventUpdates;
 
@@ -476,8 +503,15 @@ class CommandBuffer : public RefcountedStateObject {
     // Cache of current insert label...
     LoggingLabel debug_label;
 
-    std::vector<uint8_t> push_constant_data;
-    PushConstantRangesId push_constant_data_ranges;
+    struct PushConstantData {
+        VkPipelineLayout layout = VK_NULL_HANDLE;
+        VkShaderStageFlags stage_flags = 0;
+        uint32_t offset = 0;
+        std::vector<std::byte> values{};
+    };
+    std::vector<PushConstantData> push_constant_data_chunks;
+    std::array<VkPipelineLayout, BindPoint_Count> push_constant_latest_used_layout{};
+    PushConstantRangesId push_constant_ranges_layout;
 
     // Video coding related state tracking
     std::shared_ptr<vvl::VideoSession> bound_video_session;
@@ -486,6 +520,9 @@ class CommandBuffer : public RefcountedStateObject {
     VideoEncodeRateControlState video_encode_rate_control_state{};
     std::optional<uint32_t> video_encode_quality_level{};
     VideoSessionUpdateMap video_session_updates;
+
+    // VK_EXT_nested_command_buffer
+    uint32_t nesting_level;
 
     bool transform_feedback_active{false};
     uint32_t transform_feedback_buffers_bound;
@@ -499,7 +536,7 @@ class CommandBuffer : public RefcountedStateObject {
     ReadLockGuard ReadLock() const { return ReadLockGuard(lock); }
     WriteLockGuard WriteLock() { return WriteLockGuard(lock); }
 
-    CommandBuffer(ValidationStateTracker &dev, VkCommandBuffer handle, const VkCommandBufferAllocateInfo *pAllocateInfo,
+    CommandBuffer(ValidationStateTracker &dev, VkCommandBuffer handle, const VkCommandBufferAllocateInfo *allocate_info,
                   const vvl::CommandPool *cmd_pool);
 
     virtual ~CommandBuffer() { Destroy(); }
@@ -525,11 +562,11 @@ class CommandBuffer : public RefcountedStateObject {
         RemoveChild(base);
     }
 
-    virtual void Reset();
+    virtual void Reset(const Location &loc);
 
     void IncrementResources();
 
-    void ResetPushConstantDataIfIncompatible(const vvl::PipelineLayout *pipeline_layout_state);
+    void ResetPushConstantRangesLayoutIfIncompatible(const vvl::PipelineLayout &pipeline_layout_state);
 
     std::shared_ptr<const ImageSubresourceLayoutMap> GetImageSubresourceLayoutMap(VkImage image) const;
     std::shared_ptr<ImageSubresourceLayoutMap> GetImageSubresourceLayoutMap(const vvl::Image &image_state);
@@ -606,7 +643,7 @@ class CommandBuffer : public RefcountedStateObject {
 
     virtual void RecordCmd(Func command);
     void RecordStateCmd(Func command, CBDynamicState dynamic_state);
-    void RecordStateCmd(Func command, CBDynamicFlags const &state_bits);
+    void RecordDynamicState(CBDynamicState dynamic_state);
     void RecordTransferCmd(Func command, std::shared_ptr<Bindable> &&buf1, std::shared_ptr<Bindable> &&buf2 = nullptr);
     void RecordSetEvent(Func command, VkEvent event, VkPipelineStageFlags2KHR stageMask);
     void RecordResetEvent(Func command, VkEvent event, VkPipelineStageFlags2KHR stageMask);
@@ -643,7 +680,6 @@ class CommandBuffer : public RefcountedStateObject {
     bool HasValidDynamicDepthAttachment() const;
     bool HasValidDynamicStencilAttachment() const;
     bool HasExternalFormatResolveAttachment() const;
-    bool HasDynamicDualSourceBlend(uint32_t attachmentCount) const;
 
     inline void BindPipeline(LvlBindPoint bind_point, vvl::Pipeline *pipe_state) {
         lastBound[bind_point].pipeline_state = pipe_state;
@@ -651,7 +687,7 @@ class CommandBuffer : public RefcountedStateObject {
     void BindShader(VkShaderStageFlagBits shader_stage, vvl::ShaderObject *shader_object_state);
 
     bool IsPrimary() const { return allocate_info.level == VK_COMMAND_BUFFER_LEVEL_PRIMARY; }
-    bool IsSeconary() const { return allocate_info.level == VK_COMMAND_BUFFER_LEVEL_SECONDARY; }
+    bool IsSecondary() const { return allocate_info.level == VK_COMMAND_BUFFER_LEVEL_SECONDARY; }
     void BeginLabel(const char *label_name);
     void EndLabel();
     int LabelStackDepth() const { return label_stack_depth_; }

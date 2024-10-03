@@ -21,8 +21,6 @@
 #include "state_tracker/pipeline_state.h"
 #include "state_tracker/descriptor_sets.h"
 #include "state_tracker/shader_module.h"
-#include <limits>
-#include <string_view>
 
 static VkImageSubresourceRange MakeImageFullRange(const VkImageCreateInfo &create_info) {
     const auto format = create_info.format;
@@ -40,8 +38,10 @@ static VkImageSubresourceRange MakeImageFullRange(const VkImageCreateInfo &creat
 VkImageSubresourceRange NormalizeSubresourceRange(const VkImageCreateInfo &image_create_info,
                                                   const VkImageSubresourceRange &range) {
     VkImageSubresourceRange norm = range;
-    norm.levelCount = ResolveRemainingLevels(image_create_info, range);
-    norm.layerCount = ResolveRemainingLayers(image_create_info, range);
+    norm.levelCount =
+        (range.levelCount == VK_REMAINING_MIP_LEVELS) ? (image_create_info.mipLevels - range.baseMipLevel) : range.levelCount;
+    norm.layerCount =
+        (range.layerCount == VK_REMAINING_ARRAY_LAYERS) ? (image_create_info.arrayLayers - range.baseArrayLayer) : range.layerCount;
 
     // For multiplanar formats, IMAGE_ASPECT_COLOR is equivalent to adding the aspect of the individual planes
     if (vkuFormatIsMultiplane(image_create_info.format)) {
@@ -57,8 +57,8 @@ VkImageSubresourceRange NormalizeSubresourceRange(const VkImageCreateInfo &image
 }
 
 static bool IsDepthSliced(const VkImageCreateInfo &image_create_info, const VkImageViewCreateInfo &create_info) {
-    auto kDepthSlicedFlags = VK_IMAGE_CREATE_2D_ARRAY_COMPATIBLE_BIT | VK_IMAGE_CREATE_2D_VIEW_COMPATIBLE_BIT_EXT;
-    return ((image_create_info.flags & kDepthSlicedFlags) != 0) &&
+    auto depth_slice_flag = VK_IMAGE_CREATE_2D_ARRAY_COMPATIBLE_BIT | VK_IMAGE_CREATE_2D_VIEW_COMPATIBLE_BIT_EXT;
+    return ((image_create_info.flags & depth_slice_flag) != 0) &&
            (create_info.viewType == VK_IMAGE_VIEW_TYPE_2D || create_info.viewType == VK_IMAGE_VIEW_TYPE_2D_ARRAY);
 }
 
@@ -369,6 +369,34 @@ void Image::SetSwapchain(std::shared_ptr<vvl::Swapchain> &swapchain, uint32_t sw
     bind_swapchain = swapchain;
     swapchain_image_index = swapchain_index;
     bind_swapchain->AddParent(this);
+}
+
+bool Image::CompareCreateInfo(const Image &other) const {
+    bool valid_queue_family = true;
+    if (create_info.sharingMode == VK_SHARING_MODE_CONCURRENT) {
+        if (create_info.queueFamilyIndexCount != other.create_info.queueFamilyIndexCount) {
+            valid_queue_family = false;
+        } else {
+            for (uint32_t i = 0; i < create_info.queueFamilyIndexCount; i++) {
+                if (create_info.pQueueFamilyIndices[i] != other.create_info.pQueueFamilyIndices[i]) {
+                    valid_queue_family = false;
+                    break;
+                }
+            }
+        }
+    }
+
+    // There are limitations what actually needs to be compared, so for simplicity (until found otherwise needed), we only need to
+    // check the ExternalHandleType and not other pNext chains
+    const bool valid_external = GetExternalHandleTypes(&create_info) == GetExternalHandleTypes(&other.create_info);
+
+    return (create_info.flags == other.create_info.flags) && (create_info.imageType == other.create_info.imageType) &&
+           (create_info.format == other.create_info.format) && (create_info.extent.width == other.create_info.extent.width) &&
+           (create_info.extent.height == other.create_info.extent.height) &&
+           (create_info.extent.depth == other.create_info.extent.depth) && (create_info.mipLevels == other.create_info.mipLevels) &&
+           (create_info.arrayLayers == other.create_info.arrayLayers) && (create_info.samples == other.create_info.samples) &&
+           (create_info.tiling == other.create_info.tiling) && (create_info.usage == other.create_info.usage) &&
+           (create_info.initialLayout == other.create_info.initialLayout) && valid_queue_family && valid_external;
 }
 
 }  // namespace vvl
@@ -695,7 +723,7 @@ vvl::span<const vku::safe_VkSurfaceFormat2KHR> Surface::GetFormats(bool get_surf
         } else {
             result.resize(count);
             for (uint32_t surface_format_index = 0; surface_format_index < count; ++surface_format_index) {
-                result.emplace_back(vku::safe_VkSurfaceFormat2KHR(&formats2[surface_format_index]));
+                result.emplace_back(&formats2[surface_format_index]);
             }
         }
     } else {
@@ -713,7 +741,7 @@ vvl::span<const vku::safe_VkSurfaceFormat2KHR> Surface::GetFormats(bool get_surf
             VkSurfaceFormat2KHR format2 = vku::InitStructHelper();
             for (const auto &format : formats) {
                 format2.surfaceFormat = format;
-                result.emplace_back(vku::safe_VkSurfaceFormat2KHR(&format2));
+                result.emplace_back(&format2);
             }
         }
     }
@@ -753,7 +781,7 @@ void Surface::UpdateCapabilitiesCache(VkPhysicalDevice phys_dev, const VkSurface
         }
     }
     if (!info) {
-        cache.present_mode_infos.push_back(PresentModeInfo{});
+        cache.present_mode_infos.emplace_back(PresentModeInfo{});
         info = &cache.present_mode_infos.back();
         info->present_mode = present_mode;
     }

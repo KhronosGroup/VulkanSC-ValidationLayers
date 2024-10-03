@@ -14,7 +14,8 @@
 
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
-#include "../framework/descriptor_helper.h"
+
+class NegativeShaderLimits : public VkLayerTest {};
 
 TEST_F(NegativeShaderLimits, MaxSampleMaskWordsInput) {
     TEST_DESCRIPTION("Test limit of maxSampleMaskWords.");
@@ -271,49 +272,38 @@ TEST_F(NegativeShaderLimits, MinAndMaxTexelOffset) {
     m_errorMonitor->VerifyFound();
 }
 
-// https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/5208
-// Asserting in MoltenVK
-TEST_F(NegativeShaderLimits, DISABLED_MaxFragmentDualSrcAttachments) {
+TEST_F(NegativeShaderLimits, MaxFragmentDualSrcAttachments) {
     TEST_DESCRIPTION("Test drawing with dual source blending with too many fragment output attachments.");
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
-    RETURN_IF_SKIP(InitFramework());
+    AddRequiredFeature(vkt::Feature::dualSrcBlend);
+    RETURN_IF_SKIP(Init());
 
-    VkPhysicalDeviceFeatures2 features2 = vku::InitStructHelper();
-    GetPhysicalDeviceFeatures2(features2);
-
-    if (features2.features.dualSrcBlend == VK_FALSE) {
-        GTEST_SKIP() << "dualSrcBlend feature is not available";
+    const uint32_t count = m_device->phy().limits_.maxFragmentDualSrcAttachments + 1;
+    if (count != 2) {
+        GTEST_SKIP() << "Test is designed for a maxFragmentDualSrcAttachments of 1";
     }
-
-    RETURN_IF_SKIP(InitState(nullptr, &features2));
-    uint32_t count = m_device->phy().limits_.maxFragmentDualSrcAttachments + 1;
     InitRenderTarget(count);
 
-    std::stringstream fsSource;
-    fsSource << "#version 450\n";
-    for (uint32_t i = 0; i < count; ++i) {
-        fsSource << "layout(location = " << i << ") out vec4 c" << i << ";\n";
-    }
-    fsSource << " void main() {\n";
-    for (uint32_t i = 0; i < count; ++i) {
-        fsSource << "c" << i << " = vec4(0.0f);\n";
-    }
+    const char *fs_src = R"glsl(
+        #version 460
+        layout(location = 0) out vec4 c0;
+        layout(location = 1) out vec4 c1;
+        void main() {
+		    c0 = vec4(0.0f);
+		    c1 = vec4(0.0f);
+        }
+    )glsl";
+    VkShaderObj fs(this, fs_src, VK_SHADER_STAGE_FRAGMENT_BIT);
 
-    fsSource << "}";
-    VkShaderObj fs(this, fsSource.str().c_str(), VK_SHADER_STAGE_FRAGMENT_BIT);
-
-    VkPipelineColorBlendAttachmentState cb_attachments = {};
-    cb_attachments.blendEnable = VK_TRUE;
-    cb_attachments.srcColorBlendFactor = VK_BLEND_FACTOR_SRC1_COLOR;  // bad!
-    cb_attachments.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;
-    cb_attachments.colorBlendOp = VK_BLEND_OP_ADD;
-    cb_attachments.srcAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-    cb_attachments.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-    cb_attachments.alphaBlendOp = VK_BLEND_OP_ADD;
+    VkPipelineColorBlendAttachmentState color_blend[2] = {};
+    color_blend[0] = DefaultColorBlendAttachmentState();
+    color_blend[1] = DefaultColorBlendAttachmentState();
+    color_blend[1].srcColorBlendFactor = VK_BLEND_FACTOR_SRC1_COLOR;  // bad!
 
     CreatePipelineHelper pipe(*this);
-    pipe.cb_ci_.pAttachments = &cb_attachments;
+    pipe.cb_ci_.attachmentCount = 2;
+    pipe.cb_ci_.pAttachments = color_blend;
     pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
     pipe.CreateGraphicsPipeline();
 
@@ -322,7 +312,7 @@ TEST_F(NegativeShaderLimits, DISABLED_MaxFragmentDualSrcAttachments) {
 
     vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
 
-    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-Fragment-06427");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-maxFragmentDualSrcAttachments-09239");
     vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
     m_errorMonitor->VerifyFound();
 
@@ -384,5 +374,109 @@ TEST_F(NegativeShaderLimits, OffsetMaxComputeSharedMemorySize) {
 
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-Workgroup-06530");
     pipe.CreateComputePipeline();
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeShaderLimits, MaxFragmentOutputAttachments) {
+    RETURN_IF_SKIP(Init());
+    if (m_device->phy().limits_.maxFragmentOutputAttachments != 4) {
+        GTEST_SKIP() << "maxFragmentOutputAttachments is not 4";
+    }
+
+    char const *fsSource = R"glsl(
+        #version 450
+        layout(location=0) out vec4 c0;
+        layout(location=1) out vec4 c1;
+        layout(location=2) out vec4 c2;
+        layout(location=3) out vec4 c3;
+        layout(location=4) out vec4 c4;
+        void main(){
+           c0 = vec4(1.0);
+           c1 = vec4(1.0);
+           c2 = vec4(1.0);
+           c3 = vec4(1.0);
+           c4 = vec4(1.0);
+        }
+    )glsl";
+
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-Location-06272");
+    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeShaderLimits, MaxFragmentOutputAttachmentsArray) {
+    RETURN_IF_SKIP(Init());
+    if (m_device->phy().limits_.maxFragmentOutputAttachments != 4) {
+        GTEST_SKIP() << "maxFragmentOutputAttachments is not 4";
+    }
+
+    char const *fsSource = R"glsl(
+        #version 450
+        layout(location=0) out vec4 c[5];
+        void main(){
+           c[4] = vec4(1.0);
+        }
+    )glsl";
+
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-Location-06272");
+    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeShaderLimits, MaxFragmentOutputAttachmentsArrayAtEnd) {
+    RETURN_IF_SKIP(Init());
+    if (m_device->phy().limits_.maxFragmentOutputAttachments != 4) {
+        GTEST_SKIP() << "maxFragmentOutputAttachments is not 4";
+    }
+
+    char const *fsSource = R"glsl(
+        #version 450
+        layout(location=3) out vec4 c[2];
+        void main(){
+           c[1] = vec4(1.0);
+        }
+    )glsl";
+
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-Location-06272");
+    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeShaderLimits, MaxFragmentCombinedOutputResources) {
+    RETURN_IF_SKIP(InitFramework());
+    PFN_vkSetPhysicalDeviceLimitsEXT fpvkSetPhysicalDeviceLimitsEXT = nullptr;
+    PFN_vkGetOriginalPhysicalDeviceLimitsEXT fpvkGetOriginalPhysicalDeviceLimitsEXT = nullptr;
+    if (!LoadDeviceProfileLayer(fpvkSetPhysicalDeviceLimitsEXT, fpvkGetOriginalPhysicalDeviceLimitsEXT)) {
+        GTEST_SKIP() << "Failed to load device profile layer.";
+    }
+    VkPhysicalDeviceProperties props;
+    fpvkGetOriginalPhysicalDeviceLimitsEXT(gpu(), &props.limits);
+    props.limits.maxFragmentCombinedOutputResources = 4;
+    fpvkSetPhysicalDeviceLimitsEXT(gpu(), &props.limits);
+    RETURN_IF_SKIP(InitState());
+
+    char const *fsSource = R"glsl(
+        #version 450
+        layout(set = 0, binding=0) buffer SSBO_0 {
+            uint a;
+        };
+        layout(set = 0, binding=3) buffer SSBO_1 {
+            uint b;
+        };
+        layout(set = 0, binding = 4, r32f) uniform imageBuffer s_buffer;
+
+        layout(location=1) out vec4 color_0;
+        layout(location=3) out vec4 color_1;
+
+        void main(){
+           color_0 = vec4(1.0);
+           color_1 = vec4(1.0);
+           a = b;
+           imageStore(s_buffer, 0, vec4(1.0));
+        }
+    )glsl";
+
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-Location-06428");
+    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
     m_errorMonitor->VerifyFound();
 }

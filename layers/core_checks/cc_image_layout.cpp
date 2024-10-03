@@ -198,16 +198,15 @@ bool CoreChecks::ValidateCmdBufImageLayouts(const Location &loc, const vvl::Comm
     for (const auto &layout_map_entry : cb_state.image_layout_map) {
         const auto image = layout_map_entry.first;
         const auto image_state = Get<vvl::Image>(image);
-        if (!image_state) {
-            continue;
-        }
+        if (!image_state) continue;
+
         const auto &layout_map = layout_map_entry.second.map->GetLayoutMap();
         // Validate the initial_uses for each subresource referenced
         if (layout_map.empty()) continue;
 
         auto *overlay_map = GetLayoutRangeMap(overlayLayoutMap, *image_state);
         const auto *global_map = image_state->layout_range_map.get();
-        assert(global_map);
+        ASSERT_AND_CONTINUE(global_map);
         auto global_map_guard = global_map->ReadLock();
 
         // Note: don't know if it would matter
@@ -219,7 +218,6 @@ bool CoreChecks::ValidateCmdBufImageLayouts(const Location &loc, const vvl::Comm
                                                                                             pos->first.begin);
         while (pos != end) {
             VkImageLayout initial_layout = pos->second.initial_layout;
-            assert(initial_layout != image_layout_map::kInvalidLayout);
             if (initial_layout == image_layout_map::kInvalidLayout) {
                 continue;
             }
@@ -472,19 +470,19 @@ bool CoreChecks::ValidateRenderPassStencilLayoutAgainstFramebufferImageUsage(VkI
 }
 
 bool CoreChecks::VerifyFramebufferAndRenderPassLayouts(const vvl::CommandBuffer &cb_state, const VkRenderPassBeginInfo &begin_info,
+                                                       const vvl::RenderPass &render_pass_state,
                                                        const vvl::Framebuffer &framebuffer_state,
                                                        const Location &rp_begin_loc) const {
     bool skip = false;
-    auto render_pass_state = Get<vvl::RenderPass>(begin_info.renderPass);
-    const auto *render_pass_info = render_pass_state->create_info.ptr();
-    const VkRenderPass render_pass = render_pass_state->VkHandle();
+    const auto *render_pass_info = render_pass_state.create_info.ptr();
+    const VkRenderPass render_pass = render_pass_state.VkHandle();
     auto const &framebuffer_info = framebuffer_state.create_info;
     const VkImageView *attachments = framebuffer_info.pAttachments;
 
     const VkFramebuffer framebuffer = framebuffer_state.VkHandle();
 
     if (render_pass_info->attachmentCount != framebuffer_info.attachmentCount) {
-        const LogObjectList objlist(begin_info.renderPass, framebuffer_state.Handle());
+        const LogObjectList objlist(render_pass, framebuffer_state.Handle());
         // VU bieng worked on at https://gitlab.khronos.org/vulkan/vulkan/-/issues/2267
         skip |= LogError("UNASSIGNED-CoreValidation-DrawState-InvalidRenderpass", objlist, rp_begin_loc,
                          "You cannot start a render pass using a framebuffer with a different number of attachments (%" PRIu32
@@ -512,7 +510,7 @@ bool CoreChecks::VerifyFramebufferAndRenderPassLayouts(const vvl::CommandBuffer 
         auto view_state = Get<vvl::ImageView>(image_view);
 
         if (!view_state) {
-            const LogObjectList objlist(begin_info.renderPass, framebuffer_state.Handle(), image_view);
+            const LogObjectList objlist(render_pass, framebuffer_state.Handle(), image_view);
             skip |= LogError("VUID-VkRenderPassBeginInfo-framebuffer-parameter", objlist, attachment_loc, "%s is invalid.",
                              FormatHandle(image_view).c_str());
             continue;
@@ -522,13 +520,13 @@ bool CoreChecks::VerifyFramebufferAndRenderPassLayouts(const vvl::CommandBuffer 
         const auto *image_state = view_state->image_state.get();
 
         if (!image_state) {
-            const LogObjectList objlist(begin_info.renderPass, framebuffer_state.Handle(), image_view, image);
+            const LogObjectList objlist(render_pass, framebuffer_state.Handle(), image_view, image);
             skip |= LogError("VUID-VkRenderPassBeginInfo-framebuffer-parameter", objlist, attachment_loc,
                              "%s references invalid image (%s).", FormatHandle(image_view).c_str(), FormatHandle(image).c_str());
             continue;
         }
         if (image_state->IsSwapchainImage() && image_state->owned_by_swapchain && !image_state->bind_swapchain) {
-            const LogObjectList objlist(begin_info.renderPass, framebuffer_state.Handle(), image_view, image);
+            const LogObjectList objlist(render_pass, framebuffer_state.Handle(), image_view, image);
             skip |= LogError("VUID-VkRenderPassBeginInfo-framebuffer-parameter", objlist, attachment_loc,
                              "%s references a swapchain image (%s) from a swapchain that has been destroyed.",
                              FormatHandle(image_view).c_str(), FormatHandle(image).c_str());
@@ -581,7 +579,7 @@ bool CoreChecks::VerifyFramebufferAndRenderPassLayouts(const vvl::CommandBuffer 
             LayoutUseCheckAndMessage layout_check(check_layout, test_aspect);
 
             skip |= subresource_map->AnyInRange(
-                normalized_range, [this, &layout_check, i, cb = cb_state.Handle(), render_pass = begin_info.renderPass,
+                normalized_range, [this, &layout_check, i, cb = cb_state.Handle(), render_pass = render_pass,
                                    framebuffer = framebuffer_state.Handle(), image = view_state->image_state->Handle(),
                                    image_view = view_state->Handle(), attachment_loc,
                                    rp_begin_loc](const LayoutRange &range, const LayoutEntry &state) {
@@ -628,18 +626,19 @@ bool CoreChecks::VerifyFramebufferAndRenderPassLayouts(const vvl::CommandBuffer 
             if (attachment_ref.attachment != VK_ATTACHMENT_UNUSED) {
                 const Location input_loc = subpass_loc.dot(Field::pInputAttachments, k);
                 auto image_view = attachments[attachment_ref.attachment];
-                auto view_state = Get<vvl::ImageView>(image_view);
 
-                if (view_state) {
+                if (auto view_state = Get<vvl::ImageView>(image_view)) {
                     skip |= ValidateRenderPassLayoutAgainstFramebufferImageUsage(attachment_ref.layout, *view_state, framebuffer,
                                                                                  render_pass, attachment_ref.attachment, rp_loc,
                                                                                  input_loc.dot(Field::layout));
-                }
-                if (ms_rendered_to_single_sampled && ms_rendered_to_single_sampled->multisampledRenderToSingleSampledEnable) {
-                    if (render_pass_info->pAttachments[attachment_ref.attachment].samples == VK_SAMPLE_COUNT_1_BIT) {
-                        skip |= ValidateMultipassRenderedToSingleSampledSampleCount(
-                            framebuffer, render_pass, *view_state->image_state, ms_rendered_to_single_sampled->rasterizationSamples,
-                            subpass_loc.pNext(Struct::VkMultisampledRenderToSingleSampledInfoEXT, Field::rasterizationSamples));
+
+                    if (ms_rendered_to_single_sampled && ms_rendered_to_single_sampled->multisampledRenderToSingleSampledEnable) {
+                        if (render_pass_info->pAttachments[attachment_ref.attachment].samples == VK_SAMPLE_COUNT_1_BIT) {
+                            skip |= ValidateMultipassRenderedToSingleSampledSampleCount(
+                                framebuffer, render_pass, *view_state->image_state,
+                                ms_rendered_to_single_sampled->rasterizationSamples,
+                                subpass_loc.pNext(Struct::VkMultisampledRenderToSingleSampledInfoEXT, Field::rasterizationSamples));
+                        }
                     }
                 }
             }
@@ -650,9 +649,8 @@ bool CoreChecks::VerifyFramebufferAndRenderPassLayouts(const vvl::CommandBuffer 
             if (attachment_ref.attachment != VK_ATTACHMENT_UNUSED) {
                 const Location color_loc = subpass_loc.dot(Field::pColorAttachments, k);
                 auto image_view = attachments[attachment_ref.attachment];
-                auto view_state = Get<vvl::ImageView>(image_view);
 
-                if (view_state) {
+                if (auto view_state = Get<vvl::ImageView>(image_view)) {
                     skip |= ValidateRenderPassLayoutAgainstFramebufferImageUsage(attachment_ref.layout, *view_state, framebuffer,
                                                                                  render_pass, attachment_ref.attachment, rp_loc,
                                                                                  color_loc.dot(Field::layout));
@@ -661,12 +659,14 @@ bool CoreChecks::VerifyFramebufferAndRenderPassLayouts(const vvl::CommandBuffer 
                             attachment_ref.layout, *view_state, framebuffer, render_pass, attachment_ref.attachment, rp_loc,
                             subpass_loc.dot(Field::pResolveAttachments, k).dot(Field::layout));
                     }
-                }
-                if (ms_rendered_to_single_sampled && ms_rendered_to_single_sampled->multisampledRenderToSingleSampledEnable) {
-                    if (render_pass_info->pAttachments[attachment_ref.attachment].samples == VK_SAMPLE_COUNT_1_BIT) {
-                        skip |= ValidateMultipassRenderedToSingleSampledSampleCount(
-                            framebuffer, render_pass, *view_state->image_state, ms_rendered_to_single_sampled->rasterizationSamples,
-                            subpass_loc.pNext(Struct::VkMultisampledRenderToSingleSampledInfoEXT, Field::rasterizationSamples));
+
+                    if (ms_rendered_to_single_sampled && ms_rendered_to_single_sampled->multisampledRenderToSingleSampledEnable) {
+                        if (render_pass_info->pAttachments[attachment_ref.attachment].samples == VK_SAMPLE_COUNT_1_BIT) {
+                            skip |= ValidateMultipassRenderedToSingleSampledSampleCount(
+                                framebuffer, render_pass, *view_state->image_state,
+                                ms_rendered_to_single_sampled->rasterizationSamples,
+                                subpass_loc.pNext(Struct::VkMultisampledRenderToSingleSampledInfoEXT, Field::rasterizationSamples));
+                        }
                     }
                 }
             }
@@ -677,9 +677,8 @@ bool CoreChecks::VerifyFramebufferAndRenderPassLayouts(const vvl::CommandBuffer 
             if (attachment_ref.attachment != VK_ATTACHMENT_UNUSED) {
                 const Location ds_loc = subpass_loc.dot(Field::pDepthStencilAttachment);
                 auto image_view = attachments[attachment_ref.attachment];
-                auto view_state = Get<vvl::ImageView>(image_view);
 
-                if (view_state) {
+                if (auto view_state = Get<vvl::ImageView>(image_view)) {
                     skip |= ValidateRenderPassLayoutAgainstFramebufferImageUsage(attachment_ref.layout, *view_state, framebuffer,
                                                                                  render_pass, attachment_ref.attachment, rp_loc,
                                                                                  ds_loc.dot(Field::layout));
@@ -690,12 +689,14 @@ bool CoreChecks::VerifyFramebufferAndRenderPassLayouts(const vvl::CommandBuffer 
                             stencil_layout->stencilLayout, *view_state, framebuffer, render_pass,
                             ds_loc.pNext(Struct::VkAttachmentReferenceStencilLayout, Field::stencilLayout));
                     }
-                }
-                if (ms_rendered_to_single_sampled && ms_rendered_to_single_sampled->multisampledRenderToSingleSampledEnable) {
-                    if (render_pass_info->pAttachments[attachment_ref.attachment].samples == VK_SAMPLE_COUNT_1_BIT) {
-                        skip |= ValidateMultipassRenderedToSingleSampledSampleCount(
-                            framebuffer, render_pass, *view_state->image_state, ms_rendered_to_single_sampled->rasterizationSamples,
-                            subpass_loc.pNext(Struct::VkMultisampledRenderToSingleSampledInfoEXT, Field::rasterizationSamples));
+
+                    if (ms_rendered_to_single_sampled && ms_rendered_to_single_sampled->multisampledRenderToSingleSampledEnable) {
+                        if (render_pass_info->pAttachments[attachment_ref.attachment].samples == VK_SAMPLE_COUNT_1_BIT) {
+                            skip |= ValidateMultipassRenderedToSingleSampledSampleCount(
+                                framebuffer, render_pass, *view_state->image_state,
+                                ms_rendered_to_single_sampled->rasterizationSamples,
+                                subpass_loc.pNext(Struct::VkMultisampledRenderToSingleSampledInfoEXT, Field::rasterizationSamples));
+                        }
                     }
                 }
             }
@@ -825,9 +826,8 @@ bool CoreChecks::UpdateCommandBufferImageLayoutMap(const vvl::CommandBuffer &cb_
                                                    vvl::CommandBuffer::ImageLayoutMap &layout_updates) const {
     bool skip = false;
     auto image_state = Get<vvl::Image>(img_barrier.image);
-    if (!image_state) {
-        return skip;
-    }
+    ASSERT_AND_RETURN_SKIP(image_state);
+
     std::shared_ptr<ImageSubresourceLayoutMap> write_subresource_map;
     auto iter = layout_updates.find(image_state->VkHandle());
     bool new_write = false;
@@ -897,7 +897,7 @@ bool CoreChecks::FindLayouts(const vvl::Image &image_state, std::vector<VkImageL
     }
 
     for (const auto &entry : *layout_range_map) {
-        layouts.push_back(entry.second);
+        layouts.emplace_back(entry.second);
     }
     return true;
 }
@@ -909,9 +909,8 @@ void CoreChecks::RecordTransitionImageLayout(vvl::CommandBuffer &cb_state, const
         }
     }
     auto image_state = Get<vvl::Image>(mem_barrier.image);
-    if (!image_state) {
-        return;
-    }
+    ASSERT_AND_RETURN(image_state);
+
     auto normalized_isr = image_state->NormalizeSubresourceRange(mem_barrier.subresourceRange);
 
     VkImageLayout initial_layout = NormalizeSynchronization2Layout(mem_barrier.subresourceRange.aspectMask, mem_barrier.oldLayout);

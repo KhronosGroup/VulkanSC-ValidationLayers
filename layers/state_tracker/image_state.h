@@ -19,7 +19,6 @@
  */
 #pragma once
 
-#include <utility>
 #include <variant>
 
 #include "state_tracker/device_memory_state.h"
@@ -100,10 +99,10 @@ class Image : public Bindable {
     const VkFormatFeatureFlags2KHR format_features;
     // Need to memory requirments for each plane if image is disjoint
     const bool disjoint;  // True if image was created with VK_IMAGE_CREATE_DISJOINT_BIT
-    static constexpr int MAX_PLANES = 3;
-    using MemoryReqs = std::array<VkMemoryRequirements, MAX_PLANES>;
+    static constexpr int kMaxPlanes = 3;
+    using MemoryReqs = std::array<VkMemoryRequirements, kMaxPlanes>;
     const MemoryReqs requirements;
-    std::array<bool, MAX_PLANES> memory_requirements_checked = {};
+    std::array<bool, kMaxPlanes> memory_requirements_checked = {};
 
     const bool sparse_residency;
     using SparseReqs = std::vector<VkSparseImageMemoryRequirements>;
@@ -219,6 +218,9 @@ class Image : public Bindable {
     void SetInitialLayoutMap();
     void SetImageLayout(const VkImageSubresourceRange &range, VkImageLayout layout);
 
+    // This function is only used for comparing Imported External Dedicated Memory
+    bool CompareCreateInfo(const Image &other) const;
+
   protected:
     void NotifyInvalidate(const StateObject::NodeList &invalid_nodes, bool unlink) override;
 
@@ -327,7 +329,6 @@ class Swapchain : public StateObject {
     bool retired = false;
     bool exclusive_full_screen_access;
     const bool shared_presentable;
-    uint32_t get_swapchain_image_count = 0;
     uint64_t max_present_id = 0;
     const vku::safe_VkImageCreateInfo image_create_info;
 

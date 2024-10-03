@@ -44,6 +44,7 @@ bool CoreChecks::ValidateRayTracingPipeline(const vvl::Pipeline &pipeline,
                 const Location library_info_loc = create_info_loc.dot(Field::pLibraryInfo);
                 const Location library_loc = library_info_loc.dot(Field::pLibraries, i);
                 const auto library_pipelinestate = Get<vvl::Pipeline>(create_info.pLibraryInfo->pLibraries[i]);
+                if (!library_pipelinestate) continue;
                 const auto &library_create_info = library_pipelinestate->RayTracingCreateInfo();
                 if (library_create_info.maxPipelineRayRecursionDepth != create_info.maxPipelineRayRecursionDepth) {
                     skip |= LogError("VUID-VkRayTracingPipelineCreateInfoKHR-pLibraries-03591", device, library_loc,
@@ -92,12 +93,10 @@ bool CoreChecks::ValidateRayTracingPipeline(const vvl::Pipeline &pipeline,
     const auto *groups = create_info.ptr()->pGroups;
 
     for (uint32_t i = 0; i < pipeline.stage_states.size(); i++) {
-        StageCreateInfo stage_create_info(&pipeline);
-        skip |= ValidatePipelineShaderStage(stage_create_info, pipeline.stage_states[i], create_info_loc.dot(Field::pStages, i));
+        skip |= ValidateShaderStage(pipeline.stage_states[i], &pipeline, create_info_loc.dot(Field::pStages, i));
     }
 
-    if (const auto *pipeline_robustness_info = vku::FindStructInPNextChain<VkPipelineRobustnessCreateInfoEXT>(create_info.pNext);
-        pipeline_robustness_info) {
+    if (const auto *pipeline_robustness_info = vku::FindStructInPNextChain<VkPipelineRobustnessCreateInfoEXT>(create_info.pNext)) {
         skip |= ValidatePipelineRobustnessCreateInfo(pipeline, *pipeline_robustness_info, create_info_loc);
     }
 
@@ -175,11 +174,11 @@ bool CoreChecks::PreCallValidateCreateRayTracingPipelinesNV(VkDevice device, VkP
     bool skip = StateTracker::PreCallValidateCreateRayTracingPipelinesNV(device, pipelineCache, count, pCreateInfos, pAllocator,
                                                                          pPipelines, error_obj, pipeline_states, chassis_state);
 
+    skip |= ValidateDeviceQueueSupport(error_obj.location);
     for (uint32_t i = 0; i < count; i++) {
         const vvl::Pipeline *pipeline = pipeline_states[i].get();
-        if (!pipeline) {
-            continue;
-        }
+        ASSERT_AND_CONTINUE(pipeline);
+
         const Location create_info_loc = error_obj.location.dot(Field::pCreateInfos, i);
         const auto &create_info = pipeline->RayTracingCreateInfo();
         if (pipeline->create_flags & VK_PIPELINE_CREATE_DERIVATIVE_BIT) {
@@ -200,7 +199,11 @@ bool CoreChecks::PreCallValidateCreateRayTracingPipelinesNV(VkDevice device, VkP
             }
         }
         skip |= ValidateRayTracingPipeline(*pipeline, create_info, pCreateInfos[i].flags, create_info_loc);
-        skip |= ValidateShaderModuleId(*pipeline, create_info_loc);
+        uint32_t stage_index = 0;
+        for (const auto &stage_ci : pipeline->shader_stages_ci) {
+            skip |= ValidatePipelineShaderStage(*pipeline, stage_ci, pCreateInfos[i].pNext,
+                                                create_info_loc.dot(Field::pStages, stage_index++));
+        }
         skip |= ValidatePipelineCacheControlFlags(pCreateInfos[i].flags, create_info_loc.dot(Field::flags),
                                                   "VUID-VkRayTracingPipelineCreateInfoNV-pipelineCreationCacheControl-02905");
     }
@@ -217,14 +220,14 @@ bool CoreChecks::PreCallValidateCreateRayTracingPipelinesKHR(VkDevice device, Vk
                                                                           pCreateInfos, pAllocator, pPipelines, error_obj,
                                                                           pipeline_states, chassis_state);
 
+    skip |= ValidateDeviceQueueSupport(error_obj.location);
     skip |= ValidateDeferredOperation(device, deferredOperation, error_obj.location.dot(Field::deferredOperation),
                                       "VUID-vkCreateRayTracingPipelinesKHR-deferredOperation-03678");
 
     for (uint32_t i = 0; i < count; i++) {
         const vvl::Pipeline *pipeline = pipeline_states[i].get();
-        if (!pipeline) {
-            continue;
-        }
+        ASSERT_AND_CONTINUE(pipeline);
+
         const Location create_info_loc = error_obj.location.dot(Field::pCreateInfos, i);
         const auto &create_info = pipeline->RayTracingCreateInfo();
         if (pipeline->create_flags & VK_PIPELINE_CREATE_DERIVATIVE_BIT) {
@@ -245,7 +248,11 @@ bool CoreChecks::PreCallValidateCreateRayTracingPipelinesKHR(VkDevice device, Vk
             }
         }
         skip |= ValidateRayTracingPipeline(*pipeline, create_info, pCreateInfos[i].flags, create_info_loc);
-        skip |= ValidateShaderModuleId(*pipeline, create_info_loc);
+        uint32_t stage_index = 0;
+        for (const auto &stage_ci : pipeline->shader_stages_ci) {
+            skip |= ValidatePipelineShaderStage(*pipeline, stage_ci, pCreateInfos[i].pNext,
+                                                create_info_loc.dot(Field::pStages, stage_index++));
+        }
         skip |= ValidatePipelineCacheControlFlags(pCreateInfos[i].flags, create_info_loc.dot(Field::flags),
                                                   "VUID-VkRayTracingPipelineCreateInfoKHR-pipelineCreationCacheControl-02905");
         if (create_info.pLibraryInfo) {
@@ -266,6 +273,8 @@ bool CoreChecks::PreCallValidateCreateRayTracingPipelinesKHR(VkDevice device, Vk
                 const Location library_info_loc = create_info_loc.dot(Field::pLibraryInfo);
                 const Location library_loc = library_info_loc.dot(Field::pLibraries, j);
                 const auto lib = Get<vvl::Pipeline>(create_info.pLibraryInfo->pLibraries[j]);
+                if (!lib) continue;
+
                 if ((lib->create_flags & VK_PIPELINE_CREATE_LIBRARY_BIT_KHR) == 0) {
                     skip |= LogError("VUID-VkPipelineLibraryCreateInfoKHR-pLibraries-03381", device, library_loc,
                                      "was created with %s.", string_VkPipelineCreateFlags2KHR(lib->create_flags).c_str());
@@ -286,10 +295,10 @@ bool CoreChecks::PreCallValidateCreateRayTracingPipelinesKHR(VkDevice device, Vk
                 if (j == 0) {
                     uses_descriptor_buffer = lib->descriptor_buffer_mode;
                 } else if (uses_descriptor_buffer != lib->descriptor_buffer_mode) {
-                    skip |= LogError(
-                        "VUID-VkPipelineLibraryCreateInfoKHR-pLibraries-08096", device, library_loc,
-                        "%s created with VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT which is opopposite of pLibraries[0].",
-                        lib->descriptor_buffer_mode ? "was" : "was not");
+                    skip |=
+                        LogError("VUID-VkPipelineLibraryCreateInfoKHR-pLibraries-08096", device, library_loc,
+                                 "%s created with VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT which is opposite of pLibraries[0].",
+                                 lib->descriptor_buffer_mode ? "was" : "was not");
                     break;  // no point keep checking as might have many of same error
                 }
             }

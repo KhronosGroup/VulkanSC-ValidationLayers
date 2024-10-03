@@ -21,6 +21,8 @@
 #include "../framework/descriptor_helper.h"
 #include "../framework/render_pass_helper.h"
 
+class NegativeCommand : public VkLayerTest {};
+
 TEST_F(NegativeCommand, CommandPoolConsistency) {
     TEST_DESCRIPTION("Allocate command buffers from one command pool and attempt to delete them from another.");
 
@@ -100,24 +102,24 @@ TEST_F(NegativeCommand, IndexBufferSizeOffset) {
     vk::CmdBindIndexBuffer(m_commandBuffer->handle(), index_buffer.handle(), 512, VK_INDEX_TYPE_UINT16);
 
     // draw one past the end of the buffer
-    m_errorMonitor->SetDesiredError("VUID-vkCmdDrawIndexed-robustBufferAccess2-07825");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDrawIndexed-robustBufferAccess2-08798");
     vk::CmdDrawIndexed(m_commandBuffer->handle(), 256, 1, 1, 0, 0);
     m_errorMonitor->VerifyFound();
 
     // draw one too many indices
-    m_errorMonitor->SetDesiredError("VUID-vkCmdDrawIndexed-robustBufferAccess2-07825");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDrawIndexed-robustBufferAccess2-08798");
     vk::CmdDrawIndexed(m_commandBuffer->handle(), 257, 1, 0, 0, 0);
     m_errorMonitor->VerifyFound();
 
     vk::CmdBindIndexBuffer(m_commandBuffer->handle(), index_buffer.handle(), 0, VK_INDEX_TYPE_UINT16);
 
     // draw one too many indices
-    m_errorMonitor->SetDesiredError("VUID-vkCmdDrawIndexed-robustBufferAccess2-07825");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDrawIndexed-robustBufferAccess2-08798");
     vk::CmdDrawIndexed(m_commandBuffer->handle(), 513, 1, 0, 0, 0);
     m_errorMonitor->VerifyFound();
 
     // draw one past the end of the buffer using the offset
-    m_errorMonitor->SetDesiredError("VUID-vkCmdDrawIndexed-robustBufferAccess2-07825");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDrawIndexed-robustBufferAccess2-08798");
     vk::CmdDrawIndexed(m_commandBuffer->handle(), 512, 1, 1, 0, 0);
     m_errorMonitor->VerifyFound();
 }
@@ -146,6 +148,64 @@ TEST_F(NegativeCommand, MissingClearAttachment) {
     color_attachment.colorAttachment = VK_ATTACHMENT_UNUSED;
     m_errorMonitor->SetDesiredError("VUID-vkCmdClearAttachments-aspectMask-07271");
     vk::CmdClearAttachments(m_commandBuffer->handle(), 1, &color_attachment, 1, &clear_rect);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeCommand, MissingClearAttachment2) {
+    TEST_DESCRIPTION("Points to a wrong colorAttachment index in a VkClearAttachment structure passed to vkCmdClearAttachments");
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    CreatePipelineHelper pipe(*this);
+    pipe.CreateGraphicsPipeline();
+
+    m_commandBuffer->begin();
+    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
+
+    VkClearAttachment color_attachment = {VK_IMAGE_ASPECT_COLOR_BIT, 1, VkClearValue{}};
+    VkClearRect clear_rect = {{{0, 0}, {m_width, m_height}}, 0, 1};
+
+    m_errorMonitor->SetDesiredError("VUID-vkCmdClearAttachments-aspectMask-07271");
+    vk::CmdClearAttachments(m_commandBuffer->handle(), 1, &color_attachment, 1, &clear_rect);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeCommand, ClearAttachment64Bit) {
+    TEST_DESCRIPTION("Clear with a 64-bit format");
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    if (!FormatFeaturesAreSupported(gpu(), VK_FORMAT_R64G64B64A64_SFLOAT, VK_IMAGE_TILING_OPTIMAL,
+                                    VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT)) {
+        GTEST_SKIP() << "VK_FORMAT_R64G64B64A64_SFLOAT format not supported";
+    }
+    vkt::Image image(*m_device, 32, 32, 1, VK_FORMAT_R64G64B64A64_SFLOAT, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+    image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
+    vkt::ImageView image_view = image.CreateView();
+
+    RenderPassSingleSubpass rp(*this);
+    rp.AddAttachmentDescription(VK_FORMAT_R64G64B64A64_SFLOAT);
+    rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_GENERAL});
+    rp.AddColorAttachment(0);
+    rp.CreateRenderPass();
+    vkt::Framebuffer fb(*m_device, rp.Handle(), 1, &image_view.handle());
+
+    m_commandBuffer->begin();
+    m_commandBuffer->BeginRenderPass(rp.Handle(), fb.handle());
+
+    VkClearAttachment attachment;
+    attachment.colorAttachment = 0;
+    VkClearRect clear_rect = {};
+    clear_rect.rect.offset = {0, 0};
+    clear_rect.rect.extent = {1, 1};
+    clear_rect.baseArrayLayer = 0;
+    clear_rect.layerCount = 1;
+
+    attachment.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    m_errorMonitor->SetDesiredError("VUID-vkCmdClearAttachments-None-09679");
+    vk::CmdClearAttachments(m_commandBuffer->handle(), 1, &attachment, 1, &clear_rect);
     m_errorMonitor->VerifyFound();
 }
 
@@ -296,8 +356,7 @@ TEST_F(NegativeCommand, PushConstants) {
     for (const auto &iter : duplicate_stageFlags_tests) {
         pipeline_layout_ci.pPushConstantRanges = iter.ranges;
         pipeline_layout_ci.pushConstantRangeCount = ranges_per_test;
-        std::for_each(iter.msg.begin(), iter.msg.end(),
-                      [&](const char *vuid) { m_errorMonitor->SetDesiredFailureMsg(kErrorBit, vuid); });
+        std::for_each(iter.msg.begin(), iter.msg.end(), [&](const char *vuid) { m_errorMonitor->SetDesiredError(vuid); });
         vk::CreatePipelineLayout(device(), &pipeline_layout_ci, NULL, &pipeline_layout);
         m_errorMonitor->VerifyFound();
     }
@@ -375,7 +434,7 @@ TEST_F(NegativeCommand, PushConstant2PipelineLayoutCreateInfo) {
     pc_info.layout = VK_NULL_HANDLE;
 
     m_commandBuffer->begin();
-    m_errorMonitor->SetDesiredError("VUID-VkPushConstantsInfoKHR-layout-09496");
+    m_errorMonitor->SetDesiredError("VUID-VkPushConstantsInfoKHR-None-09495");
     vk::CmdPushConstants2KHR(m_commandBuffer->handle(), &pc_info);
     m_errorMonitor->VerifyFound();
     m_commandBuffer->end();
@@ -958,41 +1017,18 @@ TEST_F(NegativeCommand, ResolveImageLowSampleCount) {
     }
 
     // Create two images of sample count 1 and try to Resolve between them
-
-    VkImageCreateInfo image_create_info = vku::InitStructHelper();
-    image_create_info.imageType = VK_IMAGE_TYPE_2D;
-    image_create_info.format = VK_FORMAT_B8G8R8A8_UNORM;
-    image_create_info.extent.width = 32;
-    image_create_info.extent.height = 1;
-    image_create_info.extent.depth = 1;
-    image_create_info.mipLevels = 1;
-    image_create_info.arrayLayers = 1;
-    image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
-    image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    image_create_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-    image_create_info.flags = 0;
+    VkImageCreateInfo image_create_info = vkt::Image::ImageCreateInfo2D(
+        32, 1, 1, 1, VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
     vkt::Image srcImage(*m_device, image_create_info, vkt::set_layout);
     vkt::Image dstImage(*m_device, image_create_info, vkt::set_layout);
 
     m_commandBuffer->begin();
     VkImageResolve resolveRegion;
-    resolveRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    resolveRegion.srcSubresource.mipLevel = 0;
-    resolveRegion.srcSubresource.baseArrayLayer = 0;
-    resolveRegion.srcSubresource.layerCount = 1;
-    resolveRegion.srcOffset.x = 0;
-    resolveRegion.srcOffset.y = 0;
-    resolveRegion.srcOffset.z = 0;
-    resolveRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    resolveRegion.dstSubresource.mipLevel = 0;
-    resolveRegion.dstSubresource.baseArrayLayer = 0;
-    resolveRegion.dstSubresource.layerCount = 1;
-    resolveRegion.dstOffset.x = 0;
-    resolveRegion.dstOffset.y = 0;
-    resolveRegion.dstOffset.z = 0;
-    resolveRegion.extent.width = 1;
-    resolveRegion.extent.height = 1;
-    resolveRegion.extent.depth = 1;
+    resolveRegion.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    resolveRegion.srcOffset = {0, 0, 0};
+    resolveRegion.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    resolveRegion.dstOffset = {0, 0, 0};
+    resolveRegion.extent = {1, 1, 1};
     vk::CmdResolveImage(m_commandBuffer->handle(), srcImage.handle(), VK_IMAGE_LAYOUT_GENERAL, dstImage.handle(),
                         VK_IMAGE_LAYOUT_GENERAL, 1, &resolveRegion);
     m_commandBuffer->end();
@@ -1036,23 +1072,11 @@ TEST_F(NegativeCommand, ResolveImageHighSampleCount) {
     // VK_IMAGE_LAYOUT_UNDEFINED = 0,
     // VK_IMAGE_LAYOUT_GENERAL = 1,
     VkImageResolve resolveRegion;
-    resolveRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    resolveRegion.srcSubresource.mipLevel = 0;
-    resolveRegion.srcSubresource.baseArrayLayer = 0;
-    resolveRegion.srcSubresource.layerCount = 1;
-    resolveRegion.srcOffset.x = 0;
-    resolveRegion.srcOffset.y = 0;
-    resolveRegion.srcOffset.z = 0;
-    resolveRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    resolveRegion.dstSubresource.mipLevel = 0;
-    resolveRegion.dstSubresource.baseArrayLayer = 0;
-    resolveRegion.dstSubresource.layerCount = 1;
-    resolveRegion.dstOffset.x = 0;
-    resolveRegion.dstOffset.y = 0;
-    resolveRegion.dstOffset.z = 0;
-    resolveRegion.extent.width = 1;
-    resolveRegion.extent.height = 1;
-    resolveRegion.extent.depth = 1;
+    resolveRegion.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    resolveRegion.srcOffset = {0, 0, 0};
+    resolveRegion.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    resolveRegion.dstOffset = {0, 0, 0};
+    resolveRegion.extent = {1, 1, 1};
     vk::CmdResolveImage(m_commandBuffer->handle(), srcImage.handle(), VK_IMAGE_LAYOUT_GENERAL, dstImage.handle(),
                         VK_IMAGE_LAYOUT_GENERAL, 1, &resolveRegion);
     m_commandBuffer->end();
@@ -1099,23 +1123,11 @@ TEST_F(NegativeCommand, ResolveImageFormatMismatch) {
     // VK_IMAGE_LAYOUT_UNDEFINED = 0,
     // VK_IMAGE_LAYOUT_GENERAL = 1,
     VkImageResolve resolveRegion;
-    resolveRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    resolveRegion.srcSubresource.mipLevel = 0;
-    resolveRegion.srcSubresource.baseArrayLayer = 0;
-    resolveRegion.srcSubresource.layerCount = 1;
-    resolveRegion.srcOffset.x = 0;
-    resolveRegion.srcOffset.y = 0;
-    resolveRegion.srcOffset.z = 0;
-    resolveRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    resolveRegion.dstSubresource.mipLevel = 0;
-    resolveRegion.dstSubresource.baseArrayLayer = 0;
-    resolveRegion.dstSubresource.layerCount = 1;
-    resolveRegion.dstOffset.x = 0;
-    resolveRegion.dstOffset.y = 0;
-    resolveRegion.dstOffset.z = 0;
-    resolveRegion.extent.width = 1;
-    resolveRegion.extent.height = 1;
-    resolveRegion.extent.depth = 1;
+    resolveRegion.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    resolveRegion.srcOffset = {0, 0, 0};
+    resolveRegion.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    resolveRegion.dstOffset = {0, 0, 0};
+    resolveRegion.extent = {1, 1, 1};
     vk::CmdResolveImage(m_commandBuffer->handle(), srcImage.handle(), VK_IMAGE_LAYOUT_GENERAL, dstImage.handle(),
                         VK_IMAGE_LAYOUT_GENERAL, 1, &resolveRegion);
     m_commandBuffer->end();
@@ -1167,23 +1179,11 @@ TEST_F(NegativeCommand, ResolveImageLayoutMismatch) {
     dstImage.SetLayout(m_commandBuffer, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
     VkImageResolve resolveRegion;
-    resolveRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    resolveRegion.srcSubresource.mipLevel = 0;
-    resolveRegion.srcSubresource.baseArrayLayer = 0;
-    resolveRegion.srcSubresource.layerCount = 1;
-    resolveRegion.srcOffset.x = 0;
-    resolveRegion.srcOffset.y = 0;
-    resolveRegion.srcOffset.z = 0;
-    resolveRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    resolveRegion.dstSubresource.mipLevel = 0;
-    resolveRegion.dstSubresource.baseArrayLayer = 0;
-    resolveRegion.dstSubresource.layerCount = 1;
-    resolveRegion.dstOffset.x = 0;
-    resolveRegion.dstOffset.y = 0;
-    resolveRegion.dstOffset.z = 0;
-    resolveRegion.extent.width = 1;
-    resolveRegion.extent.height = 1;
-    resolveRegion.extent.depth = 1;
+    resolveRegion.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    resolveRegion.srcOffset = {0, 0, 0};
+    resolveRegion.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    resolveRegion.dstOffset = {0, 0, 0};
+    resolveRegion.extent = {1, 1, 1};
     // source image layout mismatch
     m_errorMonitor->SetDesiredError("VUID-vkCmdResolveImage-srcImageLayout-00260");
     vk::CmdResolveImage(m_commandBuffer->handle(), srcImage.handle(), VK_IMAGE_LAYOUT_GENERAL, dstImage.handle(),
@@ -1243,23 +1243,12 @@ TEST_F(NegativeCommand, ResolveInvalidSubresource) {
     dstImage.SetLayout(m_commandBuffer, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
     VkImageResolve resolveRegion;
-    resolveRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    resolveRegion.srcSubresource.mipLevel = 0;
-    resolveRegion.srcSubresource.baseArrayLayer = 0;
-    resolveRegion.srcSubresource.layerCount = 1;
-    resolveRegion.srcOffset.x = 0;
-    resolveRegion.srcOffset.y = 0;
-    resolveRegion.srcOffset.z = 0;
-    resolveRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    resolveRegion.dstSubresource.mipLevel = 0;
-    resolveRegion.dstSubresource.baseArrayLayer = 0;
-    resolveRegion.dstSubresource.layerCount = 1;
-    resolveRegion.dstOffset.x = 0;
-    resolveRegion.dstOffset.y = 0;
-    resolveRegion.dstOffset.z = 0;
-    resolveRegion.extent.width = 1;
-    resolveRegion.extent.height = 1;
-    resolveRegion.extent.depth = 1;
+    resolveRegion.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    resolveRegion.srcOffset = {0, 0, 0};
+    resolveRegion.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    resolveRegion.dstOffset = {0, 0, 0};
+    resolveRegion.extent = {1, 1, 1};
+
     // invalid source mip level
     resolveRegion.srcSubresource.mipLevel = image_create_info.mipLevels;
     m_errorMonitor->SetDesiredError("VUID-vkCmdResolveImage-srcSubresource-01709");
@@ -1423,23 +1412,11 @@ TEST_F(NegativeCommand, ResolveImageImageType) {
     m_commandBuffer->begin();
 
     VkImageResolve resolveRegion;
-    resolveRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    resolveRegion.srcSubresource.mipLevel = 0;
-    resolveRegion.srcSubresource.baseArrayLayer = 0;
-    resolveRegion.srcSubresource.layerCount = 1;
-    resolveRegion.srcOffset.x = 0;
-    resolveRegion.srcOffset.y = 0;
-    resolveRegion.srcOffset.z = 0;
-    resolveRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    resolveRegion.dstSubresource.mipLevel = 0;
-    resolveRegion.dstSubresource.baseArrayLayer = 0;
-    resolveRegion.dstSubresource.layerCount = 1;
-    resolveRegion.dstOffset.x = 0;
-    resolveRegion.dstOffset.y = 0;
-    resolveRegion.dstOffset.z = 0;
-    resolveRegion.extent.width = 1;
-    resolveRegion.extent.height = 1;
-    resolveRegion.extent.depth = 1;
+    resolveRegion.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    resolveRegion.srcOffset = {0, 0, 0};
+    resolveRegion.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    resolveRegion.dstOffset = {0, 0, 0};
+    resolveRegion.extent = {1, 1, 1};
 
     // layerCount is not 1
     resolveRegion.srcSubresource.layerCount = 2;
@@ -1506,23 +1483,11 @@ TEST_F(NegativeCommand, ResolveImageSizeExceeded) {
     m_commandBuffer->begin();
 
     VkImageResolve resolveRegion = {};
-    resolveRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    resolveRegion.srcSubresource.mipLevel = 0;
-    resolveRegion.srcSubresource.baseArrayLayer = 0;
-    resolveRegion.srcSubresource.layerCount = 1;
-    resolveRegion.srcOffset.x = 0;
-    resolveRegion.srcOffset.y = 0;
-    resolveRegion.srcOffset.z = 0;
-    resolveRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    resolveRegion.dstSubresource.mipLevel = 0;
-    resolveRegion.dstSubresource.baseArrayLayer = 0;
-    resolveRegion.dstSubresource.layerCount = 1;
-    resolveRegion.dstOffset.x = 0;
-    resolveRegion.dstOffset.y = 0;
-    resolveRegion.dstOffset.z = 0;
-    resolveRegion.extent.width = 32;
-    resolveRegion.extent.height = 32;
-    resolveRegion.extent.depth = 1;
+    resolveRegion.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    resolveRegion.srcOffset = {0, 0, 0};
+    resolveRegion.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    resolveRegion.dstOffset = {0, 0, 0};
+    resolveRegion.extent = {32, 32, 1};
 
     vk::CmdResolveImage(m_commandBuffer->handle(), srcImage2D.handle(), VK_IMAGE_LAYOUT_GENERAL, dstImage2D.handle(),
                         VK_IMAGE_LAYOUT_GENERAL, 1, &resolveRegion);
@@ -1649,6 +1614,25 @@ TEST_F(NegativeCommand, ClearImage) {
     m_errorMonitor->VerifyFound();
 }
 
+TEST_F(NegativeCommand, ClearColor64Bit) {
+    TEST_DESCRIPTION("Clear with a 64-bit format");
+    RETURN_IF_SKIP(Init());
+
+    if (!FormatFeaturesAreSupported(gpu(), VK_FORMAT_R64G64B64A64_SFLOAT, VK_IMAGE_TILING_OPTIMAL,
+                                    VK_FORMAT_FEATURE_TRANSFER_DST_BIT)) {
+        GTEST_SKIP() << "VK_FORMAT_R64G64B64A64_SFLOAT format not supported";
+    }
+    vkt::Image image(*m_device, 32, 32, 1, VK_FORMAT_R64G64B64A64_SFLOAT, VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+    image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
+
+    m_commandBuffer->begin();
+    const VkClearColorValue clear_color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+    VkImageSubresourceRange range = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    m_errorMonitor->SetDesiredError("VUID-vkCmdClearColorImage-image-09678");
+    vk::CmdClearColorImage(m_commandBuffer->handle(), image.handle(), image.Layout(), &clear_color, 1, &range);
+    m_errorMonitor->VerifyFound();
+}
+
 TEST_F(NegativeCommand, CommandQueueFlags) {
     TEST_DESCRIPTION(
         "Allocate a command buffer on a queue that does not support graphics and try to issue a graphics-only command");
@@ -1718,13 +1702,13 @@ TEST_F(NegativeCommand, MultiDraw) {
     vk::CmdDrawMultiIndexedEXT(m_commandBuffer->handle(), 3, multi_draw_indices, 1, 0, sizeof(VkMultiDrawIndexedInfoEXT), 0);
     // Fail with index offset
     multi_draw_indices[2].firstIndex = 1;
-    m_errorMonitor->SetDesiredError("VUID-vkCmdDrawMultiIndexedEXT-robustBufferAccess2-07825");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDrawMultiIndexedEXT-robustBufferAccess2-08798");
     // Fail with index count
     multi_draw_indices[2].firstIndex = 0;
     multi_draw_indices[2].indexCount = 512;
     vk::CmdDrawMultiIndexedEXT(m_commandBuffer->handle(), 3, multi_draw_indices, 1, 0, sizeof(VkMultiDrawIndexedInfoEXT), 0);
     m_errorMonitor->VerifyFound();
-    m_errorMonitor->SetDesiredError("VUID-vkCmdDrawMultiIndexedEXT-robustBufferAccess2-07825");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDrawMultiIndexedEXT-robustBufferAccess2-08798");
     vk::CmdDrawMultiIndexedEXT(m_commandBuffer->handle(), 3, multi_draw_indices, 1, 0, sizeof(VkMultiDrawIndexedInfoEXT), 0);
     m_errorMonitor->VerifyFound();
     multi_draw_indices[2].indexCount = 1;
@@ -1733,7 +1717,7 @@ TEST_F(NegativeCommand, MultiDraw) {
     m_errorMonitor->SetDesiredError("VUID-vkCmdDrawMultiEXT-drawCount-09628");
     vk::CmdDrawMultiEXT(m_commandBuffer->handle(), 3, multi_draws, 1, 0, sizeof(VkMultiDrawInfoEXT) + 1);
     m_errorMonitor->VerifyFound();
-    m_errorMonitor->SetDesiredError("VUID-vkCmdDrawMultiIndexedEXT-robustBufferAccess2-07825", 2);
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDrawMultiIndexedEXT-robustBufferAccess2-08798", 2);
     m_errorMonitor->SetDesiredError("VUID-vkCmdDrawMultiIndexedEXT-drawCount-09629");
     vk::CmdDrawMultiIndexedEXT(m_commandBuffer->handle(), 3, multi_draw_indices, 1, 0, sizeof(VkMultiDrawIndexedInfoEXT) + 1, 0);
     m_errorMonitor->VerifyFound();
@@ -1787,13 +1771,13 @@ TEST_F(NegativeCommand, MultiDrawMaintenance5) {
 
     // same as calling vkCmdBindIndexBuffer (size of the buffer creation)
     vk::CmdBindIndexBuffer2KHR(m_commandBuffer->handle(), buffer.handle(), 2, 1024, VK_INDEX_TYPE_UINT16);
-    m_errorMonitor->SetDesiredError("VUID-vkCmdDrawMultiIndexedEXT-robustBufferAccess2-07825");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDrawMultiIndexedEXT-robustBufferAccess2-08798");
     vk::CmdDrawMultiIndexedEXT(m_commandBuffer->handle(), 1, &multi_draw_indices, 1, 0, sizeof(VkMultiDrawIndexedInfoEXT), 0);
     m_errorMonitor->VerifyFound();
 
     multi_draw_indices.indexCount = 256;  // only uses [0 - 512]
     vk::CmdBindIndexBuffer2KHR(m_commandBuffer->handle(), buffer.handle(), 2, 508, VK_INDEX_TYPE_UINT16);
-    m_errorMonitor->SetDesiredError("VUID-vkCmdDrawMultiIndexedEXT-robustBufferAccess2-07825");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDrawMultiIndexedEXT-robustBufferAccess2-08798");
     vk::CmdDrawMultiIndexedEXT(m_commandBuffer->handle(), 1, &multi_draw_indices, 1, 0, sizeof(VkMultiDrawIndexedInfoEXT), 0);
     m_errorMonitor->VerifyFound();
 }
@@ -1826,7 +1810,7 @@ TEST_F(NegativeCommand, MultiDrawWholeSizeMaintenance5) {
 
     // VK_WHOLE_SIZE also full size of the buffer
     vk::CmdBindIndexBuffer2KHR(m_commandBuffer->handle(), buffer.handle(), 2, VK_WHOLE_SIZE, VK_INDEX_TYPE_UINT16);
-    m_errorMonitor->SetDesiredError("VUID-vkCmdDrawMultiIndexedEXT-robustBufferAccess2-07825");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDrawMultiIndexedEXT-robustBufferAccess2-08798");
     vk::CmdDrawMultiIndexedEXT(m_commandBuffer->handle(), 1, &multi_draw_indices, 1, 0, sizeof(VkMultiDrawIndexedInfoEXT), 0);
     m_errorMonitor->VerifyFound();
 }
@@ -1860,7 +1844,7 @@ TEST_F(NegativeCommand, MultiDrawMaintenance5Mixed) {
     vk::CmdBindIndexBuffer(m_commandBuffer->handle(), buffer.handle(), 0, VK_INDEX_TYPE_UINT16);
     // should be overwritten with smaller size
     vk::CmdBindIndexBuffer2KHR(m_commandBuffer->handle(), buffer.handle(), 0, 1000, VK_INDEX_TYPE_UINT16);
-    m_errorMonitor->SetDesiredError("VUID-vkCmdDrawMultiIndexedEXT-robustBufferAccess2-07825");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDrawMultiIndexedEXT-robustBufferAccess2-08798");
     vk::CmdDrawMultiIndexedEXT(m_commandBuffer->handle(), 1, &multi_draw_indices, 1, 0, sizeof(VkMultiDrawIndexedInfoEXT), 0);
     m_errorMonitor->VerifyFound();
 }
@@ -1911,14 +1895,8 @@ TEST_F(NegativeCommand, IndirectDraw) {
     vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_layout_.handle(), 0, 1,
                               &pipe.descriptor_set_->set_, 0, NULL);
 
-    VkBufferCreateInfo buffer_create_info = vku::InitStructHelper();
-    buffer_create_info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-    buffer_create_info.size = sizeof(VkDrawIndirectCommand);
-    vkt::Buffer draw_buffer(*m_device, buffer_create_info);
-
-    buffer_create_info.usage = VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
-    vkt::Buffer draw_buffer_correct(*m_device, buffer_create_info);
-
+    vkt::Buffer draw_buffer(*m_device, sizeof(VkDrawIndirectCommand), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+    vkt::Buffer draw_buffer_correct(*m_device, sizeof(VkDrawIndirectCommand), VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT);
     vkt::Buffer index_buffer(*m_device, sizeof(uint32_t), VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
     vk::CmdBindIndexBuffer(m_commandBuffer->handle(), index_buffer.handle(), 0, VK_INDEX_TYPE_UINT32);
 
@@ -2086,7 +2064,7 @@ TEST_F(NegativeCommand, DrawIndirectCountKHR) {
                                 sizeof(VkDrawIndirectCommand));
     m_errorMonitor->VerifyFound();
 
-    m_errorMonitor->SetDesiredError(" VUID-vkCmdDrawIndirectCount-countBuffer-02715");
+    m_errorMonitor->SetDesiredError("VUID-vkCmdDrawIndirectCount-countBuffer-02715");
     vk::CmdDrawIndirectCountKHR(m_commandBuffer->handle(), draw_buffer.handle(), 0, count_buffer_wrong.handle(), 0, 1,
                                 sizeof(VkDrawIndirectCommand));
     m_errorMonitor->VerifyFound();
@@ -2367,7 +2345,7 @@ TEST_F(NegativeCommand, ExclusiveScissorNV) {
             {{{0, 0}, {16, uint32_t{vvl::kI32Max} + 1}}, "VUID-vkCmdSetExclusiveScissorNV-offset-02039"}};
 
         for (const auto &test_case : test_cases) {
-            m_errorMonitor->SetDesiredFailureMsg(kErrorBit, test_case.vuid);
+            m_errorMonitor->SetDesiredError(test_case.vuid.c_str());
             vk::CmdSetExclusiveScissorNV(m_commandBuffer->handle(), 0, 1, &test_case.scissor);
             m_errorMonitor->VerifyFound();
         }
@@ -2435,14 +2413,15 @@ TEST_F(NegativeCommand, ViewportWScalingNV) {
     // Create pipeline with w-scaling enabled but without a valid scaling array
     vpsi.pViewportWScalings = nullptr;
     CreatePipelineHelper::OneshotTest(*this, set_vpci, kErrorBit,
-                                      vector<std::string>({"VUID-VkGraphicsPipelineCreateInfo-pDynamicStates-01715"}));
+                                      std::vector<std::string>({"VUID-VkGraphicsPipelineCreateInfo-pDynamicStates-01715"}));
 
     vpsi.pViewportWScalings = scale.data();
 
     // Create pipeline with w-scaling enabled but without matching viewport counts
     vpsi.viewportCount = 1;
-    CreatePipelineHelper::OneshotTest(*this, set_vpci, kErrorBit,
-                                      vector<std::string>({"VUID-VkPipelineViewportStateCreateInfo-viewportWScalingEnable-01726"}));
+    CreatePipelineHelper::OneshotTest(
+        *this, set_vpci, kErrorBit,
+        std::vector<std::string>({"VUID-VkPipelineViewportStateCreateInfo-viewportWScalingEnable-01726"}));
 
     VkShaderObj vs(this, vs_src, VK_SHADER_STAGE_VERTEX_BIT);
     VkShaderObj fs(this, fs_src, VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -2990,23 +2969,11 @@ TEST_F(NegativeCommand, ResolveUsage) {
 
     m_commandBuffer->begin();
     VkImageResolve resolveRegion;
-    resolveRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    resolveRegion.srcSubresource.mipLevel = 0;
-    resolveRegion.srcSubresource.baseArrayLayer = 0;
-    resolveRegion.srcSubresource.layerCount = 1;
-    resolveRegion.srcOffset.x = 0;
-    resolveRegion.srcOffset.y = 0;
-    resolveRegion.srcOffset.z = 0;
-    resolveRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    resolveRegion.dstSubresource.mipLevel = 0;
-    resolveRegion.dstSubresource.baseArrayLayer = 0;
-    resolveRegion.dstSubresource.layerCount = 1;
-    resolveRegion.dstOffset.x = 0;
-    resolveRegion.dstOffset.y = 0;
-    resolveRegion.dstOffset.z = 0;
-    resolveRegion.extent.width = 1;
-    resolveRegion.extent.height = 1;
-    resolveRegion.extent.depth = 1;
+    resolveRegion.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    resolveRegion.srcOffset = {0, 0, 0};
+    resolveRegion.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    resolveRegion.dstOffset = {0, 0, 0};
+    resolveRegion.extent = {1, 1, 1};
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdResolveImage-srcImage-06762");
     vk::CmdResolveImage(m_commandBuffer->handle(), invalidSrcImage.handle(), VK_IMAGE_LAYOUT_GENERAL, dstImage.handle(),
@@ -3224,10 +3191,6 @@ TEST_F(NegativeCommand, ClearDepthStencilWithAspect) {
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
     image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_create_info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-    image_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    image_create_info.queueFamilyIndexCount = 0;
-    image_create_info.pQueueFamilyIndices = nullptr;
-    image_create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
     const VkClearDepthStencilValue clear_value = {};
     VkImageSubresourceRange range = {VK_IMAGE_ASPECT_STENCIL_BIT, 0, 1, 0, 1};
@@ -3563,19 +3526,8 @@ TEST_F(NegativeCommand, CmdClearAttachmentTests) {
                                                                 m_renderTargets[0]->create_info().mipLevels, 4,
                                                                 m_renderTargets[0]->format(), m_renderTargets[0]->usage());
     vkt::Image render_target(*m_device, render_target_ci, vkt::set_layout);
-    VkImageViewCreateInfo ivci = vku::InitStructHelper();
-    ivci.image = render_target.handle();
-    ivci.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
-    ivci.format = render_target_ci.format;
-    ivci.subresourceRange.layerCount = render_target_ci.arrayLayers;
-    ivci.subresourceRange.baseMipLevel = 0;
-    ivci.subresourceRange.levelCount = 1;
-    ivci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    ivci.components.r = VK_COMPONENT_SWIZZLE_R;
-    ivci.components.g = VK_COMPONENT_SWIZZLE_G;
-    ivci.components.b = VK_COMPONENT_SWIZZLE_B;
-    ivci.components.a = VK_COMPONENT_SWIZZLE_A;
-    vkt::ImageView render_target_view(*m_device, ivci);
+    vkt::ImageView render_target_view =
+        render_target.CreateView(VK_IMAGE_VIEW_TYPE_2D_ARRAY, 0, 1, 0, render_target_ci.arrayLayers);
     VkFramebufferCreateInfo fb_info = vku::InitStructHelper();
     fb_info.renderPass = renderPass();
     fb_info.layers = 2;

@@ -18,7 +18,6 @@
  */
 
 #include "best_practices/best_practices_validation.h"
-#include "best_practices/best_practices_error_enums.h"
 #include "best_practices/bp_state.h"
 #include "state_tracker/buffer_state.h"
 
@@ -42,14 +41,17 @@ bool BestPractices::PreCallValidateAllocateMemory(VkDevice device, const VkMemor
                                                   const ErrorObject& error_obj) const {
     bool skip = false;
 
-    if ((Count<vvl::DeviceMemory>() + 1) > kMemoryObjectWarningLimit) {
-        skip |= LogPerformanceWarning(kVUID_BestPractices_AllocateMemory_TooManyObjects, device, error_obj.location,
-                                      "This app has over %" PRIu32 " memory objects.", kMemoryObjectWarningLimit);
+    const size_t object_count = Count<vvl::DeviceMemory>() + 1;
+    if (object_count > kMemoryObjectWarningLimit) {
+        skip |= LogPerformanceWarning("BestPractices-vkAllocateMemory-too-many-objects", device, error_obj.location,
+                                      "This app has %zu memory objects, recommended max is %" PRIu32 ".", object_count,
+                                      kMemoryObjectWarningLimit);
     }
 
     if (pAllocateInfo->allocationSize < kMinDeviceAllocationSize) {
-        skip |= LogPerformanceWarning(kVUID_BestPractices_AllocateMemory_SmallAllocation, device, error_obj.location,
-                                      "Allocating a VkDeviceMemory of size %" PRIu64
+        skip |= LogPerformanceWarning("BestPractices-vkAllocateMemory-small-allocation", device,
+                                      error_obj.location.dot(Field::pAllocateInfo).dot(Field::allocationSize),
+                                      "is %" PRIu64
                                       ". This is a very small allocation (current "
                                       "threshold is %" PRIu64
                                       " bytes). "
@@ -61,7 +63,7 @@ bool BestPractices::PreCallValidateAllocateMemory(VkDevice device, const VkMemor
         if (!IsExtEnabled(device_extensions.vk_ext_pageable_device_local_memory) &&
             !vku::FindStructInPNextChain<VkMemoryPriorityAllocateInfoEXT>(pAllocateInfo->pNext)) {
             skip |= LogPerformanceWarning(
-                kVUID_BestPractices_AllocateMemory_SetPriority, device, error_obj.location,
+                "BestPractices-NVIDIA-AllocateMemory-SetPriority", device, error_obj.location,
                 "%s Use VkMemoryPriorityAllocateInfoEXT to provide the operating system information on the allocations that "
                 "should stay in video memory and which should be demoted first when video memory is limited. "
                 "The highest priority should be given to GPU-written resources like color attachments, depth attachments, "
@@ -89,7 +91,7 @@ bool BestPractices::PreCallValidateAllocateMemory(VkDevice device, const VkMemor
                 const auto time_delta = std::chrono::duration_cast<std::chrono::milliseconds>(now - latest_event->time);
                 if (time_delta < std::chrono::milliseconds{5}) {
                     skip |= LogPerformanceWarning(
-                        kVUID_BestPractices_AllocateMemory_ReuseAllocations, device, error_obj.location,
+                        "BestPractices-NVIDIA-AllocateMemory-ReuseAllocations", device, error_obj.location,
                         "%s Reuse memory allocations instead of releasing and reallocating. A memory allocation "
                         "has just been released, and it could have been reused in place of this allocation.",
                         VendorSpecificTag(kBPVendorNVIDIA));
@@ -98,7 +100,7 @@ bool BestPractices::PreCallValidateAllocateMemory(VkDevice device, const VkMemor
                     const uint32_t milliseconds = static_cast<uint32_t>(time_delta.count() % 1000);
 
                     skip |= LogPerformanceWarning(
-                        kVUID_BestPractices_AllocateMemory_ReuseAllocations, device, error_obj.location,
+                        "BestPractices-NVIDIA-AllocateMemory-ReuseAllocations", device, error_obj.location,
                         "%s Reuse memory allocations instead of releasing and reallocating. A memory allocation has been released "
                         "%" PRIu32 ".%03" PRIu32 " seconds ago, and it could have been reused in place of this allocation.",
                         VendorSpecificTag(kBPVendorNVIDIA), seconds, milliseconds);
@@ -116,6 +118,7 @@ void BestPractices::PreCallRecordFreeMemory(VkDevice device, VkDeviceMemory memo
                                             const RecordObject& record_obj) {
     if (memory != VK_NULL_HANDLE && VendorCheckEnabled(kBPVendorNVIDIA)) {
         auto mem_info = Get<vvl::DeviceMemory>(memory);
+        ASSERT_AND_RETURN(mem_info);
 
         // Exclude memory free events on dedicated allocations, or imported/exported allocations.
         if (!mem_info->IsDedicatedBuffer() && !mem_info->IsDedicatedImage() && !mem_info->IsExport() && !mem_info->IsImport()) {
@@ -134,10 +137,11 @@ void BestPractices::PreCallRecordFreeMemory(VkDevice device, VkDeviceMemory memo
 
 bool BestPractices::PreCallValidateFreeMemory(VkDevice device, VkDeviceMemory memory, const VkAllocationCallbacks* pAllocator,
                                               const ErrorObject& error_obj) const {
-    if (memory == VK_NULL_HANDLE) return false;
     bool skip = false;
+    if (memory == VK_NULL_HANDLE) return skip;
 
     auto mem_info = Get<vvl::DeviceMemory>(memory);
+    ASSERT_AND_RETURN_SKIP(mem_info);
 
     for (const auto& item : mem_info->ObjectBindings()) {
         const auto& obj = item.first;
@@ -153,15 +157,16 @@ bool BestPractices::ValidateBindBufferMemory(VkBuffer buffer, VkDeviceMemory mem
     bool skip = false;
     auto buffer_state = Get<vvl::Buffer>(buffer);
     auto mem_state = Get<vvl::DeviceMemory>(memory);
+    ASSERT_AND_RETURN_SKIP(mem_state && buffer_state);
 
-    if (mem_state && mem_state->allocate_info.allocationSize == buffer_state->create_info.size &&
+    if (mem_state->allocate_info.allocationSize == buffer_state->create_info.size &&
         mem_state->allocate_info.allocationSize < kMinDedicatedAllocationSize) {
-        skip |= LogPerformanceWarning(kVUID_BestPractices_SmallDedicatedAllocation, device, loc,
-                                      "%s: Trying to bind %s to a memory block which is fully consumed by the buffer. "
+        skip |= LogPerformanceWarning("BestPractices-vkBindBufferMemory-small-dedicated-allocation", device, loc,
+                                      "Trying to bind %s to a memory block which is fully consumed by the buffer. "
                                       "The required size of the allocation is %" PRIu64
                                       ", but smaller buffers like this should be sub-allocated from "
                                       "larger memory blocks. (Current threshold is %" PRIu64 " bytes.)",
-                                      loc.Message().c_str(), FormatHandle(buffer).c_str(), mem_state->allocate_info.allocationSize,
+                                      FormatHandle(buffer).c_str(), mem_state->allocate_info.allocationSize,
                                       kMinDedicatedAllocationSize);
     }
 
@@ -200,15 +205,16 @@ bool BestPractices::ValidateBindImageMemory(VkImage image, VkDeviceMemory memory
     bool skip = false;
     auto image_state = Get<vvl::Image>(image);
     auto mem_state = Get<vvl::DeviceMemory>(memory);
+    ASSERT_AND_RETURN_SKIP(mem_state && image_state);
 
     if (mem_state->allocate_info.allocationSize == image_state->requirements[0].size &&
         mem_state->allocate_info.allocationSize < kMinDedicatedAllocationSize) {
-        skip |= LogPerformanceWarning(kVUID_BestPractices_SmallDedicatedAllocation, device, loc,
-                                      "%s: Trying to bind %s to a memory block which is fully consumed by the image. "
+        skip |= LogPerformanceWarning("BestPractices-vkBindImageMemory-small-dedicated-allocation", device, loc,
+                                      "Trying to bind %s to a memory block which is fully consumed by the image. "
                                       "The required size of the allocation is %" PRIu64
                                       ", but smaller images like this should be sub-allocated from "
                                       "larger memory blocks. (Current threshold is %" PRIu64 " bytes.)",
-                                      loc.Message().c_str(), FormatHandle(image).c_str(), mem_state->allocate_info.allocationSize,
+                                      FormatHandle(image).c_str(), mem_state->allocate_info.allocationSize,
                                       kMinDedicatedAllocationSize);
     }
 
@@ -234,11 +240,11 @@ bool BestPractices::ValidateBindImageMemory(VkImage image, VkDeviceMemory memory
 
         if (supports_lazy && (allocated_properties & VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT) == 0) {
             skip |= LogPerformanceWarning(
-                kVUID_BestPractices_NonLazyTransientImage, device, loc,
-                "%s: Attempting to bind memory type %u to VkImage which was created with TRANSIENT_ATTACHMENT_BIT,"
+                "BestPractices-vkBindImageMemory-non-lazy-transient-image", device, loc,
+                "ttempting to bind memory type %u to VkImage which was created with TRANSIENT_ATTACHMENT_BIT,"
                 "but this memory type is not LAZILY_ALLOCATED_BIT. You should use memory type %u here instead to save "
                 "%" PRIu64 " bytes of physical memory.",
-                loc.Message().c_str(), mem_state->allocate_info.memoryTypeIndex, suggested_type, image_state->requirements[0].size);
+                mem_state->allocate_info.memoryTypeIndex, suggested_type, image_state->requirements[0].size);
         }
     }
 
@@ -276,8 +282,8 @@ bool BestPractices::PreCallValidateBindImageMemory2KHR(VkDevice device, uint32_t
     return PreCallValidateBindImageMemory2(device, bindInfoCount, pBindInfos, error_obj);
 }
 
-void BestPractices::PreCallRecordSetDeviceMemoryPriorityEXT(VkDevice device, VkDeviceMemory memory, float priority,
-                                                            const RecordObject& record_obj) {
+void BestPractices::PostCallRecordSetDeviceMemoryPriorityEXT(VkDevice device, VkDeviceMemory memory, float priority,
+                                                             const RecordObject& record_obj) {
     auto mem_info = std::static_pointer_cast<bp_state::DeviceMemory>(Get<vvl::DeviceMemory>(memory));
     mem_info->dynamic_priority.emplace(priority);
 }
@@ -287,9 +293,10 @@ bool BestPractices::ValidateBindMemory(VkDevice device, VkDeviceMemory memory, c
 
     if (VendorCheckEnabled(kBPVendorNVIDIA) && IsExtEnabled(device_extensions.vk_ext_pageable_device_local_memory)) {
         auto mem_info = std::static_pointer_cast<const bp_state::DeviceMemory>(Get<vvl::DeviceMemory>(memory));
-        if (!mem_info->dynamic_priority) {
+        bool has_static_priority = vku::FindStructInPNextChain<VkMemoryPriorityAllocateInfoEXT>(mem_info->allocate_info.pNext);
+        if (!mem_info->dynamic_priority && !has_static_priority) {
             skip |=
-                LogPerformanceWarning(kVUID_BestPractices_BindMemory_NoPriority, device, loc,
+                LogPerformanceWarning("BestPractices-NVIDIA-BindMemory-NoPriority", device, loc,
                                       "%s Use vkSetDeviceMemoryPriorityEXT to provide the OS with information on which allocations "
                                       "should stay in memory and which should be demoted first when video memory is limited. The "
                                       "highest priority should be given to GPU-written resources like color attachments, depth "
@@ -302,8 +309,31 @@ bool BestPractices::ValidateBindMemory(VkDevice device, VkDeviceMemory memory, c
 }
 
 std::shared_ptr<vvl::DeviceMemory> BestPractices::CreateDeviceMemoryState(
-    VkDeviceMemory handle, const VkMemoryAllocateInfo* pAllocateInfo, uint64_t fake_address, const VkMemoryType& memory_type,
+    VkDeviceMemory handle, const VkMemoryAllocateInfo* allocate_info, uint64_t fake_address, const VkMemoryType& memory_type,
     const VkMemoryHeap& memory_heap, std::optional<vvl::DedicatedBinding>&& dedicated_binding, uint32_t physical_device_count) {
     return std::static_pointer_cast<vvl::DeviceMemory>(std::make_shared<bp_state::DeviceMemory>(
-        handle, pAllocateInfo, fake_address, memory_type, memory_heap, std::move(dedicated_binding), physical_device_count));
+        handle, allocate_info, fake_address, memory_type, memory_heap, std::move(dedicated_binding), physical_device_count));
+}
+
+void BestPractices::ManualPostCallRecordBindBufferMemory2(VkDevice device, uint32_t bindInfoCount,
+                                                          const VkBindBufferMemoryInfo* pBindInfos,
+                                                          const RecordObject& record_obj) {
+    if (record_obj.result != VK_SUCCESS && bindInfoCount > 1) {
+        // Details of check found in https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/5527
+        LogWarning(
+            "BestPractices-Partial-Bound-Buffer", device, record_obj.location,
+            "all buffer are now in an indeterminate state because the call failed to return VK_SUCCESS. The best action to take "
+            "is to destroy the buffers instead of trying to rebind");
+    }
+}
+
+void BestPractices::ManualPostCallRecordBindImageMemory2(VkDevice device, uint32_t bindInfoCount,
+                                                         const VkBindImageMemoryInfo* pBindInfos, const RecordObject& record_obj) {
+    if (record_obj.result != VK_SUCCESS && bindInfoCount > 1) {
+        // Details of check found in https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/5527
+        LogWarning(
+            "BestPractices-Partial-Bound-Image", device, record_obj.location,
+            "all image are now in an indeterminate state because the call failed to return VK_SUCCESS. The best action to take is "
+            "to destroy the images instead of trying to rebind");
+    }
 }

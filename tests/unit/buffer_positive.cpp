@@ -14,7 +14,8 @@
 #include "../framework/layer_validation_tests.h"
 #include "../framework/barrier_queue_family.h"
 #include "../framework/pipeline_helper.h"
-#include "generated/vk_extension_helper.h"
+
+class PositiveBuffer : public VkLayerTest {};
 
 TEST_F(PositiveBuffer, OwnershipTranfers) {
     TEST_DESCRIPTION("Valid buffer ownership transfers that shouldn't create errors");
@@ -87,6 +88,7 @@ TEST_F(PositiveBuffer, TexelBufferAlignmentIn13) {
     CreateBufferViewTest(*this, &buff_view_ci, {});
 }
 
+// The two PerfGetBufferAddress tests are intended to be used locally to monitor performance of the internal address -> buffer map
 TEST_F(PositiveBuffer, DISABLED_PerfGetBufferAddressWorstCase) {
     TEST_DESCRIPTION("Add elements to buffer_address_map, worst case scenario");
 
@@ -108,7 +110,6 @@ TEST_F(PositiveBuffer, DISABLED_PerfGetBufferAddressWorstCase) {
     constexpr size_t N = 1400;
     std::vector<vkt::Buffer> buffers(N);
     VkBufferCreateInfo buffer_ci = vku::InitStructHelper();
-    buffer_ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     buffer_ci.size = 4096;
     buffer_ci.usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
 
@@ -130,6 +131,7 @@ TEST_F(PositiveBuffer, DISABLED_PerfGetBufferAddressWorstCase) {
     }
 }
 
+// The two PerfGetBufferAddress tests are intended to be used locally to monitor performance of the internal address -> buffer map
 TEST_F(PositiveBuffer, DISABLED_PerfGetBufferAddressGoodCase) {
     TEST_DESCRIPTION("Add elements to buffer_address_map, good case scenario");
 
@@ -150,7 +152,6 @@ TEST_F(PositiveBuffer, DISABLED_PerfGetBufferAddressGoodCase) {
     constexpr size_t N = 1400;  // 100 * 4096;
     std::vector<vkt::Buffer> buffers(N);
     VkBufferCreateInfo buffer_ci = vku::InitStructHelper();
-    buffer_ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     buffer_ci.size = 4096;
     buffer_ci.usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
 
@@ -212,10 +213,7 @@ TEST_F(PositiveBuffer, BufferViewUsageBasic) {
     AddRequiredFeature(vkt::Feature::maintenance5);
     RETURN_IF_SKIP(Init());
 
-    VkBufferCreateInfo buffer_ci = vku::InitStructHelper();
-    buffer_ci.size = 32;
-    buffer_ci.usage = VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT;
-    vkt::Buffer buffer(*m_device, buffer_ci);
+    vkt::Buffer buffer(*m_device, 32, VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT);
 
     VkBufferUsageFlags2CreateInfoKHR buffer_usage_flags = vku::InitStructHelper();
     buffer_usage_flags.usage = VK_BUFFER_USAGE_2_UNIFORM_TEXEL_BUFFER_BIT_KHR;
@@ -234,10 +232,8 @@ TEST_F(PositiveBuffer, BufferUsageFlags2Subset) {
     AddRequiredFeature(vkt::Feature::maintenance5);
     RETURN_IF_SKIP(Init());
 
-    VkBufferCreateInfo buffer_ci = vku::InitStructHelper();
-    buffer_ci.size = 32;
-    buffer_ci.usage = VK_BUFFER_USAGE_2_UNIFORM_TEXEL_BUFFER_BIT_KHR | VK_BUFFER_USAGE_2_STORAGE_TEXEL_BUFFER_BIT_KHR;
-    vkt::Buffer buffer(*m_device, buffer_ci);
+    vkt::Buffer buffer(*m_device, 32,
+                       VK_BUFFER_USAGE_2_UNIFORM_TEXEL_BUFFER_BIT_KHR | VK_BUFFER_USAGE_2_STORAGE_TEXEL_BUFFER_BIT_KHR);
 
     VkBufferUsageFlags2CreateInfoKHR buffer_usage_flags = vku::InitStructHelper();
     buffer_usage_flags.usage = VK_BUFFER_USAGE_2_UNIFORM_TEXEL_BUFFER_BIT_KHR;

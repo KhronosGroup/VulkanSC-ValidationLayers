@@ -10,11 +10,8 @@
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
-#include "utils/cast_utils.h"
-#include "generated/enum_flag_bits.h"
 #include "layer_validation_tests.h"
-#include "pipeline_helper.h"
-#include "utils/vk_layer_utils.h"
+#include "utils/convert_utils.h"
 
 #ifdef VK_USE_PLATFORM_WAYLAND_KHR
 #include "wayland-client.h"
@@ -139,14 +136,14 @@ void TestRenderPassCreate(ErrorMonitor *error_monitor, const vkt::Device &device
             rp2_vuid = rp1_vuid;
         }
 
-        error_monitor->SetDesiredFailureMsg(kErrorBit, rp1_vuid);
+        error_monitor->SetDesiredError(rp1_vuid);
         vkt::RenderPass rp(device, create_info);
         error_monitor->VerifyFound();
     }
 
     if (rp2_supported && rp2_vuid) {
         auto create_info2 = ConvertVkRenderPassCreateInfoToV2KHR(create_info);
-        error_monitor->SetDesiredFailureMsg(kErrorBit, rp2_vuid);
+        error_monitor->SetDesiredError(rp2_vuid);
         vkt::RenderPass rp2(device, *create_info2.ptr());
         error_monitor->VerifyFound();
     }
@@ -167,7 +164,7 @@ void PositiveTestRenderPass2KHRCreate(const vkt::Device &device, const VkRenderP
 void TestRenderPass2KHRCreate(ErrorMonitor &error_monitor, const vkt::Device &device, const VkRenderPassCreateInfo2KHR &create_info,
                               const std::initializer_list<const char *> &vuids) {
     for (auto vuid : vuids) {
-        error_monitor.SetDesiredFailureMsg(kErrorBit, vuid);
+        error_monitor.SetDesiredError(vuid);
     }
     vkt::RenderPass rp(device, create_info);
     error_monitor.VerifyFound();
@@ -180,7 +177,7 @@ void TestRenderPassBegin(ErrorMonitor *error_monitor, const VkDevice device, con
 
     if (rp1_vuid) {
         vk::BeginCommandBuffer(command_buffer, &cmd_begin_info);
-        error_monitor->SetDesiredFailureMsg(kErrorBit, rp1_vuid);
+        error_monitor->SetDesiredError(rp1_vuid);
         vk::CmdBeginRenderPass(command_buffer, begin_info, VK_SUBPASS_CONTENTS_INLINE);
         error_monitor->VerifyFound();
         vk::ResetCommandBuffer(command_buffer, 0);
@@ -188,7 +185,7 @@ void TestRenderPassBegin(ErrorMonitor *error_monitor, const VkDevice device, con
     if (rp2Supported && rp2_vuid) {
         VkSubpassBeginInfoKHR subpass_begin_info = {VK_STRUCTURE_TYPE_SUBPASS_BEGIN_INFO_KHR, nullptr, VK_SUBPASS_CONTENTS_INLINE};
         vk::BeginCommandBuffer(command_buffer, &cmd_begin_info);
-        error_monitor->SetDesiredFailureMsg(kErrorBit, rp2_vuid);
+        error_monitor->SetDesiredError(rp2_vuid);
         vk::CmdBeginRenderPass2KHR(command_buffer, begin_info, &subpass_begin_info);
         error_monitor->VerifyFound();
         vk::ResetCommandBuffer(command_buffer, 0);
@@ -198,7 +195,7 @@ void TestRenderPassBegin(ErrorMonitor *error_monitor, const VkDevice device, con
             (PFN_vkCmdBeginRenderPass2KHR)vk::GetDeviceProcAddr(device, "vkCmdBeginRenderPass2");
         if (vkCmdBeginRenderPass2) {
             vk::BeginCommandBuffer(command_buffer, &cmd_begin_info);
-            error_monitor->SetDesiredFailureMsg(kErrorBit, rp2_vuid);
+            error_monitor->SetDesiredError(rp2_vuid);
             vkCmdBeginRenderPass2(command_buffer, begin_info, &subpass_begin_info);
             error_monitor->VerifyFound();
             vk::ResetCommandBuffer(command_buffer, 0);
@@ -251,7 +248,7 @@ VkFormat FindFormatWithoutFeatures2(VkPhysicalDevice gpu, VkImageTiling tiling, 
 
 void CreateSamplerTest(VkLayerTest &test, const VkSamplerCreateInfo *create_info, const std::string &code) {
     if (code.length()) {
-        test.Monitor().SetDesiredFailureMsg(kErrorBit, code);
+        test.Monitor().SetDesiredError(code.c_str());
     }
 
     vkt::Sampler sampler(*test.DeviceObj(), *create_info);
@@ -263,7 +260,7 @@ void CreateSamplerTest(VkLayerTest &test, const VkSamplerCreateInfo *create_info
 
 void CreateBufferTest(VkLayerTest &test, const VkBufferCreateInfo *create_info, const std::string &code) {
     if (code.length()) {
-        test.Monitor().SetDesiredFailureMsg(kErrorBit, code);
+        test.Monitor().SetDesiredError(code.c_str());
     }
     vkt::Buffer buffer(*test.DeviceObj(), *create_info, vkt::no_mem);
     if (code.length()) {
@@ -273,7 +270,7 @@ void CreateBufferTest(VkLayerTest &test, const VkBufferCreateInfo *create_info, 
 
 void CreateImageTest(VkLayerTest &test, const VkImageCreateInfo *create_info, const std::string &code) {
     if (code.length()) {
-        test.Monitor().SetDesiredFailureMsg(kErrorBit, code);
+        test.Monitor().SetDesiredError(code.c_str());
     }
     vkt::Image image(*test.DeviceObj(), *create_info, vkt::no_mem);
     if (code.length()) {
@@ -283,7 +280,7 @@ void CreateImageTest(VkLayerTest &test, const VkImageCreateInfo *create_info, co
 
 void CreateBufferViewTest(VkLayerTest &test, const VkBufferViewCreateInfo *create_info, const std::vector<std::string> &codes) {
     if (codes.size()) {
-        std::for_each(codes.begin(), codes.end(), [&](const std::string &s) { test.Monitor().SetDesiredFailureMsg(kErrorBit, s); });
+        std::for_each(codes.begin(), codes.end(), [&](const std::string &s) { test.Monitor().SetDesiredError(s.c_str()); });
     }
     vkt::BufferView view(*test.DeviceObj(), *create_info);
     if (codes.size()) {
@@ -293,7 +290,7 @@ void CreateBufferViewTest(VkLayerTest &test, const VkBufferViewCreateInfo *creat
 
 void CreateImageViewTest(VkLayerTest &test, const VkImageViewCreateInfo *create_info, const std::string &code) {
     if (code.length()) {
-        test.Monitor().SetDesiredFailureMsg(kErrorBit, code);
+        test.Monitor().SetDesiredError(code.c_str());
     }
     vkt::ImageView view(*test.DeviceObj(), *create_info);
     if (code.length()) {
@@ -593,7 +590,7 @@ std::vector<std::string> get_args(android_app &app, const char *intent_extra_dat
     std::stringstream ss(args_str);
     std::string arg;
     while (std::getline(ss, arg, ' ')) {
-        if (!arg.empty()) args.push_back(arg);
+        if (!arg.empty()) args.emplace_back(arg);
     }
 
     return args;
@@ -681,8 +678,10 @@ static void destroyActivity(struct android_app *app) {
     // Wait for APP_CMD_DESTROY
     while (app->destroyRequested == 0) {
         struct android_poll_source *source = nullptr;
-        int events = 0;
-        int result = ALooper_pollAll(-1, nullptr, &events, reinterpret_cast<void **>(&source));
+        int result = ALooper_pollOnce(-1, nullptr, nullptr, reinterpret_cast<void **>(&source));
+        if (result == ALOOPER_POLL_ERROR) {
+            __android_log_print(ANDROID_LOG_ERROR, appTag, "ALooper_pollOnce returned an error");
+        }
 
         if ((result >= 0) && (source)) {
             source->process(app, source);
@@ -697,9 +696,16 @@ void android_main(struct android_app *app) {
     app->onInputEvent = processInput;
 
     while (1) {
-        int events;
         struct android_poll_source *source;
-        while (ALooper_pollAll(active ? 0 : -1, NULL, &events, (void **)&source) >= 0) {
+
+        int result = ALooper_pollOnce(-1, nullptr, nullptr, reinterpret_cast<void **>(&source));
+        if (result == ALOOPER_POLL_ERROR) {
+            __android_log_print(ANDROID_LOG_ERROR, appTag, "ALooper_pollOnce returned an error");
+            VkTestFramework::Finish();
+            return;
+        }
+
+        if (result >= 0) {
             if (source) {
                 source->process(app, source);
             }

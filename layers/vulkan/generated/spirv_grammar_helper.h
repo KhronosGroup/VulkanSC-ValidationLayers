@@ -263,13 +263,20 @@ static constexpr bool OpcodeHasType(uint32_t opcode) {
         case spv::OpColorAttachmentReadEXT:
         case spv::OpDepthAttachmentReadEXT:
         case spv::OpStencilAttachmentReadEXT:
+        case spv::OpUntypedVariableKHR:
+        case spv::OpUntypedAccessChainKHR:
+        case spv::OpUntypedInBoundsAccessChainKHR:
         case spv::OpSubgroupBallotKHR:
         case spv::OpSubgroupFirstInvocationKHR:
+        case spv::OpUntypedPtrAccessChainKHR:
+        case spv::OpUntypedInBoundsPtrAccessChainKHR:
+        case spv::OpUntypedArrayLengthKHR:
         case spv::OpSubgroupAllKHR:
         case spv::OpSubgroupAnyKHR:
         case spv::OpSubgroupAllEqualKHR:
         case spv::OpGroupNonUniformRotateKHR:
         case spv::OpSubgroupReadInvocationKHR:
+        case spv::OpExtInstWithForwardRefsKHR:
         case spv::OpConvertUToAccelerationStructureKHR:
         case spv::OpSDot:
         case spv::OpUDot:
@@ -280,6 +287,9 @@ static constexpr bool OpcodeHasType(uint32_t opcode) {
         case spv::OpCooperativeMatrixLoadKHR:
         case spv::OpCooperativeMatrixMulAddKHR:
         case spv::OpCooperativeMatrixLengthKHR:
+        case spv::OpConstantCompositeReplicateEXT:
+        case spv::OpSpecConstantCompositeReplicateEXT:
+        case spv::OpCompositeConstructReplicateEXT:
         case spv::OpRayQueryProceedKHR:
         case spv::OpRayQueryGetIntersectionTypeKHR:
         case spv::OpImageSampleWeightedQCOM:
@@ -633,13 +643,21 @@ static constexpr bool OpcodeHasResult(uint32_t opcode) {
         case spv::OpColorAttachmentReadEXT:
         case spv::OpDepthAttachmentReadEXT:
         case spv::OpStencilAttachmentReadEXT:
+        case spv::OpTypeUntypedPointerKHR:
+        case spv::OpUntypedVariableKHR:
+        case spv::OpUntypedAccessChainKHR:
+        case spv::OpUntypedInBoundsAccessChainKHR:
         case spv::OpSubgroupBallotKHR:
         case spv::OpSubgroupFirstInvocationKHR:
+        case spv::OpUntypedPtrAccessChainKHR:
+        case spv::OpUntypedInBoundsPtrAccessChainKHR:
+        case spv::OpUntypedArrayLengthKHR:
         case spv::OpSubgroupAllKHR:
         case spv::OpSubgroupAnyKHR:
         case spv::OpSubgroupAllEqualKHR:
         case spv::OpGroupNonUniformRotateKHR:
         case spv::OpSubgroupReadInvocationKHR:
+        case spv::OpExtInstWithForwardRefsKHR:
         case spv::OpConvertUToAccelerationStructureKHR:
         case spv::OpSDot:
         case spv::OpUDot:
@@ -651,6 +669,9 @@ static constexpr bool OpcodeHasResult(uint32_t opcode) {
         case spv::OpCooperativeMatrixLoadKHR:
         case spv::OpCooperativeMatrixMulAddKHR:
         case spv::OpCooperativeMatrixLengthKHR:
+        case spv::OpConstantCompositeReplicateEXT:
+        case spv::OpSpecConstantCompositeReplicateEXT:
+        case spv::OpCompositeConstructReplicateEXT:
         case spv::OpTypeRayQueryKHR:
         case spv::OpRayQueryProceedKHR:
         case spv::OpRayQueryGetIntersectionTypeKHR:
@@ -1102,6 +1123,8 @@ static constexpr uint32_t OpcodeImageAccessPosition(uint32_t opcode) {
         case spv::OpImageSparseGather:
         case spv::OpImageSparseDrefGather:
         case spv::OpImageSparseRead:
+        case spv::OpFragmentMaskFetchAMD:
+        case spv::OpFragmentFetchAMD:
         case spv::OpImageSampleFootprintNV:
             return 3;
 
@@ -1129,6 +1152,7 @@ enum class SpvType {
     kPointer,
     kFunction,
     kForwardPointer,
+    kUntypedPointerKHR,
     kCooperativeMatrixKHR,
     kRayQueryKHR,
     kHitObjectNV,
@@ -1168,6 +1192,8 @@ static constexpr SpvType GetSpvType(uint32_t opcode) {
             return SpvType::kFunction;
         case spv::OpTypeForwardPointer:
             return SpvType::kForwardPointer;
+        case spv::OpTypeUntypedPointerKHR:
+            return SpvType::kUntypedPointerKHR;
         case spv::OpTypeCooperativeMatrixKHR:
             return SpvType::kCooperativeMatrixKHR;
         case spv::OpTypeRayQueryKHR:

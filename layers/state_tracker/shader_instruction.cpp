@@ -13,8 +13,8 @@
  * limitations under the License.
  */
 
+#include <sstream>
 #include "state_tracker/shader_instruction.h"
-#include "state_tracker/shader_module.h"
 #include "generated/spirv_grammar_helper.h"
 
 namespace spirv {
@@ -139,7 +139,7 @@ uint32_t Instruction::GetBitWidth() const {
         default:
             // Most likely the caller is not checking for this being a matrix/array/struct/etc
             // This class only knows a single instruction's information
-            assert(0);
+            assert(false);
             break;
     }
     return bit_width;
@@ -184,22 +184,6 @@ spv::StorageClass Instruction::StorageClass() const {
             break;
     }
     return storage_class;
-}
-
-// All post SPIR-V processing we do is just needing to inspect single instructions without knowledge of the rest of the module.
-// It is very wasteful (both time and memory) to create an entire spirv::Module object for this, so do the simple parsing here
-void GenerateInstructions(const vvl::span<const uint32_t>& spirv, std::vector<spirv::Instruction>& instructions) {
-    if (spirv.empty()) {
-        return;  // We *should not* get here, but incase, rather not report the SPIR-V debug info than crash
-    }
-    auto it = spirv.begin();
-    it += 5;  // skip first 5 word of header
-    while (it != spirv.end()) {
-        spirv::Instruction insn(it);
-        instructions.emplace_back(insn);
-        it += insn.Length();
-    }
-    instructions.shrink_to_fit();
 }
 
 }  // namespace spirv

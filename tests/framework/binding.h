@@ -23,9 +23,11 @@
 #include <iterator>
 #include <memory>
 #include <vector>
+#include <optional>
 
+#include "containers/custom_containers.h"
 #include "generated/vk_function_pointers.h"
-#include "generated/vk_extension_helper.h"
+#include "utils/cast_utils.h"
 #include "test_common.h"
 
 namespace vkt {
@@ -89,9 +91,18 @@ template <typename T>
 class Handle {
   public:
     const T &handle() const noexcept { return handle_; }
+    T &handle() noexcept { return handle_; }
     bool initialized() const noexcept { return (handle_ != T{}); }
 
     operator T() const noexcept { return handle(); }
+
+    void SetName(VkDevice device, VkObjectType object_type, const char *name) {
+        VkDebugUtilsObjectNameInfoEXT name_info = vku::InitStructHelper();
+        name_info.objectType = object_type;
+        name_info.objectHandle = CastToUint64(handle_);
+        name_info.pObjectName = name;
+        vk::SetDebugUtilsObjectNameEXT(device, &name_info);
+    }
 
   protected:
     typedef T handle_type;
@@ -145,7 +156,12 @@ class NonDispHandle : public Handle<T> {
         dev_handle_ = dev;
     }
 
+    void set_device(VkDevice device) { dev_handle_ = device; }
+
     void destroy() noexcept { dev_handle_ = VK_NULL_HANDLE; }
+
+  public:
+    void SetName(VkObjectType object_type, const char *name) { Handle<T>::SetName(dev_handle_, object_type, name); }
 
   private:
     VkDevice dev_handle_;
@@ -162,6 +178,9 @@ class PhysicalDevice : public internal::Handle<VkPhysicalDevice> {
           memory_properties_(memory_properties()),
           queue_properties_(queue_properties()) {}
 
+    void SetName(VkDevice device, const char *name) {
+        Handle<VkPhysicalDevice>::SetName(device, VK_OBJECT_TYPE_PHYSICAL_DEVICE, name);
+    }
     VkPhysicalDeviceFeatures features() const;
 
     bool set_memory_type(const uint32_t type_bits, VkMemoryAllocateInfo *info, const VkMemoryPropertyFlags properties,
@@ -219,6 +238,7 @@ class Device : public internal::Handle<VkDevice> {
         init(extensions);
     };
 
+    void SetName(const char *name) { Handle<VkDevice>::SetName(handle_, VK_OBJECT_TYPE_DEVICE, name); }
     const PhysicalDevice &phy() const { return phy_; }
 
     std::vector<const char *> GetEnabledExtensions() { return enabled_extensions_; }
@@ -330,6 +350,7 @@ class DeviceMemory : public internal::NonDispHandle<VkDeviceMemory> {
     void init(const Device &dev, const VkMemoryAllocateInfo &info);
     // Does not fail the test when allocation is unsuccessful and instead returns error code
     VkResult try_init(const Device &dev, const VkMemoryAllocateInfo &info);
+    void SetName(const char *name) { NonDispHandle<VkDeviceMemory>::SetName(VK_OBJECT_TYPE_DEVICE_MEMORY, name); }
 
     // vkMapMemory()
     const void *map(VkFlags flags) const;
@@ -354,11 +375,13 @@ class Fence : public internal::NonDispHandle<VkFence> {
     Fence(const Device &dev) { init(dev, create_info()); }
     Fence(const Device &dev, const VkFenceCreateInfo &info) { init(dev, info); }
     Fence(Fence &&rhs) noexcept : NonDispHandle(std::move(rhs)) {}
+    Fence &operator=(Fence &&) noexcept;
     ~Fence() noexcept;
     void destroy() noexcept;
 
     // vkCreateFence()
     void init(const Device &dev, const VkFenceCreateInfo &info);
+    void SetName(const char *name) { NonDispHandle<VkFence>::SetName(VK_OBJECT_TYPE_FENCE, name); }
 
     // vkGetFenceStatus()
     VkResult status() const { return vk::GetFenceStatus(device(), handle()); }
@@ -385,11 +408,13 @@ class Semaphore : public internal::NonDispHandle<VkSemaphore> {
     Semaphore(const Device &dev, VkSemaphoreType type = VK_SEMAPHORE_TYPE_BINARY, uint64_t initial_value = 0);
     Semaphore(const Device &dev, const VkSemaphoreCreateInfo &info) { init(dev, info); }
     Semaphore(Semaphore &&rhs) noexcept : NonDispHandle(std::move(rhs)) {}
+    Semaphore &operator=(Semaphore &&) noexcept;
     ~Semaphore() noexcept;
     void destroy() noexcept;
 
     // vkCreateSemaphore()
     void init(const Device &dev, const VkSemaphoreCreateInfo &info);
+    void SetName(const char *name) { NonDispHandle<VkSemaphore>::SetName(VK_OBJECT_TYPE_SEMAPHORE, name); }
 
     VkResult Wait(uint64_t value, uint64_t timeout);
     VkResult WaitKHR(uint64_t value, uint64_t timeout);
@@ -415,6 +440,7 @@ class Event : public internal::NonDispHandle<VkEvent> {
 
     // vkCreateEvent()
     void init(const Device &dev, const VkEventCreateInfo &info);
+    void SetName(const char *name) { NonDispHandle<VkEvent>::SetName(VK_OBJECT_TYPE_EVENT, name); }
 
     // vkGetEventStatus()
     // vkSetEvent()
@@ -439,6 +465,7 @@ constexpr SignalT signal{};
 class Queue : public internal::Handle<VkQueue> {
   public:
     explicit Queue(VkQueue queue, uint32_t index) : Handle(queue), family_index(index) {}
+    void SetName(const Device &device, const char *name) { Handle<VkQueue>::SetName(device.handle(), VK_OBJECT_TYPE_QUEUE, name); }
 
     // vkQueueSubmit()
     VkResult Submit(const CommandBuffer &cmd, const Fence &fence = no_fence);
@@ -501,6 +528,7 @@ class QueryPool : public internal::NonDispHandle<VkQueryPool> {
 
     // vkCreateQueryPool()
     void init(const Device &dev, const VkQueryPoolCreateInfo &info);
+    void SetName(const char *name) { NonDispHandle<VkQueryPool>::SetName(VK_OBJECT_TYPE_QUERY_POOL, name); }
 
     // vkGetQueryPoolResults()
     VkResult results(uint32_t first, uint32_t count, size_t size, void *data, size_t stride);
@@ -510,6 +538,8 @@ class QueryPool : public internal::NonDispHandle<VkQueryPool> {
 
 struct NoMemT {};
 static constexpr NoMemT no_mem{};
+struct DeviceAddressT {};
+static constexpr DeviceAddressT device_address{};
 struct SetLayoutT {};
 static constexpr SetLayoutT set_layout{};
 
@@ -525,6 +555,16 @@ class Buffer : public internal::NonDispHandle<VkBuffer> {
         init(dev, size, usage, mem_props, alloc_info_pnext);
     }
     explicit Buffer(const Device &dev, const VkBufferCreateInfo &info, NoMemT) { init_no_mem(dev, info); }
+
+    // Various spots need a host visible buffer they can call GetBufferDeviceAddress on
+    explicit Buffer(const Device &dev, VkDeviceSize size, VkBufferUsageFlags usage, DeviceAddressT) {
+        usage |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;  // always add
+        VkMemoryAllocateFlagsInfo allocate_flag_info = vku::InitStructHelper();
+        allocate_flag_info.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
+        init(dev, create_info(size, usage), VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+             &allocate_flag_info);
+    }
+
     Buffer(Buffer &&rhs) noexcept : NonDispHandle(std::move(rhs)) {
         create_info_ = std::move(rhs.create_info_);
         internal_mem_ = std::move(rhs.internal_mem_);
@@ -551,6 +591,7 @@ class Buffer : public internal::NonDispHandle<VkBuffer> {
         init(dev, create_info(size, usage, &queue_families), mem_props, alloc_info_pnext);
     }
     void init_no_mem(const Device &dev, const VkBufferCreateInfo &info);
+    void SetName(const char *name) { NonDispHandle<VkBuffer>::SetName(VK_OBJECT_TYPE_BUFFER, name); }
 
     // get the internal memory
     const DeviceMemory &memory() const { return internal_mem_; }
@@ -621,6 +662,7 @@ class BufferView : public internal::NonDispHandle<VkBufferView> {
     void init(const Device &dev, const VkBufferViewCreateInfo &info);
     static VkBufferViewCreateInfo createInfo(VkBuffer buffer, VkFormat format, VkDeviceSize offset = 0,
                                              VkDeviceSize range = VK_WHOLE_SIZE);
+    void SetName(const char *name) { NonDispHandle<VkBufferView>::SetName(VK_OBJECT_TYPE_BUFFER_VIEW, name); }
 };
 
 inline VkBufferViewCreateInfo BufferView::createInfo(VkBuffer buffer, VkFormat format, VkDeviceSize offset, VkDeviceSize range) {
@@ -652,6 +694,7 @@ class Image : public internal::NonDispHandle<VkImage> {
     void Init(const Device &dev, uint32_t const width, uint32_t const height, uint32_t const mip_levels, VkFormat const format,
               VkFlags const usage);
     void init_no_mem(const Device &dev, const VkImageCreateInfo &info);
+    void SetName(const char *name) { NonDispHandle<VkImage>::SetName(VK_OBJECT_TYPE_IMAGE, name); }
 
     static VkImageCreateInfo ImageCreateInfo2D(uint32_t const width, uint32_t const height, uint32_t const mip_levels,
                                                uint32_t const layers, VkFormat const format, VkFlags const usage,
@@ -740,7 +783,7 @@ class Image : public internal::NonDispHandle<VkImage> {
     void SetLayout(VkImageLayout image_layout) { SetLayout(aspect_mask(format()), image_layout); };
 
     VkImageViewCreateInfo BasicViewCreatInfo(VkImageAspectFlags aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT) const;
-    ImageView CreateView(VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT) const;
+    ImageView CreateView(VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT, void *pNext = nullptr) const;
     ImageView CreateView(VkImageViewType type, uint32_t baseMipLevel = 0, uint32_t levelCount = VK_REMAINING_MIP_LEVELS,
                          uint32_t baseArrayLayer = 0, uint32_t layerCount = VK_REMAINING_ARRAY_LAYERS,
                          VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT) const;
@@ -770,6 +813,7 @@ class ImageView : public internal::NonDispHandle<VkImageView> {
 
     // vkCreateImageView()
     void init(const Device &dev, const VkImageViewCreateInfo &info);
+    void SetName(const char *name) { NonDispHandle<VkImageView>::SetName(VK_OBJECT_TYPE_IMAGE_VIEW, name); }
 };
 
 class AccelerationStructureNV : public internal::NonDispHandle<VkAccelerationStructureNV> {
@@ -782,6 +826,9 @@ class AccelerationStructureNV : public internal::NonDispHandle<VkAccelerationStr
 
     // vkCreateAccelerationStructureNV
     void init(const Device &dev, const VkAccelerationStructureCreateInfoNV &info, bool init_memory = true);
+    void SetName(const char *name) {
+        NonDispHandle<VkAccelerationStructureNV>::SetName(VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_NV, name);
+    }
     // vkGetAccelerationStructureMemoryRequirementsNV()
     VkMemoryRequirements2 memory_requirements() const;
     VkMemoryRequirements2 build_scratch_memory_requirements() const;
@@ -811,6 +858,7 @@ class ShaderModule : public internal::NonDispHandle<VkShaderModule> {
     // vkCreateShaderModule()
     void init(const Device &dev, const VkShaderModuleCreateInfo &info);
     VkResult init_try(const Device &dev, const VkShaderModuleCreateInfo &info);
+    void SetName(const char *name) { NonDispHandle<VkShaderModule>::SetName(VK_OBJECT_TYPE_SHADER_MODULE, name); }
 
     static VkShaderModuleCreateInfo create_info(size_t code_size, const uint32_t *code, VkFlags flags);
 };
@@ -828,6 +876,7 @@ class Shader : public internal::NonDispHandle<VkShaderEXT> {
     // vkCreateShaderModule()
     void init(const Device &dev, const VkShaderCreateInfoEXT &info);
     VkResult init_try(const Device &dev, const VkShaderCreateInfoEXT &info);
+    void SetName(const char *name) { NonDispHandle<VkShaderEXT>::SetName(VK_OBJECT_TYPE_SHADER_EXT, name); }
 };
 
 class PipelineCache : public internal::NonDispHandle<VkPipelineCache> {
@@ -838,6 +887,7 @@ class PipelineCache : public internal::NonDispHandle<VkPipelineCache> {
     void destroy() noexcept;
 
     void init(const Device &dev, const VkPipelineCacheCreateInfo &info);
+    void SetName(const char *name) { NonDispHandle<VkPipelineCache>::SetName(VK_OBJECT_TYPE_PIPELINE_CACHE, name); }
 };
 
 class Pipeline : public internal::NonDispHandle<VkPipeline> {
@@ -860,6 +910,8 @@ class Pipeline : public internal::NonDispHandle<VkPipeline> {
     void init(const Device &dev, const VkComputePipelineCreateInfo &info);
     // vkCreateRayTracingPipelinesKHR
     void init(const Device &dev, const VkRayTracingPipelineCreateInfoKHR &info);
+    // vkCreateRayTracingPipelinesKHR with deferredOperation
+    void InitDeferred(const Device &dev, const VkRayTracingPipelineCreateInfoKHR &info, VkDeferredOperationKHR deferred_op);
     // vkLoadPipeline()
     void init(const Device &dev, size_t size, const void *data);
     // vkLoadPipelineDerivative()
@@ -867,6 +919,7 @@ class Pipeline : public internal::NonDispHandle<VkPipeline> {
 
     // vkCreateGraphicsPipeline with error return
     VkResult init_try(const Device &dev, const VkGraphicsPipelineCreateInfo &info);
+    void SetName(const char *name) { NonDispHandle<VkPipeline>::SetName(VK_OBJECT_TYPE_PIPELINE, name); }
 
     // vkStorePipeline()
     size_t store(size_t size, void *data);
@@ -907,6 +960,7 @@ class PipelineLayout : public internal::NonDispHandle<VkPipelineLayout> {
     // vCreatePipelineLayout()
     void init(const Device &dev, VkPipelineLayoutCreateInfo &info, const std::vector<const DescriptorSetLayout *> &layouts);
     void init(const Device &dev, VkPipelineLayoutCreateInfo &info);
+    void SetName(const char *name) { NonDispHandle<VkPipelineLayout>::SetName(VK_OBJECT_TYPE_PIPELINE_LAYOUT, name); }
 };
 
 class Sampler : public internal::NonDispHandle<VkSampler> {
@@ -918,6 +972,7 @@ class Sampler : public internal::NonDispHandle<VkSampler> {
 
     // vkCreateSampler()
     void init(const Device &dev, const VkSamplerCreateInfo &info);
+    void SetName(const char *name) { NonDispHandle<VkSampler>::SetName(VK_OBJECT_TYPE_SAMPLER, name); }
 };
 
 class DescriptorSetLayout : public internal::NonDispHandle<VkDescriptorSetLayout> {
@@ -958,6 +1013,7 @@ class DescriptorPool : public internal::NonDispHandle<VkDescriptorPool> {
 
     // vkCreateDescriptorPool()
     void init(const Device &dev, const VkDescriptorPoolCreateInfo &info);
+    void SetName(const char *name) { NonDispHandle<VkDescriptorPool>::SetName(VK_OBJECT_TYPE_DESCRIPTOR_POOL, name); }
 
     // vkResetDescriptorPool()
     void reset();
@@ -1000,6 +1056,7 @@ class DescriptorSet : public internal::NonDispHandle<VkDescriptorSet> {
     explicit DescriptorSet(const Device &dev, DescriptorPool *pool, VkDescriptorSet set) : NonDispHandle(dev.handle(), set) {
         containing_pool_ = pool;
     }
+    void SetName(const char *name) { NonDispHandle<VkDescriptorSet>::SetName(VK_OBJECT_TYPE_DESCRIPTOR_SET, name); }
 
   private:
     DescriptorPool *containing_pool_;
@@ -1015,6 +1072,7 @@ class CommandPool : public internal::NonDispHandle<VkCommandPool> {
     explicit CommandPool(const Device &dev, uint32_t queue_family_index, VkCommandPoolCreateFlags flags = 0);
     void Init(const Device &dev, const VkCommandPoolCreateInfo &info);
     void Init(const Device &dev, uint32_t queue_family_index, VkCommandPoolCreateFlags flags = 0);
+    void SetName(const char *name) { NonDispHandle<VkCommandPool>::SetName(VK_OBJECT_TYPE_COMMAND_POOL, name); }
 };
 
 class CommandBuffer : public internal::Handle<VkCommandBuffer> {
@@ -1038,6 +1096,9 @@ class CommandBuffer : public internal::Handle<VkCommandBuffer> {
     // vkAllocateCommandBuffers()
     void init(const Device &dev, const VkCommandBufferAllocateInfo &info);
     void Init(const Device &dev, const CommandPool &pool, VkCommandBufferLevel level = VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+    void SetName(const Device &device, const char *name) {
+        Handle<VkCommandBuffer>::SetName(device.handle(), VK_OBJECT_TYPE_COMMAND_BUFFER, name);
+    }
 
     // vkBeginCommandBuffer()
     void begin(const VkCommandBufferBeginInfo *info);
@@ -1080,6 +1141,9 @@ class CommandBuffer : public internal::Handle<VkCommandBuffer> {
                           bufferMemoryBarrierCount, pBufferMemoryBarriers, imageMemoryBarrierCount, pImageMemoryBarriers);
     }
 
+    void Copy(const Buffer &src, const Buffer &dst);
+    void ExecuteCommands(const CommandBuffer &secondary);
+
   private:
     VkDevice dev_handle_;
     VkCommandPool cmd_pool_;
@@ -1102,6 +1166,7 @@ class RenderPass : public internal::NonDispHandle<VkRenderPass> {
     void init(const Device &dev, const VkRenderPassCreateInfo &info);
     // vkCreateRenderPass2()
     void init(const Device &dev, const VkRenderPassCreateInfo2 &info);
+    void SetName(const char *name) { NonDispHandle<VkRenderPass>::SetName(VK_OBJECT_TYPE_RENDER_PASS, name); }
 };
 
 
@@ -1126,6 +1191,7 @@ class Framebuffer : public internal::NonDispHandle<VkFramebuffer> {
 
     // vkCreateFramebuffer()
     void init(const Device &dev, const VkFramebufferCreateInfo &info);
+    void SetName(const char *name) { NonDispHandle<VkFramebuffer>::SetName(VK_OBJECT_TYPE_FRAMEBUFFER, name); }
 };
 
 class SamplerYcbcrConversion : public internal::NonDispHandle<VkSamplerYcbcrConversion> {
@@ -1141,6 +1207,9 @@ class SamplerYcbcrConversion : public internal::NonDispHandle<VkSamplerYcbcrConv
     void destroy() noexcept;
 
     void init(const Device &dev, const VkSamplerYcbcrConversionCreateInfo &info);
+    void SetName(const char *name) {
+        NonDispHandle<VkSamplerYcbcrConversion>::SetName(VK_OBJECT_TYPE_SAMPLER_YCBCR_CONVERSION, name);
+    }
     VkSamplerYcbcrConversionInfo ConversionInfo();
 
     static VkSamplerYcbcrConversionCreateInfo DefaultConversionInfo(VkFormat format);

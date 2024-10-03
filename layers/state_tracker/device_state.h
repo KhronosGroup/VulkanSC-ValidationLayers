@@ -18,7 +18,6 @@
  */
 #pragma once
 #include "state_tracker/state_object.h"
-#include "generated/layer_chassis_dispatch.h"
 #include <vulkan/utility/vk_safe_struct.hpp>
 #include <vector>
 
@@ -40,6 +39,7 @@ class PhysicalDevice : public StateObject {
   public:
     uint32_t queue_family_known_count = 1;  // spec implies one QF must always be supported
     const std::vector<VkQueueFamilyProperties> queue_family_properties;
+    const VkQueueFlags supported_queues;
     // TODO These are currently used by CoreChecks, but should probably be refactored
     bool vkGetPhysicalDeviceDisplayPlanePropertiesKHR_called = false;
     uint32_t display_plane_property_count = 0;
@@ -50,20 +50,13 @@ class PhysicalDevice : public StateObject {
     // Surfaceless Query extension needs 'global' surface_state data
     SurfacelessQueryState surfaceless_query_state{};
 
-    PhysicalDevice(VkPhysicalDevice handle)
-        : StateObject(handle, kVulkanObjectTypePhysicalDevice), queue_family_properties(GetQueueFamilyProps(handle)) {}
+    PhysicalDevice(VkPhysicalDevice handle);
 
     VkPhysicalDevice VkHandle() const { return handle_.Cast<VkPhysicalDevice>(); }
 
   private:
-    const std::vector<VkQueueFamilyProperties> GetQueueFamilyProps(VkPhysicalDevice phys_dev) {
-        std::vector<VkQueueFamilyProperties> result;
-        uint32_t count;
-        DispatchGetPhysicalDeviceQueueFamilyProperties(phys_dev, &count, nullptr);
-        result.resize(count);
-        DispatchGetPhysicalDeviceQueueFamilyProperties(phys_dev, &count, result.data());
-        return result;
-    }
+    const std::vector<VkQueueFamilyProperties> GetQueueFamilyProps(VkPhysicalDevice phys_dev);
+    VkQueueFlags GetSupportedQueues();
 };
 
 class DisplayMode : public StateObject {

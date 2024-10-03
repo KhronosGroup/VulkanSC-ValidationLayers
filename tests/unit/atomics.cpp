@@ -12,9 +12,10 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
-#include "utils/cast_utils.h"
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
+
+class NegativeAtomic : public VkLayerTest {};
 
 TEST_F(NegativeAtomic, VertexStoresAndAtomicsFeatureDisable) {
     TEST_DESCRIPTION("Run shader with StoreOp or AtomicOp to verify if vertexPipelineStoresAndAtomics disable.");
@@ -116,6 +117,31 @@ TEST_F(NegativeAtomic, FragmentStoresAndAtomicsFeatureDisable) {
             CreatePipelineHelper::OneshotTest(*this, info_override, kErrorBit, "VUID-RuntimeSpirv-NonWritable-06340");
         }
     }
+}
+
+TEST_F(NegativeAtomic, FragmentStoresAndAtomicsFeatureBuffer) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME);
+    AddDisabledFeature(vkt::Feature::fragmentStoresAndAtomics);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    char const *fsSource = R"glsl(
+        #version 450
+        layout(set = 0, binding = 0) buffer ssbo { int y; };
+        void main() {
+                atomicMin(y, 1);
+        }
+    )glsl";
+
+    VkShaderObj fs(this, fsSource, VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    auto info_override = [&](CreatePipelineHelper &info) {
+        info.shader_stages_ = {info.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
+        info.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}};
+    };
+
+    CreatePipelineHelper::OneshotTest(*this, info_override, kErrorBit, "VUID-RuntimeSpirv-NonWritable-06340");
 }
 
 TEST_F(NegativeAtomic, Int64) {
@@ -410,10 +436,7 @@ TEST_F(NegativeAtomic, ImageInt64DrawtimeSparse) {
                           {1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL, nullptr}};
     pipe.CreateComputePipeline();
 
-    VkBufferCreateInfo buffer_ci = vku::InitStructHelper();
-    buffer_ci.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-    buffer_ci.size = 1024;
-    vkt::Buffer buffer(*m_device, buffer_ci);
+    vkt::Buffer buffer(*m_device, 1024, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     pipe.descriptor_set_->WriteDescriptorBufferInfo(0, buffer.handle(), 0, 1024, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     pipe.descriptor_set_->UpdateDescriptorSets();
 
@@ -1205,16 +1228,10 @@ TEST_F(NegativeAtomic, InvalidStorageOperation) {
         "VK_FORMAT_FEATURE_STORAGE_TEXEL_BUFFER_ATOMIC_BIT ");
 
     AddRequiredExtensions(VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME);
-
-    RETURN_IF_SKIP(InitFramework());
-
-    VkPhysicalDeviceShaderAtomicFloatFeaturesEXT atomic_float_features = vku::InitStructHelper();
-    auto features2 = GetPhysicalDeviceFeatures2(atomic_float_features);
-    RETURN_IF_SKIP(InitState(nullptr, &features2));
-
-    if (atomic_float_features.shaderImageFloat32Atomics == VK_FALSE) {
-        GTEST_SKIP() << "shaderImageFloat32Atomics not supported.";
-    }
+    AddRequiredFeature(vkt::Feature::shaderImageFloat32Atomics);
+    AddRequiredFeature(vkt::Feature::vertexPipelineStoresAndAtomics);
+    AddRequiredFeature(vkt::Feature::fragmentStoresAndAtomics);
+    RETURN_IF_SKIP(Init());
 
     VkImageUsageFlags usage = VK_IMAGE_USAGE_STORAGE_BIT;
     VkFormat image_format = VK_FORMAT_R8G8B8A8_UNORM;  // The format doesn't support VK_FORMAT_FEATURE_STORAGE_IMAGE_ATOMIC_BIT to
@@ -1233,12 +1250,6 @@ TEST_F(NegativeAtomic, InvalidStorageOperation) {
     }
     m_errorMonitor->SetUnexpectedError("VUID-VkBufferViewCreateInfo-format-08779");
     InitRenderTarget();
-
-    VkPhysicalDeviceFeatures device_features = {};
-    GetPhysicalDeviceFeatures(&device_features);
-    if (!device_features.vertexPipelineStoresAndAtomics || !device_features.fragmentStoresAndAtomics) {
-        GTEST_SKIP() << "vertexPipelineStoresAndAtomics & fragmentStoresAndAtomics NOT supported";
-    }
 
     vkt::Image image(*m_device, image_ci, vkt::set_layout);
     vkt::ImageView image_view = image.CreateView();
@@ -1376,4 +1387,56 @@ TEST_F(NegativeAtomic, ImageFloat16Vector) {
         VkShaderObj const cs(this, cs_image_exchange.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
         m_errorMonitor->VerifyFound();
     }
+}
+
+TEST_F(NegativeAtomic, VertexPipelineStoresAndAtomics) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8223");
+    AddDisabledFeature(vkt::Feature::vertexPipelineStoresAndAtomics);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    // This is the following GLSL, but with a member decoration missing NonWritable
+    //
+    // layout(set=0, binding=0, std430) readonly buffer SSBO {
+    //     float a;
+    //     float b;
+    // } data;
+    char const *vsSource = R"(
+               OpCapability Shader
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Vertex %main "main" %o
+               OpDecorate %o Location 0
+               OpMemberDecorate %SSBO 0 Offset 0
+               OpMemberDecorate %SSBO 1 NonWritable
+               OpMemberDecorate %SSBO 1 Offset 4
+               OpDecorate %SSBO BufferBlock
+               OpDecorate %data DescriptorSet 0
+               OpDecorate %data Binding 0
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+%_ptr_Output_float = OpTypePointer Output %float
+          %o = OpVariable %_ptr_Output_float Output
+       %SSBO = OpTypeStruct %float %float
+%_ptr_Uniform_SSBO = OpTypePointer Uniform %SSBO
+       %data = OpVariable %_ptr_Uniform_SSBO Uniform
+        %int = OpTypeInt 32 1
+      %int_1 = OpConstant %int 1
+%_ptr_Uniform_float = OpTypePointer Uniform %float
+       %main = OpFunction %void None %3
+          %5 = OpLabel
+         %15 = OpAccessChain %_ptr_Uniform_float %data %int_1
+         %16 = OpLoad %float %15
+               OpStore %o %16
+               OpReturn
+               OpFunctionEnd
+    )";
+
+    VkShaderObj vs(this, vsSource, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
+    CreatePipelineHelper pipe(*this);
+    pipe.shader_stages_ = {vs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
+    pipe.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT, nullptr}};
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-NonWritable-06341");
+    pipe.CreateGraphicsPipeline();
+    m_errorMonitor->VerifyFound();
 }

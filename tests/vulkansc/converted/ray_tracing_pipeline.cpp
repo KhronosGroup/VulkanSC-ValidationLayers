@@ -19,6 +19,8 @@
 #include "../framework/pipeline_helper.h"
 #include "../framework/ray_tracing_objects.h"
 
+class NegativeRayTracingPipeline : public RayTracingTest {};
+
 TEST_F(NegativeRayTracingPipeline, BasicUsage) {
     TEST_DESCRIPTION("Validate CreateInfo parameters during ray-tracing pipeline creation");
 
@@ -777,9 +779,9 @@ TEST_F(NegativeRayTracingPipeline, GetCaptureReplayShaderGroupHandlesKHR) {
 
     vkt::rt::Pipeline rt_pipe(*this, m_device);
     rt_pipe.AddCreateInfoFlags(VK_PIPELINE_CREATE_RAY_TRACING_SHADER_GROUP_HANDLE_CAPTURE_REPLAY_BIT_KHR);
-    rt_pipe.SetRayGenShader(kRayTracingMinimalGlsl);
-    rt_pipe.AddMissShader(kRayTracingMinimalGlsl);
-    rt_pipe.AddMissShader(kRayTracingMinimalGlsl);
+    rt_pipe.SetGlslRayGenShader(kRayTracingMinimalGlsl);
+    rt_pipe.AddGlslMissShader(kRayTracingMinimalGlsl);
+    rt_pipe.AddGlslMissShader(kRayTracingMinimalGlsl);
     rt_pipe.Build();
 
     uint32_t fake_buffer;
@@ -820,8 +822,6 @@ TEST_F(NegativeRayTracingPipeline, DeferredOp) {
     TEST_DESCRIPTION(
         "Test that objects created with deferred operations are recorded once the operation has successfully completed.");
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    AddRequiredExtensions(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
-
     AddRequiredFeature(vkt::Feature::rayTracingPipeline);
     RETURN_IF_SKIP(InitFrameworkForRayTracingTest());
     if (IsPlatformMockICD()) {
@@ -1064,10 +1064,12 @@ TEST_F(NegativeRayTracingPipeline, GetRayTracingShaderGroupStackSizeUnusedGroup)
     RETURN_IF_SKIP(InitState());
 
     vkt::rt::Pipeline pipeline(*this, m_device);
-    auto tlas = std::make_shared<vkt::as::BuildGeometryInfoKHR>(
-        vkt::as::blueprint::BuildOnDeviceTopLevel(*m_device, *m_default_queue, *m_commandBuffer));
-    pipeline.AddTopLevelAccelStructBinding(std::move(tlas), 0);
-    pipeline.SetRayGenShader(kRayTracingMinimalGlsl);
+    pipeline.AddBinding(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0);
+    pipeline.CreateDescriptorSet();
+    vkt::as::BuildGeometryInfoKHR tlas(vkt::as::blueprint::BuildOnDeviceTopLevel(*m_device, *m_default_queue, *m_commandBuffer));
+    pipeline.GetDescriptorSet().WriteDescriptorAccelStruct(0, 1, &tlas.GetDstAS()->handle());
+    pipeline.GetDescriptorSet().UpdateDescriptorSets();
+    pipeline.SetGlslRayGenShader(kRayTracingMinimalGlsl);
     pipeline.Build();
 
     m_errorMonitor->SetDesiredError("VUID-vkGetRayTracingShaderGroupStackSizeKHR-group-03608");
@@ -1129,7 +1131,7 @@ TEST_F(NegativeRayTracingPipeline, LibraryGroupHandlesEXT) {
     vkt::rt::Pipeline rt_pipe_lib(*this, m_device);
     rt_pipe_lib.AddCreateInfoFlags(VK_PIPELINE_CREATE_RAY_TRACING_SHADER_GROUP_HANDLE_CAPTURE_REPLAY_BIT_KHR);
     rt_pipe_lib.InitLibraryInfo();
-    rt_pipe_lib.SetRayGenShader(kRayTracingMinimalGlsl);
+    rt_pipe_lib.SetGlslRayGenShader(kRayTracingMinimalGlsl);
     rt_pipe_lib.BuildPipeline();
 
     m_errorMonitor->SetDesiredError("VUID-vkGetRayTracingShaderGroupHandlesKHR-pipeline-07828");
@@ -1139,4 +1141,167 @@ TEST_F(NegativeRayTracingPipeline, LibraryGroupHandlesEXT) {
     m_errorMonitor->SetDesiredError("VUID-vkGetRayTracingCaptureReplayShaderGroupHandlesKHR-pipeline-07829");
     rt_pipe_lib.GetRayTracingCaptureReplayShaderGroupHandles();
     m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeRayTracingPipeline, PipelineBinaryRayTracingPipeline) {
+    TEST_DESCRIPTION("Test creating a ray tracing pipeline with bad pipeline binary settings");
+
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::maintenance5);
+    AddRequiredExtensions(VK_KHR_PIPELINE_BINARY_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::pipelineBinaries);
+    AddRequiredFeature(vkt::Feature::rayTracingPipeline);
+    AddRequiredFeature(vkt::Feature::accelerationStructure);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::pipelineCreationCacheControl);
+    RETURN_IF_SKIP(InitFrameworkForRayTracingTest());
+    RETURN_IF_SKIP(InitState());
+
+    VkPipelineCache pipeline_cache;
+    VkPipelineCacheCreateInfo cache_create_info = vku::InitStructHelper();
+    cache_create_info.initialDataSize = 0;
+    VkResult err = vk::CreatePipelineCache(device(), &cache_create_info, nullptr, &pipeline_cache);
+    ASSERT_EQ(VK_SUCCESS, err);
+
+    const vkt::PipelineLayout empty_pipeline_layout(*m_device, {});
+    VkShaderObj rgen_shader(this, kRayTracingMinimalGlsl, VK_SHADER_STAGE_RAYGEN_BIT_KHR, SPV_ENV_VULKAN_1_2);
+    VkShaderObj chit_shader(this, kRayTracingMinimalGlsl, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, SPV_ENV_VULKAN_1_2);
+
+    const vkt::PipelineLayout pipeline_layout(*m_device, {});
+
+    std::array<VkPipelineShaderStageCreateInfo, 2> shader_stages;
+    shader_stages[0] = vku::InitStructHelper();
+    shader_stages[0].stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+    shader_stages[0].module = chit_shader.handle();
+    shader_stages[0].pName = "main";
+
+    shader_stages[1] = vku::InitStructHelper();
+    shader_stages[1].stage = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+    shader_stages[1].module = rgen_shader.handle();
+    shader_stages[1].pName = "main";
+
+    std::array<VkRayTracingShaderGroupCreateInfoKHR, 1> shader_groups;
+    shader_groups[0] = vku::InitStructHelper();
+    shader_groups[0].type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
+    shader_groups[0].generalShader = 1;
+    shader_groups[0].closestHitShader = VK_SHADER_UNUSED_KHR;
+    shader_groups[0].anyHitShader = VK_SHADER_UNUSED_KHR;
+    shader_groups[0].intersectionShader = VK_SHADER_UNUSED_KHR;
+
+    VkRayTracingPipelineCreateInfoKHR raytracing_pipeline_ci = vku::InitStructHelper();
+    raytracing_pipeline_ci.flags = 0;
+    raytracing_pipeline_ci.stageCount = static_cast<uint32_t>(shader_stages.size());
+    raytracing_pipeline_ci.pStages = shader_stages.data();
+    raytracing_pipeline_ci.pGroups = shader_groups.data();
+    raytracing_pipeline_ci.groupCount = shader_groups.size();
+    raytracing_pipeline_ci.layout = pipeline_layout.handle();
+
+    {
+        VkPipelineCreateFlags2CreateInfoKHR flags2 = vku::InitStructHelper();
+        flags2.flags = VK_PIPELINE_CREATE_2_CAPTURE_DATA_BIT_KHR;
+        raytracing_pipeline_ci.pNext = &flags2;
+
+        VkPipeline test_pipeline;
+        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateRayTracingPipelinesKHR-pNext-09617");
+        vk::CreateRayTracingPipelinesKHR(device(), VK_NULL_HANDLE, pipeline_cache, 1, &raytracing_pipeline_ci, nullptr,
+                                         &test_pipeline);
+        m_errorMonitor->VerifyFound();
+
+        err = vk::CreateRayTracingPipelinesKHR(device(), VK_NULL_HANDLE, VK_NULL_HANDLE, 1, &raytracing_pipeline_ci, nullptr,
+                                               &test_pipeline);
+        ASSERT_EQ(VK_SUCCESS, err);
+
+        VkPipelineBinaryCreateInfoKHR binary_create_info = vku::InitStructHelper();
+        binary_create_info.pipeline = test_pipeline;
+
+        VkPipelineBinaryHandlesInfoKHR handlesInfo = vku::InitStructHelper();
+        handlesInfo.pipelineBinaryCount = 1;
+
+        err = vk::CreatePipelineBinariesKHR(device(), &binary_create_info, nullptr, &handlesInfo);
+        ASSERT_EQ(VK_SUCCESS, err);
+
+        std::vector<VkPipelineBinaryKHR> binaries(handlesInfo.pipelineBinaryCount);
+        handlesInfo.pPipelineBinaries = binaries.data();
+
+        err = vk::CreatePipelineBinariesKHR(device(), &binary_create_info, nullptr, &handlesInfo);
+        ASSERT_EQ(VK_SUCCESS, err);
+
+        VkPipelineBinaryInfoKHR binary_info = vku::InitStructHelper();
+        binary_info.binaryCount = handlesInfo.pipelineBinaryCount;
+        binary_info.pPipelineBinaries = handlesInfo.pPipelineBinaries;
+
+        raytracing_pipeline_ci.pNext = &binary_info;
+
+        VkPipeline test_pipeline2;
+        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateRayTracingPipelinesKHR-pNext-09616");
+        vk::CreateRayTracingPipelinesKHR(device(), VK_NULL_HANDLE, pipeline_cache, 1, &raytracing_pipeline_ci, nullptr,
+                                         &test_pipeline2);
+        m_errorMonitor->VerifyFound();
+
+        for (uint32_t i = 0; i < binaries.size(); i++) {
+            vk::DestroyPipelineBinaryKHR(device(), binaries[i], nullptr);
+        }
+
+        vk::DestroyPipeline(device(), test_pipeline, nullptr);
+    }
+
+    {
+        VkPipelineCreateFlags2CreateInfoKHR flags2 = vku::InitStructHelper();
+        flags2.flags = VK_PIPELINE_CREATE_2_CAPTURE_DATA_BIT_KHR;
+        raytracing_pipeline_ci.pNext = &flags2;
+
+        VkPipeline test_pipeline;
+
+        err = vk::CreateRayTracingPipelinesKHR(device(), VK_NULL_HANDLE, VK_NULL_HANDLE, 1, &raytracing_pipeline_ci, nullptr,
+                                               &test_pipeline);
+        ASSERT_EQ(VK_SUCCESS, err);
+
+        VkPipelineBinaryCreateInfoKHR binary_create_info = vku::InitStructHelper();
+        binary_create_info.pipeline = test_pipeline;
+
+        VkPipelineBinaryHandlesInfoKHR handlesInfo = vku::InitStructHelper();
+        handlesInfo.pipelineBinaryCount = 1;
+
+        err = vk::CreatePipelineBinariesKHR(device(), &binary_create_info, nullptr, &handlesInfo);
+        ASSERT_EQ(VK_SUCCESS, err);
+
+        std::vector<VkPipelineBinaryKHR> binaries(handlesInfo.pipelineBinaryCount);
+        handlesInfo.pPipelineBinaries = binaries.data();
+
+        err = vk::CreatePipelineBinariesKHR(device(), &binary_create_info, nullptr, &handlesInfo);
+        ASSERT_EQ(VK_SUCCESS, err);
+
+        VkPipelineBinaryInfoKHR binary_info = vku::InitStructHelper();
+        binary_info.binaryCount = handlesInfo.pipelineBinaryCount;
+        binary_info.pPipelineBinaries = handlesInfo.pPipelineBinaries;
+
+        VkPipelineCreationFeedbackCreateInfo feedback_create_info = vku::InitStructHelper();
+        VkPipelineCreationFeedback feedback = {};
+
+        feedback_create_info.pPipelineCreationFeedback = &feedback;
+        feedback.flags = VK_PIPELINE_CREATION_FEEDBACK_APPLICATION_PIPELINE_CACHE_HIT_BIT |
+                         VK_PIPELINE_CREATION_FEEDBACK_BASE_PIPELINE_ACCELERATION_BIT;
+
+        flags2.flags |= VK_PIPELINE_CREATE_FAIL_ON_PIPELINE_COMPILE_REQUIRED_BIT_EXT;
+        flags2.pNext = &binary_info;
+        binary_info.pNext = &feedback_create_info;
+
+        VkPipeline test_pipeline2;
+        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateRayTracingPipelinesKHR-binaryCount-09620");
+        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateRayTracingPipelinesKHR-binaryCount-09621");
+        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateRayTracingPipelinesKHR-binaryCount-09622");
+
+        vk::CreateRayTracingPipelinesKHR(device(), VK_NULL_HANDLE, VK_NULL_HANDLE, 1, &raytracing_pipeline_ci, nullptr,
+                                         &test_pipeline2);
+        m_errorMonitor->VerifyFound();
+
+        for (uint32_t i = 0; i < binaries.size(); i++) {
+            vk::DestroyPipelineBinaryKHR(device(), binaries[i], nullptr);
+        }
+
+        vk::DestroyPipeline(device(), test_pipeline, nullptr);
+    }
+
+    vk::DestroyPipelineCache(device(), pipeline_cache, nullptr);
 }

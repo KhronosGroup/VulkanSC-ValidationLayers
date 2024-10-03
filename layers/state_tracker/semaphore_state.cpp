@@ -20,6 +20,11 @@
 #include "state_tracker/queue_state.h"
 #include "state_tracker/state_tracker.h"
 
+static VkExternalSemaphoreHandleTypeFlags GetExportHandleTypes(const VkSemaphoreCreateInfo *pCreateInfo) {
+    auto export_info = vku::FindStructInPNextChain<VkExportSemaphoreCreateInfo>(pCreateInfo->pNext);
+    return export_info ? export_info->handleTypes : 0;
+}
+
 void vvl::Semaphore::TimePoint::Notify() const {
     if (signal_submit && signal_submit->queue) {
         signal_submit->queue->Notify(signal_submit->seq);
@@ -36,7 +41,7 @@ vvl::Semaphore::Semaphore(ValidationStateTracker &dev, VkSemaphore handle, const
     : RefcountedStateObject(handle, kVulkanObjectTypeSemaphore),
       type(type_create_info ? type_create_info->semaphoreType : VK_SEMAPHORE_TYPE_BINARY),
       flags(pCreateInfo->flags),
-      exportHandleTypes(GetExportHandleTypes(pCreateInfo)),
+      export_handle_types(GetExportHandleTypes(pCreateInfo)),
 #ifdef VK_USE_PLATFORM_METAL_EXT
       metal_semaphore_export(GetMetalExport(pCreateInfo)),
 #endif  // VK_USE_PLATFORM_METAL_EXT
@@ -286,38 +291,19 @@ void vvl::Semaphore::NotifyAndWait(const Location &loc, uint64_t payload) {
                                " completed_.payload=%" PRIu64 " wait_payload=%" PRIu64,
                                completed_.payload, payload);
         }
-    } else {
+    } else {  // TODO: ensure atomicity of this entire else branch
         // For external timeline semaphores we should bump the completed payload to whatever the driver
-        // tells us. That value may originate from an external process that imported the semaphore and
-        // might not be signaled through the application queues.
-        //
-        // However, there is one exception. The current process can still signal the semaphore, even if
-        // it was imported. The queue's semaphore signal should not be overwritten by a potentially
-        // external signal. Otherwise, queue information (queue/seq) can be lost, which may prevent the
-        // advancement of the queue simulation.
-        const auto it = timeline_.find(payload);
-        const bool already_signaled = it != timeline_.end() && it->second.signal_submit.has_value();
-        if (!already_signaled) {
+        // tells us. That value may originate from an external process and is not trackable by vvl.
+        // There is one exception, though. If the current program signaled the imported semaphore,
+        // then this signal should not be overwritten by a potential external signal. Otherwise, signal's
+        // queue information (queue/seq) can be lost and this may block queue forward progress simulation.
+        const TimePoint *timepoint = vvl::Find(timeline_, payload);
+        const bool already_signaled = timepoint && timepoint->signal_submit.has_value();
+        if (!already_signaled && CurrentPayload() < payload) {
             EnqueueSignal(SubmissionReference{}, payload);
         }
         Retire(nullptr, loc, payload);
     }
-}
-
-VkExternalSemaphoreHandleTypeFlags vvl::Semaphore::GetExportHandleTypes(const VkSemaphoreCreateInfo *pCreateInfo) {
-    auto export_info = vku::FindStructInPNextChain<VkExportSemaphoreCreateInfo>(pCreateInfo->pNext);
-    return export_info ? export_info->handleTypes : 0;
-}
-
-bool vvl::Semaphore::HasImportedHandleType() const {
-    auto guard = ReadLock();
-    return imported_handle_type_.has_value();
-}
-
-VkExternalSemaphoreHandleTypeFlagBits vvl::Semaphore::ImportedHandleType() const {
-    auto guard = ReadLock();
-    assert(imported_handle_type_.has_value());
-    return imported_handle_type_.value();
 }
 
 void vvl::Semaphore::Import(VkExternalSemaphoreHandleTypeFlagBits handle_type, VkSemaphoreImportFlags flags) {
@@ -350,6 +336,15 @@ void vvl::Semaphore::Export(VkExternalSemaphoreHandleTypeFlagBits handle_type) {
             EnqueueWait(last_op->submit, last_op->payload);
         }
     }
+}
+
+std::optional<VkExternalSemaphoreHandleTypeFlagBits> vvl::Semaphore::ImportedHandleType() const {
+    auto guard = ReadLock();
+
+    // Sanity check: semaphore imported -> scope is not internal
+    assert(!imported_handle_type_.has_value() || scope_ != kInternal);
+
+    return imported_handle_type_;
 }
 
 #ifdef VK_USE_PLATFORM_METAL_EXT

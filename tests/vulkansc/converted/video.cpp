@@ -6613,6 +6613,7 @@ TEST_F(NegativeVideo, DecodeImageLayouts) {
 
     // Decode output must be in DECODE_DST layout if it is distinct from reconstructed
     if (config.SupportsDecodeOutputDistinct()) {
+        vk::CmdPipelineBarrier2KHR(cb.handle(), context.DecodeOutput()->LayoutTransition(VK_IMAGE_LAYOUT_GENERAL));
         m_errorMonitor->SetDesiredError("VUID-vkCmdDecodeVideoKHR-pDecodeInfo-07252");
         cb.DecodeVideo(context.DecodeFrame(0));
         m_errorMonitor->VerifyFound();
@@ -6923,13 +6924,11 @@ TEST_F(NegativeVideo, DecodeBufferMissingDecodeSrcUsage) {
     profile_list.profileCount = 1;
     profile_list.pProfiles = config.Profile();
 
-    auto create_info = vku::InitStruct<VkBufferCreateInfo>();
+    auto create_info = vku::InitStruct<VkBufferCreateInfo>(&profile_list);
     create_info.flags = 0;
-    create_info.pNext = &profile_list;
     create_info.size = std::max((VkDeviceSize)4096, config.Caps()->minBitstreamBufferSizeAlignment);
     create_info.usage = VK_BUFFER_USAGE_VIDEO_DECODE_DST_BIT_KHR;
     create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
     vkt::Buffer buffer(*m_device, create_info);
 
     vkt::CommandBuffer& cb = context.CmdBuffer();
@@ -6963,13 +6962,11 @@ TEST_F(NegativeVideo, EncodeBufferMissingEncodeDstUsage) {
     profile_list.profileCount = 1;
     profile_list.pProfiles = config.Profile();
 
-    auto create_info = vku::InitStruct<VkBufferCreateInfo>();
+    auto create_info = vku::InitStruct<VkBufferCreateInfo>(&profile_list);
     create_info.flags = 0;
-    create_info.pNext = &profile_list;
     create_info.size = std::max((VkDeviceSize)4096, config.Caps()->minBitstreamBufferSizeAlignment);
     create_info.usage = VK_BUFFER_USAGE_VIDEO_ENCODE_SRC_BIT_KHR;
     create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
     vkt::Buffer buffer(*m_device, create_info);
 
     vkt::CommandBuffer& cb = context.CmdBuffer();
@@ -11551,7 +11548,6 @@ TEST_F(NegativeVideo, CreateBufferInvalidProfileList) {
     VkBuffer buffer = VK_NULL_HANDLE;
     VkVideoProfileListInfoKHR video_profiles = vku::InitStructHelper();
     VkBufferCreateInfo buffer_ci = vku::InitStructHelper();
-    ;
     buffer_ci.size = 2048;
 
     if (decode_config) {
@@ -11607,7 +11603,6 @@ TEST_F(NegativeVideo, CreateBufferProfileIndependentNotSupported) {
 
     VkBuffer buffer = VK_NULL_HANDLE;
     VkBufferCreateInfo buffer_ci = vku::InitStructHelper();
-    ;
     buffer_ci.flags = VK_BUFFER_CREATE_VIDEO_PROFILE_INDEPENDENT_BIT_KHR;
     buffer_ci.size = 2048;
 
@@ -12004,7 +11999,7 @@ TEST_F(NegativeVideo, CreateImageViewProfileIndependent) {
         VkImageView image_view = VK_NULL_HANDLE;
 
         m_errorMonitor->SetAllowedFailureMsg("VUID-VkImageViewCreateInfo-pNext-02662");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, test_case.vuid);
+        m_errorMonitor->SetDesiredError(test_case.vuid);
         vk::CreateImageView(device(), &image_view_ci, nullptr, &image_view);
         m_errorMonitor->VerifyFound();
     }
@@ -12272,6 +12267,9 @@ TEST_F(NegativeVideo, BeginQueryInlineQueries) {
     if (!config) {
         GTEST_SKIP() << "Test requires video support";
     }
+    if (!QueueFamilySupportsResultStatusOnlyQueries(config.QueueFamilyIndex())) {
+        GTEST_SKIP() << "Test requires video queue to support result status queries";
+    }
 
     config.SessionCreateInfo()->flags |= VK_VIDEO_SESSION_CREATE_INLINE_QUERIES_BIT_KHR;
 
@@ -12401,10 +12399,7 @@ TEST_F(NegativeVideo, CopyQueryPoolResultsStatusBit) {
 
     VkQueryResultFlags flags;
 
-    auto buffer_ci = vku::InitStruct<VkBufferCreateInfo>();
-    buffer_ci.size = sizeof(uint32_t);
-    buffer_ci.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-    vkt::Buffer buffer(*m_device, buffer_ci);
+    vkt::Buffer buffer(*m_device, sizeof(uint32_t), VK_BUFFER_USAGE_TRANSFER_DST_BIT);
 
     m_commandBuffer->begin();
 
@@ -12803,7 +12798,7 @@ TEST_F(NegativeVideoBestPractices, GetVideoSessionMemoryRequirements) {
     auto mem_req = vku::InitStruct<VkVideoSessionMemoryRequirementsKHR>();
     uint32_t mem_req_count = 1;
 
-    m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "BestPractices-vkGetVideoSessionMemoryRequirementsKHR-count-not-retrieved");
+    m_errorMonitor->SetDesiredWarning("BestPractices-vkGetVideoSessionMemoryRequirementsKHR-count-not-retrieved");
     context.vk.GetVideoSessionMemoryRequirementsKHR(device(), context.Session(), &mem_req_count, &mem_req);
     m_errorMonitor->VerifyFound();
 }
@@ -12840,7 +12835,7 @@ TEST_F(NegativeVideoBestPractices, BindVideoSessionMemory) {
     bind_info.memoryOffset = 0;
     bind_info.memorySize = alloc_info.allocationSize;
 
-    m_errorMonitor->SetDesiredFailureMsg(kWarningBit, "BestPractices-vkBindVideoSessionMemoryKHR-requirements-count-not-retrieved");
+    m_errorMonitor->SetDesiredWarning("BestPractices-vkBindVideoSessionMemoryKHR-requirements-count-not-retrieved");
     context.vk.BindVideoSessionMemoryKHR(device(), context.Session(), 1, &bind_info);
     m_errorMonitor->VerifyFound();
 
@@ -12848,8 +12843,7 @@ TEST_F(NegativeVideoBestPractices, BindVideoSessionMemory) {
     context.vk.GetVideoSessionMemoryRequirementsKHR(device(), context.Session(), &mem_req_count, nullptr);
 
     if (mem_req_count > 0) {
-        m_errorMonitor->SetDesiredFailureMsg(kWarningBit,
-                                             "BestPractices-vkBindVideoSessionMemoryKHR-requirements-not-all-retrieved");
+        m_errorMonitor->SetDesiredWarning("BestPractices-vkBindVideoSessionMemoryKHR-requirements-not-all-retrieved");
         context.vk.BindVideoSessionMemoryKHR(device(), context.Session(), 1, &bind_info);
         m_errorMonitor->VerifyFound();
 
@@ -12859,8 +12853,7 @@ TEST_F(NegativeVideoBestPractices, BindVideoSessionMemory) {
 
             context.vk.GetVideoSessionMemoryRequirementsKHR(device(), context.Session(), &mem_req_count, &mem_req);
 
-            m_errorMonitor->SetDesiredFailureMsg(kWarningBit,
-                                                 "BestPractices-vkBindVideoSessionMemoryKHR-requirements-not-all-retrieved");
+            m_errorMonitor->SetDesiredWarning("BestPractices-vkBindVideoSessionMemoryKHR-requirements-not-all-retrieved");
             context.vk.BindVideoSessionMemoryKHR(device(), context.Session(), 1, &bind_info);
             m_errorMonitor->VerifyFound();
         }

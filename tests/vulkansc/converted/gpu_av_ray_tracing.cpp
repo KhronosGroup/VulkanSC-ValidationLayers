@@ -15,10 +15,10 @@
  */
 
 #include "../framework/layer_validation_tests.h"
-#include "../framework/ray_tracing_objects.h"
 #include "../framework/descriptor_helper.h"
 #include "../framework/shader_helper.h"
-#include "../framework/gpu_av_helper.h"
+
+class NegativeGpuAVRayTracing : public GpuAVRayTracingTest {};
 
 TEST_F(NegativeGpuAVRayTracing, DISABLED_CmdTraceRaysIndirectKHR) {
     TEST_DESCRIPTION("Invalid parameters used in vkCmdTraceRaysIndirectKHR");
@@ -87,7 +87,6 @@ TEST_F(NegativeGpuAVRayTracing, DISABLED_CmdTraceRaysIndirectKHR) {
     buffer_ci.usage =
         VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR;
     buffer_ci.size = 4096;
-    buffer_ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     vkt::Buffer sbt_buffer(*m_device, buffer_ci, vkt::no_mem);
 
     VkMemoryRequirements mem_reqs;
@@ -162,15 +161,15 @@ TEST_F(NegativeGpuAVRayTracing, DISABLED_CmdTraceRaysIndirectKHR) {
 
     if (uint64_t(physDevProps().limits.maxComputeWorkGroupCount[0]) * uint64_t(physDevProps().limits.maxComputeWorkGroupSize[0]) <
         uint64_t(vvl::kU32Max)) {
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkTraceRaysIndirectCommandKHR-width-03638");
+        m_errorMonitor->SetDesiredError("VUID-VkTraceRaysIndirectCommandKHR-width-03638");
     }
     if (uint64_t(physDevProps().limits.maxComputeWorkGroupCount[1]) * uint64_t(physDevProps().limits.maxComputeWorkGroupSize[1]) <
         uint64_t(vvl::kU32Max)) {
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkTraceRaysIndirectCommandKHR-height-03639");
+        m_errorMonitor->SetDesiredError("VUID-VkTraceRaysIndirectCommandKHR-height-03639");
     }
     if (uint64_t(physDevProps().limits.maxComputeWorkGroupCount[2]) * uint64_t(physDevProps().limits.maxComputeWorkGroupSize[2]) <
         uint64_t(vvl::kU32Max)) {
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkTraceRaysIndirectCommandKHR-depth-03640");
+        m_errorMonitor->SetDesiredError("VUID-VkTraceRaysIndirectCommandKHR-depth-03640");
     }
     m_default_queue->Submit(*m_commandBuffer);
     m_default_queue->Wait();
