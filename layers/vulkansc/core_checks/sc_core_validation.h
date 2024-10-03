@@ -244,7 +244,5 @@ class SCCoreChecks : public SCValidationStateTracker<CoreChecks> {
     bool ValidatePipelineStageInfo(uint32_t stage_index, const VkPipelineShaderStageCreateInfo& stage_info,
                                    const vvl::sc::PipelineCache* pipeline_cache_state,
                                    const VkPipelineOfflineCreateInfo* offline_info, const Location& loc) const;
-    virtual bool ValidateShaderStage(const ShaderStageState& stage_state, const vvl::Pipeline* pipeline,
-                                     const Location& loc) const override;
 
 };  // Class SCCoreChecks

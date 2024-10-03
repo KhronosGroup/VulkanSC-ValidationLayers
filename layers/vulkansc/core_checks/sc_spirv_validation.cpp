@@ -149,6 +149,13 @@ bool SCCoreChecks::ValidatePipelineCacheSpirv(VkPhysicalDevice physical_device, 
             spirv::StatelessData stateless_data{};
             spirv::Module temp_module(code.size() * sizeof(uint32_t), code.data(), &stateless_data);
 
+            if (stateless_data.atomic_inst.size() > 0 && (enabled_features.shaderAtomicInstructions == VK_FALSE)) {
+                skip |= LogError("VUID-RuntimeSpirv-OpAtomic-05091", physical_device, loc.dot(Field::pInitialData),
+                                 "contains pipeline identifier {%s} with SPIR-V module data for stage index entry %u "
+                                 "that is using atomic instructions, but shaderAtomicInstructions was not enabled.",
+                                 id.toString().c_str(), stage_index);
+            }
+
             // We set the entry point name to vkCreateShaderModule here to trigger the vkCreateShaderModule
             // VUIDs instead of the vkCreateShadersEXT VUIDs introduced by VK_EXT_shader_objects
             skip |= ValidateSpirvStateless(temp_module, stateless_data, Location(Func::vkCreateShaderModule));
@@ -215,30 +222,6 @@ bool SCCoreChecks::ValidatePipelineStageInfo(uint32_t stage_index, const VkPipel
                                stage_index, string_VkShaderStageFlagBits(stage_info.stage),
                                pipeline_entry->PipelineID().toString().c_str());
         }
-    }
-
-    return skip;
-}
-
-bool SCCoreChecks::ValidateShaderStage(const ShaderStageState& stage_state, const vvl::Pipeline* pipeline,
-                                       const Location& loc) const {
-    bool skip = BASE::ValidateShaderStage(stage_state, pipeline, loc);
-
-    if (!stage_state.spirv_state || !stage_state.entrypoint) {
-        // From here on we only do SPIR-V validation, so without SPIR-V data we stop here
-        return skip;
-    }
-
-    const spirv::Module& module_state = *stage_state.spirv_state.get();
-
-    auto is_atomic = [](const spirv::Instruction& insn) { return AtomicOperation(insn.Opcode()); };
-    auto are_any_atomic = [is_atomic](auto&& insn_range) {
-        return std::any_of(std::begin(insn_range), std::end(insn_range), is_atomic);
-    };
-
-    if (are_any_atomic(module_state.GetInstructions()) && (enabled_features.shaderAtomicInstructions == VK_FALSE)) {
-        skip |= LogError("VUID-RuntimeSpirv-OpAtomic-05091", module_state.handle(), loc,
-                         "SPIR-V is using atomic instructions, but shaderAtomicInstructions was not enabled.");
     }
 
     return skip;

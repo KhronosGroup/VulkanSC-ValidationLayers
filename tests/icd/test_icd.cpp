@@ -510,7 +510,7 @@ static VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL GetInstanceProcAddr(VkInstance i
     if (item != name_to_func_ptr_map.end()) {
         return reinterpret_cast<PFN_vkVoidFunction>(item->second);
     }
-#ifdef VULKANSC
+#ifndef VULKANSC
     // This false warning is generated in Vulkan SC validation tests because the tests use the
     // vk_dispatch_table.h generated from the combined headers
     printf("WARNING - Failed to find %s\n", pName);
