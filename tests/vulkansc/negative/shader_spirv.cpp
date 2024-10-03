@@ -281,7 +281,7 @@ TEST_F(VkSCNegativeShaderSpirv, Atomics) {
     RETURN_IF_SKIP(Init());
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-RuntimeSpirv-OpAtomic-05091");
-    builder.CreatePipeline(*m_device);
+    builder.CreatePipelineCache(*m_device);
     m_errorMonitor->VerifyFound();
 }
 
