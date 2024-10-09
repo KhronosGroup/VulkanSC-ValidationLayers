@@ -189,7 +189,7 @@ static bool GetEnvironmentFlag(const char *name) {
 }
 
 void VkSCTestEnvironment::InitArgs(int *argc, char *argv[]) {
-    if (GetCLIFlag(argc, argv, "--help", false)) {
+    if (GetCLIFlag(argc, argv, "--help", false) || GetCLIFlag(argc, argv, "-h", false)) {
         printf("\nVulkan SC specific options:\n");
         printf(
             "\t--no-spv-debug-info\n"
