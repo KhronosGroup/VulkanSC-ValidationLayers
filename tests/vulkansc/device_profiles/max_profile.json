@@ -3,7 +3,7 @@
     "profiles": {
         "MAX_PROFILE": {
             "version": 1,
-            "api-version": "1.0.15",
+            "api-version": "1.0.16",
             "label": "Max Vulkan SC Profile",
             "description": "Profile that supports everything possible",
             "contributors": {},

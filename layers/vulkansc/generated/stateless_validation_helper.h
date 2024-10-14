@@ -31,6 +31,7 @@ static inline bool IsDuplicatePnext(VkStructureType input_value) {
         case VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT:
         case VK_STRUCTURE_TYPE_APPLICATION_PARAMETERS_EXT:
         case VK_STRUCTURE_TYPE_DEVICE_SEMAPHORE_SCI_SYNC_POOL_RESERVATION_CREATE_INFO_NV:
+        case VK_STRUCTURE_TYPE_LAYER_SETTINGS_CREATE_INFO_EXT:
             return true;
         default:
             return false;
