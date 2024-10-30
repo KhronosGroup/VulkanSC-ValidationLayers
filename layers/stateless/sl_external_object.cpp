@@ -310,6 +310,7 @@ struct ExternalOperationsInfo {
 
     const VkImportMemoryFdInfoKHR *import_info_fd = nullptr;
     const VkImportMemoryHostPointerInfoEXT *import_info_host_pointer = nullptr;
+    const VkImportMemorySciBufInfoNV *import_info_sci = nullptr;
 
     const VkExportMemoryAllocateInfo *export_info = nullptr;
     const VkExportMemoryAllocateInfoNV *export_info_nv = nullptr;
@@ -344,6 +345,10 @@ ExternalOperationsInfo GetExternalOperationsInfo(const void *pNext) {
     // VK_EXT_external_memory_host
     ext.import_info_host_pointer = vku::FindStructInPNextChain<VkImportMemoryHostPointerInfoEXT>(pNext);
     ext.total_import_ops += (ext.import_info_host_pointer && ext.import_info_host_pointer->handleType);
+
+    // VK_NV_external_memory_sci_buf
+    ext.import_info_sci = vku::FindStructInPNextChain<VkImportMemorySciBufInfoNV>(pNext);
+    ext.total_import_ops += (ext.import_info_sci && ext.import_info_sci->handleType);
 
     // All exports need a VkExportMemoryAllocateInfo or they are ignored
     // VK_KHR_external_memory
