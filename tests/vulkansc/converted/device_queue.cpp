@@ -24,9 +24,9 @@ TEST_F(NegativeDeviceQueue, FamilyIndex) {
     RETURN_IF_SKIP(InitFramework());
 
     uint32_t queue_family_count;
-    vk::GetPhysicalDeviceQueueFamilyProperties(gpu(), &queue_family_count, nullptr);
+    vk::GetPhysicalDeviceQueueFamilyProperties(Gpu(), &queue_family_count, nullptr);
     std::vector<VkQueueFamilyProperties> queue_props(queue_family_count);
-    vk::GetPhysicalDeviceQueueFamilyProperties(gpu(), &queue_family_count, queue_props.data());
+    vk::GetPhysicalDeviceQueueFamilyProperties(Gpu(), &queue_family_count, queue_props.data());
 
     uint32_t queue_family_index = queue_family_count;
 
@@ -45,7 +45,7 @@ TEST_F(NegativeDeviceQueue, FamilyIndex) {
 
     m_errorMonitor->SetDesiredError("VUID-VkDeviceQueueCreateInfo-queueFamilyIndex-00381");
     VkDevice device;
-    vk::CreateDevice(gpu(), &device_ci, nullptr, &device);
+    vk::CreateDevice(Gpu(), &device_ci, nullptr, &device);
     m_errorMonitor->VerifyFound();
 }
 
@@ -77,7 +77,7 @@ TEST_F(NegativeDeviceQueue, FamilyIndexUsage) {
     qfi[0] = 0;
     CreateBufferTest(*this, &buffCI, "VUID-VkBufferCreateInfo-sharingMode-01419");
 
-    if (m_device->phy().queue_properties_.size() > 2) {
+    if (m_device->Physical().queue_properties_.size() > 2) {
         m_errorMonitor->SetDesiredError("VUID-vkQueueSubmit-pSubmits-04626");
 
         // Create buffer shared to queue families 1 and 2, but submitted on queue family 0
@@ -87,10 +87,10 @@ TEST_F(NegativeDeviceQueue, FamilyIndexUsage) {
         vkt::Buffer ib;
         ib.init(*m_device, buffCI);
 
-        m_commandBuffer->begin();
-        vk::CmdFillBuffer(m_commandBuffer->handle(), ib.handle(), 0, 16, 5);
-        m_commandBuffer->end();
-        m_default_queue->Submit(*m_commandBuffer);
+        m_command_buffer.Begin();
+        vk::CmdFillBuffer(m_command_buffer.handle(), ib.handle(), 0, 16, 5);
+        m_command_buffer.End();
+        m_default_queue->Submit(m_command_buffer);
         m_default_queue->Wait();
         m_errorMonitor->VerifyFound();
     }
@@ -98,10 +98,10 @@ TEST_F(NegativeDeviceQueue, FamilyIndexUsage) {
     // If there is more than one queue family, create a device with a single queue family, then create a buffer
     // with SHARING_MODE_CONCURRENT that uses a non-device PDEV queue family.
     uint32_t queue_count;
-    vk::GetPhysicalDeviceQueueFamilyProperties(gpu(), &queue_count, NULL);
+    vk::GetPhysicalDeviceQueueFamilyProperties(Gpu(), &queue_count, NULL);
     std::vector<VkQueueFamilyProperties> queue_props;
     queue_props.resize(queue_count);
-    vk::GetPhysicalDeviceQueueFamilyProperties(gpu(), &queue_count, queue_props.data());
+    vk::GetPhysicalDeviceQueueFamilyProperties(Gpu(), &queue_count, queue_props.data());
 
     if (queue_count < 3) {
         GTEST_SKIP() << "Multiple queue families are required to run this test.";
@@ -120,7 +120,7 @@ TEST_F(NegativeDeviceQueue, FamilyIndexUsage) {
 
     // Create a device with a single queue family
     VkDevice second_device;
-    ASSERT_EQ(VK_SUCCESS, vk::CreateDevice(gpu(), &dev_info, nullptr, &second_device));
+    ASSERT_EQ(VK_SUCCESS, vk::CreateDevice(Gpu(), &dev_info, nullptr, &second_device));
 
     // Select Queue family for CONCURRENT buffer that is not owned by device
     buffCI.queueFamilyIndexCount = 2;
@@ -142,9 +142,9 @@ TEST_F(NegativeDeviceQueue, FamilyIndexUnique) {
     VkQueueFamilyProperties queue_properties;  // selected queue family used
     uint32_t queue_family_index = 0;
     uint32_t queue_family_count = 0;
-    vk::GetPhysicalDeviceQueueFamilyProperties(gpu(), &queue_family_count, nullptr);
+    vk::GetPhysicalDeviceQueueFamilyProperties(Gpu(), &queue_family_count, nullptr);
     std::vector<VkQueueFamilyProperties> queue_families(queue_family_count);
-    vk::GetPhysicalDeviceQueueFamilyProperties(gpu(), &queue_family_count, queue_families.data());
+    vk::GetPhysicalDeviceQueueFamilyProperties(Gpu(), &queue_family_count, queue_families.data());
 
     for (size_t i = 0; i < queue_families.size(); i++) {
         if (queue_families[i].queueCount > 1) {
@@ -180,7 +180,7 @@ TEST_F(NegativeDeviceQueue, FamilyIndexUnique) {
     device_create_info.enabledExtensionCount = 0;
 
     m_errorMonitor->SetDesiredError("VUID-VkDeviceCreateInfo-queueFamilyIndex-02802");
-    vk::CreateDevice(gpu(), &device_create_info, nullptr, &test_device);
+    vk::CreateDevice(Gpu(), &device_create_info, nullptr, &test_device);
     m_errorMonitor->VerifyFound();
 }
 
@@ -193,9 +193,9 @@ TEST_F(NegativeDeviceQueue, MismatchedGlobalPriority) {
     RETURN_IF_SKIP(InitFramework());
 
     uint32_t queue_family_count;
-    vk::GetPhysicalDeviceQueueFamilyProperties(gpu(), &queue_family_count, nullptr);
+    vk::GetPhysicalDeviceQueueFamilyProperties(Gpu(), &queue_family_count, nullptr);
     std::vector<VkQueueFamilyProperties> queue_props(queue_family_count);
-    vk::GetPhysicalDeviceQueueFamilyProperties(gpu(), &queue_family_count, queue_props.data());
+    vk::GetPhysicalDeviceQueueFamilyProperties(Gpu(), &queue_family_count, queue_props.data());
 
     uint32_t queue_family_index = queue_family_count;
 
@@ -237,7 +237,7 @@ TEST_F(NegativeDeviceQueue, MismatchedGlobalPriority) {
     m_errorMonitor->SetDesiredError("VUID-VkDeviceCreateInfo-queueFamilyIndex-02802");
     m_errorMonitor->SetDesiredError("VUID-VkDeviceCreateInfo-pQueueCreateInfos-06654");
     VkDevice device;
-    vk::CreateDevice(gpu(), &device_ci, nullptr, &device);
+    vk::CreateDevice(Gpu(), &device_ci, nullptr, &device);
     m_errorMonitor->VerifyFound();
 }
 
@@ -247,9 +247,9 @@ TEST_F(NegativeDeviceQueue, QueueCount) {
     RETURN_IF_SKIP(InitFramework());
 
     uint32_t queue_family_count;
-    vk::GetPhysicalDeviceQueueFamilyProperties(gpu(), &queue_family_count, nullptr);
+    vk::GetPhysicalDeviceQueueFamilyProperties(Gpu(), &queue_family_count, nullptr);
     std::vector<VkQueueFamilyProperties> queue_props(queue_family_count);
-    vk::GetPhysicalDeviceQueueFamilyProperties(gpu(), &queue_family_count, queue_props.data());
+    vk::GetPhysicalDeviceQueueFamilyProperties(Gpu(), &queue_family_count, queue_props.data());
 
     const uint32_t invalid_count = queue_props[0].queueCount + 1;
     std::vector<float> priorities(invalid_count);
@@ -269,7 +269,7 @@ TEST_F(NegativeDeviceQueue, QueueCount) {
 
     VkDevice device = VK_NULL_HANDLE;
     m_errorMonitor->SetDesiredError("VUID-VkDeviceQueueCreateInfo-queueCount-00382");
-    vk::CreateDevice(gpu(), &device_ci, nullptr, &device);
+    vk::CreateDevice(Gpu(), &device_ci, nullptr, &device);
     m_errorMonitor->VerifyFound();
 }
 
@@ -279,9 +279,9 @@ TEST_F(NegativeDeviceQueue, QueuePriorities) {
     RETURN_IF_SKIP(InitFramework());
 
     uint32_t queue_family_count;
-    vk::GetPhysicalDeviceQueueFamilyProperties(gpu(), &queue_family_count, nullptr);
+    vk::GetPhysicalDeviceQueueFamilyProperties(Gpu(), &queue_family_count, nullptr);
     std::vector<VkQueueFamilyProperties> queue_props(queue_family_count);
-    vk::GetPhysicalDeviceQueueFamilyProperties(gpu(), &queue_family_count, queue_props.data());
+    vk::GetPhysicalDeviceQueueFamilyProperties(Gpu(), &queue_family_count, queue_props.data());
 
     VkDeviceQueueCreateInfo device_queue_ci = vku::InitStructHelper();
     device_queue_ci.queueFamilyIndex = 0;
@@ -299,13 +299,13 @@ TEST_F(NegativeDeviceQueue, QueuePriorities) {
     const float priority_high = 2.0f;
     device_queue_ci.pQueuePriorities = &priority_high;
     m_errorMonitor->SetDesiredError("VUID-VkDeviceQueueCreateInfo-pQueuePriorities-00383");
-    vk::CreateDevice(gpu(), &device_ci, nullptr, &device);
+    vk::CreateDevice(Gpu(), &device_ci, nullptr, &device);
     m_errorMonitor->VerifyFound();
 
     const float priority_low = -1.0f;
     device_queue_ci.pQueuePriorities = &priority_low;
     m_errorMonitor->SetDesiredError("VUID-VkDeviceQueueCreateInfo-pQueuePriorities-00383");
-    vk::CreateDevice(gpu(), &device_ci, nullptr, &device);
+    vk::CreateDevice(Gpu(), &device_ci, nullptr, &device);
     m_errorMonitor->VerifyFound();
 }
 
@@ -315,7 +315,7 @@ TEST_F(NegativeDeviceQueue, BindPipeline) {
     InitRenderTarget();
 
     uint32_t only_transfer_queueFamilyIndex = vvl::kU32Max;
-    const auto q_props = m_device->phy().queue_properties_;
+    const auto q_props = m_device->Physical().queue_properties_;
     for (uint32_t i = 0; i < (uint32_t)q_props.size(); i++) {
         if (q_props[i].queueFlags == VK_QUEUE_TRANSFER_BIT) {
             only_transfer_queueFamilyIndex = i;
@@ -334,7 +334,7 @@ TEST_F(NegativeDeviceQueue, BindPipeline) {
     c_pipe.CreateComputePipeline();
 
     // Get implicit VU because using Transfer only instead of a Graphics-only or Compute-only queue
-    commandBuffer.begin();
+    commandBuffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-vkCmdBindPipeline-commandBuffer-cmdpool");
     m_errorMonitor->SetDesiredError("VUID-vkCmdBindPipeline-pipelineBindPoint-00777");
     vk::CmdBindPipeline(commandBuffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, c_pipe.Handle());
@@ -344,47 +344,15 @@ TEST_F(NegativeDeviceQueue, BindPipeline) {
     m_errorMonitor->SetDesiredError("VUID-vkCmdBindPipeline-pipelineBindPoint-00778");
     vk::CmdBindPipeline(commandBuffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe.Handle());
     m_errorMonitor->VerifyFound();
-    commandBuffer.end();
+    commandBuffer.End();
 }
 
 TEST_F(NegativeDeviceQueue, CreateCommandPool) {
     TEST_DESCRIPTION("vkCreateCommandPool with bad queue");
     RETURN_IF_SKIP(Init());
-    const size_t queue_count = m_device->phy().queue_properties_.size();
+    const size_t queue_count = m_device->Physical().queue_properties_.size();
     m_errorMonitor->SetDesiredError("VUID-vkCreateCommandPool-queueFamilyIndex-01937");
     vkt::CommandPool commandPool(*m_device, queue_count + 1);
-    m_errorMonitor->VerifyFound();
-}
-
-TEST_F(NegativeDeviceQueue, Robustness2WithoutRobustness) {
-    AddRequiredExtensions(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(Init());
-
-    float priority = 1.0f;
-    VkDeviceQueueCreateInfo device_queue_ci = vku::InitStructHelper();
-    device_queue_ci.queueFamilyIndex = 0u;
-    device_queue_ci.queueCount = 1u;
-    device_queue_ci.pQueuePriorities = &priority;
-
-    VkPhysicalDeviceRobustness2FeaturesEXT robustness_2_features = vku::InitStructHelper();
-    GetPhysicalDeviceFeatures2(robustness_2_features);
-
-    if (!robustness_2_features.robustBufferAccess2) {
-        GTEST_SKIP() << "robustBufferAccess2 not supported.";
-    }
-
-    VkPhysicalDeviceFeatures2 features2 = vku::InitStructHelper(&robustness_2_features);
-
-    VkDeviceCreateInfo device_ci = vku::InitStructHelper(&features2);
-    device_ci.queueCreateInfoCount = 1u;
-    device_ci.pQueueCreateInfos = &device_queue_ci;
-    device_ci.enabledLayerCount = 0u;
-    device_ci.enabledExtensionCount = m_device_extension_names.size();
-    device_ci.ppEnabledExtensionNames = m_device_extension_names.data();
-
-    VkDevice device;
-    m_errorMonitor->SetDesiredError("VUID-VkPhysicalDeviceRobustness2FeaturesEXT-robustBufferAccess2-04000");
-    vk::CreateDevice(m_device->phy().handle(), &device_ci, nullptr, &device);
     m_errorMonitor->VerifyFound();
 }
 
@@ -400,9 +368,9 @@ TEST_F(NegativeDeviceQueue, QueuesSameQueueFamily) {
     RETURN_IF_SKIP(InitState(nullptr, &protected_memory_features));
 
     uint32_t qf_count;
-    vk::GetPhysicalDeviceQueueFamilyProperties(gpu(), &qf_count, nullptr);
+    vk::GetPhysicalDeviceQueueFamilyProperties(Gpu(), &qf_count, nullptr);
     std::vector<VkQueueFamilyProperties> qf_props(qf_count);
-    vk::GetPhysicalDeviceQueueFamilyProperties(gpu(), &qf_count, qf_props.data());
+    vk::GetPhysicalDeviceQueueFamilyProperties(Gpu(), &qf_count, qf_props.data());
 
     uint32_t index = 0;
     for (uint32_t i = 0; i < qf_count; ++i) {
@@ -430,7 +398,7 @@ TEST_F(NegativeDeviceQueue, QueuesSameQueueFamily) {
 
     VkDevice device;
     m_errorMonitor->SetDesiredError("VUID-VkDeviceCreateInfo-pQueueCreateInfos-06755");
-    vk::CreateDevice(gpu(), &device_ci, nullptr, &device);
+    vk::CreateDevice(Gpu(), &device_ci, nullptr, &device);
     m_errorMonitor->VerifyFound();
 }
 
@@ -442,7 +410,7 @@ TEST_F(NegativeDeviceQueue, MismatchedQueueFamiliesOnSubmit) {
     RETURN_IF_SKIP(Init());  // assumes it initializes all queue families on vk::CreateDevice
 
     // This test is meaningless unless we have multiple queue families
-    auto queue_family_properties = m_device->phy().queue_properties_;
+    auto queue_family_properties = m_device->Physical().queue_properties_;
     std::vector<uint32_t> queue_families;
     for (uint32_t i = 0; i < queue_family_properties.size(); ++i)
         if (queue_family_properties[i].queueCount > 0) queue_families.push_back(i);
@@ -460,8 +428,8 @@ TEST_F(NegativeDeviceQueue, MismatchedQueueFamiliesOnSubmit) {
     vkt::CommandPool cmd_pool(*m_device, queue_family);
     vkt::CommandBuffer cmd_buff(*m_device, cmd_pool);
 
-    cmd_buff.begin();
-    cmd_buff.end();
+    cmd_buff.Begin();
+    cmd_buff.End();
 
     // Submit on the wrong queue
     VkSubmitInfo submit_info = vku::InitStructHelper();

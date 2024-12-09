@@ -123,21 +123,21 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_DrawingWithUnboundUnusedSet) {
     OneOffDescriptorSet empty_ds(m_device, {});
     const vkt::PipelineLayout pipeline_layout(*m_device, {&empty_ds.layout_, &empty_ds.layout_});
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 1, 1,
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 1, 1,
                               &empty_ds.set_, 0, nullptr);
 
-    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
     vkt::Buffer vbo(*m_device, sizeof(float) * 3, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-    vk::CmdBindVertexBuffers(m_commandBuffer->handle(), 1, 1, &vbo.handle(), &kZeroDeviceSize);
+    vk::CmdBindVertexBuffers(m_command_buffer.handle(), 1, 1, &vbo.handle(), &kZeroDeviceSize);
 
     // The draw command will most likely produce a crash in case of a regression.
-    vk::CmdDraw(m_commandBuffer->handle(), 1, 1, 0, 0);
+    vk::CmdDraw(m_command_buffer.handle(), 1, 1, 0, 0);
 
-    m_commandBuffer->EndRenderPass();
-    m_commandBuffer->end();
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
 }
 
 // Not supported in Vulkan SC: best practices layers
@@ -173,9 +173,9 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_DynStateIgnoreAttachments) {
     pipe.cb_ci_.pAttachments = nullptr;
     pipe.gp_ci_.pDynamicState = &dynamic_create_info;
     pipe.CreateGraphicsPipeline();
-    m_commandBuffer->begin();
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    m_commandBuffer->end();
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    m_command_buffer.End();
 }
 
 // Not supported in Vulkan SC: best practices layers
@@ -239,14 +239,14 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_PushConstantSet) {
     pipe.pipeline_layout_ = vkt::PipelineLayout(*m_device, {}, push_constant_ranges);
     pipe.CreateGraphicsPipeline();
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    vk::CmdPushConstants(m_commandBuffer->handle(), pipe.pipeline_layout_.handle(), VK_SHADER_STAGE_VERTEX_BIT, 0, 16, data);
-    vk::CmdPushConstants(m_commandBuffer->handle(), pipe.pipeline_layout_.handle(), VK_SHADER_STAGE_FRAGMENT_BIT, 16, 4, data);
-    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
-    m_commandBuffer->EndRenderPass();
-    m_commandBuffer->end();
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdPushConstants(m_command_buffer.handle(), pipe.pipeline_layout_.handle(), VK_SHADER_STAGE_VERTEX_BIT, 0, 16, data);
+    vk::CmdPushConstants(m_command_buffer.handle(), pipe.pipeline_layout_.handle(), VK_SHADER_STAGE_FRAGMENT_BIT, 16, 4, data);
+    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
 }
 
 // Not supported in Vulkan SC: best practices layers
@@ -254,6 +254,7 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_VertexBufferNotForAllDraws) {
     TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/7636");
     AddRequiredExtensions(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::nullDescriptor);
+    AddRequiredFeature(vkt::Feature::robustBufferAccess);
     RETURN_IF_SKIP(InitBestPracticesFramework());
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
@@ -277,17 +278,17 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_VertexBufferNotForAllDraws) {
     vkt::Buffer vbo(*m_device, sizeof(float) * 3, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
     m_errorMonitor->ExpectSuccess(kErrorBit | kWarningBit | kPerformanceWarningBit);
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindVertexBuffers(m_commandBuffer->handle(), 1, 1, &vbo.handle(), &kZeroDeviceSize);
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindVertexBuffers(m_command_buffer.handle(), 1, 1, &vbo.handle(), &kZeroDeviceSize);
 
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe0.Handle());
-    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe0.Handle());
+    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
 
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe1.Handle());
-    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
-    m_commandBuffer->EndRenderPass();
-    m_commandBuffer->end();
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe1.Handle());
+    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
 }
 
 // Not supported in Vulkan SC: best practices layers
@@ -299,10 +300,10 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_SetDifferentEvents) {
     vkt::Event event(*m_device);
     vkt::Event event2(*m_device);
 
-    m_command_buffer.begin();
+    m_command_buffer.Begin();
     m_command_buffer.SetEvent(event, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
     m_command_buffer.SetEvent(event2, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
-    m_command_buffer.end();
+    m_command_buffer.End();
 }
 
 // Not supported in Vulkan SC: best practices layers
@@ -313,11 +314,11 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_ResetEventBeforeSet) {
 
     vkt::Event event(*m_device);
 
-    m_command_buffer.begin();
+    m_command_buffer.Begin();
     m_command_buffer.SetEvent(event, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
     m_command_buffer.ResetEvent(event, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
     m_command_buffer.SetEvent(event, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
-    m_command_buffer.end();
+    m_command_buffer.End();
 }
 
 // Not supported in Vulkan SC: best practices layers
@@ -328,16 +329,16 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_ResetEventBeforeSetMultipleSub
 
     vkt::Event event(*m_device);
 
-    m_command_buffer.begin();
+    m_command_buffer.Begin();
     m_command_buffer.SetEvent(event, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
     m_command_buffer.ResetEvent(event, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
-    m_command_buffer.end();
+    m_command_buffer.End();
     m_default_queue->Submit(m_command_buffer);
 
     vkt::CommandBuffer cb2(*m_device, m_command_pool);
-    cb2.begin();
+    cb2.Begin();
     cb2.SetEvent(event, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
-    cb2.end();
+    cb2.End();
     m_default_queue->Submit(cb2);
     m_default_queue->Wait();
 }
@@ -350,15 +351,15 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_ResetEventBeforeSetMultipleSub
 
     vkt::Event event(*m_device);
 
-    m_command_buffer.begin();
+    m_command_buffer.Begin();
     m_command_buffer.SetEvent(event, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
-    m_command_buffer.end();
+    m_command_buffer.End();
 
     vkt::CommandBuffer cb2(*m_device, m_command_pool);
-    cb2.begin();
+    cb2.Begin();
     cb2.ResetEvent(event, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
     cb2.SetEvent(event, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
-    cb2.end();
+    cb2.End();
 
     VkSubmitInfo submits[2];
     submits[0] = vku::InitStructHelper();
@@ -381,15 +382,15 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_ResetEventFromSecondary) {
     vkt::Event event(*m_device);
 
     vkt::CommandBuffer secondary_cb(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
-    secondary_cb.begin();
+    secondary_cb.Begin();
     secondary_cb.ResetEvent(event, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
-    secondary_cb.end();
+    secondary_cb.End();
 
-    m_command_buffer.begin();
+    m_command_buffer.Begin();
     m_command_buffer.SetEvent(event, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
     m_command_buffer.ExecuteCommands(secondary_cb);
     m_command_buffer.SetEvent(event, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT);
-    m_command_buffer.end();
+    m_command_buffer.End();
 }
 
 // Not supported in Vulkan SC: best practices layers
@@ -403,7 +404,7 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_CreateFifoRelaxedSwapchain) {
     InitSwapchainInfo();
 
     VkBool32 supported;
-    vk::GetPhysicalDeviceSurfaceSupportKHR(gpu(), m_device->graphics_queue_node_index_, m_surface, &supported);
+    vk::GetPhysicalDeviceSurfaceSupportKHR(Gpu(), m_device->graphics_queue_node_index_, m_surface, &supported);
     if (!supported) {
         GTEST_SKIP() << "Graphics queue does not support present";
     }
@@ -438,5 +439,5 @@ TEST_F(VkPositiveBestPracticesLayerTest, DISABLED_CreateFifoRelaxedSwapchain) {
     swapchain_create_info.oldSwapchain = 0;
 
     m_errorMonitor->SetAllowedFailureMsg("VUID-VkSwapchainCreateInfoKHR-presentMode-02839");
-    vk::CreateSwapchainKHR(device(), &swapchain_create_info, nullptr, &m_swapchain);
+    m_swapchain.Init(*m_device, swapchain_create_info);
 }

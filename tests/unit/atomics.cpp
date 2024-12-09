@@ -14,6 +14,7 @@
 
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
+#include "../framework/shader_object_helper.h"
 
 class NegativeAtomic : public VkLayerTest {};
 
@@ -22,7 +23,7 @@ TEST_F(NegativeAtomic, VertexStoresAndAtomicsFeatureDisable) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::shaderImageFloat32Atomics);
-    AddDisabledFeature(vkt::Feature::vertexPipelineStoresAndAtomics);
+
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
@@ -73,7 +74,7 @@ TEST_F(NegativeAtomic, FragmentStoresAndAtomicsFeatureDisable) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::shaderImageFloat32Atomics);
-    AddDisabledFeature(vkt::Feature::fragmentStoresAndAtomics);
+
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
@@ -122,7 +123,7 @@ TEST_F(NegativeAtomic, FragmentStoresAndAtomicsFeatureDisable) {
 TEST_F(NegativeAtomic, FragmentStoresAndAtomicsFeatureBuffer) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME);
-    AddDisabledFeature(vkt::Feature::fragmentStoresAndAtomics);
+
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
@@ -142,6 +143,34 @@ TEST_F(NegativeAtomic, FragmentStoresAndAtomicsFeatureBuffer) {
     };
 
     CreatePipelineHelper::OneshotTest(*this, info_override, kErrorBit, "VUID-RuntimeSpirv-NonWritable-06340");
+}
+
+TEST_F(NegativeAtomic, VertexStoresAndAtomicsFeatureDisableShaderObject) {
+    TEST_DESCRIPTION("Run shader with StoreOp or AtomicOp to verify if vertexPipelineStoresAndAtomics disable.");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::shaderObject);
+    AddRequiredFeature(vkt::Feature::shaderImageFloat32Atomics);
+
+    RETURN_IF_SKIP(Init());
+
+    char const *vs_source = R"glsl(
+        #version 450
+        layout(set=0, binding=0, rgba8) uniform image2D si0;
+        void main() {
+            imageStore(si0, ivec2(0), vec4(0));
+        }
+    )glsl";
+
+    OneOffDescriptorSet descriptor_set(m_device, {
+                                                     {0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_VERTEX_BIT, nullptr},
+                                                 });
+
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-NonWritable-06341");
+    const vkt::Shader vert_shader(*m_device, VK_SHADER_STAGE_VERTEX_BIT, GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, vs_source),
+                                  &descriptor_set.layout_.handle());
+    m_errorMonitor->VerifyFound();
 }
 
 TEST_F(NegativeAtomic, Int64) {
@@ -337,15 +366,15 @@ TEST_F(NegativeAtomic, ImageInt64Drawtime64) {
                                                    VK_IMAGE_LAYOUT_GENERAL);
     pipe.descriptor_set_->UpdateDescriptorSets();
 
-    m_commandBuffer->begin();
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0, 1,
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0, 1,
                               &pipe.descriptor_set_->set_, 0, nullptr);
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdDispatch-SampledType-04471");
-    vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
+    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeAtomic, ImageInt64Drawtime32) {
@@ -387,15 +416,15 @@ TEST_F(NegativeAtomic, ImageInt64Drawtime32) {
                                                    VK_IMAGE_LAYOUT_GENERAL);
     pipe.descriptor_set_->UpdateDescriptorSets();
 
-    m_commandBuffer->begin();
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0, 1,
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0, 1,
                               &pipe.descriptor_set_->set_, 0, nullptr);
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdDispatch-SampledType-04470");
-    vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
+    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeAtomic, ImageInt64DrawtimeSparse) {
@@ -456,14 +485,14 @@ TEST_F(NegativeAtomic, ImageInt64DrawtimeSparse) {
                                                    VK_IMAGE_LAYOUT_GENERAL);
     pipe.descriptor_set_->UpdateDescriptorSets();
 
-    m_commandBuffer->begin();
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0, 1,
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0, 1,
                               &pipe.descriptor_set_->set_, 0, nullptr);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
     m_errorMonitor->SetDesiredError("VUID-vkCmdDispatch-sparseImageInt64Atomics-04474");
-    vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
+    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeAtomic, ImageInt64Mesh32) {
@@ -523,16 +552,16 @@ TEST_F(NegativeAtomic, ImageInt64Mesh32) {
                                                    VK_IMAGE_LAYOUT_GENERAL);
     pipe.descriptor_set_->UpdateDescriptorSets();
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_layout_.handle(), 0, 1,
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_layout_.handle(), 0, 1,
                               &pipe.descriptor_set_->set_, 0, nullptr);
     m_errorMonitor->SetDesiredError("VUID-vkCmdDrawMeshTasksEXT-SampledType-04470");
-    vk::CmdDrawMeshTasksEXT(m_commandBuffer->handle(), 1, 1, 1);
+    vk::CmdDrawMeshTasksEXT(m_command_buffer.handle(), 1, 1, 1);
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->EndRenderPass();
-    m_commandBuffer->end();
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeAtomic, Float) {
@@ -540,10 +569,9 @@ TEST_F(NegativeAtomic, Float) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
 
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::shaderFloat64);
     // Create device without VK_EXT_shader_atomic_float extension or features enabled
     RETURN_IF_SKIP(Init());
-    VkPhysicalDeviceFeatures available_features = {};
-    GetPhysicalDeviceFeatures(&available_features);
 
     // clang-format off
     std::string cs_32_base = R"glsl(
@@ -734,12 +762,10 @@ TEST_F(NegativeAtomic, Float) {
         m_errorMonitor->VerifyFound();
     }
 
-    // shaderBufferFloat64Atomics
-    if (available_features.shaderFloat64) {
-        {
-            m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06284");
-            VkShaderObj const cs(this, cs_buffer_float_64_load.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
-            m_errorMonitor->VerifyFound();
+    // shaderBufferFloat64Atomics (requires shaderFloat64)
+    {{m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06284");
+    VkShaderObj const cs(this, cs_buffer_float_64_load.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+    m_errorMonitor->VerifyFound();
         }
         {
             m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06284");
@@ -786,8 +812,6 @@ TEST_F(NegativeAtomic, Float) {
             VkShaderObj const cs(this, cs_shared_float_64_add.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
             m_errorMonitor->VerifyFound();
         }
-    } else {
-        printf("Skipping 64-bit float tests\n");
     }
 
     // shaderImageFloat32Atomics
@@ -820,19 +844,114 @@ TEST_F(NegativeAtomic, Float) {
 TEST_F(NegativeAtomic, Float2) {
     TEST_DESCRIPTION("Test VK_EXT_shader_atomic_float2.");
     SetTargetApiVersion(VK_API_VERSION_1_2);
-
     // Create device without VK_EXT_shader_atomic_float2 extension or features enabled
-    RETURN_IF_SKIP(InitFramework());
+    RETURN_IF_SKIP(Init());
 
-    // Still check for proper 16-bit storage/float support for most tests
-    VkPhysicalDeviceShaderFloat16Int8Features float16int8_features = vku::InitStructHelper();
-    VkPhysicalDevice16BitStorageFeatures storage_16_bit_features = vku::InitStructHelper(&float16int8_features);
-    auto features2 = GetPhysicalDeviceFeatures2(storage_16_bit_features);
+    // clang-format off
+    std::string cs_32_base = R"glsl(
+        #version 450
+        #extension GL_EXT_shader_atomic_float2 : enable
+        #extension GL_EXT_shader_explicit_arithmetic_types_float32 : enable
+        shared float32_t x;
+        layout(set = 0, binding = 0) buffer ssbo { float32_t y; };
+        void main() {
+    )glsl";
 
-    const bool support_16_bit =
-        (float16int8_features.shaderFloat16 == VK_TRUE) && (storage_16_bit_features.storageBuffer16BitAccess == VK_TRUE);
+    std::string cs_buffer_float_32_min = cs_32_base + R"glsl(
+           atomicMin(y, 1);
+        }
+    )glsl";
 
-    RETURN_IF_SKIP(InitState(nullptr, &features2));
+    std::string cs_buffer_float_32_max = cs_32_base + R"glsl(
+           atomicMax(y, 1);
+        }
+    )glsl";
+
+    std::string cs_shared_float_32_min = cs_32_base + R"glsl(
+           y = atomicMin(x, 1);
+        }
+    )glsl";
+
+    std::string cs_shared_float_32_max = cs_32_base + R"glsl(
+           y = atomicMax(x, 1);
+        }
+    )glsl";
+
+    std::string cs_image_32_base = R"glsl(
+        #version 450
+        #extension GL_EXT_shader_atomic_float2 : enable
+        layout(set = 0, binding = 0) buffer ssbo { float y; };
+        layout(set = 0, binding = 1, r32f) uniform image2D z;
+        void main() {
+    )glsl";
+
+    std::string cs_image_32_min = cs_image_32_base + R"glsl(
+           y = imageAtomicMin(z, ivec2(1, 1), y);
+        }
+    )glsl";
+
+    std::string cs_image_32_max = cs_image_32_base + R"glsl(
+           y = imageAtomicMax(z, ivec2(1, 1), y);
+        }
+    )glsl";
+    // clang-format on
+
+    // shaderBufferFloat32AtomicMinMax
+    {
+        m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");
+        m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08742");
+        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06284");
+        VkShaderObj const cs(this, cs_buffer_float_32_min.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+        m_errorMonitor->VerifyFound();
+    }
+    {
+        m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");
+        m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08742");
+        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06284");
+        VkShaderObj const cs(this, cs_buffer_float_32_max.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+        m_errorMonitor->VerifyFound();
+    }
+
+    // shaderSharedFloat32AtomicMinMax
+    {
+        m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");
+        m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08742");
+        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06285");
+        VkShaderObj const cs(this, cs_shared_float_32_min.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+        m_errorMonitor->VerifyFound();
+    }
+    {
+        m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");
+        m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08742");
+        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06285");
+        VkShaderObj const cs(this, cs_shared_float_32_max.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+        m_errorMonitor->VerifyFound();
+    }
+
+    // shaderSharedFloat32AtomicMinMax
+    {
+        m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");
+        m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08742");
+        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06286");
+        VkShaderObj const cs(this, cs_image_32_min.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+        m_errorMonitor->VerifyFound();
+    }
+    {
+        m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");
+        m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08742");
+        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06286");
+        VkShaderObj const cs(this, cs_image_32_min.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+        m_errorMonitor->VerifyFound();
+    }
+}
+
+TEST_F(NegativeAtomic, Float2With16bit) {
+    TEST_DESCRIPTION("Test VK_EXT_shader_atomic_float2.");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredFeature(vkt::Feature::shaderFloat16);
+    AddRequiredFeature(vkt::Feature::storageBuffer16BitAccess);
+    // Create device without VK_EXT_shader_atomic_float2 extension or features enabled
+    RETURN_IF_SKIP(Init());
 
     // clang-format off
     std::string cs_16_base = R"glsl(
@@ -909,34 +1028,99 @@ TEST_F(NegativeAtomic, Float2) {
         }
     )glsl";
 
-    std::string cs_32_base = R"glsl(
-        #version 450
-        #extension GL_EXT_shader_atomic_float2 : enable
-        #extension GL_EXT_shader_explicit_arithmetic_types_float32 : enable
-        shared float32_t x;
-        layout(set = 0, binding = 0) buffer ssbo { float32_t y; };
-        void main() {
-    )glsl";
+    // clang-format on
 
-    std::string cs_buffer_float_32_min = cs_32_base + R"glsl(
-           atomicMin(y, 1);
-        }
-    )glsl";
+    // shaderBufferFloat16Atomics
+    {
+        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06284");
+        VkShaderObj const cs(this, cs_buffer_float_16_load.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+        m_errorMonitor->VerifyFound();
+    }
+    {
+        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06284");
+        VkShaderObj const cs(this, cs_buffer_float_16_store.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+        m_errorMonitor->VerifyFound();
+    }
+    {
+        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06284");
+        VkShaderObj const cs(this, cs_buffer_float_16_exchange.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+        m_errorMonitor->VerifyFound();
+    }
 
-    std::string cs_buffer_float_32_max = cs_32_base + R"glsl(
-           atomicMax(y, 1);
-        }
-    )glsl";
+    // shaderBufferFloat16AtomicAdd
+    {
+        m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");
+        m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08742", 2);
+        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06284");
+        VkShaderObj const cs(this, cs_buffer_float_16_add.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+        m_errorMonitor->VerifyFound();
+    }
 
-    std::string cs_shared_float_32_min = cs_32_base + R"glsl(
-           y = atomicMin(x, 1);
-        }
-    )glsl";
+    // shaderBufferFloat16AtomicMinMax
+    {
+        m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");
+        m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08742");
+        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06284");
+        VkShaderObj const cs(this, cs_buffer_float_16_min.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+        m_errorMonitor->VerifyFound();
+    }
+    {
+        m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");
+        m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08742");
+        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06284");
+        VkShaderObj const cs(this, cs_buffer_float_16_max.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+        m_errorMonitor->VerifyFound();
+    }
 
-    std::string cs_shared_float_32_max = cs_32_base + R"glsl(
-           y = atomicMax(x, 1);
-        }
-    )glsl";
+    // shaderSharedFloat16Atomics
+    {
+        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06285");
+        VkShaderObj const cs(this, cs_shared_float_16_load.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+        m_errorMonitor->VerifyFound();
+    }
+    {
+        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06285");
+        VkShaderObj const cs(this, cs_shared_float_16_store.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+        m_errorMonitor->VerifyFound();
+    }
+    {
+        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06285");
+        VkShaderObj const cs(this, cs_shared_float_16_exchange.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+        m_errorMonitor->VerifyFound();
+    }
+
+    // shaderSharedFloat16AtomicAdd
+    {
+        m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");
+        m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08742", 2);
+        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06285");
+        VkShaderObj const cs(this, cs_shared_float_16_add.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+        m_errorMonitor->VerifyFound();
+    }
+
+    // shaderSharedFloat16AtomicMinMax
+    {
+        m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");
+        m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08742");
+        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06285");
+        VkShaderObj const cs(this, cs_shared_float_16_min.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+        m_errorMonitor->VerifyFound();
+    }
+    {
+        m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");
+        m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08742");
+        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06285");
+        VkShaderObj const cs(this, cs_shared_float_16_max.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+        m_errorMonitor->VerifyFound();
+    }
+}
+
+TEST_F(NegativeAtomic, Float2With64bit) {
+    TEST_DESCRIPTION("Test VK_EXT_shader_atomic_float2.");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredFeature(vkt::Feature::shaderFloat64);
+    // Create device without VK_EXT_shader_atomic_float2 extension or features enabled
+    RETURN_IF_SKIP(Init());
 
     std::string cs_64_base = R"glsl(
         #version 450
@@ -967,194 +1151,35 @@ TEST_F(NegativeAtomic, Float2) {
         }
     )glsl";
 
-    std::string cs_image_32_base = R"glsl(
-        #version 450
-        #extension GL_EXT_shader_atomic_float2 : enable
-        layout(set = 0, binding = 0) buffer ssbo { float y; };
-        layout(set = 0, binding = 1, r32f) uniform image2D z;
-        void main() {
-    )glsl";
-
-    std::string cs_image_32_min = cs_image_32_base + R"glsl(
-           y = imageAtomicMin(z, ivec2(1, 1), y);
-        }
-    )glsl";
-
-    std::string cs_image_32_max = cs_image_32_base + R"glsl(
-           y = imageAtomicMax(z, ivec2(1, 1), y);
-        }
-    )glsl";
-    // clang-format on
-
-    if (support_16_bit) {
-        // shaderBufferFloat16Atomics
-        {
-            m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06284");
-            VkShaderObj const cs(this, cs_buffer_float_16_load.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
-            m_errorMonitor->VerifyFound();
-        }
-        {
-            m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06284");
-            VkShaderObj const cs(this, cs_buffer_float_16_store.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
-            m_errorMonitor->VerifyFound();
-        }
-        {
-            m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06284");
-            VkShaderObj const cs(this, cs_buffer_float_16_exchange.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
-            m_errorMonitor->VerifyFound();
-        }
-
-        // shaderBufferFloat16AtomicAdd
-        {
-            m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");
-            m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08742", 2);
-            m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06284");
-            VkShaderObj const cs(this, cs_buffer_float_16_add.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
-            m_errorMonitor->VerifyFound();
-        }
-
-        // shaderBufferFloat16AtomicMinMax
-        {
-            m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");
-            m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08742");
-            m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06284");
-            VkShaderObj const cs(this, cs_buffer_float_16_min.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
-            m_errorMonitor->VerifyFound();
-        }
-        {
-            m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");
-            m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08742");
-            m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06284");
-            VkShaderObj const cs(this, cs_buffer_float_16_max.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
-            m_errorMonitor->VerifyFound();
-        }
-
-        // shaderSharedFloat16Atomics
-        {
-            m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06285");
-            VkShaderObj const cs(this, cs_shared_float_16_load.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
-            m_errorMonitor->VerifyFound();
-        }
-        {
-            m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06285");
-            VkShaderObj const cs(this, cs_shared_float_16_store.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
-            m_errorMonitor->VerifyFound();
-        }
-        {
-            m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06285");
-            VkShaderObj const cs(this, cs_shared_float_16_exchange.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
-            m_errorMonitor->VerifyFound();
-        }
-
-        // shaderSharedFloat16AtomicAdd
-        {
-            m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");
-            m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08742", 2);
-            m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06285");
-            VkShaderObj const cs(this, cs_shared_float_16_add.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
-            m_errorMonitor->VerifyFound();
-        }
-
-        // shaderSharedFloat16AtomicMinMax
-        {
-            m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");
-            m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08742");
-            m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06285");
-            VkShaderObj const cs(this, cs_shared_float_16_min.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
-            m_errorMonitor->VerifyFound();
-        }
-        {
-            m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");
-            m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08742");
-            m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06285");
-            VkShaderObj const cs(this, cs_shared_float_16_max.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
-            m_errorMonitor->VerifyFound();
-        }
-    } else {
-        printf("Skipping 16-bit tests\n");
-    }
-
-    // shaderBufferFloat32AtomicMinMax
+    // shaderBufferFloat64AtomicMinMax
     {
         m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");
         m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08742");
         m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06284");
-        VkShaderObj const cs(this, cs_buffer_float_32_min.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+        VkShaderObj const cs(this, cs_buffer_float_64_min.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
         m_errorMonitor->VerifyFound();
     }
     {
         m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");
         m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08742");
         m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06284");
-        VkShaderObj const cs(this, cs_buffer_float_32_max.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+        VkShaderObj const cs(this, cs_buffer_float_64_max.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
         m_errorMonitor->VerifyFound();
     }
 
-    // shaderSharedFloat32AtomicMinMax
+    // shaderSharedFloat64AtomicMinMax
     {
         m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");
         m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08742");
         m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06285");
-        VkShaderObj const cs(this, cs_shared_float_32_min.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+        VkShaderObj const cs(this, cs_shared_float_64_min.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
         m_errorMonitor->VerifyFound();
     }
     {
         m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");
         m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08742");
         m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06285");
-        VkShaderObj const cs(this, cs_shared_float_32_max.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
-        m_errorMonitor->VerifyFound();
-    }
-
-    if (features2.features.shaderFloat64 == VK_TRUE) {
-        // shaderBufferFloat64AtomicMinMax
-        {
-            m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");
-            m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08742");
-            m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06284");
-            VkShaderObj const cs(this, cs_buffer_float_64_min.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
-            m_errorMonitor->VerifyFound();
-        }
-        {
-            m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");
-            m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08742");
-            m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06284");
-            VkShaderObj const cs(this, cs_buffer_float_64_max.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
-            m_errorMonitor->VerifyFound();
-        }
-
-        // shaderSharedFloat64AtomicMinMax
-        {
-            m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");
-            m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08742");
-            m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06285");
-            VkShaderObj const cs(this, cs_shared_float_64_min.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
-            m_errorMonitor->VerifyFound();
-        }
-        {
-            m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");
-            m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08742");
-            m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06285");
-            VkShaderObj const cs(this, cs_shared_float_64_max.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
-            m_errorMonitor->VerifyFound();
-        }
-    } else {
-        printf("Skipping 64-bit float tests\n");
-    }
-
-    // shaderSharedFloat32AtomicMinMax
-    {
-        m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");
-        m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08742");
-        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06286");
-        VkShaderObj const cs(this, cs_image_32_min.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
-        m_errorMonitor->VerifyFound();
-    }
-    {
-        m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");
-        m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08742");
-        m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-06286");
-        VkShaderObj const cs(this, cs_image_32_min.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
+        VkShaderObj const cs(this, cs_shared_float_64_max.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
         m_errorMonitor->VerifyFound();
     }
 }
@@ -1222,6 +1247,182 @@ TEST_F(NegativeAtomic, Float2WidthMismatch) {
     m_errorMonitor->VerifyFound();
 }
 
+TEST_F(NegativeAtomic, FloatOpSource) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    RETURN_IF_SKIP(Init());
+
+    std::string cs_source = R"(
+               OpCapability Shader
+          %2 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %main "main"
+               OpExecutionMode %main LocalSize 1 1 1
+          %1 = OpString "a.comp"
+               OpSource GLSL 450 %1 "#version 450
+#extension GL_EXT_shader_atomic_float : enable
+#extension GL_KHR_memory_scope_semantics : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_float32 : enable
+
+layout(set = 0, binding = 0) buffer ssbo { float32_t y; };
+void main() {
+    y = 1 + atomicLoad(y, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);
+}"
+               OpSourceExtension "GL_EXT_shader_atomic_float"
+               OpSourceExtension "GL_EXT_shader_explicit_arithmetic_types_float32"
+               OpSourceExtension "GL_KHR_memory_scope_semantics"
+               OpName %main "main"
+               OpName %ssbo "ssbo"
+               OpMemberName %ssbo 0 "y"
+               OpName %_ ""
+               OpModuleProcessed "client vulkan100"
+               OpModuleProcessed "target-env spirv1.3"
+               OpModuleProcessed "target-env vulkan1.1"
+               OpModuleProcessed "entry-point main"
+               OpDecorate %ssbo Block
+               OpMemberDecorate %ssbo 0 Offset 0
+               OpDecorate %_ Binding 0
+               OpDecorate %_ DescriptorSet 0
+       %void = OpTypeVoid
+          %4 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+       %ssbo = OpTypeStruct %float
+%_ptr_StorageBuffer_ssbo = OpTypePointer StorageBuffer %ssbo
+          %_ = OpVariable %_ptr_StorageBuffer_ssbo StorageBuffer
+        %int = OpTypeInt 32 1
+      %int_0 = OpConstant %int 0
+    %float_1 = OpConstant %float 1
+%_ptr_StorageBuffer_float = OpTypePointer StorageBuffer %float
+      %int_1 = OpConstant %int 1
+     %int_64 = OpConstant %int 64
+       %uint = OpTypeInt 32 0
+     %uint_1 = OpConstant %uint 1
+     %uint_0 = OpConstant %uint 0
+    %uint_64 = OpConstant %uint 64
+               OpLine %1 7 11
+       %main = OpFunction %void None %4
+          %6 = OpLabel
+               OpLine %1 8 0
+         %15 = OpAccessChain %_ptr_StorageBuffer_float %_ %int_0
+         %22 = OpAtomicLoad %float %15 %int_1 %uint_64
+         %23 = OpFAdd %float %float_1 %22
+         %24 = OpAccessChain %_ptr_StorageBuffer_float %_ %int_0
+               OpStore %24 %23
+               OpLine %1 9 0
+               OpReturn
+               OpFunctionEnd
+    )";
+
+    // VUID-RuntimeSpirv-None-06284
+    m_errorMonitor->SetDesiredError("atomicLoad(y, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);");
+    VkShaderObj const cs(this, cs_source.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1, SPV_SOURCE_ASM);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeAtomic, FloatShaderDebugInfo) {
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
+    RETURN_IF_SKIP(Init());
+
+    std::string cs_source = R"(
+               OpCapability Shader
+               OpExtension "SPV_KHR_non_semantic_info"
+          %1 = OpExtInstImport "NonSemantic.Shader.DebugInfo.100"
+          %3 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %main "main"
+               OpExecutionMode %main LocalSize 1 1 1
+          %2 = OpString "a.comp"
+          %8 = OpString "uint"
+         %16 = OpString "main"
+         %19 = OpString "#version 450
+#extension GL_EXT_shader_atomic_float : enable
+#extension GL_KHR_memory_scope_semantics : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_float32 : enable
+
+layout(set = 0, binding = 0) buffer ssbo { float32_t y; };
+void main() {
+    y = 1 + atomicLoad(y, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);
+}"
+         %29 = OpString "float"
+         %33 = OpString "y"
+         %36 = OpString "ssbo"
+         %43 = OpString ""
+         %45 = OpString "int"
+               OpSourceExtension "GL_EXT_shader_atomic_float"
+               OpSourceExtension "GL_EXT_shader_explicit_arithmetic_types_float32"
+               OpSourceExtension "GL_KHR_memory_scope_semantics"
+               OpName %main "main"
+               OpName %ssbo "ssbo"
+               OpMemberName %ssbo 0 "y"
+               OpName %_ ""
+               OpModuleProcessed "client vulkan100"
+               OpModuleProcessed "target-env spirv1.3"
+               OpModuleProcessed "target-env vulkan1.1"
+               OpModuleProcessed "entry-point main"
+               OpDecorate %ssbo Block
+               OpMemberDecorate %ssbo 0 Offset 0
+               OpDecorate %_ Binding 0
+               OpDecorate %_ DescriptorSet 0
+       %void = OpTypeVoid
+          %5 = OpTypeFunction %void
+       %uint = OpTypeInt 32 0
+    %uint_32 = OpConstant %uint 32
+     %uint_6 = OpConstant %uint 6
+     %uint_0 = OpConstant %uint 0
+          %9 = OpExtInst %void %1 DebugTypeBasic %8 %uint_32 %uint_6 %uint_0
+     %uint_3 = OpConstant %uint 3
+          %6 = OpExtInst %void %1 DebugTypeFunction %uint_3 %void
+         %18 = OpExtInst %void %1 DebugSource %2 %19
+     %uint_7 = OpConstant %uint 7
+     %uint_1 = OpConstant %uint 1
+     %uint_4 = OpConstant %uint 4
+     %uint_2 = OpConstant %uint 2
+         %21 = OpExtInst %void %1 DebugCompilationUnit %uint_1 %uint_4 %18 %uint_2
+         %17 = OpExtInst %void %1 DebugFunction %16 %6 %18 %uint_7 %uint_0 %21 %16 %uint_3 %uint_7
+      %float = OpTypeFloat 32
+         %30 = OpExtInst %void %1 DebugTypeBasic %29 %uint_32 %uint_3 %uint_0
+       %ssbo = OpTypeStruct %float
+    %uint_54 = OpConstant %uint 54
+         %32 = OpExtInst %void %1 DebugTypeMember %33 %30 %18 %uint_6 %uint_54 %uint_0 %uint_0 %uint_3
+     %uint_8 = OpConstant %uint 8
+         %35 = OpExtInst %void %1 DebugTypeComposite %36 %uint_1 %18 %uint_8 %uint_0 %21 %36 %uint_0 %uint_3 %32
+%_ptr_StorageBuffer_ssbo = OpTypePointer StorageBuffer %ssbo
+    %uint_12 = OpConstant %uint 12
+         %40 = OpExtInst %void %1 DebugTypePointer %35 %uint_12 %uint_0
+          %_ = OpVariable %_ptr_StorageBuffer_ssbo StorageBuffer
+         %42 = OpExtInst %void %1 DebugGlobalVariable %43 %35 %18 %uint_8 %uint_0 %21 %43 %_ %uint_8
+        %int = OpTypeInt 32 1
+         %46 = OpExtInst %void %1 DebugTypeBasic %45 %uint_32 %uint_4 %uint_0
+      %int_0 = OpConstant %int 0
+    %float_1 = OpConstant %float 1
+%_ptr_StorageBuffer_float = OpTypePointer StorageBuffer %float
+         %50 = OpExtInst %void %1 DebugTypePointer %30 %uint_12 %uint_0
+      %int_1 = OpConstant %int 1
+     %int_64 = OpConstant %int 64
+    %uint_64 = OpConstant %uint 64
+     %uint_9 = OpConstant %uint 9
+       %main = OpFunction %void None %5
+         %15 = OpLabel
+         %26 = OpExtInst %void %1 DebugScope %17
+         %27 = OpExtInst %void %1 DebugLine %18 %uint_7 %uint_7 %uint_0 %uint_0
+         %25 = OpExtInst %void %1 DebugFunctionDefinition %17 %main
+         %52 = OpExtInst %void %1 DebugLine %18 %uint_8 %uint_8 %uint_0 %uint_0
+         %51 = OpAccessChain %_ptr_StorageBuffer_float %_ %int_0
+         %56 = OpAtomicLoad %float %51 %int_1 %uint_64
+         %57 = OpFAdd %float %float_1 %56
+         %58 = OpAccessChain %_ptr_StorageBuffer_float %_ %int_0
+               OpStore %58 %57
+         %59 = OpExtInst %void %1 DebugLine %18 %uint_9 %uint_9 %uint_0 %uint_0
+               OpReturn
+               OpFunctionEnd
+    )";
+
+    // VUID-RuntimeSpirv-None-06284
+    m_errorMonitor->SetDesiredError("atomicLoad(y, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);");
+    VkShaderObj const cs(this, cs_source.c_str(), VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1, SPV_SOURCE_ASM);
+    m_errorMonitor->VerifyFound();
+}
+
 TEST_F(NegativeAtomic, InvalidStorageOperation) {
     TEST_DESCRIPTION(
         "If storage view use atomic operation, the view's format MUST support VK_FORMAT_FEATURE_STORAGE_IMAGE_ATOMIC_BIT or "
@@ -1238,14 +1439,14 @@ TEST_F(NegativeAtomic, InvalidStorageOperation) {
                                                        // cause DesiredFailure. VK_FORMAT_R32_UINT is right format.
     auto image_ci = vkt::Image::ImageCreateInfo2D(64, 64, 1, 1, image_format, usage);
 
-    if (ImageFormatIsSupported(instance(), gpu(), image_ci, VK_FORMAT_FEATURE_STORAGE_IMAGE_ATOMIC_BIT)) {
+    if (ImageFormatIsSupported(instance(), Gpu(), image_ci, VK_FORMAT_FEATURE_STORAGE_IMAGE_ATOMIC_BIT)) {
         GTEST_SKIP() << "Cannot make VK_FORMAT_FEATURE_STORAGE_IMAGE_ATOMIC_BIT not supported.";
     }
 
     VkFormat buffer_view_format =
         VK_FORMAT_R8_UNORM;  // The format doesn't support VK_FORMAT_FEATURE_STORAGE_TEXEL_BUFFER_ATOMIC_BIT to
                              // cause DesiredFailure. VK_FORMAT_R32_UINT is right format.
-    if (BufferFormatAndFeaturesSupported(gpu(), buffer_view_format, VK_FORMAT_FEATURE_STORAGE_TEXEL_BUFFER_ATOMIC_BIT)) {
+    if (BufferFormatAndFeaturesSupported(Gpu(), buffer_view_format, VK_FORMAT_FEATURE_STORAGE_TEXEL_BUFFER_ATOMIC_BIT)) {
         GTEST_SKIP() << "Cannot make VK_FORMAT_FEATURE_STORAGE_TEXEL_BUFFER_ATOMIC_BIT not supported.";
     }
     m_errorMonitor->SetUnexpectedError("VUID-VkBufferViewCreateInfo-format-08779");
@@ -1301,19 +1502,19 @@ TEST_F(NegativeAtomic, InvalidStorageOperation) {
     g_pipe.descriptor_set_->WriteDescriptorBufferView(0, buffer_view.handle(), VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1);
     g_pipe.descriptor_set_->UpdateDescriptorSets();
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe.Handle());
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe.pipeline_layout_.handle(), 0, 1,
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe.Handle());
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe.pipeline_layout_.handle(), 0, 1,
                               &g_pipe.descriptor_set_->set_, 0, nullptr);
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-02691", 2);
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-07888", 2);
-    vk::CmdDraw(m_commandBuffer->handle(), 1, 0, 0, 0);
+    vk::CmdDraw(m_command_buffer.handle(), 1, 0, 0, 0);
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->EndRenderPass();
-    m_commandBuffer->end();
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeAtomic, ImageFloat16Vector) {
@@ -1391,7 +1592,7 @@ TEST_F(NegativeAtomic, ImageFloat16Vector) {
 
 TEST_F(NegativeAtomic, VertexPipelineStoresAndAtomics) {
     TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8223");
-    AddDisabledFeature(vkt::Feature::vertexPipelineStoresAndAtomics);
+
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 

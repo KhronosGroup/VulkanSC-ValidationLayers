@@ -20,6 +20,9 @@
 #include "vksc_test_dispatch_helper.h"
 
 #include "utils/vk_layer_utils.h"
+#include "vk_layer_config.h"
+
+#include <glslang/Public/ShaderLang.h>
 
 #include <vector>
 #include <filesystem>

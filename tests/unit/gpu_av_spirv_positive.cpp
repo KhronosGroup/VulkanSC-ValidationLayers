@@ -28,13 +28,12 @@ TEST_F(PositiveGpuAVSpirv, LoopPhi) {
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
-    VkMemoryPropertyFlags mem_props = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-    vkt::Buffer buffer_uniform(*m_device, 1024, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, mem_props);
-    vkt::Buffer buffer_storage(*m_device, 1024, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, mem_props);
+    vkt::Buffer buffer_uniform(*m_device, 1024, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
+    vkt::Buffer buffer_storage(*m_device, 1024, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
 
-    uint32_t *data = (uint32_t *)buffer_uniform.memory().map();
+    uint32_t *data = (uint32_t *)buffer_uniform.Memory().Map();
     data[0] = 4;  // Scene.lightCount
-    buffer_uniform.memory().unmap();
+    buffer_uniform.Memory().Unmap();
 
     OneOffDescriptorSet descriptor_set(m_device, {
                                                      {0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
@@ -159,16 +158,16 @@ TEST_F(PositiveGpuAVSpirv, LoopPhi) {
     pipe.gp_ci_.layout = pipeline_layout.handle();
     pipe.CreateGraphicsPipeline();
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1,
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1,
                               &descriptor_set.set_, 0, nullptr);
-    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
-    vk::CmdEndRenderPass(m_commandBuffer->handle());
-    m_commandBuffer->end();
+    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
+    vk::CmdEndRenderPass(m_command_buffer.handle());
+    m_command_buffer.End();
 
-    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Submit(m_command_buffer);
     m_default_queue->Wait();
 }
 
@@ -239,31 +238,30 @@ TEST_F(PositiveGpuAVSpirv, LoopHeaderPhi) {
     pipe.cs_ = std::make_unique<VkShaderObj>(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2, SPV_SOURCE_ASM);
     pipe.CreateComputePipeline();
 
-    VkMemoryPropertyFlags mem_props = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-    vkt::Buffer buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, mem_props);
-    uint32_t *data = (uint32_t *)buffer.memory().map();
+    vkt::Buffer buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
+    uint32_t *data = (uint32_t *)buffer.Memory().Map();
     data[0] = 1;  // data[0]
     data[1] = 2;  // data[1]
     data[2] = 3;  // data[2]
     data[3] = 0;  // data[3]
-    buffer.memory().unmap();
+    buffer.Memory().Unmap();
 
     pipe.descriptor_set_->WriteDescriptorBufferInfo(0, buffer.handle(), 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     pipe.descriptor_set_->UpdateDescriptorSets();
 
-    m_commandBuffer->begin();
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0, 1,
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0, 1,
                               &pipe.descriptor_set_->set_, 0, nullptr);
-    vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
-    m_commandBuffer->end();
+    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    m_command_buffer.End();
 
-    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Submit(m_command_buffer);
     m_default_queue->Wait();
 
-    data = (uint32_t *)buffer.memory().map();
+    data = (uint32_t *)buffer.Memory().Map();
     ASSERT_EQ(4u, data[0]);
-    buffer.memory().unmap();
+    buffer.Memory().Unmap();
 }
 
 TEST_F(PositiveGpuAVSpirv, VulkanMemoryModelDeviceScope) {
@@ -276,12 +274,11 @@ TEST_F(PositiveGpuAVSpirv, VulkanMemoryModelDeviceScope) {
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
-    VkMemoryPropertyFlags mem_props = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-    vkt::Buffer buffer(*m_device, 256, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, mem_props);
+    vkt::Buffer buffer(*m_device, 256, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
 
-    uint32_t *data = (uint32_t *)buffer.memory().map();
+    uint32_t *data = (uint32_t *)buffer.Memory().Map();
     data[0] = 1;
-    buffer.memory().unmap();
+    buffer.Memory().Unmap();
 
     OneOffDescriptorSet descriptor_set(m_device, {
                                                      {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
@@ -342,20 +339,20 @@ TEST_F(PositiveGpuAVSpirv, VulkanMemoryModelDeviceScope) {
     pipe.cp_ci_.layout = pipeline_layout.handle();
     pipe.CreateComputePipeline();
 
-    m_commandBuffer->begin();
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout.handle(), 0, 1,
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout.handle(), 0, 1,
                               &descriptor_set.set_, 0, nullptr);
-    vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
-    m_commandBuffer->end();
+    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    m_command_buffer.End();
 
-    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Submit(m_command_buffer);
     m_default_queue->Wait();
 }
 
 TEST_F(PositiveGpuAVSpirv, FindMultipleStores) {
     TEST_DESCRIPTION("Catches bug when various OpStore are in top of a function");
-    AddDisabledFeature(vkt::Feature::robustBufferAccess);
+
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
@@ -379,18 +376,17 @@ TEST_F(PositiveGpuAVSpirv, FindMultipleStores) {
     pipe.cs_ = std::make_unique<VkShaderObj>(this, shader_source, VK_SHADER_STAGE_COMPUTE_BIT);
     pipe.CreateComputePipeline();
 
-    vkt::Buffer write_buffer(*m_device, 64, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    vkt::Buffer write_buffer(*m_device, 64, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
     pipe.descriptor_set_->WriteDescriptorBufferInfo(0, write_buffer.handle(), 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     pipe.descriptor_set_->UpdateDescriptorSets();
 
-    m_commandBuffer->begin();
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0, 1,
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0, 1,
                               &pipe.descriptor_set_->set_, 0, nullptr);
-    vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
-    m_commandBuffer->end();
+    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    m_command_buffer.End();
 
-    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Submit(m_command_buffer);
     m_default_queue->Wait();
 }

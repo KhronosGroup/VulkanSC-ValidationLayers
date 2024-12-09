@@ -150,14 +150,9 @@ VkResult DispatchCreateGraphicsPipelines(VkDevice device, VkPipelineCache pipeli
                                                 dynamic_rendering->stencilAttachmentFormat != VK_FORMAT_UNDEFINED);
             }
 
-            auto &graphics_info = pCreateInfos[idx0];
-            auto state_info = dynamic_cast<ValidationStateTracker *>(layer_data);
-            vku::PNextCopyState pnext_copy_state = {
-                [state_info, &graphics_info](VkBaseOutStructure *safe_struct, const VkBaseOutStructure *in_struct) -> bool {
-                    return vvl::Pipeline::PnextRenderingInfoCustomCopy(state_info, graphics_info, safe_struct, in_struct);
-                }};
-            local_pCreateInfos[idx0].initialize(&pCreateInfos[idx0], uses_color_attachment, uses_depthstencil_attachment,
-                                                &pnext_copy_state);
+            // TODO: this used to use vvl::Pipeline::PnextRenderingInfoCustomCopy() but it was effectively a no-op
+            // since the layer_data returned by GetLayerDataPtr() above was NEVER an instance of ValidationStateTracker
+            local_pCreateInfos[idx0].initialize(&pCreateInfos[idx0], uses_color_attachment, uses_depthstencil_attachment);
 
             if (pCreateInfos[idx0].basePipelineHandle) {
                 local_pCreateInfos[idx0].basePipelineHandle = layer_data->Unwrap(pCreateInfos[idx0].basePipelineHandle);
@@ -236,7 +231,7 @@ VkResult DispatchCreateGraphicsPipelines(VkDevice device, VkPipelineCache pipeli
 }
 
 template <typename T>
-static void UpdateCreateRenderPassState(ValidationObject *layer_data, const T *pCreateInfo, VkRenderPass renderPass) {
+static void UpdateCreateRenderPassState(DispatchObject *layer_data, const T *pCreateInfo, VkRenderPass renderPass) {
     auto &renderpass_state = layer_data->renderpasses_states[renderPass];
 
     for (uint32_t subpass = 0; subpass < pCreateInfo->subpassCount; ++subpass) {
@@ -255,8 +250,7 @@ static void UpdateCreateRenderPassState(ValidationObject *layer_data, const T *p
 }
 
 template <>
-void UpdateCreateRenderPassState(ValidationObject *layer_data, const VkRenderPassCreateInfo2 *pCreateInfo,
-                                 VkRenderPass renderPass) {
+void UpdateCreateRenderPassState(DispatchObject *layer_data, const VkRenderPassCreateInfo2 *pCreateInfo, VkRenderPass renderPass) {
     auto &renderpass_state = layer_data->renderpasses_states[renderPass];
 
     for (uint32_t subpassIndex = 0; subpassIndex < pCreateInfo->subpassCount; ++subpassIndex) {
@@ -648,7 +642,7 @@ void DispatchDestroyDescriptorUpdateTemplateKHR(VkDevice device, VkDescriptorUpd
     layer_data->device_dispatch_table.DestroyDescriptorUpdateTemplateKHR(device, descriptorUpdateTemplate, pAllocator);
 }
 
-void *BuildUnwrappedUpdateTemplateBuffer(ValidationObject *layer_data, uint64_t descriptorUpdateTemplate, const void *pData) {
+void *BuildUnwrappedUpdateTemplateBuffer(DispatchObject *layer_data, uint64_t descriptorUpdateTemplate, const void *pData) {
     auto const template_map_entry = layer_data->desc_template_createinfo_map.find(descriptorUpdateTemplate);
     auto const &create_info = template_map_entry->second->create_info;
     size_t allocation_size = 0;
@@ -1284,6 +1278,45 @@ VkResult DispatchGetDeferredOperationResultKHR(VkDevice device, VkDeferredOperat
     return result;
 }
 
+void DispatchCmdBuildAccelerationStructuresKHR(VkCommandBuffer commandBuffer, uint32_t infoCount,
+    const VkAccelerationStructureBuildGeometryInfoKHR* pInfos,
+    const VkAccelerationStructureBuildRangeInfoKHR* const* ppBuildRangeInfos) {
+    auto layer_data = GetLayerDataPtr(GetDispatchKey(commandBuffer), layer_data_map);
+    if (!wrap_handles)
+        return layer_data->device_dispatch_table.CmdBuildAccelerationStructuresKHR(commandBuffer, infoCount, pInfos,
+            ppBuildRangeInfos);
+    vku::safe_VkAccelerationStructureBuildGeometryInfoKHR* local_pInfos = nullptr;
+    {
+        if (pInfos) {
+            local_pInfos = new vku::safe_VkAccelerationStructureBuildGeometryInfoKHR[infoCount];
+            for (uint32_t index0 = 0; index0 < infoCount; ++index0) {
+                local_pInfos[index0].initialize(&pInfos[index0], false, nullptr);
+
+                if (pInfos[index0].srcAccelerationStructure) {
+                    local_pInfos[index0].srcAccelerationStructure = layer_data->Unwrap(pInfos[index0].srcAccelerationStructure);
+                }
+                if (pInfos[index0].dstAccelerationStructure) {
+                    local_pInfos[index0].dstAccelerationStructure = layer_data->Unwrap(pInfos[index0].dstAccelerationStructure);
+                }
+                for (uint32_t geometry_index = 0; geometry_index < local_pInfos[index0].geometryCount; ++geometry_index) {
+                    vku::safe_VkAccelerationStructureGeometryKHR& geometry_info =
+                        local_pInfos[index0].pGeometries != nullptr ? local_pInfos[index0].pGeometries[geometry_index]
+                        : *(local_pInfos[index0].ppGeometries[geometry_index]);
+
+                    if (geometry_info.geometryType == VK_GEOMETRY_TYPE_TRIANGLES_KHR) {
+                        UnwrapPnextChainHandles(layer_data, geometry_info.geometry.triangles.pNext);
+                    }
+                }
+            }
+        }
+    }
+    layer_data->device_dispatch_table.CmdBuildAccelerationStructuresKHR(
+        commandBuffer, infoCount, (const VkAccelerationStructureBuildGeometryInfoKHR*)local_pInfos, ppBuildRangeInfos);
+    if (local_pInfos) {
+        delete[] local_pInfos;
+    }
+}
+
 VkResult DispatchBuildAccelerationStructuresKHR(VkDevice device, VkDeferredOperationKHR deferredOperation, uint32_t infoCount,
                                                 const VkAccelerationStructureBuildGeometryInfoKHR *pInfos,
                                                 const VkAccelerationStructureBuildRangeInfoKHR *const *ppBuildRangeInfos) {
@@ -1308,6 +1341,9 @@ VkResult DispatchBuildAccelerationStructuresKHR(VkDevice device, VkDeferredOpera
                     vku::safe_VkAccelerationStructureGeometryKHR &geometry_info =
                         local_pInfos[index0].pGeometries != nullptr ? local_pInfos[index0].pGeometries[geometry_index]
                                                                     : *(local_pInfos[index0].ppGeometries[geometry_index]);
+                    if (geometry_info.geometryType == VK_GEOMETRY_TYPE_TRIANGLES_KHR) {
+                        UnwrapPnextChainHandles(layer_data, geometry_info.geometry.triangles.pNext);
+                    }
                     if (geometry_info.geometryType == VK_GEOMETRY_TYPE_INSTANCES_KHR) {
                         if (geometry_info.geometry.instances.arrayOfPointers) {
                             const uint8_t *byte_ptr =
@@ -1635,5 +1671,82 @@ VkResult DispatchCreatePipelineBinariesKHR(VkDevice device, const VkPipelineBina
         }
     }
 
+    return result;
+}
+
+VkResult DispatchGetPipelineKeyKHR(VkDevice device, const VkPipelineCreateInfoKHR *pPipelineCreateInfo,
+                                   VkPipelineBinaryKeyKHR *pPipelineKey) {
+    auto layer_data = GetLayerDataPtr(GetDispatchKey(device), layer_data_map);
+    if (!wrap_handles) return layer_data->device_dispatch_table.GetPipelineKeyKHR(device, pPipelineCreateInfo, pPipelineKey);
+    vku::safe_VkPipelineCreateInfoKHR var_local_pPipelineCreateInfo;
+    vku::safe_VkPipelineCreateInfoKHR *local_pPipelineCreateInfo = nullptr;
+    {
+        if (pPipelineCreateInfo) {
+            local_pPipelineCreateInfo = &var_local_pPipelineCreateInfo;
+            local_pPipelineCreateInfo->initialize(pPipelineCreateInfo);
+            UnwrapPnextChainHandles(layer_data, local_pPipelineCreateInfo->pNext);
+        }
+    }
+    VkResult result = layer_data->device_dispatch_table.GetPipelineKeyKHR(
+        device, (const VkPipelineCreateInfoKHR *)local_pPipelineCreateInfo, pPipelineKey);
+    return result;
+}
+
+VkResult DispatchCreateIndirectExecutionSetEXT(VkDevice device, const VkIndirectExecutionSetCreateInfoEXT *pCreateInfo,
+                                               const VkAllocationCallbacks *pAllocator,
+                                               VkIndirectExecutionSetEXT *pIndirectExecutionSet) {
+    auto layer_data = GetLayerDataPtr(GetDispatchKey(device), layer_data_map);
+    if (!wrap_handles)
+        return layer_data->device_dispatch_table.CreateIndirectExecutionSetEXT(device, pCreateInfo, pAllocator,
+                                                                               pIndirectExecutionSet);
+
+    // When using a union of pointer we still need to unwrap the handles, but since it is a pointer, we can just use the pointer
+    // from the incoming parameter instead of using safe structs as it is less complex doing it here
+    vku::safe_VkIndirectExecutionSetCreateInfoEXT local_pCreateInfo;
+    local_pCreateInfo.initialize(pCreateInfo);
+
+    // need in local scope to call down whatever we use
+    vku::safe_VkIndirectExecutionSetPipelineInfoEXT pipeline_info;
+    vku::safe_VkIndirectExecutionSetShaderInfoEXT shader_info;
+
+    if (pCreateInfo) {
+        local_pCreateInfo.initialize(pCreateInfo);
+        switch (local_pCreateInfo.type) {
+            case VK_INDIRECT_EXECUTION_SET_INFO_TYPE_PIPELINES_EXT:
+                if (pCreateInfo->info.pPipelineInfo) {
+                    pipeline_info.initialize(pCreateInfo->info.pPipelineInfo);
+                    pipeline_info.initialPipeline = layer_data->Unwrap(pCreateInfo->info.pPipelineInfo->initialPipeline);
+                    local_pCreateInfo.info.pPipelineInfo = pipeline_info.ptr();
+                }
+                break;
+            case VK_INDIRECT_EXECUTION_SET_INFO_TYPE_SHADER_OBJECTS_EXT:
+                if (local_pCreateInfo.info.pShaderInfo) {
+                    shader_info.initialize(pCreateInfo->info.pShaderInfo);
+
+                    for (uint32_t index0 = 0; index0 < local_pCreateInfo.info.pShaderInfo->shaderCount; ++index0) {
+                        const auto &set_layout = local_pCreateInfo.info.pShaderInfo->pSetLayoutInfos[index0];
+                        if (set_layout.pSetLayouts) {
+                            for (uint32_t index1 = 0; index1 < set_layout.setLayoutCount; ++index1) {
+                                shader_info.pSetLayoutInfos[index0].pSetLayouts[index1] =
+                                    layer_data->Unwrap(set_layout.pSetLayouts[index1]);
+                            }
+                        }
+                        shader_info.pInitialShaders[index0] =
+                            layer_data->Unwrap(local_pCreateInfo.info.pShaderInfo->pInitialShaders[index0]);
+                    }
+
+                    local_pCreateInfo.info.pShaderInfo = shader_info.ptr();
+                }
+                break;
+            default:
+                break;
+        }
+    }
+
+    VkResult result = layer_data->device_dispatch_table.CreateIndirectExecutionSetEXT(
+        device, (const VkIndirectExecutionSetCreateInfoEXT *)&local_pCreateInfo, pAllocator, pIndirectExecutionSet);
+    if (VK_SUCCESS == result) {
+        *pIndirectExecutionSet = layer_data->WrapNew(*pIndirectExecutionSet);
+    }
     return result;
 }

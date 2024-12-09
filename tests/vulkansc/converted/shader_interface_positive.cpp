@@ -219,15 +219,8 @@ TEST_F(PositiveShaderInterface, UboStd430Layout) {
     TEST_DESCRIPTION("Create a shader that requires UBO std430 layout.");
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_UNIFORM_BUFFER_STANDARD_LAYOUT_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-
-    VkPhysicalDeviceUniformBufferStandardLayoutFeaturesKHR uniform_buffer_standard_layout_features = vku::InitStructHelper(NULL);
-    uniform_buffer_standard_layout_features.uniformBufferStandardLayout = VK_TRUE;
-    GetPhysicalDeviceFeatures2(uniform_buffer_standard_layout_features);
-
-    VkPhysicalDeviceFeatures2 set_features2 = vku::InitStructHelper(&uniform_buffer_standard_layout_features);
-
-    RETURN_IF_SKIP(InitState(nullptr, &set_features2));
+    AddRequiredFeature(vkt::Feature::uniformBufferStandardLayout);
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     // Vertex shader requiring std430 in a uniform buffer.
@@ -694,12 +687,9 @@ TEST_F(PositiveShaderInterface, InputAttachmentDepthStencil) {
     TEST_DESCRIPTION("Input Attachment sharing same variable, but different aspect");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    RETURN_IF_SKIP(InitFramework());
-    VkPhysicalDeviceVulkan12Features features12 = vku::InitStructHelper();
-    GetPhysicalDeviceFeatures2(features12);
-    RETURN_IF_SKIP(InitState(nullptr, &features12));
+    RETURN_IF_SKIP(Init());
 
-    const VkFormat ds_format = FindSupportedDepthStencilFormat(gpu());
+    const VkFormat ds_format = FindSupportedDepthStencilFormat(Gpu());
 
     RenderPassSingleSubpass rp(*this);
     rp.AddAttachmentDescription(m_render_target_fmt);
@@ -909,17 +899,17 @@ TEST_F(PositiveShaderInterface, InputOutputMatch) {
     VkBuffer buffer_handle = buffer.handle();
     VkDeviceSize offset = 0;
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
 
-    vk::CmdBindVertexBuffers(m_commandBuffer->handle(), 0, 1, &buffer_handle, &offset);
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_layout_.handle(), 0, 1,
+    vk::CmdBindVertexBuffers(m_command_buffer.handle(), 0, 1, &buffer_handle, &offset);
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_layout_.handle(), 0, 1,
                               &ds.set_, 0, nullptr);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
 
-    m_commandBuffer->EndRenderPass();
-    m_commandBuffer->end();
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
 }
 
 TEST_F(PositiveShaderInterface, NestedStructs) {
@@ -1018,7 +1008,7 @@ TEST_F(PositiveShaderInterface, VsFsTypeMismatchBlockStructArray) {
 
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
-    if (m_device->phy().limits_.maxVertexOutputComponents <= 64) {
+    if (m_device->Physical().limits_.maxVertexOutputComponents <= 64) {
         GTEST_SKIP() << "maxVertexOutputComponents is too low";
     }
 
@@ -1221,7 +1211,7 @@ TEST_F(PositiveShaderInterface, MultidimensionalArrayVertex) {
 
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
-    if (m_device->phy().limits_.maxVertexOutputComponents <= 64) {
+    if (m_device->Physical().limits_.maxVertexOutputComponents <= 64) {
         GTEST_SKIP() << "maxVertexOutputComponents is too low";
     }
 
@@ -1252,7 +1242,7 @@ TEST_F(PositiveShaderInterface, MultidimensionalArrayDims) {
 
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
-    if (m_device->phy().limits_.maxVertexOutputComponents <= 64) {
+    if (m_device->Physical().limits_.maxVertexOutputComponents <= 64) {
         GTEST_SKIP() << "maxVertexOutputComponents is too low";
     }
 
@@ -1283,7 +1273,7 @@ TEST_F(PositiveShaderInterface, MultidimensionalArrayDims2) {
 
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
-    if (m_device->phy().limits_.maxVertexOutputComponents <= 64) {
+    if (m_device->Physical().limits_.maxVertexOutputComponents <= 64) {
         GTEST_SKIP() << "maxVertexOutputComponents is too low";
     }
 
@@ -1316,7 +1306,7 @@ TEST_F(PositiveShaderInterface, MultidimensionalArray64bit) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    if (m_device->phy().limits_.maxFragmentOutputAttachments < 9) {
+    if (m_device->Physical().limits_.maxFragmentOutputAttachments < 9) {
         GTEST_SKIP() << "maxFragmentOutputAttachments is too low";
     }
 

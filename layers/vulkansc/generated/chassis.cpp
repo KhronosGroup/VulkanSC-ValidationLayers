@@ -38,7 +38,7 @@
 
 thread_local WriteLockGuard* ValidationObject::record_guard{};
 
-small_unordered_map<void*, ValidationObject*, 2> layer_data_map;
+small_unordered_map<void*, DispatchObject*, 2> layer_data_map;
 
 // Global unique object identifier.
 std::atomic<uint64_t> global_unique_id(1ULL);
@@ -98,7 +98,7 @@ static std::vector<ValidationObject*> CreateObjectDispatch(const CHECK_ENABLED& 
     return object_dispatch;
 }
 
-static void InitDeviceObjectDispatch(ValidationObject* instance_interceptor, ValidationObject* device_interceptor) {
+static void InitDeviceDispatchObject(DispatchObject* instance_interceptor, DispatchObject* device_interceptor) {
     auto disables = instance_interceptor->disabled;
     auto enables = instance_interceptor->enabled;
 
@@ -226,8 +226,17 @@ std::vector<std::pair<uint32_t, uint32_t>>& GetCustomStypeInfo() {
     return custom_stype_info;
 }
 
+ValidationObject* DispatchObject::GetValidationObject(LayerObjectTypeId object_type) const {
+    for (auto validation_object : object_dispatch) {
+        if (validation_object->container_type == object_type) {
+            return validation_object;
+        }
+    }
+    return nullptr;
+}
+
 template <typename ValidationObjectType>
-ValidationObjectType* ValidationObject::GetValidationObject() const {
+ValidationObjectType* DispatchObject::GetValidationObject() const {
     LayerObjectTypeId type_id;
     if constexpr (std::is_same_v<ValidationObjectType, ThreadSafety>) {
         type_id = LayerObjectTypeThreading;
@@ -243,22 +252,22 @@ ValidationObjectType* ValidationObject::GetValidationObject() const {
     return static_cast<ValidationObjectType*>(GetValidationObject(type_id));
 }
 
-template ThreadSafety* ValidationObject::GetValidationObject<ThreadSafety>() const;
-template StatelessValidation* ValidationObject::GetValidationObject<StatelessValidation>() const;
-template ObjectLifetimes* ValidationObject::GetValidationObject<ObjectLifetimes>() const;
-template CoreChecks* ValidationObject::GetValidationObject<CoreChecks>() const;
+template ThreadSafety* DispatchObject::GetValidationObject<ThreadSafety>() const;
+template StatelessValidation* DispatchObject::GetValidationObject<StatelessValidation>() const;
+template ObjectLifetimes* DispatchObject::GetValidationObject<ObjectLifetimes>() const;
+template CoreChecks* DispatchObject::GetValidationObject<CoreChecks>() const;
 
-// Takes the layer and removes it from the chassis so it will not be called anymore
-void ValidationObject::ReleaseDeviceDispatchObject(LayerObjectTypeId type_id) const {
-    auto layer_data = GetLayerDataPtr(GetDispatchKey(device), layer_data_map);
-    for (auto object_it = layer_data->object_dispatch.begin(); object_it != layer_data->object_dispatch.end(); object_it++) {
+// Takes the validation type and removes it from the chassis so it will not be called anymore
+// Designed for things like GPU-AV to remove itself while keeping everything else alive
+void DispatchObject::ReleaseDeviceValidationObject(LayerObjectTypeId type_id) const {
+    for (auto object_it = object_dispatch.begin(); object_it != object_dispatch.end(); object_it++) {
         if ((*object_it)->container_type == type_id) {
             ValidationObject* object = *object_it;
 
-            layer_data->object_dispatch.erase(object_it);
+            object_dispatch.erase(object_it);
 
-            for (auto intercept_vector_it = layer_data->intercept_vectors.begin();
-                 intercept_vector_it != layer_data->intercept_vectors.end(); intercept_vector_it++) {
+            for (auto intercept_vector_it = intercept_vectors.begin(); intercept_vector_it != intercept_vectors.end();
+                 intercept_vector_it++) {
                 for (auto intercept_object_it = intercept_vector_it->begin(); intercept_object_it != intercept_vector_it->end();
                      intercept_object_it++) {
                     if (object == *intercept_object_it) {
@@ -270,10 +279,25 @@ void ValidationObject::ReleaseDeviceDispatchObject(LayerObjectTypeId type_id) co
 
             // We can't destroy the object itself now as it might be unsafe (things are still being used)
             // If the rare case happens we need to release, we will cleanup later when we normally would have cleaned this up
-            layer_data->aborted_object_dispatch.push_back(object);
+            aborted_object_dispatch.push_back(object);
             break;
         }
     }
+}
+
+// Incase we need to teardown things early, we want to do it safely, so we will keep the entrypoints into layer, but just remove all
+// the internal chassis hooks so that any call becomes a no-op (but still dispatches into the driver)
+void DispatchObject::ReleaseAllValidationObjects() const {
+    // Some chassis loops use the intercept_vectors instead of looking up the object
+    for (auto& intercept_vector : intercept_vectors) {
+        intercept_vector.clear();
+    }
+
+    for (auto object_it = object_dispatch.begin(); object_it != object_dispatch.end(); object_it++) {
+        ValidationObject* object = *object_it;
+        aborted_object_dispatch.push_back(object);
+    }
+    object_dispatch.clear();
 }
 
 namespace vulkan_layer_chassis {
@@ -297,7 +321,7 @@ const vvl::unordered_map<std::string, function_data>& GetNameToFuncPtrMap();
 // Manually written functions
 
 // Check enabled instance extensions against supported instance extension whitelist
-static void InstanceExtensionWhitelist(ValidationObject* layer_data, const VkInstanceCreateInfo* pCreateInfo, VkInstance instance) {
+static void InstanceExtensionWhitelist(DispatchObject* layer_data, const VkInstanceCreateInfo* pCreateInfo, VkInstance instance) {
     for (uint32_t i = 0; i < pCreateInfo->enabledExtensionCount; i++) {
         // Check for recognized instance extensions
         vvl::Extension extension = GetExtension(pCreateInfo->ppEnabledExtensionNames[i]);
@@ -313,7 +337,7 @@ static void InstanceExtensionWhitelist(ValidationObject* layer_data, const VkIns
 }
 
 // Check enabled device extensions against supported device extension whitelist
-static void DeviceExtensionWhitelist(ValidationObject* layer_data, const VkDeviceCreateInfo* pCreateInfo, VkDevice device) {
+static void DeviceExtensionWhitelist(DispatchObject* layer_data, const VkDeviceCreateInfo* pCreateInfo, VkDevice device) {
     for (uint32_t i = 0; i < pCreateInfo->enabledExtensionCount; i++) {
         // Check for recognized device extensions
         vvl::Extension extension = GetExtension(pCreateInfo->ppEnabledExtensionNames[i]);
@@ -328,7 +352,7 @@ static void DeviceExtensionWhitelist(ValidationObject* layer_data, const VkDevic
     }
 }
 
-void OutputLayerStatusInfo(ValidationObject* context) {
+void OutputLayerStatusInfo(DispatchObject* context) {
     std::string list_of_enables;
     std::string list_of_disables;
     for (uint32_t i = 0; i < kMaxEnableFlags; i++) {
@@ -350,36 +374,12 @@ void OutputLayerStatusInfo(ValidationObject* context) {
         list_of_disables.append("None");
     }
 
-    auto settings_info = GetLayerSettingsFileInfo();
-    std::string settings_status;
-    if (!settings_info->file_found) {
-        settings_status = "None. Default location is ";
-        settings_status.append(settings_info->location);
-        settings_status.append(".");
-    } else {
-        settings_status = "Found at ";
-        settings_status.append(settings_info->location);
-        settings_status.append(" specified by ");
-        switch (settings_info->source) {
-            case kEnvVar:
-                settings_status.append("environment variable (VK_LAYER_SETTINGS_PATH).");
-                break;
-            case kVkConfig:
-                settings_status.append("VkConfig application override.");
-                break;
-            case kLocal:  // Intentionally fall through
-            default:
-                settings_status.append("default location (current working directory).");
-                break;
-        }
-    }
-
     Location loc(vvl::Func::vkCreateInstance);
     // Output layer status information message
-    context->LogInfo(
-        "WARNING-CreateInstance-status-message", context->instance, loc,
-        "Khronos Validation Layer Active:\n    Settings File: %s\n    Current Enables: %s.\n    Current Disables: %s.\n",
-        settings_status.c_str(), list_of_enables.c_str(), list_of_disables.c_str());
+    // TODO - We should just dump all settings to a file (see https://github.com/KhronosGroup/Vulkan-Utility-Libraries/issues/188)
+    context->LogInfo("WARNING-CreateInstance-status-message", context->instance, loc,
+                     "Khronos Validation Layer Active:\n    Current Enables: %s.\n    Current Disables: %s.\n",
+                     list_of_enables.c_str(), list_of_disables.c_str());
 
     // Create warning message if user is running debug layers.
 #ifndef NDEBUG
@@ -475,8 +475,24 @@ VKAPI_ATTR VkResult VKAPI_CALL EnumerateDeviceExtensionProperties(VkPhysicalDevi
     return layer_data->instance_dispatch_table.EnumerateDeviceExtensionProperties(physicalDevice, pLayerName, pCount, pProperties);
 }
 
+// This is here as some applications will call exit() which results in all our static allocations (like std::map) having their
+// destructor called and destroyed from under us. It is not possible to detect as sometimes (when using things like robin hood) the
+// size()/empty() will give false positive that memory is there there. We add this global hook that will go through and remove all
+// the function calls such that things can safely run in the case the applicaiton still wants to make Vulkan calls in their atexit()
+// handler
+void ApplicationAtExit() {
+    // On a "normal" application, this function is called after vkDestroyInstance and layer_data_map is empty
+    //
+    // If there are multiple devices we still want to delete them all as exit() is a global scope call
+    for (auto object : layer_data_map) {
+        object.second->ReleaseAllValidationObjects();
+    }
+}
+
 VKAPI_ATTR VkResult VKAPI_CALL CreateInstance(const VkInstanceCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator,
                                               VkInstance* pInstance) {
+    atexit(ApplicationAtExit);
+
     VVL_ZoneScoped;
     VkLayerInstanceCreateInfo* chain_info = GetChainInfo(pCreateInfo, VK_LAYER_LINK_INFO);
 
@@ -492,19 +508,17 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateInstance(const VkInstanceCreateInfo* pCreat
     auto debug_report = new DebugReport{};
     debug_report->instance_pnext_chain = vku::SafePnextCopy(pCreateInfo->pNext);
     ActivateInstanceDebugCallbacks(debug_report);
-    LayerDebugMessengerActions(debug_report, OBJECT_LAYER_DESCRIPTION);
 
     // Set up enable and disable features flags
     CHECK_ENABLED local_enables{};
     CHECK_DISABLED local_disables{};
     GlobalSettings local_global_settings = {};
     GpuAVSettings local_gpuav_settings = {};
-    DebugPrintfSettings local_printf_settings = {};
     SyncValSettings local_syncval_settings = {};
-    ConfigAndEnvSettings config_and_env_settings_data{
-        OBJECT_LAYER_DESCRIPTION, pCreateInfo, local_enables, local_disables, debug_report,
-        // All settings for various internal layers
-        &local_global_settings, &local_gpuav_settings, &local_printf_settings, &local_syncval_settings};
+    ConfigAndEnvSettings config_and_env_settings_data{OBJECT_LAYER_DESCRIPTION, pCreateInfo, local_enables, local_disables,
+                                                      debug_report,
+                                                      // All settings for various internal layers
+                                                      &local_global_settings, &local_gpuav_settings, &local_syncval_settings};
     ProcessConfigAndEnvSettings(&config_and_env_settings_data);
 
     // Create temporary dispatch vector for pre-calls until instance is created
@@ -515,20 +529,34 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateInstance(const VkInstanceCreateInfo* pCreat
         wrap_handles = false;
     }
 
+    DispatchObject* framework = new DispatchObject();
+
+    framework->api_version = api_version;
+    framework->object_dispatch = local_object_dispatch;
+    framework->disabled = local_disables;
+    framework->enabled = local_enables;
+    framework->global_settings = local_global_settings;
+    framework->gpuav_settings = local_gpuav_settings;
+    framework->syncval_settings = local_syncval_settings;
+    framework->debug_report = debug_report;
+    framework->instance_extensions.InitFromInstanceCreateInfo(specified_version, pCreateInfo);
+
     // Initialize the validation objects
     for (auto* intercept : local_object_dispatch) {
         intercept->api_version = api_version;
         intercept->debug_report = debug_report;
+        intercept->dispatch_ = framework;
     }
 
     // Define logic to cleanup everything in case of an error
-    auto cleanup_allocations = [debug_report, &local_object_dispatch]() {
+    auto cleanup_allocations = [debug_report, framework, &local_object_dispatch]() {
         DeactivateInstanceDebugCallbacks(debug_report);
         vku::FreePnextChain(debug_report->instance_pnext_chain);
         LayerDebugUtilsDestroyInstance(debug_report);
         for (ValidationObject* object : local_object_dispatch) {
             delete object;
         }
+        delete framework;
     };
 
     // Init dispatch array and call registration functions
@@ -555,27 +583,15 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateInstance(const VkInstanceCreateInfo* pCreat
         return result;
     }
     record_obj.result = result;
-    auto framework = GetLayerDataPtr(GetDispatchKey(*pInstance), layer_data_map);
-
-    framework->object_dispatch = local_object_dispatch;
-    framework->container_type = LayerObjectTypeInstance;
-    framework->disabled = local_disables;
-    framework->enabled = local_enables;
-    framework->global_settings = local_global_settings;
-    framework->gpuav_settings = local_gpuav_settings;
-    framework->printf_settings = local_printf_settings;
-    framework->syncval_settings = local_syncval_settings;
-
     framework->instance = *pInstance;
+
     layer_init_instance_dispatch_table(*pInstance, &framework->instance_dispatch_table, fpGetInstanceProcAddr);
-    framework->debug_report = debug_report;
-    framework->api_version = api_version;
-    framework->instance_extensions.InitFromInstanceCreateInfo(specified_version, pCreateInfo);
 
     // We need to call this to properly check which device extensions have been promoted when validating query functions
     // that take as input a physical device, which can be called before a logical device has been created.
     framework->device_extensions.InitFromDeviceCreateInfo(&framework->instance_extensions, specified_version);
 
+    layer_data_map[GetDispatchKey(*pInstance)] = framework;
     OutputLayerStatusInfo(framework);
 
     for (auto* intercept : framework->object_dispatch) {
@@ -584,9 +600,10 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateInstance(const VkInstanceCreateInfo* pCreat
         intercept->disabled = framework->disabled;
         intercept->global_settings = framework->global_settings;
         intercept->gpuav_settings = framework->gpuav_settings;
-        intercept->printf_settings = framework->printf_settings;
         intercept->syncval_settings = framework->syncval_settings;
         intercept->instance = *pInstance;
+        intercept->debug_report = debug_report;
+        intercept->api_version = api_version;
     }
 
     for (ValidationObject* intercept : framework->object_dispatch) {
@@ -675,10 +692,20 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateDevice(VkPhysicalDevice gpu, const VkDevice
     // Setup the validation tables based on the application API version from the instance and the capabilities of the device driver
     auto effective_api_version = std::min(APIVersion(device_properties.apiVersion), instance_interceptor->api_version);
 
-    DeviceExtensions device_extensions = {};
-    device_extensions.InitFromDeviceCreateInfo(&instance_interceptor->instance_extensions, effective_api_version, pCreateInfo);
-    for (auto item : instance_interceptor->object_dispatch) {
-        item->device_extensions = device_extensions;
+    DispatchObject* device_interceptor = new DispatchObject();
+
+    device_interceptor->device_extensions.InitFromDeviceCreateInfo(&instance_interceptor->instance_extensions,
+                                                                   effective_api_version, pCreateInfo);
+    device_interceptor->instance_dispatch_table = instance_interceptor->instance_dispatch_table;
+    device_interceptor->instance_extensions = instance_interceptor->instance_extensions;
+    device_interceptor->physical_device = gpu;
+    device_interceptor->instance = instance_interceptor->instance;
+    device_interceptor->debug_report = instance_interceptor->debug_report;
+
+    // This is odd but we need to set the current device_extensions in all of the
+    // instance validation objects so that they are available for validating CreateDevice
+    for (auto* object : instance_interceptor->object_dispatch) {
+        object->device_extensions = device_interceptor->device_extensions;
     }
 
     // Make copy to modify as some ValidationObjects will want to add extensions/features on
@@ -689,7 +716,10 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateDevice(VkPhysicalDevice gpu, const VkDevice
     for (const ValidationObject* intercept : instance_interceptor->object_dispatch) {
         auto lock = intercept->ReadLock();
         skip |= intercept->PreCallValidateCreateDevice(gpu, pCreateInfo, pAllocator, pDevice, error_obj);
-        if (skip) return VK_ERROR_VALIDATION_FAILED_EXT;
+        if (skip) {
+            delete device_interceptor;
+            return VK_ERROR_VALIDATION_FAILED_EXT;
+        }
     }
 
     RecordObject record_obj(vvl::Func::vkCreateDevice);
@@ -700,32 +730,27 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateDevice(VkPhysicalDevice gpu, const VkDevice
 
     VkResult result = fpCreateDevice(gpu, reinterpret_cast<VkDeviceCreateInfo*>(&modified_create_info), pAllocator, pDevice);
     if (result != VK_SUCCESS) {
+        delete device_interceptor;
         return result;
     }
     record_obj.result = result;
-
-    auto device_interceptor = GetLayerDataPtr(GetDispatchKey(*pDevice), layer_data_map);
-    device_interceptor->container_type = LayerObjectTypeDevice;
+    device_interceptor->device = *pDevice;
 
     // Save local info in device object
     device_interceptor->api_version = device_interceptor->device_extensions.InitFromDeviceCreateInfo(
         &instance_interceptor->instance_extensions, effective_api_version,
         reinterpret_cast<VkDeviceCreateInfo*>(&modified_create_info));
-    device_interceptor->device_extensions = device_extensions;
 
     layer_init_device_dispatch_table(*pDevice, &device_interceptor->device_dispatch_table, fpGetDeviceProcAddr);
-
-    device_interceptor->device = *pDevice;
-    device_interceptor->physical_device = gpu;
-    device_interceptor->instance = instance_interceptor->instance;
-    device_interceptor->debug_report = instance_interceptor->debug_report;
+    layer_data_map[GetDispatchKey(*pDevice)] = device_interceptor;
 
     instance_interceptor->debug_report->device_created++;
 
-    InitDeviceObjectDispatch(instance_interceptor, device_interceptor);
+    InitDeviceDispatchObject(instance_interceptor, device_interceptor);
 
     // Initialize all of the objects with the appropriate data
     for (auto* object : device_interceptor->object_dispatch) {
+        object->dispatch_ = device_interceptor;
         object->device = device_interceptor->device;
         object->physical_device = device_interceptor->physical_device;
         object->instance = instance_interceptor->instance;
@@ -736,7 +761,6 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateDevice(VkPhysicalDevice gpu, const VkDevice
         object->enabled = instance_interceptor->enabled;
         object->global_settings = instance_interceptor->global_settings;
         object->gpuav_settings = instance_interceptor->gpuav_settings;
-        object->printf_settings = instance_interceptor->printf_settings;
         object->syncval_settings = instance_interceptor->syncval_settings;
         object->instance_dispatch_table = instance_interceptor->instance_dispatch_table;
         object->instance_extensions = instance_interceptor->instance_extensions;
@@ -1244,6 +1268,61 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateBuffer(VkDevice device, const VkBufferCreat
         for (ValidationObject* intercept : layer_data->intercept_vectors[InterceptIdPostCallRecordCreateBuffer]) {
             auto lock = intercept->WriteLock();
             intercept->PostCallRecordCreateBuffer(device, pCreateInfo, pAllocator, pBuffer, record_obj);
+        }
+    }
+    return result;
+}
+
+// This API needs to ensure that per-swapchain VkResult results are available
+VKAPI_ATTR VkResult VKAPI_CALL QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR* pPresentInfo) {
+    VVL_ZoneScoped;
+
+    auto layer_data = GetLayerDataPtr(GetDispatchKey(queue), layer_data_map);
+    bool skip = false;
+    ErrorObject error_obj(vvl::Func::vkQueuePresentKHR, VulkanTypedHandle(queue, kVulkanObjectTypeQueue));
+    {
+        VVL_ZoneScopedN("PreCallValidate");
+        for (const ValidationObject* intercept : layer_data->intercept_vectors[InterceptIdPreCallValidateQueuePresentKHR]) {
+            auto lock = intercept->ReadLock();
+            skip |= intercept->PreCallValidateQueuePresentKHR(queue, pPresentInfo, error_obj);
+            if (skip) return VK_ERROR_VALIDATION_FAILED_EXT;
+        }
+    }
+    RecordObject record_obj(vvl::Func::vkQueuePresentKHR);
+    {
+        VVL_ZoneScopedN("PreCallRecord");
+        for (ValidationObject* intercept : layer_data->intercept_vectors[InterceptIdPreCallRecordQueuePresentKHR]) {
+            auto lock = intercept->WriteLock();
+            intercept->PreCallRecordQueuePresentKHR(queue, pPresentInfo, record_obj);
+        }
+    }
+
+    // Track per-swapchain results when there is more than one swapchain and VkPresentInfoKHR::pResults is null
+    small_vector<VkResult, 2> present_results;
+    VkPresentInfoKHR modified_present_info;
+    if (pPresentInfo && pPresentInfo->swapchainCount > 1 && pPresentInfo->pResults == nullptr) {
+        present_results.resize(pPresentInfo->swapchainCount);
+        modified_present_info = *pPresentInfo;
+        modified_present_info.pResults = present_results.data();
+        pPresentInfo = &modified_present_info;
+    }
+
+    VkResult result;
+    {
+        VVL_ZoneScopedN("Dispatch");
+        result = DispatchQueuePresentKHR(queue, pPresentInfo);
+    }
+    VVL_TracyCFrameMark;
+    record_obj.result = result;
+    {
+        VVL_ZoneScopedN("PostCallRecord");
+        for (ValidationObject* intercept : layer_data->intercept_vectors[InterceptIdPostCallRecordQueuePresentKHR]) {
+            auto lock = intercept->WriteLock();
+
+            if (result == VK_ERROR_DEVICE_LOST) {
+                intercept->is_device_lost = true;
+            }
+            intercept->PostCallRecordQueuePresentKHR(queue, pPresentInfo, record_obj);
         }
     }
     return result;
@@ -9339,49 +9418,6 @@ VKAPI_ATTR VkResult VKAPI_CALL AcquireNextImageKHR(VkDevice device, VkSwapchainK
     return result;
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL QueuePresentKHR(VkQueue queue, const VkPresentInfoKHR* pPresentInfo) {
-    VVL_ZoneScoped;
-
-    auto layer_data = GetLayerDataPtr(GetDispatchKey(queue), layer_data_map);
-    bool skip = false;
-    ErrorObject error_obj(vvl::Func::vkQueuePresentKHR, VulkanTypedHandle(queue, kVulkanObjectTypeQueue));
-    {
-        VVL_ZoneScopedN("PreCallValidate");
-        for (const ValidationObject* intercept : layer_data->intercept_vectors[InterceptIdPreCallValidateQueuePresentKHR]) {
-            auto lock = intercept->ReadLock();
-            skip |= intercept->PreCallValidateQueuePresentKHR(queue, pPresentInfo, error_obj);
-            if (skip) return VK_ERROR_VALIDATION_FAILED_EXT;
-        }
-    }
-    RecordObject record_obj(vvl::Func::vkQueuePresentKHR);
-    {
-        VVL_ZoneScopedN("PreCallRecord");
-        for (ValidationObject* intercept : layer_data->intercept_vectors[InterceptIdPreCallRecordQueuePresentKHR]) {
-            auto lock = intercept->WriteLock();
-            intercept->PreCallRecordQueuePresentKHR(queue, pPresentInfo, record_obj);
-        }
-    }
-    VkResult result;
-    {
-        VVL_ZoneScopedN("Dispatch");
-        result = DispatchQueuePresentKHR(queue, pPresentInfo);
-    }
-    VVL_TracyCFrameMark;
-    record_obj.result = result;
-    {
-        VVL_ZoneScopedN("PostCallRecord");
-        for (ValidationObject* intercept : layer_data->intercept_vectors[InterceptIdPostCallRecordQueuePresentKHR]) {
-            auto lock = intercept->WriteLock();
-
-            if (result == VK_ERROR_DEVICE_LOST) {
-                intercept->is_device_lost = true;
-            }
-            intercept->PostCallRecordQueuePresentKHR(queue, pPresentInfo, record_obj);
-        }
-    }
-    return result;
-}
-
 VKAPI_ATTR VkResult VKAPI_CALL
 GetDeviceGroupPresentCapabilitiesKHR(VkDevice device, VkDeviceGroupPresentCapabilitiesKHR* pDeviceGroupPresentCapabilities) {
     VVL_ZoneScoped;
@@ -14433,81 +14469,6 @@ VKAPI_ATTR VkResult VKAPI_CALL QueueSubmit2KHR(VkQueue queue, uint32_t submitCou
     return result;
 }
 
-VKAPI_ATTR void VKAPI_CALL CmdWriteBufferMarker2AMD(VkCommandBuffer commandBuffer, VkPipelineStageFlags2 stage, VkBuffer dstBuffer,
-                                                    VkDeviceSize dstOffset, uint32_t marker) {
-    VVL_ZoneScoped;
-
-    auto layer_data = GetLayerDataPtr(GetDispatchKey(commandBuffer), layer_data_map);
-    bool skip = false;
-    ErrorObject error_obj(vvl::Func::vkCmdWriteBufferMarker2AMD, VulkanTypedHandle(commandBuffer, kVulkanObjectTypeCommandBuffer));
-    {
-        VVL_ZoneScopedN("PreCallValidate");
-        for (const ValidationObject* intercept :
-             layer_data->intercept_vectors[InterceptIdPreCallValidateCmdWriteBufferMarker2AMD]) {
-            auto lock = intercept->ReadLock();
-            skip |=
-                intercept->PreCallValidateCmdWriteBufferMarker2AMD(commandBuffer, stage, dstBuffer, dstOffset, marker, error_obj);
-            if (skip) return;
-        }
-    }
-    RecordObject record_obj(vvl::Func::vkCmdWriteBufferMarker2AMD);
-    {
-        VVL_ZoneScopedN("PreCallRecord");
-        for (ValidationObject* intercept : layer_data->intercept_vectors[InterceptIdPreCallRecordCmdWriteBufferMarker2AMD]) {
-            auto lock = intercept->WriteLock();
-            intercept->PreCallRecordCmdWriteBufferMarker2AMD(commandBuffer, stage, dstBuffer, dstOffset, marker, record_obj);
-        }
-    }
-    {
-        VVL_ZoneScopedN("Dispatch");
-        DispatchCmdWriteBufferMarker2AMD(commandBuffer, stage, dstBuffer, dstOffset, marker);
-    }
-    {
-        VVL_ZoneScopedN("PostCallRecord");
-        for (ValidationObject* intercept : layer_data->intercept_vectors[InterceptIdPostCallRecordCmdWriteBufferMarker2AMD]) {
-            auto lock = intercept->WriteLock();
-            intercept->PostCallRecordCmdWriteBufferMarker2AMD(commandBuffer, stage, dstBuffer, dstOffset, marker, record_obj);
-        }
-    }
-}
-
-VKAPI_ATTR void VKAPI_CALL GetQueueCheckpointData2NV(VkQueue queue, uint32_t* pCheckpointDataCount,
-                                                     VkCheckpointData2NV* pCheckpointData) {
-    VVL_ZoneScoped;
-
-    auto layer_data = GetLayerDataPtr(GetDispatchKey(queue), layer_data_map);
-    bool skip = false;
-    ErrorObject error_obj(vvl::Func::vkGetQueueCheckpointData2NV, VulkanTypedHandle(queue, kVulkanObjectTypeQueue));
-    {
-        VVL_ZoneScopedN("PreCallValidate");
-        for (const ValidationObject* intercept :
-             layer_data->intercept_vectors[InterceptIdPreCallValidateGetQueueCheckpointData2NV]) {
-            auto lock = intercept->ReadLock();
-            skip |= intercept->PreCallValidateGetQueueCheckpointData2NV(queue, pCheckpointDataCount, pCheckpointData, error_obj);
-            if (skip) return;
-        }
-    }
-    RecordObject record_obj(vvl::Func::vkGetQueueCheckpointData2NV);
-    {
-        VVL_ZoneScopedN("PreCallRecord");
-        for (ValidationObject* intercept : layer_data->intercept_vectors[InterceptIdPreCallRecordGetQueueCheckpointData2NV]) {
-            auto lock = intercept->WriteLock();
-            intercept->PreCallRecordGetQueueCheckpointData2NV(queue, pCheckpointDataCount, pCheckpointData, record_obj);
-        }
-    }
-    {
-        VVL_ZoneScopedN("Dispatch");
-        DispatchGetQueueCheckpointData2NV(queue, pCheckpointDataCount, pCheckpointData);
-    }
-    {
-        VVL_ZoneScopedN("PostCallRecord");
-        for (ValidationObject* intercept : layer_data->intercept_vectors[InterceptIdPostCallRecordGetQueueCheckpointData2NV]) {
-            auto lock = intercept->WriteLock();
-            intercept->PostCallRecordGetQueueCheckpointData2NV(queue, pCheckpointDataCount, pCheckpointData, record_obj);
-        }
-    }
-}
-
 VKAPI_ATTR void VKAPI_CALL CmdCopyBuffer2KHR(VkCommandBuffer commandBuffer, const VkCopyBufferInfo2* pCopyBufferInfo) {
     VVL_ZoneScoped;
 
@@ -16405,6 +16366,43 @@ VKAPI_ATTR uint32_t VKAPI_CALL GetImageViewHandleNVX(VkDevice device, const VkIm
     return result;
 }
 
+VKAPI_ATTR uint64_t VKAPI_CALL GetImageViewHandle64NVX(VkDevice device, const VkImageViewHandleInfoNVX* pInfo) {
+    VVL_ZoneScoped;
+
+    auto layer_data = GetLayerDataPtr(GetDispatchKey(device), layer_data_map);
+    bool skip = false;
+    ErrorObject error_obj(vvl::Func::vkGetImageViewHandle64NVX, VulkanTypedHandle(device, kVulkanObjectTypeDevice));
+    {
+        VVL_ZoneScopedN("PreCallValidate");
+        for (const ValidationObject* intercept : layer_data->intercept_vectors[InterceptIdPreCallValidateGetImageViewHandle64NVX]) {
+            auto lock = intercept->ReadLock();
+            skip |= intercept->PreCallValidateGetImageViewHandle64NVX(device, pInfo, error_obj);
+            if (skip) return 0;
+        }
+    }
+    RecordObject record_obj(vvl::Func::vkGetImageViewHandle64NVX);
+    {
+        VVL_ZoneScopedN("PreCallRecord");
+        for (ValidationObject* intercept : layer_data->intercept_vectors[InterceptIdPreCallRecordGetImageViewHandle64NVX]) {
+            auto lock = intercept->WriteLock();
+            intercept->PreCallRecordGetImageViewHandle64NVX(device, pInfo, record_obj);
+        }
+    }
+    uint64_t result;
+    {
+        VVL_ZoneScopedN("Dispatch");
+        result = DispatchGetImageViewHandle64NVX(device, pInfo);
+    }
+    {
+        VVL_ZoneScopedN("PostCallRecord");
+        for (ValidationObject* intercept : layer_data->intercept_vectors[InterceptIdPostCallRecordGetImageViewHandle64NVX]) {
+            auto lock = intercept->WriteLock();
+            intercept->PostCallRecordGetImageViewHandle64NVX(device, pInfo, record_obj);
+        }
+    }
+    return result;
+}
+
 VKAPI_ATTR VkResult VKAPI_CALL GetImageViewAddressNVX(VkDevice device, VkImageView imageView,
                                                       VkImageViewAddressPropertiesNVX* pProperties) {
     VVL_ZoneScoped;
@@ -18148,7 +18146,8 @@ VKAPI_ATTR VkResult VKAPI_CALL GetExecutionGraphPipelineNodeIndexAMDX(VkDevice d
     return result;
 }
 
-VKAPI_ATTR void VKAPI_CALL CmdInitializeGraphScratchMemoryAMDX(VkCommandBuffer commandBuffer, VkDeviceAddress scratch) {
+VKAPI_ATTR void VKAPI_CALL CmdInitializeGraphScratchMemoryAMDX(VkCommandBuffer commandBuffer, VkPipeline executionGraph,
+                                                               VkDeviceAddress scratch, VkDeviceSize scratchSize) {
     VVL_ZoneScoped;
 
     auto layer_data = GetLayerDataPtr(GetDispatchKey(commandBuffer), layer_data_map);
@@ -18160,7 +18159,8 @@ VKAPI_ATTR void VKAPI_CALL CmdInitializeGraphScratchMemoryAMDX(VkCommandBuffer c
         for (const ValidationObject* intercept :
              layer_data->intercept_vectors[InterceptIdPreCallValidateCmdInitializeGraphScratchMemoryAMDX]) {
             auto lock = intercept->ReadLock();
-            skip |= intercept->PreCallValidateCmdInitializeGraphScratchMemoryAMDX(commandBuffer, scratch, error_obj);
+            skip |= intercept->PreCallValidateCmdInitializeGraphScratchMemoryAMDX(commandBuffer, executionGraph, scratch,
+                                                                                  scratchSize, error_obj);
             if (skip) return;
         }
     }
@@ -18170,24 +18170,26 @@ VKAPI_ATTR void VKAPI_CALL CmdInitializeGraphScratchMemoryAMDX(VkCommandBuffer c
         for (ValidationObject* intercept :
              layer_data->intercept_vectors[InterceptIdPreCallRecordCmdInitializeGraphScratchMemoryAMDX]) {
             auto lock = intercept->WriteLock();
-            intercept->PreCallRecordCmdInitializeGraphScratchMemoryAMDX(commandBuffer, scratch, record_obj);
+            intercept->PreCallRecordCmdInitializeGraphScratchMemoryAMDX(commandBuffer, executionGraph, scratch, scratchSize,
+                                                                        record_obj);
         }
     }
     {
         VVL_ZoneScopedN("Dispatch");
-        DispatchCmdInitializeGraphScratchMemoryAMDX(commandBuffer, scratch);
+        DispatchCmdInitializeGraphScratchMemoryAMDX(commandBuffer, executionGraph, scratch, scratchSize);
     }
     {
         VVL_ZoneScopedN("PostCallRecord");
         for (ValidationObject* intercept :
              layer_data->intercept_vectors[InterceptIdPostCallRecordCmdInitializeGraphScratchMemoryAMDX]) {
             auto lock = intercept->WriteLock();
-            intercept->PostCallRecordCmdInitializeGraphScratchMemoryAMDX(commandBuffer, scratch, record_obj);
+            intercept->PostCallRecordCmdInitializeGraphScratchMemoryAMDX(commandBuffer, executionGraph, scratch, scratchSize,
+                                                                         record_obj);
         }
     }
 }
 
-VKAPI_ATTR void VKAPI_CALL CmdDispatchGraphAMDX(VkCommandBuffer commandBuffer, VkDeviceAddress scratch,
+VKAPI_ATTR void VKAPI_CALL CmdDispatchGraphAMDX(VkCommandBuffer commandBuffer, VkDeviceAddress scratch, VkDeviceSize scratchSize,
                                                 const VkDispatchGraphCountInfoAMDX* pCountInfo) {
     VVL_ZoneScoped;
 
@@ -18198,7 +18200,7 @@ VKAPI_ATTR void VKAPI_CALL CmdDispatchGraphAMDX(VkCommandBuffer commandBuffer, V
         VVL_ZoneScopedN("PreCallValidate");
         for (const ValidationObject* intercept : layer_data->intercept_vectors[InterceptIdPreCallValidateCmdDispatchGraphAMDX]) {
             auto lock = intercept->ReadLock();
-            skip |= intercept->PreCallValidateCmdDispatchGraphAMDX(commandBuffer, scratch, pCountInfo, error_obj);
+            skip |= intercept->PreCallValidateCmdDispatchGraphAMDX(commandBuffer, scratch, scratchSize, pCountInfo, error_obj);
             if (skip) return;
         }
     }
@@ -18207,24 +18209,24 @@ VKAPI_ATTR void VKAPI_CALL CmdDispatchGraphAMDX(VkCommandBuffer commandBuffer, V
         VVL_ZoneScopedN("PreCallRecord");
         for (ValidationObject* intercept : layer_data->intercept_vectors[InterceptIdPreCallRecordCmdDispatchGraphAMDX]) {
             auto lock = intercept->WriteLock();
-            intercept->PreCallRecordCmdDispatchGraphAMDX(commandBuffer, scratch, pCountInfo, record_obj);
+            intercept->PreCallRecordCmdDispatchGraphAMDX(commandBuffer, scratch, scratchSize, pCountInfo, record_obj);
         }
     }
     {
         VVL_ZoneScopedN("Dispatch");
-        DispatchCmdDispatchGraphAMDX(commandBuffer, scratch, pCountInfo);
+        DispatchCmdDispatchGraphAMDX(commandBuffer, scratch, scratchSize, pCountInfo);
     }
     {
         VVL_ZoneScopedN("PostCallRecord");
         for (ValidationObject* intercept : layer_data->intercept_vectors[InterceptIdPostCallRecordCmdDispatchGraphAMDX]) {
             auto lock = intercept->WriteLock();
-            intercept->PostCallRecordCmdDispatchGraphAMDX(commandBuffer, scratch, pCountInfo, record_obj);
+            intercept->PostCallRecordCmdDispatchGraphAMDX(commandBuffer, scratch, scratchSize, pCountInfo, record_obj);
         }
     }
 }
 
 VKAPI_ATTR void VKAPI_CALL CmdDispatchGraphIndirectAMDX(VkCommandBuffer commandBuffer, VkDeviceAddress scratch,
-                                                        const VkDispatchGraphCountInfoAMDX* pCountInfo) {
+                                                        VkDeviceSize scratchSize, const VkDispatchGraphCountInfoAMDX* pCountInfo) {
     VVL_ZoneScoped;
 
     auto layer_data = GetLayerDataPtr(GetDispatchKey(commandBuffer), layer_data_map);
@@ -18236,7 +18238,8 @@ VKAPI_ATTR void VKAPI_CALL CmdDispatchGraphIndirectAMDX(VkCommandBuffer commandB
         for (const ValidationObject* intercept :
              layer_data->intercept_vectors[InterceptIdPreCallValidateCmdDispatchGraphIndirectAMDX]) {
             auto lock = intercept->ReadLock();
-            skip |= intercept->PreCallValidateCmdDispatchGraphIndirectAMDX(commandBuffer, scratch, pCountInfo, error_obj);
+            skip |=
+                intercept->PreCallValidateCmdDispatchGraphIndirectAMDX(commandBuffer, scratch, scratchSize, pCountInfo, error_obj);
             if (skip) return;
         }
     }
@@ -18245,24 +18248,24 @@ VKAPI_ATTR void VKAPI_CALL CmdDispatchGraphIndirectAMDX(VkCommandBuffer commandB
         VVL_ZoneScopedN("PreCallRecord");
         for (ValidationObject* intercept : layer_data->intercept_vectors[InterceptIdPreCallRecordCmdDispatchGraphIndirectAMDX]) {
             auto lock = intercept->WriteLock();
-            intercept->PreCallRecordCmdDispatchGraphIndirectAMDX(commandBuffer, scratch, pCountInfo, record_obj);
+            intercept->PreCallRecordCmdDispatchGraphIndirectAMDX(commandBuffer, scratch, scratchSize, pCountInfo, record_obj);
         }
     }
     {
         VVL_ZoneScopedN("Dispatch");
-        DispatchCmdDispatchGraphIndirectAMDX(commandBuffer, scratch, pCountInfo);
+        DispatchCmdDispatchGraphIndirectAMDX(commandBuffer, scratch, scratchSize, pCountInfo);
     }
     {
         VVL_ZoneScopedN("PostCallRecord");
         for (ValidationObject* intercept : layer_data->intercept_vectors[InterceptIdPostCallRecordCmdDispatchGraphIndirectAMDX]) {
             auto lock = intercept->WriteLock();
-            intercept->PostCallRecordCmdDispatchGraphIndirectAMDX(commandBuffer, scratch, pCountInfo, record_obj);
+            intercept->PostCallRecordCmdDispatchGraphIndirectAMDX(commandBuffer, scratch, scratchSize, pCountInfo, record_obj);
         }
     }
 }
 
 VKAPI_ATTR void VKAPI_CALL CmdDispatchGraphIndirectCountAMDX(VkCommandBuffer commandBuffer, VkDeviceAddress scratch,
-                                                             VkDeviceAddress countInfo) {
+                                                             VkDeviceSize scratchSize, VkDeviceAddress countInfo) {
     VVL_ZoneScoped;
 
     auto layer_data = GetLayerDataPtr(GetDispatchKey(commandBuffer), layer_data_map);
@@ -18274,7 +18277,8 @@ VKAPI_ATTR void VKAPI_CALL CmdDispatchGraphIndirectCountAMDX(VkCommandBuffer com
         for (const ValidationObject* intercept :
              layer_data->intercept_vectors[InterceptIdPreCallValidateCmdDispatchGraphIndirectCountAMDX]) {
             auto lock = intercept->ReadLock();
-            skip |= intercept->PreCallValidateCmdDispatchGraphIndirectCountAMDX(commandBuffer, scratch, countInfo, error_obj);
+            skip |= intercept->PreCallValidateCmdDispatchGraphIndirectCountAMDX(commandBuffer, scratch, scratchSize, countInfo,
+                                                                                error_obj);
             if (skip) return;
         }
     }
@@ -18284,19 +18288,19 @@ VKAPI_ATTR void VKAPI_CALL CmdDispatchGraphIndirectCountAMDX(VkCommandBuffer com
         for (ValidationObject* intercept :
              layer_data->intercept_vectors[InterceptIdPreCallRecordCmdDispatchGraphIndirectCountAMDX]) {
             auto lock = intercept->WriteLock();
-            intercept->PreCallRecordCmdDispatchGraphIndirectCountAMDX(commandBuffer, scratch, countInfo, record_obj);
+            intercept->PreCallRecordCmdDispatchGraphIndirectCountAMDX(commandBuffer, scratch, scratchSize, countInfo, record_obj);
         }
     }
     {
         VVL_ZoneScopedN("Dispatch");
-        DispatchCmdDispatchGraphIndirectCountAMDX(commandBuffer, scratch, countInfo);
+        DispatchCmdDispatchGraphIndirectCountAMDX(commandBuffer, scratch, scratchSize, countInfo);
     }
     {
         VVL_ZoneScopedN("PostCallRecord");
         for (ValidationObject* intercept :
              layer_data->intercept_vectors[InterceptIdPostCallRecordCmdDispatchGraphIndirectCountAMDX]) {
             auto lock = intercept->WriteLock();
-            intercept->PostCallRecordCmdDispatchGraphIndirectCountAMDX(commandBuffer, scratch, countInfo, record_obj);
+            intercept->PostCallRecordCmdDispatchGraphIndirectCountAMDX(commandBuffer, scratch, scratchSize, countInfo, record_obj);
         }
     }
 }
@@ -19151,6 +19155,44 @@ VKAPI_ATTR void VKAPI_CALL CmdWriteBufferMarkerAMD(VkCommandBuffer commandBuffer
     }
 }
 
+VKAPI_ATTR void VKAPI_CALL CmdWriteBufferMarker2AMD(VkCommandBuffer commandBuffer, VkPipelineStageFlags2 stage, VkBuffer dstBuffer,
+                                                    VkDeviceSize dstOffset, uint32_t marker) {
+    VVL_ZoneScoped;
+
+    auto layer_data = GetLayerDataPtr(GetDispatchKey(commandBuffer), layer_data_map);
+    bool skip = false;
+    ErrorObject error_obj(vvl::Func::vkCmdWriteBufferMarker2AMD, VulkanTypedHandle(commandBuffer, kVulkanObjectTypeCommandBuffer));
+    {
+        VVL_ZoneScopedN("PreCallValidate");
+        for (const ValidationObject* intercept :
+             layer_data->intercept_vectors[InterceptIdPreCallValidateCmdWriteBufferMarker2AMD]) {
+            auto lock = intercept->ReadLock();
+            skip |=
+                intercept->PreCallValidateCmdWriteBufferMarker2AMD(commandBuffer, stage, dstBuffer, dstOffset, marker, error_obj);
+            if (skip) return;
+        }
+    }
+    RecordObject record_obj(vvl::Func::vkCmdWriteBufferMarker2AMD);
+    {
+        VVL_ZoneScopedN("PreCallRecord");
+        for (ValidationObject* intercept : layer_data->intercept_vectors[InterceptIdPreCallRecordCmdWriteBufferMarker2AMD]) {
+            auto lock = intercept->WriteLock();
+            intercept->PreCallRecordCmdWriteBufferMarker2AMD(commandBuffer, stage, dstBuffer, dstOffset, marker, record_obj);
+        }
+    }
+    {
+        VVL_ZoneScopedN("Dispatch");
+        DispatchCmdWriteBufferMarker2AMD(commandBuffer, stage, dstBuffer, dstOffset, marker);
+    }
+    {
+        VVL_ZoneScopedN("PostCallRecord");
+        for (ValidationObject* intercept : layer_data->intercept_vectors[InterceptIdPostCallRecordCmdWriteBufferMarker2AMD]) {
+            auto lock = intercept->WriteLock();
+            intercept->PostCallRecordCmdWriteBufferMarker2AMD(commandBuffer, stage, dstBuffer, dstOffset, marker, record_obj);
+        }
+    }
+}
+
 VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceCalibrateableTimeDomainsEXT(VkPhysicalDevice physicalDevice,
                                                                             uint32_t* pTimeDomainCount,
                                                                             VkTimeDomainKHR* pTimeDomains) {
@@ -19508,6 +19550,43 @@ VKAPI_ATTR void VKAPI_CALL GetQueueCheckpointDataNV(VkQueue queue, uint32_t* pCh
         for (ValidationObject* intercept : layer_data->intercept_vectors[InterceptIdPostCallRecordGetQueueCheckpointDataNV]) {
             auto lock = intercept->WriteLock();
             intercept->PostCallRecordGetQueueCheckpointDataNV(queue, pCheckpointDataCount, pCheckpointData, record_obj);
+        }
+    }
+}
+
+VKAPI_ATTR void VKAPI_CALL GetQueueCheckpointData2NV(VkQueue queue, uint32_t* pCheckpointDataCount,
+                                                     VkCheckpointData2NV* pCheckpointData) {
+    VVL_ZoneScoped;
+
+    auto layer_data = GetLayerDataPtr(GetDispatchKey(queue), layer_data_map);
+    bool skip = false;
+    ErrorObject error_obj(vvl::Func::vkGetQueueCheckpointData2NV, VulkanTypedHandle(queue, kVulkanObjectTypeQueue));
+    {
+        VVL_ZoneScopedN("PreCallValidate");
+        for (const ValidationObject* intercept :
+             layer_data->intercept_vectors[InterceptIdPreCallValidateGetQueueCheckpointData2NV]) {
+            auto lock = intercept->ReadLock();
+            skip |= intercept->PreCallValidateGetQueueCheckpointData2NV(queue, pCheckpointDataCount, pCheckpointData, error_obj);
+            if (skip) return;
+        }
+    }
+    RecordObject record_obj(vvl::Func::vkGetQueueCheckpointData2NV);
+    {
+        VVL_ZoneScopedN("PreCallRecord");
+        for (ValidationObject* intercept : layer_data->intercept_vectors[InterceptIdPreCallRecordGetQueueCheckpointData2NV]) {
+            auto lock = intercept->WriteLock();
+            intercept->PreCallRecordGetQueueCheckpointData2NV(queue, pCheckpointDataCount, pCheckpointData, record_obj);
+        }
+    }
+    {
+        VVL_ZoneScopedN("Dispatch");
+        DispatchGetQueueCheckpointData2NV(queue, pCheckpointDataCount, pCheckpointData);
+    }
+    {
+        VVL_ZoneScopedN("PostCallRecord");
+        for (ValidationObject* intercept : layer_data->intercept_vectors[InterceptIdPostCallRecordGetQueueCheckpointData2NV]) {
+            auto lock = intercept->WriteLock();
+            intercept->PostCallRecordGetQueueCheckpointData2NV(queue, pCheckpointDataCount, pCheckpointData, record_obj);
         }
     }
 }
@@ -26611,6 +26690,43 @@ VKAPI_ATTR void VKAPI_CALL CmdBindShadersEXT(VkCommandBuffer commandBuffer, uint
     }
 }
 
+VKAPI_ATTR void VKAPI_CALL CmdSetDepthClampRangeEXT(VkCommandBuffer commandBuffer, VkDepthClampModeEXT depthClampMode,
+                                                    const VkDepthClampRangeEXT* pDepthClampRange) {
+    VVL_ZoneScoped;
+
+    auto layer_data = GetLayerDataPtr(GetDispatchKey(commandBuffer), layer_data_map);
+    bool skip = false;
+    ErrorObject error_obj(vvl::Func::vkCmdSetDepthClampRangeEXT, VulkanTypedHandle(commandBuffer, kVulkanObjectTypeCommandBuffer));
+    {
+        VVL_ZoneScopedN("PreCallValidate");
+        for (const ValidationObject* intercept :
+             layer_data->intercept_vectors[InterceptIdPreCallValidateCmdSetDepthClampRangeEXT]) {
+            auto lock = intercept->ReadLock();
+            skip |= intercept->PreCallValidateCmdSetDepthClampRangeEXT(commandBuffer, depthClampMode, pDepthClampRange, error_obj);
+            if (skip) return;
+        }
+    }
+    RecordObject record_obj(vvl::Func::vkCmdSetDepthClampRangeEXT);
+    {
+        VVL_ZoneScopedN("PreCallRecord");
+        for (ValidationObject* intercept : layer_data->intercept_vectors[InterceptIdPreCallRecordCmdSetDepthClampRangeEXT]) {
+            auto lock = intercept->WriteLock();
+            intercept->PreCallRecordCmdSetDepthClampRangeEXT(commandBuffer, depthClampMode, pDepthClampRange, record_obj);
+        }
+    }
+    {
+        VVL_ZoneScopedN("Dispatch");
+        DispatchCmdSetDepthClampRangeEXT(commandBuffer, depthClampMode, pDepthClampRange);
+    }
+    {
+        VVL_ZoneScopedN("PostCallRecord");
+        for (ValidationObject* intercept : layer_data->intercept_vectors[InterceptIdPostCallRecordCmdSetDepthClampRangeEXT]) {
+            auto lock = intercept->WriteLock();
+            intercept->PostCallRecordCmdSetDepthClampRangeEXT(commandBuffer, depthClampMode, pDepthClampRange, record_obj);
+        }
+    }
+}
+
 VKAPI_ATTR VkResult VKAPI_CALL GetFramebufferTilePropertiesQCOM(VkDevice device, VkFramebuffer framebuffer,
                                                                 uint32_t* pPropertiesCount, VkTilePropertiesQCOM* pProperties) {
     VVL_ZoneScoped;
@@ -27044,6 +27160,431 @@ VKAPI_ATTR VkResult VKAPI_CALL GetScreenBufferPropertiesQNX(VkDevice device, con
 }
 
 #endif  // VK_USE_PLATFORM_SCREEN_QNX
+VKAPI_ATTR void VKAPI_CALL GetGeneratedCommandsMemoryRequirementsEXT(VkDevice device,
+                                                                     const VkGeneratedCommandsMemoryRequirementsInfoEXT* pInfo,
+                                                                     VkMemoryRequirements2* pMemoryRequirements) {
+    VVL_ZoneScoped;
+
+    auto layer_data = GetLayerDataPtr(GetDispatchKey(device), layer_data_map);
+    bool skip = false;
+    ErrorObject error_obj(vvl::Func::vkGetGeneratedCommandsMemoryRequirementsEXT,
+                          VulkanTypedHandle(device, kVulkanObjectTypeDevice));
+    {
+        VVL_ZoneScopedN("PreCallValidate");
+        for (const ValidationObject* intercept :
+             layer_data->intercept_vectors[InterceptIdPreCallValidateGetGeneratedCommandsMemoryRequirementsEXT]) {
+            auto lock = intercept->ReadLock();
+            skip |=
+                intercept->PreCallValidateGetGeneratedCommandsMemoryRequirementsEXT(device, pInfo, pMemoryRequirements, error_obj);
+            if (skip) return;
+        }
+    }
+    RecordObject record_obj(vvl::Func::vkGetGeneratedCommandsMemoryRequirementsEXT);
+    {
+        VVL_ZoneScopedN("PreCallRecord");
+        for (ValidationObject* intercept :
+             layer_data->intercept_vectors[InterceptIdPreCallRecordGetGeneratedCommandsMemoryRequirementsEXT]) {
+            auto lock = intercept->WriteLock();
+            intercept->PreCallRecordGetGeneratedCommandsMemoryRequirementsEXT(device, pInfo, pMemoryRequirements, record_obj);
+        }
+    }
+    {
+        VVL_ZoneScopedN("Dispatch");
+        DispatchGetGeneratedCommandsMemoryRequirementsEXT(device, pInfo, pMemoryRequirements);
+    }
+    {
+        VVL_ZoneScopedN("PostCallRecord");
+        for (ValidationObject* intercept :
+             layer_data->intercept_vectors[InterceptIdPostCallRecordGetGeneratedCommandsMemoryRequirementsEXT]) {
+            auto lock = intercept->WriteLock();
+            intercept->PostCallRecordGetGeneratedCommandsMemoryRequirementsEXT(device, pInfo, pMemoryRequirements, record_obj);
+        }
+    }
+}
+
+VKAPI_ATTR void VKAPI_CALL CmdPreprocessGeneratedCommandsEXT(VkCommandBuffer commandBuffer,
+                                                             const VkGeneratedCommandsInfoEXT* pGeneratedCommandsInfo,
+                                                             VkCommandBuffer stateCommandBuffer) {
+    VVL_ZoneScoped;
+
+    auto layer_data = GetLayerDataPtr(GetDispatchKey(commandBuffer), layer_data_map);
+    bool skip = false;
+    ErrorObject error_obj(vvl::Func::vkCmdPreprocessGeneratedCommandsEXT,
+                          VulkanTypedHandle(commandBuffer, kVulkanObjectTypeCommandBuffer));
+    {
+        VVL_ZoneScopedN("PreCallValidate");
+        for (const ValidationObject* intercept :
+             layer_data->intercept_vectors[InterceptIdPreCallValidateCmdPreprocessGeneratedCommandsEXT]) {
+            auto lock = intercept->ReadLock();
+            skip |= intercept->PreCallValidateCmdPreprocessGeneratedCommandsEXT(commandBuffer, pGeneratedCommandsInfo,
+                                                                                stateCommandBuffer, error_obj);
+            if (skip) return;
+        }
+    }
+    RecordObject record_obj(vvl::Func::vkCmdPreprocessGeneratedCommandsEXT);
+    {
+        VVL_ZoneScopedN("PreCallRecord");
+        for (ValidationObject* intercept :
+             layer_data->intercept_vectors[InterceptIdPreCallRecordCmdPreprocessGeneratedCommandsEXT]) {
+            auto lock = intercept->WriteLock();
+            intercept->PreCallRecordCmdPreprocessGeneratedCommandsEXT(commandBuffer, pGeneratedCommandsInfo, stateCommandBuffer,
+                                                                      record_obj);
+        }
+    }
+    {
+        VVL_ZoneScopedN("Dispatch");
+        DispatchCmdPreprocessGeneratedCommandsEXT(commandBuffer, pGeneratedCommandsInfo, stateCommandBuffer);
+    }
+    {
+        VVL_ZoneScopedN("PostCallRecord");
+        for (ValidationObject* intercept :
+             layer_data->intercept_vectors[InterceptIdPostCallRecordCmdPreprocessGeneratedCommandsEXT]) {
+            auto lock = intercept->WriteLock();
+            intercept->PostCallRecordCmdPreprocessGeneratedCommandsEXT(commandBuffer, pGeneratedCommandsInfo, stateCommandBuffer,
+                                                                       record_obj);
+        }
+    }
+}
+
+VKAPI_ATTR void VKAPI_CALL CmdExecuteGeneratedCommandsEXT(VkCommandBuffer commandBuffer, VkBool32 isPreprocessed,
+                                                          const VkGeneratedCommandsInfoEXT* pGeneratedCommandsInfo) {
+    VVL_ZoneScoped;
+
+    auto layer_data = GetLayerDataPtr(GetDispatchKey(commandBuffer), layer_data_map);
+    bool skip = false;
+    ErrorObject error_obj(vvl::Func::vkCmdExecuteGeneratedCommandsEXT,
+                          VulkanTypedHandle(commandBuffer, kVulkanObjectTypeCommandBuffer));
+    {
+        VVL_ZoneScopedN("PreCallValidate");
+        for (const ValidationObject* intercept :
+             layer_data->intercept_vectors[InterceptIdPreCallValidateCmdExecuteGeneratedCommandsEXT]) {
+            auto lock = intercept->ReadLock();
+            skip |= intercept->PreCallValidateCmdExecuteGeneratedCommandsEXT(commandBuffer, isPreprocessed, pGeneratedCommandsInfo,
+                                                                             error_obj);
+            if (skip) return;
+        }
+    }
+    RecordObject record_obj(vvl::Func::vkCmdExecuteGeneratedCommandsEXT);
+    {
+        VVL_ZoneScopedN("PreCallRecord");
+        for (ValidationObject* intercept : layer_data->intercept_vectors[InterceptIdPreCallRecordCmdExecuteGeneratedCommandsEXT]) {
+            auto lock = intercept->WriteLock();
+            intercept->PreCallRecordCmdExecuteGeneratedCommandsEXT(commandBuffer, isPreprocessed, pGeneratedCommandsInfo,
+                                                                   record_obj);
+        }
+    }
+    {
+        VVL_ZoneScopedN("Dispatch");
+        DispatchCmdExecuteGeneratedCommandsEXT(commandBuffer, isPreprocessed, pGeneratedCommandsInfo);
+    }
+    {
+        VVL_ZoneScopedN("PostCallRecord");
+        for (ValidationObject* intercept : layer_data->intercept_vectors[InterceptIdPostCallRecordCmdExecuteGeneratedCommandsEXT]) {
+            auto lock = intercept->WriteLock();
+            intercept->PostCallRecordCmdExecuteGeneratedCommandsEXT(commandBuffer, isPreprocessed, pGeneratedCommandsInfo,
+                                                                    record_obj);
+        }
+    }
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL CreateIndirectCommandsLayoutEXT(VkDevice device,
+                                                               const VkIndirectCommandsLayoutCreateInfoEXT* pCreateInfo,
+                                                               const VkAllocationCallbacks* pAllocator,
+                                                               VkIndirectCommandsLayoutEXT* pIndirectCommandsLayout) {
+    VVL_ZoneScoped;
+
+    auto layer_data = GetLayerDataPtr(GetDispatchKey(device), layer_data_map);
+    bool skip = false;
+    ErrorObject error_obj(vvl::Func::vkCreateIndirectCommandsLayoutEXT, VulkanTypedHandle(device, kVulkanObjectTypeDevice));
+    {
+        VVL_ZoneScopedN("PreCallValidate");
+        for (const ValidationObject* intercept :
+             layer_data->intercept_vectors[InterceptIdPreCallValidateCreateIndirectCommandsLayoutEXT]) {
+            auto lock = intercept->ReadLock();
+            skip |= intercept->PreCallValidateCreateIndirectCommandsLayoutEXT(device, pCreateInfo, pAllocator,
+                                                                              pIndirectCommandsLayout, error_obj);
+            if (skip) return VK_ERROR_VALIDATION_FAILED_EXT;
+        }
+    }
+    RecordObject record_obj(vvl::Func::vkCreateIndirectCommandsLayoutEXT);
+    {
+        VVL_ZoneScopedN("PreCallRecord");
+        for (ValidationObject* intercept : layer_data->intercept_vectors[InterceptIdPreCallRecordCreateIndirectCommandsLayoutEXT]) {
+            auto lock = intercept->WriteLock();
+            intercept->PreCallRecordCreateIndirectCommandsLayoutEXT(device, pCreateInfo, pAllocator, pIndirectCommandsLayout,
+                                                                    record_obj);
+        }
+    }
+    VkResult result;
+    {
+        VVL_ZoneScopedN("Dispatch");
+        result = DispatchCreateIndirectCommandsLayoutEXT(device, pCreateInfo, pAllocator, pIndirectCommandsLayout);
+    }
+    record_obj.result = result;
+    {
+        VVL_ZoneScopedN("PostCallRecord");
+        for (ValidationObject* intercept :
+             layer_data->intercept_vectors[InterceptIdPostCallRecordCreateIndirectCommandsLayoutEXT]) {
+            auto lock = intercept->WriteLock();
+            intercept->PostCallRecordCreateIndirectCommandsLayoutEXT(device, pCreateInfo, pAllocator, pIndirectCommandsLayout,
+                                                                     record_obj);
+        }
+    }
+    return result;
+}
+
+VKAPI_ATTR void VKAPI_CALL DestroyIndirectCommandsLayoutEXT(VkDevice device, VkIndirectCommandsLayoutEXT indirectCommandsLayout,
+                                                            const VkAllocationCallbacks* pAllocator) {
+    VVL_ZoneScoped;
+
+    auto layer_data = GetLayerDataPtr(GetDispatchKey(device), layer_data_map);
+    bool skip = false;
+    ErrorObject error_obj(vvl::Func::vkDestroyIndirectCommandsLayoutEXT, VulkanTypedHandle(device, kVulkanObjectTypeDevice));
+    {
+        VVL_ZoneScopedN("PreCallValidate");
+        for (const ValidationObject* intercept :
+             layer_data->intercept_vectors[InterceptIdPreCallValidateDestroyIndirectCommandsLayoutEXT]) {
+            auto lock = intercept->ReadLock();
+            skip |=
+                intercept->PreCallValidateDestroyIndirectCommandsLayoutEXT(device, indirectCommandsLayout, pAllocator, error_obj);
+            if (skip) return;
+        }
+    }
+    RecordObject record_obj(vvl::Func::vkDestroyIndirectCommandsLayoutEXT);
+    {
+        VVL_ZoneScopedN("PreCallRecord");
+        for (ValidationObject* intercept :
+             layer_data->intercept_vectors[InterceptIdPreCallRecordDestroyIndirectCommandsLayoutEXT]) {
+            auto lock = intercept->WriteLock();
+            intercept->PreCallRecordDestroyIndirectCommandsLayoutEXT(device, indirectCommandsLayout, pAllocator, record_obj);
+        }
+    }
+    {
+        VVL_ZoneScopedN("Dispatch");
+        DispatchDestroyIndirectCommandsLayoutEXT(device, indirectCommandsLayout, pAllocator);
+    }
+    {
+        VVL_ZoneScopedN("PostCallRecord");
+        for (ValidationObject* intercept :
+             layer_data->intercept_vectors[InterceptIdPostCallRecordDestroyIndirectCommandsLayoutEXT]) {
+            auto lock = intercept->WriteLock();
+            intercept->PostCallRecordDestroyIndirectCommandsLayoutEXT(device, indirectCommandsLayout, pAllocator, record_obj);
+        }
+    }
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL CreateIndirectExecutionSetEXT(VkDevice device,
+                                                             const VkIndirectExecutionSetCreateInfoEXT* pCreateInfo,
+                                                             const VkAllocationCallbacks* pAllocator,
+                                                             VkIndirectExecutionSetEXT* pIndirectExecutionSet) {
+    VVL_ZoneScoped;
+
+    auto layer_data = GetLayerDataPtr(GetDispatchKey(device), layer_data_map);
+    bool skip = false;
+    ErrorObject error_obj(vvl::Func::vkCreateIndirectExecutionSetEXT, VulkanTypedHandle(device, kVulkanObjectTypeDevice));
+    {
+        VVL_ZoneScopedN("PreCallValidate");
+        for (const ValidationObject* intercept :
+             layer_data->intercept_vectors[InterceptIdPreCallValidateCreateIndirectExecutionSetEXT]) {
+            auto lock = intercept->ReadLock();
+            skip |= intercept->PreCallValidateCreateIndirectExecutionSetEXT(device, pCreateInfo, pAllocator, pIndirectExecutionSet,
+                                                                            error_obj);
+            if (skip) return VK_ERROR_VALIDATION_FAILED_EXT;
+        }
+    }
+    RecordObject record_obj(vvl::Func::vkCreateIndirectExecutionSetEXT);
+    {
+        VVL_ZoneScopedN("PreCallRecord");
+        for (ValidationObject* intercept : layer_data->intercept_vectors[InterceptIdPreCallRecordCreateIndirectExecutionSetEXT]) {
+            auto lock = intercept->WriteLock();
+            intercept->PreCallRecordCreateIndirectExecutionSetEXT(device, pCreateInfo, pAllocator, pIndirectExecutionSet,
+                                                                  record_obj);
+        }
+    }
+    VkResult result;
+    {
+        VVL_ZoneScopedN("Dispatch");
+        result = DispatchCreateIndirectExecutionSetEXT(device, pCreateInfo, pAllocator, pIndirectExecutionSet);
+    }
+    record_obj.result = result;
+    {
+        VVL_ZoneScopedN("PostCallRecord");
+        for (ValidationObject* intercept : layer_data->intercept_vectors[InterceptIdPostCallRecordCreateIndirectExecutionSetEXT]) {
+            auto lock = intercept->WriteLock();
+            intercept->PostCallRecordCreateIndirectExecutionSetEXT(device, pCreateInfo, pAllocator, pIndirectExecutionSet,
+                                                                   record_obj);
+        }
+    }
+    return result;
+}
+
+VKAPI_ATTR void VKAPI_CALL DestroyIndirectExecutionSetEXT(VkDevice device, VkIndirectExecutionSetEXT indirectExecutionSet,
+                                                          const VkAllocationCallbacks* pAllocator) {
+    VVL_ZoneScoped;
+
+    auto layer_data = GetLayerDataPtr(GetDispatchKey(device), layer_data_map);
+    bool skip = false;
+    ErrorObject error_obj(vvl::Func::vkDestroyIndirectExecutionSetEXT, VulkanTypedHandle(device, kVulkanObjectTypeDevice));
+    {
+        VVL_ZoneScopedN("PreCallValidate");
+        for (const ValidationObject* intercept :
+             layer_data->intercept_vectors[InterceptIdPreCallValidateDestroyIndirectExecutionSetEXT]) {
+            auto lock = intercept->ReadLock();
+            skip |= intercept->PreCallValidateDestroyIndirectExecutionSetEXT(device, indirectExecutionSet, pAllocator, error_obj);
+            if (skip) return;
+        }
+    }
+    RecordObject record_obj(vvl::Func::vkDestroyIndirectExecutionSetEXT);
+    {
+        VVL_ZoneScopedN("PreCallRecord");
+        for (ValidationObject* intercept : layer_data->intercept_vectors[InterceptIdPreCallRecordDestroyIndirectExecutionSetEXT]) {
+            auto lock = intercept->WriteLock();
+            intercept->PreCallRecordDestroyIndirectExecutionSetEXT(device, indirectExecutionSet, pAllocator, record_obj);
+        }
+    }
+    {
+        VVL_ZoneScopedN("Dispatch");
+        DispatchDestroyIndirectExecutionSetEXT(device, indirectExecutionSet, pAllocator);
+    }
+    {
+        VVL_ZoneScopedN("PostCallRecord");
+        for (ValidationObject* intercept : layer_data->intercept_vectors[InterceptIdPostCallRecordDestroyIndirectExecutionSetEXT]) {
+            auto lock = intercept->WriteLock();
+            intercept->PostCallRecordDestroyIndirectExecutionSetEXT(device, indirectExecutionSet, pAllocator, record_obj);
+        }
+    }
+}
+
+VKAPI_ATTR void VKAPI_CALL UpdateIndirectExecutionSetPipelineEXT(
+    VkDevice device, VkIndirectExecutionSetEXT indirectExecutionSet, uint32_t executionSetWriteCount,
+    const VkWriteIndirectExecutionSetPipelineEXT* pExecutionSetWrites) {
+    VVL_ZoneScoped;
+
+    auto layer_data = GetLayerDataPtr(GetDispatchKey(device), layer_data_map);
+    bool skip = false;
+    ErrorObject error_obj(vvl::Func::vkUpdateIndirectExecutionSetPipelineEXT, VulkanTypedHandle(device, kVulkanObjectTypeDevice));
+    {
+        VVL_ZoneScopedN("PreCallValidate");
+        for (const ValidationObject* intercept :
+             layer_data->intercept_vectors[InterceptIdPreCallValidateUpdateIndirectExecutionSetPipelineEXT]) {
+            auto lock = intercept->ReadLock();
+            skip |= intercept->PreCallValidateUpdateIndirectExecutionSetPipelineEXT(
+                device, indirectExecutionSet, executionSetWriteCount, pExecutionSetWrites, error_obj);
+            if (skip) return;
+        }
+    }
+    RecordObject record_obj(vvl::Func::vkUpdateIndirectExecutionSetPipelineEXT);
+    {
+        VVL_ZoneScopedN("PreCallRecord");
+        for (ValidationObject* intercept :
+             layer_data->intercept_vectors[InterceptIdPreCallRecordUpdateIndirectExecutionSetPipelineEXT]) {
+            auto lock = intercept->WriteLock();
+            intercept->PreCallRecordUpdateIndirectExecutionSetPipelineEXT(device, indirectExecutionSet, executionSetWriteCount,
+                                                                          pExecutionSetWrites, record_obj);
+        }
+    }
+    {
+        VVL_ZoneScopedN("Dispatch");
+        DispatchUpdateIndirectExecutionSetPipelineEXT(device, indirectExecutionSet, executionSetWriteCount, pExecutionSetWrites);
+    }
+    {
+        VVL_ZoneScopedN("PostCallRecord");
+        for (ValidationObject* intercept :
+             layer_data->intercept_vectors[InterceptIdPostCallRecordUpdateIndirectExecutionSetPipelineEXT]) {
+            auto lock = intercept->WriteLock();
+            intercept->PostCallRecordUpdateIndirectExecutionSetPipelineEXT(device, indirectExecutionSet, executionSetWriteCount,
+                                                                           pExecutionSetWrites, record_obj);
+        }
+    }
+}
+
+VKAPI_ATTR void VKAPI_CALL UpdateIndirectExecutionSetShaderEXT(VkDevice device, VkIndirectExecutionSetEXT indirectExecutionSet,
+                                                               uint32_t executionSetWriteCount,
+                                                               const VkWriteIndirectExecutionSetShaderEXT* pExecutionSetWrites) {
+    VVL_ZoneScoped;
+
+    auto layer_data = GetLayerDataPtr(GetDispatchKey(device), layer_data_map);
+    bool skip = false;
+    ErrorObject error_obj(vvl::Func::vkUpdateIndirectExecutionSetShaderEXT, VulkanTypedHandle(device, kVulkanObjectTypeDevice));
+    {
+        VVL_ZoneScopedN("PreCallValidate");
+        for (const ValidationObject* intercept :
+             layer_data->intercept_vectors[InterceptIdPreCallValidateUpdateIndirectExecutionSetShaderEXT]) {
+            auto lock = intercept->ReadLock();
+            skip |= intercept->PreCallValidateUpdateIndirectExecutionSetShaderEXT(
+                device, indirectExecutionSet, executionSetWriteCount, pExecutionSetWrites, error_obj);
+            if (skip) return;
+        }
+    }
+    RecordObject record_obj(vvl::Func::vkUpdateIndirectExecutionSetShaderEXT);
+    {
+        VVL_ZoneScopedN("PreCallRecord");
+        for (ValidationObject* intercept :
+             layer_data->intercept_vectors[InterceptIdPreCallRecordUpdateIndirectExecutionSetShaderEXT]) {
+            auto lock = intercept->WriteLock();
+            intercept->PreCallRecordUpdateIndirectExecutionSetShaderEXT(device, indirectExecutionSet, executionSetWriteCount,
+                                                                        pExecutionSetWrites, record_obj);
+        }
+    }
+    {
+        VVL_ZoneScopedN("Dispatch");
+        DispatchUpdateIndirectExecutionSetShaderEXT(device, indirectExecutionSet, executionSetWriteCount, pExecutionSetWrites);
+    }
+    {
+        VVL_ZoneScopedN("PostCallRecord");
+        for (ValidationObject* intercept :
+             layer_data->intercept_vectors[InterceptIdPostCallRecordUpdateIndirectExecutionSetShaderEXT]) {
+            auto lock = intercept->WriteLock();
+            intercept->PostCallRecordUpdateIndirectExecutionSetShaderEXT(device, indirectExecutionSet, executionSetWriteCount,
+                                                                         pExecutionSetWrites, record_obj);
+        }
+    }
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV(
+    VkPhysicalDevice physicalDevice, uint32_t* pPropertyCount, VkCooperativeMatrixFlexibleDimensionsPropertiesNV* pProperties) {
+    VVL_ZoneScoped;
+
+    auto layer_data = GetLayerDataPtr(GetDispatchKey(physicalDevice), layer_data_map);
+    bool skip = false;
+    ErrorObject error_obj(vvl::Func::vkGetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV,
+                          VulkanTypedHandle(physicalDevice, kVulkanObjectTypePhysicalDevice));
+    {
+        VVL_ZoneScopedN("PreCallValidate");
+        for (const ValidationObject* intercept : layer_data->object_dispatch) {
+            auto lock = intercept->ReadLock();
+            skip |= intercept->PreCallValidateGetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV(
+                physicalDevice, pPropertyCount, pProperties, error_obj);
+            if (skip) return VK_ERROR_VALIDATION_FAILED_EXT;
+        }
+    }
+    RecordObject record_obj(vvl::Func::vkGetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV);
+    {
+        VVL_ZoneScopedN("PreCallRecord");
+        for (ValidationObject* intercept : layer_data->object_dispatch) {
+            auto lock = intercept->WriteLock();
+            intercept->PreCallRecordGetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV(physicalDevice, pPropertyCount,
+                                                                                                     pProperties, record_obj);
+        }
+    }
+    VkResult result;
+    {
+        VVL_ZoneScopedN("Dispatch");
+        result =
+            DispatchGetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV(physicalDevice, pPropertyCount, pProperties);
+    }
+    record_obj.result = result;
+    {
+        VVL_ZoneScopedN("PostCallRecord");
+        for (ValidationObject* intercept : layer_data->object_dispatch) {
+            auto lock = intercept->WriteLock();
+            intercept->PostCallRecordGetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV(
+                physicalDevice, pPropertyCount, pProperties, record_obj);
+        }
+    }
+    return result;
+}
+
 VKAPI_ATTR VkResult VKAPI_CALL CreateAccelerationStructureKHR(VkDevice device,
                                                               const VkAccelerationStructureCreateInfoKHR* pCreateInfo,
                                                               const VkAllocationCallbacks* pAllocator,
@@ -28450,8 +28991,6 @@ const vvl::unordered_map<std::string, function_data> &GetNameToFuncPtrMap() {
     {"vkCmdPipelineBarrier2KHR", {kFuncTypeDev, (void*)CmdPipelineBarrier2KHR}},
     {"vkCmdWriteTimestamp2KHR", {kFuncTypeDev, (void*)CmdWriteTimestamp2KHR}},
     {"vkQueueSubmit2KHR", {kFuncTypeDev, (void*)QueueSubmit2KHR}},
-    {"vkCmdWriteBufferMarker2AMD", {kFuncTypeDev, (void*)CmdWriteBufferMarker2AMD}},
-    {"vkGetQueueCheckpointData2NV", {kFuncTypeDev, (void*)GetQueueCheckpointData2NV}},
     {"vkCmdCopyBuffer2KHR", {kFuncTypeDev, (void*)CmdCopyBuffer2KHR}},
     {"vkCmdCopyImage2KHR", {kFuncTypeDev, (void*)CmdCopyImage2KHR}},
     {"vkCmdCopyBufferToImage2KHR", {kFuncTypeDev, (void*)CmdCopyBufferToImage2KHR}},
@@ -28501,6 +29040,7 @@ const vvl::unordered_map<std::string, function_data> &GetNameToFuncPtrMap() {
     {"vkDestroyCuFunctionNVX", {kFuncTypeDev, (void*)DestroyCuFunctionNVX}},
     {"vkCmdCuLaunchKernelNVX", {kFuncTypeDev, (void*)CmdCuLaunchKernelNVX}},
     {"vkGetImageViewHandleNVX", {kFuncTypeDev, (void*)GetImageViewHandleNVX}},
+    {"vkGetImageViewHandle64NVX", {kFuncTypeDev, (void*)GetImageViewHandle64NVX}},
     {"vkGetImageViewAddressNVX", {kFuncTypeDev, (void*)GetImageViewAddressNVX}},
     {"vkCmdDrawIndirectCountAMD", {kFuncTypeDev, (void*)CmdDrawIndirectCountAMD}},
     {"vkCmdDrawIndexedIndirectCountAMD", {kFuncTypeDev, (void*)CmdDrawIndexedIndirectCountAMD}},
@@ -28589,6 +29129,7 @@ const vvl::unordered_map<std::string, function_data> &GetNameToFuncPtrMap() {
     {"vkCompileDeferredNV", {kFuncTypeDev, (void*)CompileDeferredNV}},
     {"vkGetMemoryHostPointerPropertiesEXT", {kFuncTypeDev, (void*)GetMemoryHostPointerPropertiesEXT}},
     {"vkCmdWriteBufferMarkerAMD", {kFuncTypeDev, (void*)CmdWriteBufferMarkerAMD}},
+    {"vkCmdWriteBufferMarker2AMD", {kFuncTypeDev, (void*)CmdWriteBufferMarker2AMD}},
     {"vkGetPhysicalDeviceCalibrateableTimeDomainsEXT", {kFuncTypePdev, (void*)GetPhysicalDeviceCalibrateableTimeDomainsEXT}},
     {"vkGetCalibratedTimestampsEXT", {kFuncTypeDev, (void*)GetCalibratedTimestampsEXT}},
     {"vkCmdDrawMeshTasksNV", {kFuncTypeDev, (void*)CmdDrawMeshTasksNV}},
@@ -28598,6 +29139,7 @@ const vvl::unordered_map<std::string, function_data> &GetNameToFuncPtrMap() {
     {"vkCmdSetExclusiveScissorNV", {kFuncTypeDev, (void*)CmdSetExclusiveScissorNV}},
     {"vkCmdSetCheckpointNV", {kFuncTypeDev, (void*)CmdSetCheckpointNV}},
     {"vkGetQueueCheckpointDataNV", {kFuncTypeDev, (void*)GetQueueCheckpointDataNV}},
+    {"vkGetQueueCheckpointData2NV", {kFuncTypeDev, (void*)GetQueueCheckpointData2NV}},
     {"vkInitializePerformanceApiINTEL", {kFuncTypeDev, (void*)InitializePerformanceApiINTEL}},
     {"vkUninitializePerformanceApiINTEL", {kFuncTypeDev, (void*)UninitializePerformanceApiINTEL}},
     {"vkCmdSetPerformanceMarkerINTEL", {kFuncTypeDev, (void*)CmdSetPerformanceMarkerINTEL}},
@@ -28798,6 +29340,7 @@ const vvl::unordered_map<std::string, function_data> &GetNameToFuncPtrMap() {
     {"vkDestroyShaderEXT", {kFuncTypeDev, (void*)DestroyShaderEXT}},
     {"vkGetShaderBinaryDataEXT", {kFuncTypeDev, (void*)GetShaderBinaryDataEXT}},
     {"vkCmdBindShadersEXT", {kFuncTypeDev, (void*)CmdBindShadersEXT}},
+    {"vkCmdSetDepthClampRangeEXT", {kFuncTypeDev, (void*)CmdSetDepthClampRangeEXT}},
     {"vkGetFramebufferTilePropertiesQCOM", {kFuncTypeDev, (void*)GetFramebufferTilePropertiesQCOM}},
     {"vkGetDynamicRenderingTilePropertiesQCOM", {kFuncTypeDev, (void*)GetDynamicRenderingTilePropertiesQCOM}},
 #ifdef VK_USE_PLATFORM_SCI
@@ -28813,6 +29356,16 @@ const vvl::unordered_map<std::string, function_data> &GetNameToFuncPtrMap() {
 #ifdef VK_USE_PLATFORM_SCREEN_QNX
     {"vkGetScreenBufferPropertiesQNX", {kFuncTypeDev, (void*)GetScreenBufferPropertiesQNX}},
 #endif  // VK_USE_PLATFORM_SCREEN_QNX
+    {"vkGetGeneratedCommandsMemoryRequirementsEXT", {kFuncTypeDev, (void*)GetGeneratedCommandsMemoryRequirementsEXT}},
+    {"vkCmdPreprocessGeneratedCommandsEXT", {kFuncTypeDev, (void*)CmdPreprocessGeneratedCommandsEXT}},
+    {"vkCmdExecuteGeneratedCommandsEXT", {kFuncTypeDev, (void*)CmdExecuteGeneratedCommandsEXT}},
+    {"vkCreateIndirectCommandsLayoutEXT", {kFuncTypeDev, (void*)CreateIndirectCommandsLayoutEXT}},
+    {"vkDestroyIndirectCommandsLayoutEXT", {kFuncTypeDev, (void*)DestroyIndirectCommandsLayoutEXT}},
+    {"vkCreateIndirectExecutionSetEXT", {kFuncTypeDev, (void*)CreateIndirectExecutionSetEXT}},
+    {"vkDestroyIndirectExecutionSetEXT", {kFuncTypeDev, (void*)DestroyIndirectExecutionSetEXT}},
+    {"vkUpdateIndirectExecutionSetPipelineEXT", {kFuncTypeDev, (void*)UpdateIndirectExecutionSetPipelineEXT}},
+    {"vkUpdateIndirectExecutionSetShaderEXT", {kFuncTypeDev, (void*)UpdateIndirectExecutionSetShaderEXT}},
+    {"vkGetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV", {kFuncTypePdev, (void*)GetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV}},
     {"vkCreateAccelerationStructureKHR", {kFuncTypeDev, (void*)CreateAccelerationStructureKHR}},
     {"vkDestroyAccelerationStructureKHR", {kFuncTypeDev, (void*)DestroyAccelerationStructureKHR}},
     {"vkCmdBuildAccelerationStructuresKHR", {kFuncTypeDev, (void*)CmdBuildAccelerationStructuresKHR}},
@@ -28840,7 +29393,7 @@ const vvl::unordered_map<std::string, function_data> &GetNameToFuncPtrMap() {
     {"vkCmdDrawMeshTasksIndirectCountEXT", {kFuncTypeDev, (void*)CmdDrawMeshTasksIndirectCountEXT}},
 };
  return name_to_func_ptr_map;
-};
+}
 } // namespace vulkan_layer_chassis
 // clang-format on
 

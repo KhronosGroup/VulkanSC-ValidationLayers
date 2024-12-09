@@ -505,7 +505,7 @@ bool StatelessValidation::manual_PreCallValidateCmdBindDescriptorBuffersEXT(VkCo
         if (!vku::FindStructInPNextChain<VkBufferUsageFlags2CreateInfoKHR>(pBindingInfos[i].pNext)) {
             skip |= ValidateFlags(error_obj.location.dot(Field::pBindingInfos, i).dot(Field::usage),
                                   vvl::FlagBitmask::VkBufferUsageFlagBits, AllVkBufferUsageFlagBits, pBindingInfos[i].usage,
-                                  kRequiredFlags, "VUID-VkDescriptorBufferBindingInfoEXT-None-09499",
+                                  kRequiredFlags, VK_NULL_HANDLE, "VUID-VkDescriptorBufferBindingInfoEXT-None-09499",
                                   "VUID-VkDescriptorBufferBindingInfoEXT-None-09500");
         }
     }
@@ -521,7 +521,7 @@ bool StatelessValidation::manual_PreCallValidateGetPhysicalDeviceExternalBufferP
     if (!vku::FindStructInPNextChain<VkBufferUsageFlags2CreateInfoKHR>(pExternalBufferInfo->pNext)) {
         skip |= ValidateFlags(error_obj.location.dot(Field::pExternalBufferInfo).dot(Field::usage),
                               vvl::FlagBitmask::VkBufferUsageFlagBits, AllVkBufferUsageFlagBits, pExternalBufferInfo->usage,
-                              kRequiredFlags, "VUID-VkPhysicalDeviceExternalBufferInfo-None-09499",
+                              kRequiredFlags, VK_NULL_HANDLE, "VUID-VkPhysicalDeviceExternalBufferInfo-None-09499",
                               "VUID-VkPhysicalDeviceExternalBufferInfo-None-09500");
     }
 
@@ -701,60 +701,46 @@ bool StatelessValidation::manual_PreCallValidateBeginCommandBuffer(VkCommandBuff
                                                                    const ErrorObject &error_obj) const {
     bool skip = false;
 
-    // VkCommandBufferInheritanceInfo validation, due to a 'noautovalidity' of pBeginInfo->pInheritanceInfo in vkBeginCommandBuffer
+    // pBeginInfo->pInheritanceInfo can be a non-null invalid pointer. If not secondary command buffer we need to ignore
     if (!error_obj.handle_data->command_buffer.is_secondary) {
         return skip;
     }
-    // Implicit VUs
-    // validate only sType here; pointer has to be validated in core_validation
-    const bool k_not_required = false;
-    const char *k_no_vuid = nullptr;
-    const VkCommandBufferInheritanceInfo *info = pBeginInfo->pInheritanceInfo;
-    const Location begin_info_loc = error_obj.location.dot(Field::pBeginInfo);
-    const Location inheritance_loc = begin_info_loc.dot(Field::pInheritanceInfo);
-    skip |= ValidateStructType(inheritance_loc, info, VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO, k_not_required, k_no_vuid,
-                               "VUID-VkCommandBufferInheritanceInfo-sType-sType");
 
-    if (info) {
-        constexpr std::array allowed_structs = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_CONDITIONAL_RENDERING_INFO_EXT,
-                                                VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_RENDERING_INFO_KHR,
-                                                VK_STRUCTURE_TYPE_ATTACHMENT_SAMPLE_COUNT_INFO_AMD,
-                                                VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_VIEWPORT_SCISSOR_INFO_NV,
-                                                VK_STRUCTURE_TYPE_RENDERING_INPUT_ATTACHMENT_INDEX_INFO_KHR,
-                                                VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_LOCATION_INFO_KHR};
-        skip |= ValidateStructPnext(inheritance_loc, info->pNext, allowed_structs.size(), allowed_structs.data(),
-                                    GeneratedVulkanHeaderVersion, "VUID-VkCommandBufferInheritanceInfo-pNext-pNext",
-                                    "VUID-VkCommandBufferInheritanceInfo-sType-unique");
+    if (pBeginInfo->pInheritanceInfo) {
+        const VkCommandBufferInheritanceInfo &info = *pBeginInfo->pInheritanceInfo;
+        const Location begin_info_loc = error_obj.location.dot(Field::pBeginInfo);
+        const Location inheritance_loc = begin_info_loc.dot(Field::pInheritanceInfo);
 
-        skip |= ValidateBool32(inheritance_loc.dot(Field::occlusionQueryEnable), info->occlusionQueryEnable);
+        skip |= ValidateCommandBufferInheritanceInfo(info, inheritance_loc);
 
         // Explicit VUs
-        if (!enabled_features.inheritedQueries && info->occlusionQueryEnable == VK_TRUE) {
+        if (!enabled_features.inheritedQueries && info.occlusionQueryEnable == VK_TRUE) {
             skip |= LogError(
                 "VUID-VkCommandBufferInheritanceInfo-occlusionQueryEnable-00056", commandBuffer, error_obj.location,
-                "Inherited queries feature is disabled, but pBeginInfo->pInheritanceInfo->occlusionQueryEnable is VK_TRUE.");
+                "inheritedQueries feature is disabled, but pBeginInfo->pInheritanceInfo->occlusionQueryEnable is VK_TRUE.");
         }
 
         if (enabled_features.inheritedQueries) {
             skip |= ValidateFlags(inheritance_loc.dot(Field::queryFlags), vvl::FlagBitmask::VkQueryControlFlagBits,
-                                  AllVkQueryControlFlagBits, info->queryFlags, kOptionalFlags,
+                                  AllVkQueryControlFlagBits, info.queryFlags, kOptionalFlags, VK_NULL_HANDLE,
                                   "VUID-VkCommandBufferInheritanceInfo-queryFlags-00057");
         } else {  // !inheritedQueries
-            skip |= ValidateReservedFlags(inheritance_loc.dot(Field::queryFlags), info->queryFlags,
+            skip |= ValidateReservedFlags(inheritance_loc.dot(Field::queryFlags), info.queryFlags,
                                           "VUID-VkCommandBufferInheritanceInfo-queryFlags-02788");
         }
 
         if (enabled_features.pipelineStatisticsQuery) {
             skip |=
                 ValidateFlags(inheritance_loc.dot(Field::pipelineStatistics), vvl::FlagBitmask::VkQueryPipelineStatisticFlagBits,
-                              AllVkQueryPipelineStatisticFlagBits, info->pipelineStatistics, kOptionalFlags,
+                              AllVkQueryPipelineStatisticFlagBits, info.pipelineStatistics, kOptionalFlags, VK_NULL_HANDLE,
                               "VUID-VkCommandBufferInheritanceInfo-pipelineStatistics-02789");
         } else {  // !pipelineStatisticsQuery
-            skip |= ValidateReservedFlags(inheritance_loc.dot(Field::pipelineStatistics), info->pipelineStatistics,
+            skip |= ValidateReservedFlags(inheritance_loc.dot(Field::pipelineStatistics), info.pipelineStatistics,
                                           "VUID-VkCommandBufferInheritanceInfo-pipelineStatistics-00058");
         }
 
-        const auto *conditional_rendering = vku::FindStructInPNextChain<VkCommandBufferInheritanceConditionalRenderingInfoEXT>(info->pNext);
+        const auto *conditional_rendering =
+            vku::FindStructInPNextChain<VkCommandBufferInheritanceConditionalRenderingInfoEXT>(info.pNext);
         if (conditional_rendering) {
             if (!enabled_features.inheritedConditionalRendering && conditional_rendering->conditionalRenderingEnable == VK_TRUE) {
                 skip |= LogError(
@@ -765,7 +751,8 @@ bool StatelessValidation::manual_PreCallValidateBeginCommandBuffer(VkCommandBuff
             }
         }
 
-        auto p_inherited_viewport_scissor_info = vku::FindStructInPNextChain<VkCommandBufferInheritanceViewportScissorInfoNV>(info->pNext);
+        auto p_inherited_viewport_scissor_info =
+            vku::FindStructInPNextChain<VkCommandBufferInheritanceViewportScissorInfoNV>(info.pNext);
         if (p_inherited_viewport_scissor_info != nullptr && !enabled_features.multiViewport &&
             p_inherited_viewport_scissor_info->viewportScissor2D == VK_TRUE &&
             p_inherited_viewport_scissor_info->viewportDepthCount != 1) {

@@ -160,7 +160,6 @@ class VkLayerTest : public VkLayerTestBase {
     void Init(VkPhysicalDeviceFeatures *features = nullptr, VkPhysicalDeviceFeatures2 *features2 = nullptr,
               void *instance_pnext = nullptr);
     void AddSurfaceExtension();
-    vkt::CommandBuffer *CommandBuffer();
 
     template <typename Features>
     VkPhysicalDeviceFeatures2 GetPhysicalDeviceFeatures2(Features &feature_query) {
@@ -301,6 +300,14 @@ class ExternalMemorySyncTest : public VkLayerTest {
 #endif
 };
 
+class DeviceGeneratedCommandsTest : public VkLayerTest {
+  public:
+    void InitBasicDeviceGeneratedCommands();
+
+    void SetPreProcessBuffer(VkGeneratedCommandsInfoEXT &generated_commands_info);
+    std::unique_ptr<vkt::Buffer> pre_process_buffer_ = std::make_unique<vkt::Buffer>();
+};
+
 class GraphicsLibraryTest : public VkLayerTest {
   public:
     void InitBasicGraphicsLibrary();
@@ -371,6 +378,10 @@ class WsiTest : public VkLayerTest {
     VkImageMemoryBarrier TransitionToPresent(VkImage swapchain_image, VkImageLayout old_layout, VkAccessFlags src_access_mask);
 
   protected:
+    // Find physical device group that contains physical device selected by the test framework
+    std::optional<VkPhysicalDeviceGroupProperties> FindPhysicalDeviceGroup();
+
+  protected:
 #ifdef VK_USE_PLATFORM_WAYLAND_KHR
     struct WaylandContext {
         wl_display *display = nullptr;
@@ -383,16 +394,12 @@ class WsiTest : public VkLayerTest {
 #endif
 };
 
-class YcbcrTest : public VkLayerTest {
-  public:
-    void InitBasicYcbcr(void *pNextFeatures = nullptr);
-};
-
 class CooperativeMatrixTest : public VkLayerTest {
   public:
     void InitCooperativeMatrixKHR();
     bool HasValidProperty(VkScopeKHR scope, uint32_t m, uint32_t n, uint32_t k, VkComponentTypeKHR type);
     std::vector<VkCooperativeMatrixPropertiesKHR> coop_matrix_props;
+    std::vector<VkCooperativeMatrixFlexibleDimensionsPropertiesNV> coop_matrix_flex_props;
 };
 
 class ParentTest : public VkLayerTest {
@@ -444,4 +451,4 @@ void CreateBufferViewTest(VkLayerTest &test, const VkBufferViewCreateInfo *pCrea
 
 void CreateImageViewTest(VkLayerTest &test, const VkImageViewCreateInfo *pCreateInfo, const std::string &code = "");
 
-void print_android(const char *c);
+void PrintAndroid(const char *c);

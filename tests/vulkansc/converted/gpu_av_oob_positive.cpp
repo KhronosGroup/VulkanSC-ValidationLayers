@@ -24,17 +24,13 @@ TEST_F(PositiveGpuAVOOB, Basic) {
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::nullDescriptor);
-    AddDisabledFeature(vkt::Feature::robustBufferAccess);
-    AddDisabledFeature(vkt::Feature::robustBufferAccess2);
+
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
-
-    VkMemoryPropertyFlags reqs = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-    vkt::Buffer offset_buffer(*m_device, 4, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, reqs);
-    vkt::Buffer write_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, reqs);
-
-    vkt::Buffer storage_texel_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT, reqs);
+    vkt::Buffer offset_buffer(*m_device, 4, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
+    vkt::Buffer write_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
+    vkt::Buffer storage_texel_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT, kHostVisibleMemProps);
     VkBufferViewCreateInfo bvci = vku::InitStructHelper();
     bvci.buffer = storage_texel_buffer.handle();
     bvci.format = VK_FORMAT_R32_SFLOAT;
@@ -78,38 +74,38 @@ TEST_F(PositiveGpuAVOOB, Basic) {
     pipe.gp_ci_.layout = pipeline_layout.handle();
     pipe.CreateGraphicsPipeline();
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1,
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1,
                               &descriptor_set.set_, 0, nullptr);
-    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
-    m_commandBuffer->EndRenderPass();
-    m_commandBuffer->end();
+    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
 
-    uint32_t *data = (uint32_t *)offset_buffer.memory().map();
+    uint32_t *data = (uint32_t *)offset_buffer.Memory().Map();
     *data = 1;
-    offset_buffer.memory().unmap();
-    m_default_queue->Submit(*m_commandBuffer);
+    offset_buffer.Memory().Unmap();
+    m_default_queue->Submit(m_command_buffer);
     m_default_queue->Wait();
 
-    data = (uint32_t *)offset_buffer.memory().map();
+    data = (uint32_t *)offset_buffer.Memory().Map();
     *data = 2;
-    offset_buffer.memory().unmap();
-    m_default_queue->Submit(*m_commandBuffer);
+    offset_buffer.Memory().Unmap();
+    m_default_queue->Submit(m_command_buffer);
     m_default_queue->Wait();
 
-    data = (uint32_t *)offset_buffer.memory().map();
+    data = (uint32_t *)offset_buffer.Memory().Map();
     *data = 3;
-    offset_buffer.memory().unmap();
-    m_default_queue->Submit(*m_commandBuffer);
+    offset_buffer.Memory().Unmap();
+    m_default_queue->Submit(m_command_buffer);
     m_default_queue->Wait();
 }
 
 TEST_F(PositiveGpuAVOOB, ImageLoadStoreTexelFetch) {
     TEST_DESCRIPTION("index into an image Load, Store, and texelFetch");
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    AddDisabledFeature(vkt::Feature::robustBufferAccess);
+
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
@@ -132,15 +128,14 @@ TEST_F(PositiveGpuAVOOB, ImageLoadStoreTexelFetch) {
     pipe.cs_ = std::make_unique<VkShaderObj>(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2);
     pipe.CreateComputePipeline();
 
-    VkMemoryPropertyFlags mem_props = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-    vkt::Buffer uniform_texel_buffer(*m_device, 20, VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT, mem_props);
+    vkt::Buffer uniform_texel_buffer(*m_device, 20, VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT, kHostVisibleMemProps);
     VkBufferViewCreateInfo bvci = vku::InitStructHelper();
     bvci.buffer = uniform_texel_buffer.handle();
     bvci.format = VK_FORMAT_R32_SFLOAT;
     bvci.range = VK_WHOLE_SIZE;
     vkt::BufferView uniform_buffer_view(*m_device, bvci);
 
-    vkt::Buffer storage_texel_buffer(*m_device, 24, VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT, mem_props);
+    vkt::Buffer storage_texel_buffer(*m_device, 24, VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT, kHostVisibleMemProps);
     bvci.buffer = storage_texel_buffer.handle();
     vkt::BufferView storage_buffer_view(*m_device, bvci);
 
@@ -148,14 +143,14 @@ TEST_F(PositiveGpuAVOOB, ImageLoadStoreTexelFetch) {
     pipe.descriptor_set_->WriteDescriptorBufferView(1, storage_buffer_view.handle(), VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER);
     pipe.descriptor_set_->UpdateDescriptorSets();
 
-    m_commandBuffer->begin();
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0, 1,
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0, 1,
                               &pipe.descriptor_set_->set_, 0, nullptr);
-    vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
-    m_commandBuffer->end();
+    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    m_command_buffer.End();
 
-    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Submit(m_command_buffer);
     m_default_queue->Wait();
 }
 
@@ -163,7 +158,7 @@ TEST_F(PositiveGpuAVOOB, AtomicImageLoadStore) {
     TEST_DESCRIPTION("index into an atomic image Load and Store");
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME);
-    AddDisabledFeature(vkt::Feature::robustBufferAccess);
+
     AddRequiredFeature(vkt::Feature::shaderImageFloat32Atomics);
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
@@ -191,8 +186,7 @@ TEST_F(PositiveGpuAVOOB, AtomicImageLoadStore) {
     pipe.cs_ = std::make_unique<VkShaderObj>(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2);
     pipe.CreateComputePipeline();
 
-    VkMemoryPropertyFlags mem_props = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-    vkt::Buffer storage_texel_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT, mem_props);
+    vkt::Buffer storage_texel_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT, kHostVisibleMemProps);
     VkBufferViewCreateInfo bvci = vku::InitStructHelper();
     bvci.buffer = storage_texel_buffer.handle();
     bvci.format = VK_FORMAT_R32_SFLOAT;
@@ -202,14 +196,14 @@ TEST_F(PositiveGpuAVOOB, AtomicImageLoadStore) {
     pipe.descriptor_set_->WriteDescriptorBufferView(0, storage_buffer_view.handle(), VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER);
     pipe.descriptor_set_->UpdateDescriptorSets();
 
-    m_commandBuffer->begin();
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0, 1,
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0, 1,
                               &pipe.descriptor_set_->set_, 0, nullptr);
-    vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
-    m_commandBuffer->end();
+    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    m_command_buffer.End();
 
-    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Submit(m_command_buffer);
     m_default_queue->Wait();
 }
 
@@ -219,18 +213,16 @@ TEST_F(PositiveGpuAVOOB, GPL) {
     AddRequiredExtensions(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::nullDescriptor);
     AddRequiredFeature(vkt::Feature::graphicsPipelineLibrary);
-    AddDisabledFeature(vkt::Feature::robustBufferAccess);
-    AddDisabledFeature(vkt::Feature::robustBufferAccess2);
+
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
-    VkMemoryPropertyFlags reqs = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-    vkt::Buffer offset_buffer(*m_device, 4, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, reqs);
-    vkt::Buffer write_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, reqs);
+    vkt::Buffer offset_buffer(*m_device, 4, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
+    vkt::Buffer write_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
 
-    vkt::Buffer uniform_texel_buffer(*m_device, 16, VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT, reqs);
-    vkt::Buffer storage_texel_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT, reqs);
+    vkt::Buffer uniform_texel_buffer(*m_device, 16, VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT, kHostVisibleMemProps);
+    vkt::Buffer storage_texel_buffer(*m_device, 16, VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT, kHostVisibleMemProps);
     VkBufferViewCreateInfo bvci = vku::InitStructHelper();
     bvci.buffer = uniform_texel_buffer.handle();
     bvci.format = VK_FORMAT_R32_SFLOAT;
@@ -274,44 +266,263 @@ TEST_F(PositiveGpuAVOOB, GPL) {
     )glsl";
     vkt::SimpleGPL pipe(*this, pipeline_layout.handle(), vs_source);
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1,
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1,
                               &descriptor_set.set_, 0, nullptr);
-    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
-    m_commandBuffer->EndRenderPass();
-    m_commandBuffer->end();
+    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
 
-    uint32_t *data = (uint32_t *)offset_buffer.memory().map();
+    uint32_t *data = (uint32_t *)offset_buffer.Memory().Map();
     *data = 1;
-    offset_buffer.memory().unmap();
-    m_default_queue->Submit(*m_commandBuffer);
+    offset_buffer.Memory().Unmap();
+    m_default_queue->Submit(m_command_buffer);
     m_default_queue->Wait();
 
-    data = (uint32_t *)offset_buffer.memory().map();
+    data = (uint32_t *)offset_buffer.Memory().Map();
     *data = 2;
-    offset_buffer.memory().unmap();
-    m_default_queue->Submit(*m_commandBuffer);
+    offset_buffer.Memory().Unmap();
+    m_default_queue->Submit(m_command_buffer);
     m_default_queue->Wait();
 
-    data = (uint32_t *)offset_buffer.memory().map();
+    data = (uint32_t *)offset_buffer.Memory().Map();
     *data = 3;
-    offset_buffer.memory().unmap();
-    m_default_queue->Submit(*m_commandBuffer);
+    offset_buffer.Memory().Unmap();
+    m_default_queue->Submit(m_command_buffer);
+    m_default_queue->Wait();
+}
+
+TEST_F(PositiveGpuAVOOB, GPLNonInlined) {
+    TEST_DESCRIPTION("Make sure GPL works when shader modules are not inlined at pipeline creation time with valid GPU-AV code");
+    AddRequiredExtensions(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::graphicsPipelineLibrary);
+
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
+    InitRenderTarget();
+
+    vkt::Buffer offset_buffer(*m_device, 4, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
+    vkt::Buffer write_buffer(*m_device, 1024, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
+
+    OneOffDescriptorSet descriptor_set(m_device, {{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
+                                                  {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}});
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
+    descriptor_set.WriteDescriptorBufferInfo(0, offset_buffer.handle(), 0, VK_WHOLE_SIZE);
+    descriptor_set.WriteDescriptorBufferInfo(1, write_buffer.handle(), 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    descriptor_set.UpdateDescriptorSets();
+
+    uint32_t *offset_buffer_ptr = (uint32_t *)offset_buffer.Memory().Map();
+    *offset_buffer_ptr = 8;
+    offset_buffer.Memory().Unmap();
+
+    static const char vertshader[] = R"glsl(
+        #version 450
+        layout(set = 0, binding = 0) uniform Uniform { uint offset_buffer[]; };
+        layout(set = 0, binding = 1) buffer StorageBuffer { uint write_buffer[]; };
+        void main() {
+            uint index = offset_buffer[0];
+            write_buffer[index] = 0xdeadca71;
+        }
+    )glsl";
+    // Create VkShaderModule to pass in
+    VkShaderObj vs(this, vertshader, VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderObj fs(this, kFragmentMinimalGlsl, VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    CreatePipelineHelper vertex_input_lib(*this);
+    vertex_input_lib.InitVertexInputLibInfo();
+    vertex_input_lib.CreateGraphicsPipeline(false);
+
+    // For GPU-AV tests this shrinks things so only a single fragment is executed
+    VkViewport viewport = {0, 0, 1, 1, 0, 1};
+    VkRect2D scissor = {{0, 0}, {1, 1}};
+
+    CreatePipelineHelper pre_raster_lib(*this);
+    {
+        pre_raster_lib.InitPreRasterLibInfo(&vs.GetStageCreateInfo());
+        pre_raster_lib.vp_state_ci_.pViewports = &viewport;
+        pre_raster_lib.vp_state_ci_.pScissors = &scissor;
+        pre_raster_lib.gp_ci_.layout = pipeline_layout.handle();
+        pre_raster_lib.CreateGraphicsPipeline();
+    }
+
+    CreatePipelineHelper frag_shader_lib(*this);
+    {
+        frag_shader_lib.InitFragmentLibInfo(&fs.GetStageCreateInfo());
+        frag_shader_lib.gp_ci_.layout = pipeline_layout.handle();
+        frag_shader_lib.CreateGraphicsPipeline(false);
+    }
+
+    CreatePipelineHelper frag_out_lib(*this);
+    frag_out_lib.InitFragmentOutputLibInfo();
+    frag_out_lib.CreateGraphicsPipeline(false);
+
+    VkPipeline libraries[4] = {
+        vertex_input_lib.Handle(),
+        pre_raster_lib.Handle(),
+        frag_shader_lib.Handle(),
+        frag_out_lib.Handle(),
+    };
+    VkPipelineLibraryCreateInfoKHR link_info = vku::InitStructHelper();
+    link_info.libraryCount = size(libraries);
+    link_info.pLibraries = libraries;
+
+    VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
+    exe_pipe_ci.layout = pipeline_layout.handle();
+    vkt::Pipeline exe_pipe(*m_device, exe_pipe_ci);
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, exe_pipe.handle());
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1,
+                              &descriptor_set.set_, 0, nullptr);
+    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+
+    m_default_queue->Submit(m_command_buffer);
+    m_default_queue->Wait();
+}
+
+TEST_F(PositiveGpuAVOOB, GPLFragmentIndependentSets) {
+    AddRequiredExtensions(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    AddRequiredExtensions(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::graphicsPipelineLibrary);
+    RETURN_IF_SKIP(InitGpuAvFramework());
+    RETURN_IF_SKIP(InitState());
+    InitRenderTarget();
+
+    VkDeviceSize buffer_size = 4;
+    vkt::Buffer vs_buffer(*m_device, buffer_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
+    vkt::Buffer fs_buffer(*m_device, buffer_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
+
+    OneOffDescriptorSet vertex_set(m_device, {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_VERTEX_BIT, nullptr}});
+    OneOffDescriptorSet fragment_set(m_device, {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}});
+
+    // Independent sets
+    const vkt::PipelineLayout pipeline_layout_vs(*m_device, {&vertex_set.layout_, nullptr}, {},
+                                                 VK_PIPELINE_LAYOUT_CREATE_INDEPENDENT_SETS_BIT_EXT);
+    const auto vs_layout = pipeline_layout_vs.handle();
+    const vkt::PipelineLayout pipeline_layout_fs(*m_device, {nullptr, &fragment_set.layout_}, {},
+                                                 VK_PIPELINE_LAYOUT_CREATE_INDEPENDENT_SETS_BIT_EXT);
+    const auto fs_layout = pipeline_layout_fs.handle();
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&vertex_set.layout_, &fragment_set.layout_}, {},
+                                              VK_PIPELINE_LAYOUT_CREATE_INDEPENDENT_SETS_BIT_EXT);
+    const auto layout = pipeline_layout.handle();
+
+    vertex_set.WriteDescriptorBufferInfo(0, vs_buffer.handle(), 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    vertex_set.UpdateDescriptorSets();
+    fragment_set.WriteDescriptorBufferInfo(0, fs_buffer.handle(), 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    fragment_set.UpdateDescriptorSets();
+
+    {
+        vvl::span<uint32_t> vert_data(static_cast<uint32_t *>(vs_buffer.Memory().Map()),
+                                      static_cast<uint32_t>(buffer_size) / sizeof(uint32_t));
+        for (auto &v : vert_data) {
+            v = 0x01030507;
+        }
+        vs_buffer.Memory().Unmap();
+    }
+    {
+        vvl::span<uint32_t> frag_data(static_cast<uint32_t *>(fs_buffer.Memory().Map()),
+                                      static_cast<uint32_t>(buffer_size) / sizeof(uint32_t));
+        for (auto &v : frag_data) {
+            v = 0x02040608;
+        }
+        fs_buffer.Memory().Unmap();
+    }
+
+    const std::array<VkDescriptorSet, 2> desc_sets = {vertex_set.set_, fragment_set.set_};
+
+    CreatePipelineHelper vertex_input_lib(*this);
+    vertex_input_lib.InitVertexInputLibInfo();
+    vertex_input_lib.CreateGraphicsPipeline(false);
+
+    static const char vertshader[] = R"glsl(
+        #version 450
+        layout(set = 0, binding = 0) buffer Input { uint u_buffer[]; } v_in; // texel_buffer[4]
+        const vec2 vertices[3] = vec2[](
+            vec2(-1.0, -1.0),
+            vec2(1.0, -1.0),
+            vec2(0.0, 1.0)
+        );
+        void main() {
+            if (gl_VertexIndex == 0) {
+                const uint t = v_in.u_buffer[0];
+            }
+            gl_Position = vec4(vertices[gl_VertexIndex % 3], 0.0, 1.0);
+        }
+    )glsl";
+    const auto vs_spv = GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, vertshader);
+    vkt::GraphicsPipelineLibraryStage vs_stage(vs_spv, VK_SHADER_STAGE_VERTEX_BIT);
+
+    VkViewport viewport = {0, 0, 1, 1, 0, 1};
+    VkRect2D scissor = {{0, 0}, {1, 1}};
+    CreatePipelineHelper pre_raster_lib(*this);
+    pre_raster_lib.InitPreRasterLibInfo(&vs_stage.stage_ci);
+    pre_raster_lib.vp_state_ci_.pViewports = &viewport;
+    pre_raster_lib.vp_state_ci_.pScissors = &scissor;
+    pre_raster_lib.gp_ci_.layout = vs_layout;
+    pre_raster_lib.CreateGraphicsPipeline(false);
+
+    static const char frag_shader[] = R"glsl(
+        #version 450
+        layout(set = 1, binding = 0) buffer Input { uint u_buffer[]; } f_in; // texel_buffer[4]
+        layout(location = 0) out vec4 c_out;
+        void main() {
+            c_out = vec4(1.0);
+            const uint t = f_in.u_buffer[0];
+        }
+    )glsl";
+    const auto fs_spv = GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, frag_shader);
+    vkt::GraphicsPipelineLibraryStage fs_stage(fs_spv, VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    CreatePipelineHelper frag_shader_lib(*this);
+    frag_shader_lib.InitFragmentLibInfo(&fs_stage.stage_ci);
+    frag_shader_lib.gp_ci_.layout = fs_layout;
+    frag_shader_lib.CreateGraphicsPipeline(false);
+
+    CreatePipelineHelper frag_out_lib(*this);
+    frag_out_lib.InitFragmentOutputLibInfo();
+    frag_out_lib.CreateGraphicsPipeline(false);
+
+    VkPipeline libraries[4] = {
+        vertex_input_lib.Handle(),
+        pre_raster_lib.Handle(),
+        frag_shader_lib.Handle(),
+        frag_out_lib.Handle(),
+    };
+    VkPipelineLibraryCreateInfoKHR link_info = vku::InitStructHelper();
+    link_info.libraryCount = size(libraries);
+    link_info.pLibraries = libraries;
+
+    VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
+    exe_pipe_ci.layout = pre_raster_lib.gp_ci_.layout;
+    vkt::Pipeline pipe(*m_device, exe_pipe_ci);
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 0,
+                              static_cast<uint32_t>(desc_sets.size()), desc_sets.data(), 0, nullptr);
+    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+
+    m_default_queue->Submit(m_command_buffer);
     m_default_queue->Wait();
 }
 
 TEST_F(PositiveGpuAVOOB, VertexFragmentMultiEntrypoint) {
     TEST_DESCRIPTION("Same as negative test, but buffer are large enough");
-    AddDisabledFeature(vkt::Feature::robustBufferAccess);
+
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
 
-    VkMemoryPropertyFlags reqs = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-    vkt::Buffer uniform_buffer(*m_device, 256, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, reqs);
-    vkt::Buffer storage_buffer(*m_device, 256, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, reqs);
+    vkt::Buffer uniform_buffer(*m_device, 256, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
+    vkt::Buffer storage_buffer(*m_device, 256, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
 
     OneOffDescriptorSet descriptor_set(m_device, {{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr},
                                                   {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}});
@@ -429,22 +640,22 @@ TEST_F(PositiveGpuAVOOB, VertexFragmentMultiEntrypoint) {
     pipe.gp_ci_.layout = pipeline_layout.handle();
     pipe.CreateGraphicsPipeline();
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1,
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1,
                               &descriptor_set.set_, 0, nullptr);
-    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
-    m_commandBuffer->EndRenderPass();
-    m_commandBuffer->end();
+    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
 
-    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Submit(m_command_buffer);
     m_default_queue->Wait();
 }
 
 TEST_F(PositiveGpuAVOOB, PartialBoundDescriptorSSBO) {
     TEST_DESCRIPTION("Only bound part of a SSBO, but only use that part so it is still valid");
-    AddDisabledFeature(vkt::Feature::robustBufferAccess);
+
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
@@ -462,8 +673,7 @@ TEST_F(PositiveGpuAVOOB, PartialBoundDescriptorSSBO) {
         }
     )glsl";
 
-    vkt::Buffer buffer(*m_device, 32, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    vkt::Buffer buffer(*m_device, 32, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
     OneOffDescriptorSet descriptor_set(m_device, {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}});
     const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
     descriptor_set.WriteDescriptorBufferInfo(0, buffer.handle(), 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
@@ -474,20 +684,20 @@ TEST_F(PositiveGpuAVOOB, PartialBoundDescriptorSSBO) {
     pipe.cs_ = std::make_unique<VkShaderObj>(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
     pipe.CreateComputePipeline();
 
-    m_commandBuffer->begin();
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout.handle(), 0, 1,
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout.handle(), 0, 1,
                               &descriptor_set.set_, 0, nullptr);
-    vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
-    m_commandBuffer->end();
+    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    m_command_buffer.End();
 
-    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Submit(m_command_buffer);
     m_default_queue->Wait();
 }
 
 TEST_F(PositiveGpuAVOOB, PartialBoundDescriptorBuffer) {
     TEST_DESCRIPTION("Make large enough buffer, but only bound part of it to the SSBO that is used");
-    AddDisabledFeature(vkt::Feature::robustBufferAccess);
+
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
@@ -505,8 +715,7 @@ TEST_F(PositiveGpuAVOOB, PartialBoundDescriptorBuffer) {
         }
     )glsl";
 
-    vkt::Buffer buffer(*m_device, 64, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    vkt::Buffer buffer(*m_device, 64, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
     OneOffDescriptorSet descriptor_set(m_device, {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}});
     const vkt::PipelineLayout pipeline_layout(*m_device, {&descriptor_set.layout_});
     // only half of the buffer that is needed is
@@ -518,20 +727,20 @@ TEST_F(PositiveGpuAVOOB, PartialBoundDescriptorBuffer) {
     pipe.cs_ = std::make_unique<VkShaderObj>(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
     pipe.CreateComputePipeline();
 
-    m_commandBuffer->begin();
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout.handle(), 0, 1,
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout.handle(), 0, 1,
                               &descriptor_set.set_, 0, nullptr);
-    vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
-    m_commandBuffer->end();
+    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    m_command_buffer.End();
 
-    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Submit(m_command_buffer);
     m_default_queue->Wait();
 }
 
 TEST_F(PositiveGpuAVOOB, PartialBoundDescriptorCopy) {
     TEST_DESCRIPTION("Copy the partial bound buffer the descriptor that is used");
-    AddDisabledFeature(vkt::Feature::robustBufferAccess);
+
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
@@ -549,8 +758,7 @@ TEST_F(PositiveGpuAVOOB, PartialBoundDescriptorCopy) {
         }
     )glsl";
 
-    vkt::Buffer buffer(*m_device, 32, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    vkt::Buffer buffer(*m_device, 32, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
     OneOffDescriptorSet descriptor_set_src(m_device, {{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL, nullptr}});
     descriptor_set_src.WriteDescriptorBufferInfo(0, buffer.handle(), 0, VK_WHOLE_SIZE, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     descriptor_set_src.UpdateDescriptorSets();
@@ -572,21 +780,21 @@ TEST_F(PositiveGpuAVOOB, PartialBoundDescriptorCopy) {
     pipe.cs_ = std::make_unique<VkShaderObj>(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_1);
     pipe.CreateComputePipeline();
 
-    m_commandBuffer->begin();
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout.handle(), 0, 1,
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout.handle(), 0, 1,
                               &descriptor_set_dst.set_, 0, nullptr);
-    vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
-    m_commandBuffer->end();
+    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    m_command_buffer.End();
 
-    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Submit(m_command_buffer);
     m_default_queue->Wait();
 }
 
 TEST_F(PositiveGpuAVOOB, TexelFetchArray) {
     TEST_DESCRIPTION("index into texelFetch OOB for an array of TexelBuffers");
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    AddDisabledFeature(vkt::Feature::robustBufferAccess);
+
     RETURN_IF_SKIP(InitGpuAvFramework());
     RETURN_IF_SKIP(InitState());
 
@@ -615,10 +823,9 @@ TEST_F(PositiveGpuAVOOB, TexelFetchArray) {
     pipe.cs_ = std::make_unique<VkShaderObj>(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2);
     pipe.CreateComputePipeline();
 
-    VkMemoryPropertyFlags mem_props = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-    vkt::Buffer out_buffer(*m_device, 32, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, mem_props);
+    vkt::Buffer out_buffer(*m_device, 32, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
 
-    vkt::Buffer uniform_texel_buffer(*m_device, 1024, VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT, mem_props);
+    vkt::Buffer uniform_texel_buffer(*m_device, 1024, VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT, kHostVisibleMemProps);
     VkBufferViewCreateInfo bvci = vku::InitStructHelper();
     bvci.buffer = uniform_texel_buffer.handle();
     bvci.format = VK_FORMAT_R32_SFLOAT;
@@ -632,13 +839,13 @@ TEST_F(PositiveGpuAVOOB, TexelFetchArray) {
     pipe.descriptor_set_->WriteDescriptorBufferView(1, partial_buffer_view.handle(), VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1);
     pipe.descriptor_set_->UpdateDescriptorSets();
 
-    m_commandBuffer->begin();
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0, 1,
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0, 1,
                               &pipe.descriptor_set_->set_, 0, nullptr);
-    vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
-    m_commandBuffer->end();
+    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    m_command_buffer.End();
 
-    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Submit(m_command_buffer);
     m_default_queue->Wait();
 }

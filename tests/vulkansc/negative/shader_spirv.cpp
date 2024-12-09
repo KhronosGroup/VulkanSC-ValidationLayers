@@ -277,8 +277,12 @@ TEST_F(VkSCNegativeShaderSpirv, Atomics) {
     builder.AddBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     builder.Init(vksc::Shader::Compute(kComputeShaderAtomicInstructionsSpv));
 
-    AddDisabledFeature(vkt::Feature::shaderAtomicInstructions);
-    RETURN_IF_SKIP(Init());
+    // By default, all tests enable the atomic VKSC feature so that we need not patch massive amounts of tests.
+    // This test specifically tests the VUID that triggers in the feature's absence, so we deviate from the default.
+    RETURN_IF_SKIP(InitFramework());
+    auto vksc10_features = vku::InitStruct<VkPhysicalDeviceVulkanSC10Features>();
+    vksc10_features.shaderAtomicInstructions = VK_FALSE;
+    RETURN_IF_SKIP(InitState(nullptr, &vksc10_features));
 
     m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-RuntimeSpirv-OpAtomic-05091");
     builder.CreatePipelineCache(*m_device);

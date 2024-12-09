@@ -379,7 +379,7 @@ TEST_F(NegativeDebugExtensions, SetDebugUtilsObjectSecondDevice) {
         GTEST_SKIP() << "Skipping object naming test with MockICD.";
     }
 
-    auto features = m_device->phy().features();
+    auto features = m_device->Physical().Features();
     vkt::Device second_device(gpu_, m_device_extension_names, &features, nullptr);
 
     DebugUtilsLabelCheckData callback_data;
@@ -457,12 +457,12 @@ TEST_F(NegativeDebugExtensions, DebugLabelPrimaryCommandBuffer) {
     AddRequiredExtensions(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
 
-    m_commandBuffer->begin();
-    vk::CmdEndDebugUtilsLabelEXT(*m_commandBuffer);
-    m_commandBuffer->end();
+    m_command_buffer.Begin();
+    vk::CmdEndDebugUtilsLabelEXT(m_command_buffer);
+    m_command_buffer.End();
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdEndDebugUtilsLabelEXT-commandBuffer-01912");
-    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Submit(m_command_buffer);
     m_errorMonitor->VerifyFound();
     m_default_queue->Wait();
 }
@@ -475,16 +475,16 @@ TEST_F(NegativeDebugExtensions, DebugLabelPrimaryCommandBuffer2) {
     VkDebugUtilsLabelEXT label = vku::InitStructHelper();
     label.pLabelName = "regionA";
     vkt::CommandBuffer cb0(*m_device, m_command_pool);
-    cb0.begin();
+    cb0.Begin();
     vk::CmdBeginDebugUtilsLabelEXT(cb0, &label);
-    cb0.end();
+    cb0.End();
     m_default_queue->Submit(cb0);
 
     vkt::CommandBuffer cb1(*m_device, m_command_pool);
-    cb1.begin();
+    cb1.Begin();
     vk::CmdEndDebugUtilsLabelEXT(cb1);
     vk::CmdEndDebugUtilsLabelEXT(cb1);
-    cb1.end();
+    cb1.End();
     m_errorMonitor->SetDesiredError("VUID-vkCmdEndDebugUtilsLabelEXT-commandBuffer-01912");
     m_default_queue->Submit(cb1);
     m_errorMonitor->VerifyFound();
@@ -499,18 +499,18 @@ TEST_F(NegativeDebugExtensions, DebugLabelPrimaryCommandBuffer3) {
     VkDebugUtilsLabelEXT label = vku::InitStructHelper();
     label.pLabelName = "regionA";
     vkt::CommandBuffer cb0(*m_device, m_command_pool);
-    cb0.begin();
+    cb0.Begin();
     vk::CmdBeginDebugUtilsLabelEXT(cb0, &label);
     vk::CmdEndDebugUtilsLabelEXT(cb0);
-    cb0.end();
+    cb0.End();
 
     vkt::CommandBuffer cb1(*m_device, m_command_pool);
     label.pLabelName = "regionB";
-    cb1.begin();
+    cb1.Begin();
     vk::CmdBeginDebugUtilsLabelEXT(cb1, &label);
     vk::CmdEndDebugUtilsLabelEXT(cb1);
     vk::CmdEndDebugUtilsLabelEXT(cb1);
-    cb1.end();
+    cb1.End();
     m_errorMonitor->SetDesiredError("VUID-vkCmdEndDebugUtilsLabelEXT-commandBuffer-01912");
     std::array cbs = {&cb0, &cb1};
     m_default_queue->Submit(cbs);
@@ -524,11 +524,11 @@ TEST_F(NegativeDebugExtensions, DebugLabelSecondaryCommandBuffer) {
     RETURN_IF_SKIP(Init());
 
     vkt::CommandBuffer cb(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
-    cb.begin();
+    cb.Begin();
     m_errorMonitor->SetDesiredError("VUID-vkCmdEndDebugUtilsLabelEXT-commandBuffer-01913");
     vk::CmdEndDebugUtilsLabelEXT(cb);
     m_errorMonitor->VerifyFound();
-    cb.end();
+    cb.End();
 }
 
 TEST_F(NegativeDebugExtensions, SwapchainImagesDebugMarker) {
@@ -558,13 +558,8 @@ TEST_F(NegativeDebugExtensions, SwapchainImagesDebugMarker) {
     swapchain_create_info.clipped = VK_FALSE;
     swapchain_create_info.oldSwapchain = VK_NULL_HANDLE;
 
-    VkSwapchainKHR swapchain;
-    vk::CreateSwapchainKHR(device(), &swapchain_create_info, nullptr, &swapchain);
-
-    uint32_t imageCount;
-    vk::GetSwapchainImagesKHR(device(), swapchain, &imageCount, nullptr);
-    std::vector<VkImage> images(imageCount);
-    vk::GetSwapchainImagesKHR(device(), swapchain, &imageCount, images.data());
+    vkt::Swapchain swapchain(*m_device, swapchain_create_info);
+    const auto images = swapchain.GetImages();
 
     {
         VkDebugMarkerObjectNameInfoEXT name_info = vku::InitStructHelper();
@@ -589,6 +584,4 @@ TEST_F(NegativeDebugExtensions, SwapchainImagesDebugMarker) {
         vk::DebugMarkerSetObjectTagEXT(device(), &name_info);
         m_errorMonitor->VerifyFound();
     }
-
-    vk::DestroySwapchainKHR(device(), swapchain, nullptr);
 }

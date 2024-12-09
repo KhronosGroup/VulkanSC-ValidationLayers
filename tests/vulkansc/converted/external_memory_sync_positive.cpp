@@ -53,14 +53,14 @@ TEST_F(PositiveExternalMemorySync, ImportMemoryFd) {
     VkExternalMemoryBufferCreateInfo external_buffer_info = vku::InitStructHelper();
     external_buffer_info.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
 
-    auto buffer_info = vkt::Buffer::create_info(1024, VK_BUFFER_USAGE_TRANSFER_DST_BIT, nullptr, &external_buffer_info);
-    if (!FindSupportedExternalMemoryHandleTypes(gpu(), buffer_info, VK_EXTERNAL_MEMORY_FEATURE_EXPORTABLE_BIT)) {
+    auto buffer_info = vkt::Buffer::CreateInfo(1024, VK_BUFFER_USAGE_TRANSFER_DST_BIT, {}, &external_buffer_info);
+    if (!FindSupportedExternalMemoryHandleTypes(Gpu(), buffer_info, VK_EXTERNAL_MEMORY_FEATURE_EXPORTABLE_BIT)) {
         GTEST_SKIP() << "Unable to find exportable handle type";
     }
-    if (!FindSupportedExternalMemoryHandleTypes(gpu(), buffer_info, VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT)) {
+    if (!FindSupportedExternalMemoryHandleTypes(Gpu(), buffer_info, VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT)) {
         GTEST_SKIP() << "Unable to find importable handle type";
     }
-    const auto compatible_types = GetCompatibleHandleTypes(gpu(), buffer_info, VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT);
+    const auto compatible_types = GetCompatibleHandleTypes(Gpu(), buffer_info, VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT);
     if ((VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT & compatible_types) == 0) {
         GTEST_SKIP() << "Cannot find handle types that are supported but not compatible with each other";
     }
@@ -73,7 +73,7 @@ TEST_F(PositiveExternalMemorySync, ImportMemoryFd) {
 
     VkExportMemoryAllocateInfoKHR export_info = vku::InitStructHelper(&dedicated_info);
     export_info.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
-    auto alloc_info = vkt::DeviceMemory::get_resource_alloc_info(*m_device, buffer.memory_requirements(), 0, &export_info);
+    auto alloc_info = vkt::DeviceMemory::GetResourceAllocInfo(*m_device, buffer.MemoryRequirements(), 0, &export_info);
 
     vkt::DeviceMemory memory_export;
     memory_export.init(*m_device, alloc_info);
@@ -89,7 +89,7 @@ TEST_F(PositiveExternalMemorySync, ImportMemoryFd) {
     import_info.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
     import_info.fd = fd;
 
-    alloc_info = vkt::DeviceMemory::get_resource_alloc_info(*m_device, buffer.memory_requirements(), 0, &import_info);
+    alloc_info = vkt::DeviceMemory::GetResourceAllocInfo(*m_device, buffer.MemoryRequirements(), 0, &import_info);
     vkt::DeviceMemory memory_import(*m_device, alloc_info);
 }
 
@@ -124,7 +124,7 @@ TEST_F(PositiveExternalMemorySync, ImportMemoryHost) {
 
     VkMemoryAllocateInfo alloc_info = vku::InitStructHelper(&import_info);
     alloc_info.allocationSize = alloc_size;
-    if (!m_device->phy().set_memory_type(host_pointer_props.memoryTypeBits, &alloc_info, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) {
+    if (!m_device->Physical().SetMemoryType(host_pointer_props.memoryTypeBits, &alloc_info, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) {
         free(host_memory);
         GTEST_SKIP() << "Failed to set memory type.";
     }
@@ -155,7 +155,7 @@ TEST_F(PositiveExternalMemorySync, ExternalMemory) {
     VkPhysicalDeviceExternalBufferInfoKHR ebi = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_BUFFER_INFO_KHR, nullptr, 0,
                                                  VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, handle_type};
     VkExternalBufferPropertiesKHR ebp = {VK_STRUCTURE_TYPE_EXTERNAL_BUFFER_PROPERTIES_KHR, nullptr, {0, 0, 0}};
-    vk::GetPhysicalDeviceExternalBufferPropertiesKHR(gpu(), &ebi, &ebp);
+    vk::GetPhysicalDeviceExternalBufferPropertiesKHR(Gpu(), &ebi, &ebp);
     if (!(ebp.externalMemoryProperties.compatibleHandleTypes & handle_type) ||
         !(ebp.externalMemoryProperties.externalMemoryFeatures & VK_EXTERNAL_MEMORY_FEATURE_EXPORTABLE_BIT_KHR) ||
         !(ebp.externalMemoryProperties.externalMemoryFeatures & VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT_KHR)) {
@@ -177,13 +177,13 @@ TEST_F(PositiveExternalMemorySync, ExternalMemory) {
     // Create export and import buffers
     const VkExternalMemoryBufferCreateInfoKHR external_buffer_info = {VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO_KHR,
                                                                       nullptr, handle_type};
-    auto buffer_info = vkt::Buffer::create_info(buffer_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    auto buffer_info = vkt::Buffer::CreateInfo(buffer_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
     buffer_info.pNext = &external_buffer_info;
     vkt::Buffer buffer_export(*m_device, buffer_info, vkt::no_mem);
     vkt::Buffer buffer_import(*m_device, buffer_info, vkt::no_mem);
 
     // Allocation info
-    auto alloc_info = vkt::DeviceMemory::get_resource_alloc_info(*m_device, buffer_export.memory_requirements(), mem_flags);
+    auto alloc_info = vkt::DeviceMemory::GetResourceAllocInfo(*m_device, buffer_export.MemoryRequirements(), mem_flags);
 
     // Add export allocation info to pNext chain
     VkExportMemoryAllocateInfoKHR export_info = {VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO_KHR, nullptr, handle_type};
@@ -201,7 +201,7 @@ TEST_F(PositiveExternalMemorySync, ExternalMemory) {
     memory_export.init(*m_device, alloc_info);
 
     // Bind exported memory
-    buffer_export.bind_memory(memory_export, 0);
+    buffer_export.BindMemory(memory_export, 0);
 
 #ifdef _WIN32
     // Export memory to handle
@@ -222,37 +222,37 @@ TEST_F(PositiveExternalMemorySync, ExternalMemory) {
 #endif
 
     // Import memory
-    alloc_info = vkt::DeviceMemory::get_resource_alloc_info(*m_device, buffer_import.memory_requirements(), mem_flags);
+    alloc_info = vkt::DeviceMemory::GetResourceAllocInfo(*m_device, buffer_import.MemoryRequirements(), mem_flags);
     alloc_info.pNext = &import_info;
     vkt::DeviceMemory memory_import;
     memory_import.init(*m_device, alloc_info);
 
     // Bind imported memory
-    buffer_import.bind_memory(memory_import, 0);
+    buffer_import.BindMemory(memory_import, 0);
 
     // Create test buffers and fill input buffer
     vkt::Buffer buffer_input(*m_device, buffer_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                              VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-    auto input_mem = (uint8_t*)buffer_input.memory().map();
+    auto input_mem = (uint8_t*)buffer_input.Memory().Map();
     for (uint32_t i = 0; i < buffer_size; i++) {
         input_mem[i] = (i & 0xFF);
     }
-    buffer_input.memory().unmap();
+    buffer_input.Memory().Unmap();
     vkt::Buffer buffer_output(*m_device, buffer_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                               VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
     // Copy from input buffer to output buffer through the exported/imported memory
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
     VkBufferCopy copy_info = {0, 0, buffer_size};
-    vk::CmdCopyBuffer(m_commandBuffer->handle(), buffer_input.handle(), buffer_export.handle(), 1, &copy_info);
+    vk::CmdCopyBuffer(m_command_buffer.handle(), buffer_input.handle(), buffer_export.handle(), 1, &copy_info);
     // Insert memory barrier to guarantee copy order
     VkMemoryBarrier mem_barrier = {VK_STRUCTURE_TYPE_MEMORY_BARRIER, nullptr, VK_ACCESS_TRANSFER_WRITE_BIT,
                                    VK_ACCESS_TRANSFER_READ_BIT};
-    vk::CmdPipelineBarrier(m_commandBuffer->handle(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 1,
+    vk::CmdPipelineBarrier(m_command_buffer.handle(), VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 1,
                            &mem_barrier, 0, nullptr, 0, nullptr);
-    vk::CmdCopyBuffer(m_commandBuffer->handle(), buffer_import.handle(), buffer_output.handle(), 1, &copy_info);
-    m_commandBuffer->end();
-    m_default_queue->Submit(*m_commandBuffer);
+    vk::CmdCopyBuffer(m_command_buffer.handle(), buffer_import.handle(), buffer_output.handle(), 1, &copy_info);
+    m_command_buffer.End();
+    m_default_queue->Submit(m_command_buffer);
     m_default_queue->Wait();
 }
 
@@ -263,15 +263,15 @@ TEST_F(PositiveExternalMemorySync, BufferDedicatedAllocation) {
     IgnoreHandleTypeError(m_errorMonitor);
 
     VkExternalMemoryBufferCreateInfo external_buffer_info = vku::InitStructHelper();
-    const auto buffer_info = vkt::Buffer::create_info(4096, VK_BUFFER_USAGE_TRANSFER_DST_BIT, nullptr, &external_buffer_info);
+    const auto buffer_info = vkt::Buffer::CreateInfo(4096, VK_BUFFER_USAGE_TRANSFER_DST_BIT, {}, &external_buffer_info);
     const auto exportable_types =
-        FindSupportedExternalMemoryHandleTypes(gpu(), buffer_info, VK_EXTERNAL_MEMORY_FEATURE_EXPORTABLE_BIT);
+        FindSupportedExternalMemoryHandleTypes(Gpu(), buffer_info, VK_EXTERNAL_MEMORY_FEATURE_EXPORTABLE_BIT);
     if (!exportable_types) {
         GTEST_SKIP() << "Unable to find exportable handle type";
     }
 
     auto exportable_dedicated_types = FindSupportedExternalMemoryHandleTypes(
-        gpu(), buffer_info, VK_EXTERNAL_MEMORY_FEATURE_EXPORTABLE_BIT | VK_EXTERNAL_MEMORY_FEATURE_DEDICATED_ONLY_BIT);
+        Gpu(), buffer_info, VK_EXTERNAL_MEMORY_FEATURE_EXPORTABLE_BIT | VK_EXTERNAL_MEMORY_FEATURE_DEDICATED_ONLY_BIT);
     if (!exportable_dedicated_types) {
         GTEST_SKIP() << "Unable to find exportable handle type that requires dedicated allocation";
     }
@@ -286,7 +286,7 @@ TEST_F(PositiveExternalMemorySync, BufferDedicatedAllocation) {
     VkExportMemoryAllocateInfo export_memory_info = vku::InitStructHelper(&dedicated_info);
     export_memory_info.handleTypes = handle_type;
 
-    buffer.allocate_and_bind_memory(*m_device, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &export_memory_info);
+    buffer.AllocateAndBindMemory(*m_device, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &export_memory_info);
 }
 
 TEST_F(PositiveExternalMemorySync, SyncFdSemaphore) {
@@ -301,7 +301,7 @@ TEST_F(PositiveExternalMemorySync, SyncFdSemaphore) {
     external_semahpore_info.handleType = handle_type;
 
     VkExternalSemaphoreProperties external_semahpore_props = vku::InitStructHelper();
-    vk::GetPhysicalDeviceExternalSemaphoreProperties(gpu(), &external_semahpore_info, &external_semahpore_props);
+    vk::GetPhysicalDeviceExternalSemaphoreProperties(Gpu(), &external_semahpore_info, &external_semahpore_props);
     if (!(external_semahpore_props.externalSemaphoreFeatures & VK_EXTERNAL_SEMAPHORE_FEATURE_EXPORTABLE_BIT_KHR) ||
         !(external_semahpore_props.externalSemaphoreFeatures & VK_EXTERNAL_SEMAPHORE_FEATURE_IMPORTABLE_BIT_KHR)) {
         GTEST_SKIP() << "External semaphore does not support importing and exporting";
@@ -324,10 +324,10 @@ TEST_F(PositiveExternalMemorySync, SyncFdSemaphore) {
     vk::QueueSubmit(m_default_queue->handle(), 1, &si, VK_NULL_HANDLE);
 
     int fd_handle = -1;
-    binary_sem.export_handle(fd_handle, handle_type);
+    binary_sem.ExportHandle(fd_handle, handle_type);
 
     vkt::Semaphore import_semaphore(*m_device);
-    import_semaphore.import_handle(fd_handle, handle_type, VK_SEMAPHORE_IMPORT_TEMPORARY_BIT);
+    import_semaphore.ImportHandle(fd_handle, handle_type, VK_SEMAPHORE_IMPORT_TEMPORARY_BIT);
 
     m_default_queue->Wait();
 }
@@ -460,7 +460,7 @@ TEST_F(PositiveExternalMemorySync, ExportFromImportedFence) {
     const auto handle_type = VK_EXTERNAL_FENCE_HANDLE_TYPE_OPAQUE_WIN32_BIT;
     {
         const auto handle_types = FindSupportedExternalFenceHandleTypes(
-            gpu(), VK_EXTERNAL_FENCE_FEATURE_EXPORTABLE_BIT | VK_EXTERNAL_FENCE_FEATURE_IMPORTABLE_BIT);
+            Gpu(), VK_EXTERNAL_FENCE_FEATURE_EXPORTABLE_BIT | VK_EXTERNAL_FENCE_FEATURE_IMPORTABLE_BIT);
         if ((handle_types & VK_EXTERNAL_FENCE_HANDLE_TYPE_OPAQUE_WIN32_BIT) == 0) {
             GTEST_SKIP() << "VK_EXTERNAL_FENCE_HANDLE_TYPE_OPAQUE_WIN32_BIT is not both exportable and importable";
         }
@@ -468,7 +468,7 @@ TEST_F(PositiveExternalMemorySync, ExportFromImportedFence) {
     VkPhysicalDeviceExternalFenceInfo fence_info = vku::InitStructHelper();
     fence_info.handleType = handle_type;
     VkExternalFenceProperties fence_properties = vku::InitStructHelper();
-    vk::GetPhysicalDeviceExternalFenceProperties(gpu(), &fence_info, &fence_properties);
+    vk::GetPhysicalDeviceExternalFenceProperties(Gpu(), &fence_info, &fence_properties);
     if ((handle_type & fence_properties.exportFromImportedHandleTypes) == 0) {
         GTEST_SKIP() << "can't find handle type that can be exported from imported fence";
     }
@@ -479,18 +479,18 @@ TEST_F(PositiveExternalMemorySync, ExportFromImportedFence) {
     const VkFenceCreateInfo create_info = vku::InitStructHelper(&export_info);
     vkt::Fence fence(*m_device, create_info);
     HANDLE handle = NULL;
-    fence.export_handle(handle, handle_type);
+    fence.ExportHandle(handle, handle_type);
 
     // create fence and import payload
     VkExportFenceCreateInfo export_info2 = vku::InitStructHelper();  // prepare to export from imported fence
     export_info2.handleTypes = handle_type;
     const VkFenceCreateInfo create_info2 = vku::InitStructHelper(&export_info2);
     vkt::Fence import_fence(*m_device, create_info2);
-    import_fence.import_handle(handle, handle_type);
+    import_fence.ImportHandle(handle, handle_type);
 
     // export from imported fence
     HANDLE handle2 = NULL;
-    import_fence.export_handle(handle2, handle_type);
+    import_fence.ExportHandle(handle2, handle_type);
 
     ::CloseHandle(handle);
     if (handle2 != handle) {
@@ -505,10 +505,10 @@ TEST_F(PositiveExternalMemorySync, ImportMemoryWin32BufferDifferentDedicated) {
     RETURN_IF_SKIP(Init());
     IgnoreHandleTypeError(m_errorMonitor);
 
-    auto buffer_info = vkt::Buffer::create_info(1024, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    auto buffer_info = vkt::Buffer::CreateInfo(1024, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
 
     const auto handle_types = FindSupportedExternalMemoryHandleTypes(
-        gpu(), buffer_info, VK_EXTERNAL_MEMORY_FEATURE_EXPORTABLE_BIT | VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT);
+        Gpu(), buffer_info, VK_EXTERNAL_MEMORY_FEATURE_EXPORTABLE_BIT | VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT);
     if ((handle_types & VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT) == 0) {
         GTEST_SKIP() << "VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT is not both exportable and importable";
     }
@@ -524,7 +524,7 @@ TEST_F(PositiveExternalMemorySync, ImportMemoryWin32BufferDifferentDedicated) {
 
     VkExportMemoryAllocateInfoKHR export_info = vku::InitStructHelper(&dedicated_info);
     export_info.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
-    auto alloc_info = vkt::DeviceMemory::get_resource_alloc_info(*m_device, buffer.memory_requirements(), 0, &export_info);
+    auto alloc_info = vkt::DeviceMemory::GetResourceAllocInfo(*m_device, buffer.MemoryRequirements(), 0, &export_info);
 
     vkt::DeviceMemory memory_export;
     memory_export.init(*m_device, alloc_info);
@@ -543,7 +543,7 @@ TEST_F(PositiveExternalMemorySync, ImportMemoryWin32BufferDifferentDedicated) {
     import_info.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
     import_info.handle = handle;
 
-    alloc_info = vkt::DeviceMemory::get_resource_alloc_info(*m_device, buffer2.memory_requirements(), 0, &import_info);
+    alloc_info = vkt::DeviceMemory::GetResourceAllocInfo(*m_device, buffer2.MemoryRequirements(), 0, &import_info);
     vkt::DeviceMemory memory_import(*m_device, alloc_info);
 
     // "For handle types defined as NT handles, the handles returned by vkGetFenceWin32HandleKHR are owned by the application. To
@@ -561,7 +561,7 @@ TEST_F(PositiveExternalMemorySync, MultipleExportOpaqueFd) {
     RETURN_IF_SKIP(Init());
     IgnoreHandleTypeError(m_errorMonitor);
 
-    const auto handle_types = FindSupportedExternalSemaphoreHandleTypes(gpu(), VK_EXTERNAL_SEMAPHORE_FEATURE_EXPORTABLE_BIT);
+    const auto handle_types = FindSupportedExternalSemaphoreHandleTypes(Gpu(), VK_EXTERNAL_SEMAPHORE_FEATURE_EXPORTABLE_BIT);
     if ((handle_types & VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT) == 0) {
         GTEST_SKIP() << "VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT is not exportable";
     }
@@ -572,8 +572,8 @@ TEST_F(PositiveExternalMemorySync, MultipleExportOpaqueFd) {
     vkt::Semaphore semaphore(*m_device, create_info);
 
     int handle = 0;
-    semaphore.export_handle(handle, VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT);
-    semaphore.export_handle(handle, VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT);
+    semaphore.ExportHandle(handle, VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT);
+    semaphore.ExportHandle(handle, VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT);
 }
 
 TEST_F(PositiveExternalMemorySync, ImportMemoryFdBufferDifferentDedicated) {
@@ -586,14 +586,14 @@ TEST_F(PositiveExternalMemorySync, ImportMemoryFdBufferDifferentDedicated) {
     VkExternalMemoryBufferCreateInfo external_buffer_info = vku::InitStructHelper();
     external_buffer_info.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
 
-    auto buffer_info = vkt::Buffer::create_info(1024, VK_BUFFER_USAGE_TRANSFER_DST_BIT, nullptr, &external_buffer_info);
-    if (!FindSupportedExternalMemoryHandleTypes(gpu(), buffer_info, VK_EXTERNAL_MEMORY_FEATURE_EXPORTABLE_BIT)) {
+    auto buffer_info = vkt::Buffer::CreateInfo(1024, VK_BUFFER_USAGE_TRANSFER_DST_BIT, {}, &external_buffer_info);
+    if (!FindSupportedExternalMemoryHandleTypes(Gpu(), buffer_info, VK_EXTERNAL_MEMORY_FEATURE_EXPORTABLE_BIT)) {
         GTEST_SKIP() << "Unable to find exportable handle type";
     }
-    if (!FindSupportedExternalMemoryHandleTypes(gpu(), buffer_info, VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT)) {
+    if (!FindSupportedExternalMemoryHandleTypes(Gpu(), buffer_info, VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT)) {
         GTEST_SKIP() << "Unable to find importable handle type";
     }
-    const auto compatible_types = GetCompatibleHandleTypes(gpu(), buffer_info, VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT);
+    const auto compatible_types = GetCompatibleHandleTypes(Gpu(), buffer_info, VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT);
     if ((VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT & compatible_types) == 0) {
         GTEST_SKIP() << "Cannot find handle types that are supported but not compatible with each other";
     }
@@ -606,7 +606,7 @@ TEST_F(PositiveExternalMemorySync, ImportMemoryFdBufferDifferentDedicated) {
 
     VkExportMemoryAllocateInfoKHR export_info = vku::InitStructHelper(&dedicated_info);
     export_info.handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
-    auto alloc_info = vkt::DeviceMemory::get_resource_alloc_info(*m_device, buffer.memory_requirements(), 0, &export_info);
+    auto alloc_info = vkt::DeviceMemory::GetResourceAllocInfo(*m_device, buffer.MemoryRequirements(), 0, &export_info);
 
     vkt::DeviceMemory memory_export;
     memory_export.init(*m_device, alloc_info);
@@ -626,6 +626,6 @@ TEST_F(PositiveExternalMemorySync, ImportMemoryFdBufferDifferentDedicated) {
     import_info.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
     import_info.fd = fd;
 
-    alloc_info = vkt::DeviceMemory::get_resource_alloc_info(*m_device, buffer2.memory_requirements(), 0, &import_info);
+    alloc_info = vkt::DeviceMemory::GetResourceAllocInfo(*m_device, buffer2.MemoryRequirements(), 0, &import_info);
     vkt::DeviceMemory memory_import(*m_device, alloc_info);
 }

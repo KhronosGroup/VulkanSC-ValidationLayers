@@ -94,14 +94,14 @@ TEST_F(PositiveDebugExtensions, DebugLabelPrimaryCommandBuffer) {
     AddRequiredExtensions(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
     VkDebugUtilsLabelEXT label = vku::InitStructHelper();
     label.pLabelName = "test";
-    vk::CmdBeginDebugUtilsLabelEXT(*m_commandBuffer, &label);
-    vk::CmdEndDebugUtilsLabelEXT(*m_commandBuffer);
-    m_commandBuffer->end();
+    vk::CmdBeginDebugUtilsLabelEXT(m_command_buffer, &label);
+    vk::CmdEndDebugUtilsLabelEXT(m_command_buffer);
+    m_command_buffer.End();
 
-    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Submit(m_command_buffer);
     m_default_queue->Wait();
 }
 
@@ -113,15 +113,15 @@ TEST_F(PositiveDebugExtensions, DebugLabelPrimaryCommandBuffer2) {
     VkDebugUtilsLabelEXT label = vku::InitStructHelper();
     label.pLabelName = "test";
     vkt::CommandBuffer cb0(*m_device, m_command_pool);
-    cb0.begin();
+    cb0.Begin();
     vk::CmdBeginDebugUtilsLabelEXT(cb0, &label);
-    cb0.end();
+    cb0.End();
     m_default_queue->Submit(cb0);
 
     vkt::CommandBuffer cb1(*m_device, m_command_pool);
-    cb1.begin();
+    cb1.Begin();
     vk::CmdEndDebugUtilsLabelEXT(cb1);
-    cb1.end();
+    cb1.End();
     m_default_queue->Submit(cb1);
 
     m_default_queue->Wait();
@@ -135,14 +135,14 @@ TEST_F(PositiveDebugExtensions, DebugLabelPrimaryCommandBuffer3) {
     VkDebugUtilsLabelEXT label = vku::InitStructHelper();
     label.pLabelName = "test";
     vkt::CommandBuffer cb0(*m_device, m_command_pool);
-    cb0.begin();
+    cb0.Begin();
     vk::CmdBeginDebugUtilsLabelEXT(cb0, &label);
-    cb0.end();
+    cb0.End();
 
     vkt::CommandBuffer cb1(*m_device, m_command_pool);
-    cb1.begin();
+    cb1.Begin();
     vk::CmdEndDebugUtilsLabelEXT(cb1);
-    cb1.end();
+    cb1.End();
 
     std::array cbs = {&cb0, &cb1};
     m_default_queue->Submit(cbs);
@@ -153,14 +153,14 @@ TEST_F(PositiveDebugExtensions, DebugLabelSecondaryCommandBuffer) {
     AddRequiredExtensions(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     RETURN_IF_SKIP(Init());
     vkt::CommandBuffer cb(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
-    cb.begin();
+    cb.Begin();
     {
         VkDebugUtilsLabelEXT label = vku::InitStructHelper();
         label.pLabelName = "test";
         vk::CmdBeginDebugUtilsLabelEXT(cb, &label);
         vk::CmdEndDebugUtilsLabelEXT(cb);
     }
-    cb.end();
+    cb.End();
 }
 
 // Not supported in Vulkan SC: VK_EXT_debug_marker
@@ -191,13 +191,8 @@ TEST_F(PositiveDebugExtensions, DISABLED_SwapchainImagesDebugMarker) {
     swapchain_create_info.clipped = VK_FALSE;
     swapchain_create_info.oldSwapchain = VK_NULL_HANDLE;
 
-    VkSwapchainKHR swapchain;
-    vk::CreateSwapchainKHR(device(), &swapchain_create_info, nullptr, &swapchain);
-
-    uint32_t imageCount;
-    vk::GetSwapchainImagesKHR(device(), swapchain, &imageCount, nullptr);
-    std::vector<VkImage> images(imageCount);
-    vk::GetSwapchainImagesKHR(device(), swapchain, &imageCount, images.data());
+    vkt::Swapchain swapchain(*m_device, swapchain_create_info);
+    const auto images = swapchain.GetImages();
 
     {
         VkDebugMarkerObjectNameInfoEXT name_info = vku::InitStructHelper();
@@ -218,6 +213,4 @@ TEST_F(PositiveDebugExtensions, DISABLED_SwapchainImagesDebugMarker) {
         name_info.pTag = tags;
         vk::DebugMarkerSetObjectTagEXT(device(), &name_info);
     }
-
-    vk::DestroySwapchainKHR(device(), swapchain, nullptr);
 }

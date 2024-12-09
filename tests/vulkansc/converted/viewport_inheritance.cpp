@@ -203,7 +203,7 @@ class ViewportInheritanceTestData {
         VkPhysicalDeviceExtendedDynamicStateFeaturesEXT ext = vku::InitStructHelper();
         VkPhysicalDeviceInheritedViewportScissorFeaturesNV nv = vku::InitStructHelper(&ext);
         VkPhysicalDeviceFeatures2 features2 = vku::InitStructHelper(&nv);
-        VkPhysicalDevice gpu = p_framework->gpu();
+        VkPhysicalDevice gpu = p_framework->Gpu();
 
         // Enable extended dynamic state if requested.
         if (extended_dynamic_state_multi_viewport) {
@@ -419,7 +419,7 @@ TEST_F(NegativeViewportInheritance, BasicUsage) {
     AddRequiredFeature(vkt::Feature::nestedCommandBufferSimultaneousUse);
     RETURN_IF_SKIP(Init());
 
-    ViewportInheritanceTestData test_data(m_device, gpu());
+    ViewportInheritanceTestData test_data(m_device, Gpu());
     if (test_data.FailureReason()) {
         GTEST_SKIP() << "Test internal failure: " << test_data.FailureReason();
     }
@@ -652,7 +652,7 @@ TEST_F(NegativeViewportInheritance, MissingFeature) {
         GTEST_SKIP() << missing_feature_string;
     }
 
-    ViewportInheritanceTestData test_data(m_device, gpu());
+    ViewportInheritanceTestData test_data(m_device, Gpu());
     if (test_data.FailureReason()) {
         GTEST_SKIP() << "Test internal failure: " << test_data.FailureReason();
     }
@@ -680,7 +680,7 @@ TEST_F(NegativeViewportInheritance, MultiViewport) {
     AddRequiredFeature(vkt::Feature::nestedCommandBufferSimultaneousUse);
     RETURN_IF_SKIP(Init());
 
-    ViewportInheritanceTestData test_data(m_device, gpu());
+    ViewportInheritanceTestData test_data(m_device, Gpu());
     if (test_data.FailureReason()) {
         GTEST_SKIP() << "Test internal failure: " << test_data.FailureReason();
     }
@@ -909,7 +909,7 @@ TEST_F(NegativeViewportInheritance, ScissorMissingFeature) {
         GTEST_SKIP() << missing_feature_string;
     }
 
-    ViewportInheritanceTestData test_data(m_device, gpu());
+    ViewportInheritanceTestData test_data(m_device, Gpu());
     if (test_data.FailureReason()) {
         GTEST_SKIP() << "Test internal failure: " << test_data.FailureReason();
     }
@@ -947,7 +947,7 @@ TEST_F(NegativeViewportInheritance, PipelineMissingDynamicStateDiscardRectangle)
     vkt::CommandPool pool(*m_device, m_device->graphics_queue_node_index_, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
     vkt::CommandBuffer secondary(*m_device, pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
 
-    ViewportInheritanceTestData test_data(m_device, gpu());
+    ViewportInheritanceTestData test_data(m_device, Gpu());
     if (test_data.FailureReason()) {
         GTEST_SKIP() << "Test internal failure: " << test_data.FailureReason();
     }
@@ -1049,7 +1049,11 @@ const VkPipelineRasterizationStateCreateInfo ViewportInheritanceTestData::kRaste
     VK_POLYGON_MODE_FILL,
     VK_CULL_MODE_BACK_BIT,
     VK_FRONT_FACE_COUNTER_CLOCKWISE,
-};
+    false,
+    0.0f,
+    0.0f,
+    0.0f,
+    1.0f};
 
 const VkPipelineMultisampleStateCreateInfo ViewportInheritanceTestData::kMultisampleState = {
     VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,

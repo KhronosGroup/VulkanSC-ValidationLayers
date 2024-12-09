@@ -82,6 +82,7 @@ const VkImageCompressionFlagsEXT AllVkImageCompressionFlagBitsEXT = 0;
 const VkBuildAccelerationStructureFlagsNV AllVkBuildAccelerationStructureFlagBitsNV = 0;
 const VkExternalMemoryHandleTypeFlagsNV AllVkExternalMemoryHandleTypeFlagBitsNV = 0;
 const VkVideoEncodeFeedbackFlagsKHR AllVkVideoEncodeFeedbackFlagBitsKHR = 0;
+const VkIndirectCommandsInputModeFlagsEXT AllVkIndirectCommandsInputModeFlagBitsEXT = 0;
 const VkGraphicsPipelineLibraryFlagsEXT AllVkGraphicsPipelineLibraryFlagBitsEXT = 0xF;
 #ifdef VK_USE_PLATFORM_METAL_EXT
 const VkExportMetalObjectTypeFlagsEXT AllVkExportMetalObjectTypeFlagBitsEXT = 0x3F;

@@ -274,39 +274,39 @@ TEST_F(PositivePipelineTopology, PointSizeStructMemeberWritten) {
     )asm";
     auto vs = VkShaderObj::CreateFromASM(this, vs_src.c_str(), VK_SHADER_STAGE_VERTEX_BIT);
 
-    if (vs) {
-        // struct has {
-        //     mat4x4
-        //     float
-        //     vec4
-        // }
-        // but std140 padding so the vec4 is offset 80
-        VkPushConstantRange push_constant_ranges[1]{{VK_SHADER_STAGE_VERTEX_BIT, 0, 96}};
-
-        VkPipelineLayoutCreateInfo const pipeline_layout_info{
-            VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO, nullptr, 0, 0, nullptr, 1, push_constant_ranges};
-
-        VkVertexInputBindingDescription input_binding[2] = {
-            {0, 16, VK_VERTEX_INPUT_RATE_VERTEX},
-            {1, 16, VK_VERTEX_INPUT_RATE_VERTEX},
-        };
-        VkVertexInputAttributeDescription input_attribs[2] = {
-            {0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0},
-            {1, 1, VK_FORMAT_R32G32B32A32_SFLOAT, 0},
-        };
-
-        CreatePipelineHelper pipe(*this);
-        pipe.shader_stages_ = {vs->GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
-        pipe.pipeline_layout_ci_ = pipeline_layout_info;
-        pipe.ia_ci_.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
-        pipe.vi_ci_.pVertexBindingDescriptions = input_binding;
-        pipe.vi_ci_.vertexBindingDescriptionCount = 2;
-        pipe.vi_ci_.pVertexAttributeDescriptions = input_attribs;
-        pipe.vi_ci_.vertexAttributeDescriptionCount = 2;
-        pipe.CreateGraphicsPipeline();
-    } else {
-        printf("Error creating shader from assembly\n");
+    if (!vs) {
+        GTEST_SKIP() << "Error creating shader from assembly";
     }
+
+    // struct has {
+    //     mat4x4
+    //     float
+    //     vec4
+    // }
+    // but std140 padding so the vec4 is offset 80
+    VkPushConstantRange push_constant_ranges[1]{{VK_SHADER_STAGE_VERTEX_BIT, 0, 96}};
+
+    VkPipelineLayoutCreateInfo const pipeline_layout_info{
+        VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO, nullptr, 0, 0, nullptr, 1, push_constant_ranges};
+
+    VkVertexInputBindingDescription input_binding[2] = {
+        {0, 16, VK_VERTEX_INPUT_RATE_VERTEX},
+        {1, 16, VK_VERTEX_INPUT_RATE_VERTEX},
+    };
+    VkVertexInputAttributeDescription input_attribs[2] = {
+        {0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0},
+        {1, 1, VK_FORMAT_R32G32B32A32_SFLOAT, 0},
+    };
+
+    CreatePipelineHelper pipe(*this);
+    pipe.shader_stages_ = {vs->GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
+    pipe.pipeline_layout_ci_ = pipeline_layout_info;
+    pipe.ia_ci_.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+    pipe.vi_ci_.pVertexBindingDescriptions = input_binding;
+    pipe.vi_ci_.vertexBindingDescriptionCount = 2;
+    pipe.vi_ci_.pVertexAttributeDescriptions = input_attribs;
+    pipe.vi_ci_.vertexAttributeDescriptionCount = 2;
+    pipe.CreateGraphicsPipeline();
 }
 
 TEST_F(PositivePipelineTopology, PolygonModeValid) {
@@ -316,11 +316,11 @@ TEST_F(PositivePipelineTopology, PolygonModeValid) {
     InitRenderTarget();
 
     std::vector<const char *> device_extension_names;
-    auto features = m_device->phy().features();
+    auto features = m_device->Physical().Features();
     // Artificially disable support for non-solid fill modes
     features.fillModeNonSolid = false;
     // The sacrificial device object
-    vkt::Device test_device(gpu(), device_extension_names, &features);
+    vkt::Device test_device(Gpu(), device_extension_names, &features);
 
     VkAttachmentReference attach = {};
     attach.layout = VK_IMAGE_LAYOUT_GENERAL;
@@ -399,6 +399,7 @@ TEST_F(PositivePipelineTopology, NotPointSizeGeometry) {
 TEST_F(PositivePipelineTopology, Rasterizer) {
     TEST_DESCRIPTION("Test topology set when creating a pipeline with tessellation and geometry shader.");
 
+    AddRequiredFeature(vkt::Feature::geometryShader);
     AddRequiredFeature(vkt::Feature::tessellationShader);
     RETURN_IF_SKIP(Init());
 
@@ -448,13 +449,13 @@ TEST_F(PositivePipelineTopology, Rasterizer) {
     pipe.AddDynamicState(VK_DYNAMIC_STATE_LINE_WIDTH);
     pipe.CreateGraphicsPipeline();
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRenderPass(renderPass(), framebuffer(), 32, 32, m_renderPassClearValues.size(),
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(RenderPass(), Framebuffer(), 32, 32, m_renderPassClearValues.size(),
                                      m_renderPassClearValues.data());
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    vk::CmdDraw(m_commandBuffer->handle(), 4, 1, 0, 0);
-    m_commandBuffer->EndRenderPass();
-    m_commandBuffer->end();
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdDraw(m_command_buffer.handle(), 4, 1, 0, 0);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
 }
 
 TEST_F(PositivePipelineTopology, LineTopologyClasses) {
@@ -482,7 +483,7 @@ TEST_F(PositivePipelineTopology, LineTopologyClasses) {
     vkt::Buffer vbo(*m_device, sizeof(float) * 3, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
     vkt::CommandBuffer cb(*m_device, m_command_pool);
-    cb.begin();
+    cb.Begin();
     cb.BeginRenderPass(m_renderPassBeginInfo);
 
     vk::CmdBindPipeline(cb.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
@@ -492,7 +493,7 @@ TEST_F(PositivePipelineTopology, LineTopologyClasses) {
 
     cb.EndRenderPass();
 
-    cb.end();
+    cb.End();
 }
 
 TEST_F(PositivePipelineTopology, PointSizeDynamicAndUnestricted) {
@@ -574,8 +575,7 @@ TEST_F(PositivePipelineTopology, PrimitiveTopologyListRestartDynamic) {
     AddRequiredExtensions(VK_EXT_PRIMITIVE_TOPOLOGY_LIST_RESTART_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::extendedDynamicState2);
-    AddDisabledFeature(vkt::Feature::primitiveTopologyListRestart);
-    AddDisabledFeature(vkt::Feature::primitiveTopologyPatchListRestart);
+
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 

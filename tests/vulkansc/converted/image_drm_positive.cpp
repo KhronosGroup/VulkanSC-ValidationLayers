@@ -27,14 +27,14 @@ std::vector<uint64_t> ImageDrmTest::GetFormatModifier(VkFormat format, VkFormatF
     std::vector<uint64_t> mods;
     VkDrmFormatModifierPropertiesListEXT mod_props = vku::InitStructHelper();
     VkFormatProperties2 format_props = vku::InitStructHelper(&mod_props);
-    vk::GetPhysicalDeviceFormatProperties2(gpu(), format, &format_props);
+    vk::GetPhysicalDeviceFormatProperties2(Gpu(), format, &format_props);
     if (mod_props.drmFormatModifierCount == 0) {
         return mods;
     }
 
     std::vector<VkDrmFormatModifierPropertiesEXT> mod_props_length(mod_props.drmFormatModifierCount);
     mod_props.pDrmFormatModifierProperties = mod_props_length.data();
-    vk::GetPhysicalDeviceFormatProperties2(gpu(), format, &format_props);
+    vk::GetPhysicalDeviceFormatProperties2(Gpu(), format, &format_props);
 
     for (uint32_t i = 0; i < mod_props.drmFormatModifierCount; ++i) {
         auto &mod = mod_props.pDrmFormatModifierProperties[i];
@@ -94,7 +94,7 @@ TEST_F(PositiveImageDrm, Basic) {
 
         // bind memory
         VkPhysicalDeviceMemoryProperties phys_mem_props;
-        vk::GetPhysicalDeviceMemoryProperties(gpu(), &phys_mem_props);
+        vk::GetPhysicalDeviceMemoryProperties(Gpu(), &phys_mem_props);
         VkMemoryRequirements mem_reqs;
         vk::GetImageMemoryRequirements(device(), image, &mem_reqs);
         VkDeviceMemory mem_obj = VK_NULL_HANDLE;
@@ -190,7 +190,7 @@ TEST_F(PositiveImageDrm, ExternalMemory) {
         VkExternalImageFormatProperties external_image_properties = vku::InitStructHelper();
         VkImageFormatProperties2 image_properties = vku::InitStructHelper(&external_image_properties);
 
-        if (const auto result = vk::GetPhysicalDeviceImageFormatProperties2(gpu(), &image_info, &image_properties);
+        if (const auto result = vk::GetPhysicalDeviceImageFormatProperties2(Gpu(), &image_info, &image_properties);
             result != VK_SUCCESS) {
             GTEST_SKIP() << "Unable to create image. VkResult = " << string_VkResult(result);
         }
@@ -239,7 +239,7 @@ TEST_F(PositiveImageDrm, GetImageSubresourceLayoutPlane) {
         image_info.usage = create_info.usage;
         image_info.flags = create_info.flags;
         VkImageFormatProperties2 image_properties = vku::InitStructHelper();
-        if (vk::GetPhysicalDeviceImageFormatProperties2(gpu(), &image_info, &image_properties) != VK_SUCCESS) {
+        if (vk::GetPhysicalDeviceImageFormatProperties2(Gpu(), &image_info, &image_properties) != VK_SUCCESS) {
             // Works with Mesa, Pixel 7 doesn't support this combo
             GTEST_SKIP() << "Required formats/features not supported";
         }
@@ -339,7 +339,7 @@ TEST_F(PositiveImageDrm, PhysicalDeviceImageDrmFormatModifierInfoExclusive) {
     VkExternalImageFormatProperties external_image_properties = vku::InitStructHelper();
     VkImageFormatProperties2 image_properties = vku::InitStructHelper(&external_image_properties);
 
-    vk::GetPhysicalDeviceImageFormatProperties2(gpu(), &image_info, &image_properties);
+    vk::GetPhysicalDeviceImageFormatProperties2(Gpu(), &image_info, &image_properties);
 }
 
 TEST_F(PositiveImageDrm, PhysicalDeviceImageDrmFormatModifierInfoConcurrent) {
@@ -348,12 +348,12 @@ TEST_F(PositiveImageDrm, PhysicalDeviceImageDrmFormatModifierInfoConcurrent) {
     RETURN_IF_SKIP(InitBasicImageDrm());
 
     uint32_t queue_family_property_count = 0;
-    vk::GetPhysicalDeviceQueueFamilyProperties2(gpu(), &queue_family_property_count, nullptr);
+    vk::GetPhysicalDeviceQueueFamilyProperties2(Gpu(), &queue_family_property_count, nullptr);
     if (queue_family_property_count < 2) {
         GTEST_SKIP() << "pQueueFamilyPropertyCount is not 2 or more";
     }
     std::vector<VkQueueFamilyProperties2> queue_family_props(queue_family_property_count);
-    vk::GetPhysicalDeviceQueueFamilyProperties2(gpu(), &queue_family_property_count, nullptr);
+    vk::GetPhysicalDeviceQueueFamilyProperties2(Gpu(), &queue_family_property_count, nullptr);
 
     VkPhysicalDeviceImageDrmFormatModifierInfoEXT drm_format_modifier = vku::InitStructHelper();
     drm_format_modifier.sharingMode = VK_SHARING_MODE_CONCURRENT;
@@ -374,5 +374,5 @@ TEST_F(PositiveImageDrm, PhysicalDeviceImageDrmFormatModifierInfoConcurrent) {
     VkExternalImageFormatProperties external_image_properties = vku::InitStructHelper();
     VkImageFormatProperties2 image_properties = vku::InitStructHelper(&external_image_properties);
 
-    vk::GetPhysicalDeviceImageFormatProperties2(gpu(), &image_info, &image_properties);
+    vk::GetPhysicalDeviceImageFormatProperties2(Gpu(), &image_info, &image_properties);
 }

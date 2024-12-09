@@ -313,11 +313,11 @@ TEST_F(NegativeSubpass, NextSubpassExcessive) {
     const bool rp2Supported = IsExtensionsEnabled(VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME);
     InitRenderTarget();
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdNextSubpass-None-00909");
-    m_commandBuffer->NextSubpass();
+    m_command_buffer.NextSubpass();
     m_errorMonitor->VerifyFound();
 
     if (rp2Supported) {
@@ -326,12 +326,12 @@ TEST_F(NegativeSubpass, NextSubpassExcessive) {
 
         m_errorMonitor->SetDesiredError("VUID-vkCmdNextSubpass2-None-03102");
 
-        vk::CmdNextSubpass2KHR(m_commandBuffer->handle(), &subpassBeginInfo, &subpassEndInfo);
+        vk::CmdNextSubpass2KHR(m_command_buffer.handle(), &subpassBeginInfo, &subpassEndInfo);
         m_errorMonitor->VerifyFound();
     }
 
-    m_commandBuffer->EndRenderPass();
-    m_commandBuffer->end();
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeSubpass, RenderPassEndBeforeFinalSubpass) {
@@ -350,22 +350,22 @@ TEST_F(NegativeSubpass, RenderPassEndBeforeFinalSubpass) {
     vkt::RenderPass rp(*m_device, rcpi);
     vkt::Framebuffer fb(*m_device, rp.handle(), 0u, nullptr, 16, 16);
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRenderPass(rp.handle(), fb.handle(), 16, 16);
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(rp.handle(), fb.handle(), 16, 16);
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdEndRenderPass-None-00910");
-    m_commandBuffer->EndRenderPass();
+    m_command_buffer.EndRenderPass();
     m_errorMonitor->VerifyFound();
 
     if (rp2Supported) {
         VkSubpassEndInfoKHR subpassEndInfo = vku::InitStructHelper();
 
-        m_commandBuffer->reset();
-        m_commandBuffer->begin();
-        m_commandBuffer->BeginRenderPass(rp.handle(), fb.handle(), 16, 16);
+        m_command_buffer.Reset();
+        m_command_buffer.Begin();
+        m_command_buffer.BeginRenderPass(rp.handle(), fb.handle(), 16, 16);
 
         m_errorMonitor->SetDesiredError("VUID-vkCmdEndRenderPass2-None-03103");
-        vk::CmdEndRenderPass2KHR(m_commandBuffer->handle(), &subpassEndInfo);
+        vk::CmdEndRenderPass2KHR(m_command_buffer.handle(), &subpassEndInfo);
         m_errorMonitor->VerifyFound();
     }
 }
@@ -451,29 +451,29 @@ TEST_F(NegativeSubpass, DrawWithPipelineIncompatibleWithSubpass) {
     pipe.gp_ci_.renderPass = rp.handle();
     pipe.CreateGraphicsPipeline();
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     // subtest 1: bind in the wrong subpass
-    m_commandBuffer->BeginRenderPass(rp.handle(), fb.handle(), 32, 32);
-    m_commandBuffer->NextSubpass();
+    m_command_buffer.BeginRenderPass(rp.handle(), fb.handle(), 32, 32);
+    m_command_buffer.NextSubpass();
     m_errorMonitor->SetDesiredError("built for subpass 0 but used in subpass 1");
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->EndRenderPass();
+    m_command_buffer.EndRenderPass();
 
     // subtest 2: bind in correct subpass, then transition to next subpass
-    m_commandBuffer->BeginRenderPass(rp.handle(), fb.handle(), 32, 32);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    m_commandBuffer->NextSubpass();
+    m_command_buffer.BeginRenderPass(rp.handle(), fb.handle(), 32, 32);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    m_command_buffer.NextSubpass();
     m_errorMonitor->SetDesiredError("built for subpass 0 but used in subpass 1");
-    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
+    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->EndRenderPass();
+    m_command_buffer.EndRenderPass();
 
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeSubpass, ImageBarrierSubpassConflict) {
@@ -526,10 +526,10 @@ TEST_F(NegativeSubpass, ImageBarrierSubpassConflict) {
     img_barrier.subresourceRange.baseMipLevel = 0;
     img_barrier.subresourceRange.layerCount = 1;
     img_barrier.subresourceRange.levelCount = 1;
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRenderPass(rp.handle(), fb.handle(), 32, 32);
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(rp.handle(), fb.handle(), 32, 32);
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-image-04073");
-    vk::CmdPipelineBarrier(m_commandBuffer->handle(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+    vk::CmdPipelineBarrier(m_command_buffer.handle(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 1,
                            &img_barrier);
     m_errorMonitor->VerifyFound();
@@ -626,23 +626,23 @@ TEST_F(NegativeSubpass, SubpassInputNotBoundDescriptorSet) {
         g_pipe.descriptor_set_->WriteDescriptorImageInfo(0, view_input, sampler.handle(), VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT);
         g_pipe.descriptor_set_->UpdateDescriptorSets();
 
-        m_commandBuffer->begin();
+        m_command_buffer.Begin();
 
-        image_input.SetLayout(m_commandBuffer, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        image_input.SetLayout(m_command_buffer, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
         m_renderPassBeginInfo.renderArea = {{0, 0}, {64, 64}};
         m_renderPassBeginInfo.renderPass = rp.handle();
         m_renderPassBeginInfo.framebuffer = fb.handle();
 
-        m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-        vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe.Handle());
-        vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe.pipeline_layout_.handle(), 0,
+        m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+        vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe.Handle());
+        vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe.pipeline_layout_.handle(), 0,
                                   1, &g_pipe.descriptor_set_->set_, 0, nullptr);
 
-        vk::CmdDraw(m_commandBuffer->handle(), 1, 0, 0, 0);
+        vk::CmdDraw(m_command_buffer.handle(), 1, 0, 0, 0);
 
-        m_commandBuffer->EndRenderPass();
-        m_commandBuffer->end();
+        m_command_buffer.EndRenderPass();
+        m_command_buffer.End();
     }
 }
 
@@ -651,12 +651,8 @@ TEST_F(NegativeSubpass, SubpassDescriptionViewMask) {
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-    VkPhysicalDeviceMultiviewFeatures multiview_features = vku::InitStructHelper();
-    auto features2 = GetPhysicalDeviceFeatures2(multiview_features);
-    if (multiview_features.multiview == VK_FALSE) {
-        GTEST_SKIP() << "multiview feature not supported";
-    }
+    AddRequiredFeature(vkt::Feature::multiview);
+    RETURN_IF_SKIP(Init());
 
     VkPhysicalDeviceMultiviewProperties render_pass_multiview_props = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(render_pass_multiview_props);
@@ -664,8 +660,6 @@ TEST_F(NegativeSubpass, SubpassDescriptionViewMask) {
     if (render_pass_multiview_props.maxMultiviewViewCount >= 32) {
         GTEST_SKIP() << "maxMultiviewViewCount too high";
     }
-
-    RETURN_IF_SKIP(InitState(nullptr, &features2));
 
     VkAttachmentDescription2 attach_desc = vku::InitStructHelper();
     attach_desc.format = VK_FORMAT_R8G8B8A8_UNORM;
@@ -752,27 +746,27 @@ TEST_F(NegativeSubpass, PipelineSubpassIndex) {
     VkClearValue clear_value = {};
     clear_value.color = {{0, 0, 0, 0}};
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRenderPass(render_pass.handle(), framebuffer.handle(), 32, 32, 1, &clear_value);
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(render_pass.handle(), framebuffer.handle(), 32, 32, 1, &clear_value);
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-subpass-02685");
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe2.Handle());
-    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe2.Handle());
+    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
     m_errorMonitor->VerifyFound();
 
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe1.Handle());
-    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
-    m_commandBuffer->NextSubpass();
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe2.Handle());
-    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe1.Handle());
+    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
+    m_command_buffer.NextSubpass();
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe2.Handle());
+    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-subpass-02685");
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe1.Handle());
-    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe1.Handle());
+    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->EndRenderPass();
-    m_commandBuffer->end();
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeSubpass, SubpassDependencyMasksSync2) {
@@ -1117,14 +1111,10 @@ TEST_F(NegativeSubpass, SubpassInputWithoutFormat) {
     TEST_DESCRIPTION("Non-InputAttachment shader input with unknown image format");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    RETURN_IF_SKIP(InitFramework());
-    VkPhysicalDeviceFeatures features;
-    vk::GetPhysicalDeviceFeatures(gpu(), &features);
-    features.shaderStorageImageReadWithoutFormat = VK_FALSE;
-    RETURN_IF_SKIP(InitState(&features));
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    if (DeviceExtensionSupported(gpu(), nullptr, VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME)) {
+    if (DeviceExtensionSupported(Gpu(), nullptr, VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME)) {
         GTEST_SKIP() << "VK_KHR_format_feature_flags2 is supported";
     }
 
@@ -1181,18 +1171,18 @@ TEST_F(NegativeSubpass, NextSubpassNoRenderPass) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-vkCmdNextSubpass-renderpass");
-    m_commandBuffer->NextSubpass();
+    m_command_buffer.NextSubpass();
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-    m_commandBuffer->EndRenderPass();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    m_command_buffer.EndRenderPass();
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdNextSubpass-renderpass");
-    m_commandBuffer->NextSubpass();
+    m_command_buffer.NextSubpass();
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeSubpass, FramebufferNoAttachmentsSampleCounts) {
@@ -1200,7 +1190,7 @@ TEST_F(NegativeSubpass, FramebufferNoAttachmentsSampleCounts) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    if ((m_device->phy().limits_.framebufferNoAttachmentsSampleCounts & VK_SAMPLE_COUNT_8_BIT) != 0) {
+    if ((m_device->Physical().limits_.framebufferNoAttachmentsSampleCounts & VK_SAMPLE_COUNT_8_BIT) != 0) {
         GTEST_SKIP() << "Need framebufferNoAttachmentsSampleCounts with no support";
     }
 

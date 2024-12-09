@@ -46,6 +46,7 @@ class APISpecific:
                     'const VkBuildAccelerationStructureFlagsNV AllVkBuildAccelerationStructureFlagBitsNV = 0;\n',
                     'const VkExternalMemoryHandleTypeFlagsNV AllVkExternalMemoryHandleTypeFlagBitsNV = 0;\n',
                     'const VkVideoEncodeFeedbackFlagsKHR AllVkVideoEncodeFeedbackFlagBitsKHR = 0;\n',
+                    'const VkIndirectCommandsInputModeFlagsEXT AllVkIndirectCommandsInputModeFlagBitsEXT = 0;\n',
                     # This one is special, because upstream code uses it to verify whether a GPL based pipeline
                     # has all subsections specified and zero has a special meaning indicating no use of GPL
                     'const VkGraphicsPipelineLibraryFlagsEXT AllVkGraphicsPipelineLibraryFlagBitsEXT = 0xF;\n',

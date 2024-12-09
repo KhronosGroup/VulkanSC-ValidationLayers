@@ -15,6 +15,7 @@
 #include <vulkan/vulkan_core.h>
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
+#include "../framework/shader_object_helper.h"
 
 class NegativeGeometryTessellation : public VkLayerTest {};
 
@@ -27,12 +28,12 @@ TEST_F(NegativeGeometryTessellation, StageMaskGsTsEnabled) {
     InitRenderTarget();
 
     std::vector<const char *> device_extension_names;
-    auto features = m_device->phy().features();
+    auto features = m_device->Physical().Features();
     // Make sure gs & ts are disabled
     features.geometryShader = false;
     features.tessellationShader = false;
     // The sacrificial device object
-    vkt::Device test_device(gpu(), device_extension_names, &features);
+    vkt::Device test_device(Gpu(), device_extension_names, &features);
 
     VkCommandPoolCreateInfo pool_create_info = vku::InitStructHelper();
     pool_create_info.queueFamilyIndex = test_device.graphics_queue_node_index_;
@@ -77,7 +78,7 @@ TEST_F(NegativeGeometryTessellation, GeometryShaderEnabled) {
     RETURN_IF_SKIP(Init(&deviceFeatures));
     InitRenderTarget();
 
-    if (m_device->phy().limits_.maxGeometryOutputVertices == 0) {
+    if (m_device->Physical().limits_.maxGeometryOutputVertices == 0) {
         GTEST_SKIP() << "Device doesn't support geometry shaders";
     }
 
@@ -103,7 +104,7 @@ TEST_F(NegativeGeometryTessellation, TessellationShaderEnabled) {
     RETURN_IF_SKIP(Init(&deviceFeatures));
     InitRenderTarget();
 
-    if (m_device->phy().limits_.maxTessellationPatchSize == 0) {
+    if (m_device->Physical().limits_.maxTessellationPatchSize == 0) {
         GTEST_SKIP() << "patchControlPoints not supported";
     }
 
@@ -186,14 +187,8 @@ TEST_F(NegativeGeometryTessellation, PointSizeGeomShaderWrite) {
     TEST_DESCRIPTION(
         "Create a pipeline using TOPOLOGY_POINT_LIST, set PointSize vertex shader, but not in the final geometry stage.");
 
-    RETURN_IF_SKIP(InitFramework());
-    VkPhysicalDeviceFeatures features{};
-    vk::GetPhysicalDeviceFeatures(gpu(), &features);
-    if (features.geometryShader == VK_FALSE) {
-        GTEST_SKIP() << "geometryShader not supported";
-    }
-    features.shaderTessellationAndGeometryPointSize = VK_FALSE;
-    RETURN_IF_SKIP(InitState(&features));
+    AddRequiredFeature(vkt::Feature::geometryShader);
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     // Compiled using the GLSL code below. GlslangValidator rearranges the members, but here they are kept in the order provided.
@@ -385,29 +380,78 @@ TEST_F(NegativeGeometryTessellation, BuiltinBlockSizeMismatchVsGs) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-OpVariable-08746");
 }
 
+TEST_F(NegativeGeometryTessellation, BuiltinBlockSizeMismatchVsGsShaderObject) {
+    TEST_DESCRIPTION("Use different number of elements in builtin block interface between VS and GS.");
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    AddRequiredFeature(vkt::Feature::shaderObject);
+    AddRequiredFeature(vkt::Feature::geometryShader);
+    AddRequiredFeature(vkt::Feature::shaderTessellationAndGeometryPointSize);
+    RETURN_IF_SKIP(Init());
+    InitDynamicRenderTarget();
+
+    static const char *gsSource = R"glsl(
+        #version 450
+        layout (points) in;
+        layout (points) out;
+        layout (max_vertices = 1) out;
+        in gl_PerVertex
+        {
+            vec4 gl_Position;
+            float gl_PointSize;
+            float gl_ClipDistance[];
+        } gl_in[];
+        void main()
+        {
+            gl_Position = gl_in[0].gl_Position;
+            gl_PointSize = gl_in[0].gl_PointSize;
+            EmitVertex();
+        }
+    )glsl";
+
+    const vkt::Shader vertShader(*m_device, VK_SHADER_STAGE_VERTEX_BIT,
+                                 GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, kVertexPointSizeGlsl));
+    const vkt::Shader geomShader(*m_device, VK_SHADER_STAGE_GEOMETRY_BIT, GLSLToSPV(VK_SHADER_STAGE_GEOMETRY_BIT, gsSource));
+    const vkt::Shader fragShader(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT,
+                                 GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, kFragmentMinimalGlsl));
+
+    const VkShaderStageFlagBits stages[] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT,
+                                            VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT, VK_SHADER_STAGE_GEOMETRY_BIT,
+                                            VK_SHADER_STAGE_FRAGMENT_BIT};
+    const VkShaderEXT shaders[] = {vertShader.handle(), VK_NULL_HANDLE, VK_NULL_HANDLE, geomShader.handle(), fragShader.handle()};
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
+    SetDefaultDynamicStatesExclude();
+    vk::CmdBindShadersEXT(m_command_buffer.handle(), 5, stages, shaders);
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-OpVariable-08746");
+    vk::CmdDraw(m_command_buffer.handle(), 4, 1, 0, 0);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
+}
+
 TEST_F(NegativeGeometryTessellation, MaxTessellationControlInputOutputComponents) {
     TEST_DESCRIPTION(
         "Test that errors are produced when the number of per-vertex input and/or output components to the tessellation control "
         "stage exceeds the device limit");
 
+    AddRequiredFeature(vkt::Feature::tessellationShader);
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     // overflow == 0: no overflow, 1: too many components, 2: location number too large
     for (uint32_t overflow = 0; overflow < 3; ++overflow) {
         m_errorMonitor->Reset();
-        VkPhysicalDeviceFeatures feat;
-        vk::GetPhysicalDeviceFeatures(gpu(), &feat);
-        if (!feat.tessellationShader) {
-            GTEST_SKIP() << "tessellation shader stage(s) unsupported";
-        }
 
         // Tessellation control stage
         std::string tcsSourceStr =
             "#version 450\n"
             "\n";
         // Input components
-        const uint32_t maxTescInComp = m_device->phy().limits_.maxTessellationControlPerVertexInputComponents + overflow;
+        const uint32_t maxTescInComp = m_device->Physical().limits_.maxTessellationControlPerVertexInputComponents + overflow;
         const uint32_t numInVec4 = maxTescInComp / 4;
         uint32_t inLocation = 0;
         if (overflow == 2) {
@@ -430,7 +474,7 @@ TEST_F(NegativeGeometryTessellation, MaxTessellationControlInputOutputComponents
         }
 
         // Output components
-        const uint32_t maxTescOutComp = m_device->phy().limits_.maxTessellationControlPerVertexOutputComponents + overflow;
+        const uint32_t maxTescOutComp = m_device->Physical().limits_.maxTessellationControlPerVertexOutputComponents + overflow;
         const uint32_t numOutVec4 = maxTescOutComp / 4;
         uint32_t outLocation = 0;
         if (overflow == 2) {
@@ -493,17 +537,13 @@ TEST_F(NegativeGeometryTessellation, MaxTessellationEvaluationInputOutputCompone
         "Test that errors are produced when the number of input and/or output components to the tessellation evaluation stage "
         "exceeds the device limit");
 
+    AddRequiredFeature(vkt::Feature::tessellationShader);
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     // overflow == 0: no overflow, 1: too many components, 2: location number too large
     for (uint32_t overflow = 0; overflow < 3; ++overflow) {
         m_errorMonitor->Reset();
-        VkPhysicalDeviceFeatures feat;
-        vk::GetPhysicalDeviceFeatures(gpu(), &feat);
-        if (!feat.tessellationShader) {
-            GTEST_SKIP() << "tessellation shader stage(s) unsupported";
-        }
 
         // Tessellation evaluation stage
         std::string tesSourceStr =
@@ -512,7 +552,7 @@ TEST_F(NegativeGeometryTessellation, MaxTessellationEvaluationInputOutputCompone
             "layout (triangles) in;\n"
             "\n";
         // Input components
-        const uint32_t maxTeseInComp = m_device->phy().limits_.maxTessellationEvaluationInputComponents + overflow;
+        const uint32_t maxTeseInComp = m_device->Physical().limits_.maxTessellationEvaluationInputComponents + overflow;
         const uint32_t numInVec4 = maxTeseInComp / 4;
         uint32_t inLocation = 0;
         if (overflow == 2) {
@@ -535,7 +575,7 @@ TEST_F(NegativeGeometryTessellation, MaxTessellationEvaluationInputOutputCompone
         }
 
         // Output components
-        const uint32_t maxTeseOutComp = m_device->phy().limits_.maxTessellationEvaluationOutputComponents + overflow;
+        const uint32_t maxTeseOutComp = m_device->Physical().limits_.maxTessellationEvaluationOutputComponents + overflow;
         const uint32_t numOutVec4 = maxTeseOutComp / 4;
         uint32_t outLocation = 0;
         if (overflow == 2) {
@@ -597,17 +637,13 @@ TEST_F(NegativeGeometryTessellation, MaxGeometryInputOutputComponents) {
         "Test that errors are produced when the number of input and/or output components to the geometry stage exceeds the device "
         "limit");
 
+    AddRequiredFeature(vkt::Feature::geometryShader);
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     // overflow == 0: no overflow, 1: too many components, 2: location number too large
     for (uint32_t overflow = 0; overflow < 3; ++overflow) {
         m_errorMonitor->Reset();
-        VkPhysicalDeviceFeatures feat;
-        vk::GetPhysicalDeviceFeatures(gpu(), &feat);
-        if (!feat.geometryShader) {
-            GTEST_SKIP() << "geometry shader stage unsupported";
-        }
 
         std::string gsSourceStr =
             "#version 450\n"
@@ -616,7 +652,7 @@ TEST_F(NegativeGeometryTessellation, MaxGeometryInputOutputComponents) {
             "layout(invocations=1) in;\n";
 
         // Input components
-        const uint32_t maxGeomInComp = m_device->phy().limits_.maxGeometryInputComponents + overflow;
+        const uint32_t maxGeomInComp = m_device->Physical().limits_.maxGeometryInputComponents + overflow;
         const uint32_t numInVec4 = maxGeomInComp / 4;
         uint32_t inLocation = 0;
         if (overflow == 2) {
@@ -639,7 +675,7 @@ TEST_F(NegativeGeometryTessellation, MaxGeometryInputOutputComponents) {
         }
 
         // Output components
-        const uint32_t maxGeomOutComp = m_device->phy().limits_.maxGeometryOutputComponents + overflow;
+        const uint32_t maxGeomOutComp = m_device->Physical().limits_.maxGeometryOutputComponents + overflow;
         const uint32_t numOutVec4 = maxGeomOutComp / 4;
         uint32_t outLocation = 0;
         if (overflow == 2) {
@@ -662,7 +698,7 @@ TEST_F(NegativeGeometryTessellation, MaxGeometryInputOutputComponents) {
         }
 
         // Finalize
-        int max_vertices = overflow ? (m_device->phy().limits_.maxGeometryTotalOutputComponents / maxGeomOutComp + 1) : 1;
+        int max_vertices = overflow ? (m_device->Physical().limits_.maxGeometryTotalOutputComponents / maxGeomOutComp + 1) : 1;
         gsSourceStr += "layout(triangle_strip, max_vertices = " + std::to_string(max_vertices) +
                        ") out;\n"
                        "\n"
@@ -703,16 +739,12 @@ TEST_F(NegativeGeometryTessellation, MaxGeometryInstanceVertexCount) {
         "Test that errors are produced when the number of output vertices/instances in the geometry stage exceeds the device "
         "limit");
 
+    AddRequiredFeature(vkt::Feature::geometryShader);
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     for (int overflow = 0; overflow < 2; ++overflow) {
         m_errorMonitor->Reset();
-        VkPhysicalDeviceFeatures feat;
-        vk::GetPhysicalDeviceFeatures(gpu(), &feat);
-        if (!feat.geometryShader) {
-            GTEST_SKIP() << "geometry shader stage unsupported";
-        }
 
         std::string gsSourceStr = R"(
                OpCapability Geometry
@@ -723,10 +755,10 @@ TEST_F(NegativeGeometryTessellation, MaxGeometryInstanceVertexCount) {
                )";
         if (overflow) {
             gsSourceStr += "OpExecutionMode %main Invocations " +
-                           std::to_string(m_device->phy().limits_.maxGeometryShaderInvocations + 1) +
+                           std::to_string(m_device->Physical().limits_.maxGeometryShaderInvocations + 1) +
                            "\n\
                 OpExecutionMode %main OutputVertices " +
-                           std::to_string(m_device->phy().limits_.maxGeometryOutputVertices + 1);
+                           std::to_string(m_device->Physical().limits_.maxGeometryOutputVertices + 1);
         } else {
             gsSourceStr += R"(
                OpExecutionMode %main Invocations 1
@@ -881,7 +913,7 @@ TEST_F(NegativeGeometryTessellation, Tessellation) {
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit,
                                       "VUID-VkPipelineTessellationStateCreateInfo-patchControlPoints-01214");
 
-    tsci_bad.patchControlPoints = m_device->phy().limits_.maxTessellationPatchSize + 1;
+    tsci_bad.patchControlPoints = m_device->Physical().limits_.maxTessellationPatchSize + 1;
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit,
                                       "VUID-VkPipelineTessellationStateCreateInfo-patchControlPoints-01214");
 }
@@ -992,7 +1024,7 @@ VK_DESCRIPTOR_SET_USAGE_NON_FREE, 1, &ds_layout.handle(), &descriptorSet);
         gp_ci.pColorBlendState = NULL;
         gp_ci.flags = VK_PIPELINE_CREATE_DISABLE_OPTIMIZATION_BIT;
         gp_ci.layout = pipeline_layout.handle();
-        gp_ci.renderPass = renderPass();
+        gp_ci.renderPass = RenderPass();
 
     VkPipelineCacheCreateInfo pc_ci = vku::InitStructHelper();
         pc_ci.initialSize = 0;
@@ -1220,15 +1252,10 @@ TEST_F(NegativeGeometryTessellation, GeometryStreamsCapability) {
     TEST_DESCRIPTION("Use geometry shader with geometryStreams capability, but geometryStreams feature not enabled");
 
     AddRequiredExtensions(VK_EXT_TRANSFORM_FEEDBACK_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-    VkPhysicalDeviceTransformFeedbackFeaturesEXT xfb_features = vku::InitStructHelper();
-    auto features2 = GetPhysicalDeviceFeatures2(xfb_features);
-    if (!xfb_features.transformFeedback) {
-        GTEST_SKIP() << "transformFeedback not supported";
-    }
-    xfb_features.geometryStreams = VK_FALSE;
-    features2.features.shaderTessellationAndGeometryPointSize = VK_FALSE;
-    RETURN_IF_SKIP(InitState(nullptr, &features2));
+    AddRequiredFeature(vkt::Feature::geometryShader);
+    AddRequiredFeature(vkt::Feature::transformFeedback);
+
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     VkPhysicalDeviceTransformFeedbackPropertiesEXT xfb_props = vku::InitStructHelper();
@@ -1335,14 +1362,14 @@ TEST_F(NegativeGeometryTessellation, MismatchedTessellationExecutionModes) {
         RETURN_IF_SKIP(InitState(nullptr, &features2));
     } else {
         VkPhysicalDeviceFeatures features{};
-        vk::GetPhysicalDeviceFeatures(gpu(), &features);
+        vk::GetPhysicalDeviceFeatures(Gpu(), &features);
         if (features.tessellationShader == VK_FALSE) {
             GTEST_SKIP() << "geometryShader not supported";
         }
         features.shaderTessellationAndGeometryPointSize = VK_FALSE;
         RETURN_IF_SKIP(InitState(&features));
     }
-    if (m_device->phy().limits_.maxTessellationPatchSize == 0) {
+    if (m_device->Physical().limits_.maxTessellationPatchSize == 0) {
         GTEST_SKIP() << "Tessellation shaders not supported";
     }
     InitRenderTarget();
@@ -1518,9 +1545,10 @@ TEST_F(NegativeGeometryTessellation, MismatchedTessellationExecutionModes) {
 
 TEST_F(NegativeGeometryTessellation, WritingToLayerWithSingleFramebufferLayer) {
     TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/3019");
+    AddRequiredFeature(vkt::Feature::geometryShader);
     RETURN_IF_SKIP(Init());
     InitRenderTarget();  // Creates a framebuffer with a single layer
-    if (m_device->phy().limits_.maxGeometryOutputVertices == 0) {
+    if (m_device->Physical().limits_.maxGeometryOutputVertices == 0) {
         GTEST_SKIP() << "Device doesn't support required maxGeometryOutputVertices";
     }
     const std::string_view gsSource = R"glsl(
@@ -1540,14 +1568,14 @@ TEST_F(NegativeGeometryTessellation, WritingToLayerWithSingleFramebufferLayer) {
     pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), gs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
     pipe.CreateGraphicsPipeline();
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
     m_errorMonitor->SetDesiredWarning("Undefined-Layer-Written");
-    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
+    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->EndRenderPass();
-    m_commandBuffer->end();
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeGeometryTessellation, DrawDynamicPrimitiveTopology) {
@@ -1588,14 +1616,14 @@ TEST_F(NegativeGeometryTessellation, DrawDynamicPrimitiveTopology) {
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), gs.GetStageCreateInfo(), pipe.fs_->GetStageCreateInfo()};
     pipe.CreateGraphicsPipeline();
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
     // Invalid - matches the Geometry output, but we need to match the input
-    vk::CmdSetPrimitiveTopologyEXT(m_commandBuffer->handle(), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdSetPrimitiveTopologyEXT(m_command_buffer.handle(), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-dynamicPrimitiveTopologyUnrestricted-07500");
-    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
+    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->EndRenderPass();
-    m_commandBuffer->end();
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
 }

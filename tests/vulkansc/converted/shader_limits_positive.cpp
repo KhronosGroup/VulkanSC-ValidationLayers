@@ -50,21 +50,13 @@ TEST_F(PositiveShaderLimits, ComputeSharedMemoryWorkgroupMemoryExplicitLayout) {
     // maxComputeSharedMemorySize is the MAX of the structs since they share the same WorkGroup memory. Test makes sure validation
     // is not doing an ADD and correctly doing a MAX operation in this case.
 
+    // need at least SPIR-V 1.4 for SPV_KHR_workgroup_memory_explicit_layout
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_KHR_WORKGROUP_MEMORY_EXPLICIT_LAYOUT_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
+    AddRequiredFeature(vkt::Feature::workgroupMemoryExplicitLayout);
+    RETURN_IF_SKIP(Init());
 
-    // need at least SPIR-V 1.4 for SPV_KHR_workgroup_memory_explicit_layout
-
-    VkPhysicalDeviceWorkgroupMemoryExplicitLayoutFeaturesKHR explicit_layout_features = vku::InitStructHelper();
-    auto features2 = GetPhysicalDeviceFeatures2(explicit_layout_features);
-    RETURN_IF_SKIP(InitState(nullptr, &features2));
-
-    if (!explicit_layout_features.workgroupMemoryExplicitLayout) {
-        GTEST_SKIP() << "workgroupMemoryExplicitLayout feature not supported.";
-    }
-
-    const uint32_t max_shared_memory_size = m_device->phy().limits_.maxComputeSharedMemorySize;
+    const uint32_t max_shared_memory_size = m_device->Physical().limits_.maxComputeSharedMemorySize;
     const uint32_t max_shared_vec4 = max_shared_memory_size / 16;
 
     std::stringstream csSource;
@@ -95,7 +87,7 @@ TEST_F(PositiveShaderLimits, ComputeSharedMemoryAtLimit) {
 
     RETURN_IF_SKIP(Init());
 
-    const uint32_t max_shared_memory_size = m_device->phy().limits_.maxComputeSharedMemorySize;
+    const uint32_t max_shared_memory_size = m_device->Physical().limits_.maxComputeSharedMemorySize;
     const uint32_t max_shared_ints = max_shared_memory_size / 4;
 
     std::stringstream csSource;
@@ -117,7 +109,7 @@ TEST_F(PositiveShaderLimits, ComputeSharedMemoryBooleanAtLimit) {
 
     RETURN_IF_SKIP(Init());
 
-    const uint32_t max_shared_memory_size = m_device->phy().limits_.maxComputeSharedMemorySize;
+    const uint32_t max_shared_memory_size = m_device->Physical().limits_.maxComputeSharedMemorySize;
     // "Boolean values considered as 32-bit integer values for the purpose of this calculation."
     const uint32_t max_shared_bools = max_shared_memory_size / 4;
 
@@ -141,8 +133,7 @@ TEST_F(PositiveShaderLimits, MeshSharedMemoryAtLimit) {
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_EXT_MESH_SHADER_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::meshShader);
-    AddDisabledFeature(vkt::Feature::multiviewMeshShader);
-    AddDisabledFeature(vkt::Feature::primitiveFragmentShadingRateMeshShader);
+
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
@@ -179,8 +170,7 @@ TEST_F(PositiveShaderLimits, TaskSharedMemoryAtLimit) {
     AddRequiredExtensions(VK_EXT_MESH_SHADER_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::meshShader);
     AddRequiredFeature(vkt::Feature::taskShader);
-    AddDisabledFeature(vkt::Feature::multiviewMeshShader);
-    AddDisabledFeature(vkt::Feature::primitiveFragmentShadingRateMeshShader);
+
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
@@ -214,10 +204,11 @@ TEST_F(PositiveShaderLimits, TaskSharedMemoryAtLimit) {
 TEST_F(PositiveShaderLimits, MaxFragmentDualSrcAttachments) {
     TEST_DESCRIPTION("Test maxFragmentDualSrcAttachments when blend is not enabled.");
     SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredFeature(vkt::Feature::independentBlend);
     AddRequiredFeature(vkt::Feature::dualSrcBlend);
     RETURN_IF_SKIP(Init());
 
-    const uint32_t count = m_device->phy().limits_.maxFragmentDualSrcAttachments + 1;
+    const uint32_t count = m_device->Physical().limits_.maxFragmentDualSrcAttachments + 1;
     if (count != 2) {
         GTEST_SKIP() << "Test is designed for a maxFragmentDualSrcAttachments of 1";
     }
@@ -246,12 +237,12 @@ TEST_F(PositiveShaderLimits, MaxFragmentDualSrcAttachments) {
     pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
     pipe.CreateGraphicsPipeline();
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
-    m_commandBuffer->EndRenderPass();
-    m_commandBuffer->end();
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
 }
 
 TEST_F(PositiveShaderLimits, MaxFragmentDualSrcAttachmentsDynamicEnabled) {
@@ -260,9 +251,10 @@ TEST_F(PositiveShaderLimits, MaxFragmentDualSrcAttachmentsDynamicEnabled) {
     AddRequiredExtensions(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::dualSrcBlend);
     AddRequiredFeature(vkt::Feature::extendedDynamicState3ColorBlendEnable);
+    AddRequiredFeature(vkt::Feature::independentBlend);
     RETURN_IF_SKIP(Init());
 
-    const uint32_t count = m_device->phy().limits_.maxFragmentDualSrcAttachments + 1;
+    const uint32_t count = m_device->Physical().limits_.maxFragmentDualSrcAttachments + 1;
     if (count != 2) {
         GTEST_SKIP() << "Test is designed for a maxFragmentDualSrcAttachments of 1";
     }
@@ -291,21 +283,21 @@ TEST_F(PositiveShaderLimits, MaxFragmentDualSrcAttachmentsDynamicEnabled) {
     pipe.AddDynamicState(VK_DYNAMIC_STATE_COLOR_BLEND_ENABLE_EXT);
     pipe.CreateGraphicsPipeline();
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
     VkBool32 color_blend_enabled[2] = {VK_FALSE, VK_FALSE};  // disable any blending
-    vk::CmdSetColorBlendEnableEXT(m_commandBuffer->handle(), 0, 2, color_blend_enabled);
+    vk::CmdSetColorBlendEnableEXT(m_command_buffer.handle(), 0, 2, color_blend_enabled);
 
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
-    m_commandBuffer->EndRenderPass();
-    m_commandBuffer->end();
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
 }
 
 TEST_F(PositiveShaderLimits, MaxFragmentOutputAttachments) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
-    if (m_device->phy().limits_.maxFragmentOutputAttachments != 4) {
+    if (m_device->Physical().limits_.maxFragmentOutputAttachments != 4) {
         GTEST_SKIP() << "maxFragmentOutputAttachments is not 4";
     }
 
@@ -333,7 +325,7 @@ TEST_F(PositiveShaderLimits, MaxFragmentOutputAttachmentsArray) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    if (m_device->phy().limits_.maxFragmentOutputAttachments != 4) {
+    if (m_device->Physical().limits_.maxFragmentOutputAttachments != 4) {
         GTEST_SKIP() << "maxFragmentOutputAttachments is not 4";
     }
 

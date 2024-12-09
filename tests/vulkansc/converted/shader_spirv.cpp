@@ -62,7 +62,7 @@ TEST_F(NegativeShaderSpirv, DISABLED_CodeSize) {
         std::vector<uint32_t> shader;
         VkShaderModuleCreateInfo module_create_info = vku::InitStructHelper();
         VkShaderModule module;
-        this->GLSLtoSPV(&m_device->phy().limits_, VK_SHADER_STAGE_VERTEX_BIT, kVertexMinimalGlsl, shader);
+        GLSLtoSPV(m_device->Physical().limits_, VK_SHADER_STAGE_VERTEX_BIT, kVertexMinimalGlsl, shader);
         module_create_info.pCode = shader.data();
         // Introduce failure by making codeSize a non-multiple of 4
         module_create_info.codeSize = shader.size() * sizeof(uint32_t) - 1;
@@ -99,7 +99,7 @@ TEST_F(NegativeShaderSpirv, CodeSizeMaintenance5) {
     m_errorMonitor->VerifyFound();
 
     std::vector<uint32_t> shader;
-    this->GLSLtoSPV(&m_device->phy().limits_, VK_SHADER_STAGE_VERTEX_BIT, kVertexMinimalGlsl, shader);
+    GLSLtoSPV(m_device->Physical().limits_, VK_SHADER_STAGE_VERTEX_BIT, kVertexMinimalGlsl, shader);
     module_create_info.pCode = shader.data();
     // Introduce failure by making codeSize a non-multiple of 4
     module_create_info.codeSize = shader.size() * sizeof(uint32_t) - 1;
@@ -135,7 +135,7 @@ TEST_F(NegativeShaderSpirv, CodeSizeMaintenance5Compute) {
     m_errorMonitor->VerifyFound();
 
     std::vector<uint32_t> shader;
-    this->GLSLtoSPV(&m_device->phy().limits_, VK_SHADER_STAGE_VERTEX_BIT, kMinimalShaderGlsl, shader);
+    GLSLtoSPV(m_device->Physical().limits_, VK_SHADER_STAGE_VERTEX_BIT, kMinimalShaderGlsl, shader);
     module_create_info.pCode = shader.data();
     // Introduce failure by making codeSize a non-multiple of 4
     module_create_info.codeSize = shader.size() * sizeof(uint32_t) - 1;
@@ -628,7 +628,7 @@ TEST_F(NegativeShaderSpirv, SpirvStatelessMaintenance5) {
     AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::vertexPipelineStoresAndAtomics);
     AddRequiredFeature(vkt::Feature::maintenance5);
-    AddDisabledFeature(vkt::Feature::shaderInt16);
+
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
@@ -643,7 +643,7 @@ TEST_F(NegativeShaderSpirv, SpirvStatelessMaintenance5) {
         }
     )glsl";
     std::vector<uint32_t> shader;
-    this->GLSLtoSPV(&m_device->phy().limits_, VK_SHADER_STAGE_VERTEX_BIT, vsSource, shader);
+    GLSLtoSPV(m_device->Physical().limits_, VK_SHADER_STAGE_VERTEX_BIT, vsSource, shader);
 
     VkShaderModuleCreateInfo module_create_info = vku::InitStructHelper();
     module_create_info.pCode = shader.data();
@@ -1407,7 +1407,7 @@ TEST_F(NegativeShaderSpirv, SpecializationSizeMismatch) {
     RETURN_IF_SKIP(InitState(nullptr, &features2));
     InitRenderTarget();
 
-    if (m_device->phy().features().shaderFloat64) {
+    if (m_device->Physical().Features().shaderFloat64) {
         float64_support = true;
     }
 
@@ -1690,7 +1690,6 @@ TEST_F(NegativeShaderSpirv, ShaderNotEnabled) {
     TEST_DESCRIPTION(
         "Create a graphics pipeline in which a capability declared by the shader requires a feature not enabled on the device.");
 
-    AddDisabledFeature(vkt::Feature::shaderFloat64);
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
@@ -1711,7 +1710,7 @@ TEST_F(NegativeShaderSpirv, NonSemanticInfoEnabled) {
     TEST_DESCRIPTION("Test VK_KHR_shader_non_semantic_info.");
 
     RETURN_IF_SKIP(Init());
-    if (!DeviceExtensionSupported(gpu(), nullptr, VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME)) {
+    if (!DeviceExtensionSupported(Gpu(), nullptr, VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME)) {
         GTEST_SKIP() << "VK_KHR_shader_non_semantic_info not supported";
     }
 
@@ -2028,7 +2027,7 @@ TEST_F(NegativeShaderSpirv, SubgroupRotate) {
     TEST_DESCRIPTION("Missing shaderSubgroupRotate");
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_SHADER_SUBGROUP_ROTATE_EXTENSION_NAME);
-    AddDisabledFeature(vkt::Feature::shaderSubgroupRotate);
+
     RETURN_IF_SKIP(Init());
 
     char const *source = R"glsl(
@@ -2050,7 +2049,7 @@ TEST_F(NegativeShaderSpirv, SubgroupRotateClustered) {
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_SHADER_SUBGROUP_ROTATE_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::shaderSubgroupRotate);
-    AddDisabledFeature(vkt::Feature::shaderSubgroupRotateClustered);
+
     RETURN_IF_SKIP(Init());
 
     char const *source = R"glsl(
@@ -2073,14 +2072,9 @@ TEST_F(NegativeShaderSpirv, DeviceMemoryScope) {
     TEST_DESCRIPTION("Validate using Device memory scope in spirv.");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    RETURN_IF_SKIP(InitFramework());
-    VkPhysicalDeviceVulkan12Features features12 = vku::InitStructHelper();
-    auto features2 = GetPhysicalDeviceFeatures2(features12);
-    features12.vulkanMemoryModelDeviceScope = VK_FALSE;
-    if (features12.vulkanMemoryModel == VK_FALSE) {
-        GTEST_SKIP() << "vulkanMemoryModel feature is not supported";
-    }
-    RETURN_IF_SKIP(InitState(nullptr, &features2));
+    AddRequiredFeature(vkt::Feature::vulkanMemoryModel);
+
+    RETURN_IF_SKIP(Init());
 
     char const *csSource = R"glsl(
         #version 450
@@ -2102,14 +2096,9 @@ TEST_F(NegativeShaderSpirv, QueueFamilyMemoryScope) {
     TEST_DESCRIPTION("Validate using QueueFamily memory scope in spirv.");
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    RETURN_IF_SKIP(InitFramework());
-    VkPhysicalDeviceVulkan12Features features12 = vku::InitStructHelper();
-    auto features2 = GetPhysicalDeviceFeatures2(features12);
-    features12.vulkanMemoryModel = VK_FALSE;
-    if (features12.vulkanMemoryModelDeviceScope == VK_FALSE) {
-        GTEST_SKIP() << "vulkanMemoryModelDeviceScope feature is not supported";
-    }
-    RETURN_IF_SKIP(InitState(nullptr, &features2));
+
+    AddRequiredFeature(vkt::Feature::vulkanMemoryModelDeviceScope);
+    RETURN_IF_SKIP(Init());
 
     char const *csSource = R"glsl(
         #version 450
@@ -2123,6 +2112,70 @@ TEST_F(NegativeShaderSpirv, QueueFamilyMemoryScope) {
     m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-vulkanMemoryModel-06266");
     m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08740");
     VkShaderObj const cs(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeShaderSpirv, DeviceMemoryScopeDebugInfo) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredFeature(vkt::Feature::vulkanMemoryModel);
+    RETURN_IF_SKIP(Init());
+
+    char const *csSource = R"(
+               OpCapability Shader
+          %2 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %main "main"
+               OpExecutionMode %main LocalSize 1 1 1
+          %1 = OpString "a.comp"
+               OpSource GLSL 450 %1 "// OpModuleProcessed client vulkan100
+// OpModuleProcessed target-env vulkan1.0
+// OpModuleProcessed entry-point main
+#line 1
+#version 450
+#extension GL_KHR_memory_scope_semantics : enable
+layout(set = 0, binding = 0) buffer ssbo { uint y; };
+void main() {
+    atomicStore(y, 1u, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);
+}"
+               OpSourceExtension "GL_KHR_memory_scope_semantics"
+               OpName %main "main"
+               OpName %ssbo "ssbo"
+               OpMemberName %ssbo 0 "y"
+               OpName %_ ""
+               OpDecorate %ssbo BufferBlock
+               OpMemberDecorate %ssbo 0 Offset 0
+               OpDecorate %_ Binding 0
+               OpDecorate %_ DescriptorSet 0
+       %void = OpTypeVoid
+          %4 = OpTypeFunction %void
+       %uint = OpTypeInt 32 0
+       %ssbo = OpTypeStruct %uint
+%_ptr_Uniform_ssbo = OpTypePointer Uniform %ssbo
+          %_ = OpVariable %_ptr_Uniform_ssbo Uniform
+        %int = OpTypeInt 32 1
+      %int_0 = OpConstant %int 0
+%_ptr_Uniform_uint = OpTypePointer Uniform %uint
+     %uint_1 = OpConstant %uint 1
+      %int_1 = OpConstant %int 1
+     %int_64 = OpConstant %int 64
+     %uint_0 = OpConstant %uint 0
+    %uint_64 = OpConstant %uint 64
+               OpLine %1 4 19
+       %main = OpFunction %void None %4
+          %6 = OpLabel
+               OpLine %1 5 0
+         %14 = OpAccessChain %_ptr_Uniform_uint %_ %int_0
+               OpAtomicStore %14 %int_1 %uint_64 %uint_1
+               OpLine %1 6 0
+               OpReturn
+               OpFunctionEnd
+    )";
+
+    // VUID-RuntimeSpirv-vulkanMemoryModel-06265
+    m_errorMonitor->SetDesiredError("5:     atomicStore(y, 1u, gl_ScopeDevice, gl_StorageSemanticsBuffer, gl_SemanticsRelaxed);");
+    VkShaderObj const cs(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
     m_errorMonitor->VerifyFound();
 }
 
@@ -2494,7 +2547,7 @@ TEST_F(NegativeShaderSpirv, ScalarBlockLayoutShaderCache) {
     TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8031");
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
-    AddDisabledFeature(vkt::Feature::scalarBlockLayout);  // will NOT set --scalar-block-layout
+    // will NOT set --scalar-block-layout
     RETURN_IF_SKIP(Init());
 
     // Matches glsl from other ScalarBlockLayoutShaderCache test
@@ -2524,5 +2577,17 @@ TEST_F(NegativeShaderSpirv, ScalarBlockLayoutShaderCache) {
 
     m_errorMonitor->SetDesiredError("VUID-VkShaderModuleCreateInfo-pCode-08737");
     VkShaderObj cs(this, cs_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_2);
+    m_errorMonitor->VerifyFound();
+}
+
+// Not supported in Vulkan SC: shader module
+TEST_F(NegativeShaderSpirv, DISABLED_VkShaderModuleCreateInfoPNext) {
+    AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+    RETURN_IF_SKIP(Init());
+    VkPhysicalDeviceFeatures2 pd_features2 = vku::InitStructHelper();
+
+    m_errorMonitor->SetDesiredError("VUID-vkCreateShaderModule-pCreateInfo-06904");
+    VkShaderObj vs(this, kMinimalShaderGlsl, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_GLSL, nullptr, "main",
+                   &pd_features2);
     m_errorMonitor->VerifyFound();
 }

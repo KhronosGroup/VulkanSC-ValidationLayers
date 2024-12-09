@@ -33,23 +33,23 @@ TEST_F(PositiveBuffer, OwnershipTranfers) {
     vkt::CommandBuffer no_gfx_cb(*m_device, no_gfx_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY);
 
     vkt::Buffer buffer(*m_device, 256, VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT);
-    auto buffer_barrier = buffer.buffer_memory_barrier(0, 0, 0, VK_WHOLE_SIZE);
+    auto buffer_barrier = buffer.BufferMemoryBarrier(0, 0, 0, VK_WHOLE_SIZE);
 
     // Let gfx own it.
     buffer_barrier.srcQueueFamilyIndex = m_device->graphics_queue_node_index_;
     buffer_barrier.dstQueueFamilyIndex = m_device->graphics_queue_node_index_;
-    ValidOwnershipTransferOp(m_errorMonitor, m_default_queue, m_commandBuffer, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
+    ValidOwnershipTransferOp(m_errorMonitor, m_default_queue, m_command_buffer, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
                              VK_PIPELINE_STAGE_TRANSFER_BIT, &buffer_barrier, nullptr);
 
     // Transfer it to non-gfx
     buffer_barrier.dstQueueFamilyIndex = no_gfx_queue->family_index;
-    ValidOwnershipTransfer(m_errorMonitor, m_default_queue, m_commandBuffer, no_gfx_queue, &no_gfx_cb,
+    ValidOwnershipTransfer(m_errorMonitor, m_default_queue, m_command_buffer, no_gfx_queue, no_gfx_cb,
                            VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, &buffer_barrier, nullptr);
 
     // Transfer it to gfx
     buffer_barrier.srcQueueFamilyIndex = no_gfx_queue->family_index;
     buffer_barrier.dstQueueFamilyIndex = m_device->graphics_queue_node_index_;
-    ValidOwnershipTransfer(m_errorMonitor, no_gfx_queue, &no_gfx_cb, m_default_queue, m_commandBuffer,
+    ValidOwnershipTransfer(m_errorMonitor, no_gfx_queue, no_gfx_cb, m_default_queue, m_command_buffer,
                            VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, &buffer_barrier, nullptr);
 }
 
@@ -59,13 +59,13 @@ TEST_F(PositiveBuffer, TexelBufferAlignmentIn13) {
     SetTargetApiVersion(VK_API_VERSION_1_3);
     RETURN_IF_SKIP(Init());
 
-    const VkDeviceSize minTexelBufferOffsetAlignment = m_device->phy().limits_.minTexelBufferOffsetAlignment;
+    const VkDeviceSize minTexelBufferOffsetAlignment = m_device->Physical().limits_.minTexelBufferOffsetAlignment;
     if (minTexelBufferOffsetAlignment == 1) {
         GTEST_SKIP() << "Test requires minTexelOffsetAlignment to not be equal to 1";
     }
 
     VkFormatProperties format_properties;
-    vk::GetPhysicalDeviceFormatProperties(gpu(), VK_FORMAT_R8G8B8A8_UNORM, &format_properties);
+    vk::GetPhysicalDeviceFormatProperties(Gpu(), VK_FORMAT_R8G8B8A8_UNORM, &format_properties);
     if (!(format_properties.bufferFeatures & VK_FORMAT_FEATURE_UNIFORM_TEXEL_BUFFER_BIT)) {
         GTEST_SKIP() << "Test requires support for VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT";
     }
@@ -79,9 +79,7 @@ TEST_F(PositiveBuffer, TexelBufferAlignmentIn13) {
 
     // to prevent VUID-VkBufferViewCreateInfo-buffer-02751
     const uint32_t block_size = 4;  // VK_FORMAT_R8G8B8A8_UNORM
-
-    const VkBufferCreateInfo buffer_info = vkt::Buffer::create_info(1024, VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT);
-    vkt::Buffer buffer(*m_device, buffer_info, (VkMemoryPropertyFlags)VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    vkt::Buffer buffer(*m_device, 1024, VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT);
 
     VkBufferViewCreateInfo buff_view_ci = vku::InitStructHelper();
     buff_view_ci.format = VK_FORMAT_R8G8B8A8_UNORM;
@@ -121,9 +119,9 @@ TEST_F(PositiveBuffer, DISABLED_PerfGetBufferAddressWorstCase) {
     for (size_t i = 0; i < N; ++i) {
         vkt::Buffer &buffer = buffers[i];
         buffer_ci.size = (i + 1) * 4096;
-        buffer.init_no_mem(*m_device, buffer_ci);
+        buffer.InitNoMemory(*m_device, buffer_ci);
         vk::BindBufferMemory(device(), buffer.handle(), buffer_memory.handle(), 0);
-        VkDeviceAddress addr = buffer.address();
+        VkDeviceAddress addr = buffer.Address();
         if (ref_address == 0) {
             ref_address = addr;
         }
@@ -160,10 +158,10 @@ TEST_F(PositiveBuffer, DISABLED_PerfGetBufferAddressGoodCase) {
 
     for (size_t i = 0; i < N; ++i) {
         vkt::Buffer &buffer = buffers[i];
-        buffer.init_no_mem(*m_device, buffer_ci);
+        buffer.InitNoMemory(*m_device, buffer_ci);
         // Consecutive offsets
         vk::BindBufferMemory(device(), buffer.handle(), buffer_memory.handle(), i * buffer_ci.size);
-        (void)buffer.address();
+        (void)buffer.Address();
     }
 }
 
@@ -177,15 +175,15 @@ TEST_F(PositiveBuffer, IndexBuffer2Size) {
 
     const uint32_t buffer_size = 32;
     vkt::Buffer buffer(*m_device, buffer_size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
 
-    vk::CmdBindIndexBuffer2KHR(m_commandBuffer->handle(), buffer.handle(), 4, 8, VK_INDEX_TYPE_UINT32);
+    vk::CmdBindIndexBuffer2KHR(m_command_buffer.handle(), buffer.handle(), 4, 8, VK_INDEX_TYPE_UINT32);
 
-    vk::CmdBindIndexBuffer2KHR(m_commandBuffer->handle(), buffer.handle(), 0, buffer_size, VK_INDEX_TYPE_UINT32);
+    vk::CmdBindIndexBuffer2KHR(m_command_buffer.handle(), buffer.handle(), 0, buffer_size, VK_INDEX_TYPE_UINT32);
 
-    m_commandBuffer->EndRenderPass();
-    m_commandBuffer->end();
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
 }
 
 TEST_F(PositiveBuffer, IndexBufferNull) {
@@ -198,15 +196,15 @@ TEST_F(PositiveBuffer, IndexBufferNull) {
     CreatePipelineHelper pipe(*this);
     pipe.CreateGraphicsPipeline();
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    vk::CmdDrawIndexed(m_commandBuffer->handle(), 0, 1, 0, 0, 0);
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdDrawIndexed(m_command_buffer.handle(), 0, 1, 0, 0, 0);
 
-    vk::CmdBindIndexBuffer(m_commandBuffer->handle(), VK_NULL_HANDLE, 0, VK_INDEX_TYPE_UINT32);
-    vk::CmdDrawIndexed(m_commandBuffer->handle(), 0, 1, 0, 0, 0);
-    m_commandBuffer->EndRenderPass();
-    m_commandBuffer->end();
+    vk::CmdBindIndexBuffer(m_command_buffer.handle(), VK_NULL_HANDLE, 0, VK_INDEX_TYPE_UINT32);
+    vk::CmdDrawIndexed(m_command_buffer.handle(), 0, 1, 0, 0, 0);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
 }
 
 TEST_F(PositiveBuffer, BufferViewUsageBasic) {

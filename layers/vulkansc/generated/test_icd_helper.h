@@ -607,10 +607,6 @@ static VKAPI_ATTR void VKAPI_CALL CmdWriteTimestamp2KHR(VkCommandBuffer commandB
                                                         VkQueryPool queryPool, uint32_t query);
 static VKAPI_ATTR VkResult VKAPI_CALL QueueSubmit2KHR(VkQueue queue, uint32_t submitCount, const VkSubmitInfo2* pSubmits,
                                                       VkFence fence);
-static VKAPI_ATTR void VKAPI_CALL CmdWriteBufferMarker2AMD(VkCommandBuffer commandBuffer, VkPipelineStageFlags2 stage,
-                                                           VkBuffer dstBuffer, VkDeviceSize dstOffset, uint32_t marker);
-static VKAPI_ATTR void VKAPI_CALL GetQueueCheckpointData2NV(VkQueue queue, uint32_t* pCheckpointDataCount,
-                                                            VkCheckpointData2NV* pCheckpointData);
 static VKAPI_ATTR void VKAPI_CALL CmdCopyBuffer2KHR(VkCommandBuffer commandBuffer, const VkCopyBufferInfo2* pCopyBufferInfo);
 static VKAPI_ATTR void VKAPI_CALL CmdCopyImage2KHR(VkCommandBuffer commandBuffer, const VkCopyImageInfo2* pCopyImageInfo);
 static VKAPI_ATTR void VKAPI_CALL CmdCopyBufferToImage2KHR(VkCommandBuffer commandBuffer,
@@ -1001,8 +997,6 @@ static const std::unordered_map<std::string, void*> name_to_func_ptr_map = {
     {"vkCmdPipelineBarrier2KHR", (void*)CmdPipelineBarrier2KHR},
     {"vkCmdWriteTimestamp2KHR", (void*)CmdWriteTimestamp2KHR},
     {"vkQueueSubmit2KHR", (void*)QueueSubmit2KHR},
-    {"vkCmdWriteBufferMarker2AMD", (void*)CmdWriteBufferMarker2AMD},
-    {"vkGetQueueCheckpointData2NV", (void*)GetQueueCheckpointData2NV},
     {"vkCmdCopyBuffer2KHR", (void*)CmdCopyBuffer2KHR},
     {"vkCmdCopyImage2KHR", (void*)CmdCopyImage2KHR},
     {"vkCmdCopyBufferToImage2KHR", (void*)CmdCopyBufferToImage2KHR},
@@ -1810,12 +1804,6 @@ static VKAPI_ATTR VkResult VKAPI_CALL QueueSubmit2KHR(VkQueue queue, uint32_t su
                                                       VkFence fence) {
     return QueueSubmit2(queue, submitCount, pSubmits, fence);
 }
-
-static VKAPI_ATTR void VKAPI_CALL CmdWriteBufferMarker2AMD(VkCommandBuffer commandBuffer, VkPipelineStageFlags2 stage,
-                                                           VkBuffer dstBuffer, VkDeviceSize dstOffset, uint32_t marker) {}
-
-static VKAPI_ATTR void VKAPI_CALL GetQueueCheckpointData2NV(VkQueue queue, uint32_t* pCheckpointDataCount,
-                                                            VkCheckpointData2NV* pCheckpointData) {}
 
 static VKAPI_ATTR void VKAPI_CALL CmdCopyBuffer2KHR(VkCommandBuffer commandBuffer, const VkCopyBufferInfo2* pCopyBufferInfo) {
     CmdCopyBuffer2(commandBuffer, pCopyBufferInfo);

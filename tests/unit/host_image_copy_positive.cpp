@@ -22,16 +22,10 @@ bool HostImageCopyTest::CopyLayoutSupported(const std::vector<VkImageLayout> &sr
 void HostImageCopyTest::InitHostImageCopyTest(const VkImageCreateInfo &create_info) {
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_EXT_HOST_IMAGE_COPY_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-    // Assumes VK_KHR_sampler_ycbcr_conversion and VK_EXT_separate_stencil_usage,
+    AddRequiredFeature(vkt::Feature::separateDepthStencilLayouts);
+    AddRequiredFeature(vkt::Feature::hostImageCopy);
+    RETURN_IF_SKIP(Init());
 
-    VkPhysicalDeviceSeparateDepthStencilLayoutsFeaturesKHR separate_depth_stencil_layouts_features = vku::InitStructHelper();
-    VkPhysicalDeviceHostImageCopyFeaturesEXT host_copy_features = vku::InitStructHelper(&separate_depth_stencil_layouts_features);
-    GetPhysicalDeviceFeatures2(host_copy_features);
-    if (!host_copy_features.hostImageCopy) {
-        GTEST_SKIP() << "Test requires (unsupported) hostImageCopy";
-    }
-    separate_depth_stencil = separate_depth_stencil_layouts_features.separateDepthStencilLayouts;
     VkPhysicalDeviceFeatures device_features = {};
     GetPhysicalDeviceFeatures(&device_features);
     compressed_format = VK_FORMAT_UNDEFINED;
@@ -43,9 +37,8 @@ void HostImageCopyTest::InitHostImageCopyTest(const VkImageCreateInfo &create_in
         compressed_format = VK_FORMAT_ASTC_4x4_UNORM_BLOCK;
     }
 
-    RETURN_IF_SKIP(InitState(nullptr, &host_copy_features));
     VkImageFormatProperties img_prop = {};
-    if (VK_SUCCESS != vk::GetPhysicalDeviceImageFormatProperties(m_device->phy().handle(), create_info.format,
+    if (VK_SUCCESS != vk::GetPhysicalDeviceImageFormatProperties(m_device->Physical().handle(), create_info.format,
                                                                  create_info.imageType, create_info.tiling, create_info.usage,
                                                                  create_info.flags, &img_prop)) {
         GTEST_SKIP() << "Required formats/features not supported";
@@ -165,18 +158,18 @@ TEST_F(PositiveHostImageCopy, BasicUsage) {
     transition_info.image = image2;
     result = vk::TransitionImageLayoutEXT(*m_device, 1, &transition_info);
     ASSERT_EQ(VK_SUCCESS, result);
-    VkImageSubresource image_sub = vkt::Image::subresource(VK_IMAGE_ASPECT_COLOR_BIT, 0, 0);
-    VkImageSubresourceRange image_sub_range = vkt::Image::subresource_range(image_sub);
+    VkImageSubresource image_sub = vkt::Image::Subresource(VK_IMAGE_ASPECT_COLOR_BIT, 0, 0);
+    VkImageSubresourceRange image_sub_range = vkt::Image::SubresourceRange(image_sub);
     VkImageMemoryBarrier image_barrier =
-        image2.image_memory_barrier(0, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, image_sub_range);
+        image2.ImageMemoryBarrier(0, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, image_sub_range);
 
     image_barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     image_barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-    m_commandBuffer->begin();
-    vk::CmdPipelineBarrier(m_commandBuffer->handle(), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0,
+    m_command_buffer.Begin();
+    vk::CmdPipelineBarrier(m_command_buffer.handle(), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0,
                            nullptr, 0, nullptr, 1, &image_barrier);
-    m_commandBuffer->end();
-    m_default_queue->Submit(*m_commandBuffer);
+    m_command_buffer.End();
+    m_default_queue->Submit(m_command_buffer);
     m_default_queue->Wait();
 
     // Get memory size of tiled image
@@ -194,7 +187,7 @@ TEST_F(PositiveHostImageCopy, BasicUsage) {
     image_format_info.type = VK_IMAGE_TYPE_2D;
     image_format_info.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_format_info.usage = VK_IMAGE_USAGE_HOST_TRANSFER_BIT_EXT;
-    vk::GetPhysicalDeviceImageFormatProperties2(gpu(), &image_format_info, &image_format_properties);
+    vk::GetPhysicalDeviceImageFormatProperties2(Gpu(), &image_format_info, &image_format_properties);
 }
 
 TEST_F(PositiveHostImageCopy, CopyImageToMemoryMipLevel) {

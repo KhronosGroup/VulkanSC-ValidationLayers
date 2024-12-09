@@ -74,6 +74,8 @@ c_VkShaderEXT(kVulkanObjectTypeShaderEXT, this),
 #ifdef VK_USE_PLATFORM_SCI
 c_VkSemaphoreSciSyncPoolNV(kVulkanObjectTypeSemaphoreSciSyncPoolNV, this),
 #endif  // VK_USE_PLATFORM_SCI
+c_VkIndirectExecutionSetEXT(kVulkanObjectTypeIndirectExecutionSetEXT, this),
+c_VkIndirectCommandsLayoutEXT(kVulkanObjectTypeIndirectCommandsLayoutEXT, this),
     // clang-format on
 
     // NOLINTEND

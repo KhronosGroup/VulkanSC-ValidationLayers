@@ -51,13 +51,13 @@ TEST_F(NegativeDebugPrintfShaderDebugInfo, PipelineHandle) {
     name_info.pObjectName = object_name;
     vk::SetDebugUtilsObjectNameEXT(device(), &name_info);
 
-    m_commandBuffer->begin();
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
-    vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
-    m_commandBuffer->end();
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    m_command_buffer.End();
 
-    m_errorMonitor->SetDesiredFailureMsg(kInformationBit, "Pipeline (bad_pipeline)");
-    m_default_queue->Submit(*m_commandBuffer);
+    m_errorMonitor->SetDesiredInfo("Pipeline (bad_pipeline)");
+    m_default_queue->Submit(m_command_buffer);
     m_default_queue->Wait();
     m_errorMonitor->VerifyFound();
 }
@@ -89,13 +89,13 @@ TEST_F(NegativeDebugPrintfShaderDebugInfo, ShaderObjectHandle) {
     name_info.pObjectName = object_name;
     vk::SetDebugUtilsObjectNameEXT(device(), &name_info);
 
-    m_commandBuffer->begin();
-    vk::CmdBindShadersEXT(m_commandBuffer->handle(), 1, shader_stages, &comp_shader.handle());
-    vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
-    m_commandBuffer->end();
+    m_command_buffer.Begin();
+    vk::CmdBindShadersEXT(m_command_buffer.handle(), 1, shader_stages, &comp_shader.handle());
+    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    m_command_buffer.End();
 
-    m_errorMonitor->SetDesiredFailureMsg(kInformationBit, "Shader Object (bad_shader_object)");
-    m_default_queue->Submit(*m_commandBuffer);
+    m_errorMonitor->SetDesiredInfo("Shader Object (bad_shader_object)");
+    m_default_queue->Submit(m_command_buffer);
     m_default_queue->Wait();
     m_errorMonitor->VerifyFound();
 }
@@ -147,15 +147,104 @@ void main() {
     pipe.cs_ = std::make_unique<VkShaderObj>(this, shader_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
     pipe.CreateComputePipeline();
 
-    m_commandBuffer->begin();
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
-    vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
-    m_commandBuffer->end();
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    m_command_buffer.End();
 
     m_errorMonitor->SetDesiredFailureMsg(
         kInformationBit,
         "Debug shader printf message generated in file a.comp at line 5\n\n5:     debugPrintfEXT(\"float == %f\", myfloat);");
-    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Submit(m_command_buffer);
+    m_default_queue->Wait();
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeDebugPrintfShaderDebugInfo, ShaderDebugInfoDebugLine) {
+    TEST_DESCRIPTION("Make sure DebugLine works");
+    RETURN_IF_SKIP(InitDebugPrintfFramework(&layer_settings_create_info));
+    RETURN_IF_SKIP(InitState());
+
+    // Manually ran:
+    //   glslangValidator -V -gVS in.comp -o out.spv --target-env vulkan1.0
+    char const *shader_source = R"(
+               OpCapability Shader
+               OpExtension "SPV_KHR_non_semantic_info"
+          %1 = OpExtInstImport "NonSemantic.Shader.DebugInfo.100"
+          %3 = OpExtInstImport "GLSL.std.450"
+         %44 = OpExtInstImport "NonSemantic.DebugPrintf"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %main "main"
+               OpExecutionMode %main LocalSize 1 1 1
+          %2 = OpString "a.comp"
+          %8 = OpString "uint"
+         %16 = OpString "main"
+         %19 = OpString "#version 450
+#extension GL_EXT_debug_printf : enable
+void main() {
+    float myfloat = 3.1415f;
+    debugPrintfEXT(\"float == %f\", myfloat);
+}"
+         %28 = OpString "float"
+         %35 = OpString "myfloat"
+         %40 = OpString "float == %f"
+               OpSourceExtension "GL_EXT_debug_printf"
+               OpName %main "main"
+               OpName %myfloat "myfloat"
+       %void = OpTypeVoid
+          %5 = OpTypeFunction %void
+       %uint = OpTypeInt 32 0
+    %uint_32 = OpConstant %uint 32
+     %uint_6 = OpConstant %uint 6
+     %uint_0 = OpConstant %uint 0
+          %9 = OpExtInst %void %1 DebugTypeBasic %8 %uint_32 %uint_6 %uint_0
+     %uint_3 = OpConstant %uint 3
+          %6 = OpExtInst %void %1 DebugTypeFunction %uint_3 %void
+         %18 = OpExtInst %void %1 DebugSource %2 %19
+     %uint_1 = OpConstant %uint 1
+     %uint_4 = OpConstant %uint 4
+     %uint_2 = OpConstant %uint 2
+         %20 = OpExtInst %void %1 DebugCompilationUnit %uint_1 %uint_4 %18 %uint_2
+         %17 = OpExtInst %void %1 DebugFunction %16 %6 %18 %uint_3 %uint_0 %20 %16 %uint_3 %uint_3
+      %float = OpTypeFloat 32
+         %29 = OpExtInst %void %1 DebugTypeBasic %28 %uint_32 %uint_3 %uint_0
+%_ptr_Function_float = OpTypePointer Function %float
+     %uint_7 = OpConstant %uint 7
+         %32 = OpExtInst %void %1 DebugTypePointer %29 %uint_7 %uint_0
+         %34 = OpExtInst %void %1 DebugLocalVariable %35 %29 %18 %uint_4 %uint_0 %17 %uint_4
+         %37 = OpExtInst %void %1 DebugExpression
+%float_3_1415 = OpConstant %float 3.1415
+     %uint_5 = OpConstant %uint 5
+       %main = OpFunction %void None %5
+         %15 = OpLabel
+    %myfloat = OpVariable %_ptr_Function_float Function
+         %25 = OpExtInst %void %1 DebugScope %17
+         %26 = OpExtInst %void %1 DebugLine %18 %uint_3 %uint_3 %uint_0 %uint_0
+         %24 = OpExtInst %void %1 DebugFunctionDefinition %17 %main
+         %38 = OpExtInst %void %1 DebugLine %18 %uint_4 %uint_4 %uint_0 %uint_0
+         %36 = OpExtInst %void %1 DebugDeclare %34 %myfloat %37
+               OpStore %myfloat %float_3_1415
+         %42 = OpExtInst %void %1 DebugLine %18 %uint_5 %uint_5 %uint_0 %uint_0
+         %41 = OpLoad %float %myfloat
+         %45 = OpExtInst %void %44 1 %40 %41
+         %46 = OpExtInst %void %1 DebugLine %18 %uint_6 %uint_6 %uint_0 %uint_0
+               OpReturn
+               OpFunctionEnd
+    )";
+
+    CreateComputePipelineHelper pipe(*this);
+    pipe.cs_ = std::make_unique<VkShaderObj>(this, shader_source, VK_SHADER_STAGE_COMPUTE_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM);
+    pipe.CreateComputePipeline();
+
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    m_command_buffer.End();
+
+    m_errorMonitor->SetDesiredFailureMsg(
+        kInformationBit,
+        "Debug shader printf message generated in file a.comp at line 5\n\n5:     debugPrintfEXT(\"float == %f\", myfloat);");
+    m_default_queue->Submit(m_command_buffer);
     m_default_queue->Wait();
     m_errorMonitor->VerifyFound();
 }
@@ -181,18 +270,18 @@ TEST_F(NegativeDebugPrintfShaderDebugInfo, CommandBufferCommandIndex) {
     CreateComputePipelineHelper empty_pipe(*this);
     empty_pipe.CreateComputePipeline();
 
-    m_commandBuffer->begin();
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, empty_pipe.Handle());
-    vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
-    vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
-    vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, empty_pipe.Handle());
+    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
 
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
-    vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
-    m_commandBuffer->end();
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    m_command_buffer.End();
 
-    m_errorMonitor->SetDesiredFailureMsg(kInformationBit, "Compute Dispatch Index 3");
-    m_default_queue->Submit(*m_commandBuffer);
+    m_errorMonitor->SetDesiredInfo("Compute Dispatch Index 3");
+    m_default_queue->Submit(m_command_buffer);
     m_default_queue->Wait();
     m_errorMonitor->VerifyFound();
 }
@@ -228,7 +317,7 @@ TEST_F(NegativeDebugPrintfShaderDebugInfo, CommandBufferCommandIndexMulti) {
 
     uint32_t skip = 0;
     uint32_t good = 4;
-    cb0.begin();
+    cb0.Begin();
     vk::CmdBindPipeline(cb0.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
     vk::CmdPushConstants(cb0.handle(), pipeline_layout.handle(), VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(uint32_t), &skip);
     vk::CmdDispatch(cb0.handle(), 1, 1, 1);
@@ -238,18 +327,18 @@ TEST_F(NegativeDebugPrintfShaderDebugInfo, CommandBufferCommandIndexMulti) {
     vk::CmdDispatch(cb0.handle(), 1, 1, 1);
     vk::CmdPushConstants(cb0.handle(), pipeline_layout.handle(), VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(uint32_t), &skip);
     vk::CmdDispatch(cb0.handle(), 1, 1, 1);
-    cb0.end();
+    cb0.End();
 
-    cb1.begin();
+    cb1.Begin();
     vk::CmdBindPipeline(cb1.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
     vk::CmdPushConstants(cb1.handle(), pipeline_layout.handle(), VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(uint32_t), &good);
     vk::CmdDispatch(cb1.handle(), 1, 1, 1);
     vk::CmdPushConstants(cb1.handle(), pipeline_layout.handle(), VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(uint32_t), &skip);
     vk::CmdDispatch(cb1.handle(), 1, 1, 1);
-    cb1.end();
+    cb1.End();
 
-    m_errorMonitor->SetDesiredFailureMsg(kInformationBit, "Compute Dispatch Index 3");  // cb0
-    m_errorMonitor->SetDesiredFailureMsg(kInformationBit, "Compute Dispatch Index 0");  // cb1
+    m_errorMonitor->SetDesiredInfo("Compute Dispatch Index 3");  // cb0
+    m_errorMonitor->SetDesiredInfo("Compute Dispatch Index 0");  // cb1
 
     VkCommandBuffer cbs[2] = {cb0.handle(), cb1.handle()};
     VkSubmitInfo submit = vku::InitStructHelper();
@@ -283,13 +372,13 @@ TEST_F(NegativeDebugPrintfShaderDebugInfo, StageInfo) {
     CreateComputePipelineHelper empty_pipe(*this);
     empty_pipe.CreateComputePipeline();
 
-    m_commandBuffer->begin();
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
-    vk::CmdDispatch(m_commandBuffer->handle(), 4, 4, 1);
-    m_commandBuffer->end();
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdDispatch(m_command_buffer.handle(), 4, 4, 1);
+    m_command_buffer.End();
 
-    m_errorMonitor->SetDesiredFailureMsg(kInformationBit, "Global invocation ID (x, y, z) = (3, 1, 0)");
-    m_default_queue->Submit(*m_commandBuffer);
+    m_errorMonitor->SetDesiredInfo("Global invocation ID (x, y, z) = (3, 1, 0)");
+    m_default_queue->Submit(m_command_buffer);
     m_default_queue->Wait();
     m_errorMonitor->VerifyFound();
 }
@@ -319,16 +408,123 @@ TEST_F(NegativeDebugPrintfShaderDebugInfo, Fragment) {
     pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
     pipe.CreateGraphicsPipeline();
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
-    m_commandBuffer->EndRenderPass();
-    m_commandBuffer->end();
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
 
-    m_errorMonitor->SetDesiredFailureMsg(kInformationBit, "Stage = Fragment.  Fragment coord (x,y) = (10.5, 10.5)");
-    m_errorMonitor->SetDesiredFailureMsg(kInformationBit, "Stage = Fragment.  Fragment coord (x,y) = (10.5, 11.5)");
-    m_default_queue->Submit(*m_commandBuffer);
+    m_errorMonitor->SetDesiredInfo("Stage = Fragment.  Fragment coord (x,y) = (10.5, 10.5)");
+    m_errorMonitor->SetDesiredInfo("Stage = Fragment.  Fragment coord (x,y) = (10.5, 11.5)");
+    m_default_queue->Submit(m_command_buffer);
+    m_default_queue->Wait();
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeDebugPrintfShaderDebugInfo, VertexFragmentMultiEntrypoint) {
+    RETURN_IF_SKIP(InitDebugPrintfFramework(&layer_settings_create_info));
+    RETURN_IF_SKIP(InitState());
+    InitRenderTarget();
+
+    // void vert_main() {
+    //     gl_Position = vec4(vertices[gl_VertexIndex % 3], 0.0, 1.0);
+    // }
+    // layout(location = 0) out vec4 c_out;
+    // void frag_main() {
+    //     debugPrintfEXT("Fragment value is %i", 8);
+    //     c_out = vec4(0.0);
+    // }
+    const char *shader_source = R"(
+               OpCapability Shader
+               OpExtension "SPV_KHR_non_semantic_info"
+          %9 = OpExtInstImport "NonSemantic.DebugPrintf"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %frag_main "frag_main" %c_out
+               OpEntryPoint Vertex %vert_main "vert_main" %_ %gl_VertexIndex
+               OpExecutionMode %frag_main OriginUpperLeft
+   %frag_str = OpString "Fragment value is %i"
+               OpDecorate %c_out Location 0
+               OpMemberDecorate %gl_PerVertex 0 BuiltIn Position
+               OpMemberDecorate %gl_PerVertex 1 BuiltIn PointSize
+               OpMemberDecorate %gl_PerVertex 2 BuiltIn ClipDistance
+               OpMemberDecorate %gl_PerVertex 3 BuiltIn CullDistance
+               OpDecorate %gl_PerVertex Block
+               OpDecorate %gl_VertexIndex BuiltIn VertexIndex
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+        %int = OpTypeInt 32 1
+      %int_8 = OpConstant %int 8
+      %float = OpTypeFloat 32
+    %v4float = OpTypeVector %float 4
+       %uint = OpTypeInt 32 0
+     %uint_1 = OpConstant %uint 1
+%_arr_float_uint_1 = OpTypeArray %float %uint_1
+%gl_PerVertex = OpTypeStruct %v4float %float %_arr_float_uint_1 %_arr_float_uint_1
+%_ptr_Output_gl_PerVertex = OpTypePointer Output %gl_PerVertex
+          %_ = OpVariable %_ptr_Output_gl_PerVertex Output
+      %int_0 = OpConstant %int 0
+    %v2float = OpTypeVector %float 2
+     %uint_3 = OpConstant %uint 3
+%_arr_v2float_uint_3 = OpTypeArray %v2float %uint_3
+   %float_n1 = OpConstant %float -1
+         %24 = OpConstantComposite %v2float %float_n1 %float_n1
+    %float_1 = OpConstant %float 1
+         %26 = OpConstantComposite %v2float %float_1 %float_n1
+    %float_0 = OpConstant %float 0
+         %28 = OpConstantComposite %v2float %float_0 %float_1
+         %29 = OpConstantComposite %_arr_v2float_uint_3 %24 %26 %28
+%_ptr_Input_int = OpTypePointer Input %int
+%gl_VertexIndex = OpVariable %_ptr_Input_int Input
+      %int_3 = OpConstant %int 3
+%_ptr_Function__arr_v2float_uint_3 = OpTypePointer Function %_arr_v2float_uint_3
+%_ptr_Function_v2float = OpTypePointer Function %v2float
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+      %c_out = OpVariable %_ptr_Output_v4float Output
+         %16 = OpConstantComposite %v4float %float_0 %float_0 %float_0 %float_0
+       %vert_main = OpFunction %void None %3
+          %5 = OpLabel
+  %indexable = OpVariable %_ptr_Function__arr_v2float_uint_3 Function
+         %32 = OpLoad %int %gl_VertexIndex
+         %34 = OpSMod %int %32 %int_3
+               OpStore %indexable %29
+         %38 = OpAccessChain %_ptr_Function_v2float %indexable %34
+         %39 = OpLoad %v2float %38
+         %40 = OpCompositeExtract %float %39 0
+         %41 = OpCompositeExtract %float %39 1
+         %42 = OpCompositeConstruct %v4float %40 %41 %float_0 %float_1
+         %44 = OpAccessChain %_ptr_Output_v4float %_ %int_0
+               OpStore %44 %42
+               OpReturn
+               OpFunctionEnd
+       %frag_main = OpFunction %void None %3
+          %f5 = OpLabel
+         %f10 = OpExtInst %void %9 1 %frag_str %int_8
+               OpStore %c_out %16
+               OpReturn
+               OpFunctionEnd
+        )";
+    VkShaderObj vs(this, shader_source, VK_SHADER_STAGE_VERTEX_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM, nullptr, "vert_main");
+    VkShaderObj fs(this, shader_source, VK_SHADER_STAGE_FRAGMENT_BIT, SPV_ENV_VULKAN_1_0, SPV_SOURCE_ASM, nullptr, "frag_main");
+
+    VkViewport viewport = {0, 0, 1, 1, 0, 1};
+    VkRect2D scissor = {{0, 0}, {1, 1}};
+    CreatePipelineHelper pipe(*this);
+    pipe.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
+    pipe.vp_state_ci_.pViewports = &viewport;
+    pipe.vp_state_ci_.pScissors = &scissor;
+    pipe.CreateGraphicsPipeline();
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+
+    m_errorMonitor->SetDesiredFailureMsg(kInformationBit,
+                                         "Stage has multiple OpEntryPoint (Fragment, Vertex) and could not detect stage");
+    m_default_queue->Submit(m_command_buffer);
     m_default_queue->Wait();
     m_errorMonitor->VerifyFound();
 }

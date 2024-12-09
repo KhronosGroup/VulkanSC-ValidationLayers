@@ -15,10 +15,10 @@
  * limitations under the License.
  */
 #pragma once
-#include "error_message/error_location.h"
 #include "containers/subresource_adapter.h"
 #include "containers/range_vector.h"
 #include "generated/sync_validation_types.h"
+#include <set>
 
 namespace vvl {
 class Buffer;
@@ -66,31 +66,12 @@ ResourceAccessRange MakeRange(VkDeviceSize start, VkDeviceSize size);
 ResourceAccessRange MakeRange(const vvl::Buffer &buffer, VkDeviceSize offset, VkDeviceSize size);
 ResourceAccessRange MakeRange(const vvl::BufferView &buf_view_state);
 ResourceAccessRange MakeRange(VkDeviceSize offset, uint32_t first_index, uint32_t count, uint32_t stride);
-ResourceAccessRange MakeRange(const vvl::VertexBufferBinding &binding, uint32_t first_index, const std::optional<uint32_t> &count,
-                              uint32_t stride);
-ResourceAccessRange MakeRange(const vvl::IndexBufferBinding &binding, uint32_t first_index, const std::optional<uint32_t> &count,
-                              uint32_t index_size);
 
 extern const ResourceAccessRange kFullRange;
 
 constexpr VkImageAspectFlags kColorAspects =
     VK_IMAGE_ASPECT_COLOR_BIT | VK_IMAGE_ASPECT_PLANE_0_BIT | VK_IMAGE_ASPECT_PLANE_1_BIT | VK_IMAGE_ASPECT_PLANE_2_BIT;
 constexpr VkImageAspectFlags kDepthStencilAspects = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
-
-class SyncValidationInfo {
-  public:
-    SyncValidationInfo(const SyncValidator* sync_validator) : sync_state_(sync_validator) {}
-    const SyncValidator& GetSyncState() const {
-        assert(sync_state_);
-        return *sync_state_;
-    }
-    std::string FormatHazard(const HazardResult& hazard) const;
-    virtual std::string FormatUsage(ResourceUsageTagEx tag_ex) const = 0;
-
-  protected:
-    const SyncValidator* sync_state_;
-};
-
 
 // Useful Utilites for manipulating StageAccess parameters, suitable as base class to save typing
 struct SyncStageAccess {
@@ -106,13 +87,13 @@ struct SyncStageAccess {
     static bool IsWrite(SyncStageAccessIndex stage_access_index) { return syncStageAccessWriteMask[stage_access_index]; }
     static bool IsWrite(const SyncStageAccessInfoType &info) { return IsWrite(info.stage_access_index); }
 
-    static VkPipelineStageFlags2KHR PipelineStageBit(SyncStageAccessIndex stage_access_index) {
+    static VkPipelineStageFlags2 PipelineStageBit(SyncStageAccessIndex stage_access_index) {
         return syncStageAccessInfoByStageAccessIndex()[stage_access_index].stage_mask;
     }
-    static SyncStageAccessFlags AccessScopeByStage(VkPipelineStageFlags2KHR stages);
-    static SyncStageAccessFlags AccessScopeByAccess(VkAccessFlags2KHR access);
-    static SyncStageAccessFlags AccessScope(VkPipelineStageFlags2KHR stages, VkAccessFlags2KHR access);
-    static SyncStageAccessFlags AccessScope(const SyncStageAccessFlags &stage_scope, VkAccessFlags2KHR accesses) {
+    static SyncStageAccessFlags AccessScopeByStage(VkPipelineStageFlags2 stages);
+    static SyncStageAccessFlags AccessScopeByAccess(VkAccessFlags2 access);
+    static SyncStageAccessFlags AccessScope(VkPipelineStageFlags2 stages, VkAccessFlags2 access);
+    static SyncStageAccessFlags AccessScope(const SyncStageAccessFlags &stage_scope, VkAccessFlags2 accesses) {
         return stage_scope & AccessScopeByAccess(accesses);
     }
 };

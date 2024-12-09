@@ -17,6 +17,7 @@
 
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
+#include "../framework/shader_object_helper.h"
 #include "../framework/render_pass_helper.h"
 
 class NegativeShaderInterface : public VkLayerTest {};
@@ -34,10 +35,10 @@ TEST_F(NegativeShaderInterface, MaxVertexComponentsWithBuiltins) {
     }
 
     VkPhysicalDeviceProperties props;
-    fpvkGetOriginalPhysicalDeviceLimitsEXT(gpu(), &props.limits);
+    fpvkGetOriginalPhysicalDeviceLimitsEXT(Gpu(), &props.limits);
     props.limits.maxVertexOutputComponents = 128;
     props.limits.maxFragmentInputComponents = 128;
-    fpvkSetPhysicalDeviceLimitsEXT(gpu(), &props.limits);
+    fpvkSetPhysicalDeviceLimitsEXT(Gpu(), &props.limits);
 
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
@@ -111,10 +112,10 @@ TEST_F(NegativeShaderInterface, MaxFragmentComponentsWithBuiltins) {
     }
 
     VkPhysicalDeviceProperties props;
-    fpvkGetOriginalPhysicalDeviceLimitsEXT(gpu(), &props.limits);
+    fpvkGetOriginalPhysicalDeviceLimitsEXT(Gpu(), &props.limits);
     props.limits.maxVertexOutputComponents = 128;
     props.limits.maxFragmentInputComponents = 128;
-    fpvkSetPhysicalDeviceLimitsEXT(gpu(), &props.limits);
+    fpvkSetPhysicalDeviceLimitsEXT(Gpu(), &props.limits);
 
     RETURN_IF_SKIP(InitState());
     InitRenderTarget();
@@ -177,7 +178,7 @@ TEST_F(NegativeShaderInterface, MaxVertexOutputComponents) {
     for (uint32_t overflow = 0; overflow < 3; ++overflow) {
         m_errorMonitor->Reset();
 
-        const uint32_t maxVsOutComp = m_device->phy().limits_.maxVertexOutputComponents + overflow;
+        const uint32_t maxVsOutComp = m_device->Physical().limits_.maxVertexOutputComponents + overflow;
         std::string vsSourceStr = "#version 450\n\n";
         const uint32_t numVec4 = maxVsOutComp / 4;
         uint32_t location = 0;
@@ -238,7 +239,8 @@ TEST_F(NegativeShaderInterface, MaxComponentsBlocks) {
     InitRenderTarget();
 
     // To make the test simple, just make sure max is 128 or less (most HW is 64 or 128)
-    if (m_device->phy().limits_.maxVertexOutputComponents > 128 || m_device->phy().limits_.maxFragmentInputComponents > 128) {
+    if (m_device->Physical().limits_.maxVertexOutputComponents > 128 ||
+        m_device->Physical().limits_.maxFragmentInputComponents > 128) {
         GTEST_SKIP() << "maxVertexOutputComponents or maxFragmentInputComponents too high for test";
     }
     // vec4 == 4 components
@@ -300,7 +302,7 @@ TEST_F(NegativeShaderInterface, MaxFragmentInputComponents) {
     for (uint32_t overflow = 0; overflow < 3; ++overflow) {
         m_errorMonitor->Reset();
 
-        const uint32_t maxFsInComp = m_device->phy().limits_.maxFragmentInputComponents + overflow;
+        const uint32_t maxFsInComp = m_device->Physical().limits_.maxFragmentInputComponents + overflow;
         std::string fsSourceStr = "#version 450\n\n";
         const uint32_t numVec4 = maxFsInComp / 4;
         uint32_t location = 0;
@@ -721,7 +723,7 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockStructInnerArraySize) {
 
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
-    if (m_device->phy().limits_.maxVertexOutputComponents <= 64) {
+    if (m_device->Physical().limits_.maxVertexOutputComponents <= 64) {
         GTEST_SKIP() << "maxVertexOutputComponents is too low";
     }
 
@@ -783,7 +785,7 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockStructOuterArraySize) {
 
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
-    if (m_device->phy().limits_.maxVertexOutputComponents <= 64) {
+    if (m_device->Physical().limits_.maxVertexOutputComponents <= 64) {
         GTEST_SKIP() << "maxVertexOutputComponents is too low";
     }
 
@@ -844,7 +846,7 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockStructArraySizeVertex) {
 
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
-    if (m_device->phy().limits_.maxVertexOutputComponents <= 64) {
+    if (m_device->Physical().limits_.maxVertexOutputComponents <= 64) {
         GTEST_SKIP() << "maxVertexOutputComponents is too low";
     }
 
@@ -906,7 +908,7 @@ TEST_F(NegativeShaderInterface, VsFsTypeMismatchBlockStructOuter2DArraySize) {
 
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
-    if (m_device->phy().limits_.maxVertexOutputComponents <= 64) {
+    if (m_device->Physical().limits_.maxVertexOutputComponents <= 64) {
         GTEST_SKIP() << "maxVertexOutputComponents is too low";
     }
 
@@ -1151,6 +1153,89 @@ TEST_F(NegativeShaderInterface, VsFsMismatchByComponent) {
         helper.shader_stages_ = {vs.GetStageCreateInfo(), fs.GetStageCreateInfo()};
     };
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-RuntimeSpirv-OpEntryPoint-08743");
+}
+
+TEST_F(NegativeShaderInterface, VsFsTypeMismatchShaderObject) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    AddRequiredFeature(vkt::Feature::shaderObject);
+    RETURN_IF_SKIP(Init());
+    InitDynamicRenderTarget();
+
+    char const *vsSource = R"glsl(
+        #version 450
+        layout(location=0) out int x;
+        void main(){
+           x = 0;
+           gl_Position = vec4(1);
+        }
+    )glsl";
+    char const *fsSource = R"glsl(
+        #version 450
+        layout(location=0) in float x; /* VS writes int */
+        layout(location=0) out vec4 color;
+        void main(){
+           color = vec4(x);
+        }
+    )glsl";
+
+    const vkt::Shader vertShader(*m_device, VK_SHADER_STAGE_VERTEX_BIT, GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, vsSource));
+    const vkt::Shader fragShader(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT, GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, fsSource));
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
+    SetDefaultDynamicStatesExclude();
+    m_command_buffer.BindVertFragShader(vertShader, fragShader);
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-OpEntryPoint-07754");
+    vk::CmdDraw(m_command_buffer.handle(), 4, 1, 0, 0);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
+}
+
+TEST_F(NegativeShaderInterface, VsFsTypeMismatchVectorSizeShaderObject) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
+    SetTargetApiVersion(VK_API_VERSION_1_1);
+    AddRequiredExtensions(VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
+    AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    AddRequiredFeature(vkt::Feature::shaderObject);
+    RETURN_IF_SKIP(Init());
+    InitDynamicRenderTarget();
+
+    char const *vsSource = R"glsl(
+        #version 450
+        layout(location=0) out vec4 x;
+        void main(){
+           gl_Position = vec4(1.0);
+        }
+    )glsl";
+    char const *fsSource = R"glsl(
+        #version 450
+        layout(location=0) in vec3 x;
+        layout(location=0) out vec4 color;
+        void main(){
+           color = vec4(1.0);
+        }
+    )glsl";
+
+    const vkt::Shader vertShader(*m_device, VK_SHADER_STAGE_VERTEX_BIT, GLSLToSPV(VK_SHADER_STAGE_VERTEX_BIT, vsSource));
+    const vkt::Shader fragShader(*m_device, VK_SHADER_STAGE_FRAGMENT_BIT, GLSLToSPV(VK_SHADER_STAGE_FRAGMENT_BIT, fsSource));
+
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
+    SetDefaultDynamicStatesExclude();
+    m_command_buffer.BindVertFragShader(vertShader, fragShader);
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-maintenance4-06817");
+    vk::CmdDraw(m_command_buffer.handle(), 4, 1, 0, 0);
+    m_errorMonitor->VerifyFound();
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeShaderInterface, InputOutputMismatch) {
@@ -1526,7 +1611,7 @@ TEST_F(NegativeShaderInterface, MultidimensionalArray) {
 
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
-    if (m_device->phy().limits_.maxVertexOutputComponents <= 64) {
+    if (m_device->Physical().limits_.maxVertexOutputComponents <= 64) {
         GTEST_SKIP() << "maxVertexOutputComponents is too low";
     }
 
@@ -1559,7 +1644,7 @@ TEST_F(NegativeShaderInterface, MultidimensionalArrayDim) {
 
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
-    if (m_device->phy().limits_.maxVertexOutputComponents <= 64) {
+    if (m_device->Physical().limits_.maxVertexOutputComponents <= 64) {
         GTEST_SKIP() << "maxVertexOutputComponents is too low";
     }
 
@@ -1594,7 +1679,7 @@ TEST_F(NegativeShaderInterface, MultidimensionalArray64bit) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    if (m_device->phy().limits_.maxFragmentOutputAttachments < 25) {
+    if (m_device->Physical().limits_.maxFragmentOutputAttachments < 25) {
         GTEST_SKIP() << "maxFragmentOutputAttachments is too low";
     }
 
@@ -2084,7 +2169,7 @@ TEST_F(NegativeShaderInterface, MissingInputAttachmentIndex) {
     pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
     pipe.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}};
     pipe.gp_ci_.renderPass = rp.Handle();
-    m_errorMonitor->SetDesiredWarning("VUID-RuntimeSpirv-None-09558");
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-09558");
     pipe.CreateGraphicsPipeline();
     m_errorMonitor->VerifyFound();
 }
@@ -2148,7 +2233,65 @@ TEST_F(NegativeShaderInterface, MissingInputAttachmentIndexArray) {
     CreatePipelineHelper pipe(*this);
     pipe.shader_stages_ = {pipe.vs_->GetStageCreateInfo(), fs.GetStageCreateInfo()};
     pipe.dsl_bindings_ = {{0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr}};
-    m_errorMonitor->SetDesiredWarning("VUID-RuntimeSpirv-OpTypeImage-09644");
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-OpTypeImage-09644");
     pipe.CreateGraphicsPipeline();
+    m_errorMonitor->VerifyFound();
+}
+
+TEST_F(NegativeShaderInterface, MissingInputAttachmentIndexShaderObject) {
+    // This test case requires SPIR-V debug information
+    RequiresSpvDebugInfo();
+    AddRequiredExtensions(VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::shaderObject);
+    RETURN_IF_SKIP(Init());
+
+    // layout(input_attachment_index=0, set=0, binding=0) uniform subpassInput xs;
+    // layout(location=0) out vec4 color;
+    // void main() {
+    //     color = subpassLoad(xs);
+    // }
+    //
+    // missing OpDecorate %xs InputAttachmentIndex 0
+    const char *fsSource = R"(
+               OpCapability Shader
+               OpCapability InputAttachment
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %main "main" %color
+               OpExecutionMode %main OriginUpperLeft
+               OpDecorate %color Location 0
+               OpDecorate %xs DescriptorSet 0
+               OpDecorate %xs Binding 0
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+    %v4float = OpTypeVector %float 4
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+      %color = OpVariable %_ptr_Output_v4float Output
+         %10 = OpTypeImage %float SubpassData 0 0 0 2 Unknown
+%_ptr_UniformConstant_10 = OpTypePointer UniformConstant %10
+         %xs = OpVariable %_ptr_UniformConstant_10 UniformConstant
+        %int = OpTypeInt 32 1
+      %int_0 = OpConstant %int 0
+      %v2int = OpTypeVector %int 2
+         %17 = OpConstantComposite %v2int %int_0 %int_0
+       %main = OpFunction %void None %3
+          %5 = OpLabel
+         %13 = OpLoad %10 %xs
+         %18 = OpImageRead %v4float %13 %17
+               OpStore %color %18
+               OpReturn
+               OpFunctionEnd
+    )";
+    std::vector<uint32_t> spv;
+    ASMtoSPV(SPV_ENV_VULKAN_1_0, 0, fsSource, spv);
+
+    OneOffDescriptorSet descriptor_set(m_device,
+                                       {
+                                           {0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
+                                       });
+
+    m_errorMonitor->SetDesiredError("VUID-RuntimeSpirv-None-09558");
+    const vkt::Shader frag_shader(*m_device,
+                                  ShaderCreateInfo(spv, VK_SHADER_STAGE_FRAGMENT_BIT, 1, &descriptor_set.layout_.handle()));
     m_errorMonitor->VerifyFound();
 }

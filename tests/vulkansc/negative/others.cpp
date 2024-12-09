@@ -266,6 +266,7 @@ TEST_F(VkSCLayerTest, CreateQueryPoolExceededMaxQueriesPerPool) {
     TEST_DESCRIPTION("vkCreateQueryPool - queryCount cannot exceed max*QueriesPerPool for the corresponding query type");
 
     AddOptionalExtensions(VK_KHR_PERFORMANCE_QUERY_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::pipelineStatisticsQuery);
     RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceFeatures features{};
@@ -330,7 +331,7 @@ TEST_F(VkSCLayerTest, CreateQueryPoolExceededMaxQueriesPerPool) {
         perf_query_reservation_info2.maxPerformanceQueriesPerPool = 3;
     }
 
-    ASSERT_NO_FATAL_FAILURE(InitState(nullptr, &object_reservation_info3));
+    RETURN_IF_SKIP(InitState(nullptr, &object_reservation_info3));
 
     // Test occlusion queries
     {
@@ -606,14 +607,14 @@ TEST_F(VkSCLayerTest, BindImageMemorySplitInstanceBindRegionCount) {
     create_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
     vkt::Image image{};
-    image.init_no_mem(*m_device, create_info);
+    image.InitNoMemory(*m_device, create_info);
 
     auto mem_reqs = image.memory_requirements();
 
     auto mem_alloc = vku::InitStruct<VkMemoryAllocateInfo>();
     mem_alloc.memoryTypeIndex = 0;
     mem_alloc.allocationSize = mem_reqs.size;
-    const bool memory_found = m_device->phy().set_memory_type(mem_reqs.memoryTypeBits, &mem_alloc, 0);
+    const bool memory_found = m_device->phy().SetMemoryType(mem_reqs.memoryTypeBits, &mem_alloc, 0);
     ASSERT_TRUE(memory_found);
 
     VkDeviceMemory memory = VK_NULL_HANDLE;

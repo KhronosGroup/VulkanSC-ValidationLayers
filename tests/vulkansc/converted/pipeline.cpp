@@ -34,8 +34,8 @@ TEST_F(NegativePipeline, NotBound) {
 
     VkPipeline badPipeline = CastToHandle<VkPipeline, uintptr_t>(0xbaadb1be);
 
-    m_commandBuffer->begin();
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, badPipeline);
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, badPipeline);
 
     m_errorMonitor->VerifyFound();
 }
@@ -51,8 +51,8 @@ TEST_F(NegativePipeline, WrongBindPointGraphics) {
     CreateComputePipelineHelper pipe(*this);
     pipe.CreateComputePipeline();
 
-    m_commandBuffer->begin();
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
 
     m_errorMonitor->VerifyFound();
 }
@@ -77,13 +77,13 @@ TEST_F(NegativePipeline, BasicCompute) {
     pipe.descriptor_set_->WriteDescriptorBufferInfo(0, buffer.handle(), 0, 1024);
     pipe.descriptor_set_->UpdateDescriptorSets();
 
-    m_commandBuffer->begin();
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0, 1,
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0, 1,
                               &pipe.descriptor_set_->set_, 0, nullptr);
 
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
 
-    vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
+    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
 }
 
 TEST_F(NegativePipeline, WrongBindPointCompute) {
@@ -97,8 +97,8 @@ TEST_F(NegativePipeline, WrongBindPointCompute) {
     CreatePipelineHelper pipe(*this);
     pipe.CreateGraphicsPipeline();
 
-    m_commandBuffer->begin();
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
 
     m_errorMonitor->VerifyFound();
 }
@@ -204,16 +204,16 @@ TEST_F(NegativePipeline, CmdBufferPipelineDestroyed) {
         helper.CreateGraphicsPipeline();
 
         // Bind helper pipeline to command buffer
-        m_commandBuffer->begin();
-        vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, helper.Handle());
-        m_commandBuffer->end();
+        m_command_buffer.Begin();
+        vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, helper.Handle());
+        m_command_buffer.End();
 
         // pipeline will be destroyed when helper goes out of scope
     }
 
     // Cause error by submitting command buffer that references destroyed pipeline
     m_errorMonitor->SetDesiredError("VUID-vkQueueSubmit-pCommandBuffers-00070");
-    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Submit(m_command_buffer);
     m_default_queue->Wait();
     m_errorMonitor->VerifyFound();
 }
@@ -242,69 +242,69 @@ TEST_F(NegativePipeline, BadPipelineObject) {
 
     // Attempt to bind an invalid Pipeline to a valid Command Buffer
     m_errorMonitor->SetDesiredError("VUID-vkCmdBindPipeline-pipeline-parameter");
-    m_commandBuffer->begin();
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, bad_pipeline);
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, bad_pipeline);
     m_errorMonitor->VerifyFound();
 
     // Try each of the 6 flavors of Draw()
-    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);  // Draw*() calls must be submitted within a renderpass
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);  // Draw*() calls must be submitted within a renderpass
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-08606");
-    vk::CmdDraw(m_commandBuffer->handle(), 1, 0, 0, 0);
+    vk::CmdDraw(m_command_buffer.handle(), 1, 0, 0, 0);
     m_errorMonitor->VerifyFound();
 
     vkt::Buffer index_buffer(*m_device, 1024, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-    vk::CmdBindIndexBuffer(m_commandBuffer->handle(), index_buffer.handle(), 2, VK_INDEX_TYPE_UINT16);
+    vk::CmdBindIndexBuffer(m_command_buffer.handle(), index_buffer.handle(), 2, VK_INDEX_TYPE_UINT16);
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdDrawIndexed-None-08606");
-    vk::CmdDrawIndexed(m_commandBuffer->handle(), 1, 1, 0, 0, 0);
+    vk::CmdDrawIndexed(m_command_buffer.handle(), 1, 1, 0, 0, 0);
     m_errorMonitor->VerifyFound();
 
     vkt::Buffer buffer(*m_device, 1024, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT);
     m_errorMonitor->SetDesiredError("VUID-vkCmdDrawIndirect-None-08606");
-    vk::CmdDrawIndirect(m_commandBuffer->handle(), buffer.handle(), 0, 1, 0);
+    vk::CmdDrawIndirect(m_command_buffer.handle(), buffer.handle(), 0, 1, 0);
     m_errorMonitor->VerifyFound();
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdDrawIndexedIndirect-None-08606");
-    vk::CmdDrawIndexedIndirect(m_commandBuffer->handle(), buffer.handle(), 0, 1, 0);
+    vk::CmdDrawIndexedIndirect(m_command_buffer.handle(), buffer.handle(), 0, 1, 0);
     m_errorMonitor->VerifyFound();
 
     if (has_khr_indirect) {
         m_errorMonitor->SetDesiredError("VUID-vkCmdDrawIndirectCount-None-08606");
         // stride must be a multiple of 4 and must be greater than or equal to sizeof(VkDrawIndirectCommand)
-        vk::CmdDrawIndirectCountKHR(m_commandBuffer->handle(), buffer.handle(), 0, buffer.handle(), 512, 1, 512);
+        vk::CmdDrawIndirectCountKHR(m_command_buffer.handle(), buffer.handle(), 0, buffer.handle(), 512, 1, 512);
         m_errorMonitor->VerifyFound();
 
         if (DeviceValidationVersion() >= VK_API_VERSION_1_2) {
             m_errorMonitor->SetDesiredError("VUID-vkCmdDrawIndirectCount-None-08606");
             // stride must be a multiple of 4 and must be greater than or equal to sizeof(VkDrawIndirectCommand)
-            vk::CmdDrawIndirectCount(m_commandBuffer->handle(), buffer.handle(), 0, buffer.handle(), 512, 1, 512);
+            vk::CmdDrawIndirectCount(m_command_buffer.handle(), buffer.handle(), 0, buffer.handle(), 512, 1, 512);
             m_errorMonitor->VerifyFound();
         }
 
         m_errorMonitor->SetDesiredError("VUID-vkCmdDrawIndexedIndirectCount-None-08606");
         // stride must be a multiple of 4 and must be greater than or equal to sizeof(VkDrawIndexedIndirectCommand)
-        vk::CmdDrawIndexedIndirectCountKHR(m_commandBuffer->handle(), buffer.handle(), 0, buffer.handle(), 512, 1, 512);
+        vk::CmdDrawIndexedIndirectCountKHR(m_command_buffer.handle(), buffer.handle(), 0, buffer.handle(), 512, 1, 512);
         m_errorMonitor->VerifyFound();
 
         if (DeviceValidationVersion() >= VK_API_VERSION_1_2) {
             m_errorMonitor->SetDesiredError("VUID-vkCmdDrawIndexedIndirectCount-None-08606");
             // stride must be a multiple of 4 and must be greater than or equal to sizeof(VkDrawIndexedIndirectCommand)
-            vk::CmdDrawIndexedIndirectCount(m_commandBuffer->handle(), buffer.handle(), 0, buffer.handle(), 512, 1, 512);
+            vk::CmdDrawIndexedIndirectCount(m_command_buffer.handle(), buffer.handle(), 0, buffer.handle(), 512, 1, 512);
             m_errorMonitor->VerifyFound();
         }
     }
 
     // Also try the Dispatch variants
-    m_commandBuffer->EndRenderPass();  // Compute submissions must be outside a renderpass
+    m_command_buffer.EndRenderPass();  // Compute submissions must be outside a renderpass
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdDispatch-None-08606");
-    vk::CmdDispatch(m_commandBuffer->handle(), 0, 0, 0);
+    vk::CmdDispatch(m_command_buffer.handle(), 0, 0, 0);
     m_errorMonitor->VerifyFound();
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdDispatchIndirect-None-08606");
     m_errorMonitor->SetDesiredError("VUID-vkCmdDispatchIndirect-offset-00407");
-    vk::CmdDispatchIndirect(m_commandBuffer->handle(), buffer.handle(), 1024);
+    vk::CmdDispatchIndirect(m_command_buffer.handle(), buffer.handle(), 1024);
     m_errorMonitor->VerifyFound();
 }
 
@@ -316,13 +316,13 @@ TEST_F(NegativePipeline, NoPipelineDynamicState) {
     RETURN_IF_SKIP(Init());
     InitDynamicRenderTarget();
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderingColor(GetDynamicRenderTarget(), GetRenderTargetArea());
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-08606");
-    vk::CmdDraw(m_commandBuffer->handle(), 4, 1, 0, 0);
+    vk::CmdDraw(m_command_buffer.handle(), 4, 1, 0, 0);
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->EndRendering();
-    m_commandBuffer->end();
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativePipeline, ShaderStageName) {
@@ -382,7 +382,7 @@ TEST_F(NegativePipeline, ShaderStageBit) {
 TEST_F(NegativePipeline, SampleRateFeatureDisable) {
     // Enable sample shading in pipeline when the feature is disabled.
     // Disable sampleRateShading here
-    AddDisabledFeature(vkt::Feature::sampleRateShading);
+
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
@@ -463,7 +463,6 @@ TEST_F(NegativePipeline, SamplePNextDisabled) {
 TEST_F(NegativePipeline, DISABLED_SubpassRasterizationSamples) {
     TEST_DESCRIPTION("Test creating two pipelines referring to the same subpass but with different rasterization samples count");
 
-    AddDisabledFeature(vkt::Feature::variableMultisampleRate);
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
@@ -477,7 +476,7 @@ TEST_F(NegativePipeline, DISABLED_SubpassRasterizationSamples) {
     subpass.pColorAttachments = attachmentRefs.data();
 
     VkAttachmentDescription attach_desc = {};
-    attach_desc.format = m_renderTargets[0]->format();
+    attach_desc.format = m_renderTargets[0]->Format();
     attach_desc.samples = VK_SAMPLE_COUNT_1_BIT;
     attach_desc.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     attach_desc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -494,8 +493,8 @@ TEST_F(NegativePipeline, DISABLED_SubpassRasterizationSamples) {
 
     auto render_target_view = m_renderTargets[0]->CreateView();
 
-    const uint32_t fb_width = m_renderTargets[0]->width();
-    const uint32_t fb_height = m_renderTargets[0]->height();
+    const uint32_t fb_width = m_renderTargets[0]->Width();
+    const uint32_t fb_height = m_renderTargets[0]->Height();
     vkt::Framebuffer framebuffer(*m_device, renderpass, 1, &render_target_view.handle(), fb_width, fb_height);
 
     CreatePipelineHelper pipeline_1(*this);
@@ -508,20 +507,20 @@ TEST_F(NegativePipeline, DISABLED_SubpassRasterizationSamples) {
     pipeline_2.gp_ci_.renderPass = renderpass.handle();
     pipeline_2.CreateGraphicsPipeline();
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRenderPass(renderpass.handle(), framebuffer, fb_width, fb_height);
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(renderpass.handle(), framebuffer, fb_width, fb_height);
 
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_1.Handle());
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_1.Handle());
 
     // VkPhysicalDeviceFeatures::variableMultisampleRate is false,
     // the two pipelines refer to the same subpass, one that does not use any attachment,
     // BUT the secondly created pipeline has a different sample samples count than the 1st, this is illegal
     m_errorMonitor->SetDesiredError("VUID-vkCmdBindPipeline-pipeline-00781");
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_2.Handle());
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_2.Handle());
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->EndRenderPass();
-    m_commandBuffer->end();
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativePipeline, RenderPassShaderResolveQCOM) {
@@ -628,7 +627,7 @@ TEST_F(NegativePipeline, RenderPassShaderResolveQCOM) {
 TEST_F(NegativePipeline, RasterizerDiscardWithFragmentShader) {
     TEST_DESCRIPTION("Create Graphics Pipeline with fragment shader and rasterizer discard");
     RETURN_IF_SKIP(Init());
-    m_depth_stencil_fmt = FindSupportedDepthStencilFormat(gpu());
+    m_depth_stencil_fmt = FindSupportedDepthStencilFormat(Gpu());
 
     m_depthStencil->Init(*m_device, m_width, m_height, 1, m_depth_stencil_fmt, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
     m_depthStencil->SetLayout(VK_IMAGE_LAYOUT_GENERAL);
@@ -699,7 +698,7 @@ TEST_F(NegativePipeline, DISABLED_CreateGraphicsPipelineWithBadBasePointer) {
 
     RETURN_IF_SKIP(Init());
 
-    m_depth_stencil_fmt = FindSupportedDepthStencilFormat(gpu());
+    m_depth_stencil_fmt = FindSupportedDepthStencilFormat(Gpu());
 
     m_depthStencil->Init(*m_device, m_width, m_height, 1, m_depth_stencil_fmt, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
     m_depthStencil->SetLayout(VK_IMAGE_LAYOUT_GENERAL);
@@ -834,16 +833,16 @@ TEST_F(NegativePipeline, NumSamplesMismatch) {
     m_errorMonitor->SetUnexpectedError("VUID-VkGraphicsPipelineCreateInfo-multisampledRenderToSingleSampled-06853");
     pipe.CreateGraphicsPipeline();
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
 
     // Render triangle (the error should trigger on the attempt to draw).
-    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
+    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
 
     // Finalize recording of the command buffer
-    m_commandBuffer->EndRenderPass();
-    m_commandBuffer->end();
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
 
     m_errorMonitor->VerifyFound();
 }
@@ -887,7 +886,7 @@ TEST_F(NegativePipeline, ColorBlendInvalidLogicOp) {
 
 TEST_F(NegativePipeline, ColorBlendUnsupportedLogicOp) {
     TEST_DESCRIPTION("Attempt enabling VkPipelineColorBlendStateCreateInfo::logicOpEnable when logicOp feature is disabled.");
-    AddDisabledFeature(vkt::Feature::logicOp);
+
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
@@ -1066,7 +1065,7 @@ TEST_F(NegativePipeline, NullStagepNameMaintenance5) {
     InitRenderTarget();
 
     std::vector<uint32_t> shader;
-    this->GLSLtoSPV(&m_device->phy().limits_, VK_SHADER_STAGE_VERTEX_BIT, kMinimalShaderGlsl, shader);
+    GLSLtoSPV(m_device->Physical().limits_, VK_SHADER_STAGE_VERTEX_BIT, kMinimalShaderGlsl, shader);
 
     VkShaderModuleCreateInfo module_create_info = vku::InitStructHelper();
     module_create_info.pCode = shader.data();
@@ -1094,7 +1093,7 @@ TEST_F(NegativePipeline, NullStagepNameMaintenance5Compute) {
     RETURN_IF_SKIP(Init());
 
     std::vector<uint32_t> shader;
-    this->GLSLtoSPV(&m_device->phy().limits_, VK_SHADER_STAGE_COMPUTE_BIT, kMinimalShaderGlsl, shader);
+    GLSLtoSPV(m_device->Physical().limits_, VK_SHADER_STAGE_COMPUTE_BIT, kMinimalShaderGlsl, shader);
 
     VkShaderModuleCreateInfo module_create_info = vku::InitStructHelper();
     module_create_info.pCode = shader.data();
@@ -1221,7 +1220,7 @@ TEST_F(NegativePipeline, FramebufferMixedSamples) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    const VkFormat ds_format = FindSupportedDepthStencilFormat(gpu());
+    const VkFormat ds_format = FindSupportedDepthStencilFormat(Gpu());
 
     struct TestCase {
         VkSampleCountFlagBits color_samples;
@@ -1304,14 +1303,14 @@ TEST_F(NegativePipeline, FramebufferMixedSamplesCoverageReduction) {
     uint32_t combination_count = 0;
     std::vector<VkFramebufferMixedSamplesCombinationNV> combinations;
 
-    vk::GetPhysicalDeviceSupportedFramebufferMixedSamplesCombinationsNV(gpu(), &combination_count, nullptr);
+    vk::GetPhysicalDeviceSupportedFramebufferMixedSamplesCombinationsNV(Gpu(), &combination_count, nullptr);
     if (combination_count < 1) {
         GTEST_SKIP() << "No mixed sample combinations are supported";
     }
     combinations.resize(combination_count);
     // TODO this fill can be removed once https://github.com/KhronosGroup/Vulkan-ValidationLayers/pull/4138 merges
     std::fill(combinations.begin(), combinations.end(), vku::InitStruct<VkFramebufferMixedSamplesCombinationNV>());
-    vk::GetPhysicalDeviceSupportedFramebufferMixedSamplesCombinationsNV(gpu(), &combination_count, &combinations[0]);
+    vk::GetPhysicalDeviceSupportedFramebufferMixedSamplesCombinationsNV(Gpu(), &combination_count, &combinations[0]);
 
     // Pick the first supported combination for a positive test.
     test_cases.push_back({combinations[0].rasterizationSamples, static_cast<VkSampleCountFlagBits>(combinations[0].colorSamples),
@@ -1319,7 +1318,7 @@ TEST_F(NegativePipeline, FramebufferMixedSamplesCoverageReduction) {
                           combinations[0].coverageReductionMode, true,
                           "VUID-VkGraphicsPipelineCreateInfo-coverageReductionMode-02722"});
 
-    VkSampleCountFlags fb_sample_counts = m_device->phy().limits_.framebufferDepthSampleCounts;
+    VkSampleCountFlags fb_sample_counts = m_device->Physical().limits_.framebufferDepthSampleCounts;
     int max_sample_count = VK_SAMPLE_COUNT_64_BIT;
     while (max_sample_count > VK_SAMPLE_COUNT_1_BIT) {
         if (fb_sample_counts & max_sample_count) {
@@ -1480,6 +1479,7 @@ TEST_F(NegativePipeline, FragmentCoverageToColorNV) {
 
 TEST_F(NegativePipeline, ViewportSwizzleNV) {
     AddRequiredExtensions(VK_NV_VIEWPORT_SWIZZLE_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::multiViewport);
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
@@ -1669,11 +1669,11 @@ TEST_F(NegativePipeline, LineRasterization) {
             kErrorBit, vuids);
     }
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-vkCmdSetLineStippleKHR-lineStippleFactor-02776");
-    vk::CmdSetLineStippleEXT(m_commandBuffer->handle(), 0, 0);
+    vk::CmdSetLineStippleEXT(m_command_buffer.handle(), 0, 0);
     m_errorMonitor->VerifyFound();
-    vk::CmdSetLineStippleEXT(m_commandBuffer->handle(), 1, 1);
+    vk::CmdSetLineStippleEXT(m_command_buffer.handle(), 1, 1);
 }
 
 TEST_F(NegativePipeline, NotCompatibleForSet) {
@@ -1720,14 +1720,14 @@ TEST_F(NegativePipeline, NotCompatibleForSet) {
     pipe.cp_ci_.layout = pipeline_layout.handle();
     pipe.CreateComputePipeline();
 
-    m_commandBuffer->begin();
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, binding_pipeline_layout.handle(), 0, 1,
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, binding_pipeline_layout.handle(), 0, 1,
                               &descriptor_set.set_, 0, nullptr);
     m_errorMonitor->SetDesiredError("VUID-vkCmdDispatch-None-08600");
-    vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
+    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativePipeline, MaxPerStageResources) {
@@ -1743,9 +1743,9 @@ TEST_F(NegativePipeline, MaxPerStageResources) {
     // Spec requires a minimum of 128 so know this is setting it lower than that
     const uint32_t maxPerStageResources = 4;
     VkPhysicalDeviceProperties props;
-    fpvkGetOriginalPhysicalDeviceLimitsEXT(gpu(), &props.limits);
+    fpvkGetOriginalPhysicalDeviceLimitsEXT(Gpu(), &props.limits);
     props.limits.maxPerStageResources = maxPerStageResources;
-    fpvkSetPhysicalDeviceLimitsEXT(gpu(), &props.limits);
+    fpvkSetPhysicalDeviceLimitsEXT(Gpu(), &props.limits);
     RETURN_IF_SKIP(InitState());
     // Adds the one color attachment
     InitRenderTarget();
@@ -1825,7 +1825,7 @@ TEST_F(NegativePipeline, PipelineExecutablePropertiesFeature) {
 
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_PIPELINE_EXECUTABLE_PROPERTIES_EXTENSION_NAME);
-    AddDisabledFeature(vkt::Feature::pipelineExecutableInfo);
+
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
@@ -1876,9 +1876,9 @@ TEST_F(NegativePipeline, SampledInvalidImageViews) {
 
     // Remove format features want to test if missing
     VkFormatProperties formatProps;
-    fpvkGetOriginalPhysicalDeviceFormatPropertiesEXT(gpu(), sampled_format, &formatProps);
+    fpvkGetOriginalPhysicalDeviceFormatPropertiesEXT(Gpu(), sampled_format, &formatProps);
     formatProps.optimalTilingFeatures = (formatProps.optimalTilingFeatures & ~VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT);
-    fpvkSetPhysicalDeviceFormatPropertiesEXT(gpu(), sampled_format, formatProps);
+    fpvkSetPhysicalDeviceFormatPropertiesEXT(Gpu(), sampled_format, formatProps);
 
     vkt::Image image(*m_device, 128, 128, 1, sampled_format, VK_IMAGE_USAGE_SAMPLED_BIT);
     image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
@@ -1990,35 +1990,35 @@ TEST_F(NegativePipeline, SampledInvalidImageViews) {
                                                      VK_IMAGE_LAYOUT_UNDEFINED);
     seperate_descriptor_set.UpdateDescriptorSets();
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
 
     // Unused is a valid version of the combined pipeline/descriptors
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_unused.Handle());
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, combined_pipeline_layout.handle(), 0, 1,
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_unused.Handle());
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, combined_pipeline_layout.handle(), 0, 1,
                               &combined_descriptor_set.set_, 0, nullptr);
-    vk::CmdDraw(m_commandBuffer->handle(), 1, 0, 0, 0);
+    vk::CmdDraw(m_command_buffer.handle(), 1, 0, 0, 0);
 
     // Test magFilter
     {
         // Same descriptor set as combined test
-        vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_function.Handle());
+        vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_function.Handle());
         m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-magFilter-04553");
-        vk::CmdDraw(m_commandBuffer->handle(), 1, 0, 0, 0);
+        vk::CmdDraw(m_command_buffer.handle(), 1, 0, 0, 0);
         m_errorMonitor->VerifyFound();
 
         // Draw with invalid combined image sampler
-        vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_combined.Handle());
+        vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_combined.Handle());
         m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-magFilter-04553");
-        vk::CmdDraw(m_commandBuffer->handle(), 1, 0, 0, 0);
+        vk::CmdDraw(m_command_buffer.handle(), 1, 0, 0, 0);
         m_errorMonitor->VerifyFound();
 
         // Same error, but not with seperate descriptors
-        vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_seperate.Handle());
-        vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, seperate_pipeline_layout.handle(), 0,
+        vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_seperate.Handle());
+        vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, seperate_pipeline_layout.handle(), 0,
                                   1, &seperate_descriptor_set.set_, 0, nullptr);
         m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-magFilter-04553");
-        vk::CmdDraw(m_commandBuffer->handle(), 1, 0, 0, 0);
+        vk::CmdDraw(m_command_buffer.handle(), 1, 0, 0, 0);
         m_errorMonitor->VerifyFound();
     }
 
@@ -2033,27 +2033,27 @@ TEST_F(NegativePipeline, SampledInvalidImageViews) {
                                                          VK_IMAGE_LAYOUT_UNDEFINED);
         seperate_descriptor_set.UpdateDescriptorSets();
 
-        vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, combined_pipeline_layout.handle(), 0,
+        vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, combined_pipeline_layout.handle(), 0,
                                   1, &combined_descriptor_set.set_, 0, nullptr);
 
         // Same descriptor set as combined test
-        vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_function.Handle());
+        vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_function.Handle());
         m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-mipmapMode-04770");
-        vk::CmdDraw(m_commandBuffer->handle(), 1, 0, 0, 0);
+        vk::CmdDraw(m_command_buffer.handle(), 1, 0, 0, 0);
         m_errorMonitor->VerifyFound();
 
         // Draw with invalid combined image sampler
-        vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_combined.Handle());
+        vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_combined.Handle());
         m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-mipmapMode-04770");
-        vk::CmdDraw(m_commandBuffer->handle(), 1, 0, 0, 0);
+        vk::CmdDraw(m_command_buffer.handle(), 1, 0, 0, 0);
         m_errorMonitor->VerifyFound();
 
         // Same error, but not with seperate descriptors
-        vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_seperate.Handle());
-        vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, seperate_pipeline_layout.handle(), 0,
+        vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_seperate.Handle());
+        vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, seperate_pipeline_layout.handle(), 0,
                                   1, &seperate_descriptor_set.set_, 0, nullptr);
         m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-mipmapMode-04770");
-        vk::CmdDraw(m_commandBuffer->handle(), 1, 0, 0, 0);
+        vk::CmdDraw(m_command_buffer.handle(), 1, 0, 0, 0);
         m_errorMonitor->VerifyFound();
     }
 }
@@ -2212,7 +2212,7 @@ TEST_F(NegativePipeline, DISABLED_MergePipelineCachesInvalidDst) {
 }
 
 // Not supported in Vulkan SC: derivative pipelines
-TEST_F(NegativePipeline, DISABLED_CreateComputesPipelineWithBadBasePointer) {
+TEST_F(NegativePipeline, DISABLED_CreateComputePipelineWithBadBasePointer) {
     TEST_DESCRIPTION("Create Compute Pipeline with bad base pointer");
 
     RETURN_IF_SKIP(Init());
@@ -2235,8 +2235,6 @@ TEST_F(NegativePipeline, DISABLED_CreateComputesPipelineWithBadBasePointer) {
     compute_create_info.stage = cs.GetStageCreateInfo();
     compute_create_info.layout = pipeline_layout.handle();
 
-    vkt::Pipeline test_pipeline(*m_device, compute_create_info);
-
     {
         compute_create_info.basePipelineHandle = VK_NULL_HANDLE;
         compute_create_info.basePipelineIndex = 1;
@@ -2245,13 +2243,98 @@ TEST_F(NegativePipeline, DISABLED_CreateComputesPipelineWithBadBasePointer) {
         vk::CreateComputePipelines(device(), VK_NULL_HANDLE, 1, &compute_create_info, nullptr, &pipeline);
         m_errorMonitor->VerifyFound();
     }
+}
 
-    if (test_pipeline.initialized()) {
-        compute_create_info.basePipelineHandle = test_pipeline.handle();
-        compute_create_info.basePipelineIndex = 1;
-        m_errorMonitor->SetDesiredError("VUID-VkComputePipelineCreateInfo-flags-07986");
-        vkt::Pipeline pipeline(*m_device, compute_create_info);
+// Not supported in Vulkan SC: derivative pipelines
+TEST_F(NegativePipeline, DISABLED_CreateComputePipelineWithDerivatives) {
+    TEST_DESCRIPTION("Create Compute Pipeline with derivatives");
+
+    RETURN_IF_SKIP(Init());
+
+    char const *csSource = R"glsl(
+        #version 450
+        layout(local_size_x=2, local_size_y=4) in;
+        void main(){
+        }
+    )glsl";
+
+    VkShaderObj cs(this, csSource, VK_SHADER_STAGE_COMPUTE_BIT);
+
+    std::vector<VkDescriptorSetLayoutBinding> bindings(0);
+    const vkt::DescriptorSetLayout pipeline_dsl(*m_device, bindings);
+    const vkt::PipelineLayout pipeline_layout(*m_device, {&pipeline_dsl});
+
+    VkComputePipelineCreateInfo compute_create_infos[2];
+    compute_create_infos[0] = vku::InitStructHelper();
+    compute_create_infos[0].stage = cs.GetStageCreateInfo();
+    compute_create_infos[0].layout = pipeline_layout.handle();
+
+    compute_create_infos[1] = vku::InitStructHelper();
+    compute_create_infos[1].stage = cs.GetStageCreateInfo();
+    compute_create_infos[1].layout = pipeline_layout.handle();
+
+    {
+        // Create a base pipeline and a derivative in a single call, using 0 as the base.
+        // Base pipeline lacks the VK_PIPELINE_CREATE_ALLOW_DERIVATIVES_BIT flag
+        compute_create_infos[0].flags = 0;
+        compute_create_infos[0].basePipelineHandle = VK_NULL_HANDLE;
+        compute_create_infos[0].basePipelineIndex = -1;
+        compute_create_infos[1].flags = VK_PIPELINE_CREATE_DERIVATIVE_BIT;
+        compute_create_infos[1].basePipelineHandle = VK_NULL_HANDLE;
+        compute_create_infos[1].basePipelineIndex = 0;
+        m_errorMonitor->SetDesiredError("VUID-vkCreateComputePipelines-flags-00696");
+
+        VkPipeline pipelines[2] = {VK_NULL_HANDLE, VK_NULL_HANDLE};
+        vk::CreateComputePipelines(device(), VK_NULL_HANDLE, 2, compute_create_infos, nullptr, pipelines);
+
         m_errorMonitor->VerifyFound();
+        for (auto pipeline : pipelines) {
+            vk::DestroyPipeline(device(), pipeline, nullptr);
+        }
+    }
+
+    {
+        // Create a base pipeline and a derivative in a single call, using 1 as the base.
+        compute_create_infos[0].flags = VK_PIPELINE_CREATE_DERIVATIVE_BIT;
+        compute_create_infos[0].basePipelineHandle = VK_NULL_HANDLE;
+        compute_create_infos[0].basePipelineIndex = 1;
+        compute_create_infos[1].flags = VK_PIPELINE_CREATE_ALLOW_DERIVATIVES_BIT;
+        compute_create_infos[1].basePipelineHandle = VK_NULL_HANDLE;
+        compute_create_infos[1].basePipelineIndex = -1;
+        m_errorMonitor->SetDesiredError("VUID-vkCreateComputePipelines-flags-00695");
+
+        VkPipeline pipelines[2] = {VK_NULL_HANDLE, VK_NULL_HANDLE};
+        vk::CreateComputePipelines(device(), VK_NULL_HANDLE, 2, compute_create_infos, nullptr, pipelines);
+
+        m_errorMonitor->VerifyFound();
+        for (auto pipeline : pipelines) {
+            vk::DestroyPipeline(device(), pipeline, nullptr);
+        }
+    }
+
+    {
+        // Specify both an index and a handle for base pipeline.
+        compute_create_infos[0].flags = VK_PIPELINE_CREATE_ALLOW_DERIVATIVES_BIT;
+        compute_create_infos[0].basePipelineHandle = VK_NULL_HANDLE;
+        compute_create_infos[0].basePipelineIndex = -1;
+
+        vkt::Pipeline test_pipeline(*m_device, compute_create_infos[0]);
+        if (test_pipeline.initialized()) {
+            compute_create_infos[1].flags = VK_PIPELINE_CREATE_DERIVATIVE_BIT;
+            compute_create_infos[1].basePipelineHandle = test_pipeline.handle();
+            compute_create_infos[1].basePipelineIndex = 0;
+
+            m_errorMonitor->SetDesiredError("VUID-VkComputePipelineCreateInfo-flags-07986");
+
+            VkPipeline pipelines[2] = {VK_NULL_HANDLE, VK_NULL_HANDLE};
+            vk::CreateComputePipelines(device(), VK_NULL_HANDLE, 2, compute_create_infos, nullptr, pipelines);
+
+            m_errorMonitor->VerifyFound();
+
+            for (auto pipeline : pipelines) {
+                vk::DestroyPipeline(device(), pipeline, nullptr);
+            }
+        }
     }
 }
 
@@ -2340,7 +2423,7 @@ TEST_F(NegativePipeline, ColorWriteCreateInfoEXTMaxAttachments) {
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
-    uint32_t max_color_attachments = m_device->phy().limits_.maxColorAttachments + 1;
+    uint32_t max_color_attachments = m_device->Physical().limits_.maxColorAttachments + 1;
 
     std::vector<VkBool32> enables(max_color_attachments, VK_TRUE);
     VkPipelineColorWriteCreateInfoEXT color_write = vku::InitStructHelper();
@@ -2412,13 +2495,12 @@ TEST_F(NegativePipeline, VariableSampleLocations) {
     vkt::Framebuffer framebuffer(*m_device, render_pass.handle(), 1, &image_view.handle());
 
     VkMultisamplePropertiesEXT multisample_prop = vku::InitStructHelper();
-    vk::GetPhysicalDeviceMultisamplePropertiesEXT(gpu(), VK_SAMPLE_COUNT_1_BIT, &multisample_prop);
+    vk::GetPhysicalDeviceMultisamplePropertiesEXT(Gpu(), VK_SAMPLE_COUNT_1_BIT, &multisample_prop);
     const uint32_t valid_count =
         multisample_prop.maxSampleLocationGridSize.width * multisample_prop.maxSampleLocationGridSize.height;
 
     if (valid_count == 0) {
-        printf("multisample properties are not supported.\n");
-        return;
+        GTEST_SKIP() << "multisample properties are not supported";
     }
 
     std::vector<VkSampleLocationEXT> sample_location(valid_count, {0.5, 0.5});
@@ -2474,30 +2556,30 @@ TEST_F(NegativePipeline, VariableSampleLocations) {
     begin_info.clearValueCount = 1;
     begin_info.pClearValues = &clear_value;
 
-    m_commandBuffer->begin();
-    vk::CmdBeginRenderPass(m_commandBuffer->handle(), &begin_info, VK_SUBPASS_CONTENTS_INLINE);
+    m_command_buffer.Begin();
+    vk::CmdBeginRenderPass(m_command_buffer.handle(), &begin_info, VK_SUBPASS_CONTENTS_INLINE);
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdBindPipeline-variableSampleLocations-01525");
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->NextSubpass();
+    m_command_buffer.NextSubpass();
     sample_location[0].x = 0.5f;
     m_errorMonitor->SetDesiredError("VUID-vkCmdBindPipeline-variableSampleLocations-01525");
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->EndRenderPass();
+    m_command_buffer.EndRenderPass();
 
     begin_info.pNext = nullptr;  // Invalid, missing VkRenderPassSampleLocationsBeginInfoEXT
-    vk::CmdBeginRenderPass(m_commandBuffer->handle(), &begin_info, VK_SUBPASS_CONTENTS_INLINE);
+    vk::CmdBeginRenderPass(m_command_buffer.handle(), &begin_info, VK_SUBPASS_CONTENTS_INLINE);
     m_errorMonitor->SetDesiredError("VUID-vkCmdBindPipeline-variableSampleLocations-01525");
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->NextSubpass();
-    m_commandBuffer->EndRenderPass();
+    m_command_buffer.NextSubpass();
+    m_command_buffer.EndRenderPass();
 
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativePipeline, RasterizationConservativeStateCreateInfo) {
@@ -2566,7 +2648,7 @@ TEST_F(NegativePipeline, RasterizationOrderAttachmentAccessWithoutFeature) {
     attachments[0].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
     attachments[1].flags = 0;
-    attachments[1].format = FindSupportedDepthStencilFormat(this->gpu());
+    attachments[1].format = FindSupportedDepthStencilFormat(this->Gpu());
     attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
     attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -2666,7 +2748,7 @@ TEST_F(NegativePipeline, RasterizationOrderAttachmentAccessNoSubpassFlags) {
         attachments[0].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
         attachments[1].flags = 0;
-        attachments[1].format = FindSupportedDepthStencilFormat(this->gpu());
+        attachments[1].format = FindSupportedDepthStencilFormat(this->Gpu());
         attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
         attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
         attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -2811,14 +2893,9 @@ TEST_F(NegativePipeline, IncompatibleScissorCountAndViewportCount) {
     TEST_DESCRIPTION("Validate creating a pipeline with incompatible scissor and viewport count, without dynamic states.");
 
     SetTargetApiVersion(VK_API_VERSION_1_3);
+    AddRequiredFeature(vkt::Feature::multiViewport);
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
-
-    VkPhysicalDeviceFeatures features{};
-    vk::GetPhysicalDeviceFeatures(gpu(), &features);
-    if (features.multiViewport == false) {
-        GTEST_SKIP() << "multiViewport feature not supported by device";
-    }
 
     VkViewport viewports[2] = {{0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f}, {0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f}};
 
@@ -3063,29 +3140,19 @@ TEST_F(NegativePipeline, RasterStateWithDepthBiasRepresentationInfo) {
 
     AddRequiredExtensions(VK_EXT_DEPTH_BIAS_CONTROL_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
+    AddRequiredFeature(vkt::Feature::depthBiasControl);
 
-    VkPhysicalDeviceDepthBiasControlFeaturesEXT depth_bias_control_features = vku::InitStructHelper();
-    auto features2 = GetPhysicalDeviceFeatures2(depth_bias_control_features);
+    // Make sure validation of VkDepthBiasRepresentationInfoEXT in VkPipelineRasterizationStateCreateInfo does not rely on
+    // depthBiasClamp being enabled
 
-    if (!depth_bias_control_features.depthBiasControl) {
-        GTEST_SKIP() << "depthBiasControl not supported";
-    }
-
-    features2.features.depthBiasClamp =
-        VK_FALSE;  // Make sure validation of VkDepthBiasRepresentationInfoEXT in VkPipelineRasterizationStateCreateInfo does not
-                   // rely on depthBiasClamp being enabled
-    depth_bias_control_features.leastRepresentableValueForceUnormRepresentation = VK_FALSE;
-    depth_bias_control_features.floatRepresentation = VK_FALSE;
-    depth_bias_control_features.depthBiasExact = VK_FALSE;
-
-    RETURN_IF_SKIP(InitState(nullptr, &features2));
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     const auto create_pipe_with_depth_bias_representation = [this](VkDepthBiasRepresentationInfoEXT &depth_bias_representation) {
         CreatePipelineHelper pipe(*this);
         pipe.AddDynamicState(VK_DYNAMIC_STATE_DEPTH_BIAS);
-        const VkPipelineRasterizationStateCreateInfo raster_state = vku::InitStructHelper(&depth_bias_representation);
+        VkPipelineRasterizationStateCreateInfo raster_state = vku::InitStructHelper(&depth_bias_representation);
+        raster_state.lineWidth = 1.0f;
         pipe.rs_state_ci_ = raster_state;
         pipe.CreateGraphicsPipeline();
     };
@@ -3144,7 +3211,7 @@ TEST_F(NegativePipeline, MismatchedRasterizationSamples) {
     image_ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
     VkImageFormatProperties formProps;
-    VkResult res = vk::GetPhysicalDeviceImageFormatProperties(m_device->phy().handle(), image_ci.format, image_ci.imageType,
+    VkResult res = vk::GetPhysicalDeviceImageFormatProperties(m_device->Physical().handle(), image_ci.format, image_ci.imageType,
                                                               image_ci.tiling, image_ci.usage, image_ci.flags, &formProps);
     if (res != VK_SUCCESS || (formProps.sampleCounts & VK_SAMPLE_COUNT_2_BIT) == 0) {
         GTEST_SKIP() << "Required format not supported";
@@ -3176,14 +3243,14 @@ TEST_F(NegativePipeline, MismatchedRasterizationSamples) {
     pipe.gp_ci_.renderPass = VK_NULL_HANDLE;
     pipe.CreateGraphicsPipeline();
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRendering(rendering_info);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRendering(rendering_info);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-pNext-07935");
-    vk::CmdDraw(m_commandBuffer->handle(), 4u, 1u, 0u, 0u);
+    vk::CmdDraw(m_command_buffer.handle(), 4u, 1u, 0u, 0u);
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->EndRendering();
-    m_commandBuffer->end();
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativePipeline, PipelineMissingFeatures) {
@@ -3193,7 +3260,7 @@ TEST_F(NegativePipeline, PipelineMissingFeatures) {
     VkPhysicalDeviceFeatures features = {};
     RETURN_IF_SKIP(InitState(&features));
 
-    const VkFormat ds_format = FindSupportedDepthStencilFormat(m_device->phy().handle());
+    const VkFormat ds_format = FindSupportedDepthStencilFormat(m_device->Physical().handle());
     RenderPassSingleSubpass rp(*this);
     rp.AddAttachmentDescription(ds_format, VK_IMAGE_LAYOUT_PREINITIALIZED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
     rp.AddAttachmentReference({0, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL});
@@ -3232,7 +3299,7 @@ TEST_F(NegativePipeline, MissingPipelineFormat) {
 
     VkFormat undefined = VK_FORMAT_UNDEFINED;
     VkFormat color_format = VK_FORMAT_R8G8B8A8_UNORM;
-    VkFormat ds_format = FindSupportedDepthStencilFormat(gpu());
+    VkFormat ds_format = FindSupportedDepthStencilFormat(Gpu());
 
     vkt::Image color_image(*m_device, 32, 32, 1, color_format, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     vkt::ImageView color_image_view = color_image.CreateView();
@@ -3318,26 +3385,26 @@ TEST_F(NegativePipeline, MissingPipelineFormat) {
     color_pipe.cb_ci_ = color_blend_state;
     stencil_pipe.CreateGraphicsPipeline();
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRendering(rendering_info);
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRendering(rendering_info);
 
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, color_pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, color_pipe.Handle());
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-pColorAttachments-08963");
-    vk::CmdDraw(m_commandBuffer->handle(), 3u, 1u, 0u, 0u);
+    vk::CmdDraw(m_command_buffer.handle(), 3u, 1u, 0u, 0u);
     m_errorMonitor->VerifyFound();
 
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, depth_pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, depth_pipe.Handle());
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-pDepthAttachment-08964");
-    vk::CmdDraw(m_commandBuffer->handle(), 3u, 1u, 0u, 0u);
+    vk::CmdDraw(m_command_buffer.handle(), 3u, 1u, 0u, 0u);
     m_errorMonitor->VerifyFound();
 
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, stencil_pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, stencil_pipe.Handle());
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-pStencilAttachment-08965");
-    vk::CmdDraw(m_commandBuffer->handle(), 3u, 1u, 0u, 0u);
+    vk::CmdDraw(m_command_buffer.handle(), 3u, 1u, 0u, 0u);
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->EndRendering();
-    m_commandBuffer->end();
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativePipeline, MissingPipelineViewportState) {
@@ -3425,14 +3492,8 @@ TEST_F(NegativePipeline, GeometryShaderConservativeRasterization) {
     TEST_DESCRIPTION("Use geometry shader with invalid conservative rasterization mode");
 
     AddRequiredExtensions(VK_EXT_CONSERVATIVE_RASTERIZATION_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-    VkPhysicalDeviceFeatures features{};
-    vk::GetPhysicalDeviceFeatures(gpu(), &features);
-    if (features.geometryShader == VK_FALSE) {
-        GTEST_SKIP() << "geometryShader not supported";
-    }
-    features.shaderTessellationAndGeometryPointSize = VK_FALSE;
-    RETURN_IF_SKIP(InitState(&features));
+    AddRequiredFeature(vkt::Feature::geometryShader);
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     static char const *gsSource = R"glsl(
@@ -3469,14 +3530,8 @@ TEST_F(NegativePipeline, VertexPointOutputConservativeRasterization) {
     TEST_DESCRIPTION("Use vertex shader with invalid conservative rasterization mode");
 
     AddRequiredExtensions(VK_EXT_CONSERVATIVE_RASTERIZATION_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-    VkPhysicalDeviceFeatures features{};
-    vk::GetPhysicalDeviceFeatures(gpu(), &features);
-    if (features.geometryShader == VK_FALSE) {
-        GTEST_SKIP() << "geometryShader not supported";
-    }
-    features.shaderTessellationAndGeometryPointSize = VK_FALSE;
-    RETURN_IF_SKIP(InitState(&features));
+    AddRequiredFeature(vkt::Feature::geometryShader);
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     VkPhysicalDeviceConservativeRasterizationPropertiesEXT conservative_rasterization_props = vku::InitStructHelper();
@@ -3503,17 +3558,9 @@ TEST_F(NegativePipeline, PipelineCreationFlags2CacheControl) {
     AddRequiredExtensions(VK_EXT_PIPELINE_CREATION_CACHE_CONTROL_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
+    AddRequiredFeature(vkt::Feature::maintenance5);
 
-    VkPhysicalDevicePipelineCreationCacheControlFeaturesEXT cache_control_features = vku::InitStructHelper();
-    cache_control_features.pipelineCreationCacheControl = VK_FALSE;  // Tests all assume feature is off
-    VkPhysicalDeviceMaintenance5FeaturesKHR maintenance5_features = vku::InitStructHelper();
-    GetPhysicalDeviceFeatures2(maintenance5_features);
-    if (maintenance5_features.maintenance5 == VK_FALSE) {
-        GTEST_SKIP() << "maintenance5 not supported";
-    }
-    maintenance5_features.pNext = &cache_control_features;
-    RETURN_IF_SKIP(InitState(nullptr, &maintenance5_features));
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     VkPipelineCreateFlags2CreateInfoKHR flags2 = vku::InitStructHelper();
@@ -3634,6 +3681,32 @@ TEST_F(NegativePipeline, GetPipelinePropertiesEXT) {
     m_errorMonitor->VerifyFound();
 }
 
+// stype-check off
+TEST_F(NegativePipeline, PipelinePropertiesIdentifierEXT) {
+    AddRequiredExtensions(VK_EXT_PIPELINE_PROPERTIES_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::pipelinePropertiesIdentifier);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
+
+    CreatePipelineHelper pipe(*this);
+    pipe.CreateGraphicsPipeline();
+
+    VkPipelineInfoEXT pipeline_info = vku::InitStructHelper();
+    pipeline_info.pipeline = pipe.Handle();
+    VkPipelinePropertiesIdentifierEXT pipeline_props = vku::InitStructHelper(&pipeline_info);
+
+    m_errorMonitor->SetDesiredError("VUID-VkPipelinePropertiesIdentifierEXT-pNext-pNext");
+    vk::GetPipelinePropertiesEXT(device(), &pipeline_info, (VkBaseOutStructure *)&pipeline_props);
+    m_errorMonitor->VerifyFound();
+
+    pipeline_props.pNext = nullptr;
+    pipeline_props.sType = VK_STRUCTURE_TYPE_PIPELINE_INFO_KHR;
+    m_errorMonitor->SetDesiredError("VUID-VkPipelinePropertiesIdentifierEXT-sType-sType");
+    vk::GetPipelinePropertiesEXT(device(), &pipeline_info, (VkBaseOutStructure *)&pipeline_props);
+    m_errorMonitor->VerifyFound();
+}
+// stype-check on
+
 TEST_F(NegativePipeline, NoRasterizationState) {
     TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8051");
     RETURN_IF_SKIP(Init());
@@ -3665,899 +3738,53 @@ TEST_F(NegativePipeline, NoRasterizationStateDynamicRendering) {
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativePipeline, PipelineBinaryCacheControl) {
-    TEST_DESCRIPTION("Invalidly trying to disable the pipeline binary internal cache");
-    SetTargetApiVersion(VK_API_VERSION_1_1);
-    AddRequiredExtensions(VK_KHR_PIPELINE_BINARY_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::pipelineBinaries);
+TEST_F(NegativePipeline, DepthClampControlMinMax) {
+    AddRequiredExtensions(VK_EXT_DEPTH_CLAMP_CONTROL_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::depthClampControl);
+    RETURN_IF_SKIP(Init());
+    InitRenderTarget();
 
-    RETURN_IF_SKIP(InitFramework());
-
-    VkPhysicalDevicePipelineBinaryPropertiesKHR pipeline_binary_properties = vku::InitStructHelper();
-    GetPhysicalDeviceProperties2(pipeline_binary_properties);
-
-    if (pipeline_binary_properties.pipelineBinaryInternalCacheControl) {
-        GTEST_SKIP() << "pipelineBinaryInternalCacheControl is VK_TRUE";
-    }
-
-    const auto q_props = vkt::PhysicalDevice(gpu()).queue_properties_;
-    ASSERT_TRUE(q_props.size() > 0);
-    ASSERT_TRUE(q_props[0].queueCount > 0);
-
-    const float q_priority[] = {1.0f};
-    VkDeviceQueueCreateInfo queue_ci = vku::InitStructHelper();
-    queue_ci.queueFamilyIndex = 0;
-    queue_ci.queueCount = 1;
-    queue_ci.pQueuePriorities = q_priority;
-
-    VkDeviceCreateInfo device_ci = vku::InitStructHelper();
-    device_ci.queueCreateInfoCount = 1;
-    device_ci.pQueueCreateInfos = &queue_ci;
-
-    device_ci.enabledExtensionCount = m_device_extension_names.size();
-    device_ci.ppEnabledExtensionNames = m_device_extension_names.data();
-
-    VkDevicePipelineBinaryInternalCacheControlKHR pbicc = vku::InitStructHelper();
-    VkPhysicalDeviceFeatures2KHR features2 = vku::InitStructHelper(&pbicc);
-    device_ci.pNext = &features2;
-
-    pbicc.disableInternalCache = true;
-
-    VkDevice testDevice;
-
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit,
-                                         "VUID-VkDevicePipelineBinaryInternalCacheControlKHR-disableInternalCache-09602");
-    vk::CreateDevice(gpu(), &device_ci, nullptr, &testDevice);
+    VkDepthClampRangeEXT clamp_range = {0.5f, 0.4f};
+    VkPipelineViewportDepthClampControlCreateInfoEXT clamp_control = vku::InitStructHelper();
+    clamp_control.depthClampMode = VK_DEPTH_CLAMP_MODE_USER_DEFINED_RANGE_EXT;
+    clamp_control.pDepthClampRange = &clamp_range;
+    CreatePipelineHelper pipe(*this);
+    pipe.vp_state_ci_.pNext = &clamp_control;
+    m_errorMonitor->SetDesiredError("VUID-VkDepthClampRangeEXT-pDepthClampRange-00999");
+    pipe.CreateGraphicsPipeline();
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativePipeline, PipelineBinaryGetPipelineKey) {
-    TEST_DESCRIPTION("Try getting the pipeline key with invalid input structures");
-    SetTargetApiVersion(VK_API_VERSION_1_1);
-    AddRequiredExtensions(VK_KHR_PIPELINE_BINARY_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::pipelineBinaries);
+TEST_F(NegativePipeline, DepthClampControlUnrestricted) {
+    AddRequiredExtensions(VK_EXT_DEPTH_CLAMP_CONTROL_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::depthClampControl);
     RETURN_IF_SKIP(Init());
-
-    {
-        VkPipelineCreateInfoKHR pipeline_create_info = vku::InitStructHelper();
-        VkDescriptorSetLayoutCreateInfo layout_create_info = vku::InitStructHelper();
-        VkPipelineBinaryKeyKHR pipeline_key = vku::InitStructHelper();
-
-        pipeline_create_info.pNext = &layout_create_info;
-
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPipelineCreateInfoKHR-pNext-09604");
-        vk::GetPipelineKeyKHR(device(), &pipeline_create_info, &pipeline_key);
-        m_errorMonitor->VerifyFound();
-    }
-
-    {
-        VkShaderObj cs(this, kMinimalShaderGlsl, VK_SHADER_STAGE_COMPUTE_BIT);
-
-        std::vector<VkDescriptorSetLayoutBinding> bindings(0);
-        const vkt::DescriptorSetLayout pipeline_dsl(*m_device, bindings);
-        const vkt::PipelineLayout pipeline_layout(*m_device, {&pipeline_dsl});
-
-        VkComputePipelineCreateInfo compute_create_info = vku::InitStructHelper();
-        compute_create_info.stage = cs.GetStageCreateInfo();
-        compute_create_info.layout = pipeline_layout.handle();
-
-        VkPipelineBinaryInfoKHR pipeline_binary_info = vku::InitStructHelper();
-        pipeline_binary_info.binaryCount = 1;
-
-        compute_create_info.pNext = &pipeline_binary_info;
-
-        VkPipelineCreateInfoKHR pipeline_create_info = vku::InitStructHelper(&compute_create_info);
-
-        VkPipelineBinaryKeyKHR pipeline_key = vku::InitStructHelper();
-
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkGetPipelineKeyKHR-pNext-09605");
-        vk::GetPipelineKeyKHR(device(), &pipeline_create_info, &pipeline_key);
-        m_errorMonitor->VerifyFound();
-    }
-}
-
-TEST_F(NegativePipeline, PipelineBinaryReleaseCapturedDataAllocator) {
-    TEST_DESCRIPTION("Test using ReleaseCapturedData with/without an allocator");
-    SetTargetApiVersion(VK_API_VERSION_1_1);
-    AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::maintenance5);
-    AddRequiredExtensions(VK_KHR_PIPELINE_BINARY_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::pipelineBinaries);
-    RETURN_IF_SKIP(Init());
-
-    struct Alloc {
-        static VKAPI_ATTR void *VKAPI_CALL alloc(void *, size_t size, size_t, VkSystemAllocationScope) { return malloc(size); };
-        static VKAPI_ATTR void *VKAPI_CALL reallocFunc(void *, void *original, size_t size, size_t, VkSystemAllocationScope) {
-            return realloc(original, size);
-        };
-        static VKAPI_ATTR void VKAPI_CALL freeFunc(void *, void *ptr) { free(ptr); };
-        static VKAPI_ATTR void VKAPI_CALL internalAlloc(void *, size_t, VkInternalAllocationType, VkSystemAllocationScope) {};
-        static VKAPI_ATTR void VKAPI_CALL internalFree(void *, size_t, VkInternalAllocationType, VkSystemAllocationScope) {};
-    };
-    const VkAllocationCallbacks allocator = {nullptr, Alloc::alloc, Alloc::reallocFunc, Alloc::freeFunc, nullptr, nullptr};
-
-    VkShaderObj cs(this, kMinimalShaderGlsl, VK_SHADER_STAGE_COMPUTE_BIT);
-
-    std::vector<VkDescriptorSetLayoutBinding> bindings(0);
-    const vkt::DescriptorSetLayout pipeline_dsl(*m_device, bindings);
-    const vkt::PipelineLayout pipeline_layout(*m_device, {&pipeline_dsl});
-
-    VkComputePipelineCreateInfo compute_create_info = vku::InitStructHelper();
-    compute_create_info.stage = cs.GetStageCreateInfo();
-    compute_create_info.layout = pipeline_layout.handle();
-
-    VkPipelineCreateFlags2CreateInfoKHR flags2 = vku::InitStructHelper();
-    flags2.flags = VK_PIPELINE_CREATE_2_CAPTURE_DATA_BIT_KHR;
-    compute_create_info.pNext = &flags2;
-
-    VkPipeline test_pipeline_with_allocator;
-    VkResult err =
-        vk::CreateComputePipelines(device(), VK_NULL_HANDLE, 1, &compute_create_info, &allocator, &test_pipeline_with_allocator);
-    ASSERT_EQ(VK_SUCCESS, err);
-
-    VkPipeline test_pipeline_no_allocator;
-    err = vk::CreateComputePipelines(device(), VK_NULL_HANDLE, 1, &compute_create_info, nullptr, &test_pipeline_no_allocator);
-    ASSERT_EQ(VK_SUCCESS, err);
-
-    VkReleaseCapturedPipelineDataInfoKHR data_info = vku::InitStructHelper();
-
-    data_info.pipeline = test_pipeline_with_allocator;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkReleaseCapturedPipelineDataKHR-pipeline-09611");
-    vk::ReleaseCapturedPipelineDataKHR(device(), &data_info, nullptr);
-    m_errorMonitor->VerifyFound();
-
-    data_info.pipeline = test_pipeline_no_allocator;
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkReleaseCapturedPipelineDataKHR-pipeline-09612");
-    vk::ReleaseCapturedPipelineDataKHR(device(), &data_info, &allocator);
-    m_errorMonitor->VerifyFound();
-
-    vk::DestroyPipeline(device(), test_pipeline_with_allocator, &allocator);
-    vk::DestroyPipeline(device(), test_pipeline_no_allocator, nullptr);
-}
-
-TEST_F(NegativePipeline, PipelineBinaryReleaseCapturedData) {
-    TEST_DESCRIPTION("Test using ReleaseCapturedPipelineDataKHR in a bad state");
-    SetTargetApiVersion(VK_API_VERSION_1_1);
-    AddRequiredExtensions(VK_KHR_PIPELINE_BINARY_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::pipelineBinaries);
-    RETURN_IF_SKIP(Init());
-
-    VkShaderObj cs(this, kMinimalShaderGlsl, VK_SHADER_STAGE_COMPUTE_BIT);
-
-    std::vector<VkDescriptorSetLayoutBinding> bindings(0);
-    const vkt::DescriptorSetLayout pipeline_dsl(*m_device, bindings);
-    const vkt::PipelineLayout pipeline_layout(*m_device, {&pipeline_dsl});
-
-    VkComputePipelineCreateInfo compute_create_info = vku::InitStructHelper();
-    compute_create_info.stage = cs.GetStageCreateInfo();
-    compute_create_info.layout = pipeline_layout.handle();
-
-    VkPipeline test_pipeline;
-    VkResult err = vk::CreateComputePipelines(device(), VK_NULL_HANDLE, 1, &compute_create_info, nullptr, &test_pipeline);
-    ASSERT_EQ(VK_SUCCESS, err);
-
-    {
-        VkReleaseCapturedPipelineDataInfoKHR data_info = vku::InitStructHelper();
-        data_info.pipeline = test_pipeline;
-
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkReleaseCapturedPipelineDataInfoKHR-pipeline-09613");
-        vk::ReleaseCapturedPipelineDataKHR(device(), &data_info, nullptr);
-        m_errorMonitor->VerifyFound();
-    }
-
-    VkPipelineCreateFlags2CreateInfoKHR flags2 = vku::InitStructHelper();
-    flags2.flags = VK_PIPELINE_CREATE_2_CAPTURE_DATA_BIT_KHR;
-    compute_create_info.pNext = &flags2;
-
-    VkPipeline test_pipeline2;
-    err = vk::CreateComputePipelines(device(), VK_NULL_HANDLE, 1, &compute_create_info, nullptr, &test_pipeline2);
-    ASSERT_EQ(VK_SUCCESS, err);
-
-    {
-        VkReleaseCapturedPipelineDataInfoKHR data_info = vku::InitStructHelper();
-        data_info.pipeline = test_pipeline2;
-
-        vk::ReleaseCapturedPipelineDataKHR(device(), &data_info, nullptr);
-
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkReleaseCapturedPipelineDataInfoKHR-pipeline-09618");
-        vk::ReleaseCapturedPipelineDataKHR(device(), &data_info, nullptr);
-        m_errorMonitor->VerifyFound();
-    }
-
-    vk::DestroyPipeline(device(), test_pipeline, nullptr);
-    vk::DestroyPipeline(device(), test_pipeline2, nullptr);
-}
-
-TEST_F(NegativePipeline, PipelineBinaryDestroy) {
-    TEST_DESCRIPTION("Test using DestroyPipelineBinary with/without an allocator");
-    SetTargetApiVersion(VK_API_VERSION_1_1);
-    AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::maintenance5);
-    AddRequiredExtensions(VK_KHR_PIPELINE_BINARY_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::pipelineBinaries);
-    RETURN_IF_SKIP(Init());
-
-    VkShaderObj cs(this, kMinimalShaderGlsl, VK_SHADER_STAGE_COMPUTE_BIT);
-
-    std::vector<VkDescriptorSetLayoutBinding> bindings(0);
-    const vkt::DescriptorSetLayout pipeline_dsl(*m_device, bindings);
-    const vkt::PipelineLayout pipeline_layout(*m_device, {&pipeline_dsl});
-
-    VkComputePipelineCreateInfo compute_create_info = vku::InitStructHelper();
-    compute_create_info.stage = cs.GetStageCreateInfo();
-    compute_create_info.layout = pipeline_layout.handle();
-
-    VkPipelineCreateFlags2CreateInfoKHR flags2 = vku::InitStructHelper();
-    flags2.flags = VK_PIPELINE_CREATE_2_CAPTURE_DATA_BIT_KHR;
-    compute_create_info.pNext = &flags2;
-
-    VkPipeline test_pipeline;
-    VkResult err = vk::CreateComputePipelines(device(), VK_NULL_HANDLE, 1, &compute_create_info, nullptr, &test_pipeline);
-    ASSERT_EQ(VK_SUCCESS, err);
-
-    struct Alloc {
-        static VKAPI_ATTR void *VKAPI_CALL alloc(void *, size_t size, size_t, VkSystemAllocationScope) { return malloc(size); };
-        static VKAPI_ATTR void *VKAPI_CALL reallocFunc(void *, void *original, size_t size, size_t, VkSystemAllocationScope) {
-            return realloc(original, size);
-        };
-        static VKAPI_ATTR void VKAPI_CALL freeFunc(void *, void *ptr) { free(ptr); };
-        static VKAPI_ATTR void VKAPI_CALL internalAlloc(void *, size_t, VkInternalAllocationType, VkSystemAllocationScope) {};
-        static VKAPI_ATTR void VKAPI_CALL internalFree(void *, size_t, VkInternalAllocationType, VkSystemAllocationScope) {};
-    };
-    const VkAllocationCallbacks allocator = {nullptr, Alloc::alloc, Alloc::reallocFunc, Alloc::freeFunc, nullptr, nullptr};
-
-    VkPipelineBinaryCreateInfoKHR binary_create_info = vku::InitStructHelper();
-    binary_create_info.pipeline = test_pipeline;
-
-    VkPipelineBinaryHandlesInfoKHR handlesInfo = vku::InitStructHelper();
-    handlesInfo.pipelineBinaryCount = 1;
-
-    VkPipelineBinaryKHR pipeline_binary_alloc;
-    handlesInfo.pPipelineBinaries = &pipeline_binary_alloc;
-    err = vk::CreatePipelineBinariesKHR(device(), &binary_create_info, &allocator, &handlesInfo);
-    ASSERT_EQ(VK_SUCCESS, err);
-
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkDestroyPipelineBinaryKHR-pipelineBinary-09614");
-    vk::DestroyPipelineBinaryKHR(device(), pipeline_binary_alloc, nullptr);
-    m_errorMonitor->VerifyFound();
-    vk::DestroyPipelineBinaryKHR(device(), pipeline_binary_alloc, &allocator);
-
-    VkPipelineBinaryKHR pipeline_binary_no_alloc;
-    handlesInfo.pPipelineBinaries = &pipeline_binary_no_alloc;
-    err = vk::CreatePipelineBinariesKHR(device(), &binary_create_info, nullptr, &handlesInfo);
-    ASSERT_EQ(VK_SUCCESS, err);
-
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkDestroyPipelineBinaryKHR-pipelineBinary-09615");
-    vk::DestroyPipelineBinaryKHR(device(), pipeline_binary_no_alloc, &allocator);
-    m_errorMonitor->VerifyFound();
-    vk::DestroyPipelineBinaryKHR(device(), pipeline_binary_no_alloc, nullptr);
-
-    vk::DestroyPipeline(device(), test_pipeline, nullptr);
-}
-
-TEST_F(NegativePipeline, PipelineBinaryComputePipeline) {
-    TEST_DESCRIPTION("Test creating a compute pipeline with bad pipeline binary settings");
-    SetTargetApiVersion(VK_API_VERSION_1_3);
-    AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::maintenance5);
-    AddRequiredExtensions(VK_KHR_PIPELINE_BINARY_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::pipelineBinaries);
-    RETURN_IF_SKIP(Init());
-
-    VkPipelineCache pipeline_cache;
-    VkPipelineCacheCreateInfo cache_create_info = vku::InitStructHelper();
-    cache_create_info.initialDataSize = 0;
-    VkResult err = vk::CreatePipelineCache(device(), &cache_create_info, nullptr, &pipeline_cache);
-    ASSERT_EQ(VK_SUCCESS, err);
-
-    VkShaderObj cs(this, kMinimalShaderGlsl, VK_SHADER_STAGE_COMPUTE_BIT);
-
-    std::vector<VkDescriptorSetLayoutBinding> bindings(0);
-    const vkt::DescriptorSetLayout pipeline_dsl(*m_device, bindings);
-    const vkt::PipelineLayout pipeline_layout(*m_device, {&pipeline_dsl});
-
-    VkComputePipelineCreateInfo compute_create_info = vku::InitStructHelper();
-    compute_create_info.stage = cs.GetStageCreateInfo();
-    compute_create_info.layout = pipeline_layout.handle();
-
-    {
-        VkPipelineCreateFlags2CreateInfoKHR flags2 = vku::InitStructHelper();
-        flags2.flags = VK_PIPELINE_CREATE_2_CAPTURE_DATA_BIT_KHR;
-        compute_create_info.pNext = &flags2;
-
-        VkPipeline test_pipeline;
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateComputePipelines-pNext-09617");
-        vk::CreateComputePipelines(device(), pipeline_cache, 1, &compute_create_info, nullptr, &test_pipeline);
-        m_errorMonitor->VerifyFound();
-
-        err = vk::CreateComputePipelines(device(), VK_NULL_HANDLE, 1, &compute_create_info, nullptr, &test_pipeline);
-        ASSERT_EQ(VK_SUCCESS, err);
-
-        VkPipelineBinaryCreateInfoKHR binary_create_info = vku::InitStructHelper();
-        binary_create_info.pipeline = test_pipeline;
-
-        VkPipelineBinaryHandlesInfoKHR handlesInfo = vku::InitStructHelper();
-        handlesInfo.pipelineBinaryCount = 1;
-
-        err = vk::CreatePipelineBinariesKHR(device(), &binary_create_info, nullptr, &handlesInfo);
-        ASSERT_EQ(VK_SUCCESS, err);
-
-        std::vector<VkPipelineBinaryKHR> binaries(handlesInfo.pipelineBinaryCount);
-        handlesInfo.pPipelineBinaries = binaries.data();
-
-        err = vk::CreatePipelineBinariesKHR(device(), &binary_create_info, nullptr, &handlesInfo);
-        ASSERT_EQ(VK_SUCCESS, err);
-
-        VkPipelineBinaryInfoKHR binary_info = vku::InitStructHelper();
-        binary_info.binaryCount = handlesInfo.pipelineBinaryCount;
-        binary_info.pPipelineBinaries = handlesInfo.pPipelineBinaries;
-
-        compute_create_info.pNext = &binary_info;
-
-        VkPipeline test_pipeline2;
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateComputePipelines-pNext-09616");
-        vk::CreateComputePipelines(device(), pipeline_cache, 1, &compute_create_info, nullptr, &test_pipeline2);
-        m_errorMonitor->VerifyFound();
-
-        for (uint32_t i = 0; i < binaries.size(); i++) {
-            vk::DestroyPipelineBinaryKHR(device(), binaries[i], nullptr);
-        }
-
-        vk::DestroyPipeline(device(), test_pipeline, nullptr);
-    }
-
-    {
-        VkPipelineCreateFlags2CreateInfoKHR flags2 = vku::InitStructHelper();
-        flags2.flags = VK_PIPELINE_CREATE_2_CAPTURE_DATA_BIT_KHR;
-        compute_create_info.pNext = &flags2;
-
-        VkPipeline test_pipeline;
-
-        err = vk::CreateComputePipelines(device(), VK_NULL_HANDLE, 1, &compute_create_info, nullptr, &test_pipeline);
-        ASSERT_EQ(VK_SUCCESS, err);
-
-        VkPipelineBinaryCreateInfoKHR binary_create_info = vku::InitStructHelper();
-        binary_create_info.pipeline = test_pipeline;
-
-        VkPipelineBinaryHandlesInfoKHR handlesInfo = vku::InitStructHelper();
-        handlesInfo.pipelineBinaryCount = 1;
-
-        err = vk::CreatePipelineBinariesKHR(device(), &binary_create_info, nullptr, &handlesInfo);
-        ASSERT_EQ(VK_SUCCESS, err);
-
-        std::vector<VkPipelineBinaryKHR> binaries(handlesInfo.pipelineBinaryCount);
-        handlesInfo.pPipelineBinaries = binaries.data();
-
-        err = vk::CreatePipelineBinariesKHR(device(), &binary_create_info, nullptr, &handlesInfo);
-        ASSERT_EQ(VK_SUCCESS, err);
-
-        VkPipelineBinaryInfoKHR binary_info = vku::InitStructHelper();
-        binary_info.binaryCount = handlesInfo.pipelineBinaryCount;
-        binary_info.pPipelineBinaries = handlesInfo.pPipelineBinaries;
-
-        VkPipelineCreationFeedbackCreateInfo feedback_create_info = vku::InitStructHelper();
-        VkPipelineCreationFeedback feedback = {};
-
-        feedback_create_info.pPipelineCreationFeedback = &feedback;
-        feedback.flags = VK_PIPELINE_CREATION_FEEDBACK_APPLICATION_PIPELINE_CACHE_HIT_BIT |
-                         VK_PIPELINE_CREATION_FEEDBACK_BASE_PIPELINE_ACCELERATION_BIT;
-
-        flags2.flags |= VK_PIPELINE_CREATE_FAIL_ON_PIPELINE_COMPILE_REQUIRED_BIT_EXT;
-        flags2.pNext = &binary_info;
-        binary_info.pNext = &feedback_create_info;
-
-        VkPipeline test_pipeline2;
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateComputePipelines-binaryCount-09620");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateComputePipelines-binaryCount-09621");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateComputePipelines-binaryCount-09622");
-
-        vk::CreateComputePipelines(device(), VK_NULL_HANDLE, 1, &compute_create_info, nullptr, &test_pipeline2);
-        m_errorMonitor->VerifyFound();
-
-        for (uint32_t i = 0; i < binaries.size(); i++) {
-            vk::DestroyPipelineBinaryKHR(device(), binaries[i], nullptr);
-        }
-
-        vk::DestroyPipeline(device(), test_pipeline, nullptr);
-    }
-
-    vk::DestroyPipelineCache(device(), pipeline_cache, nullptr);
-}
-
-TEST_F(NegativePipeline, PipelineBinaryGraphicsPipeline) {
-    TEST_DESCRIPTION("Test creating a graphics pipeline with bad pipeline binary settings");
-    SetTargetApiVersion(VK_API_VERSION_1_3);
-    AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::maintenance5);
-    AddRequiredExtensions(VK_KHR_PIPELINE_BINARY_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::pipelineBinaries);
-    RETURN_IF_SKIP(Init());
-
-    VkPipelineCache pipeline_cache;
-    VkPipelineCacheCreateInfo cache_create_info = vku::InitStructHelper();
-    cache_create_info.initialDataSize = 0;
-    VkResult err = vk::CreatePipelineCache(device(), &cache_create_info, nullptr, &pipeline_cache);
-    ASSERT_EQ(VK_SUCCESS, err);
-
-    m_depth_stencil_fmt = FindSupportedDepthStencilFormat(gpu());
-
-    m_depthStencil->Init(*m_device, m_width, m_height, 1, m_depth_stencil_fmt, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
-    m_depthStencil->SetLayout(VK_IMAGE_LAYOUT_GENERAL);
-    vkt::ImageView depth_image_view = m_depthStencil->CreateView(VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
-    InitRenderTarget(&depth_image_view.handle());
-
-    VkShaderObj vs(this, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
-
-    const VkPipelineVertexInputStateCreateInfo pipeline_vertex_input_state_create_info{
-        VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO, nullptr, 0, 0, nullptr, 0, nullptr};
-
-    const VkPipelineInputAssemblyStateCreateInfo pipeline_input_assembly_state_create_info{
-        VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO, nullptr, 0, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_FALSE};
-
-    const VkPipelineRasterizationStateCreateInfo pipeline_rasterization_state_create_info_template{
-        VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
-        nullptr,
-        0,
-        VK_FALSE,
-        VK_FALSE,
-        VK_POLYGON_MODE_FILL,
-        VK_CULL_MODE_NONE,
-        VK_FRONT_FACE_COUNTER_CLOCKWISE,
-        VK_FALSE,
-        0.0f,
-        0.0f,
-        0.0f,
-        1.0f};
-
-    VkPipelineLayout pipeline_layout;
-    VkPipelineLayoutCreateInfo pipeline_layout_create_info = vku::InitStructHelper();
-    err = vk::CreatePipelineLayout(device(), &pipeline_layout_create_info, nullptr, &pipeline_layout);
-    ASSERT_EQ(VK_SUCCESS, err);
-
-    VkPipelineRasterizationStateCreateInfo pipeline_rasterization_state_create_info =
-        pipeline_rasterization_state_create_info_template;
-    pipeline_rasterization_state_create_info.rasterizerDiscardEnable = VK_TRUE;
-
-    VkGraphicsPipelineCreateInfo graphics_pipeline_create_info{VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
-                                                               nullptr,
-                                                               0,
-                                                               1,
-                                                               &vs.GetStageCreateInfo(),
-                                                               &pipeline_vertex_input_state_create_info,
-                                                               &pipeline_input_assembly_state_create_info,
-                                                               nullptr,
-                                                               nullptr,
-                                                               &pipeline_rasterization_state_create_info,
-                                                               nullptr,
-                                                               nullptr,
-                                                               nullptr,
-                                                               nullptr,
-                                                               pipeline_layout,
-                                                               m_renderPass,
-                                                               0,
-                                                               0,
-                                                               0};
-
-    {
-        VkPipelineCreateFlags2CreateInfoKHR flags2 = vku::InitStructHelper();
-        flags2.flags = VK_PIPELINE_CREATE_2_CAPTURE_DATA_BIT_KHR;
-        graphics_pipeline_create_info.pNext = &flags2;
-
-        VkPipeline test_pipeline;
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateGraphicsPipelines-pNext-09617");
-        vk::CreateGraphicsPipelines(device(), pipeline_cache, 1, &graphics_pipeline_create_info, nullptr, &test_pipeline);
-        m_errorMonitor->VerifyFound();
-
-        err = vk::CreateGraphicsPipelines(device(), VK_NULL_HANDLE, 1, &graphics_pipeline_create_info, nullptr, &test_pipeline);
-        ASSERT_EQ(VK_SUCCESS, err);
-
-        VkPipelineBinaryCreateInfoKHR binary_create_info = vku::InitStructHelper();
-        binary_create_info.pipeline = test_pipeline;
-
-        VkPipelineBinaryHandlesInfoKHR handlesInfo = vku::InitStructHelper();
-        handlesInfo.pipelineBinaryCount = 1;
-
-        err = vk::CreatePipelineBinariesKHR(device(), &binary_create_info, nullptr, &handlesInfo);
-        ASSERT_EQ(VK_SUCCESS, err);
-
-        std::vector<VkPipelineBinaryKHR> binaries(handlesInfo.pipelineBinaryCount);
-        handlesInfo.pPipelineBinaries = binaries.data();
-
-        err = vk::CreatePipelineBinariesKHR(device(), &binary_create_info, nullptr, &handlesInfo);
-        ASSERT_EQ(VK_SUCCESS, err);
-
-        VkPipelineBinaryInfoKHR binary_info = vku::InitStructHelper();
-        binary_info.binaryCount = handlesInfo.pipelineBinaryCount;
-        binary_info.pPipelineBinaries = handlesInfo.pPipelineBinaries;
-
-        graphics_pipeline_create_info.pNext = &binary_info;
-
-        VkPipeline test_pipeline2;
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateGraphicsPipelines-pNext-09616");
-        vk::CreateGraphicsPipelines(device(), pipeline_cache, 1, &graphics_pipeline_create_info, nullptr, &test_pipeline2);
-        m_errorMonitor->VerifyFound();
-
-        for (uint32_t i = 0; i < binaries.size(); i++) {
-            vk::DestroyPipelineBinaryKHR(device(), binaries[i], nullptr);
-        }
-
-        vk::DestroyPipeline(device(), test_pipeline, nullptr);
-    }
-
-    {
-        VkPipelineCreateFlags2CreateInfoKHR flags2 = vku::InitStructHelper();
-        flags2.flags = VK_PIPELINE_CREATE_2_CAPTURE_DATA_BIT_KHR;
-        graphics_pipeline_create_info.pNext = &flags2;
-
-        VkPipeline test_pipeline;
-
-        err = vk::CreateGraphicsPipelines(device(), VK_NULL_HANDLE, 1, &graphics_pipeline_create_info, nullptr, &test_pipeline);
-        ASSERT_EQ(VK_SUCCESS, err);
-
-        VkPipelineBinaryCreateInfoKHR binary_create_info = vku::InitStructHelper();
-        binary_create_info.pipeline = test_pipeline;
-
-        VkPipelineBinaryHandlesInfoKHR handlesInfo = vku::InitStructHelper();
-        handlesInfo.pipelineBinaryCount = 1;
-
-        err = vk::CreatePipelineBinariesKHR(device(), &binary_create_info, nullptr, &handlesInfo);
-        ASSERT_EQ(VK_SUCCESS, err);
-
-        std::vector<VkPipelineBinaryKHR> binaries(handlesInfo.pipelineBinaryCount);
-        handlesInfo.pPipelineBinaries = binaries.data();
-
-        err = vk::CreatePipelineBinariesKHR(device(), &binary_create_info, nullptr, &handlesInfo);
-        ASSERT_EQ(VK_SUCCESS, err);
-
-        VkPipelineBinaryInfoKHR binary_info = vku::InitStructHelper();
-        binary_info.binaryCount = handlesInfo.pipelineBinaryCount;
-        binary_info.pPipelineBinaries = handlesInfo.pPipelineBinaries;
-
-        VkPipelineCreationFeedbackCreateInfo feedback_create_info = vku::InitStructHelper();
-        VkPipelineCreationFeedback feedback = {};
-
-        feedback_create_info.pPipelineCreationFeedback = &feedback;
-        feedback.flags = VK_PIPELINE_CREATION_FEEDBACK_APPLICATION_PIPELINE_CACHE_HIT_BIT |
-                         VK_PIPELINE_CREATION_FEEDBACK_BASE_PIPELINE_ACCELERATION_BIT;
-
-        flags2.flags |= VK_PIPELINE_CREATE_FAIL_ON_PIPELINE_COMPILE_REQUIRED_BIT_EXT;
-        flags2.pNext = &binary_info;
-        binary_info.pNext = &feedback_create_info;
-
-        VkPipeline test_pipeline2;
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateGraphicsPipelines-binaryCount-09620");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateGraphicsPipelines-binaryCount-09621");
-        m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-vkCreateGraphicsPipelines-binaryCount-09622");
-
-        vk::CreateGraphicsPipelines(device(), VK_NULL_HANDLE, 1, &graphics_pipeline_create_info, nullptr, &test_pipeline2);
-        m_errorMonitor->VerifyFound();
-
-        for (uint32_t i = 0; i < binaries.size(); i++) {
-            vk::DestroyPipelineBinaryKHR(device(), binaries[i], nullptr);
-        }
-
-        vk::DestroyPipeline(device(), test_pipeline, nullptr);
-    }
-
-    vk::DestroyPipelineLayout(device(), pipeline_layout, nullptr);
-    vk::DestroyPipelineCache(device(), pipeline_cache, nullptr);
-}
-
-TEST_F(NegativePipeline, PipelineBinaryCreation1) {
-    TEST_DESCRIPTION("Test creating pipeline binaries with invalid parameters");
-    SetTargetApiVersion(VK_API_VERSION_1_1);
-    AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::maintenance5);
-    AddRequiredExtensions(VK_KHR_PIPELINE_BINARY_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::pipelineBinaries);
-    RETURN_IF_SKIP(Init());
-
-    VkResult err;
-
-    VkShaderObj cs(this, kMinimalShaderGlsl, VK_SHADER_STAGE_COMPUTE_BIT);
-
-    std::vector<VkDescriptorSetLayoutBinding> bindings(0);
-    const vkt::DescriptorSetLayout pipeline_dsl(*m_device, bindings);
-    const vkt::PipelineLayout pipeline_layout(*m_device, {&pipeline_dsl});
-
-    VkComputePipelineCreateInfo compute_create_info = vku::InitStructHelper();
-    compute_create_info.stage = cs.GetStageCreateInfo();
-    compute_create_info.layout = pipeline_layout.handle();
-
-    VkPipeline test_pipeline1;
-
-    err = vk::CreateComputePipelines(device(), VK_NULL_HANDLE, 1, &compute_create_info, nullptr, &test_pipeline1);
-    ASSERT_EQ(VK_SUCCESS, err);
-
-    VkPipelineBinaryCreateInfoKHR binary_create_info = vku::InitStructHelper();
-    binary_create_info.pipeline = test_pipeline1;
-
-    VkPipelineBinaryKHR pipeline_binary;
-    VkPipelineBinaryHandlesInfoKHR handlesInfo = vku::InitStructHelper();
-    handlesInfo.pipelineBinaryCount = 1;
-    handlesInfo.pPipelineBinaries = &pipeline_binary;
-
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPipelineBinaryCreateInfoKHR-pipeline-09607");
-    vk::CreatePipelineBinariesKHR(device(), &binary_create_info, nullptr, &handlesInfo);
-    m_errorMonitor->VerifyFound();
-
-    vk::DestroyPipeline(device(), test_pipeline1, nullptr);
-}
-
-TEST_F(NegativePipeline, PipelineBinaryCreation2) {
-    TEST_DESCRIPTION("Test creating pipeline binaries with invalid parameters");
-    SetTargetApiVersion(VK_API_VERSION_1_1);
-    AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::maintenance5);
-    AddRequiredExtensions(VK_KHR_PIPELINE_BINARY_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::pipelineBinaries);
-    RETURN_IF_SKIP(Init());
-
-    VkResult err;
-
-    VkShaderObj cs(this, kMinimalShaderGlsl, VK_SHADER_STAGE_COMPUTE_BIT);
-
-    std::vector<VkDescriptorSetLayoutBinding> bindings(0);
-    const vkt::DescriptorSetLayout pipeline_dsl(*m_device, bindings);
-    const vkt::PipelineLayout pipeline_layout(*m_device, {&pipeline_dsl});
-
-    VkComputePipelineCreateInfo compute_create_info = vku::InitStructHelper();
-    compute_create_info.stage = cs.GetStageCreateInfo();
-    compute_create_info.layout = pipeline_layout.handle();
-
-    VkPipelineCreateFlags2CreateInfoKHR flags2 = vku::InitStructHelper();
-    flags2.flags = VK_PIPELINE_CREATE_2_CAPTURE_DATA_BIT_KHR;
-    compute_create_info.pNext = &flags2;
-
-    VkPipeline test_pipeline2;
-
-    err = vk::CreateComputePipelines(device(), VK_NULL_HANDLE, 1, &compute_create_info, nullptr, &test_pipeline2);
-    ASSERT_EQ(VK_SUCCESS, err);
-
-    VkReleaseCapturedPipelineDataInfoKHR release_info = vku::InitStructHelper();
-    release_info.pipeline = test_pipeline2;
-
-    err = vk::ReleaseCapturedPipelineDataKHR(device(), &release_info, nullptr);
-    ASSERT_EQ(VK_SUCCESS, err);
-
-    VkPipelineBinaryCreateInfoKHR binary_create_info = vku::InitStructHelper();
-    binary_create_info.pipeline = test_pipeline2;
-
-    VkPipelineBinaryKHR pipeline_binary;
-    VkPipelineBinaryHandlesInfoKHR handlesInfo = vku::InitStructHelper();
-    handlesInfo.pipelineBinaryCount = 1;
-    handlesInfo.pPipelineBinaries = &pipeline_binary;
-
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPipelineBinaryCreateInfoKHR-pipeline-09608");
-    vk::CreatePipelineBinariesKHR(device(), &binary_create_info, nullptr, &handlesInfo);
-    m_errorMonitor->VerifyFound();
-
-    vk::DestroyPipeline(device(), test_pipeline2, nullptr);
-}
-
-TEST_F(NegativePipeline, PipelineBinaryCreation3) {
-    TEST_DESCRIPTION("Test creating pipeline binaries with invalid parameters");
-    SetTargetApiVersion(VK_API_VERSION_1_1);
-    AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::maintenance5);
-    AddRequiredExtensions(VK_KHR_PIPELINE_BINARY_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::pipelineBinaries);
-    RETURN_IF_SKIP(Init());
-
-    VkPhysicalDevicePipelineBinaryPropertiesKHR pipeline_binary_properties = vku::InitStructHelper();
-    GetPhysicalDeviceProperties2(pipeline_binary_properties);
-
-    if (pipeline_binary_properties.pipelineBinaryInternalCache) {
-        GTEST_SKIP() << "pipelineBinaryInternalCache is VK_TRUE";
-    }
-
-    VkShaderObj cs(this, kMinimalShaderGlsl, VK_SHADER_STAGE_COMPUTE_BIT);
-
-    std::vector<VkDescriptorSetLayoutBinding> bindings(0);
-    const vkt::DescriptorSetLayout pipeline_dsl(*m_device, bindings);
-    const vkt::PipelineLayout pipeline_layout(*m_device, {&pipeline_dsl});
-
-    VkComputePipelineCreateInfo compute_create_info = vku::InitStructHelper();
-    compute_create_info.stage = cs.GetStageCreateInfo();
-    compute_create_info.layout = pipeline_layout.handle();
-
-    VkPipelineCreateFlags2CreateInfoKHR flags2 = vku::InitStructHelper();
-    flags2.flags = VK_PIPELINE_CREATE_2_CAPTURE_DATA_BIT_KHR;
-    compute_create_info.pNext = &flags2;
-
-    VkPipelineCreateInfoKHR pipeline_create_info = vku::InitStructHelper(&compute_create_info);
-
-    VkPipelineBinaryCreateInfoKHR binary_create_info = vku::InitStructHelper();
-    binary_create_info.pPipelineCreateInfo = &pipeline_create_info;
-
-    VkPipelineBinaryKHR pipeline_binary;
-    VkPipelineBinaryHandlesInfoKHR handlesInfo = vku::InitStructHelper();
-    handlesInfo.pipelineBinaryCount = 1;
-    handlesInfo.pPipelineBinaries = &pipeline_binary;
-
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPipelineBinaryCreateInfoKHR-pipelineBinaryInternalCache-09609");
-    vk::CreatePipelineBinariesKHR(device(), &binary_create_info, nullptr, &handlesInfo);
+    InitRenderTarget();
+
+    VkDepthClampRangeEXT clamp_range = {-0.5f, 1.5f};
+    VkPipelineViewportDepthClampControlCreateInfoEXT clamp_control = vku::InitStructHelper();
+    clamp_control.depthClampMode = VK_DEPTH_CLAMP_MODE_USER_DEFINED_RANGE_EXT;
+    clamp_control.pDepthClampRange = &clamp_range;
+    CreatePipelineHelper pipe(*this);
+    pipe.vp_state_ci_.pNext = &clamp_control;
+    m_errorMonitor->SetDesiredError("VUID-VkDepthClampRangeEXT-pDepthClampRange-09648");
+    m_errorMonitor->SetDesiredError("VUID-VkDepthClampRangeEXT-pDepthClampRange-09649");
+    pipe.CreateGraphicsPipeline();
     m_errorMonitor->VerifyFound();
 }
 
-TEST_F(NegativePipeline, PipelineBinaryCreation4) {
-    TEST_DESCRIPTION("Test creating pipeline binaries with invalid parameters");
-    SetTargetApiVersion(VK_API_VERSION_1_1);
-    AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::maintenance5);
-    AddRequiredExtensions(VK_KHR_PIPELINE_BINARY_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::pipelineBinaries);
+TEST_F(NegativePipeline, DepthClampControlUserDefined) {
+    AddRequiredExtensions(VK_EXT_DEPTH_CLAMP_CONTROL_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::depthClampControl);
     RETURN_IF_SKIP(Init());
+    InitRenderTarget();
 
-    VkResult err;
-
-    VkShaderObj cs(this, kMinimalShaderGlsl, VK_SHADER_STAGE_COMPUTE_BIT);
-
-    std::vector<VkDescriptorSetLayoutBinding> bindings(0);
-    const vkt::DescriptorSetLayout pipeline_dsl(*m_device, bindings);
-    const vkt::PipelineLayout pipeline_layout(*m_device, {&pipeline_dsl});
-
-    VkComputePipelineCreateInfo compute_create_info = vku::InitStructHelper();
-    compute_create_info.stage = cs.GetStageCreateInfo();
-    compute_create_info.layout = pipeline_layout.handle();
-
-    VkPipelineCreateFlags2CreateInfoKHR flags2 = vku::InitStructHelper();
-    flags2.flags = VK_PIPELINE_CREATE_2_CAPTURE_DATA_BIT_KHR;
-    compute_create_info.pNext = &flags2;
-
-    VkPipeline test_pipeline4;
-
-    err = vk::CreateComputePipelines(device(), VK_NULL_HANDLE, 1, &compute_create_info, nullptr, &test_pipeline4);
-    ASSERT_EQ(VK_SUCCESS, err);
-
-    VkPipelineCreateInfoKHR pipeline_create_info = vku::InitStructHelper(&compute_create_info);
-
-    VkPipelineBinaryCreateInfoKHR binary_create_info = vku::InitStructHelper();
-
-    VkPipelineBinaryKHR pipeline_binary;
-    VkPipelineBinaryHandlesInfoKHR handlesInfo = vku::InitStructHelper();
-    handlesInfo.pipelineBinaryCount = 1;
-    handlesInfo.pPipelineBinaries = &pipeline_binary;
-
-    // test 0
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPipelineBinaryCreateInfoKHR-pKeysAndDataInfo-09619");
-    vk::CreatePipelineBinariesKHR(device(), &binary_create_info, nullptr, &handlesInfo);
-    m_errorMonitor->VerifyFound();
-
-    // test > 0
-    binary_create_info.pipeline = test_pipeline4;
-    binary_create_info.pPipelineCreateInfo = &pipeline_create_info;
-
-    VkPhysicalDevicePipelineBinaryPropertiesKHR pipeline_binary_properties = vku::InitStructHelper();
-    GetPhysicalDeviceProperties2(pipeline_binary_properties);
-    if (!pipeline_binary_properties.pipelineBinaryInternalCache) {
-        m_errorMonitor->SetUnexpectedError("VUID-VkPipelineBinaryCreateInfoKHR-pipelineBinaryInternalCache-09609");
-    }
-
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPipelineBinaryCreateInfoKHR-pKeysAndDataInfo-09619");
-    vk::CreatePipelineBinariesKHR(device(), &binary_create_info, nullptr, &handlesInfo);
-    m_errorMonitor->VerifyFound();
-
-    vk::DestroyPipeline(device(), test_pipeline4, nullptr);
-}
-
-TEST_F(NegativePipeline, PipelineBinaryCreation5) {
-    TEST_DESCRIPTION("Test creating pipeline binaries with invalid parameters");
-    SetTargetApiVersion(VK_API_VERSION_1_1);
-    AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::maintenance5);
-    AddRequiredExtensions(VK_KHR_PIPELINE_BINARY_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::pipelineBinaries);
-    RETURN_IF_SKIP(Init());
-
-    VkPhysicalDevicePipelineBinaryPropertiesKHR pipeline_binary_properties = vku::InitStructHelper();
-    GetPhysicalDeviceProperties2(pipeline_binary_properties);
-    if (!pipeline_binary_properties.pipelineBinaryInternalCache) {
-        GTEST_SKIP() << "pipelineBinaryInternalCache is VK_FALSE";
-    }
-
-    VkResult err;
-
-    VkShaderObj cs(this, kMinimalShaderGlsl, VK_SHADER_STAGE_COMPUTE_BIT);
-
-    std::vector<VkDescriptorSetLayoutBinding> bindings(0);
-    const vkt::DescriptorSetLayout pipeline_dsl(*m_device, bindings);
-    const vkt::PipelineLayout pipeline_layout(*m_device, {&pipeline_dsl});
-
-    VkComputePipelineCreateInfo compute_create_info = vku::InitStructHelper();
-    compute_create_info.stage = cs.GetStageCreateInfo();
-    compute_create_info.layout = pipeline_layout.handle();
-
-    VkPipelineCreateFlags2CreateInfoKHR flags2 = vku::InitStructHelper();
-    flags2.flags = VK_PIPELINE_CREATE_2_CAPTURE_DATA_BIT_KHR;
-    compute_create_info.pNext = &flags2;
-
-    VkPipeline test_pipeline5;
-
-    err = vk::CreateComputePipelines(device(), VK_NULL_HANDLE, 1, &compute_create_info, nullptr, &test_pipeline5);
-    ASSERT_EQ(VK_SUCCESS, err);
-
-    VkPipelineBinaryCreateInfoKHR binary_create_info = vku::InitStructHelper();
-    binary_create_info.pipeline = test_pipeline5;
-
-    VkPipelineBinaryHandlesInfoKHR handlesInfo = vku::InitStructHelper();
-
-    err = vk::CreatePipelineBinariesKHR(device(), &binary_create_info, nullptr, &handlesInfo);
-    ASSERT_EQ(VK_SUCCESS, err);
-
-    std::vector<VkPipelineBinaryKHR> binaries(handlesInfo.pipelineBinaryCount);
-    handlesInfo.pPipelineBinaries = binaries.data();
-
-    err = vk::CreatePipelineBinariesKHR(device(), &binary_create_info, nullptr, &handlesInfo);
-    ASSERT_EQ(VK_SUCCESS, err);
-
-    VkPipelineCreateInfoKHR pipeline_create_info = vku::InitStructHelper(&compute_create_info);
-
-    VkPipelineBinaryInfoKHR binary_info = vku::InitStructHelper();
-    binary_info.binaryCount = binaries.size();
-    binary_info.pPipelineBinaries = binaries.data();
-    flags2.pNext = &binary_info;
-
-    handlesInfo.pPipelineBinaries = nullptr;
-    binary_create_info.pipeline = VK_NULL_HANDLE;
-    binary_create_info.pPipelineCreateInfo = &pipeline_create_info;
-
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPipelineBinaryCreateInfoKHR-pPipelineCreateInfo-09606");
-    err = vk::CreatePipelineBinariesKHR(device(), &binary_create_info, nullptr, &handlesInfo);
-    m_errorMonitor->VerifyFound();
-
-    for (uint32_t i = 0; i < binaries.size(); i++) {
-        vk::DestroyPipelineBinaryKHR(device(), binaries[i], nullptr);
-    }
-
-    vk::DestroyPipeline(device(), test_pipeline5, nullptr);
-}
-
-TEST_F(NegativePipeline, PipelineBinaryCreateCacheControl) {
-    TEST_DESCRIPTION("Creating pipeline binaries with internal cache disabled");
-    SetTargetApiVersion(VK_API_VERSION_1_1);
-    AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::maintenance5);
-    AddRequiredExtensions(VK_KHR_PIPELINE_BINARY_EXTENSION_NAME);
-    AddRequiredFeature(vkt::Feature::pipelineBinaries);
-    RETURN_IF_SKIP(InitFramework());
-
-    VkPhysicalDevicePipelineBinaryPropertiesKHR pipeline_binary_properties = vku::InitStructHelper();
-    GetPhysicalDeviceProperties2(pipeline_binary_properties);
-
-    if (!pipeline_binary_properties.pipelineBinaryInternalCacheControl) {
-        GTEST_SKIP() << "pipelineBinaryInternalCacheControl is VK_FALSE";
-    }
-
-    VkDevicePipelineBinaryInternalCacheControlKHR cache_control = vku::InitStructHelper();
-    cache_control.disableInternalCache = VK_TRUE;
-    RETURN_IF_SKIP(InitState(nullptr, &cache_control));
-
-    VkShaderObj cs(this, kMinimalShaderGlsl, VK_SHADER_STAGE_COMPUTE_BIT);
-
-    std::vector<VkDescriptorSetLayoutBinding> bindings(0);
-    const vkt::DescriptorSetLayout pipeline_dsl(*m_device, bindings);
-    const vkt::PipelineLayout pipeline_layout(*m_device, {&pipeline_dsl});
-
-    VkComputePipelineCreateInfo compute_create_info = vku::InitStructHelper();
-    compute_create_info.stage = cs.GetStageCreateInfo();
-    compute_create_info.layout = pipeline_layout.handle();
-
-    VkPipelineCreateFlags2CreateInfoKHR flags2 = vku::InitStructHelper();
-    flags2.flags = VK_PIPELINE_CREATE_2_CAPTURE_DATA_BIT_KHR;
-    compute_create_info.pNext = &flags2;
-
-    VkPipelineCreateInfoKHR pipeline_create_info = vku::InitStructHelper(&compute_create_info);
-
-    VkPipelineBinaryCreateInfoKHR binary_create_info = vku::InitStructHelper();
-    binary_create_info.pPipelineCreateInfo = &pipeline_create_info;
-
-    VkPipelineBinaryKHR pipeline_binary;
-    VkPipelineBinaryHandlesInfoKHR handlesInfo = vku::InitStructHelper();
-    handlesInfo.pipelineBinaryCount = 1;
-    handlesInfo.pPipelineBinaries = &pipeline_binary;
-
-    m_errorMonitor->SetDesiredFailureMsg(kErrorBit, "VUID-VkPipelineBinaryCreateInfoKHR-device-09610");
-    vk::CreatePipelineBinariesKHR(device(), &binary_create_info, nullptr, &handlesInfo);
+    VkPipelineViewportDepthClampControlCreateInfoEXT clamp_control = vku::InitStructHelper();
+    clamp_control.depthClampMode = VK_DEPTH_CLAMP_MODE_USER_DEFINED_RANGE_EXT;
+    clamp_control.pDepthClampRange = nullptr;
+    CreatePipelineHelper pipe(*this);
+    pipe.vp_state_ci_.pNext = &clamp_control;
+    m_errorMonitor->SetDesiredError("VUID-VkPipelineViewportDepthClampControlCreateInfoEXT-pDepthClampRange-09646");
+    pipe.CreateGraphicsPipeline();
     m_errorMonitor->VerifyFound();
 }

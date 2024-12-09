@@ -1215,10 +1215,9 @@ bool CoreChecks::ValidateMapMemory(const vvl::DeviceMemory &mem_info, VkDeviceSi
     // Validate that offset + size is within object's allocationSize
     if (size != VK_WHOLE_SIZE) {
         if ((offset + size) > allocationSize) {
-            skip |=
-                LogError(map2 ? "VUID-VkMemoryMapInfoKHR-size-07961" : "VUID-vkMapMemory-size-00681", memory, offset_loc,
-                         "0x%" PRIx64 " plus size 0x%" PRIx64 " (total 0x%" PRIx64 ") oversteps total array size 0x%" PRIx64 ".",
-                         offset, size, size + offset, allocationSize);
+            skip |= LogError(map2 ? "VUID-VkMemoryMapInfoKHR-size-07961" : "VUID-vkMapMemory-size-00681", memory, offset_loc,
+                             "0x%" PRIx64 " + size 0x%" PRIx64 " (total 0x%" PRIx64 ") oversteps total array size 0x%" PRIx64 ".",
+                             offset, size, size + offset, allocationSize);
         }
     }
     return skip;
@@ -1403,7 +1402,7 @@ bool CoreChecks::ValidateMemoryIsMapped(uint32_t mem_range_count, const VkMapped
                                           : (mem_info->mapped_range.offset + mem_info->mapped_range.size);
             if ((data_end < (mem_ranges[i].offset + mem_ranges[i].size))) {
                 skip |= LogError("VUID-VkMappedMemoryRange-size-00685", mem_ranges[i].memory, memory_range_loc,
-                                 "size (%" PRIu64 ") plus offset (%" PRIu64
+                                 "size (%" PRIu64 ") + offset (%" PRIu64
                                  ") "
                                  "exceed the Memory Object's upper-bound (%" PRIu64 ").",
                                  mem_ranges[i].size, mem_ranges[i].offset, data_end);
@@ -2275,6 +2274,19 @@ bool CoreChecks::ValidateSparseImageMemoryBind(vvl::Image const *image_state, Vk
                              "(%" PRIu64 ") is not less than the size (%" PRIu64 ") of memory.", bind.memoryOffset,
                              mem_state->allocate_info.allocationSize);
         }
+
+        // TODO: We cannot validate the requirement size since there is no way
+        // to calculate the size of an optimal tiled arbitrary image region (as of now).
+        const VkMemoryRequirements &requirement = image_state->requirements[0];
+
+        if (SafeModulo(bind.memoryOffset, requirement.alignment) != 0) {
+            skip |= LogError("VUID-VkSparseImageMemoryBind-memory-01105", bind.memory, memory_loc.dot(Field::memoryOffset),
+                             "(%" PRIu64 ") is not a multiple of the required alignment (%" PRIu64 ").", bind.memoryOffset,
+                             requirement.alignment);
+        }
+
+        skip |= ValidateMemoryTypes(*mem_state.get(), requirement.memoryTypeBits, memory_loc.dot(Field::memory),
+                                    "VUID-VkSparseImageMemoryBind-memory-01105");
 
         if (mem_state->IsExport()) {
             if (!(mem_state->export_handle_types & image_state->external_memory_handle_types)) {

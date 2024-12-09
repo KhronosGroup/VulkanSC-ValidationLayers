@@ -34,8 +34,8 @@ TEST_F(PositiveGpuAVRayTracing, BasicTraceRays) {
     AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
     VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
     RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
-    if (IsPlatformMockICD()) {
-        GTEST_SKIP() << "Test not supported by MockICD";
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
     }
     RETURN_IF_SKIP(InitState());
 
@@ -86,22 +86,22 @@ TEST_F(PositiveGpuAVRayTracing, BasicTraceRays) {
     // Descriptor set
     pipeline.AddBinding(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0);
     pipeline.CreateDescriptorSet();
-    vkt::as::BuildGeometryInfoKHR tlas(vkt::as::blueprint::BuildOnDeviceTopLevel(*m_device, *m_default_queue, *m_commandBuffer));
+    vkt::as::BuildGeometryInfoKHR tlas(vkt::as::blueprint::BuildOnDeviceTopLevel(*m_device, *m_default_queue, m_command_buffer));
     pipeline.GetDescriptorSet().WriteDescriptorAccelStruct(0, 1, &tlas.GetDstAS()->handle());
     pipeline.GetDescriptorSet().UpdateDescriptorSets();
 
     pipeline.Build();
 
     // Bind descriptor set, pipeline, and trace rays
-    m_commandBuffer->begin();
-    vk::CmdBindDescriptorSets(*m_commandBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.GetPipelineLayout(), 0, 1,
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.GetPipelineLayout(), 0, 1,
                               &pipeline.GetDescriptorSet().set_, 0, nullptr);
-    vk::CmdBindPipeline(*m_commandBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.Handle());
     vkt::rt::TraceRaysSbt trace_rays_sbt = pipeline.GetTraceRaysSbt();
-    vk::CmdTraceRaysKHR(*m_commandBuffer, &trace_rays_sbt.ray_gen_sbt, &trace_rays_sbt.miss_sbt, &trace_rays_sbt.hit_sbt,
+    vk::CmdTraceRaysKHR(m_command_buffer, &trace_rays_sbt.ray_gen_sbt, &trace_rays_sbt.miss_sbt, &trace_rays_sbt.hit_sbt,
                         &trace_rays_sbt.callable_sbt, 1, 1, 1);
-    m_commandBuffer->end();
-    m_default_queue->Submit(*m_commandBuffer);
+    m_command_buffer.End();
+    m_default_queue->Submit(m_command_buffer);
     m_device->Wait();
 }
 
@@ -117,8 +117,8 @@ TEST_F(PositiveGpuAVRayTracing, BasicTraceRaysMultipleStages) {
     AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
     VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
     RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
-    if (IsPlatformMockICD()) {
-        GTEST_SKIP() << "Test not supported by MockICD";
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
     }
     RETURN_IF_SKIP(InitState());
 
@@ -150,7 +150,6 @@ TEST_F(PositiveGpuAVRayTracing, BasicTraceRaysMultipleStages) {
 
         void main() {
             hit = vec3(0.1, 0.2, 0.3);
-            traceRayEXT(tlas, gl_RayFlagsOpaqueEXT, 0xff, 0, 0, 0, vec3(0,0,1), 0.1, vec3(0,0,1), 1000.0, 0);
         }
     )glsl";
     pipeline.AddGlslMissShader(miss);
@@ -167,7 +166,6 @@ TEST_F(PositiveGpuAVRayTracing, BasicTraceRaysMultipleStages) {
         void main() {
             const vec3 barycentricCoords = vec3(1.0f - baryCoord.x - baryCoord.y, baryCoord.x, baryCoord.y);
             hit = barycentricCoords;
-            traceRayEXT(tlas, gl_RayFlagsOpaqueEXT, 0xff, 0, 0, 0, vec3(0,0,1), 0.1, vec3(0,0,1), 1000.0, 0);
         }
     )glsl";
     pipeline.AddGlslClosestHitShader(closest_hit);
@@ -175,22 +173,22 @@ TEST_F(PositiveGpuAVRayTracing, BasicTraceRaysMultipleStages) {
     // Descriptor set
     pipeline.AddBinding(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0);
     pipeline.CreateDescriptorSet();
-    vkt::as::BuildGeometryInfoKHR tlas(vkt::as::blueprint::BuildOnDeviceTopLevel(*m_device, *m_default_queue, *m_commandBuffer));
+    vkt::as::BuildGeometryInfoKHR tlas(vkt::as::blueprint::BuildOnDeviceTopLevel(*m_device, *m_default_queue, m_command_buffer));
     pipeline.GetDescriptorSet().WriteDescriptorAccelStruct(0, 1, &tlas.GetDstAS()->handle());
     pipeline.GetDescriptorSet().UpdateDescriptorSets();
 
     pipeline.Build();
 
     // Bind descriptor set, pipeline, and trace rays
-    m_commandBuffer->begin();
-    vk::CmdBindDescriptorSets(*m_commandBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.GetPipelineLayout(), 0, 1,
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.GetPipelineLayout(), 0, 1,
                               &pipeline.GetDescriptorSet().set_, 0, nullptr);
-    vk::CmdBindPipeline(*m_commandBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.Handle());
     vkt::rt::TraceRaysSbt trace_rays_sbt = pipeline.GetTraceRaysSbt();
-    vk::CmdTraceRaysKHR(*m_commandBuffer, &trace_rays_sbt.ray_gen_sbt, &trace_rays_sbt.miss_sbt, &trace_rays_sbt.hit_sbt,
+    vk::CmdTraceRaysKHR(m_command_buffer, &trace_rays_sbt.ray_gen_sbt, &trace_rays_sbt.miss_sbt, &trace_rays_sbt.hit_sbt,
                         &trace_rays_sbt.callable_sbt, 1, 1, 1);
-    m_commandBuffer->end();
-    m_default_queue->Submit(*m_commandBuffer);
+    m_command_buffer.End();
+    m_default_queue->Submit(m_command_buffer);
     m_device->Wait();
 }
 
@@ -206,8 +204,8 @@ TEST_F(PositiveGpuAVRayTracing, DynamicTminTmax) {
     AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
     VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
     RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
-    if (IsPlatformMockICD()) {
-        GTEST_SKIP() << "Test not supported by MockICD";
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
     }
     RETURN_IF_SKIP(InitState());
 
@@ -247,7 +245,6 @@ TEST_F(PositiveGpuAVRayTracing, DynamicTminTmax) {
 
         void main() {
             hit = vec3(0.1, 0.2, 0.3);
-            traceRayEXT(tlas, gl_RayFlagsOpaqueEXT, 0xff, 0, 0, 0, vec3(0,0,1), trace_rays_params.t_min, vec3(0,0,1), trace_rays_params.t_max, 0);
         }
     )glsl";
     pipeline.AddGlslMissShader(miss);
@@ -268,7 +265,7 @@ TEST_F(PositiveGpuAVRayTracing, DynamicTminTmax) {
         void main() {
             const vec3 barycentricCoords = vec3(1.0f - baryCoord.x - baryCoord.y, baryCoord.x, baryCoord.y);
             hit = barycentricCoords;
-            traceRayEXT(tlas, gl_RayFlagsOpaqueEXT, 0xff, 0, 0, 0, vec3(0,0,1), trace_rays_params.t_min, vec3(0,0,1), trace_rays_params.t_max, 0);
+
         }
     )glsl";
     pipeline.AddGlslClosestHitShader(closest_hit);
@@ -278,16 +275,15 @@ TEST_F(PositiveGpuAVRayTracing, DynamicTminTmax) {
     pipeline.AddBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1);
     pipeline.CreateDescriptorSet();
 
-    vkt::as::BuildGeometryInfoKHR tlas(vkt::as::blueprint::BuildOnDeviceTopLevel(*m_device, *m_default_queue, *m_commandBuffer));
+    vkt::as::BuildGeometryInfoKHR tlas(vkt::as::blueprint::BuildOnDeviceTopLevel(*m_device, *m_default_queue, m_command_buffer));
     pipeline.GetDescriptorSet().WriteDescriptorAccelStruct(0, 1, &tlas.GetDstAS()->handle());
 
-    vkt::Buffer uniform_buffer(*m_device, 4096, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                               VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    vkt::Buffer uniform_buffer(*m_device, 4096, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
 
-    auto uniform_buffer_ptr = static_cast<float*>(uniform_buffer.memory().map());
+    auto uniform_buffer_ptr = static_cast<float*>(uniform_buffer.Memory().Map());
     uniform_buffer_ptr[0] = 0.1f;   // t_min
     uniform_buffer_ptr[1] = 42.0f;  // t_max
-    uniform_buffer.memory().unmap();
+    uniform_buffer.Memory().Unmap();
 
     pipeline.GetDescriptorSet().WriteDescriptorBufferInfo(1, uniform_buffer.handle(), 0, 4096, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
     pipeline.GetDescriptorSet().UpdateDescriptorSets();
@@ -296,15 +292,15 @@ TEST_F(PositiveGpuAVRayTracing, DynamicTminTmax) {
     pipeline.Build();
 
     // Bind descriptor set, pipeline, and trace rays
-    m_commandBuffer->begin();
-    vk::CmdBindDescriptorSets(*m_commandBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.GetPipelineLayout(), 0, 1,
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.GetPipelineLayout(), 0, 1,
                               &pipeline.GetDescriptorSet().set_, 0, nullptr);
-    vk::CmdBindPipeline(*m_commandBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.Handle());
     vkt::rt::TraceRaysSbt trace_rays_sbt = pipeline.GetTraceRaysSbt();
-    vk::CmdTraceRaysKHR(*m_commandBuffer, &trace_rays_sbt.ray_gen_sbt, &trace_rays_sbt.miss_sbt, &trace_rays_sbt.hit_sbt,
+    vk::CmdTraceRaysKHR(m_command_buffer, &trace_rays_sbt.ray_gen_sbt, &trace_rays_sbt.miss_sbt, &trace_rays_sbt.hit_sbt,
                         &trace_rays_sbt.callable_sbt, 1, 1, 1);
-    m_commandBuffer->end();
-    m_default_queue->Submit(*m_commandBuffer);
+    m_command_buffer.End();
+    m_default_queue->Submit(m_command_buffer);
     m_device->Wait();
 }
 
@@ -320,8 +316,8 @@ TEST_F(PositiveGpuAVRayTracing, BasicTraceRaysDynamicRayFlags) {
     AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
     VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
     RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
-    if (IsPlatformMockICD()) {
-        GTEST_SKIP() << "Test not supported by MockICD";
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
     }
     RETURN_IF_SKIP(InitState());
 
@@ -359,7 +355,6 @@ TEST_F(PositiveGpuAVRayTracing, BasicTraceRaysDynamicRayFlags) {
 
         void main() {
             hit = vec3(0.1, 0.2, 0.3);
-            traceRayEXT(tlas, trace_rays_params.ray_flags, 0xff, 0, 0, 0, vec3(0,0,1), 0.1, vec3(0,0,1), 1.0, 0);
         }
     )glsl";
     pipeline.AddGlslMissShader(miss);
@@ -379,7 +374,6 @@ TEST_F(PositiveGpuAVRayTracing, BasicTraceRaysDynamicRayFlags) {
         void main() {
             const vec3 barycentricCoords = vec3(1.0f - baryCoord.x - baryCoord.y, baryCoord.x, baryCoord.y);
             hit = barycentricCoords;
-            traceRayEXT(tlas, trace_rays_params.ray_flags, 0xff, 0, 0, 0, vec3(0,0,1), 0.1, vec3(0,0,1), 1.0, 0);
         }
     )glsl";
     pipeline.AddGlslClosestHitShader(closest_hit);
@@ -389,15 +383,14 @@ TEST_F(PositiveGpuAVRayTracing, BasicTraceRaysDynamicRayFlags) {
     pipeline.AddBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1);
     pipeline.CreateDescriptorSet();
 
-    vkt::as::BuildGeometryInfoKHR tlas(vkt::as::blueprint::BuildOnDeviceTopLevel(*m_device, *m_default_queue, *m_commandBuffer));
+    vkt::as::BuildGeometryInfoKHR tlas(vkt::as::blueprint::BuildOnDeviceTopLevel(*m_device, *m_default_queue, m_command_buffer));
     pipeline.GetDescriptorSet().WriteDescriptorAccelStruct(0, 1, &tlas.GetDstAS()->handle());
 
-    vkt::Buffer uniform_buffer(*m_device, 4096, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                               VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    vkt::Buffer uniform_buffer(*m_device, 4096, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
 
-    auto uniform_buffer_ptr = static_cast<uint32_t*>(uniform_buffer.memory().map());
+    auto uniform_buffer_ptr = static_cast<uint32_t*>(uniform_buffer.Memory().Map());
     uniform_buffer_ptr[0] = 16;  // gl_RayFlagsCullBackFacingTrianglesEXT
-    uniform_buffer.memory().unmap();
+    uniform_buffer.Memory().Unmap();
 
     pipeline.GetDescriptorSet().WriteDescriptorBufferInfo(1, uniform_buffer.handle(), 0, 4096, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
 
@@ -407,15 +400,15 @@ TEST_F(PositiveGpuAVRayTracing, BasicTraceRaysDynamicRayFlags) {
     pipeline.Build();
 
     // Bind descriptor set, pipeline, and trace rays
-    m_commandBuffer->begin();
-    vk::CmdBindDescriptorSets(*m_commandBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.GetPipelineLayout(), 0, 1,
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.GetPipelineLayout(), 0, 1,
                               &pipeline.GetDescriptorSet().set_, 0, nullptr);
-    vk::CmdBindPipeline(*m_commandBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.Handle());
     vkt::rt::TraceRaysSbt trace_rays_sbt = pipeline.GetTraceRaysSbt();
-    vk::CmdTraceRaysKHR(*m_commandBuffer, &trace_rays_sbt.ray_gen_sbt, &trace_rays_sbt.miss_sbt, &trace_rays_sbt.hit_sbt,
+    vk::CmdTraceRaysKHR(m_command_buffer, &trace_rays_sbt.ray_gen_sbt, &trace_rays_sbt.miss_sbt, &trace_rays_sbt.hit_sbt,
                         &trace_rays_sbt.callable_sbt, 1, 1, 1);
-    m_commandBuffer->end();
-    m_default_queue->Submit(*m_commandBuffer);
+    m_command_buffer.End();
+    m_default_queue->Submit(m_command_buffer);
     m_device->Wait();
 }
 
@@ -432,8 +425,8 @@ TEST_F(PositiveGpuAVRayTracing, DynamicRayFlagsSkipTriangle) {
     AddRequiredFeature(vkt::Feature::rayTraversalPrimitiveCulling);
     VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
     RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
-    if (IsPlatformMockICD()) {
-        GTEST_SKIP() << "Test not supported by MockICD";
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
     }
     RETURN_IF_SKIP(InitState());
 
@@ -473,7 +466,6 @@ TEST_F(PositiveGpuAVRayTracing, DynamicRayFlagsSkipTriangle) {
 
         void main() {
             hit = vec3(0.1, 0.2, 0.3);
-            traceRayEXT(tlas, trace_rays_params.ray_flags, 0xff, 0, 0, 0, vec3(0,0,1), 0.1, vec3(0,0,1), 1.0, 0);
         }
     )glsl";
     pipeline.AddGlslMissShader(miss);
@@ -494,7 +486,6 @@ TEST_F(PositiveGpuAVRayTracing, DynamicRayFlagsSkipTriangle) {
         void main() {
             const vec3 barycentricCoords = vec3(1.0f - baryCoord.x - baryCoord.y, baryCoord.x, baryCoord.y);
             hit = barycentricCoords;
-            traceRayEXT(tlas, trace_rays_params.ray_flags, 0xff, 0, 0, 0, vec3(0,0,1), 0.1, vec3(0,0,1), 1.0, 0);
         }
     )glsl";
     pipeline.AddGlslClosestHitShader(closest_hit);
@@ -504,15 +495,14 @@ TEST_F(PositiveGpuAVRayTracing, DynamicRayFlagsSkipTriangle) {
     pipeline.AddBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1);
     pipeline.CreateDescriptorSet();
 
-    vkt::as::BuildGeometryInfoKHR tlas(vkt::as::blueprint::BuildOnDeviceTopLevel(*m_device, *m_default_queue, *m_commandBuffer));
+    vkt::as::BuildGeometryInfoKHR tlas(vkt::as::blueprint::BuildOnDeviceTopLevel(*m_device, *m_default_queue, m_command_buffer));
     pipeline.GetDescriptorSet().WriteDescriptorAccelStruct(0, 1, &tlas.GetDstAS()->handle());
 
-    vkt::Buffer uniform_buffer(*m_device, 4096, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                               VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    vkt::Buffer uniform_buffer(*m_device, 4096, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, kHostVisibleMemProps);
 
-    auto uniform_buffer_ptr = static_cast<uint32_t*>(uniform_buffer.memory().map());
+    auto uniform_buffer_ptr = static_cast<uint32_t*>(uniform_buffer.Memory().Map());
     uniform_buffer_ptr[0] = 0x100;  // gl_RayFlagsSkipTrianglesEXT, or RayFlagsSkipTrianglesKHRMask in SPIR-V
-    uniform_buffer.memory().unmap();
+    uniform_buffer.Memory().Unmap();
 
     pipeline.GetDescriptorSet().WriteDescriptorBufferInfo(1, uniform_buffer.handle(), 0, 4096, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
 
@@ -522,15 +512,15 @@ TEST_F(PositiveGpuAVRayTracing, DynamicRayFlagsSkipTriangle) {
     pipeline.Build();
 
     // Bind descriptor set, pipeline, and trace rays
-    m_commandBuffer->begin();
-    vk::CmdBindDescriptorSets(*m_commandBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.GetPipelineLayout(), 0, 1,
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.GetPipelineLayout(), 0, 1,
                               &pipeline.GetDescriptorSet().set_, 0, nullptr);
-    vk::CmdBindPipeline(*m_commandBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.Handle());
     vkt::rt::TraceRaysSbt trace_rays_sbt = pipeline.GetTraceRaysSbt();
-    vk::CmdTraceRaysKHR(*m_commandBuffer, &trace_rays_sbt.ray_gen_sbt, &trace_rays_sbt.miss_sbt, &trace_rays_sbt.hit_sbt,
+    vk::CmdTraceRaysKHR(m_command_buffer, &trace_rays_sbt.ray_gen_sbt, &trace_rays_sbt.miss_sbt, &trace_rays_sbt.hit_sbt,
                         &trace_rays_sbt.callable_sbt, 1, 1, 1);
-    m_commandBuffer->end();
-    m_default_queue->Submit(*m_commandBuffer);
+    m_command_buffer.End();
+    m_default_queue->Submit(m_command_buffer);
     m_device->Wait();
 }
 
@@ -545,10 +535,12 @@ TEST_F(PositiveGpuAVRayTracing, BasicTraceRaysMultiEntryPoint) {
     AddRequiredFeature(vkt::Feature::rayTracingPipeline);
     AddRequiredFeature(vkt::Feature::accelerationStructure);
     AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::runtimeDescriptorArray);
+    AddRequiredFeature(vkt::Feature::shaderSampledImageArrayNonUniformIndexing);
     VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
     RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
-    if (IsPlatformMockICD()) {
-        GTEST_SKIP() << "Test not supported by MockICD";
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
     }
     RETURN_IF_SKIP(InitState());
 
@@ -698,7 +690,7 @@ TEST_F(PositiveGpuAVRayTracing, BasicTraceRaysMultiEntryPoint) {
                OpFunctionEnd
       )";
 
-    pipeline.SetSpirvRayGenShader(shader_source, "mainRaygen");
+    pipeline.AddSpirvRayGenShader(shader_source, "mainRaygen");
     pipeline.AddSpirvMissShader(shader_source, "mainMiss");
     pipeline.AddSpirvClosestHitShader(shader_source, "mainClosestHit");
 
@@ -709,8 +701,7 @@ TEST_F(PositiveGpuAVRayTracing, BasicTraceRaysMultiEntryPoint) {
     pipeline.CreateDescriptorSet();
 
     // Buffer binding
-    vkt::Buffer buffer(*m_device, 4096, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    vkt::Buffer buffer(*m_device, 4096, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, kHostVisibleMemProps);
     pipeline.GetDescriptorSet().WriteDescriptorBufferInfo(0, buffer.handle(), 0, 4096, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
 
     // Texture array binding
@@ -724,7 +715,7 @@ TEST_F(PositiveGpuAVRayTracing, BasicTraceRaysMultiEntryPoint) {
                                                          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 1);
 
     // TLAS binding
-    vkt::as::BuildGeometryInfoKHR tlas(vkt::as::blueprint::BuildOnDeviceTopLevel(*m_device, *m_default_queue, *m_commandBuffer));
+    vkt::as::BuildGeometryInfoKHR tlas(vkt::as::blueprint::BuildOnDeviceTopLevel(*m_device, *m_default_queue, m_command_buffer));
     pipeline.GetDescriptorSet().WriteDescriptorAccelStruct(2, 1, &tlas.GetDstAS()->handle());
 
     pipeline.GetDescriptorSet().UpdateDescriptorSets();
@@ -733,20 +724,19 @@ TEST_F(PositiveGpuAVRayTracing, BasicTraceRaysMultiEntryPoint) {
     pipeline.Build();
 
     // Bind descriptor set, pipeline, and trace rays
-    m_commandBuffer->begin();
-    vk::CmdBindDescriptorSets(*m_commandBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.GetPipelineLayout(), 0, 1,
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.GetPipelineLayout(), 0, 1,
                               &pipeline.GetDescriptorSet().set_, 0, nullptr);
-    vk::CmdBindPipeline(*m_commandBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.Handle());
     vkt::rt::TraceRaysSbt trace_rays_sbt = pipeline.GetTraceRaysSbt();
-    vk::CmdTraceRaysKHR(*m_commandBuffer, &trace_rays_sbt.ray_gen_sbt, &trace_rays_sbt.miss_sbt, &trace_rays_sbt.hit_sbt,
+    vk::CmdTraceRaysKHR(m_command_buffer, &trace_rays_sbt.ray_gen_sbt, &trace_rays_sbt.miss_sbt, &trace_rays_sbt.hit_sbt,
                         &trace_rays_sbt.callable_sbt, 1, 1, 1);
-    m_commandBuffer->end();
-    m_default_queue->Submit(*m_commandBuffer);
+    m_command_buffer.End();
+    m_default_queue->Submit(m_command_buffer);
     m_device->Wait();
 }
 
-// Not passing ASAN with profiles layer, unrelated to deferred ray tracing pipeline build
-TEST_F(PositiveGpuAVRayTracing, DISABLED_BasicTraceRaysDeferredBuild) {
+TEST_F(PositiveGpuAVRayTracing, BasicTraceRaysDeferredBuild) {
     TEST_DESCRIPTION(
         "Setup a ray tracing pipeline (ray generation, miss and closest hit shaders, and deferred build) and acceleration "
         "structure, and trace one "
@@ -759,6 +749,9 @@ TEST_F(PositiveGpuAVRayTracing, DISABLED_BasicTraceRaysDeferredBuild) {
     AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
     VkValidationFeaturesEXT validation_features = GetGpuAvValidationFeatures();
     RETURN_IF_SKIP(InitFrameworkForRayTracingTest(&validation_features));
+    if (!CanEnableGpuAV(*this)) {
+        GTEST_SKIP() << "Requirements for GPU-AV are not met";
+    }
     RETURN_IF_SKIP(InitState());
 
     vkt::rt::Pipeline pipeline(*this, m_device);
@@ -774,9 +767,9 @@ TEST_F(PositiveGpuAVRayTracing, DISABLED_BasicTraceRaysDeferredBuild) {
         layout(location = 0) rayPayloadEXT vec3 hit;
 
         void main() {
-		traceRayEXT(tlas, gl_RayFlagsOpaqueEXT, 0xff, 0, 0, 0, vec3(0,0,1), 0.1, vec3(0,0,1), 1000.0, 0);
+            traceRayEXT(tlas, gl_RayFlagsOpaqueEXT, 0xff, 0, 0, 0, vec3(0,0,1), 0.1, vec3(0,0,1), 1000.0, 0);
         }
-		)glsl";
+    )glsl";
     pipeline.SetGlslRayGenShader(ray_gen);
 
     const char* miss = R"glsl(
@@ -786,9 +779,9 @@ TEST_F(PositiveGpuAVRayTracing, DISABLED_BasicTraceRaysDeferredBuild) {
         layout(location = 0) rayPayloadInEXT vec3 hit;
 
         void main() {
-		hit = vec3(0.1, 0.2, 0.3);
+            hit = vec3(0.1, 0.2, 0.3);
         }
-		)glsl";
+    )glsl";
     pipeline.AddGlslMissShader(miss);
 
     const char* closest_hit = R"glsl(
@@ -799,15 +792,15 @@ TEST_F(PositiveGpuAVRayTracing, DISABLED_BasicTraceRaysDeferredBuild) {
         hitAttributeEXT vec2 baryCoord;
 
         void main() {
-		const vec3 barycentricCoords = vec3(1.0f - baryCoord.x - baryCoord.y, baryCoord.x, baryCoord.y);
-		hit = barycentricCoords;
+            const vec3 barycentricCoords = vec3(1.0f - baryCoord.x - baryCoord.y, baryCoord.x, baryCoord.y);
+            hit = barycentricCoords;
         }
-		)glsl";
+    )glsl";
     pipeline.AddGlslClosestHitShader(closest_hit);
 
     pipeline.AddBinding(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0);
     pipeline.CreateDescriptorSet();
-    vkt::as::BuildGeometryInfoKHR tlas(vkt::as::blueprint::BuildOnDeviceTopLevel(*m_device, *m_default_queue, *m_commandBuffer));
+    vkt::as::BuildGeometryInfoKHR tlas(vkt::as::blueprint::BuildOnDeviceTopLevel(*m_device, *m_default_queue, m_command_buffer));
     pipeline.GetDescriptorSet().WriteDescriptorAccelStruct(0, 1, &tlas.GetDstAS()->handle());
     pipeline.GetDescriptorSet().UpdateDescriptorSets();
 
@@ -816,14 +809,14 @@ TEST_F(PositiveGpuAVRayTracing, DISABLED_BasicTraceRaysDeferredBuild) {
     RETURN_IF_SKIP(pipeline.Build());
 
     // Bind descriptor set, pipeline, and trace rays
-    m_commandBuffer->begin();
-    vk::CmdBindDescriptorSets(*m_commandBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.GetPipelineLayout(), 0, 1,
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorSets(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.GetPipelineLayout(), 0, 1,
                               &pipeline.GetDescriptorSet().set_, 0, nullptr);
-    vk::CmdBindPipeline(*m_commandBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.Handle());
+    vk::CmdBindPipeline(m_command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, pipeline.Handle());
     vkt::rt::TraceRaysSbt trace_rays_sbt = pipeline.GetTraceRaysSbt();
-    vk::CmdTraceRaysKHR(*m_commandBuffer, &trace_rays_sbt.ray_gen_sbt, &trace_rays_sbt.miss_sbt, &trace_rays_sbt.hit_sbt,
+    vk::CmdTraceRaysKHR(m_command_buffer, &trace_rays_sbt.ray_gen_sbt, &trace_rays_sbt.miss_sbt, &trace_rays_sbt.hit_sbt,
                         &trace_rays_sbt.callable_sbt, 1, 1, 1);
-    m_commandBuffer->end();
-    m_default_queue->Submit(*m_commandBuffer);
+    m_command_buffer.End();
+    m_default_queue->Submit(m_command_buffer);
     m_device->Wait();
 }

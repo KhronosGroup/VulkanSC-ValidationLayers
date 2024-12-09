@@ -92,10 +92,6 @@ class VkSCCompatibilityRenderFramework : public VkSCRenderFramework {
     VkSCCompatibilityRenderFramework();
     virtual ~VkSCCompatibilityRenderFramework() override;
 
-    virtual bool GLSLtoSPV(VkPhysicalDeviceLimits const *const device_limits, const VkShaderStageFlagBits shader_type,
-                           const char *pshader, std::vector<uint32_t> &spv,
-                           const spv_target_env spv_env = SPV_ENV_VULKAN_1_0) override;
-
     void InitFramework(void *instance_pnext = NULL);
     void InitState(VkPhysicalDeviceFeatures *features = nullptr, void *create_device_pnext = nullptr,
                    const VkCommandPoolCreateFlags flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);

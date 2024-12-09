@@ -37,6 +37,7 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/debug_extensions.cpp
     converted/debug_extensions_positive.cpp
     converted/debug_printf.cpp
+    converted/debug_printf_ray_tracing.cpp
     converted/debug_printf_shader_debug_info.cpp
     converted/descriptor_buffer.cpp
     converted/descriptor_buffer_positive.cpp
@@ -44,6 +45,9 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/descriptor_indexing_positive.cpp
     converted/descriptors.cpp
     converted/descriptors_positive.cpp
+    converted/device_feature_property.cpp
+    converted/device_generated_commands.cpp
+    converted/device_generated_commands_positive.cpp
     converted/device_queue.cpp
     converted/dynamic_rendering.cpp
     converted/dynamic_rendering_local_read.cpp
@@ -60,6 +64,8 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/gpu_av.cpp
     converted/gpu_av_buffer_device_address.cpp
     converted/gpu_av_buffer_device_address_positive.cpp
+    converted/gpu_av_debug_printf.cpp
+    converted/gpu_av_descriptor_buffer_positive.cpp
     converted/gpu_av_descriptor_indexing.cpp
     converted/gpu_av_descriptor_indexing_positive.cpp
     converted/gpu_av_indirect_buffer.cpp
@@ -86,6 +92,7 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/imageless_framebuffer_positive.cpp
     converted/instance_positive.cpp
     converted/instanceless.cpp
+    converted/layer_settings.cpp
     converted/layer_utils_positive.cpp
     converted/memory.cpp
     converted/memory_positive.cpp
@@ -101,6 +108,8 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/parent_positive.cpp
     converted/pipeline.cpp
     converted/pipeline_advanced_blend.cpp
+    converted/pipeline_binary.cpp
+    converted/pipeline_binary_positive.cpp
     converted/pipeline_layout.cpp
     converted/pipeline_layout_positive.cpp
     converted/pipeline_positive.cpp
@@ -160,6 +169,7 @@ set(VKSC_CONVERTED_TEST_FILES
     converted/sync_object_positive.cpp
     converted/sync_val.cpp
     converted/sync_val_positive.cpp
+    converted/sync_val_reporting.cpp
     converted/sync_val_semaphore.cpp
     converted/sync_val_semaphore_positive.cpp
     converted/sync_val_wsi.cpp

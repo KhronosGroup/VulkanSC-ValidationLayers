@@ -11,6 +11,7 @@
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
 
+#include <gtest/gtest.h>
 #include "../framework/layer_validation_tests.h"
 #include "../framework/pipeline_helper.h"
 
@@ -157,9 +158,9 @@ TEST_F(PositiveShaderSpirv, GroupDecorations) {
         dslb[i].pImmutableSamplers = NULL;
         dslb[i].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_ALL;
     }
-    if (m_device->phy().limits_.maxPerStageDescriptorStorageBuffers < dslb_size) {
+    if (m_device->Physical().limits_.maxPerStageDescriptorStorageBuffers < dslb_size) {
         GTEST_SKIP() << "Needed storage buffer bindings (" << dslb_size << ") exceeds this devices limit of "
-                     << m_device->phy().limits_.maxPerStageDescriptorStorageBuffers;
+                     << m_device->Physical().limits_.maxPerStageDescriptorStorageBuffers;
     }
 
     CreateComputePipelineHelper pipe(*this);
@@ -279,21 +280,16 @@ TEST_F(PositiveShaderSpirv, ShaderDrawParametersWithoutFeature11) {
 
 TEST_F(PositiveShaderSpirv, ShaderDrawParametersWithFeature) {
     TEST_DESCRIPTION("Use VK_KHR_shader_draw_parameters in 1.2 with feature bit enabled");
-
     // use 1.2 to get the feature bit in VkPhysicalDeviceVulkan11Features
     SetTargetApiVersion(VK_API_VERSION_1_2);
-
     RETURN_IF_SKIP(InitFramework());
 
     VkPhysicalDeviceVulkan11Features features11 = vku::InitStructHelper();
     features11.shaderDrawParameters = VK_TRUE;
     auto features2 = GetPhysicalDeviceFeatures2(features11);
-
     GetPhysicalDeviceFeatures2(features2);
-
-    if (features11.shaderDrawParameters != VK_TRUE) {
-        printf("shaderDrawParameters not supported, skipping test\n");
-        return;
+    if (features11.shaderDrawParameters == VK_FALSE) {
+        GTEST_SKIP() << "shaderDrawParameters not supported";
     }
 
     RETURN_IF_SKIP(InitState(nullptr, &features2));
@@ -428,15 +424,8 @@ TEST_F(PositiveShaderSpirv, SpecializationWordBoundryOffset) {
     // require to make enable logic simpler
     AddRequiredExtensions(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-
-    VkPhysicalDeviceFloat16Int8FeaturesKHR float16int8_features = vku::InitStructHelper();
-    auto features2 = GetPhysicalDeviceFeatures2(float16int8_features);
-    if (float16int8_features.shaderInt8 == VK_FALSE) {
-        GTEST_SKIP() << "shaderInt8 feature not supported";
-    }
-
-    RETURN_IF_SKIP(InitState(nullptr, &features2));
+    AddRequiredFeature(vkt::Feature::shaderInt8);
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     if (IsPlatformMockICD()) {
@@ -570,31 +559,30 @@ TEST_F(PositiveShaderSpirv, SpecializationWordBoundryOffset) {
     VkBufferCreateInfo bci = vku::InitStructHelper();
     bci.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
     bci.size = 1024;
-    VkMemoryPropertyFlags mem_props = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-    vkt::Buffer buffer(*m_device, bci, mem_props);
+    vkt::Buffer buffer(*m_device, bci, kHostVisibleMemProps);
     pipe.descriptor_set_->WriteDescriptorBufferInfo(0, buffer.handle(), 0, 1024, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     pipe.descriptor_set_->UpdateDescriptorSets();
 
-    m_commandBuffer->begin();
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0, 1,
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0, 1,
                               &pipe.descriptor_set_->set_, 0, nullptr);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
-    vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
-    m_commandBuffer->end();
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    m_command_buffer.End();
 
-    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Submit(m_command_buffer);
     m_default_queue->Wait();
 
     // Make sure spec constants were updated correctly
     void *pData;
-    ASSERT_EQ(VK_SUCCESS, vk::MapMemory(device(), buffer.memory().handle(), 0, VK_WHOLE_SIZE, 0, &pData));
+    ASSERT_EQ(VK_SUCCESS, vk::MapMemory(device(), buffer.Memory().handle(), 0, VK_WHOLE_SIZE, 0, &pData));
     uint32_t *ssbo_data = reinterpret_cast<uint32_t *>(pData);
     ASSERT_EQ(ssbo_data[0], 0x02);
     ASSERT_EQ(ssbo_data[1], 0x05040302);
     ASSERT_EQ(ssbo_data[2], 0x06050403);
     ASSERT_EQ(ssbo_data[3], 0x07060504);
     ASSERT_EQ(ssbo_data[4], 0x04);
-    vk::UnmapMemory(device(), buffer.memory().handle());
+    vk::UnmapMemory(device(), buffer.Memory().handle());
 }
 
 TEST_F(PositiveShaderSpirv, Spirv16Vulkan13) {
@@ -741,11 +729,11 @@ TEST_F(PositiveShaderSpirv, UnnormalizedCoordinatesNotSampled) {
     // This generates OpImage*Dref* instruction on R8G8B8A8_UNORM format.
     // Verify that it is allowed on this implementation if
     // VK_KHR_format_feature_flags2 is available.
-    if (DeviceExtensionSupported(gpu(), nullptr, VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME)) {
+    if (DeviceExtensionSupported(Gpu(), nullptr, VK_KHR_FORMAT_FEATURE_FLAGS_2_EXTENSION_NAME)) {
         VkFormatProperties3KHR fmt_props_3 = vku::InitStructHelper();
         VkFormatProperties2 fmt_props = vku::InitStructHelper(&fmt_props_3);
 
-        vk::GetPhysicalDeviceFormatProperties2(gpu(), VK_FORMAT_R8G8B8A8_UNORM, &fmt_props);
+        vk::GetPhysicalDeviceFormatProperties2(Gpu(), VK_FORMAT_R8G8B8A8_UNORM, &fmt_props);
 
         if (!(fmt_props_3.optimalTilingFeatures & VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT_KHR)) {
             GTEST_SKIP() << "R8G8B8A8_UNORM does not support OpImage*Dref* operations";
@@ -808,15 +796,15 @@ TEST_F(PositiveShaderSpirv, UnnormalizedCoordinatesNotSampled) {
     g_pipe.descriptor_set_->WriteDescriptorImageInfo(0, view, sampler.handle(), VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
     g_pipe.descriptor_set_->UpdateDescriptorSets();
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe.Handle());
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe.pipeline_layout_.handle(), 0, 1,
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe.Handle());
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipe.pipeline_layout_.handle(), 0, 1,
                               &g_pipe.descriptor_set_->set_, 0, nullptr);
-    vk::CmdDraw(m_commandBuffer->handle(), 1, 0, 0, 0);
+    vk::CmdDraw(m_command_buffer.handle(), 1, 0, 0, 0);
 
-    m_commandBuffer->EndRenderPass();
-    m_commandBuffer->end();
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
 }
 
 TEST_F(PositiveShaderSpirv, GeometryShaderPassthroughNV) {
@@ -896,15 +884,8 @@ TEST_F(PositiveShaderSpirv, SpecializeInt8) {
 
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-
-    VkPhysicalDeviceFloat16Int8FeaturesKHR float16int8_features = vku::InitStructHelper();
-    auto features2 = GetPhysicalDeviceFeatures2(float16int8_features);
-    if (float16int8_features.shaderInt8 == VK_FALSE) {
-        GTEST_SKIP() << "shaderInt8 feature not supported";
-    }
-
-    RETURN_IF_SKIP(InitState(nullptr, &features2));
+    AddRequiredFeature(vkt::Feature::shaderInt8);
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     const char *fs_src = R"(
@@ -954,14 +935,8 @@ TEST_F(PositiveShaderSpirv, SpecializeInt16) {
     TEST_DESCRIPTION("Test int16 specialization.");
 
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-    VkPhysicalDeviceFeatures2KHR features2 = vku::InitStructHelper();
-    GetPhysicalDeviceFeatures2(features2);
-    if (features2.features.shaderInt16 == VK_FALSE) {
-        GTEST_SKIP() << "shaderInt16 feature not supported";
-    }
-
-    RETURN_IF_SKIP(InitState(nullptr, &features2));
+    AddRequiredFeature(vkt::Feature::shaderInt16);
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     const char *fs_src = R"(
@@ -1059,15 +1034,8 @@ TEST_F(PositiveShaderSpirv, SpecializeInt64) {
     TEST_DESCRIPTION("Test int64 specialization.");
 
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-
-    VkPhysicalDeviceFeatures2KHR features2 = vku::InitStructHelper();
-    GetPhysicalDeviceFeatures2(features2);
-    if (features2.features.shaderInt64 == VK_FALSE) {
-        GTEST_SKIP() << "shaderInt64 feature not supported";
-    }
-
-    RETURN_IF_SKIP(InitState(nullptr, &features2));
+    AddRequiredFeature(vkt::Feature::shaderInt64);
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     const char *fs_src = R"(
@@ -1678,15 +1646,8 @@ TEST_F(PositiveShaderSpirv, PhysicalStorageBufferStructRecursion) {
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-
-    VkPhysicalDeviceVulkan12Features features12 = vku::InitStructHelper();
-    auto features2 = GetPhysicalDeviceFeatures2(features12);
-    if (VK_TRUE != features12.bufferDeviceAddress) {
-        GTEST_SKIP() << "VkPhysicalDeviceVulkan12Features::bufferDeviceAddress not supported and is required";
-    }
-
-    RETURN_IF_SKIP(InitState(nullptr, &features2));
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     const char *cs_src = R"glsl(
@@ -1719,15 +1680,9 @@ TEST_F(PositiveShaderSpirv, OpCopyObjectSampler) {
     // https://github.com/KhronosGroup/glslang/pull/1762 appears to be the change that introduces the OpCopyObject in this context.
 
     SetTargetApiVersion(VK_API_VERSION_1_2);
-    RETURN_IF_SKIP(InitFramework());
-
-    VkPhysicalDeviceVulkan12Features features12 = vku::InitStructHelper();
-    auto features2 = GetPhysicalDeviceFeatures2(features12);
-    if (VK_TRUE != features12.shaderStorageTexelBufferArrayNonUniformIndexing) {
-        GTEST_SKIP()
-            << "VkPhysicalDeviceVulkan12Features::shaderStorageTexelBufferArrayNonUniformIndexing not supported and is required";
-    }
-    RETURN_IF_SKIP(InitState(nullptr, &features2));
+    AddRequiredFeature(vkt::Feature::shaderSampledImageArrayNonUniformIndexing);
+    AddRequiredFeature(vkt::Feature::shaderStorageTexelBufferArrayNonUniformIndexing);
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     const char *vertex_source = R"glsl(

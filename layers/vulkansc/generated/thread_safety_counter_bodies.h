@@ -74,6 +74,8 @@ WRAPPER(VkShaderEXT)
 #ifdef VK_USE_PLATFORM_SCI
 WRAPPER(VkSemaphoreSciSyncPoolNV)
 #endif  // VK_USE_PLATFORM_SCI
+WRAPPER(VkIndirectExecutionSetEXT)
+WRAPPER(VkIndirectCommandsLayoutEXT)
 // clang-format on
 
 // NOLINTEND

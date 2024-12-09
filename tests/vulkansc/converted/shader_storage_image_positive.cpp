@@ -66,7 +66,7 @@ TEST_F(PositiveShaderStorageImage, WriteMoreComponent) {
                                      });
 
     const VkFormat format = VK_FORMAT_R32G32_UINT;  // Rg32ui
-    if (!FormatFeaturesAreSupported(gpu(), format, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT)) {
+    if (!FormatFeaturesAreSupported(Gpu(), format, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT)) {
         GTEST_SKIP() << "Format doesn't support storage image";
     }
 
@@ -82,12 +82,12 @@ TEST_F(PositiveShaderStorageImage, WriteMoreComponent) {
     pipe.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&ds.layout_});
     pipe.CreateComputePipeline();
 
-    m_commandBuffer->begin();
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0, 1,
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0, 1,
                               &ds.set_, 0, nullptr);
-    vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
-    m_commandBuffer->end();
+    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    m_command_buffer.End();
 }
 
 TEST_F(PositiveShaderStorageImage, UnknownWriteMoreComponent) {
@@ -140,13 +140,13 @@ TEST_F(PositiveShaderStorageImage, UnknownWriteMoreComponent) {
                                      });
 
     const VkFormat format = VK_FORMAT_R32G32_UINT;
-    if (!FormatFeaturesAreSupported(gpu(), format, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT)) {
+    if (!FormatFeaturesAreSupported(Gpu(), format, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT)) {
         GTEST_SKIP() << "Format doesn't support storage image";
     }
 
     VkFormatProperties3KHR fmt_props_3 = vku::InitStructHelper();
     VkFormatProperties2 fmt_props = vku::InitStructHelper(&fmt_props_3);
-    vk::GetPhysicalDeviceFormatProperties2(gpu(), format, &fmt_props);
+    vk::GetPhysicalDeviceFormatProperties2(Gpu(), format, &fmt_props);
     if ((fmt_props_3.optimalTilingFeatures & VK_FORMAT_FEATURE_2_STORAGE_WRITE_WITHOUT_FORMAT_BIT_KHR) == 0) {
         GTEST_SKIP() << "Format doesn't support storage write without format";
     }
@@ -163,12 +163,12 @@ TEST_F(PositiveShaderStorageImage, UnknownWriteMoreComponent) {
     pipe.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&ds.layout_});
     pipe.CreateComputePipeline();
 
-    m_commandBuffer->begin();
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0, 1,
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0, 1,
                               &ds.set_, 0, nullptr);
-    vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
-    m_commandBuffer->end();
+    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    m_command_buffer.End();
 }
 
 TEST_F(PositiveShaderStorageImage, WriteSpecConstantMoreComponent) {
@@ -220,7 +220,7 @@ TEST_F(PositiveShaderStorageImage, WriteSpecConstantMoreComponent) {
                                      });
 
     const VkFormat format = VK_FORMAT_R32G32_UINT;  // Rg32ui
-    if (!FormatFeaturesAreSupported(gpu(), format, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT)) {
+    if (!FormatFeaturesAreSupported(Gpu(), format, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT)) {
         GTEST_SKIP() << "Format doesn't support storage image";
     }
 
@@ -248,12 +248,12 @@ TEST_F(PositiveShaderStorageImage, WriteSpecConstantMoreComponent) {
     pipe.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&ds.layout_});
     pipe.CreateComputePipeline();
 
-    m_commandBuffer->begin();
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0, 1,
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0, 1,
                               &ds.set_, 0, nullptr);
-    vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
-    m_commandBuffer->end();
+    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    m_command_buffer.End();
 }
 
 TEST_F(PositiveShaderStorageImage, UnknownWriteLessComponentMultiEntrypoint) {
@@ -339,7 +339,7 @@ TEST_F(PositiveShaderStorageImage, UnknownWriteLessComponentMultiEntrypoint) {
                                      });
 
     const VkFormat format = VK_FORMAT_R8G8B8A8_UINT;
-    if (!FormatFeaturesAreSupported(gpu(), format, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT)) {
+    if (!FormatFeaturesAreSupported(Gpu(), format, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT)) {
         GTEST_SKIP() << "Format doesn't support storage image";
     }
 
@@ -358,13 +358,13 @@ TEST_F(PositiveShaderStorageImage, UnknownWriteLessComponentMultiEntrypoint) {
     pipe.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&ds.layout_});
     pipe.CreateGraphicsPipeline();
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_layout_.handle(), 0, 1,
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_layout_.handle(), 0, 1,
                               &ds.set_, 0, nullptr);
     // This does not invoke the Compute Entrypoint where the bad write would be
-    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
-    m_commandBuffer->EndRenderPass();
-    m_commandBuffer->end();
+    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
 }

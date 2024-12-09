@@ -205,9 +205,9 @@ TEST_F(VkSCPortedNegativeMemory, BindMemory) {
         VkMemoryAllocateInfo buffer_alloc_info = vku::InitStruct<VkMemoryAllocateInfo>();
         image_alloc_info.allocationSize = image_mem_reqs.size;
         buffer_alloc_info.allocationSize = buffer_mem_reqs.size;
-        pass = m_device->phy().set_memory_type(image_mem_reqs.memoryTypeBits, &image_alloc_info, 0);
+        pass = m_device->phy().SetMemoryType(image_mem_reqs.memoryTypeBits, &image_alloc_info, 0);
         ASSERT_TRUE(pass);
-        pass = m_device->phy().set_memory_type(buffer_mem_reqs.memoryTypeBits, &buffer_alloc_info, 0);
+        pass = m_device->phy().SetMemoryType(buffer_mem_reqs.memoryTypeBits, &buffer_alloc_info, 0);
         ASSERT_TRUE(pass);
         VkDeviceMemory image_mem, buffer_mem;
         err = vk::AllocateMemory(device(), &image_alloc_info, NULL, &image_mem);
@@ -251,9 +251,9 @@ TEST_F(VkSCPortedNegativeMemory, BindMemory) {
         // Leave some extra space for alignment wiggle room
         image_alloc_info.allocationSize = image_mem_reqs.size + image_mem_reqs.alignment;
         buffer_alloc_info.allocationSize = buffer_mem_reqs.size + buffer_mem_reqs.alignment;
-        pass = m_device->phy().set_memory_type(image_mem_reqs.memoryTypeBits, &image_alloc_info, 0);
+        pass = m_device->phy().SetMemoryType(image_mem_reqs.memoryTypeBits, &image_alloc_info, 0);
         ASSERT_TRUE(pass);
-        pass = m_device->phy().set_memory_type(buffer_mem_reqs.memoryTypeBits, &buffer_alloc_info, 0);
+        pass = m_device->phy().SetMemoryType(buffer_mem_reqs.memoryTypeBits, &buffer_alloc_info, 0);
         ASSERT_TRUE(pass);
         VkDeviceMemory image_mem, buffer_mem;
         err = vk::AllocateMemory(device(), &image_alloc_info, NULL, &image_mem);
@@ -346,7 +346,7 @@ TEST_F(VkSCPortedNegativeMemory, BindMemory) {
 
         uint32_t image_unsupported_mem_type_bits = ((1 << memory_properties.memoryTypeCount) - 1) & ~image_mem_reqs.memoryTypeBits;
         if (image_unsupported_mem_type_bits != 0) {
-            pass = m_device->phy().set_memory_type(image_unsupported_mem_type_bits, &image_alloc_info, 0);
+            pass = m_device->phy().SetMemoryType(image_unsupported_mem_type_bits, &image_alloc_info, 0);
             ASSERT_TRUE(pass);
             err = vk::AllocateMemory(device(), &image_alloc_info, NULL, &image_mem);
             ASSERT_EQ(VK_SUCCESS, err);
@@ -360,7 +360,7 @@ TEST_F(VkSCPortedNegativeMemory, BindMemory) {
         uint32_t buffer_unsupported_mem_type_bits =
             ((1 << memory_properties.memoryTypeCount) - 1) & ~buffer_mem_reqs.memoryTypeBits;
         if (buffer_unsupported_mem_type_bits != 0) {
-            pass = m_device->phy().set_memory_type(buffer_unsupported_mem_type_bits, &buffer_alloc_info, 0);
+            pass = m_device->phy().SetMemoryType(buffer_unsupported_mem_type_bits, &buffer_alloc_info, 0);
             ASSERT_TRUE(pass);
             err = vk::AllocateMemory(device(), &buffer_alloc_info, NULL, &buffer_mem);
             ASSERT_EQ(VK_SUCCESS, err);

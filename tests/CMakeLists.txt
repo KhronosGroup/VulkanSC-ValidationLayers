@@ -44,6 +44,7 @@ target_sources(vk_layer_validation_tests PRIVATE
     framework/render.h
     framework/binding.h
     framework/binding.cpp
+    framework/buffer_helper.h
     framework/test_framework.cpp
     framework/ray_tracing_objects.h
     framework/ray_tracing_objects.cpp
@@ -84,12 +85,16 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/debug_extensions_positive.cpp
     unit/debug_printf.cpp
     unit/debug_printf_shader_debug_info.cpp
+    unit/debug_printf_ray_tracing.cpp
     unit/descriptor_buffer.cpp
     unit/descriptor_buffer_positive.cpp
     unit/descriptor_indexing.cpp
     unit/descriptor_indexing_positive.cpp
     unit/descriptors.cpp
     unit/descriptors_positive.cpp
+    unit/device_feature_property.cpp
+    unit/device_generated_commands.cpp
+    unit/device_generated_commands_positive.cpp
     unit/device_queue.cpp
     unit/dynamic_rendering.cpp
     unit/dynamic_rendering_positive.cpp
@@ -106,6 +111,8 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/gpu_av.cpp
     unit/gpu_av_buffer_device_address.cpp
     unit/gpu_av_buffer_device_address_positive.cpp
+    unit/gpu_av_debug_printf.cpp
+    unit/gpu_av_descriptor_buffer_positive.cpp
     unit/gpu_av_descriptor_indexing.cpp
     unit/gpu_av_descriptor_indexing_positive.cpp
     unit/gpu_av_indirect_buffer.cpp
@@ -133,6 +140,7 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/instance_positive.cpp
     unit/instanceless.cpp
     unit/layer_utils_positive.cpp
+    unit/layer_settings.cpp
     unit/memory.cpp
     unit/memory_positive.cpp
     unit/mesh.cpp
@@ -147,6 +155,8 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/parent_positive.cpp
     unit/pipeline.cpp
     unit/pipeline_advanced_blend.cpp
+    unit/pipeline_binary.cpp
+    unit/pipeline_binary_positive.cpp
     unit/pipeline_layout.cpp
     unit/pipeline_layout_positive.cpp
     unit/pipeline_positive.cpp
@@ -206,6 +216,7 @@ target_sources(vk_layer_validation_tests PRIVATE
     unit/sync_object_positive.cpp
     unit/sync_val.cpp
     unit/sync_val_positive.cpp
+    unit/sync_val_reporting.cpp
     unit/sync_val_semaphore.cpp
     unit/sync_val_semaphore_positive.cpp
     unit/sync_val_wsi.cpp

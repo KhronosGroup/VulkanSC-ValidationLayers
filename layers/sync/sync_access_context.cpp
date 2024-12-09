@@ -15,7 +15,6 @@
  * limitations under the License.
  */
 
-#include <cinttypes>
 #include "state_tracker/buffer_state.h"
 #include "state_tracker/video_session_state.h"
 #include "state_tracker/render_pass_state.h"
@@ -196,28 +195,28 @@ void AccessContext::UpdateAccessState(const ImageState &image, SyncStageAccessIn
                                       const VkImageSubresourceRange &subresource_range, const ResourceUsageTag &tag) {
     // range_gen is non-temporary to avoid an additional copy
     ImageRangeGen range_gen = image.MakeImageRangeGen(subresource_range, false);
-    UpdateAccessState(range_gen, current_usage, ordering_rule, tag);
+    UpdateAccessState(range_gen, current_usage, ordering_rule, ResourceUsageTagEx{tag});
 }
 void AccessContext::UpdateAccessState(const ImageState &image, SyncStageAccessIndex current_usage, SyncOrdering ordering_rule,
                                       const VkImageSubresourceRange &subresource_range, const VkOffset3D &offset,
-                                      const VkExtent3D &extent, const ResourceUsageTag tag) {
+                                      const VkExtent3D &extent, const ResourceUsageTagEx tag_ex) {
     // range_gen is non-temporary to avoid an additional copy
     ImageRangeGen range_gen = image.MakeImageRangeGen(subresource_range, offset, extent, false);
-    UpdateAccessState(range_gen, current_usage, ordering_rule, tag);
+    UpdateAccessState(range_gen, current_usage, ordering_rule, tag_ex);
 }
 
 void AccessContext::UpdateAccessState(const ImageViewState &image_view, SyncStageAccessIndex current_usage,
                                       SyncOrdering ordering_rule, const VkOffset3D &offset, const VkExtent3D &extent,
-                                      const ResourceUsageTag tag) {
+                                      const ResourceUsageTagEx tag_ex) {
     // range_gen is non-temporary to avoid an additional copy
     ImageRangeGen range_gen(image_view.MakeImageRangeGen(offset, extent));
-    UpdateAccessState(range_gen, current_usage, ordering_rule, tag);
+    UpdateAccessState(range_gen, current_usage, ordering_rule, tag_ex);
 }
 
 void AccessContext::UpdateAccessState(const ImageViewState &image_view, SyncStageAccessIndex current_usage,
-                                      SyncOrdering ordering_rule, ResourceUsageTag tag) {
+                                      SyncOrdering ordering_rule, ResourceUsageTagEx tag_ex) {
     // Get is const, and will be copied in callee
-    UpdateAccessState(image_view.GetFullViewImageRangeGen(), current_usage, ordering_rule, tag);
+    UpdateAccessState(image_view.GetFullViewImageRangeGen(), current_usage, ordering_rule, tag_ex);
 }
 
 void AccessContext::UpdateAccessState(const AttachmentViewGen &view_gen, AttachmentViewGen::Gen gen_type,
@@ -225,7 +224,7 @@ void AccessContext::UpdateAccessState(const AttachmentViewGen &view_gen, Attachm
     const std::optional<ImageRangeGen> &attachment_gen = view_gen.GetRangeGen(gen_type);
     if (attachment_gen) {
         // Value of const optional is const, and will be copied in callee
-        UpdateAccessState(*attachment_gen, current_usage, ordering_rule, tag);
+        UpdateAccessState(*attachment_gen, current_usage, ordering_rule, ResourceUsageTagEx{tag});
     }
 }
 
@@ -235,23 +234,23 @@ void AccessContext::UpdateAccessState(const vvl::VideoSession &vs_state, const v
     const auto offset = resource.GetEffectiveImageOffset(vs_state);
     const auto extent = resource.GetEffectiveImageExtent(vs_state);
     ImageRangeGen range_gen(image->MakeImageRangeGen(resource.range, offset, extent, false));
-    UpdateAccessState(range_gen, current_usage, SyncOrdering::kNonAttachment, tag);
+    UpdateAccessState(range_gen, current_usage, SyncOrdering::kNonAttachment, ResourceUsageTagEx{tag});
 }
 
 void AccessContext::UpdateAccessState(ImageRangeGen &range_gen, SyncStageAccessIndex current_usage, SyncOrdering ordering_rule,
-                                      ResourceUsageTag tag) {
+                                      ResourceUsageTagEx tag_ex) {
     if (current_usage == SYNC_ACCESS_INDEX_NONE) {
         return;
     }
-    UpdateMemoryAccessStateFunctor action(*this, current_usage, ordering_rule, ResourceUsageTagEx{tag});
+    UpdateMemoryAccessStateFunctor action(*this, current_usage, ordering_rule, tag_ex);
     UpdateMemoryAccessState(action, range_gen);
 }
 
 void AccessContext::UpdateAccessState(const ImageRangeGen &range_gen, SyncStageAccessIndex current_usage,
-                                      SyncOrdering ordering_rule, ResourceUsageTag tag) {
+                                      SyncOrdering ordering_rule, ResourceUsageTagEx tag_ex) {
     // range_gen is non-temporary to avoid infinite call recursion
     ImageRangeGen mutable_range_gen(range_gen);
-    UpdateAccessState(mutable_range_gen, current_usage, ordering_rule, tag);
+    UpdateAccessState(mutable_range_gen, current_usage, ordering_rule, tag_ex);
 }
 
 void AccessContext::ResolveChildContexts(const std::vector<AccessContext> &contexts) {
@@ -389,7 +388,7 @@ HazardResult AccessContext::DetectHazard(const ImageState &image, const VkImageS
 
 class BarrierHazardDetector {
   public:
-    BarrierHazardDetector(SyncStageAccessIndex usage_index, VkPipelineStageFlags2KHR src_exec_scope,
+    BarrierHazardDetector(SyncStageAccessIndex usage_index, VkPipelineStageFlags2 src_exec_scope,
                           SyncStageAccessFlags src_access_scope)
         : usage_info_(SyncStageAccess::UsageInfo(usage_index)),
           src_exec_scope_(src_exec_scope),
@@ -406,13 +405,13 @@ class BarrierHazardDetector {
 
   private:
     const SyncStageAccessInfoType &usage_info_;
-    VkPipelineStageFlags2KHR src_exec_scope_;
+    VkPipelineStageFlags2 src_exec_scope_;
     SyncStageAccessFlags src_access_scope_;
 };
 
 class EventBarrierHazardDetector {
   public:
-    EventBarrierHazardDetector(SyncStageAccessIndex usage_index, VkPipelineStageFlags2KHR src_exec_scope,
+    EventBarrierHazardDetector(SyncStageAccessIndex usage_index, VkPipelineStageFlags2 src_exec_scope,
                                SyncStageAccessFlags src_access_scope, const AccessContext::ScopeMap &event_scope, QueueId queue_id,
                                ResourceUsageTag scope_tag)
         : usage_info_(SyncStageAccess::UsageInfo(usage_index)),
@@ -487,7 +486,7 @@ class EventBarrierHazardDetector {
     }
 
     const SyncStageAccessInfoType usage_info_;
-    VkPipelineStageFlags2KHR src_exec_scope_;
+    VkPipelineStageFlags2 src_exec_scope_;
     SyncStageAccessFlags src_access_scope_;
     const AccessContext::ScopeMap &event_scope_;
     QueueId scope_queue_id_;
@@ -497,7 +496,7 @@ class EventBarrierHazardDetector {
 };
 
 HazardResult AccessContext::DetectImageBarrierHazard(const ImageState &image, const VkImageSubresourceRange &subresource_range,
-                                                     VkPipelineStageFlags2KHR src_exec_scope,
+                                                     VkPipelineStageFlags2 src_exec_scope,
                                                      const SyncStageAccessFlags &src_access_scope, QueueId queue_id,
                                                      const ScopeMap &scope_map, const ResourceUsageTag scope_tag,
                                                      AccessContext::DetectOptions options) const {
@@ -513,7 +512,7 @@ HazardResult AccessContext::DetectImageBarrierHazard(const AttachmentViewGen &vi
     return DetectHazard(detector, view_gen, AttachmentViewGen::Gen::kViewSubresource, options);
 }
 
-HazardResult AccessContext::DetectImageBarrierHazard(const ImageState &image, VkPipelineStageFlags2KHR src_exec_scope,
+HazardResult AccessContext::DetectImageBarrierHazard(const ImageState &image, VkPipelineStageFlags2 src_exec_scope,
                                                      const SyncStageAccessFlags &src_access_scope,
                                                      const VkImageSubresourceRange &subresource_range,
                                                      const DetectOptions options) const {

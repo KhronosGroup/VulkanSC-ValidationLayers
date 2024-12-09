@@ -17,6 +17,7 @@
  */
 #include "error_monitor.h"
 #include "test_common.h"
+#include "error_message/log_message_type.h"
 #include "generated/vk_function_pointers.h"
 
 #ifdef VK_USE_PLATFORM_ANDROID_KHR
@@ -162,6 +163,22 @@ void ErrorMonitor::SetDesiredFailureMsgRegex(const VkFlags msg_flags, const char
     message_flags_ |= msg_flags;
 }
 
+void ErrorMonitor::SetDesiredFailureMsgRegex(const VkFlags msg_flags, const char *vuid, std::string regex_str,
+                                             std::string undesired_regex_str) {
+    if (NeedCheckSuccess()) {
+        VerifyNotFound();
+    }
+
+    auto guard = Lock();
+    VuidAndMessage vuid_and_regex;
+    vuid_and_regex.vuid = vuid;
+    std::regex regex(regex_str);
+    std::regex undesired_regex(undesired_regex_str);
+    vuid_and_regex.SetMsgRegex(std::move(regex_str), std::move(regex));
+    desired_messages_.emplace_back(std::move(vuid_and_regex));
+    message_flags_ |= msg_flags;
+}
+
 void ErrorMonitor::SetDesiredFailureMsgRegex(const VkFlags msg_flags, const char *vuid, std::string regex_str, std::regex regex) {
     if (NeedCheckSuccess()) {
         VerifyNotFound();
@@ -191,6 +208,12 @@ void ErrorMonitor::SetDesiredErrorRegex(const char *vuid, std::string regex_str,
 void ErrorMonitor::SetDesiredWarning(const char *msg, uint32_t count) {
     for (uint32_t i = 0; i < count; ++i) {
         SetDesiredFailureMsg(kWarningBit, msg);
+    }
+}
+
+void ErrorMonitor::SetDesiredInfo(const char *msg, uint32_t count /*= 1*/) {
+    for (uint32_t i = 0; i < count; ++i) {
+        SetDesiredFailureMsg(kInformationBit, msg);
     }
 }
 
@@ -224,8 +247,19 @@ VkBool32 ErrorMonitor::CheckForDesiredMsg(const char *vuid, const char *const ms
         return result;
     }
 
+    for (const VuidAndMessage &undesired_message : undesired_messages_) {
+        if (undesired_message.Search(vuid, msg_string)) {
+        }
+    }
+
     for (size_t desired_message_i = 0; desired_message_i < desired_messages_.size(); ++desired_message_i) {
-        auto &desired_message = desired_messages_[desired_message_i];
+        VuidAndMessage &desired_message = desired_messages_[desired_message_i];
+        if (desired_message.SearchUndesiredRegex(msg_string)) {
+            ADD_FAILURE() << "Received undesired error message " << '"' << desired_message.undesired_msg_regex_string << '"'
+                          << " in:\n"
+                          << error_string;
+            return VK_TRUE;
+        }
         if (desired_message.Search(vuid, msg_string)) {
             found_expected = true;
             failure_message_strings_.emplace_back(error_string);
@@ -238,7 +272,7 @@ VkBool32 ErrorMonitor::CheckForDesiredMsg(const char *vuid, const char *const ms
         }
     }
 
-    if (!found_expected && !allowed_message_strings_.empty()) {
+    if (!found_expected) {
         for (const auto &allowed_msg : allowed_message_strings_) {
             if (error_string.find(allowed_msg) != std::string::npos) {
                 found_expected = true;
@@ -350,6 +384,10 @@ bool ErrorMonitor::VuidAndMessage::Search(const char *vuid_, std::string_view ms
             return false;
     }
 #endif
+}
+
+bool ErrorMonitor::VuidAndMessage::SearchUndesiredRegex(std::string_view msg) const {
+    return !undesired_msg_regex_string.empty() && std::regex_search(msg.data(), undesired_msg_regex);
 }
 
 std::string ErrorMonitor::VuidAndMessage::Print() const {

@@ -30,6 +30,13 @@ class ValidationStateTracker;
 namespace vvl {
 
 class Queue;
+class Semaphore;
+
+struct SemaphoreInfo {
+    SemaphoreInfo(std::shared_ptr<Semaphore> &&sem, uint64_t pl) : semaphore(std::move(sem)), payload(pl) {}
+    std::shared_ptr<Semaphore> semaphore;
+    uint64_t payload{0};
+};
 
 class Semaphore : public RefcountedStateObject {
   public:
@@ -48,7 +55,7 @@ class Semaphore : public RefcountedStateObject {
     struct SemOp {
         OpType op_type;
         uint64_t payload;
-        SubmissionReference submit;
+        SubmissionReference submit;  // Used only by binary semaphores
         std::optional<Func> acquire_command;
 
         SemOp(OpType op_type, const SubmissionReference &submit, uint64_t payload)
@@ -73,6 +80,10 @@ class Semaphore : public RefcountedStateObject {
     Semaphore(ValidationStateTracker &dev, VkSemaphore handle, const VkSemaphoreCreateInfo *pCreateInfo)
         : Semaphore(dev, handle, vku::FindStructInPNextChain<VkSemaphoreTypeCreateInfo>(pCreateInfo->pNext), pCreateInfo) {}
 
+    std::shared_ptr<const Semaphore> shared_from_this() const { return SharedFromThisImpl(this); }
+    std::shared_ptr<Semaphore> shared_from_this() { return SharedFromThisImpl(this); }
+
+    const VulkanTypedHandle *InUse() const override;
     VkSemaphore VkHandle() const { return handle_.Cast<VkSemaphore>(); }
     enum Scope Scope() const;
 
@@ -84,15 +95,17 @@ class Semaphore : public RefcountedStateObject {
     // Enqueue binary semaphore signal from swapchain image acquire command
     void EnqueueAcquire(Func acquire_command);
 
-    // Helper for retiring timeline semaphores and then retiring all queues using the semaphore
-    void NotifyAndWait(const Location &loc, uint64_t payload);
+    // Process wait by retiring timeline timepoints up to the specified payload.
+    // If there is un-retired resolving signal then wait until another queue or a host retires timepoints instead.
+    // queue_thread determines if this function is called by a queue thread or by the validation object.
+    // (validation object has to use {Begin/End}BlockingOperation() when waiting for the timepoint)
+    void RetireWait(Queue *current_queue, uint64_t payload, const Location &loc, bool queue_thread = false);
 
-    // Remove completed operations and signal any waiters. This should only be called by Queue
-    void Retire(Queue *current_queue, const Location &loc, uint64_t payload);
+    // Process signal by retiring timeline timepoints up to the specified payload
+    void RetireSignal(uint64_t payload);
 
     // Look for most recent / highest payload operation that matches
-    std::optional<SemOp> LastOp(
-        const std::function<bool(OpType op_type, uint64_t payload, bool is_pending)> &filter = nullptr) const;
+    std::optional<SemOp> LastOp(const std::function<bool(OpType op_type, uint64_t payload, bool is_pending)> &filter) const;
 
     // Returns pending queue submission that signals this binary semaphore.
     std::optional<SubmissionReference> GetPendingBinarySignalSubmission() const;
@@ -100,12 +113,21 @@ class Semaphore : public RefcountedStateObject {
     // Returns pending queue submission that waits on this binary semaphore.
     std::optional<SubmissionReference> GetPendingBinaryWaitSubmission() const;
 
+    // If a pending binary signal depends on an unresolved timeline wait, this function
+    // returns information about the timeline wait; otherwise, it returns an empty result.
+    // This is used to validate VUs (such as VUID-vkQueueSubmit-pWaitSemaphores-03238) that have this statement:
+    // "and any semaphore signal operations on which it depends must have also been submitted for execution"
+    std::optional<SemaphoreInfo> GetPendingBinarySignalTimelineDependency() const;  
+
     // Current payload value.
-    // If a queue submission command is pending execution, then the returned value may immediately be out of date.
+    // If a queue submission command is pending execution, then the returned value may immediately be out of date
     uint64_t CurrentPayload() const;
 
     bool CanBinaryBeSignaled() const;
     bool CanBinaryBeWaited() const;
+
+    void GetLastBinarySignalSource(VkQueue &queue, vvl::Func &acquire_command) const;
+    bool HasResolvingTimelineSignal(uint64_t wait_payload) const;
 
     void Import(VkExternalSemaphoreHandleTypeFlagBits handle_type, VkSemaphoreImportFlags flags);
     void Export(VkExternalSemaphoreHandleTypeFlagBits handle_type);
@@ -114,6 +136,7 @@ class Semaphore : public RefcountedStateObject {
     const VkSemaphoreType type;
     const VkSemaphoreCreateFlags flags;
     const VkExternalSemaphoreHandleTypeFlags export_handle_types;
+    const uint64_t initial_value;  // for timelines
 
 #ifdef VK_USE_PLATFORM_METAL_EXT
     static bool GetMetalExport(const VkSemaphoreCreateInfo *info);
@@ -124,13 +147,20 @@ class Semaphore : public RefcountedStateObject {
     Semaphore(ValidationStateTracker &dev, VkSemaphore handle, const VkSemaphoreTypeCreateInfo *type_create_info,
               const VkSemaphoreCreateInfo *pCreateInfo);
 
-    // Signal queue(s) that need to retire because a wait on this payload has finished
-    void Notify(uint64_t payload);
-
-    std::shared_future<void> Wait(uint64_t payload);
-
     ReadLockGuard ReadLock() const { return ReadLockGuard(lock_); }
     WriteLockGuard WriteLock() { return WriteLockGuard(lock_); }
+
+    // Return true if timepoint has no dependencies and can be retired.
+    // If there is unresolved wait then notify signaling queue (if there is registered signal) and return false
+    bool CanRetireBinaryWait(TimePoint &timepoint) const;
+    bool CanRetireTimelineWait(const vvl::Queue *current_queue, uint64_t payload) const;
+
+    // Mark timepoints up to and including payload as completed (notify waiters) and remove them from timeline
+    void RetireTimePoint(uint64_t payload, OpType completed_op, SubmissionReference completed_submit);
+
+    // Waits for the waiter. Unblock parameter must be true if the caller is a validation object and false otherwise.
+    // (validation object has to use {Begin/End}BlockingOperation() when waiting for the timepoint)
+    void WaitTimePoint(std::shared_future<void> &&waiter, uint64_t payload, bool unblock_validation_object, const Location &loc);
 
   private:
     enum Scope scope_ { kInternal };
@@ -149,47 +179,4 @@ class Semaphore : public RefcountedStateObject {
     ValidationStateTracker &dev_data_;
 };
 
-// NOTE: Present semaphores are waited on by the implementation, not queue operations.
-// We do not yet have a good way to figure out when this wait completes,
-// so we must assume they are safe to re-use.
-static inline bool CanSignalBinarySemaphoreAfterOperation(Semaphore::OpType op_type) {
-    return op_type == Semaphore::kNone || op_type == Semaphore::kWait;
-}
-static inline bool CanWaitBinarySemaphoreAfterOperation(Semaphore::OpType op_type) {
-    return op_type == Semaphore::kSignal || op_type == Semaphore::kBinaryAcquire;
-}
-
 }  // namespace vvl
-
-class CoreChecks;
-struct SemaphoreSubmitState {
-    const CoreChecks &core;
-    VkQueue queue;
-    VkQueueFlags queue_flags;
-
-    // This tracks how the payload of a binary semaphore changes **within the current submission**.
-    // Before the first wait or signal no map entry for the semaphore is defined, which means that
-    // semaphore's state is defined by the previous submissions on this queue or by the submissions on other queues.
-    // After the first wait/signal the map starts tracking binary payload value: true - signaled, false - unsignaled.
-    vvl::unordered_map<VkSemaphore, bool> binary_signaling_state;
-
-    vvl::unordered_set<VkSemaphore> internal_semaphores;
-    vvl::unordered_map<VkSemaphore, uint64_t> timeline_signals;
-    vvl::unordered_map<VkSemaphore, uint64_t> timeline_waits;
-
-    SemaphoreSubmitState(const CoreChecks &core_, VkQueue q_, VkQueueFlags queue_flags_)
-        : core(core_), queue(q_), queue_flags(queue_flags_) {}
-
-    bool CannotWaitBinary(const vvl::Semaphore &semaphore_state) const;
-
-    VkQueue AnotherQueueWaits(const vvl::Semaphore &semaphore_state) const;
-
-    bool ValidateBinaryWait(const Location &loc, VkQueue queue, const vvl::Semaphore &semaphore_state);
-    bool ValidateWaitSemaphore(const Location &wait_semaphore_loc, const vvl::Semaphore &semaphore_state, uint64_t value);
-    bool ValidateSignalSemaphore(const Location &signal_semaphore_loc, const vvl::Semaphore &semaphore_state, uint64_t value);
-
-    bool CannotSignalBinary(const vvl::Semaphore &semaphore_state, VkQueue &other_queue, vvl::Func &other_command) const;
-
-    bool CheckSemaphoreValue(const vvl::Semaphore &semaphore_state, std::string &where, uint64_t &bad_value,
-                             std::function<bool(const vvl::Semaphore::OpType, uint64_t, bool is_pending)> compare_func);
-};

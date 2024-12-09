@@ -20,9 +20,11 @@
 #include <algorithm>
 #include <assert.h>
 #include <string>
+#include <set>
 
 #include <vulkan/vk_enum_string_helper.h>
 #include "generated/chassis.h"
+#include "core_checks/cc_synchronization.h"
 #include "core_checks/core_validation.h"
 #include "sync/sync_utils.h"
 #include "sync/sync_vuid_maps.h"
@@ -39,7 +41,7 @@
 using sync_utils::BufferBarrier;
 using sync_utils::ImageBarrier;
 using sync_utils::MemoryBarrier;
-using sync_utils::QueueFamilyBarrier;
+using sync_utils::OwnershipTransferBarrier;
 
 ReadLockGuard CoreChecks::ReadLock() const {
     if (global_settings.fine_grained_locking) {
@@ -69,38 +71,81 @@ struct TimelineMaxDiffCheck {
     uint64_t max_diff;
 };
 
-bool CoreChecks::ValidateStageMaskHost(const LogObjectList &objlist, const Location &stage_mask_loc,
-                                       VkPipelineStageFlags2KHR stageMask) const {
-    bool skip = false;
-    if ((stageMask & VK_PIPELINE_STAGE_HOST_BIT) != 0) {
-        const auto &vuid = sync_vuid_maps::GetQueueSubmitVUID(stage_mask_loc, sync_vuid_maps::SubmitError::kHostStageMask);
-        skip |= LogError(vuid, objlist, stage_mask_loc,
-                         "must not include VK_PIPELINE_STAGE_HOST_BIT as the stage can't be invoked inside a command buffer.");
+bool SemaphoreSubmitState::CanWaitBinary(const vvl::Semaphore &semaphore_state) const {
+    assert(semaphore_state.type == VK_SEMAPHORE_TYPE_BINARY);
+    // Check if current submission has signaled or unsignaled the semaphore
+    if (const bool *signaling_state = vvl::Find(binary_signaling_state, semaphore_state.VkHandle())) {
+        const bool signaled = *signaling_state;
+        return signaled;  // signaled => can wait
     }
-    return skip;
+    // Query semaphore object (state set by previous submissions)
+    return semaphore_state.CanBinaryBeWaited();
 }
 
-bool CoreChecks::ValidateFenceForSubmit(const vvl::Fence &fence_state, const char *inflight_vuid, const char *retired_vuid,
-                                        const LogObjectList &objlist, const Location &loc) const {
-    bool skip = false;
+bool SemaphoreSubmitState::CanSignalBinary(const vvl::Semaphore &semaphore_state, VkQueue &other_queue,
+                                           vvl::Func &other_acquire_command) const {
+    assert(semaphore_state.type == VK_SEMAPHORE_TYPE_BINARY);
+    // Check if current submission has signaled or unsignaled the semaphore
+    if (const bool *signaling_state = vvl::Find(binary_signaling_state, semaphore_state.VkHandle())) {
+        const bool signaled = *signaling_state;
+        if (!signaled) {
+            return true;  // not signaled => can signal
+        }
+        other_queue = queue;
+        other_acquire_command = vvl::Func::Empty;
+        return false;  // already signaled => can't signal
+    }
+    // Query semaphore object (state set by previous submissions)
+    if (semaphore_state.CanBinaryBeSignaled()) {
+        return true;
+    }
+    semaphore_state.GetLastBinarySignalSource(other_queue, other_acquire_command);
+    return false;
+}
 
-    if (fence_state.Scope() == vvl::Fence::kInternal) {
-        switch (fence_state.State()) {
-            case vvl::Fence::kInflight:
-                skip |= LogError(inflight_vuid, objlist, loc, "(%s) is already in use by another submission.",
-                                 FormatHandle(fence_state.Handle()).c_str());
-                break;
-            case vvl::Fence::kRetired:
-                skip |= LogError(retired_vuid, objlist, loc,
-                                 "(%s) submitted in SIGNALED state. Fences must be reset before being submitted",
-                                 FormatHandle(fence_state.Handle()).c_str());
-                break;
-            default:
-                break;
+VkQueue SemaphoreSubmitState::AnotherQueueWaits(const vvl::Semaphore &semaphore_state) const {
+    // VUID-vkQueueSubmit-pWaitSemaphores-00068 (and similar VUs):
+    // "When a semaphore wait operation referring to a binary semaphore defined
+    //  by any element of the pWaitSemaphores member of any element of pSubmits
+    //  executes on queue, there must be no other queues waiting on the same semaphore"
+    auto pending_wait_submit = semaphore_state.GetPendingBinaryWaitSubmission();
+    if (pending_wait_submit && pending_wait_submit->queue->VkHandle() != queue) {
+        return pending_wait_submit->queue->VkHandle();
+    }
+    return VK_NULL_HANDLE;
+}
+
+bool SemaphoreSubmitState::CheckSemaphoreValue(
+    const vvl::Semaphore &semaphore_state, std::string &where, uint64_t &bad_value,
+    std::function<bool(const vvl::Semaphore::OpType, uint64_t, bool is_pending)> compare_func) {
+    auto current_signal = timeline_signals.find(semaphore_state.VkHandle());
+    // NOTE: for purposes of validation, duplicate operations in the same submission are not yet pending.
+    if (current_signal != timeline_signals.end()) {
+        if (compare_func(vvl::Semaphore::kSignal, current_signal->second, false)) {
+            where = "current submit's signal";
+            bad_value = current_signal->second;
+            return true;
         }
     }
-
-    return skip;
+    auto current_wait = timeline_waits.find(semaphore_state.VkHandle());
+    if (current_wait != timeline_waits.end()) {
+        if (compare_func(vvl::Semaphore::kWait, current_wait->second, false)) {
+            where = "current submit's wait";
+            bad_value = current_wait->second;
+            return true;
+        }
+    }
+    auto pending = semaphore_state.LastOp(compare_func);
+    if (pending) {
+        if (pending->payload == semaphore_state.CurrentPayload()) {
+            where = "current";
+        } else {
+            where = pending->op_type == vvl::Semaphore::OpType::kSignal ? "pending signal" : "pending wait";
+        }
+        bad_value = pending->payload;
+        return true;
+    }
+    return false;
 }
 
 bool SemaphoreSubmitState::ValidateBinaryWait(const Location &loc, VkQueue queue, const vvl::Semaphore &semaphore_state) {
@@ -110,17 +155,25 @@ bool SemaphoreSubmitState::ValidateBinaryWait(const Location &loc, VkQueue queue
     bool skip = false;
     auto semaphore = semaphore_state.VkHandle();
     if ((semaphore_state.Scope() == vvl::Semaphore::kInternal || internal_semaphores.count(semaphore))) {
-        VkQueue other_queue = AnotherQueueWaits(semaphore_state);
-        if (other_queue) {
+        if (VkQueue other_queue = AnotherQueueWaits(semaphore_state)) {
             const auto &vuid = GetQueueSubmitVUID(loc, SubmitError::kOtherQueueWaiting);
             const LogObjectList objlist(semaphore, queue, other_queue);
             skip |= core.LogError(vuid, objlist, loc, "queue (%s) is already waiting on semaphore (%s).",
                                   core.FormatHandle(other_queue).c_str(), core.FormatHandle(semaphore).c_str());
-        } else if (CannotWaitBinary(semaphore_state)) {
+        } else if (!CanWaitBinary(semaphore_state)) {
             const auto &vuid = GetQueueSubmitVUID(loc, SubmitError::kBinaryCannotBeSignalled);
             const LogObjectList objlist(semaphore, queue);
             skip |= core.LogError(vuid, objlist, loc, "queue (%s) is waiting on semaphore (%s) that has no way to be signaled.",
                                   core.FormatHandle(queue).c_str(), core.FormatHandle(semaphore).c_str());
+        } else if (auto timeline_wait_info = semaphore_state.GetPendingBinarySignalTimelineDependency()) {
+            const auto &vuid = GetQueueSubmitVUID(loc, SubmitError::kBinaryCannotBeSignalled);
+            const LogObjectList objlist(semaphore_state.Handle(), timeline_wait_info->semaphore->Handle(), queue);
+            skip |= core.LogError(
+                vuid, objlist, loc,
+                "queue (%s) is waiting on binary semaphore (%s) that has an associated signal but it depends on timeline semaphore "
+                "wait (%s, wait value = %" PRIu64 ") that does not have resolving signal submitted yet.",
+                core.FormatHandle(queue).c_str(), core.FormatHandle(semaphore).c_str(),
+                core.FormatHandle(timeline_wait_info->semaphore->VkHandle()).c_str(), timeline_wait_info->payload);
         } else {
             binary_signaling_state[semaphore] = false;
         }
@@ -173,7 +226,7 @@ bool SemaphoreSubmitState::ValidateSignalSemaphore(const Location &signal_semaph
             if ((semaphore_state.Scope() == vvl::Semaphore::kInternal || internal_semaphores.count(handle))) {
                 VkQueue other_queue = VK_NULL_HANDLE;
                 vvl::Func other_command = vvl::Func::Empty;
-                if (CannotSignalBinary(semaphore_state, other_queue, other_command)) {
+                if (!CanSignalBinary(semaphore_state, other_queue, other_command)) {
                     std::stringstream initiator;
                     if (other_command != vvl::Func::Empty) {
                         initiator << String(other_command);
@@ -231,6 +284,40 @@ bool SemaphoreSubmitState::ValidateSignalSemaphore(const Location &signal_semaph
         default:
             break;
     }
+    return skip;
+}
+
+bool CoreChecks::ValidateStageMaskHost(const LogObjectList &objlist, const Location &stage_mask_loc,
+                                       VkPipelineStageFlags2KHR stageMask) const {
+    bool skip = false;
+    if ((stageMask & VK_PIPELINE_STAGE_HOST_BIT) != 0) {
+        const auto &vuid = sync_vuid_maps::GetQueueSubmitVUID(stage_mask_loc, sync_vuid_maps::SubmitError::kHostStageMask);
+        skip |= LogError(vuid, objlist, stage_mask_loc,
+                         "must not include VK_PIPELINE_STAGE_HOST_BIT as the stage can't be invoked inside a command buffer.");
+    }
+    return skip;
+}
+
+bool CoreChecks::ValidateFenceForSubmit(const vvl::Fence &fence_state, const char *inflight_vuid, const char *retired_vuid,
+                                        const LogObjectList &objlist, const Location &loc) const {
+    bool skip = false;
+
+    if (fence_state.Scope() == vvl::Fence::kInternal) {
+        switch (fence_state.State()) {
+            case vvl::Fence::kInflight:
+                skip |= LogError(inflight_vuid, objlist, loc, "(%s) is already in use by another submission.",
+                                 FormatHandle(fence_state.Handle()).c_str());
+                break;
+            case vvl::Fence::kRetired:
+                skip |= LogError(retired_vuid, objlist, loc,
+                                 "(%s) submitted in SIGNALED state. Fences must be reset before being submitted",
+                                 FormatHandle(fence_state.Handle()).c_str());
+                break;
+            default:
+                break;
+        }
+    }
+
     return skip;
 }
 
@@ -551,7 +638,7 @@ bool CoreChecks::PreCallValidateDestroyFence(VkDevice device, VkFence fence, con
     bool skip = false;
     auto fence_state = Get<vvl::Fence>(fence);
     if (fence_state && fence_state->Scope() == vvl::Fence::kInternal && fence_state->State() == vvl::Fence::kInflight) {
-        skip |= ValidateObjectNotInUse(fence_state.get(), error_obj.location.dot(Field::fence), "VUID-vkDestroyFence-fence-01120");
+        skip |= ValidateObjectNotInUse(fence_state.get(), error_obj.location, "VUID-vkDestroyFence-fence-01120");
     }
     return skip;
 }
@@ -574,8 +661,7 @@ bool CoreChecks::PreCallValidateDestroySemaphore(VkDevice device, VkSemaphore se
                                                  const ErrorObject &error_obj) const {
     bool skip = false;
     if (auto sema_node = Get<vvl::Semaphore>(semaphore)) {
-        skip |= ValidateObjectNotInUse(sema_node.get(), error_obj.location.dot(Field::semaphore),
-                                       "VUID-vkDestroySemaphore-semaphore-05149");
+        skip |= ValidateObjectNotInUse(sema_node.get(), error_obj.location, "VUID-vkDestroySemaphore-semaphore-05149");
     }
     return skip;
 }
@@ -603,7 +689,7 @@ bool CoreChecks::PreCallValidateCmdSetEvent(VkCommandBuffer commandBuffer, VkEve
                                             const ErrorObject &error_obj) const {
     auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
     bool skip = false;
-    skip |= ValidateExtendedDynamicState(*cb_state, error_obj.location, VK_TRUE, nullptr, nullptr);
+    skip |= ValidateCmd(*cb_state, error_obj.location);
     const Location stage_mask_loc = error_obj.location.dot(Field::stageMask);
     const LogObjectList objlist(commandBuffer);
     skip |= ValidatePipelineStage(objlist, stage_mask_loc, cb_state->GetQueueFlags(), stageMask);
@@ -617,8 +703,11 @@ bool CoreChecks::PreCallValidateCmdSetEvent2(VkCommandBuffer commandBuffer, VkEv
 
     auto cb_state = GetRead<vvl::CommandBuffer>(commandBuffer);
     bool skip = false;
-    skip |= ValidateExtendedDynamicState(*cb_state, error_obj.location, enabled_features.synchronization2,
-                                         "VUID-vkCmdSetEvent2-synchronization2-03824", "synchronization2");
+    if (!enabled_features.synchronization2) {
+        skip |= LogError("VUID-vkCmdSetEvent2-synchronization2-03824", commandBuffer, error_obj.location,
+                         "synchronization2 feature was not enabled.");
+    }
+    skip |= ValidateCmd(*cb_state, error_obj.location);
     const Location dep_info_loc = error_obj.location.dot(Field::pDependencyInfo);
     if (pDependencyInfo->dependencyFlags != 0) {
         skip |= LogError("VUID-vkCmdSetEvent2-dependencyFlags-03825", objlist, dep_info_loc.dot(Field::dependencyFlags),
@@ -923,12 +1012,11 @@ bool CoreChecks::ValidateStageMasksAgainstQueueCapabilities(const LogObjectList 
         return skip;
     }
 
-    static const std::map<VkPipelineStageFlags2KHR, VkQueueFlags> metaFlags{
-        {VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT_KHR, VK_QUEUE_GRAPHICS_BIT},
-        {VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT_KHR, VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT},
-        {VK_PIPELINE_STAGE_2_PRE_RASTERIZATION_SHADERS_BIT_KHR, VK_QUEUE_GRAPHICS_BIT},
-        {VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT_KHR, VK_QUEUE_GRAPHICS_BIT},
-    };
+    static const std::array<std::pair<VkPipelineStageFlags2KHR, VkQueueFlags>, 4> metaFlags{
+        {{VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT_KHR, VK_QUEUE_GRAPHICS_BIT},
+         {VK_PIPELINE_STAGE_2_ALL_TRANSFER_BIT_KHR, VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT | VK_QUEUE_TRANSFER_BIT},
+         {VK_PIPELINE_STAGE_2_PRE_RASTERIZATION_SHADERS_BIT_KHR, VK_QUEUE_GRAPHICS_BIT},
+         {VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT_KHR, VK_QUEUE_GRAPHICS_BIT}}};
 
     for (const auto &entry : metaFlags) {
         if (((entry.first & stage_mask) != 0) && ((entry.second & queue_flags) == 0)) {
@@ -1855,37 +1943,82 @@ void CoreChecks::EnqueueSubmitTimeValidateImageBarrierAttachment(const Location 
     }
 }
 
-template <typename Barrier, typename TransferBarrier>
-void CoreChecks::RecordBarrierValidationInfo(const Location &loc, vvl::CommandBuffer &cb_state, const Barrier &barrier,
-                                             QFOTransferBarrierSets<TransferBarrier> &barrier_sets) {
-    if (IsTransferOp(barrier)) {
-        if (cb_state.IsReleaseOp(barrier) && !IsQueueFamilyExternal(barrier.dstQueueFamilyIndex)) {
-            barrier_sets.release.emplace(barrier);
-        } else if (cb_state.IsAcquireOp(barrier) && !IsQueueFamilyExternal(barrier.srcQueueFamilyIndex)) {
-            barrier_sets.acquire.emplace(barrier);
+static bool IsQueueFamilyValid(const ValidationStateTracker &device_data, uint32_t queue_family) {
+    return (queue_family < static_cast<uint32_t>(device_data.physical_device_state->queue_family_properties.size()));
+}
+
+static bool IsQueueFamilySpecial(uint32_t queue_family) {
+    return IsQueueFamilyExternal(queue_family) || (queue_family == VK_QUEUE_FAMILY_IGNORED);
+}
+
+static const char *GetFamilyAnnotation(const ValidationStateTracker &device_data, uint32_t family) {
+    switch (family) {
+        case VK_QUEUE_FAMILY_EXTERNAL:
+            return " (VK_QUEUE_FAMILY_EXTERNAL)";
+        case VK_QUEUE_FAMILY_FOREIGN_EXT:
+            return " (VK_QUEUE_FAMILY_FOREIGN_EXT)";
+        case VK_QUEUE_FAMILY_IGNORED:
+            return " (VK_QUEUE_FAMILY_IGNORED)";
+        default:
+            if (!IsQueueFamilyValid(device_data, family)) {
+                return " (invalid queue family index)";
+            }
+            return "";
+    }
+}
+
+bool CoreChecks::ValidateHostStage(const LogObjectList &objlist, const Location &barrier_loc,
+                                   const OwnershipTransferBarrier &barrier) const {
+    bool skip = false;
+    // src/dst queue families should be equal if HOST_BIT is used
+    if (barrier.srcQueueFamilyIndex != barrier.dstQueueFamilyIndex) {
+        const bool is_sync2 = barrier_loc.structure == vvl::Struct::VkBufferMemoryBarrier2 ||
+                              barrier_loc.structure == vvl::Struct::VkImageMemoryBarrier2;
+        auto stage_field = vvl::Field::Empty;
+        if (barrier.srcStageMask == VK_PIPELINE_STAGE_2_HOST_BIT) {
+            stage_field = vvl::Field::srcStageMask;
+        } else if (barrier.dstStageMask == VK_PIPELINE_STAGE_2_HOST_BIT) {
+            stage_field = vvl::Field::dstStageMask;
+        }
+        if (stage_field != vvl::Field::Empty) {
+            const auto &vuid = sync_vuid_maps::GetBarrierQueueVUID(barrier_loc, sync_vuid_maps::QueueError::kHostStage);
+            const Location stage_loc = is_sync2 ? barrier_loc.dot(stage_field) : Location(barrier_loc.function, stage_field);
+            skip |= LogError(vuid, objlist, stage_loc,
+                             "is %s but srcQueueFamilyIndex (%" PRIu32 ") != dstQueueFamilyIndex (%" PRIu32 ").",
+                             is_sync2 ? "VK_PIPELINE_STAGE_2_HOST_BIT" : "VK_PIPELINE_STAGE_HOST_BIT", barrier.srcQueueFamilyIndex,
+                             barrier.dstQueueFamilyIndex);
         }
     }
+    return skip;
+}
 
-    // 7.7.4: If the values of srcQueueFamilyIndex and dstQueueFamilyIndex are equal, no ownership transfer is performed, and the
-    // barrier operates as if they were both set to VK_QUEUE_FAMILY_IGNORED.
-    const uint32_t src_queue_family = barrier.srcQueueFamilyIndex;
-    const uint32_t dst_queue_family = barrier.dstQueueFamilyIndex;
-    const bool is_ownership_transfer = src_queue_family != dst_queue_family;
+void CoreChecks::RecordBarrierValidationInfo(const Location &barrier_loc, vvl::CommandBuffer &cb_state,
+                                             const BufferBarrier &barrier,
+                                             QFOTransferBarrierSets<QFOBufferTransferBarrier> &barrier_sets) {
+    if (IsOwnershipTransfer(barrier)) {
+        if (auto buffer = Get<vvl::Buffer>(barrier.buffer)) {
+            if (cb_state.IsReleaseOp(barrier) && !IsQueueFamilyExternal(barrier.dstQueueFamilyIndex)) {
+                barrier_sets.release.emplace(barrier);
+            } else if (cb_state.IsAcquireOp(barrier) && !IsQueueFamilyExternal(barrier.srcQueueFamilyIndex)) {
+                barrier_sets.acquire.emplace(barrier);
+            }
+        }
+    }
+}
 
-    if (is_ownership_transfer) {
-        // Only enqueue submit time check if it is needed. If more submit time checks are added, change the criteria
-        // TODO create a better named list, or rename the submit time lists to something that matches the broader usage...
-        auto handle_state = barrier.GetResourceState(*this);
-        const bool mode_concurrent = handle_state && handle_state->create_info.sharingMode == VK_SHARING_MODE_CONCURRENT;
-        if (!mode_concurrent) {
-            const auto typed_handle = barrier.GetTypedHandle();
-            vvl::LocationCapture loc_capture(loc);
-            cb_state.queue_submit_functions.emplace_back(
-                [loc_capture, typed_handle, src_queue_family, dst_queue_family](
-                    const ValidationStateTracker &device_data, const vvl::Queue &queue_state, const vvl::CommandBuffer &cb_state) {
-                    return ValidateConcurrentBarrierAtSubmit(loc_capture.Get(), device_data, queue_state, cb_state, typed_handle,
-                                                             src_queue_family, dst_queue_family);
-                });
+void CoreChecks::RecordBarrierValidationInfo(const Location &barrier_loc, vvl::CommandBuffer &cb_state,
+                                             const ImageBarrier &image_barrier,
+                                             QFOTransferBarrierSets<QFOImageTransferBarrier> &barrier_sets) {
+    if (IsOwnershipTransfer(image_barrier)) {
+        if (auto image = Get<vvl::Image>(image_barrier.image)) {
+            ImageBarrier barrier = image_barrier;
+            barrier.subresourceRange = NormalizeSubresourceRange(image->create_info, image_barrier.subresourceRange);
+
+            if (cb_state.IsReleaseOp(barrier) && !IsQueueFamilyExternal(barrier.dstQueueFamilyIndex)) {
+                barrier_sets.release.emplace(barrier);
+            } else if (cb_state.IsAcquireOp(barrier) && !IsQueueFamilyExternal(barrier.srcQueueFamilyIndex)) {
+                barrier_sets.acquire.emplace(barrier);
+            }
         }
     }
 }
@@ -1895,29 +2028,29 @@ void CoreChecks::RecordBarriers(Func func_name, vvl::CommandBuffer &cb_state, Vk
                                 const VkBufferMemoryBarrier *pBufferMemBarriers, uint32_t imageMemBarrierCount,
                                 const VkImageMemoryBarrier *pImageMemBarriers) {
     for (uint32_t i = 0; i < bufferBarrierCount; i++) {
-        Location loc(func_name, Struct::VkBufferMemoryBarrier, Field::pBufferMemoryBarriers, i);
+        Location barrier_loc(func_name, Struct::VkBufferMemoryBarrier, Field::pBufferMemoryBarriers, i);
         const BufferBarrier barrier(pBufferMemBarriers[i], src_stage_mask, dst_stage_mask);
-        RecordBarrierValidationInfo(loc, cb_state, barrier, cb_state.qfo_transfer_buffer_barriers);
+        RecordBarrierValidationInfo(barrier_loc, cb_state, barrier, cb_state.qfo_transfer_buffer_barriers);
     }
     for (uint32_t i = 0; i < imageMemBarrierCount; i++) {
-        Location loc(func_name, Struct::VkImageMemoryBarrier, Field::pImageMemoryBarriers, i);
+        Location barrier_loc(func_name, Struct::VkImageMemoryBarrier, Field::pImageMemoryBarriers, i);
         const ImageBarrier img_barrier(pImageMemBarriers[i], src_stage_mask, dst_stage_mask);
-        RecordBarrierValidationInfo(loc, cb_state, img_barrier, cb_state.qfo_transfer_image_barriers);
-        EnqueueSubmitTimeValidateImageBarrierAttachment(loc, cb_state, img_barrier);
+        RecordBarrierValidationInfo(barrier_loc, cb_state, img_barrier, cb_state.qfo_transfer_image_barriers);
+        EnqueueSubmitTimeValidateImageBarrierAttachment(barrier_loc, cb_state, img_barrier);
     }
 }
 
 void CoreChecks::RecordBarriers(Func func_name, vvl::CommandBuffer &cb_state, const VkDependencyInfoKHR &dep_info) {
     for (uint32_t i = 0; i < dep_info.bufferMemoryBarrierCount; i++) {
-        Location loc(func_name, Struct::VkBufferMemoryBarrier2, Field::pBufferMemoryBarriers, i);
+        Location barrier_loc(func_name, Struct::VkBufferMemoryBarrier2, Field::pBufferMemoryBarriers, i);
         const BufferBarrier barrier(dep_info.pBufferMemoryBarriers[i]);
-        RecordBarrierValidationInfo(loc, cb_state, barrier, cb_state.qfo_transfer_buffer_barriers);
+        RecordBarrierValidationInfo(barrier_loc, cb_state, barrier, cb_state.qfo_transfer_buffer_barriers);
     }
     for (uint32_t i = 0; i < dep_info.imageMemoryBarrierCount; i++) {
-        Location loc(func_name, Struct::VkImageMemoryBarrier2, Field::pImageMemoryBarriers, i);
+        Location barrier_loc(func_name, Struct::VkImageMemoryBarrier2, Field::pImageMemoryBarriers, i);
         const ImageBarrier img_barrier(dep_info.pImageMemoryBarriers[i]);
-        RecordBarrierValidationInfo(loc, cb_state, img_barrier, cb_state.qfo_transfer_image_barriers);
-        EnqueueSubmitTimeValidateImageBarrierAttachment(loc, cb_state, img_barrier);
+        RecordBarrierValidationInfo(barrier_loc, cb_state, img_barrier, cb_state.qfo_transfer_image_barriers);
+        EnqueueSubmitTimeValidateImageBarrierAttachment(barrier_loc, cb_state, img_barrier);
     }
 }
 
@@ -2043,7 +2176,7 @@ bool CoreChecks::ValidateQFOTransferBarrierUniqueness(const Location &barrier_lo
     bool skip = false;
     const char *handle_name = TransferBarrier::HandleName();
     const char *transfer_type = nullptr;
-    if (!IsTransferOp(barrier)) {
+    if (!IsOwnershipTransfer(barrier)) {
         return skip;
     }
     const TransferBarrier *barrier_record = nullptr;
@@ -2070,200 +2203,92 @@ bool CoreChecks::ValidateQFOTransferBarrierUniqueness(const Location &barrier_lo
     return skip;
 }
 
-namespace barrier_queue_families {
-using sync_vuid_maps::GetBarrierQueueVUID;
-using sync_vuid_maps::GetQueueErrorSummaryMap;
-using sync_vuid_maps::QueueError;
-
-class ValidatorState {
-  public:
-    ValidatorState(const ValidationStateTracker &device_data, const LogObjectList &obj, const Location &location,
-                   const VulkanTypedHandle &barrier_handle, const VkSharingMode sharing_mode)
-        : device_data_(device_data),
-          objects_(std::move(obj)),
-          loc_(location),
-          barrier_handle_(barrier_handle),
-          sharing_mode_(sharing_mode),
-          limit_(static_cast<uint32_t>(device_data.physical_device_state->queue_family_properties.size())) {}
-
-    // Log the messages using boilerplate from object state, and Vu specific information from the template arg
-    // One and two family versions, in the single family version, Vu holds the name of the passed parameter
-    bool LogMsg(QueueError vu_index, uint32_t family, const char *param_name) const {
-        const std::string val_code = GetBarrierQueueVUID(loc_, vu_index);
-        const char *annotation = GetFamilyAnnotation(family);
-        return device_data_.LogError(val_code, objects_, loc_,
-                                     "barrier using %s %s created with sharingMode %s, has %s %" PRIu32 "%s. %s", GetTypeString(),
-                                     device_data_.FormatHandle(barrier_handle_).c_str(), GetModeString(), param_name, family,
-                                     annotation, GetQueueErrorSummaryMap().at(vu_index).c_str());
-    }
-
-    bool LogMsg(QueueError vu_index, uint32_t src_family, uint32_t dst_family) const {
-        const std::string val_code = GetBarrierQueueVUID(loc_, vu_index);
-        const char *src_annotation = GetFamilyAnnotation(src_family);
-        const char *dst_annotation = GetFamilyAnnotation(dst_family);
-        return device_data_.LogError(val_code, objects_, loc_,
-                                     "barrier using %s %s created with sharingMode %s, has srcQueueFamilyIndex %" PRIu32
-                                     "%s and dstQueueFamilyIndex %" PRIu32 "%s. %s",
-                                     GetTypeString(), device_data_.FormatHandle(barrier_handle_).c_str(), GetModeString(),
-                                     src_family, src_annotation, dst_family, dst_annotation,
-                                     GetQueueErrorSummaryMap().at(vu_index).c_str());
-    }
-
-    // This abstract Vu can only be tested at submit time, thus we need a callback from the closure containing the needed
-    // data. Note that the mem_barrier is copied to the closure as the lambda lifespan exceed the guarantees of validity for
-    // application input.
-    static bool ValidateAtQueueSubmit(const vvl::Queue *queue_state, const ValidationStateTracker &device_data, uint32_t src_family,
-                                      uint32_t dst_family, const ValidatorState &val) {
-        uint32_t queue_family = queue_state->queue_family_index;
-        if ((src_family != queue_family) && (dst_family != queue_family)) {
-            const char *src_annotation = val.GetFamilyAnnotation(src_family);
-            const char *dst_annotation = val.GetFamilyAnnotation(dst_family);
-            return device_data.LogError("VUID-vkQueueSubmit-pSubmits-04626", queue_state->Handle(), val.loc_,
-                                        "barrier submitted to queue with family index %" PRIu32
-                                        ", using %s %s created with sharingMode %s, has "
-                                        "srcQueueFamilyIndex %" PRIu32 "%s and dstQueueFamilyIndex %" PRIu32
-                                        "%s. Source or destination queue family must match submit queue family, if not ignored.",
-                                        queue_family, val.GetTypeString(), device_data.FormatHandle(val.barrier_handle_).c_str(),
-                                        val.GetModeString(), src_family, src_annotation, dst_family, dst_annotation);
-        }
-        return false;
-    }
-    // Logical helpers for semantic clarity
-    inline bool IsValid(uint32_t queue_family) const { return (queue_family < limit_); }
-    inline bool IsValidOrSpecial(uint32_t queue_family) const {
-        return IsValid(queue_family) || IsQueueFamilyExternal(queue_family) || (queue_family == VK_QUEUE_FAMILY_IGNORED);
-    }
-
-    // Helpers for LogMsg
-    const char *GetModeString() const { return string_VkSharingMode(sharing_mode_); }
-
-    // Descriptive text for the various types of queue family index
-    const char *GetFamilyAnnotation(uint32_t family) const {
-        const char *external = " (VK_QUEUE_FAMILY_EXTERNAL)";
-        const char *foreign = " (VK_QUEUE_FAMILY_FOREIGN_EXT)";
-        const char *ignored = " (VK_QUEUE_FAMILY_IGNORED)";
-        const char *valid = " (VALID)";
-        const char *invalid = " (INVALID)";
-        switch (family) {
-            case VK_QUEUE_FAMILY_EXTERNAL:
-                return external;
-            case VK_QUEUE_FAMILY_FOREIGN_EXT:
-                return foreign;
-            case VK_QUEUE_FAMILY_IGNORED:
-                return ignored;
-            default:
-                if (IsValid(family)) {
-                    return valid;
-                }
-                return invalid;
-        }
-    }
-    const char *GetTypeString() const { return string_VulkanObjectType(barrier_handle_.type); }
-    VkSharingMode GetSharingMode() const { return sharing_mode_; }
-
-  protected:
-    const ValidationStateTracker &device_data_;
-    const LogObjectList objects_;
-    const Location loc_;
-    const VulkanTypedHandle barrier_handle_;
-    const VkSharingMode sharing_mode_;
-    const uint32_t limit_;
-};
-
-static bool Validate(const CoreChecks *device_data, const ValidatorState &val, const uint32_t src_queue_family,
-                     const uint32_t dst_queue_family) {
+bool CoreChecks::ValidateBarrierQueueFamilies(const LogObjectList &objects, const Location &barrier_loc, const Location &field_loc,
+                                              const OwnershipTransferBarrier &barrier, const VulkanTypedHandle &resource_handle,
+                                              VkSharingMode sharing_mode, uint32_t command_pool_queue_family) const {
     bool skip = false;
+    using sync_vuid_maps::QueueError;
 
-    if (!IsExtEnabled(device_data->device_extensions.vk_khr_external_memory)) {
+    auto log_queue_family_error = [sharing_mode, resource_handle, &barrier_loc, &field_loc, device_data_ = this,
+                                   objects_ = objects](QueueError vu_index, uint32_t family, const char *param_name) -> bool {
+        const std::string &vuid = GetBarrierQueueVUID(field_loc, vu_index);
+        const char *annotation = GetFamilyAnnotation(*device_data_, family);
+        return device_data_->LogError(
+            vuid, objects_, barrier_loc, "barrier using %s created with sharingMode %s, has %s %" PRIu32 "%s. %s",
+            device_data_->FormatHandle(resource_handle).c_str(), string_VkSharingMode(sharing_mode), param_name, family, annotation,
+            sync_vuid_maps::GetQueueErrorSummaryMap().at(vu_index).c_str());
+    };
+    const auto src_queue_family = barrier.srcQueueFamilyIndex;
+    const auto dst_queue_family = barrier.dstQueueFamilyIndex;
+
+    if (!IsExtEnabled(device_extensions.vk_khr_external_memory)) {
         if (src_queue_family == VK_QUEUE_FAMILY_EXTERNAL) {
-            skip |= val.LogMsg(QueueError::kSrcNoExternalExt, src_queue_family, "srcQueueFamilyIndex");
+            skip |= log_queue_family_error(QueueError::kSrcNoExternalExt, src_queue_family, "srcQueueFamilyIndex");
         } else if (dst_queue_family == VK_QUEUE_FAMILY_EXTERNAL) {
-            skip |= val.LogMsg(QueueError::kDstNoExternalExt, dst_queue_family, "dstQueueFamilyIndex");
+            skip |= log_queue_family_error(QueueError::kDstNoExternalExt, dst_queue_family, "dstQueueFamilyIndex");
         }
 
-        if (val.GetSharingMode() == VK_SHARING_MODE_EXCLUSIVE && src_queue_family != dst_queue_family) {
-            if (!val.IsValid(src_queue_family)) {
-                skip |= val.LogMsg(QueueError::kExclusiveSrc, src_queue_family, "srcQueueFamilyIndex");
+        if (sharing_mode == VK_SHARING_MODE_EXCLUSIVE && src_queue_family != dst_queue_family) {
+            if (!IsQueueFamilyValid(*this, src_queue_family)) {
+                skip |= log_queue_family_error(QueueError::kExclusiveSrc, src_queue_family, "srcQueueFamilyIndex");
             }
-            if (!val.IsValid(dst_queue_family)) {
-                skip |= val.LogMsg(QueueError::kExclusiveDst, dst_queue_family, "dstQueueFamilyIndex");
+            if (!IsQueueFamilyValid(*this, dst_queue_family)) {
+                skip |= log_queue_family_error(QueueError::kExclusiveDst, dst_queue_family, "dstQueueFamilyIndex");
             }
         }
     } else {
-        if (val.GetSharingMode() == VK_SHARING_MODE_EXCLUSIVE && src_queue_family != dst_queue_family) {
-            if (!val.IsValidOrSpecial(src_queue_family)) {
-                skip |= val.LogMsg(QueueError::kExclusiveSrc, src_queue_family, "srcQueueFamilyIndex");
+        if (sharing_mode == VK_SHARING_MODE_EXCLUSIVE && src_queue_family != dst_queue_family) {
+            if (!(IsQueueFamilyValid(*this, src_queue_family) || IsQueueFamilySpecial(src_queue_family))) {
+                skip |= log_queue_family_error(QueueError::kExclusiveSrc, src_queue_family, "srcQueueFamilyIndex");
             }
-            if (!val.IsValidOrSpecial(dst_queue_family)) {
-                skip |= val.LogMsg(QueueError::kExclusiveDst, dst_queue_family, "dstQueueFamilyIndex");
+            if (!(IsQueueFamilyValid(*this, dst_queue_family) || IsQueueFamilySpecial(dst_queue_family))) {
+                skip |= log_queue_family_error(QueueError::kExclusiveDst, dst_queue_family, "dstQueueFamilyIndex");
             }
         }
     }
 
-    if (!IsExtEnabled(device_data->device_extensions.vk_ext_queue_family_foreign)) {
+    if (!IsExtEnabled(device_extensions.vk_ext_queue_family_foreign)) {
         if (src_queue_family == VK_QUEUE_FAMILY_FOREIGN_EXT) {
-            skip |= val.LogMsg(QueueError::kSrcNoForeignExt, src_queue_family, "srcQueueFamilyIndex");
+            skip |= log_queue_family_error(QueueError::kSrcNoForeignExt, src_queue_family, "srcQueueFamilyIndex");
         } else if (dst_queue_family == VK_QUEUE_FAMILY_FOREIGN_EXT) {
-            skip |= val.LogMsg(QueueError::kDstNoForeignExt, dst_queue_family, "dstQueueFamilyIndex");
+            skip |= log_queue_family_error(QueueError::kDstNoForeignExt, dst_queue_family, "dstQueueFamilyIndex");
         }
     }
 
-    if (!device_data->enabled_features.synchronization2 && val.GetSharingMode() == VK_SHARING_MODE_CONCURRENT) {
+    if (!enabled_features.synchronization2 && sharing_mode == VK_SHARING_MODE_CONCURRENT) {
         if (src_queue_family != VK_QUEUE_FAMILY_IGNORED && src_queue_family != VK_QUEUE_FAMILY_EXTERNAL) {
-            skip |= val.LogMsg(QueueError::kSync1ConcurrentSrc, src_queue_family, "srcQueueFamilyIndex");
+            skip |= log_queue_family_error(QueueError::kSync1ConcurrentSrc, src_queue_family, "srcQueueFamilyIndex");
         } else if (dst_queue_family != VK_QUEUE_FAMILY_IGNORED && dst_queue_family != VK_QUEUE_FAMILY_EXTERNAL) {
-            skip |= val.LogMsg(QueueError::kSync1ConcurrentDst, dst_queue_family, "dstQueueFamilyIndex");
+            skip |= log_queue_family_error(QueueError::kSync1ConcurrentDst, dst_queue_family, "dstQueueFamilyIndex");
         } else if (src_queue_family != VK_QUEUE_FAMILY_IGNORED && dst_queue_family != VK_QUEUE_FAMILY_IGNORED) {
-            skip |= val.LogMsg(QueueError::kSync1ConcurrentNoIgnored, src_queue_family, dst_queue_family);
+            const std::string &vuid = GetBarrierQueueVUID(field_loc, QueueError::kSync1ConcurrentNoIgnored);
+            const char *src_annotation = GetFamilyAnnotation(*this, src_queue_family);
+            const char *dst_annotation = GetFamilyAnnotation(*this, dst_queue_family);
+            // Log both src and dst queue families
+            skip |= LogError(vuid, objects, barrier_loc,
+                             "barrier using %s created with sharingMode %s, has srcQueueFamilyIndex %" PRIu32
+                             "%s and dstQueueFamilyIndex %" PRIu32
+                             "%s. Source or destination queue family must be VK_QUEUE_FAMILY_IGNORED.",
+                             FormatHandle(resource_handle).c_str(), string_VkSharingMode(sharing_mode), src_queue_family,
+                             src_annotation, dst_queue_family, dst_annotation);
         }
     }
 
-    return skip;
-}
-
-static bool ValidateHostStage(const ValidationObject *validation_obj, const LogObjectList &objects, const Location &barrier_loc,
-                              const QueueFamilyBarrier &barrier) {
-    bool skip = false;
-    // src/dst queue families should be equal if HOST_BIT is used
-    if (barrier.srcQueueFamilyIndex != barrier.dstQueueFamilyIndex) {
-        const bool is_sync2 = barrier_loc.structure == vvl::Struct::VkBufferMemoryBarrier2 ||
-                              barrier_loc.structure == vvl::Struct::VkImageMemoryBarrier2;
-        auto stage_field = vvl::Field::Empty;
-        if (barrier.srcStageMask == VK_PIPELINE_STAGE_2_HOST_BIT) {
-            stage_field = vvl::Field::srcStageMask;
-        } else if (barrier.dstStageMask == VK_PIPELINE_STAGE_2_HOST_BIT) {
-            stage_field = vvl::Field::dstStageMask;
-        }
-        if (stage_field != vvl::Field::Empty) {
-            const auto &vuid = GetBarrierQueueVUID(barrier_loc, QueueError::kHostStage);
-            const Location stage_loc = is_sync2 ? barrier_loc.dot(stage_field) : Location(barrier_loc.function, stage_field);
-            skip |= validation_obj->LogError(vuid, objects, stage_loc,
-                                             "is %s but srcQueueFamilyIndex (%" PRIu32 ") != dstQueueFamilyIndex (%" PRIu32 ").",
-                                             is_sync2 ? "VK_PIPELINE_STAGE_2_HOST_BIT" : "VK_PIPELINE_STAGE_HOST_BIT",
-                                             barrier.srcQueueFamilyIndex, barrier.dstQueueFamilyIndex);
+    if (sharing_mode == VK_SHARING_MODE_EXCLUSIVE && IsOwnershipTransfer(barrier)) {
+        if (src_queue_family != command_pool_queue_family && dst_queue_family != command_pool_queue_family) {
+            const std::string vuid = GetBarrierQueueVUID(barrier_loc, sync_vuid_maps::QueueError::kSubmitQueueMustMatchSrcOrDst);
+            const char *src_annotation = GetFamilyAnnotation(*this, src_queue_family);
+            const char *dst_annotation = GetFamilyAnnotation(*this, dst_queue_family);
+            skip |= LogError(
+                vuid, objects, barrier_loc,
+                "has srcQueueFamilyIndex %" PRIu32 "%s and dstQueueFamilyIndex %" PRIu32
+                "%s. The command buffer's command pool is associated with family index %" PRIu32
+                ". Source or destination queue family must match queue family associated with the command buffer's command pool.",
+                src_queue_family, src_annotation, dst_queue_family, dst_annotation, command_pool_queue_family);
         }
     }
-    return skip;
-}
 
-}  // namespace barrier_queue_families
-
-bool CoreChecks::ValidateConcurrentBarrierAtSubmit(const Location &loc, const ValidationStateTracker &state_data,
-                                                   const vvl::Queue &queue_state, const vvl::CommandBuffer &cb_state,
-                                                   const VulkanTypedHandle &typed_handle, uint32_t src_queue_family,
-                                                   uint32_t dst_queue_family) {
-    using barrier_queue_families::ValidatorState;
-    ValidatorState val(state_data, LogObjectList(cb_state.Handle()), loc, typed_handle, VK_SHARING_MODE_CONCURRENT);
-    return ValidatorState::ValidateAtQueueSubmit(&queue_state, state_data, src_queue_family, dst_queue_family, val);
-}
-
-bool CoreChecks::ValidateBarrierQueueFamilies(const LogObjectList &objects, const Location &barrier_loc, const Location &field_loc,
-                                              const QueueFamilyBarrier &barrier, const VulkanTypedHandle &handle,
-                                              VkSharingMode sharing_mode) const {
-    bool skip = false;
-    barrier_queue_families::ValidatorState val(*this, objects, field_loc, handle, sharing_mode);
-    skip |= barrier_queue_families::Validate(this, val, barrier.srcQueueFamilyIndex, barrier.dstQueueFamilyIndex);
-    skip |= barrier_queue_families::ValidateHostStage(this, objects, barrier_loc, barrier);
+    skip |= ValidateHostStage(objects, barrier_loc, barrier);
     return skip;
 }
 
@@ -2283,7 +2308,7 @@ bool CoreChecks::ValidateBufferBarrier(const LogObjectList &objects, const Locat
         skip |= ValidateMemoryIsBoundToBuffer(cb_state.VkHandle(), *buffer_state, buf_loc, mem_vuid.c_str());
 
         skip |= ValidateBarrierQueueFamilies(objects, barrier_loc, buf_loc, mem_barrier, buffer_state->Handle(),
-                                             buffer_state->create_info.sharingMode);
+                                             buffer_state->create_info.sharingMode, cb_state.command_pool->queueFamilyIndex);
 
         auto buffer_size = buffer_state->create_info.size;
         if (mem_barrier.offset >= buffer_size) {
@@ -2308,7 +2333,8 @@ bool CoreChecks::ValidateBufferBarrier(const LogObjectList &objects, const Locat
         }
     }
 
-    if ((mem_barrier.srcQueueFamilyIndex == VK_QUEUE_FAMILY_EXTERNAL ||
+    if ((mem_barrier.srcQueueFamilyIndex != mem_barrier.dstQueueFamilyIndex) &&
+        (mem_barrier.srcQueueFamilyIndex == VK_QUEUE_FAMILY_EXTERNAL ||
          mem_barrier.srcQueueFamilyIndex == VK_QUEUE_FAMILY_FOREIGN_EXT) &&
         (mem_barrier.dstQueueFamilyIndex == VK_QUEUE_FAMILY_EXTERNAL ||
          mem_barrier.dstQueueFamilyIndex == VK_QUEUE_FAMILY_FOREIGN_EXT)) {
@@ -2369,7 +2395,7 @@ bool CoreChecks::ValidateImageBarrier(const LogObjectList &objects, const Locati
         skip |= ValidateMemoryIsBoundToImage(objects, *image_data, image_loc, vuid_no_memory.c_str());
 
         skip |= ValidateBarrierQueueFamilies(objects, barrier_loc, image_loc, mem_barrier, image_data->Handle(),
-                                             image_data->create_info.sharingMode);
+                                             image_data->create_info.sharingMode, cb_state.command_pool->queueFamilyIndex);
 
         const auto &vuid_aspect = sync_vuid_maps::GetImageBarrierVUID(barrier_loc, sync_vuid_maps::ImageError::kAspectMask);
         skip |=

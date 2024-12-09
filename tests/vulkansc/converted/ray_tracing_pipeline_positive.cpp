@@ -164,13 +164,13 @@ TEST_F(PositiveRayTracingPipeline, GetCaptureReplayShaderGroupHandlesKHR) {
     AddRequiredExtensions(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_PIPELINE_LIBRARY_GROUP_HANDLES_EXTENSION_NAME);
 
+    AddRequiredFeature(vkt::Feature::rayTracingPipeline);
     AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
     AddRequiredFeature(vkt::Feature::accelerationStructure);
     AddRequiredFeature(vkt::Feature::graphicsPipelineLibrary);
     AddRequiredFeature(vkt::Feature::pipelineLibraryGroupHandles);
     AddRequiredFeature(vkt::Feature::rayTracingPipelineShaderGroupHandleCaptureReplay);
     RETURN_IF_SKIP(InitFrameworkForRayTracingTest());
-
     RETURN_IF_SKIP(InitState());
 
     vkt::rt::Pipeline rt_pipe_lib(*this, m_device);
@@ -185,7 +185,7 @@ TEST_F(PositiveRayTracingPipeline, GetCaptureReplayShaderGroupHandlesKHR) {
     rt_pipe.InitLibraryInfo();
     rt_pipe.AddBinding(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 0);
     rt_pipe.CreateDescriptorSet();
-    vkt::as::BuildGeometryInfoKHR tlas(vkt::as::blueprint::BuildOnDeviceTopLevel(*m_device, *m_default_queue, *m_commandBuffer));
+    vkt::as::BuildGeometryInfoKHR tlas(vkt::as::blueprint::BuildOnDeviceTopLevel(*m_device, *m_default_queue, m_command_buffer));
     rt_pipe.GetDescriptorSet().WriteDescriptorAccelStruct(0, 1, &tlas.GetDstAS()->handle());
     rt_pipe.GetDescriptorSet().UpdateDescriptorSets();
 

@@ -29,9 +29,7 @@
             "reason": "Not supported in Vulkan SC: assumes availability of pre-Vulkan 1.2 functionality",
             "cases": [
                 "VkLayerTest.UnsupportedPnextApiVersion",
-                "VkLayerTest.DeviceFeature2AndVertexAttributeDivisorExtensionUnenabled",
                 "VkLayerTest.UsePnextOnlyStructWithoutExtensionEnabled",
-                "VkLayerTest.RequiredPromotedFeaturesExtensions",
                 "VkLayerTest.MissingExtensionPhysicalDeviceProperties",
                 "VkLayerTest.ExtensionXmlDependsLogic3",
                 "VkPositiveLayerTest.Vulkan12FeaturesBufferDeviceAddress",
@@ -44,13 +42,17 @@
                 "NegativeShaderSpirv.NoScalarBlockLayout10",
                 "NegativeShaderSpirv.NoUniformBufferStandardLayout10",
                 "PositiveShaderSpirv.ShaderDrawParametersWithoutFeature",
-                "VkLayerTest.DeviceIDPropertiesUnsupported"
+                "VkLayerTest.DeviceIDPropertiesUnsupported",
+                "NegativeDeviceFeatureProperty.PhysicalDeviceFeatures2",
+                "NegativeDeviceFeatureProperty.PromotedFeaturesExtensions11",
+                "NegativeDeviceFeatureProperty.PromotedFeaturesExtensions12"
             ]
         },
         {
             "reason": "Not supported in Vulkan SC: shader module",
             "cases": [
-                "NegativeParent.PipelineShaderStageCreateInfo"
+                "NegativeParent.PipelineShaderStageCreateInfo",
+                "NegativeShaderSpirv.VkShaderModuleCreateInfoPNext"
             ]
         },
         {
@@ -73,9 +75,11 @@
         {
             "reason": "Not supported in Vulkan SC: derivative pipelines",
             "cases": [
-                "NegativePipeline.CreateComputesPipelineWithBadBasePointer",
+                "NegativePipeline.CreateComputePipelineWithDerivatives",
+                "NegativePipeline.CreateComputePipelineWithBadBasePointer",
                 "NegativePipeline.CreateGraphicsPipelineWithBadBasePointer",
-                "NegativePipeline.GraphicsPipelineWithBadBasePointer"
+                "NegativePipeline.GraphicsPipelineWithBadBasePointer",
+                "PositivePipeline.CreateComputePipelineWithDerivatives"
             ]
         },
         {
@@ -186,13 +190,6 @@
         {
             "reason": "Not supported in Vulkan SC: VK_EXT_layer_settings",
             "cases": [
-                "VkLayerTest.CustomStypeStructIntegerArray",
-                "VkLayerTest.CustomStypeStructString",
-                "VkLayerTest.CustomStypeStructStringArray",
-                "VkLayerTest.DuplicateMessageLimit",
-                "VkLayerTest.VuidFilterHexInt",
-                "VkLayerTest.VuidFilterInt",
-                "VkLayerTest.VuidIdFilterString"
             ]
         },
         {
@@ -226,6 +223,15 @@
             ]
         },
         {
+            "reason": "Not supported in Vulkan SC: VK_KHR_get_memory_requirements2",
+            "cases": [
+                "NegativeYcbcr.BindMemory2Disjoint",
+                "NegativeYcbcr.BindMemory2DisjointUnsupported",
+                "NegativeYcbcr.BindMemoryDisjoint",
+                "NegativeYcbcr.BindMemoryNoDisjoint"
+            ]
+        },
+        {
             "reason": "Not supported in Vulkan SC: miscellaneous Vulkan-only extensions",
             "cases": [
                 "NegativeInstanceless.ExtensionStructsWithoutExtensions",
@@ -239,6 +245,9 @@
             "reason": "This test case requires SPIR-V debug information",
             "cases": [
                 "NegativeAtomic.Float",
+                "NegativeAtomic.Float2With16bit",
+                "NegativeAtomic.Float2With64bit",
+                "NegativeAtomic.FloatOpSource",
                 "NegativeAtomic.FragmentStoresAndAtomicsFeatureDisable",
                 "NegativeAtomic.ImageInt64",
                 "NegativeAtomic.ImageInt64Drawtime32",
@@ -330,12 +339,16 @@
                 "NegativeShaderImageAccess.UnnormalizedCoordinatesFunction",
                 "NegativeShaderImageAccess.SampledImageShareBinding",
                 "NegativeShaderImageAccess.AliasImageBinding",
+                "NegativeShaderImageAccess.AliasImageMultisample",
                 "NegativeShaderInterface.*",
                 "NegativeShaderLimits.MinAndMaxTexelGatherOffset",
                 "NegativeShaderLimits.MinAndMaxTexelOffset",
                 "NegativeShaderLimits.MaxSampleMaskWordsInput",
                 "NegativeShaderLimits.MaxSampleMaskWordsOutput",
                 "NegativeShaderLimits.MaxFragmentDualSrcAttachments",
+                "NegativeShaderLimits.MaxFragmentOutputAttachments",
+                "NegativeShaderLimits.MaxFragmentOutputAttachmentsArray",
+                "NegativeShaderLimits.MaxFragmentOutputAttachmentsArrayAtEnd",
                 "NegativeShaderPushConstants.DrawWithoutUpdate",
                 "NegativeShaderPushConstants.MultipleEntryPoint",
                 "NegativeShaderPushConstants.NotDeclared",
@@ -344,6 +357,7 @@
                 "NegativeShaderSpirv.DemoteToHelperInvocation",
                 "NegativeShaderSpirv.DescriptorCountConstant",
                 "NegativeShaderSpirv.DeviceMemoryScope",
+                "NegativeShaderSpirv.DeviceMemoryScopeDebugInfo",
                 "NegativeShaderSpirv.DynamicUniformIndex",
                 "NegativeShaderSpirv.FragmentShaderInterlockEnabled",
                 "NegativeShaderSpirv.InvalidExtension",
@@ -374,10 +388,11 @@
                 "NegativeSyncVal.StageAccessExpansion",
                 "NegativeSyncVal.WriteOnlyBufferWriteHazard",
                 "NegativeSyncVal.WriteOnlyImageWriteHazard",
+                "NegativeSyncValReporting.ReportDescriptorBuffer_SubmitTime",
+                "NegativeSyncValReporting.ReportDescriptorBuffer2_SubmitTime",
+                "NegativeSyncValReporting.ReportDescriptorBuffer3_SubmitTime",
+                "NegativeSyncValReporting.ReportDescriptorImage_SubmitTime",
                 "PositiveSyncVal.AtomicAccessFromTwoSubmits2",
-                "NegativeSyncVal.DebugDescriptorBufferName",
-                "NegativeSyncVal.DebugDescriptorBufferName2",
-                "NegativeSyncVal.DebugDescriptorBufferName3",
                 "NegativeSyncVal.WriteSameLocationFromTwoSubmits",
                 "NegativeVertexInput.Attribute64bitInputAttribute",
                 "NegativeVertexInput.Attribute64bitShaderInput",
@@ -391,8 +406,10 @@
                 "NegativeVertexInput.AttributeStructTypeSecondLocation",
                 "NegativeVertexInput.AttributeTypeMismatch",
                 "NegativeVertexInput.AttributeTypeMismatchDynamic",
+                "NegativeVertexInput.ResetCmdSetVertexInput",
                 "NegativeYcbcr.DrawConstOffset",
-                "NegativeYcbcr.DrawFetch"
+                "NegativeYcbcr.DrawFetch",
+                "NegativeYcbcr.DrawFetchArray"
             ],
             "patch": [
                 "RequiresSpvDebugInfo()"

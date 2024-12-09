@@ -18,6 +18,7 @@
 #include "state_tracker/shader_object_state.h"
 #include "state_tracker/shader_module.h"
 #include "state_tracker/render_pass_state.h"
+#include "state_tracker/device_state.h"
 #include "generated/spirv_grammar_helper.h"
 #include "drawdispatch/drawdispatch_vuids.h"
 
@@ -219,6 +220,12 @@ bool CoreChecks::ValidateCreateShadersLinking(uint32_t createInfoCount, const Vk
                 "VUID-VkShaderCreateInfoEXT-flags-09405", device, create_info_loc.dot(Field::flags),
                 "contains VK_SHADER_CREATE_REQUIRE_FULL_SUBGROUPS_BIT_EXT, but computeFullSubgroups feature is not enabled.");
         }
+        if ((create_info.flags & VK_SHADER_CREATE_INDIRECT_BINDABLE_BIT_EXT) != 0 &&
+            enabled_features.deviceGeneratedCommands == VK_FALSE) {
+            skip |= LogError(
+                " VUID-VkShaderCreateInfoEXT-flags-11005", device, create_info_loc.dot(Field::flags),
+                "contains VK_SHADER_CREATE_INDIRECT_BINDABLE_BIT_EXT, but deviceGeneratedCommands feature is not enabled.");
+        }
     }
 
     if (linked_stage != invalid && non_linked_graphics_stage != invalid) {
@@ -280,7 +287,6 @@ bool CoreChecks::PreCallValidateCreateShadersEXT(VkDevice device, uint32_t creat
         return skip;  // VK_VALIDATION_FEATURE_DISABLE_SHADERS_EXT
     }
 
-    skip |= ValidateDeviceQueueSupport(error_obj.location);
     if (enabled_features.shaderObject == VK_FALSE) {
         skip |=
             LogError("VUID-vkCreateShadersEXT-None-08400", device, error_obj.location, "the shaderObject feature was not enabled.");
@@ -296,6 +302,7 @@ bool CoreChecks::PreCallValidateCreateShadersEXT(VkDevice device, uint32_t creat
     bool tese_linked_point_mode = false;
     uint32_t tesc_linked_spacing = 0u;
     uint32_t tese_linked_spacing = 0u;
+    bool has_compute = false;
 
     // Currently we don't provide a way for apps to supply their own cache for shader object
     // https://gitlab.khronos.org/vulkan/vulkan/-/issues/3570
@@ -319,6 +326,8 @@ bool CoreChecks::PreCallValidateCreateShadersEXT(VkDevice device, uint32_t creat
         if (create_info.stage == VK_SHADER_STAGE_MESH_BIT_EXT) {
             skip |= ValidateCreateShadersMesh(create_info, *spirv, create_info_loc);
         }
+
+        has_compute = create_info.stage == VK_SHADER_STAGE_COMPUTE_BIT;
 
         // Validate tessellation stages
         if (stage_state.entrypoint && (create_info.stage == VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT ||
@@ -385,6 +394,15 @@ bool CoreChecks::PreCallValidateCreateShadersEXT(VkDevice device, uint32_t creat
                          "The spacing specified in tessellation control shader (%s) does not match the spacing in "
                          "tessellation evaluation shader (%s).",
                          string_SpvExecutionMode(tesc_linked_spacing), string_SpvExecutionMode(tese_linked_spacing));
+    }
+
+    skip |= ValidateDeviceQueueSupport(error_obj.location);  // check if compute or graphics
+    const VkQueueFlags queue_flag = has_compute ? VK_QUEUE_COMPUTE_BIT : VK_QUEUE_GRAPHICS_BIT;
+    if ((physical_device_state->supported_queues & queue_flag) == 0) {
+        const char* vuid = has_compute ? "VUID-vkCreateShadersEXT-stage-09670" : "VUID-vkCreateShadersEXT-stage-09671";
+        skip |=
+            LogError(vuid, device, error_obj.location, "device only supports (%s) but require %s.",
+                     string_VkQueueFlags(physical_device_state->supported_queues).c_str(), string_VkQueueFlags(queue_flag).c_str());
     }
 
     return skip;
@@ -635,6 +653,7 @@ bool CoreChecks::ValidateDrawShaderObject(const LastBound& last_bound_state, con
 bool CoreChecks::ValidateDrawShaderObjectLinking(const LastBound& last_bound_state, const vvl::DrawDispatchVuid& vuid) const {
     bool skip = false;
     const vvl::CommandBuffer& cb_state = last_bound_state.cb_state;
+    const Location loc = vuid.loc();
 
     for (uint32_t i = 0; i < kShaderObjectStageCount; ++i) {
         if (i == static_cast<uint32_t>(ShaderObjectStage::COMPUTE) || !last_bound_state.shader_object_states[i]) {
@@ -651,7 +670,7 @@ bool CoreChecks::ValidateDrawShaderObjectLinking(const LastBound& last_bound_sta
             }
             if (!found) {
                 const auto missing_Shader = Get<vvl::ShaderObject>(linked_shader);
-                skip |= LogError(vuid.linked_shaders_08698, cb_state.Handle(), vuid.loc(),
+                skip |= LogError(vuid.linked_shaders_08698, cb_state.Handle(), loc,
                                  "Shader %s (%s) was created with VK_SHADER_CREATE_LINK_STAGE_BIT_EXT, but the linked %s "
                                  "shader (%s) is not bound.",
                                  debug_report->FormatHandle(last_bound_state.GetShader(static_cast<ShaderObjectStage>(i))).c_str(),
@@ -662,16 +681,22 @@ bool CoreChecks::ValidateDrawShaderObjectLinking(const LastBound& last_bound_sta
             }
         }
     }
-    const VkShaderStageFlagBits graphics_stages[] = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT,
-                                                     VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT, VK_SHADER_STAGE_GEOMETRY_BIT,
-                                                     VK_SHADER_STAGE_FRAGMENT_BIT};
+
+    // In order of how stages are linked together
+    const std::array graphics_stages = {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT,
+                                        VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT, VK_SHADER_STAGE_GEOMETRY_BIT,
+                                        VK_SHADER_STAGE_FRAGMENT_BIT};
     VkShaderStageFlagBits prev_stage = VK_SHADER_STAGE_ALL;
     VkShaderStageFlagBits next_stage = VK_SHADER_STAGE_ALL;
+    const vvl::ShaderObject* producer = nullptr;
+    const vvl::ShaderObject* consumer = nullptr;
+
     for (const auto stage : graphics_stages) {
-        const auto shader_object = last_bound_state.GetShaderState(VkShaderStageToShaderObjectStage(stage));
-        if (!shader_object) continue;
-        if (next_stage != VK_SHADER_STAGE_ALL && shader_object->create_info.stage != next_stage) {
-            skip |= LogError(vuid.linked_shaders_08699, cb_state.Handle(), vuid.loc(),
+        if (skip) break;
+        consumer = last_bound_state.GetShaderState(VkShaderStageToShaderObjectStage(stage));
+        if (!consumer) continue;
+        if (next_stage != VK_SHADER_STAGE_ALL && consumer->create_info.stage != next_stage) {
+            skip |= LogError(vuid.linked_shaders_08699, cb_state.Handle(), loc,
                              "Shaders %s and %s were created with VK_SHADER_CREATE_LINK_STAGE_BIT_EXT without intermediate "
                              "stage %s linked, but %s shader is bound.",
                              string_VkShaderStageFlagBits(prev_stage), string_VkShaderStageFlagBits(next_stage),
@@ -680,16 +705,22 @@ bool CoreChecks::ValidateDrawShaderObjectLinking(const LastBound& last_bound_sta
         }
 
         next_stage = VK_SHADER_STAGE_ALL;
-        if (!shader_object->linked_shaders.empty()) {
+        if (!consumer->linked_shaders.empty()) {
             prev_stage = stage;
-            for (const auto& linked_shader : shader_object->linked_shaders) {
+            for (const auto& linked_shader : consumer->linked_shaders) {
                 const auto& linked_state = Get<vvl::ShaderObject>(linked_shader);
-                if (linked_state && linked_state->create_info.stage == shader_object->create_info.nextStage) {
-                    next_stage = static_cast<VkShaderStageFlagBits>(shader_object->create_info.nextStage);
+                if (linked_state && linked_state->create_info.stage == consumer->create_info.nextStage) {
+                    next_stage = static_cast<VkShaderStageFlagBits>(consumer->create_info.nextStage);
                     break;
                 }
             }
         }
+
+        if (producer && consumer->spirv && producer->spirv && consumer->entrypoint && producer->entrypoint) {
+            skip |= ValidateInterfaceBetweenStages(*producer->spirv, *producer->entrypoint, *consumer->spirv, *consumer->entrypoint,
+                                                   loc);
+        }
+        producer = consumer;
     }
 
     return skip;

@@ -87,6 +87,8 @@ bool ObjectLifetimes::ReportUndestroyedDeviceObjects(VkDevice device, const Loca
     skip |= ReportLeakedDeviceObjects(device, kVulkanObjectTypeOpticalFlowSessionNV, error_code, loc);
     skip |= ReportLeakedDeviceObjects(device, kVulkanObjectTypeShaderEXT, error_code, loc);
     // No destroy API or implicitly freed/destroyed -- do not report: skip |= ReportLeakedDeviceObjects(device, kVulkanObjectTypeSemaphoreSciSyncPoolNV, error_code, loc);
+    skip |= ReportLeakedDeviceObjects(device, kVulkanObjectTypeIndirectExecutionSetEXT, error_code, loc);
+    skip |= ReportLeakedDeviceObjects(device, kVulkanObjectTypeIndirectCommandsLayoutEXT, error_code, loc);
     return skip;
 }
 
@@ -142,6 +144,8 @@ void ObjectLifetimes::DestroyLeakedDeviceObjects() {
     DestroyUndestroyedObjects(kVulkanObjectTypeOpticalFlowSessionNV);
     DestroyUndestroyedObjects(kVulkanObjectTypeShaderEXT);
     DestroyUndestroyedObjects(kVulkanObjectTypeSemaphoreSciSyncPoolNV);
+    DestroyUndestroyedObjects(kVulkanObjectTypeIndirectExecutionSetEXT);
+    DestroyUndestroyedObjects(kVulkanObjectTypeIndirectCommandsLayoutEXT);
 }
 // clang-format on
 // vkEnumeratePhysicalDevices:
@@ -2876,7 +2880,7 @@ bool ObjectLifetimes::PreCallValidateQueuePresentKHR(VkQueue queue, const VkPres
 
             if ((pNext->swapchainCount > 0) && (pNext->pFences)) {
                 for (uint32_t index2 = 0; index2 < pNext->swapchainCount; ++index2) {
-                    skip |= ValidateObject(pNext->pFences[index2], kVulkanObjectTypeFence, false, kVUIDUndefined,
+                    skip |= ValidateObject(pNext->pFences[index2], kVulkanObjectTypeFence, true, kVUIDUndefined,
                                            "UNASSIGNED-VkSwapchainPresentFenceInfoEXT-pFences-parent",
                                            pNext_loc.dot(Field::pFences, index2));
                 }
@@ -3900,6 +3904,9 @@ bool ObjectLifetimes::PreCallValidateCmdEncodeVideoKHR(VkCommandBuffer commandBu
                 }
             }
         }
+        if ([[maybe_unused]] auto pNext = vku::FindStructInPNextChain<VkVideoEncodeQuantizationMapInfoKHR>(pEncodeInfo->pNext)) {
+            [[maybe_unused]] const Location pNext_loc = pEncodeInfo_loc.pNext(Struct::VkVideoEncodeQuantizationMapInfoKHR);
+        }
         if ([[maybe_unused]] auto pNext = vku::FindStructInPNextChain<VkVideoInlineQueryInfoKHR>(pEncodeInfo->pNext)) {
             [[maybe_unused]] const Location pNext_loc = pEncodeInfo_loc.pNext(Struct::VkVideoInlineQueryInfoKHR);
         }
@@ -3945,13 +3952,6 @@ bool ObjectLifetimes::PreCallValidateQueueSubmit2KHR(VkQueue queue, uint32_t sub
                                                      VkFence fence, const ErrorObject& error_obj) const {
     return PreCallValidateQueueSubmit2(queue, submitCount, pSubmits, fence, error_obj);
 }
-
-// vkCmdWriteBufferMarker2AMD:
-// Checked by chassis: commandBuffer: kVUIDUndefined
-// Checked by chassis: commandBuffer: "UNASSIGNED-vkCmdWriteBufferMarker2AMD-commonparent"
-
-// vkGetQueueCheckpointData2NV:
-// Checked by chassis: queue: kVUIDUndefined
 
 bool ObjectLifetimes::PreCallValidateCmdCopyBuffer2KHR(VkCommandBuffer commandBuffer, const VkCopyBufferInfo2* pCopyBufferInfo,
                                                        const ErrorObject& error_obj) const {
@@ -4401,6 +4401,17 @@ bool ObjectLifetimes::PreCallValidateGetImageViewHandleNVX(VkDevice device, cons
     return skip;
 }
 
+bool ObjectLifetimes::PreCallValidateGetImageViewHandle64NVX(VkDevice device, const VkImageViewHandleInfoNVX* pInfo,
+                                                             const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: device: kVUIDUndefined
+    if (pInfo) {
+        [[maybe_unused]] const Location pInfo_loc = error_obj.location.dot(Field::pInfo);
+    }
+
+    return skip;
+}
+
 // vkGetImageViewAddressNVX:
 // Checked by chassis: device: kVUIDUndefined
 
@@ -4771,6 +4782,7 @@ void ObjectLifetimes::PostCallRecordCreateExecutionGraphPipelinesAMDX(VkDevice d
 
 // vkCmdInitializeGraphScratchMemoryAMDX:
 // Checked by chassis: commandBuffer: kVUIDUndefined
+// Checked by chassis: commandBuffer: "UNASSIGNED-vkCmdInitializeGraphScratchMemoryAMDX-commonparent"
 
 // vkCmdDispatchGraphAMDX:
 // Checked by chassis: commandBuffer: kVUIDUndefined
@@ -5050,6 +5062,10 @@ bool ObjectLifetimes::PreCallValidateCmdWriteAccelerationStructuresPropertiesNV(
 // Checked by chassis: commandBuffer: kVUIDUndefined
 // Checked by chassis: commandBuffer: "UNASSIGNED-vkCmdWriteBufferMarkerAMD-commonparent"
 
+// vkCmdWriteBufferMarker2AMD:
+// Checked by chassis: commandBuffer: kVUIDUndefined
+// Checked by chassis: commandBuffer: "UNASSIGNED-vkCmdWriteBufferMarker2AMD-commonparent"
+
 // vkGetPhysicalDeviceCalibrateableTimeDomainsEXT:
 // Checked by chassis: physicalDevice: "VUID-vkGetPhysicalDeviceCalibrateableTimeDomainsKHR-physicalDevice-parameter"
 
@@ -5077,6 +5093,9 @@ bool ObjectLifetimes::PreCallValidateCmdWriteAccelerationStructuresPropertiesNV(
 // Checked by chassis: commandBuffer: kVUIDUndefined
 
 // vkGetQueueCheckpointDataNV:
+// Checked by chassis: queue: kVUIDUndefined
+
+// vkGetQueueCheckpointData2NV:
 // Checked by chassis: queue: kVUIDUndefined
 
 // vkInitializePerformanceApiINTEL:
@@ -6491,6 +6510,9 @@ bool ObjectLifetimes::PreCallValidateCmdBindShadersEXT(VkCommandBuffer commandBu
     return skip;
 }
 
+// vkCmdSetDepthClampRangeEXT:
+// Checked by chassis: commandBuffer: kVUIDUndefined
+
 // vkGetFramebufferTilePropertiesQCOM:
 // Checked by chassis: device: kVUIDUndefined
 
@@ -6590,6 +6612,203 @@ bool ObjectLifetimes::PreCallValidateLatencySleepNV(VkDevice device, VkSwapchain
 // Checked by chassis: device: "VUID-vkGetScreenBufferPropertiesQNX-device-parameter"
 
 #endif  // VK_USE_PLATFORM_SCREEN_QNX
+
+bool ObjectLifetimes::PreCallValidateGetGeneratedCommandsMemoryRequirementsEXT(
+    VkDevice device, const VkGeneratedCommandsMemoryRequirementsInfoEXT* pInfo, VkMemoryRequirements2* pMemoryRequirements,
+    const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: device: kVUIDUndefined
+    if (pInfo) {
+        [[maybe_unused]] const Location pInfo_loc = error_obj.location.dot(Field::pInfo);
+        if ([[maybe_unused]] auto pNext = vku::FindStructInPNextChain<VkGeneratedCommandsPipelineInfoEXT>(pInfo->pNext)) {
+            [[maybe_unused]] const Location pNext_loc = pInfo_loc.pNext(Struct::VkGeneratedCommandsPipelineInfoEXT);
+        }
+        if ([[maybe_unused]] auto pNext = vku::FindStructInPNextChain<VkGeneratedCommandsShaderInfoEXT>(pInfo->pNext)) {
+            [[maybe_unused]] const Location pNext_loc = pInfo_loc.pNext(Struct::VkGeneratedCommandsShaderInfoEXT);
+
+            if ((pNext->shaderCount > 0) && (pNext->pShaders)) {
+                for (uint32_t index2 = 0; index2 < pNext->shaderCount; ++index2) {
+                    skip |= ValidateObject(pNext->pShaders[index2], kVulkanObjectTypeShaderEXT, false, kVUIDUndefined,
+                                           "UNASSIGNED-VkGeneratedCommandsShaderInfoEXT-pShaders-parent",
+                                           pNext_loc.dot(Field::pShaders, index2));
+                }
+            }
+        }
+    }
+
+    return skip;
+}
+
+bool ObjectLifetimes::PreCallValidateCmdPreprocessGeneratedCommandsEXT(VkCommandBuffer commandBuffer,
+                                                                       const VkGeneratedCommandsInfoEXT* pGeneratedCommandsInfo,
+                                                                       VkCommandBuffer stateCommandBuffer,
+                                                                       const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: commandBuffer: kVUIDUndefined
+    // Checked by chassis: commandBuffer: "UNASSIGNED-vkCmdPreprocessGeneratedCommandsEXT-commonparent"
+    if (pGeneratedCommandsInfo) {
+        [[maybe_unused]] const Location pGeneratedCommandsInfo_loc = error_obj.location.dot(Field::pGeneratedCommandsInfo);
+        if ([[maybe_unused]] auto pNext =
+                vku::FindStructInPNextChain<VkGeneratedCommandsPipelineInfoEXT>(pGeneratedCommandsInfo->pNext)) {
+            [[maybe_unused]] const Location pNext_loc =
+                pGeneratedCommandsInfo_loc.pNext(Struct::VkGeneratedCommandsPipelineInfoEXT);
+        }
+        if ([[maybe_unused]] auto pNext =
+                vku::FindStructInPNextChain<VkGeneratedCommandsShaderInfoEXT>(pGeneratedCommandsInfo->pNext)) {
+            [[maybe_unused]] const Location pNext_loc = pGeneratedCommandsInfo_loc.pNext(Struct::VkGeneratedCommandsShaderInfoEXT);
+
+            if ((pNext->shaderCount > 0) && (pNext->pShaders)) {
+                for (uint32_t index2 = 0; index2 < pNext->shaderCount; ++index2) {
+                    skip |= ValidateObject(pNext->pShaders[index2], kVulkanObjectTypeShaderEXT, false, kVUIDUndefined,
+                                           "UNASSIGNED-VkGeneratedCommandsShaderInfoEXT-pShaders-parent",
+                                           pNext_loc.dot(Field::pShaders, index2));
+                }
+            }
+        }
+    }
+
+    return skip;
+}
+
+bool ObjectLifetimes::PreCallValidateCmdExecuteGeneratedCommandsEXT(VkCommandBuffer commandBuffer, VkBool32 isPreprocessed,
+                                                                    const VkGeneratedCommandsInfoEXT* pGeneratedCommandsInfo,
+                                                                    const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: commandBuffer: kVUIDUndefined
+    if (pGeneratedCommandsInfo) {
+        [[maybe_unused]] const Location pGeneratedCommandsInfo_loc = error_obj.location.dot(Field::pGeneratedCommandsInfo);
+        if ([[maybe_unused]] auto pNext =
+                vku::FindStructInPNextChain<VkGeneratedCommandsPipelineInfoEXT>(pGeneratedCommandsInfo->pNext)) {
+            [[maybe_unused]] const Location pNext_loc =
+                pGeneratedCommandsInfo_loc.pNext(Struct::VkGeneratedCommandsPipelineInfoEXT);
+        }
+        if ([[maybe_unused]] auto pNext =
+                vku::FindStructInPNextChain<VkGeneratedCommandsShaderInfoEXT>(pGeneratedCommandsInfo->pNext)) {
+            [[maybe_unused]] const Location pNext_loc = pGeneratedCommandsInfo_loc.pNext(Struct::VkGeneratedCommandsShaderInfoEXT);
+
+            if ((pNext->shaderCount > 0) && (pNext->pShaders)) {
+                for (uint32_t index2 = 0; index2 < pNext->shaderCount; ++index2) {
+                    skip |= ValidateObject(pNext->pShaders[index2], kVulkanObjectTypeShaderEXT, false, kVUIDUndefined,
+                                           "UNASSIGNED-VkGeneratedCommandsShaderInfoEXT-pShaders-parent",
+                                           pNext_loc.dot(Field::pShaders, index2));
+                }
+            }
+        }
+    }
+
+    return skip;
+}
+
+bool ObjectLifetimes::PreCallValidateCreateIndirectCommandsLayoutEXT(VkDevice device,
+                                                                     const VkIndirectCommandsLayoutCreateInfoEXT* pCreateInfo,
+                                                                     const VkAllocationCallbacks* pAllocator,
+                                                                     VkIndirectCommandsLayoutEXT* pIndirectCommandsLayout,
+                                                                     const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: device: kVUIDUndefined
+    if (pCreateInfo) {
+        [[maybe_unused]] const Location pCreateInfo_loc = error_obj.location.dot(Field::pCreateInfo);
+        if ([[maybe_unused]] auto pNext = vku::FindStructInPNextChain<VkPipelineLayoutCreateInfo>(pCreateInfo->pNext)) {
+            [[maybe_unused]] const Location pNext_loc = pCreateInfo_loc.pNext(Struct::VkPipelineLayoutCreateInfo);
+
+            if ((pNext->setLayoutCount > 0) && (pNext->pSetLayouts)) {
+                for (uint32_t index2 = 0; index2 < pNext->setLayoutCount; ++index2) {
+                    skip |= ValidateObject(pNext->pSetLayouts[index2], kVulkanObjectTypeDescriptorSetLayout, true,
+                                           "VUID-VkPipelineLayoutCreateInfo-pSetLayouts-parameter",
+                                           "UNASSIGNED-VkPipelineLayoutCreateInfo-pSetLayouts-commonparent",
+                                           pNext_loc.dot(Field::pSetLayouts, index2));
+                }
+            }
+        }
+    }
+
+    return skip;
+}
+
+void ObjectLifetimes::PostCallRecordCreateIndirectCommandsLayoutEXT(VkDevice device,
+                                                                    const VkIndirectCommandsLayoutCreateInfoEXT* pCreateInfo,
+                                                                    const VkAllocationCallbacks* pAllocator,
+                                                                    VkIndirectCommandsLayoutEXT* pIndirectCommandsLayout,
+                                                                    const RecordObject& record_obj) {
+    if (record_obj.result < VK_SUCCESS) return;
+    CreateObject(*pIndirectCommandsLayout, kVulkanObjectTypeIndirectCommandsLayoutEXT, pAllocator, record_obj.location);
+}
+
+bool ObjectLifetimes::PreCallValidateDestroyIndirectCommandsLayoutEXT(VkDevice device,
+                                                                      VkIndirectCommandsLayoutEXT indirectCommandsLayout,
+                                                                      const VkAllocationCallbacks* pAllocator,
+                                                                      const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: device: kVUIDUndefined
+    skip |= ValidateDestroyObject(indirectCommandsLayout, kVulkanObjectTypeIndirectCommandsLayoutEXT, pAllocator, kVUIDUndefined,
+                                  kVUIDUndefined, error_obj.location);
+
+    return skip;
+}
+
+void ObjectLifetimes::PreCallRecordDestroyIndirectCommandsLayoutEXT(VkDevice device,
+                                                                    VkIndirectCommandsLayoutEXT indirectCommandsLayout,
+                                                                    const VkAllocationCallbacks* pAllocator,
+                                                                    const RecordObject& record_obj) {
+    RecordDestroyObject(indirectCommandsLayout, kVulkanObjectTypeIndirectCommandsLayoutEXT);
+}
+
+void ObjectLifetimes::PostCallRecordCreateIndirectExecutionSetEXT(VkDevice device,
+                                                                  const VkIndirectExecutionSetCreateInfoEXT* pCreateInfo,
+                                                                  const VkAllocationCallbacks* pAllocator,
+                                                                  VkIndirectExecutionSetEXT* pIndirectExecutionSet,
+                                                                  const RecordObject& record_obj) {
+    if (record_obj.result < VK_SUCCESS) return;
+    CreateObject(*pIndirectExecutionSet, kVulkanObjectTypeIndirectExecutionSetEXT, pAllocator, record_obj.location);
+}
+
+bool ObjectLifetimes::PreCallValidateDestroyIndirectExecutionSetEXT(VkDevice device, VkIndirectExecutionSetEXT indirectExecutionSet,
+                                                                    const VkAllocationCallbacks* pAllocator,
+                                                                    const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: device: kVUIDUndefined
+    skip |= ValidateDestroyObject(indirectExecutionSet, kVulkanObjectTypeIndirectExecutionSetEXT, pAllocator, kVUIDUndefined,
+                                  kVUIDUndefined, error_obj.location);
+
+    return skip;
+}
+
+void ObjectLifetimes::PreCallRecordDestroyIndirectExecutionSetEXT(VkDevice device, VkIndirectExecutionSetEXT indirectExecutionSet,
+                                                                  const VkAllocationCallbacks* pAllocator,
+                                                                  const RecordObject& record_obj) {
+    RecordDestroyObject(indirectExecutionSet, kVulkanObjectTypeIndirectExecutionSetEXT);
+}
+
+bool ObjectLifetimes::PreCallValidateUpdateIndirectExecutionSetPipelineEXT(
+    VkDevice device, VkIndirectExecutionSetEXT indirectExecutionSet, uint32_t executionSetWriteCount,
+    const VkWriteIndirectExecutionSetPipelineEXT* pExecutionSetWrites, const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: device: kVUIDUndefined
+    if (pExecutionSetWrites) {
+        for (uint32_t index0 = 0; index0 < executionSetWriteCount; ++index0) {
+            [[maybe_unused]] const Location index0_loc = error_obj.location.dot(Field::pExecutionSetWrites, index0);
+        }
+    }
+
+    return skip;
+}
+
+bool ObjectLifetimes::PreCallValidateUpdateIndirectExecutionSetShaderEXT(
+    VkDevice device, VkIndirectExecutionSetEXT indirectExecutionSet, uint32_t executionSetWriteCount,
+    const VkWriteIndirectExecutionSetShaderEXT* pExecutionSetWrites, const ErrorObject& error_obj) const {
+    bool skip = false;
+    // Checked by chassis: device: kVUIDUndefined
+    if (pExecutionSetWrites) {
+        for (uint32_t index0 = 0; index0 < executionSetWriteCount; ++index0) {
+            [[maybe_unused]] const Location index0_loc = error_obj.location.dot(Field::pExecutionSetWrites, index0);
+        }
+    }
+
+    return skip;
+}
+
+// vkGetPhysicalDeviceCooperativeMatrixFlexibleDimensionsPropertiesNV:
+// Checked by chassis: physicalDevice: kVUIDUndefined
 
 bool ObjectLifetimes::PreCallValidateCreateAccelerationStructureKHR(VkDevice device,
                                                                     const VkAccelerationStructureCreateInfoKHR* pCreateInfo,

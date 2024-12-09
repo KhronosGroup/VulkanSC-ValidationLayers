@@ -274,12 +274,12 @@ class AccessContext {
                               SyncOrdering ordering_rule = SyncOrdering::kOrderingNone) const;
 
     HazardResult DetectImageBarrierHazard(const ImageState &image, const VkImageSubresourceRange &subresource_range,
-                                          VkPipelineStageFlags2KHR src_exec_scope, const SyncStageAccessFlags &src_access_scope,
+                                          VkPipelineStageFlags2 src_exec_scope, const SyncStageAccessFlags &src_access_scope,
                                           QueueId queue_id, const ScopeMap &scope_map, ResourceUsageTag scope_tag,
                                           DetectOptions options) const;
     HazardResult DetectImageBarrierHazard(const AttachmentViewGen &attachment_view, const SyncBarrier &barrier,
                                           DetectOptions options) const;
-    HazardResult DetectImageBarrierHazard(const ImageState &image, VkPipelineStageFlags2KHR src_exec_scope,
+    HazardResult DetectImageBarrierHazard(const ImageState &image, VkPipelineStageFlags2 src_exec_scope,
                                           const SyncStageAccessFlags &src_access_scope,
                                           const VkImageSubresourceRange &subresource_range, DetectOptions options) const;
     HazardResult DetectSubpassTransitionHazard(const TrackBack &track_back, const AttachmentViewGen &attach_view) const;
@@ -314,17 +314,17 @@ class AccessContext {
                            const VkImageSubresourceRange &subresource_range, const ResourceUsageTag &tag);
     void UpdateAccessState(const ImageState &image, SyncStageAccessIndex current_usage, SyncOrdering ordering_rule,
                            const VkImageSubresourceRange &subresource_range, const VkOffset3D &offset, const VkExtent3D &extent,
-                           ResourceUsageTag tag);
+                           ResourceUsageTagEx tag_ex);
     void UpdateAccessState(const AttachmentViewGen &view_gen, AttachmentViewGen::Gen gen_type, SyncStageAccessIndex current_usage,
                            SyncOrdering ordering_rule, ResourceUsageTag tag);
     void UpdateAccessState(const ImageViewState &image_view, SyncStageAccessIndex current_usage, SyncOrdering ordering_rule,
-                           const VkOffset3D &offset, const VkExtent3D &extent, ResourceUsageTag tag);
+                           const VkOffset3D &offset, const VkExtent3D &extent, ResourceUsageTagEx tag_ex);
     void UpdateAccessState(const ImageViewState &image_view, SyncStageAccessIndex current_usage, SyncOrdering ordering_rule,
-                           ResourceUsageTag tag);
+                           ResourceUsageTagEx tag_ex);
     void UpdateAccessState(const ImageRangeGen &range_gen, SyncStageAccessIndex current_usage, SyncOrdering ordering_rule,
-                           ResourceUsageTag tag);
+                           ResourceUsageTagEx tag_ex);
     void UpdateAccessState(ImageRangeGen &range_gen, SyncStageAccessIndex current_usage, SyncOrdering ordering_rule,
-                           ResourceUsageTag tag);
+                           ResourceUsageTagEx tag_ex);
     void UpdateAccessState(const vvl::VideoSession &vs_state, const vvl::VideoPictureResource &resource,
                            SyncStageAccessIndex current_usage, ResourceUsageTag tag);
     void ResolveChildContexts(const std::vector<AccessContext> &contexts);

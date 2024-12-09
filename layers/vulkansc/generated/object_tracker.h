@@ -846,6 +846,8 @@ bool PreCallValidateCmdCuLaunchKernelNVX(VkCommandBuffer commandBuffer, const Vk
                                          const ErrorObject& error_obj) const override;
 bool PreCallValidateGetImageViewHandleNVX(VkDevice device, const VkImageViewHandleInfoNVX* pInfo,
                                           const ErrorObject& error_obj) const override;
+bool PreCallValidateGetImageViewHandle64NVX(VkDevice device, const VkImageViewHandleInfoNVX* pInfo,
+                                            const ErrorObject& error_obj) const override;
 bool PreCallValidateCmdDrawIndirectCountAMD(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset,
                                             VkBuffer countBuffer, VkDeviceSize countBufferOffset, uint32_t maxDrawCount,
                                             uint32_t stride, const ErrorObject& error_obj) const override;
@@ -1236,6 +1238,52 @@ bool PreCallValidateLatencySleepNV(VkDevice device, VkSwapchainKHR swapchain, co
                                    const ErrorObject& error_obj) const override;
 #ifdef VK_USE_PLATFORM_SCREEN_QNX
 #endif  // VK_USE_PLATFORM_SCREEN_QNX
+bool PreCallValidateGetGeneratedCommandsMemoryRequirementsEXT(VkDevice device,
+                                                              const VkGeneratedCommandsMemoryRequirementsInfoEXT* pInfo,
+                                                              VkMemoryRequirements2* pMemoryRequirements,
+                                                              const ErrorObject& error_obj) const override;
+bool PreCallValidateCmdPreprocessGeneratedCommandsEXT(VkCommandBuffer commandBuffer,
+                                                      const VkGeneratedCommandsInfoEXT* pGeneratedCommandsInfo,
+                                                      VkCommandBuffer stateCommandBuffer,
+                                                      const ErrorObject& error_obj) const override;
+bool PreCallValidateCmdExecuteGeneratedCommandsEXT(VkCommandBuffer commandBuffer, VkBool32 isPreprocessed,
+                                                   const VkGeneratedCommandsInfoEXT* pGeneratedCommandsInfo,
+                                                   const ErrorObject& error_obj) const override;
+bool PreCallValidateCreateIndirectCommandsLayoutEXT(VkDevice device, const VkIndirectCommandsLayoutCreateInfoEXT* pCreateInfo,
+                                                    const VkAllocationCallbacks* pAllocator,
+                                                    VkIndirectCommandsLayoutEXT* pIndirectCommandsLayout,
+                                                    const ErrorObject& error_obj) const override;
+void PostCallRecordCreateIndirectCommandsLayoutEXT(VkDevice device, const VkIndirectCommandsLayoutCreateInfoEXT* pCreateInfo,
+                                                   const VkAllocationCallbacks* pAllocator,
+                                                   VkIndirectCommandsLayoutEXT* pIndirectCommandsLayout,
+                                                   const RecordObject& record_obj) override;
+bool PreCallValidateDestroyIndirectCommandsLayoutEXT(VkDevice device, VkIndirectCommandsLayoutEXT indirectCommandsLayout,
+                                                     const VkAllocationCallbacks* pAllocator,
+                                                     const ErrorObject& error_obj) const override;
+void PreCallRecordDestroyIndirectCommandsLayoutEXT(VkDevice device, VkIndirectCommandsLayoutEXT indirectCommandsLayout,
+                                                   const VkAllocationCallbacks* pAllocator,
+                                                   const RecordObject& record_obj) override;
+bool PreCallValidateCreateIndirectExecutionSetEXT(VkDevice device, const VkIndirectExecutionSetCreateInfoEXT* pCreateInfo,
+                                                  const VkAllocationCallbacks* pAllocator,
+                                                  VkIndirectExecutionSetEXT* pIndirectExecutionSet,
+                                                  const ErrorObject& error_obj) const override;
+void PostCallRecordCreateIndirectExecutionSetEXT(VkDevice device, const VkIndirectExecutionSetCreateInfoEXT* pCreateInfo,
+                                                 const VkAllocationCallbacks* pAllocator,
+                                                 VkIndirectExecutionSetEXT* pIndirectExecutionSet,
+                                                 const RecordObject& record_obj) override;
+bool PreCallValidateDestroyIndirectExecutionSetEXT(VkDevice device, VkIndirectExecutionSetEXT indirectExecutionSet,
+                                                   const VkAllocationCallbacks* pAllocator,
+                                                   const ErrorObject& error_obj) const override;
+void PreCallRecordDestroyIndirectExecutionSetEXT(VkDevice device, VkIndirectExecutionSetEXT indirectExecutionSet,
+                                                 const VkAllocationCallbacks* pAllocator, const RecordObject& record_obj) override;
+bool PreCallValidateUpdateIndirectExecutionSetPipelineEXT(VkDevice device, VkIndirectExecutionSetEXT indirectExecutionSet,
+                                                          uint32_t executionSetWriteCount,
+                                                          const VkWriteIndirectExecutionSetPipelineEXT* pExecutionSetWrites,
+                                                          const ErrorObject& error_obj) const override;
+bool PreCallValidateUpdateIndirectExecutionSetShaderEXT(VkDevice device, VkIndirectExecutionSetEXT indirectExecutionSet,
+                                                        uint32_t executionSetWriteCount,
+                                                        const VkWriteIndirectExecutionSetShaderEXT* pExecutionSetWrites,
+                                                        const ErrorObject& error_obj) const override;
 bool PreCallValidateCreateAccelerationStructureKHR(VkDevice device, const VkAccelerationStructureCreateInfoKHR* pCreateInfo,
                                                    const VkAllocationCallbacks* pAllocator,
                                                    VkAccelerationStructureKHR* pAccelerationStructure,

@@ -116,7 +116,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_IndependentSetsLinkOnly) {
     VkGraphicsPipelineCreateInfo lib_ci = vku::InitStructHelper(&link_info);
     lib_ci.flags = VK_PIPELINE_CREATE_LIBRARY_BIT_KHR;
     lib_ci.layout = pre_raster_lib.gp_ci_.layout;
-    lib_ci.renderPass = renderPass();
+    lib_ci.renderPass = RenderPass();
     vkt::Pipeline lib(*m_device, lib_ci);
     m_errorMonitor->VerifyFound();
 }
@@ -174,9 +174,9 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_DescriptorSets) {
 
     vkt::PipelineLayout pipeline_layout(*m_device, {&ds.layout_, &ds2.layout_});
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-vkCmdBindDescriptorSets-pDescriptorSets-06563");
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0,
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0,
                               static_cast<uint32_t>(sets.size()), sets.data(), 0, nullptr);
     m_errorMonitor->VerifyFound();
 }
@@ -202,11 +202,11 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_DescriptorSetsGPL) {
 
     vkt::PipelineLayout pipeline_layout(*m_device, {&ds.layout_, &ds2.layout_});
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     // Now bind with a layout that was _not_ created with independent sets, which should trigger 06754
     m_errorMonitor->SetDesiredError("VUID-vkCmdBindDescriptorSets-pDescriptorSets-06563");
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0,
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0,
                               static_cast<uint32_t>(sets.size()), sets.data(), 0, nullptr);
     m_errorMonitor->VerifyFound();
 }
@@ -405,7 +405,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_ImplicitVUIDs) {
     pipe.CreateGraphicsPipeline(false);
     m_errorMonitor->VerifyFound();
 
-    pipe.gp_ci_.renderPass = renderPass();
+    pipe.gp_ci_.renderPass = RenderPass();
     pipe.gp_ci_.stageCount = 0;
     pipe.shader_stages_.clear();
     pipe.gp_ci_.pStages = nullptr;
@@ -683,7 +683,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_DSLShaderBindingsLinkOnly) {
     VkGraphicsPipelineCreateInfo lib_ci = vku::InitStructHelper(&link_info);
     lib_ci.flags = VK_PIPELINE_CREATE_LIBRARY_BIT_KHR;
     lib_ci.layout = pre_raster_lib.gp_ci_.layout;
-    lib_ci.renderPass = renderPass();
+    lib_ci.renderPass = RenderPass();
     m_errorMonitor->SetDesiredError("VUID-VkGraphicsPipelineCreateInfo-pLibraries-06758");
     vkt::Pipeline lib(*m_device, lib_ci);
     m_errorMonitor->VerifyFound();
@@ -788,17 +788,17 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_ImmutableSamplersIncompatibleDSL) {
 
     VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
     exe_pipe_ci.layout = pipeline_layout_fs.handle();
-    exe_pipe_ci.renderPass = renderPass();
+    exe_pipe_ci.renderPass = RenderPass();
     vkt::Pipeline exe_pipe(*m_device, exe_pipe_ci);
     ASSERT_TRUE(exe_pipe.initialized());
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
 
     // Draw with pipeline created with null set
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, exe_pipe.handle());
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, exe_pipe.handle());
     m_errorMonitor->SetDesiredError("VUID-vkCmdBindDescriptorSets-pDescriptorSets-00358");
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_null.handle(), 0,
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_null.handle(), 0,
                               static_cast<uint32_t>(desc_sets.size()), desc_sets.data(), 0, nullptr);
     m_errorMonitor->VerifyFound();
 }
@@ -1043,7 +1043,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_DescriptorBufferLibrary) {
 
     VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
     exe_pipe_ci.layout = layout;
-    exe_pipe_ci.renderPass = renderPass();
+    exe_pipe_ci.renderPass = RenderPass();
     VkPipeline pipeline;
     m_errorMonitor->SetDesiredError("VUID-VkPipelineLibraryCreateInfoKHR-pLibraries-08096");
     vk::CreateGraphicsPipelines(m_device->handle(), VK_NULL_HANDLE, 1, &exe_pipe_ci, nullptr, &pipeline);
@@ -1239,7 +1239,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_Tessellation) {
         libs[1] = pre_raster_lib.Handle();
         VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
         exe_pipe_ci.layout = fs_lib.gp_ci_.layout;
-        exe_pipe_ci.renderPass = renderPass();
+        exe_pipe_ci.renderPass = RenderPass();
         m_errorMonitor->SetDesiredError("VUID-VkGraphicsPipelineCreateInfo-topology-08889");
         vkt::Pipeline exe_pipe(*m_device, exe_pipe_ci);
         m_errorMonitor->VerifyFound();
@@ -1285,7 +1285,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_Tessellation) {
         CreatePipelineHelper pre_raster_lib(*this);
         pre_raster_lib.InitPreRasterLibInfoFromContainer(tess_shaders);
         tsci_bad = tsci;
-        tsci_bad.patchControlPoints = m_device->phy().limits_.maxTessellationPatchSize + 1;
+        tsci_bad.patchControlPoints = m_device->Physical().limits_.maxTessellationPatchSize + 1;
         pre_raster_lib.gp_ci_.pTessellationState = &tsci_bad;
         m_errorMonitor->SetDesiredError("VUID-VkPipelineTessellationStateCreateInfo-patchControlPoints-01214");
         pre_raster_lib.CreateGraphicsPipeline(false);
@@ -1311,7 +1311,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_Tessellation) {
         libs[1] = pre_raster_lib.Handle();
         VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
         exe_pipe_ci.layout = fs_lib.gp_ci_.layout;
-        exe_pipe_ci.renderPass = renderPass();
+        exe_pipe_ci.renderPass = RenderPass();
         m_errorMonitor->SetDesiredError("VUID-VkGraphicsPipelineCreateInfo-pStages-08888");
         vkt::Pipeline exe_pipe(*m_device, exe_pipe_ci);
         m_errorMonitor->VerifyFound();
@@ -1347,7 +1347,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_PipelineExecutableProperties) {
 
         VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
         exe_pipe_ci.flags = VK_PIPELINE_CREATE_LIBRARY_BIT_KHR;
-        exe_pipe_ci.renderPass = renderPass();
+        exe_pipe_ci.renderPass = RenderPass();
         m_errorMonitor->SetDesiredError("VUID-VkGraphicsPipelineCreateInfo-pLibraries-06646");
         vkt::Pipeline exe_pipe(*m_device, exe_pipe_ci);
         m_errorMonitor->VerifyFound();
@@ -1473,28 +1473,28 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_BindEmptyDS) {
 
     VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
     exe_pipe_ci.layout = pipeline_layout.handle();
-    exe_pipe_ci.renderPass = renderPass();
+    exe_pipe_ci.renderPass = RenderPass();
     m_errorMonitor->SetAllowedFailureMsg("VUID-VkGraphicsPipelineCreateInfo-pLibraries-06681");
     vkt::Pipeline exe_pipe(*m_device, exe_pipe_ci);
     ASSERT_TRUE(exe_pipe.initialized());
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
 
     // Using an "empty" descriptor set is not legal
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, exe_pipe.handle());
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, exe_pipe.handle());
     m_errorMonitor->SetDesiredError("VUID-vkCmdBindDescriptorSets-pDescriptorSets-00358");
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0,
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0,
                               static_cast<uint32_t>(desc_sets_empty.size()), desc_sets_empty.data(), 0, nullptr);
     m_errorMonitor->VerifyFound();
 
     // Using a VK_NULL_HANDLE descriptor set _is_ legal
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0,
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0,
                               static_cast<uint32_t>(desc_sets_null.size()), desc_sets_null.data(), 0, nullptr);
-    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
+    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
 
-    m_commandBuffer->EndRenderPass();
-    m_commandBuffer->end();
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
 }
 
 // Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
@@ -1510,11 +1510,11 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_BindLibraryPipeline) {
     CreatePipelineHelper pipeline(*this);
     pipeline.InitVertexInputLibInfo();
     pipeline.CreateGraphicsPipeline(false);
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-vkCmdBindPipeline-pipeline-03382");
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.Handle());
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.Handle());
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 // Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
@@ -1582,14 +1582,37 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_ShaderModuleIdentifier) {
     m_errorMonitor->SetDesiredError("VUID-VkPipelineShaderStageModuleIdentifierCreateInfoEXT-identifierSize-06852");
     pipe.CreateGraphicsPipeline();
     m_errorMonitor->VerifyFound();
+}
 
+// Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
+TEST_F(NegativeGraphicsLibrary, DISABLED_ShaderModuleIdentifierGPL) {
+    TEST_DESCRIPTION("Test for VK_EXT_shader_module_identifier extension.");
+    TEST_DESCRIPTION("Create a pipeline using a shader module identifier");
+
+    SetTargetApiVersion(VK_API_VERSION_1_3);  // Pipeline cache control needed
+    AddRequiredExtensions(VK_EXT_SHADER_MODULE_IDENTIFIER_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::pipelineCreationCacheControl);
+    AddRequiredFeature(vkt::Feature::shaderModuleIdentifier);
+    RETURN_IF_SKIP(InitBasicGraphicsLibrary());
+    InitRenderTarget();
+
+    VkShaderObj vs(this, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
+    VkPipelineShaderStageCreateInfo stage_ci = vku::InitStructHelper();
+    stage_ci.stage = VK_SHADER_STAGE_VERTEX_BIT;
+    stage_ci.module = vs.handle();
+    stage_ci.pName = "main";
+
+    VkShaderModuleIdentifierEXT get_identifier = vku::InitStructHelper();
+    vk::GetShaderModuleIdentifierEXT(device(), vs.handle(), &get_identifier);
+    VkPipelineShaderStageModuleIdentifierCreateInfoEXT sm_id_create_info = vku::InitStructHelper();
     sm_id_create_info.identifierSize = get_identifier.identifierSize;
+    sm_id_create_info.pIdentifier = get_identifier.identifier;
+
     // Trying to create a pipeline with a shader module identifier at this point can result in a VK_PIPELINE_COMPILE_REQUIRED from
     // some drivers, and no pipeline creation. Create a pipeline using the module itself presumably getting the driver to compile
     // the shader so we can create a pipeline using the identifier
+    CreatePipelineHelper pipe(*this);
     pipe.gp_ci_.flags = 0;
-    stage_ci.pNext = nullptr;
-    stage_ci.module = vs.handle();
     pipe.CreateGraphicsPipeline();
 
     // Now really create a pipeline with a smid
@@ -1601,8 +1624,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_ShaderModuleIdentifier) {
     stage_ci.module = VK_NULL_HANDLE;
     VkResult result = pipe2.CreateGraphicsPipeline();
     if (result != VK_SUCCESS) {
-        printf("Cannot create a pipeline with a shader module identifier, skipping gpl part of the test\n");
-        return;
+        GTEST_SKIP() << "Cannot create a pipeline with a shader module identifier";
     }
     // Now use it in a gpl
     VkPipelineLibraryCreateInfoKHR link_info = vku::InitStructHelper();
@@ -1622,12 +1644,10 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_ShaderModuleIdentifierFeatures) {
     TEST_DESCRIPTION("Test for VK_EXT_shader_module_identifier extension with missing features.");
     AddRequiredExtensions(VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME);
     AddRequiredExtensions(VK_EXT_SHADER_MODULE_IDENTIFIER_EXTENSION_NAME);
-    SetTargetApiVersion(VK_API_VERSION_1_3);
-    RETURN_IF_SKIP(InitFramework());
+    AddRequiredFeature(vkt::Feature::pipelineCreationCacheControl);
 
-    VkPhysicalDevicePipelineCreationCacheControlFeatures pipeline_cache_control_features = vku::InitStructHelper();
-    auto features2 = GetPhysicalDeviceFeatures2(pipeline_cache_control_features);
-    RETURN_IF_SKIP(InitState(nullptr, &features2));
+    SetTargetApiVersion(VK_API_VERSION_1_3);
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     VkPipelineShaderStageCreateInfo stage_ci = vku::InitStructHelper();
@@ -1727,7 +1747,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_IncompatibleLayouts) {
 
     VkGraphicsPipelineCreateInfo exe_ci = vku::InitStructHelper(&link_info);
     exe_ci.layout = pipeline_layout_exe.handle();
-    exe_ci.renderPass = renderPass();
+    exe_ci.renderPass = RenderPass();
     m_errorMonitor->SetDesiredError("VUID-VkGraphicsPipelineCreateInfo-layout-07827");  // incompatible with pre-raster state
     m_errorMonitor->SetDesiredError("VUID-VkGraphicsPipelineCreateInfo-layout-07827");  // incompatible with fragment shader state
     vkt::Pipeline exe_pipe(*m_device, exe_ci);
@@ -1784,7 +1804,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_IncompatibleLayoutsMultipleSubsets) {
 
     VkGraphicsPipelineCreateInfo exe_ci = vku::InitStructHelper(&link_info);
     exe_ci.layout = pipeline_layout_exe.handle();
-    exe_ci.renderPass = renderPass();
+    exe_ci.renderPass = RenderPass();
     m_errorMonitor->SetDesiredError("VUID-VkGraphicsPipelineCreateInfo-layout-07827");  // incompatible with pre-raster state
     m_errorMonitor->SetDesiredError("VUID-VkGraphicsPipelineCreateInfo-layout-07827");  // incompatible with fragment shader state
     vkt::Pipeline exe_pipe(*m_device, exe_ci);
@@ -1840,7 +1860,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_MissingLinkingLayout) {
 
     VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
     exe_pipe_ci.layout = VK_NULL_HANDLE;
-    exe_pipe_ci.renderPass = renderPass();
+    exe_pipe_ci.renderPass = RenderPass();
     m_errorMonitor->SetDesiredError("VUID-VkGraphicsPipelineCreateInfo-layout-07827");
     vkt::Pipeline exe_pipe(*m_device, exe_pipe_ci);
     m_errorMonitor->VerifyFound();
@@ -1879,7 +1899,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_NullLibrary) {
 
     VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
     exe_pipe_ci.layout = pre_raster_lib.gp_ci_.layout;
-    exe_pipe_ci.renderPass = renderPass();
+    exe_pipe_ci.renderPass = RenderPass();
     m_errorMonitor->SetDesiredError("VUID-VkPipelineLibraryCreateInfoKHR-pLibraries-parameter");
     vkt::Pipeline exe_pipe(*m_device, exe_pipe_ci);
     m_errorMonitor->VerifyFound();
@@ -1919,7 +1939,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_BadLibrary) {
 
     VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
     exe_pipe_ci.layout = pre_raster_lib.gp_ci_.layout;
-    exe_pipe_ci.renderPass = renderPass();
+    exe_pipe_ci.renderPass = RenderPass();
     m_errorMonitor->SetDesiredError("VUID-VkPipelineLibraryCreateInfoKHR-pLibraries-parameter");
     vkt::Pipeline exe_pipe(*m_device, exe_pipe_ci);
     m_errorMonitor->VerifyFound();
@@ -1965,16 +1985,16 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_DestroyedLibrary) {
 
     VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
     exe_pipe_ci.layout = pre_raster_lib.gp_ci_.layout;
-    exe_pipe_ci.renderPass = renderPass();
+    exe_pipe_ci.renderPass = RenderPass();
     vkt::Pipeline exe_pipe(*m_device, exe_pipe_ci);
 
     frag_shader_lib.Destroy();
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-vkCmdBindPipeline-pipeline-parameter");
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, exe_pipe.handle());
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, exe_pipe.handle());
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 // Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
@@ -2022,16 +2042,16 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_DestroyedLibraryNested) {
 
     VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
     exe_pipe_ci.layout = pre_raster_lib.gp_ci_.layout;
-    exe_pipe_ci.renderPass = renderPass();
+    exe_pipe_ci.renderPass = RenderPass();
     vkt::Pipeline exe_pipe(*m_device, exe_pipe_ci);
 
     vertex_input_lib.Destroy();
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-vkCmdBindPipeline-pipeline-parameter");
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, exe_pipe.handle());
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, exe_pipe.handle());
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 // Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
@@ -2090,21 +2110,21 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_DynamicPrimitiveTopolgyIngoreState) {
 
     VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
     exe_pipe_ci.layout = pre_raster_lib.gp_ci_.layout;
-    exe_pipe_ci.renderPass = renderPass();
+    exe_pipe_ci.renderPass = RenderPass();
     exe_pipe_ci.pDynamicState = &dynamic_create_info;
     vkt::Pipeline exe_pipe(*m_device, exe_pipe_ci);
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
 
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, exe_pipe.handle());
-    vk::CmdSetPrimitiveTopology(m_commandBuffer->handle(), VK_PRIMITIVE_TOPOLOGY_LINE_LIST);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, exe_pipe.handle());
+    vk::CmdSetPrimitiveTopology(m_command_buffer.handle(), VK_PRIMITIVE_TOPOLOGY_LINE_LIST);
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-08608");
-    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
+    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->EndRenderPass();
-    m_commandBuffer->end();
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
 }
 
 // Not supported in Vulkan SC: VK_EXT_graphics_pipeline_library
@@ -2147,7 +2167,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_PushConstantStages) {
     VkGraphicsPipelineCreateInfo lib_ci = vku::InitStructHelper(&link_info);
     lib_ci.flags = VK_PIPELINE_CREATE_LIBRARY_BIT_KHR;
     lib_ci.layout = pre_raster_lib.gp_ci_.layout;
-    lib_ci.renderPass = renderPass();
+    lib_ci.renderPass = RenderPass();
     vkt::Pipeline lib(*m_device, lib_ci);
     m_errorMonitor->VerifyFound();
 }
@@ -2192,7 +2212,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_PushConstantSize) {
     VkGraphicsPipelineCreateInfo lib_ci = vku::InitStructHelper(&link_info);
     lib_ci.flags = VK_PIPELINE_CREATE_LIBRARY_BIT_KHR;
     lib_ci.layout = pre_raster_lib.gp_ci_.layout;
-    lib_ci.renderPass = renderPass();
+    lib_ci.renderPass = RenderPass();
     vkt::Pipeline lib(*m_device, lib_ci);
     m_errorMonitor->VerifyFound();
 }
@@ -2237,7 +2257,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_PushConstantMultiple) {
     VkGraphicsPipelineCreateInfo lib_ci = vku::InitStructHelper(&link_info);
     lib_ci.flags = VK_PIPELINE_CREATE_LIBRARY_BIT_KHR;
     lib_ci.layout = pre_raster_lib.gp_ci_.layout;
-    lib_ci.renderPass = renderPass();
+    lib_ci.renderPass = RenderPass();
     vkt::Pipeline lib(*m_device, lib_ci);
     m_errorMonitor->VerifyFound();
 }
@@ -2281,7 +2301,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_PushConstantDifferentCount) {
     VkGraphicsPipelineCreateInfo lib_ci = vku::InitStructHelper(&link_info);
     lib_ci.flags = VK_PIPELINE_CREATE_LIBRARY_BIT_KHR;
     lib_ci.layout = pre_raster_lib.gp_ci_.layout;
-    lib_ci.renderPass = renderPass();
+    lib_ci.renderPass = RenderPass();
     vkt::Pipeline lib(*m_device, lib_ci);
     m_errorMonitor->VerifyFound();
 }
@@ -2376,7 +2396,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_SetLayoutCountLinking) {
     VkGraphicsPipelineCreateInfo lib_ci = vku::InitStructHelper(&link_info);
     lib_ci.flags = VK_PIPELINE_CREATE_LIBRARY_BIT_KHR;
     lib_ci.layout = pre_raster_lib.gp_ci_.layout;
-    lib_ci.renderPass = renderPass();
+    lib_ci.renderPass = RenderPass();
     vkt::Pipeline lib(*m_device, lib_ci);
     m_errorMonitor->VerifyFound();
 }
@@ -2613,7 +2633,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_NullDSLLinking) {
     VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
     exe_pipe_ci.flags = VK_PIPELINE_CREATE_LIBRARY_BIT_KHR;
     exe_pipe_ci.layout = pre_raster_lib.gp_ci_.layout;
-    exe_pipe_ci.renderPass = renderPass();
+    exe_pipe_ci.renderPass = RenderPass();
     m_errorMonitor->SetDesiredError("VUID-VkGraphicsPipelineCreateInfo-pLibraries-06681");
     vkt::Pipeline exe_pipe(*m_device, exe_pipe_ci);
     m_errorMonitor->VerifyFound();
@@ -2641,7 +2661,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_NullLayoutPreRasterFragShader) {
     pipe.gp_ci_.pViewportState = &pipe.vp_state_ci_;
     pipe.gp_ci_.pRasterizationState = &pipe.rs_state_ci_;
     pipe.gp_ci_.pMultisampleState = &pipe.ms_ci_;
-    pipe.gp_ci_.renderPass = renderPass();
+    pipe.gp_ci_.renderPass = RenderPass();
     pipe.gp_ci_.subpass = 0;
     pipe.gp_ci_.layout = pipeline_layout.handle();
 
@@ -2850,7 +2870,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_MultisampleStateBothLibrary) {
     m_errorMonitor->SetDesiredError("VUID-VkGraphicsPipelineCreateInfo-pLibraries-06635");
     VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
     exe_pipe_ci.layout = pre_raster_lib.gp_ci_.layout;
-    exe_pipe_ci.renderPass = renderPass();
+    exe_pipe_ci.renderPass = RenderPass();
     vkt::Pipeline exe_pipe(*m_device, exe_pipe_ci);
     m_errorMonitor->VerifyFound();
 }
@@ -2950,7 +2970,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_FragmentShadingRateStateBothLibrary) {
     m_errorMonitor->SetDesiredError("VUID-VkGraphicsPipelineCreateInfo-pLibraries-06639");
     VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
     exe_pipe_ci.layout = pre_raster_lib.gp_ci_.layout;
-    exe_pipe_ci.renderPass = renderPass();
+    exe_pipe_ci.renderPass = RenderPass();
     vkt::Pipeline exe_pipe(*m_device, exe_pipe_ci);
     m_errorMonitor->VerifyFound();
 }
@@ -3008,7 +3028,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_MultisampleStateSampleMaskArray) {
     m_errorMonitor->SetDesiredError("VUID-VkGraphicsPipelineCreateInfo-pLibraries-06635");
     VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
     exe_pipe_ci.layout = pre_raster_lib.gp_ci_.layout;
-    exe_pipe_ci.renderPass = renderPass();
+    exe_pipe_ci.renderPass = RenderPass();
     vkt::Pipeline exe_pipe(*m_device, exe_pipe_ci);
     m_errorMonitor->VerifyFound();
 }
@@ -3065,7 +3085,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_MultisampleStateSampleMaskArrayNull) {
     m_errorMonitor->SetDesiredError("VUID-VkGraphicsPipelineCreateInfo-pLibraries-06635");
     VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
     exe_pipe_ci.layout = pre_raster_lib.gp_ci_.layout;
-    exe_pipe_ci.renderPass = renderPass();
+    exe_pipe_ci.renderPass = RenderPass();
     vkt::Pipeline exe_pipe(*m_device, exe_pipe_ci);
     m_errorMonitor->VerifyFound();
 }
@@ -3110,7 +3130,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_MultisampleStateMultipleSubsets) {
     m_errorMonitor->SetDesiredError("VUID-VkGraphicsPipelineCreateInfo-pLibraries-06635");
     VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
     exe_pipe_ci.layout = shader_lib.gp_ci_.layout;
-    exe_pipe_ci.renderPass = renderPass();
+    exe_pipe_ci.renderPass = RenderPass();
     vkt::Pipeline exe_pipe(*m_device, exe_pipe_ci);
     m_errorMonitor->VerifyFound();
 }
@@ -3279,7 +3299,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_MissingFragmentOutput) {
 
     VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
     exe_pipe_ci.layout = pre_raster_lib.gp_ci_.layout;
-    exe_pipe_ci.renderPass = renderPass();
+    exe_pipe_ci.renderPass = RenderPass();
     m_errorMonitor->SetDesiredError("VUID-VkGraphicsPipelineCreateInfo-flags-08909");
     vkt::Pipeline exe_pipe(*m_device, exe_pipe_ci);
     m_errorMonitor->VerifyFound();
@@ -3421,7 +3441,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_IndependentSetLayoutNull) {
 
     VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
     exe_pipe_ci.layout = VK_NULL_HANDLE;
-    exe_pipe_ci.renderPass = renderPass();
+    exe_pipe_ci.renderPass = RenderPass();
     m_errorMonitor->SetDesiredError("VUID-VkGraphicsPipelineCreateInfo-flags-06730");
     vkt::Pipeline exe_pipe(*m_device, exe_pipe_ci);
     m_errorMonitor->VerifyFound();
@@ -3487,7 +3507,7 @@ TEST_F(NegativeGraphicsLibrary, DISABLED_IndependentSetLayoutCompatible) {
     link_info.pLibraries = libraries;
 
     VkGraphicsPipelineCreateInfo exe_pipe_ci = vku::InitStructHelper(&link_info);
-    exe_pipe_ci.renderPass = renderPass();
+    exe_pipe_ci.renderPass = RenderPass();
 
     // Stage are different
     {

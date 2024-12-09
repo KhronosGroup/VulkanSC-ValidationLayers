@@ -110,7 +110,7 @@ CreatePipelineHelper::CreatePipelineHelper(VkLayerTest &test, void *pNext) : lay
     gp_ci_.pDepthStencilState = nullptr;
     gp_ci_.pColorBlendState = &cb_ci_;
     gp_ci_.pDynamicState = nullptr;
-    gp_ci_.renderPass = layer_test_.renderPass();
+    gp_ci_.renderPass = layer_test_.RenderPass();
 }
 
 CreatePipelineHelper::~CreatePipelineHelper() { Destroy(); }
@@ -169,7 +169,7 @@ void CreatePipelineHelper::InitPreRasterLibInfo(const VkPipelineShaderStageCreat
 
     // If using Dynamic Rendering, will need to be set to null
     // otherwise needs to be shared across libraries in the same executable pipeline
-    gp_ci_.renderPass = layer_test_.renderPass();
+    gp_ci_.renderPass = layer_test_.RenderPass();
     gp_ci_.subpass = 0;
 
     gp_ci_.stageCount = 1;  // default is just the Vertex shader
@@ -187,7 +187,7 @@ void CreatePipelineHelper::InitFragmentLibInfo(const VkPipelineShaderStageCreate
 
     // If using Dynamic Rendering, will need to be set to null
     // otherwise needs to be shared across libraries in the same executable pipeline
-    gp_ci_.renderPass = layer_test_.renderPass();
+    gp_ci_.renderPass = layer_test_.RenderPass();
     gp_ci_.subpass = 0;
 
     // TODO if renderPass is null, MS info is not needed
@@ -209,7 +209,7 @@ void CreatePipelineHelper::InitFragmentOutputLibInfo(void *p_next) {
 
     // If using Dynamic Rendering, will need to be set to null
     // otherwise needs to be shared across libraries in the same executable pipeline
-    gp_ci_.renderPass = layer_test_.renderPass();
+    gp_ci_.renderPass = layer_test_.RenderPass();
     gp_ci_.subpass = 0;
 
     gp_ci_.stageCount = 0;
@@ -229,7 +229,7 @@ void CreatePipelineHelper::InitShaderLibInfo(std::vector<VkPipelineShaderStageCr
 
     // If using Dynamic Rendering, will need to be set to null
     // otherwise needs to be shared across libraries in the same executable pipeline
-    gp_ci_.renderPass = layer_test_.renderPass();
+    gp_ci_.renderPass = layer_test_.RenderPass();
     gp_ci_.subpass = 0;
 
     gp_ci_.pMultisampleState = &ms_ci_;
@@ -279,12 +279,13 @@ void CreatePipelineHelper::LateBindPipelineInfo() {
     }
 }
 
-VkResult CreatePipelineHelper::CreateGraphicsPipeline(bool do_late_bind) {
+VkResult CreatePipelineHelper::CreateGraphicsPipeline(bool do_late_bind, bool no_cache) {
     InitPipelineCache();
     if (do_late_bind) {
         LateBindPipelineInfo();
     }
-    return vk::CreateGraphicsPipelines(device_->handle(), pipeline_cache_, 1, &gp_ci_, NULL, &pipeline_);
+    return vk::CreateGraphicsPipelines(device_->handle(), no_cache ? VK_NULL_HANDLE : pipeline_cache_, 1, &gp_ci_, NULL,
+                                       &pipeline_);
 }
 
 CreateComputePipelineHelper::CreateComputePipelineHelper(VkLayerTest &test, void *pNext) : layer_test_(test) {
@@ -362,12 +363,12 @@ void CreateComputePipelineHelper::LateBindPipelineInfo() {
     cp_ci_.stage = cs_.get()->GetStageCreateInfo();
 }
 
-VkResult CreateComputePipelineHelper::CreateComputePipeline(bool do_late_bind) {
+VkResult CreateComputePipelineHelper::CreateComputePipeline(bool do_late_bind, bool no_cache) {
     InitPipelineCache();
     if (do_late_bind) {
         LateBindPipelineInfo();
     }
-    return vk::CreateComputePipelines(device_->handle(), pipeline_cache_, 1, &cp_ci_, NULL, &pipeline_);
+    return vk::CreateComputePipelines(device_->handle(), no_cache ? VK_NULL_HANDLE : pipeline_cache_, 1, &cp_ci_, NULL, &pipeline_);
 }
 
 namespace vkt {

@@ -88,6 +88,7 @@ TEST_F(PositiveAtomic, ImageInt64DrawtimeSparse) {
     AddRequiredFeature(vkt::Feature::sparseBinding);
     AddRequiredFeature(vkt::Feature::shaderImageInt64Atomics);
     AddRequiredFeature(vkt::Feature::sparseImageInt64Atomics);
+    AddRequiredFeature(vkt::Feature::sparseResidencyImage2D);
     RETURN_IF_SKIP(Init());
 
     const char *cs_source = R"glsl(
@@ -129,12 +130,12 @@ TEST_F(PositiveAtomic, ImageInt64DrawtimeSparse) {
                                                    VK_IMAGE_LAYOUT_GENERAL);
     pipe.descriptor_set_->UpdateDescriptorSets();
 
-    m_commandBuffer->begin();
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0, 1,
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0, 1,
                               &pipe.descriptor_set_->set_, 0, nullptr);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
-    vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
-    m_commandBuffer->end();
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    m_command_buffer.End();
 }
 
 TEST_F(PositiveAtomic, Float) {
@@ -667,6 +668,7 @@ TEST_F(PositiveAtomic, PhysicalPointer) {
     SetTargetApiVersion(VK_API_VERSION_1_2);
     AddRequiredFeature(vkt::Feature::shaderInt64);
     AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    AddRequiredFeature(vkt::Feature::runtimeDescriptorArray);
     RETURN_IF_SKIP(Init());
 
     const char *spv_source = R"(
@@ -819,10 +821,10 @@ TEST_F(PositiveAtomic, OpImageTexelPointerWithNoAtomic) {
     }
 
     VkFormatProperties formatProps;
-    fpvkGetOriginalPhysicalDeviceFormatPropertiesEXT(gpu(), format, &formatProps);
+    fpvkGetOriginalPhysicalDeviceFormatPropertiesEXT(Gpu(), format, &formatProps);
     formatProps.optimalTilingFeatures |= VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT;
     formatProps.optimalTilingFeatures &= ~VK_FORMAT_FEATURE_STORAGE_IMAGE_ATOMIC_BIT;
-    fpvkSetPhysicalDeviceFormatPropertiesEXT(gpu(), format, formatProps);
+    fpvkSetPhysicalDeviceFormatPropertiesEXT(Gpu(), format, formatProps);
 
     auto image_ci = vkt::Image::ImageCreateInfo2D(64, 64, 1, 1, format, VK_IMAGE_USAGE_STORAGE_BIT);
     vkt::Image image(*m_device, image_ci, vkt::set_layout);
@@ -863,12 +865,12 @@ TEST_F(PositiveAtomic, OpImageTexelPointerWithNoAtomic) {
                                                    VK_IMAGE_LAYOUT_GENERAL);
     pipe.descriptor_set_->UpdateDescriptorSets();
 
-    m_commandBuffer->begin();
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0, 1,
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.Handle());
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipe.pipeline_layout_.handle(), 0, 1,
                               &pipe.descriptor_set_->set_, 0, nullptr);
-    vk::CmdDispatch(m_commandBuffer->handle(), 1, 1, 1);
-    m_commandBuffer->end();
+    vk::CmdDispatch(m_command_buffer.handle(), 1, 1, 1);
+    m_command_buffer.End();
 }
 
 TEST_F(PositiveAtomic, ImageFloat16Vector) {
@@ -938,7 +940,7 @@ TEST_F(PositiveAtomic, ImageFloat16Vector) {
 
 TEST_F(PositiveAtomic, VertexPipelineStoresAndAtomics) {
     TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8223");
-    AddDisabledFeature(vkt::Feature::vertexPipelineStoresAndAtomics);
+
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 

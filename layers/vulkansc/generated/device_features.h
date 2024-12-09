@@ -23,6 +23,9 @@
 
 #pragma once
 
+#include <vulkan/vulkan.h>
+class APIVersion;
+
 // Union of all features defined in VkPhysicalDevice*Features* structs
 struct DeviceFeatures {
     // VkPhysicalDevice16BitStorageFeatures, VkPhysicalDeviceVulkan11Features
@@ -103,6 +106,20 @@ struct DeviceFeatures {
     bool conditionalRendering;
     // VkPhysicalDeviceConditionalRenderingFeaturesEXT
     bool inheritedConditionalRendering;
+    // VkPhysicalDeviceCooperativeMatrix2FeaturesNV
+    bool cooperativeMatrixBlockLoads;
+    // VkPhysicalDeviceCooperativeMatrix2FeaturesNV
+    bool cooperativeMatrixConversions;
+    // VkPhysicalDeviceCooperativeMatrix2FeaturesNV
+    bool cooperativeMatrixFlexibleDimensions;
+    // VkPhysicalDeviceCooperativeMatrix2FeaturesNV
+    bool cooperativeMatrixPerElementOperations;
+    // VkPhysicalDeviceCooperativeMatrix2FeaturesNV
+    bool cooperativeMatrixReductions;
+    // VkPhysicalDeviceCooperativeMatrix2FeaturesNV
+    bool cooperativeMatrixTensorAddressing;
+    // VkPhysicalDeviceCooperativeMatrix2FeaturesNV
+    bool cooperativeMatrixWorkgroupScope;
     // VkPhysicalDeviceCooperativeMatrixFeaturesKHR, VkPhysicalDeviceCooperativeMatrixFeaturesNV
     bool cooperativeMatrix;
     // VkPhysicalDeviceCooperativeMatrixFeaturesKHR, VkPhysicalDeviceCooperativeMatrixFeaturesNV
@@ -133,6 +150,8 @@ struct DeviceFeatures {
     bool floatRepresentation;
     // VkPhysicalDeviceDepthBiasControlFeaturesEXT
     bool leastRepresentableValueForceUnormRepresentation;
+    // VkPhysicalDeviceDepthClampControlFeaturesEXT
+    bool depthClampControl;
     // VkPhysicalDeviceDepthClampZeroOneFeaturesEXT
     bool depthClampZeroOne;
     // VkPhysicalDeviceDepthClipControlFeaturesEXT
@@ -197,8 +216,12 @@ struct DeviceFeatures {
     bool deviceGeneratedComputeCaptureReplay;
     // VkPhysicalDeviceDeviceGeneratedCommandsComputeFeaturesNV
     bool deviceGeneratedComputePipelines;
-    // VkPhysicalDeviceDeviceGeneratedCommandsFeaturesNV
+    // VkPhysicalDeviceDeviceGeneratedCommandsFeaturesEXT
     bool deviceGeneratedCommands;
+    // VkPhysicalDeviceDeviceGeneratedCommandsFeaturesEXT
+    bool dynamicGeneratedPipelineLayout;
+    // VkPhysicalDeviceDeviceGeneratedCommandsFeaturesNV
+    bool deviceGeneratedCommandsNV;
     // VkPhysicalDeviceDeviceMemoryReportFeaturesEXT
     bool deviceMemoryReport;
     // VkPhysicalDeviceDiagnosticsConfigFeaturesNV
@@ -455,6 +478,8 @@ struct DeviceFeatures {
     bool globalPriorityQuery;
     // VkPhysicalDeviceGraphicsPipelineLibraryFeaturesEXT
     bool graphicsPipelineLibrary;
+    // VkPhysicalDeviceHdrVividFeaturesHUAWEI
+    bool hdrVivid;
     // VkPhysicalDeviceHostImageCopyFeaturesEXT
     bool hostImageCopy;
     // VkPhysicalDeviceHostQueryResetFeatures, VkPhysicalDeviceVulkan12Features
@@ -631,6 +656,8 @@ struct DeviceFeatures {
     bool presentBarrier;
     // VkPhysicalDevicePresentIdFeaturesKHR
     bool presentId;
+    // VkPhysicalDevicePresentModeFifoLatestReadyFeaturesEXT
+    bool presentModeFifoLatestReady;
     // VkPhysicalDevicePresentWaitFeaturesKHR
     bool presentWait;
     // VkPhysicalDevicePrimitiveTopologyListRestartFeaturesEXT
@@ -775,6 +802,8 @@ struct DeviceFeatures {
     bool shaderEarlyAndLateFragmentTests;
     // VkPhysicalDeviceShaderEnqueueFeaturesAMDX
     bool shaderEnqueue;
+    // VkPhysicalDeviceShaderEnqueueFeaturesAMDX
+    bool shaderMeshEnqueue;
     // VkPhysicalDeviceShaderExpectAssumeFeaturesKHR
     bool shaderExpectAssume;
     // VkPhysicalDeviceShaderFloat16Int8Features, VkPhysicalDeviceVulkan12Features
@@ -861,8 +890,14 @@ struct DeviceFeatures {
     bool vertexAttributeInstanceRateDivisor;
     // VkPhysicalDeviceVertexAttributeDivisorFeaturesKHR
     bool vertexAttributeInstanceRateZeroDivisor;
+    // VkPhysicalDeviceVertexAttributeRobustnessFeaturesEXT
+    bool vertexAttributeRobustness;
     // VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT
     bool vertexInputDynamicState;
+    // VkPhysicalDeviceVideoEncodeAV1FeaturesKHR
+    bool videoEncodeAV1;
+    // VkPhysicalDeviceVideoEncodeQuantizationMapFeaturesKHR
+    bool videoEncodeQuantizationMap;
     // VkPhysicalDeviceVideoMaintenance1FeaturesKHR
     bool videoMaintenance1;
     // VkPhysicalDeviceVulkan12Features

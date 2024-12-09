@@ -170,14 +170,14 @@ bool CoreChecks::ValidateCreateBufferDescriptorBuffer(const VkBufferCreateInfo &
             phys_dev_ext_props.descriptor_buffer_props.samplerDescriptorBufferAddressSpaceSize) {
             skip |= LogError(
                 "VUID-VkBufferCreateInfo-usage-08097", device, create_info_loc.dot(Field::size),
-                "(%" PRIuLEAST64 ") plus current total (%" PRIuLEAST64
+                "(%" PRIuLEAST64 ") + current total (%" PRIuLEAST64
                 ") is greater than specified in properties field samplerDescriptorBufferAddressSpaceSize (%" PRIuLEAST64 ").",
                 create_info.size, samplerDescriptorBufferAddressSpaceSize.load(),
                 phys_dev_ext_props.descriptor_buffer_props.samplerDescriptorBufferAddressSpaceSize);
         } else if (create_info.size + descriptorBufferAddressSpaceSize >
                    phys_dev_ext_props.descriptor_buffer_props.descriptorBufferAddressSpaceSize) {
             skip |= LogError("VUID-VkBufferCreateInfo-usage-08097", device, create_info_loc.dot(Field::size),
-                             "(%" PRIuLEAST64 ") plus current total (%" PRIuLEAST64
+                             "(%" PRIuLEAST64 ") + current total (%" PRIuLEAST64
                              ") is greater than specified in properties field descriptorBufferAddressSpaceSize (%" PRIuLEAST64 ")",
                              create_info.size, descriptorBufferAddressSpaceSize.load(),
                              phys_dev_ext_props.descriptor_buffer_props.descriptorBufferAddressSpaceSize);
@@ -189,14 +189,14 @@ bool CoreChecks::ValidateCreateBufferDescriptorBuffer(const VkBufferCreateInfo &
             phys_dev_ext_props.descriptor_buffer_props.resourceDescriptorBufferAddressSpaceSize) {
             skip |= LogError(
                 "VUID-VkBufferCreateInfo-usage-08098", device, create_info_loc.dot(Field::size),
-                "(%" PRIuLEAST64 ") plus current total (%" PRIuLEAST64
+                "(%" PRIuLEAST64 ") + current total (%" PRIuLEAST64
                 ") is greater than specified in properties field resourceDescriptorBufferAddressSpaceSize (%" PRIuLEAST64 ").",
                 create_info.size, resourceDescriptorBufferAddressSpaceSize.load(),
                 phys_dev_ext_props.descriptor_buffer_props.resourceDescriptorBufferAddressSpaceSize);
         } else if (create_info.size + descriptorBufferAddressSpaceSize >
                    phys_dev_ext_props.descriptor_buffer_props.descriptorBufferAddressSpaceSize) {
             skip |= LogError("VUID-VkBufferCreateInfo-usage-08098", device, create_info_loc.dot(Field::size),
-                             "(%" PRIuLEAST64 ") plus current total (%" PRIuLEAST64
+                             "(%" PRIuLEAST64 ") + current total (%" PRIuLEAST64
                              ") is greater than specified in properties field descriptorBufferAddressSpaceSize (%" PRIuLEAST64 ").",
                              create_info.size, descriptorBufferAddressSpaceSize.load(),
                              phys_dev_ext_props.descriptor_buffer_props.descriptorBufferAddressSpaceSize);
@@ -321,6 +321,14 @@ bool CoreChecks::PreCallValidateCreateBuffer(VkDevice device, const VkBufferCrea
         }
     }
 
+    if (enabled_features.maintenance4 && pCreateInfo->size > phys_dev_props_core13.maxBufferSize) {
+        skip |= LogError("VUID-VkBufferCreateInfo-size-06409", device, create_info_loc.dot(Field::size),
+                         "(%" PRIu64
+                         ") is larger than the maximum allowed buffer size "
+                         "VkPhysicalDeviceMaintenance4Properties.maxBufferSize (%" PRIu64 ").",
+                         pCreateInfo->size, phys_dev_props_core13.maxBufferSize);
+    }
+
     skip |= ValidateCreateBufferBufferDeviceAddress(*pCreateInfo, create_info_loc);
     skip |= ValidateCreateBufferDescriptorBuffer(*pCreateInfo, usage, create_info_loc);
 
@@ -379,9 +387,8 @@ bool CoreChecks::PreCallValidateCreateBufferView(VkDevice device, const VkBuffer
             element_size /= 3;
         }
         if (buffer_state.usage & VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT) {
-            VkDeviceSize alignment_requirement =
-                phys_dev_ext_props.texel_buffer_alignment_props.storageTexelBufferOffsetAlignmentBytes;
-            if (phys_dev_ext_props.texel_buffer_alignment_props.storageTexelBufferOffsetSingleTexelAlignment) {
+            VkDeviceSize alignment_requirement = phys_dev_props_core13.storageTexelBufferOffsetAlignmentBytes;
+            if (phys_dev_props_core13.storageTexelBufferOffsetSingleTexelAlignment) {
                 alignment_requirement = std::min(alignment_requirement, element_size);
             }
             if (SafeModulo(pCreateInfo->offset, alignment_requirement) != 0) {
@@ -397,14 +404,13 @@ bool CoreChecks::PreCallValidateCreateBufferView(VkDevice device, const VkBuffer
                     ") is VK_TRUE, the size of a texel of the requested format. "
                     "If the size of a texel is a multiple of three bytes, then the size of a "
                     "single component of format is used instead",
-                    pCreateInfo->offset, phys_dev_ext_props.texel_buffer_alignment_props.storageTexelBufferOffsetAlignmentBytes,
-                    phys_dev_ext_props.texel_buffer_alignment_props.storageTexelBufferOffsetSingleTexelAlignment);
+                    pCreateInfo->offset, phys_dev_props_core13.storageTexelBufferOffsetAlignmentBytes,
+                    phys_dev_props_core13.storageTexelBufferOffsetSingleTexelAlignment);
             }
         }
         if (buffer_state.usage & VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT) {
-            VkDeviceSize alignment_requirement =
-                phys_dev_ext_props.texel_buffer_alignment_props.uniformTexelBufferOffsetAlignmentBytes;
-            if (phys_dev_ext_props.texel_buffer_alignment_props.uniformTexelBufferOffsetSingleTexelAlignment) {
+            VkDeviceSize alignment_requirement = phys_dev_props_core13.uniformTexelBufferOffsetAlignmentBytes;
+            if (phys_dev_props_core13.uniformTexelBufferOffsetSingleTexelAlignment) {
                 alignment_requirement = std::min(alignment_requirement, element_size);
             }
             if (SafeModulo(pCreateInfo->offset, alignment_requirement) != 0) {
@@ -420,8 +426,8 @@ bool CoreChecks::PreCallValidateCreateBufferView(VkDevice device, const VkBuffer
                     ") is VK_TRUE, the size of a texel of the requested format. "
                     "If the size of a texel is a multiple of three bytes, then the size of a "
                     "single component of format is used instead",
-                    pCreateInfo->offset, phys_dev_ext_props.texel_buffer_alignment_props.uniformTexelBufferOffsetAlignmentBytes,
-                    phys_dev_ext_props.texel_buffer_alignment_props.uniformTexelBufferOffsetSingleTexelAlignment);
+                    pCreateInfo->offset, phys_dev_props_core13.uniformTexelBufferOffsetAlignmentBytes,
+                    phys_dev_props_core13.uniformTexelBufferOffsetSingleTexelAlignment);
             }
         }
     }

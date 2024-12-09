@@ -19,16 +19,27 @@
 
 static constexpr uint32_t kDefaultShaderId = 23;
 static constexpr uint32_t kInstDefaultDescriptorSet = 3;
+static constexpr uint32_t kInstDefaultDebugPrintfBinding = 0;
+
+// While desireable for the instrumentation to be agnostic of the incoming pipeline, we do need to know how the descriptors are laid
+// out in the descriptor set layout
+//
+// This represents a shader that looks like
+//   layout(set = 0, binding = 0) type a[2];
+//   layout(set = 0, binding = 1) type b;
+//   layout(set = 0, binding = 2) type c[2];
+const std::vector<std::vector<gpuav::spirv::BindingLayout>> kSetIndexToBindingsLayoutLUT = {{{0, 2}, {2, 1}, {3, 2}}};
 
 static bool timer = false;
 static bool print_debug_info = false;
 static bool all_passes = false;
-static bool bindless_descriptor_pass = false;
-static bool non_bindless_oob_buffer_pass = false;
-static bool non_bindless_oob_texel_buffer_pass = false;
+static bool descriptor_indexing_oob = false;
+static bool descriptor_class_general_buffer_pass = false;
+static bool descriptor_class_texel_buffer_pass = false;
 static bool buffer_device_address_pass = false;
 static bool ray_query_pass = false;
 static bool debug_printf_pass = false;
+static bool post_process_descriptor_indexing_pass = false;
 
 void PrintUsage(const char* program) {
     printf(R"(
@@ -41,18 +52,21 @@ USAGE: %s <input> -o <output> <passes>
     printf(R"(
   --all-passes
                Runs all passes together
-  --bindless-descriptor
-               Runs BindlessDescriptorPass
-  --non-bindless-oob-buffer
-               Runs NonBindlessOOBBufferPass
-  --non-bindless-oob-texel-buffer
-               Runs NonBindlessOOBTexelBufferPass
+  --descriptor-indexing-oob
+               Runs DescriptorIndexingOOBPass
+  --descriptor-class-general-buffer
+               Runs DescriptorClassGeneralBufferPass
+  --descriptor-class-texel-buffer
+               Runs DescriptorClassTexelBufferPass
   --buffer-device-address
                Runs BufferDeviceAddressPass
   --ray-query
                Runs RayQueryPass
   --debug-printf
                Runs DebugPrintfPass
+  --post-process-descriptor-indexing
+               Runs PostProcessDescriptorIndexingPass
+
   --timer
                Prints time it takes to instrument entire module
   --print-debug-info
@@ -82,18 +96,20 @@ bool ParseFlags(int argc, char** argv, const char** out_file) {
             print_debug_info = true;
         } else if (0 == strcmp(cur_arg, "--all-passes")) {
             all_passes = true;
-        } else if (0 == strcmp(cur_arg, "--bindless-descriptor")) {
-            bindless_descriptor_pass = true;
-        } else if (0 == strcmp(cur_arg, "--non-bindless-oob-buffer")) {
-            non_bindless_oob_buffer_pass = true;
-        } else if (0 == strcmp(cur_arg, "--non-bindless-oob-texel-buffer")) {
-            non_bindless_oob_texel_buffer_pass = true;
+        } else if (0 == strcmp(cur_arg, "--descriptor-indexing-oob")) {
+            descriptor_indexing_oob = true;
+        } else if (0 == strcmp(cur_arg, "--descriptor-class-general-buffer")) {
+            descriptor_class_general_buffer_pass = true;
+        } else if (0 == strcmp(cur_arg, "--descriptor-class-texel-buffer")) {
+            descriptor_class_texel_buffer_pass = true;
         } else if (0 == strcmp(cur_arg, "--buffer-device-address")) {
             buffer_device_address_pass = true;
         } else if (0 == strcmp(cur_arg, "--ray-query")) {
             ray_query_pass = true;
         } else if (0 == strcmp(cur_arg, "--debug-printf")) {
             debug_printf_pass = true;
+        } else if (0 == strcmp(cur_arg, "--post-process-descriptor-indexing")) {
+            post_process_descriptor_indexing_pass = true;
         } else if (0 == strncmp(cur_arg, "--", 2)) {
             printf("Unknown pass %s\n", cur_arg);
             PrintUsage(argv[0]);
@@ -109,7 +125,7 @@ int main(int argc, char** argv) {
         PrintUsage(argv[0]);
         return EXIT_FAILURE;
     } else if (!std::filesystem::exists(argv[1])) {
-        std::cout << "ERROR: " << argv[1] << " Does not exists\n";
+        std::cout << "ERROR: " << argv[1] << " Does not exists\n(First arugment must be input spirv)\n";
         return EXIT_FAILURE;
     }
 
@@ -142,25 +158,26 @@ int main(int argc, char** argv) {
         start_time = std::chrono::high_resolution_clock::now();
     }
 
-    gpu::spirv::Settings module_settings{};
+    gpuav::spirv::Settings module_settings{};
     module_settings.shader_id = kDefaultShaderId;
     module_settings.output_buffer_descriptor_set = kInstDefaultDescriptorSet;
     module_settings.print_debug_info = print_debug_info;
-    module_settings.max_instrumented_count = 0;
+    module_settings.max_instrumentations_count = 0;
+    module_settings.support_non_semantic_info = true;
     module_settings.support_int64 = true;
     module_settings.support_memory_model_device_scope = true;
     // for all passes, test worst case of using bindless
-    module_settings.has_bindless_descriptors = all_passes || bindless_descriptor_pass;
+    module_settings.has_bindless_descriptors = all_passes || descriptor_indexing_oob;
 
-    gpu::spirv::Module module(spirv_data, nullptr, module_settings);
-    if (all_passes || bindless_descriptor_pass) {
-        module.RunPassBindlessDescriptor();
+    gpuav::spirv::Module module(spirv_data, nullptr, module_settings, kSetIndexToBindingsLayoutLUT);
+    if (all_passes || descriptor_indexing_oob) {
+        module.RunPassDescriptorIndexingOOB();
     }
-    if (all_passes || non_bindless_oob_buffer_pass) {
-        module.RunPassNonBindlessOOBBuffer();
+    if (all_passes || descriptor_class_general_buffer_pass) {
+        module.RunPassDescriptorClassGeneralBuffer();
     }
-    if (all_passes || non_bindless_oob_texel_buffer_pass) {
-        module.RunPassNonBindlessOOBTexelBuffer();
+    if (all_passes || descriptor_class_texel_buffer_pass) {
+        module.RunPassDescriptorClassTexelBuffer();
     }
     if (all_passes || buffer_device_address_pass) {
         module.RunPassBufferDeviceAddress();
@@ -168,12 +185,18 @@ int main(int argc, char** argv) {
     if (all_passes || ray_query_pass) {
         module.RunPassRayQuery();
     }
-    if (all_passes || debug_printf_pass) {
-        module.RunPassDebugPrintf();
+
+    if (all_passes || post_process_descriptor_indexing_pass) {
+        module.RunPassPostProcessDescriptorIndexing();
     }
 
     for (const auto& info : module.link_info_) {
         module.LinkFunction(info);
+    }
+
+    // DebugPrintf goes at end to match how we do it in GpuShaderInstrumentor::InstrumentShader()
+    if (all_passes || debug_printf_pass) {
+        module.RunPassDebugPrintf(kInstDefaultDebugPrintfBinding);
     }
 
     module.PostProcess();

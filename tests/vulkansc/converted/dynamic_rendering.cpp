@@ -123,15 +123,15 @@ TEST_F(NegativeDynamicRendering, CommandDraw) {
     begin_rendering_info.layerCount = 1;
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRendering(begin_rendering_info);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRendering(begin_rendering_info);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-multisampledRenderToSingleSampled-07286");
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-multisampledRenderToSingleSampled-07287");
-    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
+    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->EndRendering();
-    m_commandBuffer->end();
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, CommandDrawWithShaderTileImageRead) {
@@ -140,6 +140,7 @@ TEST_F(NegativeDynamicRendering, CommandDrawWithShaderTileImageRead) {
     AddRequiredExtensions(VK_EXT_SHADER_TILE_IMAGE_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::shaderTileImageDepthReadAccess);
     AddRequiredFeature(vkt::Feature::shaderTileImageStencilReadAccess);
+    AddRequiredFeature(vkt::Feature::sampleRateShading);
     RETURN_IF_SKIP(InitBasicDynamicRendering());
 
     VkShaderObj vs(this, kVertexMinimalGlsl, VK_SHADER_STAGE_VERTEX_BIT);
@@ -192,18 +193,18 @@ TEST_F(NegativeDynamicRendering, CommandDrawWithShaderTileImageRead) {
     begin_rendering_info.layerCount = 1;
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRendering(begin_rendering_info);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    vk::CmdSetDepthWriteEnable(m_commandBuffer->handle(), true);
-    vk::CmdSetStencilWriteMask(m_commandBuffer->handle(), VK_STENCIL_FACE_FRONT_BIT, 0xff);
-    vk::CmdSetStencilWriteMask(m_commandBuffer->handle(), VK_STENCIL_FACE_BACK_BIT, 0);
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRendering(begin_rendering_info);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdSetDepthWriteEnable(m_command_buffer.handle(), true);
+    vk::CmdSetStencilWriteMask(m_command_buffer.handle(), VK_STENCIL_FACE_FRONT_BIT, 0xff);
+    vk::CmdSetStencilWriteMask(m_command_buffer.handle(), VK_STENCIL_FACE_BACK_BIT, 0);
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-pDynamicStates-08715");
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-pDynamicStates-08716");
-    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
+    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->EndRendering();
-    m_commandBuffer->end();
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, CmdClearAttachmentTests) {
@@ -212,8 +213,8 @@ TEST_F(NegativeDynamicRendering, CmdClearAttachmentTests) {
     InitRenderTarget();
 
     VkImageFormatProperties image_format_properties{};
-    vk::GetPhysicalDeviceImageFormatProperties(m_device->phy().handle(), m_renderTargets[0]->format(), VK_IMAGE_TYPE_2D,
-                                               VK_IMAGE_TILING_OPTIMAL, m_renderTargets[0]->usage(), 0, &image_format_properties);
+    vk::GetPhysicalDeviceImageFormatProperties(m_device->Physical().handle(), m_renderTargets[0]->Format(), VK_IMAGE_TYPE_2D,
+                                               VK_IMAGE_TILING_OPTIMAL, m_renderTargets[0]->Usage(), 0, &image_format_properties);
     if (image_format_properties.maxArrayLayers < 4) {
         GTEST_SKIP() << "Test needs to create image 2D array of 4 image view, but VkImageFormatProperties::maxArrayLayers is < 4. "
                         "Skipping test.";
@@ -223,9 +224,9 @@ TEST_F(NegativeDynamicRendering, CmdClearAttachmentTests) {
     // to make sure that considered layer count is the one coming from frame buffer
     // (test would not fail if layer count used to do validation was 4)
     assert(!m_renderTargets.empty());
-    const auto render_target_ci = vkt::Image::ImageCreateInfo2D(m_renderTargets[0]->width(), m_renderTargets[0]->height(),
-                                                                m_renderTargets[0]->create_info().mipLevels, 4,
-                                                                m_renderTargets[0]->format(), m_renderTargets[0]->usage());
+    const auto render_target_ci = vkt::Image::ImageCreateInfo2D(m_renderTargets[0]->Width(), m_renderTargets[0]->Height(),
+                                                                m_renderTargets[0]->CreateInfo().mipLevels, 4,
+                                                                m_renderTargets[0]->Format(), m_renderTargets[0]->Usage());
     vkt::Image render_target(*m_device, render_target_ci, vkt::set_layout);
     vkt::ImageView render_target_view =
         render_target.CreateView(VK_IMAGE_VIEW_TYPE_2D_ARRAY, 0, 1, 0, render_target_ci.arrayLayers);
@@ -290,11 +291,11 @@ TEST_F(NegativeDynamicRendering, CmdClearAttachmentTests) {
     };
 
     // Register clear commands to secondary command buffer
-    secondary_cmd_buffer.begin(&secondary_cmd_buffer_begin_info);
+    secondary_cmd_buffer.Begin(&secondary_cmd_buffer_begin_info);
     clear_cmds(secondary_cmd_buffer.handle(), clear_rect);
-    secondary_cmd_buffer.end();
+    secondary_cmd_buffer.End();
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     VkRenderingAttachmentInfoKHR color_attachment_info = vku::InitStructHelper();
     color_attachment_info.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
@@ -307,19 +308,19 @@ TEST_F(NegativeDynamicRendering, CmdClearAttachmentTests) {
     begin_rendering_info.pColorAttachments = &color_attachment_info;
 
     // Execute secondary command buffer
-    m_commandBuffer->BeginRendering(begin_rendering_info);
-    vk::CmdExecuteCommands(m_commandBuffer->handle(), 1, &secondary_cmd_buffer.handle());
+    m_command_buffer.BeginRendering(begin_rendering_info);
+    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary_cmd_buffer.handle());
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->EndRendering();
+    m_command_buffer.EndRendering();
 
     // Execute same commands as previously, but in a primary command buffer
     begin_rendering_info.flags = 0;
-    m_commandBuffer->BeginRendering(begin_rendering_info);
-    clear_cmds(m_commandBuffer->handle(), clear_rect);
+    m_command_buffer.BeginRendering(begin_rendering_info);
+    clear_cmds(m_command_buffer.handle(), clear_rect);
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->EndRendering();
+    m_command_buffer.EndRendering();
 
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, ClearAttachments) {
@@ -435,7 +436,7 @@ TEST_F(NegativeDynamicRendering, ClearAttachments) {
     auto clear_cmd_test = [&](const bool use_dynamic_rendering) {
         std::array<VkFramebuffer, 4> framebuffers = {VK_NULL_HANDLE};
 
-        m_commandBuffer->begin();
+        m_command_buffer.Begin();
 
         // Try to clear stencil, but image view does not have stencil aspect
         // This is a valid clear because the ImageView aspect are ignored
@@ -445,14 +446,14 @@ TEST_F(NegativeDynamicRendering, ClearAttachments) {
                 depth_attachment_info.imageView = depth_image_view.handle();
                 stencil_attachment_info.imageView = depth_image_view.handle();
 
-                m_commandBuffer->BeginRendering(begin_rendering_info);
+                m_command_buffer.BeginRendering(begin_rendering_info);
             } else {
                 renderpass_image_views[0] = depth_image_view.handle();
 
                 const VkResult err = vk::CreateFramebuffer(m_device->handle(), &framebuffer_ci, nullptr, &framebuffers[0]);
                 ASSERT_EQ(VK_SUCCESS, err);
                 renderpass_bi.framebuffer = framebuffers[0];
-                m_commandBuffer->BeginRenderPass(renderpass_bi);
+                m_command_buffer.BeginRenderPass(renderpass_bi);
             }
 
             VkClearAttachment clear_stencil_attachment;
@@ -460,16 +461,16 @@ TEST_F(NegativeDynamicRendering, ClearAttachments) {
             clear_stencil_attachment.clearValue.depthStencil.depth = 1.0f;
             clear_stencil_attachment.clearValue.depthStencil.stencil = 0;
             VkClearRect clear_rect{rect, 0, 1};
-            vk::CmdClearAttachments(m_commandBuffer->handle(), 1, &clear_stencil_attachment, 1, &clear_rect);
+            vk::CmdClearAttachments(m_command_buffer.handle(), 1, &clear_stencil_attachment, 1, &clear_rect);
 
             if (use_dynamic_rendering) {
-                m_commandBuffer->EndRendering();
+                m_command_buffer.EndRendering();
 
                 depth_attachment_info.imageView = depth_stencil_image_view.handle();
                 stencil_attachment_info.imageView = depth_stencil_image_view.handle();
             } else {
-                m_commandBuffer->NextSubpass();
-                m_commandBuffer->EndRenderPass();
+                m_command_buffer.NextSubpass();
+                m_command_buffer.EndRenderPass();
 
                 renderpass_image_views[0] = depth_stencil_image_view.handle();
             }
@@ -481,30 +482,30 @@ TEST_F(NegativeDynamicRendering, ClearAttachments) {
                 depth_attachment_info.imageView = stencil_image_view.handle();
                 stencil_attachment_info.imageView = stencil_image_view.handle();
 
-                m_commandBuffer->BeginRendering(begin_rendering_info);
+                m_command_buffer.BeginRendering(begin_rendering_info);
             } else {
                 renderpass_image_views[0] = stencil_image_view.handle();
 
                 const VkResult err = vk::CreateFramebuffer(m_device->handle(), &framebuffer_ci, nullptr, &framebuffers[1]);
                 ASSERT_EQ(VK_SUCCESS, err);
                 renderpass_bi.framebuffer = framebuffers[1];
-                m_commandBuffer->BeginRenderPass(renderpass_bi);
+                m_command_buffer.BeginRenderPass(renderpass_bi);
             }
 
             VkClearAttachment clear_depth_attachment;
             clear_depth_attachment.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
             clear_depth_attachment.clearValue.depthStencil.depth = 1.0f;
             VkClearRect clear_rect{rect, 0, 1};
-            vk::CmdClearAttachments(m_commandBuffer->handle(), 1, &clear_depth_attachment, 1, &clear_rect);
+            vk::CmdClearAttachments(m_command_buffer.handle(), 1, &clear_depth_attachment, 1, &clear_rect);
 
             if (use_dynamic_rendering) {
-                m_commandBuffer->EndRendering();
+                m_command_buffer.EndRendering();
 
                 depth_attachment_info.imageView = depth_stencil_image_view.handle();
                 stencil_attachment_info.imageView = depth_stencil_image_view.handle();
             } else {
-                m_commandBuffer->NextSubpass();
-                m_commandBuffer->EndRenderPass();
+                m_command_buffer.NextSubpass();
+                m_command_buffer.EndRenderPass();
 
                 renderpass_image_views[0] = depth_stencil_image_view.handle();
             }
@@ -521,9 +522,9 @@ TEST_F(NegativeDynamicRendering, ClearAttachments) {
             {
                 // begin rendering
                 if (use_dynamic_rendering) {
-                    m_commandBuffer->BeginRendering(begin_rendering_info);
+                    m_command_buffer.BeginRendering(begin_rendering_info);
                 } else {
-                    m_commandBuffer->BeginRenderPass(renderpass_bi);
+                    m_command_buffer.BeginRenderPass(renderpass_bi);
                 }
 
                 // issue clear cmd
@@ -532,15 +533,15 @@ TEST_F(NegativeDynamicRendering, ClearAttachments) {
                 clear_depth_attachment.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT | VK_IMAGE_ASPECT_DEPTH_BIT;
                 clear_depth_attachment.colorAttachment = 0;
                 VkClearRect clear_rect{rect, 0, 1};
-                vk::CmdClearAttachments(m_commandBuffer->handle(), 1, &clear_depth_attachment, 1, &clear_rect);
+                vk::CmdClearAttachments(m_command_buffer.handle(), 1, &clear_depth_attachment, 1, &clear_rect);
                 m_errorMonitor->VerifyFound();
 
                 // end rendering
                 if (use_dynamic_rendering) {
-                    m_commandBuffer->EndRendering();
+                    m_command_buffer.EndRendering();
                 } else {
-                    m_commandBuffer->NextSubpass();
-                    m_commandBuffer->EndRenderPass();
+                    m_command_buffer.NextSubpass();
+                    m_command_buffer.EndRenderPass();
                 }
             }
 
@@ -548,9 +549,9 @@ TEST_F(NegativeDynamicRendering, ClearAttachments) {
             {
                 // begin rendering
                 if (use_dynamic_rendering) {
-                    m_commandBuffer->BeginRendering(begin_rendering_info);
+                    m_command_buffer.BeginRendering(begin_rendering_info);
                 } else {
-                    m_commandBuffer->BeginRenderPass(renderpass_bi);
+                    m_command_buffer.BeginRenderPass(renderpass_bi);
                 }
 
                 // issue clear cmd
@@ -559,34 +560,34 @@ TEST_F(NegativeDynamicRendering, ClearAttachments) {
                 clear_depth_attachment.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
                 clear_depth_attachment.colorAttachment = 2;
                 VkClearRect clear_rect{rect, 0, 1};
-                vk::CmdClearAttachments(m_commandBuffer->handle(), 1, &clear_depth_attachment, 1, &clear_rect);
+                vk::CmdClearAttachments(m_command_buffer.handle(), 1, &clear_depth_attachment, 1, &clear_rect);
                 m_errorMonitor->VerifyFound();
 
                 // end rendering
                 if (use_dynamic_rendering) {
-                    m_commandBuffer->EndRendering();
+                    m_command_buffer.EndRendering();
                 } else {
-                    m_commandBuffer->NextSubpass();
-                    m_commandBuffer->EndRenderPass();
+                    m_command_buffer.NextSubpass();
+                    m_command_buffer.EndRenderPass();
                 }
             }
 
             // Clear color, subpass has unused attachments
             if (!use_dynamic_rendering) {
-                m_commandBuffer->BeginRenderPass(renderpass_bi);
-                m_commandBuffer->NextSubpass();
+                m_command_buffer.BeginRenderPass(renderpass_bi);
+                m_command_buffer.NextSubpass();
                 std::array<VkClearAttachment, 4> clears = {{{VK_IMAGE_ASPECT_DEPTH_BIT, 0},
                                                             {VK_IMAGE_ASPECT_COLOR_BIT, 0},
                                                             {VK_IMAGE_ASPECT_COLOR_BIT, 1},
                                                             {VK_IMAGE_ASPECT_COLOR_BIT, 2}}};
                 VkClearRect clear_rect{rect, 0, 1};
-                vk::CmdClearAttachments(m_commandBuffer->handle(), static_cast<uint32_t>(clears.size()), clears.data(), 1,
+                vk::CmdClearAttachments(m_command_buffer.handle(), static_cast<uint32_t>(clears.size()), clears.data(), 1,
                                         &clear_rect);
-                m_commandBuffer->EndRenderPass();
+                m_command_buffer.EndRenderPass();
             }
         }
 
-        m_commandBuffer->end();
+        m_command_buffer.End();
 
         {
             m_command_buffer.destroy();
@@ -618,7 +619,7 @@ TEST_F(NegativeDynamicRendering, ClearAttachments) {
                 cmd_buffer_inheritance_info.framebuffer = framebuffers[3];
             }
 
-            secondary_cmd_buffer->begin(&cmd_buffer_begin_info);
+            secondary_cmd_buffer->Begin(&cmd_buffer_begin_info);
             // issue clear cmd to secondary cmd buffer
             std::array<VkClearAttachment, 3> clear_attachments = {};
             clear_attachments[0].aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
@@ -637,30 +638,30 @@ TEST_F(NegativeDynamicRendering, ClearAttachments) {
             m_errorMonitor->SetDesiredError("VUID-vkCmdClearAttachments-aspectMask-07271");
             vk::CmdClearAttachments(secondary_cmd_buffer->handle(), 1, &clear_color_out_of_range, 1, &clear_rect);
             m_errorMonitor->VerifyFound();
-            secondary_cmd_buffer->end();
+            secondary_cmd_buffer->End();
 
-            m_commandBuffer->begin();
+            m_command_buffer.Begin();
 
             // begin rendering
             if (use_dynamic_rendering) {
                 begin_rendering_info.flags |= VK_RENDERING_CONTENTS_SECONDARY_COMMAND_BUFFERS_BIT;
-                m_commandBuffer->BeginRendering(begin_rendering_info);
+                m_command_buffer.BeginRendering(begin_rendering_info);
                 begin_rendering_info.flags &= ~VK_RENDERING_CONTENTS_SECONDARY_COMMAND_BUFFERS_BIT;
             } else {
-                m_commandBuffer->BeginRenderPass(renderpass_bi, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
+                m_command_buffer.BeginRenderPass(renderpass_bi, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
             }
 
-            vk::CmdExecuteCommands(m_commandBuffer->handle(), 1, &secondary_cmd_buffer->handle());
+            vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary_cmd_buffer->handle());
 
             // end rendering
             if (use_dynamic_rendering) {
-                m_commandBuffer->EndRendering();
+                m_command_buffer.EndRendering();
             } else {
-                m_commandBuffer->NextSubpass();
-                m_commandBuffer->EndRenderPass();
+                m_command_buffer.NextSubpass();
+                m_command_buffer.EndRenderPass();
             }
 
-            m_commandBuffer->end();
+            m_command_buffer.End();
         }
 
         for (auto framebuffer : framebuffers) {
@@ -677,9 +678,12 @@ TEST_F(NegativeDynamicRendering, ClearAttachments) {
 
 TEST_F(NegativeDynamicRendering, GraphicsPipelineCreateInfo) {
     TEST_DESCRIPTION("Test graphics pipeline creation with dynamic rendering.");
+    SetTargetApiVersion(VK_API_VERSION_1_2);
+    AddRequiredFeature(vkt::Feature::geometryShader);
+    AddRequiredFeature(vkt::Feature::tessellationShader);
     RETURN_IF_SKIP(InitBasicDynamicRendering());
 
-    if (m_device->phy().limits_.maxGeometryOutputVertices == 0) {
+    if (m_device->Physical().limits_.maxGeometryOutputVertices == 0) {
         GTEST_SKIP() << "Device doesn't support required maxGeometryOutputVertices";
     }
     std::vector<VkPipelineColorBlendAttachmentState> color_blend_attachment_state(2);
@@ -818,14 +822,14 @@ TEST_F(NegativeDynamicRendering, MismatchingViewMask) {
     begin_rendering_info.layerCount = 1;
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRendering(begin_rendering_info);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRendering(begin_rendering_info);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-viewMask-06178");
-    vk::CmdDraw(m_commandBuffer->handle(), 1, 1, 0, 0);
+    vk::CmdDraw(m_command_buffer.handle(), 1, 1, 0, 0);
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->EndRendering();
-    m_commandBuffer->end();
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, MismatchingAttachmentFormats) {
@@ -850,24 +854,24 @@ TEST_F(NegativeDynamicRendering, MismatchingAttachmentFormats) {
     pipeline_depth.cb_ci_.attachmentCount = 0;
     pipeline_depth.CreateGraphicsPipeline();
 
-    VkFormat depthStencilFormat = FindSupportedDepthStencilFormat(gpu());
+    VkFormat depthStencilFormat = FindSupportedDepthStencilFormat(Gpu());
 
     bool testStencil = false;
     VkFormat stencilFormat = VK_FORMAT_UNDEFINED;
 
-    if (FormatIsSupported(gpu(), VK_FORMAT_S8_UINT, VK_IMAGE_TILING_OPTIMAL)) {
+    if (FormatIsSupported(Gpu(), VK_FORMAT_S8_UINT, VK_IMAGE_TILING_OPTIMAL)) {
         stencilFormat = VK_FORMAT_S8_UINT;
         testStencil = true;
     } else if ((depthStencilFormat != VK_FORMAT_D16_UNORM_S8_UINT) &&
-               FormatIsSupported(gpu(), VK_FORMAT_D16_UNORM_S8_UINT, VK_IMAGE_TILING_OPTIMAL)) {
+               FormatIsSupported(Gpu(), VK_FORMAT_D16_UNORM_S8_UINT, VK_IMAGE_TILING_OPTIMAL)) {
         stencilFormat = VK_FORMAT_D16_UNORM_S8_UINT;
         testStencil = true;
     } else if ((depthStencilFormat != VK_FORMAT_D24_UNORM_S8_UINT) &&
-               FormatIsSupported(gpu(), VK_FORMAT_D24_UNORM_S8_UINT, VK_IMAGE_TILING_OPTIMAL)) {
+               FormatIsSupported(Gpu(), VK_FORMAT_D24_UNORM_S8_UINT, VK_IMAGE_TILING_OPTIMAL)) {
         stencilFormat = VK_FORMAT_D24_UNORM_S8_UINT;
         testStencil = true;
     } else if ((depthStencilFormat != VK_FORMAT_D32_SFLOAT_S8_UINT) &&
-               FormatIsSupported(gpu(), VK_FORMAT_D32_SFLOAT_S8_UINT, VK_IMAGE_TILING_OPTIMAL)) {
+               FormatIsSupported(Gpu(), VK_FORMAT_D32_SFLOAT_S8_UINT, VK_IMAGE_TILING_OPTIMAL)) {
         stencilFormat = VK_FORMAT_D32_SFLOAT_S8_UINT;
         testStencil = true;
     }
@@ -901,50 +905,50 @@ TEST_F(NegativeDynamicRendering, MismatchingAttachmentFormats) {
     VkRenderingInfoKHR begin_rendering_info = vku::InitStructHelper();
     begin_rendering_info.layerCount = 1;
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     // Mismatching color attachment count
-    m_commandBuffer->BeginRendering(begin_rendering_info);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_color.Handle());
+    m_command_buffer.BeginRendering(begin_rendering_info);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_color.Handle());
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-colorAttachmentCount-06179");
-    vk::CmdDraw(m_commandBuffer->handle(), 1, 1, 0, 0);
+    vk::CmdDraw(m_command_buffer.handle(), 1, 1, 0, 0);
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->EndRendering();
+    m_command_buffer.EndRendering();
 
     // Mismatching color formats
     begin_rendering_info.colorAttachmentCount = 1;
     begin_rendering_info.pColorAttachments = &color_attachment;
-    m_commandBuffer->BeginRendering(begin_rendering_info);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_color.Handle());
+    m_command_buffer.BeginRendering(begin_rendering_info);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_color.Handle());
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-dynamicRenderingUnusedAttachments-08910");
-    vk::CmdDraw(m_commandBuffer->handle(), 1, 1, 0, 0);
+    vk::CmdDraw(m_command_buffer.handle(), 1, 1, 0, 0);
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->EndRendering();
+    m_command_buffer.EndRendering();
 
     // Mismatching depth format
     begin_rendering_info.colorAttachmentCount = 0;
     begin_rendering_info.pColorAttachments = nullptr;
     begin_rendering_info.pDepthAttachment = &depth_stencil_attachment;
-    m_commandBuffer->BeginRendering(begin_rendering_info);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_depth.Handle());
+    m_command_buffer.BeginRendering(begin_rendering_info);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_depth.Handle());
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-dynamicRenderingUnusedAttachments-08914");
-    vk::CmdDraw(m_commandBuffer->handle(), 1, 1, 0, 0);
+    vk::CmdDraw(m_command_buffer.handle(), 1, 1, 0, 0);
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->EndRendering();
+    m_command_buffer.EndRendering();
 
     // Mismatching stencil format
     if (testStencil) {
         begin_rendering_info.pDepthAttachment = nullptr;
         begin_rendering_info.pStencilAttachment = &depth_stencil_attachment;
-        m_commandBuffer->BeginRendering(begin_rendering_info);
-        vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_stencil.Handle());
+        m_command_buffer.BeginRendering(begin_rendering_info);
+        vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_stencil.Handle());
         m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-dynamicRenderingUnusedAttachments-08917");
-        vk::CmdDraw(m_commandBuffer->handle(), 1, 1, 0, 0);
+        vk::CmdDraw(m_command_buffer.handle(), 1, 1, 0, 0);
         m_errorMonitor->VerifyFound();
-        m_commandBuffer->EndRendering();
+        m_command_buffer.EndRendering();
     }
 
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, MismatchingAttachmentFormats2) {
@@ -972,7 +976,7 @@ TEST_F(NegativeDynamicRendering, MismatchingAttachmentFormats2) {
     pipeline_depth.cb_ci_.attachmentCount = 0;
     pipeline_depth.CreateGraphicsPipeline();
 
-    const VkFormat depthStencilFormat = FindSupportedDepthStencilFormat(gpu());
+    const VkFormat depthStencilFormat = FindSupportedDepthStencilFormat(Gpu());
     pipeline_rendering_info.colorAttachmentCount = 0;
     pipeline_rendering_info.depthAttachmentFormat = VK_FORMAT_UNDEFINED;
     pipeline_rendering_info.stencilAttachmentFormat = depthStencilFormat;
@@ -994,7 +998,7 @@ TEST_F(NegativeDynamicRendering, MismatchingAttachmentFormats2) {
     depth_stencil_attachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     depth_stencil_attachment.imageView = VK_NULL_HANDLE;
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     {
         // Mismatching color formats
@@ -1003,12 +1007,12 @@ TEST_F(NegativeDynamicRendering, MismatchingAttachmentFormats2) {
         begin_rendering_info.colorAttachmentCount = 1;
         begin_rendering_info.pColorAttachments = &color_attachment;
         begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
-        m_commandBuffer->BeginRendering(begin_rendering_info);
-        vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_color.Handle());
+        m_command_buffer.BeginRendering(begin_rendering_info);
+        vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_color.Handle());
         m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-dynamicRenderingUnusedAttachments-08912");
-        vk::CmdDraw(m_commandBuffer->handle(), 1, 1, 0, 0);
+        vk::CmdDraw(m_command_buffer.handle(), 1, 1, 0, 0);
         m_errorMonitor->VerifyFound();
-        m_commandBuffer->EndRendering();
+        m_command_buffer.EndRendering();
     }
 
     {
@@ -1017,12 +1021,12 @@ TEST_F(NegativeDynamicRendering, MismatchingAttachmentFormats2) {
         begin_rendering_info.layerCount = 1;
         begin_rendering_info.pDepthAttachment = &depth_stencil_attachment;
         begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
-        m_commandBuffer->BeginRendering(begin_rendering_info);
-        vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_depth.Handle());
+        m_command_buffer.BeginRendering(begin_rendering_info);
+        vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_depth.Handle());
         m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-dynamicRenderingUnusedAttachments-08913");
-        vk::CmdDraw(m_commandBuffer->handle(), 1, 1, 0, 0);
+        vk::CmdDraw(m_command_buffer.handle(), 1, 1, 0, 0);
         m_errorMonitor->VerifyFound();
-        m_commandBuffer->EndRendering();
+        m_command_buffer.EndRendering();
     }
 
     {
@@ -1031,15 +1035,15 @@ TEST_F(NegativeDynamicRendering, MismatchingAttachmentFormats2) {
         begin_rendering_info.layerCount = 1;
         begin_rendering_info.pStencilAttachment = &depth_stencil_attachment;
         begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
-        m_commandBuffer->BeginRendering(begin_rendering_info);
-        vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_stencil.Handle());
+        m_command_buffer.BeginRendering(begin_rendering_info);
+        vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_stencil.Handle());
         m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-dynamicRenderingUnusedAttachments-08916");
-        vk::CmdDraw(m_commandBuffer->handle(), 1, 1, 0, 0);
+        vk::CmdDraw(m_command_buffer.handle(), 1, 1, 0, 0);
         m_errorMonitor->VerifyFound();
-        m_commandBuffer->EndRendering();
+        m_command_buffer.EndRendering();
     }
 
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, MismatchingAttachmentFormats3Color) {
@@ -1070,19 +1074,19 @@ TEST_F(NegativeDynamicRendering, MismatchingAttachmentFormats3Color) {
     VkRenderingInfoKHR begin_rendering_info = vku::InitStructHelper();
     begin_rendering_info.layerCount = 1;
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     // Mismatching color formats
     begin_rendering_info.colorAttachmentCount = 1;
     begin_rendering_info.pColorAttachments = &color_attachment;
-    m_commandBuffer->BeginRendering(begin_rendering_info);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    m_command_buffer.BeginRendering(begin_rendering_info);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-dynamicRenderingUnusedAttachments-08911");
-    vk::CmdDraw(m_commandBuffer->handle(), 1, 1, 0, 0);
+    vk::CmdDraw(m_command_buffer.handle(), 1, 1, 0, 0);
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->EndRendering();
+    m_command_buffer.EndRendering();
 
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, MismatchingAttachmentFormats3DepthStencil) {
@@ -1104,24 +1108,24 @@ TEST_F(NegativeDynamicRendering, MismatchingAttachmentFormats3DepthStencil) {
     pipe1.gp_ci_.pColorBlendState = nullptr;
     pipe1.CreateGraphicsPipeline();
 
-    VkFormat depthStencilFormat = FindSupportedDepthStencilFormat(gpu());
+    VkFormat depthStencilFormat = FindSupportedDepthStencilFormat(Gpu());
 
     bool testStencil = false;
     VkFormat stencilFormat = VK_FORMAT_UNDEFINED;
 
-    if (FormatIsSupported(gpu(), VK_FORMAT_S8_UINT, VK_IMAGE_TILING_OPTIMAL)) {
+    if (FormatIsSupported(Gpu(), VK_FORMAT_S8_UINT, VK_IMAGE_TILING_OPTIMAL)) {
         stencilFormat = VK_FORMAT_S8_UINT;
         testStencil = true;
     } else if ((depthStencilFormat != VK_FORMAT_D16_UNORM_S8_UINT) &&
-               FormatIsSupported(gpu(), VK_FORMAT_D16_UNORM_S8_UINT, VK_IMAGE_TILING_OPTIMAL)) {
+               FormatIsSupported(Gpu(), VK_FORMAT_D16_UNORM_S8_UINT, VK_IMAGE_TILING_OPTIMAL)) {
         stencilFormat = VK_FORMAT_D16_UNORM_S8_UINT;
         testStencil = true;
     } else if ((depthStencilFormat != VK_FORMAT_D24_UNORM_S8_UINT) &&
-               FormatIsSupported(gpu(), VK_FORMAT_D24_UNORM_S8_UINT, VK_IMAGE_TILING_OPTIMAL)) {
+               FormatIsSupported(Gpu(), VK_FORMAT_D24_UNORM_S8_UINT, VK_IMAGE_TILING_OPTIMAL)) {
         stencilFormat = VK_FORMAT_D24_UNORM_S8_UINT;
         testStencil = true;
     } else if ((depthStencilFormat != VK_FORMAT_D32_SFLOAT_S8_UINT) &&
-               FormatIsSupported(gpu(), VK_FORMAT_D32_SFLOAT_S8_UINT, VK_IMAGE_TILING_OPTIMAL)) {
+               FormatIsSupported(Gpu(), VK_FORMAT_D32_SFLOAT_S8_UINT, VK_IMAGE_TILING_OPTIMAL)) {
         stencilFormat = VK_FORMAT_D32_SFLOAT_S8_UINT;
         testStencil = true;
     }
@@ -1148,32 +1152,32 @@ TEST_F(NegativeDynamicRendering, MismatchingAttachmentFormats3DepthStencil) {
     VkRenderingInfoKHR begin_rendering_info = vku::InitStructHelper();
     begin_rendering_info.layerCount = 1;
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     // Mismatching depth format
     begin_rendering_info.colorAttachmentCount = 0;
     begin_rendering_info.pColorAttachments = nullptr;
     begin_rendering_info.pDepthAttachment = &depth_stencil_attachment;
-    m_commandBuffer->BeginRendering(begin_rendering_info);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe1.Handle());
+    m_command_buffer.BeginRendering(begin_rendering_info);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe1.Handle());
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-dynamicRenderingUnusedAttachments-08915");
-    vk::CmdDraw(m_commandBuffer->handle(), 1, 1, 0, 0);
+    vk::CmdDraw(m_command_buffer.handle(), 1, 1, 0, 0);
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->EndRendering();
+    m_command_buffer.EndRendering();
 
     // Mismatching stencil format
     if (testStencil) {
         begin_rendering_info.pDepthAttachment = nullptr;
         begin_rendering_info.pStencilAttachment = &depth_stencil_attachment;
-        m_commandBuffer->BeginRendering(begin_rendering_info);
-        vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe2.Handle());
+        m_command_buffer.BeginRendering(begin_rendering_info);
+        vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe2.Handle());
         m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-dynamicRenderingUnusedAttachments-08918");
-        vk::CmdDraw(m_commandBuffer->handle(), 1, 1, 0, 0);
+        vk::CmdDraw(m_command_buffer.handle(), 1, 1, 0, 0);
         m_errorMonitor->VerifyFound();
-        m_commandBuffer->EndRendering();
+        m_command_buffer.EndRendering();
     }
 
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, MismatchingAttachmentSamplesColor) {
@@ -1202,26 +1206,26 @@ TEST_F(NegativeDynamicRendering, MismatchingAttachmentSamplesColor) {
     VkRenderingInfoKHR begin_rendering_info = vku::InitStructHelper();
     begin_rendering_info.layerCount = 1;
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     // Mismatching color samples
     begin_rendering_info.colorAttachmentCount = 1;
     begin_rendering_info.pColorAttachments = &color_attachment;
-    m_commandBuffer->BeginRendering(begin_rendering_info);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    m_command_buffer.BeginRendering(begin_rendering_info);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-multisampledRenderToSingleSampled-07285");
-    vk::CmdDraw(m_commandBuffer->handle(), 1, 1, 0, 0);
+    vk::CmdDraw(m_command_buffer.handle(), 1, 1, 0, 0);
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->EndRendering();
+    m_command_buffer.EndRendering();
 
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, MismatchingAttachmentSamplesDepthStencil) {
     TEST_DESCRIPTION("Draw with Dynamic Rendering with mismatching depth/stencil sample counts");
     RETURN_IF_SKIP(InitBasicDynamicRendering());
 
-    VkFormat depthStencilFormat = FindSupportedDepthStencilFormat(gpu());
+    VkFormat depthStencilFormat = FindSupportedDepthStencilFormat(Gpu());
 
     VkPipelineRenderingCreateInfoKHR pipeline_rendering_info = vku::InitStructHelper();
     pipeline_rendering_info.colorAttachmentCount = 0;
@@ -1256,30 +1260,30 @@ TEST_F(NegativeDynamicRendering, MismatchingAttachmentSamplesDepthStencil) {
     VkRenderingInfoKHR begin_rendering_info = vku::InitStructHelper();
     begin_rendering_info.layerCount = 1;
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     // Mismatching depth samples
     begin_rendering_info.colorAttachmentCount = 0;
     begin_rendering_info.pColorAttachments = nullptr;
     begin_rendering_info.pDepthAttachment = &depth_stencil_attachment;
-    m_commandBuffer->BeginRendering(begin_rendering_info);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe1.Handle());
+    m_command_buffer.BeginRendering(begin_rendering_info);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe1.Handle());
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-multisampledRenderToSingleSampled-07286");
-    vk::CmdDraw(m_commandBuffer->handle(), 1, 1, 0, 0);
+    vk::CmdDraw(m_command_buffer.handle(), 1, 1, 0, 0);
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->EndRendering();
+    m_command_buffer.EndRendering();
 
     // Mismatching stencil samples
     begin_rendering_info.pDepthAttachment = nullptr;
     begin_rendering_info.pStencilAttachment = &depth_stencil_attachment;
-    m_commandBuffer->BeginRendering(begin_rendering_info);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe2.Handle());
+    m_command_buffer.BeginRendering(begin_rendering_info);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe2.Handle());
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-multisampledRenderToSingleSampled-07287");
-    vk::CmdDraw(m_commandBuffer->handle(), 1, 1, 0, 0);
+    vk::CmdDraw(m_command_buffer.handle(), 1, 1, 0, 0);
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->EndRendering();
+    m_command_buffer.EndRendering();
 
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, MismatchingMixedAttachmentSamplesColor) {
@@ -1327,20 +1331,20 @@ TEST_F(NegativeDynamicRendering, MismatchingMixedAttachmentSamplesColor) {
 
     VkRenderingInfoKHR begin_rendering_info = vku::InitStructHelper();
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     // Mismatching color samples
     begin_rendering_info.colorAttachmentCount = 1;
     begin_rendering_info.pColorAttachments = &color_attachment;
     begin_rendering_info.layerCount = 1;
-    m_commandBuffer->BeginRendering(begin_rendering_info);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    m_command_buffer.BeginRendering(begin_rendering_info);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-colorAttachmentCount-06185");
-    vk::CmdDraw(m_commandBuffer->handle(), 1, 1, 0, 0);
+    vk::CmdDraw(m_command_buffer.handle(), 1, 1, 0, 0);
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->EndRendering();
+    m_command_buffer.EndRendering();
 
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, MismatchingMixedAttachmentSamplesDepthStencil) {
@@ -1360,7 +1364,7 @@ TEST_F(NegativeDynamicRendering, MismatchingMixedAttachmentSamplesDepthStencil) 
 
     VkPipelineRenderingCreateInfoKHR pipeline_rendering_info = vku::InitStructHelper(&samples_info);
 
-    VkFormat depthStencilFormat = FindSupportedDepthStencilFormat(gpu());
+    VkFormat depthStencilFormat = FindSupportedDepthStencilFormat(Gpu());
 
     pipeline_rendering_info.colorAttachmentCount = 0;
     pipeline_rendering_info.pColorAttachmentFormats = nullptr;
@@ -1396,30 +1400,30 @@ TEST_F(NegativeDynamicRendering, MismatchingMixedAttachmentSamplesDepthStencil) 
     VkRenderingInfoKHR begin_rendering_info = vku::InitStructHelper();
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
     begin_rendering_info.layerCount = 1;
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     // Mismatching depth samples
     begin_rendering_info.colorAttachmentCount = 0;
     begin_rendering_info.pColorAttachments = nullptr;
     begin_rendering_info.pDepthAttachment = &depth_stencil_attachment;
-    m_commandBuffer->BeginRendering(begin_rendering_info);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe1.Handle());
+    m_command_buffer.BeginRendering(begin_rendering_info);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe1.Handle());
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-pDepthAttachment-06186");
-    vk::CmdDraw(m_commandBuffer->handle(), 1, 1, 0, 0);
+    vk::CmdDraw(m_command_buffer.handle(), 1, 1, 0, 0);
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->EndRendering();
+    m_command_buffer.EndRendering();
 
     // Mismatching stencil samples
     begin_rendering_info.pDepthAttachment = nullptr;
     begin_rendering_info.pStencilAttachment = &depth_stencil_attachment;
-    m_commandBuffer->BeginRendering(begin_rendering_info);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe2.Handle());
+    m_command_buffer.BeginRendering(begin_rendering_info);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe2.Handle());
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-pStencilAttachment-06187");
-    vk::CmdDraw(m_commandBuffer->handle(), 1, 1, 0, 0);
+    vk::CmdDraw(m_command_buffer.handle(), 1, 1, 0, 0);
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->EndRendering();
+    m_command_buffer.EndRendering();
 
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, AttachmentInfo) {
@@ -1434,7 +1438,7 @@ TEST_F(NegativeDynamicRendering, AttachmentInfo) {
 
     VkFormat depth_format = VK_FORMAT_D32_SFLOAT_S8_UINT;
 
-    if (!FormatFeaturesAreSupported(gpu(), depth_format, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_FRAGMENT_DENSITY_MAP_BIT_EXT)) {
+    if (!FormatFeaturesAreSupported(Gpu(), depth_format, VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_FRAGMENT_DENSITY_MAP_BIT_EXT)) {
         GTEST_SKIP() << "VK_FORMAT_FEATURE_FRAGMENT_DENSITY_MAP_BIT_EXT not supported";
     }
 
@@ -1460,9 +1464,9 @@ TEST_F(NegativeDynamicRendering, AttachmentInfo) {
     begin_rendering_info.layerCount = 1;
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-imageView-06116");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
     fragment_density_map.imageView = depth_image_view_fragment;
 
@@ -1470,7 +1474,8 @@ TEST_F(NegativeDynamicRendering, AttachmentInfo) {
     m_errorMonitor->SetDesiredError("VUID-VkRenderingAttachmentInfo-imageView-06146");
     m_errorMonitor->SetDesiredError("VUID-VkRenderingAttachmentInfo-imageView-06861");
     m_errorMonitor->SetDesiredError("VUID-VkRenderingAttachmentInfo-imageView-06862");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-imageView-06107");
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 }
 
@@ -1582,14 +1587,14 @@ TEST_F(NegativeDynamicRendering, PipelineMissingFlags) {
 
     InitRenderTarget();
 
-    VkFormat depthStencilFormat = FindSupportedDepthStencilFormat(gpu());
+    VkFormat depthStencilFormat = FindSupportedDepthStencilFormat(Gpu());
 
     // Mostly likely will only find support for this on a custom profiles
-    if (!FormatFeaturesAreSupported(gpu(), depthStencilFormat, VK_IMAGE_TILING_OPTIMAL,
+    if (!FormatFeaturesAreSupported(Gpu(), depthStencilFormat, VK_IMAGE_TILING_OPTIMAL,
                                     VK_FORMAT_FEATURE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR)) {
         shading_rate = false;
     }
-    if (!FormatFeaturesAreSupported(gpu(), depthStencilFormat, VK_IMAGE_TILING_OPTIMAL,
+    if (!FormatFeaturesAreSupported(Gpu(), depthStencilFormat, VK_IMAGE_TILING_OPTIMAL,
                                     VK_FORMAT_FEATURE_FRAGMENT_DENSITY_MAP_BIT_EXT)) {
         fragment_density = false;
     }
@@ -1615,7 +1620,7 @@ TEST_F(NegativeDynamicRendering, PipelineMissingFlags) {
     }
 
     VkImageFormatProperties imageFormatProperties;
-    if (vk::GetPhysicalDeviceImageFormatProperties(gpu(), image_create_info.format, image_create_info.imageType,
+    if (vk::GetPhysicalDeviceImageFormatProperties(Gpu(), image_create_info.format, image_create_info.imageType,
                                                    image_create_info.tiling, image_create_info.usage, image_create_info.flags,
                                                    &imageFormatProperties) == VK_ERROR_FORMAT_NOT_SUPPORTED) {
         GTEST_SKIP() << "Format not supported";
@@ -1649,12 +1654,12 @@ TEST_F(NegativeDynamicRendering, PipelineMissingFlags) {
         pipe.gp_ci_.renderPass = VK_NULL_HANDLE;
         pipe.CreateGraphicsPipeline();
 
-        m_commandBuffer->begin();
-        m_commandBuffer->BeginRendering(begin_rendering_info);
-        vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-        vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
-        m_commandBuffer->EndRendering();
-        m_commandBuffer->end();
+        m_command_buffer.Begin();
+        m_command_buffer.BeginRendering(begin_rendering_info);
+        vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+        vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
+        m_command_buffer.EndRendering();
+        m_command_buffer.End();
 
         m_errorMonitor->VerifyFound();
     }
@@ -1681,12 +1686,12 @@ TEST_F(NegativeDynamicRendering, PipelineMissingFlags) {
         pipe.gp_ci_.renderPass = VK_NULL_HANDLE;
         pipe.CreateGraphicsPipeline();
 
-        m_commandBuffer->begin();
-        m_commandBuffer->BeginRendering(begin_rendering_info);
-        vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-        vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
-        m_commandBuffer->EndRendering();
-        m_commandBuffer->end();
+        m_command_buffer.Begin();
+        m_command_buffer.BeginRendering(begin_rendering_info);
+        vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+        vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
+        m_command_buffer.EndRendering();
+        m_command_buffer.End();
 
         m_errorMonitor->VerifyFound();
     }
@@ -1700,9 +1705,9 @@ TEST_F(NegativeDynamicRendering, LayerCount) {
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
 
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-viewMask-06069");
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRendering(begin_rendering_info);
-    m_commandBuffer->end();
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRendering(begin_rendering_info);
+    m_command_buffer.End();
     m_errorMonitor->VerifyFound();
 }
 
@@ -1729,7 +1734,7 @@ TEST_F(NegativeDynamicRendering, InfoMismatchedSamples) {
     color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     color_attachment.resolveMode = VK_RESOLVE_MODE_NONE;
 
-    const VkFormat depth_format = FindSupportedDepthOnlyFormat(gpu());
+    const VkFormat depth_format = FindSupportedDepthOnlyFormat(Gpu());
 
     vkt::Image depth_image(*m_device, 64, 64, 1, depth_format, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
     vkt::ImageView depth_image_view = depth_image.CreateView(VK_IMAGE_ASPECT_DEPTH_BIT);
@@ -1746,11 +1751,11 @@ TEST_F(NegativeDynamicRendering, InfoMismatchedSamples) {
     begin_rendering_info.pDepthAttachment = &depth_attachment;
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-multisampledRenderToSingleSampled-06857");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, BeginRenderingFragmentShadingRate) {
@@ -1764,7 +1769,7 @@ TEST_F(NegativeDynamicRendering, BeginRenderingFragmentShadingRate) {
 
     InitRenderTarget();
 
-    if (!FormatFeaturesAreSupported(gpu(), VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
+    if (!FormatFeaturesAreSupported(Gpu(), VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
                                     VK_FORMAT_FEATURE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR)) {
         GTEST_SKIP() << "format doesn't support FRAGMENT_SHADING_RATE_ATTACHMENT_BIT";
     }
@@ -1782,7 +1787,7 @@ TEST_F(NegativeDynamicRendering, BeginRenderingFragmentShadingRate) {
     image_ci.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR;
 
     VkImageFormatProperties imageFormatProperties;
-    if (vk::GetPhysicalDeviceImageFormatProperties(gpu(), image_ci.format, image_ci.imageType, image_ci.tiling, image_ci.usage,
+    if (vk::GetPhysicalDeviceImageFormatProperties(Gpu(), image_ci.format, image_ci.imageType, image_ci.tiling, image_ci.usage,
                                                    image_ci.flags, &imageFormatProperties) == VK_ERROR_FORMAT_NOT_SUPPORTED) {
         GTEST_SKIP() << "Format not supported";
     }
@@ -1799,15 +1804,15 @@ TEST_F(NegativeDynamicRendering, BeginRenderingFragmentShadingRate) {
     begin_rendering_info.layerCount = 4;
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-imageView-06123");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     begin_rendering_info.viewMask = 0xF;
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-imageView-06124");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     VkRenderingAttachmentInfoKHR color_attachment = vku::InitStructHelper();
@@ -1819,10 +1824,10 @@ TEST_F(NegativeDynamicRendering, BeginRenderingFragmentShadingRate) {
     begin_rendering_info.pColorAttachments = &color_attachment;
     begin_rendering_info.viewMask = 0;
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-imageView-06125");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, DeviceGroupRenderPassBeginInfo) {
@@ -1852,22 +1857,22 @@ TEST_F(NegativeDynamicRendering, DeviceGroupRenderPassBeginInfo) {
     begin_rendering_info.pColorAttachments = &color_attachment;
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
-    m_commandBuffer->BeginRendering(begin_rendering_info);
-    m_commandBuffer->EndRendering();
+    m_command_buffer.BeginRendering(begin_rendering_info);
+    m_command_buffer.EndRendering();
 
     render_area.offset.x = 1;
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06083");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     render_area.offset.x = 0;
     render_area.offset.y = 16;
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06084");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, BeginRenderingFragmentShadingRateImage) {
@@ -1875,7 +1880,7 @@ TEST_F(NegativeDynamicRendering, BeginRenderingFragmentShadingRateImage) {
     AddRequiredExtensions(VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME);
     RETURN_IF_SKIP(InitBasicDynamicRendering());
 
-    if (!FormatFeaturesAreSupported(gpu(), VK_FORMAT_R8G8B8A8_UINT, VK_IMAGE_TILING_OPTIMAL,
+    if (!FormatFeaturesAreSupported(Gpu(), VK_FORMAT_R8G8B8A8_UINT, VK_IMAGE_TILING_OPTIMAL,
                                     VK_FORMAT_FEATURE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR)) {
         GTEST_SKIP() << "VK_FORMAT_FEATURE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR not supported";
     }
@@ -1900,10 +1905,10 @@ TEST_F(NegativeDynamicRendering, BeginRenderingFragmentShadingRateImage) {
     begin_rendering_info.layerCount = 1;
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     m_errorMonitor->SetDesiredError("VUID-VkRenderingFragmentShadingRateAttachmentInfoKHR-imageView-06148");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
     fragment_shading_rate.imageView = image_view;
 
@@ -1913,7 +1918,7 @@ TEST_F(NegativeDynamicRendering, BeginRenderingFragmentShadingRateImage) {
         fsr_properties.minFragmentShadingRateAttachmentTexelSize.width) {
         m_errorMonitor->SetDesiredError("VUID-VkRenderingFragmentShadingRateAttachmentInfoKHR-imageView-06150");
     }
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     if (fsr_properties.minFragmentShadingRateAttachmentTexelSize.width > 1) {
@@ -1925,7 +1930,7 @@ TEST_F(NegativeDynamicRendering, BeginRenderingFragmentShadingRateImage) {
             fsr_properties.maxFragmentShadingRateAttachmentTexelSizeAspectRatio) {
             m_errorMonitor->SetDesiredError("VUID-VkRenderingFragmentShadingRateAttachmentInfoKHR-imageView-06156");
         }
-        m_commandBuffer->BeginRendering(begin_rendering_info);
+        m_command_buffer.BeginRendering(begin_rendering_info);
         m_errorMonitor->VerifyFound();
     }
 
@@ -1938,7 +1943,7 @@ TEST_F(NegativeDynamicRendering, BeginRenderingFragmentShadingRateImage) {
         fsr_properties.minFragmentShadingRateAttachmentTexelSize.height) {
         m_errorMonitor->SetDesiredError("VUID-VkRenderingFragmentShadingRateAttachmentInfoKHR-imageView-06153");
     }
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     if (fsr_properties.minFragmentShadingRateAttachmentTexelSize.height > 1) {
@@ -1950,18 +1955,18 @@ TEST_F(NegativeDynamicRendering, BeginRenderingFragmentShadingRateImage) {
             fsr_properties.maxFragmentShadingRateAttachmentTexelSizeAspectRatio) {
             m_errorMonitor->SetDesiredError("VUID-VkRenderingFragmentShadingRateAttachmentInfoKHR-imageView-06155");
         }
-        m_commandBuffer->BeginRendering(begin_rendering_info);
+        m_command_buffer.BeginRendering(begin_rendering_info);
         m_errorMonitor->VerifyFound();
     }
 
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, BeginRenderingDepthAttachmentFormat) {
     TEST_DESCRIPTION("Test begin rendering with a depth attachment that has an invalid format");
     RETURN_IF_SKIP(InitBasicDynamicRendering());
 
-    VkFormat stencil_format = FindSupportedStencilOnlyFormat(gpu());
+    VkFormat stencil_format = FindSupportedStencilOnlyFormat(Gpu());
     if (stencil_format == VK_FORMAT_UNDEFINED) {
         GTEST_SKIP() << "Couldn't find a stencil only image format";
     }
@@ -1979,11 +1984,11 @@ TEST_F(NegativeDynamicRendering, BeginRenderingDepthAttachmentFormat) {
     begin_rendering_info.pDepthAttachment = &depth_attachment;
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pDepthAttachment-06547");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, TestFragmentDensityMapRenderArea) {
@@ -1991,7 +1996,7 @@ TEST_F(NegativeDynamicRendering, TestFragmentDensityMapRenderArea) {
     AddRequiredExtensions(VK_EXT_FRAGMENT_DENSITY_MAP_EXTENSION_NAME);
     RETURN_IF_SKIP(InitBasicDynamicRendering());
 
-    if (!FormatFeaturesAreSupported(gpu(), VK_FORMAT_R8G8B8A8_UINT, VK_IMAGE_TILING_OPTIMAL,
+    if (!FormatFeaturesAreSupported(Gpu(), VK_FORMAT_R8G8B8A8_UINT, VK_IMAGE_TILING_OPTIMAL,
                                     VK_FORMAT_FEATURE_FRAGMENT_DENSITY_MAP_BIT_EXT)) {
         GTEST_SKIP() << "VK_FORMAT_FEATURE_FRAGMENT_DENSITY_MAP_BIT_EXT not supported";
     }
@@ -2013,24 +2018,24 @@ TEST_F(NegativeDynamicRendering, TestFragmentDensityMapRenderArea) {
     begin_rendering_info.renderArea.extent.width = 64 * fdm_props.maxFragmentDensityTexelSize.width;
     begin_rendering_info.renderArea.extent.height = 32 * fdm_props.maxFragmentDensityTexelSize.height;
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06112");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     begin_rendering_info.renderArea.offset.x = 1;
     begin_rendering_info.renderArea.extent.width = vvl::MaxTypeValue(begin_rendering_info.renderArea.extent.width) - 1;
     m_errorMonitor->SetUnexpectedError("VUID-VkRenderingInfo-pNext-07815");  // if over max
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06112");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     begin_rendering_info.renderArea.offset.x = vvl::MaxTypeValue(begin_rendering_info.renderArea.offset.x);
     begin_rendering_info.renderArea.extent.width = vvl::MaxTypeValue(begin_rendering_info.renderArea.extent.width);
     m_errorMonitor->SetUnexpectedError("VUID-VkRenderingInfo-pNext-07815");  // if over max
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06112");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     begin_rendering_info.renderArea.offset.x = 0;
@@ -2038,21 +2043,21 @@ TEST_F(NegativeDynamicRendering, TestFragmentDensityMapRenderArea) {
     begin_rendering_info.renderArea.extent.height = 64 * fdm_props.maxFragmentDensityTexelSize.height;
 
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06114");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     begin_rendering_info.renderArea.offset.y = 1;
     begin_rendering_info.renderArea.extent.height = vvl::MaxTypeValue(begin_rendering_info.renderArea.extent.height) - 1;
     m_errorMonitor->SetUnexpectedError("VUID-VkRenderingInfo-pNext-07816");  // if over max
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06114");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     begin_rendering_info.renderArea.offset.y = vvl::MaxTypeValue(begin_rendering_info.renderArea.offset.y);
     begin_rendering_info.renderArea.extent.height = vvl::MaxTypeValue(begin_rendering_info.renderArea.extent.height);
     m_errorMonitor->SetUnexpectedError("VUID-VkRenderingInfo-pNext-07816");  // if over max
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06114");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     begin_rendering_info.renderArea.offset.y = 0;
@@ -2067,16 +2072,16 @@ TEST_F(NegativeDynamicRendering, TestFragmentDensityMapRenderArea) {
     fragment_density_map.pNext = &device_group_render_pass_begin_info;
 
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06113");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     device_render_area.extent.width = 32 * fdm_props.maxFragmentDensityTexelSize.width;
     device_render_area.extent.height = 64 * fdm_props.maxFragmentDensityTexelSize.height;
 
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06115");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, FragmentDensityMapRenderAreaWithoutDeviceGroupExt) {
@@ -2088,7 +2093,7 @@ TEST_F(NegativeDynamicRendering, FragmentDensityMapRenderAreaWithoutDeviceGroupE
 
     RETURN_IF_SKIP(InitFramework());
 
-    if (!FormatFeaturesAreSupported(gpu(), VK_FORMAT_R8G8B8A8_UINT, VK_IMAGE_TILING_OPTIMAL,
+    if (!FormatFeaturesAreSupported(Gpu(), VK_FORMAT_R8G8B8A8_UINT, VK_IMAGE_TILING_OPTIMAL,
                                     VK_FORMAT_FEATURE_FRAGMENT_DENSITY_MAP_BIT_EXT)) {
         GTEST_SKIP() << "VK_FORMAT_FEATURE_FRAGMENT_DENSITY_MAP_BIT_EXT not supported";
     }
@@ -2122,20 +2127,20 @@ TEST_F(NegativeDynamicRendering, FragmentDensityMapRenderAreaWithoutDeviceGroupE
     begin_rendering_info.renderArea.extent.width = 64 * fdm_props.maxFragmentDensityTexelSize.width;
     begin_rendering_info.renderArea.extent.height = 32 * fdm_props.maxFragmentDensityTexelSize.height;
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06112");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     begin_rendering_info.renderArea.extent.width = 32 * fdm_props.maxFragmentDensityTexelSize.width;
     begin_rendering_info.renderArea.extent.height = 64 * fdm_props.maxFragmentDensityTexelSize.height;
 
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06114");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, BarrierShaderTileFeaturesNotEnabled) {
@@ -2145,14 +2150,14 @@ TEST_F(NegativeDynamicRendering, BarrierShaderTileFeaturesNotEnabled) {
     RETURN_IF_SKIP(InitBasicDynamicRendering());
     InitRenderTarget();
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     VkRenderingInfoKHR begin_rendering_info = vku::InitStructHelper();
     VkClearRect clear_rect = {{{0, 0}, {m_width, m_height}}, 0, 1};
     begin_rendering_info.renderArea = clear_rect.rect;
     begin_rendering_info.layerCount = 1;
 
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
 
     VkMemoryBarrier2 barrier2 = vku::InitStructHelper();
     barrier2.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
@@ -2165,7 +2170,7 @@ TEST_F(NegativeDynamicRendering, BarrierShaderTileFeaturesNotEnabled) {
     dependency_info.memoryBarrierCount = 1;
     dependency_info.pMemoryBarriers = &barrier2;
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier2-None-09553");
-    vk::CmdPipelineBarrier2(m_commandBuffer->handle(), &dependency_info);
+    vk::CmdPipelineBarrier2(m_command_buffer.handle(), &dependency_info);
     m_errorMonitor->VerifyFound();
 
     VkMemoryBarrier barrier = vku::InitStructHelper();
@@ -2173,13 +2178,13 @@ TEST_F(NegativeDynamicRendering, BarrierShaderTileFeaturesNotEnabled) {
     barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-None-09553");
-    vk::CmdPipelineBarrier(m_commandBuffer->handle(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+    vk::CmdPipelineBarrier(m_command_buffer.handle(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT, 1, &barrier, 0, nullptr, 0,
                            nullptr);
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->EndRendering();
-    m_commandBuffer->end();
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, WithoutShaderTileImageAndBarrier) {
@@ -2210,14 +2215,14 @@ TEST_F(NegativeDynamicRendering, WithoutShaderTileImageAndBarrier) {
     RETURN_IF_SKIP(InitState(nullptr, &features2));
     InitRenderTarget();
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     VkRenderingInfoKHR begin_rendering_info = vku::InitStructHelper();
     VkClearRect clear_rect = {{{0, 0}, {m_width, m_height}}, 0, 1};
     begin_rendering_info.renderArea = clear_rect.rect;
     begin_rendering_info.layerCount = 1;
 
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
 
     VkMemoryBarrier2KHR memory_barrier_2 = vku::InitStructHelper();
     memory_barrier_2.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
@@ -2235,7 +2240,7 @@ TEST_F(NegativeDynamicRendering, WithoutShaderTileImageAndBarrier) {
     dependency_info.pImageMemoryBarriers = VK_NULL_HANDLE;
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier2-None-09553");
-    vk::CmdPipelineBarrier2(m_commandBuffer->handle(), &dependency_info);
+    vk::CmdPipelineBarrier2(m_command_buffer.handle(), &dependency_info);
     m_errorMonitor->VerifyFound();
 
     VkMemoryBarrier memory_barrier = vku::InitStructHelper();
@@ -2243,13 +2248,13 @@ TEST_F(NegativeDynamicRendering, WithoutShaderTileImageAndBarrier) {
     memory_barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-None-09553");
-    vk::CmdPipelineBarrier(m_commandBuffer->handle(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+    vk::CmdPipelineBarrier(m_command_buffer.handle(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT, 1, &memory_barrier, 0,
                            nullptr, 0, nullptr);
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->EndRendering();
-    m_commandBuffer->end();
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, WithShaderTileImageAndBarrier) {
@@ -2275,14 +2280,14 @@ TEST_F(NegativeDynamicRendering, WithShaderTileImageAndBarrier) {
     RETURN_IF_SKIP(InitState(nullptr, &features2));
     InitRenderTarget();
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     VkRenderingInfoKHR begin_rendering_info = vku::InitStructHelper();
     VkClearRect clear_rect = {{{0, 0}, {m_width, m_height}}, 0, 1};
     begin_rendering_info.renderArea = clear_rect.rect;
     begin_rendering_info.layerCount = 1;
 
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
 
     VkMemoryBarrier2KHR memory_barrier_2 = vku::InitStructHelper();
     memory_barrier_2.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
@@ -2312,7 +2317,7 @@ TEST_F(NegativeDynamicRendering, WithShaderTileImageAndBarrier) {
     dependency_info.bufferMemoryBarrierCount = 1;
     dependency_info.pBufferMemoryBarriers = &buf_barrier_2;
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier2-None-09554");
-    vk::CmdPipelineBarrier2(m_commandBuffer->handle(), &dependency_info);
+    vk::CmdPipelineBarrier2(m_command_buffer.handle(), &dependency_info);
     m_errorMonitor->VerifyFound();
 
     dependency_info.bufferMemoryBarrierCount = 0;
@@ -2320,30 +2325,30 @@ TEST_F(NegativeDynamicRendering, WithShaderTileImageAndBarrier) {
     memory_barrier_2.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier2-srcStageMask-09556");
     m_errorMonitor->SetDesiredError("VUID-VkMemoryBarrier2-srcAccessMask-03911");
-    vk::CmdPipelineBarrier2(m_commandBuffer->handle(), &dependency_info);
+    vk::CmdPipelineBarrier2(m_command_buffer.handle(), &dependency_info);
     m_errorMonitor->VerifyFound();
 
     memory_barrier_2.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
     memory_barrier_2.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier2-srcStageMask-09556");
     m_errorMonitor->SetDesiredError("VUID-VkMemoryBarrier2-dstAccessMask-03910");
-    vk::CmdPipelineBarrier2(m_commandBuffer->handle(), &dependency_info);
+    vk::CmdPipelineBarrier2(m_command_buffer.handle(), &dependency_info);
     m_errorMonitor->VerifyFound();
 
     memory_barrier_2.srcAccessMask = VK_ACCESS_2_INPUT_ATTACHMENT_READ_BIT;
     memory_barrier_2.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
     m_errorMonitor->SetDesiredError("VUID-VkMemoryBarrier2-srcAccessMask-03903");
-    vk::CmdPipelineBarrier2(m_commandBuffer->handle(), &dependency_info);
+    vk::CmdPipelineBarrier2(m_command_buffer.handle(), &dependency_info);
     m_errorMonitor->VerifyFound();
 
     memory_barrier_2.srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT;
     memory_barrier_2.dstAccessMask = VK_ACCESS_2_INPUT_ATTACHMENT_READ_BIT;
     m_errorMonitor->SetDesiredError("VUID-VkMemoryBarrier2-dstAccessMask-03903");
-    vk::CmdPipelineBarrier2(m_commandBuffer->handle(), &dependency_info);
+    vk::CmdPipelineBarrier2(m_command_buffer.handle(), &dependency_info);
     m_errorMonitor->VerifyFound();
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-dependencyFlags-07891");
-    vk::CmdPipelineBarrier(m_commandBuffer->handle(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+    vk::CmdPipelineBarrier(m_command_buffer.handle(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_DEVICE_GROUP_BIT, 0, nullptr, 0, nullptr, 0,
                            nullptr);
     m_errorMonitor->VerifyFound();
@@ -2360,19 +2365,19 @@ TEST_F(NegativeDynamicRendering, WithShaderTileImageAndBarrier) {
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-None-09554");
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-pBufferMemoryBarriers-02817");
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-pBufferMemoryBarriers-02818");
-    vk::CmdPipelineBarrier(m_commandBuffer->handle(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+    vk::CmdPipelineBarrier(m_command_buffer.handle(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 1, &buf_barrier,
                            0, nullptr);
     m_errorMonitor->VerifyFound();
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-srcStageMask-09556");
-    vk::CmdPipelineBarrier(m_commandBuffer->handle(), VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+    vk::CmdPipelineBarrier(m_command_buffer.handle(), VK_PIPELINE_STAGE_2_TRANSFER_BIT,
                            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 0,
                            nullptr);
     m_errorMonitor->VerifyFound();
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-srcStageMask-09556");
-    vk::CmdPipelineBarrier(m_commandBuffer->handle(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+    vk::CmdPipelineBarrier(m_command_buffer.handle(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                            VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_DEPENDENCY_BY_REGION_BIT, 0, nullptr, 0, nullptr, 0, nullptr);
     m_errorMonitor->VerifyFound();
 
@@ -2382,7 +2387,7 @@ TEST_F(NegativeDynamicRendering, WithShaderTileImageAndBarrier) {
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-srcAccessMask-02815");
     memory_barrier.srcAccessMask = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
-    vk::CmdPipelineBarrier(m_commandBuffer->handle(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+    vk::CmdPipelineBarrier(m_command_buffer.handle(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT, 1, &memory_barrier, 0,
                            nullptr, 0, nullptr);
     m_errorMonitor->VerifyFound();
@@ -2390,20 +2395,20 @@ TEST_F(NegativeDynamicRendering, WithShaderTileImageAndBarrier) {
     m_errorMonitor->SetDesiredError("VUID-vkCmdPipelineBarrier-dstAccessMask-02816 ");
     memory_barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
     memory_barrier.dstAccessMask = VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
-    vk::CmdPipelineBarrier(m_commandBuffer->handle(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+    vk::CmdPipelineBarrier(m_command_buffer.handle(), VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_DEPENDENCY_BY_REGION_BIT, 1, &memory_barrier, 0,
                            nullptr, 0, nullptr);
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->EndRendering();
-    m_commandBuffer->end();
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, BeginRenderingStencilAttachmentFormat) {
     TEST_DESCRIPTION("Test begin rendering with a stencil attachment that has an invalid format");
     RETURN_IF_SKIP(InitBasicDynamicRendering());
 
-    VkFormat depth_format = FindSupportedDepthOnlyFormat(gpu());
+    VkFormat depth_format = FindSupportedDepthOnlyFormat(Gpu());
 
     vkt::Image image(*m_device, 32, 32, 1, depth_format, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
     image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
@@ -2418,18 +2423,18 @@ TEST_F(NegativeDynamicRendering, BeginRenderingStencilAttachmentFormat) {
     begin_rendering_info.pStencilAttachment = &stencil_attachment;
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pStencilAttachment-06548");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, InheritanceRenderingInfoStencilAttachmentFormat) {
     TEST_DESCRIPTION("Test begin rendering with a stencil attachment that has an invalid format");
     RETURN_IF_SKIP(InitBasicDynamicRendering());
 
-    VkFormat depth_format = FindSupportedDepthOnlyFormat(gpu());
+    VkFormat depth_format = FindSupportedDepthOnlyFormat(Gpu());
 
     VkFormat color_format = VK_FORMAT_R8G8B8A8_UNORM;
 
@@ -2521,19 +2526,12 @@ TEST_F(NegativeDynamicRendering, AreaGreaterThanAttachmentExtent) {
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
     AddOptionalExtensions(VK_KHR_SEPARATE_DEPTH_STENCIL_LAYOUTS_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    RETURN_IF_SKIP(Init());
 
     if (DeviceValidationVersion() != VK_API_VERSION_1_0) {
         GTEST_SKIP() << "Tests for 1.0 only";
     }
-
-    VkPhysicalDeviceDynamicRenderingFeatures dynamic_rendering_features = vku::InitStructHelper();
-    auto features2 = GetPhysicalDeviceFeatures2(dynamic_rendering_features);
-    if (dynamic_rendering_features.dynamicRendering == VK_FALSE) {
-        GTEST_SKIP() << "Test requires (unsupported) dynamicRendering";
-    }
-
-    RETURN_IF_SKIP(InitState(nullptr, &features2));
 
     vkt::Image colorImage(*m_device, 32, 32, 1, VK_FORMAT_R8G8B8A8_UINT, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
     vkt::ImageView colorImageView = colorImage.CreateView();
@@ -2549,24 +2547,24 @@ TEST_F(NegativeDynamicRendering, AreaGreaterThanAttachmentExtent) {
     begin_rendering_info.renderArea.extent.width = 64;
     begin_rendering_info.renderArea.extent.height = 32;
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06079");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     begin_rendering_info.renderArea.offset.x = 1;
     begin_rendering_info.renderArea.extent.width = vvl::MaxTypeValue(begin_rendering_info.renderArea.extent.width) - 1;
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06079");
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-07815");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     begin_rendering_info.renderArea.offset.x = vvl::MaxTypeValue(begin_rendering_info.renderArea.offset.x);
     begin_rendering_info.renderArea.extent.width = vvl::MaxTypeValue(begin_rendering_info.renderArea.extent.width);
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06079");
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-07815");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     begin_rendering_info.renderArea.offset.x = 0;
@@ -2574,24 +2572,24 @@ TEST_F(NegativeDynamicRendering, AreaGreaterThanAttachmentExtent) {
     begin_rendering_info.renderArea.extent.height = 64;
 
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06080");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     begin_rendering_info.renderArea.offset.y = 1;
     begin_rendering_info.renderArea.extent.height = vvl::MaxTypeValue(begin_rendering_info.renderArea.extent.height) - 1;
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06080");
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-07816");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     begin_rendering_info.renderArea.offset.y = vvl::MaxTypeValue(begin_rendering_info.renderArea.offset.y);
     begin_rendering_info.renderArea.extent.height = vvl::MaxTypeValue(begin_rendering_info.renderArea.extent.height);
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06080");
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-07816");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
-    const VkFormat ds_format = FindSupportedDepthStencilFormat(gpu());
+    const VkFormat ds_format = FindSupportedDepthStencilFormat(Gpu());
     if ((ds_format != VK_FORMAT_UNDEFINED) && IsExtensionsEnabled(VK_KHR_SEPARATE_DEPTH_STENCIL_LAYOUTS_EXTENSION_NAME)) {
         vkt::Image depthImage(*m_device, 32, 32, 1, ds_format, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
         vkt::ImageView depthImageView = depthImage.CreateView(VK_IMAGE_ASPECT_DEPTH_BIT);
@@ -2606,11 +2604,11 @@ TEST_F(NegativeDynamicRendering, AreaGreaterThanAttachmentExtent) {
         begin_rendering_info.renderArea.extent.height = 64;
 
         m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06080");
-        m_commandBuffer->BeginRendering(begin_rendering_info);
+        m_command_buffer.BeginRendering(begin_rendering_info);
         m_errorMonitor->VerifyFound();
     }
 
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, DeviceGroupAreaGreaterThanAttachmentExtent) {
@@ -2632,24 +2630,24 @@ TEST_F(NegativeDynamicRendering, DeviceGroupAreaGreaterThanAttachmentExtent) {
     begin_rendering_info.renderArea.extent.width = 64;
     begin_rendering_info.renderArea.extent.height = 32;
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06079");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     begin_rendering_info.renderArea.offset.x = 1;
     begin_rendering_info.renderArea.extent.width = vvl::MaxTypeValue(begin_rendering_info.renderArea.extent.width) - 1;
     m_errorMonitor->SetUnexpectedError("VUID-VkRenderingInfo-pNext-07815");  // if over max
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06079");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     begin_rendering_info.renderArea.offset.x = vvl::MaxTypeValue(begin_rendering_info.renderArea.offset.x);
     begin_rendering_info.renderArea.extent.width = vvl::MaxTypeValue(begin_rendering_info.renderArea.extent.width);
     m_errorMonitor->SetUnexpectedError("VUID-VkRenderingInfo-pNext-07815");  // if over max
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06079");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     begin_rendering_info.renderArea.offset.x = 0;
@@ -2657,24 +2655,24 @@ TEST_F(NegativeDynamicRendering, DeviceGroupAreaGreaterThanAttachmentExtent) {
     begin_rendering_info.renderArea.extent.height = 64;
 
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06080");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     begin_rendering_info.renderArea.offset.y = 1;
     begin_rendering_info.renderArea.extent.height = vvl::MaxTypeValue(begin_rendering_info.renderArea.extent.height) - 1;
     m_errorMonitor->SetUnexpectedError("VUID-VkRenderingInfo-pNext-07816");  // if over max
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06080");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     begin_rendering_info.renderArea.offset.y = vvl::MaxTypeValue(begin_rendering_info.renderArea.offset.y);
     begin_rendering_info.renderArea.extent.height = vvl::MaxTypeValue(begin_rendering_info.renderArea.extent.height);
     m_errorMonitor->SetUnexpectedError("VUID-VkRenderingInfo-pNext-07816");  // if over max
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06080");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
-    const VkFormat ds_format = FindSupportedDepthStencilFormat(gpu());
+    const VkFormat ds_format = FindSupportedDepthStencilFormat(Gpu());
     if ((ds_format != VK_FORMAT_UNDEFINED) && IsExtensionsEnabled(VK_KHR_SEPARATE_DEPTH_STENCIL_LAYOUTS_EXTENSION_NAME)) {
         vkt::Image depthImage(*m_device, 32, 32, 1, ds_format, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
         vkt::ImageView depthImageView = depthImage.CreateView(VK_IMAGE_ASPECT_DEPTH_BIT);
@@ -2689,11 +2687,11 @@ TEST_F(NegativeDynamicRendering, DeviceGroupAreaGreaterThanAttachmentExtent) {
         begin_rendering_info.renderArea.extent.height = 64;
 
         m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06080");
-        m_commandBuffer->BeginRendering(begin_rendering_info);
+        m_command_buffer.BeginRendering(begin_rendering_info);
         m_errorMonitor->VerifyFound();
     }
 
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, SecondaryCommandBufferIncompatibleRenderPass) {
@@ -2719,18 +2717,18 @@ TEST_F(NegativeDynamicRendering, SecondaryCommandBufferIncompatibleRenderPass) {
     cmd_buffer_begin_info.flags = VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
     cmd_buffer_begin_info.pInheritanceInfo = &cmd_buffer_inheritance_info;
 
-    cb.begin(&cmd_buffer_begin_info);
-    cb.end();
+    cb.Begin(&cmd_buffer_begin_info);
+    cb.End();
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-pBeginInfo-06020");
-    vk::CmdExecuteCommands(m_commandBuffer->handle(), 1, &secondary_handle);
+    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary_handle);
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->EndRenderPass();
-    m_commandBuffer->end();
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, SecondaryCommandBufferIncompatibleSubpass) {
@@ -2758,24 +2756,24 @@ TEST_F(NegativeDynamicRendering, SecondaryCommandBufferIncompatibleSubpass) {
     cmd_buffer_begin_info.flags = VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
     cmd_buffer_begin_info.pInheritanceInfo = &cmd_buffer_inheritance_info;
 
-    cb.begin(&cmd_buffer_begin_info);
-    cb.end();
+    cb.Begin(&cmd_buffer_begin_info);
+    cb.End();
 
     VkRenderPassBeginInfo render_pass_begin_info = vku::InitStructHelper();
     render_pass_begin_info.renderPass = render_pass.handle();
     render_pass_begin_info.renderArea.extent = {32, 32};
     render_pass_begin_info.framebuffer = framebuffer.handle();
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRenderPass(render_pass_begin_info, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
-    m_commandBuffer->NextSubpass(VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(render_pass_begin_info, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
+    m_command_buffer.NextSubpass(VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-pCommandBuffers-06019");
-    vk::CmdExecuteCommands(m_commandBuffer->handle(), 1, &secondary_handle);
+    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary_handle);
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->EndRenderPass();
-    m_commandBuffer->end();
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, SecondaryCommandBufferContents) {
@@ -2796,18 +2794,18 @@ TEST_F(NegativeDynamicRendering, SecondaryCommandBufferContents) {
     cmd_buffer_begin_info.flags = VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
     cmd_buffer_begin_info.pInheritanceInfo = &cmd_buffer_inheritance_info;
 
-    cb.begin(&cmd_buffer_begin_info);
-    cb.end();
+    cb.Begin(&cmd_buffer_begin_info);
+    cb.End();
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-contents-09680");
-    vk::CmdExecuteCommands(m_commandBuffer->handle(), 1, &secondary_handle);
+    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary_handle);
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->EndRenderPass();
-    m_commandBuffer->end();
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, ShaderLayerBuiltIn) {
@@ -2815,22 +2813,11 @@ TEST_F(NegativeDynamicRendering, ShaderLayerBuiltIn) {
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-
-    VkPhysicalDeviceDynamicRenderingFeatures dynamic_rendering_features = vku::InitStructHelper();
-    VkPhysicalDeviceMultiviewFeatures multiview_features = vku::InitStructHelper(&dynamic_rendering_features);
-    auto features2 = GetPhysicalDeviceFeatures2(multiview_features);
-    if (dynamic_rendering_features.dynamicRendering == VK_FALSE) {
-        GTEST_SKIP() << "Test requires (unsupported) dynamicRendering";
-    }
-    if (multiview_features.multiview == VK_FALSE) {
-        GTEST_SKIP() << "Test requires (unsupported) multiview";
-    }
-    if (multiview_features.multiviewGeometryShader == VK_FALSE) {
-        GTEST_SKIP() << "Test requires (unsupported) multiviewGeometryShader";
-    }
-
-    RETURN_IF_SKIP(InitState(nullptr, &features2));
+    AddRequiredFeature(vkt::Feature::geometryShader);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    AddRequiredFeature(vkt::Feature::multiview);
+    AddRequiredFeature(vkt::Feature::multiviewGeometryShader);
+    RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
     static char const *gsSource = R"glsl(
@@ -2932,7 +2919,7 @@ TEST_F(NegativeDynamicRendering, PipelineRenderingCreateInfoFormat) {
     RETURN_IF_SKIP(InitBasicDynamicRendering());
     InitRenderTarget();
 
-    uint32_t over_limit = m_device->phy().limits_.maxColorAttachments + 1;
+    uint32_t over_limit = m_device->Physical().limits_.maxColorAttachments + 1;
     std::vector<VkFormat> color_format(over_limit);
     std::fill(color_format.begin(), color_format.end(), VK_FORMAT_R8G8B8A8_UNORM);
 
@@ -3149,7 +3136,7 @@ TEST_F(NegativeDynamicRendering, RenderingFragmentDensityMapAttachment) {
     AddRequiredFeature(vkt::Feature::multiview);
     RETURN_IF_SKIP(InitBasicDynamicRendering());
 
-    if (!FormatFeaturesAreSupported(gpu(), VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
+    if (!FormatFeaturesAreSupported(Gpu(), VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
                                     VK_FORMAT_FEATURE_FRAGMENT_DENSITY_MAP_BIT_EXT)) {
         GTEST_SKIP() << "VK_FORMAT_FEATURE_FRAGMENT_DENSITY_MAP_BIT_EXT not supported";
     }
@@ -3169,10 +3156,10 @@ TEST_F(NegativeDynamicRendering, RenderingFragmentDensityMapAttachment) {
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
     begin_rendering_info.viewMask = 0;
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     m_errorMonitor->SetDesiredError("VUID-VkRenderingFragmentDensityMapAttachmentInfoEXT-imageView-06157");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     rendering_fragment_density.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
@@ -3186,7 +3173,7 @@ TEST_F(NegativeDynamicRendering, RenderingFragmentDensityMapAttachment) {
     image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
     image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_create_info.usage = VK_IMAGE_USAGE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR | VK_IMAGE_USAGE_FRAGMENT_DENSITY_MAP_BIT_EXT;
-    if (!ImageFormatIsSupported(instance(), gpu(), image_create_info, VK_FORMAT_FEATURE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR)) {
+    if (!ImageFormatIsSupported(instance(), Gpu(), image_create_info, VK_FORMAT_FEATURE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR)) {
         GTEST_SKIP() << "format doesn't support FRAGMENT_SHADING_RATE_ATTACHMENT_BIT";
     }
 
@@ -3194,10 +3181,10 @@ TEST_F(NegativeDynamicRendering, RenderingFragmentDensityMapAttachment) {
     vkt::ImageView image_view2 = image2.CreateView(VK_IMAGE_VIEW_TYPE_2D_ARRAY);
     rendering_fragment_density.imageView = image_view2;
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-imageView-06109");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, RenderingFragmentDensityMapAttachmentUsage) {
@@ -3217,11 +3204,11 @@ TEST_F(NegativeDynamicRendering, RenderingFragmentDensityMapAttachmentUsage) {
     begin_rendering_info.layerCount = 1;
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-VkRenderingFragmentDensityMapAttachmentInfoEXT-imageView-06158");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, FragmentDensityMapAttachmentCreateFlags) {
@@ -3230,7 +3217,7 @@ TEST_F(NegativeDynamicRendering, FragmentDensityMapAttachmentCreateFlags) {
     RETURN_IF_SKIP(InitBasicDynamicRendering());
     InitRenderTarget();
 
-    if (!FormatFeaturesAreSupported(gpu(), VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
+    if (!FormatFeaturesAreSupported(Gpu(), VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
                                     VK_FORMAT_FEATURE_FRAGMENT_DENSITY_MAP_BIT_EXT)) {
         GTEST_SKIP() << "VK_FORMAT_FEATURE_FRAGMENT_DENSITY_MAP_BIT_EXT not supported";
     }
@@ -3256,11 +3243,11 @@ TEST_F(NegativeDynamicRendering, FragmentDensityMapAttachmentCreateFlags) {
     begin_rendering_info.layerCount = 1;
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-VkRenderingFragmentDensityMapAttachmentInfoEXT-imageView-06159");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, FragmentDensityMapAttachmentLayerCount) {
@@ -3268,7 +3255,7 @@ TEST_F(NegativeDynamicRendering, FragmentDensityMapAttachmentLayerCount) {
     AddRequiredExtensions(VK_EXT_FRAGMENT_DENSITY_MAP_EXTENSION_NAME);
     RETURN_IF_SKIP(InitBasicDynamicRendering());
 
-    if (!FormatFeaturesAreSupported(gpu(), VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
+    if (!FormatFeaturesAreSupported(Gpu(), VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
                                     VK_FORMAT_FEATURE_FRAGMENT_DENSITY_MAP_BIT_EXT)) {
         GTEST_SKIP() << "VK_FORMAT_FEATURE_FRAGMENT_DENSITY_MAP_BIT_EXT not supported";
     }
@@ -3295,11 +3282,11 @@ TEST_F(NegativeDynamicRendering, FragmentDensityMapAttachmentLayerCount) {
     begin_rendering_info.viewMask = 0x1;
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-multiview-06127");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, PNextImageView) {
@@ -3312,7 +3299,7 @@ TEST_F(NegativeDynamicRendering, PNextImageView) {
     AddRequiredFeature(vkt::Feature::multiview);
     RETURN_IF_SKIP(InitBasicDynamicRendering());
 
-    if (!FormatFeaturesAreSupported(gpu(), VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
+    if (!FormatFeaturesAreSupported(Gpu(), VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
                                     VK_FORMAT_FEATURE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR)) {
         GTEST_SKIP() << "VK_FORMAT_FEATURE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR not supported";
     }
@@ -3340,9 +3327,9 @@ TEST_F(NegativeDynamicRendering, PNextImageView) {
     begin_rendering_info.viewMask = 0x1;
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-imageView-06126");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 }
 
@@ -3352,19 +3339,12 @@ TEST_F(NegativeDynamicRendering, RenderArea) {
     SetTargetApiVersion(VK_API_VERSION_1_0);
     AddRequiredExtensions(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    RETURN_IF_SKIP(Init());
     if (DeviceValidationVersion() != VK_API_VERSION_1_0) {
         GTEST_SKIP() << "Tests for 1.0 only";
     }
 
-    VkPhysicalDeviceDynamicRenderingFeatures dynamic_rendering_features = vku::InitStructHelper();
-    auto features2 = GetPhysicalDeviceFeatures2(dynamic_rendering_features);
-    if (dynamic_rendering_features.dynamicRendering == VK_FALSE) {
-        GTEST_SKIP() << "Test requires (unsupported) dynamicRendering";
-    }
-
-    RETURN_IF_SKIP(InitState(nullptr, &features2));
     InitRenderTarget();
 
     VkRenderingInfoKHR begin_rendering_info = vku::InitStructHelper();
@@ -3373,57 +3353,57 @@ TEST_F(NegativeDynamicRendering, RenderArea) {
     begin_rendering_info.renderArea.extent.width = 32;
     begin_rendering_info.renderArea.extent.height = 32;
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06077");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     begin_rendering_info.renderArea.offset.x = 0;
     begin_rendering_info.renderArea.offset.y = -1;
 
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06078");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     begin_rendering_info.renderArea.offset.y = 0;
-    begin_rendering_info.renderArea.offset.x = m_device->phy().limits_.maxFramebufferWidth - 16;
+    begin_rendering_info.renderArea.offset.x = m_device->Physical().limits_.maxFramebufferWidth - 16;
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-07815");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     begin_rendering_info.renderArea.offset.x = 1;
     begin_rendering_info.renderArea.extent.width = vvl::MaxTypeValue(begin_rendering_info.renderArea.extent.width) - 1;
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-07815");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     begin_rendering_info.renderArea.offset.x = vvl::MaxTypeValue(begin_rendering_info.renderArea.offset.x);
     begin_rendering_info.renderArea.extent.width = vvl::MaxTypeValue(begin_rendering_info.renderArea.extent.width);
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-07815");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     begin_rendering_info.renderArea.offset.x = 0;
     begin_rendering_info.renderArea.extent.width = 32;
-    begin_rendering_info.renderArea.offset.y = m_device->phy().limits_.maxFramebufferHeight - 16;
+    begin_rendering_info.renderArea.offset.y = m_device->Physical().limits_.maxFramebufferHeight - 16;
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-07816");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     begin_rendering_info.renderArea.offset.y = 1;
     begin_rendering_info.renderArea.extent.height = vvl::MaxTypeValue(begin_rendering_info.renderArea.extent.height) - 1;
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-07816");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     begin_rendering_info.renderArea.offset.y = vvl::MaxTypeValue(begin_rendering_info.renderArea.offset.y);
     begin_rendering_info.renderArea.extent.height = vvl::MaxTypeValue(begin_rendering_info.renderArea.extent.height);
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-07816");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, InfoViewMask) {
@@ -3446,13 +3426,13 @@ TEST_F(NegativeDynamicRendering, InfoViewMask) {
     begin_rendering_info.renderArea.extent.height = 32;
     begin_rendering_info.viewMask = 1u << multiview_props.maxMultiviewViewCount;
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-viewMask-06128");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, ColorAttachmentFormat) {
@@ -3461,7 +3441,7 @@ TEST_F(NegativeDynamicRendering, ColorAttachmentFormat) {
     RETURN_IF_SKIP(InitBasicDynamicRendering());
     InitRenderTarget();
 
-    VkFormat format = FindSupportedDepthStencilFormat(gpu());
+    VkFormat format = FindSupportedDepthStencilFormat(Gpu());
     VkPipelineRenderingCreateInfoKHR pipeline_rendering_info = vku::InitStructHelper();
     pipeline_rendering_info.colorAttachmentCount = 1;
     pipeline_rendering_info.pColorAttachmentFormats = &format;
@@ -3508,13 +3488,13 @@ TEST_F(NegativeDynamicRendering, ResolveModeWithNonIntegerColorFormat) {
     begin_rendering_info.layerCount = 1;
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     m_errorMonitor->SetDesiredError("VUID-VkRenderingAttachmentInfo-imageView-06129");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, ResolveModeWithIntegerColorFormat) {
@@ -3551,13 +3531,13 @@ TEST_F(NegativeDynamicRendering, ResolveModeWithIntegerColorFormat) {
     begin_rendering_info.layerCount = 1;
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     m_errorMonitor->SetDesiredError("VUID-VkRenderingAttachmentInfo-imageView-06130");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, ResolveModeSamples) {
@@ -3581,13 +3561,13 @@ TEST_F(NegativeDynamicRendering, ResolveModeSamples) {
     begin_rendering_info.layerCount = 1;
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     m_errorMonitor->SetDesiredError("VUID-VkRenderingAttachmentInfo-imageView-06861");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, ResolveImageViewSamples) {
@@ -3623,18 +3603,18 @@ TEST_F(NegativeDynamicRendering, ResolveImageViewSamples) {
     begin_rendering_info.layerCount = 1;
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     m_errorMonitor->SetDesiredError("VUID-VkRenderingAttachmentInfo-imageView-06864");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     color_attachment.resolveImageView = VK_NULL_HANDLE;
     m_errorMonitor->SetDesiredError("VUID-VkRenderingAttachmentInfo-imageView-06862");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, ResolveImageViewFormatMatch) {
@@ -3670,13 +3650,13 @@ TEST_F(NegativeDynamicRendering, ResolveImageViewFormatMatch) {
     begin_rendering_info.layerCount = 1;
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     m_errorMonitor->SetDesiredError("VUID-VkRenderingAttachmentInfo-imageView-06865");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, AttachmentImageViewLayout) {
@@ -3697,13 +3677,13 @@ TEST_F(NegativeDynamicRendering, AttachmentImageViewLayout) {
     begin_rendering_info.layerCount = 1;
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     m_errorMonitor->SetDesiredError("VUID-VkRenderingAttachmentInfo-imageView-06135");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, ResolveImageViewLayout) {
@@ -3739,13 +3719,13 @@ TEST_F(NegativeDynamicRendering, ResolveImageViewLayout) {
     begin_rendering_info.layerCount = 1;
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     m_errorMonitor->SetDesiredError("VUID-VkRenderingAttachmentInfo-imageView-06136");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, ResolveImageViewLayoutSeparateDepthStencil) {
@@ -3782,13 +3762,13 @@ TEST_F(NegativeDynamicRendering, ResolveImageViewLayoutSeparateDepthStencil) {
     begin_rendering_info.layerCount = 1;
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     m_errorMonitor->SetDesiredError("VUID-VkRenderingAttachmentInfo-imageView-06137");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, AttachmentImageViewShadingRateLayout) {
@@ -3819,16 +3799,16 @@ TEST_F(NegativeDynamicRendering, AttachmentImageViewShadingRateLayout) {
     begin_rendering_info.layerCount = 1;
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     // SHADING_RATE_OPTIMAL_NV is aliased FRAGMENT_SHADING_RATE_ATTACHMENT_OPTIMAL_KHR so VU depends on which extensions
     const char *vuid =
         khr_fragment_shading ? "VUID-VkRenderingAttachmentInfo-imageView-06143" : "VUID-VkRenderingAttachmentInfo-imageView-06138";
     m_errorMonitor->SetDesiredError(vuid);
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, ResolveImageViewShadingRateLayout) {
@@ -3873,16 +3853,16 @@ TEST_F(NegativeDynamicRendering, ResolveImageViewShadingRateLayout) {
     begin_rendering_info.layerCount = 1;
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     // SHADING_RATE_OPTIMAL_NV is aliased FRAGMENT_SHADING_RATE_ATTACHMENT_OPTIMAL_KHR so VU depends on which extensions
     const char *vuid =
         khr_fragment_shading ? "VUID-VkRenderingAttachmentInfo-imageView-06144" : "VUID-VkRenderingAttachmentInfo-imageView-06139";
     m_errorMonitor->SetDesiredError(vuid);
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, AttachmentImageViewFragmentDensityLayout) {
@@ -3905,13 +3885,13 @@ TEST_F(NegativeDynamicRendering, AttachmentImageViewFragmentDensityLayout) {
     begin_rendering_info.layerCount = 1;
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     m_errorMonitor->SetDesiredError("VUID-VkRenderingAttachmentInfo-imageView-06140");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, ResolveImageViewFragmentDensityLayout) {
@@ -3948,13 +3928,13 @@ TEST_F(NegativeDynamicRendering, ResolveImageViewFragmentDensityLayout) {
     begin_rendering_info.layerCount = 1;
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     m_errorMonitor->SetDesiredError("VUID-VkRenderingAttachmentInfo-imageView-06141");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, ResolveImageViewReadOnlyOptimalLayout) {
@@ -3991,13 +3971,13 @@ TEST_F(NegativeDynamicRendering, ResolveImageViewReadOnlyOptimalLayout) {
     begin_rendering_info.layerCount = 1;
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     m_errorMonitor->SetDesiredError("VUID-VkRenderingAttachmentInfo-imageView-06142");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, BeginRenderingFragmentShadingRateImageView) {
@@ -4005,7 +3985,7 @@ TEST_F(NegativeDynamicRendering, BeginRenderingFragmentShadingRateImageView) {
     AddRequiredExtensions(VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME);
     RETURN_IF_SKIP(InitBasicDynamicRendering());
 
-    if (!FormatFeaturesAreSupported(gpu(), VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
+    if (!FormatFeaturesAreSupported(Gpu(), VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
                                     VK_FORMAT_FEATURE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR)) {
         GTEST_SKIP() << "VK_FORMAT_FEATURE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR not supported";
     }
@@ -4028,13 +4008,13 @@ TEST_F(NegativeDynamicRendering, BeginRenderingFragmentShadingRateImageView) {
     begin_rendering_info.layerCount = 1;
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     m_errorMonitor->SetDesiredError("VUID-VkRenderingFragmentShadingRateAttachmentInfoKHR-imageView-06147");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, RenderingInfoColorAttachment) {
@@ -4073,27 +4053,27 @@ TEST_F(NegativeDynamicRendering, RenderingInfoColorAttachment) {
     begin_rendering_info.pColorAttachments = &color_attachment;
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-colorAttachmentCount-06087");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     color_attachment.imageView = image_view;
     color_attachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-colorAttachmentCount-06090");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     color_attachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL;
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-colorAttachmentCount-06096");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     color_attachment.imageLayout = VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL;
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-colorAttachmentCount-06100");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
@@ -4101,22 +4081,22 @@ TEST_F(NegativeDynamicRendering, RenderingInfoColorAttachment) {
     color_attachment.resolveImageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-colorAttachmentCount-06091");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     color_attachment.resolveImageLayout = VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL;
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-colorAttachmentCount-06097");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     color_attachment.resolveImageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-colorAttachmentCount-06101");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     color_attachment.resolveMode = VK_RESOLVE_MODE_NONE;
 
-    const uint32_t max_color_attachments = m_device->phy().limits_.maxColorAttachments + 1;
+    const uint32_t max_color_attachments = m_device->Physical().limits_.maxColorAttachments + 1;
     std::vector<VkRenderingAttachmentInfoKHR> color_attachments(max_color_attachments);
     for (auto &attachment : color_attachments) {
         attachment = vku::InitStructHelper();
@@ -4126,10 +4106,10 @@ TEST_F(NegativeDynamicRendering, RenderingInfoColorAttachment) {
     begin_rendering_info.colorAttachmentCount = max_color_attachments;
     begin_rendering_info.pColorAttachments = color_attachments.data();
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-colorAttachmentCount-06106");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, RenderingInfoDepthAttachment) {
@@ -4142,7 +4122,7 @@ TEST_F(NegativeDynamicRendering, RenderingInfoDepthAttachment) {
 
     const bool separate_ds_layouts = IsExtensionsEnabled(VK_KHR_SEPARATE_DEPTH_STENCIL_LAYOUTS_EXTENSION_NAME);
 
-    VkFormat ds_format = FindSupportedDepthStencilFormat(gpu());
+    VkFormat ds_format = FindSupportedDepthStencilFormat(Gpu());
 
     VkPhysicalDeviceDepthStencilResolveProperties depth_stencil_resolve_properties = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(depth_stencil_resolve_properties);
@@ -4195,10 +4175,10 @@ TEST_F(NegativeDynamicRendering, RenderingInfoDepthAttachment) {
     begin_rendering_info.pStencilAttachment = &stencil_attachment;
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pDepthAttachment-06085");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     depth_attachment.imageView = VK_NULL_HANDLE;
@@ -4211,7 +4191,7 @@ TEST_F(NegativeDynamicRendering, RenderingInfoDepthAttachment) {
     stencil_attachment.resolveImageView = stencil_resolve_image_view;
 
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pDepthAttachment-06086");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     depth_attachment.imageView = depth_image_view;
@@ -4226,7 +4206,7 @@ TEST_F(NegativeDynamicRendering, RenderingInfoDepthAttachment) {
         m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pStencilAttachment-06103");
     }
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pDepthAttachment-06093");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     if (separate_ds_layouts) {
@@ -4238,14 +4218,14 @@ TEST_F(NegativeDynamicRendering, RenderingInfoDepthAttachment) {
             m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pStencilAttachment-06103");
         }
         m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pDepthAttachment-07733");
-        m_commandBuffer->BeginRendering(begin_rendering_info);
+        m_command_buffer.BeginRendering(begin_rendering_info);
         m_errorMonitor->VerifyFound();
     }
 
     depth_attachment.resolveImageLayout = VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL;
     if (has_depth_resolve_mode_average && has_stencil_resolve_mode_average) {
         m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pDepthAttachment-06098");
-        m_commandBuffer->BeginRendering(begin_rendering_info);
+        m_command_buffer.BeginRendering(begin_rendering_info);
         m_errorMonitor->VerifyFound();
     }
 
@@ -4255,20 +4235,20 @@ TEST_F(NegativeDynamicRendering, RenderingInfoDepthAttachment) {
     stencil_attachment.resolveMode = VK_RESOLVE_MODE_NONE;
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pDepthAttachment-06088");
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pStencilAttachment-06089");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     depth_attachment.imageView = depth_image_view;
     stencil_attachment.imageView = depth_image_view;
     depth_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pDepthAttachment-06092");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     if (separate_ds_layouts) {
         depth_attachment.imageLayout = VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL;
         m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pDepthAttachment-07732");
-        m_commandBuffer->BeginRendering(begin_rendering_info);
+        m_command_buffer.BeginRendering(begin_rendering_info);
         m_errorMonitor->VerifyFound();
     }
 
@@ -4280,7 +4260,7 @@ TEST_F(NegativeDynamicRendering, RenderingInfoDepthAttachment) {
         depth_attachment.resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT;
         stencil_attachment.resolveMode = VK_RESOLVE_MODE_NONE;
         m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pDepthAttachment-06104");
-        m_commandBuffer->BeginRendering(begin_rendering_info);
+        m_command_buffer.BeginRendering(begin_rendering_info);
         m_errorMonitor->VerifyFound();
     }
     if (depth_stencil_resolve_properties.independentResolve == VK_FALSE && has_depth_resolve_mode_average &&
@@ -4289,7 +4269,7 @@ TEST_F(NegativeDynamicRendering, RenderingInfoDepthAttachment) {
         stencil_attachment.resolveMode = VK_RESOLVE_MODE_SAMPLE_ZERO_BIT;
         m_errorMonitor->SetUnexpectedError("VUID-VkRenderingInfo-pDepthAttachment-06104");  // if independentResolveNone is false
         m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pDepthAttachment-06105");
-        m_commandBuffer->BeginRendering(begin_rendering_info);
+        m_command_buffer.BeginRendering(begin_rendering_info);
         m_errorMonitor->VerifyFound();
     }
 
@@ -4298,19 +4278,19 @@ TEST_F(NegativeDynamicRendering, RenderingInfoDepthAttachment) {
     stencil_attachment.resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     if (has_stencil_resolve_mode_average) {
         m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pStencilAttachment-06095");
-        m_commandBuffer->BeginRendering(begin_rendering_info);
+        m_command_buffer.BeginRendering(begin_rendering_info);
         m_errorMonitor->VerifyFound();
         if (separate_ds_layouts) {
             stencil_attachment.resolveImageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
             m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pStencilAttachment-07735");
-            m_commandBuffer->BeginRendering(begin_rendering_info);
+            m_command_buffer.BeginRendering(begin_rendering_info);
             m_errorMonitor->VerifyFound();
         }
     }
     stencil_attachment.resolveImageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL;
     if (has_stencil_resolve_mode_average) {
         m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pStencilAttachment-06099");
-        m_commandBuffer->BeginRendering(begin_rendering_info);
+        m_command_buffer.BeginRendering(begin_rendering_info);
         m_errorMonitor->VerifyFound();
     }
 
@@ -4318,17 +4298,17 @@ TEST_F(NegativeDynamicRendering, RenderingInfoDepthAttachment) {
     stencil_attachment.resolveMode = VK_RESOLVE_MODE_NONE;
     stencil_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pStencilAttachment-06094");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     if (separate_ds_layouts) {
         stencil_attachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
         m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pStencilAttachment-07734");
-        m_commandBuffer->BeginRendering(begin_rendering_info);
+        m_command_buffer.BeginRendering(begin_rendering_info);
         m_errorMonitor->VerifyFound();
     }
 
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, RenderAreaNegativeOffset) {
@@ -4342,20 +4322,20 @@ TEST_F(NegativeDynamicRendering, RenderAreaNegativeOffset) {
     begin_rendering_info.renderArea.extent.width = 32;
     begin_rendering_info.renderArea.extent.height = 32;
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06077");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     begin_rendering_info.renderArea.offset.x = 0;
     begin_rendering_info.renderArea.offset.y = -1;
 
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06078");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, ZeroRenderArea) {
@@ -4371,19 +4351,19 @@ TEST_F(NegativeDynamicRendering, ZeroRenderArea) {
     begin_rendering_info.colorAttachmentCount = 1;
     begin_rendering_info.pColorAttachments = &color_attachment;
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-None-08994");
     begin_rendering_info.renderArea = {{0, 0}, {0, 64}};
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-None-08995");
     begin_rendering_info.renderArea = {{0, 0}, {64, 0}};
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, Pipeline) {
@@ -4398,16 +4378,16 @@ TEST_F(NegativeDynamicRendering, Pipeline) {
     begin_rendering_info.layerCount = 1;
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRendering(begin_rendering_info);
 
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-renderPass-06198");
-    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
+    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->EndRendering();
-    m_commandBuffer->end();
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, BeginRenderingFragmentShadingRateAttachmentSize) {
@@ -4420,7 +4400,7 @@ TEST_F(NegativeDynamicRendering, BeginRenderingFragmentShadingRateAttachmentSize
 
     RETURN_IF_SKIP(InitFramework());
 
-    if (!FormatFeaturesAreSupported(gpu(), VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
+    if (!FormatFeaturesAreSupported(Gpu(), VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
                                     VK_FORMAT_FEATURE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR)) {
         GTEST_SKIP() << "VK_FORMAT_FEATURE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR not supported";
     }
@@ -4458,17 +4438,17 @@ TEST_F(NegativeDynamicRendering, BeginRenderingFragmentShadingRateAttachmentSize
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
     begin_rendering_info.renderArea.offset.x = fragment_shading_rate.shadingRateAttachmentTexelSize.width * 64;
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06119");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     begin_rendering_info.renderArea.offset.x = 0;
     begin_rendering_info.renderArea.offset.y = fragment_shading_rate.shadingRateAttachmentTexelSize.height * 64;
 
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06121");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 }
 
@@ -4479,29 +4459,18 @@ TEST_F(NegativeDynamicRendering, FragmentShadingRateAttachmentSizeWithDeviceGrou
     AddRequiredExtensions(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_MULTIVIEW_EXTENSION_NAME);
+    AddRequiredFeature(vkt::Feature::multiview);
+    AddRequiredFeature(vkt::Feature::dynamicRendering);
+    RETURN_IF_SKIP(Init());
 
-    RETURN_IF_SKIP(InitFramework());
-
-    if (!FormatFeaturesAreSupported(gpu(), VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
+    if (!FormatFeaturesAreSupported(Gpu(), VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
                                     VK_FORMAT_FEATURE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR)) {
         GTEST_SKIP() << "VK_FORMAT_FEATURE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR not supported";
-    }
-
-    VkPhysicalDeviceDynamicRenderingFeatures dynamic_rendering_features = vku::InitStructHelper();
-    VkPhysicalDeviceMultiviewFeaturesKHR multiview_features = vku::InitStructHelper(&dynamic_rendering_features);
-    VkPhysicalDeviceFeatures2 features2 = GetPhysicalDeviceFeatures2(multiview_features);
-
-    if (multiview_features.multiview == VK_FALSE) {
-        GTEST_SKIP() << "Test requires (unsupported) multiview";
-    }
-    if (dynamic_rendering_features.dynamicRendering == VK_FALSE) {
-        GTEST_SKIP() << "Test requires (unsupported) dynamicRendering";
     }
 
     VkPhysicalDeviceFragmentShadingRatePropertiesKHR fsr_properties = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(fsr_properties);
 
-    RETURN_IF_SKIP(InitState(nullptr, &features2));
     vkt::Image image(*m_device, 32, 32, 1, VK_FORMAT_R8G8B8A8_UNORM,
                      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR);
     vkt::ImageView image_view = image.CreateView();
@@ -4516,24 +4485,24 @@ TEST_F(NegativeDynamicRendering, FragmentShadingRateAttachmentSizeWithDeviceGrou
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
     begin_rendering_info.renderArea.offset.x = fragment_shading_rate.shadingRateAttachmentTexelSize.width * 64;
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06119");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     begin_rendering_info.renderArea.offset.x = 1;
     begin_rendering_info.renderArea.extent.width = vvl::MaxTypeValue(begin_rendering_info.renderArea.extent.width) - 1;
     m_errorMonitor->SetUnexpectedError("VUID-VkRenderingInfo-pNext-07815");  // if over max
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06119");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     begin_rendering_info.renderArea.offset.x = vvl::MaxTypeValue(begin_rendering_info.renderArea.offset.x);
     begin_rendering_info.renderArea.extent.width = vvl::MaxTypeValue(begin_rendering_info.renderArea.extent.width);
     m_errorMonitor->SetUnexpectedError("VUID-VkRenderingInfo-pNext-07815");  // if over max
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06119");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     begin_rendering_info.renderArea.offset.x = 0;
@@ -4552,19 +4521,19 @@ TEST_F(NegativeDynamicRendering, FragmentShadingRateAttachmentSizeWithDeviceGrou
     fragment_shading_rate.pNext = &device_group_render_pass_begin_info;
 
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06120");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     begin_rendering_info.renderArea.offset.y = 1;
     begin_rendering_info.renderArea.extent.height = vvl::MaxTypeValue(begin_rendering_info.renderArea.extent.height) - 1;
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06120");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     begin_rendering_info.renderArea.offset.y = vvl::MaxTypeValue(begin_rendering_info.renderArea.offset.y);
     begin_rendering_info.renderArea.extent.height = vvl::MaxTypeValue(begin_rendering_info.renderArea.extent.height);
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06120");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     render_area.extent.width = 32;
@@ -4572,7 +4541,7 @@ TEST_F(NegativeDynamicRendering, FragmentShadingRateAttachmentSizeWithDeviceGrou
     render_area.extent.height = 64 * fragment_shading_rate.shadingRateAttachmentTexelSize.height;
 
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-06122");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 }
 
@@ -4601,20 +4570,20 @@ TEST_F(NegativeDynamicRendering, SuspendingRenderPassInstance) {
 
     VkCommandBufferBeginInfo cmd_begin = vku::InitStructHelper();
 
-    cmd_buffer1.begin(&cmd_begin);
+    cmd_buffer1.Begin(&cmd_begin);
     cmd_buffer1.BeginRendering(suspend_rendering_info);
     cmd_buffer1.EndRendering();
-    cmd_buffer1.end();
+    cmd_buffer1.End();
 
-    cmd_buffer2.begin(&cmd_begin);
+    cmd_buffer2.Begin(&cmd_begin);
     cmd_buffer2.BeginRendering(resume_rendering_info);
     cmd_buffer2.EndRendering();
-    cmd_buffer2.end();
+    cmd_buffer2.End();
 
-    cmd_buffer3.begin(&cmd_begin);
+    cmd_buffer3.Begin(&cmd_begin);
     cmd_buffer3.BeginRendering(rendering_info);
     cmd_buffer3.EndRendering();
-    cmd_buffer3.end();
+    cmd_buffer3.End();
 
     VkCommandBuffer command_buffers[3] = {cmd_buffer1.handle(), cmd_buffer2.handle()};
 
@@ -4679,20 +4648,20 @@ TEST_F(NegativeDynamicRendering, SuspendingRenderPassInstanceQueueSubmit2) {
 
     VkCommandBufferBeginInfo cmd_begin = vku::InitStructHelper();
 
-    cmd_buffer1.begin(&cmd_begin);
+    cmd_buffer1.Begin(&cmd_begin);
     cmd_buffer1.BeginRendering(suspend_rendering_info);
     cmd_buffer1.EndRendering();
-    cmd_buffer1.end();
+    cmd_buffer1.End();
 
-    cmd_buffer2.begin(&cmd_begin);
+    cmd_buffer2.Begin(&cmd_begin);
     cmd_buffer2.BeginRendering(resume_rendering_info);
     cmd_buffer2.EndRendering();
-    cmd_buffer2.end();
+    cmd_buffer2.End();
 
-    cmd_buffer3.begin(&cmd_begin);
+    cmd_buffer3.Begin(&cmd_begin);
     cmd_buffer3.BeginRendering(rendering_info);
     cmd_buffer3.EndRendering();
-    cmd_buffer3.end();
+    cmd_buffer3.End();
 
     VkCommandBufferSubmitInfo command_buffer_submit_info[3];
     command_buffer_submit_info[0] = vku::InitStructHelper();
@@ -4746,7 +4715,7 @@ TEST_F(NegativeDynamicRendering, NullDepthStencilExecuteCommands) {
     vkt::CommandPool pool(*m_device, m_device->graphics_queue_node_index_, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
     vkt::CommandBuffer secondary(*m_device, pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
 
-    VkFormat depth_stencil_format = FindSupportedDepthStencilFormat(gpu());
+    VkFormat depth_stencil_format = FindSupportedDepthStencilFormat(Gpu());
 
     VkCommandBufferInheritanceRenderingInfoKHR cbiri = vku::InitStructHelper();
     // format is defined, although no image view provided in dynamic rendering
@@ -4775,53 +4744,53 @@ TEST_F(NegativeDynamicRendering, NullDepthStencilExecuteCommands) {
     ri.renderArea = {{0, 0}, {1, 1}};
 
     // Record secondary cmd buffer with depth stencil format
-    secondary.begin(&cbbi);
-    secondary.end();
+    secondary.Begin(&cbbi);
+    secondary.End();
 
     // Record primary cmd buffer with depth stencil
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRendering(ri);
-    vk::CmdExecuteCommands(m_commandBuffer->handle(), 1, &secondary.handle());
-    m_commandBuffer->EndRendering();
-    m_commandBuffer->end();
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRendering(ri);
+    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary.handle());
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
 
     // Retry with null depth stencil attachment image view
     rai.imageView = VK_NULL_HANDLE;
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRendering(ri);
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRendering(ri);
     m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-pDepthAttachment-06774");
     m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-pStencilAttachment-06775");
-    vk::CmdExecuteCommands(m_commandBuffer->handle(), 1, &secondary.handle());
+    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary.handle());
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->EndRendering();
-    m_commandBuffer->end();
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
 
     // Retry with nullptr attachment struct
     ri.pDepthAttachment = nullptr;
     ri.pStencilAttachment = nullptr;
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRendering(ri);
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRendering(ri);
     m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-pDepthAttachment-06774");
     m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-pStencilAttachment-06775");
-    vk::CmdExecuteCommands(m_commandBuffer->handle(), 1, &secondary.handle());
+    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary.handle());
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->EndRendering();
-    m_commandBuffer->end();
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
 
     // Retry with no format in inheritance info
     cbiri.depthAttachmentFormat = VK_FORMAT_UNDEFINED;
     cbiri.stencilAttachmentFormat = VK_FORMAT_UNDEFINED;
 
-    secondary.begin(&cbbi);
-    secondary.end();
+    secondary.Begin(&cbbi);
+    secondary.End();
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRendering(ri);
-    vk::CmdExecuteCommands(m_commandBuffer->handle(), 1, &secondary.handle());
-    m_commandBuffer->EndRendering();
-    m_commandBuffer->end();
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRendering(ri);
+    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary.handle());
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, BeginRenderingWithSecondaryContents) {
@@ -4840,13 +4809,13 @@ TEST_F(NegativeDynamicRendering, BeginRenderingWithSecondaryContents) {
 
     vkt::CommandBuffer secondary(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
 
-    secondary.begin();
+    secondary.Begin();
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdBeginRendering-commandBuffer-06068");
     secondary.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
-    secondary.end();
+    secondary.End();
 }
 
 TEST_F(NegativeDynamicRendering, BadRenderPassContentsWhenCallingCmdExecuteCommands) {
@@ -4885,19 +4854,19 @@ TEST_F(NegativeDynamicRendering, BadRenderPassContentsWhenCallingCmdExecuteComma
                                             nullptr,  // pNext
                                             VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, &cmdbuff_ii};
     cmdbuff__bi.flags |= VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
-    secondary.begin(&cmdbuff__bi);
-    secondary.end();
+    secondary.Begin(&cmdbuff__bi);
+    secondary.End();
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-flags-06024");
-    vk::CmdExecuteCommands(m_commandBuffer->handle(), 1, &secondary.handle());
+    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary.handle());
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->EndRendering();
-    m_commandBuffer->end();
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, ExecuteCommandsWithNonNullRenderPass) {
@@ -4951,19 +4920,19 @@ TEST_F(NegativeDynamicRendering, ExecuteCommandsWithNonNullRenderPass) {
                                             nullptr,  // pNext
                                             VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, &cmdbuff_ii};
     cmdbuff__bi.flags |= VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
-    secondary.begin(&cmdbuff__bi);
-    secondary.end();
+    secondary.Begin(&cmdbuff__bi);
+    secondary.End();
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-pBeginInfo-06025");
-    vk::CmdExecuteCommands(m_commandBuffer->handle(), 1, &secondary.handle());
+    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary.handle());
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->EndRendering();
-    m_commandBuffer->end();
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, ExecuteCommandsWithMismatchingFlags) {
@@ -5002,19 +4971,19 @@ TEST_F(NegativeDynamicRendering, ExecuteCommandsWithMismatchingFlags) {
                                             nullptr,  // pNext
                                             VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, &cmdbuff_ii};
     cmdbuff__bi.flags |= VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
-    secondary.begin(&cmdbuff__bi);
-    secondary.end();
+    secondary.Begin(&cmdbuff__bi);
+    secondary.End();
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-flags-06026");
-    vk::CmdExecuteCommands(m_commandBuffer->handle(), 1, &secondary.handle());
+    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary.handle());
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->EndRendering();
-    m_commandBuffer->end();
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, ExecuteCommandsWithMismatchingColorAttachmentCount) {
@@ -5053,19 +5022,19 @@ TEST_F(NegativeDynamicRendering, ExecuteCommandsWithMismatchingColorAttachmentCo
                                             nullptr,  // pNext
                                             VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, &cmdbuff_ii};
     cmdbuff__bi.flags |= VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
-    secondary.begin(&cmdbuff__bi);
-    secondary.end();
+    secondary.Begin(&cmdbuff__bi);
+    secondary.End();
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-colorAttachmentCount-06027");
-    vk::CmdExecuteCommands(m_commandBuffer->handle(), 1, &secondary.handle());
+    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary.handle());
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->EndRendering();
-    m_commandBuffer->end();
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, ExecuteCommandsWithMismatchingColorImageViewFormat) {
@@ -5102,19 +5071,19 @@ TEST_F(NegativeDynamicRendering, ExecuteCommandsWithMismatchingColorImageViewFor
     cmdbuff_bi.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT | VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
     cmdbuff_bi.pInheritanceInfo = &cmdbuff_ii;
 
-    secondary.begin(&cmdbuff_bi);
-    secondary.end();
+    secondary.Begin(&cmdbuff_bi);
+    secondary.End();
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-imageView-06028");
-    vk::CmdExecuteCommands(m_commandBuffer->handle(), 1, &secondary.handle());
+    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary.handle());
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->EndRendering();
-    m_commandBuffer->end();
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, ExecuteCommandsWithNullImageView) {
@@ -5149,19 +5118,19 @@ TEST_F(NegativeDynamicRendering, ExecuteCommandsWithNullImageView) {
     cmdbuff_bi.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT | VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
     cmdbuff_bi.pInheritanceInfo = &cmdbuff_ii;
 
-    secondary.begin(&cmdbuff_bi);
-    secondary.end();
+    secondary.Begin(&cmdbuff_bi);
+    secondary.End();
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-imageView-07606");
-    vk::CmdExecuteCommands(m_commandBuffer->handle(), 1, &secondary.handle());
+    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary.handle());
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->EndRendering();
-    m_commandBuffer->end();
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, ExecuteCommandsWithMismatchingDepthStencilImageViewFormat) {
@@ -5171,7 +5140,7 @@ TEST_F(NegativeDynamicRendering, ExecuteCommandsWithMismatchingDepthStencilImage
     AddRequiredExtensions(VK_KHR_SEPARATE_DEPTH_STENCIL_LAYOUTS_EXTENSION_NAME);
     RETURN_IF_SKIP(InitBasicDynamicRendering());
 
-    auto depth_stencil_format = FindSupportedDepthStencilFormat(gpu());
+    auto depth_stencil_format = FindSupportedDepthStencilFormat(Gpu());
     if (depth_stencil_format == VK_FORMAT_D32_SFLOAT_S8_UINT) {
         GTEST_SKIP() << "Insufficient depth-stencil formats supported";
     }
@@ -5210,16 +5179,16 @@ TEST_F(NegativeDynamicRendering, ExecuteCommandsWithMismatchingDepthStencilImage
                                             nullptr,  // pNext
                                             VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, &cmdbuff_ii};
     cmdbuff__bi.flags |= VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
-    secondary.begin(&cmdbuff__bi);
-    secondary.end();
+    secondary.Begin(&cmdbuff__bi);
+    secondary.End();
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-pDepthAttachment-06029");
     m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-pStencilAttachment-06030");
-    vk::CmdExecuteCommands(m_commandBuffer->handle(), 1, &secondary.handle());
+    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary.handle());
     m_errorMonitor->VerifyFound();
 }
 
@@ -5262,15 +5231,15 @@ TEST_F(NegativeDynamicRendering, ExecuteCommandsWithMismatchingViewMask) {
                                             nullptr,  // pNext
                                             VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, &cmdbuff_ii};
     cmdbuff__bi.flags |= VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
-    secondary.begin(&cmdbuff__bi);
-    secondary.end();
+    secondary.Begin(&cmdbuff__bi);
+    secondary.End();
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-viewMask-06031");
-    vk::CmdExecuteCommands(m_commandBuffer->handle(), 1, &secondary.handle());
+    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary.handle());
     m_errorMonitor->VerifyFound();
 }
 
@@ -5317,19 +5286,19 @@ TEST_F(NegativeDynamicRendering, ExecuteCommandsWithMismatchingImageViewRasteriz
                                             nullptr,  // pNext
                                             VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, &cmdbuff_ii};
     cmdbuff__bi.flags |= VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
-    secondary.begin(&cmdbuff__bi);
-    secondary.end();
+    secondary.Begin(&cmdbuff__bi);
+    secondary.End();
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     // color samples mismatch
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-pNext-06035");
-    vk::CmdExecuteCommands(m_commandBuffer->handle(), 1, &secondary.handle());
+    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary.handle());
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->EndRendering();
+    m_command_buffer.EndRendering();
 
-    auto depth_stencil_format = FindSupportedDepthStencilFormat(gpu());
+    auto depth_stencil_format = FindSupportedDepthStencilFormat(Gpu());
     vkt::Image depthStencilImage(*m_device, 32, 32, 1, depth_stencil_format, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
     vkt::ImageView depthStencilImageView = depthStencilImage.CreateView(VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
 
@@ -5342,32 +5311,32 @@ TEST_F(NegativeDynamicRendering, ExecuteCommandsWithMismatchingImageViewRasteriz
     inheritance_rendering_info.colorAttachmentCount = 0;
     inheritance_rendering_info.depthAttachmentFormat = depth_stencil_format;
 
-    secondary.begin(&cmdbuff__bi);
-    secondary.end();
+    secondary.Begin(&cmdbuff__bi);
+    secondary.End();
 
     // depth samples mismatch
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-pNext-06036");
-    vk::CmdExecuteCommands(m_commandBuffer->handle(), 1, &secondary.handle());
+    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary.handle());
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->EndRendering();
+    m_command_buffer.EndRendering();
 
     begin_rendering_info.pDepthAttachment = nullptr;
     begin_rendering_info.pStencilAttachment = &depth_stencil_attachment;
     inheritance_rendering_info.depthAttachmentFormat = VK_FORMAT_UNDEFINED;
     inheritance_rendering_info.stencilAttachmentFormat = depth_stencil_format;
 
-    secondary.begin(&cmdbuff__bi);
-    secondary.end();
+    secondary.Begin(&cmdbuff__bi);
+    secondary.End();
 
     // stencil samples mismatch
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-pNext-06037");
-    vk::CmdExecuteCommands(m_commandBuffer->handle(), 1, &secondary.handle());
+    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary.handle());
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->EndRendering();
+    m_command_buffer.EndRendering();
 
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, ExecuteCommandsWithMismatchingImageViewAttachmentSamples) {
@@ -5427,19 +5396,19 @@ TEST_F(NegativeDynamicRendering, ExecuteCommandsWithMismatchingImageViewAttachme
                                             nullptr,  // pNext
                                             VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, &cmdbuff_ii};
     cmdbuff__bi.flags |= VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
-    secondary.begin(&cmdbuff__bi);
-    secondary.end();
+    secondary.Begin(&cmdbuff__bi);
+    secondary.End();
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     // color samples mismatch
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-pNext-06032");
-    vk::CmdExecuteCommands(m_commandBuffer->handle(), 1, &secondary.handle());
+    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary.handle());
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->EndRendering();
+    m_command_buffer.EndRendering();
 
-    auto depth_stencil_format = FindSupportedDepthStencilFormat(gpu());
+    auto depth_stencil_format = FindSupportedDepthStencilFormat(Gpu());
     vkt::Image depthStencilImage(*m_device, 32, 32, 1, depth_stencil_format, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
     vkt::ImageView depthStencilImageView = depthStencilImage.CreateView(VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
 
@@ -5455,32 +5424,32 @@ TEST_F(NegativeDynamicRendering, ExecuteCommandsWithMismatchingImageViewAttachme
     inheritance_rendering_info.depthAttachmentFormat = depth_stencil_format;
     samples_info.depthStencilAttachmentSamples = VK_SAMPLE_COUNT_2_BIT;
 
-    secondary.begin(&cmdbuff__bi);
-    secondary.end();
+    secondary.Begin(&cmdbuff__bi);
+    secondary.End();
 
     // depth samples mismatch
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-pNext-06033");
-    vk::CmdExecuteCommands(m_commandBuffer->handle(), 1, &secondary.handle());
+    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary.handle());
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->EndRendering();
+    m_command_buffer.EndRendering();
 
     begin_rendering_info.pDepthAttachment = nullptr;
     begin_rendering_info.pStencilAttachment = &depth_stencil_attachment;
     inheritance_rendering_info.depthAttachmentFormat = VK_FORMAT_UNDEFINED;
     inheritance_rendering_info.stencilAttachmentFormat = depth_stencil_format;
 
-    secondary.begin(&cmdbuff__bi);
-    secondary.end();
+    secondary.Begin(&cmdbuff__bi);
+    secondary.End();
 
     // stencil samples mismatch
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->SetDesiredError("VUID-vkCmdExecuteCommands-pNext-06034");
-    vk::CmdExecuteCommands(m_commandBuffer->handle(), 1, &secondary.handle());
+    vk::CmdExecuteCommands(m_command_buffer.handle(), 1, &secondary.handle());
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->EndRendering();
+    m_command_buffer.EndRendering();
 
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, InSecondaryCommandBuffers) {
@@ -5509,10 +5478,10 @@ TEST_F(NegativeDynamicRendering, InSecondaryCommandBuffers) {
     cbbi.pInheritanceInfo = &cbii;
 
     vkt::CommandBuffer secondary(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_SECONDARY);
-    secondary.begin(&cbbi);
+    secondary.Begin(&cbbi);
     vk::CmdBindPipeline(secondary.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
     vk::CmdDraw(secondary.handle(), 3, 1, 0, 0);
-    secondary.end();
+    secondary.End();
 }
 
 TEST_F(NegativeDynamicRendering, CommandBufferInheritanceDepthFormat) {
@@ -5521,7 +5490,7 @@ TEST_F(NegativeDynamicRendering, CommandBufferInheritanceDepthFormat) {
     AddRequiredFeature(vkt::Feature::variableMultisampleRate);
     RETURN_IF_SKIP(InitBasicDynamicRendering());
 
-    auto stencil_format = FindSupportedStencilOnlyFormat(gpu());
+    auto stencil_format = FindSupportedStencilOnlyFormat(Gpu());
     if (stencil_format == VK_FORMAT_UNDEFINED) {
         GTEST_SKIP() << "Couldn't find a stencil only image format";
     }
@@ -5562,38 +5531,38 @@ TEST_F(NegativeDynamicRendering, DeviceGroupRenderArea) {
     begin_rendering_info.colorAttachmentCount = 1;
     begin_rendering_info.pColorAttachments = &color_attachment;
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     m_errorMonitor->SetDesiredError("VUID-VkDeviceGroupRenderPassBeginInfo-offset-06166");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     renderArea = {{0, -1}, {64, 64}};
     m_errorMonitor->SetDesiredError("VUID-VkDeviceGroupRenderPassBeginInfo-offset-06167");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     renderArea = {{0, 0}, {0, 64}};
     m_errorMonitor->SetDesiredError("VUID-VkDeviceGroupRenderPassBeginInfo-extent-08998");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     renderArea = {{0, 0}, {64, 0}};
     m_errorMonitor->SetDesiredError("VUID-VkDeviceGroupRenderPassBeginInfo-extent-08999");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
-    renderArea = {{0, 0}, {m_device->phy().limits_.maxFramebufferWidth + 1, 64}};
+    renderArea = {{0, 0}, {m_device->Physical().limits_.maxFramebufferWidth + 1, 64}};
     m_errorMonitor->SetDesiredError("VUID-VkDeviceGroupRenderPassBeginInfo-offset-06168");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
-    renderArea = {{0, 0}, {64, m_device->phy().limits_.maxFramebufferWidth + 1}};
+    renderArea = {{0, 0}, {64, m_device->Physical().limits_.maxFramebufferWidth + 1}};
     m_errorMonitor->SetDesiredError("VUID-VkDeviceGroupRenderPassBeginInfo-offset-06169");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, MaxFramebufferLayers) {
@@ -5604,16 +5573,16 @@ TEST_F(NegativeDynamicRendering, MaxFramebufferLayers) {
     color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
     VkRenderingInfoKHR begin_rendering_info = vku::InitStructHelper();
-    begin_rendering_info.layerCount = m_device->phy().limits_.maxFramebufferLayers + 1;
+    begin_rendering_info.layerCount = m_device->Physical().limits_.maxFramebufferLayers + 1;
     begin_rendering_info.renderArea = {{0, 0}, {64, 64}};
     begin_rendering_info.colorAttachmentCount = 1;
     begin_rendering_info.pColorAttachments = &color_attachment;
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-layerCount-07817");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, EndRenderingWithIncorrectlyStartedRenderpassInstance) {
@@ -5639,11 +5608,11 @@ TEST_F(NegativeDynamicRendering, EndRenderingWithIncorrectlyStartedRenderpassIns
 
     vkt::Framebuffer fb(*m_device, rp.handle(), 1, &imageView.handle());
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
-    m_commandBuffer->BeginRenderPass(rp.handle(), fb.handle(), 32, 32);
+    m_command_buffer.BeginRenderPass(rp.handle(), fb.handle(), 32, 32);
     m_errorMonitor->SetDesiredError("VUID-vkCmdEndRendering-None-06161");
-    m_commandBuffer->EndRendering();
+    m_command_buffer.EndRendering();
     m_errorMonitor->VerifyFound();
 
     VkFormat color_formats = {VK_FORMAT_R8G8B8A8_UNORM};
@@ -5667,7 +5636,7 @@ TEST_F(NegativeDynamicRendering, EndRenderingWithIncorrectlyStartedRenderpassIns
                                             nullptr,  // pNext
                                             VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, &cmdbuff_ii};
     cmdbuff__bi.flags |= VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
-    secondary.begin(&cmdbuff__bi);
+    secondary.Begin(&cmdbuff__bi);
     m_errorMonitor->SetDesiredError("VUID-vkCmdEndRendering-commandBuffer-06162");
     secondary.EndRendering();
     m_errorMonitor->VerifyFound();
@@ -5691,18 +5660,18 @@ TEST_F(NegativeDynamicRendering, EndRenderpassWithBeginRenderingRenderpassInstan
     begin_rendering_info.layerCount = 1;
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->SetDesiredError("VUID-vkCmdEndRenderPass-None-06170");
-    m_commandBuffer->EndRenderPass();
+    m_command_buffer.EndRenderPass();
     m_errorMonitor->VerifyFound();
 
     VkSubpassEndInfoKHR subpassEndInfo = {VK_STRUCTURE_TYPE_SUBPASS_END_INFO_KHR, nullptr};
 
     vkt::CommandBuffer primary(*m_device, m_command_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY);
 
-    primary.begin();
+    primary.Begin();
     primary.BeginRendering(begin_rendering_info);
     m_errorMonitor->SetDesiredError("VUID-vkCmdEndRenderPass2-None-06171");
     vk::CmdEndRenderPass2KHR(primary.handle(), &subpassEndInfo);
@@ -5722,24 +5691,24 @@ TEST_F(NegativeDynamicRendering, BeginRenderingDisabled) {
     begin_rendering_info.layerCount = 1;
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     m_errorMonitor->SetDesiredError("VUID-vkCmdBeginRendering-dynamicRendering-06446");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->VerifyFound();
 
     if (vulkan_13) {
         m_errorMonitor->SetDesiredError("VUID-vkCmdBeginRendering-dynamicRendering-06446");
-        m_commandBuffer->BeginRendering(begin_rendering_info);
+        m_command_buffer.BeginRendering(begin_rendering_info);
         m_errorMonitor->VerifyFound();
         m_errorMonitor->SetDesiredError("VUID-vkCmdEndRendering-None-06161");
-        m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-        m_commandBuffer->EndRendering();
+        m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+        m_command_buffer.EndRendering();
         m_errorMonitor->VerifyFound();
-        m_commandBuffer->EndRenderPass();
+        m_command_buffer.EndRenderPass();
     }
 
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, PipelineRenderingParameters) {
@@ -5925,22 +5894,22 @@ TEST_F(NegativeDynamicRendering, DynamicColorBlendAttchment) {
     begin_rendering_info.layerCount = 1;
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRendering(begin_rendering_info);
 
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
     VkColorComponentFlags color_component_flags = VK_COLOR_COMPONENT_R_BIT;
-    vk::CmdSetColorWriteMaskEXT(m_commandBuffer->handle(), 1u, 1u, &color_component_flags);
+    vk::CmdSetColorWriteMaskEXT(m_command_buffer.handle(), 1u, 1u, &color_component_flags);
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-firstAttachment-07478");
-    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
+    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
     m_errorMonitor->VerifyFound();
 
     // once set error goes away
-    vk::CmdSetColorWriteMaskEXT(m_commandBuffer->handle(), 0, 1, &color_component_flags);
-    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
+    vk::CmdSetColorWriteMaskEXT(m_command_buffer.handle(), 0, 1, &color_component_flags);
+    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
 
-    m_commandBuffer->EndRendering();
-    m_commandBuffer->end();
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, BeginTwice) {
@@ -5956,13 +5925,13 @@ TEST_F(NegativeDynamicRendering, BeginTwice) {
     begin_rendering_info.colorAttachmentCount = 1;
     begin_rendering_info.pColorAttachments = &color_attachment;
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRendering(begin_rendering_info);
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRendering(begin_rendering_info);
     m_errorMonitor->SetDesiredError("VUID-vkCmdBeginRendering-renderpass");
-    m_commandBuffer->BeginRendering(begin_rendering_info);
-    m_commandBuffer->EndRendering();
+    m_command_buffer.BeginRendering(begin_rendering_info);
+    m_command_buffer.EndRendering();
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, EndTwice) {
@@ -5978,13 +5947,13 @@ TEST_F(NegativeDynamicRendering, EndTwice) {
     begin_rendering_info.colorAttachmentCount = 1;
     begin_rendering_info.pColorAttachments = &color_attachment;
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRendering(begin_rendering_info);
-    m_commandBuffer->EndRendering();
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRendering(begin_rendering_info);
+    m_command_buffer.EndRendering();
     m_errorMonitor->SetDesiredError("VUID-vkCmdEndRendering-renderpass");
-    m_commandBuffer->EndRendering();
+    m_command_buffer.EndRendering();
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, MissingMultisampleState) {
@@ -6011,7 +5980,7 @@ TEST_F(NegativeDynamicRendering, MismatchingDepthAttachmentFormatInSecondaryCmdB
     VkFormat depth_format2 = VK_FORMAT_UNDEFINED;
     for (uint32_t i = 0; i < size(ds_formats); ++i) {
         VkFormatProperties format_props;
-        vk::GetPhysicalDeviceFormatProperties(m_device->phy().handle(), ds_formats[i], &format_props);
+        vk::GetPhysicalDeviceFormatProperties(m_device->Physical().handle(), ds_formats[i], &format_props);
 
         if ((format_props.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) != 0 ||
             (format_props.linearTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) != 0) {
@@ -6049,12 +6018,12 @@ TEST_F(NegativeDynamicRendering, MismatchingDepthAttachmentFormatInSecondaryCmdB
         VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT | VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
     secondary_cmd_buffer_begin_info.pInheritanceInfo = &secondary_cmd_buffer_inheritance_info;
 
-    secondary_cmd_buf.begin(&secondary_cmd_buffer_begin_info);
+    secondary_cmd_buf.Begin(&secondary_cmd_buffer_begin_info);
     vk::CmdBindPipeline(secondary_cmd_buf.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-dynamicRenderingUnusedAttachments-08914");
     vk::CmdDraw(secondary_cmd_buf.handle(), 3u, 1u, 0u, 0u);
     m_errorMonitor->VerifyFound();
-    secondary_cmd_buf.end();
+    secondary_cmd_buf.End();
 }
 
 TEST_F(NegativeDynamicRendering, MissingImageCreateSubsampled) {
@@ -6063,7 +6032,7 @@ TEST_F(NegativeDynamicRendering, MissingImageCreateSubsampled) {
     AddRequiredExtensions(VK_EXT_FRAGMENT_DENSITY_MAP_EXTENSION_NAME);
     RETURN_IF_SKIP(InitBasicDynamicRendering());
 
-    if (!FormatFeaturesAreSupported(gpu(), VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
+    if (!FormatFeaturesAreSupported(Gpu(), VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
                                     VK_FORMAT_FEATURE_FRAGMENT_DENSITY_MAP_BIT_EXT)) {
         GTEST_SKIP() << "VK_FORMAT_FEATURE_FRAGMENT_DENSITY_MAP_BIT_EXT not supported";
     }
@@ -6094,11 +6063,11 @@ TEST_F(NegativeDynamicRendering, MissingImageCreateSubsampled) {
     rendering_info.colorAttachmentCount = 1u;
     rendering_info.pColorAttachments = &color_attachment;
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-imageView-06107");
-    vk::CmdBeginRenderingKHR(m_commandBuffer->handle(), &rendering_info);
+    vk::CmdBeginRenderingKHR(m_command_buffer.handle(), &rendering_info);
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, DynamicRenderingInlineContents) {
@@ -6111,11 +6080,11 @@ TEST_F(NegativeDynamicRendering, DynamicRenderingInlineContents) {
     rendering_info.renderArea = {{0, 0}, {32u, 32u}};
     rendering_info.layerCount = 1u;
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-flags-10012");
-    vk::CmdBeginRenderingKHR(m_commandBuffer->handle(), &rendering_info);
+    vk::CmdBeginRenderingKHR(m_command_buffer.handle(), &rendering_info);
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, IdentitySwizzleColor) {
@@ -6137,16 +6106,16 @@ TEST_F(NegativeDynamicRendering, IdentitySwizzleColor) {
     rendering_info.colorAttachmentCount = 1;
     rendering_info.pColorAttachments = &attachment;
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-colorAttachmentCount-09479");
-    m_commandBuffer->BeginRendering(rendering_info);
+    m_command_buffer.BeginRendering(rendering_info);
     m_errorMonitor->VerifyFound();
 }
 
 TEST_F(NegativeDynamicRendering, IdentitySwizzleDepthStencil) {
     RETURN_IF_SKIP(InitBasicDynamicRendering());
 
-    const VkFormat depth_format = FindSupportedDepthStencilFormat(gpu());
+    const VkFormat depth_format = FindSupportedDepthStencilFormat(Gpu());
 
     vkt::Image image(*m_device, 32, 32, 1, depth_format, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
     image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
@@ -6163,16 +6132,16 @@ TEST_F(NegativeDynamicRendering, IdentitySwizzleDepthStencil) {
     rendering_info.layerCount = 1;
     rendering_info.pDepthAttachment = &attachment;
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pDepthAttachment-09481");
-    m_commandBuffer->BeginRendering(rendering_info);
+    m_command_buffer.BeginRendering(rendering_info);
     m_errorMonitor->VerifyFound();
 
     rendering_info.pStencilAttachment = &attachment;
     rendering_info.pDepthAttachment = nullptr;
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pStencilAttachment-09483");
-    m_commandBuffer->BeginRendering(rendering_info);
+    m_command_buffer.BeginRendering(rendering_info);
     m_errorMonitor->VerifyFound();
 }
 
@@ -6183,7 +6152,7 @@ TEST_F(NegativeDynamicRendering, IdentitySwizzleFragmentShadingRate) {
     VkPhysicalDeviceFragmentShadingRatePropertiesKHR fsr_properties = vku::InitStructHelper();
     GetPhysicalDeviceProperties2(fsr_properties);
 
-    if (!FormatFeaturesAreSupported(gpu(), VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
+    if (!FormatFeaturesAreSupported(Gpu(), VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
                                     VK_FORMAT_FEATURE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR)) {
         GTEST_SKIP() << "format doesn't support FRAGMENT_SHADING_RATE_ATTACHMENT_BIT";
     }
@@ -6203,9 +6172,9 @@ TEST_F(NegativeDynamicRendering, IdentitySwizzleFragmentShadingRate) {
     rendering_info.renderArea = {{0, 0}, {32, 32}};
     rendering_info.layerCount = 1;
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-imageView-09485");
-    m_commandBuffer->BeginRendering(rendering_info);
+    m_command_buffer.BeginRendering(rendering_info);
     m_errorMonitor->VerifyFound();
 }
 
@@ -6213,7 +6182,7 @@ TEST_F(NegativeDynamicRendering, IdentitySwizzleFragmentDensityMap) {
     AddRequiredExtensions(VK_EXT_FRAGMENT_DENSITY_MAP_EXTENSION_NAME);
     RETURN_IF_SKIP(InitBasicDynamicRendering());
 
-    if (!FormatFeaturesAreSupported(gpu(), VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
+    if (!FormatFeaturesAreSupported(Gpu(), VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL,
                                     VK_FORMAT_FEATURE_FRAGMENT_DENSITY_MAP_BIT_EXT)) {
         GTEST_SKIP() << "format doesn't support VK_FORMAT_FEATURE_FRAGMENT_DENSITY_MAP_BIT_EXT";
     }
@@ -6232,16 +6201,16 @@ TEST_F(NegativeDynamicRendering, IdentitySwizzleFragmentDensityMap) {
     rendering_info.renderArea = {{0, 0}, {32, 32}};
     rendering_info.layerCount = 1;
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-imageView-09486");
-    m_commandBuffer->BeginRendering(rendering_info);
+    m_command_buffer.BeginRendering(rendering_info);
     m_errorMonitor->VerifyFound();
 }
 
 TEST_F(NegativeDynamicRendering, ResolveAttachmentUsage) {
     RETURN_IF_SKIP(InitBasicDynamicRendering());
 
-    const VkFormat depth_format = FindSupportedDepthStencilFormat(gpu());
+    const VkFormat depth_format = FindSupportedDepthStencilFormat(Gpu());
 
     VkImageCreateInfo image_create_info = vku::InitStructHelper();
     image_create_info.imageType = VK_IMAGE_TYPE_2D;
@@ -6270,17 +6239,17 @@ TEST_F(NegativeDynamicRendering, ResolveAttachmentUsage) {
     rendering_info.layerCount = 1;
     rendering_info.pDepthAttachment = &attachment;
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-VkRenderingAttachmentInfo-imageView-06865");
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pDepthAttachment-09477");
-    m_commandBuffer->BeginRendering(rendering_info);
+    m_command_buffer.BeginRendering(rendering_info);
     m_errorMonitor->VerifyFound();
 
     rendering_info.pStencilAttachment = &attachment;
     rendering_info.pDepthAttachment = nullptr;
     m_errorMonitor->SetDesiredError("VUID-VkRenderingAttachmentInfo-imageView-06865");
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pStencilAttachment-09478");
-    m_commandBuffer->BeginRendering(rendering_info);
+    m_command_buffer.BeginRendering(rendering_info);
     m_errorMonitor->VerifyFound();
 }
 
@@ -6316,11 +6285,11 @@ TEST_F(NegativeDynamicRendering, BeginRenderingWithRenderPassStriped) {
     rendering_info.pNext = &rp_stripe_info;
     rendering_info.renderArea = {{0, 0}, {stripe_width * stripe_count, stripe_height}};
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-VkRenderPassStripeBeginInfoARM-stripeInfoCount-09450");
-    m_commandBuffer->BeginRendering(rendering_info);
+    m_command_buffer.BeginRendering(rendering_info);
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->end();
+    m_command_buffer.End();
 
     // Stripes overlap
     stripe_count = 8;
@@ -6334,15 +6303,15 @@ TEST_F(NegativeDynamicRendering, BeginRenderingWithRenderPassStriped) {
         stripe_infos[i].stripeArea.extent.height = stripe_height;
     }
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-VkRenderPassStripeInfoARM-stripeArea-09452");
     m_errorMonitor->SetDesiredError("VUID-VkRenderPassStripeInfoARM-stripeArea-09452");
     m_errorMonitor->SetDesiredError("VUID-VkRenderPassStripeBeginInfoARM-stripeArea-09451");
-    m_commandBuffer->BeginRendering(rendering_info);
+    m_command_buffer.BeginRendering(rendering_info);
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->end();
+    m_command_buffer.End();
 
-    // Offset, width and height not multiple of granularity width and height
+    // Offset, width and height not a multiple of granularity width and height
     const uint32_t half_stripe_width = stripe_width / 2;
     for (uint32_t i = 0; i < stripe_count; ++i) {
         stripe_infos[i].stripeArea.offset.x = (i == 1 ? half_stripe_width : stripe_width) * i;
@@ -6351,13 +6320,13 @@ TEST_F(NegativeDynamicRendering, BeginRenderingWithRenderPassStriped) {
         stripe_infos[i].stripeArea.extent.height = stripe_height;
     }
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-VkRenderPassStripeBeginInfoARM-stripeArea-09451");
     m_errorMonitor->SetDesiredError("VUID-VkRenderPassStripeInfoARM-stripeArea-09452");
     m_errorMonitor->SetDesiredError("VUID-VkRenderPassStripeInfoARM-stripeArea-09453");
-    m_commandBuffer->BeginRendering(rendering_info);
+    m_command_buffer.BeginRendering(rendering_info);
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->end();
+    m_command_buffer.End();
 
     const uint32_t non_align_stripe_width = stripe_width - 12;
     rendering_info.renderArea.extent.width = (stripe_width * (stripe_count - 1)) + non_align_stripe_width + 4;
@@ -6368,12 +6337,12 @@ TEST_F(NegativeDynamicRendering, BeginRenderingWithRenderPassStriped) {
         stripe_infos[i].stripeArea.extent.height = stripe_height;
     }
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-VkRenderPassStripeInfoARM-stripeArea-09453");
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-09535");
-    m_commandBuffer->BeginRendering(rendering_info);
+    m_command_buffer.BeginRendering(rendering_info);
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->end();
+    m_command_buffer.End();
 
     rendering_info.renderArea.extent = {stripe_width, stripe_height * stripe_count};
     const uint32_t half_stripe_height = stripe_height / 2;
@@ -6384,13 +6353,13 @@ TEST_F(NegativeDynamicRendering, BeginRenderingWithRenderPassStriped) {
         stripe_infos[i].stripeArea.extent.height = i == 2 ? half_stripe_height : stripe_height;
     }
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-VkRenderPassStripeBeginInfoARM-stripeArea-09451");
     m_errorMonitor->SetDesiredError("VUID-VkRenderPassStripeInfoARM-stripeArea-09454");
     m_errorMonitor->SetDesiredError("VUID-VkRenderPassStripeInfoARM-stripeArea-09455");
-    m_commandBuffer->BeginRendering(rendering_info);
+    m_command_buffer.BeginRendering(rendering_info);
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->end();
+    m_command_buffer.End();
 
     const uint32_t non_align_stripe_height = stripe_height - 12;
     rendering_info.renderArea.extent.height = (stripe_height * (stripe_count - 1)) + non_align_stripe_height + 4;
@@ -6401,12 +6370,12 @@ TEST_F(NegativeDynamicRendering, BeginRenderingWithRenderPassStriped) {
         stripe_infos[i].stripeArea.extent.height = i == 7 ? non_align_stripe_height : stripe_height;
     }
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
     m_errorMonitor->SetDesiredError("VUID-VkRenderPassStripeInfoARM-stripeArea-09455");
     m_errorMonitor->SetDesiredError("VUID-VkRenderingInfo-pNext-09535");
-    m_commandBuffer->BeginRendering(rendering_info);
+    m_command_buffer.BeginRendering(rendering_info);
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, RenderPassStripeInfoQueueSubmit2) {
@@ -6448,10 +6417,10 @@ TEST_F(NegativeDynamicRendering, RenderPassStripeInfoQueueSubmit2) {
 
     VkCommandBufferBeginInfo cmd_begin = vku::InitStructHelper();
 
-    cmd_buffer.begin(&cmd_begin);
+    cmd_buffer.Begin(&cmd_begin);
     cmd_buffer.BeginRendering(rendering_info);
     cmd_buffer.EndRendering();
-    cmd_buffer.end();
+    cmd_buffer.End();
 
     VkCommandBufferSubmitInfo cb_submit_info = vku::InitStructHelper();
     cb_submit_info.commandBuffer = cmd_buffer.handle();
@@ -6520,14 +6489,14 @@ TEST_F(NegativeDynamicRendering, PipelineLegacyDithering) {
     begin_rendering_info.layerCount = 1;
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRendering(begin_rendering_info);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRendering(begin_rendering_info);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-09643");
-    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
+    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->EndRendering();
-    m_commandBuffer->end();
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
 }
 
 TEST_F(NegativeDynamicRendering, RenderPassLegacyDithering) {
@@ -6553,12 +6522,12 @@ TEST_F(NegativeDynamicRendering, RenderPassLegacyDithering) {
     begin_rendering_info.layerCount = 1;
     begin_rendering_info.renderArea = {{0, 0}, {1, 1}};
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRendering(begin_rendering_info);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRendering(begin_rendering_info);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-09642");
-    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
+    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
     m_errorMonitor->VerifyFound();
-    m_commandBuffer->EndRendering();
-    m_commandBuffer->end();
+    m_command_buffer.EndRendering();
+    m_command_buffer.End();
 }

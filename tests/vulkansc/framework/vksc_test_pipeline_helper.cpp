@@ -17,6 +17,7 @@
 
 #include "vksc_test_pipeline_helper.h"
 #include "vksc_render_framework.h"
+#include "framework/shader_helper.h"
 
 namespace vksc {
 
@@ -39,10 +40,10 @@ void PipelineBuilder::AddStage(const Shader& shader) {
         std::vector<uint32_t> spv;
         switch (shader.source_type_) {
             case Shader::SourceType::ASM:
-                framework_.ASMtoSPV(shader.spirv_env_, 0, shader.source_, spv);
+                ASMtoSPV(shader.spirv_env_, 0, shader.source_, spv);
                 break;
             case Shader::SourceType::GLSL:
-                framework_.GLSLtoSPV(&device_.phy().limits_, shader.stage_, shader.source_, spv, shader.spirv_env_);
+                GLSLtoSPV(framework_.PhysicalDeviceProps().limits, shader.stage_, shader.source_, spv, shader.spirv_env_);
                 break;
         }
         spirv_data_.emplace_back(std::move(spv));
@@ -206,7 +207,7 @@ vksc::Pipeline GraphicsPipelineBuilder::CreatePipeline(vkt::Device& device) {
     PipelineBuilder::CreatePipeline(device);
 
     pipeline_ci.layout = pipeline_layout_;
-    pipeline_ci.renderPass = framework_.renderPass();
+    pipeline_ci.renderPass = framework_.RenderPass();
 
     VkPipeline pipeline = VK_NULL_HANDLE;
     vksc::CreateGraphicsPipelines(device.handle(), pipeline_cache_.handle(), 1, &pipeline_ci, nullptr, &pipeline);

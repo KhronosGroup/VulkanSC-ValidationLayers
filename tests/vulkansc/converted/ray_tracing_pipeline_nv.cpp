@@ -43,7 +43,6 @@ TEST_F(NegativeRayTracingPipelineNV, BasicUsage) {
     VkPipeline pipeline = VK_NULL_HANDLE;
     VkPipelineShaderStageCreateInfo stage_create_info = vku::InitStructHelper();
     stage_create_info.stage = VK_SHADER_STAGE_RAYGEN_BIT_NV;
-    ;
     stage_create_info.module = rgen_shader.handle();
     stage_create_info.pName = "main";
     VkRayTracingShaderGroupCreateInfoNV group_create_info = vku::InitStructHelper();
@@ -175,8 +174,8 @@ TEST_F(NegativeRayTracingPipelineNV, BindPoint) {
     CreatePipelineHelper pipe(*this);
     pipe.CreateGraphicsPipeline();
 
-    m_commandBuffer->begin();
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_RAY_TRACING_NV, pipe.Handle());
+    m_command_buffer.Begin();
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_RAY_TRACING_NV, pipe.Handle());
 
     m_errorMonitor->VerifyFound();
 }

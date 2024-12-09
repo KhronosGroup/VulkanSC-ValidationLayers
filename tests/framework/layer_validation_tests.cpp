@@ -324,8 +324,6 @@ void VkLayerTest::Init(VkPhysicalDeviceFeatures *features, VkPhysicalDeviceFeatu
     RETURN_IF_SKIP(InitState(features, features2));
 }
 
-vkt::CommandBuffer *VkLayerTest::CommandBuffer() { return m_commandBuffer; }
-
 VkLayerTest::VkLayerTest() {
 #if !defined(VK_USE_PLATFORM_ANDROID_KHR)
     m_instance_extension_names.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
@@ -341,6 +339,12 @@ VkLayerTest::VkLayerTest() {
 
     if (InstanceLayerSupported(kSynchronization2LayerName)) {
         instance_layers_.push_back(kSynchronization2LayerName);
+    }
+
+    // If self validation is detected (ex. in CI) then we will add it.
+    // It is VERY important this is the last layer.
+    if (InstanceLayerSupported("VK_LAYER_DEV_self_validation")) {
+        instance_layers_.push_back("VK_LAYER_DEV_self_validation");
     }
 
     app_info_ = vku::InitStructHelper();
@@ -401,18 +405,18 @@ void VkLayerTest::SetTargetApiVersion(APIVersion target_api_version) {
 
 APIVersion VkLayerTest::DeviceValidationVersion() const {
     // The validation layers assume the version we are validating to is the apiVersion unless the device apiVersion is lower
-    return std::min(m_target_api_version, APIVersion(physDevProps().apiVersion));
+    return std::min(m_target_api_version, APIVersion(PhysicalDeviceProps().apiVersion));
 }
 
 template <>
 VkPhysicalDeviceFeatures2 VkLayerTest::GetPhysicalDeviceFeatures2(VkPhysicalDeviceFeatures2 &features2) {
     if (DeviceValidationVersion() >= VK_API_VERSION_1_1) {
-        vk::GetPhysicalDeviceFeatures2(gpu(), &features2);
+        vk::GetPhysicalDeviceFeatures2(Gpu(), &features2);
     } else {
         auto vkGetPhysicalDeviceFeatures2KHR = reinterpret_cast<PFN_vkGetPhysicalDeviceFeatures2KHR>(
             vk::GetInstanceProcAddr(instance(), "vkGetPhysicalDeviceFeatures2KHR"));
         assert(vkGetPhysicalDeviceFeatures2KHR);
-        vkGetPhysicalDeviceFeatures2KHR(gpu(), &features2);
+        vkGetPhysicalDeviceFeatures2KHR(Gpu(), &features2);
     }
     return features2;
 }
@@ -420,12 +424,12 @@ VkPhysicalDeviceFeatures2 VkLayerTest::GetPhysicalDeviceFeatures2(VkPhysicalDevi
 template <>
 VkPhysicalDeviceProperties2 VkLayerTest::GetPhysicalDeviceProperties2(VkPhysicalDeviceProperties2 &props2) {
     if (DeviceValidationVersion() >= VK_API_VERSION_1_1) {
-        vk::GetPhysicalDeviceProperties2(gpu(), &props2);
+        vk::GetPhysicalDeviceProperties2(Gpu(), &props2);
     } else {
         auto vkGetPhysicalDeviceProperties2KHR = reinterpret_cast<PFN_vkGetPhysicalDeviceProperties2KHR>(
             vk::GetInstanceProcAddr(instance(), "vkGetPhysicalDeviceProperties2KHR"));
         assert(vkGetPhysicalDeviceProperties2KHR);
-        vkGetPhysicalDeviceProperties2KHR(gpu(), &props2);
+        vkGetPhysicalDeviceProperties2KHR(Gpu(), &props2);
     }
     return props2;
 }
@@ -545,7 +549,7 @@ bool VkLayerTest::LoadDeviceProfileLayer(PFN_VkSetPhysicalDeviceProperties2EXT &
     return true;
 }
 
-void print_android(const char *c) {
+void PrintAndroid(const char *c) {
 #ifdef VK_USE_PLATFORM_ANDROID_KHR
     __android_log_print(ANDROID_LOG_INFO, "VulkanLayerValidationTests", "%s", c);
 #endif  // VK_USE_PLATFORM_ANDROID_KHR

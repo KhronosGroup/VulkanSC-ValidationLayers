@@ -1414,11 +1414,11 @@ bool CoreChecks::PreCallValidateCmdExecuteCommands(VkCommandBuffer commandBuffer
                         const auto subresource = image_state->subresource_encoder.Decode(index);
                         // VU being worked on https://gitlab.khronos.org/vulkan/vulkan/-/issues/2456
                         skip |= LogError("UNASSIGNED-vkCmdExecuteCommands-commandBuffer-00001", objlist, cb_loc,
-                                         "was executed using %s (subresource: aspectMask 0x%x array layer %" PRIu32
+                                         "was executed using %s (subresource: aspectMask %s, array layer %" PRIu32
                                          ", mip level %" PRIu32 ") which expects layout %s--instead, image %s layout is %s.",
-                                         FormatHandle(image).c_str(), subresource.aspectMask, subresource.arrayLayer,
-                                         subresource.mipLevel, string_VkImageLayout(sub_layout), layout_type,
-                                         string_VkImageLayout(cb_layout));
+                                         FormatHandle(image).c_str(), string_VkImageAspectFlags(subresource.aspectMask).c_str(),
+                                         subresource.arrayLayer, subresource.mipLevel, string_VkImageLayout(sub_layout),
+                                         layout_type, string_VkImageLayout(cb_layout));
                     }
                 }
             }
@@ -1883,7 +1883,7 @@ bool CoreChecks::PreCallValidateCmdEndDebugUtilsLabelEXT(VkCommandBuffer command
         return skip;
     }
 
-    if (cb_state->LabelStackDepth() < 1) {
+    if (cb_state->GetLabelStackDepth() < 1) {
         skip |= LogError("VUID-vkCmdEndDebugUtilsLabelEXT-commandBuffer-01913", commandBuffer, error_obj.location,
                          "called without a corresponding vkCmdBeginDebugUtilsLabelEXT first");
     }

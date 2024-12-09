@@ -16,15 +16,15 @@ TEST_F(VkSCPositiveRemoved, SetNegativeViewport) {
 
     RETURN_IF_SKIP(Init());
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     std::vector<VkViewport> test_cases = {{0.0, 0.0, 64.0, 0.0, 0.0, 1.0}, {0.0, 0.0, 64.0, -1.0, 0.0, 1.0}};
 
     for (const auto &test_case : test_cases) {
-        vksc::CmdSetViewport(m_commandBuffer->handle(), 0, 1, &test_case);
+        vksc::CmdSetViewport(m_command_buffer.handle(), 0, 1, &test_case);
     }
 
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(VkSCPositiveRemoved, CopyBetween2DAnd3DImage) {
@@ -51,7 +51,7 @@ TEST_F(VkSCPositiveRemoved, CopyBetween2DAnd3DImage) {
 
     VkImageCopy region{};
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     region.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 2, 1, 4};
     region.srcOffset = {3, 4, 0};
@@ -59,7 +59,7 @@ TEST_F(VkSCPositiveRemoved, CopyBetween2DAnd3DImage) {
     region.dstOffset = {2, 1, 1};
     region.extent = {5, 3, 4};
 
-    vksc::CmdCopyImage(m_commandBuffer->handle(), image2D.handle(), VK_IMAGE_LAYOUT_GENERAL, image3D.handle(),
+    vksc::CmdCopyImage(m_command_buffer.handle(), image2D.handle(), VK_IMAGE_LAYOUT_GENERAL, image3D.handle(),
                        VK_IMAGE_LAYOUT_GENERAL, 1, &region);
 
     region.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
@@ -68,10 +68,10 @@ TEST_F(VkSCPositiveRemoved, CopyBetween2DAnd3DImage) {
     region.dstOffset = {4, 4, 0};
     region.extent = {8, 8, 5};
 
-    vksc::CmdCopyImage(m_commandBuffer->handle(), image3D.handle(), VK_IMAGE_LAYOUT_GENERAL, image2D.handle(),
+    vksc::CmdCopyImage(m_command_buffer.handle(), image3D.handle(), VK_IMAGE_LAYOUT_GENERAL, image2D.handle(),
                        VK_IMAGE_LAYOUT_GENERAL, 1, &region);
 
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(VkSCPositiveRemoved, CopyImagePlane) {
@@ -108,33 +108,33 @@ TEST_F(VkSCPositiveRemoved, CopyImagePlane) {
     region.dstOffset = {0, 0, 0};
     region.extent = {32, 32, 1};
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
     region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_PLANE_0_BIT;
 
-    vksc::CmdCopyImage(m_commandBuffer->handle(), imageR8.handle(), VK_IMAGE_LAYOUT_GENERAL, imageNV12.handle(),
+    vksc::CmdCopyImage(m_command_buffer.handle(), imageR8.handle(), VK_IMAGE_LAYOUT_GENERAL, imageNV12.handle(),
                        VK_IMAGE_LAYOUT_GENERAL, 1, &region);
 
     region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_PLANE_0_BIT;
     region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 
-    vksc::CmdCopyImage(m_commandBuffer->handle(), imageNV12.handle(), VK_IMAGE_LAYOUT_GENERAL, imageR8.handle(),
+    vksc::CmdCopyImage(m_command_buffer.handle(), imageNV12.handle(), VK_IMAGE_LAYOUT_GENERAL, imageR8.handle(),
                        VK_IMAGE_LAYOUT_GENERAL, 1, &region);
 
     region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_PLANE_1_BIT;
 
-    vksc::CmdCopyImage(m_commandBuffer->handle(), imageR8G8.handle(), VK_IMAGE_LAYOUT_GENERAL, imageNV12.handle(),
+    vksc::CmdCopyImage(m_command_buffer.handle(), imageR8G8.handle(), VK_IMAGE_LAYOUT_GENERAL, imageNV12.handle(),
                        VK_IMAGE_LAYOUT_GENERAL, 1, &region);
 
     region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_PLANE_1_BIT;
     region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 
-    vksc::CmdCopyImage(m_commandBuffer->handle(), imageNV12.handle(), VK_IMAGE_LAYOUT_GENERAL, imageR8G8.handle(),
+    vksc::CmdCopyImage(m_command_buffer.handle(), imageNV12.handle(), VK_IMAGE_LAYOUT_GENERAL, imageR8G8.handle(),
                        VK_IMAGE_LAYOUT_GENERAL, 1, &region);
 
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(VkSCPositiveRemoved, AllocateDescriptorSetsExceedsCapacity) {

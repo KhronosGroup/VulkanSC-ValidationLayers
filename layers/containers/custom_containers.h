@@ -23,9 +23,7 @@
 #include <cassert>
 #include <limits>
 #include <memory>
-#include <map>
 #include <unordered_map>
-#include <set>
 #include <algorithm>
 #include <iterator>
 #include <type_traits>
@@ -35,6 +33,8 @@
 #ifdef USE_ROBIN_HOOD_HASHING
 #include "robin_hood.h"
 #else
+#include <map>
+#include <set>
 #include <unordered_set>
 #endif
 
@@ -1054,6 +1054,12 @@ template <typename T>
 bool Contains(const std::vector<T> &v, const T &value) {
     return std::find(v.cbegin(), v.cend(), value) != v.cend();
 }
+// Overload for the case of shared_ptr<const T> and shared_ptr<T>.
+// They are convertible but conversion is not performed during template type deduction.
+template <typename T>
+bool Contains(const std::vector<std::shared_ptr<const T>> &v, const std::shared_ptr<T> &value) {
+    return std::find(v.cbegin(), v.cend(), value) != v.cend();
+}
 
 //
 // if (auto* thing = vvl::Find(map, key)) { thing->jump(); }
@@ -1067,6 +1073,28 @@ template <typename Container, typename Key = typename Container::key_type, typen
 const Value *Find(const Container &container, const Key &key) {
     auto it = container.find(key);
     return (it != container.cend()) ? &it->second : nullptr;
+}
+
+//
+// auto& thing = vvl::FindExisting(map, key);
+//
+template <typename Container, typename Key = typename Container::key_type, typename Value = typename Container::mapped_type>
+Value &FindExisting(Container &container, const Key &key) {
+    auto it = container.find(key);
+    assert(it != container.end());
+    return it->second;
+}
+
+template <typename Container, typename Key = typename Container::key_type, typename Value = typename Container::mapped_type>
+const Value &FindExisting(const Container &container, const Key &key) {
+    auto it = container.find(key);
+    assert(it != container.end());
+    return it->second;
+}
+
+template <typename T>
+void Append(std::vector<T> &dst, const std::vector<T> &src) {
+    dst.insert(dst.end(), src.begin(), src.end());
 }
 
 // EraseIf is not implemented as std::erase(std::remove_if(...), ...) for two reasons:
@@ -1084,6 +1112,16 @@ typename Container::size_type EraseIf(Container &c, Predicate &&p) {
         }
     }
     return before_size - c.size();
+}
+
+// Replace with the std version after VVL switches to C++20.
+// https://en.cppreference.com/w/cpp/container/vector/erase2
+template <typename T, typename Pred>
+typename std::vector<T>::size_type erase_if(std::vector<T> &c, Pred pred) {
+    auto it = std::remove_if(c.begin(), c.end(), pred);
+    auto r = c.end() - it;
+    c.erase(it, c.end());
+    return r;
 }
 
 template <typename T>

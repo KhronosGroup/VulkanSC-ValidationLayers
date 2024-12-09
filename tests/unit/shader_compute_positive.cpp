@@ -23,9 +23,9 @@ TEST_F(PositiveShaderCompute, WorkGroupSizePrecedenceOverLocalSize) {
 
     RETURN_IF_SKIP(Init());
 
-    uint32_t x_size_limit = m_device->phy().limits_.maxComputeWorkGroupSize[0];
-    uint32_t y_size_limit = m_device->phy().limits_.maxComputeWorkGroupSize[1];
-    uint32_t z_size_limit = m_device->phy().limits_.maxComputeWorkGroupSize[2];
+    uint32_t x_size_limit = m_device->Physical().limits_.maxComputeWorkGroupSize[0];
+    uint32_t y_size_limit = m_device->Physical().limits_.maxComputeWorkGroupSize[1];
+    uint32_t z_size_limit = m_device->Physical().limits_.maxComputeWorkGroupSize[2];
 
     std::stringstream spv_source;
     spv_source << R"(
@@ -64,7 +64,7 @@ TEST_F(PositiveShaderCompute, WorkGroupSizeSpecConstantUnder) {
 
     RETURN_IF_SKIP(Init());
 
-    uint32_t x_size_limit = m_device->phy().limits_.maxComputeWorkGroupSize[0];
+    uint32_t x_size_limit = m_device->Physical().limits_.maxComputeWorkGroupSize[0];
 
     std::stringstream spv_source;
     spv_source << R"(
@@ -157,7 +157,7 @@ TEST_F(PositiveShaderCompute, WorkGroupSizeLocalSizeIdSpecConstant) {
     features13.maintenance4 = VK_TRUE;  // required to be supported in 1.3
     RETURN_IF_SKIP(InitState(nullptr, &features13));
 
-    uint32_t x_size_limit = m_device->phy().limits_.maxComputeWorkGroupSize[0];
+    uint32_t x_size_limit = m_device->Physical().limits_.maxComputeWorkGroupSize[0];
 
     // layout(local_size_x_id = 18, local_size_z_id = 19) in;
     // layout(local_size_x = 32) in;
@@ -215,7 +215,7 @@ TEST_F(PositiveShaderCompute, WorkGroupSizePrecedenceOverLocalSizeId) {
     features13.maintenance4 = VK_TRUE;  // required to be supported in 1.3
     RETURN_IF_SKIP(InitState(nullptr, &features13));
 
-    uint32_t x_size_limit = m_device->phy().limits_.maxComputeWorkGroupSize[0];
+    uint32_t x_size_limit = m_device->Physical().limits_.maxComputeWorkGroupSize[0];
 
     std::stringstream spv_source;
     spv_source << R"(
@@ -254,7 +254,7 @@ TEST_F(PositiveShaderCompute, SharedMemorySpecConstantOp) {
 
     RETURN_IF_SKIP(Init());
 
-    const uint32_t max_shared_memory_size = m_device->phy().limits_.maxComputeSharedMemorySize;
+    const uint32_t max_shared_memory_size = m_device->Physical().limits_.maxComputeSharedMemorySize;
     const uint32_t max_shared_ints = max_shared_memory_size / 4;
 
     if (max_shared_ints < 16 * 7) {
@@ -312,12 +312,8 @@ TEST_F(PositiveShaderCompute, ZeroInitializeWorkgroupMemoryFeature) {
     TEST_DESCRIPTION("Enable and use shaderZeroInitializeWorkgroupMemory feature");
 
     AddRequiredExtensions(VK_KHR_ZERO_INITIALIZE_WORKGROUP_MEMORY_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-
-    VkPhysicalDeviceZeroInitializeWorkgroupMemoryFeaturesKHR zero_initialize_work_group_memory_features = vku::InitStructHelper();
-    GetPhysicalDeviceFeatures2(zero_initialize_work_group_memory_features);
-
-    RETURN_IF_SKIP(InitState(nullptr, &zero_initialize_work_group_memory_features));
+    AddRequiredFeature(vkt::Feature::shaderZeroInitializeWorkgroupMemory);
+    RETURN_IF_SKIP(Init());
 
     const char *spv_source = R"(
                OpCapability Shader

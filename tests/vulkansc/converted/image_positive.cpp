@@ -57,12 +57,12 @@ TEST_F(PositiveImage, OwnershipTranfersImage) {
     VkFlags image_use = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
     vkt::Image image(*m_device, 32, 32, 1, VK_FORMAT_B8G8R8A8_UNORM, image_use);
     image.SetLayout(VK_IMAGE_LAYOUT_GENERAL);
-    auto image_subres = image.subresource_range(VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1);
-    auto image_barrier = image.image_memory_barrier(0, 0, image.Layout(), image.Layout(), image_subres);
+    auto image_subres = image.SubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1);
+    auto image_barrier = image.ImageMemoryBarrier(0, 0, image.Layout(), image.Layout(), image_subres);
     image_barrier.srcQueueFamilyIndex = m_device->graphics_queue_node_index_;
     image_barrier.dstQueueFamilyIndex = no_gfx_queue->family_index;
 
-    ValidOwnershipTransfer(m_errorMonitor, m_default_queue, m_commandBuffer, no_gfx_queue, &no_gfx_cb,
+    ValidOwnershipTransfer(m_errorMonitor, m_default_queue, m_command_buffer, no_gfx_queue, no_gfx_cb,
                            VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, nullptr, &image_barrier);
 
     // Change layouts while changing ownership
@@ -76,7 +76,7 @@ TEST_F(PositiveImage, OwnershipTranfersImage) {
         image_barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     }
 
-    ValidOwnershipTransfer(m_errorMonitor, no_gfx_queue, &no_gfx_cb, m_default_queue, m_commandBuffer,
+    ValidOwnershipTransfer(m_errorMonitor, no_gfx_queue, no_gfx_cb, m_default_queue, m_command_buffer,
                            VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, nullptr, &image_barrier);
 }
 
@@ -87,7 +87,7 @@ TEST_F(PositiveImage, AliasedMemoryTracking) {
     RETURN_IF_SKIP(Init());
 
     VkDeviceSize buff_size = 256;
-    auto buffer = std::make_unique<vkt::Buffer>(*m_device, vkt::Buffer::create_info(buff_size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT),
+    auto buffer = std::make_unique<vkt::Buffer>(*m_device, vkt::Buffer::CreateInfo(buff_size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT),
                                                 vkt::no_mem);
 
     VkImageCreateInfo image_create_info = vku::InitStructHelper();
@@ -104,25 +104,25 @@ TEST_F(PositiveImage, AliasedMemoryTracking) {
     image_create_info.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     vkt::Image image(*m_device, image_create_info, vkt::no_mem);
 
-    const auto buffer_memory_requirements = buffer->memory_requirements();
-    const auto image_memory_requirements = image.memory_requirements();
+    const auto buffer_memory_requirements = buffer->MemoryRequirements();
+    const auto image_memory_requirements = image.MemoryRequirements();
 
     vkt::DeviceMemory mem;
     VkMemoryAllocateInfo alloc_info = vku::InitStructHelper();
     alloc_info.allocationSize = (std::max)(buffer_memory_requirements.size, image_memory_requirements.size);
     bool has_memtype =
-        m_device->phy().set_memory_type(buffer_memory_requirements.memoryTypeBits & image_memory_requirements.memoryTypeBits,
-                                        &alloc_info, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+        m_device->Physical().SetMemoryType(buffer_memory_requirements.memoryTypeBits & image_memory_requirements.memoryTypeBits,
+                                           &alloc_info, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
     if (!has_memtype) {
         GTEST_SKIP() << "Failed to find a host visible memory type for both a buffer and an image";
     }
     mem.init(*m_device, alloc_info);
 
-    auto pData = mem.map();
+    auto pData = mem.Map();
     std::memset(pData, 0xCADECADE, static_cast<size_t>(buff_size));
-    mem.unmap();
+    mem.Unmap();
 
-    buffer->bind_memory(mem, 0);
+    buffer->BindMemory(mem, 0);
 
     // NOW, destroy the buffer. Obviously, the resource no longer occupies this
     // memory. In fact, it was never used by the GPU.
@@ -131,7 +131,7 @@ TEST_F(PositiveImage, AliasedMemoryTracking) {
     m_device->Wait();
 
     // VALIDATION FAILURE:
-    image.bind_memory(mem, 0);
+    image.BindMemory(mem, 0);
 }
 
 TEST_F(PositiveImage, CreateImageViewFollowsParameterCompatibilityRequirements) {
@@ -169,7 +169,7 @@ TEST_F(PositiveImage, BarrierLayoutToImageUsage) {
     TEST_DESCRIPTION("Ensure barriers' new and old VkImageLayout are compatible with their images' VkImageUsageFlags");
 
     RETURN_IF_SKIP(Init());
-    auto depth_format = FindSupportedDepthStencilFormat(gpu());
+    auto depth_format = FindSupportedDepthStencilFormat(Gpu());
     InitRenderTarget();
 
     VkImageMemoryBarrier img_barrier = vku::InitStructHelper();
@@ -210,25 +210,25 @@ TEST_F(PositiveImage, BarrierLayoutToImageUsage) {
         };
         const uint32_t layout_count = sizeof(buffer_layouts) / sizeof(buffer_layouts[0]);
 
-        m_commandBuffer->begin();
+        m_command_buffer.Begin();
         for (uint32_t i = 0; i < layout_count; ++i) {
             img_barrier.image = buffer_layouts[i].image_obj.handle();
-            const VkImageUsageFlags usage = buffer_layouts[i].image_obj.usage();
+            const VkImageUsageFlags usage = buffer_layouts[i].image_obj.Usage();
             img_barrier.subresourceRange.aspectMask = (usage == VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
                                                           ? (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT)
                                                           : VK_IMAGE_ASPECT_COLOR_BIT;
 
             img_barrier.oldLayout = buffer_layouts[i].old_layout;
             img_barrier.newLayout = buffer_layouts[i].new_layout;
-            vk::CmdPipelineBarrier(m_commandBuffer->handle(), VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, 0, 0,
+            vk::CmdPipelineBarrier(m_command_buffer.handle(), VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, 0, 0,
                                    nullptr, 0, nullptr, 1, &img_barrier);
 
             img_barrier.oldLayout = buffer_layouts[i].new_layout;
             img_barrier.newLayout = buffer_layouts[i].old_layout;
-            vk::CmdPipelineBarrier(m_commandBuffer->handle(), VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, 0, 0,
+            vk::CmdPipelineBarrier(m_command_buffer.handle(), VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, 0, 0,
                                    nullptr, 0, nullptr, 1, &img_barrier);
         }
-        m_commandBuffer->end();
+        m_command_buffer.End();
 
         img_barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
         img_barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
@@ -237,12 +237,9 @@ TEST_F(PositiveImage, BarrierLayoutToImageUsage) {
 
 TEST_F(PositiveImage, FormatCompatibility) {
     TEST_DESCRIPTION("Test format compatibility");
-
     AddRequiredExtensions(VK_KHR_IMAGE_FORMAT_LIST_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-
-    RETURN_IF_SKIP(InitState());
+    RETURN_IF_SKIP(Init());
 
     VkFormat format = VK_FORMAT_R12X4G12X4_UNORM_2PACK16;
 
@@ -262,11 +259,7 @@ TEST_F(PositiveImage, FormatCompatibility) {
     image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
     image_create_info.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
     image_create_info.flags = 0;
-
-    VkImage image;
-    vk::CreateImage(device(), &image_create_info, nullptr, &image);
-
-    vk::DestroyImage(device(), image, nullptr);
+    vkt::Image image(*m_device, image_create_info);
 }
 
 TEST_F(PositiveImage, MultpilePNext) {
@@ -349,7 +342,7 @@ TEST_F(PositiveImage, FramebufferFrom3DImage) {
 TEST_F(PositiveImage, SubresourceLayout) {
     RETURN_IF_SKIP(Init());
 
-    auto image_ci = vkt::Image::create_info();
+    auto image_ci = vkt::Image::CreateInfo();
     image_ci.imageType = VK_IMAGE_TYPE_2D;
     image_ci.extent.width = 64;
     image_ci.extent.height = 64;
@@ -360,29 +353,29 @@ TEST_F(PositiveImage, SubresourceLayout) {
     image_ci.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     vkt::Image image(*m_device, image_ci);
 
-    m_commandBuffer->begin();
-    const auto subresource_range = image.subresource_range(VK_IMAGE_ASPECT_COLOR_BIT);
-    auto barrier = image.image_memory_barrier(0, VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
-                                              VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, subresource_range);
-    vk::CmdPipelineBarrier(m_commandBuffer->handle(), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0,
+    m_command_buffer.Begin();
+    const auto subresource_range = image.SubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT);
+    auto barrier = image.ImageMemoryBarrier(0, VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED,
+                                            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, subresource_range);
+    vk::CmdPipelineBarrier(m_command_buffer.handle(), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0,
                            nullptr, 0, nullptr, 1, &barrier);
     barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
     barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
     barrier.subresourceRange.baseMipLevel = 1;
     barrier.subresourceRange.levelCount = 1;
-    vk::CmdPipelineBarrier(m_commandBuffer->handle(), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0,
+    vk::CmdPipelineBarrier(m_command_buffer.handle(), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0,
                            nullptr, 0, nullptr, 1, &barrier);
     barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
     barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-    vk::CmdPipelineBarrier(m_commandBuffer->handle(), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0,
+    vk::CmdPipelineBarrier(m_command_buffer.handle(), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0,
                            nullptr, 0, nullptr, 1, &barrier);
     barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
     barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
     barrier.subresourceRange.baseMipLevel = 2;
-    vk::CmdPipelineBarrier(m_commandBuffer->handle(), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0,
+    vk::CmdPipelineBarrier(m_command_buffer.handle(), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0,
                            nullptr, 0, nullptr, 1, &barrier);
-    m_commandBuffer->end();
-    m_default_queue->Submit(*m_commandBuffer);
+    m_command_buffer.End();
+    m_default_queue->Submit(m_command_buffer);
     m_default_queue->Wait();
 }
 
@@ -463,14 +456,10 @@ TEST_F(PositiveImage, ImagelessLayoutTracking) {
 
     vk::BindImageMemory2(device(), 1, &bind_info);
 
-    uint32_t swapchain_images_count = 0;
-    vk::GetSwapchainImagesKHR(device(), m_swapchain, &swapchain_images_count, nullptr);
-    std::vector<VkImage> swapchain_images;
-    swapchain_images.resize(swapchain_images_count);
-    vk::GetSwapchainImagesKHR(device(), m_swapchain, &swapchain_images_count, swapchain_images.data());
-    uint32_t current_buffer;
+    const std::vector<VkImage> swapchain_images = m_swapchain.GetImages();
+
     vkt::Semaphore image_acquired(*m_device);
-    vk::AcquireNextImageKHR(device(), m_swapchain, kWaitTimeout, image_acquired, VK_NULL_HANDLE, &current_buffer);
+    const uint32_t current_buffer = m_swapchain.AcquireNextImage(image_acquired, kWaitTimeout);
 
     vkt::ImageView imageView = image.CreateView();
     VkFramebufferAttachmentImageInfoKHR framebufferAttachmentImageInfo = {VK_STRUCTURE_TYPE_FRAMEBUFFER_ATTACHMENT_IMAGE_INFO_KHR,
@@ -503,21 +492,15 @@ TEST_F(PositiveImage, ImagelessLayoutTracking) {
                                                VkRect2D{{0, 0}, {attachmentWidth, attachmentHeight}}, 0u, nullptr);
 
     // RenderPass should change the image layout of both the swapchain image and the aliased image to PRESENT_SRC_KHR
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRenderPass(renderPassBeginInfo);
-    m_commandBuffer->EndRenderPass();
-    m_commandBuffer->end();
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(renderPassBeginInfo);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
 
-    m_default_queue->Submit(*m_commandBuffer);
+    m_default_queue->Submit(m_command_buffer);
     m_default_queue->Wait();
 
-    VkPresentInfoKHR present = vku::InitStructHelper();
-    present.waitSemaphoreCount = 1;
-    present.pWaitSemaphores = &image_acquired.handle();
-    present.pSwapchains = &m_swapchain;
-    present.pImageIndices = &current_buffer;
-    present.swapchainCount = 1;
-    vk::QueuePresentKHR(m_default_queue->handle(), &present);
+    m_default_queue->Present(m_swapchain, current_buffer, image_acquired);
     m_default_queue->Wait();
 }
 
@@ -545,7 +528,7 @@ TEST_F(PositiveImage, ExtendedUsageWithDifferentFormatViews) {
         VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 
     VkImageFormatProperties image_properties;
-    VkResult err = vk::GetPhysicalDeviceImageFormatProperties(gpu(), image_ci.format, image_ci.imageType, image_ci.tiling,
+    VkResult err = vk::GetPhysicalDeviceImageFormatProperties(Gpu(), image_ci.format, image_ci.imageType, image_ci.tiling,
                                                               image_ci.usage, image_ci.flags, &image_properties);
     // Test not supported by driver
     if (err != VK_SUCCESS) {
@@ -596,9 +579,9 @@ TEST_F(PositiveImage, ImageCompressionControl) {
     VkImageCompressionPropertiesEXT compression_properties = vku::InitStructHelper();
     VkImageFormatProperties2 image_format_properties = vku::InitStructHelper(&compression_properties);
 
-    vk::GetPhysicalDeviceImageFormatProperties2(gpu(), &image_format_info, &image_format_properties);
+    vk::GetPhysicalDeviceImageFormatProperties2(Gpu(), &image_format_info, &image_format_properties);
 
-    auto image_ci = vkt::Image::create_info();
+    auto image_ci = vkt::Image::CreateInfo();
     image_ci.imageType = VK_IMAGE_TYPE_2D;
     image_ci.format = VK_FORMAT_R8G8B8A8_UNORM;
     image_ci.tiling = VK_IMAGE_TILING_LINEAR;
@@ -836,7 +819,7 @@ TEST_F(PositiveImage, DescriptorSubresourceLayout) {
         auto init_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
         VkImageMemoryBarrier image_barrier = vku::InitStructHelper();
 
-        cmd_buf.begin();
+        cmd_buf.Begin();
         image_barrier.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
         image_barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
         image_barrier.image = image.handle();
@@ -861,10 +844,10 @@ TEST_F(PositiveImage, DescriptorSubresourceLayout) {
 
         if (test_type == kExternal) {
             // The image layout is external to the command buffer we are recording to test.  Submit to push to instance scope.
-            cmd_buf.end();
+            cmd_buf.End();
             m_default_queue->Submit(cmd_buf);
             m_default_queue->Wait();
-            cmd_buf.begin();
+            cmd_buf.Begin();
         }
 
         cmd_buf.BeginRenderPass(m_renderPassBeginInfo);
@@ -875,7 +858,7 @@ TEST_F(PositiveImage, DescriptorSubresourceLayout) {
         vk::CmdDraw(cmd_buf.handle(), 1, 0, 0, 0);
 
         cmd_buf.EndRenderPass();
-        cmd_buf.end();
+        cmd_buf.End();
 
         // Submit cmd buffer
         m_default_queue->Submit(cmd_buf);
@@ -1010,7 +993,7 @@ TEST_F(PositiveImage, Descriptor3D2DSubresourceLayout) {
 
         vkt::Framebuffer fb(*m_device, rp.handle(), 1, &view_2d.handle(), kWidth, kHeight);
 
-        cmd_buf.begin();
+        cmd_buf.Begin();
         image_barrier.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
         image_barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
         image_barrier.image = image_3d.handle();
@@ -1026,10 +1009,10 @@ TEST_F(PositiveImage, Descriptor3D2DSubresourceLayout) {
 
         if (test_type == kExternal) {
             // The image layout is external to the command buffer we are recording to test.  Submit to push to instance scope.
-            cmd_buf.end();
+            cmd_buf.End();
             m_default_queue->Submit(cmd_buf);
             m_default_queue->Wait();
-            cmd_buf.begin();
+            cmd_buf.Begin();
         }
 
         m_renderPassBeginInfo.renderPass = rp.handle();
@@ -1043,7 +1026,7 @@ TEST_F(PositiveImage, Descriptor3D2DSubresourceLayout) {
         vk::CmdDraw(cmd_buf.handle(), 1, 0, 0, 0);
 
         cmd_buf.EndRenderPass();
-        cmd_buf.end();
+        cmd_buf.End();
 
         // Submit cmd buffer
         m_default_queue->Submit(cmd_buf);
@@ -1056,10 +1039,9 @@ TEST_F(PositiveImage, BlitRemainingArrayLayers) {
     AddRequiredExtensions(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
     AddRequiredFeature(vkt::Feature::maintenance5);
     RETURN_IF_SKIP(Init());
-    ;
 
     VkFormat f_color = VK_FORMAT_R32_SFLOAT;  // Need features ..BLIT_SRC_BIT & ..BLIT_DST_BIT
-    if (!FormatFeaturesAreSupported(gpu(), f_color, VK_IMAGE_TILING_OPTIMAL,
+    if (!FormatFeaturesAreSupported(Gpu(), f_color, VK_IMAGE_TILING_OPTIMAL,
                                     VK_FORMAT_FEATURE_BLIT_SRC_BIT | VK_FORMAT_FEATURE_BLIT_DST_BIT)) {
         GTEST_SKIP() << "No blit feature format support";
     }
@@ -1083,13 +1065,13 @@ TEST_F(PositiveImage, BlitRemainingArrayLayers) {
     blitRegion.dstOffsets[0] = {32, 32, 0};
     blitRegion.dstOffsets[1] = {64, 64, 1};
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
 
-    vk::CmdBlitImage(m_commandBuffer->handle(), image.handle(), image.Layout(), image.handle(), image.Layout(), 1, &blitRegion,
+    vk::CmdBlitImage(m_command_buffer.handle(), image.handle(), image.Layout(), image.handle(), image.Layout(), 1, &blitRegion,
                      VK_FILTER_NEAREST);
 
     blitRegion.dstSubresource.layerCount = 2;  // same as VK_REMAINING_ARRAY_LAYERS
-    vk::CmdBlitImage(m_commandBuffer->handle(), image.handle(), image.Layout(), image.handle(), image.Layout(), 1, &blitRegion,
+    vk::CmdBlitImage(m_command_buffer.handle(), image.handle(), image.Layout(), image.handle(), image.Layout(), 1, &blitRegion,
                      VK_FILTER_NEAREST);
 }
 
@@ -1120,7 +1102,7 @@ TEST_F(PositiveImage, BlockTexelViewCompatibleMultipleLayers) {
     image_create_info.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
 
     VkFormatProperties image_fmt;
-    vk::GetPhysicalDeviceFormatProperties(m_device->phy().handle(), image_create_info.format, &image_fmt);
+    vk::GetPhysicalDeviceFormatProperties(m_device->Physical().handle(), image_create_info.format, &image_fmt);
     if (!vkt::Image::IsCompatible(*m_device, image_create_info.usage, image_fmt.optimalTilingFeatures)) {
         GTEST_SKIP() << "Image usage and format not compatible on device";
     }
@@ -1210,7 +1192,7 @@ TEST_F(PositiveImage, RemainingMipLevelsBlockTexelView) {
     image_create_info.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
 
     VkFormatProperties image_fmt;
-    vk::GetPhysicalDeviceFormatProperties(m_device->phy().handle(), image_create_info.format, &image_fmt);
+    vk::GetPhysicalDeviceFormatProperties(m_device->Physical().handle(), image_create_info.format, &image_fmt);
     if (!vkt::Image::IsCompatible(*m_device, image_create_info.usage, image_fmt.optimalTilingFeatures)) {
         GTEST_SKIP() << "Image usage and format not compatible on device";
     }

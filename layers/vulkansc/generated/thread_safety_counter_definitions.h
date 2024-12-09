@@ -74,6 +74,8 @@ counter<VkShaderEXT> c_VkShaderEXT;
 #ifdef VK_USE_PLATFORM_SCI
 counter<VkSemaphoreSciSyncPoolNV> c_VkSemaphoreSciSyncPoolNV;
 #endif  // VK_USE_PLATFORM_SCI
+counter<VkIndirectExecutionSetEXT> c_VkIndirectExecutionSetEXT;
+counter<VkIndirectCommandsLayoutEXT> c_VkIndirectCommandsLayoutEXT;
 // clang-format on
 
 // NOLINTEND

@@ -26,6 +26,8 @@
 
 #include "generated/vk_extension_helper.h"
 #include "layer_validation_tests.h"
+#include "vk_layer_config.h"
+#include "shader_helper.h"
 
 #if defined(VK_USE_PLATFORM_METAL_EXT)
 #include "apple_wsi.h"
@@ -43,7 +45,6 @@ typename C::iterator RemoveIf(C &container, F &&fn) {
 VkRenderFramework::VkRenderFramework()
     : instance_(nullptr),
       m_device(nullptr),
-      m_commandBuffer(nullptr),
       m_renderPass(VK_NULL_HANDLE),
       m_vertex_buffer(nullptr),
       m_width(256),   // default window width
@@ -66,12 +67,12 @@ VkRenderFramework::~VkRenderFramework() {
     m_errorMonitor->Finish();
 }
 
-VkPhysicalDevice VkRenderFramework::gpu() const {
+VkPhysicalDevice VkRenderFramework::Gpu() const {
     EXPECT_NE((VkInstance)0, instance_);  // Invalid to request gpu before instance exists
     return gpu_;
 }
 
-const VkPhysicalDeviceProperties &VkRenderFramework::physDevProps() const {
+const VkPhysicalDeviceProperties &VkRenderFramework::PhysicalDeviceProps() const {
     EXPECT_NE((VkPhysicalDevice)0, gpu_);  // Invalid to request physical device properties before gpu
     return physDevProps_;
 }
@@ -123,9 +124,9 @@ bool VkRenderFramework::DeviceExtensionSupported(const char *extension_name, con
 
     const auto enabled_layers = instance_layers_;  // assumes instance_layers_ contains enabled layers
 
-    auto extensions = device_obj.extensions();
+    auto extensions = device_obj.Extensions();
     for (const auto &layer : enabled_layers) {
-        const auto layer_extensions = device_obj.extensions(layer);
+        const auto layer_extensions = device_obj.Extensions(layer);
         extensions.insert(extensions.end(), layer_extensions.begin(), layer_extensions.end());
     }
 
@@ -349,11 +350,8 @@ std::string VkRenderFramework::RequiredExtensionsNotSupported() const {
 }
 
 void VkRenderFramework::AddRequiredFeature(vkt::Feature feature) {
-    feature_requirements_.AddRequiredFeature(m_target_api_version, feature);
-}
-
-void VkRenderFramework::AddDisabledFeature(vkt::Feature feature) {
-    feature_requirements_.AddDisabledFeature(m_target_api_version, feature);
+    required_features_.AddRequiredFeature(m_target_api_version, feature);
+    features_to_enable_.AddRequiredFeature(m_target_api_version, feature);
 }
 
 bool VkRenderFramework::AddRequestedInstanceExtensions(const char *ext_name) {
@@ -438,7 +436,7 @@ bool VkRenderFramework::AddRequestedDeviceExtensions(const char *dev_ext_name) {
         return true;
     }
 
-    if (!DeviceExtensionSupported(gpu(), nullptr, dev_ext_name)) {
+    if (!DeviceExtensionSupported(Gpu(), nullptr, dev_ext_name)) {
         return false;
     }
     m_device_extension_names.push_back(dev_ext_name);
@@ -453,7 +451,7 @@ bool VkRenderFramework::AddRequestedDeviceExtensions(const char *dev_ext_name) {
 }
 
 bool VkRenderFramework::IsPromotedDeviceExtension(const char *dev_ext_name) const {
-    auto device_version = std::min(m_target_api_version, APIVersion(physDevProps().apiVersion));
+    auto device_version = std::min(m_target_api_version, APIVersion(PhysicalDeviceProps().apiVersion));
     if (!device_version.Valid()) return false;
 
     const auto promotion_info_map = GetDevicePromotionInfoMap();
@@ -485,7 +483,6 @@ void VkRenderFramework::ShutdownFramework() {
     }
 
     m_command_buffer.destroy();
-    m_commandBuffer = nullptr;
     m_command_pool.destroy();
 
     if (m_second_queue) {
@@ -526,7 +523,7 @@ void VkRenderFramework::ShutdownFramework() {
 ErrorMonitor &VkRenderFramework::Monitor() { return monitor_; }
 
 void VkRenderFramework::GetPhysicalDeviceFeatures(VkPhysicalDeviceFeatures *features) {
-    vk::GetPhysicalDeviceFeatures(gpu(), features);
+    vk::GetPhysicalDeviceFeatures(Gpu(), features);
 }
 
 // static
@@ -546,7 +543,7 @@ bool VkRenderFramework::IsPlatformMockICD() {
     if (VkRenderFramework::IgnoreDisableChecks()) {
         return false;
     } else {
-        return 0 == mock_icd_device_name.compare(physDevProps().deviceName);
+        return 0 == mock_icd_device_name.compare(PhysicalDeviceProps().deviceName);
     }
 }
 
@@ -617,35 +614,35 @@ void VkRenderFramework::InitState(VkPhysicalDeviceFeatures *features, void *crea
 
     // Apply required features after we are done with handling promoted extensions
     if (!features) {
-        if (feature_requirements_.HasFeatures2()) {
+        if (required_features_.HasFeatures2()) {
             if (vk::GetPhysicalDeviceFeatures2KHR) {
-                vk::GetPhysicalDeviceFeatures2KHR(gpu(), feature_requirements_.GetFeatures2());
+                vk::GetPhysicalDeviceFeatures2KHR(Gpu(), required_features_.GetFeatures2());
             } else {
-                vk::GetPhysicalDeviceFeatures2(gpu(), feature_requirements_.GetFeatures2());
+                vk::GetPhysicalDeviceFeatures2(Gpu(), required_features_.GetFeatures2());
             }
         } else {
-            GetPhysicalDeviceFeatures(feature_requirements_.GetFeatures());
+            GetPhysicalDeviceFeatures(required_features_.GetFeatures());
         }
 
-        if (const char *f = feature_requirements_.AnyRequiredFeatureDisabled()) {
+        if (const char *f = required_features_.AnyRequiredFeatureDisabled()) {
             GTEST_SKIP() << "Required feature " << f << " is not available on device, skipping test";
         }
 
-        feature_requirements_.EnforceDisableFeatures();
+        features_to_enable_.EnforceRequiredFeatures();
 
-        if (feature_requirements_.HasFeatures2()) {
+        if (features_to_enable_.HasFeatures2()) {
             if (create_device_pnext) {
                 // Chain to the end of the list
                 VkBaseOutStructure *p = reinterpret_cast<VkBaseOutStructure *>(create_device_pnext);
                 while (p->pNext != nullptr) {
                     p = p->pNext;
                 }
-                p->pNext = reinterpret_cast<VkBaseOutStructure *>(feature_requirements_.GetFeatures2());
+                p->pNext = reinterpret_cast<VkBaseOutStructure *>(features_to_enable_.GetFeatures2());
             } else {
-                create_device_pnext = feature_requirements_.GetFeatures2();
+                create_device_pnext = features_to_enable_.GetFeatures2();
             }
         } else {
-            features = feature_requirements_.GetFeatures();
+            features = features_to_enable_.GetFeatures();
         }
     }
 
@@ -655,30 +652,26 @@ void VkRenderFramework::InitState(VkPhysicalDeviceFeatures *features, void *crea
         vk::InitDeviceExtension(instance_, *m_device, device_ext_name);
     }
 
-    m_default_queue = m_device->QueuesWithGraphicsCapability()[0];
-
-    m_second_queue = [this]() -> vkt::Queue * {
-        if (m_device->QueuesWithGraphicsCapability().size() > 1) {
-            return m_device->QueuesWithGraphicsCapability()[1];  // skip default queue
+    std::vector<vkt::Queue *> queues;
+    vvl::Append(queues, m_device->QueuesWithGraphicsCapability());
+    for (vkt::Queue *queue_with_compute_caps : m_device->QueuesWithComputeCapability()) {
+        if (!vvl::Contains(queues, queue_with_compute_caps)) {
+            queues.emplace_back(queue_with_compute_caps);
         }
-        const auto &with_compute_caps = m_device->QueuesWithComputeCapability();
-        if (with_compute_caps.size() > 0 && with_compute_caps[0] != m_default_queue) {
-            return with_compute_caps[0];
+    }
+    for (vkt::Queue *queue_with_transfer_caps : m_device->QueuesWithTransferCapability()) {
+        if (!vvl::Contains(queues, queue_with_transfer_caps)) {
+            queues.emplace_back(queue_with_transfer_caps);
         }
-        if (with_compute_caps.size() > 1) {
-            return with_compute_caps[1];
-        }
-        const auto &with_transfer_caps = m_device->QueuesWithTransferCapability();
-        if (with_transfer_caps.size() > 0 && with_transfer_caps[0] != m_default_queue) {
-            return with_transfer_caps[0];
-        }
-        if (with_transfer_caps.size() > 1) {
-            return with_transfer_caps[1];
-        }
-        return nullptr;
-    }();
-    if (m_second_queue) {
-        m_second_queue_caps = m_device->phy().queue_properties_[m_second_queue->family_index].queueFlags;
+    }
+    m_default_queue = queues[0];
+    if (queues.size() > 1) {
+        m_second_queue = queues[1];
+        m_second_queue_caps = m_device->Physical().queue_properties_[m_second_queue->family_index].queueFlags;
+    }
+    if (queues.size() > 2) {
+        m_third_queue = queues[2];
+        m_third_queue_caps = m_device->Physical().queue_properties_[m_third_queue->family_index].queueFlags;
     }
 
     m_depthStencil = new vkt::Image();
@@ -687,7 +680,6 @@ void VkRenderFramework::InitState(VkPhysicalDeviceFeatures *features, void *crea
 
     m_command_pool.Init(*m_device, m_device->graphics_queue_node_index_, flags);
     m_command_buffer.Init(*m_device, m_command_pool);
-    m_commandBuffer = &m_command_buffer;
 
     if (m_second_queue) {
         m_second_command_pool.Init(*m_device, m_second_queue->family_index, flags);
@@ -709,6 +701,10 @@ void VkRenderFramework::InitSurface() {
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
+
+void SurfaceContext::Resize(uint32_t width, uint32_t height) {
+    ::SetWindowPos(m_win32Window, NULL, 0, 0, (int)width, (int)height, SWP_NOMOVE);
+}
 #endif  // VK_USE_PLATFORM_WIN32_KHR
 
 VkResult VkRenderFramework::CreateSurface(SurfaceContext &surface_context, VkSurfaceKHR &surface, VkInstance custom_instance) {
@@ -723,7 +719,8 @@ VkResult VkRenderFramework::CreateSurface(SurfaceContext &surface_context, VkSur
         wc.hInstance = window_instance;
         wc.lpszClassName = class_name;
         RegisterClass(&wc);
-        HWND window = CreateWindowEx(0, class_name, 0, 0, 0, 0, (int)m_width, (int)m_height, NULL, NULL, window_instance, NULL);
+        HWND window = CreateWindowEx(0, class_name, nullptr, 0, 0, 0, (int)m_width, (int)m_height, NULL, NULL, window_instance, NULL);
+        surface_context.m_win32Window = window;
         ShowWindow(window, SW_HIDE);
 
         VkWin32SurfaceCreateInfoKHR surface_create_info = vku::InitStructHelper();
@@ -838,7 +835,7 @@ void VkRenderFramework::InitSwapchainInfo() {
 // Makes query to get information about swapchain needed to create a valid swapchain object each test creating a swapchain will
 // need
 SurfaceInformation VkRenderFramework::GetSwapchainInfo(const VkSurfaceKHR surface) {
-    const VkPhysicalDevice physicalDevice = gpu();
+    const VkPhysicalDevice physicalDevice = Gpu();
 
     assert(surface != VK_NULL_HANDLE);
 
@@ -883,17 +880,17 @@ SurfaceInformation VkRenderFramework::GetSwapchainInfo(const VkSurfaceKHR surfac
 
 void VkRenderFramework::InitSwapchain(VkImageUsageFlags imageUsage, VkSurfaceTransformFlagBitsKHR preTransform) {
     RETURN_IF_SKIP(InitSurface());
-    ASSERT_TRUE(CreateSwapchain(m_surface, imageUsage, preTransform, m_swapchain));
+    m_swapchain = CreateSwapchain(m_surface, imageUsage, preTransform);
+    ASSERT_TRUE(m_swapchain.initialized());
 }
 
-bool VkRenderFramework::CreateSwapchain(VkSurfaceKHR &surface, VkImageUsageFlags imageUsage,
-                                        VkSurfaceTransformFlagBitsKHR preTransform, VkSwapchainKHR &swapchain,
-                                        VkSwapchainKHR oldSwapchain) {
+vkt::Swapchain VkRenderFramework::CreateSwapchain(VkSurfaceKHR &surface, VkImageUsageFlags imageUsage,
+                                                  VkSurfaceTransformFlagBitsKHR preTransform, VkSwapchainKHR oldSwapchain) {
     VkBool32 supported;
-    vk::GetPhysicalDeviceSurfaceSupportKHR(gpu(), m_device->graphics_queue_node_index_, surface, &supported);
+    vk::GetPhysicalDeviceSurfaceSupportKHR(Gpu(), m_device->graphics_queue_node_index_, surface, &supported);
     if (!supported) {
         // Graphics queue does not support present
-        return false;
+        return vkt::Swapchain{};
     }
 
     SurfaceInformation info = GetSwapchainInfo(surface);
@@ -921,26 +918,28 @@ bool VkRenderFramework::CreateSwapchain(VkSurfaceKHR &surface, VkImageUsageFlags
     swapchain_create_info.clipped = VK_FALSE;
     swapchain_create_info.oldSwapchain = oldSwapchain;
 
-    VkResult result = vk::CreateSwapchainKHR(device(), &swapchain_create_info, nullptr, &swapchain);
-    return result == VK_SUCCESS;
-}
-
-std::vector<VkImage> VkRenderFramework::GetSwapchainImages(const VkSwapchainKHR swapchain) {
-    uint32_t imageCount = 0;
-    vk::GetSwapchainImagesKHR(device(), swapchain, &imageCount, nullptr);
-    vector<VkImage> swapchainImages;
-    swapchainImages.resize(imageCount);
-    vk::GetSwapchainImagesKHR(device(), swapchain, &imageCount, swapchainImages.data());
-    return swapchainImages;
+    vkt::Swapchain swapchain(*m_device, swapchain_create_info);
+    return swapchain;
 }
 
 void VkRenderFramework::DestroySwapchain() {
     if (m_device && m_device->handle() != VK_NULL_HANDLE) {
         m_device->Wait();
-        if (m_swapchain != VK_NULL_HANDLE) {
-            vk::DestroySwapchainKHR(device(), m_swapchain, nullptr);
-            m_swapchain = VK_NULL_HANDLE;
+        if (m_swapchain.initialized()) {
+            m_swapchain.destroy();
         }
+    }
+}
+
+void VkRenderFramework::SupportMultiSwapchain() {
+#ifdef VK_USE_PLATFORM_ANDROID_KHR
+    GTEST_SKIP() << "Android currently doesn't support multiple swapchain on all devices";
+#endif  // VK_USE_PLATFORM_ANDROID_KHR
+}
+
+void VkRenderFramework::SupportSurfaceResize() {
+    if (!SurfaceContext::CanResize()) {
+        GTEST_SKIP() << "VVL test framework does not support surface resizing on the current platform";
     }
 }
 
@@ -985,7 +984,7 @@ void VkRenderFramework::InitRenderTarget(uint32_t targets, const VkImageView *ds
         m_renderPassClearValues.push_back(clear);
 
         VkFormatProperties props;
-        vk::GetPhysicalDeviceFormatProperties(m_device->phy().handle(), m_render_target_fmt, &props);
+        vk::GetPhysicalDeviceFormatProperties(m_device->Physical().handle(), m_render_target_fmt, &props);
 
         VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL;
         if (props.linearTilingFeatures & VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT) {
@@ -1109,7 +1108,7 @@ void VkRenderFramework::SetDefaultDynamicStatesExclude(const std::vector<VkDynam
         m_vertex_buffer = new vkt::Buffer(*m_device, 32u, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
     }
 
-    VkCommandBuffer cmdBuffer = commandBuffer ? commandBuffer : m_commandBuffer->handle();
+    VkCommandBuffer cmdBuffer = commandBuffer ? commandBuffer : m_command_buffer.handle();
     VkViewport viewport = {0, 0, static_cast<float>(m_width), static_cast<float>(m_height), 0.0f, 1.0f};
     VkRect2D scissor = {{0, 0}, {m_width, m_height}};
     if (!excluded(VK_DYNAMIC_STATE_VIEWPORT_WITH_COUNT)) vk::CmdSetViewportWithCountEXT(cmdBuffer, 1u, &viewport);
@@ -1219,4 +1218,10 @@ void VkRenderFramework::SetDefaultDynamicStatesAll(VkCommandBuffer cmdBuffer) {
     VkColorComponentFlags colorWriteMask =
         VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
     vk::CmdSetColorWriteMaskEXT(cmdBuffer, 0u, 1u, &colorWriteMask);
+}
+
+std::vector<uint32_t> VkRenderFramework::GLSLToSPV(VkShaderStageFlagBits stage, const char *code, const spv_target_env env) {
+    std::vector<uint32_t> spv;
+    GLSLtoSPV(m_device->Physical().limits_, stage, code, spv, env);
+    return spv;
 }

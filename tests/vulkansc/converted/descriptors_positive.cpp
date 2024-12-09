@@ -114,7 +114,7 @@ TEST_F(PositiveDescriptors, IgnoreUnrelatedDescriptor) {
     // Verify VK_FORMAT_R8_UNORM supports VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT
     const VkFormat format_texel_case = VK_FORMAT_R8_UNORM;
     VkFormatProperties format_properties;
-    vk::GetPhysicalDeviceFormatProperties(gpu(), format_texel_case, &format_properties);
+    vk::GetPhysicalDeviceFormatProperties(Gpu(), format_texel_case, &format_properties);
     if (!(format_properties.bufferFeatures & VK_FORMAT_FEATURE_STORAGE_TEXEL_BUFFER_BIT)) {
         GTEST_SKIP() << "Test requires to support VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT";
     }
@@ -262,17 +262,17 @@ TEST_F(PositiveDescriptors, ImmutableSamplerOnlyDescriptor) {
     pipe.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&descriptor_set.layout_});
     pipe.CreateGraphicsPipeline();
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
 
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
 
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1,
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1,
                               &descriptor_set.set_, 0, nullptr);
-    vk::CmdDraw(m_commandBuffer->handle(), 1, 0, 0, 0);
+    vk::CmdDraw(m_command_buffer.handle(), 1, 0, 0, 0);
 
-    m_commandBuffer->EndRenderPass();
-    m_commandBuffer->end();
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
 
     sampler.destroy();
 }
@@ -346,8 +346,8 @@ TEST_F(PositiveDescriptors, DynamicOffsetWithInactiveBinding) {
 
     vk::UpdateDescriptorSets(device(), 1, &descriptor_write, 0, NULL);
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
 
     // Create PSO to be used for draw-time errors below
     char const *fsSource = R"glsl(
@@ -367,16 +367,16 @@ TEST_F(PositiveDescriptors, DynamicOffsetWithInactiveBinding) {
     pipe.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&descriptor_set.layout_});
     pipe.CreateGraphicsPipeline();
 
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
     // This update should succeed, but offset of inactive binding 1 oversteps binding 2 buffer size
     //   we used to have a bug in this case.
     uint32_t dyn_off[BINDING_COUNT] = {0, 1024, 256};
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_layout_.handle(), 0, 1,
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_layout_.handle(), 0, 1,
                               &descriptor_set.set_, BINDING_COUNT, dyn_off);
-    vk::CmdDraw(m_commandBuffer->handle(), 1, 0, 0, 0);
+    vk::CmdDraw(m_command_buffer.handle(), 1, 0, 0, 0);
 
-    m_commandBuffer->EndRenderPass();
-    m_commandBuffer->end();
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
 }
 
 TEST_F(PositiveDescriptors, CopyMutableDescriptors) {
@@ -475,13 +475,10 @@ TEST_F(PositiveDescriptors, CopyAccelerationStructureMutableDescriptors) {
     AddRequiredExtensions(VK_EXT_MUTABLE_DESCRIPTOR_TYPE_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
     AddRequiredExtensions(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-
-    VkPhysicalDeviceMutableDescriptorTypeFeaturesEXT mutable_descriptor_type_features = vku::InitStructHelper();
-    VkPhysicalDeviceAccelerationStructureFeaturesKHR acc_struct_features = vku::InitStructHelper(&mutable_descriptor_type_features);
-    VkPhysicalDeviceBufferDeviceAddressFeaturesKHR bda_features = vku::InitStructHelper(&acc_struct_features);
-    GetPhysicalDeviceFeatures2(bda_features);
-    RETURN_IF_SKIP(InitState(nullptr, &bda_features));
+    AddRequiredFeature(vkt::Feature::mutableDescriptorType);
+    AddRequiredFeature(vkt::Feature::accelerationStructure);
+    AddRequiredFeature(vkt::Feature::bufferDeviceAddress);
+    RETURN_IF_SKIP(Init());
 
     std::array descriptor_types = {VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR};
 
@@ -623,16 +620,16 @@ TEST_F(PositiveDescriptors, ImageViewAsDescriptorReadAndInputAttachment) {
     descriptor_set2.WriteDescriptorImageInfo(0, image_view, sampler, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VK_IMAGE_LAYOUT_GENERAL);
     descriptor_set2.UpdateDescriptorSets();
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRenderPass(rp.Handle(), framebuffer.handle(), 32, 32, 1, m_renderPassClearValues.data());
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1,
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(rp.Handle(), framebuffer.handle(), 32, 32, 1, m_renderPassClearValues.data());
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1,
                               &descriptor_set.set_, 0, nullptr);
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 1, 1,
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 1, 1,
                               &descriptor_set2.set_, 0, nullptr);
-    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
-    m_commandBuffer->EndRenderPass();
-    m_commandBuffer->end();
+    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
 }
 
 TEST_F(PositiveDescriptors, UpdateImageDescriptorSetThatHasImageViewUsage) {
@@ -717,10 +714,10 @@ TEST_F(PositiveDescriptors, BindingEmptyDescriptorSets) {
     OneOffDescriptorSet empty_ds(m_device, {});
     const vkt::PipelineLayout pipeline_layout(*m_device, {&empty_ds.layout_});
 
-    m_commandBuffer->begin();
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1,
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1,
                               &empty_ds.set_, 0, nullptr);
-    m_commandBuffer->end();
+    m_command_buffer.End();
 }
 
 TEST_F(PositiveDescriptors, DrawingWithUnboundUnusedSetWithInputAttachments) {
@@ -773,19 +770,19 @@ TEST_F(PositiveDescriptors, DrawingWithUnboundUnusedSetWithInputAttachments) {
     pipe.gp_ci_.renderPass = rp.Handle();
     pipe.CreateGraphicsPipeline();
 
-    m_commandBuffer->begin();
+    m_command_buffer.Begin();
     m_renderPassBeginInfo.renderPass = rp.Handle();
     m_renderPassBeginInfo.framebuffer = fb.handle();
-    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1,
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1,
                               &descriptor_set.set_, 0, nullptr);
 
     // This draw command will likely produce a crash in case of a regression.
-    vk::CmdDraw(m_commandBuffer->handle(), 1, 0, 0, 0);
+    vk::CmdDraw(m_command_buffer.handle(), 1, 0, 0, 0);
 
-    m_commandBuffer->EndRenderPass();
-    m_commandBuffer->end();
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
 }
 
 TEST_F(PositiveDescriptors, UpdateDescritorSetsNoLongerInUse) {
@@ -870,14 +867,14 @@ TEST_F(PositiveDescriptors, UpdateDescritorSetsNoLongerInUse) {
 
         // Bind set A to a command buffer and submit the command buffer;
         {
-            auto &cb = use_single_command_buffer ? *m_commandBuffer : cb0;
-            cb.begin();
+            auto &cb = use_single_command_buffer ? m_command_buffer : cb0;
+            cb.Begin();
             vk::CmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1, &set_A, 0, nullptr);
             vk::CmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
             cb.BeginRenderPass(m_renderPassBeginInfo);
             vk::CmdDraw(cb, 0, 0, 0, 0);
             vk::CmdEndRenderPass(cb);
-            cb.end();
+            cb.End();
             m_default_queue->Submit(cb);
         }
 
@@ -886,14 +883,14 @@ TEST_F(PositiveDescriptors, UpdateDescritorSetsNoLongerInUse) {
 
         // Bind set B to a command buffer and submit the command buffer;
         {
-            auto &cb = use_single_command_buffer ? *m_commandBuffer : cb1;
-            cb.begin();
+            auto &cb = use_single_command_buffer ? m_command_buffer : cb1;
+            cb.Begin();
             vk::CmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1, &set_B, 0, nullptr);
             vk::CmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
             cb.BeginRenderPass(m_renderPassBeginInfo);
             vk::CmdDraw(cb, 0, 0, 0, 0);
             vk::CmdEndRenderPass(cb);
-            cb.end();
+            cb.End();
             m_default_queue->Submit(cb);
         }
 
@@ -915,7 +912,7 @@ TEST_F(PositiveDescriptors, DSUsageBitsFlags2) {
 
     const VkFormat buffer_format = VK_FORMAT_R8_UNORM;
     VkFormatProperties format_properties;
-    vk::GetPhysicalDeviceFormatProperties(gpu(), buffer_format, &format_properties);
+    vk::GetPhysicalDeviceFormatProperties(Gpu(), buffer_format, &format_properties);
     if (!(format_properties.bufferFeatures & VK_FORMAT_FEATURE_STORAGE_TEXEL_BUFFER_BIT)) {
         GTEST_SKIP() << "Device does not support VK_FORMAT_FEATURE_STORAGE_TEXEL_BUFFER_BIT for this format";
     }
@@ -945,13 +942,8 @@ TEST_F(PositiveDescriptors, AttachmentFeedbackLoopLayout) {
     TEST_DESCRIPTION("Read from image with layout attachment feedback loop");
 
     AddRequiredExtensions(VK_EXT_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_EXTENSION_NAME);
-    RETURN_IF_SKIP(InitFramework());
-    VkPhysicalDeviceAttachmentFeedbackLoopLayoutFeaturesEXT afll_features = vku::InitStructHelper();
-    GetPhysicalDeviceFeatures2(afll_features);
-    if (!afll_features.attachmentFeedbackLoopLayout) {
-        GTEST_SKIP() << "attachmentFeedbackLoopLayout not supported";
-    }
-    RETURN_IF_SKIP(InitState(nullptr, &afll_features));
+    AddRequiredFeature(vkt::Feature::attachmentFeedbackLoopLayout);
+    RETURN_IF_SKIP(Init());
 
     VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
     vkt::Image image(
@@ -1002,14 +994,14 @@ TEST_F(PositiveDescriptors, AttachmentFeedbackLoopLayout) {
     pipe.pipeline_layout_ = vkt::PipelineLayout(*m_device, {&descriptor_set.layout_});
     pipe.CreateGraphicsPipeline();
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRenderPass(rp.Handle(), framebuffer.handle(), 32, 32, 1, &clear_value);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_layout_.handle(), 0u, 1u,
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(rp.Handle(), framebuffer.handle(), 32, 32, 1, &clear_value);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.pipeline_layout_.handle(), 0u, 1u,
                               &descriptor_set.set_, 0u, nullptr);
-    vk::CmdDraw(m_commandBuffer->handle(), 3u, 1u, 0u, 0u);
-    vk::CmdEndRenderPass(m_commandBuffer->handle());
-    m_commandBuffer->end();
+    vk::CmdDraw(m_command_buffer.handle(), 3u, 1u, 0u, 0u);
+    vk::CmdEndRenderPass(m_command_buffer.handle());
+    m_command_buffer.End();
 }
 
 TEST_F(PositiveDescriptors, VariableDescriptorCount) {
@@ -1191,12 +1183,89 @@ TEST_F(PositiveDescriptors, ImageSubresourceOverlapBetweenRenderPassAndDescripto
                                             VK_IMAGE_LAYOUT_GENERAL);
     descriptor_set.UpdateDescriptorSets();
 
-    m_commandBuffer->begin();
-    m_commandBuffer->BeginRenderPass(rp.Handle(), framebuffer.handle(), 32, 32, 1, m_renderPassClearValues.data());
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
-    vk::CmdBindDescriptorSets(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1,
+    m_command_buffer.Begin();
+    m_command_buffer.BeginRenderPass(rp.Handle(), framebuffer.handle(), 32, 32, 1, m_renderPassClearValues.data());
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout.handle(), 0, 1,
                               &descriptor_set.set_, 0, nullptr);
-    vk::CmdDraw(m_commandBuffer->handle(), 3, 1, 0, 0);
-    m_commandBuffer->EndRenderPass();
-    m_commandBuffer->end();
+    vk::CmdDraw(m_command_buffer.handle(), 3, 1, 0, 0);
+    m_command_buffer.EndRenderPass();
+    m_command_buffer.End();
+}
+
+TEST_F(PositiveDescriptors, DuplicateLayoutSameSampler) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8497");
+    RETURN_IF_SKIP(Init());
+    vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
+
+    OneOffDescriptorSet ds_0(m_device,
+                             {{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_COMPUTE_BIT, &sampler.handle()}});
+    const vkt::PipelineLayout pipeline_layout_0(*m_device, {&ds_0.layout_});
+
+    OneOffDescriptorSet ds_1(m_device,
+                             {{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_COMPUTE_BIT, &sampler.handle()}});
+
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout_0.handle(), 0, 1,
+                              &ds_1.set_, 0, nullptr);
+    m_command_buffer.End();
+}
+
+TEST_F(PositiveDescriptors, DuplicateLayoutDuplicateSampler) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8497");
+    RETURN_IF_SKIP(Init());
+    vkt::Sampler sampler_0(*m_device, SafeSaneSamplerCreateInfo());
+    vkt::Sampler sampler_1(*m_device, SafeSaneSamplerCreateInfo());
+
+    OneOffDescriptorSet ds_0(m_device,
+                             {{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_COMPUTE_BIT, &sampler_0.handle()}});
+    const vkt::PipelineLayout pipeline_layout_0(*m_device, {&ds_0.layout_});
+
+    OneOffDescriptorSet ds_1(m_device,
+                             {{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_COMPUTE_BIT, &sampler_1.handle()}});
+
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout_0.handle(), 0, 1,
+                              &ds_1.set_, 0, nullptr);
+    m_command_buffer.End();
+}
+
+TEST_F(PositiveDescriptors, DuplicateLayoutSameSamplerArray) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8497");
+    RETURN_IF_SKIP(Init());
+    vkt::Sampler sampler(*m_device, SafeSaneSamplerCreateInfo());
+    VkSampler sampler_array[3] = {sampler.handle(), sampler.handle(), sampler.handle()};
+
+    OneOffDescriptorSet ds_0(m_device,
+                             {{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3, VK_SHADER_STAGE_COMPUTE_BIT, sampler_array}});
+    const vkt::PipelineLayout pipeline_layout_0(*m_device, {&ds_0.layout_});
+
+    OneOffDescriptorSet ds_1(m_device,
+                             {{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3, VK_SHADER_STAGE_COMPUTE_BIT, sampler_array}});
+
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout_0.handle(), 0, 1,
+                              &ds_1.set_, 0, nullptr);
+    m_command_buffer.End();
+}
+
+TEST_F(PositiveDescriptors, DuplicateLayoutDuplicateSamplerArray) {
+    TEST_DESCRIPTION("https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/8497");
+    RETURN_IF_SKIP(Init());
+    vkt::Sampler sampler_0(*m_device, SafeSaneSamplerCreateInfo());
+    vkt::Sampler sampler_1(*m_device, SafeSaneSamplerCreateInfo());
+    VkSampler sampler_array_0[3] = {sampler_0.handle(), sampler_0.handle(), sampler_0.handle()};
+    VkSampler sampler_array_1[3] = {sampler_1.handle(), sampler_1.handle(), sampler_1.handle()};
+
+    OneOffDescriptorSet ds_0(m_device,
+                             {{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3, VK_SHADER_STAGE_COMPUTE_BIT, sampler_array_0}});
+    const vkt::PipelineLayout pipeline_layout_0(*m_device, {&ds_0.layout_});
+
+    OneOffDescriptorSet ds_1(m_device,
+                             {{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3, VK_SHADER_STAGE_COMPUTE_BIT, sampler_array_1}});
+
+    m_command_buffer.Begin();
+    vk::CmdBindDescriptorSets(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_COMPUTE, pipeline_layout_0.handle(), 0, 1,
+                              &ds_1.set_, 0, nullptr);
+    m_command_buffer.End();
 }

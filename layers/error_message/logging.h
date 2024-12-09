@@ -26,14 +26,11 @@
 
 #include <vulkan/utility/vk_struct_helper.hpp>
 
-#include "vk_layer_config.h"
 #include "containers/custom_containers.h"
-#include "generated/vk_layer_dispatch_table.h"
 #include "generated/vk_object_types.h"
 
 #if defined __ANDROID__
 #include <android/log.h>
-#define LOGCONSOLE(...) ((void)__android_log_print(ANDROID_LOG_INFO, "VALIDATION", __VA_ARGS__))
 [[maybe_unused]] static const char *kForceDefaultCallbackKey = "debug.vvl.forcelayerlog";
 #endif
 
@@ -110,8 +107,8 @@ static inline uint64_t HandleToUint64(uint64_t h) { return h; }
 
 // Data we store per label for logging
 struct LoggingLabel {
-    std::string name;
-    std::array<float, 4> color;
+    std::string name{};
+    std::array<float, 4> color{};
 
     void Reset() { *this = LoggingLabel(); }
     bool Empty() const { return name.empty(); }
@@ -128,8 +125,6 @@ struct LoggingLabel {
         if (label_info && label_info->pLabelName) {
             name = label_info->pLabelName;
             std::copy_n(std::begin(label_info->color), 4, color.begin());
-        } else {
-            Reset();
         }
     }
 
@@ -147,20 +142,18 @@ struct LoggingLabelState {
     LoggingLabel insert_label;
 
     // Export the labels, but in reverse order since we want the most recent at the top.
-    std::vector<VkDebugUtilsLabelEXT> Export() const {
-        size_t count = labels.size() + (insert_label.Empty() ? 0 : 1);
-        std::vector<VkDebugUtilsLabelEXT> out(count);
+    void Export(std::vector<VkDebugUtilsLabelEXT> &exported_labels) const {
+        exported_labels.reserve(exported_labels.size() + 1 + labels.size());
 
-        if (!count) return out;
-
-        size_t index = count - 1;
         if (!insert_label.Empty()) {
-            out[index--] = insert_label.Export();
+            exported_labels.emplace_back(insert_label.Export());
         }
-        for (const auto &label : labels) {
-            out[index--] = label.Export();
-        }
-        return out;
+
+        std::for_each(labels.rbegin(), labels.rend(), [&exported_labels](const LoggingLabel &label) {
+            if (!label.Empty()) {
+                exported_labels.emplace_back(label.Export());
+            }
+        });
     }
 };
 
@@ -191,7 +184,7 @@ class DebugReport {
     // This mutex is defined as mutable since the normal usage for a debug report object is as 'const'. The mutable keyword allows
     // the layers to continue this pattern, but also allows them to use/change this specific member for synchronization purposes.
     mutable std::mutex debug_output_mutex;
-    uint32_t duplicate_message_limit = 0;
+    uint32_t duplicate_message_limit = 0;  // zero will keep printing forever
     const void *instance_pnext_chain{};
     bool force_default_log_callback{false};
     uint32_t device_created = 0;

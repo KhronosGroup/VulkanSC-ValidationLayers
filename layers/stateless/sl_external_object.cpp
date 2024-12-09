@@ -97,8 +97,8 @@ bool StatelessValidation::manual_PreCallValidateImportSemaphoreFdKHR(VkDevice de
         skip |= LogError("VUID-VkImportSemaphoreFdInfoKHR-handleType-07307", pImportSemaphoreFdInfo->semaphore,
                          info_loc.dot(Field::handleType),
                          "is VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT so"
-                         " VK_SEMAPHORE_IMPORT_TEMPORARY_BIT must be set, but flags is 0x%x",
-                         pImportSemaphoreFdInfo->flags);
+                         " VK_SEMAPHORE_IMPORT_TEMPORARY_BIT must be set, but flags is %s",
+                         string_VkSemaphoreImportFlags(pImportSemaphoreFdInfo->flags).c_str());
     }
     return skip;
 }
@@ -124,8 +124,8 @@ bool StatelessValidation::manual_PreCallValidateImportFenceFdKHR(VkDevice device
         (pImportFenceFdInfo->flags & VK_FENCE_IMPORT_TEMPORARY_BIT) == 0) {
         skip |= LogError("VUID-VkImportFenceFdInfoKHR-handleType-07306", pImportFenceFdInfo->fence, info_loc.dot(Field::handleType),
                          "is VK_EXTERNAL_FENCE_HANDLE_TYPE_SYNC_FD_BIT so"
-                         " VK_FENCE_IMPORT_TEMPORARY_BIT must be set, but flags is 0x%x",
-                         pImportFenceFdInfo->flags);
+                         " VK_FENCE_IMPORT_TEMPORARY_BIT must be set, but flags is %s",
+                         string_VkFenceImportFlags(pImportFenceFdInfo->flags).c_str());
     }
     return skip;
 }
@@ -279,24 +279,6 @@ bool StatelessValidation::ExportMetalObjectsPNextUtil(VkExportMetalObjectTypeFla
     return skip;
 }
 
-bool StatelessValidation::manual_PreCallValidateExportMetalObjectsEXT(VkDevice device,
-                                                                      VkExportMetalObjectsInfoEXT *pMetalObjectsInfo,
-                                                                      const ErrorObject &error_obj) const {
-    bool skip = false;
-
-    static_assert(AllVkExportMetalObjectTypeFlagBitsEXT == 0x3F, "Add new ExportMetalObjects support to VVL!");
-
-    constexpr std::array allowed_structs = {
-        VK_STRUCTURE_TYPE_EXPORT_METAL_BUFFER_INFO_EXT,       VK_STRUCTURE_TYPE_EXPORT_METAL_COMMAND_QUEUE_INFO_EXT,
-        VK_STRUCTURE_TYPE_EXPORT_METAL_DEVICE_INFO_EXT,       VK_STRUCTURE_TYPE_EXPORT_METAL_IO_SURFACE_INFO_EXT,
-        VK_STRUCTURE_TYPE_EXPORT_METAL_SHARED_EVENT_INFO_EXT, VK_STRUCTURE_TYPE_EXPORT_METAL_TEXTURE_INFO_EXT,
-    };
-    skip |=
-        ValidateStructPnext(error_obj.location.dot(Field::pMetalObjectsInfo), pMetalObjectsInfo->pNext, allowed_structs.size(),
-                            allowed_structs.data(), GeneratedVulkanHeaderVersion, "VUID-VkExportMetalObjectsInfoEXT-pNext-pNext",
-                            "VUID-VkExportMetalObjectsInfoEXT-sType-unique", VK_NULL_HANDLE, true);
-    return skip;
-}
 #endif  // VK_USE_PLATFORM_METAL_EXT
 
 namespace {

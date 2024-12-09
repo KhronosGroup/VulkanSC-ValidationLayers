@@ -20,7 +20,7 @@ class NegativePipelineTopology : public VkLayerTest {};
 TEST_F(NegativePipelineTopology, PolygonMode) {
     TEST_DESCRIPTION("Attempt to use invalid polygon fill modes.");
     // The sacrificial device object
-    AddDisabledFeature(vkt::Feature::fillModeNonSolid);
+
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
@@ -224,8 +224,7 @@ TEST_F(NegativePipelineTopology, PrimitiveTopologyListRestart) {
 
     SetTargetApiVersion(VK_API_VERSION_1_1);
     AddRequiredExtensions(VK_EXT_PRIMITIVE_TOPOLOGY_LIST_RESTART_EXTENSION_NAME);
-    AddDisabledFeature(vkt::Feature::primitiveTopologyListRestart);
-    AddDisabledFeature(vkt::Feature::primitiveTopologyPatchListRestart);
+    AddRequiredFeature(vkt::Feature::tessellationShader);
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
@@ -242,7 +241,7 @@ TEST_F(NegativePipelineTopology, PrimitiveTopologyListRestart) {
     topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
     CreatePipelineHelper::OneshotTest(*this, set_info, kErrorBit, "VUID-VkPipelineInputAssemblyStateCreateInfo-topology-06252");
 
-    if (m_device->phy().features().tessellationShader) {
+    if (m_device->Physical().Features().tessellationShader) {
         topology = VK_PRIMITIVE_TOPOLOGY_PATCH_LIST;
         constexpr std::array vuids = {"VUID-VkPipelineInputAssemblyStateCreateInfo-topology-06253",
                                       "VUID-VkGraphicsPipelineCreateInfo-topology-08889"};
@@ -270,7 +269,7 @@ TEST_F(NegativePipelineTopology, FillRectangleNV) {
     AddRequiredExtensions(VK_NV_FILL_RECTANGLE_EXTENSION_NAME);
     // Disable non-solid fill modes to make sure that the usage of VK_POLYGON_MODE_LINE and
     // VK_POLYGON_MODE_POINT will cause an error when the VK_NV_fill_rectangle extension is enabled.
-    AddDisabledFeature(vkt::Feature::fillModeNonSolid);
+
     RETURN_IF_SKIP(Init());
     InitRenderTarget();
 
@@ -310,13 +309,13 @@ TEST_F(NegativePipelineTopology, DynamicPrimitiveRestartEnable) {
     pipe.ia_ci_.topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
     pipe.CreateGraphicsPipeline();
 
-    m_commandBuffer->begin();
-    vk::CmdSetPrimitiveRestartEnableEXT(m_commandBuffer->handle(), VK_TRUE);
-    m_commandBuffer->BeginRenderPass(m_renderPassBeginInfo);
-    vk::CmdBindPipeline(m_commandBuffer->handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
+    m_command_buffer.Begin();
+    vk::CmdSetPrimitiveRestartEnableEXT(m_command_buffer.handle(), VK_TRUE);
+    m_command_buffer.BeginRenderPass(m_renderPassBeginInfo);
+    vk::CmdBindPipeline(m_command_buffer.handle(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipe.Handle());
     m_errorMonitor->SetDesiredError("VUID-vkCmdDraw-None-09637");
-    vk::CmdDraw(m_commandBuffer->handle(), 1, 1, 0, 0);
+    vk::CmdDraw(m_command_buffer.handle(), 1, 1, 0, 0);
     m_errorMonitor->VerifyFound();
-    vk::CmdEndRenderPass(m_commandBuffer->handle());
-    m_commandBuffer->end();
+    vk::CmdEndRenderPass(m_command_buffer.handle());
+    m_command_buffer.End();
 }
