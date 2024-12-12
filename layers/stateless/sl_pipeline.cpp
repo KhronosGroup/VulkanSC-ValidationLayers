@@ -558,10 +558,6 @@ bool StatelessValidation::manual_PreCallValidateCreateGraphicsPipelines(
                 active_shaders |= create_info.pStages[stage_index].stage;
                 const Location stage_loc = create_info_loc.dot(Field::pStages, stage_index);
 
-#ifndef VULKANSC
-                skip |= ValidateRequiredPointer(stage_loc.dot(Field::pName), create_info.pStages[stage_index].pName,
-                                                "VUID-VkPipelineShaderStageCreateInfo-pName-parameter");
-#endif
                 skip |= ValidateStructType(stage_loc, &create_info.pStages[stage_index],
                                            VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, false, kVUIDUndefined,
                                            "VUID-VkPipelineShaderStageCreateInfo-sType-sType");
