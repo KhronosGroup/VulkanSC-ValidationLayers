@@ -16,25 +16,18 @@
  * Author: Daniel Rakos <daniel.rakos@rastergrid.com>
  */
 #pragma once
-#include "state_tracker/cmd_buffer_state.h"
+#include "state_tracker/descriptor_sets.h"
 
 #include <atomic>
 
 namespace vvl::sc {
 
-class CommandPool : public vvl::CommandPool {
+class DescriptorPool : public vvl::DescriptorPool {
   public:
-    uint32_t max_command_buffers;
-    std::atomic_uint32_t command_buffers_recording;
+    std::atomic_uint32_t allocated_descriptor_sets{0};
 
-    CommandPool(ValidationStateTracker &dev, VkCommandPool cp, const VkCommandPoolCreateInfo *pCreateInfo, VkQueueFlags flags)
-        : vvl::CommandPool(dev, cp, pCreateInfo, flags), max_command_buffers(0), command_buffers_recording(0) {
-        const auto *mem_reservation_info =
-            vku::FindStructInPNextChain<VkCommandPoolMemoryReservationCreateInfo>(pCreateInfo->pNext);
-        if (mem_reservation_info) {
-            max_command_buffers = mem_reservation_info->commandPoolMaxCommandBuffers;
-        }
-    }
+    DescriptorPool(ValidationStateTracker &dev, const VkDescriptorPool handle, const VkDescriptorPoolCreateInfo *pCreateInfo)
+        : vvl::DescriptorPool(dev, handle, pCreateInfo) {}
 };
 
 }  // namespace vvl::sc

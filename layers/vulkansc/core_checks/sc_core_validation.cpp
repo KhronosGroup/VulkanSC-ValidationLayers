@@ -1,5 +1,5 @@
-/* Copyright (c) 2023-2024 The Khronos Group Inc.
- * Copyright (c) 2023-2024 RasterGrid Kft.
+/* Copyright (c) 2023-2025 The Khronos Group Inc.
+ * Copyright (c) 2023-2025 RasterGrid Kft.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -631,7 +631,7 @@ bool SCCoreChecks::PreCallValidateCreateCommandPool(VkDevice device, const VkCom
     bool skip = BASE::PreCallValidateCreateCommandPool(device, pCreateInfo, pAllocator, pCommandPool, error_obj);
 
     skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateCommandPool-device-05068", "command pools",
-                                       Count<vvl::CommandPool>(), "commandPoolRequestCount",
+                                       sc_reserved_objects_.command_pools.load(), "commandPoolRequestCount",
                                        sc_object_limits_.commandPoolRequestCount, 1);
 
     const Location create_info_loc = error_obj.location.dot(Field::pCreateInfo);
@@ -679,8 +679,8 @@ bool SCCoreChecks::PreCallValidateCreateDescriptorSetLayout(VkDevice device, con
     bool skip = BASE::PreCallValidateCreateDescriptorSetLayout(device, pCreateInfo, pAllocator, pSetLayout, error_obj);
 
     skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateDescriptorSetLayout-device-05068",
-                                       "descriptor set layouts", Count<vvl::DescriptorSetLayout>(), "descriptorSetLayout",
-                                       sc_object_limits_.descriptorSetLayoutRequestCount, 1);
+                                       "descriptor set layouts", sc_reserved_objects_.descriptor_set_layouts.load(),
+                                       "descriptorSetLayout", sc_object_limits_.descriptorSetLayoutRequestCount, 1);
 
     if (pCreateInfo) {
         const Location create_info_loc = error_obj.location.dot(Field::pCreateInfo);
@@ -732,9 +732,9 @@ bool SCCoreChecks::PreCallValidateCreatePipelineLayout(VkDevice device, const Vk
                                                        const ErrorObject& error_obj) const {
     bool skip = BASE::PreCallValidateCreatePipelineLayout(device, pCreateInfo, pAllocator, pPipelineLayout, error_obj);
 
-    skip |=
-        ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreatePipelineLayout-device-05068", "pipeline layouts",
-                                   Count<vvl::PipelineLayout>(), "pipelineLayout", sc_object_limits_.pipelineLayoutRequestCount, 1);
+    skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreatePipelineLayout-device-05068", "pipeline layouts",
+                                       sc_reserved_objects_.pipeline_layouts.load(), "pipelineLayout",
+                                       sc_object_limits_.pipelineLayoutRequestCount, 1);
 
     return skip;
 }
@@ -744,9 +744,9 @@ bool SCCoreChecks::PreCallValidateCreateDescriptorPool(VkDevice device, const Vk
                                                        const ErrorObject& error_obj) const {
     bool skip = BASE::PreCallValidateCreateDescriptorPool(device, pCreateInfo, pAllocator, pDescriptorPool, error_obj);
 
-    skip |=
-        ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateDescriptorPool-device-05068", "descriptor pool",
-                                   Count<vvl::DescriptorPool>(), "descriptorPool", sc_object_limits_.descriptorPoolRequestCount, 1);
+    skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateDescriptorPool-device-05068", "descriptor pool",
+                                       sc_reserved_objects_.descriptor_pools.load(), "descriptorPool",
+                                       sc_object_limits_.descriptorPoolRequestCount, 1);
 
     return skip;
 }
@@ -778,7 +778,7 @@ bool SCCoreChecks::PreCallValidateAllocateDescriptorSets(VkDevice device, const 
 
     if (pAllocateInfo) {
         skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkAllocateDescriptorSets-device-05068",
-                                           "descriptor sets", Count<vvl::DescriptorSet>(), "descriptorSet",
+                                           "descriptor sets", sc_reserved_objects_.descriptor_sets.load(), "descriptorSet",
                                            sc_object_limits_.descriptorSetRequestCount, "pAllocateInfo->descriptorSetCount",
                                            pAllocateInfo->descriptorSetCount);
     }
@@ -792,7 +792,8 @@ bool SCCoreChecks::PreCallValidateAllocateMemory(VkDevice device, const VkMemory
     bool skip = BASE::PreCallValidateAllocateMemory(device, pAllocateInfo, pAllocator, pMemory, error_obj);
 
     skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkAllocateMemory-device-05068", "device memory objects",
-                                       Count<vvl::DeviceMemory>(), "deviceMemory", sc_object_limits_.deviceMemoryRequestCount, 1);
+                                       sc_reserved_objects_.device_memories.load(), "deviceMemory",
+                                       sc_object_limits_.deviceMemoryRequestCount, 1);
 
     return skip;
 }
@@ -883,9 +884,9 @@ bool SCCoreChecks::PreCallValidateCreatePipelineCache(VkDevice device, const VkP
                                                       const ErrorObject& error_obj) const {
     bool skip = BASE::PreCallValidateCreatePipelineCache(device, pCreateInfo, pAllocator, pPipelineCache, error_obj);
 
-    skip |=
-        ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreatePipelineCache-device-05068", "pipeline caches",
-                                   Count<vvl::PipelineCache>(), "pipelineCache", sc_object_limits_.pipelineCacheRequestCount, 1);
+    skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreatePipelineCache-device-05068", "pipeline caches",
+                                       sc_reserved_objects_.pipeline_caches.load(), "pipelineCache",
+                                       sc_object_limits_.pipelineCacheRequestCount, 1);
 
     if (pCreateInfo) {
         const Location create_info_loc = error_obj.location.dot(Field::pCreateInfo);
@@ -921,7 +922,8 @@ bool SCCoreChecks::PreCallValidateCreateQueryPool(VkDevice device, const VkQuery
     bool skip = BASE::PreCallValidateCreateQueryPool(device, pCreateInfo, pAllocator, pQueryPool, error_obj);
 
     skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateQueryPool-device-05068", "query pools",
-                                       Count<vvl::QueryPool>(), "queryPool", sc_object_limits_.queryPoolRequestCount, 1);
+                                       sc_reserved_objects_.query_pools.load(), "queryPool",
+                                       sc_object_limits_.queryPoolRequestCount, 1);
 
     if (pCreateInfo) {
         const Location create_info_loc = error_obj.location.dot(Field::pCreateInfo);
@@ -972,7 +974,8 @@ bool SCCoreChecks::PreCallValidateCreateRenderPass(VkDevice device, const VkRend
     bool skip = BASE::PreCallValidateCreateRenderPass(device, pCreateInfo, pAllocator, pRenderPass, error_obj);
 
     skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateRenderPass-device-05068", "render passes",
-                                       Count<vvl::RenderPass>(), "renderPass", sc_object_limits_.renderPassRequestCount, 1);
+                                       sc_reserved_objects_.render_passes.load(), "renderPass",
+                                       sc_object_limits_.renderPassRequestCount, 1);
 
     if (pCreateInfo) {
         const Location create_info_loc = error_obj.location.dot(Field::pCreateInfo);
@@ -1033,7 +1036,8 @@ bool SCCoreChecks::PreCallValidateCreateRenderPass2(VkDevice device, const VkRen
     bool skip = BASE::PreCallValidateCreateRenderPass2(device, pCreateInfo, pAllocator, pRenderPass, error_obj);
 
     skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateRenderPass2-device-05068", "render passes",
-                                       Count<vvl::RenderPass>(), "renderPass", sc_object_limits_.renderPassRequestCount, 1);
+                                       sc_reserved_objects_.render_passes.load(), "renderPass",
+                                       sc_object_limits_.renderPassRequestCount, 1);
 
     if (pCreateInfo) {
         const Location create_info_loc = error_obj.location.dot(Field::pCreateInfo);
@@ -1094,7 +1098,8 @@ bool SCCoreChecks::PreCallValidateCreateFramebuffer(VkDevice device, const VkFra
     bool skip = BASE::PreCallValidateCreateFramebuffer(device, pCreateInfo, pAllocator, pFramebuffer, error_obj);
 
     skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateFramebuffer-device-05068", "framebuffers",
-                                       Count<vvl::Framebuffer>(), "framebuffer", sc_object_limits_.framebufferRequestCount, 1);
+                                       sc_reserved_objects_.framebuffers.load(), "framebuffer",
+                                       sc_object_limits_.framebufferRequestCount, 1);
 
     if (pCreateInfo) {
         const Location create_info_loc = error_obj.location.dot(Field::pCreateInfo);
@@ -1116,7 +1121,7 @@ bool SCCoreChecks::PreCallValidateCreateBuffer(VkDevice device, const VkBufferCr
     bool skip = BASE::PreCallValidateCreateBuffer(device, pCreateInfo, pAllocator, pBuffer, error_obj);
 
     skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateBuffer-device-05068", "buffers",
-                                       Count<vvl::Buffer>(), "buffer", sc_object_limits_.bufferRequestCount, 1);
+                                       sc_reserved_objects_.buffers.load(), "buffer", sc_object_limits_.bufferRequestCount, 1);
 
     if (pCreateInfo) {
         const Location create_info_loc = error_obj.location.dot(Field::pCreateInfo);
@@ -1140,7 +1145,8 @@ bool SCCoreChecks::PreCallValidateCreateBufferView(VkDevice device, const VkBuff
     bool skip = BASE::PreCallValidateCreateBufferView(device, pCreateInfo, pAllocator, pView, error_obj);
 
     skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateBufferView-device-05068", "buffer views",
-                                       Count<vvl::BufferView>(), "bufferView", sc_object_limits_.bufferViewRequestCount, 1);
+                                       sc_reserved_objects_.buffer_views.load(), "bufferView",
+                                       sc_object_limits_.bufferViewRequestCount, 1);
 
     return skip;
 }
@@ -1150,8 +1156,8 @@ bool SCCoreChecks::PreCallValidateCreateImage(VkDevice device, const VkImageCrea
                                               const ErrorObject& error_obj) const {
     bool skip = BASE::PreCallValidateCreateImage(device, pCreateInfo, pAllocator, pImage, error_obj);
 
-    skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateImage-device-05068", "images", Count<vvl::Image>(),
-                                       "image", sc_object_limits_.imageRequestCount, 1);
+    skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateImage-device-05068", "images",
+                                       sc_reserved_objects_.images.load(), "image", sc_object_limits_.imageRequestCount, 1);
 
     if (pCreateInfo) {
         const Location create_info_loc = error_obj.location.dot(Field::pCreateInfo);
@@ -1179,7 +1185,8 @@ bool SCCoreChecks::PreCallValidateCreateImageView(VkDevice device, const VkImage
     }
 
     skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateImageView-device-05068", "image views",
-                                       Count<vvl::ImageView>(), "imageView", sc_object_limits_.imageViewRequestCount, 1);
+                                       sc_reserved_objects_.image_views.load(), "imageView",
+                                       sc_object_limits_.imageViewRequestCount, 1);
 
     if (pCreateInfo) {
         const auto normalized_subresource_range = image_state->NormalizeSubresourceRange(pCreateInfo->subresourceRange);
@@ -1235,7 +1242,7 @@ bool SCCoreChecks::PreCallValidateCreateSampler(VkDevice device, const VkSampler
     bool skip = BASE::PreCallValidateCreateSampler(device, pCreateInfo, pAllocator, pSampler, error_obj);
 
     skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateSampler-device-05068", "samplers",
-                                       Count<vvl::Sampler>(), "sampler", sc_object_limits_.samplerRequestCount, 1);
+                                       sc_reserved_objects_.samplers.load(), "sampler", sc_object_limits_.samplerRequestCount, 1);
 
     return skip;
 }
@@ -1248,8 +1255,8 @@ bool SCCoreChecks::PreCallValidateCreateSamplerYcbcrConversion(VkDevice device,
     bool skip = BASE::PreCallValidateCreateSamplerYcbcrConversion(device, pCreateInfo, pAllocator, pYcbcrConversion, error_obj);
 
     skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateSamplerYcbcrConversion-device-05068",
-                                       "sampler conversions", Count<vvl::SamplerYcbcrConversion>(), "samplerYcbcrConversion",
-                                       sc_object_limits_.samplerYcbcrConversionRequestCount, 1);
+                                       "sampler conversions", sc_reserved_objects_.sampler_ycbcr_conversions.load(),
+                                       "samplerYcbcrConversion", sc_object_limits_.samplerYcbcrConversionRequestCount, 1);
 
     return skip;
 }
@@ -1259,8 +1266,8 @@ bool SCCoreChecks::PreCallValidateCreateFence(VkDevice device, const VkFenceCrea
                                               const ErrorObject& error_obj) const {
     bool skip = BASE::PreCallValidateCreateFence(device, pCreateInfo, pAllocator, pFence, error_obj);
 
-    skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateFence-device-05068", "fences", Count<vvl::Fence>(),
-                                       "fence", sc_object_limits_.fenceRequestCount, 1);
+    skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateFence-device-05068", "fences",
+                                       sc_reserved_objects_.fences.load(), "fence", sc_object_limits_.fenceRequestCount, 1);
 
     return skip;
 }
@@ -1270,8 +1277,9 @@ bool SCCoreChecks::PreCallValidateCreateSemaphore(VkDevice device, const VkSemap
                                                   const ErrorObject& error_obj) const {
     bool skip = BASE::PreCallValidateCreateSemaphore(device, pCreateInfo, pAllocator, pSemaphore, error_obj);
 
-    skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateSemaphore-device-05068", "semaphores",
-                                       Count<vvl::Semaphore>(), "semaphore", sc_object_limits_.semaphoreRequestCount, 1);
+    skip |=
+        ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateSemaphore-device-05068", "semaphores",
+                                   sc_reserved_objects_.semaphores.load(), "semaphore", sc_object_limits_.semaphoreRequestCount, 1);
 
     return skip;
 }
@@ -1281,8 +1289,8 @@ bool SCCoreChecks::PreCallValidateCreateEvent(VkDevice device, const VkEventCrea
                                               const ErrorObject& error_obj) const {
     bool skip = BASE::PreCallValidateCreateEvent(device, pCreateInfo, pAllocator, pEvent, error_obj);
 
-    skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateEvent-device-05068", "events", Count<vvl::Event>(),
-                                       "event", sc_object_limits_.eventRequestCount, 1);
+    skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateEvent-device-05068", "events",
+                                       sc_reserved_objects_.events.load(), "event", sc_object_limits_.eventRequestCount, 1);
 
     return skip;
 }
@@ -1292,8 +1300,9 @@ bool SCCoreChecks::PreCallValidateCreateSwapchainKHR(VkDevice device, const VkSw
                                                      const ErrorObject& error_obj) const {
     bool skip = BASE::PreCallValidateCreateSwapchainKHR(device, pCreateInfo, pAllocator, pSwapchain, error_obj);
 
-    skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateSwapchainKHR-device-05068", "swapchains",
-                                       Count<vvl::Swapchain>(), "swapchain", sc_object_limits_.swapchainRequestCount, 1);
+    skip |=
+        ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateSwapchainKHR-device-05068", "swapchains",
+                                   sc_reserved_objects_.swapchains.load(), "swapchain", sc_object_limits_.swapchainRequestCount, 1);
 
     skip |= ValidateSwapchainCreateInfo(device, *pCreateInfo, error_obj.location.dot(Field::pCreateInfo));
 
@@ -1307,8 +1316,8 @@ bool SCCoreChecks::PreCallValidateCreateSharedSwapchainsKHR(VkDevice device, uin
     bool skip =
         BASE::PreCallValidateCreateSharedSwapchainsKHR(device, swapchainCount, pCreateInfos, pAllocator, pSwapchains, error_obj);
 
-    skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateSharedSwapchainsKHR-device-05068",
-                                       "swapchains", Count<vvl::Swapchain>(), "swapchain", sc_object_limits_.swapchainRequestCount,
+    skip |= ValidateObjectRequestCount(device, error_obj.location, "VUID-vkCreateSharedSwapchainsKHR-device-05068", "swapchains",
+                                       sc_reserved_objects_.swapchains.load(), "swapchain", sc_object_limits_.swapchainRequestCount,
                                        "swapchainCount", swapchainCount);
 
     for (uint32_t i = 0; i < swapchainCount; i++) {
