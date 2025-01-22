@@ -1,5 +1,5 @@
-/* Copyright (c) 2023-2024 The Khronos Group Inc.
- * Copyright (c) 2023-2024 RasterGrid Kft.
+/* Copyright (c) 2023-2025 The Khronos Group Inc.
+ * Copyright (c) 2023-2025 RasterGrid Kft.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -183,6 +183,18 @@ void SCValidationStateTracker<BASE>::PostCallRecordCreateCommandPool(VkDevice de
     if (mem_reservation_info) {
         sc_reserved_objects_.command_buffers.fetch_add(mem_reservation_info->commandPoolMaxCommandBuffers);
     }
+
+    sc_reserved_objects_.command_pools++;
+}
+
+template <typename BASE>
+void SCValidationStateTracker<BASE>::PostCallRecordAllocateMemory(VkDevice device, const VkMemoryAllocateInfo* pAllocateInfo,
+                                                                  const VkAllocationCallbacks* pAllocator, VkDeviceMemory* pMemory,
+                                                                  const RecordObject& record_obj) {
+    BASE::PostCallRecordAllocateMemory(device, pAllocateInfo, pAllocator, pMemory, record_obj);
+    if (VK_SUCCESS != record_obj.result) return;
+
+    sc_reserved_objects_.device_memories++;
 }
 
 template <typename BASE>
@@ -190,6 +202,30 @@ std::shared_ptr<vvl::PipelineCache> SCValidationStateTracker<BASE>::CreatePipeli
     VkPipelineCache pipeline_cache, const VkPipelineCacheCreateInfo *pCreateInfo) const {
     return std::static_pointer_cast<vvl::PipelineCache>(
         std::make_shared<vvl::sc::PipelineCache>(*this, pipeline_cache, pCreateInfo));
+}
+
+template <typename BASE>
+void SCValidationStateTracker<BASE>::PostCallRecordCreatePipelineCache(VkDevice device,
+                                                                       const VkPipelineCacheCreateInfo* pCreateInfo,
+                                                                       const VkAllocationCallbacks* pAllocator,
+                                                                       VkPipelineCache* pPipelineCache,
+                                                                       const RecordObject& record_obj) {
+    BASE::PostCallRecordCreatePipelineCache(device, pCreateInfo, pAllocator, pPipelineCache, record_obj);
+    if (VK_SUCCESS != record_obj.result) return;
+
+    sc_reserved_objects_.pipeline_caches++;
+}
+
+template <typename BASE>
+void SCValidationStateTracker<BASE>::PreCallRecordDestroyPipelineCache(VkDevice device, VkPipelineCache pipelineCache,
+                                                                       const VkAllocationCallbacks* pAllocator,
+                                                                       const RecordObject& record_obj) {
+    auto pipeline_cache_state = Get<vvl::PipelineCache>(pipelineCache);
+    if (pipeline_cache_state) {
+        sc_reserved_objects_.pipeline_caches--;
+    }
+
+    BASE::PreCallRecordDestroyPipelineCache(device, pipelineCache, pAllocator, record_obj);
 }
 
 template <typename BASE>
@@ -347,11 +383,79 @@ void SCValidationStateTracker<BASE>::PreCallRecordDestroyPipeline(VkDevice devic
 }
 
 template <typename BASE>
+void SCValidationStateTracker<BASE>::PostCallRecordCreateBuffer(VkDevice device, const VkBufferCreateInfo* pCreateInfo,
+                                                                const VkAllocationCallbacks* pAllocator, VkBuffer* pBuffer,
+                                                                const RecordObject& record_obj) {
+    BASE::PostCallRecordCreateBuffer(device, pCreateInfo, pAllocator, pBuffer, record_obj);
+    if (VK_SUCCESS != record_obj.result) return;
+
+    sc_reserved_objects_.buffers++;
+}
+
+template <typename BASE>
+void SCValidationStateTracker<BASE>::PreCallRecordDestroyBuffer(VkDevice device, VkBuffer buffer,
+                                                                const VkAllocationCallbacks* pAllocator,
+                                                                const RecordObject& record_obj) {
+    auto buffer_state = Get<vvl::Buffer>(buffer);
+    if (buffer_state) {
+        sc_reserved_objects_.buffers--;
+    }
+
+    BASE::PreCallRecordDestroyBuffer(device, buffer, pAllocator, record_obj);
+}
+
+template <typename BASE>
+void SCValidationStateTracker<BASE>::PostCallRecordCreateBufferView(VkDevice device, const VkBufferViewCreateInfo* pCreateInfo,
+                                                                    const VkAllocationCallbacks* pAllocator, VkBufferView* pView,
+                                                                    const RecordObject& record_obj) {
+    BASE::PostCallRecordCreateBufferView(device, pCreateInfo, pAllocator, pView, record_obj);
+    if (VK_SUCCESS != record_obj.result) return;
+
+    sc_reserved_objects_.buffer_views++;
+}
+
+template <typename BASE>
+void SCValidationStateTracker<BASE>::PreCallRecordDestroyBufferView(VkDevice device, VkBufferView bufferView,
+                                                                    const VkAllocationCallbacks* pAllocator,
+                                                                    const RecordObject& record_obj) {
+    auto buffer_view_state = Get<vvl::BufferView>(bufferView);
+    if (buffer_view_state) {
+        sc_reserved_objects_.buffer_views--;
+    }
+
+    BASE::PreCallRecordDestroyBufferView(device, bufferView, pAllocator, record_obj);
+}
+
+template <typename BASE>
+void SCValidationStateTracker<BASE>::PostCallRecordCreateImage(VkDevice device, const VkImageCreateInfo* pCreateInfo,
+                                                               const VkAllocationCallbacks* pAllocator, VkImage* pImage,
+                                                               const RecordObject& record_obj) {
+    BASE::PostCallRecordCreateImage(device, pCreateInfo, pAllocator, pImage, record_obj);
+    if (VK_SUCCESS != record_obj.result) return;
+
+    sc_reserved_objects_.images++;
+}
+
+template <typename BASE>
+void SCValidationStateTracker<BASE>::PreCallRecordDestroyImage(VkDevice device, VkImage image,
+                                                               const VkAllocationCallbacks* pAllocator,
+                                                               const RecordObject& record_obj) {
+    auto image_state = Get<vvl::Image>(image);
+    if (image_state) {
+        sc_reserved_objects_.images--;
+    }
+
+    BASE::PreCallRecordDestroyImage(device, image, pAllocator, record_obj);
+}
+
+template <typename BASE>
 void SCValidationStateTracker<BASE>::PostCallRecordCreateImageView(VkDevice device, const VkImageViewCreateInfo *pCreateInfo,
                                                                    const VkAllocationCallbacks *pAllocator, VkImageView *pView,
                                                                    const RecordObject &record_obj) {
     BASE::PostCallRecordCreateImageView(device, pCreateInfo, pAllocator, pView, record_obj);
     if (VK_SUCCESS != record_obj.result) return;
+
+    sc_reserved_objects_.image_views++;
 
     if (pCreateInfo->subresourceRange.layerCount > 1) {
         sc_reserved_objects_.layered_image_views++;
@@ -367,9 +471,79 @@ void SCValidationStateTracker<BASE>::PreCallRecordDestroyImageView(VkDevice devi
         if (image_view_state->create_info.subresourceRange.layerCount > 1) {
             sc_reserved_objects_.layered_image_views--;
         }
+        sc_reserved_objects_.image_views--;
     }
 
     BASE::PreCallRecordDestroyImageView(device, imageView, pAllocator, record_obj);
+}
+
+template <typename BASE>
+void SCValidationStateTracker<BASE>::PostCallRecordCreateSampler(VkDevice device, const VkSamplerCreateInfo* pCreateInfo,
+                                                                 const VkAllocationCallbacks* pAllocator, VkSampler* pSampler,
+                                                                 const RecordObject& record_obj) {
+    BASE::PostCallRecordCreateSampler(device, pCreateInfo, pAllocator, pSampler, record_obj);
+    if (VK_SUCCESS != record_obj.result) return;
+
+    sc_reserved_objects_.samplers++;
+}
+
+template <typename BASE>
+void SCValidationStateTracker<BASE>::PreCallRecordDestroySampler(VkDevice device, VkSampler sampler,
+                                                                 const VkAllocationCallbacks* pAllocator,
+                                                                 const RecordObject& record_obj) {
+    auto sampler_state = Get<vvl::Sampler>(sampler);
+    if (sampler_state) {
+        sc_reserved_objects_.samplers--;
+    }
+
+    BASE::PreCallRecordDestroySampler(device, sampler, pAllocator, record_obj);
+}
+
+template <typename BASE>
+void SCValidationStateTracker<BASE>::PostCallRecordCreateSamplerYcbcrConversion(
+    VkDevice device, const VkSamplerYcbcrConversionCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator,
+    VkSamplerYcbcrConversion* pYcbcrConversion, const RecordObject& record_obj) {
+    BASE::PostCallRecordCreateSamplerYcbcrConversion(device, pCreateInfo, pAllocator, pYcbcrConversion, record_obj);
+    if (VK_SUCCESS != record_obj.result) return;
+
+    sc_reserved_objects_.sampler_ycbcr_conversions++;
+}
+
+template <typename BASE>
+void SCValidationStateTracker<BASE>::PostCallRecordDestroySamplerYcbcrConversion(VkDevice device,
+                                                                                 VkSamplerYcbcrConversion ycbcrConversion,
+                                                                                 const VkAllocationCallbacks* pAllocator,
+                                                                                 const RecordObject& record_obj) {
+    auto conversion_state = Get<vvl::SamplerYcbcrConversion>(ycbcrConversion);
+    if (conversion_state) {
+        sc_reserved_objects_.sampler_ycbcr_conversions--;
+    }
+
+    BASE::PostCallRecordDestroySamplerYcbcrConversion(device, ycbcrConversion, pAllocator, record_obj);
+}
+
+template <typename BASE>
+void SCValidationStateTracker<BASE>::PostCallRecordCreatePipelineLayout(VkDevice device,
+                                                                        const VkPipelineLayoutCreateInfo* pCreateInfo,
+                                                                        const VkAllocationCallbacks* pAllocator,
+                                                                        VkPipelineLayout* pPipelineLayout,
+                                                                        const RecordObject& record_obj) {
+    BASE::PostCallRecordCreatePipelineLayout(device, pCreateInfo, pAllocator, pPipelineLayout, record_obj);
+    if (VK_SUCCESS != record_obj.result) return;
+
+    sc_reserved_objects_.pipeline_layouts++;
+}
+
+template <typename BASE>
+void SCValidationStateTracker<BASE>::PreCallRecordDestroyPipelineLayout(VkDevice device, VkPipelineLayout pipelineLayout,
+                                                                        const VkAllocationCallbacks* pAllocator,
+                                                                        const RecordObject& record_obj) {
+    auto pipeline_layout_state = Get<vvl::PipelineLayout>(pipelineLayout);
+    if (pipeline_layout_state) {
+        sc_reserved_objects_.pipeline_layouts--;
+    }
+
+    BASE::PreCallRecordDestroyPipelineLayout(device, pipelineLayout, pAllocator, record_obj);
 }
 
 template <typename BASE>
@@ -382,6 +556,7 @@ void SCValidationStateTracker<BASE>::PostCallRecordCreateDescriptorSetLayout(VkD
     if (VK_SUCCESS != record_obj.result) return;
 
     sc_reserved_objects_.descriptor_set_layout_bindings.fetch_add(pCreateInfo->bindingCount);
+    sc_reserved_objects_.descriptor_set_layouts++;
 }
 
 template <typename BASE>
@@ -391,10 +566,78 @@ void SCValidationStateTracker<BASE>::PreCallRecordDestroyDescriptorSetLayout(VkD
                                                                              const RecordObject &record_obj) {
     auto set_layout_state = Get<vvl::DescriptorSetLayout>(descriptorSetLayout);
     if (set_layout_state) {
+        sc_reserved_objects_.descriptor_set_layouts--;
         sc_reserved_objects_.descriptor_set_layout_bindings.fetch_sub(set_layout_state->GetBindingCount());
     }
 
     BASE::PreCallRecordDestroyDescriptorSetLayout(device, descriptorSetLayout, pAllocator, record_obj);
+}
+
+template <typename BASE>
+std::shared_ptr<vvl::DescriptorPool> SCValidationStateTracker<BASE>::CreateDescriptorPoolState(
+    VkDescriptorPool handle, const VkDescriptorPoolCreateInfo* create_info) {
+    return std::make_shared<vvl::sc::DescriptorPool>(*this, handle, create_info);
+}
+
+template <typename BASE>
+void SCValidationStateTracker<BASE>::PostCallRecordCreateDescriptorPool(VkDevice device,
+                                                                        const VkDescriptorPoolCreateInfo* pCreateInfo,
+                                                                        const VkAllocationCallbacks* pAllocator,
+                                                                        VkDescriptorPool* pDescriptorPool,
+                                                                        const RecordObject& record_obj) {
+    BASE::PostCallRecordCreateDescriptorPool(device, pCreateInfo, pAllocator, pDescriptorPool, record_obj);
+    if (VK_SUCCESS != record_obj.result) return;
+
+    sc_reserved_objects_.descriptor_pools++;
+}
+
+template <typename BASE>
+void SCValidationStateTracker<BASE>::PostCallRecordResetDescriptorPool(VkDevice device, VkDescriptorPool descriptorPool,
+                                                                       VkDescriptorPoolResetFlags flags,
+                                                                       const RecordObject& record_obj) {
+    auto pool_state = Get<vvl::sc::DescriptorPool>(descriptorPool);
+    if (pool_state) {
+        uint32_t allocated_sets = pool_state->allocated_descriptor_sets.exchange(0);
+        sc_reserved_objects_.descriptor_sets.fetch_sub(allocated_sets);
+    }
+
+    BASE::PostCallRecordResetDescriptorPool(device, descriptorPool, flags, record_obj);
+}
+
+template <typename BASE>
+void SCValidationStateTracker<BASE>::PostCallRecordAllocateDescriptorSets(VkDevice device,
+                                                                          const VkDescriptorSetAllocateInfo* pAllocateInfo,
+                                                                          VkDescriptorSet* pDescriptorSets,
+                                                                          const RecordObject& record_obj,
+                                                                          vvl::AllocateDescriptorSetsData& ads_state) {
+    BASE::PostCallRecordAllocateDescriptorSets(device, pAllocateInfo, pDescriptorSets, record_obj, ads_state);
+    if (VK_SUCCESS != record_obj.result) return;
+
+    auto pool_state = Get<vvl::sc::DescriptorPool>(pAllocateInfo->descriptorPool);
+    if (pool_state) {
+        sc_reserved_objects_.descriptor_sets.fetch_add(pAllocateInfo->descriptorSetCount);
+        pool_state->allocated_descriptor_sets.fetch_add(pAllocateInfo->descriptorSetCount);
+    }
+}
+
+template <typename BASE>
+void SCValidationStateTracker<BASE>::PreCallRecordFreeDescriptorSets(VkDevice device, VkDescriptorPool descriptorPool,
+                                                                     uint32_t count, const VkDescriptorSet* pDescriptorSets,
+                                                                     const RecordObject& record_obj) {
+    auto pool_state = Get<vvl::sc::DescriptorPool>(descriptorPool);
+    if (pool_state) {
+        uint32_t actual_free_count = 0;
+        for (uint32_t i = 0; i < count; ++i) {
+            auto set_state = Get<vvl::DescriptorSet>(pDescriptorSets[i]);
+            if (set_state) {
+                actual_free_count++;
+            }
+        }
+        pool_state->allocated_descriptor_sets.fetch_sub(actual_free_count);
+        sc_reserved_objects_.descriptor_sets.fetch_sub(actual_free_count);
+    }
+
+    BASE::PreCallRecordFreeDescriptorSets(device, descriptorPool, count, pDescriptorSets, record_obj);
 }
 
 template <typename BASE>
@@ -406,6 +649,7 @@ void SCValidationStateTracker<BASE>::PostCallRecordCreateRenderPass(VkDevice dev
 
     sc_reserved_objects_.subpass_descriptions.fetch_add(pCreateInfo->subpassCount);
     sc_reserved_objects_.attachment_descriptions.fetch_add(pCreateInfo->attachmentCount);
+    sc_reserved_objects_.render_passes++;
 }
 
 template <typename BASE>
@@ -417,6 +661,7 @@ void SCValidationStateTracker<BASE>::PostCallRecordCreateRenderPass2(VkDevice de
 
     sc_reserved_objects_.subpass_descriptions.fetch_add(pCreateInfo->subpassCount);
     sc_reserved_objects_.attachment_descriptions.fetch_add(pCreateInfo->attachmentCount);
+    sc_reserved_objects_.render_passes++;
 }
 
 template <typename BASE>
@@ -425,11 +670,110 @@ void SCValidationStateTracker<BASE>::PreCallRecordDestroyRenderPass(VkDevice dev
                                                                     const RecordObject &record_obj) {
     auto rp_state = Get<vvl::RenderPass>(renderPass);
     if (rp_state) {
+        sc_reserved_objects_.render_passes--;
         sc_reserved_objects_.subpass_descriptions.fetch_sub(rp_state->create_info.subpassCount);
         sc_reserved_objects_.attachment_descriptions.fetch_sub(rp_state->create_info.attachmentCount);
     }
 
     BASE::PreCallRecordDestroyRenderPass(device, renderPass, pAllocator, record_obj);
+}
+
+template <typename BASE>
+void SCValidationStateTracker<BASE>::PostCallRecordCreateFramebuffer(VkDevice device, const VkFramebufferCreateInfo* pCreateInfo,
+                                                                     const VkAllocationCallbacks* pAllocator,
+                                                                     VkFramebuffer* pFramebuffer, const RecordObject& record_obj) {
+    BASE::PostCallRecordCreateFramebuffer(device, pCreateInfo, pAllocator, pFramebuffer, record_obj);
+    if (VK_SUCCESS != record_obj.result) return;
+
+    sc_reserved_objects_.framebuffers++;
+}
+
+template <typename BASE>
+void SCValidationStateTracker<BASE>::PreCallRecordDestroyFramebuffer(VkDevice device, VkFramebuffer framebuffer,
+                                                                     const VkAllocationCallbacks* pAllocator,
+                                                                     const RecordObject& record_obj) {
+    auto fb_state = Get<vvl::Framebuffer>(framebuffer);
+    if (fb_state) {
+        sc_reserved_objects_.framebuffers--;
+    }
+
+    BASE::PreCallRecordDestroyFramebuffer(device, framebuffer, pAllocator, record_obj);
+}
+
+template <typename BASE>
+void SCValidationStateTracker<BASE>::PostCallRecordCreateFence(VkDevice device, const VkFenceCreateInfo* pCreateInfo,
+                                                               const VkAllocationCallbacks* pAllocator, VkFence* pFence,
+                                                               const RecordObject& record_obj) {
+    BASE::PostCallRecordCreateFence(device, pCreateInfo, pAllocator, pFence, record_obj);
+    if (VK_SUCCESS != record_obj.result) return;
+
+    sc_reserved_objects_.fences++;
+}
+
+template <typename BASE>
+void SCValidationStateTracker<BASE>::PreCallRecordDestroyFence(VkDevice device, VkFence fence,
+                                                               const VkAllocationCallbacks* pAllocator,
+                                                               const RecordObject& record_obj) {
+    auto fence_state = Get<vvl::Fence>(fence);
+    if (fence_state) {
+        sc_reserved_objects_.fences--;
+    }
+
+    BASE::PreCallRecordDestroyFence(device, fence, pAllocator, record_obj);
+}
+
+template <typename BASE>
+void SCValidationStateTracker<BASE>::PostCallRecordCreateSemaphore(VkDevice device, const VkSemaphoreCreateInfo* pCreateInfo,
+                                                                   const VkAllocationCallbacks* pAllocator, VkSemaphore* pSemaphore,
+                                                                   const RecordObject& record_obj) {
+    BASE::PostCallRecordCreateSemaphore(device, pCreateInfo, pAllocator, pSemaphore, record_obj);
+    if (VK_SUCCESS != record_obj.result) return;
+
+    sc_reserved_objects_.semaphores++;
+}
+
+template <typename BASE>
+void SCValidationStateTracker<BASE>::PreCallRecordDestroySemaphore(VkDevice device, VkSemaphore semaphore,
+                                                                   const VkAllocationCallbacks* pAllocator,
+                                                                   const RecordObject& record_obj) {
+    auto semaphore_state = Get<vvl::Semaphore>(semaphore);
+    if (semaphore_state) {
+        sc_reserved_objects_.semaphores--;
+    }
+
+    BASE::PreCallRecordDestroySemaphore(device, semaphore, pAllocator, record_obj);
+}
+
+template <typename BASE>
+void SCValidationStateTracker<BASE>::PostCallRecordCreateEvent(VkDevice device, const VkEventCreateInfo* pCreateInfo,
+                                                               const VkAllocationCallbacks* pAllocator, VkEvent* pEvent,
+                                                               const RecordObject& record_obj) {
+    BASE::PostCallRecordCreateEvent(device, pCreateInfo, pAllocator, pEvent, record_obj);
+    if (VK_SUCCESS != record_obj.result) return;
+
+    sc_reserved_objects_.events++;
+}
+
+template <typename BASE>
+void SCValidationStateTracker<BASE>::PreCallRecordDestroyEvent(VkDevice device, VkEvent event,
+                                                               const VkAllocationCallbacks* pAllocator,
+                                                               const RecordObject& record_obj) {
+    auto event_state = Get<vvl::Event>(event);
+    if (event_state) {
+        sc_reserved_objects_.events--;
+    }
+
+    BASE::PreCallRecordDestroyEvent(device, event, pAllocator, record_obj);
+}
+
+template <typename BASE>
+void SCValidationStateTracker<BASE>::PostCallRecordCreateQueryPool(VkDevice device, const VkQueryPoolCreateInfo* pCreateInfo,
+                                                                   const VkAllocationCallbacks* pAllocator, VkQueryPool* pQueryPool,
+                                                                   const RecordObject& record_obj) {
+    BASE::PostCallRecordCreateQueryPool(device, pCreateInfo, pAllocator, pQueryPool, record_obj);
+    if (VK_SUCCESS != record_obj.result) return;
+
+    sc_reserved_objects_.query_pools++;
 }
 
 template <typename BASE>
@@ -453,6 +797,28 @@ void SCValidationStateTracker<BASE>::PreCallRecordDestroyPrivateDataSlotEXT(VkDe
     }
 
     BASE::PreCallRecordDestroyPrivateDataSlotEXT(device, privateDataSlot, pAllocator, record_obj);
+}
+
+template <typename BASE>
+void SCValidationStateTracker<BASE>::PostCallRecordCreateSharedSwapchainsKHR(VkDevice device, uint32_t swapchainCount,
+                                                                             const VkSwapchainCreateInfoKHR* pCreateInfos,
+                                                                             const VkAllocationCallbacks* pAllocator,
+                                                                             VkSwapchainKHR* pSwapchains,
+                                                                             const RecordObject& record_obj) {
+    BASE::PostCallRecordCreateSharedSwapchainsKHR(device, swapchainCount, pCreateInfos, pAllocator, pSwapchains, record_obj);
+    if (VK_SUCCESS != record_obj.result) return;
+
+    sc_reserved_objects_.swapchains.fetch_add(swapchainCount);
+}
+
+template <typename BASE>
+void SCValidationStateTracker<BASE>::PostCallRecordCreateSwapchainKHR(VkDevice device, const VkSwapchainCreateInfoKHR* pCreateInfo,
+                                                                      const VkAllocationCallbacks* pAllocator,
+                                                                      VkSwapchainKHR* pSwapchain, const RecordObject& record_obj) {
+    BASE::PostCallRecordCreateSwapchainKHR(device, pCreateInfo, pAllocator, pSwapchain, record_obj);
+    if (VK_SUCCESS != record_obj.result) return;
+
+    sc_reserved_objects_.swapchains++;
 }
 
 template <typename BASE>
